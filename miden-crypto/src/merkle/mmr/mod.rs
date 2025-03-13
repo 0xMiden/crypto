@@ -1,6 +1,7 @@
 mod bit;
 mod delta;
 mod error;
+mod forest;
 mod full;
 mod inorder;
 mod partial;
@@ -58,6 +59,8 @@ const fn leaf_to_corresponding_tree(pos: usize, forest: usize) -> Option<u32> {
 ///
 /// This will panic if the forest has size greater than `usize::MAX / 2`
 const fn nodes_in_forest(forest: usize) -> usize {
+    // TODO: replace with forest.node_count()
+    
     // - the size of a perfect binary tree is $2^{k+1}-1$ or $2*2^k-1$
     // - the forest represents the sum of $2^k$ so a single multiplication is necessary
     // - the number of `-1` is the same as the number of trees, which is the same as the number

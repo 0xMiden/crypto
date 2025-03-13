@@ -14,7 +14,7 @@ pub struct MmrPeaks {
     /// has a power-of-two number of leaves there is a single peak.
     ///
     /// Every tree in the MMR forest has a distinct power-of-two size, this means only the right-
-    /// most tree can have an odd number of elements (e.g. `1`). Additionally this means that the
+    /// most tree can have an odd number of elements (i.e. `1`). Additionally this means that the
     /// bits in `num_leaves` conveniently encode the size of each individual tree.
     ///
     /// Examples:
@@ -25,6 +25,7 @@ pub struct MmrPeaks {
     ///   and the left most has `2**2`.
     /// - With 12 leaves, the binary is `0b1100`, this case also has 2 peaks, the leftmost tree has
     ///   `2**3=8` elements, and the right most has `2**2=4` elements.
+    /// TODO: also a forest struct
     num_leaves: usize,
 
     /// All the peaks of every tree in the MMR forest. The peaks are always ordered by number of
@@ -51,6 +52,7 @@ impl MmrPeaks {
     /// # Errors
     /// Returns an error if the number of leaves and the number of peaks are inconsistent.
     pub fn new(num_leaves: usize, peaks: Vec<Word>) -> Result<Self, MmrError> {
+        // TODO: forest.tree_count() != peaks.len
         if num_leaves.count_ones() as usize != peaks.len() {
             return Err(MmrError::InvalidPeaks(format!(
                 "number of one bits in leaves is {} which does not equal peak length {}",
