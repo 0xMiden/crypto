@@ -23,7 +23,8 @@ impl MmrProof {
     /// Converts the leaf global position into a local position that can be used to verify the
     /// merkle_path.
     pub fn relative_pos(&self) -> usize {
-        self.forest.leaf_relative_position(self.position)
+        self.forest
+            .leaf_relative_position(self.position)
             .expect("position must be part of the forest")
         // let tree_bit = leaf_to_corresponding_tree(self.position, self.forest)
         //     .expect("position must be part of the forest");
@@ -33,7 +34,9 @@ impl MmrProof {
 
     /// Returns index of the MMR peak against which the Merkle path in this proof can be verified.
     pub fn peak_index(&self) -> usize {
-        let root = self.forest.leaf_to_corresponding_tree(self.position)
+        let root = self
+            .forest
+            .leaf_to_corresponding_tree(self.position)
             .expect("position must be part of the forest");
         let smaller_peak_mask = Forest::with_leaves(2_usize.pow(root) as usize - 1);
         let num_smaller_peaks = (self.forest & smaller_peak_mask).num_trees();
@@ -46,9 +49,8 @@ impl MmrProof {
 
 #[cfg(test)]
 mod tests {
-    use crate::merkle::mmr::forest::Forest;
-
     use super::{MerklePath, MmrProof};
+    use crate::merkle::mmr::forest::Forest;
 
     #[test]
     fn test_peak_index() {

@@ -5,7 +5,7 @@ use alloc::{
 
 use winter_utils::{Deserializable, Serializable};
 
-use super::{MmrDelta, MmrProof};
+use super::{MmrDelta, MmrProof, Rpo256, RpoDigest};
 use crate::{
     Word,
     hash::rpo::Rpo256,

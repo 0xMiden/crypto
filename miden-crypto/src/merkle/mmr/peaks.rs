@@ -1,6 +1,7 @@
 use alloc::vec::Vec;
 
-use super::{super::ZERO, Felt, MmrError, MmrProof, Rpo256, Word, forest::Forest};
+use super::{super::ZERO, MmrError, MmrProof, forest::Forest};
+use crate::{Felt, Word, merkle::Rpo256};
 
 // MMR PEAKS
 // ================================================================================================
