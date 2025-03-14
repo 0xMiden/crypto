@@ -35,6 +35,11 @@ impl Forest {
         Forest(1 << self.0.trailing_zeros())
     }
 
+    pub fn smallest_tree_checked(self) -> Forest {
+        let result = 1usize.checked_shl(self.0.trailing_zeros()).unwrap_or(0);
+        Forest(result)
+    }
+
     // TODO: this is not great if it's not a single tree
     // maybe debug_assert is sufficient
     pub fn all_smaller_trees(self) -> Forest {

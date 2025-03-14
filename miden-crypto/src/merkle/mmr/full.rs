@@ -186,9 +186,9 @@ impl Mmr {
             )));
         }
 
-        let peaks: Vec<Word> = TrueBitPositionIterator::new(forest.0)
+        let peaks: Vec<Word> = TrueBitPositionIterator::new(forest)
             .rev()
-            .map(|bit| nodes_in_forest(1 << bit))
+            .map(|tree| tree.num_nodes())
             .scan(0, |offset, el| {
                 *offset += el;
                 Some(*offset)

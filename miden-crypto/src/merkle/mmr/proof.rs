@@ -1,7 +1,6 @@
 /// The representation of a single Merkle path.
 use super::super::MerklePath;
-use super::forest::{high_bitmask, Forest};
-use super::{leaf_to_corresponding_tree};
+use super::forest::Forest;
 
 // MMR PROOF
 // ================================================================================================
