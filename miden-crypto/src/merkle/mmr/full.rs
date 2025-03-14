@@ -158,15 +158,15 @@ impl Mmr {
         let mut left_offset = self.nodes.len().saturating_sub(2);
         let mut right = el;
         let mut left_tree = 1;
-        while !(self.forest & Forest(left_tree)).is_empty() {
+        while !(self.forest & Forest::with_leaves(left_tree)).is_empty() {
             right = Rpo256::merge(&[self.nodes[left_offset], right]);
             self.nodes.push(right);
 
-            left_offset = left_offset.saturating_sub(Forest(left_tree).num_nodes());
+            left_offset = left_offset.saturating_sub(Forest::with_leaves(left_tree).num_nodes());
             left_tree <<= 1;
         }
 
-        self.forest.0 += 1;
+        self.forest.add_leaf();
     }
 
     /// Returns the current peaks of the MMR.
@@ -312,7 +312,7 @@ impl Mmr {
 
         // The tree walk below goes from the root to the leaf, compute the root index to start
         let mut forest_target: usize = 1usize << tree_bit;
-        let mut index = Forest(forest_target).num_nodes() - 1;
+        let mut index = Forest::with_leaves(forest_target).num_nodes() - 1;
 
         // Loop until the leaf is reached
         while forest_target > 1 {
@@ -321,7 +321,7 @@ impl Mmr {
 
             // compute the indices of the right and left subtrees based on the post-order
             let right_offset = index - 1;
-            let left_offset = right_offset - Forest(forest_target).num_nodes();
+            let left_offset = right_offset - Forest::with_leaves(forest_target).num_nodes();
 
             let left_or_right = relative_pos & forest_target;
             let sibling = if left_or_right != 0 {
@@ -389,9 +389,9 @@ impl Iterator for MmrNodes<'_> {
         debug_assert!(self.last_right.count_ones() <= 1, "last_right tracks zero or one element");
 
         // only parent nodes are emitted, remove the single node tree from the forest
-        let target = self.mmr.forest.odd_leaf_removed();
+        let target = self.mmr.forest.odd_leaf_removed().num_leaves();
 
-        if self.forest < target.0 {
+        if self.forest < target {
             if self.last_right == 0 {
                 // yield the left leaf
                 debug_assert!(self.last_right == 0, "left must be before right");
@@ -411,7 +411,7 @@ impl Iterator for MmrNodes<'_> {
 
             // compute the number of nodes in the right tree, this is the offset to the
             // previous left parent
-            let right_nodes = Forest(self.last_right).num_nodes();
+            let right_nodes = Forest::with_leaves(self.last_right).num_nodes();
             // the next parent position is one above the position of the pair
             let parent = self.last_right << 1;
 

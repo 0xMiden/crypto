@@ -2,12 +2,16 @@ use core::{fmt::{Binary, Display}, ops::{BitAnd, BitOr, BitXor, BitXorAssign, Sh
 
 // TODO: make the field private
 #[derive(Debug, Copy, Clone, Default, PartialEq, Eq, PartialOrd, Ord)]
-pub struct Forest(pub usize);
+pub struct Forest(usize);
 
 // TODO: add Felt conversion methods
 impl Forest {
     pub const fn empty() -> Self {
         Self(0)
+    }
+
+    pub const fn with_leaves(n: usize) -> Self {
+        Self(n)
     }
 
     pub fn is_empty(self) -> bool {
@@ -28,7 +32,7 @@ impl Forest {
     }
 
     pub fn highest_tree(self) -> Forest {
-        Forest(1 << self.0.ilog2())
+        Forest::with_leaves(1 << self.0.ilog2())
     }
 
     pub fn smallest_tree_height(self) -> usize {
@@ -36,25 +40,29 @@ impl Forest {
     }
 
     pub fn smallest_tree(self) -> Forest {
-        Forest(1 << self.0.trailing_zeros())
+        Forest::with_leaves(1 << self.0.trailing_zeros())
     }
 
     pub fn smallest_tree_checked(self) -> Forest {
         let result = 1usize.checked_shl(self.0.trailing_zeros()).unwrap_or(0);
-        Forest(result)
+        Forest::with_leaves(result)
     }
 
     pub fn all_smaller_trees(self) -> Forest {
         debug_assert!(self.0.count_ones() == 1);
-        Forest(self.0 - 1)
+        Forest::with_leaves(self.0 - 1)
     }
 
     pub fn has_odd_leaf(self) -> bool {
         self.0 & 1 != 0
     }
 
+    pub fn odd_leaf_added(self) -> Forest {
+        Forest::with_leaves(self.0 | 1)
+    }
+
     pub fn odd_leaf_removed(self) -> Forest {
-        Forest(self.0 & (usize::MAX << 1))
+        Forest::with_leaves(self.0 & (usize::MAX << 1))
     }
 
     /// Return the total number of nodes of a given forest
@@ -130,7 +138,7 @@ impl BitAnd<Forest> for Forest {
     type Output = Forest;
 
     fn bitand(self, rhs: Forest) -> Self::Output {
-        Forest(self.0 & rhs.0)
+        Forest::with_leaves(self.0 & rhs.0)
     }
 }
 
@@ -138,7 +146,7 @@ impl BitOr<Forest> for Forest {
     type Output = Forest;
 
     fn bitor(self, rhs: Forest) -> Self::Output {
-        Forest(self.0 | rhs.0)
+        Forest::with_leaves(self.0 | rhs.0)
     }
 }
 
@@ -146,7 +154,7 @@ impl BitXor<Forest> for Forest {
     type Output = Forest;
 
     fn bitxor(self, rhs: Forest) -> Self::Output {
-        Forest(self.0 ^ rhs.0)
+        Forest::with_leaves(self.0 ^ rhs.0)
     }
 }
 
@@ -167,6 +175,6 @@ pub(crate) const fn high_bitmask(bit: u32) -> Forest {
     if bit > usize::BITS - 1 {
         Forest::empty()
     } else {
-        Forest(usize::MAX << bit)
+        Forest::with_leaves(usize::MAX << bit)
     }
 }

@@ -134,9 +134,10 @@ impl PartialMmr {
     /// Returns true if this partial MMR tracks an authentication path for the leaf at the
     /// specified position.
     pub fn is_tracked(&self, pos: usize) -> bool {
-        if pos >= self.forest.0 {
+        let leaves = self.forest.num_leaves();
+        if pos >= leaves {
             return false;
-        } else if pos == self.forest.num_leaves() - 1 && self.forest.has_odd_leaf() {
+        } else if pos == leaves - 1 && self.forest.has_odd_leaf() {
             // if the number of leaves in the MMR is odd and the position is for the last leaf
             // whether the leaf is tracked is defined by the `track_latest` flag
             return self.track_latest;
@@ -237,7 +238,7 @@ impl PartialMmr {
             let mut track_left = self.track_latest;
 
             let mut right = leaf;
-            let mut right_idx = forest_to_rightmost_index(Forest(self.forest.0));
+            let mut right_idx = forest_to_rightmost_index(self.forest);
 
             for _ in 0..merges {
                 let left = self.peaks.pop().expect("Missing peak");
@@ -307,7 +308,7 @@ impl PartialMmr {
     ) -> Result<(), MmrError> {
         // Checks there is a tree with same depth as the authentication path, if not the path is
         // invalid.
-        let tree = Forest(1 << path.depth());
+        let tree = Forest::with_leaves(1 << path.depth());
         if (tree & self.forest).is_empty() {
             return Err(MmrError::UnknownPeak(path.depth()));
         };
@@ -416,7 +417,7 @@ impl PartialMmr {
 
         if !merges.is_empty() {
             // starts at the smallest peak and follows the merged peaks
-            let mut peak_idx = forest_to_root_index(Forest(self.forest.0));
+            let mut peak_idx = forest_to_root_index(self.forest);
 
             // match order of the update data while applying it
             self.peaks.reverse();
@@ -433,7 +434,7 @@ impl PartialMmr {
             while target < largest {
                 // check if either the left or right subtrees have saved for authentication paths.
                 // If so, turn tracking on to update those paths.
-                if target != Forest(1) && !track {
+                if target != Forest::with_leaves(1) && !track {
                     track = self.is_tracked_node(&peak_idx);
                 }
 
@@ -590,7 +591,7 @@ impl<I: Iterator<Item = (usize, Word)>> Iterator for InnerNodeIterator<'_, I> {
 
 impl Serializable for PartialMmr {
     fn write_into<W: winter_utils::ByteWriter>(&self, target: &mut W) {
-        self.forest.0.write_into(target);
+        self.forest.num_leaves().write_into(target);
         self.peaks.write_into(target);
         self.nodes.write_into(target);
         target.write_bool(self.track_latest);
@@ -601,8 +602,8 @@ impl Deserializable for PartialMmr {
     fn read_from<R: winter_utils::ByteReader>(
         source: &mut R,
     ) -> Result<Self, winter_utils::DeserializationError> {
-        let forest = Forest(usize::read_from(source)?);
-        let peaks = Vec::<Word>::read_from(source)?;
+        let forest = Forest::with_leaves(usize::read_from(source)?);
+        let peaks = Vec::<RpoDigest>::read_from(source)?;
         let nodes = NodeMap::read_from(source)?;
         let track_latest = source.read_bool()?;
 
@@ -678,22 +679,22 @@ mod tests {
 
         // When there is a single tree in the forest, the index is equivalent to the number of
         // leaves in that tree, which is `2^n`.
-        assert_eq!(forest_to_root_index(Forest(0b0001)), idx(1));
-        assert_eq!(forest_to_root_index(Forest(0b0010)), idx(2));
-        assert_eq!(forest_to_root_index(Forest(0b0100)), idx(4));
-        assert_eq!(forest_to_root_index(Forest(0b1000)), idx(8));
+        assert_eq!(forest_to_root_index(Forest::with_leaves(0b0001)), idx(1));
+        assert_eq!(forest_to_root_index(Forest::with_leaves(0b0010)), idx(2));
+        assert_eq!(forest_to_root_index(Forest::with_leaves(0b0100)), idx(4));
+        assert_eq!(forest_to_root_index(Forest::with_leaves(0b1000)), idx(8));
 
-        assert_eq!(forest_to_root_index(Forest(0b0011)), idx(5));
-        assert_eq!(forest_to_root_index(Forest(0b0101)), idx(9));
-        assert_eq!(forest_to_root_index(Forest(0b1001)), idx(17));
-        assert_eq!(forest_to_root_index(Forest(0b0111)), idx(13));
-        assert_eq!(forest_to_root_index(Forest(0b1011)), idx(21));
-        assert_eq!(forest_to_root_index(Forest(0b1111)), idx(29));
+        assert_eq!(forest_to_root_index(Forest::with_leaves(0b0011)), idx(5));
+        assert_eq!(forest_to_root_index(Forest::with_leaves(0b0101)), idx(9));
+        assert_eq!(forest_to_root_index(Forest::with_leaves(0b1001)), idx(17));
+        assert_eq!(forest_to_root_index(Forest::with_leaves(0b0111)), idx(13));
+        assert_eq!(forest_to_root_index(Forest::with_leaves(0b1011)), idx(21));
+        assert_eq!(forest_to_root_index(Forest::with_leaves(0b1111)), idx(29));
 
-        assert_eq!(forest_to_root_index(Forest(0b0110)), idx(10));
-        assert_eq!(forest_to_root_index(Forest(0b1010)), idx(18));
-        assert_eq!(forest_to_root_index(Forest(0b1100)), idx(20));
-        assert_eq!(forest_to_root_index(Forest(0b1110)), idx(26));
+        assert_eq!(forest_to_root_index(Forest::with_leaves(0b0110)), idx(10));
+        assert_eq!(forest_to_root_index(Forest::with_leaves(0b1010)), idx(18));
+        assert_eq!(forest_to_root_index(Forest::with_leaves(0b1100)), idx(20));
+        assert_eq!(forest_to_root_index(Forest::with_leaves(0b1110)), idx(26));
     }
 
     #[test]
@@ -704,26 +705,26 @@ mod tests {
 
         for forest in 1..256 {
             assert!(
-                forest_to_rightmost_index(Forest(forest)).inner() % 2 == 1,
+                forest_to_rightmost_index(Forest::with_leaves(forest)).inner() % 2 == 1,
                 "Leaves are always odd"
             );
         }
 
-        assert_eq!(forest_to_rightmost_index(Forest(0b0001)), idx(1));
-        assert_eq!(forest_to_rightmost_index(Forest(0b0010)), idx(3));
-        assert_eq!(forest_to_rightmost_index(Forest(0b0011)), idx(5));
-        assert_eq!(forest_to_rightmost_index(Forest(0b0100)), idx(7));
-        assert_eq!(forest_to_rightmost_index(Forest(0b0101)), idx(9));
-        assert_eq!(forest_to_rightmost_index(Forest(0b0110)), idx(11));
-        assert_eq!(forest_to_rightmost_index(Forest(0b0111)), idx(13));
-        assert_eq!(forest_to_rightmost_index(Forest(0b1000)), idx(15));
-        assert_eq!(forest_to_rightmost_index(Forest(0b1001)), idx(17));
-        assert_eq!(forest_to_rightmost_index(Forest(0b1010)), idx(19));
-        assert_eq!(forest_to_rightmost_index(Forest(0b1011)), idx(21));
-        assert_eq!(forest_to_rightmost_index(Forest(0b1100)), idx(23));
-        assert_eq!(forest_to_rightmost_index(Forest(0b1101)), idx(25));
-        assert_eq!(forest_to_rightmost_index(Forest(0b1110)), idx(27));
-        assert_eq!(forest_to_rightmost_index(Forest(0b1111)), idx(29));
+        assert_eq!(forest_to_rightmost_index(Forest::with_leaves(0b0001)), idx(1));
+        assert_eq!(forest_to_rightmost_index(Forest::with_leaves(0b0010)), idx(3));
+        assert_eq!(forest_to_rightmost_index(Forest::with_leaves(0b0011)), idx(5));
+        assert_eq!(forest_to_rightmost_index(Forest::with_leaves(0b0100)), idx(7));
+        assert_eq!(forest_to_rightmost_index(Forest::with_leaves(0b0101)), idx(9));
+        assert_eq!(forest_to_rightmost_index(Forest::with_leaves(0b0110)), idx(11));
+        assert_eq!(forest_to_rightmost_index(Forest::with_leaves(0b0111)), idx(13));
+        assert_eq!(forest_to_rightmost_index(Forest::with_leaves(0b1000)), idx(15));
+        assert_eq!(forest_to_rightmost_index(Forest::with_leaves(0b1001)), idx(17));
+        assert_eq!(forest_to_rightmost_index(Forest::with_leaves(0b1010)), idx(19));
+        assert_eq!(forest_to_rightmost_index(Forest::with_leaves(0b1011)), idx(21));
+        assert_eq!(forest_to_rightmost_index(Forest::with_leaves(0b1100)), idx(23));
+        assert_eq!(forest_to_rightmost_index(Forest::with_leaves(0b1101)), idx(25));
+        assert_eq!(forest_to_rightmost_index(Forest::with_leaves(0b1110)), idx(27));
+        assert_eq!(forest_to_rightmost_index(Forest::with_leaves(0b1111)), idx(29));
     }
 
     #[test]

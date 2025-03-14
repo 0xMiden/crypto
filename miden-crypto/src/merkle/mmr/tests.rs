@@ -87,11 +87,11 @@ fn test_leaf_to_corresponding_tree() {
 
 #[test]
 fn test_high_bitmask() {
-    assert_eq!(high_bitmask(0), Forest(usize::MAX));
-    assert_eq!(high_bitmask(1), Forest(usize::MAX << 1));
-    assert_eq!(high_bitmask(usize::BITS - 2), Forest(0b11usize.rotate_right(2)));
-    assert_eq!(high_bitmask(usize::BITS - 1), Forest(0b1usize.rotate_right(1)));
-    assert_eq!(high_bitmask(usize::BITS), Forest(0), "overflow should be handled");
+    assert_eq!(high_bitmask(0), Forest::with_leaves(usize::MAX));
+    assert_eq!(high_bitmask(1), Forest::with_leaves(usize::MAX << 1));
+    assert_eq!(high_bitmask(usize::BITS - 2), Forest::with_leaves(0b11usize.rotate_right(2)));
+    assert_eq!(high_bitmask(usize::BITS - 1), Forest::with_leaves(0b1usize.rotate_right(1)));
+    assert_eq!(high_bitmask(usize::BITS), Forest::empty(), "overflow should be handled");
 }
 
 #[test]
@@ -303,7 +303,7 @@ fn test_mmr_open_older_version() {
 
     // merkle path of a node is empty if there are no elements to pair with it
     for pos in (0..mmr.forest().num_leaves()).filter(is_even) {
-        let forest = Forest(pos + 1);
+        let forest = Forest::with_leaves(pos + 1);
         let proof = mmr.open_at(pos, forest).unwrap();
         assert_eq!(proof.forest, forest);
         assert_eq!(proof.merkle_path.nodes(), []);
@@ -313,7 +313,7 @@ fn test_mmr_open_older_version() {
     // openings match that of a merkle tree
     let mtree: MerkleTree = LEAVES[..4].try_into().unwrap();
     for forest in 4..=LEAVES.len() {
-        let forest = Forest(forest);
+        let forest = Forest::with_leaves(forest);
         for pos in 0..4 {
             let idx = NodeIndex::new(2, pos).unwrap();
             let path = mtree.get_path(idx).unwrap();
@@ -323,7 +323,7 @@ fn test_mmr_open_older_version() {
     }
     let mtree: MerkleTree = LEAVES[4..6].try_into().unwrap();
     for forest in 6..=LEAVES.len() {
-        let forest = Forest(forest);
+        let forest = Forest::with_leaves(forest);
         for pos in 0..2 {
             let idx = NodeIndex::new(1, pos).unwrap();
             let path = mtree.get_path(idx).unwrap();
@@ -350,7 +350,7 @@ fn test_mmr_open_eight() {
     ];
 
     let mtree: MerkleTree = leaves.as_slice().try_into().unwrap();
-    let forest = Forest(leaves.len());
+    let forest = Forest::with_leaves(leaves.len());
     let mmr: Mmr = leaves.into();
     let root = mtree.root();
 
@@ -409,7 +409,7 @@ fn test_mmr_open_seven() {
     let mtree1: MerkleTree = LEAVES[..4].try_into().unwrap();
     let mtree2: MerkleTree = LEAVES[4..6].try_into().unwrap();
 
-    let forest = Forest(LEAVES.len());
+    let forest = Forest::with_leaves(LEAVES.len());
     let mmr: Mmr = LEAVES.into();
 
     let position = 0;
@@ -508,34 +508,40 @@ fn test_mmr_invariants() {
 
 #[test]
 fn test_bit_position_iterator() {
-    assert_eq!(TrueBitPositionIterator::new(Forest(0)).count(), 0);
-    assert_eq!(TrueBitPositionIterator::new(Forest(0)).rev().count(), 0);
+    assert_eq!(TrueBitPositionIterator::new(Forest::empty()).count(), 0);
+    assert_eq!(TrueBitPositionIterator::new(Forest::empty()).rev().count(), 0);
 
     assert_eq!(
-        TrueBitPositionIterator::new(Forest(1)).collect::<Vec<Forest>>(),
-        vec![Forest(1)]
+        TrueBitPositionIterator::new(Forest::with_leaves(1)).collect::<Vec<Forest>>(),
+        vec![Forest::with_leaves(1)]
     );
     assert_eq!(
-        TrueBitPositionIterator::new(Forest(1)).rev().collect::<Vec<Forest>>(),
-        vec![Forest(1)],
-    );
-
-    assert_eq!(
-        TrueBitPositionIterator::new(Forest(2)).collect::<Vec<Forest>>(),
-        vec![Forest(2)]
-    );
-    assert_eq!(
-        TrueBitPositionIterator::new(Forest(2)).rev().collect::<Vec<Forest>>(),
-        vec![Forest(2)],
+        TrueBitPositionIterator::new(Forest::with_leaves(1))
+            .rev()
+            .collect::<Vec<Forest>>(),
+        vec![Forest::with_leaves(1)],
     );
 
     assert_eq!(
-        TrueBitPositionIterator::new(Forest(3)).collect::<Vec<Forest>>(),
-        vec![Forest(1), Forest(2)],
+        TrueBitPositionIterator::new(Forest::with_leaves(2)).collect::<Vec<Forest>>(),
+        vec![Forest::with_leaves(2)]
     );
     assert_eq!(
-        TrueBitPositionIterator::new(Forest(3)).rev().collect::<Vec<Forest>>(),
-        vec![Forest(2), Forest(1)],
+        TrueBitPositionIterator::new(Forest::with_leaves(2))
+            .rev()
+            .collect::<Vec<Forest>>(),
+        vec![Forest::with_leaves(2)],
+    );
+
+    assert_eq!(
+        TrueBitPositionIterator::new(Forest::with_leaves(3)).collect::<Vec<Forest>>(),
+        vec![Forest::with_leaves(1), Forest::with_leaves(2)],
+    );
+    assert_eq!(
+        TrueBitPositionIterator::new(Forest::with_leaves(3))
+            .rev()
+            .collect::<Vec<Forest>>(),
+        vec![Forest::with_leaves(2), Forest::with_leaves(1)],
     );
 
     // TODO: convert
@@ -584,37 +590,37 @@ fn test_mmr_inner_nodes() {
 fn test_mmr_peaks() {
     let mmr: Mmr = LEAVES.into();
 
-    let forest = Forest(0b0001);
+    let forest = Forest::with_leaves(0b0001);
     let acc = mmr.peaks_at(forest).unwrap();
     assert_eq!(acc.num_leaves(), forest.num_leaves());
     assert_eq!(acc.peaks(), &[mmr.nodes[0]]);
 
-    let forest = Forest(0b0010);
+    let forest = Forest::with_leaves(0b0010);
     let acc = mmr.peaks_at(forest).unwrap();
     assert_eq!(acc.num_leaves(), forest.num_leaves());
     assert_eq!(acc.peaks(), &[mmr.nodes[2]]);
 
-    let forest = Forest(0b0011);
+    let forest = Forest::with_leaves(0b0011);
     let acc = mmr.peaks_at(forest).unwrap();
     assert_eq!(acc.num_leaves(), forest.num_leaves());
     assert_eq!(acc.peaks(), &[mmr.nodes[2], mmr.nodes[3]]);
 
-    let forest = Forest(0b0100);
+    let forest = Forest::with_leaves(0b0100);
     let acc = mmr.peaks_at(forest).unwrap();
     assert_eq!(acc.num_leaves(), forest.num_leaves());
     assert_eq!(acc.peaks(), &[mmr.nodes[6]]);
 
-    let forest = Forest(0b0101);
+    let forest = Forest::with_leaves(0b0101);
     let acc = mmr.peaks_at(forest).unwrap();
     assert_eq!(acc.num_leaves(), forest.num_leaves());
     assert_eq!(acc.peaks(), &[mmr.nodes[6], mmr.nodes[7]]);
 
-    let forest = Forest(0b0110);
+    let forest = Forest::with_leaves(0b0110);
     let acc = mmr.peaks_at(forest).unwrap();
     assert_eq!(acc.num_leaves(), forest.num_leaves());
     assert_eq!(acc.peaks(), &[mmr.nodes[6], mmr.nodes[9]]);
 
-    let forest = Forest(0b0111);
+    let forest = Forest::with_leaves(0b0111);
     let acc = mmr.peaks_at(forest).unwrap();
     assert_eq!(acc.num_leaves(), forest.num_leaves());
     assert_eq!(acc.peaks(), &[mmr.nodes[6], mmr.nodes[9], mmr.nodes[10]]);
@@ -645,7 +651,7 @@ fn test_mmr_peaks_hash_less_than_16() {
     for i in 0..16 {
         peaks.push(int_to_node(i));
 
-        let forest = Forest(1 << peaks.len()).all_smaller_trees();
+        let forest = Forest::with_leaves(1 << peaks.len()).all_smaller_trees();
         let accumulator = MmrPeaks::new(forest, peaks.clone()).unwrap();
 
         // minimum length is 16
@@ -662,7 +668,7 @@ fn test_mmr_peaks_hash_less_than_16() {
 fn test_mmr_peaks_hash_odd() {
     let peaks: Vec<_> = (0..=17).map(int_to_node).collect();
 
-    let forest = Forest(1 << peaks.len()).all_smaller_trees();
+    let forest = Forest::with_leaves(1 << peaks.len()).all_smaller_trees();
     let accumulator = MmrPeaks::new(forest, peaks.clone()).unwrap();
 
     // odd length bigger than 16 is padded to the next even number
@@ -681,40 +687,43 @@ fn test_mmr_delta() {
 
     // original_forest can't have more elements
     assert!(
-        mmr.get_delta(Forest(LEAVES.len() + 1), mmr.forest()).is_err(),
+        mmr.get_delta(Forest::with_leaves(LEAVES.len() + 1), mmr.forest()).is_err(),
         "Can not provide updates for a newer Mmr"
     );
 
     // if the number of elements is the same there is no change
     assert!(
-        mmr.get_delta(Forest(LEAVES.len()), mmr.forest()).unwrap().data.is_empty(),
+        mmr.get_delta(Forest::with_leaves(LEAVES.len()), mmr.forest())
+            .unwrap()
+            .data
+            .is_empty(),
         "There are no updates for the same Mmr version"
     );
 
     // missing the last element added, which is itself a tree peak
     assert_eq!(
-        mmr.get_delta(Forest(6), mmr.forest()).unwrap().data,
+        mmr.get_delta(Forest::with_leaves(6), mmr.forest()).unwrap().data,
         vec![acc.peaks()[2]],
         "one peak"
     );
 
     // missing the sibling to complete the tree of depth 2, and the last element
     assert_eq!(
-        mmr.get_delta(Forest(5), mmr.forest()).unwrap().data,
+        mmr.get_delta(Forest::with_leaves(5), mmr.forest()).unwrap().data,
         vec![LEAVES[5], acc.peaks()[2]],
         "one sibling, one peak"
     );
 
     // missing the whole last two trees, only send the peaks
     assert_eq!(
-        mmr.get_delta(Forest(4), mmr.forest()).unwrap().data,
+        mmr.get_delta(Forest::with_leaves(4), mmr.forest()).unwrap().data,
         vec![acc.peaks()[1], acc.peaks()[2]],
         "two peaks"
     );
 
     // missing the sibling to complete the first tree, and the two last trees
     assert_eq!(
-        mmr.get_delta(Forest(3), mmr.forest()).unwrap().data,
+        mmr.get_delta(Forest::with_leaves(3), mmr.forest()).unwrap().data,
         vec![LEAVES[3], acc.peaks()[1], acc.peaks()[2]],
         "one sibling, two peaks"
     );
@@ -722,13 +731,13 @@ fn test_mmr_delta() {
     // missing half of the first tree, only send the computed element (not the leaves), and the new
     // peaks
     assert_eq!(
-        mmr.get_delta(Forest(2), mmr.forest()).unwrap().data,
+        mmr.get_delta(Forest::with_leaves(2), mmr.forest()).unwrap().data,
         vec![mmr.nodes[5], acc.peaks()[1], acc.peaks()[2]],
         "one sibling, two peaks"
     );
 
     assert_eq!(
-        mmr.get_delta(Forest(1), mmr.forest()).unwrap().data,
+        mmr.get_delta(Forest::with_leaves(1), mmr.forest()).unwrap().data,
         vec![LEAVES[1], mmr.nodes[5], acc.peaks()[1], acc.peaks()[2]],
         "one sibling, two peaks"
     );
@@ -746,12 +755,15 @@ fn test_mmr_delta_old_forest() {
 
     // from_forest must be smaller-or-equal to to_forest
     for version in 1..=mmr.forest().num_leaves() {
-        assert!(mmr.get_delta(Forest(version + 1), Forest(version)).is_err());
+        assert!(
+            mmr.get_delta(Forest::with_leaves(version + 1), Forest::with_leaves(version))
+                .is_err()
+        );
     }
 
     // when from_forest and to_forest are equal, there are no updates
     for version in 1..=mmr.forest().num_leaves() {
-        let version = Forest(version);
+        let version = Forest::with_leaves(version);
         let delta = mmr.get_delta(version, version).unwrap();
         assert!(delta.data.is_empty());
         assert_eq!(delta.forest, version);
@@ -761,8 +773,8 @@ fn test_mmr_delta_old_forest() {
     for count in 0..(mmr.forest().num_leaves() / 2) {
         // *2 because every iteration tests a pair
         // +1 because the Mmr is 1-indexed
-        let from_forest = Forest((count * 2) + 1);
-        let to_forest = Forest((count * 2) + 2);
+        let from_forest = Forest::with_leaves((count * 2) + 1);
+        let to_forest = Forest::with_leaves((count * 2) + 2);
         let delta = mmr.get_delta(from_forest, to_forest).unwrap();
 
         // *2 because every iteration tests a pair
@@ -772,13 +784,13 @@ fn test_mmr_delta_old_forest() {
         assert_eq!(delta.forest, to_forest);
     }
 
-    let version = Forest(4);
-    let delta = mmr.get_delta(Forest(1), version).unwrap();
+    let version = Forest::with_leaves(4);
+    let delta = mmr.get_delta(Forest::with_leaves(1), version).unwrap();
     assert_eq!(delta.data, [mmr.nodes[1], mmr.nodes[5]]);
     assert_eq!(delta.forest, version);
 
-    let version = Forest(5);
-    let delta = mmr.get_delta(Forest(1), version).unwrap();
+    let version = Forest::with_leaves(5);
+    let delta = mmr.get_delta(Forest::with_leaves(1), version).unwrap();
     assert_eq!(delta.data, [mmr.nodes[1], mmr.nodes[5], mmr.nodes[7]]);
     assert_eq!(delta.forest, version);
 }
@@ -875,7 +887,7 @@ fn test_mmr_add_invalid_odd_leaf() {
 fn test_mmr_proof_num_peaks_exceeds_current_num_peaks() {
     let mmr: Mmr = LEAVES[0..4].iter().cloned().into();
     let mut proof = mmr.open(3).unwrap();
-    proof.forest = Forest(5);
+    proof.forest = Forest::with_leaves(5);
     proof.position = 4;
     mmr.peaks().verify(LEAVES[3], proof).unwrap();
 }
@@ -944,10 +956,10 @@ fn merge(l: Word, r: Word) -> Word {
 /// Given a 0-indexed leaf position and the current forest, return the tree number responsible for
 /// the position.
 fn leaf_to_corresponding_tree(pos: usize, forest: usize) -> Option<u32> {
-    Forest(forest).leaf_to_corresponding_tree(pos)
+    Forest::with_leaves(forest).leaf_to_corresponding_tree(pos)
 }
 
 /// Return the total number of nodes of a given forest
 const fn nodes_in_forest(forest: usize) -> usize {
-    Forest(forest).num_nodes()
+    Forest::with_leaves(forest).num_nodes()
 }
