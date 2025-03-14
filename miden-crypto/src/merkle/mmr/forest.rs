@@ -23,12 +23,17 @@ impl Forest {
         self.0
     }
     
-    pub fn num_trees(self) -> u32 {
-        self.0.count_ones()
+    // TODO: make it usize for consistency
+    pub fn num_trees(self) -> usize {
+        self.0.count_ones() as usize
     }
 
     pub fn highest_tree(self) -> Forest {
         Forest(1 << self.0.ilog2())
+    }
+
+    pub fn smallest_tree_height(self) -> usize {
+        self.0.trailing_zeros() as usize
     }
 
     pub fn smallest_tree(self) -> Forest {
@@ -45,6 +50,10 @@ impl Forest {
     pub fn all_smaller_trees(self) -> Forest {
         debug_assert!(self.0.count_ones() == 1);
         Forest(self.0 - 1)
+    }
+
+    pub fn has_odd_leaf(self) -> bool {
+        self.0 & 1 != 0
     }
 
     pub fn odd_leaf_removed(self) -> Forest {

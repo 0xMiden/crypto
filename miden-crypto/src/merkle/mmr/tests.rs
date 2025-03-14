@@ -625,8 +625,8 @@ fn test_mmr_peaks_hash_less_than_16() {
     for i in 0..16 {
         peaks.push(int_to_node(i));
 
-        let num_leaves = (1 << peaks.len()) - 1;
-        let accumulator = MmrPeaks::new(num_leaves, peaks.clone()).unwrap();
+        let forest = Forest(1 << peaks.len()).all_smaller_trees();
+        let accumulator = MmrPeaks::new(forest, peaks.clone()).unwrap();
 
         // minimum length is 16
         let mut expected_peaks = peaks.clone();
@@ -642,8 +642,8 @@ fn test_mmr_peaks_hash_less_than_16() {
 fn test_mmr_peaks_hash_odd() {
     let peaks: Vec<_> = (0..=17).map(int_to_node).collect();
 
-    let num_leaves = (1 << peaks.len()) - 1;
-    let accumulator = MmrPeaks::new(num_leaves, peaks.clone()).unwrap();
+    let forest = Forest(1 << peaks.len()).all_smaller_trees();
+    let accumulator = MmrPeaks::new(forest, peaks.clone()).unwrap();
 
     // odd length bigger than 16 is padded to the next even number
     let mut expected_peaks = peaks;
@@ -725,7 +725,7 @@ fn test_mmr_delta_old_forest() {
     for version in 1..=mmr.forest() {
         let delta = mmr.get_delta(version, version).unwrap();
         assert!(delta.data.is_empty());
-        assert_eq!(delta.forest, version);
+        assert_eq!(delta.forest, Forest(version));
     }
 
     // test update which merges the odd peak to the right
@@ -740,18 +740,18 @@ fn test_mmr_delta_old_forest() {
         // +1 because sibling is the odd element
         let sibling = (count * 2) + 1;
         assert_eq!(delta.data, [LEAVES[sibling]]);
-        assert_eq!(delta.forest, to_forest);
+        assert_eq!(delta.forest, Forest(to_forest));
     }
 
     let version = 4;
     let delta = mmr.get_delta(1, version).unwrap();
     assert_eq!(delta.data, [mmr.nodes[1], mmr.nodes[5]]);
-    assert_eq!(delta.forest, version);
+    assert_eq!(delta.forest, Forest(version));
 
     let version = 5;
     let delta = mmr.get_delta(1, version).unwrap();
     assert_eq!(delta.data, [mmr.nodes[1], mmr.nodes[5], mmr.nodes[7]]);
-    assert_eq!(delta.forest, version);
+    assert_eq!(delta.forest, Forest(version));
 }
 
 #[test]
@@ -762,8 +762,8 @@ fn test_partial_mmr_simple() {
 
     // check initial state of the partial mmr
     assert_eq!(partial.peaks(), peaks);
-    assert_eq!(partial.forest(), peaks.num_leaves());
-    assert_eq!(partial.forest(), LEAVES.len());
+    assert_eq!(partial.num_leaves(), peaks.num_leaves());
+    assert_eq!(partial.num_leaves(), LEAVES.len());
     assert_eq!(partial.peaks().num_peaks(), 3);
     assert_eq!(partial.nodes.len(), 0);
 
@@ -806,10 +806,10 @@ fn test_partial_mmr_update_single() {
     for i in 1..100 {
         let node = int_to_node(i);
         full.add(node);
-        let delta = full.get_delta(partial.forest(), full.forest()).unwrap();
+        let delta = full.get_delta(partial.forest().0, full.forest()).unwrap();
         partial.apply(delta).unwrap();
 
-        assert_eq!(partial.forest(), full.forest());
+        assert_eq!(partial.forest().0, full.forest());
         assert_eq!(partial.peaks(), full.peaks());
 
         let proof1 = full.open(i as usize).unwrap();

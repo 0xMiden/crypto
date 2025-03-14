@@ -35,7 +35,7 @@ pub struct PartialMmr {
     /// - The bits in the forest also corresponds to the count and size of every perfect binary
     ///   tree that composes the MMR structure, which server to compute indexes and perform
     ///   validation.
-    pub(crate) forest: usize,
+    pub(crate) forest: Forest,
 
     /// The MMR peaks.
     ///
@@ -88,7 +88,7 @@ impl PartialMmr {
 
     /// Returns a new [PartialMmr] instantiated from the specified peaks.
     pub fn from_peaks(peaks: MmrPeaks) -> Self {
-        let forest = peaks.num_leaves();
+        let forest = peaks.forest();
         let peaks = peaks.into();
         let nodes = BTreeMap::new();
         let track_latest = false;
@@ -101,7 +101,7 @@ impl PartialMmr {
     /// This constructor does not check the consistency between peaks and nodes. If the specified
     /// peaks are nodes are inconsistent, the returned partial MMR may exhibit undefined behavior.
     pub fn from_parts(peaks: MmrPeaks, nodes: NodeMap, track_latest: bool) -> Self {
-        let forest = peaks.num_leaves();
+        let forest = peaks.forest();
         let peaks = peaks.into();
 
         Self { forest, peaks, nodes, track_latest }
@@ -114,13 +114,13 @@ impl PartialMmr {
     ///
     /// This value corresponds to the version of the [PartialMmr] and the number of leaves in the
     /// underlying MMR.
-    pub fn forest(&self) -> usize {
+    pub fn forest(&self) -> Forest {
         self.forest
     }
 
     /// Returns the number of leaves in the underlying MMR for this [PartialMmr].
     pub fn num_leaves(&self) -> usize {
-        self.forest
+        self.forest.num_leaves()
     }
 
     /// Returns the peaks of the MMR for this [PartialMmr].
@@ -133,9 +133,9 @@ impl PartialMmr {
     /// Returns true if this partial MMR tracks an authentication path for the leaf at the
     /// specified position.
     pub fn is_tracked(&self, pos: usize) -> bool {
-        if pos >= self.forest {
+        if pos >= self.forest.0 {
             return false;
-        } else if pos == self.forest - 1 && self.forest & 1 != 0 {
+        } else if pos == self.forest.num_leaves() - 1 && self.forest.has_odd_leaf() {
             // if the number of leaves in the MMR is odd and the position is for the last leaf
             // whether the leaf is tracked is defined by the `track_latest` flag
             return self.track_latest;
@@ -156,8 +156,10 @@ impl PartialMmr {
     /// Returns an error if the specified position is greater-or-equal than the number of leaves
     /// in the underlying MMR.
     pub fn open(&self, pos: usize) -> Result<Option<MmrProof>, MmrError> {
-        let tree_bit =
-            leaf_to_corresponding_tree(pos, self.forest).ok_or(MmrError::PositionNotFound(pos))?;
+        let tree_bit = self
+            .forest
+            .leaf_to_corresponding_tree(pos)
+            .ok_or(MmrError::PositionNotFound(pos))?;
         let depth = tree_bit as usize;
 
         let mut nodes = Vec::with_capacity(depth);
@@ -176,7 +178,7 @@ impl PartialMmr {
             Ok(None)
         } else {
             Ok(Some(MmrProof {
-                forest: Forest(self.forest),
+                forest: self.forest,
                 position: pos,
                 merkle_path: MerklePath::new(nodes),
             }))
@@ -222,8 +224,8 @@ impl PartialMmr {
     ///
     /// When `track` is `true` the new leaf is tracked.
     pub fn add(&mut self, leaf: Word, track: bool) -> Vec<(InOrderIndex, Word)> {
-        self.forest += 1;
-        let merges = self.forest.trailing_zeros() as usize;
+        self.forest.add_leaf();
+        let merges = self.forest.smallest_tree_height() as usize;
         let mut new_nodes = Vec::with_capacity(merges);
 
         let peak = if merges == 0 {
@@ -234,7 +236,7 @@ impl PartialMmr {
             let mut track_left = self.track_latest;
 
             let mut right = leaf;
-            let mut right_idx = forest_to_rightmost_index(self.forest);
+            let mut right_idx = forest_to_rightmost_index(self.forest.0);
 
             for _ in 0..merges {
                 let left = self.peaks.pop().expect("Missing peak");
@@ -304,12 +306,12 @@ impl PartialMmr {
     ) -> Result<(), MmrError> {
         // Checks there is a tree with same depth as the authentication path, if not the path is
         // invalid.
-        let tree = 1 << path.depth();
-        if tree & self.forest == 0 {
+        let tree = Forest(1 << path.depth());
+        if (tree & self.forest).is_empty() {
             return Err(MmrError::UnknownPeak(path.depth()));
         };
 
-        if leaf_pos + 1 == self.forest
+        if leaf_pos + 1 == self.forest.num_leaves()
             && path.depth() == 0
             && self.peaks.last().is_some_and(|v| *v == leaf)
         {
@@ -319,11 +321,11 @@ impl PartialMmr {
 
         // ignore the trees smaller than the target (these elements are position after the current
         // target and don't affect the target leaf_pos)
-        let target_forest = self.forest ^ (self.forest & (tree - 1));
-        let peak_pos = (target_forest.count_ones() - 1) as usize;
+        let target_forest = self.forest ^ (self.forest & tree.all_smaller_trees());
+        let peak_pos = (target_forest.num_trees() - 1) as usize;
 
         // translate from mmr leaf_pos to merkle path
-        let path_idx = leaf_pos - (target_forest ^ tree);
+        let path_idx = leaf_pos - (target_forest ^ tree).num_leaves();
 
         // Compute the root of the authentication path, and check it matches the current version of
         // the PartialMmr.
@@ -381,22 +383,22 @@ impl PartialMmr {
 
         // find the tree merges
         let changes = self.forest ^ delta.forest;
-        let largest = 1 << changes.ilog2();
-        let merges = self.forest & (largest - 1);
+        let largest = changes.highest_tree();
+        let merges = self.forest & largest.all_smaller_trees();
 
         debug_assert!(
-            !self.track_latest || (merges & 1) == 1,
+            !self.track_latest || merges.has_odd_leaf(),
             "if there is an odd element, a merge is required"
         );
 
         // count the number elements needed to produce largest from the current state
-        let (merge_count, new_peaks) = if merges != 0 {
-            let depth = largest.trailing_zeros();
-            let skipped = merges.trailing_zeros();
-            let computed = merges.count_ones() - 1;
+        let (merge_count, new_peaks) = if !merges.is_empty() {
+            let depth = largest.smallest_tree_height();
+            let skipped = merges.smallest_tree_height();
+            let computed = merges.num_trees() - 1;
             let merge_count = depth - skipped - computed;
 
-            let new_peaks = delta.forest & (largest - 1);
+            let new_peaks = delta.forest & largest.all_smaller_trees();
 
             (merge_count, new_peaks)
         } else {
@@ -404,16 +406,16 @@ impl PartialMmr {
         };
 
         // verify the delta size
-        if (delta.data.len() as u32) != merge_count + new_peaks.count_ones() {
+        if delta.data.len() != merge_count + new_peaks.num_trees() {
             return Err(MmrError::InvalidUpdate);
         }
 
         // keeps track of how many data elements from the update have been consumed
         let mut update_count = 0;
 
-        if merges != 0 {
+        if !merges.is_empty() {
             // starts at the smallest peak and follows the merged peaks
-            let mut peak_idx = forest_to_root_index(self.forest);
+            let mut peak_idx = forest_to_root_index(self.forest.0);
 
             // match order of the update data while applying it
             self.peaks.reverse();
@@ -423,20 +425,20 @@ impl PartialMmr {
             self.track_latest = false;
 
             let mut peak_count = 0;
-            let mut target = 1 << merges.trailing_zeros();
+            let mut target = merges.smallest_tree();
             let mut new = delta.data[0];
             update_count += 1;
 
             while target < largest {
                 // check if either the left or right subtrees have saved for authentication paths.
                 // If so, turn tracking on to update those paths.
-                if target != 1 && !track {
+                if target != Forest(1) && !track {
                     track = self.is_tracked_node(&peak_idx);
                 }
 
                 // update data only contains the nodes from the right subtrees, left nodes are
                 // either previously known peaks or computed values
-                let (left, right) = if target & merges != 0 {
+                let (left, right) = if !(target & merges).is_empty() {
                     let peak = self.peaks[peak_count];
                     let sibling_idx = peak_idx.sibling();
 
@@ -470,7 +472,7 @@ impl PartialMmr {
                 target <<= 1;
             }
 
-            debug_assert!(peak_count == (merges.count_ones() as usize));
+            debug_assert!(peak_count == merges.num_trees());
 
             // restore the peaks order
             self.peaks.reverse();
@@ -486,7 +488,7 @@ impl PartialMmr {
         self.peaks.extend_from_slice(&delta.data[update_count..]);
         self.forest = delta.forest;
 
-        debug_assert!(self.peaks.len() == (self.forest.count_ones() as usize));
+        debug_assert!(self.peaks.len() == self.forest.num_trees());
 
         Ok(inserted_nodes)
     }
@@ -587,7 +589,7 @@ impl<I: Iterator<Item = (usize, Word)>> Iterator for InnerNodeIterator<'_, I> {
 
 impl Serializable for PartialMmr {
     fn write_into<W: winter_utils::ByteWriter>(&self, target: &mut W) {
-        self.forest.write_into(target);
+        self.forest.0.write_into(target);
         self.peaks.write_into(target);
         self.nodes.write_into(target);
         target.write_bool(self.track_latest);
@@ -598,7 +600,7 @@ impl Deserializable for PartialMmr {
     fn read_from<R: winter_utils::ByteReader>(
         source: &mut R,
     ) -> Result<Self, winter_utils::DeserializationError> {
-        let forest = usize::read_from(source)?;
+        let forest = Forest(usize::read_from(source)?);
         let peaks = Vec::<Word>::read_from(source)?;
         let nodes = NodeMap::read_from(source)?;
         let track_latest = source.read_bool()?;
@@ -655,7 +657,7 @@ mod tests {
     use super::{
         InOrderIndex, MmrPeaks, PartialMmr, Word, forest_to_rightmost_index, forest_to_root_index,
     };
-    use crate::merkle::{MerkleStore, Mmr, NodeIndex, int_to_node};
+    use crate::merkle::{MerkleStore, Mmr, NodeIndex, int_to_node, mmr::forest::Forest};
 
     const LEAVES: [Word; 7] = [
         int_to_node(0),
@@ -770,7 +772,7 @@ mod tests {
         let nodes_before = partial.nodes.clone();
 
         // compute and apply delta
-        let delta = mmr.get_delta(partial.forest(), mmr.forest()).unwrap();
+        let delta = mmr.get_delta(partial.forest().0, mmr.forest()).unwrap();
         let nodes_delta = partial.apply(delta).unwrap();
 
         // new peaks were computed correctly
@@ -890,7 +892,7 @@ mod tests {
     #[test]
     fn test_partial_mmr_add_without_track() {
         let mut mmr = Mmr::default();
-        let empty_peaks = MmrPeaks::new(0, vec![]).unwrap();
+        let empty_peaks = MmrPeaks::new(Forest::empty(), vec![]).unwrap();
         let mut partial_mmr = PartialMmr::from_peaks(empty_peaks);
 
         for el in (0..256).map(int_to_node) {
@@ -898,14 +900,14 @@ mod tests {
             partial_mmr.add(el, false);
 
             assert_eq!(mmr.peaks(), partial_mmr.peaks());
-            assert_eq!(mmr.forest(), partial_mmr.forest());
+            assert_eq!(mmr.forest(), partial_mmr.forest().0);
         }
     }
 
     #[test]
     fn test_partial_mmr_add_with_track() {
         let mut mmr = Mmr::default();
-        let empty_peaks = MmrPeaks::new(0, vec![]).unwrap();
+        let empty_peaks = MmrPeaks::new(Forest::empty(), vec![]).unwrap();
         let mut partial_mmr = PartialMmr::from_peaks(empty_peaks);
 
         for i in 0..256 {
@@ -914,7 +916,7 @@ mod tests {
             partial_mmr.add(el, true);
 
             assert_eq!(mmr.peaks(), partial_mmr.peaks());
-            assert_eq!(mmr.forest(), partial_mmr.forest());
+            assert_eq!(mmr.forest(), partial_mmr.forest().0);
 
             for pos in 0..i {
                 let mmr_proof = mmr.open(pos as usize).unwrap();
