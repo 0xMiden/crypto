@@ -233,7 +233,7 @@ fn test_mmr_open() {
         .open(6)
         .expect("Element 6 is contained in the tree, expected an opening result.");
     assert_eq!(opening.merkle_path, empty);
-    assert_eq!(opening.forest, mmr.forest.0);
+    assert_eq!(opening.forest, mmr.forest);
     assert_eq!(opening.position, 6);
     mmr.peaks().verify(LEAVES[6], opening).unwrap();
 
@@ -243,7 +243,7 @@ fn test_mmr_open() {
         .open(5)
         .expect("Element 5 is contained in the tree, expected an opening result.");
     assert_eq!(opening.merkle_path, root_to_path);
-    assert_eq!(opening.forest, mmr.forest.0);
+    assert_eq!(opening.forest, mmr.forest);
     assert_eq!(opening.position, 5);
     mmr.peaks().verify(LEAVES[5], opening).unwrap();
 
@@ -252,7 +252,7 @@ fn test_mmr_open() {
         .open(4)
         .expect("Element 4 is contained in the tree, expected an opening result.");
     assert_eq!(opening.merkle_path, root_to_path);
-    assert_eq!(opening.forest, mmr.forest.0);
+    assert_eq!(opening.forest, mmr.forest);
     assert_eq!(opening.position, 4);
     mmr.peaks().verify(LEAVES[4], opening).unwrap();
 
@@ -262,7 +262,7 @@ fn test_mmr_open() {
         .open(3)
         .expect("Element 3 is contained in the tree, expected an opening result.");
     assert_eq!(opening.merkle_path, root_to_path);
-    assert_eq!(opening.forest, mmr.forest.0);
+    assert_eq!(opening.forest, mmr.forest);
     assert_eq!(opening.position, 3);
     mmr.peaks().verify(LEAVES[3], opening).unwrap();
 
@@ -271,7 +271,7 @@ fn test_mmr_open() {
         .open(2)
         .expect("Element 2 is contained in the tree, expected an opening result.");
     assert_eq!(opening.merkle_path, root_to_path);
-    assert_eq!(opening.forest, mmr.forest.0);
+    assert_eq!(opening.forest, mmr.forest);
     assert_eq!(opening.position, 2);
     mmr.peaks().verify(LEAVES[2], opening).unwrap();
 
@@ -280,7 +280,7 @@ fn test_mmr_open() {
         .open(1)
         .expect("Element 1 is contained in the tree, expected an opening result.");
     assert_eq!(opening.merkle_path, root_to_path);
-    assert_eq!(opening.forest, mmr.forest.0);
+    assert_eq!(opening.forest, mmr.forest);
     assert_eq!(opening.position, 1);
     mmr.peaks().verify(LEAVES[1], opening).unwrap();
 
@@ -289,7 +289,7 @@ fn test_mmr_open() {
         .open(0)
         .expect("Element 0 is contained in the tree, expected an opening result.");
     assert_eq!(opening.merkle_path, root_to_path);
-    assert_eq!(opening.forest, mmr.forest.0);
+    assert_eq!(opening.forest, mmr.forest);
     assert_eq!(opening.position, 0);
     mmr.peaks().verify(LEAVES[0], opening).unwrap();
 }
@@ -306,7 +306,7 @@ fn test_mmr_open_older_version() {
     for pos in (0..mmr.forest()).filter(is_even) {
         let forest = Forest(pos + 1);
         let proof = mmr.open_at(pos, forest).unwrap();
-        assert_eq!(proof.forest, forest.0);
+        assert_eq!(proof.forest, forest);
         assert_eq!(proof.merkle_path.nodes(), []);
         assert_eq!(proof.position, pos);
     }
@@ -351,7 +351,7 @@ fn test_mmr_open_eight() {
     ];
 
     let mtree: MerkleTree = leaves.as_slice().try_into().unwrap();
-    let forest = leaves.len();
+    let forest = Forest(leaves.len());
     let mmr: Mmr = leaves.into();
     let root = mtree.root();
 
@@ -410,7 +410,7 @@ fn test_mmr_open_seven() {
     let mtree1: MerkleTree = LEAVES[..4].try_into().unwrap();
     let mtree2: MerkleTree = LEAVES[4..6].try_into().unwrap();
 
-    let forest = LEAVES.len();
+    let forest = Forest(LEAVES.len());
     let mmr: Mmr = LEAVES.into();
 
     let position = 0;
@@ -845,7 +845,7 @@ fn test_mmr_add_invalid_odd_leaf() {
 fn test_mmr_proof_num_peaks_exceeds_current_num_peaks() {
     let mmr: Mmr = LEAVES[0..4].iter().cloned().into();
     let mut proof = mmr.open(3).unwrap();
-    proof.forest = 5;
+    proof.forest = Forest(5);
     proof.position = 4;
     mmr.peaks().verify(LEAVES[3], proof).unwrap();
 }

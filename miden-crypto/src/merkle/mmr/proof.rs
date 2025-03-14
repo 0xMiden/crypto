@@ -10,7 +10,7 @@ use super::{leaf_to_corresponding_tree};
 #[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 pub struct MmrProof {
     /// The state of the MMR when the MmrProof was created.
-    pub forest: usize,
+    pub forest: Forest,
 
     /// The position of the leaf value on this MmrProof.
     pub position: usize,
@@ -24,19 +24,21 @@ impl MmrProof {
     /// Converts the leaf global position into a local position that can be used to verify the
     /// merkle_path.
     pub fn relative_pos(&self) -> usize {
-        let tree_bit = leaf_to_corresponding_tree(self.position, self.forest)
-            .expect("position must be part of the forest");
-        let forest_before = Forest(self.forest) & high_bitmask(tree_bit + 1);
-        self.position - forest_before.0
+        self.forest.leaf_relative_position(self.position)
+            .expect("position must be part of the forest")
+        // let tree_bit = leaf_to_corresponding_tree(self.position, self.forest)
+        //     .expect("position must be part of the forest");
+        // let forest_before = Forest(self.forest) & high_bitmask(tree_bit + 1);
+        // self.position - forest_before.0
     }
 
     /// Returns index of the MMR peak against which the Merkle path in this proof can be verified.
     pub fn peak_index(&self) -> usize {
-        let root = leaf_to_corresponding_tree(self.position, self.forest)
+        let root = self.forest.leaf_to_corresponding_tree(self.position)
             .expect("position must be part of the forest");
-        let smaller_peak_mask = 2_usize.pow(root) as usize - 1;
-        let num_smaller_peaks = (self.forest & smaller_peak_mask).count_ones();
-        (self.forest.count_ones() - num_smaller_peaks - 1) as usize
+        let smaller_peak_mask = Forest(2_usize.pow(root) as usize - 1);
+        let num_smaller_peaks = (self.forest & smaller_peak_mask).num_trees();
+        (self.forest.num_trees() - num_smaller_peaks - 1) as usize
     }
 }
 
@@ -45,12 +47,14 @@ impl MmrProof {
 
 #[cfg(test)]
 mod tests {
+    use crate::merkle::mmr::forest::Forest;
+
     use super::{MerklePath, MmrProof};
 
     #[test]
     fn test_peak_index() {
         // --- single peak forest ---------------------------------------------
-        let forest = 11;
+        let forest = Forest(11);
 
         // the first 4 leaves belong to peak 0
         for position in 0..8 {
@@ -59,7 +63,7 @@ mod tests {
         }
 
         // --- forest with non-consecutive peaks ------------------------------
-        let forest = 11;
+        let forest = Forest(11);
 
         // the first 8 leaves belong to peak 0
         for position in 0..8 {
@@ -78,7 +82,7 @@ mod tests {
         assert_eq!(proof.peak_index(), 2);
 
         // --- forest with consecutive peaks ----------------------------------
-        let forest = 7;
+        let forest = Forest(7);
 
         // the first 4 leaves belong to peak 0
         for position in 0..4 {
@@ -97,7 +101,7 @@ mod tests {
         assert_eq!(proof.peak_index(), 2);
     }
 
-    fn make_dummy_proof(forest: usize, position: usize) -> MmrProof {
+    fn make_dummy_proof(forest: Forest, position: usize) -> MmrProof {
         MmrProof {
             forest,
             position,

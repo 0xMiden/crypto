@@ -116,7 +116,7 @@ impl Mmr {
         let (_, path) = self.collect_merkle_path_and_value(tree_bit, relative_pos, index_offset);
 
         Ok(MmrProof {
-            forest: forest.0,
+            forest,
             position: pos,
             merkle_path: MerklePath::new(path),
         })
