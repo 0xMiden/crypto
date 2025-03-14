@@ -38,6 +38,14 @@ impl Forest {
         Forest::with_leaves(1 << self.0.ilog2())
     }
 
+    pub fn highest_tree_checked(self) -> Forest {
+        if self.0 > 0 {
+            Forest::with_leaves(1 << self.0.ilog2())
+        } else {
+            Forest::empty()
+        }
+    }
+
     pub fn smallest_tree_height(self) -> usize {
         self.0.trailing_zeros() as usize
     }
@@ -101,8 +109,8 @@ impl Forest {
             // - this means the first tree owns from `0` up to the `2^k_0` first positions, where
             //   `k_0` is the highest true bit position, the second tree from `2^k_0 + 1` up to
             //   `2^k_1` where `k_1` is the second highest bit, so on.
-            // - this means the highest bits work as a category marker, and the position is owned
-            //   by the first tree which doesn't share a high bit with the position
+            // - this means the highest bits work as a category marker, and the position is owned by
+            //   the first tree which doesn't share a high bit with the position
             let before = forest & pos;
             let after = forest ^ before;
             let tree = after.ilog2();

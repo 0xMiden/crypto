@@ -32,13 +32,11 @@ impl DoubleEndedIterator for TrueBitPositionIterator {
     fn next_back(&mut self) -> Option<<Self as Iterator>::Item> {
         // trailing_zeros is computed with the intrinsic ctlz. [Rust 1.67.0] x86 uses the `bsr`
         // instruction. AArch64 uses the `clz` instruction.
-        let zeros = self.value.num_leaves().leading_zeros();
+        let mask = self.value.highest_tree_checked();
 
-        if zeros == usize::BITS {
+        if mask.is_empty() {
             None
         } else {
-            let bit_position = usize::BITS - zeros - 1;
-            let mask = Forest::with_leaves(1 << bit_position);
             self.value ^= mask;
             Some(mask)
         }

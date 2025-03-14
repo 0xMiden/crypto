@@ -227,7 +227,7 @@ impl PartialMmr {
     /// When `track` is `true` the new leaf is tracked.
     pub fn add(&mut self, leaf: Word, track: bool) -> Vec<(InOrderIndex, Word)> {
         self.forest.add_leaf();
-        let merges = self.forest.smallest_tree_height() as usize;
+        let merges = self.forest.smallest_tree_height();
         let mut new_nodes = Vec::with_capacity(merges);
 
         let peak = if merges == 0 {
@@ -324,7 +324,7 @@ impl PartialMmr {
         // ignore the trees smaller than the target (these elements are position after the current
         // target and don't affect the target leaf_pos)
         let target_forest = self.forest ^ (self.forest & tree.all_smaller_trees());
-        let peak_pos = (target_forest.num_trees() - 1) as usize;
+        let peak_pos = target_forest.num_trees() - 1;
 
         // translate from mmr leaf_pos to merkle path
         let path_idx = leaf_pos - (target_forest ^ tree).num_leaves();
@@ -794,10 +794,9 @@ mod tests {
 
         // make sure tracked leaves open to the same proofs as in the underlying MMR
         for index in tracked_leaves {
-            let index_value: u64 = index.into();
-            let pos = index_value / 2;
-            let proof1 = partial.open(pos as usize).unwrap().unwrap();
-            let proof2 = mmr.open(pos as usize).unwrap();
+            let pos = index.inner() / 2;
+            let proof1 = partial.open(pos).unwrap().unwrap();
+            let proof2 = mmr.open(pos).unwrap();
             assert_eq!(proof1, proof2);
         }
     }
@@ -916,7 +915,7 @@ mod tests {
         let mut partial_mmr = PartialMmr::from_peaks(empty_peaks);
 
         for i in 0..256 {
-            let el = int_to_node(i);
+            let el = int_to_node(i as u64);
             mmr.add(el);
             partial_mmr.add(el, true);
 
@@ -924,8 +923,8 @@ mod tests {
             assert_eq!(mmr.forest(), partial_mmr.forest());
 
             for pos in 0..i {
-                let mmr_proof = mmr.open(pos as usize).unwrap();
-                let partialmmr_proof = partial_mmr.open(pos as usize).unwrap().unwrap();
+                let mmr_proof = mmr.open(pos).unwrap();
+                let partialmmr_proof = partial_mmr.open(pos).unwrap().unwrap();
                 assert_eq!(mmr_proof, partialmmr_proof);
             }
         }

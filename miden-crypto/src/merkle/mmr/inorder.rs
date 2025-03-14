@@ -109,8 +109,8 @@ impl InOrderIndex {
     }
 
     /// Returns the inner value of this [InOrderIndex].
-    pub fn inner(&self) -> u64 {
-        self.idx as u64
+    pub fn inner(&self) -> usize {
+        self.idx
     }
 }
 
@@ -132,9 +132,9 @@ impl Deserializable for InOrderIndex {
 // CONVERSIONS FROM IN-ORDER INDEX
 // ------------------------------------------------------------------------------------------------
 
-impl From<InOrderIndex> for u64 {
+impl From<InOrderIndex> for usize {
     fn from(index: InOrderIndex) -> Self {
-        index.idx as u64
+        index.idx
     }
 }
 

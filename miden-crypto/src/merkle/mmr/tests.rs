@@ -845,7 +845,7 @@ fn test_partial_mmr_update_single() {
     partial.track(proof.position, zero, &proof.merkle_path).unwrap();
 
     for i in 1..100 {
-        let node = int_to_node(i);
+        let node = int_to_node(i as u64);
         full.add(node);
         let delta = full.get_delta(partial.forest(), full.forest()).unwrap();
         partial.apply(delta).unwrap();
@@ -853,7 +853,7 @@ fn test_partial_mmr_update_single() {
         assert_eq!(partial.forest(), full.forest());
         assert_eq!(partial.peaks(), full.peaks());
 
-        let proof1 = full.open(i as usize).unwrap();
+        let proof1 = full.open(i).unwrap();
         partial.track(proof1.position, node, &proof1.merkle_path).unwrap();
         let proof2 = partial.open(proof1.position).unwrap().unwrap();
         assert_eq!(proof1.merkle_path, proof2.merkle_path);

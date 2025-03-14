@@ -52,7 +52,7 @@ impl MmrPeaks {
     /// # Errors
     /// Returns an error if the number of leaves and the number of peaks are inconsistent.
     pub fn new(forest: Forest, peaks: Vec<Word>) -> Result<Self, MmrError> {
-        if forest.num_trees() as usize != peaks.len() {
+        if forest.num_trees() != peaks.len() {
             return Err(MmrError::InvalidPeaks(format!(
                 "number of one bits in leaves is {} which does not equal peak length {}",
                 forest.num_trees(),

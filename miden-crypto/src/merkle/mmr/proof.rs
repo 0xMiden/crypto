@@ -38,9 +38,9 @@ impl MmrProof {
             .forest
             .leaf_to_corresponding_tree(self.position)
             .expect("position must be part of the forest");
-        let smaller_peak_mask = Forest::with_leaves(2_usize.pow(root) as usize - 1);
+        let smaller_peak_mask = Forest::with_leaves(2_usize.pow(root) - 1);
         let num_smaller_peaks = (self.forest & smaller_peak_mask).num_trees();
-        (self.forest.num_trees() - num_smaller_peaks - 1) as usize
+        self.forest.num_trees() - num_smaller_peaks - 1
     }
 }
 

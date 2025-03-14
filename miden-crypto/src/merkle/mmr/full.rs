@@ -221,8 +221,8 @@ impl Mmr {
         let mut result = Vec::new();
 
         // Find the largest tree in this [Mmr] which is new to `from_forest`.
-        let candidate_trees = to_forest ^ from_forest; // xor remains the best description of the op
-        let mut new_high = candidate_trees.highest_tree(); // TODO: largest tree (in number of leaves)
+        let candidate_trees = to_forest ^ from_forest;
+        let mut new_high = candidate_trees.highest_tree();
 
         // Collect authentication nodes used for tree merges
         // ----------------------------------------------------------------------------------------
@@ -231,7 +231,7 @@ impl Mmr {
         let mut merges = from_forest & new_high.all_smaller_trees();
 
         // Find the peaks that are common to `from_forest` and this [Mmr]
-        let common_trees = from_forest ^ merges; // alternatively: from_forest & !(new_high - 1)
+        let common_trees = from_forest ^ merges;
 
         if !merges.is_empty() {
             // Skip the smallest trees unknown to `from_forest`.
