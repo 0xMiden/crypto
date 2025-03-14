@@ -4,7 +4,6 @@ use super::{
     super::{InnerNodeInfo, Rpo256, Word},
     Mmr, MmrPeaks, PartialMmr,
     bit::TrueBitPositionIterator,
-    nodes_in_forest,
 };
 use crate::{
     Felt,
@@ -946,4 +945,9 @@ fn merge(l: Word, r: Word) -> Word {
 /// the position.
 fn leaf_to_corresponding_tree(pos: usize, forest: usize) -> Option<u32> {
     Forest(forest).leaf_to_corresponding_tree(pos)
+}
+
+/// Return the total number of nodes of a given forest
+const fn nodes_in_forest(forest: usize) -> usize {
+    Forest(forest).num_nodes()
 }

@@ -5,10 +5,11 @@ use alloc::{
 
 use winter_utils::{Deserializable, Serializable};
 
-use super::{MmrDelta, MmrProof, Rpo256, Word};
-use crate::merkle::{
-    InOrderIndex, InnerNodeInfo, MerklePath, MmrError, MmrPeaks,
-    mmr::{forest::Forest, leaf_to_corresponding_tree, nodes_in_forest},
+use super::{MmrDelta, MmrProof};
+use crate::{
+    Word,
+    hash::rpo::Rpo256,
+    merkle::{InOrderIndex, InnerNodeInfo, MerklePath, MmrError, MmrPeaks, mmr::forest::Forest},
 };
 
 // TYPE ALIASES
@@ -73,7 +74,7 @@ pub struct PartialMmr {
 impl Default for PartialMmr {
     /// Creates a new [PartialMmr] with default values.
     fn default() -> Self {
-        let forest = 0;
+        let forest = Forest(0);
         let peaks = Vec::new();
         let nodes = BTreeMap::new();
         let track_latest = false;
@@ -236,7 +237,7 @@ impl PartialMmr {
             let mut track_left = self.track_latest;
 
             let mut right = leaf;
-            let mut right_idx = forest_to_rightmost_index(self.forest.0);
+            let mut right_idx = forest_to_rightmost_index(Forest(self.forest.0));
 
             for _ in 0..merges {
                 let left = self.peaks.pop().expect("Missing peak");
@@ -415,7 +416,7 @@ impl PartialMmr {
 
         if !merges.is_empty() {
             // starts at the smallest peak and follows the merged peaks
-            let mut peak_idx = forest_to_root_index(self.forest.0);
+            let mut peak_idx = forest_to_root_index(Forest(self.forest.0));
 
             // match order of the update data while applying it
             self.peaks.reverse();
@@ -614,17 +615,17 @@ impl Deserializable for PartialMmr {
 
 /// Given the description of a `forest`, returns the index of the root element of the smallest tree
 /// in it.
-fn forest_to_root_index(forest: usize) -> InOrderIndex {
+fn forest_to_root_index(forest: Forest) -> InOrderIndex {
     // Count total size of all trees in the forest.
-    let nodes = nodes_in_forest(forest);
+    let nodes = forest.num_nodes();
 
     // Add the count for the parent nodes that separate each tree. These are allocated but
     // currently empty, and correspond to the nodes that will be used once the trees are merged.
-    let open_trees = (forest.count_ones() - 1) as usize;
+    let open_trees = forest.num_trees() - 1;
 
     // Remove the count of the right subtree of the target tree, target tree root index comes
     // before the subtree for the in-order tree walk.
-    let right_subtree_count = ((1u32 << forest.trailing_zeros()) - 1) as usize;
+    let right_subtree_count = forest.smallest_tree().num_leaves() - 1;
 
     let idx = nodes + open_trees - right_subtree_count;
 
@@ -632,13 +633,13 @@ fn forest_to_root_index(forest: usize) -> InOrderIndex {
 }
 
 /// Given the description of a `forest`, returns the index of the right most element.
-fn forest_to_rightmost_index(forest: usize) -> InOrderIndex {
+fn forest_to_rightmost_index(forest: Forest) -> InOrderIndex {
     // Count total size of all trees in the forest.
-    let nodes = nodes_in_forest(forest);
+    let nodes = forest.num_nodes();
 
     // Add the count for the parent nodes that separate each tree. These are allocated but
     // currently empty, and correspond to the nodes that will be used once the trees are merged.
-    let open_trees = (forest.count_ones() - 1) as usize;
+    let open_trees = forest.num_trees() - 1;
 
     let idx = nodes + open_trees;
 
@@ -677,22 +678,22 @@ mod tests {
 
         // When there is a single tree in the forest, the index is equivalent to the number of
         // leaves in that tree, which is `2^n`.
-        assert_eq!(forest_to_root_index(0b0001), idx(1));
-        assert_eq!(forest_to_root_index(0b0010), idx(2));
-        assert_eq!(forest_to_root_index(0b0100), idx(4));
-        assert_eq!(forest_to_root_index(0b1000), idx(8));
+        assert_eq!(forest_to_root_index(Forest(0b0001)), idx(1));
+        assert_eq!(forest_to_root_index(Forest(0b0010)), idx(2));
+        assert_eq!(forest_to_root_index(Forest(0b0100)), idx(4));
+        assert_eq!(forest_to_root_index(Forest(0b1000)), idx(8));
 
-        assert_eq!(forest_to_root_index(0b0011), idx(5));
-        assert_eq!(forest_to_root_index(0b0101), idx(9));
-        assert_eq!(forest_to_root_index(0b1001), idx(17));
-        assert_eq!(forest_to_root_index(0b0111), idx(13));
-        assert_eq!(forest_to_root_index(0b1011), idx(21));
-        assert_eq!(forest_to_root_index(0b1111), idx(29));
+        assert_eq!(forest_to_root_index(Forest(0b0011)), idx(5));
+        assert_eq!(forest_to_root_index(Forest(0b0101)), idx(9));
+        assert_eq!(forest_to_root_index(Forest(0b1001)), idx(17));
+        assert_eq!(forest_to_root_index(Forest(0b0111)), idx(13));
+        assert_eq!(forest_to_root_index(Forest(0b1011)), idx(21));
+        assert_eq!(forest_to_root_index(Forest(0b1111)), idx(29));
 
-        assert_eq!(forest_to_root_index(0b0110), idx(10));
-        assert_eq!(forest_to_root_index(0b1010), idx(18));
-        assert_eq!(forest_to_root_index(0b1100), idx(20));
-        assert_eq!(forest_to_root_index(0b1110), idx(26));
+        assert_eq!(forest_to_root_index(Forest(0b0110)), idx(10));
+        assert_eq!(forest_to_root_index(Forest(0b1010)), idx(18));
+        assert_eq!(forest_to_root_index(Forest(0b1100)), idx(20));
+        assert_eq!(forest_to_root_index(Forest(0b1110)), idx(26));
     }
 
     #[test]
@@ -702,24 +703,27 @@ mod tests {
         }
 
         for forest in 1..256 {
-            assert!(forest_to_rightmost_index(forest).inner() % 2 == 1, "Leaves are always odd");
+            assert!(
+                forest_to_rightmost_index(Forest(forest)).inner() % 2 == 1,
+                "Leaves are always odd"
+            );
         }
 
-        assert_eq!(forest_to_rightmost_index(0b0001), idx(1));
-        assert_eq!(forest_to_rightmost_index(0b0010), idx(3));
-        assert_eq!(forest_to_rightmost_index(0b0011), idx(5));
-        assert_eq!(forest_to_rightmost_index(0b0100), idx(7));
-        assert_eq!(forest_to_rightmost_index(0b0101), idx(9));
-        assert_eq!(forest_to_rightmost_index(0b0110), idx(11));
-        assert_eq!(forest_to_rightmost_index(0b0111), idx(13));
-        assert_eq!(forest_to_rightmost_index(0b1000), idx(15));
-        assert_eq!(forest_to_rightmost_index(0b1001), idx(17));
-        assert_eq!(forest_to_rightmost_index(0b1010), idx(19));
-        assert_eq!(forest_to_rightmost_index(0b1011), idx(21));
-        assert_eq!(forest_to_rightmost_index(0b1100), idx(23));
-        assert_eq!(forest_to_rightmost_index(0b1101), idx(25));
-        assert_eq!(forest_to_rightmost_index(0b1110), idx(27));
-        assert_eq!(forest_to_rightmost_index(0b1111), idx(29));
+        assert_eq!(forest_to_rightmost_index(Forest(0b0001)), idx(1));
+        assert_eq!(forest_to_rightmost_index(Forest(0b0010)), idx(3));
+        assert_eq!(forest_to_rightmost_index(Forest(0b0011)), idx(5));
+        assert_eq!(forest_to_rightmost_index(Forest(0b0100)), idx(7));
+        assert_eq!(forest_to_rightmost_index(Forest(0b0101)), idx(9));
+        assert_eq!(forest_to_rightmost_index(Forest(0b0110)), idx(11));
+        assert_eq!(forest_to_rightmost_index(Forest(0b0111)), idx(13));
+        assert_eq!(forest_to_rightmost_index(Forest(0b1000)), idx(15));
+        assert_eq!(forest_to_rightmost_index(Forest(0b1001)), idx(17));
+        assert_eq!(forest_to_rightmost_index(Forest(0b1010)), idx(19));
+        assert_eq!(forest_to_rightmost_index(Forest(0b1011)), idx(21));
+        assert_eq!(forest_to_rightmost_index(Forest(0b1100)), idx(23));
+        assert_eq!(forest_to_rightmost_index(Forest(0b1101)), idx(25));
+        assert_eq!(forest_to_rightmost_index(Forest(0b1110)), idx(27));
+        assert_eq!(forest_to_rightmost_index(Forest(0b1111)), idx(29));
     }
 
     #[test]

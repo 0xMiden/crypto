@@ -14,7 +14,7 @@ use alloc::vec::Vec;
 
 use super::{
     super::{InnerNodeInfo, MerklePath},
-    MmrDelta, MmrError, MmrPeaks, MmrProof, Rpo256, Word,
+    MmrDelta, MmrError, MmrPeaks, MmrProof, Rpo256, RpoDigest, Word,
     bit::TrueBitPositionIterator,
     forest::{Forest, high_bitmask},
     nodes_in_forest,
@@ -311,8 +311,8 @@ impl Mmr {
         let mut path = Vec::with_capacity(tree_depth);
 
         // The tree walk below goes from the root to the leaf, compute the root index to start
-        let mut forest_target = 1usize << tree_bit;
-        let mut index = nodes_in_forest(forest_target) - 1;
+        let mut forest_target: usize = 1usize << tree_bit;
+        let mut index = Forest(forest_target).num_nodes() - 1;
 
         // Loop until the leaf is reached
         while forest_target > 1 {
@@ -321,7 +321,7 @@ impl Mmr {
 
             // compute the indices of the right and left subtrees based on the post-order
             let right_offset = index - 1;
-            let left_offset = right_offset - nodes_in_forest(forest_target);
+            let left_offset = right_offset - Forest(forest_target).num_nodes();
 
             let left_or_right = relative_pos & forest_target;
             let sibling = if left_or_right != 0 {
@@ -411,7 +411,7 @@ impl Iterator for MmrNodes<'_> {
 
             // compute the number of nodes in the right tree, this is the offset to the
             // previous left parent
-            let right_nodes = nodes_in_forest(self.last_right);
+            let right_nodes = Forest(self.last_right).num_nodes();
             // the next parent position is one above the position of the pair
             let parent = self.last_right << 1;
 

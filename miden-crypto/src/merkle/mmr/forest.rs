@@ -23,8 +23,7 @@ impl Forest {
         self.0
     }
     
-    // TODO: make it usize for consistency
-    pub fn num_trees(self) -> usize {
+    pub const fn num_trees(self) -> usize {
         self.0.count_ones() as usize
     }
 
@@ -45,8 +44,6 @@ impl Forest {
         Forest(result)
     }
 
-    // TODO: this is not great if it's not a single tree
-    // maybe debug_assert is sufficient
     pub fn all_smaller_trees(self) -> Forest {
         debug_assert!(self.0.count_ones() == 1);
         Forest(self.0 - 1)
@@ -65,7 +62,7 @@ impl Forest {
     /// Panics:
     ///
     /// This will panic if the forest has size greater than `usize::MAX / 2`
-    pub fn num_nodes(self) -> usize {
+    pub const fn num_nodes(self) -> usize {
         self.0 * 2 - self.num_trees() as usize
     }
 
@@ -114,22 +111,6 @@ impl Forest {
         //let tree_offset = forest_before.num_nodes();
         let leaf_offset = pos - forest_before.0;
         Some((tree, leaf_offset))
-    }
-
-    pub fn diff(self, other: Forest) -> Forest {
-        Forest(self.0 ^ other.0)
-    }
-
-    pub fn intersect(self, other: Forest) -> Forest {
-        Forest(self.0 & other.0)
-    }
-
-    pub fn union(self, other: Forest) -> Forest {
-        Forest(self.0 | other.0)
-    }
-
-    pub fn max_tree_height(self) -> usize {
-        1 << self.0.ilog2()
     }
 }
 
