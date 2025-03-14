@@ -1,6 +1,7 @@
 /// The representation of a single Merkle path.
 use super::super::MerklePath;
-use super::{full::high_bitmask, leaf_to_corresponding_tree};
+use super::forest::{high_bitmask, Forest};
+use super::{leaf_to_corresponding_tree};
 
 // MMR PROOF
 // ================================================================================================
@@ -25,8 +26,8 @@ impl MmrProof {
     pub fn relative_pos(&self) -> usize {
         let tree_bit = leaf_to_corresponding_tree(self.position, self.forest)
             .expect("position must be part of the forest");
-        let forest_before = self.forest & high_bitmask(tree_bit + 1);
-        self.position - forest_before
+        let forest_before = Forest(self.forest) & high_bitmask(tree_bit + 1);
+        self.position - forest_before.0
     }
 
     /// Returns index of the MMR peak against which the Merkle path in this proof can be verified.
