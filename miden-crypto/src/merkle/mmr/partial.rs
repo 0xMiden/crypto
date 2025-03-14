@@ -772,7 +772,7 @@ mod tests {
         let nodes_before = partial.nodes.clone();
 
         // compute and apply delta
-        let delta = mmr.get_delta(partial.forest().0, mmr.forest()).unwrap();
+        let delta = mmr.get_delta(partial.forest(), mmr.forest()).unwrap();
         let nodes_delta = partial.apply(delta).unwrap();
 
         // new peaks were computed correctly
@@ -900,7 +900,7 @@ mod tests {
             partial_mmr.add(el, false);
 
             assert_eq!(mmr.peaks(), partial_mmr.peaks());
-            assert_eq!(mmr.forest(), partial_mmr.forest().0);
+            assert_eq!(mmr.forest(), partial_mmr.forest());
         }
     }
 
@@ -916,7 +916,7 @@ mod tests {
             partial_mmr.add(el, true);
 
             assert_eq!(mmr.peaks(), partial_mmr.peaks());
-            assert_eq!(mmr.forest(), partial_mmr.forest().0);
+            assert_eq!(mmr.forest(), partial_mmr.forest());
 
             for pos in 0..i {
                 let mmr_proof = mmr.open(pos as usize).unwrap();

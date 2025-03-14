@@ -1,4 +1,4 @@
-use core::{fmt::Display, ops::{BitAnd, BitOr, BitXor, BitXorAssign, ShlAssign}};
+use core::{fmt::{Binary, Display}, ops::{BitAnd, BitOr, BitXor, BitXorAssign, ShlAssign}};
 
 // TODO: make the field private
 #[derive(Debug, Copy, Clone, Default, PartialEq, Eq, PartialOrd, Ord)]
@@ -139,6 +139,12 @@ impl Display for Forest {
     }
 }
 
+impl Binary for Forest {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        write!(f, "{:b}", self.0)
+    }
+}
+
 impl BitAnd<Forest> for Forest {
     type Output = Forest;
 
@@ -182,8 +188,4 @@ pub(crate) const fn high_bitmask(bit: u32) -> Forest {
     } else {
         Forest(usize::MAX << bit)
     }
-}
-
-pub fn nodes_in_tree(tree: u64) -> u64 {
-    2 * tree - 1
 }

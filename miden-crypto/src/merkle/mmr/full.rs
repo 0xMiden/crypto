@@ -56,7 +56,7 @@ impl Mmr {
     /// Constructor for an empty `Mmr`.
     pub fn new() -> Mmr {
         Mmr {
-            forest: Forest::default(),
+            forest: Forest::empty(),
             nodes: Vec::new(),
         }
     }
@@ -70,8 +70,8 @@ impl Mmr {
     /// - its value is the number of elements in the forest
     /// - bit count corresponds to the number of trees in the forest
     /// - each true bit position determines the depth of a tree in the forest
-    pub const fn forest(&self) -> usize {
-        self.forest.0
+    pub const fn forest(&self) -> Forest {
+        self.forest
     }
 
     // FUNCTIONALITY
@@ -206,10 +206,7 @@ impl Mmr {
     ///
     /// The result is a packed sequence of the authentication elements required to update the trees
     /// that have been merged together, followed by the new peaks of the [Mmr].
-    pub fn get_delta(&self, from_forest: usize, to_forest: usize) -> Result<MmrDelta, MmrError> {
-        let from_forest = Forest(from_forest);
-        let to_forest = Forest(to_forest);
-
+    pub fn get_delta(&self, from_forest: Forest, to_forest: Forest) -> Result<MmrDelta, MmrError> {
         if to_forest > self.forest || from_forest > to_forest {
             return Err(MmrError::InvalidPeaks(format!(
                 "to_forest {to_forest} exceeds the current forest {} or from_forest {from_forest} exceeds to_forest",
