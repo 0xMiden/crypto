@@ -14,11 +14,11 @@ use alloc::vec::Vec;
 
 use super::{
     super::{InnerNodeInfo, MerklePath},
-    MmrDelta, MmrError, MmrPeaks, MmrProof, Rpo256, RpoDigest, Word,
+    MmrDelta, MmrError, MmrPeaks, MmrProof,
     bit::TrueBitPositionIterator,
-    forest::{Forest, high_bitmask},
-    nodes_in_forest,
+    forest::Forest,
 };
+use crate::{Word, merkle::Rpo256};
 
 // MMR
 // ===============================================================================================
@@ -106,7 +106,7 @@ impl Mmr {
             forest.leaf_to_corresponding_tree(pos).ok_or(MmrError::PositionNotFound(pos))?;
 
         // isolate the trees before the target
-        let forest_before = forest & high_bitmask(tree_bit + 1);
+        let forest_before = forest.trees_larger_than(tree_bit);
         let index_offset = forest_before.num_nodes();
 
         // update the value position from global to the target tree
@@ -135,7 +135,7 @@ impl Mmr {
             .ok_or(MmrError::PositionNotFound(pos))?;
 
         // isolate the trees before the target
-        let forest_before = self.forest & high_bitmask(tree_bit + 1);
+        let forest_before = self.forest.trees_larger_than(tree_bit);
         let index_offset = forest_before.num_nodes();
 
         // update the value position from global to the target tree

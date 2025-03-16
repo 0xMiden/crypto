@@ -77,6 +77,10 @@ impl Forest {
         }
     }
 
+    pub fn trees_larger_than(self, base: u32) -> Forest {
+        self & high_bitmask(base + 1)
+    }
+
     pub fn all_smaller_trees(self) -> Forest {
         debug_assert!(self.0.count_ones() == 1);
         Forest::with_leaves(self.0 - 1)
