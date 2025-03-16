@@ -222,7 +222,7 @@ impl Mmr {
 
         // Find the largest tree in this [Mmr] which is new to `from_forest`.
         let candidate_trees = to_forest ^ from_forest;
-        let mut new_high = candidate_trees.highest_tree();
+        let mut new_high = candidate_trees.largest_tree();
 
         // Collect authentication nodes used for tree merges
         // ----------------------------------------------------------------------------------------
@@ -270,7 +270,7 @@ impl Mmr {
         let old_peaks = to_forest ^ new_peaks;
         let mut offset = old_peaks.num_nodes();
         while !new_peaks.is_empty() {
-            let target = new_peaks.highest_tree();
+            let target = new_peaks.largest_tree();
             offset += target.num_nodes();
             result.push(self.nodes[offset - 1]);
             new_peaks ^= target;

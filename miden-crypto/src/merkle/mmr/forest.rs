@@ -3,6 +3,8 @@ use core::{
     ops::{BitAnd, BitOr, BitXor, BitXorAssign, ShlAssign},
 };
 
+use crate::Felt;
+
 // TODO: make the field private
 #[derive(Debug, Copy, Clone, Default, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Forest(usize);
@@ -30,17 +32,30 @@ impl Forest {
         self.0
     }
 
+    /// Return the total number of nodes of a given forest
+    ///
+    /// Panics:
+    ///
+    /// This will panic if the forest has size greater than `usize::MAX / 2`
+    pub const fn num_nodes(self) -> usize {
+        self.0 * 2 - self.num_trees() as usize
+    }
+
     pub const fn num_trees(self) -> usize {
         self.0.count_ones() as usize
     }
 
-    pub fn highest_tree(self) -> Forest {
-        Forest::with_leaves(1 << self.0.ilog2())
+    pub fn largest_tree_height(self) -> usize {
+        self.0.ilog2() as usize
     }
 
-    pub fn highest_tree_checked(self) -> Forest {
+    pub fn largest_tree(self) -> Forest {
+        Forest::with_leaves(1 << self.largest_tree_height())
+    }
+
+    pub fn largest_tree_checked(self) -> Forest {
         if self.0 > 0 {
-            Forest::with_leaves(1 << self.0.ilog2())
+            self.largest_tree()
         } else {
             Forest::empty()
         }
@@ -51,12 +66,15 @@ impl Forest {
     }
 
     pub fn smallest_tree(self) -> Forest {
-        Forest::with_leaves(1 << self.0.trailing_zeros())
+        Forest::with_leaves(1 << self.smallest_tree_height())
     }
 
     pub fn smallest_tree_checked(self) -> Forest {
-        let result = 1usize.checked_shl(self.0.trailing_zeros()).unwrap_or(0);
-        Forest::with_leaves(result)
+        if self.0 > 0 {
+            self.smallest_tree()
+        } else {
+            Forest::empty()
+        }
     }
 
     pub fn all_smaller_trees(self) -> Forest {
@@ -76,18 +94,7 @@ impl Forest {
         Forest::with_leaves(self.0 & (usize::MAX << 1))
     }
 
-    /// Return the total number of nodes of a given forest
-    ///
-    /// Panics:
-    ///
-    /// This will panic if the forest has size greater than `usize::MAX / 2`
-    pub const fn num_nodes(self) -> usize {
-        self.0 * 2 - self.num_trees() as usize
-    }
 
-    pub fn contains_tree(self, tree: usize) -> bool {
-        (self.0 & tree) != 0
-    }
 
     /// Given a 0-indexed leaf position and the current forest, return the tree number responsible
     /// for the position.
@@ -181,6 +188,19 @@ impl ShlAssign<usize> for Forest {
         self.0 <<= rhs;
     }
 }
+
+impl From<Felt> for Forest {
+    fn from(value: Felt) -> Self {
+        Self::with_leaves(value.as_int() as usize)
+    }
+}
+
+impl Into<Felt> for Forest {
+    fn into(self) -> Felt {
+        Felt::new(self.0 as u64)
+    }
+}
+
 
 /// Return a bitmask for the bits including and above the given position.
 pub(crate) const fn high_bitmask(bit: u32) -> Forest {
