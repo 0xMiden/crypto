@@ -544,15 +544,14 @@ fn test_bit_position_iterator() {
         vec![Forest::with_leaves(2), Forest::with_leaves(1)],
     );
 
-    // TODO: convert
-    // assert_eq!(
-    //     TrueBitPositionIterator::new(0b11010101).collect::<Vec<Forest>>(),
-    //     vec![0, 2, 4, 6, 7],
-    // );
-    // assert_eq!(
-    //     TrueBitPositionIterator::new(0b11010101).rev().collect::<Vec<Forest>>(),
-    //     vec![7, 6, 4, 2, 0],
-    // );
+    assert_eq!(
+        TrueBitPositionIterator::new(Forest::with_leaves(0b11010101)).collect::<Vec<Forest>>(),
+        vec![0, 2, 4, 6, 7].into_iter().map(|bit| Forest::with_leaves(1 << bit)).collect::<Vec<_>>()
+    );
+    assert_eq!(
+        TrueBitPositionIterator::new(Forest::with_leaves(0b11010101)).rev().collect::<Vec<Forest>>(),
+        vec![7, 6, 4, 2, 0].into_iter().map(|bit| Forest::with_leaves(1 << bit)).collect::<Vec<_>>()
+    );
 }
 
 #[test]

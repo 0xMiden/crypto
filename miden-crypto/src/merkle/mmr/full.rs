@@ -166,7 +166,7 @@ impl Mmr {
             left_tree <<= 1;
         }
 
-        self.forest.add_leaf();
+        self.forest = self.forest.with_new_leaf();
     }
 
     /// Returns the current peaks of the MMR.

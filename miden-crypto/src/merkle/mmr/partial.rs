@@ -5,7 +5,7 @@ use alloc::{
 
 use winter_utils::{Deserializable, Serializable};
 
-use super::{MmrDelta, MmrProof, Rpo256, RpoDigest};
+use super::{MmrDelta, MmrProof};
 use crate::{
     Word,
     hash::rpo::Rpo256,
@@ -74,7 +74,7 @@ pub struct PartialMmr {
 impl Default for PartialMmr {
     /// Creates a new [PartialMmr] with default values.
     fn default() -> Self {
-        let forest = Forest(0);
+        let forest = Forest::with_leaves(0);
         let peaks = Vec::new();
         let nodes = BTreeMap::new();
         let track_latest = false;
@@ -226,7 +226,7 @@ impl PartialMmr {
     ///
     /// When `track` is `true` the new leaf is tracked.
     pub fn add(&mut self, leaf: Word, track: bool) -> Vec<(InOrderIndex, Word)> {
-        self.forest.add_leaf();
+        self.forest = self.forest.with_new_leaf();
         let merges = self.forest.smallest_tree_height();
         let mut new_nodes = Vec::with_capacity(merges);
 
@@ -603,7 +603,7 @@ impl Deserializable for PartialMmr {
         source: &mut R,
     ) -> Result<Self, winter_utils::DeserializationError> {
         let forest = Forest::with_leaves(usize::read_from(source)?);
-        let peaks = Vec::<RpoDigest>::read_from(source)?;
+        let peaks = Vec::<Word>::read_from(source)?;
         let nodes = NodeMap::read_from(source)?;
         let track_latest = source.read_bool()?;
 
