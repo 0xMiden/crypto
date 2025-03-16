@@ -6,17 +6,17 @@ use core::{
 use crate::Felt;
 
 /// A compact representation of trees (or peaks) in Merkle Mountain Range (MMR)
-/// 
+///
 /// Each active bit of the stored number represents a disjoint tree with number of leaves
 /// equal to the bit position.
-/// 
+///
 /// Examples:
 /// - Forest(0) is a forest with no trees.
 /// - Forest(0b01) is a forest with a single node (the smallest tree possible)
 /// - Forest(0b10) is a forest with a single binary tree with 2 leaves (3 modes)
 /// - Forest(0b11) is a forest with two trees: one with a single node, and one with 3 nodes
-/// - Forest(0b1010) is a forest with two trees: one with 8 leaves (15 nodes),
-///     one with 2 leaves (3 nodes)
+/// - Forest(0b1010) is a forest with two trees: one with 8 leaves (15 nodes), one with 2 leaves (3
+///   nodes)
 #[derive(Debug, Copy, Clone, Default, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Forest(usize);
 
@@ -173,7 +173,6 @@ impl Forest {
         let forest_before = self & high_bitmask(tree + 1);
         Some(pos - forest_before.0)
     }
-
 }
 
 impl Display for Forest {
@@ -235,7 +234,6 @@ impl Into<Felt> for Forest {
         Felt::new(self.0 as u64)
     }
 }
-
 
 /// Return a bitmask for the bits including and above the given position.
 pub(crate) const fn high_bitmask(bit: u32) -> Forest {
