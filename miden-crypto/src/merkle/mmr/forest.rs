@@ -64,6 +64,8 @@ impl Forest {
 
     /// Returns the height (bit position) of the largest tree in the forest
     pub fn largest_tree_height(self) -> usize {
+        // ilog2 is computed with leading zeros, which itself is computed with the intrinsic ctlz.
+        // [Rust 1.67.0] x86 uses the `bsr` instruction. AArch64 uses the `clz` instruction.
         self.0.ilog2() as usize
     }
 
@@ -88,6 +90,8 @@ impl Forest {
 
     /// Returns the height (bit position) of the smallest tree in the forest
     pub fn smallest_tree_height(self) -> usize {
+        // Trailing_zeros is computed with the intrinsic cttz. [Rust 1.67.0] x86 uses the `bsf`
+        // instruction. AArch64 uses the `rbit clz` instructions.
         self.0.trailing_zeros() as usize
     }
 
