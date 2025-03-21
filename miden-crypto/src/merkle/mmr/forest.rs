@@ -18,6 +18,7 @@ use crate::Felt;
 /// - Forest(0b1010) is a forest with two trees: one with 8 leaves (15 nodes), one with 2 leaves (3
 ///   nodes)
 #[derive(Debug, Copy, Clone, Default, PartialEq, Eq, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 pub struct Forest(usize);
 
 impl Forest {
