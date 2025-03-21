@@ -54,7 +54,7 @@ impl Forest {
     ///
     /// This will panic if the forest has size greater than `usize::MAX / 2`
     pub const fn num_nodes(self) -> usize {
-        self.0 * 2 - self.num_trees() as usize
+        self.0 * 2 - self.num_trees()
     }
 
     /// Return the total number of trees of a given forest (the number of active bits)
@@ -230,9 +230,9 @@ impl From<Felt> for Forest {
     }
 }
 
-impl Into<Felt> for Forest {
-    fn into(self) -> Felt {
-        Felt::new(self.0 as u64)
+impl From<Forest> for Felt {
+    fn from(value: Forest) -> Felt {
+        Felt::new(value.0 as u64)
     }
 }
 
