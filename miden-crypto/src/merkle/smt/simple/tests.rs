@@ -10,8 +10,8 @@ use crate::{
     EMPTY_WORD, Word,
     hash::rpo::Rpo256,
     merkle::{
-        EmptySubtreeRoots, InnerNodeInfo, LeafIndex, MerkleTree, digests_to_words, int_to_leaf,
-        int_to_node, smt::SparseMerkleTree,
+        EmptySubtreeRoots, InnerNodeInfo, LeafIndex, MerklePath, MerkleTree, digests_to_words,
+        int_to_leaf, int_to_node, smt::SparseMerkleTree,
     },
 };
 
@@ -115,10 +115,22 @@ fn test_depth2_tree() {
     assert_eq!(VALUES4[3], tree.get_node(NodeIndex::make(2, 3)).unwrap());
 
     // check get_path(): depth 2
-    assert_eq!(vec![VALUES4[1], node3], *tree.open(&LeafIndex::<2>::new(0).unwrap()).path);
-    assert_eq!(vec![VALUES4[0], node3], *tree.open(&LeafIndex::<2>::new(1).unwrap()).path);
-    assert_eq!(vec![VALUES4[3], node2], *tree.open(&LeafIndex::<2>::new(2).unwrap()).path);
-    assert_eq!(vec![VALUES4[2], node2], *tree.open(&LeafIndex::<2>::new(3).unwrap()).path);
+    assert_eq!(
+        MerklePath::from(vec![VALUES4[1], node3]),
+        tree.open(&LeafIndex::<2>::new(0).unwrap()).path,
+    );
+    assert_eq!(
+        MerklePath::from(vec![VALUES4[0], node3]),
+        tree.open(&LeafIndex::<2>::new(1).unwrap()).path,
+    );
+    assert_eq!(
+        MerklePath::from(vec![VALUES4[3], node2]),
+        tree.open(&LeafIndex::<2>::new(2).unwrap()).path,
+    );
+    assert_eq!(
+        MerklePath::from(vec![VALUES4[2], node2]),
+        tree.open(&LeafIndex::<2>::new(3).unwrap()).path,
+    );
 }
 
 #[test]
@@ -239,7 +251,7 @@ fn small_tree_opening_is_consistent() {
     for (key, path) in cases {
         let opening = tree.open(&LeafIndex::<3>::new(key).unwrap());
 
-        assert_eq!(path, *opening.path);
+        assert_eq!(MerklePath::from(path), opening.path);
     }
 }
 
