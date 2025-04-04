@@ -1,5 +1,8 @@
 use alloc::vec::Vec;
-use core::ops::{Deref, DerefMut};
+use core::{
+    num::NonZero,
+    ops::{Deref, DerefMut},
+};
 
 use super::{InnerNodeInfo, MerkleError, NodeIndex, Rpo256, RpoDigest};
 use crate::{
@@ -34,6 +37,26 @@ impl MerklePath {
 
     // PROVIDERS
     // --------------------------------------------------------------------------------------------
+
+    /// Returns a reference to the path node at the specified depth.
+    ///
+    /// The `depth` parameter is defined in terms of `self.depth()`. Merkle paths conventionally do
+    /// not include the root, so the shallowest depth is `1`, and the deepest depth is
+    /// `self.depth()`.
+    pub fn at_depth(&self, depth: NonZero<u8>) -> Option<RpoDigest> {
+        let index = u8::checked_sub(self.depth(), depth.get())?;
+        self.nodes.get(index as usize).copied()
+    }
+
+    /// Returns a reference to the path node at the specified index, or [None] if the index is out
+    /// of bounds.
+    ///
+    /// The node at index 0 is the deepest part of the path.
+    ///
+    /// This is a checked version of using the indexing operator `[]`.
+    pub fn at_idx(&self, index: usize) -> Option<RpoDigest> {
+        self.nodes.get(index).copied()
+    }
 
     /// Returns the depth in which this Merkle path proof is valid.
     pub fn depth(&self) -> u8 {
