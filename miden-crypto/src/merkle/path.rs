@@ -11,6 +11,9 @@ use crate::{
 // ================================================================================================
 
 /// A merkle path container, composed of a sequence of nodes of a Merkle tree.
+///
+/// Indexing into this type starts at the deepest part of the path and gets shallower. That is,
+/// the node at index `0` is deeper than the node at index `self.len() - 1`.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 pub struct MerklePath {
@@ -22,6 +25,8 @@ impl MerklePath {
     // --------------------------------------------------------------------------------------------
 
     /// Creates a new Merkle path from a list of nodes.
+    ///
+    /// The list must be in order of deepest to shallowest.
     pub fn new(nodes: Vec<RpoDigest>) -> Self {
         assert!(nodes.len() <= u8::MAX.into(), "MerklePath may have at most 256 items");
         Self { nodes }
@@ -35,7 +40,7 @@ impl MerklePath {
         self.nodes.len() as u8
     }
 
-    /// Returns a reference to the [MerklePath]'s nodes.
+    /// Returns a reference to the [MerklePath]'s nodes, in order of deepest to shallowest.
     pub fn nodes(&self) -> &[RpoDigest] {
         &self.nodes
     }
