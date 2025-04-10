@@ -141,6 +141,11 @@ impl Forest {
         Forest::with_leaves(self.0 & (usize::MAX << 1))
     }
 
+    /// Returns a new Forest that does not have the trees that `other` has.
+    pub fn without_trees(self, other: Forest) -> Self {
+        self ^ other
+    }
+
     /// Given a 0-indexed leaf position in the current forest, return the tree number responsible
     /// for the position.
     ///

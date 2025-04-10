@@ -3,7 +3,7 @@ use alloc::vec::Vec;
 use super::{
     super::{InnerNodeInfo, Rpo256, Word},
     Mmr, MmrPeaks, PartialMmr,
-    bit::TrueBitPositionIterator,
+    bit::TreeSizeIterator,
 };
 use crate::{
     Felt,
@@ -495,7 +495,7 @@ fn test_mmr_invariants() {
         );
 
         let expected_nodes: usize =
-            TrueBitPositionIterator::new(mmr.forest()).map(|tree| tree.num_nodes()).sum();
+            TreeSizeIterator::new(mmr.forest()).map(|tree| tree.num_nodes()).sum();
 
         assert_eq!(
             expected_nodes,
@@ -508,51 +508,45 @@ fn test_mmr_invariants() {
 
 #[test]
 fn test_bit_position_iterator() {
-    assert_eq!(TrueBitPositionIterator::new(Forest::empty()).count(), 0);
-    assert_eq!(TrueBitPositionIterator::new(Forest::empty()).rev().count(), 0);
+    assert_eq!(TreeSizeIterator::new(Forest::empty()).count(), 0);
+    assert_eq!(TreeSizeIterator::new(Forest::empty()).rev().count(), 0);
 
     assert_eq!(
-        TrueBitPositionIterator::new(Forest::with_leaves(1)).collect::<Vec<Forest>>(),
+        TreeSizeIterator::new(Forest::with_leaves(1)).collect::<Vec<Forest>>(),
         vec![Forest::with_leaves(1)]
     );
     assert_eq!(
-        TrueBitPositionIterator::new(Forest::with_leaves(1))
-            .rev()
-            .collect::<Vec<Forest>>(),
+        TreeSizeIterator::new(Forest::with_leaves(1)).rev().collect::<Vec<Forest>>(),
         vec![Forest::with_leaves(1)],
     );
 
     assert_eq!(
-        TrueBitPositionIterator::new(Forest::with_leaves(2)).collect::<Vec<Forest>>(),
+        TreeSizeIterator::new(Forest::with_leaves(2)).collect::<Vec<Forest>>(),
         vec![Forest::with_leaves(2)]
     );
     assert_eq!(
-        TrueBitPositionIterator::new(Forest::with_leaves(2))
-            .rev()
-            .collect::<Vec<Forest>>(),
+        TreeSizeIterator::new(Forest::with_leaves(2)).rev().collect::<Vec<Forest>>(),
         vec![Forest::with_leaves(2)],
     );
 
     assert_eq!(
-        TrueBitPositionIterator::new(Forest::with_leaves(3)).collect::<Vec<Forest>>(),
+        TreeSizeIterator::new(Forest::with_leaves(3)).collect::<Vec<Forest>>(),
         vec![Forest::with_leaves(1), Forest::with_leaves(2)],
     );
     assert_eq!(
-        TrueBitPositionIterator::new(Forest::with_leaves(3))
-            .rev()
-            .collect::<Vec<Forest>>(),
+        TreeSizeIterator::new(Forest::with_leaves(3)).rev().collect::<Vec<Forest>>(),
         vec![Forest::with_leaves(2), Forest::with_leaves(1)],
     );
 
     assert_eq!(
-        TrueBitPositionIterator::new(Forest::with_leaves(0b11010101)).collect::<Vec<Forest>>(),
+        TreeSizeIterator::new(Forest::with_leaves(0b11010101)).collect::<Vec<Forest>>(),
         vec![0, 2, 4, 6, 7]
             .into_iter()
             .map(|bit| Forest::with_leaves(1 << bit))
             .collect::<Vec<_>>()
     );
     assert_eq!(
-        TrueBitPositionIterator::new(Forest::with_leaves(0b11010101))
+        TreeSizeIterator::new(Forest::with_leaves(0b11010101))
             .rev()
             .collect::<Vec<Forest>>(),
         vec![7, 6, 4, 2, 0]

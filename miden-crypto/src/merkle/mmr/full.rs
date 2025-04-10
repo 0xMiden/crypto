@@ -15,7 +15,7 @@ use alloc::vec::Vec;
 use super::{
     super::{InnerNodeInfo, MerklePath},
     MmrDelta, MmrError, MmrPeaks, MmrProof,
-    bit::TrueBitPositionIterator,
+    bit::TreeSizeIterator,
     forest::Forest,
 };
 use crate::{Word, merkle::Rpo256};
@@ -186,7 +186,7 @@ impl Mmr {
             )));
         }
 
-        let peaks: Vec<Word> = TrueBitPositionIterator::new(forest)
+        let peaks: Vec<Word> = TreeSizeIterator::new(forest)
             .rev()
             .map(|tree| tree.num_nodes())
             .scan(0, |offset, el| {
