@@ -16,10 +16,10 @@ pub struct BenchmarkCmd {
     #[clap(short = 's', long = "size", default_value = "1000000")]
     size: usize,
     /// Number of insertions
-    #[clap(short = 'i', long = "insertions", default_value = "1000")]
+    #[clap(short = 'i', long = "insertions", default_value = "10000")]
     insertions: usize,
     /// Number of updates
-    #[clap(short = 'u', long = "updates", default_value = "1000")]
+    #[clap(short = 'u', long = "updates", default_value = "10000")]
     updates: usize,
 }
 

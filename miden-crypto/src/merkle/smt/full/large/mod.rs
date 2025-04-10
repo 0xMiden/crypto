@@ -21,6 +21,9 @@ use crate::merkle::smt::{NodeMutation, NodeMutations, UnorderedMap};
 #[cfg(test)]
 mod tests;
 
+mod subtree;
+use subtree::Subtree;
+
 // CONSTANTS
 // ================================================================================================
 
@@ -339,10 +342,7 @@ impl LargeSmt {
             });
         }
 
-        let mut batch = rocksdb::WriteBatch::default();
-
         for (index, mutation) in node_mutations {
-            if index.depth() <= IN_MEMORY_DEPTH {
                 match mutation {
                     Removal => {
                         self.remove_inner_node(index);
@@ -351,19 +351,7 @@ impl LargeSmt {
                         self.insert_inner_node(index, node);
                     },
                 }
-            } else {
-                let key = Self::inner_key(index.depth(), index.value());
-                match mutation {
-                    Removal => {
-                        batch.delete(key);
-                    },
-                    Addition(node) => {
-                        batch.put(key, node.to_bytes());
-                    },
-                }
-            }
         }
-        self.db.write(batch).expect("Failed to write inner nodes batch to RocksDB");
 
         for (key, value) in new_pairs {
             self.insert_value(key, value);
@@ -412,6 +400,9 @@ impl LargeSmt {
             nodes: initial_leaves,
         } = Smt::sorted_pairs_to_leaves(entries)?;
         // If there are no leaves, we can return early
+        if initial_leaves.is_empty() {
+            return Ok(());
+        }
 
         // Store the leaves in the database
         self.store_leaves_to_db_batch(&initial_leaves);
@@ -419,8 +410,37 @@ impl LargeSmt {
         if initial_leaves.is_empty() {
             return Ok(());
         }
-        // build the lower part of the tree
-        for current_depth in (SUBTREE_DEPTH..=SMT_DEPTH).step_by(SUBTREE_DEPTH as usize).rev() {
+
+        for current_depth in (IN_MEMORY_DEPTH + SUBTREE_DEPTH..=SMT_DEPTH).step_by(SUBTREE_DEPTH as usize).rev() {
+            let (subtrees, mut subtree_roots): (Vec<(Vec<u8>, Vec<u8>)>, Vec<SubtreeLeaf>) =
+                leaf_subtrees
+                    .into_par_iter()
+                    .map(|subtree| {
+                        debug_assert!(subtree.is_sorted());
+                        debug_assert!(!subtree.is_empty());
+                        let (nodes, subtree_root) =
+                            build_subtree(subtree, SMT_DEPTH, current_depth);
+                        // TODO: optimize this
+                        let subtree_root_index = NodeIndex::new(current_depth-SUBTREE_DEPTH, subtree_root.col).unwrap();
+                        let mut subtree = Subtree::new(subtree_root_index);
+                        for (index, node) in nodes {    
+                            subtree.insert_inner_node(index, node);
+                        }
+                        let subtree_key = Subtree::subtree_key(subtree_root_index);
+                        let subtree_value = subtree.to_vec();
+                        ((subtree_key, subtree_value), subtree_root)
+                    })
+                    .unzip();
+            leaf_subtrees = SubtreeLeavesIter::from_leaves(&mut subtree_roots).collect();
+            debug_assert!(!leaf_subtrees.is_empty());
+
+            let mut batch = WriteBatch::default();
+            for (key, value) in subtrees {
+                batch.put(key, value);
+            }
+            self.db.write(batch).expect("Failed to store subtree batch");
+        }
+        for current_depth in (SUBTREE_DEPTH..=IN_MEMORY_DEPTH).step_by(SUBTREE_DEPTH as usize).rev() {
             let (nodes, mut subtree_roots): (Vec<UnorderedMap<_, _>>, Vec<SubtreeLeaf>) =
                 leaf_subtrees
                     .into_par_iter()
@@ -436,7 +456,9 @@ impl LargeSmt {
             debug_assert!(!leaf_subtrees.is_empty());
 
             // Insert the inner nodes into the tree
-            self.insert_inner_nodes_batch(nodes.into_iter().flatten());
+            for subtree_nodes in nodes {
+                self.insert_inner_nodes_batch(subtree_nodes.into_iter());
+            }
         }
         self.root = self.get_inner_node(NodeIndex::root()).hash();
         Ok(())
@@ -719,13 +741,18 @@ impl SparseMerkleTree<SMT_DEPTH> for LargeSmt {
                 .unwrap_or_else(|| EmptySubtreeRoots::get_inner_node(SMT_DEPTH, index.depth()));
         }
 
-        let key = Self::inner_key(index.depth(), index.value());
-        self.db
-            .get(key)
+        let subtree_root_index = Subtree::find_subtree_root(index);
+        let subtree_key = Subtree::subtree_key(subtree_root_index);
+        
+        let subtree = self.db.get(&subtree_key)
             .ok()
             .flatten()
-            .and_then(|bytes| InnerNode::read_from_bytes(&bytes).ok())
-            .unwrap_or_else(|| EmptySubtreeRoots::get_inner_node(SMT_DEPTH, index.depth()))
+            .map_or_else(
+                || Subtree::new(subtree_root_index),
+                |bytes| Subtree::from_vec(subtree_root_index, bytes).unwrap()
+            );
+
+        subtree.get_inner_node(index).unwrap_or_else(|| EmptySubtreeRoots::get_inner_node(SMT_DEPTH, index.depth())).clone()
     }
 
     fn insert_inner_node(&mut self, index: NodeIndex, inner_node: InnerNode) -> Option<InnerNode> {
@@ -738,17 +765,18 @@ impl SparseMerkleTree<SMT_DEPTH> for LargeSmt {
             return old;
         }
 
-        let key = Self::inner_key(index.depth(), index.value());
-        let old_bytes = self.db.get(&key).ok().flatten();
-
-        // serialize and write new node
-        let new_bytes = inner_node.to_bytes();
-        self.db.put(&key, new_bytes).expect("failed to write to RocksDB");
+        let subtree_root_index = Subtree::find_subtree_root(index);
+        let subtree_key = Subtree::subtree_key(subtree_root_index);
+        let mut subtree = match self.db.get(&subtree_key).ok().flatten() {
+            Some(subtree_bytes) => Subtree::from_vec(subtree_root_index, subtree_bytes).unwrap(),
+            None => Subtree::new(subtree_root_index),
+        };
+        
+        let old_value = subtree.insert_inner_node(index, inner_node);
+        self.db.put(&subtree_key, subtree.to_vec()).expect("failed to write to RocksDB");
 
         // deserialize and return old value if it existed
-        old_bytes.map(|bytes| {
-            InnerNode::read_from_bytes(&bytes).expect("failed to deserialize InnerNode")
-        })
+        old_value
     }
 
     fn remove_inner_node(&mut self, index: NodeIndex) -> Option<InnerNode> {
@@ -761,15 +789,17 @@ impl SparseMerkleTree<SMT_DEPTH> for LargeSmt {
             return old;
         }
 
-        let key = Self::inner_key(index.depth(), index.value());
-        let old_bytes = self.db.get(&key).ok().flatten();
-
-        if let Some(bytes) = old_bytes {
-            self.db.delete(&key).expect("failed to delete from RocksDB");
-            Some(InnerNode::read_from_bytes(&bytes).expect("failed to deserialize InnerNode"))
-        } else {
-            None
-        }
+        let subtree_root_index = Subtree::find_subtree_root(index);
+        let subtree_key = Subtree::subtree_key(subtree_root_index);
+        let mut subtree = match self.db.get(&subtree_key).ok().flatten() {
+            Some(subtree_bytes) => Subtree::from_vec(subtree_root_index, subtree_bytes).unwrap(),
+            None => return None, // nothing to remove, return None
+        };
+        
+        let old_value = subtree.remove_inner_node(index);
+        self.db.put(&subtree_key, subtree.to_vec()).expect("failed to write to RocksDB");
+        old_value
+        // TODO: remove the whole subtree if empty
     }
 
     fn insert_value(&mut self, key: Self::Key, value: Self::Value) -> Option<Self::Value> {
