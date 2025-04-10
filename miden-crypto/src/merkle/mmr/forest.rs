@@ -78,7 +78,7 @@ impl Forest {
         Forest::with_leaves(1 << self.largest_tree_height())
     }
 
-    /// Returns a forest with only the largest tree preset.
+    /// Returns a forest with only the largest tree present.
     /// If forest cannot be empty, use `largest_tree` for performance.
     pub fn largest_tree_checked(self) -> Forest {
         if self.0 > 0 {
@@ -104,7 +104,7 @@ impl Forest {
         Forest::with_leaves(1 << self.smallest_tree_height())
     }
 
-    /// Returns a forest with only the smallest tree preset.
+    /// Returns a forest with only the smallest tree present.
     /// If forest cannot be empty, use `smallest_tree` for performance.
     pub fn smallest_tree_checked(self) -> Forest {
         if self.0 > 0 {
