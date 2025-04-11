@@ -50,6 +50,9 @@ impl<const DEPTH: u8> Display for LeafIndex<DEPTH> {
     }
 }
 
+#[doc(hidden)]
+pub use mmr::MountainRange;
+
 // HELPER FUNCTIONS
 // ================================================================================================
 

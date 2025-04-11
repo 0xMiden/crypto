@@ -567,6 +567,51 @@ fn test_bit_position_iterator() {
             .map(|bit| MountainRange::with_leaves(1 << bit))
             .collect::<Vec<_>>()
     );
+
+    let forest = MountainRange::with_leaves(0b1101_0101);
+    let mut it = TreeSizeIterator::new(forest);
+
+    // 0b1101_0101
+    //           ^
+    let smallest = it.next().unwrap();
+    assert_eq!(smallest.smallest_tree(), smallest);
+    assert_eq!(smallest.num_leaves(), 0b0000_0001);
+    assert_eq!(smallest.num_nodes(), 1);
+    assert_eq!(smallest.num_trees(), 1);
+
+    // 0b1101_0101
+    //         ^
+    let next_smallest = it.next().unwrap();
+    assert_eq!(next_smallest.smallest_tree(), next_smallest);
+    assert_eq!(next_smallest.num_leaves(), 0b0000_0100);
+    assert_eq!(next_smallest.num_nodes(), 0b0000_0111);
+    assert_eq!(next_smallest.num_trees(), 1);
+
+    // 0b1101_0101
+    //      ^
+    let next_smallest = it.next().unwrap();
+    assert_eq!(next_smallest.smallest_tree(), next_smallest);
+    assert_eq!(next_smallest.num_leaves(), 0b0001_0000);
+    assert_eq!(next_smallest.num_nodes(), 0b0001_1111);
+    assert_eq!(next_smallest.num_trees(), 1);
+
+    // 0b1101_0101
+    //    ^
+    let next_smallest = it.next().unwrap();
+    assert_eq!(next_smallest.smallest_tree(), next_smallest);
+    assert_eq!(next_smallest.num_leaves(), 0b0100_0000);
+    assert_eq!(next_smallest.num_nodes(), 0b0111_1111);
+    assert_eq!(next_smallest.num_trees(), 1);
+
+    // 0b1101_0101
+    //   ^
+    let next_smallest = it.next().unwrap();
+    assert_eq!(next_smallest.smallest_tree(), next_smallest);
+    assert_eq!(next_smallest.num_leaves(), 0b1000_0000);
+    assert_eq!(next_smallest.num_nodes(), 0b1111_1111);
+    assert_eq!(next_smallest.num_trees(), 1);
+
+    assert_eq!(it.next(), None);
 }
 
 #[test]
