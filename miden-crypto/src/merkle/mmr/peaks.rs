@@ -1,7 +1,7 @@
 use alloc::vec::Vec;
 
-use super::{super::ZERO, MmrError, MmrProof, forest::Forest};
-use crate::{Felt, Word, merkle::Rpo256};
+use super::{super::ZERO, MmrError, MmrProof, mountain_range::MountainRange};
+use crate::{Felt, Word, hash::rpo::Rpo256};
 
 // MMR PEAKS
 // ================================================================================================
@@ -26,7 +26,7 @@ pub struct MmrPeaks {
     ///   and the left most has `2**2`.
     /// - With 12 leaves, the binary is `0b1100`, this case also has 2 peaks, the leftmost tree has
     ///   `2**3=8` elements, and the right most has `2**2=4` elements.
-    forest: Forest,
+    forest: MountainRange,
 
     /// All the peaks of every tree in the MMR forest. The peaks are always ordered by number of
     /// leaves, starting from the peak with most children, to the one with least.
@@ -38,7 +38,10 @@ pub struct MmrPeaks {
 impl Default for MmrPeaks {
     /// Returns new [`MmrPeaks`] instantiated from an empty vector of peaks and 0 leaves.
     fn default() -> Self {
-        Self { forest: Forest(0), peaks: Vec::new() }
+        Self {
+            forest: MountainRange::with_leaves(0),
+            peaks: Vec::new(),
+        }
     }
 }
 
@@ -51,7 +54,7 @@ impl MmrPeaks {
     ///
     /// # Errors
     /// Returns an error if the number of leaves and the number of peaks are inconsistent.
-    pub fn new(forest: Forest, peaks: Vec<Word>) -> Result<Self, MmrError> {
+    pub fn new(forest: MountainRange, peaks: Vec<Word>) -> Result<Self, MmrError> {
         if forest.num_trees() != peaks.len() {
             return Err(MmrError::InvalidPeaks(format!(
                 "number of one bits in leaves is {} which does not equal peak length {}",
@@ -67,7 +70,7 @@ impl MmrPeaks {
     // --------------------------------------------------------------------------------------------
 
     /// Returns the underlying forest.
-    pub fn forest(&self) -> Forest {
+    pub fn forest(&self) -> MountainRange {
         self.forest
     }
 
@@ -99,7 +102,7 @@ impl MmrPeaks {
 
     /// Converts this [MmrPeaks] into its components: number of leaves and a vector of peaks of
     /// the underlying MMR.
-    pub fn into_parts(self) -> (Forest, Vec<Word>) {
+    pub fn into_parts(self) -> (MountainRange, Vec<Word>) {
         (self.forest, self.peaks)
     }
 

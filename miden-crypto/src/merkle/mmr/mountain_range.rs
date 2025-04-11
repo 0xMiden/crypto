@@ -5,29 +5,31 @@ use core::{
 
 use crate::Felt;
 
-/// A compact representation of trees (or peaks) in Merkle Mountain Range (MMR)
+/// A compact representation of trees (or peaks) in Merkle Mountain Range (MMR).
 ///
 /// Each active bit of the stored number represents a disjoint tree with number of leaves
 /// equal to the bit position.
 ///
 /// Examples:
-/// - Forest(0) is a forest with no trees.
-/// - Forest(0b01) is a forest with a single node (the smallest tree possible)
-/// - Forest(0b10) is a forest with a single binary tree with 2 leaves (3 modes)
-/// - Forest(0b11) is a forest with two trees: one with a single node, and one with 3 nodes
-/// - Forest(0b1010) is a forest with two trees: one with 8 leaves (15 nodes), one with 2 leaves (3
-///   nodes)
+/// - `Forest(0)` is a forest with no trees.
+/// - `Forest(0b01)` is a forest with a single node (the smallest tree possible).
+/// - `Forest(0b10)` is a forest with a single binary tree with 2 leaves (3 nodes).
+/// - `Forest(0b11)` is a forest with two trees: one with 1 leaf (1 node), and one with 2 leaves (3
+/// nodes).
+/// - `Forest(0b1010)` is a forest with two trees: one with 8 leaves (15 nodes), one with 2 leaves (3
+///   nodes).
+/// - `Forest(0b1000)` is a forest with one tree, which has 8 leaves (15 nodes).
 #[derive(Debug, Copy, Clone, Default, PartialEq, Eq, PartialOrd, Ord)]
 #[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
-pub struct Forest(usize);
+pub struct MountainRange(usize);
 
-impl Forest {
-    /// Creates an empty forest (no trees)
+impl MountainRange {
+    /// Creates an empty forest (no trees).
     pub const fn empty() -> Self {
         Self(0)
     }
 
-    /// Creates a forest with n leaves
+    /// Creates a forest with `n` leaves.
     pub const fn with_leaves(n: usize) -> Self {
         Self(n)
     }
@@ -37,10 +39,11 @@ impl Forest {
         self.0 == 0
     }
 
-    /// Returns a forest with a capacity for exactly one more leaf
+    /// Returns a forest with a capacity for exactly one more leaf.
+    ///
     /// Some smaller trees might be merged together.
-    pub fn with_new_leaf(&mut self) -> Forest {
-        Forest(self.0 + 1)
+    pub fn increment(&mut self) {
+        self.0 += 1;
     }
 
     /// Returns a count of leaves in the entire underlying Forest (MMR).
@@ -48,21 +51,21 @@ impl Forest {
         self.0
     }
 
-    /// Return the total number of nodes of a given forest
+    /// Return the total number of nodes of a given forest.
     ///
-    /// Panics:
+    /// # Panics
     ///
-    /// This will panic if the forest has size greater than `usize::MAX / 2`
+    /// This will panic if the forest has size greater than `usize::MAX / 2`.
     pub const fn num_nodes(self) -> usize {
         self.0 * 2 - self.num_trees()
     }
 
-    /// Return the total number of trees of a given forest (the number of active bits)
+    /// Return the total number of trees of a given forest (the number of active bits).
     pub const fn num_trees(self) -> usize {
         self.0.count_ones() as usize
     }
 
-    /// Returns the height (bit position) of the largest tree in the forest
+    /// Returns the height (bit position) of the largest tree in the forest.
     pub fn largest_tree_height(self) -> usize {
         // ilog2 is computed with leading zeros, which itself is computed with the intrinsic ctlz.
         // [Rust 1.67.0] x86 uses the `bsr` instruction. AArch64 uses the `clz` instruction.
@@ -71,24 +74,25 @@ impl Forest {
 
     /// Returns a forest with only the largest tree present.
     ///
-    /// Panics:
+    /// # Panics
     ///
     /// This will panic if the forest is empty.
-    pub fn largest_tree(self) -> Forest {
-        Forest::with_leaves(1 << self.largest_tree_height())
+    pub fn largest_tree_unchecked(self) -> MountainRange {
+        MountainRange::with_leaves(1 << self.largest_tree_height())
     }
 
     /// Returns a forest with only the largest tree present.
+    ///
     /// If forest cannot be empty, use `largest_tree` for performance.
-    pub fn largest_tree_checked(self) -> Forest {
+    pub fn largest_tree(self) -> MountainRange {
         if self.0 > 0 {
-            self.largest_tree()
+            self.largest_tree_unchecked()
         } else {
-            Forest::empty()
+            MountainRange::empty()
         }
     }
 
-    /// Returns the height (bit position) of the smallest tree in the forest
+    /// Returns the height (bit position) of the smallest tree in the forest.
     pub fn smallest_tree_height(self) -> usize {
         // Trailing_zeros is computed with the intrinsic cttz. [Rust 1.67.0] x86 uses the `bsf`
         // instruction. AArch64 uses the `rbit clz` instructions.
@@ -97,52 +101,69 @@ impl Forest {
 
     /// Returns a forest with only the smallest tree present.
     ///
-    /// Panics:
+    /// # Panics
     ///
     /// This will panic if the forest is empty.
-    pub fn smallest_tree(self) -> Forest {
-        Forest::with_leaves(1 << self.smallest_tree_height())
+    pub fn smallest_tree(self) -> MountainRange {
+        MountainRange::with_leaves(1 << self.smallest_tree_height())
     }
 
     /// Returns a forest with only the smallest tree present.
+    ///
     /// If forest cannot be empty, use `smallest_tree` for performance.
-    pub fn smallest_tree_checked(self) -> Forest {
+    pub fn smallest_tree_checked(self) -> MountainRange {
         if self.0 > 0 {
             self.smallest_tree()
         } else {
-            Forest::empty()
+            MountainRange::empty()
         }
     }
 
     /// Keeps only trees larger than the reference tree.
-    pub fn trees_larger_than(self, base: u32) -> Forest {
-        self & high_bitmask(base + 1)
+    ///
+    /// For example, if we start with the bit pattern `0b0101_0110`, and keep only the trees larger
+    /// than tree index 1, that targets this bit:
+    /// ```text
+    /// MountainRange(0b0101_0110).trees_larger_than(1)
+    ///                        ^
+    /// Becomes:      0b0101_0100
+    ///                        ^
+    /// ```
+    /// And keeps only trees *after* that bit, meaning that the tree at `tree_idx` is also removed,
+    /// resulting in `0b0101_0100`.
+    ///
+    /// ```
+    /// # use miden_crypto::merkle::MountainRange;
+    /// let range = MountainRange::with_leaves(0b0101_0110);
+    /// assert_eq!(range.trees_larger_than(1), MountainRange::with_leaves(0b0101_0100));
+    /// ```
+    pub fn trees_larger_than(self, tree_idx: u32) -> MountainRange {
+        self & high_bitmask(tree_idx + 1)
     }
 
-    /// Creates a new forest with all possible trees smaller than
-    /// the smallest tree in this forest.
-    pub fn all_smaller_trees(self) -> Forest {
+    /// Creates a new forest with all possible trees smaller than the smallest tree in this forest.
+    pub fn all_smaller_trees(self) -> MountainRange {
         debug_assert!(self.0.count_ones() == 1);
-        Forest::with_leaves(self.0 - 1)
+        MountainRange::with_leaves(self.0 - 1)
     }
 
-    /// Returns true if the forest containts a single-node tree
+    /// Returns true if the forest contains a single-node tree.
     pub fn has_odd_leaf(self) -> bool {
         self.0 & 1 != 0
     }
 
     /// Add a single-node tree if not already present in the forest.
-    pub fn odd_leaf_added(self) -> Forest {
-        Forest::with_leaves(self.0 | 1)
+    pub fn odd_leaf_added(self) -> MountainRange {
+        MountainRange::with_leaves(self.0 | 1)
     }
 
     /// Remove the single-node tree if present in the forest.
-    pub fn odd_leaf_removed(self) -> Forest {
-        Forest::with_leaves(self.0 & (usize::MAX << 1))
+    pub fn odd_leaf_removed(self) -> MountainRange {
+        MountainRange::with_leaves(self.0 & (usize::MAX << 1))
     }
 
     /// Returns a new Forest that does not have the trees that `other` has.
-    pub fn without_trees(self, other: Forest) -> Self {
+    pub fn without_trees(self, other: MountainRange) -> Self {
         self ^ other
     }
 
@@ -150,10 +171,12 @@ impl Forest {
     /// for the position.
     ///
     /// Note:
-    /// The result is a tree position `p`, it has the following interpretations. $p+1$ is the depth
-    /// of the tree. Because the root element is not part of the proof, $p$ is the length of the
-    /// authentication path. $2^p$ is equal to the number of leaves in this particular tree. and
-    /// $2^(p+1)-1$ corresponds to size of the tree.
+    /// The result is a tree position `p`, it has the following interpretations:
+    /// - $p+1$ is the depth of the tree.
+    /// - Because the root element is not part of the proof, $p$ is the length of the
+    /// authentication path.
+    /// - $2^p$ is equal to the number of leaves in this particular tree.
+    /// - And $2^(p+1)-1$ corresponds to size of the tree.
     pub fn leaf_to_corresponding_tree(self, pos: usize) -> Option<u32> {
         let forest = self.0;
 
@@ -177,7 +200,7 @@ impl Forest {
     }
 
     /// Given a 0-indexed leaf position in the current forest, return the 0-indexed leaf position
-    /// in the tree to which the leaf belongs.
+    /// in the tree to which the leaf belongs..
     pub fn leaf_relative_position(self, pos: usize) -> Option<usize> {
         let tree = self.leaf_to_corresponding_tree(pos)?;
         let forest_before = self & high_bitmask(tree + 1);
@@ -185,71 +208,71 @@ impl Forest {
     }
 }
 
-impl Display for Forest {
+impl Display for MountainRange {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         write!(f, "{}", self.0)
     }
 }
 
-impl Binary for Forest {
+impl Binary for MountainRange {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         write!(f, "{:b}", self.0)
     }
 }
 
-impl BitAnd<Forest> for Forest {
-    type Output = Forest;
+impl BitAnd<MountainRange> for MountainRange {
+    type Output = MountainRange;
 
-    fn bitand(self, rhs: Forest) -> Self::Output {
-        Forest::with_leaves(self.0 & rhs.0)
+    fn bitand(self, rhs: MountainRange) -> Self::Output {
+        MountainRange::with_leaves(self.0 & rhs.0)
     }
 }
 
-impl BitOr<Forest> for Forest {
-    type Output = Forest;
+impl BitOr<MountainRange> for MountainRange {
+    type Output = MountainRange;
 
-    fn bitor(self, rhs: Forest) -> Self::Output {
-        Forest::with_leaves(self.0 | rhs.0)
+    fn bitor(self, rhs: MountainRange) -> Self::Output {
+        MountainRange::with_leaves(self.0 | rhs.0)
     }
 }
 
-impl BitXor<Forest> for Forest {
-    type Output = Forest;
+impl BitXor<MountainRange> for MountainRange {
+    type Output = MountainRange;
 
-    fn bitxor(self, rhs: Forest) -> Self::Output {
-        Forest::with_leaves(self.0 ^ rhs.0)
+    fn bitxor(self, rhs: MountainRange) -> Self::Output {
+        MountainRange::with_leaves(self.0 ^ rhs.0)
     }
 }
 
-impl BitXorAssign<Forest> for Forest {
-    fn bitxor_assign(&mut self, rhs: Forest) {
+impl BitXorAssign<MountainRange> for MountainRange {
+    fn bitxor_assign(&mut self, rhs: MountainRange) {
         self.0 ^= rhs.0;
     }
 }
 
-impl ShlAssign<usize> for Forest {
+impl ShlAssign<usize> for MountainRange {
     fn shl_assign(&mut self, rhs: usize) {
         self.0 <<= rhs;
     }
 }
 
-impl From<Felt> for Forest {
+impl From<Felt> for MountainRange {
     fn from(value: Felt) -> Self {
         Self::with_leaves(value.as_int() as usize)
     }
 }
 
-impl From<Forest> for Felt {
-    fn from(value: Forest) -> Felt {
+impl From<MountainRange> for Felt {
+    fn from(value: MountainRange) -> Felt {
         Felt::new(value.0 as u64)
     }
 }
 
 /// Return a bitmask for the bits including and above the given position.
-pub(crate) const fn high_bitmask(bit: u32) -> Forest {
+pub(crate) const fn high_bitmask(bit: u32) -> MountainRange {
     if bit > usize::BITS - 1 {
-        Forest::empty()
+        MountainRange::empty()
     } else {
-        Forest::with_leaves(usize::MAX << bit)
+        MountainRange::with_leaves(usize::MAX << bit)
     }
 }

@@ -1,12 +1,12 @@
 use alloc::vec::Vec;
 
-use super::{super::Word, forest::Forest};
+use super::{super::Word, mountain_range::MountainRange};
 
 /// Container for the update data of a [super::PartialMmr]
 #[derive(Debug)]
 pub struct MmrDelta {
     /// The new version of the [super::Mmr]
-    pub forest: Forest,
+    pub forest: MountainRange,
 
     /// Update data.
     ///

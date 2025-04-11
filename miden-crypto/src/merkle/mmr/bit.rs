@@ -1,20 +1,20 @@
-use super::forest::Forest;
+use super::mountain_range::MountainRange;
 
 /// Iterate over the the trees within this forest, from smallest to largest.
 ///
 /// Each item is a "sub-forest", containing only one tree.
 pub struct TreeSizeIterator {
-    value: Forest,
+    value: MountainRange,
 }
 
 impl TreeSizeIterator {
-    pub fn new(value: Forest) -> TreeSizeIterator {
+    pub fn new(value: MountainRange) -> TreeSizeIterator {
         TreeSizeIterator { value }
     }
 }
 
 impl Iterator for TreeSizeIterator {
-    type Item = Forest;
+    type Item = MountainRange;
 
     fn next(&mut self) -> Option<<Self as Iterator>::Item> {
         let tree = self.value.smallest_tree_checked();

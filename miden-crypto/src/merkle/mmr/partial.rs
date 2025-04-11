@@ -5,11 +5,9 @@ use alloc::{
 
 use winter_utils::{Deserializable, Serializable};
 
-use super::{MmrDelta, MmrProof};
-use crate::{
-    Word,
-    hash::rpo::Rpo256,
-    merkle::{InOrderIndex, InnerNodeInfo, MerklePath, MmrError, MmrPeaks, mmr::forest::Forest},
+use super::{MmrDelta, MmrProof, Rpo256, Word};
+use crate::merkle::{
+    InOrderIndex, InnerNodeInfo, MerklePath, MmrError, MmrPeaks, mmr::mountain_range::MountainRange,
 };
 
 // TYPE ALIASES
@@ -36,7 +34,7 @@ pub struct PartialMmr {
     /// - The bits in the forest also corresponds to the count and size of every perfect binary
     ///   tree that composes the MMR structure, which server to compute indexes and perform
     ///   validation.
-    pub(crate) forest: Forest,
+    pub(crate) forest: MountainRange,
 
     /// The MMR peaks.
     ///
@@ -115,7 +113,7 @@ impl PartialMmr {
     ///
     /// This value corresponds to the version of the [PartialMmr] and the number of leaves in the
     /// underlying MMR.
-    pub fn forest(&self) -> Forest {
+    pub fn forest(&self) -> MountainRange {
         self.forest
     }
 
@@ -308,7 +306,7 @@ impl PartialMmr {
     ) -> Result<(), MmrError> {
         // Checks there is a tree with same depth as the authentication path, if not the path is
         // invalid.
-        let tree = Forest::with_leaves(1 << path.depth());
+        let tree = MountainRange::with_leaves(1 << path.depth());
         if (tree & self.forest).is_empty() {
             return Err(MmrError::UnknownPeak(path.depth()));
         };
@@ -434,7 +432,7 @@ impl PartialMmr {
             while target < largest {
                 // check if either the left or right subtrees have saved for authentication paths.
                 // If so, turn tracking on to update those paths.
-                if target != Forest::with_leaves(1) && !track {
+                if target != MountainRange::with_leaves(1) && !track {
                     track = self.is_tracked_node(&peak_idx);
                 }
 
@@ -602,7 +600,7 @@ impl Deserializable for PartialMmr {
     fn read_from<R: winter_utils::ByteReader>(
         source: &mut R,
     ) -> Result<Self, winter_utils::DeserializationError> {
-        let forest = Forest::with_leaves(usize::read_from(source)?);
+        let forest = MountainRange::with_leaves(usize::read_from(source)?);
         let peaks = Vec::<Word>::read_from(source)?;
         let nodes = NodeMap::read_from(source)?;
         let track_latest = source.read_bool()?;
@@ -616,7 +614,7 @@ impl Deserializable for PartialMmr {
 
 /// Given the description of a `forest`, returns the index of the root element of the smallest tree
 /// in it.
-fn forest_to_root_index(forest: Forest) -> InOrderIndex {
+fn forest_to_root_index(forest: MountainRange) -> InOrderIndex {
     // Count total size of all trees in the forest.
     let nodes = forest.num_nodes();
 
@@ -634,7 +632,7 @@ fn forest_to_root_index(forest: Forest) -> InOrderIndex {
 }
 
 /// Given the description of a `forest`, returns the index of the right most element.
-fn forest_to_rightmost_index(forest: Forest) -> InOrderIndex {
+fn forest_to_rightmost_index(forest: MountainRange) -> InOrderIndex {
     // Count total size of all trees in the forest.
     let nodes = forest.num_nodes();
 
@@ -659,7 +657,9 @@ mod tests {
     use super::{
         InOrderIndex, MmrPeaks, PartialMmr, Word, forest_to_rightmost_index, forest_to_root_index,
     };
-    use crate::merkle::{MerkleStore, Mmr, NodeIndex, int_to_node, mmr::forest::Forest};
+    use crate::merkle::{
+        MerkleStore, Mmr, NodeIndex, int_to_node, mmr::mountain_range::MountainRange,
+    };
 
     const LEAVES: [Word; 7] = [
         int_to_node(0),
@@ -679,22 +679,22 @@ mod tests {
 
         // When there is a single tree in the forest, the index is equivalent to the number of
         // leaves in that tree, which is `2^n`.
-        assert_eq!(forest_to_root_index(Forest::with_leaves(0b0001)), idx(1));
-        assert_eq!(forest_to_root_index(Forest::with_leaves(0b0010)), idx(2));
-        assert_eq!(forest_to_root_index(Forest::with_leaves(0b0100)), idx(4));
-        assert_eq!(forest_to_root_index(Forest::with_leaves(0b1000)), idx(8));
+        assert_eq!(forest_to_root_index(MountainRange::with_leaves(0b0001)), idx(1));
+        assert_eq!(forest_to_root_index(MountainRange::with_leaves(0b0010)), idx(2));
+        assert_eq!(forest_to_root_index(MountainRange::with_leaves(0b0100)), idx(4));
+        assert_eq!(forest_to_root_index(MountainRange::with_leaves(0b1000)), idx(8));
 
-        assert_eq!(forest_to_root_index(Forest::with_leaves(0b0011)), idx(5));
-        assert_eq!(forest_to_root_index(Forest::with_leaves(0b0101)), idx(9));
-        assert_eq!(forest_to_root_index(Forest::with_leaves(0b1001)), idx(17));
-        assert_eq!(forest_to_root_index(Forest::with_leaves(0b0111)), idx(13));
-        assert_eq!(forest_to_root_index(Forest::with_leaves(0b1011)), idx(21));
-        assert_eq!(forest_to_root_index(Forest::with_leaves(0b1111)), idx(29));
+        assert_eq!(forest_to_root_index(MountainRange::with_leaves(0b0011)), idx(5));
+        assert_eq!(forest_to_root_index(MountainRange::with_leaves(0b0101)), idx(9));
+        assert_eq!(forest_to_root_index(MountainRange::with_leaves(0b1001)), idx(17));
+        assert_eq!(forest_to_root_index(MountainRange::with_leaves(0b0111)), idx(13));
+        assert_eq!(forest_to_root_index(MountainRange::with_leaves(0b1011)), idx(21));
+        assert_eq!(forest_to_root_index(MountainRange::with_leaves(0b1111)), idx(29));
 
-        assert_eq!(forest_to_root_index(Forest::with_leaves(0b0110)), idx(10));
-        assert_eq!(forest_to_root_index(Forest::with_leaves(0b1010)), idx(18));
-        assert_eq!(forest_to_root_index(Forest::with_leaves(0b1100)), idx(20));
-        assert_eq!(forest_to_root_index(Forest::with_leaves(0b1110)), idx(26));
+        assert_eq!(forest_to_root_index(MountainRange::with_leaves(0b0110)), idx(10));
+        assert_eq!(forest_to_root_index(MountainRange::with_leaves(0b1010)), idx(18));
+        assert_eq!(forest_to_root_index(MountainRange::with_leaves(0b1100)), idx(20));
+        assert_eq!(forest_to_root_index(MountainRange::with_leaves(0b1110)), idx(26));
     }
 
     #[test]
@@ -705,26 +705,26 @@ mod tests {
 
         for forest in 1..256 {
             assert!(
-                forest_to_rightmost_index(Forest::with_leaves(forest)).inner() % 2 == 1,
+                forest_to_rightmost_index(MountainRange::with_leaves(forest)).inner() % 2 == 1,
                 "Leaves are always odd"
             );
         }
 
-        assert_eq!(forest_to_rightmost_index(Forest::with_leaves(0b0001)), idx(1));
-        assert_eq!(forest_to_rightmost_index(Forest::with_leaves(0b0010)), idx(3));
-        assert_eq!(forest_to_rightmost_index(Forest::with_leaves(0b0011)), idx(5));
-        assert_eq!(forest_to_rightmost_index(Forest::with_leaves(0b0100)), idx(7));
-        assert_eq!(forest_to_rightmost_index(Forest::with_leaves(0b0101)), idx(9));
-        assert_eq!(forest_to_rightmost_index(Forest::with_leaves(0b0110)), idx(11));
-        assert_eq!(forest_to_rightmost_index(Forest::with_leaves(0b0111)), idx(13));
-        assert_eq!(forest_to_rightmost_index(Forest::with_leaves(0b1000)), idx(15));
-        assert_eq!(forest_to_rightmost_index(Forest::with_leaves(0b1001)), idx(17));
-        assert_eq!(forest_to_rightmost_index(Forest::with_leaves(0b1010)), idx(19));
-        assert_eq!(forest_to_rightmost_index(Forest::with_leaves(0b1011)), idx(21));
-        assert_eq!(forest_to_rightmost_index(Forest::with_leaves(0b1100)), idx(23));
-        assert_eq!(forest_to_rightmost_index(Forest::with_leaves(0b1101)), idx(25));
-        assert_eq!(forest_to_rightmost_index(Forest::with_leaves(0b1110)), idx(27));
-        assert_eq!(forest_to_rightmost_index(Forest::with_leaves(0b1111)), idx(29));
+        assert_eq!(forest_to_rightmost_index(MountainRange::with_leaves(0b0001)), idx(1));
+        assert_eq!(forest_to_rightmost_index(MountainRange::with_leaves(0b0010)), idx(3));
+        assert_eq!(forest_to_rightmost_index(MountainRange::with_leaves(0b0011)), idx(5));
+        assert_eq!(forest_to_rightmost_index(MountainRange::with_leaves(0b0100)), idx(7));
+        assert_eq!(forest_to_rightmost_index(MountainRange::with_leaves(0b0101)), idx(9));
+        assert_eq!(forest_to_rightmost_index(MountainRange::with_leaves(0b0110)), idx(11));
+        assert_eq!(forest_to_rightmost_index(MountainRange::with_leaves(0b0111)), idx(13));
+        assert_eq!(forest_to_rightmost_index(MountainRange::with_leaves(0b1000)), idx(15));
+        assert_eq!(forest_to_rightmost_index(MountainRange::with_leaves(0b1001)), idx(17));
+        assert_eq!(forest_to_rightmost_index(MountainRange::with_leaves(0b1010)), idx(19));
+        assert_eq!(forest_to_rightmost_index(MountainRange::with_leaves(0b1011)), idx(21));
+        assert_eq!(forest_to_rightmost_index(MountainRange::with_leaves(0b1100)), idx(23));
+        assert_eq!(forest_to_rightmost_index(MountainRange::with_leaves(0b1101)), idx(25));
+        assert_eq!(forest_to_rightmost_index(MountainRange::with_leaves(0b1110)), idx(27));
+        assert_eq!(forest_to_rightmost_index(MountainRange::with_leaves(0b1111)), idx(29));
     }
 
     #[test]
@@ -777,7 +777,7 @@ mod tests {
         let nodes_before = partial.nodes.clone();
 
         // compute and apply delta
-        let delta = mmr.get_delta(partial.forest(), mmr.forest()).unwrap();
+        let delta = mmr.get_delta(partial.forest(), mmr.mountain_range()).unwrap();
         let nodes_delta = partial.apply(delta).unwrap();
 
         // new peaks were computed correctly
@@ -896,7 +896,7 @@ mod tests {
     #[test]
     fn test_partial_mmr_add_without_track() {
         let mut mmr = Mmr::default();
-        let empty_peaks = MmrPeaks::new(Forest::empty(), vec![]).unwrap();
+        let empty_peaks = MmrPeaks::new(MountainRange::empty(), vec![]).unwrap();
         let mut partial_mmr = PartialMmr::from_peaks(empty_peaks);
 
         for el in (0..256).map(int_to_node) {
@@ -904,14 +904,14 @@ mod tests {
             partial_mmr.add(el, false);
 
             assert_eq!(mmr.peaks(), partial_mmr.peaks());
-            assert_eq!(mmr.forest(), partial_mmr.forest());
+            assert_eq!(mmr.mountain_range(), partial_mmr.forest());
         }
     }
 
     #[test]
     fn test_partial_mmr_add_with_track() {
         let mut mmr = Mmr::default();
-        let empty_peaks = MmrPeaks::new(Forest::empty(), vec![]).unwrap();
+        let empty_peaks = MmrPeaks::new(MountainRange::empty(), vec![]).unwrap();
         let mut partial_mmr = PartialMmr::from_peaks(empty_peaks);
 
         for i in 0..256 {
@@ -920,7 +920,7 @@ mod tests {
             partial_mmr.add(el, true);
 
             assert_eq!(mmr.peaks(), partial_mmr.peaks());
-            assert_eq!(mmr.forest(), partial_mmr.forest());
+            assert_eq!(mmr.mountain_range(), partial_mmr.forest());
 
             for pos in 0..i {
                 let mmr_proof = mmr.open(pos).unwrap();

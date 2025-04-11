@@ -1,6 +1,6 @@
 /// The representation of a single Merkle path.
 use super::super::MerklePath;
-use super::forest::Forest;
+use super::mountain_range::MountainRange;
 
 // MMR PROOF
 // ================================================================================================
@@ -9,7 +9,7 @@ use super::forest::Forest;
 #[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 pub struct MmrProof {
     /// The state of the MMR when the MmrProof was created.
-    pub forest: Forest,
+    pub forest: MountainRange,
 
     /// The position of the leaf value on this MmrProof.
     pub position: usize,
@@ -38,7 +38,7 @@ impl MmrProof {
             .forest
             .leaf_to_corresponding_tree(self.position)
             .expect("position must be part of the forest");
-        let smaller_peak_mask = Forest::with_leaves(2_usize.pow(root) - 1);
+        let smaller_peak_mask = MountainRange::with_leaves(2_usize.pow(root) - 1);
         let num_smaller_peaks = (self.forest & smaller_peak_mask).num_trees();
         self.forest.num_trees() - num_smaller_peaks - 1
     }
@@ -50,12 +50,12 @@ impl MmrProof {
 #[cfg(test)]
 mod tests {
     use super::{MerklePath, MmrProof};
-    use crate::merkle::mmr::forest::Forest;
+    use crate::merkle::mmr::mountain_range::MountainRange;
 
     #[test]
     fn test_peak_index() {
         // --- single peak forest ---------------------------------------------
-        let forest = Forest::with_leaves(11);
+        let forest = MountainRange::with_leaves(11);
 
         // the first 4 leaves belong to peak 0
         for position in 0..8 {
@@ -64,7 +64,7 @@ mod tests {
         }
 
         // --- forest with non-consecutive peaks ------------------------------
-        let forest = Forest::with_leaves(11);
+        let forest = MountainRange::with_leaves(11);
 
         // the first 8 leaves belong to peak 0
         for position in 0..8 {
@@ -83,7 +83,7 @@ mod tests {
         assert_eq!(proof.peak_index(), 2);
 
         // --- forest with consecutive peaks ----------------------------------
-        let forest = Forest::with_leaves(7);
+        let forest = MountainRange::with_leaves(7);
 
         // the first 4 leaves belong to peak 0
         for position in 0..4 {
@@ -102,7 +102,7 @@ mod tests {
         assert_eq!(proof.peak_index(), 2);
     }
 
-    fn make_dummy_proof(forest: Forest, position: usize) -> MmrProof {
+    fn make_dummy_proof(forest: MountainRange, position: usize) -> MmrProof {
         MmrProof {
             forest,
             position,
