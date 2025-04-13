@@ -32,7 +32,7 @@ pub const SMT_MAX_DEPTH: u8 = 64;
 // SPARSE MERKLE TREE
 // ================================================================================================
 
-/// A map whose keys are not guarantied to be ordered.
+/// A map whose keys are not guaranteed to be ordered.
 #[cfg(feature = "smt_hashmaps")]
 type UnorderedMap<K, V> = hashbrown::HashMap<K, V>;
 #[cfg(not(feature = "smt_hashmaps"))]
