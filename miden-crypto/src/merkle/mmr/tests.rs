@@ -1006,10 +1006,10 @@ fn merge(l: Word, r: Word) -> Word {
     Rpo256::merge(&[l, r])
 }
 
-/// Given a 0-indexed leaf position and the current forest, return the tree number responsible for
+/// Given a leaf index and the current forest, return the tree number responsible for
 /// the position.
-fn leaf_to_corresponding_tree(pos: usize, forest: usize) -> Option<u32> {
-    MountainRange::new(forest).leaf_to_corresponding_tree(pos)
+fn leaf_to_corresponding_tree(leaf_idx: usize, forest: usize) -> Option<u32> {
+    MountainRange::new(forest).leaf_to_corresponding_tree(leaf_idx)
 }
 
 /// Return the total number of nodes of a given forest

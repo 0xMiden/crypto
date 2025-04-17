@@ -169,7 +169,7 @@ impl MountainRange {
         self ^ other
     }
 
-    /// Given a 0-indexed leaf position in the current mountain range, return the tree number
+    /// Given a leaf index in the current mountain range, return the tree number
     /// responsible for the position.
     ///
     /// Note:
@@ -179,10 +179,10 @@ impl MountainRange {
     /// authentication path.
     /// - $2^p$ is equal to the number of leaves in this particular tree.
     /// - And $2^(p+1)-1$ corresponds to size of the tree.
-    pub fn leaf_to_corresponding_tree(self, pos: usize) -> Option<u32> {
+    pub fn leaf_to_corresponding_tree(self, leaf_idx: usize) -> Option<u32> {
         let forest = self.0;
 
-        if pos >= forest {
+        if leaf_idx >= forest {
             None
         } else {
             // - each bit in the mountain range is a unique tree and the bit position is its
@@ -194,7 +194,7 @@ impl MountainRange {
             //   `2^k_1` where `k_1` is the second highest bit, so on.
             // - this means the highest bits work as a category marker, and the position is owned by
             //   the first tree which doesn't share a high bit with the position
-            let before = forest & pos;
+            let before = forest & leaf_idx;
             let after = forest ^ before;
             let tree = after.ilog2();
 
@@ -202,12 +202,11 @@ impl MountainRange {
         }
     }
 
-    /// Given a 0-indexed leaf position in the current mountain range, return the 0-indexed leaf
-    /// position in the tree to which the leaf belongs..
-    pub fn leaf_relative_position(self, pos: usize) -> Option<usize> {
-        let tree = self.leaf_to_corresponding_tree(pos)?;
+    /// Given a leaf index in the current mountain range, return the lead index in the tree to which the leaf belongs..
+    pub fn leaf_relative_position(self, leaf_idx: usize) -> Option<usize> {
+        let tree = self.leaf_to_corresponding_tree(leaf_idx)?;
         let forest_before = self & high_bitmask(tree + 1);
-        Some(pos - forest_before.0)
+        Some(leaf_idx - forest_before.0)
     }
 }
 
