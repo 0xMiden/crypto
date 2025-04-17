@@ -425,7 +425,7 @@ impl PartialMmr {
             self.track_latest = false;
 
             let mut peak_count = 0;
-            let mut target = merges.smallest_tree();
+            let mut target = merges.smallest_tree_unchecked();
             let mut new = delta.data[0];
             update_count += 1;
 
@@ -624,7 +624,7 @@ fn forest_to_root_index(forest: MountainRange) -> InOrderIndex {
 
     // Remove the count of the right subtree of the target tree, target tree root index comes
     // before the subtree for the in-order tree walk.
-    let right_subtree_count = forest.smallest_tree().num_leaves() - 1;
+    let right_subtree_count = forest.smallest_tree_unchecked().num_leaves() - 1;
 
     let idx = nodes + open_trees - right_subtree_count;
 

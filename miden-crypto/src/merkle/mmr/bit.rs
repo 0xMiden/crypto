@@ -17,7 +17,7 @@ impl Iterator for TreeSizeIterator {
     type Item = MountainRange;
 
     fn next(&mut self) -> Option<<Self as Iterator>::Item> {
-        let tree = self.value.smallest_tree_checked();
+        let tree = self.value.smallest_tree();
 
         if tree.is_empty() {
             None

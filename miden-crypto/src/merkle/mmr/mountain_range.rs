@@ -105,16 +105,16 @@ impl MountainRange {
     /// # Panics
     ///
     /// This will panic if the mountain range is empty.
-    pub fn smallest_tree(self) -> MountainRange {
+    pub fn smallest_tree_unchecked(self) -> MountainRange {
         MountainRange::new(1 << self.smallest_tree_height())
     }
 
     /// Returns a mountain range with only the smallest tree present.
     ///
     /// If mountain range cannot be empty, use `smallest_tree` for performance.
-    pub fn smallest_tree_checked(self) -> MountainRange {
+    pub fn smallest_tree(self) -> MountainRange {
         if self.0 > 0 {
-            self.smallest_tree()
+            self.smallest_tree_unchecked()
         } else {
             MountainRange::empty()
         }

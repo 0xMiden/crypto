@@ -239,7 +239,7 @@ impl Mmr {
 
         if !merges.is_empty() {
             // Skip the smallest trees unknown to `from_forest`.
-            let mut target = merges.smallest_tree();
+            let mut target = merges.smallest_tree_unchecked();
 
             // Collect siblings required to computed the merged tree's peak
             while target < new_high {
