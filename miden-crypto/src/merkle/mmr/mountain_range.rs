@@ -21,8 +21,7 @@ use crate::Felt;
 /// - `MountainRange(0b01)` is a forest with a single leaf/node (the smallest tree possible).
 /// - `MountainRange(0b10)` is a forest with a single binary tree with 2 leaves (3 nodes).
 /// - `MountainRange(0b11)` is a forest with two trees: one with 1 leaf (1 node), and one with 2
-///   leaves (3
-/// nodes).
+///   leaves (3 nodes).
 /// - `MountainRange(0b1010)` is a forest with two trees: one with 8 leaves (15 nodes), one with 2
 ///   leaves (3 nodes).
 /// - `MountainRange(0b1000)` is a forest with one tree, which has 8 leaves (15 nodes).
