@@ -14,10 +14,11 @@ use crate::Felt;
 /// - `MountainRange(0)` is a forest with no trees.
 /// - `MountainRange(0b01)` is a forest with a single leaf/node (the smallest tree possible).
 /// - `MountainRange(0b10)` is a forest with a single binary tree with 2 leaves (3 nodes).
-/// - `MountainRange(0b11)` is a forest with two trees: one with 1 leaf (1 node), and one with 2 leaves (3
+/// - `MountainRange(0b11)` is a forest with two trees: one with 1 leaf (1 node), and one with 2
+///   leaves (3
 /// nodes).
-/// - `MountainRange(0b1010)` is a forest with two trees: one with 8 leaves (15 nodes), one with 2 leaves (3
-///   nodes).
+/// - `MountainRange(0b1010)` is a forest with two trees: one with 8 leaves (15 nodes), one with 2
+///   leaves (3 nodes).
 /// - `MountainRange(0b1000)` is a forest with one tree, which has 8 leaves (15 nodes).
 #[derive(Debug, Copy, Clone, Default, PartialEq, Eq, PartialOrd, Ord)]
 #[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
@@ -30,8 +31,8 @@ impl MountainRange {
     }
 
     /// Creates a mountain range with `n` leaves.
-    pub const fn with_leaves(n: usize) -> Self {
-        Self(n)
+    pub const fn new(num_leaves: usize) -> Self {
+        Self(num_leaves)
     }
 
     /// Returns true if there are no trees in the mountain range.
@@ -78,7 +79,7 @@ impl MountainRange {
     ///
     /// This will panic if the mountain range is empty.
     pub fn largest_tree_unchecked(self) -> MountainRange {
-        MountainRange::with_leaves(1 << self.largest_tree_height())
+        MountainRange::new(1 << self.largest_tree_height())
     }
 
     /// Returns a mountain range with only the largest tree present.
@@ -105,7 +106,7 @@ impl MountainRange {
     ///
     /// This will panic if the mountain range is empty.
     pub fn smallest_tree(self) -> MountainRange {
-        MountainRange::with_leaves(1 << self.smallest_tree_height())
+        MountainRange::new(1 << self.smallest_tree_height())
     }
 
     /// Returns a mountain range with only the smallest tree present.
@@ -141,10 +142,11 @@ impl MountainRange {
         self & high_bitmask(tree_idx + 1)
     }
 
-    /// Creates a new mountain range with all possible trees smaller than the smallest tree in this mountain range.
+    /// Creates a new mountain range with all possible trees smaller than the smallest tree in this
+    /// mountain range.
     pub fn all_smaller_trees(self) -> MountainRange {
         debug_assert!(self.0.count_ones() == 1);
-        MountainRange::with_leaves(self.0 - 1)
+        MountainRange::new(self.0 - 1)
     }
 
     /// Returns true if the mountain range contains a single-node tree.
@@ -154,12 +156,12 @@ impl MountainRange {
 
     /// Add a single-node tree if not already present in the mountain range.
     pub fn odd_leaf_added(self) -> MountainRange {
-        MountainRange::with_leaves(self.0 | 1)
+        MountainRange::new(self.0 | 1)
     }
 
     /// Remove the single-node tree if present in the mountain range.
     pub fn odd_leaf_removed(self) -> MountainRange {
-        MountainRange::with_leaves(self.0 & (usize::MAX << 1))
+        MountainRange::new(self.0 & (usize::MAX << 1))
     }
 
     /// Returns a new mountain range that does not have the trees that `other` has.
@@ -167,8 +169,8 @@ impl MountainRange {
         self ^ other
     }
 
-    /// Given a 0-indexed leaf position in the current mountain range, return the tree number responsible
-    /// for the position.
+    /// Given a 0-indexed leaf position in the current mountain range, return the tree number
+    /// responsible for the position.
     ///
     /// Note:
     /// The result is a tree position `p`, it has the following interpretations:
@@ -183,11 +185,12 @@ impl MountainRange {
         if pos >= forest {
             None
         } else {
-            // - each bit in the mountain range is a unique tree and the bit position its power-of-two size
-            // - each tree owns a consecutive range of positions equal to its size from
+            // - each bit in the mountain range is a unique tree and the bit position is its
+            //   power-of-two size
+            // - each tree is associated to a consecutive range of positions equal to its size from
             //   left-to-right
             // - this means the first tree owns from `0` up to the `2^k_0` first positions, where
-            //   `k_0` is the highest true bit position, the second tree from `2^k_0 + 1` up to
+            //   `k_0` is the highest set bit position, the second tree from `2^k_0 + 1` up to
             //   `2^k_1` where `k_1` is the second highest bit, so on.
             // - this means the highest bits work as a category marker, and the position is owned by
             //   the first tree which doesn't share a high bit with the position
@@ -199,8 +202,8 @@ impl MountainRange {
         }
     }
 
-    /// Given a 0-indexed leaf position in the current mountain range, return the 0-indexed leaf position
-    /// in the tree to which the leaf belongs..
+    /// Given a 0-indexed leaf position in the current mountain range, return the 0-indexed leaf
+    /// position in the tree to which the leaf belongs..
     pub fn leaf_relative_position(self, pos: usize) -> Option<usize> {
         let tree = self.leaf_to_corresponding_tree(pos)?;
         let forest_before = self & high_bitmask(tree + 1);
@@ -224,7 +227,7 @@ impl BitAnd<MountainRange> for MountainRange {
     type Output = MountainRange;
 
     fn bitand(self, rhs: MountainRange) -> Self::Output {
-        MountainRange::with_leaves(self.0 & rhs.0)
+        MountainRange::new(self.0 & rhs.0)
     }
 }
 
@@ -232,7 +235,7 @@ impl BitOr<MountainRange> for MountainRange {
     type Output = MountainRange;
 
     fn bitor(self, rhs: MountainRange) -> Self::Output {
-        MountainRange::with_leaves(self.0 | rhs.0)
+        MountainRange::new(self.0 | rhs.0)
     }
 }
 
@@ -240,7 +243,7 @@ impl BitXor<MountainRange> for MountainRange {
     type Output = MountainRange;
 
     fn bitxor(self, rhs: MountainRange) -> Self::Output {
-        MountainRange::with_leaves(self.0 ^ rhs.0)
+        MountainRange::new(self.0 ^ rhs.0)
     }
 }
 
@@ -258,7 +261,7 @@ impl ShlAssign<usize> for MountainRange {
 
 impl From<Felt> for MountainRange {
     fn from(value: Felt) -> Self {
-        Self::with_leaves(value.as_int() as usize)
+        Self::new(value.as_int() as usize)
     }
 }
 
@@ -273,6 +276,6 @@ pub(crate) const fn high_bitmask(bit: u32) -> MountainRange {
     if bit > usize::BITS - 1 {
         MountainRange::empty()
     } else {
-        MountainRange::with_leaves(usize::MAX << bit)
+        MountainRange::new(usize::MAX << bit)
     }
 }

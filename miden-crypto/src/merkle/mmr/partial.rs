@@ -306,7 +306,7 @@ impl PartialMmr {
     ) -> Result<(), MmrError> {
         // Checks there is a tree with same depth as the authentication path, if not the path is
         // invalid.
-        let tree = MountainRange::with_leaves(1 << path.depth());
+        let tree = MountainRange::new(1 << path.depth());
         if (tree & self.forest).is_empty() {
             return Err(MmrError::UnknownPeak(path.depth()));
         };
@@ -432,7 +432,7 @@ impl PartialMmr {
             while target < largest {
                 // check if either the left or right subtrees have saved for authentication paths.
                 // If so, turn tracking on to update those paths.
-                if target != MountainRange::with_leaves(1) && !track {
+                if target != MountainRange::new(1) && !track {
                     track = self.is_tracked_node(&peak_idx);
                 }
 
@@ -600,7 +600,7 @@ impl Deserializable for PartialMmr {
     fn read_from<R: winter_utils::ByteReader>(
         source: &mut R,
     ) -> Result<Self, winter_utils::DeserializationError> {
-        let forest = MountainRange::with_leaves(usize::read_from(source)?);
+        let forest = MountainRange::new(usize::read_from(source)?);
         let peaks = Vec::<Word>::read_from(source)?;
         let nodes = NodeMap::read_from(source)?;
         let track_latest = source.read_bool()?;
@@ -679,22 +679,22 @@ mod tests {
 
         // When there is a single tree in the forest, the index is equivalent to the number of
         // leaves in that tree, which is `2^n`.
-        assert_eq!(forest_to_root_index(MountainRange::with_leaves(0b0001)), idx(1));
-        assert_eq!(forest_to_root_index(MountainRange::with_leaves(0b0010)), idx(2));
-        assert_eq!(forest_to_root_index(MountainRange::with_leaves(0b0100)), idx(4));
-        assert_eq!(forest_to_root_index(MountainRange::with_leaves(0b1000)), idx(8));
+        assert_eq!(forest_to_root_index(MountainRange::new(0b0001)), idx(1));
+        assert_eq!(forest_to_root_index(MountainRange::new(0b0010)), idx(2));
+        assert_eq!(forest_to_root_index(MountainRange::new(0b0100)), idx(4));
+        assert_eq!(forest_to_root_index(MountainRange::new(0b1000)), idx(8));
 
-        assert_eq!(forest_to_root_index(MountainRange::with_leaves(0b0011)), idx(5));
-        assert_eq!(forest_to_root_index(MountainRange::with_leaves(0b0101)), idx(9));
-        assert_eq!(forest_to_root_index(MountainRange::with_leaves(0b1001)), idx(17));
-        assert_eq!(forest_to_root_index(MountainRange::with_leaves(0b0111)), idx(13));
-        assert_eq!(forest_to_root_index(MountainRange::with_leaves(0b1011)), idx(21));
-        assert_eq!(forest_to_root_index(MountainRange::with_leaves(0b1111)), idx(29));
+        assert_eq!(forest_to_root_index(MountainRange::new(0b0011)), idx(5));
+        assert_eq!(forest_to_root_index(MountainRange::new(0b0101)), idx(9));
+        assert_eq!(forest_to_root_index(MountainRange::new(0b1001)), idx(17));
+        assert_eq!(forest_to_root_index(MountainRange::new(0b0111)), idx(13));
+        assert_eq!(forest_to_root_index(MountainRange::new(0b1011)), idx(21));
+        assert_eq!(forest_to_root_index(MountainRange::new(0b1111)), idx(29));
 
-        assert_eq!(forest_to_root_index(MountainRange::with_leaves(0b0110)), idx(10));
-        assert_eq!(forest_to_root_index(MountainRange::with_leaves(0b1010)), idx(18));
-        assert_eq!(forest_to_root_index(MountainRange::with_leaves(0b1100)), idx(20));
-        assert_eq!(forest_to_root_index(MountainRange::with_leaves(0b1110)), idx(26));
+        assert_eq!(forest_to_root_index(MountainRange::new(0b0110)), idx(10));
+        assert_eq!(forest_to_root_index(MountainRange::new(0b1010)), idx(18));
+        assert_eq!(forest_to_root_index(MountainRange::new(0b1100)), idx(20));
+        assert_eq!(forest_to_root_index(MountainRange::new(0b1110)), idx(26));
     }
 
     #[test]
@@ -705,26 +705,26 @@ mod tests {
 
         for forest in 1..256 {
             assert!(
-                forest_to_rightmost_index(MountainRange::with_leaves(forest)).inner() % 2 == 1,
+                forest_to_rightmost_index(MountainRange::new(forest)).inner() % 2 == 1,
                 "Leaves are always odd"
             );
         }
 
-        assert_eq!(forest_to_rightmost_index(MountainRange::with_leaves(0b0001)), idx(1));
-        assert_eq!(forest_to_rightmost_index(MountainRange::with_leaves(0b0010)), idx(3));
-        assert_eq!(forest_to_rightmost_index(MountainRange::with_leaves(0b0011)), idx(5));
-        assert_eq!(forest_to_rightmost_index(MountainRange::with_leaves(0b0100)), idx(7));
-        assert_eq!(forest_to_rightmost_index(MountainRange::with_leaves(0b0101)), idx(9));
-        assert_eq!(forest_to_rightmost_index(MountainRange::with_leaves(0b0110)), idx(11));
-        assert_eq!(forest_to_rightmost_index(MountainRange::with_leaves(0b0111)), idx(13));
-        assert_eq!(forest_to_rightmost_index(MountainRange::with_leaves(0b1000)), idx(15));
-        assert_eq!(forest_to_rightmost_index(MountainRange::with_leaves(0b1001)), idx(17));
-        assert_eq!(forest_to_rightmost_index(MountainRange::with_leaves(0b1010)), idx(19));
-        assert_eq!(forest_to_rightmost_index(MountainRange::with_leaves(0b1011)), idx(21));
-        assert_eq!(forest_to_rightmost_index(MountainRange::with_leaves(0b1100)), idx(23));
-        assert_eq!(forest_to_rightmost_index(MountainRange::with_leaves(0b1101)), idx(25));
-        assert_eq!(forest_to_rightmost_index(MountainRange::with_leaves(0b1110)), idx(27));
-        assert_eq!(forest_to_rightmost_index(MountainRange::with_leaves(0b1111)), idx(29));
+        assert_eq!(forest_to_rightmost_index(MountainRange::new(0b0001)), idx(1));
+        assert_eq!(forest_to_rightmost_index(MountainRange::new(0b0010)), idx(3));
+        assert_eq!(forest_to_rightmost_index(MountainRange::new(0b0011)), idx(5));
+        assert_eq!(forest_to_rightmost_index(MountainRange::new(0b0100)), idx(7));
+        assert_eq!(forest_to_rightmost_index(MountainRange::new(0b0101)), idx(9));
+        assert_eq!(forest_to_rightmost_index(MountainRange::new(0b0110)), idx(11));
+        assert_eq!(forest_to_rightmost_index(MountainRange::new(0b0111)), idx(13));
+        assert_eq!(forest_to_rightmost_index(MountainRange::new(0b1000)), idx(15));
+        assert_eq!(forest_to_rightmost_index(MountainRange::new(0b1001)), idx(17));
+        assert_eq!(forest_to_rightmost_index(MountainRange::new(0b1010)), idx(19));
+        assert_eq!(forest_to_rightmost_index(MountainRange::new(0b1011)), idx(21));
+        assert_eq!(forest_to_rightmost_index(MountainRange::new(0b1100)), idx(23));
+        assert_eq!(forest_to_rightmost_index(MountainRange::new(0b1101)), idx(25));
+        assert_eq!(forest_to_rightmost_index(MountainRange::new(0b1110)), idx(27));
+        assert_eq!(forest_to_rightmost_index(MountainRange::new(0b1111)), idx(29));
     }
 
     #[test]

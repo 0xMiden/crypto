@@ -158,12 +158,11 @@ impl Mmr {
         let mut left_offset = self.nodes.len().saturating_sub(2);
         let mut right = el;
         let mut left_tree = 1;
-        while !(self.forest & MountainRange::with_leaves(left_tree)).is_empty() {
+        while !(self.forest & MountainRange::new(left_tree)).is_empty() {
             right = Rpo256::merge(&[self.nodes[left_offset], right]);
             self.nodes.push(right);
 
-            left_offset =
-                left_offset.saturating_sub(MountainRange::with_leaves(left_tree).num_nodes());
+            left_offset = left_offset.saturating_sub(MountainRange::new(left_tree).num_nodes());
             left_tree <<= 1;
         }
 
@@ -317,7 +316,7 @@ impl Mmr {
 
         // The tree walk below goes from the root to the leaf, compute the root index to start
         let mut forest_target: usize = 1usize << tree_bit;
-        let mut index = MountainRange::with_leaves(forest_target).num_nodes() - 1;
+        let mut index = MountainRange::new(forest_target).num_nodes() - 1;
 
         // Loop until the leaf is reached
         while forest_target > 1 {
@@ -326,7 +325,7 @@ impl Mmr {
 
             // compute the indices of the right and left subtrees based on the post-order
             let right_offset = index - 1;
-            let left_offset = right_offset - MountainRange::with_leaves(forest_target).num_nodes();
+            let left_offset = right_offset - MountainRange::new(forest_target).num_nodes();
 
             let left_or_right = relative_pos & forest_target;
             let sibling = if left_or_right != 0 {
@@ -416,7 +415,7 @@ impl Iterator for MmrNodes<'_> {
 
             // compute the number of nodes in the right tree, this is the offset to the
             // previous left parent
-            let right_nodes = MountainRange::with_leaves(self.last_right).num_nodes();
+            let right_nodes = MountainRange::new(self.last_right).num_nodes();
             // the next parent position is one above the position of the pair
             let parent = self.last_right << 1;
 

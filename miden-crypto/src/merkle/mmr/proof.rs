@@ -26,10 +26,6 @@ impl MmrProof {
         self.forest
             .leaf_relative_position(self.position)
             .expect("position must be part of the forest")
-        // let tree_bit = leaf_to_corresponding_tree(self.position, self.forest)
-        //     .expect("position must be part of the forest");
-        // let forest_before = Forest::with_leaves(self.forest) & high_bitmask(tree_bit + 1);
-        // self.position - forest_before.0
     }
 
     /// Returns index of the MMR peak against which the Merkle path in this proof can be verified.
@@ -38,7 +34,7 @@ impl MmrProof {
             .forest
             .leaf_to_corresponding_tree(self.position)
             .expect("position must be part of the forest");
-        let smaller_peak_mask = MountainRange::with_leaves(2_usize.pow(root) - 1);
+        let smaller_peak_mask = MountainRange::new(2_usize.pow(root) - 1);
         let num_smaller_peaks = (self.forest & smaller_peak_mask).num_trees();
         self.forest.num_trees() - num_smaller_peaks - 1
     }
@@ -55,7 +51,7 @@ mod tests {
     #[test]
     fn test_peak_index() {
         // --- single peak forest ---------------------------------------------
-        let forest = MountainRange::with_leaves(11);
+        let forest = MountainRange::new(11);
 
         // the first 4 leaves belong to peak 0
         for position in 0..8 {
@@ -64,7 +60,7 @@ mod tests {
         }
 
         // --- forest with non-consecutive peaks ------------------------------
-        let forest = MountainRange::with_leaves(11);
+        let forest = MountainRange::new(11);
 
         // the first 8 leaves belong to peak 0
         for position in 0..8 {
@@ -83,7 +79,7 @@ mod tests {
         assert_eq!(proof.peak_index(), 2);
 
         // --- forest with consecutive peaks ----------------------------------
-        let forest = MountainRange::with_leaves(7);
+        let forest = MountainRange::new(7);
 
         // the first 4 leaves belong to peak 0
         for position in 0..4 {
