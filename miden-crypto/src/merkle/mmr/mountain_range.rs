@@ -150,17 +150,17 @@ impl MountainRange {
     }
 
     /// Returns true if the mountain range contains a single-node tree.
-    pub fn has_odd_leaf(self) -> bool {
+    pub fn has_single_leaf_tree(self) -> bool {
         self.0 & 1 != 0
     }
 
     /// Add a single-node tree if not already present in the mountain range.
-    pub fn odd_leaf_added(self) -> MountainRange {
+    pub fn single_leaf_tree_added(self) -> MountainRange {
         MountainRange::new(self.0 | 1)
     }
 
     /// Remove the single-node tree if present in the mountain range.
-    pub fn odd_leaf_removed(self) -> MountainRange {
+    pub fn single_leaf_tree_removed(self) -> MountainRange {
         MountainRange::new(self.0 & (usize::MAX << 1))
     }
 

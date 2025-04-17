@@ -393,7 +393,7 @@ impl Iterator for MmrNodes<'_> {
         debug_assert!(self.last_right.count_ones() <= 1, "last_right tracks zero or one element");
 
         // only parent nodes are emitted, remove the single node tree from the forest
-        let target = self.mmr.forest.odd_leaf_removed().num_leaves();
+        let target = self.mmr.forest.single_leaf_tree_removed().num_leaves();
 
         if self.forest < target {
             if self.last_right == 0 {

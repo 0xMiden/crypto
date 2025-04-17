@@ -135,7 +135,7 @@ impl PartialMmr {
         let leaves = self.forest.num_leaves();
         if pos >= leaves {
             return false;
-        } else if pos == leaves - 1 && self.forest.has_odd_leaf() {
+        } else if pos == leaves - 1 && self.forest.has_single_leaf_tree() {
             // if the number of leaves in the MMR is odd and the position is for the last leaf
             // whether the leaf is tracked is defined by the `track_latest` flag
             return self.track_latest;
@@ -387,7 +387,7 @@ impl PartialMmr {
         let merges = self.forest & largest.all_smaller_trees();
 
         debug_assert!(
-            !self.track_latest || merges.has_odd_leaf(),
+            !self.track_latest || merges.has_single_leaf_tree(),
             "if there is an odd element, a merge is required"
         );
 
