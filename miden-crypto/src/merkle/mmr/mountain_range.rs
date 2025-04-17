@@ -169,16 +169,26 @@ impl MountainRange {
         self ^ other
     }
 
-    /// Given a leaf index in the current mountain range, return the tree number
-    /// responsible for the position.
+    /// Given a leaf index in the current mountain range, return the tree number responsible for the leaf.
     ///
     /// Note:
     /// The result is a tree position `p`, it has the following interpretations:
-    /// - $p+1$ is the depth of the tree.
-    /// - Because the root element is not part of the proof, $p$ is the length of the
+    /// - `p+1` is the depth of the tree.
+    /// - Because the root element is not part of the proof, `p` is the length of the
     /// authentication path.
-    /// - $2^p$ is equal to the number of leaves in this particular tree.
-    /// - And $2^(p+1)-1$ corresponds to size of the tree.
+    /// - `2^p` is equal to the number of leaves in this particular tree.
+    /// - And `2^(p+1)-1` corresponds to the size of the tree.
+    /// 
+    /// For example, given a mountain range with 6 leaves whose forest is `0b110`:
+    /// ```
+    ///       __ peak 2 __
+    ///      /            \
+    ///    ____          ____         _ peak 1 _
+    ///   /    \        /    \       /          \
+    ///  0      1      2      3     4            5
+    /// ```
+    ///
+    /// Leaf indices `0..=3` are in the tree at index 2 and leaf indices `4..=5` are in the tree at index 1.
     pub fn leaf_to_corresponding_tree(self, leaf_idx: usize) -> Option<u32> {
         let forest = self.0;
 
@@ -196,16 +206,16 @@ impl MountainRange {
             //   the first tree which doesn't share a high bit with the position
             let before = forest & leaf_idx;
             let after = forest ^ before;
-            let tree = after.ilog2();
+            let tree_idx = after.ilog2();
 
-            Some(tree)
+            Some(tree_idx)
         }
     }
 
     /// Given a leaf index in the current mountain range, return the lead index in the tree to which the leaf belongs..
-    pub fn leaf_relative_position(self, leaf_idx: usize) -> Option<usize> {
-        let tree = self.leaf_to_corresponding_tree(leaf_idx)?;
-        let forest_before = self & high_bitmask(tree + 1);
+    pub(super) fn leaf_relative_position(self, leaf_idx: usize) -> Option<usize> {
+        let tree_idx = self.leaf_to_corresponding_tree(leaf_idx)?;
+        let forest_before = self & high_bitmask(tree_idx + 1);
         Some(leaf_idx - forest_before.0)
     }
 }
