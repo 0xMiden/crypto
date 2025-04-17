@@ -1,8 +1,8 @@
 use super::mountain_range::MountainRange;
 
-/// Iterate over the the trees within this forest, from smallest to largest.
+/// Iterate over the the trees within this `MountainRange`, from smallest to largest.
 ///
-/// Each item is a "sub-forest", containing only one tree.
+/// Each item is a "sub-mountain range", containing only one tree.
 pub struct TreeSizeIterator {
     value: MountainRange,
 }

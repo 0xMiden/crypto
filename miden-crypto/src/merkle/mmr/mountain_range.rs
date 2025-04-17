@@ -11,80 +11,80 @@ use crate::Felt;
 /// equal to the bit position.
 ///
 /// Examples:
-/// - `Forest(0)` is a forest with no trees.
-/// - `Forest(0b01)` is a forest with a single node (the smallest tree possible).
-/// - `Forest(0b10)` is a forest with a single binary tree with 2 leaves (3 nodes).
-/// - `Forest(0b11)` is a forest with two trees: one with 1 leaf (1 node), and one with 2 leaves (3
+/// - `MountainRange(0)` is a forest with no trees.
+/// - `MountainRange(0b01)` is a forest with a single leaf/node (the smallest tree possible).
+/// - `MountainRange(0b10)` is a forest with a single binary tree with 2 leaves (3 nodes).
+/// - `MountainRange(0b11)` is a forest with two trees: one with 1 leaf (1 node), and one with 2 leaves (3
 /// nodes).
-/// - `Forest(0b1010)` is a forest with two trees: one with 8 leaves (15 nodes), one with 2 leaves (3
+/// - `MountainRange(0b1010)` is a forest with two trees: one with 8 leaves (15 nodes), one with 2 leaves (3
 ///   nodes).
-/// - `Forest(0b1000)` is a forest with one tree, which has 8 leaves (15 nodes).
+/// - `MountainRange(0b1000)` is a forest with one tree, which has 8 leaves (15 nodes).
 #[derive(Debug, Copy, Clone, Default, PartialEq, Eq, PartialOrd, Ord)]
 #[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 pub struct MountainRange(usize);
 
 impl MountainRange {
-    /// Creates an empty forest (no trees).
+    /// Creates an empty mountain range (no trees).
     pub const fn empty() -> Self {
         Self(0)
     }
 
-    /// Creates a forest with `n` leaves.
+    /// Creates a mountain range with `n` leaves.
     pub const fn with_leaves(n: usize) -> Self {
         Self(n)
     }
 
-    /// Returns true if there are no trees in the forest.
+    /// Returns true if there are no trees in the mountain range.
     pub fn is_empty(self) -> bool {
         self.0 == 0
     }
 
-    /// Returns a forest with a capacity for exactly one more leaf.
+    /// Returns a mountain range with a capacity for exactly one more leaf.
     ///
     /// Some smaller trees might be merged together.
     pub fn increment(&mut self) {
         self.0 += 1;
     }
 
-    /// Returns a count of leaves in the entire underlying Forest (MMR).
+    /// Returns a count of leaves in the entire underlying Mountain Range (MMR).
     pub fn num_leaves(self) -> usize {
         self.0
     }
 
-    /// Return the total number of nodes of a given forest.
+    /// Return the total number of nodes of a given mountain range.
     ///
     /// # Panics
     ///
-    /// This will panic if the forest has size greater than `usize::MAX / 2`.
+    /// This will panic if the mountain range has size greater than `usize::MAX / 2`.
     pub const fn num_nodes(self) -> usize {
         self.0 * 2 - self.num_trees()
     }
 
-    /// Return the total number of trees of a given forest (the number of active bits).
+    /// Return the total number of trees of a given mountain range (the number of active bits).
     pub const fn num_trees(self) -> usize {
         self.0.count_ones() as usize
     }
 
-    /// Returns the height (bit position) of the largest tree in the forest.
+    /// Returns the height (bit position) of the largest tree in the mountain range.
     pub fn largest_tree_height(self) -> usize {
         // ilog2 is computed with leading zeros, which itself is computed with the intrinsic ctlz.
         // [Rust 1.67.0] x86 uses the `bsr` instruction. AArch64 uses the `clz` instruction.
         self.0.ilog2() as usize
     }
 
-    /// Returns a forest with only the largest tree present.
+    /// Returns a mountain range with only the largest tree present.
     ///
     /// # Panics
     ///
-    /// This will panic if the forest is empty.
-    pub fn largest_tree(self) -> MountainRange {
+    /// This will panic if the mountain range is empty.
+    pub fn largest_tree_unchecked(self) -> MountainRange {
         MountainRange::with_leaves(1 << self.largest_tree_height())
     }
 
-    /// Returns a forest with only the largest tree present.
+    /// Returns a mountain range with only the largest tree present.
     ///
-    /// If forest cannot be empty, use `largest_tree` for performance.
-    pub fn largest_tree_checked(self) -> MountainRange {
+    /// If mountain range cannot be empty, use `largest_tree` for better performance.
+    pub fn largest_tree(self) -> MountainRange {
         if self.0 > 0 {
             self.largest_tree()
         } else {
@@ -92,25 +92,25 @@ impl MountainRange {
         }
     }
 
-    /// Returns the height (bit position) of the smallest tree in the forest.
+    /// Returns the height (bit position) of the smallest tree in the mountain range.
     pub fn smallest_tree_height(self) -> usize {
         // Trailing_zeros is computed with the intrinsic cttz. [Rust 1.67.0] x86 uses the `bsf`
         // instruction. AArch64 uses the `rbit clz` instructions.
         self.0.trailing_zeros() as usize
     }
 
-    /// Returns a forest with only the smallest tree present.
+    /// Returns a mountain range with only the smallest tree present.
     ///
     /// # Panics
     ///
-    /// This will panic if the forest is empty.
+    /// This will panic if the mountain range is empty.
     pub fn smallest_tree(self) -> MountainRange {
         MountainRange::with_leaves(1 << self.smallest_tree_height())
     }
 
-    /// Returns a forest with only the smallest tree present.
+    /// Returns a mountain range with only the smallest tree present.
     ///
-    /// If forest cannot be empty, use `smallest_tree` for performance.
+    /// If mountain range cannot be empty, use `smallest_tree` for performance.
     pub fn smallest_tree_checked(self) -> MountainRange {
         if self.0 > 0 {
             self.smallest_tree()
@@ -141,33 +141,33 @@ impl MountainRange {
         self & high_bitmask(tree_idx + 1)
     }
 
-    /// Creates a new forest with all possible trees smaller than the smallest tree in this forest.
+    /// Creates a new mountain range with all possible trees smaller than the smallest tree in this mountain range.
     pub fn all_smaller_trees(self) -> MountainRange {
         debug_assert!(self.0.count_ones() == 1);
         MountainRange::with_leaves(self.0 - 1)
     }
 
-    /// Returns true if the forest contains a single-node tree.
+    /// Returns true if the mountain range contains a single-node tree.
     pub fn has_odd_leaf(self) -> bool {
         self.0 & 1 != 0
     }
 
-    /// Add a single-node tree if not already present in the forest.
+    /// Add a single-node tree if not already present in the mountain range.
     pub fn odd_leaf_added(self) -> MountainRange {
         MountainRange::with_leaves(self.0 | 1)
     }
 
-    /// Remove the single-node tree if present in the forest.
+    /// Remove the single-node tree if present in the mountain range.
     pub fn odd_leaf_removed(self) -> MountainRange {
         MountainRange::with_leaves(self.0 & (usize::MAX << 1))
     }
 
-    /// Returns a new Forest that does not have the trees that `other` has.
+    /// Returns a new mountain range that does not have the trees that `other` has.
     pub fn without_trees(self, other: MountainRange) -> Self {
         self ^ other
     }
 
-    /// Given a 0-indexed leaf position in the current forest, return the tree number responsible
+    /// Given a 0-indexed leaf position in the current mountain range, return the tree number responsible
     /// for the position.
     ///
     /// Note:
@@ -183,7 +183,7 @@ impl MountainRange {
         if pos >= forest {
             None
         } else {
-            // - each bit in the forest is a unique tree and the bit position its power-of-two size
+            // - each bit in the mountain range is a unique tree and the bit position its power-of-two size
             // - each tree owns a consecutive range of positions equal to its size from
             //   left-to-right
             // - this means the first tree owns from `0` up to the `2^k_0` first positions, where
@@ -199,7 +199,7 @@ impl MountainRange {
         }
     }
 
-    /// Given a 0-indexed leaf position in the current forest, return the 0-indexed leaf position
+    /// Given a 0-indexed leaf position in the current mountain range, return the 0-indexed leaf position
     /// in the tree to which the leaf belongs..
     pub fn leaf_relative_position(self, pos: usize) -> Option<usize> {
         let tree = self.leaf_to_corresponding_tree(pos)?;
