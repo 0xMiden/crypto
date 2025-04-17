@@ -135,8 +135,8 @@ impl MountainRange {
     ///
     /// ```
     /// # use miden_crypto::merkle::MountainRange;
-    /// let range = MountainRange::with_leaves(0b0101_0110);
-    /// assert_eq!(range.trees_larger_than(1), MountainRange::with_leaves(0b0101_0100));
+    /// let range = MountainRange::new(0b0101_0110);
+    /// assert_eq!(range.trees_larger_than(1), MountainRange::new(0b0101_0100));
     /// ```
     pub fn trees_larger_than(self, tree_idx: u32) -> MountainRange {
         self & high_bitmask(tree_idx + 1)
