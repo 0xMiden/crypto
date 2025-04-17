@@ -10,6 +10,12 @@ use crate::Felt;
 /// Each active bit of the stored number represents a disjoint tree with number of leaves
 /// equal to the bit position.
 ///
+/// The mountain range value has the following interpretations:
+/// - its value is the number of leaves in the mountain range
+/// - the version number (MMR is append only so the number of leaves always increases)
+/// - bit count corresponds to the number of peaks (trees) in the mountain range
+/// - each true bit position determines the depth of a tree in the mountain range
+///
 /// Examples:
 /// - `MountainRange(0)` is a forest with no trees.
 /// - `MountainRange(0b01)` is a forest with a single leaf/node (the smallest tree possible).
@@ -169,7 +175,8 @@ impl MountainRange {
         self ^ other
     }
 
-    /// Given a leaf index in the current mountain range, return the tree number responsible for the leaf.
+    /// Given a leaf index in the current mountain range, return the tree number responsible for the
+    /// leaf.
     ///
     /// Note:
     /// The result is a tree position `p`, it has the following interpretations:
@@ -178,9 +185,9 @@ impl MountainRange {
     /// authentication path.
     /// - `2^p` is equal to the number of leaves in this particular tree.
     /// - And `2^(p+1)-1` corresponds to the size of the tree.
-    /// 
+    ///
     /// For example, given a mountain range with 6 leaves whose forest is `0b110`:
-    /// ```
+    /// ```ignore
     ///       __ peak 2 __
     ///      /            \
     ///    ____          ____         _ peak 1 _
@@ -188,7 +195,8 @@ impl MountainRange {
     ///  0      1      2      3     4            5
     /// ```
     ///
-    /// Leaf indices `0..=3` are in the tree at index 2 and leaf indices `4..=5` are in the tree at index 1.
+    /// Leaf indices `0..=3` are in the tree at index 2 and leaf indices `4..=5` are in the tree at
+    /// index 1.
     pub fn leaf_to_corresponding_tree(self, leaf_idx: usize) -> Option<u32> {
         let forest = self.0;
 
@@ -212,7 +220,8 @@ impl MountainRange {
         }
     }
 
-    /// Given a leaf index in the current mountain range, return the lead index in the tree to which the leaf belongs..
+    /// Given a leaf index in the current mountain range, return the lead index in the tree to which
+    /// the leaf belongs..
     pub(super) fn leaf_relative_position(self, leaf_idx: usize) -> Option<usize> {
         let tree_idx = self.leaf_to_corresponding_tree(leaf_idx)?;
         let forest_before = self & high_bitmask(tree_idx + 1);

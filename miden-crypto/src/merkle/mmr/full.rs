@@ -64,12 +64,7 @@ impl Mmr {
     // ACCESSORS
     // ============================================================================================
 
-    /// Returns the MMR representation.
-    ///
-    /// The mountain range value has the following interpretations:
-    /// - its value is the number of elements in the forest
-    /// - bit count corresponds to the number of trees in the forest
-    /// - each true bit position determines the depth of a tree in the forest
+    /// Returns the MMR representation. See [`MountainRange`].
     pub const fn mountain_range(&self) -> MountainRange {
         self.forest
     }
