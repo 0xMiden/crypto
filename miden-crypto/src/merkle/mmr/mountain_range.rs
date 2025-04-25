@@ -77,16 +77,16 @@ impl MountainRange {
     /// # Panics
     ///
     /// This will panic if the forest is empty.
-    pub fn largest_tree_unchecked(self) -> MountainRange {
+    pub fn largest_tree(self) -> MountainRange {
         MountainRange::with_leaves(1 << self.largest_tree_height())
     }
 
     /// Returns a forest with only the largest tree present.
     ///
     /// If forest cannot be empty, use `largest_tree` for performance.
-    pub fn largest_tree(self) -> MountainRange {
+    pub fn largest_tree_checked(self) -> MountainRange {
         if self.0 > 0 {
-            self.largest_tree_unchecked()
+            self.largest_tree()
         } else {
             MountainRange::empty()
         }

@@ -383,7 +383,7 @@ impl PartialMmr {
 
         // find the tree merges
         let changes = self.forest ^ delta.forest;
-        let largest = changes.largest_tree();
+        let largest = changes.largest_tree_unchecked();
         let merges = self.forest & largest.all_smaller_trees();
 
         debug_assert!(

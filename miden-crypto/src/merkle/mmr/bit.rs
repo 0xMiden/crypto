@@ -30,7 +30,7 @@ impl Iterator for TreeSizeIterator {
 
 impl DoubleEndedIterator for TreeSizeIterator {
     fn next_back(&mut self) -> Option<<Self as Iterator>::Item> {
-        let tree = self.value.largest_tree_checked();
+        let tree = self.value.largest_tree();
 
         if tree.is_empty() {
             None
