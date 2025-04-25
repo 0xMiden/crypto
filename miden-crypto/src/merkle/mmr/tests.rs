@@ -703,7 +703,7 @@ fn test_mmr_peaks_hash_less_than_16() {
     for i in 0..16 {
         peaks.push(int_to_node(i));
 
-        let forest = MountainRange::new(1 << peaks.len()).all_smaller_trees();
+        let forest = MountainRange::new(1 << peaks.len()).all_smaller_trees().unwrap();
         let accumulator = MmrPeaks::new(forest, peaks.clone()).unwrap();
 
         // minimum length is 16
@@ -720,7 +720,7 @@ fn test_mmr_peaks_hash_less_than_16() {
 fn test_mmr_peaks_hash_odd() {
     let peaks: Vec<_> = (0..=17).map(int_to_node).collect();
 
-    let forest = MountainRange::new(1 << peaks.len()).all_smaller_trees();
+    let forest = MountainRange::new(1 << peaks.len()).all_smaller_trees_unchecked();
     let accumulator = MmrPeaks::new(forest, peaks.clone()).unwrap();
 
     // odd length bigger than 16 is padded to the next even number

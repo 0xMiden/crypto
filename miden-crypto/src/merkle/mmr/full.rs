@@ -227,7 +227,7 @@ impl Mmr {
         // ----------------------------------------------------------------------------------------
 
         // Find the trees from `from_forest` that have been merged into `new_high`.
-        let mut merges = from_forest & new_high.all_smaller_trees();
+        let mut merges = from_forest & new_high.all_smaller_trees_unchecked();
 
         // Find the peaks that are common to `from_forest` and this [Mmr]
         let common_trees = from_forest ^ merges;
@@ -254,7 +254,7 @@ impl Mmr {
                     target <<= 1;
                 }
                 // Remove the merges done so far
-                merges ^= merges & target.all_smaller_trees();
+                merges ^= merges & target.all_smaller_trees_unchecked();
             }
         } else {
             // The new high tree may not be the result of any merges, if it is smaller than all the

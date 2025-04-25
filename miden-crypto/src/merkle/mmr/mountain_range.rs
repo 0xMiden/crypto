@@ -149,9 +149,29 @@ impl MountainRange {
 
     /// Creates a new mountain range with all possible trees smaller than the smallest tree in this
     /// mountain range.
-    pub fn all_smaller_trees(self) -> MountainRange {
+    ///
+    /// This mountain range must have exactly one tree.
+    ///
+    /// # Panics
+    /// With debug assertions enabled, this function panics if this mountain range does not have
+    /// exactly one tree.
+    ///
+    /// For a non-panicking version of this function, see [`MountainRange::all_smaller_trees()`].
+    pub fn all_smaller_trees_unchecked(self) -> MountainRange {
         debug_assert!(self.0.count_ones() == 1);
         MountainRange::new(self.0 - 1)
+    }
+
+    /// Creates a new mountain range with all possible trees smaller than the smallest tree in this
+    /// mountain range, or returns `None` if this mountain range has more or less than one tree.
+    ///
+    /// If the mountain range cannot have more or less than one tree, use
+    /// [`MountainRange::all_smaller_trees_unchecked()`] for performance.
+    pub fn all_smaller_trees(self) -> Option<MountainRange> {
+        if self.0.count_ones() != 0 {
+            return None;
+        }
+        Some(self.all_smaller_trees_unchecked())
     }
 
     /// Returns true if the mountain range contains a single-node tree.

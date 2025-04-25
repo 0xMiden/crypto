@@ -321,7 +321,7 @@ impl PartialMmr {
 
         // ignore the trees smaller than the target (these elements are position after the current
         // target and don't affect the target leaf_pos)
-        let target_forest = self.forest ^ (self.forest & tree.all_smaller_trees());
+        let target_forest = self.forest ^ (self.forest & tree.all_smaller_trees_unchecked());
         let peak_pos = target_forest.num_trees() - 1;
 
         // translate from mmr leaf_pos to merkle path
@@ -384,7 +384,7 @@ impl PartialMmr {
         // find the tree merges
         let changes = self.forest ^ delta.forest;
         let largest = changes.largest_tree_unchecked();
-        let merges = self.forest & largest.all_smaller_trees();
+        let merges = self.forest & largest.all_smaller_trees_unchecked();
 
         debug_assert!(
             !self.track_latest || merges.has_single_leaf_tree(),
@@ -398,7 +398,7 @@ impl PartialMmr {
             let computed = merges.num_trees() - 1;
             let merge_count = depth - skipped - computed;
 
-            let new_peaks = delta.forest & largest.all_smaller_trees();
+            let new_peaks = delta.forest & largest.all_smaller_trees_unchecked();
 
             (merge_count, new_peaks)
         } else {
