@@ -50,6 +50,8 @@ impl<const DEPTH: u8> Display for LeafIndex<DEPTH> {
     }
 }
 
+// Used for doctests in `merkle::mmr::mountain_range`; #[cfg(doctest)] doesn't help here:
+// https://github.com/rust-lang/rust/issues/67295.
 #[doc(hidden)]
 pub use mmr::MountainRange;
 
