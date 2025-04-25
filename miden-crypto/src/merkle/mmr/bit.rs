@@ -4,12 +4,12 @@ use super::mountain_range::MountainRange;
 ///
 /// Each item is a "sub-mountain range", containing only one tree.
 pub struct TreeSizeIterator {
-    value: MountainRange,
+    inner: MountainRange,
 }
 
 impl TreeSizeIterator {
     pub fn new(value: MountainRange) -> TreeSizeIterator {
-        TreeSizeIterator { value }
+        TreeSizeIterator { inner: value }
     }
 }
 
@@ -17,12 +17,12 @@ impl Iterator for TreeSizeIterator {
     type Item = MountainRange;
 
     fn next(&mut self) -> Option<<Self as Iterator>::Item> {
-        let tree = self.value.smallest_tree();
+        let tree = self.inner.smallest_tree();
 
         if tree.is_empty() {
             None
         } else {
-            self.value = self.value.without_trees(tree);
+            self.inner = self.inner.without_trees(tree);
             Some(tree)
         }
     }
@@ -30,12 +30,12 @@ impl Iterator for TreeSizeIterator {
 
 impl DoubleEndedIterator for TreeSizeIterator {
     fn next_back(&mut self) -> Option<<Self as Iterator>::Item> {
-        let tree = self.value.largest_tree();
+        let tree = self.inner.largest_tree();
 
         if tree.is_empty() {
             None
         } else {
-            self.value = self.value.without_trees(tree);
+            self.inner = self.inner.without_trees(tree);
             Some(tree)
         }
     }
