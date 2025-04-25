@@ -24,6 +24,7 @@
 - [BREAKING] Moved `rand` to version `0.9` removing the `try_fill_bytes` method (#398).
 - [BREAKING] Increment minimum supported Rust version to 1.85 (#399).
 - Added `SparseMerklePath`, a compact representation of `MerklePath` which compacts empty nodes into a bitmask (#389).
+- Use a rich newtype for Merkle mountain range types' forest values (#400).
 
 ## 0.13.3 (2025-02-18)
 
