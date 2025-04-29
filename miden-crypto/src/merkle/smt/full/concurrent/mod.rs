@@ -57,6 +57,27 @@ impl Smt {
         <Self as SparseMerkleTree<SMT_DEPTH>>::from_raw_parts(inner_nodes, leaves, root)
     }
 
+    /// Similar to `with_entries_concurrent` but used for pre-sorted entries to avoid overhead.
+    pub(crate) fn with_sorted_entries_concurrent(
+        entries: impl IntoIterator<Item = (RpoDigest, Word)>,
+    ) -> Result<Self, MerkleError> {
+        let entries: Vec<(RpoDigest, Word)> = entries.into_iter().collect();
+
+        if entries.is_empty() {
+            return Ok(Self::default());
+        }
+
+        let (inner_nodes, leaves) = Self::build_subtrees_from_sorted_entries(entries)?;
+
+        // All the leaves are empty
+        if inner_nodes.is_empty() {
+            return Ok(Self::default());
+        }
+
+        let root = inner_nodes.get(&NodeIndex::root()).unwrap().hash();
+        <Self as SparseMerkleTree<SMT_DEPTH>>::from_raw_parts(inner_nodes, leaves, root)
+    }
+
     /// Parallel implementation of [`Smt::compute_mutations()`].
     ///
     /// This method computes mutations by recursively processing subtrees in parallel, working from

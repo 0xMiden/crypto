@@ -96,6 +96,20 @@ impl Smt {
         }
     }
 
+    /// Similar to `with_entries` but used for pre-sorted entries to avoid overhead
+    pub fn with_sorted_entries(
+        entries: impl IntoIterator<Item = (RpoDigest, Word)>,
+    ) -> Result<Self, MerkleError> {
+        #[cfg(feature = "concurrent")]
+        {
+            Self::with_sorted_entries_concurrent(entries)
+        }
+        #[cfg(not(feature = "concurrent"))]
+        {
+            Self::with_entries_sequential(entries)
+        }
+    }
+
     /// Returns a new [Smt] instantiated with leaves set as specified by the provided entries.
     ///
     /// This sequential implementation processes entries one at a time to build the tree.
