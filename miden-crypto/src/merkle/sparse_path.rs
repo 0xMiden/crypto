@@ -89,11 +89,10 @@ impl SparseMerklePath {
             return Err(MerkleError::DepthTooBig(node_depth.get().into()));
         }
 
-        let node = if self.is_depth_empty(node_depth) {
-            *EmptySubtreeRoots::entry(self.depth(), node_depth.get())
-        } else {
-            let nonempty_index = self.get_nonempty_index(node_depth);
+        let node = if let Some(nonempty_index) = self.get_nonempty_index(node_depth) {
             self.nodes[nonempty_index]
+        } else {
+            *EmptySubtreeRoots::entry(self.depth(), node_depth.get())
         };
 
         Ok(node)
@@ -103,7 +102,7 @@ impl SparseMerklePath {
     // ============================================================================================
 
     /// Constructs a borrowing iterator over the nodes in this path.
-    /// Starts from the leaf and iterates toward the root (excluding root).
+    /// Starts from the leaf and iterates toward the root (excluding the root).
     pub fn iter(&self) -> impl ExactSizeIterator<Item = RpoDigest> {
         self.into_iter()
     }
@@ -120,14 +119,20 @@ impl SparseMerklePath {
         (self.empty_nodes_mask & Self::bitmask_for_depth(node_depth)) != 0
     }
 
-    fn get_nonempty_index(&self, node_depth: NonZero<u8>) -> usize {
+    /// Index of the non-empty node in the `self.nodes` vector. If the specified depth is
+    /// empty, None is returned.
+    fn get_nonempty_index(&self, node_depth: NonZero<u8>) -> Option<usize> {
+        if self.is_depth_empty(node_depth) {
+            return None;
+        }
+
         let bit_index = node_depth.get() - 1;
         let without_shallower = self.empty_nodes_mask >> bit_index;
         let empty_deeper = without_shallower.count_ones() as usize;
         // The vec index we would use if we didn't have any empty nodes to account for...
         let normal_index = (self.depth() - node_depth.get()) as usize;
         // subtracted by the number of empty nodes that are deeper than us.
-        normal_index - empty_deeper
+        Some(normal_index - empty_deeper)
     }
 }
 
@@ -198,7 +203,7 @@ impl From<SparseMerklePath> for Vec<RpoDigest> {
 // ================================================================================================
 
 /// Iterator for [`SparseMerklePath`]. Starts from the leaf and iterates toward the root (excluding
-/// root).
+/// the root).
 pub struct SparseMerklePathIter<'p> {
     /// The "inner" value we're iterating over.
     path: Cow<'p, SparseMerklePath>,
@@ -492,7 +497,7 @@ mod tests {
                 // Check that we can calculate non-empty indices correctly.
                 let control_node = raw_nodes.get(idx).unwrap();
                 assert_eq!(
-                    sparse_path.get_nonempty_index(NonZero::new(depth).unwrap()),
+                    sparse_path.get_nonempty_index(NonZero::new(depth).unwrap()).unwrap(),
                     nonempty_idx
                 );
                 let test_node = sparse_path.nodes.get(nonempty_idx).unwrap();
