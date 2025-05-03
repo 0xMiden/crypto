@@ -17,7 +17,7 @@ use super::{
 /// maximum of 64 nodes (`SMT_MAX_DEPTH`) can be stored (empty and non-empty). The more nodes in a
 /// path are empty, the less memory this struct will use. This type calculates empty nodes on-demand
 /// when iterated through, converted to a [MerklePath], or an empty node is retrieved with
-/// [`SparseMerklePath::at_idx()`] or [`SparseMerklePath::at_depth()`], which will incur overhead.
+/// [`SparseMerklePath::at_depth()`], which will incur overhead.
 ///
 /// NOTE: This type assumes that Merkle paths always span from the root of the tree to a leaf.
 /// Partial paths are not supported.
@@ -97,28 +97,6 @@ impl SparseMerklePath {
         };
 
         Ok(node)
-    }
-
-    /// Returns the path node at the specified index, or [None] if the index is out of bounds.
-    ///
-    /// The node at index 0 is the deepest part of the path.
-    ///
-    /// ```
-    /// # use core::num::NonZero;
-    /// # use miden_crypto::{ZERO, ONE, hash::rpo::RpoDigest, merkle::SparseMerklePath};
-    /// # let zero = RpoDigest::new([ZERO; 4]);
-    /// # let one = RpoDigest::new([ONE; 4]);
-    /// # let sparse_path = SparseMerklePath::from_sized_iter(vec![zero, one, one, zero]).unwrap();
-    /// let depth = NonZero::new(sparse_path.depth()).unwrap();
-    /// assert_eq!(
-    ///     sparse_path.at_idx(0).unwrap(),
-    ///     sparse_path.at_depth(depth).unwrap(),
-    /// );
-    /// ```
-    pub fn at_idx(&self, index: usize) -> Option<RpoDigest> {
-        // If this overflows *or* if the depth is zero then the index was out of bounds.
-        let depth = NonZero::new(u8::checked_sub(self.depth(), index as u8)?)?;
-        self.at_depth(depth).ok()
     }
 
     // PROVIDERS
@@ -570,15 +548,6 @@ mod tests {
                 let sparse_node = sparse_path.at_depth(depth).unwrap();
                 assert_eq!(control_node, sparse_node, "at depth {depth} for entry {i}");
             }
-
-            // Test random access by index.
-            // Letting index get to `control_path.len()` will test that both sides correctly return
-            // `None` for out of bounds access.
-            for index in 0..=(control_path.len()) {
-                let control_node = control_path.at_idx(index);
-                let sparse_node = sparse_path.at_idx(index);
-                assert_eq!(control_node, sparse_node);
-            }
         }
     }
 
@@ -636,7 +605,6 @@ mod tests {
             sparse_path.at_depth(NonZero::new(1).unwrap()),
             Err(MerkleError::DepthTooBig(1))
         );
-        assert_eq!(sparse_path.at_idx(0), None);
         assert_eq!(sparse_path.iter().next(), None);
         assert_eq!(sparse_path.into_iter().next(), None);
     }

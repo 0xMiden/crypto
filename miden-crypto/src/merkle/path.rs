@@ -48,16 +48,6 @@ impl MerklePath {
         self.nodes.get(index as usize).copied()
     }
 
-    /// Returns a reference to the path node at the specified index, or [None] if the index is out
-    /// of bounds.
-    ///
-    /// The node at index 0 is the deepest part of the path.
-    ///
-    /// This is a checked version of using the indexing operator `[]`.
-    pub fn at_idx(&self, index: usize) -> Option<RpoDigest> {
-        self.nodes.get(index).copied()
-    }
-
     /// Returns the depth in which this Merkle path proof is valid.
     pub fn depth(&self) -> u8 {
         self.nodes.len() as u8
