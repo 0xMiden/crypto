@@ -71,31 +71,14 @@ impl SparseMerklePath {
             return Err(MerkleError::DepthTooBig(node_depth.get().into()));
         }
 
-        let node = self
-            .at_depth_nonempty(node_depth)
-            .unwrap_or_else(|| *EmptySubtreeRoots::entry(self.depth(), node_depth.get()));
+        let node = if self.is_depth_empty(node_depth) {
+            *EmptySubtreeRoots::entry(self.depth(), node_depth.get())
+        } else {
+            let nonempty_index = self.get_nonempty_index(node_depth);
+            self.nodes[nonempty_index]
+        };
 
         Ok(node)
-    }
-
-    /// Get a specific non-empty node in this path at a given depth, or `None` if the specified
-    /// node is an empty node.
-    fn at_depth_nonempty(&self, node_depth: NonZero<u8>) -> Option<RpoDigest> {
-        assert!(
-            node_depth.get() <= self.depth(),
-            "node depth {} cannot be greater than tree depth {}",
-            node_depth.get(),
-            self.depth(),
-        );
-
-        if self.is_depth_empty(node_depth) {
-            return None;
-        }
-
-        // Our index needs to account for all the empty nodes that aren't in `self.nodes`.
-        let nonempty_index = self.get_nonempty_index(node_depth);
-
-        Some(self.nodes[nonempty_index])
     }
 
     /// Returns the path node at the specified index, or [None] if the index is out of bounds.
