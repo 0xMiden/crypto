@@ -103,6 +103,7 @@ impl SparseMerklePath {
     // ============================================================================================
 
     /// Constructs a borrowing iterator over the nodes in this path.
+    /// Starts from the leaf and iterates toward the root (excluding root).
     pub fn iter(&self) -> impl ExactSizeIterator<Item = RpoDigest> {
         self.into_iter()
     }
@@ -196,7 +197,8 @@ impl From<SparseMerklePath> for Vec<RpoDigest> {
 // ITERATORS
 // ================================================================================================
 
-/// Iterator for [`SparseMerklePath`].
+/// Iterator for [`SparseMerklePath`]. Starts from the leaf and iterates toward the root (excluding
+/// root).
 pub struct SparseMerklePathIter<'p> {
     /// The "inner" value we're iterating over.
     path: Cow<'p, SparseMerklePath>,
