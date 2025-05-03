@@ -47,9 +47,27 @@ impl SparseMerklePath {
         I: IntoIterator<IntoIter: ExactSizeIterator, Item = RpoDigest>,
     {
         let iterator = iterator.into_iter();
-        // `iterator.len() as u8` will truncate, but not below `SMT_MAX_DEPTH`, which
-        // `from_iter_with_depth` checks for.
-        Self::from_iter_with_depth(iterator.len() as u8, iterator)
+        let tree_depth = iterator.len() as u8;
+
+        if tree_depth > SMT_MAX_DEPTH {
+            return Err(MerkleError::DepthTooBig(tree_depth as u64));
+        }
+
+        let mut empty_nodes_mask: u64 = 0;
+        let mut nodes: Vec<RpoDigest> = Default::default();
+
+        for (depth, node) in iter::zip(path_depth_iter(tree_depth), iterator) {
+            let &equivalent_empty_node = EmptySubtreeRoots::entry(tree_depth, depth.get());
+            let is_empty = node == equivalent_empty_node;
+            let node = if is_empty { None } else { Some(node) };
+
+            match node {
+                Some(node) => nodes.push(node),
+                None => empty_nodes_mask |= Self::bitmask_for_depth(depth),
+            }
+        }
+
+        Ok(SparseMerklePath { nodes, empty_nodes_mask })
     }
 
     /// Returns the total depth of this path, i.e., the number of nodes this path represents.
@@ -113,41 +131,6 @@ impl SparseMerklePath {
 
     // PRIVATE HELPERS
     // ============================================================================================
-
-    /// Constructs a sparse Merkle path from a manually specified tree depth, and an iterator over
-    /// Merkle nodes from deepest to shallowest.
-    ///
-    /// Knowing the size is necessary to calculate the depth of the tree, which is needed to detect
-    /// which nodes are empty nodes.
-    ///
-    /// Warning: this method does not check if the iterator contained more elements.
-    ///
-    /// # Errors
-    /// Returns [MerkleError::DepthTooBig] if `tree_depth` is greater than [SMT_MAX_DEPTH].
-    fn from_iter_with_depth(
-        tree_depth: u8,
-        iter: impl IntoIterator<Item = RpoDigest>,
-    ) -> Result<Self, MerkleError> {
-        if tree_depth > SMT_MAX_DEPTH {
-            return Err(MerkleError::DepthTooBig(tree_depth as u64));
-        }
-
-        let mut empty_nodes_mask: u64 = 0;
-        let mut nodes: Vec<RpoDigest> = Default::default();
-
-        for (depth, node) in iter::zip(path_depth_iter(tree_depth), iter) {
-            let &equivalent_empty_node = EmptySubtreeRoots::entry(tree_depth, depth.get());
-            let is_empty = node == equivalent_empty_node;
-            let node = if is_empty { None } else { Some(node) };
-
-            match node {
-                Some(node) => nodes.push(node),
-                None => empty_nodes_mask |= Self::bitmask_for_depth(depth),
-            }
-        }
-
-        Ok(SparseMerklePath { nodes, empty_nodes_mask })
-    }
 
     const fn bitmask_for_depth(node_depth: NonZero<u8>) -> u64 {
         // - 1 because paths do not include the root.
