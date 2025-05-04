@@ -1,4 +1,3 @@
-mod bit;
 mod delta;
 mod error;
 mod full;

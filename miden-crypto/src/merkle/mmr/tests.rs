@@ -3,13 +3,12 @@ use alloc::vec::Vec;
 use super::{
     super::{InnerNodeInfo, Rpo256, Word},
     Mmr, MmrPeaks, PartialMmr,
-    bit::TreeSizeIterator,
 };
 use crate::{
     Felt,
     merkle::{
         InOrderIndex, MerklePath, MerkleTree, MmrProof, NodeIndex, int_to_node,
-        mmr::mountain_range::{MountainRange, high_bitmask},
+        mmr::mountain_range::{MountainRange, TreeSizeIterator, high_bitmask},
     },
 };
 

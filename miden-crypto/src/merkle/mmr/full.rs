@@ -15,8 +15,7 @@ use alloc::vec::Vec;
 use super::{
     super::{InnerNodeInfo, MerklePath},
     MmrDelta, MmrError, MmrPeaks, MmrProof,
-    bit::TreeSizeIterator,
-    mountain_range::MountainRange,
+    mountain_range::{MountainRange, TreeSizeIterator},
 };
 use crate::{Word, merkle::Rpo256};
 
