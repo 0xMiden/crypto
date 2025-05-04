@@ -84,6 +84,16 @@ impl PartialMmr {
         Self { forest, peaks, nodes, track_latest }
     }
 
+    /// Returns a new [`PartialMmr`] instantiated with empty peaks and nodes and 0 leaves.
+    pub const fn empty() -> Self {
+        let forest = 0;
+        let peaks = Vec::new();
+        let nodes = BTreeMap::new();
+        let track_latest = false;
+
+        Self { forest, peaks, nodes, track_latest }
+    }
+
     /// Returns a new [PartialMmr] instantiated from the specified components.
     ///
     /// This constructor does not check the consistency between peaks and nodes. If the specified
