@@ -92,7 +92,7 @@ impl MountainRange {
     /// If mountain range cannot be empty, use `largest_tree` for better performance.
     pub fn largest_tree(self) -> MountainRange {
         if self.0 > 0 {
-            self.largest_tree()
+            self.largest_tree_unchecked()
         } else {
             MountainRange::empty()
         }
