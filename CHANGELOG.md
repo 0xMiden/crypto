@@ -1,5 +1,6 @@
 ## 0.15.0 (TBD)
 
+- Added `empty()` constructors to `MmrPeaks` and `PartialMmr` (#409).
 
 ## 0.14.0 (2025-03-15)
 
