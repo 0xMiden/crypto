@@ -1,6 +1,6 @@
 use core::{
     fmt::{Binary, Display},
-    ops::{BitAnd, BitOr, BitXor, BitXorAssign, ShlAssign},
+    ops::{BitAnd, BitOr, BitXor, BitXorAssign},
 };
 
 use super::InOrderIndex;
@@ -249,8 +249,8 @@ impl MountainRange {
     /// Note:
     /// The result is a tree position `p`, it has the following interpretations:
     /// - `p+1` is the depth of the tree.
-    /// - Because the root element is not part of the proof, `p` is the length of the
-    /// authentication path.
+    /// - Because the root element is not part of the proof, `p` is the length of the authentication
+    ///   path.
     /// - `2^p` is equal to the number of leaves in this particular tree.
     /// - And `2^(p+1)-1` corresponds to the size of the tree.
     ///
