@@ -168,7 +168,7 @@ impl MountainRange {
     /// If the mountain range cannot have more or less than one tree, use
     /// [`MountainRange::all_smaller_trees_unchecked()`] for performance.
     pub fn all_smaller_trees(self) -> Option<MountainRange> {
-        if self.0.count_ones() != 0 {
+        if self.0.count_ones() != 1 {
             return None;
         }
         Some(self.all_smaller_trees_unchecked())
