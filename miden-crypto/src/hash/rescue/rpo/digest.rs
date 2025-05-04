@@ -21,6 +21,7 @@ use crate::{
 // DIGEST TRAIT IMPLEMENTATIONS
 // ================================================================================================
 
+/// An RPO digest consisting of 4 field elements.
 #[derive(Debug, Default, Copy, Clone, Eq, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 #[cfg_attr(feature = "serde", serde(into = "String", try_from = "&str"))]
@@ -30,18 +31,22 @@ impl RpoDigest {
     /// The serialized size of the digest in bytes.
     pub const SERIALIZED_SIZE: usize = DIGEST_BYTES;
 
+    /// Creates a new RpoDigest from the given field elements.
     pub const fn new(value: [Felt; DIGEST_SIZE]) -> Self {
         Self(value)
     }
 
+    /// Returns the digest as a slice of field elements.
     pub fn as_elements(&self) -> &[Felt] {
         self.as_ref()
     }
 
+    /// Returns the digest as a byte array.
     pub fn as_bytes(&self) -> [u8; DIGEST_BYTES] {
         <Self as Digest>::as_bytes(self)
     }
 
+    /// Returns an iterator over the elements of multiple digests.
     pub fn digests_as_elements_iter<'a, I>(digests: I) -> impl Iterator<Item = &'a Felt>
     where
         I: Iterator<Item = &'a Self>,
@@ -49,6 +54,7 @@ impl RpoDigest {
         digests.flat_map(|d| d.0.iter())
     }
 
+    /// Returns all elements of multiple digests as a slice.
     pub fn digests_as_elements(digests: &[Self]) -> &[Felt] {
         let p = digests.as_ptr();
         let len = digests.len() * DIGEST_SIZE;
@@ -141,10 +147,13 @@ impl Randomizable for RpoDigest {
 // CONVERSIONS: FROM RPO DIGEST
 // ================================================================================================
 
+/// Errors that can occur when working with RpoDigest.
 #[derive(Debug, Error)]
 pub enum RpoDigestError {
+    /// Failed to convert digest field element to the specified type.
     #[error("failed to convert digest field element to {0}")]
     TypeConversion(&'static str),
+    /// Field element conversion failed due to invalid value.
     #[error("failed to convert to field element: {0}")]
     InvalidFieldElement(String),
 }
