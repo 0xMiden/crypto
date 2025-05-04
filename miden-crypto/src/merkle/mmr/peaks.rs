@@ -1,7 +1,7 @@
 use alloc::vec::Vec;
 
-use super::{super::ZERO, Felt, MmrError, MmrProof, Word, forest::Forest};
-use crate::{Felt, merkle::Rpo256};
+use super::{super::ZERO, MmrError, MmrProof, forest::Forest};
+use crate::{Felt, Word, merkle::Rpo256};
 
 // MMR PEAKS
 // ================================================================================================
@@ -9,10 +9,11 @@ use crate::{Felt, merkle::Rpo256};
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 pub struct MmrPeaks {
-    /// The number of leaves is used to differentiate MMRs that have the same number of peaks. This
-    /// happens because the number of peaks goes up-and-down as the structure is used causing
-    /// existing trees to be merged and new ones to be created. As an example, every time the MMR
-    /// has a power-of-two number of leaves there is a single peak.
+    /// The number of leaves (represented by [`Forest`]) is used to differentiate MMRs that have
+    /// the same number of peaks. This happens because the number of peaks goes up-and-down as
+    /// the structure is used causing existing trees to be merged and new ones to be created.
+    /// As an example, every time the MMR has a power-of-two number of leaves there is a single
+    /// peak.
     ///
     /// Every tree in the MMR forest has a distinct power-of-two size, this means only the right-
     /// most tree can have an odd number of elements (i.e. `1`). Additionally this means that the
@@ -39,7 +40,7 @@ impl Default for MmrPeaks {
     /// Returns new [`MmrPeaks`] instantiated from an empty vector of peaks and 0 leaves.
     fn default() -> Self {
         Self {
-            forest: MountainRange::with_leaves(0),
+            forest: Forest::new(0),
             peaks: Vec::new(),
         }
     }
@@ -100,8 +101,8 @@ impl MmrPeaks {
             .ok_or(MmrError::PeakOutOfBounds { peak_idx, peaks_len: self.peaks.len() })
     }
 
-    /// Converts this [MmrPeaks] into its components: number of leaves and a vector of peaks of
-    /// the underlying MMR.
+    /// Converts this [MmrPeaks] into its components: number of leaves (represented as a [`Forest`])
+    /// and a vector of peaks of the underlying MMR.
     pub fn into_parts(self) -> (Forest, Vec<Word>) {
         (self.forest, self.peaks)
     }

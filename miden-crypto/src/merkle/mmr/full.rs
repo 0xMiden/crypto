@@ -63,7 +63,7 @@ impl Mmr {
     // ACCESSORS
     // ============================================================================================
 
-    /// Returns the MMR representation. See [`Forest`].
+    /// Returns the MMR forest representation. See [`Forest`].
     pub const fn forest(&self) -> Forest {
         self.forest
     }

@@ -23,7 +23,7 @@ fn tests_empty_mmr_peaks() {
 fn test_empty_partial_mmr() {
     let mmr = PartialMmr::default();
     assert_eq!(mmr.num_leaves(), 0);
-    assert_eq!(mmr.forest(), 0);
+    assert_eq!(mmr.forest(), Forest::new(0));
     assert_eq!(mmr.peaks(), MmrPeaks::default());
     assert!(mmr.nodes.is_empty());
     assert!(!mmr.track_latest);
@@ -120,6 +120,171 @@ fn test_nodes_in_forest_single_bit() {
         let size = 2usize.pow(bit + 1) - 1;
         assert_eq!(nodes_in_forest(1usize << bit), size);
     }
+}
+
+#[test]
+fn test_forest_largest_smallest_tree() {
+    // largest_tree and smallest_tree return correct results
+    let forest = Forest::new(0b1101_0100);
+    let largest = Forest::new(0b1000_0000);
+    let smallest = Forest::new(0b0000_0100);
+
+    assert_eq!(forest.largest_tree(), largest);
+    assert_eq!(forest.smallest_tree(), smallest);
+
+    // no trees in an empty forest
+    let empty_forest = Forest::new(0);
+    assert_eq!(empty_forest.largest_tree(), empty_forest);
+    assert_eq!(empty_forest.smallest_tree(), empty_forest);
+}
+
+#[test]
+fn test_forest_to_root_index() {
+    fn idx(pos: usize) -> InOrderIndex {
+        InOrderIndex::new(pos.try_into().unwrap())
+    }
+
+    // When there is a single tree in the forest, the index is equivalent to the number of
+    // leaves in that tree, which is `2^n`.
+    assert_eq!(Forest::new(0b0001).root_in_order_index(), idx(1));
+    assert_eq!(Forest::new(0b0010).root_in_order_index(), idx(2));
+    assert_eq!(Forest::new(0b0100).root_in_order_index(), idx(4));
+    assert_eq!(Forest::new(0b1000).root_in_order_index(), idx(8));
+
+    assert_eq!(Forest::new(0b0011).root_in_order_index(), idx(5));
+    assert_eq!(Forest::new(0b0101).root_in_order_index(), idx(9));
+    assert_eq!(Forest::new(0b1001).root_in_order_index(), idx(17));
+    assert_eq!(Forest::new(0b0111).root_in_order_index(), idx(13));
+    assert_eq!(Forest::new(0b1011).root_in_order_index(), idx(21));
+    assert_eq!(Forest::new(0b1111).root_in_order_index(), idx(29));
+
+    assert_eq!(Forest::new(0b0110).root_in_order_index(), idx(10));
+    assert_eq!(Forest::new(0b1010).root_in_order_index(), idx(18));
+    assert_eq!(Forest::new(0b1100).root_in_order_index(), idx(20));
+    assert_eq!(Forest::new(0b1110).root_in_order_index(), idx(26));
+}
+
+#[test]
+fn test_forest_to_rightmost_index() {
+    fn idx(pos: usize) -> InOrderIndex {
+        InOrderIndex::new(pos.try_into().unwrap())
+    }
+
+    for forest in 1..256 {
+        assert!(
+            Forest::new(forest).rightmost_in_order_index().inner() % 2 == 1,
+            "Leaves are always odd"
+        );
+    }
+
+    assert_eq!(Forest::new(0b0001).rightmost_in_order_index(), idx(1));
+    assert_eq!(Forest::new(0b0010).rightmost_in_order_index(), idx(3));
+    assert_eq!(Forest::new(0b0011).rightmost_in_order_index(), idx(5));
+    assert_eq!(Forest::new(0b0100).rightmost_in_order_index(), idx(7));
+    assert_eq!(Forest::new(0b0101).rightmost_in_order_index(), idx(9));
+    assert_eq!(Forest::new(0b0110).rightmost_in_order_index(), idx(11));
+    assert_eq!(Forest::new(0b0111).rightmost_in_order_index(), idx(13));
+    assert_eq!(Forest::new(0b1000).rightmost_in_order_index(), idx(15));
+    assert_eq!(Forest::new(0b1001).rightmost_in_order_index(), idx(17));
+    assert_eq!(Forest::new(0b1010).rightmost_in_order_index(), idx(19));
+    assert_eq!(Forest::new(0b1011).rightmost_in_order_index(), idx(21));
+    assert_eq!(Forest::new(0b1100).rightmost_in_order_index(), idx(23));
+    assert_eq!(Forest::new(0b1101).rightmost_in_order_index(), idx(25));
+    assert_eq!(Forest::new(0b1110).rightmost_in_order_index(), idx(27));
+    assert_eq!(Forest::new(0b1111).rightmost_in_order_index(), idx(29));
+}
+
+#[test]
+fn test_bit_position_iterator() {
+    assert_eq!(TreeSizeIterator::new(Forest::empty()).count(), 0);
+    assert_eq!(TreeSizeIterator::new(Forest::empty()).rev().count(), 0);
+
+    assert_eq!(
+        TreeSizeIterator::new(Forest::new(1)).collect::<Vec<Forest>>(),
+        vec![Forest::new(1)]
+    );
+    assert_eq!(
+        TreeSizeIterator::new(Forest::new(1)).rev().collect::<Vec<Forest>>(),
+        vec![Forest::new(1)],
+    );
+
+    assert_eq!(
+        TreeSizeIterator::new(Forest::new(2)).collect::<Vec<Forest>>(),
+        vec![Forest::new(2)]
+    );
+    assert_eq!(
+        TreeSizeIterator::new(Forest::new(2)).rev().collect::<Vec<Forest>>(),
+        vec![Forest::new(2)],
+    );
+
+    assert_eq!(
+        TreeSizeIterator::new(Forest::new(3)).collect::<Vec<Forest>>(),
+        vec![Forest::new(1), Forest::new(2)],
+    );
+    assert_eq!(
+        TreeSizeIterator::new(Forest::new(3)).rev().collect::<Vec<Forest>>(),
+        vec![Forest::new(2), Forest::new(1)],
+    );
+
+    assert_eq!(
+        TreeSizeIterator::new(Forest::new(0b11010101)).collect::<Vec<Forest>>(),
+        vec![0, 2, 4, 6, 7]
+            .into_iter()
+            .map(|bit| Forest::new(1 << bit))
+            .collect::<Vec<_>>()
+    );
+    assert_eq!(
+        TreeSizeIterator::new(Forest::new(0b11010101)).rev().collect::<Vec<Forest>>(),
+        vec![7, 6, 4, 2, 0]
+            .into_iter()
+            .map(|bit| Forest::new(1 << bit))
+            .collect::<Vec<_>>()
+    );
+
+    let forest = Forest::new(0b1101_0101);
+    let mut it = TreeSizeIterator::new(forest);
+
+    // 0b1101_0101
+    //           ^
+    let smallest = it.next().unwrap();
+    assert_eq!(smallest.smallest_tree_unchecked(), smallest);
+    assert_eq!(smallest.num_leaves(), 0b0000_0001);
+    assert_eq!(smallest.num_nodes(), 1);
+    assert_eq!(smallest.num_trees(), 1);
+
+    // 0b1101_0101
+    //         ^
+    let next_smallest = it.next().unwrap();
+    assert_eq!(next_smallest.smallest_tree_unchecked(), next_smallest);
+    assert_eq!(next_smallest.num_leaves(), 0b0000_0100);
+    assert_eq!(next_smallest.num_nodes(), 0b0000_0111);
+    assert_eq!(next_smallest.num_trees(), 1);
+
+    // 0b1101_0101
+    //      ^
+    let next_smallest = it.next().unwrap();
+    assert_eq!(next_smallest.smallest_tree_unchecked(), next_smallest);
+    assert_eq!(next_smallest.num_leaves(), 0b0001_0000);
+    assert_eq!(next_smallest.num_nodes(), 0b0001_1111);
+    assert_eq!(next_smallest.num_trees(), 1);
+
+    // 0b1101_0101
+    //    ^
+    let next_smallest = it.next().unwrap();
+    assert_eq!(next_smallest.smallest_tree_unchecked(), next_smallest);
+    assert_eq!(next_smallest.num_leaves(), 0b0100_0000);
+    assert_eq!(next_smallest.num_nodes(), 0b0111_1111);
+    assert_eq!(next_smallest.num_trees(), 1);
+
+    // 0b1101_0101
+    //   ^
+    let next_smallest = it.next().unwrap();
+    assert_eq!(next_smallest.smallest_tree_unchecked(), next_smallest);
+    assert_eq!(next_smallest.num_leaves(), 0b1000_0000);
+    assert_eq!(next_smallest.num_nodes(), 0b1111_1111);
+    assert_eq!(next_smallest.num_trees(), 1);
+
+    assert_eq!(it.next(), None);
 }
 
 const LEAVES: [Word; 7] = [
@@ -503,99 +668,6 @@ fn test_mmr_invariants() {
             mmr.forest(),
         );
     }
-}
-
-#[test]
-fn test_bit_position_iterator() {
-    assert_eq!(TreeSizeIterator::new(Forest::empty()).count(), 0);
-    assert_eq!(TreeSizeIterator::new(Forest::empty()).rev().count(), 0);
-
-    assert_eq!(
-        TreeSizeIterator::new(Forest::new(1)).collect::<Vec<Forest>>(),
-        vec![Forest::new(1)]
-    );
-    assert_eq!(
-        TreeSizeIterator::new(Forest::new(1)).rev().collect::<Vec<Forest>>(),
-        vec![Forest::new(1)],
-    );
-
-    assert_eq!(
-        TreeSizeIterator::new(Forest::new(2)).collect::<Vec<Forest>>(),
-        vec![Forest::new(2)]
-    );
-    assert_eq!(
-        TreeSizeIterator::new(Forest::new(2)).rev().collect::<Vec<Forest>>(),
-        vec![Forest::new(2)],
-    );
-
-    assert_eq!(
-        TreeSizeIterator::new(Forest::new(3)).collect::<Vec<Forest>>(),
-        vec![Forest::new(1), Forest::new(2)],
-    );
-    assert_eq!(
-        TreeSizeIterator::new(Forest::new(3)).rev().collect::<Vec<Forest>>(),
-        vec![Forest::new(2), Forest::new(1)],
-    );
-
-    assert_eq!(
-        TreeSizeIterator::new(Forest::new(0b11010101)).collect::<Vec<Forest>>(),
-        vec![0, 2, 4, 6, 7]
-            .into_iter()
-            .map(|bit| Forest::new(1 << bit))
-            .collect::<Vec<_>>()
-    );
-    assert_eq!(
-        TreeSizeIterator::new(Forest::new(0b11010101)).rev().collect::<Vec<Forest>>(),
-        vec![7, 6, 4, 2, 0]
-            .into_iter()
-            .map(|bit| Forest::new(1 << bit))
-            .collect::<Vec<_>>()
-    );
-
-    let forest = Forest::new(0b1101_0101);
-    let mut it = TreeSizeIterator::new(forest);
-
-    // 0b1101_0101
-    //           ^
-    let smallest = it.next().unwrap();
-    assert_eq!(smallest.smallest_tree_unchecked(), smallest);
-    assert_eq!(smallest.num_leaves(), 0b0000_0001);
-    assert_eq!(smallest.num_nodes(), 1);
-    assert_eq!(smallest.num_trees(), 1);
-
-    // 0b1101_0101
-    //         ^
-    let next_smallest = it.next().unwrap();
-    assert_eq!(next_smallest.smallest_tree_unchecked(), next_smallest);
-    assert_eq!(next_smallest.num_leaves(), 0b0000_0100);
-    assert_eq!(next_smallest.num_nodes(), 0b0000_0111);
-    assert_eq!(next_smallest.num_trees(), 1);
-
-    // 0b1101_0101
-    //      ^
-    let next_smallest = it.next().unwrap();
-    assert_eq!(next_smallest.smallest_tree_unchecked(), next_smallest);
-    assert_eq!(next_smallest.num_leaves(), 0b0001_0000);
-    assert_eq!(next_smallest.num_nodes(), 0b0001_1111);
-    assert_eq!(next_smallest.num_trees(), 1);
-
-    // 0b1101_0101
-    //    ^
-    let next_smallest = it.next().unwrap();
-    assert_eq!(next_smallest.smallest_tree_unchecked(), next_smallest);
-    assert_eq!(next_smallest.num_leaves(), 0b0100_0000);
-    assert_eq!(next_smallest.num_nodes(), 0b0111_1111);
-    assert_eq!(next_smallest.num_trees(), 1);
-
-    // 0b1101_0101
-    //   ^
-    let next_smallest = it.next().unwrap();
-    assert_eq!(next_smallest.smallest_tree_unchecked(), next_smallest);
-    assert_eq!(next_smallest.num_leaves(), 0b1000_0000);
-    assert_eq!(next_smallest.num_nodes(), 0b1111_1111);
-    assert_eq!(next_smallest.num_trees(), 1);
-
-    assert_eq!(it.next(), None);
 }
 
 #[test]
