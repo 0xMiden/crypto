@@ -607,22 +607,6 @@ fn test_bit_position_iterator() {
 }
 
 #[test]
-fn test_mountain_range_largest_smallest_tree() {
-    // largest_tree and smallest_tree return correct results
-    let forest = MountainRange::new(0b1101_0100);
-    let largest = MountainRange::new(0b1000_0000);
-    let smallest = MountainRange::new(0b0000_0100);
-
-    assert_eq!(forest.largest_tree(), largest);
-    assert_eq!(forest.smallest_tree(), smallest);
-
-    // no trees in an empty forest
-    let empty_forest = MountainRange::new(0);
-    assert_eq!(empty_forest.largest_tree(), empty_forest);
-    assert_eq!(empty_forest.smallest_tree(), empty_forest);
-}
-
-#[test]
 fn test_mmr_inner_nodes() {
     let mmr: Mmr = LEAVES.into();
     let nodes: Vec<InnerNodeInfo> = mmr.inner_nodes().collect();

@@ -3,6 +3,7 @@ use core::{
     ops::{BitAnd, BitOr, BitXor, BitXorAssign, ShlAssign},
 };
 
+use super::InOrderIndex;
 use crate::Felt;
 
 /// A compact representation of trees (or peaks) in Merkle Mountain Range (MMR).
@@ -204,6 +205,38 @@ impl MountainRange {
         self.num_trees() - num_smaller_peaks - 1
     }
 
+    /// Returns the in-order index of the root element.
+    pub fn root_in_order_index(&self) -> InOrderIndex {
+        // Count total size of all trees in the forest.
+        let nodes = self.num_nodes();
+
+        // Add the count for the parent nodes that separate each tree. These are allocated but
+        // currently empty, and correspond to the nodes that will be used once the trees are merged.
+        let open_trees = self.num_trees() - 1;
+
+        // Remove the count of the right subtree of the target tree, target tree root index comes
+        // before the subtree for the in-order tree walk.
+        let right_subtree_count = self.smallest_tree_unchecked().num_leaves() - 1;
+
+        let idx = nodes + open_trees - right_subtree_count;
+
+        InOrderIndex::new(idx.try_into().unwrap())
+    }
+
+    /// Returns the in-order index of the rightmost element (the smallest tree).
+    pub fn rightmost_in_order_index(&self) -> InOrderIndex {
+        // Count total size of all trees in the forest.
+        let nodes = self.num_nodes();
+
+        // Add the count for the parent nodes that separate each tree. These are allocated but
+        // currently empty, and correspond to the nodes that will be used once the trees are merged.
+        let open_trees = self.num_trees() - 1;
+
+        let idx = nodes + open_trees;
+
+        InOrderIndex::new(idx.try_into().unwrap())
+    }
+
     /// Given a leaf index in the current mountain range, return the tree number responsible for the
     /// leaf.
     ///
@@ -368,5 +401,85 @@ impl DoubleEndedIterator for TreeSizeIterator {
             self.inner = self.inner.without_trees(tree);
             Some(tree)
         }
+    }
+}
+
+// TESTS
+// ================================================================================================
+
+#[cfg(test)]
+mod tests {
+    use crate::merkle::{InOrderIndex, MountainRange};
+
+    #[test]
+    fn test_mountain_range_largest_smallest_tree() {
+        // largest_tree and smallest_tree return correct results
+        let forest = MountainRange::new(0b1101_0100);
+        let largest = MountainRange::new(0b1000_0000);
+        let smallest = MountainRange::new(0b0000_0100);
+
+        assert_eq!(forest.largest_tree(), largest);
+        assert_eq!(forest.smallest_tree(), smallest);
+
+        // no trees in an empty forest
+        let empty_forest = MountainRange::new(0);
+        assert_eq!(empty_forest.largest_tree(), empty_forest);
+        assert_eq!(empty_forest.smallest_tree(), empty_forest);
+    }
+
+    #[test]
+    fn test_forest_to_root_index() {
+        fn idx(pos: usize) -> InOrderIndex {
+            InOrderIndex::new(pos.try_into().unwrap())
+        }
+
+        // When there is a single tree in the forest, the index is equivalent to the number of
+        // leaves in that tree, which is `2^n`.
+        assert_eq!(MountainRange::new(0b0001).root_in_order_index(), idx(1));
+        assert_eq!(MountainRange::new(0b0010).root_in_order_index(), idx(2));
+        assert_eq!(MountainRange::new(0b0100).root_in_order_index(), idx(4));
+        assert_eq!(MountainRange::new(0b1000).root_in_order_index(), idx(8));
+
+        assert_eq!(MountainRange::new(0b0011).root_in_order_index(), idx(5));
+        assert_eq!(MountainRange::new(0b0101).root_in_order_index(), idx(9));
+        assert_eq!(MountainRange::new(0b1001).root_in_order_index(), idx(17));
+        assert_eq!(MountainRange::new(0b0111).root_in_order_index(), idx(13));
+        assert_eq!(MountainRange::new(0b1011).root_in_order_index(), idx(21));
+        assert_eq!(MountainRange::new(0b1111).root_in_order_index(), idx(29));
+
+        assert_eq!(MountainRange::new(0b0110).root_in_order_index(), idx(10));
+        assert_eq!(MountainRange::new(0b1010).root_in_order_index(), idx(18));
+        assert_eq!(MountainRange::new(0b1100).root_in_order_index(), idx(20));
+        assert_eq!(MountainRange::new(0b1110).root_in_order_index(), idx(26));
+    }
+
+    #[test]
+    fn test_forest_to_rightmost_index() {
+        fn idx(pos: usize) -> InOrderIndex {
+            InOrderIndex::new(pos.try_into().unwrap())
+        }
+
+        for forest in 1..256 {
+            assert!(
+                MountainRange::new(forest).rightmost_in_order_index().inner() % 2 == 1,
+                "Leaves are always odd"
+            );
+        }
+
+        assert_eq!(MountainRange::new(0b0001).rightmost_in_order_index(), idx(1));
+        assert_eq!(MountainRange::new(0b0010).rightmost_in_order_index(), idx(3));
+        assert_eq!(MountainRange::new(0b0011).rightmost_in_order_index(), idx(5));
+        assert_eq!(MountainRange::new(0b0100).rightmost_in_order_index(), idx(7));
+        assert_eq!(MountainRange::new(0b0101).rightmost_in_order_index(), idx(9));
+        assert_eq!(MountainRange::new(0b0110).rightmost_in_order_index(), idx(11));
+        assert_eq!(MountainRange::new(0b0111).rightmost_in_order_index(), idx(13));
+        assert_eq!(MountainRange::new(0b1000).rightmost_in_order_index(), idx(15));
+        assert_eq!(MountainRange::new(0b1001).rightmost_in_order_index(), idx(17));
+        assert_eq!(MountainRange::new(0b1010).rightmost_in_order_index(), idx(19));
+        assert_eq!(MountainRange::new(0b1011).rightmost_in_order_index(), idx(21));
+        assert_eq!(MountainRange::new(0b1100).rightmost_in_order_index(), idx(23));
+        assert_eq!(MountainRange::new(0b1101).rightmost_in_order_index(), idx(25));
+        assert_eq!(MountainRange::new(0b1110).rightmost_in_order_index(), idx(27));
+        assert_eq!(MountainRange::new(0b1111).rightmost_in_order_index(), idx(29));
     }
 }

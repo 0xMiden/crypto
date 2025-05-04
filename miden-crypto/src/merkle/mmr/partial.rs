@@ -5,9 +5,13 @@ use alloc::{
 
 use winter_utils::{Deserializable, Serializable};
 
-use super::{MmrDelta, MmrProof, Rpo256, Word};
-use crate::merkle::{
-    InOrderIndex, InnerNodeInfo, MerklePath, MmrError, MmrPeaks, mmr::mountain_range::MountainRange,
+use super::{MmrDelta, MmrProof};
+use crate::{
+    Word,
+    merkle::{
+        InOrderIndex, InnerNodeInfo, MerklePath, MmrError, MmrPeaks, Rpo256,
+        mmr::mountain_range::MountainRange,
+    },
 };
 
 // TYPE ALIASES
@@ -72,7 +76,7 @@ pub struct PartialMmr {
 impl Default for PartialMmr {
     /// Creates a new [PartialMmr] with default values.
     fn default() -> Self {
-        let forest = Forest::with_leaves(0);
+        let forest = MountainRange::new(0);
         let peaks = Vec::new();
         let nodes = BTreeMap::new();
         let track_latest = false;
@@ -236,7 +240,7 @@ impl PartialMmr {
             let mut track_left = self.track_latest;
 
             let mut right = leaf;
-            let mut right_idx = forest_to_rightmost_index(self.forest);
+            let mut right_idx = self.forest.rightmost_in_order_index();
 
             for _ in 0..merges {
                 let left = self.peaks.pop().expect("Missing peak");
@@ -415,7 +419,7 @@ impl PartialMmr {
 
         if !merges.is_empty() {
             // starts at the smallest peak and follows the merged peaks
-            let mut peak_idx = forest_to_root_index(self.forest);
+            let mut peak_idx = self.forest.root_in_order_index();
 
             // match order of the update data while applying it
             self.peaks.reverse();
@@ -609,42 +613,6 @@ impl Deserializable for PartialMmr {
     }
 }
 
-// UTILS
-// ================================================================================================
-
-/// Given the description of a `forest`, returns the index of the root element of the smallest tree
-/// in it.
-fn forest_to_root_index(forest: MountainRange) -> InOrderIndex {
-    // Count total size of all trees in the forest.
-    let nodes = forest.num_nodes();
-
-    // Add the count for the parent nodes that separate each tree. These are allocated but
-    // currently empty, and correspond to the nodes that will be used once the trees are merged.
-    let open_trees = forest.num_trees() - 1;
-
-    // Remove the count of the right subtree of the target tree, target tree root index comes
-    // before the subtree for the in-order tree walk.
-    let right_subtree_count = forest.smallest_tree_unchecked().num_leaves() - 1;
-
-    let idx = nodes + open_trees - right_subtree_count;
-
-    InOrderIndex::new(idx.try_into().unwrap())
-}
-
-/// Given the description of a `forest`, returns the index of the right most element.
-fn forest_to_rightmost_index(forest: MountainRange) -> InOrderIndex {
-    // Count total size of all trees in the forest.
-    let nodes = forest.num_nodes();
-
-    // Add the count for the parent nodes that separate each tree. These are allocated but
-    // currently empty, and correspond to the nodes that will be used once the trees are merged.
-    let open_trees = forest.num_trees() - 1;
-
-    let idx = nodes + open_trees;
-
-    InOrderIndex::new(idx.try_into().unwrap())
-}
-
 // TESTS
 // ================================================================================================
 
@@ -654,11 +622,10 @@ mod tests {
 
     use winter_utils::{Deserializable, Serializable};
 
-    use super::{
-        InOrderIndex, MmrPeaks, PartialMmr, Word, forest_to_rightmost_index, forest_to_root_index,
-    };
-    use crate::merkle::{
-        MerkleStore, Mmr, NodeIndex, int_to_node, mmr::mountain_range::MountainRange,
+    use super::{MmrPeaks, PartialMmr};
+    use crate::{
+        Word,
+        merkle::{MerkleStore, Mmr, NodeIndex, int_to_node, mmr::mountain_range::MountainRange},
     };
 
     const LEAVES: [Word; 7] = [
@@ -670,62 +637,6 @@ mod tests {
         int_to_node(5),
         int_to_node(6),
     ];
-
-    #[test]
-    fn test_forest_to_root_index() {
-        fn idx(pos: usize) -> InOrderIndex {
-            InOrderIndex::new(pos.try_into().unwrap())
-        }
-
-        // When there is a single tree in the forest, the index is equivalent to the number of
-        // leaves in that tree, which is `2^n`.
-        assert_eq!(forest_to_root_index(MountainRange::new(0b0001)), idx(1));
-        assert_eq!(forest_to_root_index(MountainRange::new(0b0010)), idx(2));
-        assert_eq!(forest_to_root_index(MountainRange::new(0b0100)), idx(4));
-        assert_eq!(forest_to_root_index(MountainRange::new(0b1000)), idx(8));
-
-        assert_eq!(forest_to_root_index(MountainRange::new(0b0011)), idx(5));
-        assert_eq!(forest_to_root_index(MountainRange::new(0b0101)), idx(9));
-        assert_eq!(forest_to_root_index(MountainRange::new(0b1001)), idx(17));
-        assert_eq!(forest_to_root_index(MountainRange::new(0b0111)), idx(13));
-        assert_eq!(forest_to_root_index(MountainRange::new(0b1011)), idx(21));
-        assert_eq!(forest_to_root_index(MountainRange::new(0b1111)), idx(29));
-
-        assert_eq!(forest_to_root_index(MountainRange::new(0b0110)), idx(10));
-        assert_eq!(forest_to_root_index(MountainRange::new(0b1010)), idx(18));
-        assert_eq!(forest_to_root_index(MountainRange::new(0b1100)), idx(20));
-        assert_eq!(forest_to_root_index(MountainRange::new(0b1110)), idx(26));
-    }
-
-    #[test]
-    fn test_forest_to_rightmost_index() {
-        fn idx(pos: usize) -> InOrderIndex {
-            InOrderIndex::new(pos.try_into().unwrap())
-        }
-
-        for forest in 1..256 {
-            assert!(
-                forest_to_rightmost_index(MountainRange::new(forest)).inner() % 2 == 1,
-                "Leaves are always odd"
-            );
-        }
-
-        assert_eq!(forest_to_rightmost_index(MountainRange::new(0b0001)), idx(1));
-        assert_eq!(forest_to_rightmost_index(MountainRange::new(0b0010)), idx(3));
-        assert_eq!(forest_to_rightmost_index(MountainRange::new(0b0011)), idx(5));
-        assert_eq!(forest_to_rightmost_index(MountainRange::new(0b0100)), idx(7));
-        assert_eq!(forest_to_rightmost_index(MountainRange::new(0b0101)), idx(9));
-        assert_eq!(forest_to_rightmost_index(MountainRange::new(0b0110)), idx(11));
-        assert_eq!(forest_to_rightmost_index(MountainRange::new(0b0111)), idx(13));
-        assert_eq!(forest_to_rightmost_index(MountainRange::new(0b1000)), idx(15));
-        assert_eq!(forest_to_rightmost_index(MountainRange::new(0b1001)), idx(17));
-        assert_eq!(forest_to_rightmost_index(MountainRange::new(0b1010)), idx(19));
-        assert_eq!(forest_to_rightmost_index(MountainRange::new(0b1011)), idx(21));
-        assert_eq!(forest_to_rightmost_index(MountainRange::new(0b1100)), idx(23));
-        assert_eq!(forest_to_rightmost_index(MountainRange::new(0b1101)), idx(25));
-        assert_eq!(forest_to_rightmost_index(MountainRange::new(0b1110)), idx(27));
-        assert_eq!(forest_to_rightmost_index(MountainRange::new(0b1111)), idx(29));
-    }
 
     #[test]
     fn test_partial_mmr_apply_delta() {
