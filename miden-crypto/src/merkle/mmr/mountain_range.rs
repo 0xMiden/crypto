@@ -194,6 +194,16 @@ impl MountainRange {
         self ^ other
     }
 
+    /// Returns index of the mountain range peak for a specified leaf index.
+    pub fn peak_index(&self, leaf_idx: usize) -> usize {
+        let root = self
+            .leaf_to_corresponding_tree(leaf_idx)
+            .expect("position must be part of the forest");
+        let smaller_peak_mask = MountainRange::new(2_usize.pow(root) - 1);
+        let num_smaller_peaks = (*self & smaller_peak_mask).num_trees();
+        self.num_trees() - num_smaller_peaks - 1
+    }
+
     /// Given a leaf index in the current mountain range, return the tree number responsible for the
     /// leaf.
     ///
