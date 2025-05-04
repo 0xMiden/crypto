@@ -95,19 +95,7 @@ impl Mmr {
     /// - The specified leaf position is out of bounds for this MMR.
     /// - The specified `forest` value is not valid for this MMR.
     pub fn open_at(&self, pos: usize, forest: MountainRange) -> Result<MmrProof, MmrError> {
-        // find the target tree responsible for the MMR position
-        let tree_bit =
-            forest.leaf_to_corresponding_tree(pos).ok_or(MmrError::PositionNotFound(pos))?;
-
-        // isolate the trees before the target
-        let forest_before = forest.trees_larger_than(tree_bit);
-        let index_offset = forest_before.num_nodes();
-
-        // update the value position from global to the target tree
-        let relative_pos = pos - forest_before.num_leaves();
-
-        // collect the path and the final index of the target value
-        let (_, path) = self.collect_merkle_path_and_value(tree_bit, relative_pos, index_offset);
+        let (_, path) = self.collect_merkle_path_and_value(pos, forest)?;
 
         Ok(MmrProof {
             forest,
@@ -122,21 +110,7 @@ impl Mmr {
     /// added, this corresponds to the MMR size _prior_ to adding the element. So the 1st element
     /// has position 0, the second position 1, and so on.
     pub fn get(&self, pos: usize) -> Result<Word, MmrError> {
-        // find the target tree responsible for the MMR position
-        let tree_bit = self
-            .forest
-            .leaf_to_corresponding_tree(pos)
-            .ok_or(MmrError::PositionNotFound(pos))?;
-
-        // isolate the trees before the target
-        let forest_before = self.forest.trees_larger_than(tree_bit);
-        let index_offset = forest_before.num_nodes();
-
-        // update the value position from global to the target tree
-        let relative_pos = pos - forest_before.num_leaves();
-
-        // collect the path and the final index of the target value
-        let (value, _) = self.collect_merkle_path_and_value(tree_bit, relative_pos, index_offset);
+        let (value, _) = self.collect_merkle_path_and_value(pos, self.forest)?;
 
         Ok(value)
     }
@@ -290,20 +264,30 @@ impl Mmr {
     // UTILITIES
     // ============================================================================================
 
-    /// Internal function used to collect the Merkle path of a value.
+    /// Internal function used to collect the leaf value and its Merkle path.
     ///
     /// The arguments are relative to the target tree. To compute the opening of the second leaf
     /// for a tree with depth 2 in the forest `0b110`:
     ///
-    /// - `tree_bit`: Depth of the target tree, e.g. 2 for the smallest tree.
-    /// - `relative_pos`: 0-indexed leaf position in the target tree, e.g. 1 for the second leaf.
-    /// - `index_offset`: Node count prior to the target tree, e.g. 7 for the tree of depth 3.
+    /// - `leaf_idx`: Position corresponding to the order the leaves were added.
+    /// - `forest`: State of the MMR.
     fn collect_merkle_path_and_value(
         &self,
-        tree_bit: u32,
-        relative_pos: usize,
-        index_offset: usize,
-    ) -> (Word, Vec<Word>) {
+        leaf_idx: usize,
+        forest: MountainRange,
+    ) -> Result<(Word, Vec<Word>), MmrError> {
+        // find the target tree responsible for the MMR position
+        let tree_bit = forest
+            .leaf_to_corresponding_tree(leaf_idx)
+            .ok_or(MmrError::PositionNotFound(leaf_idx))?;
+
+        // isolate the trees before the target
+        let forest_before = forest.trees_larger_than(tree_bit);
+        let index_offset = forest_before.num_nodes();
+
+        // update the value position from global to the target tree
+        let relative_pos = leaf_idx - forest_before.num_leaves();
+
         // see documentation of `leaf_to_corresponding_tree` for details
         let tree_depth = (tree_bit + 1) as usize;
         let mut path = Vec::with_capacity(tree_depth);
@@ -342,7 +326,7 @@ impl Mmr {
         path.reverse();
 
         let value = self.nodes[index_offset + index];
-        (value, path)
+        Ok((value, path))
     }
 }
 
