@@ -11,7 +11,7 @@ use crate::utils::{ByteReader, ByteWriter, Deserializable, DeserializationError,
 /// The position is represented by the pair `(depth, pos)`, where for a given depth `d` elements
 /// are numbered from $0..(2^d)-1$. Example:
 ///
-/// ```ignore
+/// ```text
 /// depth
 /// 0             0
 /// 1         0        1

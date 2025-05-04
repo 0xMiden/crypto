@@ -216,7 +216,7 @@ impl MountainRange {
     /// - And `2^(p+1)-1` corresponds to the size of the tree.
     ///
     /// For example, given a mountain range with 6 leaves whose forest is `0b110`:
-    /// ```ignore
+    /// ```text
     ///       __ peak 2 __
     ///      /            \
     ///    ____          ____         _ peak 1 _
