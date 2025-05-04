@@ -6,12 +6,8 @@ use alloc::{
 use winter_utils::{Deserializable, Serializable};
 
 use super::{MmrDelta, MmrProof};
-use crate::{
-    Word,
-    merkle::{
-        InOrderIndex, InnerNodeInfo, MerklePath, MmrError, MmrPeaks, Rpo256,
-        mmr::mountain_range::MountainRange,
-    },
+use crate::merkle::{
+    InOrderIndex, InnerNodeInfo, MerklePath, MmrError, MmrPeaks, Rpo256, mmr::forest::Forest,
 };
 
 // TYPE ALIASES
@@ -38,7 +34,7 @@ pub struct PartialMmr {
     /// - The bits in the forest also corresponds to the count and size of every perfect binary
     ///   tree that composes the MMR structure, which server to compute indexes and perform
     ///   validation.
-    pub(crate) forest: MountainRange,
+    pub(crate) forest: Forest,
 
     /// The MMR peaks.
     ///
@@ -117,7 +113,7 @@ impl PartialMmr {
     ///
     /// This value corresponds to the version of the [PartialMmr] and the number of leaves in the
     /// underlying MMR.
-    pub fn forest(&self) -> MountainRange {
+    pub fn forest(&self) -> Forest {
         self.forest
     }
 
@@ -310,7 +306,7 @@ impl PartialMmr {
     ) -> Result<(), MmrError> {
         // Checks there is a tree with same depth as the authentication path, if not the path is
         // invalid.
-        let tree = MountainRange::new(1 << path.depth());
+        let tree = Forest::new(1 << path.depth());
         if (tree & self.forest).is_empty() {
             return Err(MmrError::UnknownPeak(path.depth()));
         };
@@ -436,7 +432,7 @@ impl PartialMmr {
             while target < largest {
                 // check if either the left or right subtrees have saved for authentication paths.
                 // If so, turn tracking on to update those paths.
-                if target != MountainRange::new(1) && !track {
+                if target != Forest::new(1) && !track {
                     track = self.is_tracked_node(&peak_idx);
                 }
 
@@ -604,7 +600,7 @@ impl Deserializable for PartialMmr {
     fn read_from<R: winter_utils::ByteReader>(
         source: &mut R,
     ) -> Result<Self, winter_utils::DeserializationError> {
-        let forest = MountainRange::new(usize::read_from(source)?);
+        let forest = Forest::new(usize::read_from(source)?);
         let peaks = Vec::<Word>::read_from(source)?;
         let nodes = NodeMap::read_from(source)?;
         let track_latest = source.read_bool()?;
@@ -625,7 +621,7 @@ mod tests {
     use super::{MmrPeaks, PartialMmr};
     use crate::{
         Word,
-        merkle::{MerkleStore, Mmr, NodeIndex, int_to_node, mmr::mountain_range::MountainRange},
+        merkle::{MerkleStore, Mmr, NodeIndex, int_to_node, mmr::forest::Forest},
     };
 
     const LEAVES: [Word; 7] = [
@@ -688,7 +684,7 @@ mod tests {
         let nodes_before = partial.nodes.clone();
 
         // compute and apply delta
-        let delta = mmr.get_delta(partial.forest(), mmr.mountain_range()).unwrap();
+        let delta = mmr.get_delta(partial.forest(), mmr.forest()).unwrap();
         let nodes_delta = partial.apply(delta).unwrap();
 
         // new peaks were computed correctly
@@ -807,7 +803,7 @@ mod tests {
     #[test]
     fn test_partial_mmr_add_without_track() {
         let mut mmr = Mmr::default();
-        let empty_peaks = MmrPeaks::new(MountainRange::empty(), vec![]).unwrap();
+        let empty_peaks = MmrPeaks::new(Forest::empty(), vec![]).unwrap();
         let mut partial_mmr = PartialMmr::from_peaks(empty_peaks);
 
         for el in (0..256).map(int_to_node) {
@@ -815,14 +811,14 @@ mod tests {
             partial_mmr.add(el, false);
 
             assert_eq!(mmr.peaks(), partial_mmr.peaks());
-            assert_eq!(mmr.mountain_range(), partial_mmr.forest());
+            assert_eq!(mmr.forest(), partial_mmr.forest());
         }
     }
 
     #[test]
     fn test_partial_mmr_add_with_track() {
         let mut mmr = Mmr::default();
-        let empty_peaks = MmrPeaks::new(MountainRange::empty(), vec![]).unwrap();
+        let empty_peaks = MmrPeaks::new(Forest::empty(), vec![]).unwrap();
         let mut partial_mmr = PartialMmr::from_peaks(empty_peaks);
 
         for i in 0..256 {
@@ -831,7 +827,7 @@ mod tests {
             partial_mmr.add(el, true);
 
             assert_eq!(mmr.peaks(), partial_mmr.peaks());
-            assert_eq!(mmr.mountain_range(), partial_mmr.forest());
+            assert_eq!(mmr.forest(), partial_mmr.forest());
 
             for pos in 0..i {
                 let mmr_proof = mmr.open(pos).unwrap();

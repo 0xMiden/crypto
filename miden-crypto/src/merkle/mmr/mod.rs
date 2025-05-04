@@ -1,8 +1,8 @@
 mod delta;
 mod error;
+mod forest;
 mod full;
 mod inorder;
-mod mountain_range;
 mod partial;
 mod peaks;
 mod proof;
@@ -14,9 +14,9 @@ mod tests;
 // ================================================================================================
 pub use delta::MmrDelta;
 pub use error::MmrError;
+pub use forest::Forest;
 pub use full::Mmr;
 pub use inorder::InOrderIndex;
-pub use mountain_range::MountainRange;
 pub use partial::PartialMmr;
 pub use peaks::MmrPeaks;
 pub use proof::MmrProof;

@@ -15,7 +15,7 @@ use alloc::vec::Vec;
 use super::{
     super::{InnerNodeInfo, MerklePath},
     MmrDelta, MmrError, MmrPeaks, MmrProof,
-    mountain_range::{MountainRange, TreeSizeIterator},
+    forest::{Forest, TreeSizeIterator},
 };
 use crate::{Word, merkle::Rpo256};
 
@@ -31,7 +31,7 @@ use crate::{Word, merkle::Rpo256};
 #[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 pub struct Mmr {
     /// Refer to the `forest` method documentation for details of the semantics of this value.
-    pub(super) forest: MountainRange,
+    pub(super) forest: Forest,
 
     /// Contains every element of the forest.
     ///
@@ -55,7 +55,7 @@ impl Mmr {
     /// Constructor for an empty `Mmr`.
     pub fn new() -> Mmr {
         Mmr {
-            forest: MountainRange::empty(),
+            forest: Forest::empty(),
             nodes: Vec::new(),
         }
     }
@@ -63,8 +63,8 @@ impl Mmr {
     // ACCESSORS
     // ============================================================================================
 
-    /// Returns the MMR representation. See [`MountainRange`].
-    pub const fn mountain_range(&self) -> MountainRange {
+    /// Returns the MMR representation. See [`Forest`].
+    pub const fn forest(&self) -> Forest {
         self.forest
     }
 
@@ -94,7 +94,7 @@ impl Mmr {
     /// Returns an error if:
     /// - The specified leaf position is out of bounds for this MMR.
     /// - The specified `forest` value is not valid for this MMR.
-    pub fn open_at(&self, pos: usize, forest: MountainRange) -> Result<MmrProof, MmrError> {
+    pub fn open_at(&self, pos: usize, forest: Forest) -> Result<MmrProof, MmrError> {
         let (_, path) = self.collect_merkle_path_and_value(pos, forest)?;
 
         Ok(MmrProof {
@@ -126,11 +126,11 @@ impl Mmr {
         let mut left_offset = self.nodes.len().saturating_sub(2);
         let mut right = el;
         let mut left_tree = 1;
-        while !(self.forest & MountainRange::new(left_tree)).is_empty() {
+        while !(self.forest & Forest::new(left_tree)).is_empty() {
             right = Rpo256::merge(&[self.nodes[left_offset], right]);
             self.nodes.push(right);
 
-            left_offset = left_offset.saturating_sub(MountainRange::new(left_tree).num_nodes());
+            left_offset = left_offset.saturating_sub(Forest::new(left_tree).num_nodes());
             left_tree <<= 1;
         }
 
@@ -146,7 +146,7 @@ impl Mmr {
     ///
     /// # Errors
     /// Returns an error if the specified `forest` value is not valid for this MMR.
-    pub fn peaks_at(&self, forest: MountainRange) -> Result<MmrPeaks, MmrError> {
+    pub fn peaks_at(&self, forest: Forest) -> Result<MmrPeaks, MmrError> {
         if forest > self.forest {
             return Err(MmrError::InvalidPeaks(format!(
                 "requested forest {forest} exceeds current forest {}",
@@ -174,11 +174,7 @@ impl Mmr {
     ///
     /// The result is a packed sequence of the authentication elements required to update the trees
     /// that have been merged together, followed by the new peaks of the [Mmr].
-    pub fn get_delta(
-        &self,
-        from_forest: MountainRange,
-        to_forest: MountainRange,
-    ) -> Result<MmrDelta, MmrError> {
+    pub fn get_delta(&self, from_forest: Forest, to_forest: Forest) -> Result<MmrDelta, MmrError> {
         if to_forest > self.forest || from_forest > to_forest {
             return Err(MmrError::InvalidPeaks(format!(
                 "to_forest {to_forest} exceeds the current forest {} or from_forest {from_forest} exceeds to_forest",
@@ -232,7 +228,7 @@ impl Mmr {
         } else {
             // The new high tree may not be the result of any merges, if it is smaller than all the
             // trees of `from_forest`.
-            new_high = MountainRange::empty();
+            new_high = Forest::empty();
         }
 
         // Collect the new [Mmr] peaks
@@ -274,7 +270,7 @@ impl Mmr {
     fn collect_merkle_path_and_value(
         &self,
         leaf_idx: usize,
-        forest: MountainRange,
+        forest: Forest,
     ) -> Result<(Word, Vec<Word>), MmrError> {
         // find the target tree responsible for the MMR position
         let tree_bit = forest
@@ -294,7 +290,7 @@ impl Mmr {
 
         // The tree walk below goes from the root to the leaf, compute the root index to start
         let mut forest_target: usize = 1usize << tree_bit;
-        let mut index = MountainRange::new(forest_target).num_nodes() - 1;
+        let mut index = Forest::new(forest_target).num_nodes() - 1;
 
         // Loop until the leaf is reached
         while forest_target > 1 {
@@ -303,7 +299,7 @@ impl Mmr {
 
             // compute the indices of the right and left subtrees based on the post-order
             let right_offset = index - 1;
-            let left_offset = right_offset - MountainRange::new(forest_target).num_nodes();
+            let left_offset = right_offset - Forest::new(forest_target).num_nodes();
 
             let left_or_right = relative_pos & forest_target;
             let sibling = if left_or_right != 0 {
@@ -393,7 +389,7 @@ impl Iterator for MmrNodes<'_> {
 
             // compute the number of nodes in the right tree, this is the offset to the
             // previous left parent
-            let right_nodes = MountainRange::new(self.last_right).num_nodes();
+            let right_nodes = Forest::new(self.last_right).num_nodes();
             // the next parent position is one above the position of the pair
             let parent = self.last_right << 1;
 

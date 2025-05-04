@@ -1,6 +1,6 @@
 /// The representation of a single Merkle path.
 use super::super::MerklePath;
-use super::mountain_range::MountainRange;
+use super::forest::Forest;
 
 // MMR PROOF
 // ================================================================================================
@@ -9,7 +9,7 @@ use super::mountain_range::MountainRange;
 #[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 pub struct MmrProof {
     /// The state of the MMR when the MmrProof was created.
-    pub forest: MountainRange,
+    pub forest: Forest,
 
     /// The position of the leaf value on this MmrProof.
     pub position: usize,
@@ -30,7 +30,7 @@ impl MmrProof {
 
     /// Returns index of the MMR peak against which the Merkle path in this proof can be verified.
     pub fn peak_index(&self) -> usize {
-        self.forest.peak_index(self.position)
+        self.forest.tree_index(self.position)
     }
 }
 
@@ -40,12 +40,12 @@ impl MmrProof {
 #[cfg(test)]
 mod tests {
     use super::{MerklePath, MmrProof};
-    use crate::merkle::mmr::mountain_range::MountainRange;
+    use crate::merkle::mmr::forest::Forest;
 
     #[test]
     fn test_peak_index() {
         // --- single peak forest ---------------------------------------------
-        let forest = MountainRange::new(11);
+        let forest = Forest::new(11);
 
         // the first 4 leaves belong to peak 0
         for position in 0..8 {
@@ -54,7 +54,7 @@ mod tests {
         }
 
         // --- forest with non-consecutive peaks ------------------------------
-        let forest = MountainRange::new(11);
+        let forest = Forest::new(11);
 
         // the first 8 leaves belong to peak 0
         for position in 0..8 {
@@ -73,7 +73,7 @@ mod tests {
         assert_eq!(proof.peak_index(), 2);
 
         // --- forest with consecutive peaks ----------------------------------
-        let forest = MountainRange::new(7);
+        let forest = Forest::new(7);
 
         // the first 4 leaves belong to peak 0
         for position in 0..4 {
@@ -92,7 +92,7 @@ mod tests {
         assert_eq!(proof.peak_index(), 2);
     }
 
-    fn make_dummy_proof(forest: MountainRange, position: usize) -> MmrProof {
+    fn make_dummy_proof(forest: Forest, position: usize) -> MmrProof {
         MmrProof {
             forest,
             position,
