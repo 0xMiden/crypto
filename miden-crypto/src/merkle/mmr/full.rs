@@ -222,9 +222,9 @@ impl Mmr {
                 result.push(self.nodes[known + sibling - 1]);
 
                 // Update the target and account for tree merges
-                target <<= 1;
+                target = target.next_larger_tree();
                 while !(merges & target).is_empty() {
-                    target <<= 1;
+                    target = target.next_larger_tree();
                 }
                 // Remove the merges done so far
                 merges ^= merges & target.all_smaller_trees_unchecked();

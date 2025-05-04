@@ -473,7 +473,7 @@ impl PartialMmr {
 
                 peak_idx = peak_idx.parent();
                 new = Rpo256::merge(&[left, right]);
-                target <<= 1;
+                target = target.next_larger_tree();
             }
 
             debug_assert!(peak_count == merges.num_trees());

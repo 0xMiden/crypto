@@ -175,6 +175,12 @@ impl MountainRange {
         Some(self.all_smaller_trees_unchecked())
     }
 
+    /// Returns a forest with exactly one tree, one size (depth) larger than the current one.
+    pub fn next_larger_tree(self) -> MountainRange {
+        debug_assert!(self.0.count_ones() == 1);
+        MountainRange(self.0 << 1)
+    }
+
     /// Returns true if the mountain range contains a single-node tree.
     pub fn has_single_leaf_tree(self) -> bool {
         self.0 & 1 != 0
@@ -330,12 +336,6 @@ impl BitXor<MountainRange> for MountainRange {
 impl BitXorAssign<MountainRange> for MountainRange {
     fn bitxor_assign(&mut self, rhs: MountainRange) {
         self.0 ^= rhs.0;
-    }
-}
-
-impl ShlAssign<usize> for MountainRange {
-    fn shl_assign(&mut self, rhs: usize) {
-        self.0 <<= rhs;
     }
 }
 
