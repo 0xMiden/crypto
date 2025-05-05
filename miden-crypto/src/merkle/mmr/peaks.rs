@@ -40,7 +40,7 @@ impl Default for MmrPeaks {
     /// Returns new [`MmrPeaks`] instantiated from an empty vector of peaks and 0 leaves.
     fn default() -> Self {
         Self {
-            forest: Forest::new(0),
+            forest: Forest::empty(),
             peaks: Vec::new(),
         }
     }

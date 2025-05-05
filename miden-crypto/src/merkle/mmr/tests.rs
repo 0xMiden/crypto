@@ -23,7 +23,7 @@ fn tests_empty_mmr_peaks() {
 fn test_empty_partial_mmr() {
     let mmr = PartialMmr::default();
     assert_eq!(mmr.num_leaves(), 0);
-    assert_eq!(mmr.forest(), Forest::new(0));
+    assert_eq!(mmr.forest(), Forest::empty());
     assert_eq!(mmr.peaks(), MmrPeaks::default());
     assert!(mmr.nodes.is_empty());
     assert!(!mmr.track_latest);

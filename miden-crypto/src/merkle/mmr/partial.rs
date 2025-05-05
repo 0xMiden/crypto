@@ -6,8 +6,11 @@ use alloc::{
 use winter_utils::{Deserializable, Serializable};
 
 use super::{MmrDelta, MmrProof};
-use crate::merkle::{
-    InOrderIndex, InnerNodeInfo, MerklePath, MmrError, MmrPeaks, Rpo256, mmr::forest::Forest,
+use crate::{
+    Word,
+    merkle::{
+        InOrderIndex, InnerNodeInfo, MerklePath, MmrError, MmrPeaks, Rpo256, mmr::forest::Forest,
+    },
 };
 
 // TYPE ALIASES
@@ -72,7 +75,7 @@ pub struct PartialMmr {
 impl Default for PartialMmr {
     /// Creates a new [PartialMmr] with default values.
     fn default() -> Self {
-        let forest = MountainRange::new(0);
+        let forest = Forest::empty();
         let peaks = Vec::new();
         let nodes = BTreeMap::new();
         let track_latest = false;
