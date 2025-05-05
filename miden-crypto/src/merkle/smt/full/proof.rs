@@ -3,14 +3,16 @@ use alloc::string::ToString;
 use super::{MerklePath, RpoDigest, SMT_DEPTH, SmtLeaf, SmtProofError, Word};
 use crate::utils::{ByteReader, ByteWriter, Deserializable, DeserializationError, Serializable};
 
-/// A proof which can be used to assert membership (or non-membership) of key-value pairs in a
-/// [`super::Smt`].
+/// A proof which can be used to assert membership (or non-membership) of key-value pairs
+/// in a [`super::Smt`] (Sparse Merkle Tree).
 ///
-/// The proof consists of a Merkle path and leaf which describes the node located at the base of the
-/// path.
+/// The proof consists of a Merkle path and a leaf, which describes the node located at
+/// the base of the path.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct SmtProof {
+    /// The Merkle path from the leaf to the root.
     path: MerklePath,
+    /// The leaf node containing one or more key-value pairs.
     leaf: SmtLeaf,
 }
 
@@ -21,7 +23,8 @@ impl SmtProof {
     /// Returns a new instance of [`SmtProof`] instantiated from the specified path and leaf.
     ///
     /// # Errors
-    /// Returns an error if the path length is not [`SMT_DEPTH`].
+    /// Returns an error if the path length does not match the expected [`SMT_DEPTH`],
+    /// which would make the proof invalid.
     pub fn new(path: MerklePath, leaf: SmtLeaf) -> Result<Self, SmtProofError> {
         let depth: usize = SMT_DEPTH.into();
         if path.len() != depth {

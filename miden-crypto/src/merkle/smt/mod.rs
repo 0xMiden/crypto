@@ -493,6 +493,9 @@ pub struct LeafIndex<const DEPTH: u8> {
 }
 
 impl<const DEPTH: u8> LeafIndex<DEPTH> {
+    /// Creates a new `LeafIndex` with the specified value.
+    ///
+    /// Returns an error if the provided depth is less than the minimum supported depth.
     pub fn new(value: u64) -> Result<Self, MerkleError> {
         if DEPTH < SMT_MIN_DEPTH {
             return Err(MerkleError::DepthTooSmall(DEPTH));
@@ -501,12 +504,14 @@ impl<const DEPTH: u8> LeafIndex<DEPTH> {
         Ok(LeafIndex { index: NodeIndex::new(DEPTH, value)? })
     }
 
+    /// Returns the numeric value of this leaf index.
     pub fn value(&self) -> u64 {
         self.index.value()
     }
 }
 
 impl LeafIndex<SMT_MAX_DEPTH> {
+    /// Creates a new `LeafIndex` at the maximum supported depth without validation.
     pub const fn new_max_depth(value: u64) -> Self {
         LeafIndex {
             index: NodeIndex::new_unchecked(SMT_MAX_DEPTH, value),

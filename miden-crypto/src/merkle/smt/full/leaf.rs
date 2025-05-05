@@ -4,11 +4,17 @@ use core::cmp::Ordering;
 use super::{EMPTY_WORD, Felt, LeafIndex, Rpo256, RpoDigest, SMT_DEPTH, SmtLeafError, Word};
 use crate::utils::{ByteReader, ByteWriter, Deserializable, DeserializationError, Serializable};
 
+/// Represents a leaf node in the Sparse Merkle Tree.
+///
+/// A leaf can be empty, hold a single key-value pair, or multiple key-value pairs.
 #[derive(Clone, Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 pub enum SmtLeaf {
+    /// An empty leaf at the specified index.
     Empty(LeafIndex<SMT_DEPTH>),
+    /// A leaf containing a single key-value pair.
     Single((RpoDigest, Word)),
+    /// A leaf containing multiple key-value pairs.
     Multiple(Vec<(RpoDigest, Word)>),
 }
 

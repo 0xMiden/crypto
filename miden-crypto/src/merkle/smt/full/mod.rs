@@ -27,6 +27,9 @@ mod tests;
 // CONSTANTS
 // ================================================================================================
 
+/// The depth of the sparse Merkle tree.
+///
+/// All leaves in this SMT are located at depth 64.
 pub const SMT_DEPTH: u8 = 64;
 
 // SMT
