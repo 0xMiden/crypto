@@ -70,6 +70,18 @@ pub struct PartialMmr {
     pub(crate) track_latest: bool,
 }
 
+impl Default for PartialMmr {
+    /// Creates a new [PartialMmr] with default values.
+    fn default() -> Self {
+        let forest = 0;
+        let peaks = Vec::new();
+        let nodes = BTreeMap::new();
+        let track_latest = false;
+
+        Self { forest, peaks, nodes, track_latest }
+    }
+}
+
 impl PartialMmr {
     // CONSTRUCTORS
     // --------------------------------------------------------------------------------------------
@@ -78,16 +90,6 @@ impl PartialMmr {
     pub fn from_peaks(peaks: MmrPeaks) -> Self {
         let forest = peaks.num_leaves();
         let peaks = peaks.into();
-        let nodes = BTreeMap::new();
-        let track_latest = false;
-
-        Self { forest, peaks, nodes, track_latest }
-    }
-
-    /// Returns a new [`PartialMmr`] instantiated with empty peaks and nodes and 0 leaves.
-    pub const fn empty() -> Self {
-        let forest = 0;
-        let peaks = Vec::new();
         let nodes = BTreeMap::new();
         let track_latest = false;
 

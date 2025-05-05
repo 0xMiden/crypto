@@ -34,6 +34,13 @@ pub struct MmrPeaks {
     peaks: Vec<RpoDigest>,
 }
 
+impl Default for MmrPeaks {
+    /// Returns new [`MmrPeaks`] instantiated from an empty vector of peaks and 0 leaves.
+    fn default() -> Self {
+        Self { num_leaves: 0, peaks: Vec::new() }
+    }
+}
+
 impl MmrPeaks {
     // CONSTRUCTOR
     // --------------------------------------------------------------------------------------------
@@ -53,11 +60,6 @@ impl MmrPeaks {
         }
 
         Ok(Self { num_leaves, peaks })
-    }
-
-    /// Returns new [`MmrPeaks`] instantiated from an empty vector of peaks and 0 leaves.
-    pub const fn empty() -> Self {
-        Self { num_leaves: 0, peaks: Vec::new() }
     }
 
     // ACCESSORS

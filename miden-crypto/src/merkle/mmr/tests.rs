@@ -14,17 +14,17 @@ use crate::{
 
 #[test]
 fn tests_empty_mmr_peaks() {
-    let peaks = MmrPeaks::empty();
+    let peaks = MmrPeaks::default();
     assert_eq!(peaks.num_peaks(), 0);
     assert_eq!(peaks.num_leaves(), 0);
 }
 
 #[test]
 fn test_empty_partial_mmr() {
-    let mmr = PartialMmr::empty();
+    let mmr = PartialMmr::default();
     assert_eq!(mmr.num_leaves(), 0);
     assert_eq!(mmr.forest(), 0);
-    assert_eq!(mmr.peaks(), MmrPeaks::empty());
+    assert_eq!(mmr.peaks(), MmrPeaks::default());
     assert!(mmr.nodes.is_empty());
     assert!(!mmr.track_latest);
 }
