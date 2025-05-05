@@ -15,6 +15,9 @@ mod proof;
 pub use proof::SmtProof;
 use winter_utils::{ByteReader, ByteWriter, Deserializable, DeserializationError, Serializable};
 
+mod large;
+pub use large::LargeSmt;
+
 // Concurrent implementation
 #[cfg(feature = "concurrent")]
 mod concurrent;

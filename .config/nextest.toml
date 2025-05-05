@@ -7,3 +7,8 @@ default-filter = 'not test(merkle::smt::full::concurrent)'
 failure-output = "immediate-final"
 fail-fast = false
 default-filter = 'test(merkle::smt::full::concurrent)'
+
+[profile.large-smt]
+failure-output = "immediate-final"
+fail-fast = false
+default-filter = 'test(merkle::smt::full::large)'

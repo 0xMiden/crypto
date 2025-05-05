@@ -1,10 +1,10 @@
-use std::time::Instant;
+use std::{fs, path::Path, time::Instant};
 
 use clap::Parser;
 use miden_crypto::{
     EMPTY_WORD, Felt, ONE, Word,
     hash::rpo::{Rpo256, RpoDigest},
-    merkle::{MerkleError, Smt},
+    merkle::{LargeSmt, MerkleError},
 };
 use rand::{Rng, prelude::IteratorRandom, rng};
 use rand_utils::rand_value;
@@ -16,10 +16,10 @@ pub struct BenchmarkCmd {
     #[clap(short = 's', long = "size", default_value = "1000000")]
     size: usize,
     /// Number of insertions
-    #[clap(short = 'i', long = "insertions", default_value = "1000")]
+    #[clap(short = 'i', long = "insertions", default_value = "10000")]
     insertions: usize,
     /// Number of updates
-    #[clap(short = 'u', long = "updates", default_value = "1000")]
+    #[clap(short = 'u', long = "updates", default_value = "10000")]
     updates: usize,
 }
 
@@ -43,27 +43,34 @@ pub fn benchmark_smt() {
         entries.push((key, value));
     }
 
-    let mut tree = construction(entries.clone(), tree_size).unwrap();
+    let tree = construction(entries.clone(), tree_size).unwrap();
     insertion(&mut tree.clone(), insertions).unwrap();
     batched_insertion(&mut tree.clone(), insertions).unwrap();
     batched_update(&mut tree.clone(), entries, updates).unwrap();
-    proof_generation(&mut tree).unwrap();
+    proof_generation(&mut tree.clone()).unwrap();
 }
 
 /// Runs the construction benchmark for [`Smt`], returning the constructed tree.
-pub fn construction(entries: Vec<(RpoDigest, Word)>, size: usize) -> Result<Smt, MerkleError> {
+pub fn construction(entries: Vec<(RpoDigest, Word)>, size: usize) -> Result<LargeSmt, MerkleError> {
     println!("Running a construction benchmark:");
     let now = Instant::now();
-    let tree = Smt::with_entries(entries)?;
+    let path = Path::new("bench_large_smt");
+    // delete the folder if it exists
+    if path.exists() {
+        std::fs::remove_dir_all(path).unwrap();
+    }
+    fs::create_dir_all(path).expect("Failed to create database directory");
+
+    let tree = LargeSmt::with_entries(path, entries)?;
     let elapsed = now.elapsed().as_secs_f32();
     println!("Constructed an SMT with {size} key-value pairs in {elapsed:.1} seconds");
-    println!("Number of leaf nodes: {}\n", tree.leaves().count());
+    println!("Number of leaf nodes: {}\n", tree.num_leaves());
 
     Ok(tree)
 }
 
 /// Runs the insertion benchmark for the [`Smt`].
-pub fn insertion(tree: &mut Smt, insertions: usize) -> Result<(), MerkleError> {
+pub fn insertion(tree: &mut LargeSmt, insertions: usize) -> Result<(), MerkleError> {
     println!("Running an insertion benchmark:");
 
     let size = tree.num_leaves();
@@ -88,7 +95,7 @@ pub fn insertion(tree: &mut Smt, insertions: usize) -> Result<(), MerkleError> {
     Ok(())
 }
 
-pub fn batched_insertion(tree: &mut Smt, insertions: usize) -> Result<(), MerkleError> {
+pub fn batched_insertion(tree: &mut LargeSmt, insertions: usize) -> Result<(), MerkleError> {
     println!("Running a batched insertion benchmark:");
 
     let size = tree.num_leaves();
@@ -132,7 +139,7 @@ pub fn batched_insertion(tree: &mut Smt, insertions: usize) -> Result<(), Merkle
 }
 
 pub fn batched_update(
-    tree: &mut Smt,
+    tree: &mut LargeSmt,
     entries: Vec<(RpoDigest, Word)>,
     updates: usize,
 ) -> Result<(), MerkleError> {
@@ -191,7 +198,7 @@ pub fn batched_update(
 }
 
 /// Runs the proof generation benchmark for the [`Smt`].
-pub fn proof_generation(tree: &mut Smt) -> Result<(), MerkleError> {
+pub fn proof_generation(tree: &mut LargeSmt) -> Result<(), MerkleError> {
     const NUM_PROOFS: usize = 100;
 
     println!("Running a proof generation benchmark:");

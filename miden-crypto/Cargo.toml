@@ -46,7 +46,7 @@ harness = false
 
 [features]
 concurrent = ["dep:rayon", "hashbrown?/rayon"]
-default = ["std", "concurrent"]
+default = ["std", "concurrent", "serde"]
 executable = ["dep:clap", "dep:rand-utils", "std"]
 smt_hashmaps = ["dep:hashbrown"]
 internal = []
@@ -71,6 +71,7 @@ rand = { version = "0.9", default-features = false }
 rand_core = { version = "0.9", default-features = false }
 rand-utils = { version = "0.12", package = "winter-rand-utils", optional = true }
 rayon = { version = "1.10", optional = true }
+rocksdb = { version = "0.23.0" }
 serde = { version = "1.0", default-features = false, optional = true, features = ["derive"] }
 sha3 = { version = "0.10", default-features = false }
 thiserror = { version = "2.0", default-features = false }

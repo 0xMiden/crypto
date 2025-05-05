@@ -101,7 +101,7 @@ fn test_sorted_pairs_to_leaves() {
 }
 
 // Helper for the below tests.
-fn generate_entries(pair_count: u64) -> Vec<(RpoDigest, Word)> {
+pub(crate) fn generate_entries(pair_count: u64) -> Vec<(RpoDigest, Word)> {
     (0..pair_count)
         .map(|i| {
             let leaf_index = ((i as f64 / pair_count as f64) * (pair_count as f64)) as u64;
@@ -112,7 +112,10 @@ fn generate_entries(pair_count: u64) -> Vec<(RpoDigest, Word)> {
         .collect()
 }
 
-fn generate_updates(entries: Vec<(RpoDigest, Word)>, updates: usize) -> Vec<(RpoDigest, Word)> {
+pub(crate) fn generate_updates(
+    entries: Vec<(RpoDigest, Word)>,
+    updates: usize,
+) -> Vec<(RpoDigest, Word)> {
     const REMOVAL_PROBABILITY: f64 = 0.2;
     let mut rng = rng();
     // Assertion to ensure input keys are unique
