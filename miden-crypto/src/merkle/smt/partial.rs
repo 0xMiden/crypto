@@ -46,8 +46,8 @@ impl PartialSmt {
     {
         let mut partial_smt = Self::new();
 
-        for (leaf, path) in paths.into_iter().map(SmtProof::into_parts) {
-            partial_smt.add_path(path, leaf)?;
+        for (path, leaf) in paths.into_iter().map(SmtProof::into_parts) {
+            partial_smt.add_path(leaf, path)?;
         }
 
         Ok(partial_smt)

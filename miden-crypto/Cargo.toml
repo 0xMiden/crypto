@@ -83,6 +83,7 @@ assert_matches = { version = "1.5", default-features = false }
 criterion = { version = "0.5", features = ["html_reports"] }
 getrandom = { version = "0.3", default-features = false }
 hex = { version = "0.4", default-features = false, features = ["alloc"] }
+itertools = { version = "0.14" }
 proptest = { version = "1.6", default-features = false, features = ["alloc"]}
 rand_chacha = { version = "0.9", default-features = false }
 rand-utils = { version = "0.12", package = "winter-rand-utils" }

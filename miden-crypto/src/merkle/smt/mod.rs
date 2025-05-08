@@ -79,28 +79,34 @@ pub(crate) trait SparseMerkleTree<const DEPTH: u8> {
     // PROVIDED METHODS
     // ---------------------------------------------------------------------------------------------
 
+    /// Returns a [MerklePath] to the specified key.
+    ///
+    /// Mostly this is an implementation detail of [`Self::open()`].
+    fn get_path(&self, key: &Self::Key) -> MerklePath {
+        let index = NodeIndex::from(Self::key_to_leaf_index(key));
+        index.proof_indices().map(|index| self.get_node_hash(index)).collect()
+    }
+
+    /// Get the hash of a node at an arbitrary index, including the root or leaf hashes.
+    ///
+    /// The root index simply returns [`Self::root()`]. Other hashes are retrieved by calling
+    /// [`Self::get_inner_node()`] on the parent, and returning the respective child hash.
+    fn get_node_hash(&self, index: NodeIndex) -> RpoDigest {
+        if index.is_root() {
+            return self.root();
+        }
+
+        let InnerNode { left, right } = self.get_inner_node(index.parent());
+
+        let index_is_right = index.is_value_odd();
+        if index_is_right { right } else { left }
+    }
+
     /// Returns an opening of the leaf associated with `key`. Conceptually, an opening is a Merkle
     /// path to the leaf, as well as the leaf itself.
     fn open(&self, key: &Self::Key) -> Self::Opening {
         let leaf = self.get_leaf(key);
-
-        let mut index: NodeIndex = {
-            let leaf_index: LeafIndex<DEPTH> = Self::key_to_leaf_index(key);
-            leaf_index.into()
-        };
-
-        let merkle_path = {
-            let mut path = Vec::with_capacity(index.depth() as usize);
-            for _ in 0..index.depth() {
-                let is_right = index.is_value_odd();
-                index.move_up();
-                let InnerNode { left, right } = self.get_inner_node(index);
-                let value = if is_right { left } else { right };
-                path.push(value);
-            }
-
-            MerklePath::new(path)
-        };
+        let merkle_path = self.get_path(key);
 
         Self::path_and_leaf_to_opening(merkle_path, leaf)
     }

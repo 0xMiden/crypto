@@ -95,26 +95,16 @@ impl MerkleTree {
     /// Returns an error if:
     /// * The specified depth is greater than the depth of the tree.
     /// * The specified value is not valid for the specified depth.
-    pub fn get_path(&self, mut index: NodeIndex) -> Result<MerklePath, MerkleError> {
+    pub fn get_path(&self, index: NodeIndex) -> Result<MerklePath, MerkleError> {
         if index.is_root() {
             return Err(MerkleError::DepthTooSmall(index.depth()));
         } else if index.depth() > self.depth() {
             return Err(MerkleError::DepthTooBig(index.depth() as u64));
         }
 
-        // TODO should we create a helper in `NodeIndex` that will encapsulate traversal to root so
-        // we always use inlined `for` instead of `while`? the reason to use `for` is because its
-        // easier for the compiler to vectorize.
-        let mut path = Vec::with_capacity(index.depth() as usize);
-        for _ in 0..index.depth() {
-            let sibling = index.sibling().to_scalar_index() as usize;
-            path.push(self.nodes[sibling]);
-            index.move_up();
-        }
-
-        debug_assert!(index.is_root(), "the path walk must go all the way to the root");
-
-        Ok(path.into())
+        Ok(MerklePath::from(Vec::from_iter(
+            index.proof_indices().map(|index| self.get_node(index).unwrap()),
+        )))
     }
 
     // ITERATORS

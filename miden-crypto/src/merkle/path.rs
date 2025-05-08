@@ -1,5 +1,8 @@
 use alloc::vec::Vec;
-use core::ops::{Deref, DerefMut};
+use core::{
+    num::NonZero,
+    ops::{Deref, DerefMut},
+};
 
 use super::{InnerNodeInfo, MerkleError, NodeIndex, Rpo256, RpoDigest};
 use crate::{
@@ -11,6 +14,9 @@ use crate::{
 // ================================================================================================
 
 /// A merkle path container, composed of a sequence of nodes of a Merkle tree.
+///
+/// Indexing into this type starts at the deepest part of the path and gets shallower. That is,
+/// the node at index `0` is deeper than the node at index `self.len() - 1`.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 pub struct MerklePath {
@@ -22,6 +28,8 @@ impl MerklePath {
     // --------------------------------------------------------------------------------------------
 
     /// Creates a new Merkle path from a list of nodes.
+    ///
+    /// The list must be in order of deepest to shallowest.
     pub fn new(nodes: Vec<RpoDigest>) -> Self {
         assert!(nodes.len() <= u8::MAX.into(), "MerklePath may have at most 256 items");
         Self { nodes }
@@ -30,12 +38,22 @@ impl MerklePath {
     // PROVIDERS
     // --------------------------------------------------------------------------------------------
 
+    /// Returns a reference to the path node at the specified depth.
+    ///
+    /// The `depth` parameter is defined in terms of `self.depth()`. Merkle paths conventionally do
+    /// not include the root, so the shallowest depth is `1`, and the deepest depth is
+    /// `self.depth()`.
+    pub fn at_depth(&self, depth: NonZero<u8>) -> Option<RpoDigest> {
+        let index = u8::checked_sub(self.depth(), depth.get())?;
+        self.nodes.get(index as usize).copied()
+    }
+
     /// Returns the depth in which this Merkle path proof is valid.
     pub fn depth(&self) -> u8 {
         self.nodes.len() as u8
     }
 
-    /// Returns a reference to the [MerklePath]'s nodes.
+    /// Returns a reference to the [MerklePath]'s nodes, in order of deepest to shallowest.
     pub fn nodes(&self) -> &[RpoDigest] {
         &self.nodes
     }

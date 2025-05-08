@@ -5,6 +5,7 @@ use super::{
     LeafIndex, MerkleError, MerklePath, MutationSet, NodeIndex, RpoDigest, SMT_MAX_DEPTH,
     SMT_MIN_DEPTH, SparseMerkleTree, Word,
 };
+use crate::merkle::{SparseMerklePath, SparseValuePath};
 
 #[cfg(test)]
 mod tests;
@@ -169,8 +170,15 @@ impl<const DEPTH: u8> SimpleSmt<DEPTH> {
 
     /// Returns an opening of the leaf associated with `key`. Conceptually, an opening is a Merkle
     /// path to the leaf, as well as the leaf itself.
-    pub fn open(&self, key: &LeafIndex<DEPTH>) -> ValuePath {
-        <Self as SparseMerkleTree<DEPTH>>::open(self, key)
+    pub fn open(&self, key: &LeafIndex<DEPTH>) -> SparseValuePath {
+        let value = RpoDigest::new(self.get_value(key));
+        let nodes = key.index.proof_indices().map(|index| self.get_node_hash(index));
+        // `from_sized_iter()` returns an error if there are more nodes than `SMT_MAX_DEPTH`, but
+        // this could only happen if we have more levels than `SMT_MAX_DEPTH` ourselves, which is
+        // guarded against in `SimpleSmt::new()`.
+        let path = SparseMerklePath::from_sized_iter(nodes).unwrap();
+
+        SparseValuePath { value, path }
     }
 
     /// Returns a boolean value indicating whether the SMT is empty.

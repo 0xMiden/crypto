@@ -20,6 +20,9 @@ pub use merkle_tree::{MerkleTree, path_to_text, tree_to_text};
 mod path;
 pub use path::{MerklePath, RootPath, ValuePath};
 
+mod sparse_path;
+pub use sparse_path::{SparseMerklePath, SparseValuePath};
+
 mod smt;
 pub use smt::{
     InnerNode, LeafIndex, MutationSet, NodeMutation, PartialSmt, SMT_DEPTH, SMT_MAX_DEPTH,
