@@ -10,7 +10,7 @@ resolver = "3"  # Use the edition 2024 dependency resolver
 [workspace.package]
 authors = ["miden contributors"]
 license = "MIT"
-repository = "https://github.com/0xPolygonMiden/crypto"
+repository = "https://github.com/0xMiden/crypto"
 categories = ["cryptography", "no-std"]
 keywords = ["miden", "crypto", "hash", "merkle"]
 edition = "2024"
