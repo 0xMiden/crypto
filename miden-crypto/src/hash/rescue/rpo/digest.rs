@@ -120,7 +120,7 @@ impl PartialOrd for RpoDigest {
 impl Display for RpoDigest {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         let encoded: String = self.into();
-        write!(f, "{}", encoded)?;
+        write!(f, "{encoded}")?;
         Ok(())
     }
 }

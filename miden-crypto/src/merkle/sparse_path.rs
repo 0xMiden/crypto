@@ -154,16 +154,14 @@ impl Deserializable for SparseMerklePath {
         let depth = source.read_u8()?;
         if depth > SMT_MAX_DEPTH {
             return Err(DeserializationError::InvalidValue(format!(
-                "SparseMerklePath max depth exceeded ({} > {})",
-                depth, SMT_MAX_DEPTH
+                "SparseMerklePath max depth exceeded ({depth} > {SMT_MAX_DEPTH})",
             )));
         }
         let empty_nodes_mask = source.read_u64()?;
         let empty_nodes_count = empty_nodes_mask.count_ones();
         if empty_nodes_count > depth as u32 {
             return Err(DeserializationError::InvalidValue(format!(
-                "SparseMerklePath has more empty nodes ({}) than its full length ({})",
-                empty_nodes_count, depth
+                "SparseMerklePath has more empty nodes ({empty_nodes_count}) than its full length ({depth})",
             )));
         }
         let count = depth as u32 - empty_nodes_count;

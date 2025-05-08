@@ -10,16 +10,16 @@ use rand::{Rng, prelude::IteratorRandom, rng};
 use rand_utils::rand_value;
 
 #[derive(Parser, Debug)]
-#[clap(name = "Benchmark", about = "SMT benchmark", version, rename_all = "kebab-case")]
+#[command(name = "Benchmark", about = "SMT benchmark", version, rename_all = "kebab-case")]
 pub struct BenchmarkCmd {
     /// Size of the tree
-    #[clap(short = 's', long = "size", default_value = "1000000")]
+    #[arg(short = 's', long = "size", default_value = "1000000")]
     size: usize,
     /// Number of insertions
-    #[clap(short = 'i', long = "insertions", default_value = "1000")]
+    #[arg(short = 'i', long = "insertions", default_value = "1000")]
     insertions: usize,
     /// Number of updates
-    #[clap(short = 'u', long = "updates", default_value = "1000")]
+    #[arg(short = 'u', long = "updates", default_value = "1000")]
     updates: usize,
 }
 

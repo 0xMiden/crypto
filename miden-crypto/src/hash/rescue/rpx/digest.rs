@@ -108,7 +108,7 @@ impl PartialOrd for RpxDigest {
 impl Display for RpxDigest {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         let encoded: String = self.into();
-        write!(f, "{}", encoded)?;
+        write!(f, "{encoded}")?;
         Ok(())
     }
 }

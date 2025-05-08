@@ -5,7 +5,7 @@
 //! tree will perform better than the sparse version. At the time of this writing (2024/11/24), this
 //! benchmark is about four times more efficient than the equivalent benchmark in
 //! `benches/smt-subtree.rs`.
-use std::{hint, mem, time::Duration};
+use std::{hint, time::Duration};
 
 use criterion::{BatchSize, Criterion, criterion_group, criterion_main};
 use miden_crypto::{Felt, ONE, Word, merkle::MerkleTree};
@@ -60,7 +60,7 @@ criterion_main!(smt_subtree_group);
 // --------------------------------------------------------------------------------------------
 
 fn generate_word(seed: &mut [u8; 32]) -> Word {
-    mem::swap(seed, &mut prng_array(*seed));
+    *seed = prng_array(*seed);
     let nums: [u64; 4] = prng_array(*seed);
     [Felt::new(nums[0]), Felt::new(nums[1]), Felt::new(nums[2]), Felt::new(nums[3])]
 }
