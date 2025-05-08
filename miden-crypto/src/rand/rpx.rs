@@ -2,9 +2,12 @@ use alloc::{string::ToString, vec::Vec};
 
 use rand_core::impls;
 
-use super::{Felt, FeltRng, FieldElement, RandomCoin, RandomCoinError, RngCore, Word, ZERO};
+use super::{Felt, FeltRng, FieldElement, RandomCoin, RandomCoinError, RngCore, ZERO};
 use crate::{
-    hash::rpx::{Rpx256, RpxDigest},
+    hash::{
+        rpo::Word,
+        rpx::{Rpx256, RpxDigest},
+    },
     utils::{ByteReader, ByteWriter, Deserializable, DeserializationError, Serializable},
 };
 
@@ -88,7 +91,7 @@ impl RandomCoin for RpxRandomCoin {
     type Hasher = Rpx256;
 
     fn new(seed: &[Self::BaseField]) -> Self {
-        let digest: Word = Rpx256::hash_elements(seed).into();
+        let digest: Word = (*Rpx256::hash_elements(seed)).into();
         Self::new(digest)
     }
 
@@ -97,7 +100,7 @@ impl RandomCoin for RpxRandomCoin {
         self.current = RATE_START;
 
         // Add the new seed material to the first half of the rate portion of the RPX state
-        let data: Word = data.into();
+        let data: Word = (*data).into();
 
         self.state[RATE_START] += data[0];
         self.state[RATE_START + 1] += data[1];
@@ -187,7 +190,7 @@ impl FeltRng for RpxRandomCoin {
         for o in output.iter_mut() {
             *o = self.draw_basefield();
         }
-        output
+        Word::new(output)
     }
 }
 
@@ -251,14 +254,14 @@ impl Deserializable for RpxRandomCoin {
 #[cfg(test)]
 mod tests {
     use super::{Deserializable, FeltRng, RpxRandomCoin, Serializable, ZERO};
-    use crate::ONE;
+    use crate::{ONE, hash::rpo::Word};
 
     #[test]
     fn test_feltrng_felt() {
-        let mut rpxcoin = RpxRandomCoin::new([ZERO; 4]);
+        let mut rpxcoin = RpxRandomCoin::new(Word::new([ZERO; 4]));
         let output = rpxcoin.draw_element();
 
-        let mut rpxcoin = RpxRandomCoin::new([ZERO; 4]);
+        let mut rpxcoin = RpxRandomCoin::new(Word::new([ZERO; 4]));
         let expected = rpxcoin.draw_basefield();
 
         assert_eq!(output, expected);
@@ -266,14 +269,15 @@ mod tests {
 
     #[test]
     fn test_feltrng_word() {
-        let mut rpxcoin = RpxRandomCoin::new([ZERO; 4]);
+        let mut rpxcoin = RpxRandomCoin::new(Word::new([ZERO; 4]));
         let output = rpxcoin.draw_word();
 
-        let mut rpocoin = RpxRandomCoin::new([ZERO; 4]);
+        let mut rpocoin = RpxRandomCoin::new(Word::new([ZERO; 4]));
         let mut expected = [ZERO; 4];
         for o in expected.iter_mut() {
             *o = rpocoin.draw_basefield();
         }
+        let expected = Word::new(expected);
 
         assert_eq!(output, expected);
     }

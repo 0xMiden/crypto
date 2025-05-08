@@ -5,7 +5,7 @@ use alloc::{
 
 use winter_utils::{Deserializable, Serializable};
 
-use super::{MmrDelta, MmrProof, Rpo256, RpoDigest};
+use super::{MmrDelta, MmrProof, Rpo256, Word};
 use crate::merkle::{
     InOrderIndex, InnerNodeInfo, MerklePath, MmrError, MmrPeaks,
     mmr::{leaf_to_corresponding_tree, nodes_in_forest},
@@ -14,7 +14,7 @@ use crate::merkle::{
 // TYPE ALIASES
 // ================================================================================================
 
-type NodeMap = BTreeMap<InOrderIndex, RpoDigest>;
+type NodeMap = BTreeMap<InOrderIndex, Word>;
 
 // PARTIAL MERKLE MOUNTAIN RANGE
 // ================================================================================================
@@ -48,7 +48,7 @@ pub struct PartialMmr {
     ///
     /// All the peaks of every tree in the MMR forest. The peaks are always ordered by number of
     /// leaves, starting from the peak with most children, to the one with least.
-    pub(crate) peaks: Vec<RpoDigest>,
+    pub(crate) peaks: Vec<Word>,
 
     /// Authentication nodes used to construct merkle paths for a subset of the MMR's leaves.
     ///
@@ -187,7 +187,7 @@ impl PartialMmr {
     // --------------------------------------------------------------------------------------------
 
     /// Returns an iterator nodes of all authentication paths of this [PartialMmr].
-    pub fn nodes(&self) -> impl Iterator<Item = (&InOrderIndex, &RpoDigest)> {
+    pub fn nodes(&self) -> impl Iterator<Item = (&InOrderIndex, &Word)> {
         self.nodes.iter()
     }
 
@@ -195,7 +195,7 @@ impl PartialMmr {
     ///
     /// The order of iteration is not defined. If a leaf is not presented in this partial MMR it
     /// is silently ignored.
-    pub fn inner_nodes<'a, I: Iterator<Item = (usize, RpoDigest)> + 'a>(
+    pub fn inner_nodes<'a, I: Iterator<Item = (usize, Word)> + 'a>(
         &'a self,
         mut leaves: I,
     ) -> impl Iterator<Item = InnerNodeInfo> + 'a {
@@ -221,7 +221,7 @@ impl PartialMmr {
     /// inserted into this [PartialMmr] as a result of this operation.
     ///
     /// When `track` is `true` the new leaf is tracked.
-    pub fn add(&mut self, leaf: RpoDigest, track: bool) -> Vec<(InOrderIndex, RpoDigest)> {
+    pub fn add(&mut self, leaf: Word, track: bool) -> Vec<(InOrderIndex, Word)> {
         self.forest += 1;
         let merges = self.forest.trailing_zeros() as usize;
         let mut new_nodes = Vec::with_capacity(merges);
@@ -299,7 +299,7 @@ impl PartialMmr {
     pub fn track(
         &mut self,
         leaf_pos: usize,
-        leaf: RpoDigest,
+        leaf: Word,
         path: &MerklePath,
     ) -> Result<(), MmrError> {
         // Checks there is a tree with same depth as the authentication path, if not the path is
@@ -361,7 +361,7 @@ impl PartialMmr {
 
     /// Applies updates to this [PartialMmr] and returns a vector of new authentication nodes
     /// inserted into the partial MMR.
-    pub fn apply(&mut self, delta: MmrDelta) -> Result<Vec<(InOrderIndex, RpoDigest)>, MmrError> {
+    pub fn apply(&mut self, delta: MmrDelta) -> Result<Vec<(InOrderIndex, Word)>, MmrError> {
         if delta.forest < self.forest {
             return Err(MmrError::InvalidPeaks(format!(
                 "forest of mmr delta {} is less than current forest {}",
@@ -542,14 +542,14 @@ impl From<&PartialMmr> for MmrPeaks {
 // ================================================================================================
 
 /// An iterator over every inner node of the [PartialMmr].
-pub struct InnerNodeIterator<'a, I: Iterator<Item = (usize, RpoDigest)>> {
+pub struct InnerNodeIterator<'a, I: Iterator<Item = (usize, Word)>> {
     nodes: &'a NodeMap,
     leaves: I,
-    stack: Vec<(InOrderIndex, RpoDigest)>,
+    stack: Vec<(InOrderIndex, Word)>,
     seen_nodes: BTreeSet<InOrderIndex>,
 }
 
-impl<I: Iterator<Item = (usize, RpoDigest)>> Iterator for InnerNodeIterator<'_, I> {
+impl<I: Iterator<Item = (usize, Word)>> Iterator for InnerNodeIterator<'_, I> {
     type Item = InnerNodeInfo;
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -599,7 +599,7 @@ impl Deserializable for PartialMmr {
         source: &mut R,
     ) -> Result<Self, winter_utils::DeserializationError> {
         let forest = usize::read_from(source)?;
-        let peaks = Vec::<RpoDigest>::read_from(source)?;
+        let peaks = Vec::<Word>::read_from(source)?;
         let nodes = NodeMap::read_from(source)?;
         let track_latest = source.read_bool()?;
 
@@ -653,12 +653,11 @@ mod tests {
     use winter_utils::{Deserializable, Serializable};
 
     use super::{
-        InOrderIndex, MmrPeaks, PartialMmr, RpoDigest, forest_to_rightmost_index,
-        forest_to_root_index,
+        InOrderIndex, MmrPeaks, PartialMmr, Word, forest_to_rightmost_index, forest_to_root_index,
     };
     use crate::merkle::{MerkleStore, Mmr, NodeIndex, int_to_node};
 
-    const LEAVES: [RpoDigest; 7] = [
+    const LEAVES: [Word; 7] = [
         int_to_node(0),
         int_to_node(1),
         int_to_node(2),

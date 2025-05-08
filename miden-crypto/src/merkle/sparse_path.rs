@@ -6,9 +6,7 @@ use core::{
 
 use winter_utils::{Deserializable, DeserializationError, Serializable};
 
-use super::{
-    EmptySubtreeRoots, MerkleError, MerklePath, RpoDigest, SMT_MAX_DEPTH, ValuePath, Word,
-};
+use super::{EmptySubtreeRoots, MerkleError, MerklePath, SMT_MAX_DEPTH, ValuePath, Word};
 
 /// A different representation of [`MerklePath`] designed for memory efficiency for Merkle paths
 /// with empty nodes.
@@ -29,7 +27,7 @@ pub struct SparseMerklePath {
     /// The `bit index + 1` is equal to node's depth.
     empty_nodes_mask: u64,
     /// The non-empty nodes, stored in depth-order, but not contiguous across depth.
-    nodes: Vec<RpoDigest>,
+    nodes: Vec<Word>,
 }
 
 impl SparseMerklePath {
@@ -44,7 +42,7 @@ impl SparseMerklePath {
     /// Returns [MerkleError::DepthTooBig] if `tree_depth` is greater than [SMT_MAX_DEPTH].
     pub fn from_sized_iter<I>(iterator: I) -> Result<Self, MerkleError>
     where
-        I: IntoIterator<IntoIter: ExactSizeIterator, Item = RpoDigest>,
+        I: IntoIterator<IntoIter: ExactSizeIterator, Item = Word>,
     {
         let iterator = iterator.into_iter();
         let tree_depth = iterator.len() as u8;
@@ -54,7 +52,7 @@ impl SparseMerklePath {
         }
 
         let mut empty_nodes_mask: u64 = 0;
-        let mut nodes: Vec<RpoDigest> = Default::default();
+        let mut nodes: Vec<Word> = Default::default();
 
         for (depth, node) in iter::zip(path_depth_iter(tree_depth), iterator) {
             let &equivalent_empty_node = EmptySubtreeRoots::entry(tree_depth, depth.get());
@@ -84,7 +82,7 @@ impl SparseMerklePath {
     /// # Errors
     /// Returns [MerkleError::DepthTooBig] if `node_depth` is greater than the total depth of this
     /// path.
-    pub fn at_depth(&self, node_depth: NonZero<u8>) -> Result<RpoDigest, MerkleError> {
+    pub fn at_depth(&self, node_depth: NonZero<u8>) -> Result<Word, MerkleError> {
         if node_depth.get() > self.depth() {
             return Err(MerkleError::DepthTooBig(node_depth.get().into()));
         }
@@ -103,7 +101,7 @@ impl SparseMerklePath {
 
     /// Constructs a borrowing iterator over the nodes in this path.
     /// Starts from the leaf and iterates toward the root (excluding the root).
-    pub fn iter(&self) -> impl ExactSizeIterator<Item = RpoDigest> {
+    pub fn iter(&self) -> impl ExactSizeIterator<Item = Word> {
         self.into_iter()
     }
 
@@ -165,7 +163,7 @@ impl Deserializable for SparseMerklePath {
             )));
         }
         let count = depth as u32 - empty_nodes_count;
-        let nodes = source.read_many::<RpoDigest>(count as usize)?;
+        let nodes = source.read_many::<Word>(count as usize)?;
         Ok(Self { empty_nodes_mask, nodes })
     }
 }
@@ -191,7 +189,7 @@ impl TryFrom<MerklePath> for SparseMerklePath {
     }
 }
 
-impl From<SparseMerklePath> for Vec<RpoDigest> {
+impl From<SparseMerklePath> for Vec<Word> {
     fn from(path: SparseMerklePath) -> Self {
         Vec::from_iter(path)
     }
@@ -212,9 +210,9 @@ pub struct SparseMerklePathIter<'p> {
 }
 
 impl Iterator for SparseMerklePathIter<'_> {
-    type Item = RpoDigest;
+    type Item = Word;
 
-    fn next(&mut self) -> Option<RpoDigest> {
+    fn next(&mut self) -> Option<Word> {
         let this_depth = self.next_depth;
         // Paths don't include the root, so if `this_depth` is 0 then we keep returning `None`.
         let this_depth = NonZero::new(this_depth)?;
@@ -301,7 +299,7 @@ impl PartialEq<SparseMerklePath> for MerklePath {
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct SparseValuePath {
     /// The node value opening for `path`.
-    pub value: RpoDigest,
+    pub value: Word,
     /// The path from `value` to `root` (exclusive), using an efficient memory representation for
     /// empty nodes.
     pub path: SparseMerklePath,
@@ -311,14 +309,14 @@ impl SparseValuePath {
     /// Convenience function to construct a [SparseValuePath].
     ///
     /// `value` is the value `path` leads to, in the tree.
-    pub fn new(value: RpoDigest, path: SparseMerklePath) -> Self {
+    pub fn new(value: Word, path: SparseMerklePath) -> Self {
         Self { value, path }
     }
 }
 
 impl From<(SparseMerklePath, Word)> for SparseValuePath {
     fn from((path, value): (SparseMerklePath, Word)) -> Self {
-        SparseValuePath::new(value.into(), path)
+        SparseValuePath::new(value, path)
     }
 }
 
@@ -384,7 +382,6 @@ mod tests {
     use super::SparseMerklePath;
     use crate::{
         Felt, ONE, Word,
-        hash::rpo::RpoDigest,
         merkle::{
             EmptySubtreeRoots, MerkleError, MerklePath, NodeIndex, SMT_DEPTH, Smt,
             smt::SparseMerkleTree, sparse_path::path_depth_iter,
@@ -392,11 +389,11 @@ mod tests {
     };
 
     fn make_smt(pair_count: u64) -> Smt {
-        let entries: Vec<(RpoDigest, Word)> = (0..pair_count)
+        let entries: Vec<(Word, Word)> = (0..pair_count)
             .map(|n| {
                 let leaf_index = ((n as f64 / pair_count as f64) * 255.0) as u64;
-                let key = RpoDigest::new([ONE, ONE, Felt::new(n), Felt::new(leaf_index)]);
-                let value = [ONE, ONE, ONE, ONE];
+                let key = Word::new([ONE, ONE, Felt::new(n), Felt::new(leaf_index)]);
+                let value = Word::new([ONE, ONE, ONE, ONE]);
                 (key, value)
             })
             .collect();
@@ -429,7 +426,7 @@ mod tests {
     #[test]
     fn test_sparse_bits() {
         const DEPTH: u8 = 8;
-        let raw_nodes: [RpoDigest; DEPTH as usize] = [
+        let raw_nodes: [Word; DEPTH as usize] = [
             // Depth 8.
             ([8u8, 8, 8, 8].into()),
             // Depth 7.
@@ -449,7 +446,7 @@ mod tests {
             // Root is not included.
         ];
 
-        let sparse_nodes: [Option<RpoDigest>; DEPTH as usize] = [
+        let sparse_nodes: [Option<Word>; DEPTH as usize] = [
             // Depth 8.
             Some([8u8, 8, 8, 8].into()),
             // Depth 7.
@@ -601,7 +598,7 @@ mod tests {
 
     #[test]
     fn test_zero_sized() {
-        let nodes: Vec<RpoDigest> = Default::default();
+        let nodes: Vec<Word> = Default::default();
 
         // Sparse paths that don't actually contain any nodes should still be well behaved.
         let sparse_path = SparseMerklePath::from_sized_iter(nodes).unwrap();

@@ -1,6 +1,6 @@
 use core::fmt::Display;
 
-use super::{Felt, MerkleError, RpoDigest};
+use super::{Felt, MerkleError, Word};
 use crate::utils::{ByteReader, ByteWriter, Deserializable, DeserializationError, Serializable};
 
 // NODE INDEX
@@ -111,7 +111,7 @@ impl NodeIndex {
     /// Builds a node to be used as input of a hash function when computing a Merkle path.
     ///
     /// Will evaluate the parity of the current instance to define the result.
-    pub const fn build_node(&self, slf: RpoDigest, sibling: RpoDigest) -> [RpoDigest; 2] {
+    pub const fn build_node(&self, slf: Word, sibling: Word) -> [Word; 2] {
         if self.is_value_odd() {
             [sibling, slf]
         } else {

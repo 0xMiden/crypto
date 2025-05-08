@@ -1,6 +1,6 @@
 use alloc::vec::Vec;
 
-use super::super::RpoDigest;
+use super::super::Word;
 
 /// Container for the update data of a [super::PartialMmr]
 #[derive(Debug)]
@@ -14,5 +14,5 @@ pub struct MmrDelta {
     /// 1. All the elements needed to perform authentication path updates. These are the right
     ///    siblings required to perform tree merges on the [super::PartialMmr].
     /// 2. The new peaks.
-    pub data: Vec<RpoDigest>,
+    pub data: Vec<Word>,
 }

@@ -8,7 +8,7 @@
 use std::{hint, time::Duration};
 
 use criterion::{BatchSize, Criterion, criterion_group, criterion_main};
-use miden_crypto::{Felt, ONE, Word, merkle::MerkleTree};
+use miden_crypto::{Felt, ONE, hash::rpo::Word, merkle::MerkleTree};
 use rand_utils::prng_array;
 
 fn balanced_merkle_even(c: &mut Criterion) {
@@ -16,7 +16,7 @@ fn balanced_merkle_even(c: &mut Criterion) {
         b.iter_batched(
             || {
                 let entries: Vec<Word> =
-                    (0..256).map(|i| [Felt::new(i), ONE, ONE, Felt::new(i)]).collect();
+                    (0..256).map(|i| Word::new([Felt::new(i), ONE, ONE, Felt::new(i)])).collect();
                 assert_eq!(entries.len(), 256);
                 entries
             },
@@ -62,5 +62,5 @@ criterion_main!(smt_subtree_group);
 fn generate_word(seed: &mut [u8; 32]) -> Word {
     *seed = prng_array(*seed);
     let nums: [u64; 4] = prng_array(*seed);
-    [Felt::new(nums[0]), Felt::new(nums[1]), Felt::new(nums[2]), Felt::new(nums[3])]
+    Word::new([Felt::new(nums[0]), Felt::new(nums[1]), Felt::new(nums[2]), Felt::new(nums[3])])
 }

@@ -2,7 +2,8 @@ use alloc::vec::Vec;
 
 use num::Zero;
 
-use super::{MODULUS, N, Nonce, Polynomial, Rpo256, Word, ZERO, math::FalconFelt};
+use super::{MODULUS, N, Nonce, Polynomial, Rpo256, ZERO, math::FalconFelt};
+use crate::hash::rpo::Word;
 
 // HASH-TO-POINT FUNCTIONS
 // ================================================================================================

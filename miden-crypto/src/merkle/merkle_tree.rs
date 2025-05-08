@@ -1,7 +1,7 @@
 use alloc::{string::String, vec::Vec};
-use core::{fmt, ops::Deref, slice};
+use core::{fmt, slice};
 
-use super::{InnerNodeInfo, MerkleError, MerklePath, NodeIndex, Rpo256, RpoDigest, Word};
+use super::{InnerNodeInfo, MerkleError, MerklePath, NodeIndex, Rpo256, Word};
 use crate::utils::{uninit_vector, word_to_hex};
 
 // MERKLE TREE
@@ -11,7 +11,7 @@ use crate::utils::{uninit_vector, word_to_hex};
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 pub struct MerkleTree {
-    nodes: Vec<RpoDigest>,
+    nodes: Vec<Word>,
 }
 
 impl MerkleTree {
@@ -35,17 +35,17 @@ impl MerkleTree {
 
         // create un-initialized vector to hold all tree nodes
         let mut nodes = unsafe { uninit_vector(2 * n) };
-        nodes[0] = RpoDigest::default();
+        nodes[0] = Word::default();
 
         // copy leaves into the second part of the nodes vector
         nodes[n..].iter_mut().zip(leaves).for_each(|(node, leaf)| {
-            *node = RpoDigest::from(*leaf);
+            *node = *leaf;
         });
 
         // re-interpret nodes as an array of two nodes fused together
         // Safety: `nodes` will never move here as it is not bound to an external lifetime (i.e.
         // `self`).
-        let ptr = nodes.as_ptr() as *const [RpoDigest; 2];
+        let ptr = nodes.as_ptr() as *const [Word; 2];
         let pairs = unsafe { slice::from_raw_parts(ptr, n) };
 
         // calculate all internal tree nodes
@@ -60,7 +60,7 @@ impl MerkleTree {
     // --------------------------------------------------------------------------------------------
 
     /// Returns the root of this Merkle tree.
-    pub fn root(&self) -> RpoDigest {
+    pub fn root(&self) -> Word {
         self.nodes[1]
     }
 
@@ -77,7 +77,7 @@ impl MerkleTree {
     /// Returns an error if:
     /// * The specified depth is greater than the depth of the tree.
     /// * The specified index is not valid for the specified depth.
-    pub fn get_node(&self, index: NodeIndex) -> Result<RpoDigest, MerkleError> {
+    pub fn get_node(&self, index: NodeIndex) -> Result<Word, MerkleError> {
         if index.is_root() {
             return Err(MerkleError::DepthTooSmall(index.depth()));
         } else if index.depth() > self.depth() {
@@ -113,11 +113,7 @@ impl MerkleTree {
     /// Returns an iterator over the leaves of this [MerkleTree].
     pub fn leaves(&self) -> impl Iterator<Item = (u64, &Word)> {
         let leaves_start = self.nodes.len() / 2;
-        self.nodes
-            .iter()
-            .skip(leaves_start)
-            .enumerate()
-            .map(|(i, v)| (i as u64, v.deref()))
+        self.nodes.iter().skip(leaves_start).enumerate().map(|(i, v)| (i as u64, v))
     }
 
     /// Returns n iterator over every inner node of this [MerkleTree].
@@ -151,12 +147,12 @@ impl MerkleTree {
         // `self.nodes` will be moved only if `pairs` is moved as well. also, the algorithm is
         // logically guaranteed to not overlap write positions as the write index is always half
         // the index from which we read the digest input.
-        let ptr = self.nodes.as_ptr() as *const [RpoDigest; 2];
-        let pairs: &'a [[RpoDigest; 2]] = unsafe { slice::from_raw_parts(ptr, n) };
+        let ptr = self.nodes.as_ptr() as *const [Word; 2];
+        let pairs: &'a [[Word; 2]] = unsafe { slice::from_raw_parts(ptr, n) };
 
         // update the current node
         let pos = index.to_scalar_index() as usize;
-        self.nodes[pos] = value.into();
+        self.nodes[pos] = value;
 
         // traverse to the root, updating each node with the merged values of its parents
         for _ in 0..index.depth() {
@@ -181,15 +177,6 @@ impl TryFrom<&[Word]> for MerkleTree {
     }
 }
 
-impl TryFrom<&[RpoDigest]> for MerkleTree {
-    type Error = MerkleError;
-
-    fn try_from(value: &[RpoDigest]) -> Result<Self, Self::Error> {
-        let value: Vec<Word> = value.iter().map(|v| *v.deref()).collect();
-        MerkleTree::new(value)
-    }
-}
-
 // ITERATORS
 // ================================================================================================
 
@@ -197,7 +184,7 @@ impl TryFrom<&[RpoDigest]> for MerkleTree {
 ///
 /// Use this to extract the data of the tree, there is no guarantee on the order of the elements.
 pub struct InnerNodeIterator<'a> {
-    nodes: &'a Vec<RpoDigest>,
+    nodes: &'a Vec<Word>,
     index: usize,
 }
 
@@ -281,13 +268,13 @@ mod tests {
     use super::*;
     use crate::{
         Felt, WORD_SIZE,
-        merkle::{digests_to_words, int_to_leaf, int_to_node},
+        merkle::{int_to_leaf, int_to_node},
     };
 
-    const LEAVES4: [RpoDigest; WORD_SIZE] =
+    const LEAVES4: [Word; WORD_SIZE] =
         [int_to_node(1), int_to_node(2), int_to_node(3), int_to_node(4)];
 
-    const LEAVES8: [RpoDigest; 8] = [
+    const LEAVES8: [Word; 8] = [
         int_to_node(1),
         int_to_node(2),
         int_to_node(3),
@@ -300,7 +287,7 @@ mod tests {
 
     #[test]
     fn build_merkle_tree() {
-        let tree = super::MerkleTree::new(digests_to_words(&LEAVES4)).unwrap();
+        let tree = super::MerkleTree::new(LEAVES4).unwrap();
         assert_eq!(8, tree.nodes.len());
 
         // leaves were copied correctly
@@ -319,7 +306,7 @@ mod tests {
 
     #[test]
     fn get_leaf() {
-        let tree = super::MerkleTree::new(digests_to_words(&LEAVES4)).unwrap();
+        let tree = super::MerkleTree::new(LEAVES4).unwrap();
 
         // check depth 2
         assert_eq!(LEAVES4[0], tree.get_node(NodeIndex::make(2, 0)).unwrap());
@@ -336,7 +323,7 @@ mod tests {
 
     #[test]
     fn get_path() {
-        let tree = super::MerkleTree::new(digests_to_words(&LEAVES4)).unwrap();
+        let tree = super::MerkleTree::new(LEAVES4).unwrap();
 
         let (_, node2, node3) = compute_internal_nodes();
 
@@ -353,12 +340,12 @@ mod tests {
 
     #[test]
     fn update_leaf() {
-        let mut tree = super::MerkleTree::new(digests_to_words(&LEAVES8)).unwrap();
+        let mut tree = super::MerkleTree::new(LEAVES8).unwrap();
 
         // update one leaf
         let value = 3;
         let new_node = int_to_leaf(9);
-        let mut expected_leaves = digests_to_words(&LEAVES8);
+        let mut expected_leaves = LEAVES8.to_vec();
         expected_leaves[value as usize] = new_node;
         let expected_tree = super::MerkleTree::new(expected_leaves.clone()).unwrap();
 
@@ -377,7 +364,7 @@ mod tests {
 
     #[test]
     fn nodes() -> Result<(), MerkleError> {
-        let tree = super::MerkleTree::new(digests_to_words(&LEAVES4)).unwrap();
+        let tree = super::MerkleTree::new(LEAVES4).unwrap();
         let root = tree.root();
         let l1n0 = tree.get_node(NodeIndex::make(1, 0))?;
         let l1n1 = tree.get_node(NodeIndex::make(1, 1))?;
@@ -411,7 +398,7 @@ mod tests {
 
             // build a word and copy it to another address as digest
             let word = [Felt::new(a), Felt::new(b), Felt::new(c), Felt::new(d)];
-            let digest = RpoDigest::from(word);
+            let digest = Word::from(word);
 
             // assert the addresses are different
             let word_ptr = word.as_ptr() as *const u8;
@@ -420,7 +407,7 @@ mod tests {
 
             // compare the bytes representation
             let word_bytes = unsafe { slice::from_raw_parts(word_ptr, size_of::<Word>()) };
-            let digest_bytes = unsafe { slice::from_raw_parts(digest_ptr, size_of::<RpoDigest>()) };
+            let digest_bytes = unsafe { slice::from_raw_parts(digest_ptr, size_of::<Word>()) };
             assert_eq!(word_bytes, digest_bytes);
         }
     }
@@ -428,11 +415,9 @@ mod tests {
     // HELPER FUNCTIONS
     // --------------------------------------------------------------------------------------------
 
-    fn compute_internal_nodes() -> (RpoDigest, RpoDigest, RpoDigest) {
-        let node2 =
-            Rpo256::hash_elements(&[Word::from(LEAVES4[0]), Word::from(LEAVES4[1])].concat());
-        let node3 =
-            Rpo256::hash_elements(&[Word::from(LEAVES4[2]), Word::from(LEAVES4[3])].concat());
+    fn compute_internal_nodes() -> (Word, Word, Word) {
+        let node2 = Rpo256::hash_elements(&[*LEAVES4[0], *LEAVES4[1]].concat());
+        let node3 = Rpo256::hash_elements(&[*LEAVES4[2], *LEAVES4[3]].concat());
         let root = Rpo256::merge(&[node2, node3]);
 
         (root, node2, node3)

@@ -3,7 +3,7 @@ use std::time::Instant;
 use clap::Parser;
 use miden_crypto::{
     EMPTY_WORD, Felt, ONE, Word,
-    hash::rpo::{Rpo256, RpoDigest},
+    hash::rpo::Rpo256,
     merkle::{MerkleError, Smt},
 };
 use rand::{Rng, prelude::IteratorRandom, rng};
@@ -38,8 +38,8 @@ pub fn benchmark_smt() {
     // prepare the `leaves` vector for tree creation
     let mut entries = Vec::new();
     for i in 0..tree_size {
-        let key = rand_value::<RpoDigest>();
-        let value = [ONE, ONE, ONE, Felt::new(i as u64)];
+        let key = rand_value::<Word>();
+        let value = Word::new([ONE, ONE, ONE, Felt::new(i as u64)]);
         entries.push((key, value));
     }
 
@@ -51,7 +51,7 @@ pub fn benchmark_smt() {
 }
 
 /// Runs the construction benchmark for [`Smt`], returning the constructed tree.
-pub fn construction(entries: Vec<(RpoDigest, Word)>, size: usize) -> Result<Smt, MerkleError> {
+pub fn construction(entries: Vec<(Word, Word)>, size: usize) -> Result<Smt, MerkleError> {
     println!("Running a construction benchmark:");
     let now = Instant::now();
     let tree = Smt::with_entries(entries)?;
@@ -71,7 +71,7 @@ pub fn insertion(tree: &mut Smt, insertions: usize) -> Result<(), MerkleError> {
 
     for i in 0..insertions {
         let test_key = Rpo256::hash(&rand_value::<u64>().to_be_bytes());
-        let test_value = [ONE, ONE, ONE, Felt::new((size + i) as u64)];
+        let test_value = Word::new([ONE, ONE, ONE, Felt::new((size + i) as u64)]);
 
         let now = Instant::now();
         tree.insert(test_key, test_value);
@@ -93,10 +93,10 @@ pub fn batched_insertion(tree: &mut Smt, insertions: usize) -> Result<(), Merkle
 
     let size = tree.num_leaves();
 
-    let new_pairs: Vec<(RpoDigest, Word)> = (0..insertions)
+    let new_pairs: Vec<(Word, Word)> = (0..insertions)
         .map(|i| {
             let key = Rpo256::hash(&rand_value::<u64>().to_be_bytes());
-            let value = [ONE, ONE, ONE, Felt::new((size + i) as u64)];
+            let value = Word::new([ONE, ONE, ONE, Felt::new((size + i) as u64)]);
             (key, value)
         })
         .collect();
@@ -133,7 +133,7 @@ pub fn batched_insertion(tree: &mut Smt, insertions: usize) -> Result<(), Merkle
 
 pub fn batched_update(
     tree: &mut Smt,
-    entries: Vec<(RpoDigest, Word)>,
+    entries: Vec<(Word, Word)>,
     updates: usize,
 ) -> Result<(), MerkleError> {
     const REMOVAL_PROBABILITY: f64 = 0.2;
@@ -152,7 +152,7 @@ pub fn batched_update(
                 let value = if rng.random_bool(REMOVAL_PROBABILITY) {
                     EMPTY_WORD
                 } else {
-                    [ONE, ONE, ONE, Felt::new(rng.random())]
+                    Word::new([ONE, ONE, ONE, Felt::new(rng.random())])
                 };
 
                 (key, value)
@@ -201,7 +201,7 @@ pub fn proof_generation(tree: &mut Smt) -> Result<(), MerkleError> {
 
     for i in 0..NUM_PROOFS {
         let test_key = Rpo256::hash(&rand_value::<u64>().to_be_bytes());
-        let test_value = [ONE, ONE, ONE, Felt::new((size + i) as u64)];
+        let test_value = Word::new([ONE, ONE, ONE, Felt::new((size + i) as u64)]);
         tree.insert(test_key, test_value);
 
         let now = Instant::now();

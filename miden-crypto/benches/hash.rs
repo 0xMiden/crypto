@@ -3,7 +3,7 @@ use miden_crypto::{
     Felt,
     hash::{
         blake::Blake3_256,
-        rpo::{Rpo256, RpoDigest},
+        rpo::{Rpo256, Word},
         rpx::{Rpx256, RpxDigest},
     },
 };
@@ -11,7 +11,7 @@ use rand_utils::rand_value;
 use winter_crypto::Hasher;
 
 fn rpo256_2to1(c: &mut Criterion) {
-    let v: [RpoDigest; 2] = [Rpo256::hash(&[1_u8]), Rpo256::hash(&[2_u8])];
+    let v: [Word; 2] = [Rpo256::hash(&[1_u8]), Rpo256::hash(&[2_u8])];
     c.bench_function("RPO256 2-to-1 hashing (cached)", |bench| {
         bench.iter(|| Rpo256::merge(black_box(&v)))
     });

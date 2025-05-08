@@ -8,12 +8,12 @@ use proptest::prelude::*;
 use rand::{Rng, prelude::IteratorRandom, rng};
 
 use super::{
-    COLS_PER_SUBTREE, InnerNode, NodeIndex, NodeMutations, PairComputations, RpoDigest, SMT_DEPTH,
+    COLS_PER_SUBTREE, InnerNode, NodeIndex, NodeMutations, PairComputations, SMT_DEPTH,
     SUBTREE_DEPTH, Smt, SmtLeaf, SparseMerkleTree, SubtreeLeaf, SubtreeLeavesIter, UnorderedMap,
-    build_subtree,
+    Word, build_subtree,
 };
 use crate::{
-    EMPTY_WORD, ONE, Word, ZERO,
+    EMPTY_WORD, ONE, ZERO,
     merkle::{LeafIndex, MerkleError, smt::Felt},
 };
 
@@ -26,18 +26,18 @@ fn smtleaf_to_subtree_leaf(leaf: &SmtLeaf) -> SubtreeLeaf {
 
 #[test]
 fn test_sorted_pairs_to_leaves() {
-    let entries: Vec<(RpoDigest, Word)> = vec![
+    let entries: Vec<(Word, Word)> = vec![
         // Subtree 0.
-        (RpoDigest::new([ONE, ONE, ONE, Felt::new(16)]), [ONE; 4]),
-        (RpoDigest::new([ONE, ONE, ONE, Felt::new(17)]), [ONE; 4]),
+        (Word::new([ONE, ONE, ONE, Felt::new(16)]), Word::new([ONE; 4])),
+        (Word::new([ONE, ONE, ONE, Felt::new(17)]), Word::new([ONE; 4])),
         // Leaf index collision.
-        (RpoDigest::new([ONE, ONE, Felt::new(10), Felt::new(20)]), [ONE; 4]),
-        (RpoDigest::new([ONE, ONE, Felt::new(20), Felt::new(20)]), [ONE; 4]),
+        (Word::new([ONE, ONE, Felt::new(10), Felt::new(20)]), Word::new([ONE; 4])),
+        (Word::new([ONE, ONE, Felt::new(20), Felt::new(20)]), Word::new([ONE; 4])),
         // Subtree 1. Normal single leaf again.
-        (RpoDigest::new([ONE, ONE, ONE, Felt::new(400)]), [ONE; 4]), // Subtree boundary.
-        (RpoDigest::new([ONE, ONE, ONE, Felt::new(401)]), [ONE; 4]),
+        (Word::new([ONE, ONE, ONE, Felt::new(400)]), Word::new([ONE; 4])), // Subtree boundary.
+        (Word::new([ONE, ONE, ONE, Felt::new(401)]), Word::new([ONE; 4])),
         // Subtree 2. Another normal leaf.
-        (RpoDigest::new([ONE, ONE, ONE, Felt::new(1024)]), [ONE; 4]),
+        (Word::new([ONE, ONE, ONE, Felt::new(1024)]), Word::new([ONE; 4])),
     ];
 
     let control = Smt::with_entries_sequential(entries.clone()).unwrap();
@@ -101,18 +101,18 @@ fn test_sorted_pairs_to_leaves() {
 }
 
 // Helper for the below tests.
-fn generate_entries(pair_count: u64) -> Vec<(RpoDigest, Word)> {
+fn generate_entries(pair_count: u64) -> Vec<(Word, Word)> {
     (0..pair_count)
         .map(|i| {
             let leaf_index = ((i as f64 / pair_count as f64) * (pair_count as f64)) as u64;
-            let key = RpoDigest::new([ONE, ONE, Felt::new(i), Felt::new(leaf_index)]);
-            let value = [ONE, ONE, ONE, Felt::new(i)];
+            let key = Word::new([ONE, ONE, Felt::new(i), Felt::new(leaf_index)]);
+            let value = Word::new([ONE, ONE, ONE, Felt::new(i)]);
             (key, value)
         })
         .collect()
 }
 
-fn generate_updates(entries: Vec<(RpoDigest, Word)>, updates: usize) -> Vec<(RpoDigest, Word)> {
+fn generate_updates(entries: Vec<(Word, Word)>, updates: usize) -> Vec<(Word, Word)> {
     const REMOVAL_PROBABILITY: f64 = 0.2;
     let mut rng = rng();
     // Assertion to ensure input keys are unique
@@ -120,7 +120,7 @@ fn generate_updates(entries: Vec<(RpoDigest, Word)>, updates: usize) -> Vec<(Rpo
         entries.iter().map(|(key, _)| key).collect::<BTreeSet<_>>().len() == entries.len(),
         "Input entries contain duplicate keys!"
     );
-    let mut sorted_entries: Vec<(RpoDigest, Word)> = entries
+    let mut sorted_entries: Vec<(Word, Word)> = entries
         .into_iter()
         .choose_multiple(&mut rng, updates)
         .into_iter()
@@ -128,7 +128,7 @@ fn generate_updates(entries: Vec<(RpoDigest, Word)>, updates: usize) -> Vec<(Rpo
             let value = if rng.random_bool(REMOVAL_PROBABILITY) {
                 EMPTY_WORD
             } else {
-                [ONE, ONE, ONE, Felt::new(rng.random())]
+                Word::new([ONE, ONE, ONE, Felt::new(rng.random())])
             };
             (key, value)
         })
@@ -471,8 +471,8 @@ fn test_compute_mutations_parallel() {
 #[test]
 fn test_smt_construction_with_entries_unsorted() {
     let entries = [
-        (RpoDigest::new([ONE, ONE, Felt::new(2_u64), ONE]), [ONE; 4]),
-        (RpoDigest::new([ONE; 4]), [ONE; 4]),
+        (Word::new([ONE, ONE, Felt::new(2_u64), ONE]), Word::new([ONE; 4])),
+        (Word::new([ONE; 4]), Word::new([ONE; 4])),
     ];
     let control = Smt::with_entries_sequential(entries).unwrap();
     let smt = Smt::with_entries(entries).unwrap();
@@ -483,9 +483,9 @@ fn test_smt_construction_with_entries_unsorted() {
 #[test]
 fn test_smt_construction_with_entries_duplicate_keys() {
     let entries = [
-        (RpoDigest::new([ONE, ONE, ONE, Felt::new(16)]), [ONE; 4]),
-        (RpoDigest::new([ONE; 4]), [ONE; 4]),
-        (RpoDigest::new([ONE, ONE, ONE, Felt::new(16)]), [ONE; 4]),
+        (Word::new([ONE, ONE, ONE, Felt::new(16)]), Word::new([ONE; 4])),
+        (Word::new([ONE; 4]), Word::new([ONE; 4])),
+        (Word::new([ONE, ONE, ONE, Felt::new(16)]), Word::new([ONE; 4])),
     ];
     let expected_col = Smt::key_to_leaf_index(&entries[0].0).index.value();
     let err = Smt::with_entries(entries).unwrap_err();
@@ -495,8 +495,8 @@ fn test_smt_construction_with_entries_duplicate_keys() {
 #[test]
 fn test_smt_construction_with_some_empty_values() {
     let entries = [
-        (RpoDigest::new([ONE, ONE, ONE, ONE]), Smt::EMPTY_VALUE),
-        (RpoDigest::new([ONE, ONE, ONE, Felt::new(2)]), [ONE; 4]),
+        (Word::new([ONE, ONE, ONE, ONE]), Smt::EMPTY_VALUE),
+        (Word::new([ONE, ONE, ONE, Felt::new(2)]), Word::new([ONE; 4])),
     ];
 
     let result = Smt::with_entries(entries);
@@ -512,7 +512,7 @@ fn test_smt_construction_with_some_empty_values() {
 
 #[test]
 fn test_smt_construction_with_all_empty_values() {
-    let entries = [(RpoDigest::new([ONE, ONE, ONE, ONE]), Smt::EMPTY_VALUE)];
+    let entries = [(Word::new([ONE, ONE, ONE, ONE]), Smt::EMPTY_VALUE)];
 
     let result = Smt::with_entries(entries);
     assert!(result.is_ok(), "SMT construction failed with all empty values");
@@ -529,7 +529,7 @@ fn test_smt_construction_with_all_empty_values() {
 
 #[test]
 fn test_smt_construction_with_no_entries() {
-    let entries: [(RpoDigest, Word); 0] = [];
+    let entries: [(Word, Word); 0] = [];
 
     let result = Smt::with_entries(entries);
     assert!(result.is_ok(), "SMT construction failed with no entries");
@@ -543,22 +543,22 @@ fn arb_felt() -> impl Strategy<Value = Felt> {
 }
 
 /// Generate entries that are guaranteed to be in different subtrees
-fn generate_cross_subtree_entries() -> impl Strategy<Value = Vec<(RpoDigest, Word)>> {
+fn generate_cross_subtree_entries() -> impl Strategy<Value = Vec<(Word, Word)>> {
     let subtree_offsets = prop::collection::vec(0..(COLS_PER_SUBTREE * 4), 1..100);
 
     subtree_offsets.prop_map(|offsets| {
         offsets
             .into_iter()
             .map(|base_col| {
-                let key = RpoDigest::new([ONE, ONE, ONE, Felt::new(base_col)]);
-                let value = [ONE, ONE, ONE, Felt::new(base_col)];
+                let key = Word::new([ONE, ONE, ONE, Felt::new(base_col)]);
+                let value = Word::new([ONE, ONE, ONE, Felt::new(base_col)]);
                 (key, value)
             })
             .collect()
     })
 }
 
-fn arb_entries() -> impl Strategy<Value = Vec<(RpoDigest, Word)>> {
+fn arb_entries() -> impl Strategy<Value = Vec<(Word, Word)>> {
     // Combine random entries with guaranteed cross-subtree entries
     prop_oneof![
         // Original random entry generation
@@ -566,13 +566,13 @@ fn arb_entries() -> impl Strategy<Value = Vec<(RpoDigest, Word)>> {
             prop_oneof![
                 // Random values case
                 (
-                    prop::array::uniform4(arb_felt()).prop_map(RpoDigest::new),
-                    prop::array::uniform4(arb_felt())
+                    prop::array::uniform4(arb_felt()).prop_map(Word::new),
+                    prop::array::uniform4(arb_felt()).prop_map(Word::new)
                 ),
                 // Edge case values
                 (
-                    Just(RpoDigest::new([ONE, ONE, ONE, Felt::new(0)])),
-                    Just([ONE, ONE, ONE, Felt::new(u64::MAX)])
+                    Just(Word::new([ONE, ONE, ONE, Felt::new(0)])),
+                    Just(Word::new([ONE, ONE, ONE, Felt::new(u64::MAX)]))
                 )
             ],
             1..1000,
@@ -584,8 +584,8 @@ fn arb_entries() -> impl Strategy<Value = Vec<(RpoDigest, Word)>> {
             generate_cross_subtree_entries(),
             prop::collection::vec(
                 (
-                    prop::array::uniform4(arb_felt()).prop_map(RpoDigest::new),
-                    prop::array::uniform4(arb_felt())
+                    prop::array::uniform4(arb_felt()).prop_map(Word::new),
+                    prop::array::uniform4(arb_felt()).prop_map(Word::new)
                 ),
                 1..1000,
             )

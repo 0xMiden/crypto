@@ -16,9 +16,9 @@ use num::Zero;
 use super::{
     super::{LOG_N, N, PK_LEN, Rpo256},
     ByteReader, ByteWriter, Deserializable, DeserializationError, FalconFelt, Felt, Polynomial,
-    Serializable, Signature, Word,
+    Serializable, Signature,
 };
-use crate::dsa::rpo_falcon512::FALCON_ENCODING_BITS;
+use crate::{dsa::rpo_falcon512::FALCON_ENCODING_BITS, hash::rpo::Word};
 
 // PUBLIC KEY
 // ================================================================================================
@@ -46,7 +46,7 @@ impl PublicKey {
 impl From<PubKeyPoly> for PublicKey {
     fn from(pk_poly: PubKeyPoly) -> Self {
         let pk_felts: Polynomial<Felt> = pk_poly.0.into();
-        let pk_digest = Rpo256::hash_elements(&pk_felts.coefficients).into();
+        let pk_digest = Rpo256::hash_elements(&pk_felts.coefficients);
         Self(pk_digest)
     }
 }

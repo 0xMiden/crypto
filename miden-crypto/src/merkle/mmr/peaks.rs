@@ -1,6 +1,6 @@
 use alloc::vec::Vec;
 
-use super::{super::ZERO, Felt, MmrError, MmrProof, Rpo256, RpoDigest, Word};
+use super::{super::ZERO, Felt, MmrError, MmrProof, Rpo256, Word};
 
 // MMR PEAKS
 // ================================================================================================
@@ -31,7 +31,7 @@ pub struct MmrPeaks {
     /// leaves, starting from the peak with most children, to the one with least.
     ///
     /// Invariant: The length of `peaks` must be equal to the number of true bits in `num_leaves`.
-    peaks: Vec<RpoDigest>,
+    peaks: Vec<Word>,
 }
 
 impl Default for MmrPeaks {
@@ -50,7 +50,7 @@ impl MmrPeaks {
     ///
     /// # Errors
     /// Returns an error if the number of leaves and the number of peaks are inconsistent.
-    pub fn new(num_leaves: usize, peaks: Vec<RpoDigest>) -> Result<Self, MmrError> {
+    pub fn new(num_leaves: usize, peaks: Vec<Word>) -> Result<Self, MmrError> {
         if num_leaves.count_ones() as usize != peaks.len() {
             return Err(MmrError::InvalidPeaks(format!(
                 "number of one bits in leaves is {} which does not equal peak length {}",
@@ -76,7 +76,7 @@ impl MmrPeaks {
     }
 
     /// Returns the list of peaks of the underlying MMR.
-    pub fn peaks(&self) -> &[RpoDigest] {
+    pub fn peaks(&self) -> &[Word] {
         &self.peaks
     }
 
@@ -85,7 +85,7 @@ impl MmrPeaks {
     /// # Errors
     /// Returns an error if the provided peak index is greater or equal to the current number of
     /// peaks in the Mmr.
-    pub fn get_peak(&self, peak_idx: usize) -> Result<&RpoDigest, MmrError> {
+    pub fn get_peak(&self, peak_idx: usize) -> Result<&Word, MmrError> {
         self.peaks
             .get(peak_idx)
             .ok_or(MmrError::PeakOutOfBounds { peak_idx, peaks_len: self.peaks.len() })
@@ -93,7 +93,7 @@ impl MmrPeaks {
 
     /// Converts this [MmrPeaks] into its components: number of leaves and a vector of peaks of
     /// the underlying MMR.
-    pub fn into_parts(self) -> (usize, Vec<RpoDigest>) {
+    pub fn into_parts(self) -> (usize, Vec<Word>) {
         (self.num_leaves, self.peaks)
     }
 
@@ -102,7 +102,7 @@ impl MmrPeaks {
     /// The procedure will:
     /// - Flatten and pad the peaks to a vector of Felts.
     /// - Hash the vector of Felts.
-    pub fn hash_peaks(&self) -> RpoDigest {
+    pub fn hash_peaks(&self) -> Word {
         Rpo256::hash_elements(&self.flatten_and_pad_peaks())
     }
 
@@ -112,7 +112,7 @@ impl MmrPeaks {
     /// Returns an error if:
     /// - provided opening proof is invalid.
     /// - Mmr root value computed using the provided leaf value differs from the actual one.
-    pub fn verify(&self, value: RpoDigest, opening: MmrProof) -> Result<(), MmrError> {
+    pub fn verify(&self, value: Word, opening: MmrProof) -> Result<(), MmrError> {
         let root = self.get_peak(opening.peak_index())?;
         opening
             .merkle_path
@@ -153,8 +153,8 @@ impl MmrPeaks {
                 .peaks
                 .as_slice()
                 .iter()
-                .map(|digest| digest.into())
-                .collect::<Vec<Word>>()
+                .map(|digest| digest.as_slice())
+                .collect::<Vec<_>>()
                 .concat(),
         );
         elements.resize(len, ZERO);
@@ -162,7 +162,7 @@ impl MmrPeaks {
     }
 }
 
-impl From<MmrPeaks> for Vec<RpoDigest> {
+impl From<MmrPeaks> for Vec<Word> {
     fn from(peaks: MmrPeaks) -> Self {
         peaks.peaks
     }

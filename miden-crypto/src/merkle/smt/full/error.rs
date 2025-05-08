@@ -1,7 +1,7 @@
 use thiserror::Error;
 
 use crate::{
-    hash::rpo::RpoDigest,
+    hash::rpo::Word,
     merkle::{LeafIndex, SMT_DEPTH},
 };
 
@@ -15,14 +15,13 @@ pub enum SmtLeafError {
     #[error(
         "multiple leaf requires all keys to map to the same leaf index but key1 {key_1} and key2 {key_2} map to different indices"
     )]
-    InconsistentMultipleLeafKeys { key_1: RpoDigest, key_2: RpoDigest },
-
     /// A single leaf key maps to a different index than expected.
+    InconsistentMultipleLeafKeys { key_1: Word, key_2: Word },
     #[error(
         "single leaf key {key} maps to leaf {actual_leaf_index} but was expected to map to leaf {expected_leaf_index}"
     )]
     InconsistentSingleLeafIndices {
-        key: RpoDigest,
+        key: Word,
         expected_leaf_index: LeafIndex<SMT_DEPTH>,
         actual_leaf_index: LeafIndex<SMT_DEPTH>,
     },

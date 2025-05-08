@@ -4,6 +4,7 @@
 - Added default constructors to `MmrPeaks` and `PartialMmr` (#409).
 - Added module and function documentation-2 (#410).
 - Add module and function documentation. (#408).
+- [BREAKING] Replace `RpoDigest` with `Word` struct (#411).
 
 ## 0.14.0 (2025-03-15)
 

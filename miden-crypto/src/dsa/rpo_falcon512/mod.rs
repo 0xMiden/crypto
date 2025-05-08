@@ -1,5 +1,5 @@
 use crate::{
-    Felt, Word, ZERO,
+    Felt, ZERO,
     hash::rpo::Rpo256,
     utils::{ByteReader, ByteWriter, Deserializable, DeserializationError, Serializable},
 };

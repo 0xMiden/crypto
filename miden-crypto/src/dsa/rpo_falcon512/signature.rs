@@ -5,11 +5,12 @@ use num::Zero;
 
 use super::{
     ByteReader, ByteWriter, Deserializable, DeserializationError, Felt, LOG_N, MODULUS, N, Nonce,
-    Rpo256, SIG_L2_BOUND, SIG_POLY_BYTE_LEN, Serializable, Word,
+    Rpo256, SIG_L2_BOUND, SIG_POLY_BYTE_LEN, Serializable,
     hash_to_point::hash_to_point_rpo256,
     keys::PubKeyPoly,
     math::{FalconFelt, FastFft, Polynomial},
 };
+use crate::hash::rpo::Word;
 
 // FALCON SIGNATURE
 // ================================================================================================
@@ -94,7 +95,7 @@ impl Signature {
     pub fn verify(&self, message: Word, pubkey_com: Word) -> bool {
         // compute the hash of the public key polynomial
         let h_felt: Polynomial<Felt> = (&**self.pk_poly()).into();
-        let h_digest: Word = Rpo256::hash_elements(&h_felt.coefficients).into();
+        let h_digest: Word = Rpo256::hash_elements(&h_felt.coefficients);
         if h_digest != pubkey_com {
             return false;
         }
