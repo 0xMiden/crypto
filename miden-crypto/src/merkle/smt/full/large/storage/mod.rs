@@ -1,22 +1,20 @@
 // Potential location: src/merkle/smt/storage.rs
-use thiserror::Error;
-
-use alloc::string::String;
-use alloc::vec::Vec;
-use crate::merkle::{NodeIndex, RpoDigest, SmtLeaf};
-use crate::merkle::smt::full::InnerNode; // Check path
-use crate::merkle::smt::full::large::subtree::Subtree; // Check path (Used for deep nodes)
-
-use alloc::collections::BTreeMap;
+use alloc::{boxed::Box, string::String, vec::Vec};
 use core::fmt;
 
+use thiserror::Error;
+
+use crate::merkle::smt::full::InnerNode; // Check path
+use crate::merkle::smt::full::large::subtree::Subtree; // Check path (Used for deep nodes)
+use crate::merkle::{NodeIndex, RpoDigest, SmtLeaf, smt::UnorderedMap};
+
+#[cfg(feature = "rocksdb")]
 mod rocksdb;
+#[cfg(feature = "rocksdb")]
 pub use rocksdb::RocksDbStorage;
 
 mod memory;
 pub use memory::MemoryStorage;
-
-use super::UnorderedMap;
 
 /// Custom error enum for storage operations.
 #[derive(Debug, Error)]
@@ -46,17 +44,17 @@ pub enum StorageError {
 pub struct StorageUpdates {
     /// Leaf updates: Map from logical leaf index (u64) to Option<SmtLeaf>.
     /// Some(leaf) means insert/update, None means delete.
-    pub leaf_updates: BTreeMap<u64, Option<SmtLeaf>>,
+    pub leaf_updates: UnorderedMap<u64, Option<SmtLeaf>>,
 
     /// Subtree updates (for deep nodes, depth > IN_MEMORY_DEPTH):
     /// Map from subtree root NodeIndex to Option<Subtree>.
     /// Some(subtree) means insert/update, None means delete.
-    pub subtree_updates: BTreeMap<NodeIndex, Option<Subtree>>,
+    pub subtree_updates: UnorderedMap<NodeIndex, Option<Subtree>>,
 
     /// Upper node updates (for nodes with depth <= IN_MEMORY_DEPTH):
     /// Map from NodeIndex to Option<InnerNode>.
     /// Some(node) means insert/update, None means delete.
-    pub upper_node_updates: BTreeMap<NodeIndex, Option<InnerNode>>,
+    pub upper_node_updates: UnorderedMap<NodeIndex, Option<InnerNode>>,
 
     /// The new root hash to be persisted atomically with the other updates.
     pub new_root: RpoDigest,
@@ -68,10 +66,12 @@ pub struct StorageUpdates {
     pub entry_count_delta: isize,
 }
 
-
 pub trait SmtStorage: fmt::Debug + Send + Sync {
     /// Retrieves the stored root hash of the SMT. Returns Ok(None) if not set.
     fn get_root(&self) -> Result<Option<RpoDigest>, StorageError>;
+
+    /// Sets the root hash of the SMT.
+    fn set_root(&self, root: RpoDigest) -> Result<(), StorageError>;
 
     /// Gets the total number of non-empty leaves currently stored.
     fn get_leaf_count(&self) -> Result<usize, StorageError>;
@@ -83,7 +83,7 @@ pub trait SmtStorage: fmt::Debug + Send + Sync {
     fn get_leaf(&self, index: u64) -> Result<Option<SmtLeaf>, StorageError>;
 
     /// Sets a single leaf node.
-    fn set_leaf(&self, index: u64, leaf: &SmtLeaf) -> Result<Option<SmtLeaf>, StorageError> ;
+    fn set_leaf(&self, index: u64, leaf: &SmtLeaf) -> Result<Option<SmtLeaf>, StorageError>;
 
     /// Sets multiple leaf nodes.
     fn set_leaves(&self, leaves: UnorderedMap<u64, SmtLeaf>) -> Result<(), StorageError>;
@@ -99,7 +99,8 @@ pub trait SmtStorage: fmt::Debug + Send + Sync {
     fn get_subtree(&self, index: NodeIndex) -> Result<Option<Subtree>, StorageError>;
 
     /// Retrieves multiple Subtrees.
-    /// Assumes index.depth() > IN_MEMORY_DEPTH for all indices. Returns Ok(None) for indices not found.
+    /// Assumes index.depth() > IN_MEMORY_DEPTH for all indices. Returns Ok(None) for indices not
+    /// found.
     fn get_subtrees(&self, indices: &[NodeIndex]) -> Result<Vec<Option<Subtree>>, StorageError>;
 
     /// Sets a single Subtree (representing deep nodes) by its root NodeIndex.
@@ -114,11 +115,12 @@ pub trait SmtStorage: fmt::Debug + Send + Sync {
     /// Retrieves a single inner node.
     fn get_inner_node(&self, index: NodeIndex) -> Result<Option<InnerNode>, StorageError>;
 
-    /// Retrieves multiple upper-level inner nodes by their indices.
-    fn get_upper_nodes(&self, indices: &[NodeIndex]) -> Result<Vec<Option<InnerNode>>, StorageError>;
-
     /// Sets a single inner node.
-    fn set_inner_node(&self, index: NodeIndex, node: InnerNode) -> Result<Option<InnerNode>, StorageError>;
+    fn set_inner_node(
+        &self,
+        index: NodeIndex,
+        node: InnerNode,
+    ) -> Result<Option<InnerNode>, StorageError>;
 
     /// Removes a single inner node.
     fn remove_inner_node(&self, index: NodeIndex) -> Result<Option<InnerNode>, StorageError>;
@@ -126,5 +128,15 @@ pub trait SmtStorage: fmt::Debug + Send + Sync {
     /// Applies a set of updates atomically.
     /// This includes updates to leaves, deep subtrees, upper nodes, the root hash,
     /// and atomically updating persisted leaf/entry counts based on deltas.
-    fn apply_batch(&self, updates: StorageUpdates) -> Result<(), StorageError>;
+    fn apply(&self, updates: StorageUpdates) -> Result<(), StorageError>;
+
+    /// Returns an iterator over all leaves in the storage.
+    /// The items are (leaf_index, SmtLeaf).
+    fn iter_leaves(&self) -> Result<Box<dyn Iterator<Item = (u64, SmtLeaf)> + '_>, StorageError>;
+
+    /// Returns an iterator over all subtrees in the storage.
+    fn iter_subtrees(&self) -> Result<Box<dyn Iterator<Item = Subtree> + '_>, StorageError>;
+
+    /// Returns the Inner roots of all subtrees stored at the specified depth.
+    fn get_subtree_roots_at_depth(&self, depth: u8) -> Result<Vec<(u64, RpoDigest)>, StorageError>;
 }

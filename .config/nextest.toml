@@ -1,7 +1,7 @@
 [profile.default]
 failure-output = "immediate-final"
 fail-fast = false
-default-filter = 'not test(merkle::smt::full::concurrent)'
+default-filter = 'not (test(merkle::smt::full::concurrent) or test(merkle::smt::full::large))'
 
 [profile.smt-concurrent]
 failure-output = "immediate-final"

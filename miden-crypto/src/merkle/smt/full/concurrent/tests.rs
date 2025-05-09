@@ -250,8 +250,7 @@ fn test_singlethreaded_subtrees() {
                     let control_node = control.get_inner_node(index);
                     assert_eq!(
                         test_node, &control_node,
-                        "depth {} subtree {}: test node does not match control at index {:?}",
-                        current_depth, i, index,
+                        "depth {current_depth} subtree {i}: test node does not match control at index {index:?}"
                     );
                 }
                 (nodes, subtree_root)
@@ -332,8 +331,7 @@ fn test_multithreaded_subtrees() {
                     let control_node = control.get_inner_node(index);
                     assert_eq!(
                         test_node, &control_node,
-                        "depth {} subtree {}: test node does not match control at index {:?}",
-                        current_depth, i, index,
+                        "depth {current_depth} subtree {i}: test node does not match control at index {index:?}",
                     );
                 }
                 (nodes, subtree_root)
@@ -431,8 +429,7 @@ fn test_singlethreaded_subtree_mutations() {
                     let control_mutation = control.node_mutations().get(&index).unwrap();
                     assert_eq!(
                         control_mutation, mutation,
-                        "depth {} subtree {}: mutation does not match control at index {:?}",
-                        current_depth, i, index,
+                        "depth {current_depth} subtree {i}: mutation does not match control at index {index:?}",
                     );
                 }
                 (mutations_per_subtree, subtree_root)

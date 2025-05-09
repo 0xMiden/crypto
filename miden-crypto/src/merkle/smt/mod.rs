@@ -10,7 +10,11 @@ use crate::{
 };
 
 mod full;
-pub use full::{LargeSmt, MemoryStorage,RocksDbStorage, SMT_DEPTH, Smt, SmtLeaf, SmtLeafError, SmtProof, SmtProofError};
+#[cfg(feature = "rocksdb")]
+pub use full::RocksDbStorage;
+#[cfg(feature = "concurrent")]
+pub use full::{LargeSmt, MemoryStorage};
+pub use full::{SMT_DEPTH, Smt, SmtLeaf, SmtLeafError, SmtProof, SmtProofError};
 #[cfg(feature = "internal")]
 pub use full::{SubtreeLeaf, build_subtree_for_bench};
 

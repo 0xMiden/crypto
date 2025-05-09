@@ -21,10 +21,14 @@ mod path;
 pub use path::{MerklePath, RootPath, ValuePath};
 
 mod smt;
+#[cfg(feature = "rocksdb")]
+pub use smt::RocksDbStorage;
 pub use smt::{
-    InnerNode, LargeSmt, LeafIndex, MemoryStorage, MutationSet, NodeMutation, PartialSmt, RocksDbStorage, SMT_DEPTH,
-    SMT_MAX_DEPTH, SMT_MIN_DEPTH, SimpleSmt, Smt, SmtLeaf, SmtLeafError, SmtProof, SmtProofError,
+    InnerNode, LeafIndex, MutationSet, NodeMutation, PartialSmt, SMT_DEPTH, SMT_MAX_DEPTH,
+    SMT_MIN_DEPTH, SimpleSmt, Smt, SmtLeaf, SmtLeafError, SmtProof, SmtProofError,
 };
+#[cfg(feature = "concurrent")]
+pub use smt::{LargeSmt, MemoryStorage};
 #[cfg(feature = "internal")]
 pub use smt::{SubtreeLeaf, build_subtree_for_bench};
 
