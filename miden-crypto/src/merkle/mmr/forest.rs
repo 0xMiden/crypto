@@ -41,6 +41,13 @@ impl Forest {
         Self(num_leaves)
     }
 
+    /// Creates a forest with a given height.
+    ///
+    /// This is equivalent to `Forest::new(1 << height)`.
+    pub const fn with_height(height: usize) -> Self {
+        Self::new(1 << height)
+    }
+
     /// Returns true if there are no trees in the forest.
     pub fn is_empty(self) -> bool {
         self.0 == 0
@@ -85,7 +92,7 @@ impl Forest {
     ///
     /// This will panic if the forest is empty.
     pub fn largest_tree_unchecked(self) -> Self {
-        Self::new(1 << self.largest_tree_height())
+        Self::with_height(self.largest_tree_height())
     }
 
     /// Returns a forest with only the largest tree present.
@@ -112,7 +119,7 @@ impl Forest {
     ///
     /// This will panic if the forest is empty.
     pub fn smallest_tree_unchecked(self) -> Self {
-        Self::new(1 << self.smallest_tree_height())
+        Self::with_height(self.smallest_tree_height())
     }
 
     /// Returns a forest with only the smallest tree present.
