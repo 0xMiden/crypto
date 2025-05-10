@@ -84,18 +84,18 @@ impl Forest {
     /// # Panics
     ///
     /// This will panic if the forest is empty.
-    pub fn largest_tree_unchecked(self) -> Forest {
-        Forest::new(1 << self.largest_tree_height())
+    pub fn largest_tree_unchecked(self) -> Self {
+        Self::new(1 << self.largest_tree_height())
     }
 
     /// Returns a forest with only the largest tree present.
     ///
     /// If forest cannot be empty, use `largest_tree` for better performance.
-    pub fn largest_tree(self) -> Forest {
+    pub fn largest_tree(self) -> Self {
         if self.0 > 0 {
             self.largest_tree_unchecked()
         } else {
-            Forest::empty()
+            Self::empty()
         }
     }
 
@@ -111,18 +111,18 @@ impl Forest {
     /// # Panics
     ///
     /// This will panic if the forest is empty.
-    pub fn smallest_tree_unchecked(self) -> Forest {
-        Forest::new(1 << self.smallest_tree_height())
+    pub fn smallest_tree_unchecked(self) -> Self {
+        Self::new(1 << self.smallest_tree_height())
     }
 
     /// Returns a forest with only the smallest tree present.
     ///
     /// If forest cannot be empty, use `smallest_tree` for performance.
-    pub fn smallest_tree(self) -> Forest {
+    pub fn smallest_tree(self) -> Self {
         if self.0 > 0 {
             self.smallest_tree_unchecked()
         } else {
-            Forest::empty()
+            Self::empty()
         }
     }
 
@@ -144,7 +144,7 @@ impl Forest {
     /// let range = Forest::new(0b0101_0110);
     /// assert_eq!(range.trees_larger_than(1), Forest::new(0b0101_0100));
     /// ```
-    pub fn trees_larger_than(self, tree_idx: u32) -> Forest {
+    pub fn trees_larger_than(self, tree_idx: u32) -> Self {
         self & high_bitmask(tree_idx + 1)
     }
 
@@ -158,9 +158,9 @@ impl Forest {
     /// exactly one tree.
     ///
     /// For a non-panicking version of this function, see [`Forest::all_smaller_trees()`].
-    pub fn all_smaller_trees_unchecked(self) -> Forest {
+    pub fn all_smaller_trees_unchecked(self) -> Self {
         debug_assert!(self.0.count_ones() == 1);
-        Forest::new(self.0 - 1)
+        Self::new(self.0 - 1)
     }
 
     /// Creates a new forest with all possible trees smaller than the smallest tree in this
@@ -176,7 +176,7 @@ impl Forest {
     }
 
     /// Returns a forest with exactly one tree, one size (depth) larger than the current one.
-    pub fn next_larger_tree(self) -> Forest {
+    pub fn next_larger_tree(self) -> Self {
         debug_assert!(self.0.count_ones() == 1);
         Forest(self.0 << 1)
     }
@@ -187,13 +187,13 @@ impl Forest {
     }
 
     /// Add a single-node tree if not already present in the forest.
-    pub fn single_leaf_tree_added(self) -> Forest {
-        Forest::new(self.0 | 1)
+    pub fn single_leaf_tree_added(self) -> Self {
+        Self::new(self.0 | 1)
     }
 
     /// Remove the single-node tree if present in the forest.
-    pub fn single_leaf_tree_removed(self) -> Forest {
-        Forest::new(self.0 & (usize::MAX << 1))
+    pub fn single_leaf_tree_removed(self) -> Self {
+        Self::new(self.0 & (usize::MAX << 1))
     }
 
     /// Returns a new forest that does not have the trees that `other` has.
@@ -206,7 +206,7 @@ impl Forest {
         let root = self
             .leaf_to_corresponding_tree(leaf_idx)
             .expect("position must be part of the forest");
-        let smaller_tree_mask = Forest::new(2_usize.pow(root) - 1);
+        let smaller_tree_mask = Self::new(2_usize.pow(root) - 1);
         let num_smaller_trees = (*self & smaller_tree_mask).num_trees();
         self.num_trees() - num_smaller_trees - 1
     }
@@ -310,31 +310,31 @@ impl Binary for Forest {
 }
 
 impl BitAnd<Forest> for Forest {
-    type Output = Forest;
+    type Output = Self;
 
-    fn bitand(self, rhs: Forest) -> Self::Output {
-        Forest::new(self.0 & rhs.0)
+    fn bitand(self, rhs: Self) -> Self::Output {
+        Self::new(self.0 & rhs.0)
     }
 }
 
 impl BitOr<Forest> for Forest {
-    type Output = Forest;
+    type Output = Self;
 
-    fn bitor(self, rhs: Forest) -> Self::Output {
-        Forest::new(self.0 | rhs.0)
+    fn bitor(self, rhs: Self) -> Self::Output {
+        Self::new(self.0 | rhs.0)
     }
 }
 
 impl BitXor<Forest> for Forest {
-    type Output = Forest;
+    type Output = Self;
 
-    fn bitxor(self, rhs: Forest) -> Self::Output {
-        Forest::new(self.0 ^ rhs.0)
+    fn bitxor(self, rhs: Self) -> Self::Output {
+        Self::new(self.0 ^ rhs.0)
     }
 }
 
 impl BitXorAssign<Forest> for Forest {
-    fn bitxor_assign(&mut self, rhs: Forest) {
+    fn bitxor_assign(&mut self, rhs: Self) {
         self.0 ^= rhs.0;
     }
 }
@@ -346,7 +346,7 @@ impl From<Felt> for Forest {
 }
 
 impl From<Forest> for Felt {
-    fn from(value: Forest) -> Felt {
+    fn from(value: Forest) -> Self {
         Felt::new(value.0 as u64)
     }
 }
