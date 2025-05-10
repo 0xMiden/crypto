@@ -99,11 +99,11 @@ impl Forest {
     ///
     /// If forest cannot be empty, use `largest_tree` for better performance.
     pub fn largest_tree(self) -> Self {
-        if self.0 > 0 {
-            self.largest_tree_unchecked()
-        } else {
-            Self::empty()
+        if self.is_empty() {
+            return Self::empty();
         }
+
+        self.largest_tree_unchecked()
     }
 
     /// Returns the height (bit position) of the smallest tree in the forest.
@@ -126,11 +126,10 @@ impl Forest {
     ///
     /// If forest cannot be empty, use `smallest_tree` for performance.
     pub fn smallest_tree(self) -> Self {
-        if self.0 > 0 {
-            self.smallest_tree_unchecked()
-        } else {
-            Self::empty()
+        if self.is_empty() {
+            return Self::empty();
         }
+        self.smallest_tree_unchecked()
     }
 
     /// Keeps only trees larger than the reference tree.
