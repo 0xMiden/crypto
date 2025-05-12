@@ -1,5 +1,5 @@
 //! Data structures related to Merkle trees based on RPO256 hash function.
-
+use core::fmt::{self, Display};
 use super::{
     EMPTY_WORD, Felt, Word, ZERO,
     hash::rpo::{Rpo256, RpoDigest},
@@ -45,6 +45,12 @@ pub use partial_mt::PartialMerkleTree;
 
 mod error;
 pub use error::MerkleError;
+
+impl<const DEPTH: u8> Display for LeafIndex<DEPTH> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "DEPTH={}, value={}", DEPTH, self.index.value())
+    }
+}
 
 // HELPER FUNCTIONS
 // ================================================================================================
