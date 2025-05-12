@@ -27,7 +27,7 @@ pub enum SmtLeafError {
         actual_leaf_index: LeafIndex<SMT_DEPTH>,
     },
 
-    /// Supplied leaf index does not match the expected index for multiple keys
+    /// Supplied leaf index does not match the expected index for the provided keys.
     #[error(
         "supplied leaf index {leaf_index_supplied:?} does not match {leaf_index_from_keys:?} for multiple leaf"
     )]
