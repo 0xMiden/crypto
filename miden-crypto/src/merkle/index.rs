@@ -227,12 +227,6 @@ impl Iterator for ProofIter {
     }
 }
 
-impl<const DEPTH: u8> Display for LeafIndex<DEPTH> {
-    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        write!(f, "DEPTH={DEPTH}, value={}", self.index.value())
-    }
-}
-
 impl ExactSizeIterator for ProofIter {
     fn len(&self) -> usize {
         self.next_index.depth() as usize
