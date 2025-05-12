@@ -495,6 +495,8 @@ pub struct LeafIndex<const DEPTH: u8> {
 impl<const DEPTH: u8> LeafIndex<DEPTH> {
     /// Creates a new `LeafIndex` with the specified value.
     ///
+    /// # Errors
+    ///
     /// Returns an error if the provided depth is less than the minimum supported depth.
     pub fn new(value: u64) -> Result<Self, MerkleError> {
         if DEPTH < SMT_MIN_DEPTH {
