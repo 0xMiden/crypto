@@ -1,5 +1,6 @@
 //! Data structures related to Merkle trees based on RPO256 hash function.
 use core::fmt::{self, Display};
+
 use super::{
     EMPTY_WORD, Felt, Word, ZERO,
     hash::rpo::{Rpo256, RpoDigest},
