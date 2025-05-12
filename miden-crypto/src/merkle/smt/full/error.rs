@@ -19,7 +19,7 @@ pub enum SmtLeafError {
 
     /// A single leaf key maps to a different index than expected.
     #[error(
-        "single leaf key {key} maps to {actual_leaf_index:?} but was expected to map to {expected_leaf_index:?}"
+        "single leaf key {key} maps to leaf {actual_leaf_index} but was expected to map to leaf {expected_leaf_index}"
     )]
     InconsistentSingleLeafIndices {
         key: RpoDigest,
