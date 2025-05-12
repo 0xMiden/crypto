@@ -48,7 +48,7 @@ pub use error::MerkleError;
 
 impl<const DEPTH: u8> Display for LeafIndex<DEPTH> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "DEPTH={}, value={}", DEPTH, self.index.value())
+        write!(f, "DEPTH={}, value={}", DEPTH, self.value())
     }
 }
 
