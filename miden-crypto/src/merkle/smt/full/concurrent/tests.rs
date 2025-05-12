@@ -545,6 +545,36 @@ fn arb_felt() -> impl Strategy<Value = Felt> {
     prop_oneof![any::<u64>().prop_map(Felt::new), Just(ZERO), Just(ONE),]
 }
 
+/// Test that the debug assertion panics on unsorted entries.
+#[test]
+#[should_panic = "is_sorted_by_key"]
+fn smt_with_sorted_entries_panics_on_unsorted_entries() {
+    // Unsorted keys.
+    let smt_leaves_2: [(RpoDigest, Word); 2] = [
+        (
+            RpoDigest::new([Felt::new(105), Felt::new(106), Felt::new(107), Felt::new(108)]),
+            [Felt::new(5_u64), Felt::new(6_u64), Felt::new(7_u64), Felt::new(8_u64)],
+        ),
+        (
+            RpoDigest::new([Felt::new(101), Felt::new(102), Felt::new(103), Felt::new(104)]),
+            [Felt::new(1_u64), Felt::new(2_u64), Felt::new(3_u64), Felt::new(4_u64)],
+        ),
+    ];
+
+    // Should panic because entries are not sorted.
+    Smt::with_sorted_entries(smt_leaves_2).unwrap();
+}
+
+#[test]
+fn test_with_sorted_entries_large_num_leaves() {
+    const PAIR_COUNT: u64 = COLS_PER_SUBTREE * 8;
+    let entries = generate_entries(PAIR_COUNT);
+    let control = Smt::with_entries_sequential(entries.clone()).unwrap();
+    // `entries` should already be sorted by nature of how we constructed it.
+    let actual = Smt::with_sorted_entries(entries).unwrap();
+    assert_eq!(actual, control);
+}
+
 /// Generate entries that are guaranteed to be in different subtrees
 fn generate_cross_subtree_entries() -> impl Strategy<Value = Vec<(RpoDigest, Word)>> {
     let subtree_offsets = prop::collection::vec(0..(COLS_PER_SUBTREE * 4), 1..100);

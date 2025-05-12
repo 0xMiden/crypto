@@ -1,4 +1,5 @@
 ## 0.15.0 (TBD)
+- Allow pre-sorted entries in `Smt` (#406).
 
 
 ## 0.14.0 (2025-03-15)
