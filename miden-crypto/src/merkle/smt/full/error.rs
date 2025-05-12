@@ -47,7 +47,7 @@ pub enum SmtLeafError {
 /// Errors that can occur when validating SMT proofs.
 #[derive(Debug, Error)]
 pub enum SmtProofError {
-    /// The length of the provided Merkle path does not match the expected SMT depth.
+    /// The length of the provided Merkle path is not [`SMT_DEPTH`].
     #[error("merkle path length {0} does not match SMT depth {SMT_DEPTH}")]
     InvalidMerklePathLength(usize),
 }
