@@ -1,7 +1,9 @@
 ## 0.15.0 (TBD)
 
+- Replace deprecated #[clap(...)] with #[command(...)] and #[arg(...)] (#413).
 - Added default constructors to `MmrPeaks` and `PartialMmr` (#409).
 - Added module and function documentation-2 (#410).
+- Add module and function documentation. (#408).
 
 ## 0.14.0 (2025-03-15)
 

@@ -1,4 +1,4 @@
-use std::{fmt::Debug, hint, mem, time::Duration};
+use std::{fmt::Debug, hint, time::Duration};
 
 use criterion::{BatchSize, BenchmarkId, Criterion, criterion_group, criterion_main};
 use miden_crypto::{Felt, ONE, Word, hash::rpo::RpoDigest, merkle::Smt};
@@ -59,13 +59,13 @@ fn prepare_entries(pair_count: u64, seed: &mut [u8; 32]) -> Vec<(RpoDigest, [Fel
 }
 
 fn generate_value<T: Copy + Debug + Randomizable>(seed: &mut [u8; 32]) -> T {
-    mem::swap(seed, &mut prng_array(*seed));
+    *seed = prng_array(*seed);
     let value: [T; 1] = rand_utils::prng_array(*seed);
     value[0]
 }
 
 fn generate_word(seed: &mut [u8; 32]) -> Word {
-    mem::swap(seed, &mut prng_array(*seed));
+    *seed = prng_array(*seed);
     let nums: [u64; 4] = prng_array(*seed);
     [Felt::new(nums[0]), Felt::new(nums[1]), Felt::new(nums[2]), Felt::new(nums[3])]
 }

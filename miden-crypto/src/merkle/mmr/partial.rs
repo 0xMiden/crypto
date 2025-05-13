@@ -246,9 +246,7 @@ impl PartialMmr {
 
                     debug_assert!(
                         old.is_none(),
-                        "Idx {:?} already contained an element {:?}",
-                        left_idx,
-                        old
+                        "Idx {left_idx:?} already contained an element {old:?}",
                     );
                 };
                 if track_left {
@@ -257,9 +255,7 @@ impl PartialMmr {
 
                     debug_assert!(
                         old.is_none(),
-                        "Idx {:?} already contained an element {:?}",
-                        right_idx,
-                        old
+                        "Idx {right_idx:?} already contained an element {old:?}",
                     );
                 };
 
