@@ -221,7 +221,7 @@ impl Forest {
     /// If the forest cannot have more or less than one tree, use
     /// [`Forest::all_smaller_trees_unchecked()`] for performance.
     pub fn all_smaller_trees(self) -> Option<Forest> {
-        if self.0.count_ones() != 1 {
+        if self.num_trees() != 1 {
             return None;
         }
         Some(self.all_smaller_trees_unchecked())
