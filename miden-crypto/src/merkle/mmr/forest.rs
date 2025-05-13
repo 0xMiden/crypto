@@ -80,10 +80,27 @@ impl Forest {
     }
 
     /// Returns the height (bit position) of the largest tree in the forest.
-    pub fn largest_tree_height(self) -> usize {
+    ///
+    /// # Panics
+    ///
+    /// This will panic if the forest is empty.
+    pub fn largest_tree_height_unchecked(self) -> usize {
         // ilog2 is computed with leading zeros, which itself is computed with the intrinsic ctlz.
         // [Rust 1.67.0] x86 uses the `bsr` instruction. AArch64 uses the `clz` instruction.
         self.0.ilog2() as usize
+    }
+
+    /// Returns the height (bit position) of the largest tree in the forest.
+    ///
+    /// If the forest cannot be empty, use [`largest_tree_height_unchecked`] for performance.
+    ///
+    /// [`largest_tree_height_unchecked`]: Self::largest_tree_height_unchecked
+    pub fn largest_tree_height(self) -> Option<usize> {
+        if self.is_empty() {
+            return None;
+        }
+
+        Some(self.largest_tree_height_unchecked())
     }
 
     /// Returns a forest with only the largest tree present.
@@ -92,7 +109,7 @@ impl Forest {
     ///
     /// This will panic if the forest is empty.
     pub fn largest_tree_unchecked(self) -> Self {
-        Self::with_height(self.largest_tree_height())
+        Self::with_height(self.largest_tree_height_unchecked())
     }
 
     /// Returns a forest with only the largest tree present.
