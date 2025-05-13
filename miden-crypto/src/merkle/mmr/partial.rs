@@ -228,7 +228,8 @@ impl PartialMmr {
     /// When `track` is `true` the new leaf is tracked.
     pub fn add(&mut self, leaf: Word, track: bool) -> Vec<(InOrderIndex, Word)> {
         self.forest.increment();
-        let merges = self.forest.smallest_tree_height();
+        // We just incremented the forest, so this cannot panic.
+        let merges = self.forest.smallest_tree_height_unchecked();
         let mut new_nodes = Vec::with_capacity(merges);
 
         let peak = if merges == 0 {
@@ -386,7 +387,10 @@ impl PartialMmr {
 
         // find the tree merges
         let changes = self.forest ^ delta.forest;
+        // `largest_tree_unchecked()` panics if `changes` is empty. `changes` cannot be empty
+        // unless `self.forest == delta.forest`, which is guarded against above.
         let largest = changes.largest_tree_unchecked();
+        // The largest tree itself also cannot be an empty forest, so this cannot panic either.
         let merges = self.forest & largest.all_smaller_trees_unchecked();
 
         debug_assert!(
@@ -396,8 +400,9 @@ impl PartialMmr {
 
         // count the number elements needed to produce largest from the current state
         let (merge_count, new_peaks) = if !merges.is_empty() {
-            let depth = largest.smallest_tree_height();
-            let skipped = merges.smallest_tree_height();
+            let depth = largest.smallest_tree_height_unchecked();
+            // `merges` also cannot be an empty forest, so this cannot panic either.
+            let skipped = merges.smallest_tree_height_unchecked();
             let computed = merges.num_trees() - 1;
             let merge_count = depth - skipped - computed;
 

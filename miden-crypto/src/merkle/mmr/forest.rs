@@ -107,10 +107,27 @@ impl Forest {
     }
 
     /// Returns the height (bit position) of the smallest tree in the forest.
-    pub fn smallest_tree_height(self) -> usize {
+    ///
+    /// # Panics
+    ///
+    /// This will panic if the forest is empty.
+    pub fn smallest_tree_height_unchecked(self) -> usize {
         // Trailing_zeros is computed with the intrinsic cttz. [Rust 1.67.0] x86 uses the `bsf`
         // instruction. AArch64 uses the `rbit clz` instructions.
         self.0.trailing_zeros() as usize
+    }
+
+    /// Returns the height (bit position) of the smallest tree in the forest.
+    ///
+    /// If the forest cannot be empty, use [`smallest_tree_height_unchecked`] for better performance.
+    ///
+    /// [`smallest_tree_height_unchecked`]: Self::smallest_tree_height_unchecked
+    pub fn smallest_tree_height(self) -> Option<usize> {
+        if self.is_empty() {
+            return None;
+        }
+
+        Some(self.smallest_tree_height_unchecked())
     }
 
     /// Returns a forest with only the smallest tree present.
@@ -119,7 +136,7 @@ impl Forest {
     ///
     /// This will panic if the forest is empty.
     pub fn smallest_tree_unchecked(self) -> Self {
-        Self::with_height(self.smallest_tree_height())
+        Self::with_height(self.smallest_tree_height_unchecked())
     }
 
     /// Returns a forest with only the smallest tree present.
