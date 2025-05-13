@@ -40,32 +40,32 @@ impl Word {
         Self(value)
     }
 
-    /// Returns the digest as a slice of field elements.
+    /// Returns the word as a slice of field elements.
     pub fn as_elements(&self) -> &[Felt] {
         self.as_ref()
     }
 
-    /// Returns the digest as a byte array.
+    /// Returns the word as a byte array.
     pub fn as_bytes(&self) -> [u8; WORD_SIZE_BYTES] {
         <Self as Digest>::as_bytes(self)
     }
 
-    /// Returns an iterator over the elements of multiple digests.
-    pub fn digests_as_elements_iter<'a, I>(digests: I) -> impl Iterator<Item = &'a Felt>
+    /// Returns an iterator over the elements of multiple words.
+    pub(crate) fn words_as_elements_iter<'a, I>(words: I) -> impl Iterator<Item = &'a Felt>
     where
         I: Iterator<Item = &'a Self>,
     {
-        digests.flat_map(|d| d.0.iter())
+        words.flat_map(|d| d.0.iter())
     }
 
-    /// Returns all elements of multiple digests as a slice.
-    pub fn digests_as_elements(digests: &[Self]) -> &[Felt] {
-        let p = digests.as_ptr();
-        let len = digests.len() * WORD_SIZE_FELT;
+    /// Returns all elements of multiple words as a slice.
+    pub(crate) fn words_as_elements(words: &[Self]) -> &[Felt] {
+        let p = words.as_ptr();
+        let len = words.len() * WORD_SIZE_FELT;
         unsafe { slice::from_raw_parts(p as *const Felt, len) }
     }
 
-    /// Returns hexadecimal representation of this digest prefixed with `0x`.
+    /// Returns hexadecimal representation of this word prefixed with `0x`.
     pub fn to_hex(&self) -> String {
         bytes_to_hex_string(self.as_bytes())
     }
@@ -106,8 +106,8 @@ impl Ord for Word {
         // `Equal`. Otherwise, the ordering is equal.
         //
         // Finally, we use `Felt::inner` instead of `Felt::as_int` so we avoid performing a
-        // montgomery reduction for every limb. that is safe because every inner element of the
-        // digest is guaranteed to be in its canonical form (that is, `x in [0,p)`).
+        // montgomery reduction for every limb. That is safe because every inner element of the
+        // word is guaranteed to be in its canonical form (that is, `x in [0,p)`).
         self.0.iter().map(Felt::inner).zip(other.0.iter().map(Felt::inner)).fold(
             Ordering::Equal,
             |ord, (a, b)| match ord {
@@ -500,7 +500,7 @@ mod tests {
     use crate::utils::SliceReader;
 
     #[test]
-    fn digest_serialization() {
+    fn word_serialization() {
         let e1 = Felt::new(rand_value());
         let e2 = Felt::new(rand_value());
         let e3 = Felt::new(rand_value());
@@ -520,23 +520,23 @@ mod tests {
     }
 
     #[test]
-    fn digest_encoding() {
-        let digest = Word([
+    fn word_encoding() {
+        let word = Word([
             Felt::new(rand_value()),
             Felt::new(rand_value()),
             Felt::new(rand_value()),
             Felt::new(rand_value()),
         ]);
 
-        let string: String = digest.into();
+        let string: String = word.into();
         let round_trip: Word = string.try_into().expect("decoding failed");
 
-        assert_eq!(digest, round_trip);
+        assert_eq!(word, round_trip);
     }
 
     #[test]
     fn test_conversions() {
-        let digest = Word([
+        let word = Word([
             Felt::new(rand_value()),
             Felt::new(rand_value()),
             Felt::new(rand_value()),
@@ -561,21 +561,21 @@ mod tests {
         let v2: Word = v.into();
         assert_eq!(v, <[u32; WORD_SIZE_FELT]>::try_from(v2).unwrap());
 
-        let v: [u64; WORD_SIZE_FELT] = digest.into();
+        let v: [u64; WORD_SIZE_FELT] = word.into();
         let v2: Word = v.try_into().unwrap();
-        assert_eq!(digest, v2);
+        assert_eq!(word, v2);
 
-        let v: [Felt; WORD_SIZE_FELT] = digest.into();
+        let v: [Felt; WORD_SIZE_FELT] = word.into();
         let v2: Word = v.into();
-        assert_eq!(digest, v2);
+        assert_eq!(word, v2);
 
-        let v: [u8; WORD_SIZE_BYTES] = digest.into();
+        let v: [u8; WORD_SIZE_BYTES] = word.into();
         let v2: Word = v.try_into().unwrap();
-        assert_eq!(digest, v2);
+        assert_eq!(word, v2);
 
-        let v: String = digest.into();
+        let v: String = word.into();
         let v2: Word = v.try_into().unwrap();
-        assert_eq!(digest, v2);
+        assert_eq!(word, v2);
 
         // BY REF
         // ----------------------------------------------------------------------------------------
@@ -595,20 +595,20 @@ mod tests {
         let v2: Word = (&v).into();
         assert_eq!(v, <[u32; WORD_SIZE_FELT]>::try_from(&v2).unwrap());
 
-        let v: [u64; WORD_SIZE_FELT] = (&digest).into();
+        let v: [u64; WORD_SIZE_FELT] = (&word).into();
         let v2: Word = (&v).try_into().unwrap();
-        assert_eq!(digest, v2);
+        assert_eq!(word, v2);
 
-        let v: [Felt; WORD_SIZE_FELT] = (&digest).into();
+        let v: [Felt; WORD_SIZE_FELT] = (&word).into();
         let v2: Word = (&v).into();
-        assert_eq!(digest, v2);
+        assert_eq!(word, v2);
 
-        let v: [u8; WORD_SIZE_BYTES] = (&digest).into();
+        let v: [u8; WORD_SIZE_BYTES] = (&word).into();
         let v2: Word = (&v).try_into().unwrap();
-        assert_eq!(digest, v2);
+        assert_eq!(word, v2);
 
-        let v: String = (&digest).into();
+        let v: String = (&word).into();
         let v2: Word = (&v).try_into().unwrap();
-        assert_eq!(digest, v2);
+        assert_eq!(word, v2);
     }
 }
