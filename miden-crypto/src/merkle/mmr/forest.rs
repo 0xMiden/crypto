@@ -36,7 +36,7 @@ impl Forest {
         Self(0)
     }
 
-    /// Creates a forest with `n` leaves.
+    /// Creates a forest with `num_leaves` leaves.
     pub const fn new(num_leaves: usize) -> Self {
         Self(num_leaves)
     }
