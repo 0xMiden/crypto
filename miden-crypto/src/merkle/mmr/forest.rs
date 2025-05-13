@@ -148,7 +148,8 @@ impl Forest {
 
     /// Returns the height (bit position) of the smallest tree in the forest.
     ///
-    /// If the forest cannot be empty, use [`smallest_tree_height_unchecked`] for better performance.
+    /// If the forest cannot be empty, use [`smallest_tree_height_unchecked`] for better
+    /// performance.
     ///
     /// [`smallest_tree_height_unchecked`]: Self::smallest_tree_height_unchecked
     pub fn smallest_tree_height(self) -> Option<usize> {
