@@ -245,7 +245,7 @@ impl Forest {
 
     /// Remove the single-node tree if present in the forest.
     pub fn single_leaf_tree_removed(self) -> Self {
-        Self::new(self.0 & (usize::MAX << 1))
+        Self::new(self.0 & (usize::MAX - 1))
     }
 
     /// Returns a new forest that does not have the trees that `other` has.
