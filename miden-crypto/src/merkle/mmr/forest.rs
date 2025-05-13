@@ -204,7 +204,7 @@ impl Forest {
     ///
     /// For a non-panicking version of this function, see [`Forest::all_smaller_trees()`].
     pub fn all_smaller_trees_unchecked(self) -> Self {
-        debug_assert!(self.0.count_ones() == 1);
+        debug_assert_eq!(self.num_trees(), 1);
         Self::new(self.0 - 1)
     }
 
@@ -222,7 +222,7 @@ impl Forest {
 
     /// Returns a forest with exactly one tree, one size (depth) larger than the current one.
     pub fn next_larger_tree(self) -> Self {
-        debug_assert!(self.0.count_ones() == 1);
+        debug_assert_eq!(self.num_trees(), 1);
         Forest(self.0 << 1)
     }
 
