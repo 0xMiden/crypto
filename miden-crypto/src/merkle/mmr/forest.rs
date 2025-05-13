@@ -74,9 +74,16 @@ impl Forest {
     ///
     /// # Panics
     ///
-    /// This will panic if the forest has size greater than `usize::MAX / 2`.
+    /// This will panic if the forest has size greater than `usize::MAX / 2 + 1`.
     pub const fn num_nodes(self) -> usize {
-        self.0 * 2 - self.num_trees()
+        assert!(self.0 <= usize::MAX / 2 + 1);
+        if self.0 <= usize::MAX / 2 {
+            self.0 * 2 - self.num_trees()
+        } else {
+            // If `self.0 > usize::MAX / 2` then we need 128-bit math to double it.
+            let (inner, num_trees) = (self.0 as u128, self.num_trees() as u128);
+            (inner * 2 - num_trees) as usize
+        }
     }
 
     /// Return the total number of trees of a given forest (the number of active bits).
