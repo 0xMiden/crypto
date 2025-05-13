@@ -44,7 +44,12 @@ impl Forest {
     /// Creates a forest with a given height.
     ///
     /// This is equivalent to `Forest::new(1 << height)`.
+    ///
+    /// # Panics
+    ///
+    /// This will panic if `height` is greater than `usize::BITS - 1`.
     pub const fn with_height(height: usize) -> Self {
+        assert!(height < usize::BITS as usize);
         Self::new(1 << height)
     }
 
