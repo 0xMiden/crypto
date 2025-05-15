@@ -1,7 +1,11 @@
+use super::{LeafIndex, SMT_DEPTH};
 use crate::{
     EMPTY_WORD, Word,
     hash::rpo::RpoDigest,
-    merkle::{InnerNode, MerkleError, MerklePath, Smt, SmtLeaf, SmtProof, smt::SparseMerkleTree},
+    merkle::{
+        InnerNode, InnerNodeInfo, MerkleError, MerklePath, Smt, SmtLeaf, SmtProof,
+        smt::SparseMerkleTree,
+    },
 };
 
 /// A partial version of an [`Smt`].
@@ -40,14 +44,14 @@ impl PartialSmt {
     /// Returns an error if:
     /// - the new root after the insertion of a (leaf, path) tuple does not match the existing root
     ///   (except if the tree was previously empty).
-    pub fn from_proofs<I>(paths: I) -> Result<Self, MerkleError>
+    pub fn from_proofs<I>(proofs: I) -> Result<Self, MerkleError>
     where
         I: IntoIterator<Item = SmtProof>,
     {
         let mut partial_smt = Self::new();
 
-        for (leaf, path) in paths.into_iter().map(SmtProof::into_parts) {
-            partial_smt.add_path(path, leaf)?;
+        for (proof, leaf) in proofs.into_iter().map(SmtProof::into_parts) {
+            partial_smt.add_path(leaf, proof)?;
         }
 
         Ok(partial_smt)
@@ -222,6 +226,45 @@ impl PartialSmt {
     /// were added, while it returns false if the merkle paths were **not** added.
     fn is_leaf_tracked(&self, key: &RpoDigest) -> bool {
         self.0.leaves.contains_key(&Smt::key_to_leaf_index(key).value())
+    }
+
+    /// Returns an iterator over the inner nodes of the inner [Smt].
+    pub fn inner_nodes(&self) -> impl Iterator<Item = InnerNodeInfo> + '_ {
+        self.0.inner_nodes()
+    }
+
+    /// Returns an iterator over the leaves of the inner [Smt].
+    pub fn leaves(&self) -> impl Iterator<Item = (LeafIndex<SMT_DEPTH>, &SmtLeaf)> {
+        self.0.leaves()
+    }
+
+    /// Returns an iterator over the key-value pairs of the inner [Smt].
+    pub fn entries(&self) -> impl Iterator<Item = &(RpoDigest, Word)> {
+        self.0.entries()
+    }
+
+    /// Returns the number of non-empty leaves in this tree.
+    ///
+    /// Note that this may return a different value from [Self::num_entries()] as a single leaf may
+    /// contain more than one key-value pair.
+    pub fn num_leaves(&self) -> usize {
+        self.0.num_leaves()
+    }
+
+    /// Returns the number of key-value pairs with non-default values in this tree.
+    ///
+    /// Note that this may return a different value from [Self::num_leaves()] as a single leaf may
+    /// contain more than one key-value pair.
+    ///
+    /// Also note that this is currently an expensive operation is counting the number of entries
+    /// requires iterating over all leaves of the tree.
+    pub fn num_entries(&self) -> usize {
+        self.0.num_entries()
+    }
+
+    /// Returns a boolean value indicating whether the inner `SMT` is empty.
+    pub fn is_empty(&self) -> bool {
+        self.0.is_empty()
     }
 }
 
