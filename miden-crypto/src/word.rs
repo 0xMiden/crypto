@@ -108,6 +108,10 @@ impl Ord for Word {
         // Finally, we use `Felt::inner` instead of `Felt::as_int` so we avoid performing a
         // montgomery reduction for every limb. That is safe because every inner element of the
         // word is guaranteed to be in its canonical form (that is, `x in [0,p)`).
+        //
+        // Because we don't perform Montgomery reduction, we must iterate over, and compare,
+        // each element. A simple bytestring comparison would be inappropriate because the `Word`s
+        // are represented in "lexicographical" order.
         self.0.iter().map(Felt::inner).zip(other.0.iter().map(Felt::inner)).fold(
             Ordering::Equal,
             |ord, (a, b)| match ord {
