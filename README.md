@@ -63,7 +63,7 @@ This crate can be compiled with the following features:
 - `concurrent`- enabled by default; enables multi-threaded implementation of `Smt::with_entries()` which significantly improves performance on multi-core CPUs.
 - `std` - enabled by default and relies on the Rust standard library.
 - `no_std` does not rely on the Rust standard library and enables compilation to WebAssembly.
-- `smt_hashmaps` - uses hashbrown hashmaps in SMT implementation which significantly improves performance of SMT updating. Keys ordering in SMT iterators is not guarantied when this feature is enabled.
+- `smt_hashmaps` - uses hashbrown hashmaps in SMT implementation which significantly improves performance of SMT updating. Keys ordering in SMT iterators is not guaranteed when this feature is enabled.
 
 All of these features imply the use of [alloc](https://doc.rust-lang.org/alloc/) to support heap-allocated collections.
 
