@@ -47,7 +47,14 @@ impl Word {
 
     /// Returns the word as a byte array.
     pub fn as_bytes(&self) -> [u8; WORD_SIZE_BYTES] {
-        <Self as Digest>::as_bytes(self)
+        let mut result = [0; WORD_SIZE_BYTES];
+
+        result[..8].copy_from_slice(&self.0[0].as_int().to_le_bytes());
+        result[8..16].copy_from_slice(&self.0[1].as_int().to_le_bytes());
+        result[16..24].copy_from_slice(&self.0[2].as_int().to_le_bytes());
+        result[24..].copy_from_slice(&self.0[3].as_int().to_le_bytes());
+
+        result
     }
 
     /// Returns an iterator over the elements of multiple words.
@@ -79,14 +86,7 @@ impl Hash for Word {
 
 impl Digest for Word {
     fn as_bytes(&self) -> [u8; WORD_SIZE_BYTES] {
-        let mut result = [0; WORD_SIZE_BYTES];
-
-        result[..8].copy_from_slice(&self.0[0].as_int().to_le_bytes());
-        result[8..16].copy_from_slice(&self.0[1].as_int().to_le_bytes());
-        result[16..24].copy_from_slice(&self.0[2].as_int().to_le_bytes());
-        result[24..].copy_from_slice(&self.0[3].as_int().to_le_bytes());
-
-        result
+        self.as_bytes()
     }
 }
 
