@@ -155,6 +155,12 @@ pub enum WordError {
     /// Field element conversion failed due to invalid value.
     #[error("failed to convert to field element: {0}")]
     InvalidFieldElement(String),
+    /// Field elements parsed are out of range.
+    #[error("values of a Word must be inside the field modulus")]
+    OutOfRange,
+    /// Hex-encoded field elements parsed are invalid.
+    #[error("hex encoded values of a word are invalid")]
+    HexParse(#[from] HexParseError),
 }
 
 impl TryFrom<&Word> for [bool; WORD_SIZE_FELT] {
@@ -385,7 +391,7 @@ impl From<[Felt; WORD_SIZE_FELT]> for Word {
 }
 
 impl TryFrom<&[u8; WORD_SIZE_BYTES]> for Word {
-    type Error = HexParseError;
+    type Error = WordError;
 
     fn try_from(value: &[u8; WORD_SIZE_BYTES]) -> Result<Self, Self::Error> {
         (*value).try_into()
@@ -393,7 +399,7 @@ impl TryFrom<&[u8; WORD_SIZE_BYTES]> for Word {
 }
 
 impl TryFrom<[u8; WORD_SIZE_BYTES]> for Word {
-    type Error = HexParseError;
+    type Error = WordError;
 
     fn try_from(value: [u8; WORD_SIZE_BYTES]) -> Result<Self, Self::Error> {
         // Note: the input length is known, the conversion from slice to array must succeed so the
@@ -404,7 +410,7 @@ impl TryFrom<[u8; WORD_SIZE_BYTES]> for Word {
         let d = u64::from_le_bytes(value[24..32].try_into().unwrap());
 
         if [a, b, c, d].iter().any(|v| *v >= Felt::MODULUS) {
-            return Err(HexParseError::OutOfRange);
+            return Err(WordError::OutOfRange);
         }
 
         Ok(Word([Felt::new(a), Felt::new(b), Felt::new(c), Felt::new(d)]))
@@ -412,7 +418,7 @@ impl TryFrom<[u8; WORD_SIZE_BYTES]> for Word {
 }
 
 impl TryFrom<&[u8]> for Word {
-    type Error = HexParseError;
+    type Error = WordError;
 
     fn try_from(value: &[u8]) -> Result<Self, Self::Error> {
         (*value).try_into()
@@ -420,16 +426,18 @@ impl TryFrom<&[u8]> for Word {
 }
 
 impl TryFrom<&str> for Word {
-    type Error = HexParseError;
+    type Error = WordError;
 
     /// Expects the string to start with `0x`.
     fn try_from(value: &str) -> Result<Self, Self::Error> {
-        hex_to_bytes::<WORD_SIZE_BYTES>(value).and_then(Word::try_from)
+        hex_to_bytes::<WORD_SIZE_BYTES>(value)
+            .map_err(WordError::HexParse)
+            .and_then(Word::try_from)
     }
 }
 
 impl TryFrom<String> for Word {
-    type Error = HexParseError;
+    type Error = WordError;
 
     /// Expects the string to start with `0x`.
     fn try_from(value: String) -> Result<Self, Self::Error> {
@@ -438,7 +446,7 @@ impl TryFrom<String> for Word {
 }
 
 impl TryFrom<&String> for Word {
-    type Error = HexParseError;
+    type Error = WordError;
 
     /// Expects the string to start with `0x`.
     fn try_from(value: &String) -> Result<Self, Self::Error> {
