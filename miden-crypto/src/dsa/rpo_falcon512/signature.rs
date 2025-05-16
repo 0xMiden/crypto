@@ -10,7 +10,7 @@ use super::{
     keys::PubKeyPoly,
     math::{FalconFelt, FastFft, Polynomial},
 };
-use crate::hash::rpo::Word;
+use crate::Word;
 
 // FALCON SIGNATURE
 // ================================================================================================

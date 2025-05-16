@@ -1,7 +1,7 @@
 use std::{fmt::Debug, hint, time::Duration};
 
 use criterion::{BatchSize, BenchmarkId, Criterion, criterion_group, criterion_main};
-use miden_crypto::{Felt, ONE, hash::rpo::Word, merkle::Smt};
+use miden_crypto::{Felt, ONE, Word, merkle::Smt};
 use rand_utils::prng_array;
 use winter_utils::Randomizable;
 

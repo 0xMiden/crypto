@@ -15,7 +15,7 @@ pub use winter_utils::{
     uninit_vector,
 };
 
-use crate::hash::rpo::Word;
+use crate::Word;
 
 pub mod collections {
     pub use super::kv_map::*;

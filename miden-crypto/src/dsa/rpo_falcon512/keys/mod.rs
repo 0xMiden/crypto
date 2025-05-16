@@ -20,7 +20,7 @@ mod tests {
     use winter_math::FieldElement;
     use winter_utils::{Deserializable, Serializable};
 
-    use crate::{ONE, dsa::rpo_falcon512::SecretKey, hash::rpo::Word};
+    use crate::{ONE, Word, dsa::rpo_falcon512::SecretKey};
 
     #[test]
     fn test_falcon_verification() {

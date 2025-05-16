@@ -3,7 +3,7 @@ use alloc::vec::Vec;
 use num::Zero;
 
 use super::{MODULUS, N, Nonce, Polynomial, Rpo256, ZERO, math::FalconFelt};
-use crate::hash::rpo::Word;
+use crate::Word;
 
 // HASH-TO-POINT FUNCTIONS
 // ================================================================================================

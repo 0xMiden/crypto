@@ -9,7 +9,7 @@ mod rescue;
 
 /// Rescue Prime Optimized (RPO) hash function.
 pub mod rpo {
-    pub use super::rescue::{Rpo256, Word, WordError};
+    pub use super::rescue::Rpo256;
 }
 
 /// Rescue Prime Extended (RPX) hash function.

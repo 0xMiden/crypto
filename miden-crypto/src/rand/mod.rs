@@ -4,7 +4,7 @@ use rand::RngCore;
 pub use winter_crypto::{DefaultRandomCoin as WinterRandomCoin, RandomCoin, RandomCoinError};
 pub use winter_utils::Randomizable;
 
-use crate::{Felt, FieldElement, ZERO, hash::rpo::Word};
+use crate::{Felt, FieldElement, Word, ZERO};
 
 mod rpo;
 mod rpx;

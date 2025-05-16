@@ -1,6 +1,5 @@
 use crate::{
-    EMPTY_WORD,
-    hash::rpo::Word,
+    EMPTY_WORD, Word,
     merkle::{InnerNode, MerkleError, MerklePath, Smt, SmtLeaf, SmtProof, smt::SparseMerkleTree},
 };
 

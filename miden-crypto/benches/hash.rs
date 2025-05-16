@@ -1,9 +1,9 @@
 use criterion::{BatchSize, Criterion, black_box, criterion_group, criterion_main};
 use miden_crypto::{
-    Felt,
+    Felt, Word,
     hash::{
         blake::Blake3_256,
-        rpo::{Rpo256, Word},
+        rpo::Rpo256,
         rpx::{Rpx256, RpxDigest},
     },
 };

@@ -6,7 +6,7 @@ use super::{
     StarkField, ZERO, add_constants, add_constants_and_apply_inv_sbox,
     add_constants_and_apply_sbox, apply_inv_sbox, apply_mds, apply_sbox,
 };
-pub use crate::{Word, WordError};
+use crate::Word;
 
 #[cfg(test)]
 mod tests;

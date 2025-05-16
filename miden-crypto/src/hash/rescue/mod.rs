@@ -9,7 +9,7 @@ mod mds;
 use mds::{MDS, apply_mds};
 
 mod rpo;
-pub use rpo::{Rpo256, Word, WordError};
+pub use rpo::Rpo256;
 
 mod rpx;
 pub use rpx::{Rpx256, RpxDigest, RpxDigestError};

@@ -1,7 +1,7 @@
 use thiserror::Error;
 
 use crate::{
-    hash::rpo::Word,
+    Word,
     merkle::{LeafIndex, SMT_DEPTH},
 };
 

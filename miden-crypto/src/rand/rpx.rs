@@ -4,10 +4,8 @@ use rand_core::impls;
 
 use super::{Felt, FeltRng, FieldElement, RandomCoin, RandomCoinError, RngCore, ZERO};
 use crate::{
-    hash::{
-        rpo::Word,
-        rpx::{Rpx256, RpxDigest},
-    },
+    Word,
+    hash::rpx::{Rpx256, RpxDigest},
     utils::{ByteReader, ByteWriter, Deserializable, DeserializationError, Serializable},
 };
 
@@ -254,7 +252,7 @@ impl Deserializable for RpxRandomCoin {
 #[cfg(test)]
 mod tests {
     use super::{Deserializable, FeltRng, RpxRandomCoin, Serializable, ZERO};
-    use crate::{ONE, hash::rpo::Word};
+    use crate::{ONE, Word};
 
     #[test]
     fn test_feltrng_felt() {

@@ -18,7 +18,7 @@ use super::{
     ByteReader, ByteWriter, Deserializable, DeserializationError, FalconFelt, Felt, Polynomial,
     Serializable, Signature,
 };
-use crate::{dsa::rpo_falcon512::FALCON_ENCODING_BITS, hash::rpo::Word};
+use crate::{Word, dsa::rpo_falcon512::FALCON_ENCODING_BITS};
 
 // PUBLIC KEY
 // ================================================================================================

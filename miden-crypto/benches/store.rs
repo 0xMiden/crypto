@@ -1,7 +1,6 @@
 use criterion::{BatchSize, BenchmarkId, Criterion, black_box, criterion_group, criterion_main};
 use miden_crypto::{
-    Felt,
-    hash::rpo::Word,
+    Felt, Word,
     merkle::{
         DefaultMerkleStore as MerkleStore, LeafIndex, MerkleTree, NodeIndex, SMT_MAX_DEPTH,
         SimpleSmt,

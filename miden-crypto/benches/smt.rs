@@ -1,7 +1,6 @@
 use criterion::{Criterion, black_box, criterion_group, criterion_main};
 use miden_crypto::{
-    Felt,
-    hash::rpo::Word,
+    Felt, Word,
     merkle::{LeafIndex, SimpleSmt},
 };
 use rand_utils::prng_array;

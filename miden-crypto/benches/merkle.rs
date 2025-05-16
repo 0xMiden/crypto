@@ -8,7 +8,7 @@
 use std::{hint, time::Duration};
 
 use criterion::{BatchSize, Criterion, criterion_group, criterion_main};
-use miden_crypto::{Felt, ONE, hash::rpo::Word, merkle::MerkleTree};
+use miden_crypto::{Felt, ONE, Word, merkle::MerkleTree};
 use rand_utils::prng_array;
 
 fn balanced_merkle_even(c: &mut Criterion) {
