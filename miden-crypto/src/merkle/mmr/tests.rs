@@ -899,7 +899,7 @@ mod property_tests {
 // ================================================================================================
 
 fn digests_to_elements(digests: &[Word]) -> Vec<Felt> {
-    digests.iter().flat_map(|&d| d.to_vec()).collect()
+    Word::words_as_elements(digests).to_vec()
 }
 
 // short hand for the rpo hash, used to make test code more concise and easy to read
