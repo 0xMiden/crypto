@@ -98,8 +98,6 @@ impl RandomCoin for RpoRandomCoin {
         self.current = RATE_START;
 
         // Add the new seed material to the first half of the rate portion of the RPO state
-        let data: Word = data;
-
         self.state[RATE_START] += data[0];
         self.state[RATE_START + 1] += data[1];
         self.state[RATE_START + 2] += data[2];
@@ -258,10 +256,10 @@ mod tests {
 
     #[test]
     fn test_feltrng_felt() {
-        let mut rpocoin = RpoRandomCoin::new(Word::new([ZERO; 4]));
+        let mut rpocoin = RpoRandomCoin::new([ZERO; 4].into());
         let output = rpocoin.draw_element();
 
-        let mut rpocoin = RpoRandomCoin::new(Word::new([ZERO; 4]));
+        let mut rpocoin = RpoRandomCoin::new([ZERO; 4].into());
         let expected = rpocoin.draw_basefield();
 
         assert_eq!(output, expected);
@@ -269,10 +267,10 @@ mod tests {
 
     #[test]
     fn test_feltrng_word() {
-        let mut rpocoin = RpoRandomCoin::new(Word::new([ZERO; 4]));
+        let mut rpocoin = RpoRandomCoin::new([ZERO; 4].into());
         let output = rpocoin.draw_word();
 
-        let mut rpocoin = RpoRandomCoin::new(Word::new([ZERO; 4]));
+        let mut rpocoin = RpoRandomCoin::new([ZERO; 4].into());
         let mut expected = [ZERO; 4];
         for o in expected.iter_mut() {
             *o = rpocoin.draw_basefield();

@@ -256,10 +256,10 @@ mod tests {
 
     #[test]
     fn test_feltrng_felt() {
-        let mut rpxcoin = RpxRandomCoin::new(Word::new([ZERO; 4]));
+        let mut rpxcoin = RpxRandomCoin::new([ZERO; 4].into());
         let output = rpxcoin.draw_element();
 
-        let mut rpxcoin = RpxRandomCoin::new(Word::new([ZERO; 4]));
+        let mut rpxcoin = RpxRandomCoin::new([ZERO; 4].into());
         let expected = rpxcoin.draw_basefield();
 
         assert_eq!(output, expected);
@@ -267,10 +267,10 @@ mod tests {
 
     #[test]
     fn test_feltrng_word() {
-        let mut rpxcoin = RpxRandomCoin::new(Word::new([ZERO; 4]));
+        let mut rpxcoin = RpxRandomCoin::new([ZERO; 4].into());
         let output = rpxcoin.draw_word();
 
-        let mut rpocoin = RpxRandomCoin::new(Word::new([ZERO; 4]));
+        let mut rpocoin = RpxRandomCoin::new([ZERO; 4].into());
         let mut expected = [ZERO; 4];
         for o in expected.iter_mut() {
             *o = rpocoin.draw_basefield();

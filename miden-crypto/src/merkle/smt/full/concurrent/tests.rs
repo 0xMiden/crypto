@@ -28,16 +28,16 @@ fn smtleaf_to_subtree_leaf(leaf: &SmtLeaf) -> SubtreeLeaf {
 fn test_sorted_pairs_to_leaves() {
     let entries: Vec<(Word, Word)> = vec![
         // Subtree 0.
-        (Word::new([ONE, ONE, ONE, Felt::new(16)]), Word::new([ONE; 4])),
-        (Word::new([ONE, ONE, ONE, Felt::new(17)]), Word::new([ONE; 4])),
+        ([ONE, ONE, ONE, Felt::new(16)].into(), [ONE; 4].into()),
+        ([ONE, ONE, ONE, Felt::new(17)].into(), [ONE; 4].into()),
         // Leaf index collision.
-        (Word::new([ONE, ONE, Felt::new(10), Felt::new(20)]), Word::new([ONE; 4])),
-        (Word::new([ONE, ONE, Felt::new(20), Felt::new(20)]), Word::new([ONE; 4])),
+        ([ONE, ONE, Felt::new(10), Felt::new(20)].into(), [ONE; 4].into()),
+        ([ONE, ONE, Felt::new(20), Felt::new(20)].into(), [ONE; 4].into()),
         // Subtree 1. Normal single leaf again.
-        (Word::new([ONE, ONE, ONE, Felt::new(400)]), Word::new([ONE; 4])), // Subtree boundary.
-        (Word::new([ONE, ONE, ONE, Felt::new(401)]), Word::new([ONE; 4])),
+        ([ONE, ONE, ONE, Felt::new(400)].into(), [ONE; 4].into()), // Subtree boundary.
+        ([ONE, ONE, ONE, Felt::new(401)].into(), [ONE; 4].into()),
         // Subtree 2. Another normal leaf.
-        (Word::new([ONE, ONE, ONE, Felt::new(1024)]), Word::new([ONE; 4])),
+        ([ONE, ONE, ONE, Felt::new(1024)].into(), [ONE; 4].into()),
     ];
 
     let control = Smt::with_entries_sequential(entries.clone()).unwrap();
@@ -471,8 +471,8 @@ fn test_compute_mutations_parallel() {
 #[test]
 fn test_smt_construction_with_entries_unsorted() {
     let entries = [
-        (Word::new([ONE, ONE, Felt::new(2_u64), ONE]), Word::new([ONE; 4])),
-        (Word::new([ONE; 4]), Word::new([ONE; 4])),
+        ([ONE, ONE, Felt::new(2_u64), ONE].into(), [ONE; 4].into()),
+        ([ONE; 4].into(), [ONE; 4].into()),
     ];
     let control = Smt::with_entries_sequential(entries).unwrap();
     let smt = Smt::with_entries(entries).unwrap();
@@ -483,9 +483,9 @@ fn test_smt_construction_with_entries_unsorted() {
 #[test]
 fn test_smt_construction_with_entries_duplicate_keys() {
     let entries = [
-        (Word::new([ONE, ONE, ONE, Felt::new(16)]), Word::new([ONE; 4])),
-        (Word::new([ONE; 4]), Word::new([ONE; 4])),
-        (Word::new([ONE, ONE, ONE, Felt::new(16)]), Word::new([ONE; 4])),
+        ([ONE, ONE, ONE, Felt::new(16)].into(), [ONE; 4].into()),
+        ([ONE; 4].into(), [ONE; 4].into()),
+        ([ONE, ONE, ONE, Felt::new(16)].into(), [ONE; 4].into()),
     ];
     let expected_col = Smt::key_to_leaf_index(&entries[0].0).index.value();
     let err = Smt::with_entries(entries).unwrap_err();
@@ -495,8 +495,8 @@ fn test_smt_construction_with_entries_duplicate_keys() {
 #[test]
 fn test_smt_construction_with_some_empty_values() {
     let entries = [
-        (Word::new([ONE, ONE, ONE, ONE]), Smt::EMPTY_VALUE),
-        (Word::new([ONE, ONE, ONE, Felt::new(2)]), Word::new([ONE; 4])),
+        ([ONE, ONE, ONE, ONE].into(), Smt::EMPTY_VALUE),
+        ([ONE, ONE, ONE, Felt::new(2)].into(), [ONE; 4].into()),
     ];
 
     let result = Smt::with_entries(entries);
@@ -512,7 +512,7 @@ fn test_smt_construction_with_some_empty_values() {
 
 #[test]
 fn test_smt_construction_with_all_empty_values() {
-    let entries = [(Word::new([ONE, ONE, ONE, ONE]), Smt::EMPTY_VALUE)];
+    let entries = [([ONE, ONE, ONE, ONE].into(), Smt::EMPTY_VALUE)];
 
     let result = Smt::with_entries(entries);
     assert!(result.is_ok(), "SMT construction failed with all empty values");
@@ -571,8 +571,8 @@ fn arb_entries() -> impl Strategy<Value = Vec<(Word, Word)>> {
                 ),
                 // Edge case values
                 (
-                    Just(Word::new([ONE, ONE, ONE, Felt::new(0)])),
-                    Just(Word::new([ONE, ONE, ONE, Felt::new(u64::MAX)]))
+                    Just([ONE, ONE, ONE, Felt::new(0)].into()),
+                    Just([ONE, ONE, ONE, Felt::new(u64::MAX)].into())
                 )
             ],
             1..1000,
