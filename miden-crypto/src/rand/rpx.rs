@@ -5,7 +5,7 @@ use rand_core::impls;
 use super::{Felt, FeltRng, FieldElement, RandomCoin, RandomCoinError, RngCore, ZERO};
 use crate::{
     Word,
-    hash::rpx::{Rpx256, RpxDigest},
+    hash::rpx::Rpx256,
     utils::{ByteReader, ByteWriter, Deserializable, DeserializationError, Serializable},
 };
 
@@ -89,11 +89,11 @@ impl RandomCoin for RpxRandomCoin {
     type Hasher = Rpx256;
 
     fn new(seed: &[Self::BaseField]) -> Self {
-        let digest: Word = (*Rpx256::hash_elements(seed)).into();
-        Self::new(digest)
+        let word: Word = (*Rpx256::hash_elements(seed)).into();
+        Self::new(word)
     }
 
-    fn reseed(&mut self, data: RpxDigest) {
+    fn reseed(&mut self, data: Word) {
         // Reset buffer
         self.current = RATE_START;
 

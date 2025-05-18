@@ -4,15 +4,15 @@ use proptest::prelude::*;
 use rand_utils::rand_value;
 
 use super::{Felt, Hasher, Rpx256, StarkField, ZERO};
-use crate::{ONE, hash::rescue::RpxDigest};
+use crate::{ONE, Word};
 
 #[test]
 fn hash_elements_vs_merge() {
     let elements = [Felt::new(rand_value()); 8];
 
-    let digests: [RpxDigest; 2] = [
-        RpxDigest::new(elements[..4].try_into().unwrap()),
-        RpxDigest::new(elements[4..].try_into().unwrap()),
+    let digests: [Word; 2] = [
+        Word::new(elements[..4].try_into().unwrap()),
+        Word::new(elements[4..].try_into().unwrap()),
     ];
 
     let m_result = Rpx256::merge(&digests);
@@ -24,9 +24,9 @@ fn hash_elements_vs_merge() {
 fn merge_vs_merge_in_domain() {
     let elements = [Felt::new(rand_value()); 8];
 
-    let digests: [RpxDigest; 2] = [
-        RpxDigest::new(elements[..4].try_into().unwrap()),
-        RpxDigest::new(elements[4..].try_into().unwrap()),
+    let digests: [Word; 2] = [
+        Word::new(elements[..4].try_into().unwrap()),
+        Word::new(elements[4..].try_into().unwrap()),
     ];
     let merge_result = Rpx256::merge(&digests);
 
@@ -50,7 +50,7 @@ fn merge_vs_merge_in_domain() {
 #[test]
 fn hash_elements_vs_merge_with_int() {
     let tmp = [Felt::new(rand_value()); 4];
-    let seed = RpxDigest::new(tmp);
+    let seed = Word::new(tmp);
 
     // ----- value fits into a field element ------------------------------------------------------
     let val: Felt = Felt::new(rand_value());
@@ -120,9 +120,9 @@ fn hash_elements() {
         Felt::new(7),
     ];
 
-    let digests: [RpxDigest; 2] = [
-        RpxDigest::new(elements[..4].try_into().unwrap()),
-        RpxDigest::new(elements[4..8].try_into().unwrap()),
+    let digests: [Word; 2] = [
+        Word::new(elements[..4].try_into().unwrap()),
+        Word::new(elements[4..8].try_into().unwrap()),
     ];
 
     let m_result = Rpx256::merge(&digests);
@@ -134,7 +134,7 @@ fn hash_elements() {
 fn hash_empty() {
     let elements: Vec<Felt> = vec![];
 
-    let zero_digest = RpxDigest::default();
+    let zero_digest = Word::default();
     let h_result = Rpx256::hash_elements(&elements);
     assert_eq!(zero_digest, h_result);
 }
@@ -143,7 +143,7 @@ fn hash_empty() {
 fn hash_empty_bytes() {
     let bytes: Vec<u8> = vec![];
 
-    let zero_digest = RpxDigest::default();
+    let zero_digest = Word::default();
     let h_result = Rpx256::hash(&bytes);
     assert_eq!(zero_digest, h_result);
 }

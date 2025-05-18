@@ -14,7 +14,7 @@ pub mod rpo {
 
 /// Rescue Prime Extended (RPX) hash function.
 pub mod rpx {
-    pub use super::rescue::{Rpx256, RpxDigest, RpxDigestError};
+    pub use super::rescue::Rpx256;
 }
 
 // RE-EXPORTS
