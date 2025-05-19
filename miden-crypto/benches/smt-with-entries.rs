@@ -1,7 +1,7 @@
-use std::{fmt::Debug, hint, mem, time::Duration};
+use std::{fmt::Debug, hint, time::Duration};
 
 use criterion::{BatchSize, BenchmarkId, Criterion, criterion_group, criterion_main};
-use miden_crypto::{Felt, ONE, Word, hash::rpo::RpoDigest, merkle::Smt};
+use miden_crypto::{Felt, ONE, Word, merkle::Smt};
 use rand_utils::prng_array;
 use winter_utils::Randomizable;
 
@@ -45,12 +45,12 @@ criterion_main!(smt_with_entries_group);
 // HELPER FUNCTIONS
 // --------------------------------------------------------------------------------------------
 
-fn prepare_entries(pair_count: u64, seed: &mut [u8; 32]) -> Vec<(RpoDigest, [Felt; 4])> {
-    let entries: Vec<(RpoDigest, Word)> = (0..pair_count)
+fn prepare_entries(pair_count: u64, seed: &mut [u8; 32]) -> Vec<(Word, Word)> {
+    let entries: Vec<(Word, Word)> = (0..pair_count)
         .map(|i| {
             let count = pair_count as f64;
             let idx = ((i as f64 / count) * (count)) as u64;
-            let key = RpoDigest::new([generate_value(seed), ONE, Felt::new(i), Felt::new(idx)]);
+            let key = Word::new([generate_value(seed), ONE, Felt::new(i), Felt::new(idx)]);
             let value = generate_word(seed);
             (key, value)
         })
@@ -59,13 +59,13 @@ fn prepare_entries(pair_count: u64, seed: &mut [u8; 32]) -> Vec<(RpoDigest, [Fel
 }
 
 fn generate_value<T: Copy + Debug + Randomizable>(seed: &mut [u8; 32]) -> T {
-    mem::swap(seed, &mut prng_array(*seed));
+    *seed = prng_array(*seed);
     let value: [T; 1] = rand_utils::prng_array(*seed);
     value[0]
 }
 
 fn generate_word(seed: &mut [u8; 32]) -> Word {
-    mem::swap(seed, &mut prng_array(*seed));
+    *seed = prng_array(*seed);
     let nums: [u64; 4] = prng_array(*seed);
-    [Felt::new(nums[0]), Felt::new(nums[1]), Felt::new(nums[2]), Felt::new(nums[3])]
+    Word::new([Felt::new(nums[0]), Felt::new(nums[1]), Felt::new(nums[2]), Felt::new(nums[3])])
 }

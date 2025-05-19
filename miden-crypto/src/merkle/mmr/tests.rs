@@ -1,16 +1,33 @@
 use alloc::vec::Vec;
 
 use super::{
-    super::{InnerNodeInfo, Rpo256, RpoDigest},
+    super::{InnerNodeInfo, Rpo256, Word},
     Mmr, MmrPeaks, PartialMmr,
     bit::TrueBitPositionIterator,
     full::high_bitmask,
     leaf_to_corresponding_tree, nodes_in_forest,
 };
 use crate::{
-    Felt, Word,
+    Felt,
     merkle::{InOrderIndex, MerklePath, MerkleTree, MmrProof, NodeIndex, int_to_node},
 };
+
+#[test]
+fn tests_empty_mmr_peaks() {
+    let peaks = MmrPeaks::default();
+    assert_eq!(peaks.num_peaks(), 0);
+    assert_eq!(peaks.num_leaves(), 0);
+}
+
+#[test]
+fn test_empty_partial_mmr() {
+    let mmr = PartialMmr::default();
+    assert_eq!(mmr.num_leaves(), 0);
+    assert_eq!(mmr.forest(), 0);
+    assert_eq!(mmr.peaks(), MmrPeaks::default());
+    assert!(mmr.nodes.is_empty());
+    assert!(!mmr.track_latest);
+}
 
 #[test]
 fn test_position_equal_or_higher_than_leafs_is_never_contained() {
@@ -105,7 +122,7 @@ fn test_nodes_in_forest_single_bit() {
     }
 }
 
-const LEAVES: [RpoDigest; 7] = [
+const LEAVES: [Word; 7] = [
     int_to_node(0),
     int_to_node(1),
     int_to_node(2),
@@ -592,7 +609,7 @@ fn test_mmr_hash_peaks() {
 
     // minimum length is 16
     let mut expected_peaks = [first_peak, second_peak, third_peak].to_vec();
-    expected_peaks.resize(16, RpoDigest::default());
+    expected_peaks.resize(16, Word::default());
     assert_eq!(peaks.hash_peaks(), Rpo256::hash_elements(&digests_to_elements(&expected_peaks)));
 }
 
@@ -608,7 +625,7 @@ fn test_mmr_peaks_hash_less_than_16() {
 
         // minimum length is 16
         let mut expected_peaks = peaks.clone();
-        expected_peaks.resize(16, RpoDigest::default());
+        expected_peaks.resize(16, Word::default());
         assert_eq!(
             accumulator.hash_peaks(),
             Rpo256::hash_elements(&digests_to_elements(&expected_peaks))
@@ -625,7 +642,7 @@ fn test_mmr_peaks_hash_odd() {
 
     // odd length bigger than 16 is padded to the next even number
     let mut expected_peaks = peaks;
-    expected_peaks.resize(18, RpoDigest::default());
+    expected_peaks.resize(18, Word::default());
     assert_eq!(
         accumulator.hash_peaks(),
         Rpo256::hash_elements(&digests_to_elements(&expected_peaks))
@@ -881,11 +898,11 @@ mod property_tests {
 // HELPER FUNCTIONS
 // ================================================================================================
 
-fn digests_to_elements(digests: &[RpoDigest]) -> Vec<Felt> {
-    digests.iter().flat_map(Word::from).collect()
+fn digests_to_elements(digests: &[Word]) -> Vec<Felt> {
+    Word::words_as_elements(digests).to_vec()
 }
 
 // short hand for the rpo hash, used to make test code more concise and easy to read
-fn merge(l: RpoDigest, r: RpoDigest) -> RpoDigest {
+fn merge(l: Word, r: Word) -> Word {
     Rpo256::merge(&[l, r])
 }

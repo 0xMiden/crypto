@@ -1,6 +1,12 @@
 ## 0.15.0 (TBD)
 - Allow pre-sorted entries in `Smt` (#406).
 
+- Replace deprecated #[clap(...)] with #[command(...)] and #[arg(...)] (#413).
+- Added default constructors to `MmrPeaks` and `PartialMmr` (#409).
+- Added module and function documentation-2 (#410).
+- Add module and function documentation. (#408).
+- [BREAKING] Replace `RpoDigest` with `Word` struct (#411).
+- Replace `RpxDigest` with `Word` struct (#420).
 
 ## 0.14.0 (2025-03-15)
 
@@ -17,6 +23,7 @@
 - Optimized duplicate key detection in `Smt::with_entries_concurrent` (#395).
 - [BREAKING] Moved `rand` to version `0.9` removing the `try_fill_bytes` method (#398).
 - [BREAKING] Increment minimum supported Rust version to 1.85 (#399).
+- Added `SparseMerklePath`, a compact representation of `MerklePath` which compacts empty nodes into a bitmask (#389).
 
 ## 0.13.3 (2025-02-18)
 

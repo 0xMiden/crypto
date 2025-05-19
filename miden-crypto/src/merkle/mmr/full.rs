@@ -14,7 +14,7 @@ use alloc::vec::Vec;
 
 use super::{
     super::{InnerNodeInfo, MerklePath},
-    MmrDelta, MmrError, MmrPeaks, MmrProof, Rpo256, RpoDigest,
+    MmrDelta, MmrError, MmrPeaks, MmrProof, Rpo256, Word,
     bit::TrueBitPositionIterator,
     leaf_to_corresponding_tree, nodes_in_forest,
 };
@@ -39,7 +39,7 @@ pub struct Mmr {
     /// the elements of every tree in the forest to be stored in the same sequential buffer. It
     /// also means new elements can be added to the forest, and merging of trees is very cheap with
     /// no need to copy elements.
-    pub(super) nodes: Vec<RpoDigest>,
+    pub(super) nodes: Vec<Word>,
 }
 
 impl Default for Mmr {
@@ -123,7 +123,7 @@ impl Mmr {
     /// Note: The leaf position is the 0-indexed number corresponding to the order the leaves were
     /// added, this corresponds to the MMR size _prior_ to adding the element. So the 1st element
     /// has position 0, the second position 1, and so on.
-    pub fn get(&self, pos: usize) -> Result<RpoDigest, MmrError> {
+    pub fn get(&self, pos: usize) -> Result<Word, MmrError> {
         // find the target tree responsible for the MMR position
         let tree_bit =
             leaf_to_corresponding_tree(pos, self.forest).ok_or(MmrError::PositionNotFound(pos))?;
@@ -142,7 +142,7 @@ impl Mmr {
     }
 
     /// Adds a new element to the MMR.
-    pub fn add(&mut self, el: RpoDigest) {
+    pub fn add(&mut self, el: Word) {
         // Note: every node is also a tree of size 1, adding an element to the forest creates a new
         // rooted-tree of size 1. This may temporarily break the invariant that every tree in the
         // forest has different sizes, the loop below will eagerly merge trees of same size and
@@ -180,7 +180,7 @@ impl Mmr {
             )));
         }
 
-        let peaks: Vec<RpoDigest> = TrueBitPositionIterator::new(forest)
+        let peaks: Vec<Word> = TrueBitPositionIterator::new(forest)
             .rev()
             .map(|bit| nodes_in_forest(1 << bit))
             .scan(0, |offset, el| {
@@ -299,7 +299,7 @@ impl Mmr {
         tree_bit: u32,
         relative_pos: usize,
         index_offset: usize,
-    ) -> (RpoDigest, Vec<RpoDigest>) {
+    ) -> (Word, Vec<Word>) {
         // see documentation of `leaf_to_corresponding_tree` for details
         let tree_depth = (tree_bit + 1) as usize;
         let mut path = Vec::with_capacity(tree_depth);
@@ -347,7 +347,7 @@ impl Mmr {
 
 impl<T> From<T> for Mmr
 where
-    T: IntoIterator<Item = RpoDigest>,
+    T: IntoIterator<Item = Word>,
 {
     fn from(values: T) -> Self {
         let mut mmr = Mmr::new();

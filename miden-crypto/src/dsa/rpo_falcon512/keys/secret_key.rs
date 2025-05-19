@@ -9,14 +9,17 @@ use rand::Rng;
 use super::{
     super::{
         ByteReader, ByteWriter, Deserializable, DeserializationError, MODULUS, N, Nonce,
-        SIG_L2_BOUND, SIGMA, Serializable, ShortLatticeBasis, Signature, Word,
+        SIG_L2_BOUND, SIGMA, Serializable, ShortLatticeBasis, Signature,
         math::{FalconFelt, FastFft, LdlTree, Polynomial, ffldl, ffsampling, gram, normalize_tree},
         signature::SignaturePoly,
     },
     PubKeyPoly, PublicKey,
 };
-use crate::dsa::rpo_falcon512::{
-    SIG_NONCE_LEN, SK_LEN, hash_to_point::hash_to_point_rpo256, math::ntru_gen,
+use crate::{
+    Word,
+    dsa::rpo_falcon512::{
+        SIG_NONCE_LEN, SK_LEN, hash_to_point::hash_to_point_rpo256, math::ntru_gen,
+    },
 };
 
 // CONSTANTS
@@ -114,7 +117,7 @@ impl SecretKey {
 
     /// Signs a message with this secret key.
     #[cfg(feature = "std")]
-    pub fn sign(&self, message: Word) -> Signature {
+    pub fn sign(&self, message: crate::Word) -> Signature {
         use rand::{SeedableRng, rngs::StdRng};
 
         let mut rng = StdRng::from_os_rng();

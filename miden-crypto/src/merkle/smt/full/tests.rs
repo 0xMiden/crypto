@@ -1,8 +1,8 @@
 use alloc::vec::Vec;
 
-use super::{EMPTY_WORD, Felt, LeafIndex, NodeIndex, Rpo256, RpoDigest, SMT_DEPTH, Smt, SmtLeaf};
+use super::{EMPTY_WORD, Felt, LeafIndex, NodeIndex, Rpo256, SMT_DEPTH, Smt, SmtLeaf, Word};
 use crate::{
-    ONE, WORD_SIZE, Word,
+    ONE, WORD_SIZE,
     merkle::{
         EmptySubtreeRoots, MerkleStore, MutationSet,
         smt::{NodeMutation, SparseMerkleTree, UnorderedMap},
@@ -21,15 +21,15 @@ fn test_smt_insert_at_same_key() {
 
     assert_eq!(smt.root(), *EmptySubtreeRoots::entry(SMT_DEPTH, 0));
 
-    let key_1: RpoDigest = {
+    let key_1: Word = {
         let raw = 0b_01101001_01101100_00011111_11111111_10010110_10010011_11100000_00000000_u64;
 
-        RpoDigest::from([ONE, ONE, ONE, Felt::new(raw)])
+        Word::from([ONE, ONE, ONE, Felt::new(raw)])
     };
     let key_1_index: NodeIndex = LeafIndex::<SMT_DEPTH>::from(key_1).into();
 
-    let value_1 = [ONE; WORD_SIZE];
-    let value_2 = [ONE + ONE; WORD_SIZE];
+    let value_1 = Word::new([ONE; WORD_SIZE]);
+    let value_2 = Word::new([ONE + ONE; WORD_SIZE]);
 
     // Insert value 1 and ensure root is as expected
     {
@@ -61,11 +61,11 @@ fn test_smt_insert_at_same_key_2() {
     // The most significant u64 used for both keys (to ensure they map to the same leaf)
     let key_msb: u64 = 42;
 
-    let key_already_present: RpoDigest =
-        RpoDigest::from([2_u32.into(), 2_u32.into(), 2_u32.into(), Felt::new(key_msb)]);
+    let key_already_present =
+        Word::from([2_u32.into(), 2_u32.into(), 2_u32.into(), Felt::new(key_msb)]);
     let key_already_present_index: NodeIndex =
         LeafIndex::<SMT_DEPTH>::from(key_already_present).into();
-    let value_already_present = [ONE + ONE + ONE; WORD_SIZE];
+    let value_already_present = Word::new([ONE + ONE + ONE; WORD_SIZE]);
 
     let mut smt =
         Smt::with_entries(core::iter::once((key_already_present, value_already_present))).unwrap();
@@ -79,13 +79,13 @@ fn test_smt_insert_at_same_key_2() {
         store
     };
 
-    let key_1: RpoDigest = RpoDigest::from([ONE, ONE, ONE, Felt::new(key_msb)]);
+    let key_1: Word = Word::from([ONE, ONE, ONE, Felt::new(key_msb)]);
     let key_1_index: NodeIndex = LeafIndex::<SMT_DEPTH>::from(key_1).into();
 
     assert_eq!(key_1_index, key_already_present_index);
 
-    let value_1 = [ONE; WORD_SIZE];
-    let value_2 = [ONE + ONE; WORD_SIZE];
+    let value_1 = Word::new([ONE; WORD_SIZE]);
+    let value_2 = Word::new([ONE + ONE; WORD_SIZE]);
 
     // Insert value 1 and ensure root is as expected
     {
@@ -124,7 +124,7 @@ fn test_smt_insert_and_remove_multiple_values() {
     fn insert_values_and_assert_path(
         smt: &mut Smt,
         store: &mut MerkleStore,
-        key_values: &[(RpoDigest, Word)],
+        key_values: &[(Word, Word)],
     ) {
         for &(key, value) in key_values {
             let key_index: NodeIndex = LeafIndex::<SMT_DEPTH>::from(key).into();
@@ -145,27 +145,27 @@ fn test_smt_insert_and_remove_multiple_values() {
 
     assert_eq!(smt.root(), *EmptySubtreeRoots::entry(SMT_DEPTH, 0));
 
-    let key_1: RpoDigest = {
+    let key_1: Word = {
         let raw = 0b_01101001_01101100_00011111_11111111_10010110_10010011_11100000_00000000_u64;
 
-        RpoDigest::from([ONE, ONE, ONE, Felt::new(raw)])
+        Word::from([ONE, ONE, ONE, Felt::new(raw)])
     };
 
-    let key_2: RpoDigest = {
+    let key_2: Word = {
         let raw = 0b_11111111_11111111_11111111_11111111_11111111_11111111_11111111_11111111_u64;
 
-        RpoDigest::from([ONE, ONE, ONE, Felt::new(raw)])
+        Word::from([ONE, ONE, ONE, Felt::new(raw)])
     };
 
-    let key_3: RpoDigest = {
+    let key_3: Word = {
         let raw = 0b_00000000_00000000_00000000_00000000_00000000_00000000_00000000_00000000_u64;
 
-        RpoDigest::from([ONE, ONE, ONE, Felt::new(raw)])
+        Word::from([ONE, ONE, ONE, Felt::new(raw)])
     };
 
-    let value_1 = [ONE; WORD_SIZE];
-    let value_2 = [ONE + ONE; WORD_SIZE];
-    let value_3 = [ONE + ONE + ONE; WORD_SIZE];
+    let value_1 = Word::new([ONE; WORD_SIZE]);
+    let value_2 = Word::new([ONE + ONE; WORD_SIZE]);
+    let value_3 = Word::new([ONE + ONE + ONE; WORD_SIZE]);
 
     // Insert values in the tree
     let key_values = [(key_1, value_1), (key_2, value_2), (key_3, value_3)];
@@ -192,15 +192,13 @@ fn test_smt_removal() {
 
     let raw = 0b_01101001_01101100_00011111_11111111_10010110_10010011_11100000_00000000_u64;
 
-    let key_1: RpoDigest = RpoDigest::from([ONE, ONE, ONE, Felt::new(raw)]);
-    let key_2: RpoDigest =
-        RpoDigest::from([2_u32.into(), 2_u32.into(), 2_u32.into(), Felt::new(raw)]);
-    let key_3: RpoDigest =
-        RpoDigest::from([3_u32.into(), 3_u32.into(), 3_u32.into(), Felt::new(raw)]);
+    let key_1: Word = Word::from([ONE, ONE, ONE, Felt::new(raw)]);
+    let key_2: Word = Word::from([2_u32.into(), 2_u32.into(), 2_u32.into(), Felt::new(raw)]);
+    let key_3: Word = Word::from([3_u32.into(), 3_u32.into(), 3_u32.into(), Felt::new(raw)]);
 
-    let value_1 = [ONE; WORD_SIZE];
-    let value_2 = [2_u32.into(); WORD_SIZE];
-    let value_3: [Felt; 4] = [3_u32.into(); WORD_SIZE];
+    let value_1 = Word::new([ONE; WORD_SIZE]);
+    let value_2 = Word::new([2_u32.into(); WORD_SIZE]);
+    let value_3 = Word::new([3_u32.into(); WORD_SIZE]);
 
     // insert key-value 1
     {
@@ -269,16 +267,14 @@ fn test_prospective_hash() {
 
     let raw = 0b_01101001_01101100_00011111_11111111_10010110_10010011_11100000_00000000_u64;
 
-    let key_1: RpoDigest = RpoDigest::from([ONE, ONE, ONE, Felt::new(raw)]);
-    let key_2: RpoDigest =
-        RpoDigest::from([2_u32.into(), 2_u32.into(), 2_u32.into(), Felt::new(raw)]);
+    let key_1: Word = Word::from([ONE, ONE, ONE, Felt::new(raw)]);
+    let key_2: Word = Word::from([2_u32.into(), 2_u32.into(), 2_u32.into(), Felt::new(raw)]);
     // Sort key_3 before key_1, to test non-append insertion.
-    let key_3: RpoDigest =
-        RpoDigest::from([0_u32.into(), 0_u32.into(), 0_u32.into(), Felt::new(raw)]);
+    let key_3: Word = Word::from([0_u32.into(), 0_u32.into(), 0_u32.into(), Felt::new(raw)]);
 
-    let value_1 = [ONE; WORD_SIZE];
-    let value_2 = [2_u32.into(); WORD_SIZE];
-    let value_3: [Felt; 4] = [3_u32.into(); WORD_SIZE];
+    let value_1 = Word::new([ONE; WORD_SIZE]);
+    let value_2 = Word::new([2_u32.into(); WORD_SIZE]);
+    let value_3 = Word::new([3_u32.into(); WORD_SIZE]);
 
     // insert key-value 1
     {
@@ -380,16 +376,14 @@ fn test_prospective_insertion() {
 
     let raw = 0b_01101001_01101100_00011111_11111111_10010110_10010011_11100000_00000000_u64;
 
-    let key_1: RpoDigest = RpoDigest::from([ONE, ONE, ONE, Felt::new(raw)]);
-    let key_2: RpoDigest =
-        RpoDigest::from([2_u32.into(), 2_u32.into(), 2_u32.into(), Felt::new(raw)]);
+    let key_1: Word = Word::from([ONE, ONE, ONE, Felt::new(raw)]);
+    let key_2: Word = Word::from([2_u32.into(), 2_u32.into(), 2_u32.into(), Felt::new(raw)]);
     // Sort key_3 before key_1, to test non-append insertion.
-    let key_3: RpoDigest =
-        RpoDigest::from([0_u32.into(), 0_u32.into(), 0_u32.into(), Felt::new(raw)]);
+    let key_3: Word = Word::from([0_u32.into(), 0_u32.into(), 0_u32.into(), Felt::new(raw)]);
 
-    let value_1 = [ONE; WORD_SIZE];
-    let value_2 = [2_u32.into(); WORD_SIZE];
-    let value_3: [Felt; 4] = [3_u32.into(); WORD_SIZE];
+    let value_1 = Word::new([ONE; WORD_SIZE]);
+    let value_2 = Word::new([2_u32.into(); WORD_SIZE]);
+    let value_3 = Word::new([3_u32.into(); WORD_SIZE]);
 
     let root_empty = smt.root();
 
@@ -487,8 +481,8 @@ fn test_prospective_insertion() {
 
 #[test]
 fn test_mutations_no_mutations() {
-    let key = RpoDigest::from([ONE, ONE, ONE, ONE]);
-    let value = [ONE; WORD_SIZE];
+    let key = Word::from([ONE, ONE, ONE, ONE]);
+    let value = Word::new([ONE; WORD_SIZE]);
     let entries = [(key, value)];
 
     let tree = Smt::with_entries(entries).unwrap();
@@ -503,15 +497,13 @@ fn test_mutations_no_mutations() {
 fn test_mutations_revert() {
     let mut smt = Smt::default();
 
-    let key_1: RpoDigest = RpoDigest::from([ONE, ONE, ONE, Felt::new(1)]);
-    let key_2: RpoDigest =
-        RpoDigest::from([2_u32.into(), 2_u32.into(), 2_u32.into(), Felt::new(2)]);
-    let key_3: RpoDigest =
-        RpoDigest::from([0_u32.into(), 0_u32.into(), 0_u32.into(), Felt::new(3)]);
+    let key_1: Word = Word::from([ONE, ONE, ONE, Felt::new(1)]);
+    let key_2: Word = Word::from([2_u32.into(), 2_u32.into(), 2_u32.into(), Felt::new(2)]);
+    let key_3: Word = Word::from([0_u32.into(), 0_u32.into(), 0_u32.into(), Felt::new(3)]);
 
-    let value_1 = [ONE; WORD_SIZE];
-    let value_2 = [2_u32.into(); WORD_SIZE];
-    let value_3 = [3_u32.into(); WORD_SIZE];
+    let value_1 = Word::new([ONE; WORD_SIZE]);
+    let value_2 = Word::new([2_u32.into(); WORD_SIZE]);
+    let value_3 = Word::new([3_u32.into(); WORD_SIZE]);
 
     smt.insert(key_1, value_1);
     smt.insert(key_2, value_2);
@@ -534,15 +526,13 @@ fn test_mutations_revert() {
 fn test_mutation_set_serialization() {
     let mut smt = Smt::default();
 
-    let key_1: RpoDigest = RpoDigest::from([ONE, ONE, ONE, Felt::new(1)]);
-    let key_2: RpoDigest =
-        RpoDigest::from([2_u32.into(), 2_u32.into(), 2_u32.into(), Felt::new(2)]);
-    let key_3: RpoDigest =
-        RpoDigest::from([0_u32.into(), 0_u32.into(), 0_u32.into(), Felt::new(3)]);
+    let key_1: Word = Word::from([ONE, ONE, ONE, Felt::new(1)]);
+    let key_2: Word = Word::from([2_u32.into(), 2_u32.into(), 2_u32.into(), Felt::new(2)]);
+    let key_3: Word = Word::from([0_u32.into(), 0_u32.into(), 0_u32.into(), Felt::new(3)]);
 
-    let value_1 = [ONE; WORD_SIZE];
-    let value_2 = [2_u32.into(); WORD_SIZE];
-    let value_3 = [3_u32.into(); WORD_SIZE];
+    let value_1 = Word::new([ONE; WORD_SIZE]);
+    let value_2 = Word::new([2_u32.into(); WORD_SIZE]);
+    let value_3 = Word::new([3_u32.into(); WORD_SIZE]);
 
     smt.insert(key_1, value_1);
     smt.insert(key_2, value_2);
@@ -551,16 +541,14 @@ fn test_mutation_set_serialization() {
         smt.compute_mutations(vec![(key_1, EMPTY_WORD), (key_2, value_1), (key_3, value_3)]);
 
     let serialized = mutations.to_bytes();
-    let deserialized =
-        MutationSet::<SMT_DEPTH, RpoDigest, Word>::read_from_bytes(&serialized).unwrap();
+    let deserialized = MutationSet::<SMT_DEPTH, Word, Word>::read_from_bytes(&serialized).unwrap();
 
     assert_eq!(deserialized, mutations, "deserialized mutations did not match original");
 
     let revert = smt.apply_mutations_with_reversion(mutations).unwrap();
 
     let serialized = revert.to_bytes();
-    let deserialized =
-        MutationSet::<SMT_DEPTH, RpoDigest, Word>::read_from_bytes(&serialized).unwrap();
+    let deserialized = MutationSet::<SMT_DEPTH, Word, Word>::read_from_bytes(&serialized).unwrap();
 
     assert_eq!(deserialized, revert, "deserialized mutations did not match original");
 }
@@ -570,12 +558,11 @@ fn test_mutation_set_serialization() {
 fn test_smt_path_to_keys_in_same_leaf_are_equal() {
     let raw = 0b_01101001_01101100_00011111_11111111_10010110_10010011_11100000_00000000_u64;
 
-    let key_1: RpoDigest = RpoDigest::from([ONE, ONE, ONE, Felt::new(raw)]);
-    let key_2: RpoDigest =
-        RpoDigest::from([2_u32.into(), 2_u32.into(), 2_u32.into(), Felt::new(raw)]);
+    let key_1: Word = Word::from([ONE, ONE, ONE, Felt::new(raw)]);
+    let key_2: Word = Word::from([2_u32.into(), 2_u32.into(), 2_u32.into(), Felt::new(raw)]);
 
-    let value_1 = [ONE; WORD_SIZE];
-    let value_2 = [2_u32.into(); WORD_SIZE];
+    let value_1 = Word::new([ONE; WORD_SIZE]);
+    let value_2 = Word::new([2_u32.into(); WORD_SIZE]);
 
     let smt = Smt::with_entries([(key_1, value_1), (key_2, value_2)]).unwrap();
 
@@ -587,18 +574,18 @@ fn test_smt_path_to_keys_in_same_leaf_are_equal() {
 fn test_empty_leaf_hash() {
     let smt = Smt::default();
 
-    let leaf = smt.get_leaf(&RpoDigest::default());
-    assert_eq!(leaf.hash(), EMPTY_WORD.into());
+    let leaf = smt.get_leaf(&Word::default());
+    assert_eq!(leaf.hash(), EMPTY_WORD);
 }
 
 /// Tests that `get_value()` works as expected
 #[test]
 fn test_smt_get_value() {
-    let key_1: RpoDigest = RpoDigest::from([ONE, ONE, ONE, ONE]);
-    let key_2: RpoDigest = RpoDigest::from([2_u32, 2_u32, 2_u32, 2_u32]);
+    let key_1: Word = Word::from([ONE, ONE, ONE, ONE]);
+    let key_2: Word = Word::from([2_u32, 2_u32, 2_u32, 2_u32]);
 
-    let value_1 = [ONE; WORD_SIZE];
-    let value_2 = [2_u32.into(); WORD_SIZE];
+    let value_1 = Word::new([ONE; WORD_SIZE]);
+    let value_2 = Word::new([2_u32.into(); WORD_SIZE]);
 
     let smt = Smt::with_entries([(key_1, value_1), (key_2, value_2)]).unwrap();
 
@@ -609,7 +596,7 @@ fn test_smt_get_value() {
     assert_eq!(value_2, returned_value_2);
 
     // Check that a key with no inserted value returns the empty word
-    let key_no_value = RpoDigest::from([42_u32, 42_u32, 42_u32, 42_u32]);
+    let key_no_value = Word::from([42_u32, 42_u32, 42_u32, 42_u32]);
 
     assert_eq!(EMPTY_WORD, smt.get_value(&key_no_value));
 }
@@ -617,11 +604,11 @@ fn test_smt_get_value() {
 /// Tests that `entries()` works as expected
 #[test]
 fn test_smt_entries() {
-    let key_1 = RpoDigest::from([ONE, ONE, ONE, ONE]);
-    let key_2 = RpoDigest::from([2_u32, 2_u32, 2_u32, 2_u32]);
+    let key_1 = Word::from([ONE, ONE, ONE, ONE]);
+    let key_2 = Word::from([2_u32, 2_u32, 2_u32, 2_u32]);
 
-    let value_1 = [ONE; WORD_SIZE];
-    let value_2 = [2_u32.into(); WORD_SIZE];
+    let value_1 = Word::new([ONE; WORD_SIZE]);
+    let value_2 = Word::new([2_u32.into(); WORD_SIZE]);
     let entries = [(key_1, value_1), (key_2, value_2)];
 
     let smt = Smt::with_entries(entries).unwrap();
@@ -662,8 +649,8 @@ fn test_empty_smt_leaf_serialization() {
 #[test]
 fn test_single_smt_leaf_serialization() {
     let single_leaf = SmtLeaf::new_single(
-        RpoDigest::from([10_u32, 11_u32, 12_u32, 13_u32]),
-        [1_u32.into(), 2_u32.into(), 3_u32.into(), 4_u32.into()],
+        Word::from([10_u32, 11_u32, 12_u32, 13_u32]),
+        Word::new([1_u32.into(), 2_u32.into(), 3_u32.into(), 4_u32.into()]),
     );
 
     let mut serialized = single_leaf.to_bytes();
@@ -678,12 +665,12 @@ fn test_single_smt_leaf_serialization() {
 fn test_multiple_smt_leaf_serialization_success() {
     let multiple_leaf = SmtLeaf::new_multiple(vec![
         (
-            RpoDigest::from([10_u32, 11_u32, 12_u32, 13_u32]),
-            [1_u32.into(), 2_u32.into(), 3_u32.into(), 4_u32.into()],
+            Word::from([10_u32, 11_u32, 12_u32, 13_u32]),
+            Word::new([1_u32.into(), 2_u32.into(), 3_u32.into(), 4_u32.into()]),
         ),
         (
-            RpoDigest::from([100_u32, 101_u32, 102_u32, 13_u32]),
-            [11_u32.into(), 12_u32.into(), 13_u32.into(), 14_u32.into()],
+            Word::from([100_u32, 101_u32, 102_u32, 13_u32]),
+            Word::new([11_u32.into(), 12_u32.into(), 13_u32.into(), 14_u32.into()]),
         ),
     ])
     .unwrap();
@@ -699,7 +686,7 @@ fn test_multiple_smt_leaf_serialization_success() {
 // HELPERS
 // --------------------------------------------------------------------------------------------
 
-fn build_empty_or_single_leaf_node(key: RpoDigest, value: Word) -> RpoDigest {
+fn build_empty_or_single_leaf_node(key: Word, value: Word) -> Word {
     if value == EMPTY_WORD {
         SmtLeaf::new_empty(key.into()).hash()
     } else {
@@ -707,7 +694,7 @@ fn build_empty_or_single_leaf_node(key: RpoDigest, value: Word) -> RpoDigest {
     }
 }
 
-fn build_multiple_leaf_node(kv_pairs: &[(RpoDigest, Word)]) -> RpoDigest {
+fn build_multiple_leaf_node(kv_pairs: &[(Word, Word)]) -> Word {
     let elements: Vec<Felt> = kv_pairs
         .iter()
         .flat_map(|(key, value)| {
@@ -725,8 +712,8 @@ fn build_multiple_leaf_node(kv_pairs: &[(RpoDigest, Word)]) -> RpoDigest {
 /// returning mutation set for reversion.
 fn apply_mutations(
     smt: &mut Smt,
-    mutation_set: MutationSet<SMT_DEPTH, RpoDigest, Word>,
-) -> MutationSet<SMT_DEPTH, RpoDigest, Word> {
+    mutation_set: MutationSet<SMT_DEPTH, Word, Word>,
+) -> MutationSet<SMT_DEPTH, Word, Word> {
     let mut smt2 = smt.clone();
 
     let reversion = smt.apply_mutations_with_reversion(mutation_set.clone()).unwrap();

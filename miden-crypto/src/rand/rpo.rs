@@ -2,9 +2,10 @@ use alloc::{string::ToString, vec::Vec};
 
 use rand_core::impls;
 
-use super::{Felt, FeltRng, FieldElement, RandomCoin, RandomCoinError, RngCore, Word, ZERO};
+use super::{Felt, FeltRng, FieldElement, RandomCoin, RandomCoinError, RngCore, ZERO};
 use crate::{
-    hash::rpo::{Rpo256, RpoDigest},
+    Word,
+    hash::rpo::Rpo256,
     utils::{ByteReader, ByteWriter, Deserializable, DeserializationError, Serializable},
 };
 
@@ -88,17 +89,15 @@ impl RandomCoin for RpoRandomCoin {
     type Hasher = Rpo256;
 
     fn new(seed: &[Self::BaseField]) -> Self {
-        let digest: Word = Rpo256::hash_elements(seed).into();
+        let digest: Word = Rpo256::hash_elements(seed);
         Self::new(digest)
     }
 
-    fn reseed(&mut self, data: RpoDigest) {
+    fn reseed(&mut self, data: Word) {
         // Reset buffer
         self.current = RATE_START;
 
         // Add the new seed material to the first half of the rate portion of the RPO state
-        let data: Word = data.into();
-
         self.state[RATE_START] += data[0];
         self.state[RATE_START + 1] += data[1];
         self.state[RATE_START + 2] += data[2];
@@ -189,7 +188,7 @@ impl FeltRng for RpoRandomCoin {
         for o in output.iter_mut() {
             *o = self.draw_basefield();
         }
-        output
+        Word::new(output)
     }
 }
 
@@ -253,14 +252,14 @@ impl Deserializable for RpoRandomCoin {
 #[cfg(test)]
 mod tests {
     use super::{Deserializable, FeltRng, RpoRandomCoin, Serializable, ZERO};
-    use crate::ONE;
+    use crate::{ONE, Word};
 
     #[test]
     fn test_feltrng_felt() {
-        let mut rpocoin = RpoRandomCoin::new([ZERO; 4]);
+        let mut rpocoin = RpoRandomCoin::new([ZERO; 4].into());
         let output = rpocoin.draw_element();
 
-        let mut rpocoin = RpoRandomCoin::new([ZERO; 4]);
+        let mut rpocoin = RpoRandomCoin::new([ZERO; 4].into());
         let expected = rpocoin.draw_basefield();
 
         assert_eq!(output, expected);
@@ -268,14 +267,15 @@ mod tests {
 
     #[test]
     fn test_feltrng_word() {
-        let mut rpocoin = RpoRandomCoin::new([ZERO; 4]);
+        let mut rpocoin = RpoRandomCoin::new([ZERO; 4].into());
         let output = rpocoin.draw_word();
 
-        let mut rpocoin = RpoRandomCoin::new([ZERO; 4]);
+        let mut rpocoin = RpoRandomCoin::new([ZERO; 4].into());
         let mut expected = [ZERO; 4];
         for o in expected.iter_mut() {
             *o = rpocoin.draw_basefield();
         }
+        let expected = Word::new(expected);
 
         assert_eq!(output, expected);
     }

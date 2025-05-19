@@ -1,6 +1,5 @@
 use super::{
     ByteReader, ByteWriter, Deserializable, DeserializationError, Felt, Serializable, Signature,
-    Word,
     math::{FalconFelt, Polynomial},
 };
 
@@ -39,14 +38,14 @@ mod tests {
         assert_eq!(sk.short_lattice_basis(), sk_deserialized.short_lattice_basis());
 
         // sign a random message
-        let message: Word = [ONE; 4];
+        let message = Word::new([ONE; 4]);
         let signature = sk.sign_with_rng(message, &mut rng);
 
         // make sure the signature verifies correctly
         assert!(pk.verify(message, &signature));
 
         // a signature should not verify against a wrong message
-        let message2: Word = [ONE.double(); 4];
+        let message2 = Word::new([ONE.double(); 4]);
         assert!(!pk.verify(message2, &signature));
 
         // a signature should not verify against a wrong public key
