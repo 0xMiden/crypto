@@ -228,22 +228,25 @@ impl PartialSmt {
         self.0.leaves.contains_key(&Smt::key_to_leaf_index(key).value())
     }
 
-    /// Returns an iterator over the inner nodes of the inner [Smt].
+    /// Returns an iterator over the inner nodes of the [`PartialSmt`].
     pub fn inner_nodes(&self) -> impl Iterator<Item = InnerNodeInfo> + '_ {
         self.0.inner_nodes()
     }
 
-    /// Returns an iterator over the leaves of the inner [Smt].
+    /// Returns an iterator over the tracked leaves of the [`PartialSmt`] in arbitrary order.
+    ///
+    /// Note that this includes empty leaves.
     pub fn leaves(&self) -> impl Iterator<Item = (LeafIndex<SMT_DEPTH>, &SmtLeaf)> {
         self.0.leaves()
     }
 
-    /// Returns an iterator over the key-value pairs of the inner [Smt].
+    /// Returns an iterator over the tracked, non-empty key-value pairs of the [`PartialSmt`] in
+    /// arbitrary order.
     pub fn entries(&self) -> impl Iterator<Item = &(RpoDigest, Word)> {
         self.0.entries()
     }
 
-    /// Returns the number of non-empty leaves in this tree.
+    /// Returns the number of tracked leaves in this tree, which includes empty ones.
     ///
     /// Note that this may return a different value from [Self::num_entries()] as a single leaf may
     /// contain more than one key-value pair.
@@ -251,18 +254,18 @@ impl PartialSmt {
         self.0.num_leaves()
     }
 
-    /// Returns the number of key-value pairs with non-default values in this tree.
+    /// Returns the number of tracked, non-empty key-value pairs in this tree.
     ///
     /// Note that this may return a different value from [Self::num_leaves()] as a single leaf may
     /// contain more than one key-value pair.
     ///
-    /// Also note that this is currently an expensive operation is counting the number of entries
-    /// requires iterating over all leaves of the tree.
+    /// Also note that this is currently an expensive operation since as counting the number of
+    /// entries requires iterating over all leaves of the tree.
     pub fn num_entries(&self) -> usize {
         self.0.num_entries()
     }
 
-    /// Returns a boolean value indicating whether the inner `SMT` is empty.
+    /// Returns a boolean value indicating whether the [`PartialSmt`] is empty.
     pub fn is_empty(&self) -> bool {
         self.0.is_empty()
     }
@@ -279,6 +282,8 @@ impl Default for PartialSmt {
 
 #[cfg(test)]
 mod tests {
+
+    use std::collections::{BTreeMap, BTreeSet};
 
     use assert_matches::assert_matches;
     use rand_utils::rand_array;
@@ -473,5 +478,101 @@ mod tests {
         partial.add_proof(stale_proof0).unwrap();
         let err = partial.add_proof(proof2).unwrap_err();
         assert_matches!(err, MerkleError::ConflictingRoots { .. });
+    }
+
+    /// Tests that a basic PartialSmt's iterator APIs return the expected values.
+    #[test]
+    fn partial_smt_iterator_apis() {
+        let key0 = RpoDigest::from(Word::from(rand_array()));
+        let key1 = RpoDigest::from(Word::from(rand_array()));
+        let key2 = RpoDigest::from(Word::from(rand_array()));
+        // A key for which we won't add a value so it will be empty.
+        let key_empty = RpoDigest::from(Word::from(rand_array()));
+
+        let value0 = Word::from(rand_array());
+        let value1 = Word::from(rand_array());
+        let value2 = Word::from(rand_array());
+
+        let mut kv_pairs = vec![(key0, value0), (key1, value1), (key2, value2)];
+
+        // Add more random leaves.
+        kv_pairs.reserve(1000);
+        for _ in 0..1000 {
+            let key = RpoDigest::from(Word::from(rand_array()));
+            let value = Word::from(rand_array());
+            kv_pairs.push((key, value));
+        }
+
+        let full = Smt::with_entries(kv_pairs).unwrap();
+
+        // Construct a partial SMT from proofs.
+        // ----------------------------------------------------------------------------------------
+
+        let proof0 = full.open(&key0);
+        let proof2 = full.open(&key2);
+        let proof_empty = full.open(&key_empty);
+
+        assert!(proof_empty.leaf().is_empty());
+
+        let proofs = [proof0, proof2, proof_empty];
+        let partial = PartialSmt::from_proofs(proofs.clone()).unwrap();
+
+        assert!(!partial.is_empty());
+        assert_eq!(full.root(), partial.root());
+        // There should be 2 non-empty entries.
+        assert_eq!(partial.num_entries(), 2);
+        // There should be 3 leaves, including the empty one.
+        assert_eq!(partial.num_leaves(), 3);
+
+        // The leaves API should return all tracked leaves, including empty ones.
+        // ----------------------------------------------------------------------------------------
+
+        // Construct the sorted vector of leaves that should be yielded by the partial SMT.
+        let expected_leaves: BTreeMap<_, _> = [
+            SmtLeaf::new_single(key0, value0),
+            SmtLeaf::new_single(key2, value2),
+            SmtLeaf::new_empty(LeafIndex::from(key_empty)),
+        ]
+        .into_iter()
+        .map(|leaf| (leaf.index(), leaf))
+        .collect();
+
+        let actual_leaves = partial
+            .leaves()
+            .map(|(idx, leaf)| (idx, leaf.clone()))
+            .collect::<BTreeMap<_, _>>();
+
+        assert_eq!(actual_leaves.len(), expected_leaves.len());
+        assert_eq!(actual_leaves, expected_leaves);
+
+        // The entries API should return all tracked, non-empty leaves.
+        // ----------------------------------------------------------------------------------------
+
+        let expected_entries: BTreeMap<_, _> =
+            [(key0, value0), (key2, value2)].into_iter().collect();
+
+        let actual_entries = partial.entries().cloned().collect::<BTreeMap<_, _>>();
+
+        assert_eq!(actual_entries.len(), expected_entries.len());
+        assert_eq!(actual_entries, expected_entries);
+
+        // The entries of the merkle paths from the proofs should exist as children of inner nodes
+        // in the partial SMT.
+        // ----------------------------------------------------------------------------------------
+
+        let partial_inner_nodes: BTreeSet<_> =
+            partial.inner_nodes().map(|node| [node.left, node.right]).flatten().collect();
+
+        for merkle_path in proofs.into_iter().map(|proof| proof.into_parts().0) {
+            for (idx, digest) in merkle_path.into_iter().enumerate() {
+                assert!(partial_inner_nodes.contains(&digest), "failed at idx {idx}");
+            }
+        }
+    }
+
+    /// Test that an empty partial SMT's is_empty method returns `true`.
+    #[test]
+    fn partial_smt_is_empty() {
+        assert!(PartialSmt::new().is_empty());
     }
 }

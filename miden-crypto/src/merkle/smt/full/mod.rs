@@ -171,8 +171,8 @@ impl Smt {
     /// Note that this may return a different value from [Self::num_leaves()] as a single leaf may
     /// contain more than one key-value pair.
     ///
-    /// Also note that this is currently an expensive operation is counting the number of entries
-    /// requires iterating over all leaves of the tree.
+    /// Also note that this is currently an expensive operation since as counting the number of
+    /// entries requires iterating over all leaves of the tree.
     pub fn num_entries(&self) -> usize {
         self.entries().count()
     }
@@ -202,14 +202,14 @@ impl Smt {
     // ITERATORS
     // --------------------------------------------------------------------------------------------
 
-    /// Returns an iterator over the leaves of this [Smt].
+    /// Returns an iterator over the tracked leaves of this [`Smt`] in arbitrary order.
     pub fn leaves(&self) -> impl Iterator<Item = (LeafIndex<SMT_DEPTH>, &SmtLeaf)> {
         self.leaves
             .iter()
             .map(|(leaf_index, leaf)| (LeafIndex::new_max_depth(*leaf_index), leaf))
     }
 
-    /// Returns an iterator over the key-value pairs of this [Smt].
+    /// Returns an iterator over the key-value pairs of this [Smt] in arbitrary order.
     pub fn entries(&self) -> impl Iterator<Item = &(RpoDigest, Word)> {
         self.leaves().flat_map(|(_, leaf)| leaf.entries())
     }
