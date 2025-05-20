@@ -1,6 +1,6 @@
 ## 0.15.0 (TBD)
-- Allow pre-sorted entries in `Smt` (#406).
 
+- Allow pre-sorted entries in `Smt` (#406).
 - Replace deprecated #[clap(...)] with #[command(...)] and #[arg(...)] (#413).
 - Added default constructors to `MmrPeaks` and `PartialMmr` (#409).
 - Added module and function documentation-2 (#410).
