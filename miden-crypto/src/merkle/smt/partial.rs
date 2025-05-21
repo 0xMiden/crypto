@@ -233,10 +233,21 @@ impl PartialSmt {
         self.0.inner_nodes()
     }
 
+    /// Returns an iterator over the tracked, non-empty leaves of the [`PartialSmt`] in arbitrary
+    /// order.
+    pub fn leaves(&self) -> impl Iterator<Item = (LeafIndex<SMT_DEPTH>, &SmtLeaf)> {
+        // The partial SMT also contains empty leaves, so we have to filter them out.
+        self.0.leaves().filter_map(
+            |(leaf_idx, leaf)| {
+                if leaf.is_empty() { None } else { Some((leaf_idx, leaf)) }
+            },
+        )
+    }
+
     /// Returns an iterator over the tracked leaves of the [`PartialSmt`] in arbitrary order.
     ///
     /// Note that this includes empty leaves.
-    pub fn leaves(&self) -> impl Iterator<Item = (LeafIndex<SMT_DEPTH>, &SmtLeaf)> {
+    pub fn tracked_leaves(&self) -> impl Iterator<Item = (LeafIndex<SMT_DEPTH>, &SmtLeaf)> {
         self.0.leaves()
     }
 
@@ -259,7 +270,7 @@ impl PartialSmt {
     /// Note that this may return a different value from [Self::num_leaves()] as a single leaf may
     /// contain more than one key-value pair.
     ///
-    /// Also note that this is currently an expensive operation since as counting the number of
+    /// Also note that this is currently an expensive operation as counting the number of
     /// entries requires iterating over all leaves of the tree.
     pub fn num_entries(&self) -> usize {
         self.0.num_entries()
@@ -524,18 +535,15 @@ mod tests {
         // There should be 3 leaves, including the empty one.
         assert_eq!(partial.num_leaves(), 3);
 
-        // The leaves API should return all tracked leaves, including empty ones.
+        // The leaves API should only return tracked but non-empty leaves.
         // ----------------------------------------------------------------------------------------
 
         // Construct the sorted vector of leaves that should be yielded by the partial SMT.
-        let expected_leaves: BTreeMap<_, _> = [
-            SmtLeaf::new_single(key0, value0),
-            SmtLeaf::new_single(key2, value2),
-            SmtLeaf::new_empty(LeafIndex::from(key_empty)),
-        ]
-        .into_iter()
-        .map(|leaf| (leaf.index(), leaf))
-        .collect();
+        let expected_leaves: BTreeMap<_, _> =
+            [SmtLeaf::new_single(key0, value0), SmtLeaf::new_single(key2, value2)]
+                .into_iter()
+                .map(|leaf| (leaf.index(), leaf))
+                .collect();
 
         let actual_leaves = partial
             .leaves()
@@ -545,16 +553,20 @@ mod tests {
         assert_eq!(actual_leaves.len(), expected_leaves.len());
         assert_eq!(actual_leaves, expected_leaves);
 
-        // The entries API should return all tracked, non-empty leaves.
+        // The tracked_leaves API should return all tracked leaves, including empty ones.
         // ----------------------------------------------------------------------------------------
 
-        let expected_entries: BTreeMap<_, _> =
-            [(key0, value0), (key2, value2)].into_iter().collect();
+        let mut expected_tracked_leaves = expected_leaves;
+        let empty_leaf = SmtLeaf::new_empty(LeafIndex::from(key_empty));
+        expected_tracked_leaves.insert(empty_leaf.index(), empty_leaf);
 
-        let actual_entries = partial.entries().cloned().collect::<BTreeMap<_, _>>();
+        let actual_tracked_leaves = partial
+            .tracked_leaves()
+            .map(|(idx, leaf)| (idx, leaf.clone()))
+            .collect::<BTreeMap<_, _>>();
 
-        assert_eq!(actual_entries.len(), expected_entries.len());
-        assert_eq!(actual_entries, expected_entries);
+        assert_eq!(actual_tracked_leaves.len(), expected_tracked_leaves.len());
+        assert_eq!(actual_tracked_leaves, expected_tracked_leaves);
 
         // The entries of the merkle paths from the proofs should exist as children of inner nodes
         // in the partial SMT.
