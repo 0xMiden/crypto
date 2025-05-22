@@ -294,7 +294,7 @@ impl Default for PartialSmt {
 #[cfg(test)]
 mod tests {
 
-    use std::collections::{BTreeMap, BTreeSet};
+    use alloc::collections::{BTreeMap, BTreeSet};
 
     use assert_matches::assert_matches;
     use rand_utils::rand_array;
