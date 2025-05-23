@@ -732,7 +732,7 @@ mod tests {
         // Right pad to 64 hex digits (66 including prefix). This is required by the
         // Digest::try_from(String) implementation.
         let padded_input = format!("{input:<66}").replace(" ", "0");
-        let expected = crate::Word::try_from(std::dbg!(padded_input)).unwrap();
+        let expected = crate::Word::try_from(padded_input.as_str()).unwrap();
 
         assert_eq!(uut, expected);
     }
