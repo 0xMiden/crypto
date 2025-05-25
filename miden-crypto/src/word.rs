@@ -709,7 +709,7 @@ mod tests {
     #[case::overflow_felt2("0x00000000000000000000000000000000ffffffffffffffff0000000000000000")]
     #[case::overflow_felt3("0x000000000000000000000000000000000000000000000000ffffffffffffffff")]
     #[should_panic]
-    fn digest_macro_invalid(#[case] bad_input: &str) {
+    fn word_macro_invalid(#[case] bad_input: &str) {
         word!(bad_input);
     }
 
@@ -726,7 +726,7 @@ mod tests {
     #[case::touch_each_felt("0x00000000000123450000000000067890000000000000abcd00000000000000ef")]
     #[case::unique_felt("0x111111111111111155555555555555559999999999999999cccccccccccccccc")]
     #[case::digits_on_repeat("0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef")]
-    fn digest_macro(#[case] input: &str) {
+    fn word_macro(#[case] input: &str) {
         let uut = word!(input);
 
         // Right pad to 64 hex digits (66 including prefix). This is required by the
