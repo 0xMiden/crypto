@@ -502,11 +502,11 @@ impl IntoIterator for Word {
 // MACROS
 // ================================================================================================
 
-/// Construct a new `Digest` from a hex value.
+/// Construct a new `Word` from a hex value.
 ///
 /// Expects a '0x' prefixed hex string followed by up to 64 hex digits.
 #[macro_export]
-macro_rules! digest {
+macro_rules! word {
     ($hex:expr) => {{
         let felts: [$crate::Felt; 4] = match $crate::word::parse_hex_string_as_word($hex) {
             Ok(v) => v,
@@ -517,7 +517,7 @@ macro_rules! digest {
     }};
 }
 
-#[allow(dead_code)]
+/// Parses a hex string into a `[Felt; 4]` array.
 pub const fn parse_hex_string_as_word(hex: &str) -> Result<[Felt; 4], &'static str> {
     const fn parse_hex_digit(digit: u8) -> Result<u8, &'static str> {
         match digit {
@@ -710,7 +710,7 @@ mod tests {
     #[case::overflow_felt3("0x000000000000000000000000000000000000000000000000ffffffffffffffff")]
     #[should_panic]
     fn digest_macro_invalid(#[case] bad_input: &str) {
-        digest!(bad_input);
+        word!(bad_input);
     }
 
     #[rstest::rstest]
@@ -727,7 +727,7 @@ mod tests {
     #[case::unique_felt("0x111111111111111155555555555555559999999999999999cccccccccccccccc")]
     #[case::digits_on_repeat("0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef")]
     fn digest_macro(#[case] input: &str) {
-        let uut = digest!(input);
+        let uut = word!(input);
 
         // Right pad to 64 hex digits (66 including prefix). This is required by the
         // Digest::try_from(String) implementation.
