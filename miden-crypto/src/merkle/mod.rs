@@ -30,7 +30,7 @@ pub use smt::{
 pub use smt::{SubtreeLeaf, build_subtree_for_bench};
 
 mod mmr;
-pub use mmr::{InOrderIndex, Mmr, MmrDelta, MmrError, MmrPeaks, MmrProof, PartialMmr};
+pub use mmr::{Forest, InOrderIndex, Mmr, MmrDelta, MmrError, MmrPeaks, MmrProof, PartialMmr};
 
 mod store;
 pub use store::{DefaultMerkleStore, MerkleStore, RecordingMerkleStore, StoreNode};
@@ -49,11 +49,6 @@ impl<const DEPTH: u8> Display for LeafIndex<DEPTH> {
         write!(f, "DEPTH={}, value={}", DEPTH, self.value())
     }
 }
-
-// Used for doctests in `merkle::mmr::mountain_range`; #[cfg(doctest)] doesn't help here:
-// https://github.com/rust-lang/rust/issues/67295.
-#[doc(hidden)]
-pub use mmr::Forest;
 
 // HELPER FUNCTIONS
 // ================================================================================================
