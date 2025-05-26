@@ -558,7 +558,7 @@ pub const fn parse_hex_string_as_word(hex: &str) -> Result<[Felt; 4], &'static s
     }
 
     // Ensure each felt is within bounds as `Felt::new` silently wraps around.
-    // This matches the behaviour of `Digest::try_from(String)`.
+    // This matches the behaviour of `Word::try_from(String)`.
     let mut idx = 0;
     while idx < felts.len() {
         if felts[idx] > Felt::MODULUS {
@@ -730,7 +730,7 @@ mod tests {
         let uut = word!(input);
 
         // Right pad to 64 hex digits (66 including prefix). This is required by the
-        // Digest::try_from(String) implementation.
+        // Word::try_from(String) implementation.
         let padded_input = format!("{input:<66}").replace(" ", "0");
         let expected = crate::Word::try_from(padded_input.as_str()).unwrap();
 
