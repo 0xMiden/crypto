@@ -134,7 +134,7 @@ impl Mmr {
             left_tree <<= 1;
         }
 
-        self.forest.increment();
+        self.forest.append_leaf();
     }
 
     /// Returns the current peaks of the MMR.

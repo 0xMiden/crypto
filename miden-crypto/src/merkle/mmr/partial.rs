@@ -227,7 +227,7 @@ impl PartialMmr {
     ///
     /// When `track` is `true` the new leaf is tracked.
     pub fn add(&mut self, leaf: Word, track: bool) -> Vec<(InOrderIndex, Word)> {
-        self.forest.increment();
+        self.forest.append_leaf();
         // We just incremented the forest, so this cannot panic.
         let merges = self.forest.smallest_tree_height_unchecked();
         let mut new_nodes = Vec::with_capacity(merges);
