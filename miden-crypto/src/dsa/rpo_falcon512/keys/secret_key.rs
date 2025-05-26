@@ -82,7 +82,7 @@ impl SecretKey {
     }
 
     /// Given a short basis [[g, -f], [G, -F]], computes the normalized LDL tree i.e., Falcon tree.
-    fn from_short_lattice_basis(basis: ShortLatticeBasis) -> SecretKey {
+    pub(crate) fn from_short_lattice_basis(basis: ShortLatticeBasis) -> SecretKey {
         // FFT each polynomial of the short basis.
         let basis_fft = to_complex_fft(&basis);
         // compute the Gram matrix.
@@ -200,6 +200,95 @@ impl SecretKey {
             if let Ok(s2) = SignaturePoly::try_from(&s2_coef) {
                 return s2;
             }
+        }
+    }
+
+    /// Signs a message with the secret key relying on the provided randomness generator.
+    #[cfg(test)]
+    pub fn sign_with_rng_testing<R: Rng>(
+        &self,
+        message: &[u8],
+        rng: &mut R,
+        skip_bytes: usize,
+    ) -> Signature {
+        use crate::dsa::rpo_falcon512::{
+            CHACHA_SEED_LEN, hash_to_point::hash_to_point_shake256, tests::ChaCha,
+        };
+
+        let mut dummy = vec![0_u8; skip_bytes];
+        rng.fill_bytes(&mut dummy);
+        let mut nonce_bytes = [0u8; SIG_NONCE_LEN];
+        rng.fill_bytes(&mut nonce_bytes);
+        let nonce = Nonce::new(nonce_bytes);
+
+        let h = self.compute_pub_key_poly();
+        let c = hash_to_point_shake256(message, &nonce);
+
+        let s2 = loop {
+            let mut chacha_seed = [0_u8; CHACHA_SEED_LEN];
+            rng.fill_bytes(&mut chacha_seed);
+
+            let mut chacha_prng = ChaCha::new(chacha_seed.to_vec());
+
+            let s2 = self.sign_helper_testing(c.clone(), &mut chacha_prng);
+            if let Some(s2) = s2 {
+                break s2;
+            }
+        };
+
+        Signature::new(nonce, h, s2)
+    }
+
+    /// Signs a message polynomial with the secret key.
+    ///
+    /// Takes a randomness generator implementing `Rng` and message polynomial representing `c`
+    /// the hash-to-point of the message to be signed. It outputs a signature polynomial `s2`.
+    #[cfg(test)]
+    fn sign_helper_testing<R: Rng>(
+        &self,
+        c: Polynomial<FalconFelt>,
+        rng: &mut R,
+    ) -> Option<SignaturePoly> {
+        let one_over_q = 1.0 / (MODULUS as f64);
+        let c_over_q_fft = c.map(|cc| Complex::new(one_over_q * cc.value() as f64, 0.0)).fft();
+
+        // B = [[FFT(g), -FFT(f)], [FFT(G), -FFT(F)]]
+        let [g_fft, minus_f_fft, big_g_fft, minus_big_f_fft] = to_complex_fft(&self.secret_key);
+        let t0 = c_over_q_fft.hadamard_mul(&minus_big_f_fft);
+        let t1 = -c_over_q_fft.hadamard_mul(&minus_f_fft);
+
+        let z = ffsampling(&(t0.clone(), t1.clone()), &self.tree, rng);
+        let t0_min_z0 = t0.clone() - z.0;
+        let t1_min_z1 = t1.clone() - z.1;
+
+        // s = (t-z) * B
+        let s0 = t0_min_z0.hadamard_mul(&g_fft) + t1_min_z1.hadamard_mul(&big_g_fft);
+        let s1 = t0_min_z0.hadamard_mul(&minus_f_fft) + t1_min_z1.hadamard_mul(&minus_big_f_fft);
+
+        // compute the norm of (s0||s1) and note that they are in FFT representation
+        let length_squared: f64 = (s0.coefficients.iter().map(|a| (a * a.conj()).re).sum::<f64>()
+            + s1.coefficients.iter().map(|a| (a * a.conj()).re).sum::<f64>())
+            / (N as f64);
+
+        if length_squared < (SIG_L2_BOUND as f64) {
+            let bold_s = [-s0, s1];
+
+            let s2 = bold_s[1].ifft();
+            let s2_coef: [i16; N] = s2
+                .coefficients
+                .iter()
+                .map(|a| a.re.round() as i16)
+                .collect::<Vec<i16>>()
+                .try_into()
+                .expect("The number of coefficients should be equal to N");
+
+            if let Ok(s2) = SignaturePoly::try_from(&s2_coef) {
+                Some(s2)
+            } else {
+                None
+            }
+        } else {
+            None
         }
     }
 }
