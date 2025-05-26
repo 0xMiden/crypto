@@ -341,7 +341,7 @@ impl Forest {
         }
     }
 
-    /// Given a leaf index in the current forest, return the lead index in the tree to which
+    /// Given a leaf index in the current forest, return the leaf index in the tree to which
     /// the leaf belongs..
     pub(super) fn leaf_relative_position(self, leaf_idx: usize) -> Option<usize> {
         let tree_idx = self.leaf_to_corresponding_tree(leaf_idx)?;
