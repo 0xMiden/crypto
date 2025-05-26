@@ -240,12 +240,12 @@ impl Forest {
     }
 
     /// Add a single-node tree if not already present in the forest.
-    pub fn single_leaf_tree_added(self) -> Self {
+    pub fn with_single_leaf(self) -> Self {
         Self::new(self.0 | 1)
     }
 
     /// Remove the single-node tree if present in the forest.
-    pub fn single_leaf_tree_removed(self) -> Self {
+    pub fn without_single_leaf(self) -> Self {
         Self::new(self.0 & (usize::MAX - 1))
     }
 
