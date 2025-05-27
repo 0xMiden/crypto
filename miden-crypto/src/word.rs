@@ -561,7 +561,7 @@ pub const fn parse_hex_string_as_word(hex: &str) -> Result<[Felt; 4], &'static s
     // This matches the behaviour of `Word::try_from(String)`.
     let mut idx = 0;
     while idx < felts.len() {
-        if felts[idx] > Felt::MODULUS {
+        if felts[idx] >= Felt::MODULUS {
             return Err("Felt overflow");
         }
         idx += 1;
@@ -704,10 +704,10 @@ mod tests {
     #[case::missing_prefix("1234")]
     #[case::invalid_character("1234567890abcdefg")]
     #[case::too_long("0xx00000000000000000000000000000000000000000000000000000000000000001")]
-    #[case::overflow_felt0("0xffffffffffffffff000000000000000000000000000000000000000000000000")]
-    #[case::overflow_felt1("0x0000000000000000ffffffffffffffff00000000000000000000000000000000")]
-    #[case::overflow_felt2("0x00000000000000000000000000000000ffffffffffffffff0000000000000000")]
-    #[case::overflow_felt3("0x000000000000000000000000000000000000000000000000ffffffffffffffff")]
+    #[case::overflow_felt0("0x01000000ffffffff000000000000000000000000000000000000000000000000")]
+    #[case::overflow_felt1("0x000000000000000001000000ffffffff00000000000000000000000000000000")]
+    #[case::overflow_felt2("0x0000000000000000000000000000000001000000ffffffff0000000000000000")]
+    #[case::overflow_felt3("0x00000000000000000000000000000000000000000000000001000000ffffffff")]
     #[should_panic]
     fn word_macro_invalid(#[case] bad_input: &str) {
         word!(bad_input);
