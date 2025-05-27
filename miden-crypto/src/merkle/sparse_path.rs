@@ -205,14 +205,23 @@ pub struct SparseMerklePathIter<'p> {
     path: Cow<'p, SparseMerklePath>,
 
     /// The depth a `next()` call will get. `next_depth == 0` indicates that the iterator has been
-    /// exhausted.
+    /// exhausted from the front.
     next_depth: u8,
+
+    /// The depth a `next_back()` call will get. `back_depth > path.depth()` indicates that the 
+    /// iterator has been exhausted from the back.
+    back_depth: u8,
 }
 
 impl Iterator for SparseMerklePathIter<'_> {
     type Item = Word;
 
     fn next(&mut self) -> Option<Word> {
+        // Check if we've exhausted the iterator or if front and back have met
+        if self.next_depth == 0 || self.next_depth > self.back_depth {
+            return None;
+        }
+
         let this_depth = self.next_depth;
         // Paths don't include the root, so if `this_depth` is 0 then we keep returning `None`.
         let this_depth = NonZero::new(this_depth)?;
@@ -235,13 +244,36 @@ impl Iterator for SparseMerklePathIter<'_> {
 
 impl ExactSizeIterator for SparseMerklePathIter<'_> {
     fn len(&self) -> usize {
-        self.next_depth as usize
+        if self.next_depth == 0 || self.next_depth > self.back_depth {
+            0
+        } else {
+            (self.back_depth - self.next_depth + 1) as usize
+        }
     }
 }
 
 impl FusedIterator for SparseMerklePathIter<'_> {}
 
-// TODO: impl DoubleEndedIterator.
+impl DoubleEndedIterator for SparseMerklePathIter<'_> {
+    fn next_back(&mut self) -> Option<Self::Item> {
+        // Check if we've exhausted the iterator or if front and back have met
+        if self.back_depth == 0 || self.next_depth > self.back_depth {
+            return None;
+        }
+
+        let this_depth = self.back_depth;
+        // Paths don't include the root, so if `this_depth` is 0 then we keep returning `None`.
+        let this_depth = NonZero::new(this_depth)?;
+        self.back_depth = this_depth.get() - 1;
+
+        // `this_depth` is bounded by the path depth, so it can't ever exceed `self.path.depth()`.
+        let node = self
+            .path
+            .at_depth(this_depth)
+            .expect("current depth should never exceed the path depth");
+        Some(node)
+    }
+}
 
 impl IntoIterator for SparseMerklePath {
     type IntoIter = SparseMerklePathIter<'static>;
@@ -252,6 +284,7 @@ impl IntoIterator for SparseMerklePath {
         SparseMerklePathIter {
             path: Cow::Owned(self),
             next_depth: tree_depth,
+            back_depth: 1,
         }
     }
 }
@@ -265,6 +298,7 @@ impl<'p> IntoIterator for &'p SparseMerklePath {
         SparseMerklePathIter {
             path: Cow::Borrowed(self),
             next_depth: tree_depth,
+            back_depth: 1,
         }
     }
 }
@@ -609,5 +643,53 @@ mod tests {
         );
         assert_eq!(sparse_path.iter().next(), None);
         assert_eq!(sparse_path.into_iter().next(), None);
+    }
+
+    #[test]
+    fn test_double_ended_iterator() {
+        let tree = make_smt(64);
+
+        for (key, _value) in tree.entries() {
+            let control_path = tree.get_path(key);
+            let sparse_path = SparseMerklePath::try_from(control_path.clone()).unwrap();
+            
+            // Test forward iteration
+            let forward: Vec<Word> = sparse_path.iter().collect();
+            let control_forward: Vec<Word> = control_path.iter().cloned().collect();
+            assert_eq!(forward, control_forward);
+            
+            // Test backward iteration
+            let backward: Vec<Word> = sparse_path.iter().rev().collect();
+            let mut expected_backward = control_forward.clone();
+            expected_backward.reverse();
+            assert_eq!(backward, expected_backward);
+            
+            // Test mixed iteration (next and next_back)
+            let mut iter = sparse_path.iter();
+            let original_len = iter.len();
+            
+            if original_len > 0 {
+                // Take one from front
+                let first = iter.next();
+                assert_eq!(first, Some(control_forward[0]));
+                assert_eq!(iter.len(), original_len - 1);
+                
+                if original_len > 1 {
+                    // Take one from back
+                    let last = iter.next_back();
+                    assert_eq!(last, Some(control_forward[original_len - 1]));
+                    assert_eq!(iter.len(), original_len - 2);
+                }
+            }
+            
+            // Test that exhausted iterator behaves correctly
+            let mut iter = sparse_path.iter();
+            for _ in 0..sparse_path.depth() {
+                iter.next();
+            }
+            assert_eq!(iter.next(), None);
+            assert_eq!(iter.next_back(), None);
+            assert_eq!(iter.len(), 0);
+        }
     }
 }
