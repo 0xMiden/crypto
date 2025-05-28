@@ -58,7 +58,7 @@ impl Forest {
         self.0 == 0
     }
 
-    /// Returns a forest with a capacity for exactly one more leaf.
+    /// Adds exactly one more leaf to the capacity of this forest.
     ///
     /// Some smaller trees might be merged together.
     pub fn append_leaf(&mut self) {
