@@ -7,6 +7,9 @@ use super::{full::high_bitmask, leaf_to_corresponding_tree};
 
 #[derive(Debug, Clone, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
+/// Represents a proof for a leaf in a Merkle Mountain Range (MMR).
+///
+/// Contains the leaf's global position, the forest state, and the associated Merkle path.
 pub struct MmrProof {
     /// The state of the MMR when the MmrProof was created.
     pub forest: usize,

@@ -7,6 +7,7 @@
 - Add module and function documentation. (#408).
 - [BREAKING] Replace `RpoDigest` with `Word` struct (#411).
 - Replace `RpxDigest` with `Word` struct (#420).
+- Added module and function documentation-3 #427
 
 ## 0.14.0 (2025-03-15)
 

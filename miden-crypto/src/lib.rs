@@ -1,4 +1,7 @@
+//! Cryptographic utilities and primitives used by the Miden VM.
+
 #![no_std]
+#![deny(missing_docs)]
 
 #[macro_use]
 extern crate alloc;

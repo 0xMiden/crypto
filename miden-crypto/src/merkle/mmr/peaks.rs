@@ -7,6 +7,9 @@ use super::{super::ZERO, Felt, MmrError, MmrProof, Rpo256, Word};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
+/// Represents the peaks of a Merkle Mountain Range (MMR) at a given state.
+///
+/// Contains the number of leaves and the current peak nodes in the forest.
 pub struct MmrPeaks {
     /// The number of leaves is used to differentiate MMRs that have the same number of peaks. This
     /// happens because the number of peaks goes up-and-down as the structure is used causing

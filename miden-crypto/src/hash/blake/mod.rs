@@ -34,6 +34,9 @@ const DIGEST20_BYTES: usize = 20;
 pub struct Blake3Digest<const N: usize>([u8; N]);
 
 impl<const N: usize> Blake3Digest<N> {
+    /// Returns a byte slice containing the concatenated bytes of all given digests.
+    ///
+    /// The returned slice represents the raw underlying bytes of each `Blake3Digest<N>` in order.
     pub fn digests_as_bytes(digests: &[Blake3Digest<N>]) -> &[u8] {
         let p = digests.as_ptr();
         let len = digests.len() * N;
