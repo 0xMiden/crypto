@@ -264,7 +264,11 @@ impl Forest {
         self.num_trees() - num_smaller_trees - 1
     }
 
-    /// Returns the in-order index of the root element.
+    /// Returns the smallest tree's root element as an [InOrderIndex].
+    ///
+    /// This function takes the smallest tree in this forest, "pretends" that it is a subtree of a
+    /// fully balanced binary tree, and returns the the in-order index of that balanced tree's root
+    /// node.
     pub fn root_in_order_index(&self) -> InOrderIndex {
         // Count total size of all trees in the forest.
         let nodes = self.num_nodes();
@@ -273,8 +277,8 @@ impl Forest {
         // currently empty, and correspond to the nodes that will be used once the trees are merged.
         let open_trees = self.num_trees() - 1;
 
-        // Remove the count of the right subtree of the target tree, target tree root index comes
-        // before the subtree for the in-order tree walk.
+        // Remove the leaf-count of the rightmost subtree. The target tree root index comes before
+        // the subtree, for the in-order tree walk.
         let right_subtree_count = self.smallest_tree_unchecked().num_leaves() - 1;
 
         let idx = nodes + open_trees - right_subtree_count;
