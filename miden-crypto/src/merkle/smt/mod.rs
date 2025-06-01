@@ -4,10 +4,7 @@ use core::hash::Hash;
 use winter_utils::{ByteReader, ByteWriter, Deserializable, DeserializationError, Serializable};
 
 use super::{EmptySubtreeRoots, InnerNodeInfo, MerkleError, MerklePath, NodeIndex};
-use crate::{
-    EMPTY_WORD, Felt, Word,
-    hash::rpo::{Rpo256, RpoDigest},
-};
+use crate::{EMPTY_WORD, Felt, Word, hash::rpo::Rpo256};
 
 mod full;
 pub use full::{SMT_DEPTH, Smt, SmtLeaf, SmtLeafError, SmtProof, SmtProofError};
@@ -32,7 +29,7 @@ pub const SMT_MAX_DEPTH: u8 = 64;
 // SPARSE MERKLE TREE
 // ================================================================================================
 
-/// A map whose keys are not guarantied to be ordered.
+/// A map whose keys are not guaranteed to be ordered.
 #[cfg(feature = "smt_hashmaps")]
 type UnorderedMap<K, V> = hashbrown::HashMap<K, V>;
 #[cfg(not(feature = "smt_hashmaps"))]
@@ -74,33 +71,39 @@ pub(crate) trait SparseMerkleTree<const DEPTH: u8> {
     const EMPTY_VALUE: Self::Value;
 
     /// The root of the empty tree with provided DEPTH
-    const EMPTY_ROOT: RpoDigest;
+    const EMPTY_ROOT: Word;
 
     // PROVIDED METHODS
     // ---------------------------------------------------------------------------------------------
+
+    /// Returns a [MerklePath] to the specified key.
+    ///
+    /// Mostly this is an implementation detail of [`Self::open()`].
+    fn get_path(&self, key: &Self::Key) -> MerklePath {
+        let index = NodeIndex::from(Self::key_to_leaf_index(key));
+        index.proof_indices().map(|index| self.get_node_hash(index)).collect()
+    }
+
+    /// Get the hash of a node at an arbitrary index, including the root or leaf hashes.
+    ///
+    /// The root index simply returns [`Self::root()`]. Other hashes are retrieved by calling
+    /// [`Self::get_inner_node()`] on the parent, and returning the respective child hash.
+    fn get_node_hash(&self, index: NodeIndex) -> Word {
+        if index.is_root() {
+            return self.root();
+        }
+
+        let InnerNode { left, right } = self.get_inner_node(index.parent());
+
+        let index_is_right = index.is_value_odd();
+        if index_is_right { right } else { left }
+    }
 
     /// Returns an opening of the leaf associated with `key`. Conceptually, an opening is a Merkle
     /// path to the leaf, as well as the leaf itself.
     fn open(&self, key: &Self::Key) -> Self::Opening {
         let leaf = self.get_leaf(key);
-
-        let mut index: NodeIndex = {
-            let leaf_index: LeafIndex<DEPTH> = Self::key_to_leaf_index(key);
-            leaf_index.into()
-        };
-
-        let merkle_path = {
-            let mut path = Vec::with_capacity(index.depth() as usize);
-            for _ in 0..index.depth() {
-                let is_right = index.is_value_odd();
-                index.move_up();
-                let InnerNode { left, right } = self.get_inner_node(index);
-                let value = if is_right { left } else { right };
-                path.push(value);
-            }
-
-            MerklePath::new(path)
-        };
+        let merkle_path = self.get_path(key);
 
         Self::path_and_leaf_to_opening(merkle_path, leaf)
     }
@@ -135,7 +138,7 @@ pub(crate) trait SparseMerkleTree<const DEPTH: u8> {
     fn recompute_nodes_from_index_to_root(
         &mut self,
         mut index: NodeIndex,
-        node_hash_at_index: RpoDigest,
+        node_hash_at_index: Word,
     ) {
         let mut node_hash = node_hash_at_index;
         for node_depth in (0..index.depth()).rev() {
@@ -397,16 +400,16 @@ pub(crate) trait SparseMerkleTree<const DEPTH: u8> {
     fn from_raw_parts(
         inner_nodes: InnerNodes,
         leaves: Leaves<Self::Leaf>,
-        root: RpoDigest,
+        root: Word,
     ) -> Result<Self, MerkleError>
     where
         Self: Sized;
 
     /// The root of the tree
-    fn root(&self) -> RpoDigest;
+    fn root(&self) -> Word;
 
     /// Sets the root of the tree
-    fn set_root(&mut self, root: RpoDigest);
+    fn set_root(&mut self, root: Word);
 
     /// Retrieves an inner node at the given index
     fn get_inner_node(&self, index: NodeIndex) -> InnerNode;
@@ -428,7 +431,7 @@ pub(crate) trait SparseMerkleTree<const DEPTH: u8> {
     fn get_leaf(&self, key: &Self::Key) -> Self::Leaf;
 
     /// Returns the hash of a leaf
-    fn hash_leaf(leaf: &Self::Leaf) -> RpoDigest;
+    fn hash_leaf(leaf: &Self::Leaf) -> Word;
 
     /// Returns what a leaf would look like if a key-value pair were inserted into the tree, without
     /// mutating the tree itself. The existing leaf can be empty.
@@ -466,12 +469,12 @@ pub(crate) trait SparseMerkleTree<const DEPTH: u8> {
 #[derive(Debug, Default, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 pub struct InnerNode {
-    pub left: RpoDigest,
-    pub right: RpoDigest,
+    pub left: Word,
+    pub right: Word,
 }
 
 impl InnerNode {
-    pub fn hash(&self) -> RpoDigest {
+    pub fn hash(&self) -> Word {
         Rpo256::merge(&[self.left, self.right])
     }
 }
@@ -487,6 +490,11 @@ pub struct LeafIndex<const DEPTH: u8> {
 }
 
 impl<const DEPTH: u8> LeafIndex<DEPTH> {
+    /// Creates a new `LeafIndex` with the specified value.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the provided depth is less than the minimum supported depth.
     pub fn new(value: u64) -> Result<Self, MerkleError> {
         if DEPTH < SMT_MIN_DEPTH {
             return Err(MerkleError::DepthTooSmall(DEPTH));
@@ -495,12 +503,14 @@ impl<const DEPTH: u8> LeafIndex<DEPTH> {
         Ok(LeafIndex { index: NodeIndex::new(DEPTH, value)? })
     }
 
+    /// Returns the numeric value of this leaf index.
     pub fn value(&self) -> u64 {
         self.index.value()
     }
 }
 
 impl LeafIndex<SMT_MAX_DEPTH> {
+    /// Creates a new `LeafIndex` at the maximum supported depth without validation.
     pub const fn new_max_depth(value: u64) -> Self {
         LeafIndex {
             index: NodeIndex::new_unchecked(SMT_MAX_DEPTH, value),
@@ -563,7 +573,7 @@ pub struct MutationSet<const DEPTH: u8, K: Eq + Hash, V> {
     /// The root of the Merkle tree this MutationSet is for, recorded at the time
     /// [`SparseMerkleTree::compute_mutations()`] was called. Exists to guard against applying
     /// mutations to the wrong tree or applying stale mutations to a tree that has since changed.
-    old_root: RpoDigest,
+    old_root: Word,
     /// The set of nodes that need to be removed or added. The "effective" node at an index is the
     /// Merkle tree's existing node at that index, with the [`NodeMutation`] in this map at that
     /// index overlayed, if any. Each [`NodeMutation::Addition`] corresponds to a
@@ -577,18 +587,18 @@ pub struct MutationSet<const DEPTH: u8, K: Eq + Hash, V> {
     new_pairs: UnorderedMap<K, V>,
     /// The calculated root for the Merkle tree, given these mutations. Publicly retrievable with
     /// [`MutationSet::root()`]. Corresponds to a [`SparseMerkleTree::set_root()`]. call.
-    new_root: RpoDigest,
+    new_root: Word,
 }
 
 impl<const DEPTH: u8, K: Eq + Hash, V> MutationSet<DEPTH, K, V> {
     /// Returns the SMT root that was calculated during `SparseMerkleTree::compute_mutations()`. See
     /// that method for more information.
-    pub fn root(&self) -> RpoDigest {
+    pub fn root(&self) -> Word {
         self.new_root
     }
 
     /// Returns the SMT root before the mutations were applied.
-    pub fn old_root(&self) -> RpoDigest {
+    pub fn old_root(&self) -> Word {
         self.old_root
     }
 

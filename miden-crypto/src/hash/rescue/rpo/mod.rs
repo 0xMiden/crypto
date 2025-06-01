@@ -1,15 +1,12 @@
 use core::ops::Range;
 
 use super::{
-    ARK1, ARK2, BINARY_CHUNK_SIZE, CAPACITY_RANGE, DIGEST_BYTES, DIGEST_RANGE, DIGEST_SIZE, Digest,
-    ElementHasher, Felt, FieldElement, Hasher, INPUT1_RANGE, INPUT2_RANGE, MDS, NUM_ROUNDS,
-    RATE_RANGE, RATE_WIDTH, STATE_WIDTH, StarkField, ZERO, add_constants,
-    add_constants_and_apply_inv_sbox, add_constants_and_apply_sbox, apply_inv_sbox, apply_mds,
-    apply_sbox,
+    ARK1, ARK2, BINARY_CHUNK_SIZE, CAPACITY_RANGE, DIGEST_RANGE, ElementHasher, Felt, FieldElement,
+    Hasher, INPUT1_RANGE, INPUT2_RANGE, MDS, NUM_ROUNDS, RATE_RANGE, RATE_WIDTH, STATE_WIDTH,
+    StarkField, ZERO, add_constants, add_constants_and_apply_inv_sbox,
+    add_constants_and_apply_sbox, apply_inv_sbox, apply_mds, apply_sbox,
 };
-
-mod digest;
-pub use digest::{RpoDigest, RpoDigestError};
+use crate::Word;
 
 #[cfg(test)]
 mod tests;
@@ -77,7 +74,7 @@ impl Hasher for Rpo256 {
     /// Rpo256 collision resistance is 128-bits.
     const COLLISION_RESISTANCE: u32 = 128;
 
-    type Digest = RpoDigest;
+    type Digest = Word;
 
     fn hash(bytes: &[u8]) -> Self::Digest {
         // initialize the state with zeroes
@@ -148,25 +145,25 @@ impl Hasher for Rpo256 {
         }
 
         // return the first 4 elements of the rate as hash result.
-        RpoDigest::new(state[DIGEST_RANGE].try_into().unwrap())
+        Word::new(state[DIGEST_RANGE].try_into().unwrap())
     }
 
     fn merge(values: &[Self::Digest; 2]) -> Self::Digest {
         // initialize the state by copying the digest elements into the rate portion of the state
         // (8 total elements), and set the capacity elements to 0.
         let mut state = [ZERO; STATE_WIDTH];
-        let it = Self::Digest::digests_as_elements_iter(values.iter());
+        let it = Self::Digest::words_as_elements_iter(values.iter());
         for (i, v) in it.enumerate() {
             state[RATE_RANGE.start + i] = *v;
         }
 
         // apply the RPO permutation and return the first four elements of the state
         Self::apply_permutation(&mut state);
-        RpoDigest::new(state[DIGEST_RANGE].try_into().unwrap())
+        Word::new(state[DIGEST_RANGE].try_into().unwrap())
     }
 
     fn merge_many(values: &[Self::Digest]) -> Self::Digest {
-        Self::hash_elements(Self::Digest::digests_as_elements(values))
+        Self::hash_elements(Self::Digest::words_as_elements(values))
     }
 
     fn merge_with_int(seed: Self::Digest, value: u64) -> Self::Digest {
@@ -188,7 +185,7 @@ impl Hasher for Rpo256 {
 
         // apply the RPO permutation and return the first four elements of the rate
         Self::apply_permutation(&mut state);
-        RpoDigest::new(state[DIGEST_RANGE].try_into().unwrap())
+        Word::new(state[DIGEST_RANGE].try_into().unwrap())
     }
 }
 
@@ -229,7 +226,7 @@ impl ElementHasher for Rpo256 {
         }
 
         // return the first 4 elements of the state as hash result
-        RpoDigest::new(state[DIGEST_RANGE].try_into().unwrap())
+        Word::new(state[DIGEST_RANGE].try_into().unwrap())
     }
 }
 
@@ -270,20 +267,20 @@ impl Rpo256 {
 
     /// Returns a hash of the provided sequence of bytes.
     #[inline(always)]
-    pub fn hash(bytes: &[u8]) -> RpoDigest {
+    pub fn hash(bytes: &[u8]) -> Word {
         <Self as Hasher>::hash(bytes)
     }
 
     /// Returns a hash of two digests. This method is intended for use in construction of
     /// Merkle trees and verification of Merkle paths.
     #[inline(always)]
-    pub fn merge(values: &[RpoDigest; 2]) -> RpoDigest {
+    pub fn merge(values: &[Word; 2]) -> Word {
         <Self as Hasher>::merge(values)
     }
 
     /// Returns a hash of the provided field elements.
     #[inline(always)]
-    pub fn hash_elements<E: FieldElement<BaseField = Felt>>(elements: &[E]) -> RpoDigest {
+    pub fn hash_elements<E: FieldElement<BaseField = Felt>>(elements: &[E]) -> Word {
         <Self as ElementHasher>::hash_elements(elements)
     }
 
@@ -291,11 +288,11 @@ impl Rpo256 {
     // --------------------------------------------------------------------------------------------
 
     /// Returns a hash of two digests and a domain identifier.
-    pub fn merge_in_domain(values: &[RpoDigest; 2], domain: Felt) -> RpoDigest {
+    pub fn merge_in_domain(values: &[Word; 2], domain: Felt) -> Word {
         // initialize the state by copying the digest elements into the rate portion of the state
         // (8 total elements), and set the capacity elements to 0.
         let mut state = [ZERO; STATE_WIDTH];
-        let it = RpoDigest::digests_as_elements_iter(values.iter());
+        let it = Word::words_as_elements_iter(values.iter());
         for (i, v) in it.enumerate() {
             state[RATE_RANGE.start + i] = *v;
         }
@@ -306,7 +303,7 @@ impl Rpo256 {
 
         // apply the RPO permutation and return the first four elements of the state
         Self::apply_permutation(&mut state);
-        RpoDigest::new(state[DIGEST_RANGE].try_into().unwrap())
+        Word::new(state[DIGEST_RANGE].try_into().unwrap())
     }
 
     // RESCUE PERMUTATION

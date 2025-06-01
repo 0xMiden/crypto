@@ -1,3 +1,13 @@
+//! Public key types for the RPO Falcon 512 digital signature scheme used in Miden VM.
+//!
+//! This module defines two main types:
+//! - `PublicKey`: A commitment to a polynomial, represented as a hash of the polynomial’s
+//!   coefficients.
+//! - `PubKeyPoly`: A public key represented directly as a polynomial over FalconFelt coefficients.
+//!
+//! The `PublicKey` is used for signature verification.
+//! The `PubKeyPoly` provides the raw polynomial form of a public key.
+
 use alloc::string::ToString;
 use core::ops::Deref;
 
@@ -6,9 +16,9 @@ use num::Zero;
 use super::{
     super::{LOG_N, N, PK_LEN, Rpo256},
     ByteReader, ByteWriter, Deserializable, DeserializationError, FalconFelt, Felt, Polynomial,
-    Serializable, Signature, Word,
+    Serializable, Signature,
 };
-use crate::dsa::rpo_falcon512::FALCON_ENCODING_BITS;
+use crate::{Word, dsa::rpo_falcon512::FALCON_ENCODING_BITS};
 
 // PUBLIC KEY
 // ================================================================================================
@@ -36,7 +46,7 @@ impl PublicKey {
 impl From<PubKeyPoly> for PublicKey {
     fn from(pk_poly: PubKeyPoly) -> Self {
         let pk_felts: Polynomial<Felt> = pk_poly.0.into();
-        let pk_digest = Rpo256::hash_elements(&pk_felts.coefficients).into();
+        let pk_digest = Rpo256::hash_elements(&pk_felts.coefficients);
         Self(pk_digest)
     }
 }
@@ -50,6 +60,8 @@ impl From<PublicKey> for Word {
 // PUBLIC KEY POLYNOMIAL
 // ================================================================================================
 
+/// Public key represented as a polynomial with coefficients over the Falcon prime field.
+/// Used in the RPO Falcon 512 signature scheme.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PubKeyPoly(pub Polynomial<FalconFelt>);
 

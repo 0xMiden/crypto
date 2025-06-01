@@ -1,6 +1,6 @@
 use core::ops::Range;
 
-use super::{CubeExtension, Digest, ElementHasher, Felt, FieldElement, Hasher, StarkField, ZERO};
+use super::{CubeExtension, ElementHasher, Felt, FieldElement, Hasher, StarkField, ZERO};
 
 mod arch;
 pub use arch::optimized::{add_constants_and_apply_inv_sbox, add_constants_and_apply_sbox};
@@ -9,10 +9,10 @@ mod mds;
 use mds::{MDS, apply_mds};
 
 mod rpo;
-pub use rpo::{Rpo256, RpoDigest, RpoDigestError};
+pub use rpo::Rpo256;
 
 mod rpx;
-pub use rpx::{Rpx256, RpxDigest, RpxDigestError};
+pub use rpx::Rpx256;
 
 #[cfg(test)]
 mod tests;
@@ -43,10 +43,6 @@ const CAPACITY_RANGE: Range<usize> = 0..4;
 /// The digest is returned from state elements 4, 5, 6, and 7 (the first four elements of the
 /// rate portion).
 const DIGEST_RANGE: Range<usize> = 4..8;
-const DIGEST_SIZE: usize = DIGEST_RANGE.end - DIGEST_RANGE.start;
-
-/// The number of bytes needed to encoded a digest
-const DIGEST_BYTES: usize = 32;
 
 /// The number of byte chunks defining a field element when hashing a sequence of bytes
 const BINARY_CHUNK_SIZE: usize = 7;

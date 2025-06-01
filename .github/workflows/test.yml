@@ -43,3 +43,18 @@ jobs:
         run: |
           rustup update --no-self-update ${{matrix.toolchain}}
           make test-smt-concurrent
+
+  doc-tests:
+    name: doc-tests
+    runs-on: ubuntu-latest
+    if: ${{ github.event_name == 'pull_request' && (github.base_ref == 'main' || github.base_ref == 'next') }}
+    strategy:
+      fail-fast: false
+    steps:
+      - uses: actions/checkout@main
+      - uses: Swatinem/rust-cache@v2
+      - name: Run doc-tests
+        run: |
+          rustup update --no-self-update
+          make test-docs
+

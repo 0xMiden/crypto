@@ -4,10 +4,10 @@
 
 We want to make contributing to this project as easy and transparent as possible, whether it's:
 
-- Reporting a [bug](https://github.com/0xPolygonMiden/crypto/issues/new)
-- Taking part in [discussions](https://github.com/0xPolygonMiden/crypto/discussions)
-- Submitting a [fix](https://github.com/0xPolygonMiden/crypto/pulls)
-- Proposing new [features](https://github.com/0xPolygonMiden/crypto/issues/new)
+- Reporting a [bug](https://github.com/0xMiden/crypto/issues/new)
+- Taking part in [discussions](https://github.com/0xMiden/crypto/discussions)
+- Submitting a [fix](https://github.com/0xMiden/crypto/pulls)
+- Proposing new [features](https://github.com/0xMiden/crypto/issues/new)
 
 &nbsp;
 

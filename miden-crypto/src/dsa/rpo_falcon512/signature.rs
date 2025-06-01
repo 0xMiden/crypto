@@ -5,11 +5,12 @@ use num::Zero;
 
 use super::{
     ByteReader, ByteWriter, Deserializable, DeserializationError, Felt, LOG_N, MODULUS, N, Nonce,
-    Rpo256, SIG_L2_BOUND, SIG_POLY_BYTE_LEN, Serializable, Word,
+    Rpo256, SIG_L2_BOUND, SIG_POLY_BYTE_LEN, Serializable,
     hash_to_point::hash_to_point_rpo256,
     keys::PubKeyPoly,
     math::{FalconFelt, FastFft, Polynomial},
 };
+use crate::Word;
 
 // FALCON SIGNATURE
 // ================================================================================================
@@ -56,6 +57,9 @@ pub struct Signature {
 impl Signature {
     // CONSTRUCTOR
     // --------------------------------------------------------------------------------------------
+
+    /// Creates a new signature from the given nonce, public key polynomial, and signature
+    /// polynomial.
     pub fn new(nonce: Nonce, h: PubKeyPoly, s2: SignaturePoly) -> Signature {
         Self {
             header: SignatureHeader::default(),
@@ -73,7 +77,7 @@ impl Signature {
         &self.h
     }
 
-    // Returns the polynomial representation of the signature in Z_p[x]/(phi).
+    /// Returns the polynomial representation of the signature in Z_p\[x\]/(phi).
     pub fn sig_poly(&self) -> &Polynomial<FalconFelt> {
         &self.s2
     }
@@ -91,7 +95,7 @@ impl Signature {
     pub fn verify(&self, message: Word, pubkey_com: Word) -> bool {
         // compute the hash of the public key polynomial
         let h_felt: Polynomial<Felt> = (&**self.pk_poly()).into();
-        let h_digest: Word = Rpo256::hash_elements(&h_felt.coefficients).into();
+        let h_digest: Word = Rpo256::hash_elements(&h_felt.coefficients);
         if h_digest != pubkey_com {
             return false;
         }
@@ -124,6 +128,7 @@ impl Deserializable for Signature {
 // SIGNATURE HEADER
 // ================================================================================================
 
+/// The header byte used to encode the signature metadata.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SignatureHeader(u8);
 
@@ -174,6 +179,7 @@ impl Deserializable for SignatureHeader {
 // SIGNATURE POLYNOMIAL
 // ================================================================================================
 
+/// A polynomial used as the `s2` component of the signature.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SignaturePoly(pub Polynomial<FalconFelt>);
 

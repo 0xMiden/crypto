@@ -1,9 +1,7 @@
 //! Data structures related to Merkle trees based on RPO256 hash function.
+use core::fmt::{self, Display};
 
-use super::{
-    EMPTY_WORD, Felt, Word, ZERO,
-    hash::rpo::{Rpo256, RpoDigest},
-};
+use super::{EMPTY_WORD, Felt, Word, ZERO, hash::rpo::Rpo256};
 
 // REEXPORTS
 // ================================================================================================
@@ -20,6 +18,9 @@ pub use merkle_tree::{MerkleTree, path_to_text, tree_to_text};
 mod path;
 pub use path::{MerklePath, RootPath, ValuePath};
 
+mod sparse_path;
+pub use sparse_path::{SparseMerklePath, SparseValuePath};
+
 mod smt;
 pub use smt::{
     InnerNode, LeafIndex, MutationSet, NodeMutation, PartialSmt, SMT_DEPTH, SMT_MAX_DEPTH,
@@ -29,7 +30,7 @@ pub use smt::{
 pub use smt::{SubtreeLeaf, build_subtree_for_bench};
 
 mod mmr;
-pub use mmr::{InOrderIndex, Mmr, MmrDelta, MmrError, MmrPeaks, MmrProof, PartialMmr};
+pub use mmr::{Forest, InOrderIndex, Mmr, MmrDelta, MmrError, MmrPeaks, MmrProof, PartialMmr};
 
 mod store;
 pub use store::{DefaultMerkleStore, MerkleStore, RecordingMerkleStore, StoreNode};
@@ -43,20 +44,21 @@ pub use partial_mt::PartialMerkleTree;
 mod error;
 pub use error::MerkleError;
 
+impl<const DEPTH: u8> Display for LeafIndex<DEPTH> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "DEPTH={}, value={}", DEPTH, self.value())
+    }
+}
+
 // HELPER FUNCTIONS
 // ================================================================================================
 
 #[cfg(test)]
-const fn int_to_node(value: u64) -> RpoDigest {
-    RpoDigest::new([Felt::new(value), ZERO, ZERO, ZERO])
+const fn int_to_node(value: u64) -> Word {
+    Word::new([Felt::new(value), ZERO, ZERO, ZERO])
 }
 
 #[cfg(test)]
 const fn int_to_leaf(value: u64) -> Word {
-    [Felt::new(value), ZERO, ZERO, ZERO]
-}
-
-#[cfg(test)]
-fn digests_to_words(digests: &[RpoDigest]) -> alloc::vec::Vec<Word> {
-    digests.iter().map(|d| d.into()).collect()
+    Word::new([Felt::new(value), ZERO, ZERO, ZERO])
 }
