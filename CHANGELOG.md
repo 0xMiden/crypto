@@ -1,13 +1,15 @@
 ## 0.15.0 (TBD)
 
 - Allow pre-sorted entries in `Smt` (#406).
-- Replace deprecated #[clap(...)] with #[command(...)] and #[arg(...)] (#413).
+- Add module and function documentation. (#408).
 - Added default constructors to `MmrPeaks` and `PartialMmr` (#409).
 - Added module and function documentation-2 (#410).
-- Add module and function documentation. (#408).
 - [BREAKING] Replace `RpoDigest` with `Word` struct (#411).
+- Replace deprecated #[clap(...)] with #[command(...)] and #[arg(...)] (#413).
 - Replace `RpxDigest` with `Word` struct (#420).
-- Added module and function documentation-3 #427
+- Add `word!` macro to `miden-crypto` (#423).
+- Added module and function documentation-3 (#427).
+
 
 ## 0.14.0 (2025-03-15)
 

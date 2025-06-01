@@ -499,6 +499,82 @@ impl IntoIterator for Word {
     }
 }
 
+// MACROS
+// ================================================================================================
+
+/// Construct a new `Word` from a hex value.
+///
+/// Expects a '0x' prefixed hex string followed by up to 64 hex digits.
+#[macro_export]
+macro_rules! word {
+    ($hex:expr) => {{
+        let felts: [$crate::Felt; 4] = match $crate::word::parse_hex_string_as_word($hex) {
+            Ok(v) => v,
+            Err(e) => panic!("{}", e),
+        };
+
+        $crate::Word::new(felts)
+    }};
+}
+
+/// Parses a hex string into a `[Felt; 4]` array.
+pub const fn parse_hex_string_as_word(hex: &str) -> Result<[Felt; 4], &'static str> {
+    const fn parse_hex_digit(digit: u8) -> Result<u8, &'static str> {
+        match digit {
+            b'0'..=b'9' => Ok(digit - b'0'),
+            b'A'..=b'F' => Ok(digit - b'A' + 0x0a),
+            b'a'..=b'f' => Ok(digit - b'a' + 0x0a),
+            _ => Err("Invalid hex character"),
+        }
+    }
+    // Enforce and skip the '0x' prefix.
+    let hex_bytes = match hex.as_bytes() {
+        [b'0', b'x', rest @ ..] => rest,
+        _ => return Err("Hex string must have a \"0x\" prefix"),
+    };
+
+    if hex_bytes.len() > 64 {
+        return Err("Hex string has more than 64 characters");
+    }
+
+    let mut felts = [0u64; 4];
+    let mut i = 0;
+    while i < hex_bytes.len() {
+        let hex_digit = match parse_hex_digit(hex_bytes[i]) {
+            // SAFETY: u8 cast to u64 is safe. We cannot use u64::from in const context so we
+            // are forced to cast.
+            Ok(v) => v as u64,
+            Err(e) => return Err(e),
+        };
+
+        // This digit's nibble offset within the felt. We need to invert the nibbles per
+        // byte for endianness reasons i.e. ABCD -> BADC.
+        let inibble = if i % 2 == 0 { (i + 1) % 16 } else { (i - 1) % 16 };
+
+        let value = hex_digit << (inibble * 4);
+        felts[i / 2 / 8] += value;
+
+        i += 1;
+    }
+
+    // Ensure each felt is within bounds as `Felt::new` silently wraps around.
+    // This matches the behaviour of `Word::try_from(String)`.
+    let mut idx = 0;
+    while idx < felts.len() {
+        if felts[idx] >= Felt::MODULUS {
+            return Err("Felt overflow");
+        }
+        idx += 1;
+    }
+
+    Ok([
+        Felt::new(felts[0]),
+        Felt::new(felts[1]),
+        Felt::new(felts[2]),
+        Felt::new(felts[3]),
+    ])
+}
+
 // TESTS
 // ================================================================================================
 
@@ -622,5 +698,42 @@ mod tests {
         let v: String = (&word).into();
         let v2: Word = (&v).try_into().unwrap();
         assert_eq!(word, v2);
+    }
+
+    #[rstest::rstest]
+    #[case::missing_prefix("1234")]
+    #[case::invalid_character("1234567890abcdefg")]
+    #[case::too_long("0xx00000000000000000000000000000000000000000000000000000000000000001")]
+    #[case::overflow_felt0("0x01000000ffffffff000000000000000000000000000000000000000000000000")]
+    #[case::overflow_felt1("0x000000000000000001000000ffffffff00000000000000000000000000000000")]
+    #[case::overflow_felt2("0x0000000000000000000000000000000001000000ffffffff0000000000000000")]
+    #[case::overflow_felt3("0x00000000000000000000000000000000000000000000000001000000ffffffff")]
+    #[should_panic]
+    fn word_macro_invalid(#[case] bad_input: &str) {
+        word!(bad_input);
+    }
+
+    #[rstest::rstest]
+    #[case::each_digit("0x1234567890abcdef")]
+    #[case::empty("0x")]
+    #[case::zero("0x0")]
+    #[case::zero_full("0x0000000000000000000000000000000000000000000000000000000000000000")]
+    #[case::one_lsb("0x1")]
+    #[case::one_msb("0x0000000000000000000000000000000000000000000000000000000000000001")]
+    #[case::one_partial("0x0001")]
+    #[case::odd("0x123")]
+    #[case::even("0x1234")]
+    #[case::touch_each_felt("0x00000000000123450000000000067890000000000000abcd00000000000000ef")]
+    #[case::unique_felt("0x111111111111111155555555555555559999999999999999cccccccccccccccc")]
+    #[case::digits_on_repeat("0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef")]
+    fn word_macro(#[case] input: &str) {
+        let uut = word!(input);
+
+        // Right pad to 64 hex digits (66 including prefix). This is required by the
+        // Word::try_from(String) implementation.
+        let padded_input = format!("{input:<66}").replace(" ", "0");
+        let expected = crate::Word::try_from(padded_input.as_str()).unwrap();
+
+        assert_eq!(uut, expected);
     }
 }

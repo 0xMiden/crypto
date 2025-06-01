@@ -87,6 +87,7 @@ itertools = { version = "0.14" }
 proptest = { version = "1.6", default-features = false, features = ["alloc"]}
 rand_chacha = { version = "0.9", default-features = false }
 rand-utils = { version = "0.12", package = "winter-rand-utils" }
+rstest = { version = "0.25" }
 seq-macro = { version = "0.3" }
 
 [build-dependencies]
