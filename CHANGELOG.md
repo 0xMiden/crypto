@@ -10,10 +10,15 @@
 - [BREAKING] Replaced `RpxDigest` with `Word` struct (#420).
 - Added `word!` macro to `miden-crypto` (#423).
 - [BREAKING] Incremented MSRV to 1.87.
+- [BREAKING] Renamed `MerklePath::inner_nodes()` to `authenticated_nodes()` to better reflect its functionality (#415).
+- Added `compute_root()`, `verify()`, and `authenticated_nodes()` to `SparseMerklePath` for parity with `MerklePath` (#415).
 
 ## 0.14.1 (2025-05-31)
 
 - Added missing `PartialSmt` APIs (#417).
+- Add module and function documentation. (#408).
+- [BREAKING] Replace `RpoDigest` with `Word` struct (#411).
+- Replace `RpxDigest` with `Word` struct (#420).
 
 ## 0.14.0 (2025-03-15)
 

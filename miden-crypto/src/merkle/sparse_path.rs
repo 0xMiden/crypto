@@ -6,7 +6,11 @@ use core::{
 
 use winter_utils::{Deserializable, DeserializationError, Serializable};
 
-use super::{EmptySubtreeRoots, MerkleError, MerklePath, SMT_MAX_DEPTH, ValuePath, Word};
+use super::{
+    EmptySubtreeRoots, InnerNodeInfo, MerkleError, MerklePath, NodeIndex, SMT_MAX_DEPTH, ValuePath,
+    Word,
+};
+use crate::hash::rpo::Rpo256;
 
 /// A different representation of [`MerklePath`] designed for memory efficiency for Merkle paths
 /// with empty nodes.
@@ -103,6 +107,61 @@ impl SparseMerklePath {
     /// Starts from the leaf and iterates toward the root (excluding the root).
     pub fn iter(&self) -> impl ExactSizeIterator<Item = Word> {
         self.into_iter()
+    }
+
+    /// Computes the Merkle root for this opening.
+    pub fn compute_root(&self, index: u64, node_to_prove: Word) -> Result<Word, MerkleError> {
+        let mut index = NodeIndex::new(self.depth(), index)?;
+        let root = self.iter().fold(node_to_prove, |node, sibling| {
+            // Compute the node and move to the next iteration.
+            let input = index.build_node(node, sibling);
+            index.move_up();
+            Rpo256::merge(&input)
+        });
+
+        Ok(root)
+    }
+
+    /// Verifies the Merkle opening proof towards the provided root.
+    ///
+    /// # Errors
+    /// Returns an error if:
+    /// - provided node index is invalid.
+    /// - root calculated during the verification differs from the provided one.
+    pub fn verify(&self, index: u64, node: Word, &expected_root: &Word) -> Result<(), MerkleError> {
+        let computed_root = self.compute_root(index, node)?;
+        if computed_root != expected_root {
+            return Err(MerkleError::ConflictingRoots {
+                expected_root,
+                actual_root: computed_root,
+            });
+        }
+
+        Ok(())
+    }
+
+    /// Given the node this path opens to, return an iterator of all the nodes that are known via
+    /// this path.
+    ///
+    /// Each item in the iterator is an [InnerNodeInfo], containing the hash of a node as `.value`,
+    /// and its two children as `.left` and `.right`. The very first item in that iterator will be
+    /// the parent of `node_to_prove` as stored in this [SparseMerklePath].
+    ///
+    /// From there, the iterator will continue to yield every further parent and both of its
+    /// children, up to and including the root node.
+    ///
+    /// If `node_to_prove` is not the node this path is an opening to, or `index` is not the
+    /// correct index for that node, the returned nodes will be meaningless.
+    ///
+    /// # Errors
+    /// Returns an error if the specified index is not valid for this path.
+    pub fn authenticated_nodes(
+        &self,
+        index: u64,
+        node_to_prove: Word,
+    ) -> Result<InnerNodeIterator, MerkleError> {
+        let index = NodeIndex::new(self.depth(), index)?;
+        Ok(InnerNodeIterator { path: self, index, value: node_to_prove })
     }
 
     // PRIVATE HELPERS
@@ -266,6 +325,39 @@ impl<'p> IntoIterator for &'p SparseMerklePath {
             path: Cow::Borrowed(self),
             next_depth: tree_depth,
         }
+    }
+}
+
+/// An iterator over nodes known by a [SparseMerklePath]. See
+/// [`SparseMerklePath::authenticated_nodes()`].
+pub struct InnerNodeIterator<'p> {
+    path: &'p SparseMerklePath,
+    index: NodeIndex,
+    value: Word,
+}
+
+impl Iterator for InnerNodeIterator<'_> {
+    type Item = InnerNodeInfo;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.index.is_root() {
+            return None;
+        }
+
+        let index_depth = NonZero::new(self.index.depth()).expect("non-root depth cannot be 0");
+        let path_node = self.path.at_depth(index_depth).unwrap();
+
+        let is_right = self.index.is_value_odd();
+        let (left, right) = if is_right {
+            (path_node, self.value)
+        } else {
+            (self.value, path_node)
+        };
+
+        self.value = Rpo256::merge(&[left, right]);
+        self.index.move_up();
+
+        Some(InnerNodeInfo { value: self.value, left, right })
     }
 }
 
@@ -609,5 +701,28 @@ mod tests {
         );
         assert_eq!(sparse_path.iter().next(), None);
         assert_eq!(sparse_path.into_iter().next(), None);
+    }
+
+    #[test]
+    fn test_root() {
+        let tree = make_smt(8192);
+
+        for (key, _value) in tree.entries() {
+            let leaf = tree.get_leaf(key);
+            let leaf_node = leaf.hash();
+            let index: NodeIndex = Smt::key_to_leaf_index(key).into();
+            let control_path = tree.get_path(key);
+            let sparse_path = SparseMerklePath::try_from(control_path.clone()).unwrap();
+
+            let authed_nodes: Vec<_> =
+                sparse_path.authenticated_nodes(index.value(), leaf_node).unwrap().collect();
+            let authed_root = authed_nodes.last().unwrap().value;
+
+            let control_root = control_path.compute_root(index.value(), leaf_node).unwrap();
+            let sparse_root = sparse_path.compute_root(index.value(), leaf_node).unwrap();
+            assert_eq!(control_root, sparse_root);
+            assert_eq!(authed_root, control_root);
+            assert_eq!(authed_root, tree.root());
+        }
     }
 }
