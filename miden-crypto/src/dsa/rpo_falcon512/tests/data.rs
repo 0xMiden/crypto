@@ -1,243 +1,9 @@
-use alloc::vec::Vec;
-
-use rand::RngCore;
-use rand_core::impls;
-use sha3::{
-    Shake256, Shake256ReaderCore,
-    digest::{ExtendableOutput, Update, XofReader, core_api::XofReaderCoreWrapper},
-};
-
-use super::{Serializable, math::Polynomial};
-use crate::dsa::rpo_falcon512::{CHACHA_SEED_LEN, SIG_NONCE_LEN, SecretKey};
-
-const NUM_TEST_VECTORS: usize = 12;
-
-/// Tests the Falcon512 implementation using the test vectors in
-/// https://github.com/tprest/falcon.py/blob/88d01ede1d7fa74a8392116bc5149dee57af93f2/scripts/sign_KAT.py#L1131
-#[test]
-fn test_signature_gen_reference_impl() {
-    // message and initial seed used for generating the test vectors in the reference implementation
-    let message = b"data1";
-    let seed = b"external";
-
-    // the reference implementation uses SHAKE256 for generating:
-    // 1. The nonce for the hash-to-point algorithm.
-    // 2. The seed used for initializing the ChaCha20 PRNG which is used in signature generation.
-    let mut rng_shake = Shake256Testing::new(seed.to_vec());
-
-    // the test vectors in the reference implementation include test vectors for signatures with
-    // parameter N = 2^i for i = 1..10, where N is the exponent of the monic irreducible polynomial
-    // phi. We are only interested in the test vectors for N = 2^9 = 512 and thus need to "sync"
-    // the SHAKE256 PRNG before we can use it in testing the test vectors that are relevant for
-    // N = 512.
-    // The following makes the necessary calls to the PRNG in order to prepare it for use with
-    // the test vectors for N = 512.
-    sync_rng(&mut rng_shake);
-
-    for i in 0..NUM_TEST_VECTORS {
-        // construct the four polynomials defining the secret key for this test vector
-        let [f, g, big_f, big_g] = SK_POLYS[i];
-        let f = Polynomial::new(f.to_vec());
-        let g = Polynomial::new(g.to_vec());
-        let big_f = Polynomial::new(big_f.to_vec());
-        let big_g = Polynomial::new(big_g.to_vec());
-
-        // we generate the secret key using the above four polynomials
-        let sk = SecretKey::from_short_lattice_basis([g, f, big_g, big_f]);
-
-        // we compare the signature as a polynomial
-        let signature =
-            sk.sign_with_rng_testing(message, &mut rng_shake, SYNC_DATA_FOR_TEST_VECTOR[i].0 * 8);
-        let sig_coef: Vec<i16> =
-            signature.sig_poly().coefficients.iter().map(|c| c.balanced_value()).collect();
-        assert_eq!(sig_coef, EXPECTED_SIG_POLYS[i]);
-
-        // we compare the encoded signature including the nonce
-        let sig_bytes = signature.to_bytes();
-        let expected_sig_bytes = EXPECTED_SIG[i];
-        let hex_expected_sig_bytes = hex::decode(expected_sig_bytes).unwrap();
-
-        // we remove the headers when comparing as RPO_FALCON512 uses a different header format.
-        // we also remove the public key from the RPO_FALCON512 signature as this is not part of
-        // the signature in the reference implementation
-        assert_eq!(&hex_expected_sig_bytes[2..], &sig_bytes[2..2 + 664]);
-    }
-}
-
-/// A function to help with "syncing" the SHAKE256 PRNG so that it can be used with the test vectors
-/// for Falcon512.
-fn sync_rng<R: RngCore>(rng_shake: &mut R) {
-    for (bytes, num_seed_sampled) in SYNC_DATA.iter() {
-        let mut dummy = vec![0_u8; bytes * 8];
-        rng_shake.fill_bytes(&mut dummy);
-        let mut nonce_bytes = [0u8; SIG_NONCE_LEN];
-        rng_shake.fill_bytes(&mut nonce_bytes);
-
-        for _ in 0..*num_seed_sampled {
-            let mut chacha_seed = [0_u8; CHACHA_SEED_LEN];
-            rng_shake.fill_bytes(&mut chacha_seed);
-        }
-    }
-}
-
-/// A PRNG based on SHAKE256 used for testing.
-///
-/// DO NOT USE IN PRODUCTION.
-pub struct Shake256Testing(XofReaderCoreWrapper<Shake256ReaderCore>);
-
-impl Shake256Testing {
-    pub fn new(data: Vec<u8>) -> Self {
-        let mut hasher = Shake256::default();
-        hasher.update(&data);
-        let result = hasher.finalize_xof();
-
-        Self(result)
-    }
-
-    fn fill_bytes(&mut self, des: &mut [u8]) {
-        self.0.read(des)
-    }
-}
-
-impl RngCore for Shake256Testing {
-    fn next_u32(&mut self) -> u32 {
-        impls::next_u32_via_fill(self)
-    }
-
-    fn next_u64(&mut self) -> u64 {
-        impls::next_u64_via_u32(self)
-    }
-
-    fn fill_bytes(&mut self, dest: &mut [u8]) {
-        self.fill_bytes(dest)
-    }
-}
-
-/// A PRNG based on ChaCha20 used for testing.
-///
-/// DO NOT USE IN PRODUCTION.
-#[derive(Clone, PartialEq, Eq)]
-pub struct ChaCha {
-    state: Vec<u32>,
-    s: Vec<u32>,
-    ctr: u64,
-    buffer: Vec<u8>,
-}
-
-impl ChaCha {
-    pub fn new(src: Vec<u8>) -> Self {
-        let mut s = vec![0_u32; 14];
-        for i in 0..14 {
-            let bytes = &src[(4 * i)..(4 * (i + 1))];
-            let value = u32::from_le_bytes(bytes.try_into().unwrap());
-            s[i] = value;
-        }
-        Self {
-            state: vec![0_u32; 16],
-            ctr: s[12] as u64 + ((s[13] as u64) << 32),
-            s,
-            buffer: vec![0_u8; 0],
-        }
-    }
-    #[inline(always)]
-    fn qround(&mut self, a: usize, b: usize, c: usize, d: usize) {
-        self.state[a] = self.state[a].wrapping_add(self.state[b]);
-        self.state[d] = Self::roll(self.state[d] ^ self.state[a], 16);
-        self.state[c] = self.state[c].wrapping_add(self.state[d]);
-        self.state[b] = Self::roll(self.state[b] ^ self.state[c], 12);
-        self.state[a] = self.state[a].wrapping_add(self.state[b]);
-        self.state[d] = Self::roll(self.state[d] ^ self.state[a], 8);
-        self.state[c] = self.state[c].wrapping_add(self.state[d]);
-        self.state[b] = Self::roll(self.state[b] ^ self.state[c], 7);
-    }
-
-    fn update(&mut self) -> Vec<u32> {
-        const CW: [u32; 4] = [0x61707865, 0x3320646e, 0x79622d32, 0x6b206574];
-
-        self.state = vec![0_u32; 16];
-        self.state[0] = CW[0];
-        self.state[1] = CW[1];
-        self.state[2] = CW[2];
-        self.state[3] = CW[3];
-
-        for i in 0..10 {
-            self.state[i + 4] = self.s[i]
-        }
-
-        self.state[14] = self.s[10] ^ ((self.ctr & 0xffffffff) as u32);
-        self.state[15] = self.s[11] ^ ((self.ctr >> 32) as u32);
-
-        let state = self.state.clone();
-
-        for _ in 0..10 {
-            self.qround(0, 4, 8, 12);
-            self.qround(1, 5, 9, 13);
-            self.qround(2, 6, 10, 14);
-            self.qround(3, 7, 11, 15);
-            self.qround(0, 5, 10, 15);
-            self.qround(1, 6, 11, 12);
-            self.qround(2, 7, 8, 13);
-            self.qround(3, 4, 9, 14);
-        }
-
-        for (i, s) in self.state.iter_mut().enumerate().take(16) {
-            *s = (*s).wrapping_add(state[i]);
-        }
-
-        self.ctr += 1;
-        self.state.clone()
-    }
-
-    fn block_update(&mut self) -> Vec<u32> {
-        let mut block = vec![0_u32; 16 * 8];
-        for i in 0..8 {
-            let updated = self.update();
-            block
-                .iter_mut()
-                .skip(i)
-                .step_by(8)
-                .zip(updated.iter())
-                .for_each(|(b, &u)| *b = u);
-        }
-        block
-    }
-
-    fn random_bytes(&mut self, k: usize) -> Vec<u8> {
-        if k > self.buffer.len() {
-            let block = self.block_update();
-            self.buffer = block.iter().flat_map(|&e| e.to_le_bytes().to_vec()).collect();
-        }
-        let out = (self.buffer[..k]).to_vec();
-        self.buffer = self.buffer[k..].to_vec();
-
-        out
-    }
-
-    fn roll(x: u32, n: usize) -> u32 {
-        (x << n) ^ (x >> (32 - n))
-    }
-}
-
-impl RngCore for ChaCha {
-    fn next_u32(&mut self) -> u32 {
-        impls::next_u32_via_fill(self)
-    }
-
-    fn next_u64(&mut self) -> u64 {
-        impls::next_u64_via_u32(self)
-    }
-
-    fn fill_bytes(&mut self, dest: &mut [u8]) {
-        let len = dest.len();
-        let buffer = self.random_bytes(len);
-        dest.iter_mut().enumerate().for_each(|(i, d)| *d = buffer[i])
-    }
-}
+pub(crate) const NUM_TEST_VECTORS: usize = 12;
 
 /// Helper data to indicate the number of bytes the should be draw from the SHAKE256-based PRNG
 /// in order to sync its state to the state of the PRNG in the reference implementation during
 /// testing of the Falcon512 test vectors.
-const SYNC_DATA_FOR_TEST_VECTOR: [(usize, usize); NUM_TEST_VECTORS] = [
+pub(crate) const SYNC_DATA_FOR_TEST_VECTOR: [(usize, usize); NUM_TEST_VECTORS] = [
     (135376, 1),
     (127224, 1),
     (61580, 1),
@@ -255,7 +21,7 @@ const SYNC_DATA_FOR_TEST_VECTOR: [(usize, usize); NUM_TEST_VECTORS] = [
 /// Helper data to indicate the number of bytes the should be draw from the SHAKE256-based PRNG
 /// in order to sync its state to the state of the PRNG in the reference implementation before
 /// testing of the Falcon512 test vectors.
-const SYNC_DATA: [(usize, usize); 96] = [
+pub(crate) const SYNC_DATA: [(usize, usize); 96] = [
     (75776, 2),
     (8192, 3),
     (29696, 1),
@@ -355,7 +121,7 @@ const SYNC_DATA: [(usize, usize); 96] = [
 ];
 
 /// The encoded test vector signatures.
-const EXPECTED_SIG: [&str; NUM_TEST_VECTORS] = [
+pub(crate) const EXPECTED_SIG: [&str; NUM_TEST_VECTORS] = [
     "39938882ef322e8a46b93c6d67c47f31f92a30e31e181b6c6e57760d2a08f254a7e798b27956333e7f928bc01928dac4dcfbf93ba6decb4c21f5c30cd8796cece9626113f8dae0e21e9cef91a383bfa6f139462d5a964b567efb1269bb2989f24acd165110d6a50caa263eb8e8f60fd5fed2f231498167beccf199ca66d347378794b719665f6c74194d89308b2119acf270cf5ff9f1f70b45dd93a67b5dcc41b28c0a6a9db0a2275f470a3fc1620843d1ad45b44687a3ca692935d675df9bbefe5cec12f9af8cc53e04175d56b92a29b40d869836698a0e8452c992856cb74a906f0ed4ddb8aa1e0a2f645db18903d046768e5fb7ef13d1b3a8064129987e4b53428b7549d735e672908eb08861a63c3ee698b5c8a0dab8aed4acea186a89bd33ac92576ab758ad30fddd11698f54717afc36b093a053166b022f99e50dbb718bba87eea9ad491e1e778e1afd4ed92dd05621b48847ebbf0d517e3a2a943f33803434854b225d8cbb8f1e4bd252c9826a629b3ca9da85216d07771ca6538cf6f198f1e55cfd52c9232ffb941445533d30dfae6fd4e5cf63e2250e0593ed92a3df09898ea7dbb6d941179a42275dd93afab392d959075eb104b97375c7259e23703d036f25c92a8f9e6904e64675504bad272068a7bf34d18f665818899fddbf3a5c9bc694cd99a9913bd74f7c36e5422af91eb64371f16c5b28c3454dc360df8442ed2a4edc6956abd7adc4091302ddc3b98cbc47899eaacf250a476b4faa72e434f6767135b24d747e65eb9100e86f3084beb952c3be19369908cade8923d7e4ca32edabb2a593d4b7a5fd82b5d34ca9204010ec9161847d604c7b288a59f8848b548970d814b8d0a4f96e1b433848343a2c6c6cf7af3f84aec9d269d9be632c5c57672d948839ea863208cdc0000000000000000000000000",
     "3990524b2f19ea93992641f81adfa0779d4aa5db24a4ddc243e94b85f8f63da5e443658926af37d1b506a9a992d428b32748aa3a80e911d4564a4332878b5d32779af56668bfdcd5faa414bfa77b95031e47373778eb2ceacef0e9aed21a97f0700f5d918d8a606384adf0c0eeb6797c00d4ba5f26273538569135cd586230b767d952b6c192521d1aaee594ea3d6b1fe363b21064abe172867919c825ad528e39877b11569662b6c5c73b4932dc159b71069398bfaea1b487fcd9583e192fea62da26dfaa287d8fbf9d5eae42b7895a63524c79265352b13b880989ea9bfe02f0f9f975532d931fccfe5d60da05c39a62c836792f8a3e12e6e7759b7753d5198c95b2f644690a5f58763d3b5b14a97a72cda6d97a6b4daecf97c7111c5275b44437cb8ecdc25a0a0ff1bef8b250a5a2e699b368c7bbe6eab4be97a2957957d6e9bb0faa9326f9568cca5a636f2653c6ee635c986d9d84753cff5ac17834c1385a066adf43c5633719cf34c15588d997d7a13782d19704363ea1d22858d41be56eb5c0842d0422fcf4261075f1af2178e849715249dce1af4c8583427258eadac0b03f721c62b7fcf33939a5fccadd264e830f0b58a7992b1c99f69c406ef03912e7b54342a11a8930d3259332c555e891119bca3c8d3905e2229ef334c854e405ba53431af462a74e48d9aa06cfed3b30897f3bf6e9d0496a549cc6636d9cd7287178947682bf8b982ab2b44a976071d3230233332189ca405256e776b25c881a85932c6a2a1af6f29e2abeda2d4a5f53be39f37e5d99db15af4a288dde537117d4153ebd5297946b99cebacabc4ee265cb698da59cc5f5492389dc964fc92cd2d665c64eb7f08f2a8ad660c8bb90c3dc0866111bde7c91d60f6a81d2ebd16af48ed7cd6079741abc414c922470680000000000000000000000",
     "3919c9011564865ced4e03fa8e7c9b2b0f103e9fe24dbe9f28a4b5db5821dce0d70495ac617fcfd6038cba4de75bf78737b3b317a6478268f08d7c95f7d9202e4a04de2434ee86d988d4397557a2c78122b475bfe9a7b2e75388ba0344cebaea22c335267ba2f48e61d1c58b785473525271baa911bd35e8def50900ed4caa7854d709afc8f36cd02562199dc76fe6b644111d833cda7819cc7a5b58947e8c8cccf9af2cb07963c9f699516018b481cf61c80a248fa1bd78c18048efc86f366293a4847902224bcf1d3cb8bc54e4d0c7149c45df69377a6c6c4474ee1403f336b0e7673d4be6c1ea54361452009e266b6b0d1181221cf814f7779ef8dab9183fe94ea54730eace00a3fcab9ab0a8f6fe9374bb292868236a2640c4680a7410a540b5f10849a4dbcb6c7093bb49b6a9878b88d4601bdd6559b1649e8e019e54eeb508ee2e9c8636105670c5a76ef336fa9c76eea7b29871660fe6bf2ae8dd5878c72ea7b8405f08b3785d2ebb88f92bbaffac17f41f38c9d554bb3134afa8d834415cce30e40e4369e85dfe464b6f3aec13552e1b3376f026a108d9f4120b5a39b4fa9634390cb9c5ba484e6e36ad62fbd27468beb61d62b36785cfd1853e339ca365342ed315838a78c8495d80df73481e077cd5153671c4deccbb46051c70d1751afca525edd91ec53636b8d220db78a4308fecb5515cbebba4bfcdeaf3acc7fbeffd9a62d5f8fdd9335dd297013b8295b5b3dad5f0bbaf83aecaf3b1449917a5699aef39f5c25899782f4c8dadc8db0bf68067f1ee6a6d8835c9445dbccec54dcc43757d4396083c3a185e5cc2f7583e3148ac56ba7991152d075aedfb8c76e48ee1f5431d048cf1599659f3f366e669c1674433f1e75e666fd41b5ecb39b577dbea1ff2ebc2aaa3d398bffab1000000000000000000000000",
@@ -371,7 +137,7 @@ const EXPECTED_SIG: [&str; NUM_TEST_VECTORS] = [
 ];
 
 /// The polynomial test vector signatures.
-const EXPECTED_SIG_POLYS: [[i16; 512]; NUM_TEST_VECTORS] = [
+pub(crate) const EXPECTED_SIG_POLYS: [[i16; 512]; NUM_TEST_VECTORS] = [
     [
         -18, 23, 128, -18, 155, 226, -57, -111, -73, -186, -55, 101, 332, 15, 348, -134, -48, -101,
         231, -285, 226, -132, 63, 155, 240, -324, -105, -29, -228, -35, 135, -381, -188, 185, 24,
@@ -747,7 +513,7 @@ const EXPECTED_SIG_POLYS: [[i16; 512]; NUM_TEST_VECTORS] = [
 ];
 
 /// The secret key polynomials used for generating the test vector signatures
-const SK_POLYS: [[[i16; 512]; 4]; NUM_TEST_VECTORS] = [
+pub(crate) const SK_POLYS: [[[i16; 512]; 4]; NUM_TEST_VECTORS] = [
     [
         [
             1, -3, 0, 4, 0, 5, -3, -4, 4, -2, -6, 4, -2, 6, -5, 7, 7, -1, 1, 6, -2, 1, 6, -3, 3, 0,
