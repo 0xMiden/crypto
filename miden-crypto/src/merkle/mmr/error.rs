@@ -19,9 +19,7 @@ pub enum MmrError {
     #[error("requested peak index is {peak_idx} but the number of peaks is {peaks_len}")]
     /// Indicates that the requested peak index is out of bounds.
     PeakOutOfBounds {
-        /// Index of the peak that was requested.
         peak_idx: usize,
-        /// Total number of peaks in the MMR.
         peaks_len: usize,
     },
     #[error("invalid mmr update")]
