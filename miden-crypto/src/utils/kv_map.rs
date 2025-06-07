@@ -121,14 +121,14 @@ impl<K: Ord + Clone, V: Clone> RecordingMap<K, V> {
     // TEST HELPERS
     // --------------------------------------------------------------------------------------------
 
-    #[cfg(test)]
     /// Returns the number of keys that were accessed (read) during the test.
+    #[cfg(test)]
     pub fn trace_len(&self) -> usize {
         self.trace.borrow().len()
     }
 
-    #[cfg(test)]
     /// Returns the number of keys that were modified (written) during the test.
+    #[cfg(test)]
     pub fn updates_len(&self) -> usize {
         self.updates.len()
     }
