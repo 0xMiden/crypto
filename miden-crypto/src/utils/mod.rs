@@ -67,7 +67,7 @@ pub enum HexParseError {
     #[error("hex encoded data must contain only characters [a-zA-Z0-9]")]
     InvalidChar,
 
-    /// The parsed digest value is outside the field modulus.
+    /// The parsed digest value contains values that are greater than the field modulus.
     #[error("hex encoded values of a Digest must be inside the field modulus")]
     OutOfRange,
 }
