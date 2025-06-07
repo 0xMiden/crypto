@@ -1,6 +1,7 @@
 use alloc::vec::Vec;
 
-use super::{super::ZERO, Felt, MmrError, MmrProof, Rpo256, Word};
+use super::{super::ZERO, MmrError, MmrProof, forest::Forest};
+use crate::{Felt, Word, merkle::Rpo256};
 
 // MMR PEAKS
 // ================================================================================================
@@ -11,13 +12,14 @@ use super::{super::ZERO, Felt, MmrError, MmrProof, Rpo256, Word};
 ///
 /// Contains the number of leaves and the current peak nodes in the forest.
 pub struct MmrPeaks {
-    /// The number of leaves is used to differentiate MMRs that have the same number of peaks. This
-    /// happens because the number of peaks goes up-and-down as the structure is used causing
-    /// existing trees to be merged and new ones to be created. As an example, every time the MMR
-    /// has a power-of-two number of leaves there is a single peak.
+    /// The number of leaves (represented by [`Forest`]) is used to differentiate MMRs that have
+    /// the same number of peaks. This happens because the number of peaks goes up-and-down as
+    /// the structure is used causing existing trees to be merged and new ones to be created.
+    /// As an example, every time the MMR has a power-of-two number of leaves there is a single
+    /// peak.
     ///
     /// Every tree in the MMR forest has a distinct power-of-two size, this means only the right-
-    /// most tree can have an odd number of elements (e.g. `1`). Additionally this means that the
+    /// most tree can have an odd number of elements (i.e. `1`). Additionally this means that the
     /// bits in `num_leaves` conveniently encode the size of each individual tree.
     ///
     /// Examples:
@@ -28,7 +30,7 @@ pub struct MmrPeaks {
     ///   and the left most has `2**2`.
     /// - With 12 leaves, the binary is `0b1100`, this case also has 2 peaks, the leftmost tree has
     ///   `2**3=8` elements, and the right most has `2**2=4` elements.
-    num_leaves: usize,
+    forest: Forest,
 
     /// All the peaks of every tree in the MMR forest. The peaks are always ordered by number of
     /// leaves, starting from the peak with most children, to the one with least.
@@ -40,7 +42,10 @@ pub struct MmrPeaks {
 impl Default for MmrPeaks {
     /// Returns new [`MmrPeaks`] instantiated from an empty vector of peaks and 0 leaves.
     fn default() -> Self {
-        Self { num_leaves: 0, peaks: Vec::new() }
+        Self {
+            forest: Forest::empty(),
+            peaks: Vec::new(),
+        }
     }
 }
 
@@ -53,24 +58,29 @@ impl MmrPeaks {
     ///
     /// # Errors
     /// Returns an error if the number of leaves and the number of peaks are inconsistent.
-    pub fn new(num_leaves: usize, peaks: Vec<Word>) -> Result<Self, MmrError> {
-        if num_leaves.count_ones() as usize != peaks.len() {
+    pub fn new(forest: Forest, peaks: Vec<Word>) -> Result<Self, MmrError> {
+        if forest.num_trees() != peaks.len() {
             return Err(MmrError::InvalidPeaks(format!(
                 "number of one bits in leaves is {} which does not equal peak length {}",
-                num_leaves.count_ones(),
+                forest.num_trees(),
                 peaks.len()
             )));
         }
 
-        Ok(Self { num_leaves, peaks })
+        Ok(Self { forest, peaks })
     }
 
     // ACCESSORS
     // --------------------------------------------------------------------------------------------
 
+    /// Returns the underlying forest (a set of mountain range peaks).
+    pub fn forest(&self) -> Forest {
+        self.forest
+    }
+
     /// Returns a count of leaves in the underlying MMR.
     pub fn num_leaves(&self) -> usize {
-        self.num_leaves
+        self.forest.num_leaves()
     }
 
     /// Returns the number of peaks of the underlying MMR.
@@ -94,10 +104,10 @@ impl MmrPeaks {
             .ok_or(MmrError::PeakOutOfBounds { peak_idx, peaks_len: self.peaks.len() })
     }
 
-    /// Converts this [MmrPeaks] into its components: number of leaves and a vector of peaks of
-    /// the underlying MMR.
-    pub fn into_parts(self) -> (usize, Vec<Word>) {
-        (self.num_leaves, self.peaks)
+    /// Converts this [MmrPeaks] into its components: number of leaves (represented as a [`Forest`])
+    /// and a vector of peaks of the underlying MMR.
+    pub fn into_parts(self) -> (Forest, Vec<Word>) {
+        (self.forest, self.peaks)
     }
 
     /// Hashes the peaks.

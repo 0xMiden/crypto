@@ -1,15 +1,19 @@
 ## 0.15.0 (TBD)
 
+- [BREAKING] Use a rich newtype for Merkle mountain range types' forest values (#400).
 - Allow pre-sorted entries in `Smt` (#406).
-- Add module and function documentation. (#408).
+- Added module and function documentation. (#408).
 - Added default constructors to `MmrPeaks` and `PartialMmr` (#409).
 - Added module and function documentation-2 (#410).
-- [BREAKING] Replace `RpoDigest` with `Word` struct (#411).
-- Replace deprecated #[clap(...)] with #[command(...)] and #[arg(...)] (#413).
-- Replace `RpxDigest` with `Word` struct (#420).
-- Add `word!` macro to `miden-crypto` (#423).
+- [BREAKING] Replaced `RpoDigest` with `Word` struct (#411).
+- Replaced deprecated #[clap(...)] with #[command(...)] and #[arg(...)] (#413).
+- [BREAKING] Replaced `RpxDigest` with `Word` struct (#420).
+- Added `word!` macro to `miden-crypto` (#423).
+- [BREAKING] Incremented MSRV to 1.87.
 - Added module and function documentation-3 (#427).
+## 0.14.1 (2025-05-31)
 
+- Added missing `PartialSmt` APIs (#417).
 
 ## 0.14.0 (2025-03-15)
 
@@ -22,7 +26,7 @@
 - Added property-based testing (proptest) and fuzzing for `Smt::with_entries` and `Smt::compute_mutations` (#385).
 - Sort keys in a leaf in the concurrent implementation of `Smt::with_entries`, ensuring consistency with the sequential version (#385).
 - Skip unchanged leaves in the concurrent implementation of `Smt::compute_mutations` (#385).
-- Add range checks to `ntru_gen` for Falcon DSA (#391).
+- Added range checks to `ntru_gen` for Falcon DSA (#391).
 - Optimized duplicate key detection in `Smt::with_entries_concurrent` (#395).
 - [BREAKING] Moved `rand` to version `0.9` removing the `try_fill_bytes` method (#398).
 - [BREAKING] Increment minimum supported Rust version to 1.85 (#399).

@@ -13,7 +13,7 @@ pub mod hash;
 pub mod merkle;
 pub mod rand;
 pub mod utils;
-mod word;
+pub mod word;
 
 // RE-EXPORTS
 // ================================================================================================

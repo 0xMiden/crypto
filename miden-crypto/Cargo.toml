@@ -3,7 +3,7 @@ name = "miden-crypto"
 version = "0.15.0"
 description = "Miden Cryptographic primitives"
 authors.workspace = true
-readme = "README.md"
+readme = "../README.md"
 license.workspace = true
 repository.workspace = true
 documentation = "https://docs.rs/miden-crypto/0.15.0"
@@ -51,18 +51,10 @@ executable = ["dep:clap", "dep:rand-utils", "std"]
 smt_hashmaps = ["dep:hashbrown"]
 internal = []
 serde = ["dep:serde", "serde?/alloc", "winter-math/serde"]
-std = [
-    "blake3/std",
-    "dep:cc",
-    "rand/std",
-    "rand/thread_rng",
-    "winter-crypto/std",
-    "winter-math/std",
-    "winter-utils/std",
-]
+std = ["blake3/std", "dep:cc", "rand/std", "rand/thread_rng", "winter-crypto/std", "winter-math/std", "winter-utils/std"]
 
 [dependencies]
-blake3 = { version = "1.6", default-features = false }
+blake3 = { version = "1.8", default-features = false }
 clap = { version = "4.5", optional = true, features = ["derive"] }
 hashbrown = { version = "0.15", optional = true, features = ["serde"] }
 num = { version = "0.4", default-features = false, features = ["alloc", "libm"] }
@@ -80,7 +72,7 @@ winter-utils = { version = "0.12", default-features = false }
 
 [dev-dependencies]
 assert_matches = { version = "1.5", default-features = false }
-criterion = { version = "0.5", features = ["html_reports"] }
+criterion = { version = "0.6", features = ["html_reports"] }
 getrandom = { version = "0.3", default-features = false }
 hex = { version = "0.4", default-features = false, features = ["alloc"] }
 itertools = { version = "0.14" }

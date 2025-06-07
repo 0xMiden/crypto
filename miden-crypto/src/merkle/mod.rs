@@ -30,7 +30,7 @@ pub use smt::{
 pub use smt::{SubtreeLeaf, build_subtree_for_bench};
 
 mod mmr;
-pub use mmr::{InOrderIndex, Mmr, MmrDelta, MmrError, MmrPeaks, MmrProof, PartialMmr};
+pub use mmr::{Forest, InOrderIndex, Mmr, MmrDelta, MmrError, MmrPeaks, MmrProof, PartialMmr};
 
 mod store;
 pub use store::{DefaultMerkleStore, MerkleStore, RecordingMerkleStore, StoreNode};
