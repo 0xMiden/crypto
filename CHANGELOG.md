@@ -10,7 +10,7 @@
 - [BREAKING] Replaced `RpxDigest` with `Word` struct (#420).
 - Added `word!` macro to `miden-crypto` (#423).
 - [BREAKING] Incremented MSRV to 1.87.
-
+- Added module and function documentation-3 (#427).
 ## 0.14.1 (2025-05-31)
 
 - Added missing `PartialSmt` APIs (#417).

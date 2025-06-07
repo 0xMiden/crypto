@@ -17,6 +17,7 @@ pub use winter_utils::{
 
 use crate::Word;
 
+/// Re-exported utility collection modules such as custom key-value maps.
 pub mod collections {
     pub use super::kv_map::*;
 }
@@ -49,13 +50,21 @@ pub fn bytes_to_hex_string<const N: usize>(data: [u8; N]) -> String {
 
 /// Defines errors which can occur during parsing of hexadecimal strings.
 #[derive(Debug, Error)]
+/// Errors that can occur when decoding hexadecimal strings.
 pub enum HexParseError {
+    /// The input hex string has an incorrect length.
     #[error("expected hex data to have length {expected}, including the 0x prefix, found {actual}")]
     InvalidLength { expected: usize, actual: usize },
+
+    /// The hex string does not start with the required "0x" prefix.
     #[error("hex encoded data must start with 0x prefix")]
     MissingPrefix,
+
+    /// The hex string contains invalid characters outside [a-zA-Z0-9].
     #[error("hex encoded data must contain only characters [a-zA-Z0-9]")]
     InvalidChar,
+
+    /// The parsed digest value contains values that are greater than the field modulus.
     #[error("hex encoded values of a Digest must be inside the field modulus")]
     OutOfRange,
 }

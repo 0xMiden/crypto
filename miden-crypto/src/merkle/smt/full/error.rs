@@ -15,14 +15,22 @@ pub enum SmtLeafError {
     #[error(
         "multiple leaf requires all keys to map to the same leaf index but key1 {key_1} and key2 {key_2} map to different indices"
     )]
-    /// A single leaf key maps to a different index than expected.
-    InconsistentMultipleLeafKeys { key_1: Word, key_2: Word },
+    InconsistentMultipleLeafKeys {
+        /// First key that maps to a different leaf index.
+        key_1: Word,
+        /// Second key that maps to a different leaf index.
+        key_2: Word,
+    },
     #[error(
         "single leaf key {key} maps to leaf {actual_leaf_index} but was expected to map to leaf {expected_leaf_index}"
     )]
+    /// A single leaf key maps to a different index than expected.
     InconsistentSingleLeafIndices {
+        /// The key that caused the mismatch.
         key: Word,
+        /// The expected leaf index.
         expected_leaf_index: LeafIndex<SMT_DEPTH>,
+        /// The actual leaf index computed from the key.
         actual_leaf_index: LeafIndex<SMT_DEPTH>,
     },
 
@@ -31,7 +39,9 @@ pub enum SmtLeafError {
         "supplied leaf index {leaf_index_supplied:?} does not match {leaf_index_from_keys:?} for multiple leaf"
     )]
     InconsistentMultipleLeafIndices {
+        /// Leaf index derived from the provided keys.
         leaf_index_from_keys: LeafIndex<SMT_DEPTH>,
+        /// Leaf index explicitly supplied by the caller.
         leaf_index_supplied: LeafIndex<SMT_DEPTH>,
     },
 
