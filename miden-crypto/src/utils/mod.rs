@@ -55,9 +55,7 @@ pub enum HexParseError {
     /// The input hex string has an incorrect length.
     #[error("expected hex data to have length {expected}, including the 0x prefix, found {actual}")]
     InvalidLength {
-        /// The expected length of the input, including the "0x" prefix.
         expected: usize,
-        /// The actual length of the input.
         actual: usize,
     },
 
