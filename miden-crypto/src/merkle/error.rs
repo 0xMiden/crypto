@@ -7,10 +7,7 @@ use super::{NodeIndex, Word};
 pub enum MerkleError {
     /// The computed root does not match the expected root.
     #[error("expected merkle root {expected_root} found {actual_root}")]
-    ConflictingRoots {
-        expected_root: Word,
-        actual_root: Word,
-    },
+    ConflictingRoots { expected_root: Word, actual_root: Word },
 
     /// The provided Merkle tree depth is too small.
     #[error("provided merkle tree depth {0} is too small")]
@@ -26,24 +23,15 @@ pub enum MerkleError {
 
     /// The node index value is invalid for the specified depth.
     #[error("node index value {value} is not valid for depth {depth}")]
-    InvalidNodeIndex {
-        depth: u8,
-        value: u64,
-    },
+    InvalidNodeIndex { depth: u8, value: u64 },
 
     /// Provided node index depth does not match the expected depth.
     #[error("provided node index depth {provided} does not match expected depth {expected}")]
-    InvalidNodeIndexDepth {
-        expected: u8,
-        provided: u8,
-    },
+    InvalidNodeIndexDepth { expected: u8, provided: u8 },
 
     /// The depth of a Merkle subtree exceeds the depth of the full tree.
     #[error("merkle subtree depth {subtree_depth} exceeds merkle tree depth {tree_depth}")]
-    SubtreeDepthExceedsDepth {
-        subtree_depth: u8,
-        tree_depth: u8,
-    },
+    SubtreeDepthExceedsDepth { subtree_depth: u8, tree_depth: u8 },
 
     /// The number of entries exceeds the allowed maximum.
     #[error("number of entries in the merkle tree exceeds the maximum of {0}")]
@@ -55,10 +43,7 @@ pub enum MerkleError {
 
     /// The specified node is not found in the store.
     #[error("node {0:?} with index `{1}` not found in the store")]
-    NodeIndexNotFoundInStore(
-        Word,
-        NodeIndex,
-    ),
+    NodeIndexNotFoundInStore(Word, NodeIndex),
 
     /// The number of leaves is not a power of two.
     #[error("number of provided merkle tree leaves {0} is not a power of two")]
