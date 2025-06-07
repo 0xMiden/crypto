@@ -54,10 +54,7 @@ pub fn bytes_to_hex_string<const N: usize>(data: [u8; N]) -> String {
 pub enum HexParseError {
     /// The input hex string has an incorrect length.
     #[error("expected hex data to have length {expected}, including the 0x prefix, found {actual}")]
-    InvalidLength {
-        expected: usize,
-        actual: usize,
-    },
+    InvalidLength { expected: usize, actual: usize },
 
     /// The hex string does not start with the required "0x" prefix.
     #[error("hex encoded data must start with 0x prefix")]
