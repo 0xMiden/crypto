@@ -393,7 +393,7 @@ impl<T: KvMap<Word, StoreNode>> MerkleStore<T> {
         node: Word,
         path: MerklePath,
     ) -> Result<Word, MerkleError> {
-        let root = path.inner_nodes(index, node)?.fold(Word::default(), |_, node| {
+        let root = path.authenticated_nodes(index, node)?.fold(Word::default(), |_, node| {
             let value: Word = node.value;
             let left: Word = node.left;
             let right: Word = node.right;
