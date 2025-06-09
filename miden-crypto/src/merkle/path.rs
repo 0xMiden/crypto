@@ -85,17 +85,31 @@ impl MerklePath {
         Ok(())
     }
 
-    /// Returns an iterator over every inner node of this [MerklePath].
+    /// Given the node this path opens to, return an iterator of all the nodes that are known via
+    /// this path.
     ///
-    /// The iteration order is unspecified.
+    /// Each item in the iterator is an [InnerNodeInfo], containing the hash of a node as `.value`,
+    /// and its two children as `.left` and `.right`. The very first item in that iterator will be
+    /// the parent of `node_to_prove`, either `left` or `right` will be `node_to_prove` itself, and
+    /// the other child will be `node_to_prove` as stored in this [MerklePath].
+    ///
+    /// From there, the iterator will continue to yield every further parent and both of its
+    /// children, up to and including the root node.
+    ///
+    /// If `node_to_prove` is not the node this path is an opening to, or `index` is not the
+    /// correct index for that node, the returned nodes will be meaningless.
     ///
     /// # Errors
     /// Returns an error if the specified index is not valid for this path.
-    pub fn inner_nodes(&self, index: u64, node: Word) -> Result<InnerNodeIterator, MerkleError> {
+    pub fn authenticated_nodes(
+        &self,
+        index: u64,
+        node_to_prove: Word,
+    ) -> Result<InnerNodeIterator, MerkleError> {
         Ok(InnerNodeIterator {
             nodes: &self.nodes,
             index: NodeIndex::new(self.depth(), index)?,
-            value: node,
+            value: node_to_prove,
         })
     }
 }
@@ -155,7 +169,7 @@ impl IntoIterator for MerklePath {
     }
 }
 
-/// An iterator over internal nodes of a [MerklePath].
+/// An iterator over internal nodes of a [MerklePath]. See [`MerklePath::authenticated_nodes()`]
 pub struct InnerNodeIterator<'a> {
     nodes: &'a Vec<Word>,
     index: NodeIndex,
@@ -286,7 +300,8 @@ mod tests {
         let node = int_to_node(5);
         let root = merkle_path.compute_root(index, node).unwrap();
 
-        let inner_root = merkle_path.inner_nodes(index, node).unwrap().last().unwrap().value;
+        let inner_root =
+            merkle_path.authenticated_nodes(index, node).unwrap().last().unwrap().value;
 
         assert_eq!(root, inner_root);
     }
