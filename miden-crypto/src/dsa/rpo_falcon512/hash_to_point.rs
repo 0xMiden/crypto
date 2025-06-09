@@ -1,5 +1,4 @@
 use alloc::vec::Vec;
-use core::ops::Range;
 
 use super::{MODULUS, N, Nonce, Polynomial, Rpo256, ZERO, math::FalconFelt};
 use crate::{Felt, Word};
@@ -10,28 +9,25 @@ use crate::{Felt, Word};
 /// Returns a polynomial in Z_p[x]/(phi) representing the hash of the provided message and
 /// nonce using RPO256.
 pub fn hash_to_point_rpo256(message: Word, nonce: &Nonce) -> Polynomial<FalconFelt> {
-    const STATE_WIDTH: usize = Rpo256::STATE_WIDTH;
-    const RATE_RANGE: Range<usize> = Rpo256::RATE_RANGE;
-
-    let mut state = [ZERO; STATE_WIDTH];
+    let mut state = [ZERO; Rpo256::STATE_WIDTH];
 
     // absorb the nonce into the state
     let nonce_elements = nonce.to_elements();
-    for (&n, s) in nonce_elements.iter().zip(state[RATE_RANGE].iter_mut()) {
+    for (&n, s) in nonce_elements.iter().zip(state[Rpo256::RATE_RANGE].iter_mut()) {
         *s = n;
     }
     Rpo256::apply_permutation(&mut state);
 
     // absorb message into the state
-    for (&m, s) in message.iter().zip(state[RATE_RANGE].iter_mut()) {
+    for (&m, s) in message.iter().zip(state[Rpo256::RATE_RANGE].iter_mut()) {
         *s = m;
     }
 
     // squeeze the coefficients of the polynomial
     let mut coefficients: Vec<FalconFelt> = Vec::with_capacity(N);
-    for _ in 0..(N / STATE_WIDTH) {
+    for _ in 0..64 {
         Rpo256::apply_permutation(&mut state);
-        state[RATE_RANGE]
+        state[Rpo256::RATE_RANGE]
             .iter()
             .for_each(|value| coefficients.push(felt_to_falcon_felt(*value)));
     }
