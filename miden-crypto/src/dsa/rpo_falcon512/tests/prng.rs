@@ -8,7 +8,10 @@ use sha3::{
 };
 
 use super::data::SYNC_DATA;
-use crate::dsa::rpo_falcon512::{CHACHA_SEED_LEN, SIG_NONCE_LEN};
+use crate::dsa::rpo_falcon512::SIG_NONCE_LEN;
+
+/// Length of the seed for the ChaCha20-based PRNG.
+pub(crate) const CHACHA_SEED_LEN: usize = 56;
 
 // SHAKE256
 // ================================================================================================
