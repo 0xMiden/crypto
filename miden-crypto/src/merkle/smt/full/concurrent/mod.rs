@@ -709,10 +709,10 @@ fn fetch_sibling_pair(
     }
 }
 
-#[cfg(feature = "internal")]
 /// Builds a subtree from the given leaves for benchmarking purposes.
 ///
 /// Returns a tuple containing the constructed inner nodes and the final root leaf.
+#[cfg(feature = "internal")]
 pub fn build_subtree_for_bench(
     leaves: Vec<SubtreeLeaf>,
     tree_depth: u8,
