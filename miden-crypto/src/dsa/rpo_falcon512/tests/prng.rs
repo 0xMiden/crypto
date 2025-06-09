@@ -14,8 +14,6 @@ use crate::dsa::rpo_falcon512::{CHACHA_SEED_LEN, SIG_NONCE_LEN};
 // ================================================================================================
 
 /// A PRNG based on SHAKE256 used for testing.
-///
-/// DO NOT USE IN PRODUCTION.
 pub struct Shake256Testing(XofReaderCoreWrapper<Shake256ReaderCore>);
 
 impl Shake256Testing {
@@ -66,8 +64,6 @@ impl RngCore for Shake256Testing {
 // ================================================================================================
 
 /// A PRNG based on ChaCha20 used for testing.
-///
-/// DO NOT USE IN PRODUCTION.
 #[derive(Clone, PartialEq, Eq)]
 pub struct ChaCha {
     state: Vec<u32>,
@@ -91,6 +87,7 @@ impl ChaCha {
             buffer: vec![0_u8; 0],
         }
     }
+
     #[inline(always)]
     fn qround(&mut self, a: usize, b: usize, c: usize, d: usize) {
         self.state[a] = self.state[a].wrapping_add(self.state[b]);

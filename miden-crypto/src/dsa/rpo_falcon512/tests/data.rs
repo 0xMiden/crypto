@@ -513,7 +513,7 @@ pub(crate) const EXPECTED_SIG_POLYS: [[i16; 512]; NUM_TEST_VECTORS] = [
 ];
 
 /// The secret key polynomials used for generating the test vector signatures
-pub(crate) const SK_POLYS: [[[i16; 512]; 4]; NUM_TEST_VECTORS] = [
+pub(crate) static SK_POLYS: [[[i16; 512]; 4]; NUM_TEST_VECTORS] = [
     [
         [
             1, -3, 0, 4, 0, 5, -3, -4, 4, -2, -6, 4, -2, 6, -5, 7, 7, -1, 1, 6, -2, 1, 6, -3, 3, 0,
