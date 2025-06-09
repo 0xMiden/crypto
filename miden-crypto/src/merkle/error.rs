@@ -2,8 +2,8 @@ use thiserror::Error;
 
 use super::{NodeIndex, Word};
 
-/// Errors that can occur when constructing or verifying a Merkle tree.
 #[derive(Debug, Error)]
+/// Errors that can occur when constructing or verifying a Merkle tree.
 pub enum MerkleError {
     /// The computed root does not match the expected root.
     #[error("expected merkle root {expected_root} found {actual_root}")]
