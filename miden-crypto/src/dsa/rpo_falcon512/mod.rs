@@ -1,3 +1,5 @@
+use rand::Rng;
+
 use crate::{
     Felt, ZERO,
     hash::rpo::Rpo256,
@@ -73,6 +75,13 @@ impl Nonce {
     /// Returns a new [Nonce] instantiated from the provided bytes.
     pub fn new(bytes: [u8; SIG_NONCE_LEN]) -> Self {
         Self(bytes)
+    }
+
+    /// Returns a new [Nonce] drawn from the provided RNG.
+    pub fn random<R: Rng>(rng: &mut R) -> Self {
+        let mut nonce_bytes = [0u8; SIG_NONCE_LEN];
+        rng.fill_bytes(&mut nonce_bytes);
+        Self::new(nonce_bytes)
     }
 
     /// Returns the underlying bytes of this nonce.

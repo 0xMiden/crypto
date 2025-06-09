@@ -1,6 +1,6 @@
 use alloc::vec::Vec;
 
-use rand::RngCore;
+use rand::{Rng, RngCore};
 use rand_core::impls;
 use sha3::{
     Shake256, Shake256ReaderCore,
@@ -73,7 +73,13 @@ pub struct ChaCha {
 }
 
 impl ChaCha {
-    pub fn new(src: Vec<u8>) -> Self {
+    pub fn new<R: Rng>(rng: &mut R) -> Self {
+        let mut chacha_seed = [0_u8; CHACHA_SEED_LEN];
+        rng.fill_bytes(&mut chacha_seed);
+        ChaCha::with_seed(chacha_seed.to_vec())
+    }
+
+    pub fn with_seed(src: Vec<u8>) -> Self {
         let mut s = vec![0_u32; 14];
         for i in 0..14 {
             let bytes = &src[(4 * i)..(4 * (i + 1))];
