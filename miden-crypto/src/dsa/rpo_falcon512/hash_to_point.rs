@@ -8,6 +8,15 @@ use crate::{Felt, Word};
 
 /// Returns a polynomial in Z_p[x]/(phi) representing the hash of the provided message and
 /// nonce using RPO256.
+///
+/// Note that, in contrast to the SHAKE256-based reference implementation, this implementation
+/// does not use rejection sampling but instead uses one of the variants listed in the specification
+/// [1]. This variant omits the conditional check in the rejection sampling step at the cost of
+/// having to extract 64 bits, instead of 16 bits, of pseudo-randomness. This makes
+/// the implementation simpler and constant-time at the cost of a higher number of extracted
+/// pseudo-random bits per call to the hash-to-point algorithm.
+///
+/// [1]: https://falcon-sign.info/falcon.pdf
 pub fn hash_to_point_rpo256(message: Word, nonce: &Nonce) -> Polynomial<FalconFelt> {
     let mut state = [ZERO; Rpo256::STATE_WIDTH];
 
@@ -69,10 +78,21 @@ pub fn hash_to_point_shake256(message: &[u8], nonce: &Nonce) -> Polynomial<Falco
 // HELPER FUNCTIONS
 // ================================================================================================
 
+/// Converts a Miden field element to a field element in the prime field with characteristic
+/// the Falcon prime.
+///
+/// Note that since `FalconFelt::new` accepts `i16`, we first reduce the canonical value of
+/// the Miden field element modulo the Falcon prime and then cast the resulting value to an `i16`.
+/// Note that this final cast is safe as the Falcon prime is less than `i16::MAX`.
 fn felt_to_falcon_felt(value: Felt) -> FalconFelt {
     FalconFelt::new((value.as_int() % MODULUS as u64) as i16)
 }
 
+/// Converts a `u32` to a field element in the prime field with characteristic the Falcon prime.
+///
+/// Note that since `FalconFelt::new` accepts `i16`, we first reduce the `u32` value modulo
+/// the Falcon prime and then cast the resulting value to an `i16`.
+/// Note that this final cast is safe as the Falcon prime is less than `i16::MAX`.
 #[cfg(test)]
 fn u32_to_falcon_felt(value: u32) -> FalconFelt {
     FalconFelt::new((value % MODULUS as u32) as i16)
