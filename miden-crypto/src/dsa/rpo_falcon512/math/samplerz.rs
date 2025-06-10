@@ -114,6 +114,7 @@ pub(crate) fn sampler_z<R: Rng>(mu: f64, sigma: f64, sigma_min: f64, rng: &mut R
         rng.fill_bytes(&mut dest);
         let random_byte: u8 = dest[0];
 
+        // x = ((z-r)^2)/(2*sigma^2) - ((z-b)^2)/(2*sigma0^2)
         let b = (random_byte & 1) as i16;
         let z = b + (2 * b - 1) * z0;
         let zf_min_r = (z as f64) - r;
