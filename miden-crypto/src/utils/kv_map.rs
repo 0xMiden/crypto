@@ -11,15 +11,28 @@ use core::cell::RefCell;
 pub trait KvMap<K: Ord + Clone, V: Clone>:
     Extend<(K, V)> + FromIterator<(K, V)> + IntoIterator<Item = (K, V)>
 {
+    /// Returns a reference to the value corresponding to the given key.
     fn get(&self, key: &K) -> Option<&V>;
+
+    /// Returns `true` if the map contains a value for the specified key.
     fn contains_key(&self, key: &K) -> bool;
+
+    /// Returns the number of key-value pairs in the map.
     fn len(&self) -> usize;
+
+    /// Returns `true` if the map contains no elements.
     fn is_empty(&self) -> bool {
         self.len() == 0
     }
+
+    /// Inserts a key-value pair into the map. Returns the previous value if the key was present.
     fn insert(&mut self, key: K, value: V) -> Option<V>;
+
+    /// Removes a key from the map, returning the value at the key if the key was previously in the
+    /// map.
     fn remove(&mut self, key: &K) -> Option<V>;
 
+    /// Returns an iterator over the key-value pairs in the map.
     fn iter(&self) -> Box<dyn Iterator<Item = (&K, &V)> + '_>;
 }
 
@@ -89,6 +102,7 @@ impl<K: Ord + Clone, V: Clone> RecordingMap<K, V> {
     // PUBLIC ACCESSORS
     // --------------------------------------------------------------------------------------------
 
+    /// Returns a reference to the underlying BTreeMap storing the key-value pairs.
     pub fn inner(&self) -> &BTreeMap<K, V> {
         &self.data
     }
@@ -107,11 +121,13 @@ impl<K: Ord + Clone, V: Clone> RecordingMap<K, V> {
     // TEST HELPERS
     // --------------------------------------------------------------------------------------------
 
+    /// Returns the number of keys that were accessed (read) during the test.
     #[cfg(test)]
     pub fn trace_len(&self) -> usize {
         self.trace.borrow().len()
     }
 
+    /// Returns the number of keys that were modified (written) during the test.
     #[cfg(test)]
     pub fn updates_len(&self) -> usize {
         self.updates.len()
