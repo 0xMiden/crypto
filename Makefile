@@ -58,8 +58,12 @@ test-no-std: ## Run tests with `no-default-features` (std)
 test-smt-concurrent: ## Run only concurrent SMT tests
 	$(DEBUG_OVERFLOW_INFO) cargo nextest run --profile smt-concurrent --release --all-features
 
+.PHONY: test-docs
+test-docs:
+	$(DEBUG_OVERFLOW_INFO) cargo test --doc --all-features
+
 .PHONY: test
-test: test-default test-smt-hashmaps test-no-std ## Run all tests except concurrent SMT tests
+test: test-default test-smt-hashmaps test-no-std test-docs ## Run all tests except concurrent SMT tests
 
 # --- checking ------------------------------------------------------------------------------------
 

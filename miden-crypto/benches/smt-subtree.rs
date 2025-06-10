@@ -1,9 +1,8 @@
-use std::{fmt::Debug, hint, mem, time::Duration};
+use std::{fmt::Debug, hint, time::Duration};
 
 use criterion::{BatchSize, BenchmarkId, Criterion, criterion_group, criterion_main};
 use miden_crypto::{
     Felt, ONE, Word,
-    hash::rpo::RpoDigest,
     merkle::{NodeIndex, SMT_DEPTH, SmtLeaf, SubtreeLeaf, build_subtree_for_bench},
 };
 use rand_utils::prng_array;
@@ -22,11 +21,11 @@ fn smt_subtree_even(c: &mut Criterion) {
             b.iter_batched(
                 || {
                     // Setup.
-                    let entries: Vec<(RpoDigest, Word)> = (0..pair_count)
+                    let entries: Vec<(Word, Word)> = (0..pair_count)
                         .map(|n| {
                             // A single depth-8 subtree can have a maximum of 255 leaves.
                             let leaf_index = ((n as f64 / pair_count as f64) * 255.0) as u64;
-                            let key = RpoDigest::new([
+                            let key = Word::new([
                                 generate_value(&mut seed),
                                 ONE,
                                 Felt::new(n),
@@ -76,15 +75,11 @@ fn smt_subtree_random(c: &mut Criterion) {
             b.iter_batched(
                 || {
                     // Setup.
-                    let entries: Vec<(RpoDigest, Word)> = (0..pair_count)
+                    let entries: Vec<(Word, Word)> = (0..pair_count)
                         .map(|i| {
                             let leaf_index: u8 = generate_value(&mut seed);
-                            let key = RpoDigest::new([
-                                ONE,
-                                ONE,
-                                Felt::new(i),
-                                Felt::new(leaf_index as u64),
-                            ]);
+                            let key =
+                                Word::new([ONE, ONE, Felt::new(i), Felt::new(leaf_index as u64)]);
                             let value = generate_word(&mut seed);
                             (key, value)
                         })
@@ -131,13 +126,13 @@ criterion_main!(smt_subtree_group);
 // --------------------------------------------------------------------------------------------
 
 fn generate_value<T: Copy + Debug + Randomizable>(seed: &mut [u8; 32]) -> T {
-    mem::swap(seed, &mut prng_array(*seed));
+    *seed = prng_array(*seed);
     let value: [T; 1] = rand_utils::prng_array(*seed);
     value[0]
 }
 
 fn generate_word(seed: &mut [u8; 32]) -> Word {
-    mem::swap(seed, &mut prng_array(*seed));
+    *seed = prng_array(*seed);
     let nums: [u64; 4] = prng_array(*seed);
-    [Felt::new(nums[0]), Felt::new(nums[1]), Felt::new(nums[2]), Felt::new(nums[3])]
+    Word::new([Felt::new(nums[0]), Felt::new(nums[1]), Felt::new(nums[2]), Felt::new(nums[3])])
 }

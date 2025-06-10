@@ -2,7 +2,7 @@ use alloc::{string::ToString, vec::Vec};
 
 use super::{
     EMPTY_WORD, EmptySubtreeRoots, Felt, InnerNode, InnerNodeInfo, InnerNodes, LeafIndex,
-    MerkleError, MerklePath, MutationSet, NodeIndex, Rpo256, RpoDigest, SparseMerkleTree, Word,
+    MerkleError, MerklePath, MutationSet, NodeIndex, Rpo256, SparseMerkleTree, Word,
 };
 
 mod error;
@@ -27,6 +27,9 @@ mod tests;
 // CONSTANTS
 // ================================================================================================
 
+/// The depth of the sparse Merkle tree.
+///
+/// All leaves in this SMT are located at depth 64.
 pub const SMT_DEPTH: u8 = 64;
 
 // SMT
@@ -46,7 +49,7 @@ type Leaves = super::Leaves<SmtLeaf>;
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 pub struct Smt {
-    root: RpoDigest,
+    root: Word,
     // pub(super) for use in PartialSmt.
     pub(super) leaves: Leaves,
     inner_nodes: InnerNodes,
@@ -84,11 +87,29 @@ impl Smt {
     /// # Errors
     /// Returns an error if the provided entries contain multiple values for the same key.
     pub fn with_entries(
-        entries: impl IntoIterator<Item = (RpoDigest, Word)>,
+        entries: impl IntoIterator<Item = (Word, Word)>,
     ) -> Result<Self, MerkleError> {
         #[cfg(feature = "concurrent")]
         {
             Self::with_entries_concurrent(entries)
+        }
+        #[cfg(not(feature = "concurrent"))]
+        {
+            Self::with_entries_sequential(entries)
+        }
+    }
+
+    /// Similar to `with_entries` but avoids the overhead of sorting if the entries are already
+    /// sorted.
+    ///
+    /// This only applies if the "concurrent" feature is enabled. Without the feature, the behavior
+    /// is equivalent to `with_entiries`.
+    pub fn with_sorted_entries(
+        entries: impl IntoIterator<Item = (Word, Word)>,
+    ) -> Result<Self, MerkleError> {
+        #[cfg(feature = "concurrent")]
+        {
+            Self::with_sorted_entries_concurrent(entries)
         }
         #[cfg(not(feature = "concurrent"))]
         {
@@ -105,7 +126,7 @@ impl Smt {
     /// Returns an error if the provided entries contain multiple values for the same key.
     #[cfg(any(not(feature = "concurrent"), fuzzing, test))]
     fn with_entries_sequential(
-        entries: impl IntoIterator<Item = (RpoDigest, Word)>,
+        entries: impl IntoIterator<Item = (Word, Word)>,
     ) -> Result<Self, MerkleError> {
         use alloc::collections::BTreeSet;
 
@@ -140,7 +161,7 @@ impl Smt {
     /// # Panics
     /// With debug assertions on, this function panics if `root` does not match the root node in
     /// `inner_nodes`.
-    pub fn from_raw_parts(inner_nodes: InnerNodes, leaves: Leaves, root: RpoDigest) -> Self {
+    pub fn from_raw_parts(inner_nodes: InnerNodes, leaves: Leaves, root: Word) -> Self {
         // Our particular implementation of `from_raw_parts()` never returns `Err`.
         <Self as SparseMerkleTree<SMT_DEPTH>>::from_raw_parts(inner_nodes, leaves, root).unwrap()
     }
@@ -154,7 +175,7 @@ impl Smt {
     }
 
     /// Returns the root of the tree
-    pub fn root(&self) -> RpoDigest {
+    pub fn root(&self) -> Word {
         <Self as SparseMerkleTree<SMT_DEPTH>>::root(self)
     }
 
@@ -178,18 +199,18 @@ impl Smt {
     }
 
     /// Returns the leaf to which `key` maps
-    pub fn get_leaf(&self, key: &RpoDigest) -> SmtLeaf {
+    pub fn get_leaf(&self, key: &Word) -> SmtLeaf {
         <Self as SparseMerkleTree<SMT_DEPTH>>::get_leaf(self, key)
     }
 
     /// Returns the value associated with `key`
-    pub fn get_value(&self, key: &RpoDigest) -> Word {
+    pub fn get_value(&self, key: &Word) -> Word {
         <Self as SparseMerkleTree<SMT_DEPTH>>::get_value(self, key)
     }
 
     /// Returns an opening of the leaf associated with `key`. Conceptually, an opening is a Merkle
     /// path to the leaf, as well as the leaf itself.
-    pub fn open(&self, key: &RpoDigest) -> SmtProof {
+    pub fn open(&self, key: &Word) -> SmtProof {
         <Self as SparseMerkleTree<SMT_DEPTH>>::open(self, key)
     }
 
@@ -210,7 +231,7 @@ impl Smt {
     }
 
     /// Returns an iterator over the key-value pairs of this [Smt] in arbitrary order.
-    pub fn entries(&self) -> impl Iterator<Item = &(RpoDigest, Word)> {
+    pub fn entries(&self) -> impl Iterator<Item = &(Word, Word)> {
         self.leaves().flat_map(|(_, leaf)| leaf.entries())
     }
 
@@ -232,7 +253,7 @@ impl Smt {
     ///
     /// This also recomputes all hashes between the leaf (associated with the key) and the root,
     /// updating the root itself.
-    pub fn insert(&mut self, key: RpoDigest, value: Word) -> Word {
+    pub fn insert(&mut self, key: Word, value: Word) -> Word {
         <Self as SparseMerkleTree<SMT_DEPTH>>::insert(self, key, value)
     }
 
@@ -247,10 +268,10 @@ impl Smt {
     ///
     /// # Example
     /// ```
-    /// # use miden_crypto::{hash::rpo::RpoDigest, Felt, Word};
+    /// # use miden_crypto::{Felt, Word};
     /// # use miden_crypto::merkle::{Smt, EmptySubtreeRoots, SMT_DEPTH};
     /// let mut smt = Smt::new();
-    /// let pair = (RpoDigest::default(), Word::default());
+    /// let pair = (Word::default(), Word::default());
     /// let mutations = smt.compute_mutations(vec![pair]);
     /// assert_eq!(mutations.root(), *EmptySubtreeRoots::entry(SMT_DEPTH, 0));
     /// smt.apply_mutations(mutations);
@@ -258,8 +279,8 @@ impl Smt {
     /// ```
     pub fn compute_mutations(
         &self,
-        kv_pairs: impl IntoIterator<Item = (RpoDigest, Word)>,
-    ) -> MutationSet<SMT_DEPTH, RpoDigest, Word> {
+        kv_pairs: impl IntoIterator<Item = (Word, Word)>,
+    ) -> MutationSet<SMT_DEPTH, Word, Word> {
         #[cfg(feature = "concurrent")]
         {
             self.compute_mutations_concurrent(kv_pairs)
@@ -279,7 +300,7 @@ impl Smt {
     /// this tree.
     pub fn apply_mutations(
         &mut self,
-        mutations: MutationSet<SMT_DEPTH, RpoDigest, Word>,
+        mutations: MutationSet<SMT_DEPTH, Word, Word>,
     ) -> Result<(), MerkleError> {
         <Self as SparseMerkleTree<SMT_DEPTH>>::apply_mutations(self, mutations)
     }
@@ -296,8 +317,8 @@ impl Smt {
     /// this tree.
     pub fn apply_mutations_with_reversion(
         &mut self,
-        mutations: MutationSet<SMT_DEPTH, RpoDigest, Word>,
-    ) -> Result<MutationSet<SMT_DEPTH, RpoDigest, Word>, MerkleError> {
+        mutations: MutationSet<SMT_DEPTH, Word, Word>,
+    ) -> Result<MutationSet<SMT_DEPTH, Word, Word>, MerkleError> {
         <Self as SparseMerkleTree<SMT_DEPTH>>::apply_mutations_with_reversion(self, mutations)
     }
 
@@ -306,7 +327,7 @@ impl Smt {
 
     /// Inserts `value` at leaf index pointed to by `key`. `value` is guaranteed to not be the empty
     /// value, such that this is indeed an insertion.
-    fn perform_insert(&mut self, key: RpoDigest, value: Word) -> Option<Word> {
+    fn perform_insert(&mut self, key: Word, value: Word) -> Option<Word> {
         debug_assert_ne!(value, Self::EMPTY_VALUE);
 
         let leaf_index: LeafIndex<SMT_DEPTH> = Self::key_to_leaf_index(&key);
@@ -322,7 +343,7 @@ impl Smt {
     }
 
     /// Removes key-value pair at leaf index pointed to by `key` if it exists.
-    fn perform_remove(&mut self, key: RpoDigest) -> Option<Word> {
+    fn perform_remove(&mut self, key: Word) -> Option<Word> {
         let leaf_index: LeafIndex<SMT_DEPTH> = Self::key_to_leaf_index(&key);
 
         if let Some(leaf) = self.leaves.get_mut(&leaf_index.value()) {
@@ -339,18 +360,18 @@ impl Smt {
 }
 
 impl SparseMerkleTree<SMT_DEPTH> for Smt {
-    type Key = RpoDigest;
+    type Key = Word;
     type Value = Word;
     type Leaf = SmtLeaf;
     type Opening = SmtProof;
 
     const EMPTY_VALUE: Self::Value = EMPTY_WORD;
-    const EMPTY_ROOT: RpoDigest = *EmptySubtreeRoots::entry(SMT_DEPTH, 0);
+    const EMPTY_ROOT: Word = *EmptySubtreeRoots::entry(SMT_DEPTH, 0);
 
     fn from_raw_parts(
         inner_nodes: InnerNodes,
         leaves: Leaves,
-        root: RpoDigest,
+        root: Word,
     ) -> Result<Self, MerkleError> {
         if cfg!(debug_assertions) {
             let root_node = inner_nodes.get(&NodeIndex::root()).unwrap();
@@ -360,11 +381,11 @@ impl SparseMerkleTree<SMT_DEPTH> for Smt {
         Ok(Self { root, inner_nodes, leaves })
     }
 
-    fn root(&self) -> RpoDigest {
+    fn root(&self) -> Word {
         self.root
     }
 
-    fn set_root(&mut self, root: RpoDigest) {
+    fn set_root(&mut self, root: Word) {
         self.root = root;
     }
 
@@ -401,23 +422,23 @@ impl SparseMerkleTree<SMT_DEPTH> for Smt {
         }
     }
 
-    fn get_leaf(&self, key: &RpoDigest) -> Self::Leaf {
+    fn get_leaf(&self, key: &Word) -> Self::Leaf {
         let leaf_pos = LeafIndex::<SMT_DEPTH>::from(*key).value();
 
         match self.leaves.get(&leaf_pos) {
             Some(leaf) => leaf.clone(),
-            None => SmtLeaf::new_empty(key.into()),
+            None => SmtLeaf::new_empty((*key).into()),
         }
     }
 
-    fn hash_leaf(leaf: &Self::Leaf) -> RpoDigest {
+    fn hash_leaf(leaf: &Self::Leaf) -> Word {
         leaf.hash()
     }
 
     fn construct_prospective_leaf(
         &self,
         mut existing_leaf: SmtLeaf,
-        key: &RpoDigest,
+        key: &Word,
         value: &Word,
     ) -> SmtLeaf {
         debug_assert_eq!(existing_leaf.index(), Self::key_to_leaf_index(key));
@@ -436,7 +457,7 @@ impl SparseMerkleTree<SMT_DEPTH> for Smt {
         }
     }
 
-    fn key_to_leaf_index(key: &RpoDigest) -> LeafIndex<SMT_DEPTH> {
+    fn key_to_leaf_index(key: &Word) -> LeafIndex<SMT_DEPTH> {
         let most_significant_felt = key[3];
         LeafIndex::new_max_depth(most_significant_felt.as_int())
     }
@@ -462,18 +483,6 @@ impl From<Word> for LeafIndex<SMT_DEPTH> {
     }
 }
 
-impl From<RpoDigest> for LeafIndex<SMT_DEPTH> {
-    fn from(value: RpoDigest) -> Self {
-        Word::from(value).into()
-    }
-}
-
-impl From<&RpoDigest> for LeafIndex<SMT_DEPTH> {
-    fn from(value: &RpoDigest) -> Self {
-        Word::from(value).into()
-    }
-}
-
 // SERIALIZATION
 // ================================================================================================
 
@@ -494,7 +503,7 @@ impl Serializable for Smt {
 
         // Each entry is the size of a digest plus a word.
         entries_count.get_size_hint()
-            + entries_count * (RpoDigest::SERIALIZED_SIZE + EMPTY_WORD.get_size_hint())
+            + entries_count * (Word::SERIALIZED_SIZE + EMPTY_WORD.get_size_hint())
     }
 }
 
@@ -521,15 +530,15 @@ impl Deserializable for Smt {
 #[cfg(fuzzing)]
 impl Smt {
     pub fn fuzz_with_entries_sequential(
-        entries: impl IntoIterator<Item = (RpoDigest, Word)>,
+        entries: impl IntoIterator<Item = (Word, Word)>,
     ) -> Result<Smt, MerkleError> {
         Self::with_entries_sequential(entries)
     }
 
     pub fn fuzz_compute_mutations_sequential(
         &self,
-        kv_pairs: impl IntoIterator<Item = (RpoDigest, Word)>,
-    ) -> MutationSet<SMT_DEPTH, RpoDigest, Word> {
+        kv_pairs: impl IntoIterator<Item = (Word, Word)>,
+    ) -> MutationSet<SMT_DEPTH, Word, Word> {
         <Self as SparseMerkleTree<SMT_DEPTH>>::compute_mutations(self, kv_pairs)
     }
 }
@@ -546,14 +555,14 @@ fn test_smt_serialization_deserialization() {
     assert_eq!(bytes.len(), smt_default.get_size_hint());
 
     // Smt with values
-    let smt_leaves_2: [(RpoDigest, Word); 2] = [
+    let smt_leaves_2: [(Word, Word); 2] = [
         (
-            RpoDigest::new([Felt::new(101), Felt::new(102), Felt::new(103), Felt::new(104)]),
-            [Felt::new(1_u64), Felt::new(2_u64), Felt::new(3_u64), Felt::new(4_u64)],
+            Word::new([Felt::new(105), Felt::new(106), Felt::new(107), Felt::new(108)]),
+            [Felt::new(5_u64), Felt::new(6_u64), Felt::new(7_u64), Felt::new(8_u64)].into(),
         ),
         (
-            RpoDigest::new([Felt::new(105), Felt::new(106), Felt::new(107), Felt::new(108)]),
-            [Felt::new(5_u64), Felt::new(6_u64), Felt::new(7_u64), Felt::new(8_u64)],
+            Word::new([Felt::new(101), Felt::new(102), Felt::new(103), Felt::new(104)]),
+            [Felt::new(1_u64), Felt::new(2_u64), Felt::new(3_u64), Felt::new(4_u64)].into(),
         ),
     ];
     let smt = Smt::with_entries(smt_leaves_2).unwrap();
@@ -561,4 +570,24 @@ fn test_smt_serialization_deserialization() {
     let bytes = smt.to_bytes();
     assert_eq!(smt, Smt::read_from_bytes(&bytes).unwrap());
     assert_eq!(bytes.len(), smt.get_size_hint());
+}
+
+#[test]
+fn smt_with_sorted_entries() {
+    // Smt with sorted values
+    let smt_leaves_2: [(Word, Word); 2] = [
+        (
+            Word::new([Felt::new(101), Felt::new(102), Felt::new(103), Felt::new(104)]),
+            [Felt::new(1_u64), Felt::new(2_u64), Felt::new(3_u64), Felt::new(4_u64)].into(),
+        ),
+        (
+            Word::new([Felt::new(105), Felt::new(106), Felt::new(107), Felt::new(108)]),
+            [Felt::new(5_u64), Felt::new(6_u64), Felt::new(7_u64), Felt::new(8_u64)].into(),
+        ),
+    ];
+
+    let smt = Smt::with_sorted_entries(smt_leaves_2).unwrap();
+    let expected_smt = Smt::with_entries(smt_leaves_2).unwrap();
+
+    assert_eq!(smt, expected_smt);
 }

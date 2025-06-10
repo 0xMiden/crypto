@@ -1,6 +1,25 @@
+## 0.15.0 (TBD)
+
+- [BREAKING] Use a rich newtype for Merkle mountain range types' forest values (#400).
+- Allow pre-sorted entries in `Smt` (#406).
+- Added module and function documentation. (#408).
+- Added default constructors to `MmrPeaks` and `PartialMmr` (#409).
+- Added module and function documentation-2 (#410).
+- [BREAKING] Replaced `RpoDigest` with `Word` struct (#411).
+- Replaced deprecated #[clap(...)] with #[command(...)] and #[arg(...)] (#413).
+- [BREAKING] Renamed `MerklePath::inner_nodes()` to `authenticated_nodes()` to better reflect its functionality (#415).
+- Added `compute_root()`, `verify()`, and `authenticated_nodes()` to `SparseMerklePath` for parity with `MerklePath` (#415).
+- [BREAKING] Replaced `RpxDigest` with `Word` struct (#420).
+- Added `word!` macro to `miden-crypto` (#423).
+- Added test vectors for RpoFalcon512 (#425).
+- [BREAKING] Incremented MSRV to 1.87.
+
 ## 0.14.1 (2025-05-31)
 
-- Add missing `PartialSmt` APIs (#417).
+- Added missing `PartialSmt` APIs (#417).
+- Add module and function documentation. (#408).
+- [BREAKING] Replace `RpoDigest` with `Word` struct (#411).
+- Replace `RpxDigest` with `Word` struct (#420).
 
 ## 0.14.0 (2025-03-15)
 
@@ -13,10 +32,11 @@
 - Added property-based testing (proptest) and fuzzing for `Smt::with_entries` and `Smt::compute_mutations` (#385).
 - Sort keys in a leaf in the concurrent implementation of `Smt::with_entries`, ensuring consistency with the sequential version (#385).
 - Skip unchanged leaves in the concurrent implementation of `Smt::compute_mutations` (#385).
-- Add range checks to `ntru_gen` for Falcon DSA (#391).
+- Added range checks to `ntru_gen` for Falcon DSA (#391).
 - Optimized duplicate key detection in `Smt::with_entries_concurrent` (#395).
 - [BREAKING] Moved `rand` to version `0.9` removing the `try_fill_bytes` method (#398).
 - [BREAKING] Increment minimum supported Rust version to 1.85 (#399).
+- Added `SparseMerklePath`, a compact representation of `MerklePath` which compacts empty nodes into a bitmask (#389).
 
 ## 0.13.3 (2025-02-18)
 

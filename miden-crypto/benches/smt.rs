@@ -1,6 +1,6 @@
-use core::mem::swap;
+use std::hint::black_box;
 
-use criterion::{Criterion, black_box, criterion_group, criterion_main};
+use criterion::{Criterion, criterion_group, criterion_main};
 use miden_crypto::{
     Felt, Word,
     merkle::{LeafIndex, SimpleSmt},
@@ -71,7 +71,7 @@ criterion_main!(smt_group);
 // --------------------------------------------------------------------------------------------
 
 fn generate_word(seed: &mut [u8; 32]) -> Word {
-    swap(seed, &mut prng_array(*seed));
+    *seed = prng_array(*seed);
     let nums: [u64; 4] = prng_array(*seed);
-    [Felt::new(nums[0]), Felt::new(nums[1]), Felt::new(nums[2]), Felt::new(nums[3])]
+    Word::new([Felt::new(nums[0]), Felt::new(nums[1]), Felt::new(nums[2]), Felt::new(nums[3])])
 }

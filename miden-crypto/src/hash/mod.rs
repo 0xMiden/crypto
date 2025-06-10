@@ -2,15 +2,19 @@
 
 use super::{CubeExtension, Felt, FieldElement, StarkField, ZERO};
 
+/// Blake2s hash function.
 pub mod blake;
 
 mod rescue;
+
+/// Rescue Prime Optimized (RPO) hash function.
 pub mod rpo {
-    pub use super::rescue::{Rpo256, RpoDigest, RpoDigestError};
+    pub use super::rescue::Rpo256;
 }
 
+/// Rescue Prime Extended (RPX) hash function.
 pub mod rpx {
-    pub use super::rescue::{Rpx256, RpxDigest, RpxDigestError};
+    pub use super::rescue::Rpx256;
 }
 
 // RE-EXPORTS

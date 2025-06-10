@@ -1,6 +1,6 @@
 use core::fmt::Display;
 
-use super::{Felt, MerkleError, RpoDigest};
+use super::{Felt, MerkleError, Word};
 use crate::utils::{ByteReader, ByteWriter, Deserializable, DeserializationError, Serializable};
 
 // NODE INDEX
@@ -11,7 +11,7 @@ use crate::utils::{ByteReader, ByteWriter, Deserializable, DeserializationError,
 /// The position is represented by the pair `(depth, pos)`, where for a given depth `d` elements
 /// are numbered from $0..(2^d)-1$. Example:
 ///
-/// ```ignore
+/// ```text
 /// depth
 /// 0             0
 /// 1         0        1
@@ -111,7 +111,7 @@ impl NodeIndex {
     /// Builds a node to be used as input of a hash function when computing a Merkle path.
     ///
     /// Will evaluate the parity of the current instance to define the result.
-    pub const fn build_node(&self, slf: RpoDigest, sibling: RpoDigest) -> [RpoDigest; 2] {
+    pub const fn build_node(&self, slf: Word, sibling: Word) -> [Word; 2] {
         if self.is_value_odd() {
             [sibling, slf]
         } else {
@@ -164,6 +164,18 @@ impl NodeIndex {
         self.depth = self.depth.saturating_sub(delta);
         self.value >>= delta as u32;
     }
+
+    // ITERATORS
+    // --------------------------------------------------------------------------------------------
+
+    /// Return an iterator of the indices required for a Merkle proof of inclusion of a node at
+    /// `self`.
+    ///
+    /// This is *exclusive* on both ends: neither `self` nor the root index are included in the
+    /// returned iterator.
+    pub fn proof_indices(&self) -> impl ExactSizeIterator<Item = NodeIndex> + use<> {
+        ProofIter { next_index: self.sibling() }
+    }
 }
 
 impl Display for NodeIndex {
@@ -185,6 +197,39 @@ impl Deserializable for NodeIndex {
         let value = source.read_u64()?;
         NodeIndex::new(depth, value)
             .map_err(|_| DeserializationError::InvalidValue("Invalid index".into()))
+    }
+}
+
+/// Implementation for [`NodeIndex::proof_indices()`].
+#[derive(Debug, Default, Copy, Clone, Eq, PartialEq, Hash)]
+struct ProofIter {
+    next_index: NodeIndex,
+}
+
+impl Iterator for ProofIter {
+    type Item = NodeIndex;
+
+    fn next(&mut self) -> Option<NodeIndex> {
+        if self.next_index.is_root() {
+            return None;
+        }
+
+        let index = self.next_index;
+        self.next_index = index.parent().sibling();
+
+        Some(index)
+    }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        let remaining = ExactSizeIterator::len(self);
+
+        (remaining, Some(remaining))
+    }
+}
+
+impl ExactSizeIterator for ProofIter {
+    fn len(&self) -> usize {
+        self.next_index.depth() as usize
     }
 }
 

@@ -1,17 +1,15 @@
-use criterion::{BatchSize, Criterion, black_box, criterion_group, criterion_main};
+use std::hint::black_box;
+
+use criterion::{BatchSize, Criterion, criterion_group, criterion_main};
 use miden_crypto::{
-    Felt,
-    hash::{
-        blake::Blake3_256,
-        rpo::{Rpo256, RpoDigest},
-        rpx::{Rpx256, RpxDigest},
-    },
+    Felt, Word,
+    hash::{blake::Blake3_256, rpo::Rpo256, rpx::Rpx256},
 };
 use rand_utils::rand_value;
 use winter_crypto::Hasher;
 
 fn rpo256_2to1(c: &mut Criterion) {
-    let v: [RpoDigest; 2] = [Rpo256::hash(&[1_u8]), Rpo256::hash(&[2_u8])];
+    let v: [Word; 2] = [Rpo256::hash(&[1_u8]), Rpo256::hash(&[2_u8])];
     c.bench_function("RPO256 2-to-1 hashing (cached)", |bench| {
         bench.iter(|| Rpo256::merge(black_box(&v)))
     });
@@ -57,7 +55,7 @@ fn rpo256_sequential(c: &mut Criterion) {
 }
 
 fn rpx256_2to1(c: &mut Criterion) {
-    let v: [RpxDigest; 2] = [Rpx256::hash(&[1_u8]), Rpx256::hash(&[2_u8])];
+    let v: [Word; 2] = [Rpx256::hash(&[1_u8]), Rpx256::hash(&[2_u8])];
     c.bench_function("RPX256 2-to-1 hashing (cached)", |bench| {
         bench.iter(|| Rpx256::merge(black_box(&v)))
     });

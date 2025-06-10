@@ -1,6 +1,6 @@
 use core::slice;
 
-use super::{EMPTY_WORD, Felt, RpoDigest, smt::InnerNode};
+use super::{EMPTY_WORD, Felt, Word, smt::InnerNode};
 
 // EMPTY NODES SUBTREES
 // ================================================================================================
@@ -11,8 +11,8 @@ pub struct EmptySubtreeRoots;
 impl EmptySubtreeRoots {
     /// Returns a static slice with roots of empty subtrees of a Merkle tree starting at the
     /// specified depth.
-    pub const fn empty_hashes(tree_depth: u8) -> &'static [RpoDigest] {
-        let ptr = &EMPTY_SUBTREES[255 - tree_depth as usize] as *const RpoDigest;
+    pub const fn empty_hashes(tree_depth: u8) -> &'static [Word] {
+        let ptr = &EMPTY_SUBTREES[255 - tree_depth as usize] as *const Word;
         // Safety: this is a static/constant array, so it will never be outlived. If we attempt to
         // use regular slices, this wouldn't be a `const` function, meaning we won't be able to use
         // the returned value for static/constant definitions.
@@ -20,7 +20,7 @@ impl EmptySubtreeRoots {
     }
 
     /// Returns the node's digest for a sub-tree with all its leaves set to the empty word.
-    pub const fn entry(tree_depth: u8, node_depth: u8) -> &'static RpoDigest {
+    pub const fn entry(tree_depth: u8, node_depth: u8) -> &'static Word {
         assert!(node_depth <= tree_depth);
         let pos = 255 - tree_depth + node_depth;
         &EMPTY_SUBTREES[pos as usize]
@@ -38,1538 +38,1538 @@ impl EmptySubtreeRoots {
     }
 }
 
-const EMPTY_SUBTREES: [RpoDigest; 256] = [
-    RpoDigest::new([
+const EMPTY_SUBTREES: [Word; 256] = [
+    Word::new([
         Felt::new(0xee3d94db86d48dc4),
         Felt::new(0x3d13166c7aba0368),
         Felt::new(0x282e861f2936aa7),
         Felt::new(0xf0328a1745537b4),
     ]),
-    RpoDigest::new([
+    Word::new([
         Felt::new(0x33174b312b730760),
         Felt::new(0x9d1e00c5b50352b2),
         Felt::new(0x16bf9ec4acef2e42),
         Felt::new(0x4263877e63c4cbe7),
     ]),
-    RpoDigest::new([
+    Word::new([
         Felt::new(0xa8e039042672a8bc),
         Felt::new(0x1010d951d941d9d4),
         Felt::new(0xd3e8f0ecc866ac3b),
         Felt::new(0xb2dbbbb80da232ba),
     ]),
-    RpoDigest::new([
+    Word::new([
         Felt::new(0xa0d2c1a3e455f299),
         Felt::new(0x648e8e13867dc8eb),
         Felt::new(0xe79f94ea61189847),
         Felt::new(0xb88a89e1f2765a31),
     ]),
-    RpoDigest::new([
+    Word::new([
         Felt::new(0xe168133fd9ab570d),
         Felt::new(0x6fc7d0295ac5a3a2),
         Felt::new(0xc973ea026e9411c),
         Felt::new(0x63c29ea04552b532),
     ]),
-    RpoDigest::new([
+    Word::new([
         Felt::new(0x27e57ecc0f9f196),
         Felt::new(0xc02f6e29fd19b059),
         Felt::new(0x4a42fbc436efb0b6),
         Felt::new(0xbff30574a98a1b29),
     ]),
-    RpoDigest::new([
+    Word::new([
         Felt::new(0x18c32592a4f4d0b),
         Felt::new(0x6b9a08797252d5d5),
         Felt::new(0xdbfe48f00a088a2),
         Felt::new(0x16b4c3e485b173e3),
     ]),
-    RpoDigest::new([
+    Word::new([
         Felt::new(0x26c8902938b831a5),
         Felt::new(0x66ee91b36943f92e),
         Felt::new(0x4e8deeafef9f5725),
         Felt::new(0xbb35751d5dfb0a33),
     ]),
-    RpoDigest::new([
+    Word::new([
         Felt::new(0x74af678f8e020ff4),
         Felt::new(0xd4784cda0beed295),
         Felt::new(0x4380949d841d793c),
         Felt::new(0xdf587011d09d3bbb),
     ]),
-    RpoDigest::new([
+    Word::new([
         Felt::new(0xa211d1da76aaef98),
         Felt::new(0xd904ccc6435e268),
         Felt::new(0x1c6f16a5d03b8416),
         Felt::new(0x87800f7f5da9c93),
     ]),
-    RpoDigest::new([
+    Word::new([
         Felt::new(0xa00bbad0a52adeff),
         Felt::new(0xe22179c651da9d76),
         Felt::new(0x474f10493a3723f4),
         Felt::new(0x84397e6bd34a1f5b),
     ]),
-    RpoDigest::new([
+    Word::new([
         Felt::new(0xe8f440afef4d082b),
         Felt::new(0x14fff8e329613cc9),
         Felt::new(0x78e984bc8b40f4f1),
         Felt::new(0x6ed8f02e5be1bab2),
     ]),
-    RpoDigest::new([
+    Word::new([
         Felt::new(0xda824edf085b5f9f),
         Felt::new(0xc8a8f1c1b86d349e),
         Felt::new(0xe1bf6975afb7b2de),
         Felt::new(0xd7df51ea51028489),
     ]),
-    RpoDigest::new([
+    Word::new([
         Felt::new(0xf64873d31456de99),
         Felt::new(0x1fc9cb920b6c72b),
         Felt::new(0x96613d9d71af4373),
         Felt::new(0x61d607eb097e76c9),
     ]),
-    RpoDigest::new([
+    Word::new([
         Felt::new(0xca304d2b3b778719),
         Felt::new(0xa54d8602f37eed39),
         Felt::new(0xb4574db6dc09bcf2),
         Felt::new(0x5e42cd4f1de9587c),
     ]),
-    RpoDigest::new([
+    Word::new([
         Felt::new(0x17575dfa689d8a07),
         Felt::new(0x1db9d374d7436444),
         Felt::new(0x21d1e8dca296f38d),
         Felt::new(0xbc4aad43a9d93f54),
     ]),
-    RpoDigest::new([
+    Word::new([
         Felt::new(0x9fa0697330c054cd),
         Felt::new(0xd5d57fbf059452e8),
         Felt::new(0xe848fafb1c43414c),
         Felt::new(0xacb7754fd77c9d52),
     ]),
-    RpoDigest::new([
+    Word::new([
         Felt::new(0x406af89b918e596c),
         Felt::new(0xb735a2c588ee87df),
         Felt::new(0xb40ff1dd1c3c6599),
         Felt::new(0x675a582b4c8a68ac),
     ]),
-    RpoDigest::new([
+    Word::new([
         Felt::new(0x530ff6be0c86a2f6),
         Felt::new(0x5541fabfefd34c91),
         Felt::new(0x4af1579d212149ae),
         Felt::new(0x23962b7df862f27c),
     ]),
-    RpoDigest::new([
+    Word::new([
         Felt::new(0x1676b694f41cfc0d),
         Felt::new(0x59b165ea5f354fd8),
         Felt::new(0x5b45ee14e2501f08),
         Felt::new(0xd0c8ca7bc2e01e18),
     ]),
-    RpoDigest::new([
+    Word::new([
         Felt::new(0x2cff5d1e629ddc7b),
         Felt::new(0x5062be34e4351fe),
         Felt::new(0xfd76495b9d8ea67),
         Felt::new(0xb96453b1c8060ca8),
     ]),
-    RpoDigest::new([
+    Word::new([
         Felt::new(0x860b00517d3de1ef),
         Felt::new(0xd609c82af07b9dad),
         Felt::new(0xa54a528b8f1cbddc),
         Felt::new(0xb4fff658ed97e635),
     ]),
-    RpoDigest::new([
+    Word::new([
         Felt::new(0xd002cea8f347c347),
         Felt::new(0xa135cebffdf3ec10),
         Felt::new(0xb0200ea08da2cef4),
         Felt::new(0x4e6f2f75d627b137),
     ]),
-    RpoDigest::new([
+    Word::new([
         Felt::new(0xc1983ce677cabbf4),
         Felt::new(0x58f0143480f44788),
         Felt::new(0xf8c23e4f84b6c6c1),
         Felt::new(0xc9ce41371c4900b8),
     ]),
-    RpoDigest::new([
+    Word::new([
         Felt::new(0x837d99979bc9a5e6),
         Felt::new(0x7621559aa4af175a),
         Felt::new(0x6986737347c799c2),
         Felt::new(0x8cee99eb47c3e702),
     ]),
-    RpoDigest::new([
+    Word::new([
         Felt::new(0x42e17ba02508a41f),
         Felt::new(0xb95e349bd55ba61f),
         Felt::new(0xcc2bfeb29c4c68b2),
         Felt::new(0xf268f57860a446b1),
     ]),
-    RpoDigest::new([
+    Word::new([
         Felt::new(0xd3ffd4ccc6dda508),
         Felt::new(0x81db1910ef04ca07),
         Felt::new(0x5c698ee6c3aeab97),
         Felt::new(0x2ac1e2c2c5f237de),
     ]),
-    RpoDigest::new([
+    Word::new([
         Felt::new(0x1f42a1ef25bd0aad),
         Felt::new(0x81b0f63e2760b8db),
         Felt::new(0xe9607c7061b018f9),
         Felt::new(0xf02a88202294a700),
     ]),
-    RpoDigest::new([
+    Word::new([
         Felt::new(0xea5da09b39b60468),
         Felt::new(0xe48ea41d94fe91a7),
         Felt::new(0x24dde954ce08b32b),
         Felt::new(0xe1bb6e41bd0613e6),
     ]),
-    RpoDigest::new([
+    Word::new([
         Felt::new(0xc5e9f7188b43a24f),
         Felt::new(0x8d7132abc9d901e4),
         Felt::new(0xdc09a33ff4d0eb03),
         Felt::new(0xa119bb1db594b4cf),
     ]),
-    RpoDigest::new([
+    Word::new([
         Felt::new(0x589002afcbd4a233),
         Felt::new(0xe4eae44d3c2a308d),
         Felt::new(0x8bc0bca14b6b4dde),
         Felt::new(0x3716e0e86a7aaa6c),
     ]),
-    RpoDigest::new([
+    Word::new([
         Felt::new(0xaa4ba9602230007e),
         Felt::new(0x2b2c3e14b888a3d4),
         Felt::new(0x90a36fb42ec2ba19),
         Felt::new(0x2e07ef26b078c4a7),
     ]),
-    RpoDigest::new([
+    Word::new([
         Felt::new(0x32307da7aad33113),
         Felt::new(0x343ed87928b9ab0c),
         Felt::new(0x1c01d79482c021f0),
         Felt::new(0x6f866afccc595439),
     ]),
-    RpoDigest::new([
+    Word::new([
         Felt::new(0x9780804b58b0d066),
         Felt::new(0x1329929c6dc19c09),
         Felt::new(0xc04add06dbaef6bf),
         Felt::new(0xf494a28db17c5c4),
     ]),
-    RpoDigest::new([
+    Word::new([
         Felt::new(0xe9dbb1c64d55571f),
         Felt::new(0x663f0f716f28734),
         Felt::new(0x7285fd4b8e87a78c),
         Felt::new(0x2e152a4595b7597e),
     ]),
-    RpoDigest::new([
+    Word::new([
         Felt::new(0x5531fabfa5960807),
         Felt::new(0x8afe79be96d903a4),
         Felt::new(0x24321cce4f1942f8),
         Felt::new(0xb1829ec9d60aac8f),
     ]),
-    RpoDigest::new([
+    Word::new([
         Felt::new(0x9f7afc6634a82d1),
         Felt::new(0x496e26bc17af352b),
         Felt::new(0x8216f090e1d13381),
         Felt::new(0x610cf5a3b3e190f9),
     ]),
-    RpoDigest::new([
+    Word::new([
         Felt::new(0xb5f8c141a9acd007),
         Felt::new(0x4430345ace970576),
         Felt::new(0x64d97e5533db3170),
         Felt::new(0x95c016d769b0fc2d),
     ]),
-    RpoDigest::new([
+    Word::new([
         Felt::new(0x88820d6a7ba5a94a),
         Felt::new(0x27b614d79eb7b30b),
         Felt::new(0xff2751e904085d5f),
         Felt::new(0x752509a0860b37d),
     ]),
-    RpoDigest::new([
+    Word::new([
         Felt::new(0x1070bc84bb53a855),
         Felt::new(0x1edad3d5da84e59b),
         Felt::new(0x8efd48a13e4dfe0d),
         Felt::new(0x3ab20af6203aba62),
     ]),
-    RpoDigest::new([
+    Word::new([
         Felt::new(0xb4d6d3cc85438d08),
         Felt::new(0x5592639fb2792724),
         Felt::new(0x5939996ea4c52176),
         Felt::new(0xaa83a79236367ee7),
     ]),
-    RpoDigest::new([
+    Word::new([
         Felt::new(0x4c08ac735aa1925a),
         Felt::new(0x84951e177ac84e86),
         Felt::new(0xd5b2657778d3271a),
         Felt::new(0x375f75333654a77c),
     ]),
-    RpoDigest::new([
+    Word::new([
         Felt::new(0x2fcbd8fcd125e5),
         Felt::new(0xd8f711ed1b369d43),
         Felt::new(0x9688301695b6bcd4),
         Felt::new(0x52a010319401179),
     ]),
-    RpoDigest::new([
+    Word::new([
         Felt::new(0x1c67f8fde4c9c070),
         Felt::new(0x438ccdf9d82b3a3f),
         Felt::new(0xb9324515d5547ff5),
         Felt::new(0x85ff37504c8230f0),
     ]),
-    RpoDigest::new([
+    Word::new([
         Felt::new(0xcf8b6fabda4621f3),
         Felt::new(0x1df94bb4ea8aeb6d),
         Felt::new(0x8efffb7e8996b9e5),
         Felt::new(0xa9aef575e8a86c4d),
     ]),
-    RpoDigest::new([
+    Word::new([
         Felt::new(0x6e20862a64baaaef),
         Felt::new(0xc54fbbfa034d6f1b),
         Felt::new(0x16d9fd099f5bba71),
         Felt::new(0xe4ac4cf3186fae83),
     ]),
-    RpoDigest::new([
+    Word::new([
         Felt::new(0x12914625293d7f84),
         Felt::new(0xd3b46add4f77be8),
         Felt::new(0xaac8846e6eeb9acd),
         Felt::new(0xab6a69452b4b167b),
     ]),
-    RpoDigest::new([
+    Word::new([
         Felt::new(0x69652e812cdfe03d),
         Felt::new(0x22731622b139de96),
         Felt::new(0xd7226e9a887f368d),
         Felt::new(0xe9bbf6ad8f51ee13),
     ]),
-    RpoDigest::new([
+    Word::new([
         Felt::new(0xc39a01964af141d7),
         Felt::new(0xb5ab2062263dcaa2),
         Felt::new(0x1d7fbcd9204cbd34),
         Felt::new(0xd48c517d5543c163),
     ]),
-    RpoDigest::new([
+    Word::new([
         Felt::new(0x44118fda0c2b4af2),
         Felt::new(0x487d307ce7444bb2),
         Felt::new(0x171b7c6a17d734b2),
         Felt::new(0xd9a737ddf65949d9),
     ]),
-    RpoDigest::new([
+    Word::new([
         Felt::new(0xc2cdc1b940450fec),
         Felt::new(0x29864b9632eff0cd),
         Felt::new(0x9ae31f150850e78c),
         Felt::new(0xf9f9d0ef1092be87),
     ]),
-    RpoDigest::new([
+    Word::new([
         Felt::new(0x1703dd34002f3862),
         Felt::new(0xf04b44446be81ea1),
         Felt::new(0x8da51598849beb99),
         Felt::new(0x8112e155f7f856a0),
     ]),
-    RpoDigest::new([
+    Word::new([
         Felt::new(0x3d4da8351f41dc1c),
         Felt::new(0x682e55817f56f30b),
         Felt::new(0xf20cc7fe5b98b951),
         Felt::new(0x8297d3de042785d4),
     ]),
-    RpoDigest::new([
+    Word::new([
         Felt::new(0x1f9d07a435a6d13e),
         Felt::new(0x789a1330825c199a),
         Felt::new(0x6e058e9dbc30f3a0),
         Felt::new(0xb09be46b59290984),
     ]),
-    RpoDigest::new([
+    Word::new([
         Felt::new(0xaf2d49c9a3975d21),
         Felt::new(0xebd4d399fc30a751),
         Felt::new(0x224a3884ca353e5d),
         Felt::new(0xbebba344bbe055a7),
     ]),
-    RpoDigest::new([
+    Word::new([
         Felt::new(0xdf576dc16b0abc3f),
         Felt::new(0x40439af403c36338),
         Felt::new(0x317b1f2308849c53),
         Felt::new(0x91e5c9d14107cb04),
     ]),
-    RpoDigest::new([
+    Word::new([
         Felt::new(0x93af916aa15f97e2),
         Felt::new(0x50d4aec3e408fba7),
         Felt::new(0xd16bd5f71b6d6915),
         Felt::new(0x27b96db871be03ef),
     ]),
-    RpoDigest::new([
+    Word::new([
         Felt::new(0x72fce6dd7d54e348),
         Felt::new(0x632a2e8b6177c670),
         Felt::new(0xefd897bebdc4ec2b),
         Felt::new(0xfe66bfe440033790),
     ]),
-    RpoDigest::new([
+    Word::new([
         Felt::new(0xc581364aef408d6a),
         Felt::new(0xfcc7efb35cccae32),
         Felt::new(0xee0a97dded065fbf),
         Felt::new(0x2b1eb2c45fd0e633),
     ]),
-    RpoDigest::new([
+    Word::new([
         Felt::new(0x9e460e8159152a88),
         Felt::new(0xcc5a2946f03bf507),
         Felt::new(0x95535e9cf29e4ab9),
         Felt::new(0x29b23d31ffe6df18),
     ]),
-    RpoDigest::new([
+    Word::new([
         Felt::new(0xbae2c405d8ba715d),
         Felt::new(0xb886f0545ae16153),
         Felt::new(0x728d5965a4cdfc0b),
         Felt::new(0x86bd552048f3ebc4),
     ]),
-    RpoDigest::new([
+    Word::new([
         Felt::new(0x3a4c6dbaa6feda93),
         Felt::new(0x8a32917885a3f22c),
         Felt::new(0xd6016ba7fc1a0717),
         Felt::new(0x3bfd41569497b156),
     ]),
-    RpoDigest::new([
+    Word::new([
         Felt::new(0xa907fad371653f15),
         Felt::new(0x6be9ce6ac746f5bc),
         Felt::new(0x1bee5ac8750d2444),
         Felt::new(0x16050d83d4f7a90c),
     ]),
-    RpoDigest::new([
+    Word::new([
         Felt::new(0x4b194182aa7e9324),
         Felt::new(0x813af49c845cea5e),
         Felt::new(0x6886f4d8628bab16),
         Felt::new(0xe3b6ef1419e2432c),
     ]),
-    RpoDigest::new([
+    Word::new([
         Felt::new(0x3edc103de28f1fac),
         Felt::new(0xb6a05b8802d6ed5c),
         Felt::new(0xf320c3f130a175c8),
         Felt::new(0x326c8bb02f9a51f6),
     ]),
-    RpoDigest::new([
+    Word::new([
         Felt::new(0x5b1ac27a49b5d1da),
         Felt::new(0x9e1fa75b04da7545),
         Felt::new(0x9a522396a1cd68af),
         Felt::new(0x91a4d435f3fcd43f),
     ]),
-    RpoDigest::new([
+    Word::new([
         Felt::new(0x318ac5d8f1e489ce),
         Felt::new(0x339e7a0b2aec5843),
         Felt::new(0x38f15bf9832a2c28),
         Felt::new(0x5e3fef94216f72f1),
     ]),
-    RpoDigest::new([
+    Word::new([
         Felt::new(0xc43e0723d2a7e79c),
         Felt::new(0xa06167cc0ebdf1e5),
         Felt::new(0xe62f10089af57ba6),
         Felt::new(0x838c863d60b859a2),
     ]),
-    RpoDigest::new([
+    Word::new([
         Felt::new(0xd10456af5f30e5d5),
         Felt::new(0x235df7fe21fb912c),
         Felt::new(0xe5acc29d13d80779),
         Felt::new(0x580b83247a1f6524),
     ]),
-    RpoDigest::new([
+    Word::new([
         Felt::new(0x2a8b1bf7e9bc5675),
         Felt::new(0x9e523f2d659a3e30),
         Felt::new(0x3ecfdb1615666b74),
         Felt::new(0xf53746b86fedee7f),
     ]),
-    RpoDigest::new([
+    Word::new([
         Felt::new(0xa12095b3b22680a9),
         Felt::new(0x3010ad751585161d),
         Felt::new(0xfb9c0ea33c7437b2),
         Felt::new(0x9225d8151ec724a8),
     ]),
-    RpoDigest::new([
+    Word::new([
         Felt::new(0x1b09eac8ad815107),
         Felt::new(0x33cb241ad41b562d),
         Felt::new(0xa04f457b4cd1ece9),
         Felt::new(0x84f27a45985d700e),
     ]),
-    RpoDigest::new([
+    Word::new([
         Felt::new(0xe5598d92d1507185),
         Felt::new(0x84aa2bf7d87a26e8),
         Felt::new(0x158f0e13550dec2a),
         Felt::new(0x54d699e5eb65ee63),
     ]),
-    RpoDigest::new([
+    Word::new([
         Felt::new(0x902e89f122f8f8f7),
         Felt::new(0xc2da7127af8c699a),
         Felt::new(0x75762e75b77a1662),
         Felt::new(0x7e683b3c116af130),
     ]),
-    RpoDigest::new([
+    Word::new([
         Felt::new(0xabc2aa2ecd2316dd),
         Felt::new(0x44558fa721857f00),
         Felt::new(0xf61dd475fdbc23d0),
         Felt::new(0x22ba84332065a9e8),
     ]),
-    RpoDigest::new([
+    Word::new([
         Felt::new(0x5aa94e045e4bb7ae),
         Felt::new(0xf6ddadbdd8747728),
         Felt::new(0xeeab65efab2a1d2),
         Felt::new(0xd12cc579c49b9db5),
     ]),
-    RpoDigest::new([
+    Word::new([
         Felt::new(0x71ea68262a73196a),
         Felt::new(0x9612483af09f1bde),
         Felt::new(0x7fe5fd69bbf241a4),
         Felt::new(0x34de27c57b37975d),
     ]),
-    RpoDigest::new([
+    Word::new([
         Felt::new(0xf29bc8ba140714f6),
         Felt::new(0xf0b44caca4f6561e),
         Felt::new(0x742695d702446774),
         Felt::new(0x7e1437b52ee16c0c),
     ]),
-    RpoDigest::new([
+    Word::new([
         Felt::new(0x13f6180493eaa129),
         Felt::new(0x8fa2e77f499c911c),
         Felt::new(0x1223e5ccda975bf),
         Felt::new(0xc2a362e5449eac8b),
     ]),
-    RpoDigest::new([
+    Word::new([
         Felt::new(0xcf1254ec733c8fb0),
         Felt::new(0x34359ae1e2272fc9),
         Felt::new(0xce928a65262d59d5),
         Felt::new(0xc84e1f72e2e78101),
     ]),
-    RpoDigest::new([
+    Word::new([
         Felt::new(0x8841b659676a2df5),
         Felt::new(0x4c808c965135ff8f),
         Felt::new(0x374d574fd96ee7d1),
         Felt::new(0xa0ae0e5765bc8716),
     ]),
-    RpoDigest::new([
+    Word::new([
         Felt::new(0xba3692cf34a6eb7a),
         Felt::new(0x384dce8b1fd8fcd5),
         Felt::new(0x248f1c83f6cf6055),
         Felt::new(0xbf50ca14b3c5b022),
     ]),
-    RpoDigest::new([
+    Word::new([
         Felt::new(0x18611824fa468341),
         Felt::new(0xaab4187ff224ec04),
         Felt::new(0x4ad742d8a070d084),
         Felt::new(0xfa3bb42df7d86480),
     ]),
-    RpoDigest::new([
+    Word::new([
         Felt::new(0x2ab25bf43fc462b5),
         Felt::new(0x6ac0cc243f54b796),
         Felt::new(0x2401eabf391a2199),
         Felt::new(0x62a71dae211b983),
     ]),
-    RpoDigest::new([
+    Word::new([
         Felt::new(0xbc5e568df9f18772),
         Felt::new(0xee864850b75a99ba),
         Felt::new(0x2a53e3e6776ae456),
         Felt::new(0x8eb51bedbe483d7c),
     ]),
-    RpoDigest::new([
+    Word::new([
         Felt::new(0xce8161f4c705bfbb),
         Felt::new(0xf1071a4e343a37e9),
         Felt::new(0xddc4878a9e5de00f),
         Felt::new(0xee33d737cd3c5dc8),
     ]),
-    RpoDigest::new([
+    Word::new([
         Felt::new(0x9eadd43aebfcd43d),
         Felt::new(0xf35cec43429c0a95),
         Felt::new(0xcad253fc16b63e5a),
         Felt::new(0xea25dc9baaf21d38),
     ]),
-    RpoDigest::new([
+    Word::new([
         Felt::new(0xa85a87fbf220f449),
         Felt::new(0x1db1c09109882161),
         Felt::new(0xab5139cb30eb2c88),
         Felt::new(0xe62f2ade31d95b14),
     ]),
-    RpoDigest::new([
+    Word::new([
         Felt::new(0xad3fae6f7f635376),
         Felt::new(0x21e5dba9b8e21ac8),
         Felt::new(0x86506eeeba6c7151),
         Felt::new(0x6bf71fdffc8d9ae7),
     ]),
-    RpoDigest::new([
+    Word::new([
         Felt::new(0x37ec52a9396f4574),
         Felt::new(0xf19404a514aa9285),
         Felt::new(0x3ed5ae669769c4e7),
         Felt::new(0x2286b493b85c9481),
     ]),
-    RpoDigest::new([
+    Word::new([
         Felt::new(0xc37fc37b83940bd2),
         Felt::new(0xe3d67417540b620b),
         Felt::new(0x1495f7a7848dde0a),
         Felt::new(0xeaf4f9c053465ff),
     ]),
-    RpoDigest::new([
+    Word::new([
         Felt::new(0x80131752569df8f0),
         Felt::new(0x30720a862b82f732),
         Felt::new(0xabed5fb95dbe678b),
         Felt::new(0x6cf7da37075ad45e),
     ]),
-    RpoDigest::new([
+    Word::new([
         Felt::new(0xa318ea66909473fe),
         Felt::new(0x4a6c6ebc4bee8b3c),
         Felt::new(0xf0d622f04ce1b02e),
         Felt::new(0x92c2f8e192c000a1),
     ]),
-    RpoDigest::new([
+    Word::new([
         Felt::new(0xb39d728756dca017),
         Felt::new(0x4f66acee5bcd7d98),
         Felt::new(0xf623331bed29e125),
         Felt::new(0xbcfc777f0eb03793),
     ]),
-    RpoDigest::new([
+    Word::new([
         Felt::new(0x6cdabd98e067b039),
         Felt::new(0xd6356a27c3df3ddc),
         Felt::new(0xd5afb88820db9d2f),
         Felt::new(0x8203a7adfa667bfc),
     ]),
-    RpoDigest::new([
+    Word::new([
         Felt::new(0x1ddef8e482da50e0),
         Felt::new(0x7fa3c9c0865609ec),
         Felt::new(0x6ca762886d4d6227),
         Felt::new(0x9a95160f2a4fe5d9),
     ]),
-    RpoDigest::new([
+    Word::new([
         Felt::new(0x607230c3b366dbd5),
         Felt::new(0x5b996a7d876b7602),
         Felt::new(0xf61df5d15469c8ea),
         Felt::new(0x9bb4f5c06ac49403),
     ]),
-    RpoDigest::new([
+    Word::new([
         Felt::new(0x6a27c9e7082595e7),
         Felt::new(0xbf93eb89e2090438),
         Felt::new(0xd2db18139bedc636),
         Felt::new(0x79710c33a1f1f612),
     ]),
-    RpoDigest::new([
+    Word::new([
         Felt::new(0xf54e4461aa09608b),
         Felt::new(0x898a7b52804d88c9),
         Felt::new(0xbc548fab0257ea25),
         Felt::new(0xe783017a62b49474),
     ]),
-    RpoDigest::new([
+    Word::new([
         Felt::new(0xf7efdb376a7734c9),
         Felt::new(0x2d4ded56d9ef2076),
         Felt::new(0xa17d90a509b879d0),
         Felt::new(0xcf012a20045b29e1),
     ]),
-    RpoDigest::new([
+    Word::new([
         Felt::new(0x37e40a30232a4f06),
         Felt::new(0xfbd9877fb761052e),
         Felt::new(0xc4c41f56a70377cd),
         Felt::new(0x631e942f6680d4cc),
     ]),
-    RpoDigest::new([
+    Word::new([
         Felt::new(0xcf868b6d54b515a5),
         Felt::new(0xa522edf7c43f7aee),
         Felt::new(0x66057652f34d479),
         Felt::new(0x59f4a86223bc80bd),
     ]),
-    RpoDigest::new([
+    Word::new([
         Felt::new(0xb7214ce5a0ba8dfd),
         Felt::new(0x5c7a6e583e4e255e),
         Felt::new(0xabc8369f8bf38a1c),
         Felt::new(0xb5db79ae07f0689c),
     ]),
-    RpoDigest::new([
+    Word::new([
         Felt::new(0x18c980169ef2d0bb),
         Felt::new(0x6526b64df8eb4eac),
         Felt::new(0xfe4d8327ca5bd91a),
         Felt::new(0xe36d607069c7dd85),
     ]),
-    RpoDigest::new([
+    Word::new([
         Felt::new(0x602a97209948e5cc),
         Felt::new(0xb7d19db914da726),
         Felt::new(0xe4e43672c24d376c),
         Felt::new(0x8bb9f7465e019213),
     ]),
-    RpoDigest::new([
+    Word::new([
         Felt::new(0x187bff077d393e3d),
         Felt::new(0x17fb9a97c5055580),
         Felt::new(0x618469c060eb2719),
         Felt::new(0xfc7be4b58477e5ac),
     ]),
-    RpoDigest::new([
+    Word::new([
         Felt::new(0x1d40fcbc7a25cc97),
         Felt::new(0xaee142f7cebadbd5),
         Felt::new(0x22dbaed94300ddf8),
         Felt::new(0xe069c36278753a06),
     ]),
-    RpoDigest::new([
+    Word::new([
         Felt::new(0xcd1e21c5f02ce44d),
         Felt::new(0x3b0ddbaa04daff25),
         Felt::new(0xbb55cd14f54818c7),
         Felt::new(0xc57f1b84ed302102),
     ]),
-    RpoDigest::new([
+    Word::new([
         Felt::new(0x5c8e1f56cbdb0f87),
         Felt::new(0xeeeb31b4d317cf1d),
         Felt::new(0x8bf45cd3659a6d1),
         Felt::new(0x9e179aa20693175a),
     ]),
-    RpoDigest::new([
+    Word::new([
         Felt::new(0x10f58975fbb0fca),
         Felt::new(0x5f35c19eb0f615c1),
         Felt::new(0x9870cdafe46a3d),
         Felt::new(0xcec9d9f3925df88b),
     ]),
-    RpoDigest::new([
+    Word::new([
         Felt::new(0x89e90b2f029b50c0),
         Felt::new(0xd78a4223d0036c8a),
         Felt::new(0x996b326a1d5cd76d),
         Felt::new(0x5b314d29bb1694e3),
     ]),
-    RpoDigest::new([
+    Word::new([
         Felt::new(0x1be6e6955ba0f3a8),
         Felt::new(0xc7e07c49076315ef),
         Felt::new(0x93e91de5c7849fb2),
         Felt::new(0xe81bc86fc641596f),
     ]),
-    RpoDigest::new([
+    Word::new([
         Felt::new(0x5320464735f18522),
         Felt::new(0x1a741214432ca63d),
         Felt::new(0xaf3ed59d324bdbe8),
         Felt::new(0x2493eb414c91ac94),
     ]),
-    RpoDigest::new([
+    Word::new([
         Felt::new(0x35897b61f231fa86),
         Felt::new(0xb1531e954332f229),
         Felt::new(0x92e950b1c1f874a),
         Felt::new(0x469de0412ca52491),
     ]),
-    RpoDigest::new([
+    Word::new([
         Felt::new(0x1ecea76deca59ec5),
         Felt::new(0xe884b570f5d54e45),
         Felt::new(0x58939f3a1b5bc7e1),
         Felt::new(0xf14eab10f926958f),
     ]),
-    RpoDigest::new([
+    Word::new([
         Felt::new(0x26251aa927a69723),
         Felt::new(0xb1808fe0795ab008),
         Felt::new(0xd195fe923d1944c9),
         Felt::new(0x2334a61c28dc63c),
     ]),
-    RpoDigest::new([
+    Word::new([
         Felt::new(0xe4b659081d9cf4e4),
         Felt::new(0xf1174a5f72916819),
         Felt::new(0x1de902b42b3b4054),
         Felt::new(0xbe2bc215120367d0),
     ]),
-    RpoDigest::new([
+    Word::new([
         Felt::new(0xfc87b8043d32428f),
         Felt::new(0x8f8cb244e3ddf6da),
         Felt::new(0xc7539186ece143a7),
         Felt::new(0xf28008f902075229),
     ]),
-    RpoDigest::new([
+    Word::new([
         Felt::new(0xf76c24c9f86c44d3),
         Felt::new(0x97c7abcbb6d07d35),
         Felt::new(0x9d8e37a1697a0d4),
         Felt::new(0xa3f818e48770f5fa),
     ]),
-    RpoDigest::new([
+    Word::new([
         Felt::new(0x885686c79c1cd95e),
         Felt::new(0xcdebe76fd203c23e),
         Felt::new(0xdf9b7cd5099673ed),
         Felt::new(0xe60438536ad13270),
     ]),
-    RpoDigest::new([
+    Word::new([
         Felt::new(0x7790809942b9389d),
         Felt::new(0xa3d82432c31de99),
         Felt::new(0xaea11fece88c7d27),
         Felt::new(0x5cc764da96d0b2f0),
     ]),
-    RpoDigest::new([
+    Word::new([
         Felt::new(0x80e555c41170427f),
         Felt::new(0x87e68144276d79c8),
         Felt::new(0xebdc63f28aa58a53),
         Felt::new(0x168dd22672627819),
     ]),
-    RpoDigest::new([
+    Word::new([
         Felt::new(0xea1dc59c29da5b6c),
         Felt::new(0xa33188c0a077761),
         Felt::new(0xabd3c84cddbe1477),
         Felt::new(0xd28244bc92f36e0f),
     ]),
-    RpoDigest::new([
+    Word::new([
         Felt::new(0xdadc2beb7ccfe3fa),
         Felt::new(0x218532461f981fb4),
         Felt::new(0xf0455f1d4e2f9732),
         Felt::new(0xa7338b43d2b7e62d),
     ]),
-    RpoDigest::new([
+    Word::new([
         Felt::new(0x195d8bc1cfe2711a),
         Felt::new(0x44e392ba7e259f47),
         Felt::new(0x480120d41e18ab3c),
         Felt::new(0x2056ffb29c2d89d1),
     ]),
-    RpoDigest::new([
+    Word::new([
         Felt::new(0x382e33ba5fe6ada3),
         Felt::new(0x45402a8903efebc9),
         Felt::new(0xb9b0d63a59c70da),
         Felt::new(0x7afebd4726d8cfe5),
     ]),
-    RpoDigest::new([
+    Word::new([
         Felt::new(0xbf60bf6b45a4c9d),
         Felt::new(0xfb5b9b553646f19c),
         Felt::new(0x9949b60ce7639da3),
         Felt::new(0x9c62552c0d1868ff),
     ]),
-    RpoDigest::new([
+    Word::new([
         Felt::new(0xdb2a0aba0fc5e4f8),
         Felt::new(0x8ee4f01d4b0fa49e),
         Felt::new(0xd70a17a77b5c4a03),
         Felt::new(0x57aaaa5b48fea66e),
     ]),
-    RpoDigest::new([
+    Word::new([
         Felt::new(0x6d635940443564cb),
         Felt::new(0xc7fbf0e26b5e3ff6),
         Felt::new(0xa45bce664368b65e),
         Felt::new(0xd6c5c1a92be0c60d),
     ]),
-    RpoDigest::new([
+    Word::new([
         Felt::new(0x6ea62d6033fb2dd3),
         Felt::new(0x1a37910cf90ec6d8),
         Felt::new(0x83d826e9933760b5),
         Felt::new(0xf8387c90d9c6b5a9),
     ]),
-    RpoDigest::new([
+    Word::new([
         Felt::new(0x134766f1da2fbc91),
         Felt::new(0xcfaeea545df2c757),
         Felt::new(0xd0accefaed1eaa0f),
         Felt::new(0xec38d4053f84b163),
     ]),
-    RpoDigest::new([
+    Word::new([
         Felt::new(0xb02ad1e757380aee),
         Felt::new(0x4538b8ea13112d4),
         Felt::new(0xb2d761fe842a2a85),
         Felt::new(0x8e98d58adf5a1f29),
     ]),
-    RpoDigest::new([
+    Word::new([
         Felt::new(0x44603d9549ddee64),
         Felt::new(0x43de72d570967bbb),
         Felt::new(0x4a3e71144e62d0fa),
         Felt::new(0xffb2fdcb48965939),
     ]),
-    RpoDigest::new([
+    Word::new([
         Felt::new(0x606f3ee12fe9ec0c),
         Felt::new(0xe7d494ab8e483d87),
         Felt::new(0x3b47f7c0d316cd4a),
         Felt::new(0x86f941c7fa834581),
     ]),
-    RpoDigest::new([
+    Word::new([
         Felt::new(0x30c2385facf08b86),
         Felt::new(0x4446168e25ac2c21),
         Felt::new(0x61c6db1c3f283b21),
         Felt::new(0x2fdf6bc360bf803),
     ]),
-    RpoDigest::new([
+    Word::new([
         Felt::new(0xeec8d9cc3e46d243),
         Felt::new(0x65bcae511dcce39),
         Felt::new(0xd3da5bbfdbd09cd3),
         Felt::new(0xe7c35fc3d11216a5),
     ]),
-    RpoDigest::new([
+    Word::new([
         Felt::new(0x841fb6fb35e7b49b),
         Felt::new(0xfc4e2e1239caa7b8),
         Felt::new(0x37cb93ec88f102e5),
         Felt::new(0xa707a1556032152c),
     ]),
-    RpoDigest::new([
+    Word::new([
         Felt::new(0x37c67bd7b7cef984),
         Felt::new(0x75bbe46da2ee5c90),
         Felt::new(0x3a5c568d1f71cab1),
         Felt::new(0x36939cdca2dc0b55),
     ]),
-    RpoDigest::new([
+    Word::new([
         Felt::new(0x4f76756a55f3a644),
         Felt::new(0xd30f8fa45394aff4),
         Felt::new(0x65c55096158b202f),
         Felt::new(0x368a5fb0b0d475d0),
     ]),
-    RpoDigest::new([
+    Word::new([
         Felt::new(0xa9b9acd256cabb0f),
         Felt::new(0xd8b1170f301208c7),
         Felt::new(0xab152f908d46bf8),
         Felt::new(0x1b7a10556730ec16),
     ]),
-    RpoDigest::new([
+    Word::new([
         Felt::new(0xd967a72076e3059c),
         Felt::new(0xbd1015a08ffe8881),
         Felt::new(0xf72f186dde0c6e78),
         Felt::new(0xa58910205352895a),
     ]),
-    RpoDigest::new([
+    Word::new([
         Felt::new(0x130333f2fd400a4d),
         Felt::new(0xf20104837a118d6e),
         Felt::new(0xda1e5d608fb9062c),
         Felt::new(0xb8ac5c76d60950b8),
     ]),
-    RpoDigest::new([
+    Word::new([
         Felt::new(0x65d0deae6fb0c6cb),
         Felt::new(0x1b442ae344dcd9e7),
         Felt::new(0x1eedabab8fc07fa4),
         Felt::new(0xb0dc89b96f256189),
     ]),
-    RpoDigest::new([
+    Word::new([
         Felt::new(0xef88de626968c17a),
         Felt::new(0x569a01072cdbbc2b),
         Felt::new(0xc99bbba6d083c68f),
         Felt::new(0x9ed4a176fe341849),
     ]),
-    RpoDigest::new([
+    Word::new([
         Felt::new(0x5d49d1e9d17448a6),
         Felt::new(0x6974d510bc47ee66),
         Felt::new(0xbcbea4dec0b68586),
         Felt::new(0xdaa5457e0cfd3e61),
     ]),
-    RpoDigest::new([
+    Word::new([
         Felt::new(0x9fceba739503cda0),
         Felt::new(0xb9daf271ac42c8ba),
         Felt::new(0x10fe3e8de8680d83),
         Felt::new(0xd7e1dc73ced7730b),
     ]),
-    RpoDigest::new([
+    Word::new([
         Felt::new(0x93ec6c422d4271ea),
         Felt::new(0x73923813232b0e70),
         Felt::new(0xbbe6a4441a900b65),
         Felt::new(0x36b2164f37c9319b),
     ]),
-    RpoDigest::new([
+    Word::new([
         Felt::new(0xce3ecb2eed624694),
         Felt::new(0xb7e1d75fff7a454c),
         Felt::new(0x86c24aa3a8d92d2b),
         Felt::new(0xb1ba74cafa9ce649),
     ]),
-    RpoDigest::new([
+    Word::new([
         Felt::new(0xb5fae724eb357479),
         Felt::new(0x359532ddc4840cb9),
         Felt::new(0x4b111251e037e9fa),
         Felt::new(0xfcdab1cdd314c1d9),
     ]),
-    RpoDigest::new([
+    Word::new([
         Felt::new(0xb3a89464d21c9ff1),
         Felt::new(0x8136e1b457a59ca8),
         Felt::new(0x88b0fa606b53c4d5),
         Felt::new(0x89645f8a9dfe97a2),
     ]),
-    RpoDigest::new([
+    Word::new([
         Felt::new(0xfe115ef35b814cbf),
         Felt::new(0x63de467fb93b6851),
         Felt::new(0x17c73b03c9f44ad8),
         Felt::new(0x53742721f568b5be),
     ]),
-    RpoDigest::new([
+    Word::new([
         Felt::new(0xd8110ea6e905cc2),
         Felt::new(0xd67b3c7cea25100),
         Felt::new(0x9e49b38ed51d1c60),
         Felt::new(0xe9e24f9b597c9bfd),
     ]),
-    RpoDigest::new([
+    Word::new([
         Felt::new(0xefe9086b5bb5a504),
         Felt::new(0x991f92a90c9346a3),
         Felt::new(0xe4fab215a20f453b),
         Felt::new(0x4e4d4dde9146d61a),
     ]),
-    RpoDigest::new([
+    Word::new([
         Felt::new(0xaa998c3b26497ffa),
         Felt::new(0x985bd5cf4ccefb3c),
         Felt::new(0xce44e80aa02424bb),
         Felt::new(0x75158a37503aed75),
     ]),
-    RpoDigest::new([
+    Word::new([
         Felt::new(0xdb61760c917116f1),
         Felt::new(0xf378c9645174a832),
         Felt::new(0x1216aa71b73e7fac),
         Felt::new(0x8a4e7f0591a129fd),
     ]),
-    RpoDigest::new([
+    Word::new([
         Felt::new(0xaf11a04daaf4ed67),
         Felt::new(0xd3e59f0d7dad9064),
         Felt::new(0x30c206089a2c294d),
         Felt::new(0xe104db59761e8a99),
     ]),
-    RpoDigest::new([
+    Word::new([
         Felt::new(0x70b545ba7a6d447),
         Felt::new(0x6ac0e423ddf68913),
         Felt::new(0xf9b50997257bb033),
         Felt::new(0xdac37c7b1c18b48a),
     ]),
-    RpoDigest::new([
+    Word::new([
         Felt::new(0xd182b9dff0fcd5c0),
         Felt::new(0xf87619ae86b6eb02),
         Felt::new(0x6838c1b612b17cb5),
         Felt::new(0x9b705d5b6bcf92c),
     ]),
-    RpoDigest::new([
+    Word::new([
         Felt::new(0xfba622b3026c6193),
         Felt::new(0xdacde486f8129b96),
         Felt::new(0xd5acd22a7c2cf6aa),
         Felt::new(0xf5beb40535e6c0f2),
     ]),
-    RpoDigest::new([
+    Word::new([
         Felt::new(0x59bde17b2d501969),
         Felt::new(0xb4abe1389123d3b9),
         Felt::new(0x683d8dd8635d9a67),
         Felt::new(0x347e01da4c07833),
     ]),
-    RpoDigest::new([
+    Word::new([
         Felt::new(0x4e28956ab7162a06),
         Felt::new(0xccfcc7358f48c727),
         Felt::new(0x7b3485f20c979144),
         Felt::new(0xeeb27fa694f1c8fd),
     ]),
-    RpoDigest::new([
+    Word::new([
         Felt::new(0x275b2c0ee883807b),
         Felt::new(0x8f68f2016c1391cd),
         Felt::new(0xb59fdccb20322765),
         Felt::new(0xeb9b902c5351d5d4),
     ]),
-    RpoDigest::new([
+    Word::new([
         Felt::new(0xb767d8cb8816cc8e),
         Felt::new(0xbd29bb02cdcbc9af),
         Felt::new(0xeb1dca9bfebee6f),
         Felt::new(0x57597da8109c0354),
     ]),
-    RpoDigest::new([
+    Word::new([
         Felt::new(0xeb32a8db8cf216),
         Felt::new(0xeb5532ac68f304c1),
         Felt::new(0x9bca72ffccb957ee),
         Felt::new(0x33d4b152ebedb841),
     ]),
-    RpoDigest::new([
+    Word::new([
         Felt::new(0x439b20dce9810169),
         Felt::new(0x2b693e2530a1b88c),
         Felt::new(0x36b8898f4e900c7a),
         Felt::new(0x7bf5064dde3a0da1),
     ]),
-    RpoDigest::new([
+    Word::new([
         Felt::new(0x8794201ce6158fe0),
         Felt::new(0xfcc53644557471f3),
         Felt::new(0xa66d87f6ae6f64d0),
         Felt::new(0x4e876d9d933b2ad0),
     ]),
-    RpoDigest::new([
+    Word::new([
         Felt::new(0x6ff8f4900e43bab6),
         Felt::new(0x40014f298cb7b9a3),
         Felt::new(0x9d6b252ff946ee3d),
         Felt::new(0xb014d99ab8508072),
     ]),
-    RpoDigest::new([
+    Word::new([
         Felt::new(0x9cdd5a4a37511cae),
         Felt::new(0x684444122d770c18),
         Felt::new(0x8982944b22a22577),
         Felt::new(0x50a58d944629de54),
     ]),
-    RpoDigest::new([
+    Word::new([
         Felt::new(0x853f5b8ad557fac3),
         Felt::new(0xdab1743c03b8da56),
         Felt::new(0xc70d6683d4f4c086),
         Felt::new(0x2f1d0f67a5dfae4c),
     ]),
-    RpoDigest::new([
+    Word::new([
         Felt::new(0xf3b6fe76eb11284),
         Felt::new(0xbeb9e98b146c63a8),
         Felt::new(0xc7e8824fce7777ad),
         Felt::new(0x5229918b04410d6a),
     ]),
-    RpoDigest::new([
+    Word::new([
         Felt::new(0xc170c46601ffc4f3),
         Felt::new(0x1258e8e47103c39b),
         Felt::new(0x612e99da984aac99),
         Felt::new(0xc82fcfcf56d6dd94),
     ]),
-    RpoDigest::new([
+    Word::new([
         Felt::new(0xf793819d04d5679d),
         Felt::new(0xb738b97ec0a52dd3),
         Felt::new(0x4df897389119a098),
         Felt::new(0xa5af45eb0d007785),
     ]),
-    RpoDigest::new([
+    Word::new([
         Felt::new(0xfcf59c6c9d7280e7),
         Felt::new(0x662b993b320f3345),
         Felt::new(0xeb8e04ba28f156fa),
         Felt::new(0xe72233ee6a444749),
     ]),
-    RpoDigest::new([
+    Word::new([
         Felt::new(0x7ad6b7badfc9e757),
         Felt::new(0x3332f340184af6f5),
         Felt::new(0xe92a736dcdf52022),
         Felt::new(0xf1759f8041119245),
     ]),
-    RpoDigest::new([
+    Word::new([
         Felt::new(0x166382d3c8ca3a95),
         Felt::new(0x36c8c25f971d771a),
         Felt::new(0xe82cc977ee1402cc),
         Felt::new(0xe13f6dc2ab919177),
     ]),
-    RpoDigest::new([
+    Word::new([
         Felt::new(0x41fb8b9d5a9ab5e8),
         Felt::new(0xb2a608f5d6fbc37d),
         Felt::new(0xe81719d9778c54b4),
         Felt::new(0xcc0d4373ef2bb8e1),
     ]),
-    RpoDigest::new([
+    Word::new([
         Felt::new(0x60b3788c45c1bc29),
         Felt::new(0xcb38969a428c5423),
         Felt::new(0xca11f6b9d957f57c),
         Felt::new(0x7a166881648514cb),
     ]),
-    RpoDigest::new([
+    Word::new([
         Felt::new(0x3548d7dcbe4af37f),
         Felt::new(0xb199194f25a6f55a),
         Felt::new(0x751017bda8f0d816),
         Felt::new(0x80117260c6525c4a),
     ]),
-    RpoDigest::new([
+    Word::new([
         Felt::new(0x1d1d34d842e95671),
         Felt::new(0x38ab2833c4a2bded),
         Felt::new(0x3a53caf5f6e20f5f),
         Felt::new(0xfee946c5ebce837d),
     ]),
-    RpoDigest::new([
+    Word::new([
         Felt::new(0x65dbb5d849e46f92),
         Felt::new(0x753679d0d09d1250),
         Felt::new(0xc539adf9062e7698),
         Felt::new(0xd76f4b13d2635af3),
     ]),
-    RpoDigest::new([
+    Word::new([
         Felt::new(0x9eae446581f7076d),
         Felt::new(0x237138e3a1c55ee8),
         Felt::new(0xfb54da0b58969484),
         Felt::new(0x9a899375c4f10483),
     ]),
-    RpoDigest::new([
+    Word::new([
         Felt::new(0x88b12578d3c36cc4),
         Felt::new(0x9cd868d6a29df146),
         Felt::new(0x5443d21524637821),
         Felt::new(0xceb3692fad9f76b9),
     ]),
-    RpoDigest::new([
+    Word::new([
         Felt::new(0x4e45d3e34ebfcb0d),
         Felt::new(0xedca6a0f8d90eb2e),
         Felt::new(0x1a182dad4a914731),
         Felt::new(0xd89946f41f53f106),
     ]),
-    RpoDigest::new([
+    Word::new([
         Felt::new(0x42a89e1abee8b12d),
         Felt::new(0x3af360678475225a),
         Felt::new(0x3e28a1cdede0c7a3),
         Felt::new(0x25cc76ad1c8788e),
     ]),
-    RpoDigest::new([
+    Word::new([
         Felt::new(0xa6e955e3b0721737),
         Felt::new(0xbbd721b51cbc605f),
         Felt::new(0xfa537854669f20a5),
         Felt::new(0x2a1ab83bb24d43f7),
     ]),
-    RpoDigest::new([
+    Word::new([
         Felt::new(0x1c289dc62c4e7907),
         Felt::new(0x186437cf1f8b3abf),
         Felt::new(0x929244addee54abf),
         Felt::new(0x42ec87a9141b58fb),
     ]),
-    RpoDigest::new([
+    Word::new([
         Felt::new(0xf5ea743b81e59fee),
         Felt::new(0x32e2c826d0fc57d4),
         Felt::new(0xbc411bca1b745388),
         Felt::new(0xc9af8de5bc3b8692),
     ]),
-    RpoDigest::new([
+    Word::new([
         Felt::new(0xf75129028d95ebab),
         Felt::new(0xf9d02d7713784ff2),
         Felt::new(0x944b5fea457c946b),
         Felt::new(0xa6645d6f5389a91f),
     ]),
-    RpoDigest::new([
+    Word::new([
         Felt::new(0x236ce9e32fb0131c),
         Felt::new(0x92cac3a2b67600b8),
         Felt::new(0x437914d1d9e409bb),
         Felt::new(0x6bff102a4ea81e38),
     ]),
-    RpoDigest::new([
+    Word::new([
         Felt::new(0x9906825ec6d45f25),
         Felt::new(0x1245ccf4121950a2),
         Felt::new(0xff82337f357949bb),
         Felt::new(0xe1f59f6b824f97af),
     ]),
-    RpoDigest::new([
+    Word::new([
         Felt::new(0xd6030ea8046f0d1e),
         Felt::new(0x69fd3c732586f5db),
         Felt::new(0x765cccb10c151f30),
         Felt::new(0xd1bad2f1ba1bdc5b),
     ]),
-    RpoDigest::new([
+    Word::new([
         Felt::new(0xd4a0cff6578c123e),
         Felt::new(0xf11a17948930b14a),
         Felt::new(0xd128dd2a4213b53c),
         Felt::new(0x2df8fe54f23f6b91),
     ]),
-    RpoDigest::new([
+    Word::new([
         Felt::new(0xa891ab94552907b2),
         Felt::new(0xc64b69708f99b16e),
         Felt::new(0xb99d29be9af9df15),
         Felt::new(0xa452647d61bd3d7b),
     ]),
-    RpoDigest::new([
+    Word::new([
         Felt::new(0xd339a7d5f35bdf7e),
         Felt::new(0x296127097a98dbdd),
         Felt::new(0x66d3eac876c1a984),
         Felt::new(0x2714db555ccbdca4),
     ]),
-    RpoDigest::new([
+    Word::new([
         Felt::new(0x6ca87920a067acd6),
         Felt::new(0x55a102d742879de5),
         Felt::new(0xa3f57a4b6a56d7f3),
         Felt::new(0x18770879a832a177),
     ]),
-    RpoDigest::new([
+    Word::new([
         Felt::new(0x1208793a0a77e984),
         Felt::new(0x89ed5a1f45b34219),
         Felt::new(0x8d74e6f75e77ef03),
         Felt::new(0xa78cc9b7d29a1ee9),
     ]),
-    RpoDigest::new([
+    Word::new([
         Felt::new(0x345fffecefd56a65),
         Felt::new(0x23dec03b9f663006),
         Felt::new(0x66f452be070b34d8),
         Felt::new(0xe1c6aaaa54765dc),
     ]),
-    RpoDigest::new([
+    Word::new([
         Felt::new(0xb7b714ca60c77011),
         Felt::new(0x5ffe9476baa10259),
         Felt::new(0xbea15cd2b4150dda),
         Felt::new(0x4467804ab919e3d8),
     ]),
-    RpoDigest::new([
+    Word::new([
         Felt::new(0x21c65ff7a4185640),
         Felt::new(0x5d20fffcc7779035),
         Felt::new(0x92b571249fa728d5),
         Felt::new(0xe9e2eeca83b49342),
     ]),
-    RpoDigest::new([
+    Word::new([
         Felt::new(0x2be46f9d0b431948),
         Felt::new(0xa5c1a12c95a56f44),
         Felt::new(0xc620adca5cd874),
         Felt::new(0x51c64b969c1dc0c9),
     ]),
-    RpoDigest::new([
+    Word::new([
         Felt::new(0xae9e7f421ab12b3f),
         Felt::new(0x5f90e40cdb47bbec),
         Felt::new(0x3d2a6be00ce19d31),
         Felt::new(0x609632a98643a06c),
     ]),
-    RpoDigest::new([
+    Word::new([
         Felt::new(0xde0f38c1d4cf5977),
         Felt::new(0x3d6f0f44105b0fb2),
         Felt::new(0x5f34005bed22db6f),
         Felt::new(0x377009a91543c872),
     ]),
-    RpoDigest::new([
+    Word::new([
         Felt::new(0x8763f1c59420f662),
         Felt::new(0xbe15cc9b37fdbdb3),
         Felt::new(0xeed75857d5451487),
         Felt::new(0x10b3507901fcfb8b),
     ]),
-    RpoDigest::new([
+    Word::new([
         Felt::new(0x2e40aeb53f7ba2f5),
         Felt::new(0xed598b103221e46),
         Felt::new(0xed943dae7f3be8f7),
         Felt::new(0x7115a61b37a95c30),
     ]),
-    RpoDigest::new([
+    Word::new([
         Felt::new(0xef9bdb6947abe190),
         Felt::new(0xfe47c74c5ad62e2b),
         Felt::new(0xf85ee41bc6960d64),
         Felt::new(0x55e51b57d5990e2b),
     ]),
-    RpoDigest::new([
+    Word::new([
         Felt::new(0x81798808c02cffe0),
         Felt::new(0x22df79cb29991e51),
         Felt::new(0x965714f831e09f90),
         Felt::new(0x67ac8aef55047894),
     ]),
-    RpoDigest::new([
+    Word::new([
         Felt::new(0x321d58dfe138e326),
         Felt::new(0xee80b399b444c937),
         Felt::new(0x6cbc565ad3d69ccf),
         Felt::new(0x6ea9e44922bdc48e),
     ]),
-    RpoDigest::new([
+    Word::new([
         Felt::new(0xf2a11cd35120f6c3),
         Felt::new(0x4e77378973b2ca8),
         Felt::new(0x1adb26e6c1630440),
         Felt::new(0x42e5495895baee92),
     ]),
-    RpoDigest::new([
+    Word::new([
         Felt::new(0xe07020daabcdebae),
         Felt::new(0x2d5c6456b50a05c3),
         Felt::new(0x3050bdec1715085b),
         Felt::new(0xe4d05bce00c4f30d),
     ]),
-    RpoDigest::new([
+    Word::new([
         Felt::new(0xe64d54038f19cbc3),
         Felt::new(0xde70db9c37ffc1a6),
         Felt::new(0xb4a54682fe025b15),
         Felt::new(0xcb4e28247a791f29),
     ]),
-    RpoDigest::new([
+    Word::new([
         Felt::new(0x9cd2815cef52b092),
         Felt::new(0xd46fa4485d7aaf5c),
         Felt::new(0x275777fd3b9637f7),
         Felt::new(0x684317aab8bb48da),
     ]),
-    RpoDigest::new([
+    Word::new([
         Felt::new(0xfef7ca5bc1a8531),
         Felt::new(0x66da24a709f70f60),
         Felt::new(0xc6d0048b0222dc8d),
         Felt::new(0xd82cc216eed266b4),
     ]),
-    RpoDigest::new([
+    Word::new([
         Felt::new(0xc11007d4b20c68e8),
         Felt::new(0xb88dea2c92f105d1),
         Felt::new(0xfe885fceee959992),
         Felt::new(0x4d8c71eeb47c8f90),
     ]),
-    RpoDigest::new([
+    Word::new([
         Felt::new(0x980fbe89dd050886),
         Felt::new(0xdb7ad3a9a9f39be1),
         Felt::new(0xf830b6439c7e9bc0),
         Felt::new(0xdd76938b7c686c07),
     ]),
-    RpoDigest::new([
+    Word::new([
         Felt::new(0xb678629d183cf841),
         Felt::new(0x664f19c21a6465bc),
         Felt::new(0xba142578e79eb9d0),
         Felt::new(0x1d57cbcdb2bbcb18),
     ]),
-    RpoDigest::new([
+    Word::new([
         Felt::new(0xc8822aae44990ed3),
         Felt::new(0xf7edce1d2a235ab4),
         Felt::new(0x8f35d229e981ca01),
         Felt::new(0x50dc4c673c8fc58),
     ]),
-    RpoDigest::new([
+    Word::new([
         Felt::new(0x86edc215b92306e7),
         Felt::new(0xe333ce17fd0f40df),
         Felt::new(0xabcca6409bb48e29),
         Felt::new(0xa110affea61c2951),
     ]),
-    RpoDigest::new([
+    Word::new([
         Felt::new(0x269d782ba380a2e4),
         Felt::new(0x32bdc65a619310cd),
         Felt::new(0x52895e02cb1df991),
         Felt::new(0x1749f76388896455),
     ]),
-    RpoDigest::new([
+    Word::new([
         Felt::new(0x8f99ac4698f12102),
         Felt::new(0x9983407c99f948c5),
         Felt::new(0x7b89856f980cb407),
         Felt::new(0x8acff0a017e68367),
     ]),
-    RpoDigest::new([
+    Word::new([
         Felt::new(0xe7983973c759318a),
         Felt::new(0xb389a6754d7976ca),
         Felt::new(0x1d7ded5044c6ede6),
         Felt::new(0x4290fc214bd001d7),
     ]),
-    RpoDigest::new([
+    Word::new([
         Felt::new(0x2a1607db398812eb),
         Felt::new(0xbbaaed6d5de95899),
         Felt::new(0x53699ff1add9cc48),
         Felt::new(0x71c99c4c20a2cbe9),
     ]),
-    RpoDigest::new([
+    Word::new([
         Felt::new(0x9c211abaf37beba7),
         Felt::new(0x44f91ee2c8f84830),
         Felt::new(0xdaf1ca95546ff105),
         Felt::new(0x4d15218eb972c855),
     ]),
-    RpoDigest::new([
+    Word::new([
         Felt::new(0x47018b067647ff40),
         Felt::new(0xabd25bc93e3cd280),
         Felt::new(0x1e33fd9953262800),
         Felt::new(0x9b8f68c64db159c3),
     ]),
-    RpoDigest::new([
+    Word::new([
         Felt::new(0xa20fb2bcf2636418),
         Felt::new(0xdc8996a5085ba820),
         Felt::new(0x349b49cddfc936d4),
         Felt::new(0x1d816c1d0bfef815),
     ]),
-    RpoDigest::new([
+    Word::new([
         Felt::new(0xc19364d95b916e9b),
         Felt::new(0xdcb0cf99f9ca31b5),
         Felt::new(0x1b5493d83dca1621),
         Felt::new(0xf0758e5e3459a0f9),
     ]),
-    RpoDigest::new([
+    Word::new([
         Felt::new(0xdf2cb895c1de5b3a),
         Felt::new(0xb7347b591512353a),
         Felt::new(0xfdbbce7837412eb7),
         Felt::new(0x893fa2af604d446f),
     ]),
-    RpoDigest::new([
+    Word::new([
         Felt::new(0x75d2b8fc6043d11e),
         Felt::new(0xa6559eaebeed7d5f),
         Felt::new(0xa9379773dad056b3),
         Felt::new(0xf3bcf80d0748d3c1),
     ]),
-    RpoDigest::new([
+    Word::new([
         Felt::new(0x35b731f6c583214a),
         Felt::new(0x26249962927dd05f),
         Felt::new(0x75fc431a3e7c9e93),
         Felt::new(0x170c1036d421083d),
     ]),
-    RpoDigest::new([
+    Word::new([
         Felt::new(0x1d6fbabfdf0d9096),
         Felt::new(0x7d7c9687d9eca6cc),
         Felt::new(0xd62974b75d27af1c),
         Felt::new(0x93ed9a3825cc1c35),
     ]),
-    RpoDigest::new([
+    Word::new([
         Felt::new(0xd30946664518ff6e),
         Felt::new(0xd3e54aedfb7ba7e5),
         Felt::new(0xb91107b2bfadfa1d),
         Felt::new(0x2f7b0b2cb06cc43b),
     ]),
-    RpoDigest::new([
+    Word::new([
         Felt::new(0x47d1dc850260558e),
         Felt::new(0x8e5dbde02c522c39),
         Felt::new(0x3464d9fe9fd4a1e),
         Felt::new(0xf9e5bcfe534437be),
     ]),
-    RpoDigest::new([
+    Word::new([
         Felt::new(0x83378fd3d8e8a235),
         Felt::new(0x5c12793119b6dfdb),
         Felt::new(0xfc6f110fe6acbc57),
         Felt::new(0x3138336422622a48),
     ]),
-    RpoDigest::new([
+    Word::new([
         Felt::new(0x239c939a0a9787a0),
         Felt::new(0x6c0d389b75f1cfb4),
         Felt::new(0xc1947a136998e2a1),
         Felt::new(0x76c1779e38ffb573),
     ]),
-    RpoDigest::new([
+    Word::new([
         Felt::new(0x7a266f705e62cd23),
         Felt::new(0x7246a2960a038c2),
         Felt::new(0xc1f47087a22fa2cb),
         Felt::new(0xf298d4651af0b8b2),
     ]),
-    RpoDigest::new([
+    Word::new([
         Felt::new(0x623bcdb6cc15e3ad),
         Felt::new(0x8a6e820adf4725c3),
         Felt::new(0x48737f1587e13208),
         Felt::new(0xbf747c141bf3564c),
     ]),
-    RpoDigest::new([
+    Word::new([
         Felt::new(0x14842ec18fe2348c),
         Felt::new(0x3701e593309841cf),
         Felt::new(0x8e85c9f1884fdf7b),
         Felt::new(0xa4cc06a6b8cae8e3),
     ]),
-    RpoDigest::new([
+    Word::new([
         Felt::new(0xcfebb64f4bf4f79),
         Felt::new(0x54754d70569eeecd),
         Felt::new(0x50405a6b79d1ae83),
         Felt::new(0x9075f17ccebc056c),
     ]),
-    RpoDigest::new([
+    Word::new([
         Felt::new(0x9a93d03d0f9c825f),
         Felt::new(0xf704fa1580fe53c7),
         Felt::new(0xf95df7a7d06a22b7),
         Felt::new(0x8462e18adf8b3607),
     ]),
-    RpoDigest::new([
+    Word::new([
         Felt::new(0xb5210a5cbd9556b4),
         Felt::new(0x6fd4218ebf3c7336),
         Felt::new(0x19d661830be725ae),
         Felt::new(0x28a2862b49428353),
     ]),
-    RpoDigest::new([
+    Word::new([
         Felt::new(0x93ceddc8a18724fe),
         Felt::new(0x4e3299172e9130ed),
         Felt::new(0x80229e0e1808c860),
         Felt::new(0x13f479347eb7fd78),
     ]),
-    RpoDigest::new([
+    Word::new([
         Felt::new(0x86e4db88d39d4203),
         Felt::new(0x81c24ca37b068741),
         Felt::new(0x12b7d21371ca58f5),
         Felt::new(0xb6546d4722efcbb0),
     ]),
-    RpoDigest::new([
+    Word::new([
         Felt::new(0x96ce1320155172c5),
         Felt::new(0xbf622c3a5ab86fba),
         Felt::new(0x5876a31266554836),
         Felt::new(0x4f23fd3646963922),
     ]),
-    RpoDigest::new([
+    Word::new([
         Felt::new(0x48f59a613c9baa43),
         Felt::new(0x761de5ad2fd2c806),
         Felt::new(0x2db99e809e35728f),
         Felt::new(0x38b05ac131a0edc0),
     ]),
-    RpoDigest::new([
+    Word::new([
         Felt::new(0x6e4fba2ef071cb8a),
         Felt::new(0x77c415814dc5a0e5),
         Felt::new(0xa0492c8344a64bb1),
         Felt::new(0xc6dd5e8dbc841fe5),
     ]),
-    RpoDigest::new([
+    Word::new([
         Felt::new(0xa31e2e634187fec),
         Felt::new(0xa4c019c12457e4b1),
         Felt::new(0xa7b9de27a75ec6b4),
         Felt::new(0x990bacb76b218164),
     ]),
-    RpoDigest::new([
+    Word::new([
         Felt::new(0x97c85363ab1c997e),
         Felt::new(0xa95cd8ccab0b41b3),
         Felt::new(0xb98b7ebc3680470b),
         Felt::new(0x22fe1b13640f19a9),
     ]),
-    RpoDigest::new([
+    Word::new([
         Felt::new(0x113c9a5f0dfbf187),
         Felt::new(0x77f2dc9c46f3d699),
         Felt::new(0xc3d92d34c950f8f4),
         Felt::new(0x9cc6aaf7ffdaf2b6),
     ]),
-    RpoDigest::new([
+    Word::new([
         Felt::new(0xa5f51bc68b62924c),
         Felt::new(0x54182d0b8b519f87),
         Felt::new(0x15b42760e2ad50a5),
         Felt::new(0x3b2d54cae046788),
     ]),
-    RpoDigest::new([
+    Word::new([
         Felt::new(0xefec815078a58b7d),
         Felt::new(0x2d02bd88ae2b8a3d),
         Felt::new(0x7b3dee115eaac60a),
         Felt::new(0x8e659da09a00ffad),
     ]),
-    RpoDigest::new([
+    Word::new([
         Felt::new(0x1987fb02253b4338),
         Felt::new(0xa7c1e3a856b329be),
         Felt::new(0x8d90defd305553e8),
         Felt::new(0xb132ee2f7526c94d),
     ]),
-    RpoDigest::new([
+    Word::new([
         Felt::new(0x1556b5441e77734f),
         Felt::new(0xa2ceaf4b2822a233),
         Felt::new(0x41e5ee79d553e00c),
         Felt::new(0xf2cdc04fd67a69f2),
     ]),
-    RpoDigest::new([
+    Word::new([
         Felt::new(0xd4a8d6025cb6e3a),
         Felt::new(0xd8d181277e183f21),
         Felt::new(0x3bf9725618de11d3),
         Felt::new(0xb26a0eb5a7d9c86e),
     ]),
-    RpoDigest::new([
+    Word::new([
         Felt::new(0xcdc5ad1e45e351c2),
         Felt::new(0xf00b06807244caa6),
         Felt::new(0xbbb01495c9a7e17d),
         Felt::new(0xd9614df7e656a73f),
     ]),
-    RpoDigest::new([
+    Word::new([
         Felt::new(0xfc61931c05c4a55f),
         Felt::new(0xcff6ce2372650a9),
         Felt::new(0x6e6c32ff4dc92c6),
         Felt::new(0x1b72d8c04b0e409d),
     ]),
-    RpoDigest::new([
+    Word::new([
         Felt::new(0x77d6e2f32439dbf0),
         Felt::new(0xa1f8ce9eb02419a5),
         Felt::new(0xd3ad9fb0cea61624),
         Felt::new(0x66ab5c684fbb8597),
     ]),
-    RpoDigest::new(EMPTY_WORD),
+    EMPTY_WORD,
 ];
 
 #[test]
@@ -1589,7 +1589,7 @@ fn all_depths_opens_to_zero() {
         assert_eq!(depth as usize + 1, subtree.len());
 
         // assert the opening is zero
-        let initial = RpoDigest::new(EMPTY_WORD);
+        let initial = EMPTY_WORD;
         assert_eq!(initial, subtree.remove(0));
 
         // compute every node of the path manually and compare with the output
@@ -1607,7 +1607,7 @@ fn all_depths_opens_to_zero() {
 fn test_entry() {
     // check the leaf is always the empty work
     for depth in 0..255 {
-        assert_eq!(EmptySubtreeRoots::entry(depth, depth), &RpoDigest::new(EMPTY_WORD));
+        assert_eq!(EmptySubtreeRoots::entry(depth, depth), &EMPTY_WORD);
     }
 
     // check the root matches the first element of empty_hashes

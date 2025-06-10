@@ -6,8 +6,7 @@ use alloc::{
 use core::fmt;
 
 use super::{
-    EMPTY_WORD, InnerNodeInfo, MerkleError, MerklePath, NodeIndex, Rpo256, RpoDigest, ValuePath,
-    Word,
+    EMPTY_WORD, InnerNodeInfo, MerkleError, MerklePath, NodeIndex, Rpo256, ValuePath, Word,
 };
 use crate::utils::{
     ByteReader, ByteWriter, Deserializable, DeserializationError, Serializable, word_to_hex,
@@ -22,13 +21,13 @@ mod tests;
 /// Index of the root node.
 const ROOT_INDEX: NodeIndex = NodeIndex::root();
 
-/// An RpoDigest consisting of 4 ZERO elements.
-const EMPTY_DIGEST: RpoDigest = RpoDigest::new(EMPTY_WORD);
+/// An Word consisting of 4 ZERO elements.
+const EMPTY_DIGEST: Word = EMPTY_WORD;
 
 // PARTIAL MERKLE TREE
 // ================================================================================================
 
-/// A partial Merkle tree with NodeIndex keys and 4-element RpoDigest leaf values. Partial Merkle
+/// A partial Merkle tree with NodeIndex keys and 4-element [Word] leaf values. Partial Merkle
 /// Tree allows to create Merkle Tree by providing Merkle paths of different lengths.
 ///
 /// The root of the tree is recomputed on each new leaf update.
@@ -36,7 +35,7 @@ const EMPTY_DIGEST: RpoDigest = RpoDigest::new(EMPTY_WORD);
 #[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 pub struct PartialMerkleTree {
     max_depth: u8,
-    nodes: BTreeMap<NodeIndex, RpoDigest>,
+    nodes: BTreeMap<NodeIndex, Word>,
     leaves: BTreeSet<NodeIndex>,
 }
 
@@ -73,7 +72,7 @@ impl PartialMerkleTree {
     /// Analogous to [Self::add_path].
     pub fn with_paths<I>(paths: I) -> Result<Self, MerkleError>
     where
-        I: IntoIterator<Item = (u64, RpoDigest, MerklePath)>,
+        I: IntoIterator<Item = (u64, Word, MerklePath)>,
     {
         // create an empty tree
         let tree = PartialMerkleTree::new();
@@ -95,7 +94,7 @@ impl PartialMerkleTree {
     pub fn with_leaves<R, I>(entries: R) -> Result<Self, MerkleError>
     where
         R: IntoIterator<IntoIter = I>,
-        I: Iterator<Item = (NodeIndex, RpoDigest)> + ExactSizeIterator,
+        I: Iterator<Item = (NodeIndex, Word)> + ExactSizeIterator,
     {
         let mut layers: BTreeMap<u8, Vec<u64>> = BTreeMap::new();
         let mut leaves = BTreeSet::new();
@@ -171,7 +170,7 @@ impl PartialMerkleTree {
     // --------------------------------------------------------------------------------------------
 
     /// Returns the root of this Merkle tree.
-    pub fn root(&self) -> RpoDigest {
+    pub fn root(&self) -> Word {
         self.nodes.get(&ROOT_INDEX).cloned().unwrap_or(EMPTY_DIGEST)
     }
 
@@ -184,7 +183,7 @@ impl PartialMerkleTree {
     ///
     /// # Errors
     /// Returns an error if the specified NodeIndex is not contained in the nodes map.
-    pub fn get_node(&self, index: NodeIndex) -> Result<RpoDigest, MerkleError> {
+    pub fn get_node(&self, index: NodeIndex) -> Result<Word, MerkleError> {
         self.nodes
             .get(&index)
             .ok_or(MerkleError::NodeIndexNotFoundInTree(index))
@@ -246,7 +245,7 @@ impl PartialMerkleTree {
     // --------------------------------------------------------------------------------------------
 
     /// Returns an iterator over the leaves of this [PartialMerkleTree].
-    pub fn leaves(&self) -> impl Iterator<Item = (NodeIndex, RpoDigest)> + '_ {
+    pub fn leaves(&self) -> impl Iterator<Item = (NodeIndex, Word)> + '_ {
         self.leaves.iter().map(|&leaf| {
             (
                 leaf,
@@ -286,7 +285,7 @@ impl PartialMerkleTree {
     pub fn add_path(
         &mut self,
         index_value: u64,
-        value: RpoDigest,
+        value: Word,
         path: MerklePath,
     ) -> Result<(), MerkleError> {
         let index_value = NodeIndex::new(path.len() as u8, index_value)?;
@@ -359,7 +358,7 @@ impl PartialMerkleTree {
     /// Returns an error if:
     /// - No entry exists at the specified index.
     /// - The specified index is greater than the maximum number of nodes on the deepest layer.
-    pub fn update_leaf(&mut self, index: u64, value: Word) -> Result<RpoDigest, MerkleError> {
+    pub fn update_leaf(&mut self, index: u64, value: Word) -> Result<Word, MerkleError> {
         let mut node_index = NodeIndex::new(self.max_depth(), index)?;
 
         // proceed to the leaf
@@ -372,15 +371,15 @@ impl PartialMerkleTree {
         // add node value to the nodes Map
         let old_value = self
             .nodes
-            .insert(node_index, value.into())
+            .insert(node_index, value)
             .ok_or(MerkleError::NodeIndexNotFoundInTree(node_index))?;
 
         // if the old value and new value are the same, there is nothing to update
-        if value == *old_value {
+        if value == old_value {
             return Ok(old_value);
         }
 
-        let mut value = value.into();
+        let mut value = value;
         for _ in 0..node_index.depth() {
             let sibling = self.nodes.get(&node_index.sibling()).expect("sibling should exist");
             value = Rpo256::merge(&node_index.build_node(value, *sibling));
@@ -465,7 +464,7 @@ impl Deserializable for PartialMerkleTree {
         // add leaf nodes to the vector
         for _ in 0..leaves_len {
             let index = NodeIndex::read_from(source)?;
-            let hash = RpoDigest::read_from(source)?;
+            let hash = Word::read_from(source)?;
             leaf_nodes.push((index, hash));
         }
 

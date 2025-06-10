@@ -1,6 +1,7 @@
 use alloc::vec::Vec;
 
-use super::{super::ZERO, Felt, MmrError, MmrProof, Rpo256, RpoDigest, Word};
+use super::{super::ZERO, MmrError, MmrProof, forest::Forest};
+use crate::{Felt, Word, merkle::Rpo256};
 
 // MMR PEAKS
 // ================================================================================================
@@ -8,13 +9,14 @@ use super::{super::ZERO, Felt, MmrError, MmrProof, Rpo256, RpoDigest, Word};
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 pub struct MmrPeaks {
-    /// The number of leaves is used to differentiate MMRs that have the same number of peaks. This
-    /// happens because the number of peaks goes up-and-down as the structure is used causing
-    /// existing trees to be merged and new ones to be created. As an example, every time the MMR
-    /// has a power-of-two number of leaves there is a single peak.
+    /// The number of leaves (represented by [`Forest`]) is used to differentiate MMRs that have
+    /// the same number of peaks. This happens because the number of peaks goes up-and-down as
+    /// the structure is used causing existing trees to be merged and new ones to be created.
+    /// As an example, every time the MMR has a power-of-two number of leaves there is a single
+    /// peak.
     ///
     /// Every tree in the MMR forest has a distinct power-of-two size, this means only the right-
-    /// most tree can have an odd number of elements (e.g. `1`). Additionally this means that the
+    /// most tree can have an odd number of elements (i.e. `1`). Additionally this means that the
     /// bits in `num_leaves` conveniently encode the size of each individual tree.
     ///
     /// Examples:
@@ -25,13 +27,23 @@ pub struct MmrPeaks {
     ///   and the left most has `2**2`.
     /// - With 12 leaves, the binary is `0b1100`, this case also has 2 peaks, the leftmost tree has
     ///   `2**3=8` elements, and the right most has `2**2=4` elements.
-    num_leaves: usize,
+    forest: Forest,
 
     /// All the peaks of every tree in the MMR forest. The peaks are always ordered by number of
     /// leaves, starting from the peak with most children, to the one with least.
     ///
     /// Invariant: The length of `peaks` must be equal to the number of true bits in `num_leaves`.
-    peaks: Vec<RpoDigest>,
+    peaks: Vec<Word>,
+}
+
+impl Default for MmrPeaks {
+    /// Returns new [`MmrPeaks`] instantiated from an empty vector of peaks and 0 leaves.
+    fn default() -> Self {
+        Self {
+            forest: Forest::empty(),
+            peaks: Vec::new(),
+        }
+    }
 }
 
 impl MmrPeaks {
@@ -43,24 +55,29 @@ impl MmrPeaks {
     ///
     /// # Errors
     /// Returns an error if the number of leaves and the number of peaks are inconsistent.
-    pub fn new(num_leaves: usize, peaks: Vec<RpoDigest>) -> Result<Self, MmrError> {
-        if num_leaves.count_ones() as usize != peaks.len() {
+    pub fn new(forest: Forest, peaks: Vec<Word>) -> Result<Self, MmrError> {
+        if forest.num_trees() != peaks.len() {
             return Err(MmrError::InvalidPeaks(format!(
                 "number of one bits in leaves is {} which does not equal peak length {}",
-                num_leaves.count_ones(),
+                forest.num_trees(),
                 peaks.len()
             )));
         }
 
-        Ok(Self { num_leaves, peaks })
+        Ok(Self { forest, peaks })
     }
 
     // ACCESSORS
     // --------------------------------------------------------------------------------------------
 
+    /// Returns the underlying forest (a set of mountain range peaks).
+    pub fn forest(&self) -> Forest {
+        self.forest
+    }
+
     /// Returns a count of leaves in the underlying MMR.
     pub fn num_leaves(&self) -> usize {
-        self.num_leaves
+        self.forest.num_leaves()
     }
 
     /// Returns the number of peaks of the underlying MMR.
@@ -69,7 +86,7 @@ impl MmrPeaks {
     }
 
     /// Returns the list of peaks of the underlying MMR.
-    pub fn peaks(&self) -> &[RpoDigest] {
+    pub fn peaks(&self) -> &[Word] {
         &self.peaks
     }
 
@@ -78,16 +95,16 @@ impl MmrPeaks {
     /// # Errors
     /// Returns an error if the provided peak index is greater or equal to the current number of
     /// peaks in the Mmr.
-    pub fn get_peak(&self, peak_idx: usize) -> Result<&RpoDigest, MmrError> {
+    pub fn get_peak(&self, peak_idx: usize) -> Result<&Word, MmrError> {
         self.peaks
             .get(peak_idx)
             .ok_or(MmrError::PeakOutOfBounds { peak_idx, peaks_len: self.peaks.len() })
     }
 
-    /// Converts this [MmrPeaks] into its components: number of leaves and a vector of peaks of
-    /// the underlying MMR.
-    pub fn into_parts(self) -> (usize, Vec<RpoDigest>) {
-        (self.num_leaves, self.peaks)
+    /// Converts this [MmrPeaks] into its components: number of leaves (represented as a [`Forest`])
+    /// and a vector of peaks of the underlying MMR.
+    pub fn into_parts(self) -> (Forest, Vec<Word>) {
+        (self.forest, self.peaks)
     }
 
     /// Hashes the peaks.
@@ -95,7 +112,7 @@ impl MmrPeaks {
     /// The procedure will:
     /// - Flatten and pad the peaks to a vector of Felts.
     /// - Hash the vector of Felts.
-    pub fn hash_peaks(&self) -> RpoDigest {
+    pub fn hash_peaks(&self) -> Word {
         Rpo256::hash_elements(&self.flatten_and_pad_peaks())
     }
 
@@ -105,7 +122,7 @@ impl MmrPeaks {
     /// Returns an error if:
     /// - provided opening proof is invalid.
     /// - Mmr root value computed using the provided leaf value differs from the actual one.
-    pub fn verify(&self, value: RpoDigest, opening: MmrProof) -> Result<(), MmrError> {
+    pub fn verify(&self, value: Word, opening: MmrProof) -> Result<(), MmrError> {
         let root = self.get_peak(opening.peak_index())?;
         opening
             .merkle_path
@@ -146,8 +163,8 @@ impl MmrPeaks {
                 .peaks
                 .as_slice()
                 .iter()
-                .map(|digest| digest.into())
-                .collect::<Vec<Word>>()
+                .map(|digest| digest.as_slice())
+                .collect::<Vec<_>>()
                 .concat(),
         );
         elements.resize(len, ZERO);
@@ -155,7 +172,7 @@ impl MmrPeaks {
     }
 }
 
-impl From<MmrPeaks> for Vec<RpoDigest> {
+impl From<MmrPeaks> for Vec<Word> {
     fn from(peaks: MmrPeaks) -> Self {
         peaks.peaks
     }

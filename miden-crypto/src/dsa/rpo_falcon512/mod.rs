@@ -1,5 +1,7 @@
+use rand::Rng;
+
 use crate::{
-    Felt, Word, ZERO,
+    Felt, ZERO,
     hash::rpo::Rpo256,
     utils::{ByteReader, ByteWriter, Deserializable, DeserializationError, Serializable},
 };
@@ -8,6 +10,9 @@ mod hash_to_point;
 mod keys;
 mod math;
 mod signature;
+
+#[cfg(test)]
+mod tests;
 
 pub use self::{
     keys::{PubKeyPoly, PublicKey, SecretKey},
@@ -66,6 +71,13 @@ impl Nonce {
     /// Returns a new [Nonce] instantiated from the provided bytes.
     pub fn new(bytes: [u8; SIG_NONCE_LEN]) -> Self {
         Self(bytes)
+    }
+
+    /// Returns a new [Nonce] drawn from the provided RNG.
+    pub fn random<R: Rng>(rng: &mut R) -> Self {
+        let mut nonce_bytes = [0u8; SIG_NONCE_LEN];
+        rng.fill_bytes(&mut nonce_bytes);
+        Self::new(nonce_bytes)
     }
 
     /// Returns the underlying bytes of this nonce.
