@@ -17,9 +17,7 @@ use super::{
 };
 use crate::{
     Word,
-    dsa::rpo_falcon512::{
-        SIG_NONCE_LEN, SK_LEN, hash_to_point::hash_to_point_rpo256, math::ntru_gen,
-    },
+    dsa::rpo_falcon512::{SK_LEN, hash_to_point::hash_to_point_rpo256, math::ntru_gen},
 };
 
 // CONSTANTS
@@ -82,7 +80,7 @@ impl SecretKey {
     }
 
     /// Given a short basis [[g, -f], [G, -F]], computes the normalized LDL tree i.e., Falcon tree.
-    fn from_short_lattice_basis(basis: ShortLatticeBasis) -> SecretKey {
+    pub(crate) fn from_short_lattice_basis(basis: ShortLatticeBasis) -> SecretKey {
         // FFT each polynomial of the short basis.
         let basis_fft = to_complex_fft(&basis);
         // compute the Gram matrix.
@@ -126,13 +124,38 @@ impl SecretKey {
 
     /// Signs a message with the secret key relying on the provided randomness generator.
     pub fn sign_with_rng<R: Rng>(&self, message: Word, rng: &mut R) -> Signature {
-        let mut nonce_bytes = [0u8; SIG_NONCE_LEN];
-        rng.fill_bytes(&mut nonce_bytes);
-        let nonce = Nonce::new(nonce_bytes);
+        let nonce = Nonce::random(rng);
 
         let h = self.compute_pub_key_poly();
         let c = hash_to_point_rpo256(message, &nonce);
         let s2 = self.sign_helper(c, rng);
+
+        Signature::new(nonce, h, s2)
+    }
+
+    /// Signs a message with the secret key relying on the provided randomness generator.
+    ///
+    /// This is similar to [SecretKey::sign_with_rng()] and is used only for testing with
+    /// the main difference being that this method:
+    ///
+    /// 1. uses `SHAKE256` for the hash-to-point algorithm, and
+    /// 2. uses `ChaCha20` in `Self::sign_helper`.
+    ///
+    /// Hence, in contrast to `Self::sign_with_rng`, the current method uses different random
+    /// number generators for generating the nonce and in `Self::sign_helper`.
+    ///
+    /// These changes make the signature algorithm compliant with the reference implementation.
+    #[cfg(test)]
+    pub fn sign_with_rng_testing<R: Rng>(&self, message: &[u8], rng: &mut R) -> Signature {
+        use crate::dsa::rpo_falcon512::{hash_to_point::hash_to_point_shake256, tests::ChaCha};
+
+        let nonce = Nonce::random(rng);
+
+        let h = self.compute_pub_key_poly();
+        let c = hash_to_point_shake256(message, &nonce);
+
+        let mut chacha_prng = ChaCha::new(rng);
+        let s2 = self.sign_helper(c, &mut chacha_prng);
 
         Signature::new(nonce, h, s2)
     }

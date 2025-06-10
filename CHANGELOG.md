@@ -7,8 +7,11 @@
 - Added module and function documentation-2 (#410).
 - [BREAKING] Replaced `RpoDigest` with `Word` struct (#411).
 - Replaced deprecated #[clap(...)] with #[command(...)] and #[arg(...)] (#413).
+- [BREAKING] Renamed `MerklePath::inner_nodes()` to `authenticated_nodes()` to better reflect its functionality (#415).
+- Added `compute_root()`, `verify()`, and `authenticated_nodes()` to `SparseMerklePath` for parity with `MerklePath` (#415).
 - [BREAKING] Replaced `RpxDigest` with `Word` struct (#420).
 - Added `word!` macro to `miden-crypto` (#423).
+- Added test vectors for RpoFalcon512 (#425).
 - [BREAKING] Incremented MSRV to 1.87.
 - [BREAKING] Renamed `MerklePath::inner_nodes()` to `authenticated_nodes()` to better reflect its functionality (#415).
 - Added `compute_root()`, `verify()`, and `authenticated_nodes()` to `SparseMerklePath` for parity with `MerklePath` (#415).
