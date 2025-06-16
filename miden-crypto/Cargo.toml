@@ -61,14 +61,14 @@ num = { version = "0.4", default-features = false, features = ["alloc", "libm"] 
 num-complex = { version = "0.4", default-features = false }
 rand = { version = "0.9", default-features = false }
 rand_core = { version = "0.9", default-features = false }
-rand-utils = { version = "0.12", package = "winter-rand-utils", optional = true }
+rand-utils = { version = "0.13", package = "winter-rand-utils", optional = true }
 rayon = { version = "1.10", optional = true }
 serde = { version = "1.0", default-features = false, optional = true, features = ["derive"] }
 sha3 = { version = "0.10", default-features = false }
 thiserror = { version = "2.0", default-features = false }
-winter-crypto = { version = "0.12", default-features = false }
-winter-math = { version = "0.12", default-features = false }
-winter-utils = { version = "0.12", default-features = false }
+winter-crypto = { version = "0.13", default-features = false }
+winter-math = { version = "0.13", default-features = false }
+winter-utils = { version = "0.13", default-features = false }
 
 [dev-dependencies]
 assert_matches = { version = "1.5", default-features = false }
@@ -78,7 +78,7 @@ hex = { version = "0.4", default-features = false, features = ["alloc"] }
 itertools = { version = "0.14" }
 proptest = { version = "1.6", default-features = false, features = ["alloc"]}
 rand_chacha = { version = "0.9", default-features = false }
-rand-utils = { version = "0.12", package = "winter-rand-utils" }
+rand-utils = { version = "0.13", package = "winter-rand-utils" }
 rstest = { version = "0.25" }
 seq-macro = { version = "0.3" }
 
