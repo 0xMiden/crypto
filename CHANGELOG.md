@@ -13,7 +13,7 @@
 - Added `word!` macro to `miden-crypto` (#423).
 - Added test vectors for RpoFalcon512 (#425).
 - [BREAKING] Incremented MSRV to 1.87.
-- [BREAKING] Updated Winterfell dependency to v0.13 and licensed the project under the Apache 2.0 license (in addition to the MIT)(#).
+- [BREAKING] Updated Winterfell dependency to v0.13 and licensed the project under the Apache 2.0 license (in addition to the MIT)(#433).
 
 
 ## 0.14.1 (2025-05-31)
