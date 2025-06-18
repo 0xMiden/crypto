@@ -3,7 +3,7 @@ use core::{
     cmp::Ordering,
     fmt::Display,
     hash::{Hash, Hasher},
-    ops::Deref,
+    ops::{Deref, DerefMut},
     slice,
 };
 
@@ -95,6 +95,12 @@ impl Deref for Word {
 
     fn deref(&self) -> &Self::Target {
         &self.0
+    }
+}
+
+impl DerefMut for Word {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
     }
 }
 
