@@ -3,7 +3,7 @@ use core::{
     cmp::Ordering,
     fmt::Display,
     hash::{Hash, Hasher},
-    ops::{Deref, DerefMut},
+    ops::{Deref, DerefMut, Index, IndexMut, Range},
     slice,
 };
 
@@ -101,6 +101,34 @@ impl Deref for Word {
 impl DerefMut for Word {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.0
+    }
+}
+
+impl Index<usize> for Word {
+    type Output = Felt;
+
+    fn index(&self, index: usize) -> &Self::Output {
+        &self.0[index]
+    }
+}
+
+impl IndexMut<usize> for Word {
+    fn index_mut(&mut self, index: usize) -> &mut Self::Output {
+        &mut self.0[index]
+    }
+}
+
+impl Index<Range<usize>> for Word {
+    type Output = [Felt];
+
+    fn index(&self, index: Range<usize>) -> &Self::Output {
+        &self.0[index]
+    }
+}
+
+impl IndexMut<Range<usize>> for Word {
+    fn index_mut(&mut self, index: Range<usize>) -> &mut Self::Output {
+        &mut self.0[index]
     }
 }
 
