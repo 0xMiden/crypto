@@ -3,7 +3,7 @@
 [![LICENSE](https://img.shields.io/badge/license-MIT-blue.svg)](https://github.com/0xMiden/crypto/blob/main/LICENSE)
 [![test](https://github.com/0xMiden/crypto/actions/workflows/test.yml/badge.svg)](https://github.com/0xMiden/crypto/actions/workflows/test.yml)
 [![build](https://github.com/0xMiden/crypto/actions/workflows/build.yml/badge.svg)](https://github.com/0xMiden/crypto/actions/workflows/build.yml)
-[![RUST_VERSION](https://img.shields.io/badge/rustc-1.85+-lightgray.svg)](https://www.rust-lang.org/tools/install)
+[![RUST_VERSION](https://img.shields.io/badge/rustc-1.87+-lightgray.svg)](https://www.rust-lang.org/tools/install)
 [![CRATE](https://img.shields.io/crates/v/miden-crypto)](https://crates.io/crates/miden-crypto)
 
 This crate contains cryptographic primitives used in Miden.
