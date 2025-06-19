@@ -22,10 +22,13 @@ pub type DefaultMerkleStore = MerkleStore<BTreeMap<Word, StoreNode>>;
 /// A [MerkleStore] with recording capabilities which uses [RecordingMap] as the backing storage.
 pub type RecordingMerkleStore = MerkleStore<RecordingMap<Word, StoreNode>>;
 
+/// A Merkle node storing references to its left and right child nodes.
 #[derive(Debug, Default, Copy, Clone, Eq, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 pub struct StoreNode {
+    /// The left child node.
     left: Word,
+    /// The right child node.
     right: Word,
 }
 
