@@ -1,5 +1,6 @@
 ## 0.16.0 (TBD)
 
+- [BREAKING] Make Falcon DSA deterministic (#436).
 
 ## 0.15.3 (2025-06-18)
 

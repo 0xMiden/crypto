@@ -60,6 +60,7 @@ hashbrown = { version = "0.15", optional = true, features = ["serde"] }
 num = { version = "0.4", default-features = false, features = ["alloc", "libm"] }
 num-complex = { version = "0.4", default-features = false }
 rand = { version = "0.9", default-features = false }
+rand_chacha = { version = "0.9", default-features = false }
 rand_core = { version = "0.9", default-features = false }
 rand-utils = { version = "0.13", package = "winter-rand-utils", optional = true }
 rayon = { version = "1.10", optional = true }
@@ -77,7 +78,6 @@ getrandom = { version = "0.3", default-features = false }
 hex = { version = "0.4", default-features = false, features = ["alloc"] }
 itertools = { version = "0.14" }
 proptest = { version = "1.7", default-features = false, features = ["alloc"]}
-rand_chacha = { version = "0.9", default-features = false }
 rand-utils = { version = "0.13", package = "winter-rand-utils" }
 rstest = { version = "0.25" }
 seq-macro = { version = "0.3" }
