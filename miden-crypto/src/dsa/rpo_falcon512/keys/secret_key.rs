@@ -148,7 +148,7 @@ impl SecretKey {
     /// number generators for generating the nonce and in `Self::sign_helper`.
     ///
     /// These changes make the signature algorithm compliant with the reference implementation.
-    #[cfg(test)]
+    #[cfg(all(test, feature = "std"))]
     pub fn sign_with_rng_testing<R: Rng>(&self, message: &[u8], rng: &mut R) -> Signature {
         use crate::dsa::rpo_falcon512::{hash_to_point::hash_to_point_shake256, tests::ChaCha};
 
