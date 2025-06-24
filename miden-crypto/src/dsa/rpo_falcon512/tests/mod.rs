@@ -106,7 +106,9 @@ fn check_preversioned_fixed_nonce() {
 
 /// Builds the preversioned portion of the fixed nonce following [1].
 ///
-/// Note that reference [1] uses the term salt instead of nonce.
+/// Note that [1] uses the term salt instead of nonce.
+///
+/// [1]: https://github.com/algorand/falcon/blob/main/falcon-det.pdf
 fn build_preversioned_fixed_nonce() -> [u8; PREVERSIONED_NONCE_LEN] {
     use crate::dsa::rpo_falcon512::LOG_N;
 

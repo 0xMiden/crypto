@@ -441,6 +441,7 @@ pub fn decode_i8(buf: &[u8], bits: usize) -> Option<Vec<i8>> {
 /// different versions of the Falcon DSA, see [1] Section 3.4.1.
 ///
 /// [1]: https://github.com/algorand/falcon/blob/main/falcon-det.pdf
+#[cfg(feature = "std")]
 fn generate_seed(sk: &SecretKey, message: &Word) -> [u8; 32] {
     let mut buffer = Vec::with_capacity(1 + SK_LEN + Word::SERIALIZED_SIZE);
     buffer.push(LOG_N);
