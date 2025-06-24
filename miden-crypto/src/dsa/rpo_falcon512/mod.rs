@@ -1,3 +1,4 @@
+#[cfg(test)]
 use rand::Rng;
 
 use crate::{
@@ -34,8 +35,28 @@ const FALCON_ENCODING_BITS: u32 = 14;
 const N: usize = 512;
 const LOG_N: u8 = 9;
 
-/// Length of nonce used for key-pair generation.
+/// Length of nonce used for signature generation.
 const SIG_NONCE_LEN: usize = 40;
+
+/// Length of the preversioned portion of the fixed nonce.
+///
+/// Since we use one byte to encode the version of the nonce, this is equal to `SIG_NONCE_LEN - 1`.
+const PREVERSIONED_NONCE_LEN: usize = 39;
+
+/// Current version of the fixed nonce.
+///
+/// The usefulness of the notion of versioned fixed nonce is discussed in Section 2.1 in [1].
+///
+/// [1]: https://github.com/algorand/falcon/blob/main/falcon-det.pdf
+const NONCE_VERSION_BYTE: u8 = 1;
+
+/// The preversioned portion of the fixed nonce constructed following [1].
+///
+/// Note that reference [1] uses the term salt instead of nonce.
+const PREVERSIONED_NONCE: [u8; PREVERSIONED_NONCE_LEN] = [
+    9, 82, 80, 79, 45, 70, 65, 76, 67, 79, 78, 45, 68, 69, 84, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+];
 
 /// Number of filed elements used to encode a nonce.
 const NONCE_ELEMENTS: usize = 8;
@@ -65,24 +86,50 @@ type ShortLatticeBasis = [Polynomial<i16>; 4];
 
 /// Nonce of the Falcon signature.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Nonce([u8; SIG_NONCE_LEN]);
+pub struct Nonce {
+    nonce_version: u8,
+    preversioned_nonce: [u8; PREVERSIONED_NONCE_LEN],
+}
 
 impl Nonce {
-    /// Returns a new [Nonce] instantiated from the provided bytes.
-    pub fn new(bytes: [u8; SIG_NONCE_LEN]) -> Self {
-        Self(bytes)
+    /// Returns a new [Nonce].
+    #[allow(clippy::new_without_default)]
+    pub fn new() -> Self {
+        Self {
+            nonce_version: NONCE_VERSION_BYTE,
+            preversioned_nonce: PREVERSIONED_NONCE,
+        }
     }
 
     /// Returns a new [Nonce] drawn from the provided RNG.
+    ///
+    /// This is used only in testing against the test vectors of the reference (non-deterministic)
+    /// Falcon DSA implementation.
+    #[cfg(test)]
     pub fn random<R: Rng>(rng: &mut R) -> Self {
         let mut nonce_bytes = [0u8; SIG_NONCE_LEN];
         rng.fill_bytes(&mut nonce_bytes);
-        Self::new(nonce_bytes)
+        Self::from_bytes(nonce_bytes)
     }
 
-    /// Returns the underlying bytes of this nonce.
-    pub fn as_bytes(&self) -> &[u8; SIG_NONCE_LEN] {
-        &self.0
+    /// Returns the underlying concatenated bytes of this nonce.
+    pub fn as_bytes(&self) -> [u8; SIG_NONCE_LEN] {
+        let mut nonce_bytes = [0u8; SIG_NONCE_LEN];
+        nonce_bytes[0] = self.nonce_version;
+        nonce_bytes
+            .iter_mut()
+            .skip(1)
+            .zip(self.preversioned_nonce.iter())
+            .for_each(|(dst, src)| *dst = *src);
+
+        nonce_bytes
+    }
+
+    /// Returns a `Nonce` given an array of bytes.
+    pub fn from_bytes(nonce_bytes: [u8; SIG_NONCE_LEN]) -> Self {
+        let nonce_version = nonce_bytes[0];
+        let preversioned_nonce = (&nonce_bytes[1..]).try_into().expect("should not fail");
+        Self { nonce_version, preversioned_nonce }
     }
 
     /// Converts byte representation of the nonce into field element representation.
@@ -92,7 +139,7 @@ impl Nonce {
     pub fn to_elements(&self) -> [Felt; NONCE_ELEMENTS] {
         let mut buffer = [0_u8; 8];
         let mut result = [ZERO; 8];
-        for (i, bytes) in self.0.chunks(5).enumerate() {
+        for (i, bytes) in self.as_bytes().chunks(5).enumerate() {
             buffer[..5].copy_from_slice(bytes);
             // we can safely (without overflow) create a new Felt from u64 value here since this
             // value contains at most 5 bytes
@@ -105,13 +152,16 @@ impl Nonce {
 
 impl Serializable for &Nonce {
     fn write_into<W: ByteWriter>(&self, target: &mut W) {
-        target.write_bytes(&self.0)
+        target.write_u8(self.nonce_version)
     }
 }
 
 impl Deserializable for Nonce {
     fn read_from<R: ByteReader>(source: &mut R) -> Result<Self, DeserializationError> {
-        let bytes = source.read()?;
-        Ok(Self(bytes))
+        let nonce_version = source.read()?;
+        Ok(Self {
+            nonce_version,
+            preversioned_nonce: PREVERSIONED_NONCE,
+        })
     }
 }
