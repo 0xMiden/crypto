@@ -12,7 +12,7 @@ mod keys;
 mod math;
 mod signature;
 
-#[cfg(test)]
+#[cfg(all(test, feature = "std"))]
 mod tests;
 
 pub use self::{
