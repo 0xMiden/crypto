@@ -22,7 +22,7 @@ pub use path::{MerklePath, RootPath, ValuePath};
 
 mod smt;
 #[cfg(feature = "rocksdb")]
-pub use smt::RocksDbStorage;
+pub use smt::{RocksDbConfig, RocksDbStorage};
 #[cfg(feature = "internal")]
 pub use smt::test_details;
 pub use smt::{

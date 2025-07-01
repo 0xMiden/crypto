@@ -1,6 +1,6 @@
 use alloc::vec::Vec;
 
-use super::{InnerNode, InnerNodeInfo, NodeIndex, Rpo256, RpoDigest, SUBTREE_DEPTH};
+use super::{InnerNode, InnerNodeInfo, NodeIndex, SUBTREE_DEPTH};
 use crate::{
     merkle::smt::UnorderedMap,
     utils::{Deserializable, DeserializationError},
@@ -20,8 +20,8 @@ pub struct Subtree {
 }
 
 impl Subtree {
-    pub const DEPTH: usize = 8;
-    pub const NODE_COUNT: usize = (1 << Self::DEPTH) - 1;
+    const DEPTH: usize = 8;
+    const NODE_COUNT: usize = (1 << Self::DEPTH) - 1;
     const NODE_SIZE: usize = 64;
     const BITMASK_SIZE: usize = 32;
 
@@ -122,10 +122,10 @@ impl Subtree {
                     )
                 })?;
 
-                let left = RpoDigest::read_from_bytes(&node_bytes[..32])?;
-                let right = RpoDigest::read_from_bytes(&node_bytes[32..])?;
-
-                nodes.insert(local_index, InnerNode { left, right });
+                //let left = RpoDigest::read_from_bytes(&node_bytes[..32])?;
+                //let right = RpoDigest::read_from_bytes(&node_bytes[32..])?;
+                let node = InnerNode::read_from_bytes(node_bytes)?;
+                nodes.insert(local_index, node);
                 Ok(())
             })?;
 
@@ -181,7 +181,7 @@ impl Subtree {
 
     pub fn iter_inner_node_info(&self) -> impl Iterator<Item = InnerNodeInfo> + '_ {
         self.nodes.values().map(|inner_node_ref| InnerNodeInfo {
-            value: Rpo256::merge(&[inner_node_ref.left, inner_node_ref.right]),
+            value: inner_node_ref.hash(),
             left: inner_node_ref.left,
             right: inner_node_ref.right,
         })

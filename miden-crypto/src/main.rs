@@ -4,7 +4,8 @@ use clap::Parser;
 #[cfg(not(feature = "rocksdb"))]
 use miden_crypto::merkle::MemoryStorage;
 #[cfg(feature = "rocksdb")]
-use miden_crypto::merkle::RocksDbStorage;
+use miden_crypto::merkle::{RocksDbConfig, RocksDbStorage};
+
 use miden_crypto::{
     EMPTY_WORD, Felt, ONE, Word,
     hash::rpo::{Rpo256, RpoDigest},
@@ -32,11 +33,14 @@ pub struct BenchmarkCmd {
     #[clap(short = 'u', long = "updates", default_value = "10000")]
     updates: usize,
     /// Path for the benchmark database
-    #[clap(short = 'p', long = "path")]
+    #[clap(short = 'p', long = "path", default_value = "/mnt/rocksdb/benchmark_db")]
     storage_path: Option<PathBuf>,
     /// Open existing database and skip construction
     #[clap(short = 'o', long = "open", default_value = "false")]
     open: bool,
+    /// Number of batch operations
+    #[clap(short = 'b', long = "batches", default_value = "1")]
+    batches: usize,
 }
 
 fn main() {
@@ -51,6 +55,7 @@ pub fn benchmark_smt() {
     let insertions = args.insertions;
     let updates = args.updates;
     let storage_path = args.storage_path;
+    let batches = args.batches;
 
     if cfg!(feature = "rocksdb") {
         println!("Running benchmark with rocksdb storage");
@@ -72,8 +77,10 @@ pub fn benchmark_smt() {
         construction(entries.clone(), tree_size, storage_path).unwrap()
     };
     insertion(&mut tree, insertions).unwrap();
-    batched_insertion(&mut tree, insertions).unwrap();
-    batched_update(&mut tree, entries.clone(), updates).unwrap();
+    for _ in 0..batches {
+        batched_insertion(&mut tree, insertions).unwrap();
+        batched_update(&mut tree, entries.clone(), updates).unwrap();
+    }
     proof_generation(&mut tree).unwrap();
 }
 
@@ -276,8 +283,7 @@ fn get_storage(database_path: Option<PathBuf>, open: bool) -> Storage {
         }
         std::fs::create_dir_all(path.clone()).expect("Failed to create database directory");
     }
-    let storage = Storage::open(&path).expect("Failed to open database");
-    storage
+    Storage::open(RocksDbConfig::new(path).with_cache_size(1 << 30).with_max_open_files(1024)).expect("Failed to open database")
 }
 
 #[cfg(not(feature = "rocksdb"))]

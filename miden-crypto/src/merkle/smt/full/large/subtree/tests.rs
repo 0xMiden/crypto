@@ -1,4 +1,5 @@
-use super::{InnerNode, NodeIndex, RpoDigest, SUBTREE_DEPTH, Subtree};
+use super::{InnerNode, NodeIndex, SUBTREE_DEPTH, Subtree};
+use crate::merkle::RpoDigest;
 
 #[test]
 fn test_initial_state() {

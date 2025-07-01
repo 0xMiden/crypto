@@ -13,7 +13,7 @@ use crate::{
 
 mod full;
 #[cfg(feature = "rocksdb")]
-pub use full::RocksDbStorage;
+pub use full::{RocksDbConfig, RocksDbStorage};
 #[cfg(feature = "concurrent")]
 pub use full::{LargeSmt, MemoryStorage};
 pub use full::{SMT_DEPTH, Smt, SmtLeaf, SmtLeafError, SmtProof, SmtProofError};

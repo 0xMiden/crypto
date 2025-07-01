@@ -1,4 +1,5 @@
-use miden_crypto::merkle::{InnerNodeInfo, LargeSmt, RocksDbStorage, test_details};
+use miden_crypto::merkle::test_details;
+use miden_crypto::merkle::{InnerNodeInfo, LargeSmt, RocksDbConfig, RocksDbStorage};
 use tempfile::TempDir;
 
 fn setup_storage() -> (RocksDbStorage, TempDir) {
@@ -9,7 +10,7 @@ fn setup_storage() -> (RocksDbStorage, TempDir) {
 
     let db_path = temp_dir.path().to_path_buf();
 
-    let storage = RocksDbStorage::open(&db_path)
+    let storage = RocksDbStorage::open(RocksDbConfig::new(db_path))
         .expect("Failed to open RocksDbStorage in temporary directory");
     (storage, temp_dir)
 }
@@ -103,7 +104,7 @@ fn rocksdb_test_reopening_smt() {
     drop(smt);
 
     // Reopen the db using the same path
-    let reopened_storage = RocksDbStorage::open(&db_path).unwrap();
+    let reopened_storage = RocksDbStorage::open(RocksDbConfig::new(db_path)).unwrap();
     let smt = LargeSmt::<RocksDbStorage>::new(reopened_storage).unwrap();
 
     // again collect all the inner nodes
@@ -133,7 +134,7 @@ fn rocksdb_test_reopening_smt_after_insertion() {
     drop(smt);
 
     // Reopen the db using the same path
-    let reopened_storage = RocksDbStorage::open(&db_path).unwrap();
+    let reopened_storage = RocksDbStorage::open(RocksDbConfig::new(db_path)).unwrap();
     let smt = LargeSmt::<RocksDbStorage>::new(reopened_storage).unwrap();
 
     // again collect all the inner nodes

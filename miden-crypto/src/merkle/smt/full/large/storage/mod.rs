@@ -17,7 +17,7 @@ use crate::{
 #[cfg(feature = "rocksdb")]
 mod rocksdb;
 #[cfg(feature = "rocksdb")]
-pub use rocksdb::RocksDbStorage;
+pub use rocksdb::{RocksDbConfig, RocksDbStorage};
 
 mod memory;
 pub use memory::MemoryStorage;
@@ -324,6 +324,12 @@ pub trait SmtStorage: 'static + fmt::Debug + Send + Sync {
     /// For each `index` in the input, the corresponding element in the output `Vec`
     /// will be `Some(SmtLeaf)` if found, or `None` if not found.
     fn get_leaves(&self, indices: &[u64]) -> Result<Vec<Option<SmtLeaf>>, StorageError>;
+
+    /// Returns true if the storage has any leaves.
+    ///
+    /// # Errors
+    /// Returns `StorageError` if the storage read operation fails.
+    fn has_leaves(&self) -> Result<bool, StorageError>;
 
     /// Retrieves a single SMT Subtree by its root `NodeIndex`.
     ///

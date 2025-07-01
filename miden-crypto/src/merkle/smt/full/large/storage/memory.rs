@@ -212,6 +212,14 @@ impl SmtStorage for MemoryStorage {
         Ok(leaves)
     }
 
+    /// Returns true if the storage has any leaves.
+    fn has_leaves(&self) -> Result<bool, StorageError> {
+        let leaves_guard = self.leaves.read().map_err(|_| {
+            StorageError::BackendError("Failed to acquire read lock for get_leaves".into())
+        })?;
+        Ok(!leaves_guard.is_empty())
+    }
+
     /// Retrieves a single Subtree (representing deep nodes) by its root NodeIndex.
     /// Assumes index.depth() >= IN_MEMORY_DEPTH. Returns Ok(None) if not found.
     fn get_subtree(&self, index: NodeIndex) -> Result<Option<Subtree>, StorageError> {
