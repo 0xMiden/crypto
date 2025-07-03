@@ -1,5 +1,6 @@
 ## 0.16.0 (TBD)
 
+- Added implementation of Poseidon2 hash function ([#429](https://github.com/0xMiden/crypto/issues/429)).
 
 ## 0.15.3 (2025-06-18)
 
