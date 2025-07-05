@@ -1,7 +1,7 @@
 ## 0.16.0 (TBD)
 
 - [BREAKING] Incremented MSRV to 1.88.
-- Remove generics from `MerklStore` and remove `KvMap` and `RecordingMap` (#442).
+- [BREAKING] Remove generics from `MerklStore` and remove `KvMap` and `RecordingMap` (#442).
 
 ## 0.15.3 (2025-06-18)
 
