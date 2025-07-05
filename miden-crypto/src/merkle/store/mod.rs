@@ -1,4 +1,4 @@
-use alloc::{collections::BTreeMap, vec::Vec};
+use alloc::vec::Vec;
 use core::borrow::Borrow;
 
 use super::{
@@ -12,6 +12,11 @@ mod tests;
 
 // MERKLE STORE
 // ================================================================================================
+
+#[cfg(feature = "smt_hashmaps")]
+type HashMap<K, V> = hashbrown::HashMap<K, V>;
+#[cfg(not(feature = "smt_hashmaps"))]
+type HashMap<K, V> = std::collections::HashMap<K, V>;
 
 #[derive(Debug, Default, Copy, Clone, Eq, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
@@ -85,7 +90,7 @@ pub struct StoreNode {
 #[derive(Debug, Clone, Eq, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 pub struct MerkleStore {
-    nodes: BTreeMap<Word, StoreNode>,
+    nodes: HashMap<Word, StoreNode>,
 }
 
 impl Default for MerkleStore {
