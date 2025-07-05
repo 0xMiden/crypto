@@ -16,7 +16,7 @@ mod tests;
 #[cfg(feature = "smt_hashmaps")]
 type HashMap<K, V> = hashbrown::HashMap<K, V>;
 #[cfg(not(feature = "smt_hashmaps"))]
-type HashMap<K, V> = std::collections::HashMap<K, V>;
+type HashMap<K, V> = alloc::collections::BTreeMap<K, V>;
 
 #[derive(Debug, Default, Copy, Clone, Eq, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
