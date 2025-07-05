@@ -1,4 +1,4 @@
-//! Cryptographic hash functions used by the Protocol.
+//! Cryptographic hash functions used by the Miden protocol.
 
 use super::{CubeExtension, Felt, FieldElement, StarkField, ZERO};
 
