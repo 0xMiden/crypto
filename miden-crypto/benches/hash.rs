@@ -195,12 +195,12 @@ fn blake3_sequential(c: &mut Criterion) {
 
 criterion_group!(
     hash_group,
-    rpx256_2to1,
-    rpx256_sequential,
+    //rpx256_2to1,
+    //rpx256_sequential,
     rpo256_2to1,
     rpo256_sequential,
-    poseidon2_2to1,
-    poseidon2_sequential,
+    //poseidon2_2to1,
+    //poseidon2_sequential,
     blake3_2to1,
     blake3_sequential
 );
