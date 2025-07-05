@@ -10,7 +10,7 @@ This crate contains cryptographic primitives used in Miden.
 
 ## Hash
 
-[Hash module](./miden-crypto/src/hash) provides a set of cryptographic hash functions which are used by the Miden VM and the Miden rollup. Currently, these functions are:
+[Hash module](./miden-crypto/src/hash) provides a set of cryptographic hash functions which are used by the Miden protocol. Currently, these functions are:
 
 - [BLAKE3](https://github.com/BLAKE3-team/BLAKE3) hash function with 256-bit, 192-bit, or 160-bit output. The 192-bit and 160-bit outputs are obtained by truncating the 256-bit output of the standard BLAKE3.
 - [RPO](https://eprint.iacr.org/2022/1577) hash function with 256-bit output. This hash function is an algebraic hash function suitable for recursive STARKs.
@@ -42,7 +42,7 @@ For the above signatures, key generation, signing, and signature verification ar
 
 ## Pseudo-Random Element Generator
 
-[Pseudo random element generator module](./miden-crypto/src/rand/) provides a set of traits and data structures that facilitate generating pseudo-random elements in the context of Miden VM and Miden rollup. The module currently includes:
+[Pseudo random element generator module](./miden-crypto/src/rand/) provides a set of traits and data structures that facilitate generating pseudo-random elements in the context of Miden protocol. The module currently includes:
 
 - `FeltRng`: a trait for generating random field elements and random 4 field elements.
 - `RpoRandomCoin`: a struct implementing `FeltRng` as well as the [`RandomCoin`](https://github.com/facebook/winterfell/blob/main/crypto/src/random/mod.rs) trait using RPO hash function.
