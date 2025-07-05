@@ -11,7 +11,7 @@ In the Miden VM, we make use of different hash functions. Some of these are "tra
 * **Poseidon2** as specified [here](https://eprint.iacr.org/2023/1045) and implemented in this crate.
 
 We benchmark the above hash functions using two scenarios. The first is a 2-to-1 $(a,b)\mapsto h(a,b)$ hashing where both $a$, $b$ and $h(a,b)$ are the digests corresponding to each of the hash functions.
-The second scenario is that of sequential hashing where we take a sequence of length $100$ field elements and hash these to produce a single digest. The digests are $4$ field elements in a prime field with modulus $2^{64} - 2^{32} + 1$ (i.e., 32 bytes) for Poseidon, Poseidon2, Rescue Prime and RPO, and an array `[u8; 32]` for SHA3 and BLAKE3.
+The second scenario is that of sequential hashing where we take a sequence of length $100$ field elements and hash these to produce a single digest. The digests are $4$ field elements in a prime field with modulus $2^{64} - 2^{32} + 1$ (i.e., 32 bytes) for Poseidon2, Rescue Prime and RPO, and an array `[u8; 32]` for SHA3 and BLAKE3.
 
 ### Scenario 1: 2-to-1 hashing `h(a,b)`
 
