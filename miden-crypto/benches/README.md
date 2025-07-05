@@ -5,7 +5,6 @@ In the Miden VM, we make use of different hash functions. Some of these are "tra
 
 * **BLAKE3** as specified [here](https://github.com/BLAKE3-team/BLAKE3-specs/blob/master/blake3.pdf) and implemented [here](https://github.com/BLAKE3-team/BLAKE3) (with a wrapper exposed via this crate).
 * **SHA3** as specified [here](https://nvlpubs.nist.gov/nistpubs/FIPS/NIST.FIPS.202.pdf) and implemented [here](https://github.com/novifinancial/winterfell/blob/46dce1adf0/crypto/src/hash/sha/mod.rs).
-* **Poseidon** as specified [here](https://eprint.iacr.org/2019/458.pdf) and implemented [here](https://github.com/mir-protocol/plonky2/blob/806b88d7d6e69a30dc0b4775f7ba275c45e8b63b/plonky2/src/hash/poseidon_goldilocks.rs) (but in pure Rust, without vectorized instructions).
 * **Rescue Prime (RP)** as specified [here](https://eprint.iacr.org/2020/1143) and implemented [here](https://github.com/novifinancial/winterfell/blob/46dce1adf0/crypto/src/hash/rescue/rp64_256/mod.rs).
 * **Rescue Prime Optimized (RPO)** as specified [here](https://eprint.iacr.org/2022/1577) and implemented in this crate.
 * **Rescue Prime Extended (RPX)** a variant of the [xHash](https://eprint.iacr.org/2023/1045) hash function as implemented in this crate.
@@ -16,29 +15,31 @@ The second scenario is that of sequential hashing where we take a sequence of le
 
 ### Scenario 1: 2-to-1 hashing `h(a,b)`
 
-| Function            | BLAKE3 | SHA3   | Poseidon | Rp64_256 | RPO_256 | RPX_256 | Poseidon2 |
-| ------------------- | ------ | ------ | -------- | -------- | ------- | ------- | --------- |
-| Apple M1 Pro        | 76 ns  | 245 ns | 1.5 µs   | 9.1 µs   | 5.2 µs  | 2.7 µs  |           |
-| Apple M2 Max        | 71 ns  | 233 ns | 1.3 µs   | 7.9 µs   | 4.6 µs  | 2.4 µs  |           |
-| Amazon Graviton 3   | 108 ns |        |          |          | 5.3 µs  | 3.1 µs  |           |
-| Amazon Graviton 4   | 96 ns  |        |          |          | 5.1 µs  | 2.8 µs  |           |
-| AMD Ryzen 9 5950X   | 64 ns  | 273 ns | 1.2 µs   | 9.1 µs   | 5.5 µs  |         |           |
-| AMD EPYC 9R14       | 83 ns  |        |          |          | 4.3 µs  | 2.4 µs  |           |
-| Intel Core i5-8279U | 68 ns  | 536 ns | 2.0 µs   | 13.6 µs  | 8.5 µs  | 4.4 µs  | 1.7 µs    |
-| Intel Xeon 8375C    | 67 ns  |        |          |          | 8.2 µs  |         |           |
+| Function            | BLAKE3 | SHA3   | Poseidon2 | Rp64_256 | RPO_256 | RPX_256 |
+| ------------------- | ------ | ------ | --------- | -------- | ------- | ------- |
+| Apple M1 Pro        | 76 ns  | 245 ns |           | 9.1 µs   | 5.2 µs  | 2.7 µs  |
+| Apple M2 Max        | 71 ns  | 233 ns |           | 7.9 µs   | 4.6 µs  | 2.4 µs  |
+| Apple M4 Max        | 48 ns  |        | 698 ns    |          | 2.9 µs  | 1.5 µs  |
+| Amazon Graviton 3   | 108 ns |        |           |          | 5.3 µs  | 3.1 µs  |
+| Amazon Graviton 4   | 96 ns  |        |           |          | 5.1 µs  | 2.8 µs  |
+| AMD Ryzen 9 5950X   | 64 ns  | 273 ns |           | 9.1 µs   | 5.5 µs  |         |
+| AMD EPYC 9R14       | 83 ns  |        |           |          | 4.3 µs  | 2.4 µs  |
+| Intel Core i5-8279U | 68 ns  | 536 ns | 1.7 µs    | 13.6 µs  | 8.5 µs  | 4.4 µs  |
+| Intel Xeon 8375C    | 67 ns  |        |           |          | 8.2 µs  |         |
 
 ### Scenario 2: Sequential hashing of 100 elements `h([a_0,...,a_99])`
 
-| Function            | BLAKE3 | SHA3   | Poseidon | Rp64_256 | RPO_256 | RPX_256 | Poseidon2 |
-| ------------------- | ------ | ------ | -------- | -------- | ------- | ------- | --------- |
-| Apple M1 Pro        | 1.0 µs | 1.5 µs | 19.4 µs  | 118 µs   | 69 µs   | 35 µs   |           |
-| Apple M2 Max        | 0.9 µs | 1.5 µs | 17.4 µs  | 103 µs   | 60 µs   | 31 µs   |           |
-| Amazon Graviton 3   | 1.4 µs |        |          |          | 69 µs   | 41 µs   |           |
-| Amazon Graviton 4   | 1.2 µs |        |          |          | 67 µs   | 36 µs   |           |
-| AMD Ryzen 9 5950X   | 0.8 µs | 1.7 µs | 15.7 µs  | 120 µs   | 72 µs   |         |           |
-| AMD EPYC 9R14       | 0.9 µs |        |          |          | 56 µs   | 32 µs   |           |
-| Intel Core i5-8279U | 0.9 µs |        |          |          | 107 µs  | 56 µs   | 27 µs     |
-| Intel Xeon 8375C    | 0.8 µs |        |          |          | 110 µs  |         |           |
+| Function            | BLAKE3 | SHA3   | Poseidon2 | Rp64_256 | RPO_256 | RPX_256 |
+| ------------------- | ------ | ------ | --------- | -------- | ------- | ------- |
+| Apple M1 Pro        | 1.0 µs | 1.5 µs |           | 118 µs   | 69 µs   | 35 µs   |
+| Apple M2 Max        | 0.9 µs | 1.5 µs |           | 103 µs   | 60 µs   | 31 µs   |
+| Apple M4 Max        | 671 ns |        | 9.7 µs    |          | 37.5 µs | 19.4 µs |
+| Amazon Graviton 3   | 1.4 µs |        |           |          | 69 µs   | 41 µs   |
+| Amazon Graviton 4   | 1.2 µs |        |           |          | 67 µs   | 36 µs   |
+| AMD Ryzen 9 5950X   | 0.8 µs | 1.7 µs |           | 120 µs   | 72 µs   |         |
+| AMD EPYC 9R14       | 0.9 µs |        |           |          | 56 µs   | 32 µs   |
+| Intel Core i5-8279U | 0.9 µs |        | 27 µs     |          | 107 µs  | 56 µs   |
+| Intel Xeon 8375C    | 0.8 µs |        |           |          | 110 µs  |         |
 
 Notes:
 - On Graviton 3 and 4, RPO256 and RPX256 are run with SVE acceleration enabled.
@@ -80,13 +81,13 @@ Notes:
 - On AMD Ryzen 9 7950X, benchmarks are run with AVX2 acceleration enabled.
 
 ## Instructions
-Before you can run the benchmarks, you'll need to make sure you have Rust [installed](https://www.rust-lang.org/tools/install). After that, to run the benchmarks for RPO and BLAKE3, clone the current repository, and from the root directory of the repo run the following:
+Before you can run the benchmarks, you'll need to make sure you have Rust [installed](https://www.rust-lang.org/tools/install). After that, to run the benchmarks for RPO, Poseidon2 and BLAKE3, clone the current repository, and from the root directory of the repo run the following:
 
  ```
  cargo bench hash
  ```
 
-To run the benchmarks for Rescue Prime, Poseidon and SHA3, clone the following [repository](https://github.com/Dominik1999/winterfell.git) as above, then checkout the `hash-functions-benches` branch, and from the root directory of the repo run the following:
+To run the benchmarks for Rescue Prime and SHA3, clone the following [repository](https://github.com/Dominik1999/winterfell.git) as above, then checkout the `hash-functions-benches` branch, and from the root directory of the repo run the following:
 
 ```
 cargo bench hash
