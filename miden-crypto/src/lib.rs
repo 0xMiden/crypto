@@ -37,6 +37,26 @@ pub const ONE: Felt = Felt::ONE;
 /// Array of field elements representing word of ZEROs in the Miden base field.
 pub const EMPTY_WORD: Word = Word::new([ZERO; WORD_SIZE]);
 
+// TRAITS
+// ================================================================================================
+
+/// Defines how to compute a commitment to an object represented as a sequence of field elements.
+pub trait SequentialCommit {
+    /// A type of the commitment which must be derivable from [Word].
+    type Commitment: From<Word>;
+
+    /// Computes the commitment to the object.
+    ///
+    /// The default implementation of this function uses RPO256 hash function to hash the sequence
+    /// of elements returned from [Self::to_elements()].
+    fn to_commitment(&self) -> Self::Commitment {
+        hash::rpo::Rpo256::hash_elements(&self.to_elements()).into()
+    }
+
+    /// Returns a representation of the object as a sequence of fields elements.
+    fn to_elements(&self) -> alloc::vec::Vec<Felt>;
+}
+
 // TESTS
 // ================================================================================================
 
