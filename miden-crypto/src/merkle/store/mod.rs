@@ -447,14 +447,6 @@ impl MerkleStore {
         Ok(parent)
     }
 
-    // DESTRUCTURING
-    // --------------------------------------------------------------------------------------------
-
-    /// Returns the inner storage of this MerkleStore while consuming `self`.
-    pub fn into_inner(self) -> BTreeMap<Word, StoreNode> {
-        self.nodes
-    }
-
     // HELPER METHODS
     // --------------------------------------------------------------------------------------------
 
