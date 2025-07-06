@@ -1,3 +1,5 @@
+//! Cryptographic utilities and primitives used by the Miden VM.
+
 #![no_std]
 
 #[macro_use]

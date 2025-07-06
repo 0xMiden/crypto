@@ -31,6 +31,9 @@
 - Added test vectors for RpoFalcon512 (#425).
 - [BREAKING] Updated Winterfell dependency to v0.13 and licensed the project under the Apache 2.0 license (in addition to the MIT)(#433).
 - [BREAKING] Incremented MSRV to 1.87.
+- [BREAKING] Renamed `MerklePath::inner_nodes()` to `authenticated_nodes()` to better reflect its functionality (#415).
+- Added `compute_root()`, `verify()`, and `authenticated_nodes()` to `SparseMerklePath` for parity with `MerklePath` (#415).
+- Added module and function documentation-3 (#427).
 
 ## 0.14.1 (2025-05-31)
 
