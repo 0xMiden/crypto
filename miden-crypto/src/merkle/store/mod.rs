@@ -6,7 +6,7 @@ use super::{
     PartialMerkleTree, RootPath, Rpo256, SimpleSmt, Smt, ValuePath, Word, mmr::Mmr,
 };
 use crate::{
-    UnorderedMap,
+    Map,
     utils::{ByteReader, ByteWriter, Deserializable, DeserializationError, Serializable},
 };
 
@@ -88,7 +88,7 @@ pub struct StoreNode {
 #[derive(Debug, Clone, Eq, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 pub struct MerkleStore {
-    nodes: UnorderedMap<Word, StoreNode>,
+    nodes: Map<Word, StoreNode>,
 }
 
 impl Default for MerkleStore {

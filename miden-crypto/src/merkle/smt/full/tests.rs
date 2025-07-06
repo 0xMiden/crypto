@@ -5,7 +5,7 @@ use crate::{
     ONE, WORD_SIZE,
     merkle::{
         EmptySubtreeRoots, MerkleStore, MutationSet,
-        smt::{NodeMutation, SparseMerkleTree, UnorderedMap},
+        smt::{Map, NodeMutation, SparseMerkleTree},
     },
     utils::{Deserializable, Serializable},
 };
@@ -414,7 +414,7 @@ fn test_prospective_insertion() {
     assert_eq!(revert.root(), root_empty, "reverse mutations new root did not match");
     assert_eq!(
         revert.new_pairs,
-        UnorderedMap::from_iter([(key_1, EMPTY_WORD)]),
+        Map::from_iter([(key_1, EMPTY_WORD)]),
         "reverse mutations pairs did not match"
     );
     assert_eq!(
@@ -434,7 +434,7 @@ fn test_prospective_insertion() {
     assert_eq!(revert.root(), old_root, "reverse mutations new root did not match");
     assert_eq!(
         revert.new_pairs,
-        UnorderedMap::from_iter([(key_2, EMPTY_WORD), (key_3, EMPTY_WORD)]),
+        Map::from_iter([(key_2, EMPTY_WORD), (key_3, EMPTY_WORD)]),
         "reverse mutations pairs did not match"
     );
 
@@ -448,7 +448,7 @@ fn test_prospective_insertion() {
     assert_eq!(revert.root(), old_root, "reverse mutations new root did not match");
     assert_eq!(
         revert.new_pairs,
-        UnorderedMap::from_iter([(key_3, value_3)]),
+        Map::from_iter([(key_3, value_3)]),
         "reverse mutations pairs did not match"
     );
 
@@ -468,7 +468,7 @@ fn test_prospective_insertion() {
     assert_eq!(revert.root(), old_root, "reverse mutations new root did not match");
     assert_eq!(
         revert.new_pairs,
-        UnorderedMap::from_iter([(key_1, value_1), (key_2, value_2), (key_3, value_3)]),
+        Map::from_iter([(key_1, value_1), (key_2, value_2), (key_3, value_3)]),
         "reverse mutations pairs did not match"
     );
 

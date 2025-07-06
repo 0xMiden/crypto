@@ -23,10 +23,10 @@ pub use winter_math::{
 pub use word::{Word, WordError};
 
 /// A map whose keys are not guaranteed to be ordered.
-#[cfg(feature = "ext_hashmaps")]
-pub type UnorderedMap<K, V> = hashbrown::HashMap<K, V>;
-#[cfg(not(feature = "ext_hashmaps"))]
-pub type UnorderedMap<K, V> = alloc::collections::BTreeMap<K, V>;
+#[cfg(feature = "unordered_maps")]
+pub type Map<K, V> = hashbrown::HashMap<K, V>;
+#[cfg(not(feature = "unordered_maps"))]
+pub type Map<K, V> = alloc::collections::BTreeMap<K, V>;
 
 // TYPE ALIASES
 // ================================================================================================
