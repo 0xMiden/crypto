@@ -46,8 +46,8 @@ doc: ## Generate and check documentation
 test-default: ## Run tests with default features
 	$(DEBUG_OVERFLOW_INFO) cargo nextest run --profile default --release --all-features
 
-.PHONY: test-smt-hashmaps
-test-smt-hashmaps: ## Run tests with `unordered_maps` feature enabled
+.PHONY: test-unordered-maps
+test-unordered-maps: ## Run tests with `unordered_maps` feature enabled
 	$(DEBUG_OVERFLOW_INFO) cargo nextest run --profile default --release --features unordered_maps
 
 .PHONY: test-no-std
