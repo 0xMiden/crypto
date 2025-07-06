@@ -48,22 +48,35 @@ harness = false
 concurrent = ["dep:rayon", "hashbrown?/rayon"]
 default = ["std", "concurrent"]
 executable = ["dep:clap", "dep:rand-utils", "std"]
-smt_hashmaps = ["dep:hashbrown"]
+ext_hashmaps = ["dep:hashbrown"]
 internal = []
 serde = ["dep:serde", "serde?/alloc", "winter-math/serde"]
-std = ["blake3/std", "dep:cc", "rand/std", "rand/thread_rng", "winter-crypto/std", "winter-math/std", "winter-utils/std"]
+std = [
+    "blake3/std",
+    "dep:cc",
+    "rand/std",
+    "rand/thread_rng",
+    "winter-crypto/std",
+    "winter-math/std",
+    "winter-utils/std",
+]
 
 [dependencies]
 blake3 = { version = "1.8", default-features = false }
 clap = { version = "4.5", optional = true, features = ["derive"] }
 hashbrown = { version = "0.15", optional = true, features = ["serde"] }
-num = { version = "0.4", default-features = false, features = ["alloc", "libm"] }
+num = { version = "0.4", default-features = false, features = [
+    "alloc",
+    "libm",
+] }
 num-complex = { version = "0.4", default-features = false }
 rand = { version = "0.9", default-features = false }
 rand_core = { version = "0.9", default-features = false }
 rand-utils = { version = "0.13", package = "winter-rand-utils", optional = true }
 rayon = { version = "1.10", optional = true }
-serde = { version = "1.0", default-features = false, optional = true, features = ["derive"] }
+serde = { version = "1.0", default-features = false, optional = true, features = [
+    "derive",
+] }
 sha3 = { version = "0.10", default-features = false }
 thiserror = { version = "2.0", default-features = false }
 winter-crypto = { version = "0.13", default-features = false }
@@ -76,7 +89,7 @@ criterion = { version = "0.6", features = ["html_reports"] }
 getrandom = { version = "0.3", default-features = false }
 hex = { version = "0.4", default-features = false, features = ["alloc"] }
 itertools = { version = "0.14" }
-proptest = { version = "1.7", default-features = false, features = ["alloc"]}
+proptest = { version = "1.7", default-features = false, features = ["alloc"] }
 rand_chacha = { version = "0.9", default-features = false }
 rand-utils = { version = "0.13", package = "winter-rand-utils" }
 rstest = { version = "0.25" }

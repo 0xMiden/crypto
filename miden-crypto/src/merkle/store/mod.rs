@@ -5,18 +5,16 @@ use super::{
     EmptySubtreeRoots, InnerNodeInfo, MerkleError, MerklePath, MerkleTree, NodeIndex,
     PartialMerkleTree, RootPath, Rpo256, SimpleSmt, Smt, ValuePath, Word, mmr::Mmr,
 };
-use crate::utils::{ByteReader, ByteWriter, Deserializable, DeserializationError, Serializable};
+use crate::{
+    UnorderedMap,
+    utils::{ByteReader, ByteWriter, Deserializable, DeserializationError, Serializable},
+};
 
 #[cfg(test)]
 mod tests;
 
 // MERKLE STORE
 // ================================================================================================
-
-#[cfg(feature = "smt_hashmaps")]
-type HashMap<K, V> = hashbrown::HashMap<K, V>;
-#[cfg(not(feature = "smt_hashmaps"))]
-type HashMap<K, V> = alloc::collections::BTreeMap<K, V>;
 
 #[derive(Debug, Default, Copy, Clone, Eq, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
@@ -90,7 +88,7 @@ pub struct StoreNode {
 #[derive(Debug, Clone, Eq, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 pub struct MerkleStore {
-    nodes: HashMap<Word, StoreNode>,
+    nodes: UnorderedMap<Word, StoreNode>,
 }
 
 impl Default for MerkleStore {
