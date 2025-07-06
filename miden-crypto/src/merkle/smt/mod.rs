@@ -4,7 +4,7 @@ use core::hash::Hash;
 use winter_utils::{ByteReader, ByteWriter, Deserializable, DeserializationError, Serializable};
 
 use super::{EmptySubtreeRoots, InnerNodeInfo, MerkleError, MerklePath, NodeIndex};
-use crate::{EMPTY_WORD, Felt, Word, hash::rpo::Rpo256};
+use crate::{EMPTY_WORD, Felt, UnorderedMap, Word, hash::rpo::Rpo256};
 
 mod full;
 pub use full::{SMT_DEPTH, Smt, SmtLeaf, SmtLeafError, SmtProof, SmtProofError};
