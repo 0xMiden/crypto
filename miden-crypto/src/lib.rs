@@ -22,12 +22,17 @@ pub use winter_math::{
 };
 pub use word::{Word, WordError};
 
-/// A map whose keys are not guaranteed to be ordered. Has improved update performance but the
-/// iterator cannot be used to retrieve ordered keys.
+/// An alias for a key-value map.
+///
+/// By default, this is an alias for the standard [BTreeMap], however, when the `hashmaps` feature
+/// is enabled, this is an alias for the `hashbrown`'s `HashMap`.
 #[cfg(feature = "hashmaps")]
 pub type Map<K, V> = hashbrown::HashMap<K, V>;
 
-/// A B-Tree based map whose keys are guaranteed to be in ascending order.
+/// An alias for a key-value map.
+///
+/// By default, this is an alias for the standard [BTreeMap], however, when the `hashmaps` feature
+/// is enabled, this is an alias for the `hashbrown`'s `HashMap`.
 #[cfg(not(feature = "hashmaps"))]
 pub type Map<K, V> = alloc::collections::BTreeMap<K, V>;
 

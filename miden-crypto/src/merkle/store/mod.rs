@@ -453,6 +453,11 @@ impl MerkleStore {
     // HELPER METHODS
     // --------------------------------------------------------------------------------------------
 
+    /// Returns the inner storage of this MerkleStore while consuming `self`.
+    pub fn into_inner(self) -> Map<Word, StoreNode> {
+        self.nodes
+    }
+
     /// Recursively clones a tree with the specified root from the specified source into self.
     ///
     /// If the source store does not contain a tree with the specified root, this is a noop.
