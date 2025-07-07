@@ -2,7 +2,7 @@
 
 - [BREAKING] Incremented MSRV to 1.88.
 - [BREAKING] Remove generics from `MerkleStore` and remove `KvMap` and `RecordingMap` (#442).
-- Rename `smt_hashmaps` feature to `unordered_maps` (#442).
+- Rename `smt_hashmaps` feature to `hashmaps` (#442).
 
 ## 0.15.3 (2025-06-18)
 

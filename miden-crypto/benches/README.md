@@ -46,7 +46,7 @@ Notes:
 ## Sparse Merkle Tree
 We build cryptographic data structures incorporating these hash functions.
 What follows are benchmarks of operations on sparse Merkle trees (SMTs) which use the above `RPO_256` hash function.
-We perform a batched modification of 1,000 values in a tree with 1,000,000 leaves (with the `unordered_maps` feature to use the `hashbrown` crate).
+We perform a batched modification of 1,000 values in a tree with 1,000,000 leaves (with the `hashmaps` feature to use the `hashbrown` crate).
 
 ### Scenario 1: SMT Construction (1M pairs)
 
@@ -101,7 +101,7 @@ The `concurrent` feature enables the concurrent benchmark, and is enabled by def
 disable the crate's default features:
 
 ```
-cargo run --no-default-features --features=executable,unordered_maps
+cargo run --no-default-features --features=executable,hashmaps
 ```
 
 The benchmark parameters may also be customized with the `-s`/`--size`, `-i`/`--insertions`, and `-u`/`--updates` options.

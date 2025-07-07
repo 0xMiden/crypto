@@ -576,7 +576,7 @@ pub struct MutationSet<const DEPTH: u8, K: Eq + Hash, V> {
     /// corresponds to a [`SparseMerkleTree::remove_inner_node()`] call.
     node_mutations: NodeMutations,
     /// The set of top-level key-value pairs we're prospectively adding to the tree, including
-    /// adding empty values. The "effective" value for a key is the value in this BTreeMap, falling
+    /// adding empty values. The "effective" value for a key is the value in this Map, falling
     /// back to the existing value in the Merkle tree. Each entry corresponds to a
     /// [`SparseMerkleTree::insert_value()`] call.
     new_pairs: Map<K, V>,

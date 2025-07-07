@@ -46,9 +46,9 @@ doc: ## Generate and check documentation
 test-default: ## Run tests with default features
 	$(DEBUG_OVERFLOW_INFO) cargo nextest run --profile default --release --all-features
 
-.PHONY: test-unordered-maps
-test-unordered-maps: ## Run tests with `unordered_maps` feature enabled
-	$(DEBUG_OVERFLOW_INFO) cargo nextest run --profile default --release --features unordered_maps
+.PHONY: test-hashmaps
+test-hashmaps: ## Run tests with `hashmaps` feature enabled
+	$(DEBUG_OVERFLOW_INFO) cargo nextest run --profile default --release --features hashmaps
 
 .PHONY: test-no-std
 test-no-std: ## Run tests with `no-default-features` (std)

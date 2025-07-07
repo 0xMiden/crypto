@@ -22,10 +22,13 @@ pub use winter_math::{
 };
 pub use word::{Word, WordError};
 
-/// A map whose keys are not guaranteed to be ordered.
-#[cfg(feature = "unordered_maps")]
+/// A map whose keys are not guaranteed to be ordered. Has improved update performance but the
+/// iterator cannot be used to retrieve ordered keys.
+#[cfg(feature = "hashmaps")]
 pub type Map<K, V> = hashbrown::HashMap<K, V>;
-#[cfg(not(feature = "unordered_maps"))]
+
+/// A B-Tree based map whose keys are guaranteed to be in ascending order.
+#[cfg(not(feature = "hashmaps"))]
 pub type Map<K, V> = alloc::collections::BTreeMap<K, V>;
 
 // TYPE ALIASES
