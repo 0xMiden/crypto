@@ -104,7 +104,7 @@ impl MerkleStore {
     /// Creates an empty `MerkleStore` instance.
     pub fn new() -> MerkleStore {
         // pre-populate the store with the empty hashes
-        let nodes = empty_hashes().into_iter().collect();
+        let nodes = empty_hashes().collect();
         MerkleStore { nodes }
     }
 
@@ -585,7 +585,7 @@ impl Deserializable for MerkleStore {
 // ================================================================================================
 
 /// Creates empty hashes for all the subtrees of a tree with a max depth of 255.
-fn empty_hashes() -> impl IntoIterator<Item = (Word, StoreNode)> {
+fn empty_hashes() -> impl Iterator<Item = (Word, StoreNode)> {
     let subtrees = EmptySubtreeRoots::empty_hashes(255);
     subtrees
         .iter()
