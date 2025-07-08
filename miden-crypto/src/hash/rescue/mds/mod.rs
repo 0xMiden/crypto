@@ -1,11 +1,11 @@
-use std::println;
-
+use core::u64;
 use super::{Felt, STATE_WIDTH, ZERO};
 
 mod freq;
 pub use freq::mds_multiply_freq;
+//use winter_math::StarkField;
 
-const TWO_POWER_32: Felt = Felt::new(1 << 32);
+//const TWO_POWER_32: Felt = Felt::new(1 << 32);
 
 // MDS MULTIPLICATION
 // ================================================================================================
@@ -31,58 +31,60 @@ pub fn apply_mds(state: &mut [Felt; STATE_WIDTH]) {
     let state_l = mds_multiply_freq(state_l);
 
     for r in 0..STATE_WIDTH {
-               //    result[r] = Felt::from_mont(state_h[r]) * TWO_POWER_32 + Felt::from_mont(state_l[r]);
-        //result[r] =    Felt::from_mont(mont_mul_by_2pow32_u40(state_h[r])) + Felt::from_mont(state_l[r]);
-
-        // Idea: inner lhs above plus inner rhs can be added as u64 and then reduced modulo p
-        //
-        // let (res, over) = lhs.overflow_add(rhs);
-        // res.wrapping_add(0u32.wrapping_sub(over as u32) as u64)
-
-        //let lhs = mont_mul_by_2pow32_u40(state_h[r]);
-        //let rhs = state_l[r];
-        //let (res, over) = lhs.overflowing_add(rhs);
-        //let u = res.wrapping_add(0u32.wrapping_sub(over as u32) as u64);
-        //result[r] =    Felt::from_mont(u);
+        // Solution 0: base solution
+        // ================================================================================================
 
         let s = state_l[r] as u128 + ((state_h[r] as u128) << 32);
         let s_hi = (s >> 64) as u64;
         let s_lo = s as u64;
         let z = (s_hi << 32) - s_hi;
         let (res, over) = s_lo.overflowing_add(z);
+        result[r] = Felt::new(
+            Felt::from_mont(res.wrapping_add(0u32.wrapping_sub(over as u32) as u64)).as_int(),
+        );
 
-        result[r] = Felt::from_mont(res.wrapping_add(0u32.wrapping_sub(over as u32) as u64));
+        // Solution 1: Modular reduction
+        // ================================================================================================
+
+        //let s = state_l[r] as u128 + ((state_h[r] as u128) << 32);
+        //let s_hi = (s >> 64) as u64;
+        //let s_lo = s as u64;
+        //let z = (s_hi << 32) - s_hi;
+        //let (res, over) = s_lo.overflowing_add(z);
+        //let tmp = res.wrapping_add(0u32.wrapping_sub(over as u32) as u64);
+
+        // version 1: branching
+        //let res = if tmp > Felt::MODULUS { tmp - Felt::MODULUS } else { tmp };
+        //result[r] = Felt::from_mont(res);
+
+        // version 2: constant-time
+        //let (res, over) = tmp.overflowing_sub(Felt::MODULUS);
+        //let mask = 0u64.wrapping_sub(over as u64);
+        //let res = res.wrapping_add(Felt::MODULUS & mask);
+        //result[r] = Felt::from_mont(res);
+
+        // Solution 2: apply from_mont on the limbs before composing
+        // ================================================================================================
+
+        // Since we are decomposing an element in the range 0 to p-1 into two limbs each a u32, we can get
+        // an upper bound on the size of the resulting state from the multiplication by the matrix. Indeed, given
+        // the current MDS matrix, the size of each entry is upper bounded by the (tight) bound
+        // entry < 2**39 + 2 **37 - 159
+        // In particular `entry` is bounded by modulus and hence we can call Felt::from_mont on each limb before combining
+        //result[r] = Felt::from_mont(state_h[r]) * TWO_POWER_32 + Felt::from_mont(state_l[r]);
+
+        // Solution 3: perform the multiplication by 2^32 before calling from_mont on the limbs
+        // ================================================================================================
+
+        // Let x = state_h[r], then x = u * R mod p where R = 2**64 mod p.
+        // On the other hand 2**32 * R = 2**64 * 2**32 = (2**32 - 1) * 2**32 = 2**64 - 2**32 = -1 (mod p)
+        // and hence 2**32 = -R^(-1) mod p
+        // Combining the above, this means that x * 2**32 = u * R * (-R^(-1)) = - u (mod p)
+        // In other words, multiplying by 2**32 is equivalent to mapping Montgomery form to canonical one
+        // and then negating.
+        // result[r] = Felt::from_mont(state_l[r]) - Felt::from_mont(Felt::from_mont(state_h[r]).as_int());
     }
     *state = result;
-}
-
-#[inline(always)]
-pub fn mont_mul_by_2pow32_u40(x: u64) -> u64 {
-    debug_assert!(x < (1u64 << 40));
-
-    let h = x >> 32;
-    let l = x & 0xFFFF_FFFF;
-    let t = l + h;
-
-    let r = t.wrapping_shl(32).wrapping_sub(h);
-
-    r
-}
-
-#[test]
-fn test(){
-    let x:u64 = (1 << 40) -78000 ;
-    let x =5641;
-
-    let x_mont = Felt::from_mont(x);
-
-    let x_mont_shifted_0 = x_mont * Felt::new(1 << 32);
-
-    let x_mont_shifted_1 = Felt::from_mont(mont_mul_by_2pow32_u40(x));
-
-    println!("0 is {:?}", x_mont_shifted_0);
-    println!("1 is {:?}", x_mont_shifted_1);
-
 }
 
 // MDS MATRIX
