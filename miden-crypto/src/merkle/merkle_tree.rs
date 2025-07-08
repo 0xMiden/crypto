@@ -116,16 +116,6 @@ impl MerkleTree {
         self.nodes.iter().skip(leaves_start).enumerate().map(|(i, v)| (i as u64, v))
     }
 
-    /// Returns n iterator over every inner node of this [MerkleTree].
-    ///
-    /// The iterator order is unspecified.
-    pub fn inner_nodes(&self) -> InnerNodeIterator<'_> {
-        InnerNodeIterator {
-            nodes: &self.nodes,
-            index: 1, // index 0 is just padding, start at 1
-        }
-    }
-
     // STATE MUTATORS
     // --------------------------------------------------------------------------------------------
 
@@ -166,6 +156,18 @@ impl MerkleTree {
     }
 }
 
+impl IntoIterator for MerkleTree {
+    type Item = InnerNodeInfo;
+    type IntoIter = InnerNodeIterator;
+
+    fn into_iter(self) -> Self::IntoIter {
+        InnerNodeIterator {
+            nodes: self.nodes,
+            index: 1, // index 0 is just padding, start at 1
+        }
+    }
+}
+
 // CONVERSIONS
 // ================================================================================================
 
@@ -183,12 +185,12 @@ impl TryFrom<&[Word]> for MerkleTree {
 /// An iterator over every inner node of the [MerkleTree].
 ///
 /// Use this to extract the data of the tree, there is no guarantee on the order of the elements.
-pub struct InnerNodeIterator<'a> {
-    nodes: &'a Vec<Word>,
+pub struct InnerNodeIterator {
+    nodes: Vec<Word>,
     index: usize,
 }
 
-impl Iterator for InnerNodeIterator<'_> {
+impl Iterator for InnerNodeIterator {
     type Item = InnerNodeInfo;
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -373,7 +375,7 @@ mod tests {
         let l2n2 = tree.get_node(NodeIndex::make(2, 2))?;
         let l2n3 = tree.get_node(NodeIndex::make(2, 3))?;
 
-        let nodes: Vec<InnerNodeInfo> = tree.inner_nodes().collect();
+        let nodes: Vec<InnerNodeInfo> = tree.into_iter().collect();
         let expected = vec![
             InnerNodeInfo { value: root, left: l1n0, right: l1n1 },
             InnerNodeInfo { value: l1n0, left: l2n0, right: l2n1 },

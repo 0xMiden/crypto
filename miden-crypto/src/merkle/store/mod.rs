@@ -60,8 +60,8 @@ pub struct StoreNode {
 /// let tree2 = MerkleTree::new(vec![A, B, C, D, E, F, G, H1]).unwrap();
 ///
 /// // populates the store with two merkle trees, common nodes are shared
-/// store.extend(tree1.inner_nodes());
-/// store.extend(tree2.inner_nodes());
+/// store.extend(tree1);
+/// store.extend(tree2);
 ///
 /// // every leaf except the last are the same
 /// for i in 0..7 {
@@ -477,9 +477,9 @@ impl MerkleStore {
 // CONVERSIONS
 // ================================================================================================
 
-impl From<&MerkleTree> for MerkleStore {
-    fn from(value: &MerkleTree) -> Self {
-        let nodes = combine_nodes_with_empty_hashes(value.inner_nodes()).collect();
+impl From<MerkleTree> for MerkleStore {
+    fn from(value: MerkleTree) -> Self {
+        let nodes = combine_nodes_with_empty_hashes(value).collect();
         Self { nodes }
     }
 }
