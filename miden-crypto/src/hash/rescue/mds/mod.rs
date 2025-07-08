@@ -3,9 +3,9 @@ use super::{Felt, STATE_WIDTH, ZERO};
 
 mod freq;
 pub use freq::mds_multiply_freq;
-use winter_math::StarkField;
+//use winter_math::StarkField;
 
-//const TWO_POWER_32: Felt = Felt::new(1 << 32);
+const TWO_POWER_32: Felt = Felt::new(1 << 32);
 
 // MDS MULTIPLICATION
 // ================================================================================================
@@ -46,22 +46,22 @@ pub fn apply_mds(state: &mut [Felt; STATE_WIDTH]) {
         // Solution 1: Modular reduction
         // ================================================================================================
 
-        let s = state_l[r] as u128 + ((state_h[r] as u128) << 32);
-        let s_hi = (s >> 64) as u64;
-        let s_lo = s as u64;
-        let z = (s_hi << 32) - s_hi;
-        let (res, over) = s_lo.overflowing_add(z);
-        let tmp = res.wrapping_add(0u32.wrapping_sub(over as u32) as u64);
+        //let s = state_l[r] as u128 + ((state_h[r] as u128) << 32);
+        //let s_hi = (s >> 64) as u64;
+        //let s_lo = s as u64;
+        //let z = (s_hi << 32) - s_hi;
+        //let (res, over) = s_lo.overflowing_add(z);
+        //let tmp = res.wrapping_add(0u32.wrapping_sub(over as u32) as u64);
 
         // version 1: branching
         //let res = if tmp > Felt::MODULUS { tmp - Felt::MODULUS } else { tmp };
         //result[r] = Felt::from_mont(res);
 
         // version 2: constant-time
-        let (res, over) = tmp.overflowing_sub(Felt::MODULUS);
-        let mask = 0u64.wrapping_sub(over as u64);
-        let res = res.wrapping_add(Felt::MODULUS & mask);
-        result[r] = Felt::from_mont(res);
+        //let (res, over) = tmp.overflowing_sub(Felt::MODULUS);
+        //let mask = 0u64.wrapping_sub(over as u64);
+        //let res = res.wrapping_add(Felt::MODULUS & mask);
+        //result[r] = Felt::from_mont(res);
 
         // Solution 2: apply from_mont on the limbs before composing
         // ================================================================================================
@@ -71,7 +71,7 @@ pub fn apply_mds(state: &mut [Felt; STATE_WIDTH]) {
         // the current MDS matrix, the size of each entry is upper bounded by the (tight) bound
         // entry < 2**39 + 2 **37 - 159
         // In particular `entry` is bounded by modulus and hence we can call Felt::from_mont on each limb before combining
-        //result[r] = Felt::from_mont(state_h[r]) * TWO_POWER_32 + Felt::from_mont(state_l[r]);
+        result[r] = Felt::from_mont(state_h[r]) * TWO_POWER_32 + Felt::from_mont(state_l[r]);
 
         // Solution 3: perform the multiplication by 2^32 before calling from_mont on the limbs
         // ================================================================================================
