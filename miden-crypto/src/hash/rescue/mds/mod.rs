@@ -54,14 +54,14 @@ pub fn apply_mds(state: &mut [Felt; STATE_WIDTH]) {
         let tmp = res.wrapping_add(0u32.wrapping_sub(over as u32) as u64);
 
         // version 1: branching
-        let res = if tmp > Felt::MODULUS { tmp - Felt::MODULUS } else { tmp };
-        result[r] = Felt::from_mont(res);
+        //let res = if tmp > Felt::MODULUS { tmp - Felt::MODULUS } else { tmp };
+        //result[r] = Felt::from_mont(res);
 
         // version 2: constant-time
-        //let (res, over) = tmp.overflowing_sub(Felt::MODULUS);
-        //let mask = 0u64.wrapping_sub(over as u64);
-        //let res = res.wrapping_add(Felt::MODULUS & mask);
-        //result[r] = Felt::from_mont(res);
+        let (res, over) = tmp.overflowing_sub(Felt::MODULUS);
+        let mask = 0u64.wrapping_sub(over as u64);
+        let res = res.wrapping_add(Felt::MODULUS & mask);
+        result[r] = Felt::from_mont(res);
 
         // Solution 2: apply from_mont on the limbs before composing
         // ================================================================================================
