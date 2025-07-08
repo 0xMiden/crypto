@@ -5,7 +5,7 @@ mod freq;
 pub use freq::mds_multiply_freq;
 //use winter_math::StarkField;
 
-const TWO_POWER_32: Felt = Felt::new(1 << 32);
+//const TWO_POWER_32: Felt = Felt::new(1 << 32);
 
 // MDS MULTIPLICATION
 // ================================================================================================
@@ -71,7 +71,7 @@ pub fn apply_mds(state: &mut [Felt; STATE_WIDTH]) {
         // the current MDS matrix, the size of each entry is upper bounded by the (tight) bound
         // entry < 2**39 + 2 **37 - 159
         // In particular `entry` is bounded by modulus and hence we can call Felt::from_mont on each limb before combining
-        result[r] = Felt::from_mont(state_h[r]) * TWO_POWER_32 + Felt::from_mont(state_l[r]);
+        //result[r] = Felt::from_mont(state_h[r]) * TWO_POWER_32 + Felt::from_mont(state_l[r]);
 
         // Solution 3: perform the multiplication by 2^32 before calling from_mont on the limbs
         // ================================================================================================
@@ -82,7 +82,7 @@ pub fn apply_mds(state: &mut [Felt; STATE_WIDTH]) {
         // Combining the above, this means that x * 2**32 = u * R * (-R^(-1)) = - u (mod p)
         // In other words, multiplying by 2**32 is equivalent to mapping Montgomery form to canonical one
         // and then negating.
-        // result[r] = Felt::from_mont(state_l[r]) - Felt::from_mont(Felt::from_mont(state_h[r]).as_int());
+        result[r] = Felt::from_mont(state_l[r]) - Felt::from_mont(Felt::from_mont(state_h[r]).as_int());
     }
     *state = result;
 }
