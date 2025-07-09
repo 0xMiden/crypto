@@ -177,7 +177,7 @@ impl<P: Permutation> Hasher for AlgebraicSponge<P> {
             state[RATE_RANGE.start + i] = *v;
         }
 
-        // apply the permutation and return the first four elements of the state
+        // apply the permutation and return the digest portion of the state
         P::apply_permutation(&mut state);
         Word::new(state[DIGEST_RANGE].try_into().unwrap())
     }
@@ -204,7 +204,7 @@ impl<P: Permutation> Hasher for AlgebraicSponge<P> {
             state[CAPACITY_RANGE.start] = Felt::from(6_u8);
         }
 
-        // apply the permutation and return the first four elements of the rate
+        // apply the permutation and return the digest portion of the rate
         P::apply_permutation(&mut state);
         Word::new(state[DIGEST_RANGE].try_into().unwrap())
     }
@@ -294,7 +294,7 @@ impl<P: Permutation> AlgebraicSponge<P> {
         // for padding purposes.
         state[CAPACITY_RANGE.start + 1] = domain;
 
-        // apply the permutation and return the first four elements of the state
+        // apply the permutation and return the digest portion of the state
         P::apply_permutation(&mut state);
         Word::new(state[DIGEST_RANGE].try_into().unwrap())
     }
