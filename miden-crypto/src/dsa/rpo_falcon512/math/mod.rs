@@ -34,8 +34,8 @@ use self::samplerz::sampler_z;
 mod polynomial;
 pub use polynomial::Polynomial;
 
-const MAX_SMALL_POLY_COEFFICENT_SIZE: i16 = (1 << (WIDTH_SMALL_POLY_COEFFICIENT - 1)) - 1;
-const MAX_BIG_POLY_COEFFICENT_SIZE: i16 = (1 << (WIDTH_BIG_POLY_COEFFICIENT - 1)) - 1;
+const MAX_SMALL_POLY_COEFFICIENT_SIZE: i16 = (1 << (WIDTH_SMALL_POLY_COEFFICIENT - 1)) - 1;
+const MAX_BIG_POLY_COEFFICIENT_SIZE: i16 = (1 << (WIDTH_BIG_POLY_COEFFICIENT - 1)) - 1;
 
 pub trait Inverse: Copy + Zero + MulAssign + One {
     /// Gets the inverse of a, or zero if it is zero.
@@ -94,8 +94,8 @@ pub(crate) fn ntru_gen<R: Rng>(n: usize, rng: &mut R) -> [Polynomial<i16>; 4] {
 
         // we do bound checks on the coefficients of the sampled polynomials in order to make sure
         // that they will be encodable/decodable
-        if !(check_coefficients_bound(&f, MAX_SMALL_POLY_COEFFICENT_SIZE)
-            && check_coefficients_bound(&g, MAX_SMALL_POLY_COEFFICENT_SIZE))
+        if !(check_coefficients_bound(&f, MAX_SMALL_POLY_COEFFICIENT_SIZE)
+            && check_coefficients_bound(&g, MAX_SMALL_POLY_COEFFICIENT_SIZE))
         {
             continue;
         }
@@ -116,8 +116,8 @@ pub(crate) fn ntru_gen<R: Rng>(n: usize, rng: &mut R) -> [Polynomial<i16>; 4] {
             // sure that they will be encodable/decodable
             let capital_f = capital_f.map(|i| i.try_into().unwrap());
             let capital_g = capital_g.map(|i| i.try_into().unwrap());
-            if !(check_coefficients_bound(&capital_f, MAX_BIG_POLY_COEFFICENT_SIZE)
-                && check_coefficients_bound(&capital_g, MAX_BIG_POLY_COEFFICENT_SIZE))
+            if !(check_coefficients_bound(&capital_f, MAX_BIG_POLY_COEFFICIENT_SIZE)
+                && check_coefficients_bound(&capital_g, MAX_BIG_POLY_COEFFICIENT_SIZE))
             {
                 continue;
             }
