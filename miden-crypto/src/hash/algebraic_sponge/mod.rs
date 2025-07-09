@@ -40,12 +40,15 @@ const ALPHA: u64 = 7;
 #[cfg(test)]
 const INV_ALPHA: u64 = 10540996611094048183;
 
-pub trait Permutation {
-    fn apply_permutation(state: &mut [Felt; STATE_WIDTH]);
-}
+// ALGEBRAIC SPONGE PRIMITIVE
+// ================================================================================================
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub struct AlgebraicSponge<P>(P);
+
+pub trait Permutation {
+    fn apply_permutation(state: &mut [Felt; STATE_WIDTH]);
+}
 
 impl<P: Permutation> ElementHasher for AlgebraicSponge<P> {
     type BaseField = Felt;
