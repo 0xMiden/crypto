@@ -48,10 +48,18 @@ harness = false
 concurrent = ["dep:rayon", "hashbrown?/rayon"]
 default = ["std", "concurrent"]
 executable = ["dep:clap", "dep:rand-utils", "std"]
-smt_hashmaps = ["dep:hashbrown"]
+hashmaps = ["dep:hashbrown"]
 internal = []
 serde = ["dep:serde", "serde?/alloc", "winter-math/serde"]
-std = ["blake3/std", "dep:cc", "rand/std", "rand/thread_rng", "winter-crypto/std", "winter-math/std", "winter-utils/std"]
+std = [
+    "blake3/std",
+    "dep:cc",
+    "rand/std",
+    "rand/thread_rng",
+    "winter-crypto/std",
+    "winter-math/std",
+    "winter-utils/std",
+]
 
 [dependencies]
 blake3 = { version = "1.8", default-features = false }
@@ -76,7 +84,7 @@ criterion = { version = "0.6", features = ["html_reports"] }
 getrandom = { version = "0.3", default-features = false }
 hex = { version = "0.4", default-features = false, features = ["alloc"] }
 itertools = { version = "0.14" }
-proptest = { version = "1.7", default-features = false, features = ["alloc"]}
+proptest = { version = "1.7", default-features = false, features = ["alloc"] }
 rand_chacha = { version = "0.9", default-features = false }
 rand-utils = { version = "0.13", package = "winter-rand-utils" }
 rstest = { version = "0.25" }

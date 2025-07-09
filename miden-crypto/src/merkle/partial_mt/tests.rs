@@ -1,9 +1,7 @@
 use alloc::{collections::BTreeMap, vec::Vec};
 
 use super::{
-    super::{
-        DefaultMerkleStore as MerkleStore, MerkleTree, NodeIndex, PartialMerkleTree, int_to_node,
-    },
+    super::{MerkleStore, MerkleTree, NodeIndex, PartialMerkleTree, int_to_node},
     Deserializable, InnerNodeInfo, Serializable, ValuePath, Word,
 };
 

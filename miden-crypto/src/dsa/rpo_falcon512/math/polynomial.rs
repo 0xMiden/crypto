@@ -109,7 +109,7 @@ impl<
         let mut coefficients = vec![F::zero(); n];
         let mut sign = -F::one();
         for (i, c) in self.coefficients.iter().cloned().enumerate() {
-            if i % n == 0 {
+            if i.is_multiple_of(n) {
                 sign *= -F::one();
             }
             coefficients[i % n] += sign.clone() * c;
@@ -156,7 +156,13 @@ impl<
             self.coefficients
                 .iter()
                 .enumerate()
-                .map(|(i, c)| if i % 2 == 0 { c.clone() } else { c.clone().neg() })
+                .map(|(i, c)| {
+                    if i.is_multiple_of(2) {
+                        c.clone()
+                    } else {
+                        c.clone().neg()
+                    }
+                })
                 .collect(),
         )
     }
