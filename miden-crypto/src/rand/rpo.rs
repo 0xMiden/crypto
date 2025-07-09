@@ -12,10 +12,10 @@ use crate::{
 // CONSTANTS
 // ================================================================================================
 
-const STATE_WIDTH: usize = Rpo256::STATE_WIDTH;
-const RATE_START: usize = Rpo256::RATE_RANGE.start;
-const RATE_END: usize = Rpo256::RATE_RANGE.end;
-const HALF_RATE_WIDTH: usize = (Rpo256::RATE_RANGE.end - Rpo256::RATE_RANGE.start) / 2;
+const STATE_WIDTH: usize = Rpo256::state_width();
+const RATE_START: usize = Rpo256::rate_range().start;
+const RATE_END: usize = Rpo256::rate_range().end;
+const HALF_RATE_WIDTH: usize = (Rpo256::rate_range().end - Rpo256::rate_range().start) / 2;
 
 // RPO RANDOM COIN
 // ================================================================================================

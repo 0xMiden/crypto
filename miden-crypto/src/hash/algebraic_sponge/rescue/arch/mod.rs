@@ -81,7 +81,7 @@ pub mod optimized {
 
 #[cfg(not(any(target_feature = "avx2", target_feature = "sve")))]
 pub mod optimized {
-    use crate::{Felt, hash::rescue::STATE_WIDTH};
+    use crate::{Felt, hash::algebraic_sponge::rescue::STATE_WIDTH};
 
     #[inline(always)]
     pub fn add_constants_and_apply_sbox(

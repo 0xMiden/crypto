@@ -8,7 +8,7 @@ In the Miden VM, we make use of different hash functions. Some of these are "tra
 * **Rescue Prime (RP)** as specified [here](https://eprint.iacr.org/2020/1143) and implemented [here](https://github.com/novifinancial/winterfell/blob/46dce1adf0/crypto/src/hash/rescue/rp64_256/mod.rs).
 * **Rescue Prime Optimized (RPO)** as specified [here](https://eprint.iacr.org/2022/1577) and implemented in this crate.
 * **Rescue Prime Extended (RPX)** a variant of the [xHash](https://eprint.iacr.org/2023/1045) hash function as implemented in this crate.
-* **Poseidon2** as specified [here](https://eprint.iacr.org/2023/1045) and implemented in this crate.
+* **Poseidon2** as specified [here](https://eprint.iacr.org/2023/323) and implemented in this crate.
 
 We benchmark the above hash functions using two scenarios. The first is a 2-to-1 $(a,b)\mapsto h(a,b)$ hashing where both $a$, $b$ and $h(a,b)$ are the digests corresponding to each of the hash functions.
 The second scenario is that of sequential hashing where we take a sequence of length $100$ field elements and hash these to produce a single digest. The digests are $4$ field elements in a prime field with modulus $2^{64} - 2^{32} + 1$ (i.e., 32 bytes) for Poseidon2, Rescue Prime and RPO, and an array `[u8; 32]` for SHA3 and BLAKE3.

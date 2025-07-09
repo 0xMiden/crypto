@@ -2,14 +2,15 @@ use alloc::{collections::BTreeSet, vec::Vec};
 
 use proptest::prelude::*;
 use rand_utils::rand_value;
+use winter_crypto::Hasher;
 
 use super::{
     super::{ALPHA, INV_ALPHA, apply_inv_sbox, apply_sbox},
-    Felt, FieldElement, Hasher, Rpo256, STATE_WIDTH, StarkField, Word, ZERO,
+    Felt, Permutation, Rpo256, Rpo256Permutation, STATE_WIDTH,
 };
 use crate::{
-    ONE,
-    hash::rescue::{BINARY_CHUNK_SIZE, CAPACITY_RANGE, RATE_WIDTH},
+    FieldElement, ONE, StarkField, Word, ZERO,
+    hash::algebraic_sponge::{BINARY_CHUNK_SIZE, CAPACITY_RANGE, RATE_WIDTH},
 };
 
 #[test]
@@ -131,7 +132,7 @@ fn hash_padding() {
 
 #[test]
 fn hash_padding_no_extra_permutation_call() {
-    use crate::hash::rescue::DIGEST_RANGE;
+    use crate::hash::algebraic_sponge::DIGEST_RANGE;
 
     // Implementation
     let num_bytes = BINARY_CHUNK_SIZE * RATE_WIDTH;
@@ -145,7 +146,7 @@ fn hash_padding_no_extra_permutation_call() {
     // padding when hashing bytes
     state[CAPACITY_RANGE.start] = Felt::from(RATE_WIDTH as u8);
     *state.last_mut().unwrap() = Felt::new(u64::from_le_bytes(final_chunk));
-    Rpo256::apply_permutation(&mut state);
+    Rpo256Permutation::apply_permutation(&mut state);
 
     assert_eq!(&r1[0..4], &state[DIGEST_RANGE]);
 }
