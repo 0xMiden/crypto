@@ -63,7 +63,7 @@ fn get_leaf_merkletree(c: &mut Criterion) {
         let leaves = &random_data[..size];
 
         let mtree = MerkleTree::new(leaves).unwrap();
-        let store = MerkleStore::from(mtree.clone());
+        let store = MerkleStore::from(&mtree);
         let depth = mtree.depth();
         let root = mtree.root();
         let size_u64 = size as u64;
@@ -168,7 +168,7 @@ fn get_node_merkletree(c: &mut Criterion) {
         let leaves = &random_data[..size];
 
         let mtree = MerkleTree::new(leaves).unwrap();
-        let store = MerkleStore::from(mtree.clone());
+        let store = MerkleStore::from(&mtree);
         let root = mtree.root();
         let half_depth = mtree.depth() / 2;
         let half_size = 2_u64.pow(half_depth as u32);
@@ -242,7 +242,7 @@ fn get_leaf_path_merkletree(c: &mut Criterion) {
         let leaves = &random_data[..size];
 
         let mtree = MerkleTree::new(leaves).unwrap();
-        let store = MerkleStore::from(mtree.clone());
+        let store = MerkleStore::from(&mtree);
         let depth = mtree.depth();
         let root = mtree.root();
         let size_u64 = size as u64;
@@ -328,7 +328,7 @@ fn new(c: &mut Criterion) {
                 || leaves,
                 |l| {
                     let mtree = MerkleTree::new(l).unwrap();
-                    black_box(MerkleStore::from(mtree));
+                    black_box(MerkleStore::from(&mtree));
                 },
                 BatchSize::SmallInput,
             )
@@ -378,7 +378,7 @@ fn update_leaf_merkletree(c: &mut Criterion) {
         let leaves = &random_data[..size];
 
         let mut mtree = MerkleTree::new(leaves).unwrap();
-        let mut store = MerkleStore::from(mtree.clone());
+        let mut store = MerkleStore::from(&mtree);
         let depth = mtree.depth();
         let root = mtree.root();
         let size_u64 = size as u64;
