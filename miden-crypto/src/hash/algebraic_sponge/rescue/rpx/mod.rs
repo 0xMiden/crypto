@@ -1,11 +1,12 @@
+#[cfg(test)]
+use super::StarkField;
 use super::{
-    ARK1, ARK2, CubeExtension, Felt, FieldElement, STATE_WIDTH, add_constants,
+    ARK1, ARK2, CAPACITY_RANGE, CubeExtension, DIGEST_RANGE, ElementHasher, Felt, FieldElement,
+    Hasher, MDS, NUM_ROUNDS, RATE_RANGE, Range, STATE_WIDTH, Word, ZERO, add_constants,
     add_constants_and_apply_inv_sbox, add_constants_and_apply_sbox, apply_inv_sbox, apply_mds,
     apply_sbox,
 };
-#[cfg(test)]
-use super::{Hasher, StarkField, ZERO};
-use crate::hash::algebraic_sponge::{AlgebraicSponge, Permutation};
+use crate::hash::algebraic_sponge::AlgebraicSponge;
 
 #[cfg(test)]
 mod tests;
@@ -71,12 +72,9 @@ pub type CubicExtElement = CubeExtension<Felt>;
 /// ## Hashing of empty input
 /// The current implementation hashes empty input to the zero digest [0, 0, 0, 0]. This has
 /// the benefit of requiring no calls to the RPX permutation when hashing empty input.
-pub type Rpx256 = AlgebraicSponge<Rpx256Permutation>;
+pub struct Rpx256();
 
-/// Rescue Prime eXtension permutation function with 256-bit state size.
-pub struct Rpx256Permutation();
-
-impl Permutation for Rpx256Permutation {
+impl AlgebraicSponge for Rpx256 {
     /// Applies RPX permutation to the provided state.
     #[inline(always)]
     fn apply_permutation(state: &mut [Felt; STATE_WIDTH]) {
@@ -90,23 +88,89 @@ impl Permutation for Rpx256Permutation {
     }
 }
 
-impl Rpx256Permutation {
-    /// RPO round function.
+impl Rpx256 {
+    // CONSTANTS
+    // --------------------------------------------------------------------------------------------
+
+    /// Sponge state is set to 12 field elements or 768 bytes; 8 elements are reserved for rate and
+    /// the remaining 4 elements are reserved for capacity.
+    pub const STATE_WIDTH: usize = STATE_WIDTH;
+
+    /// The rate portion of the state is located in elements 4 through 11 (inclusive).
+    pub const RATE_RANGE: Range<usize> = RATE_RANGE;
+
+    /// The capacity portion of the state is located in elements 0, 1, 2, and 3.
+    pub const CAPACITY_RANGE: Range<usize> = CAPACITY_RANGE;
+
+    /// The output of the hash function can be read from state elements 4, 5, 6, and 7.
+    pub const DIGEST_RANGE: Range<usize> = DIGEST_RANGE;
+
+    /// MDS matrix used for computing the linear layer in the (FB) and (E) rounds.
+    pub const MDS: [[Felt; STATE_WIDTH]; STATE_WIDTH] = MDS;
+
+    /// Round constants added to the hasher state in the first half of the round.
+    pub const ARK1: [[Felt; STATE_WIDTH]; NUM_ROUNDS] = ARK1;
+
+    /// Round constants added to the hasher state in the second half of the round.
+    pub const ARK2: [[Felt; STATE_WIDTH]; NUM_ROUNDS] = ARK2;
+
+    // TRAIT PASS-THROUGH FUNCTIONS
+    // --------------------------------------------------------------------------------------------
+
+    /// Returns a hash of the provided sequence of bytes.
     #[inline(always)]
-    pub fn apply_round(state: &mut [Felt; STATE_WIDTH], round: usize) {
-        // apply first half of RPO round
-        apply_mds(state);
-        if !add_constants_and_apply_sbox(state, &ARK1[round]) {
-            add_constants(state, &ARK1[round]);
-            apply_sbox(state);
+    pub fn hash(bytes: &[u8]) -> Word {
+        <Self as Hasher>::hash(bytes)
+    }
+
+    /// Returns a hash of two digests. This method is intended for use in construction of
+    /// Merkle trees and verification of Merkle paths.
+    #[inline(always)]
+    pub fn merge(values: &[Word; 2]) -> Word {
+        <Self as Hasher>::merge(values)
+    }
+
+    /// Returns a hash of the provided field elements.
+    #[inline(always)]
+    pub fn hash_elements<E: FieldElement<BaseField = Felt>>(elements: &[E]) -> Word {
+        <Self as ElementHasher>::hash_elements(elements)
+    }
+
+    // DOMAIN IDENTIFIER HASHING
+    // --------------------------------------------------------------------------------------------
+
+    /// Returns a hash of two digests and a domain identifier.
+    pub fn merge_in_domain(values: &[Word; 2], domain: Felt) -> Word {
+        // initialize the state by copying the digest elements into the rate portion of the state
+        // (8 total elements), and set the capacity elements to 0.
+        let mut state = [ZERO; STATE_WIDTH];
+        let it = Word::words_as_elements_iter(values.iter());
+        for (i, v) in it.enumerate() {
+            state[RATE_RANGE.start + i] = *v;
         }
 
-        // apply second half of RPO round
-        apply_mds(state);
-        if !add_constants_and_apply_inv_sbox(state, &ARK2[round]) {
-            add_constants(state, &ARK2[round]);
-            apply_inv_sbox(state);
-        }
+        // set the second capacity element to the domain value. The first capacity element is used
+        // for padding purposes.
+        state[CAPACITY_RANGE.start + 1] = domain;
+
+        // apply the RPX permutation and return the first four elements of the state
+        Self::apply_permutation(&mut state);
+        Word::new(state[DIGEST_RANGE].try_into().unwrap())
+    }
+
+    // RPX PERMUTATION
+    // --------------------------------------------------------------------------------------------
+
+    /// Applies RPX permutation to the provided state.
+    #[inline(always)]
+    pub fn apply_permutation(state: &mut [Felt; STATE_WIDTH]) {
+        Self::apply_fb_round(state, 0);
+        Self::apply_ext_round(state, 1);
+        Self::apply_fb_round(state, 2);
+        Self::apply_ext_round(state, 3);
+        Self::apply_fb_round(state, 4);
+        Self::apply_ext_round(state, 5);
+        Self::apply_final_round(state, 6);
     }
 
     // RPX PERMUTATION ROUND FUNCTIONS
@@ -164,5 +228,35 @@ impl Rpx256Permutation {
 
         let x3 = x2 * x;
         x3 * x4
+    }
+}
+
+impl Hasher for Rpx256 {
+    const COLLISION_RESISTANCE: u32 = 128;
+
+    type Digest = Word;
+
+    fn hash(bytes: &[u8]) -> Self::Digest {
+        <Self as AlgebraicSponge>::hash(bytes)
+    }
+
+    fn merge(values: &[Self::Digest; 2]) -> Self::Digest {
+        <Self as AlgebraicSponge>::merge(values)
+    }
+
+    fn merge_many(values: &[Self::Digest]) -> Self::Digest {
+        <Self as AlgebraicSponge>::merge_many(values)
+    }
+
+    fn merge_with_int(seed: Self::Digest, value: u64) -> Self::Digest {
+        <Self as AlgebraicSponge>::merge_with_int(seed, value)
+    }
+}
+
+impl ElementHasher for Rpx256 {
+    type BaseField = Felt;
+
+    fn hash_elements<E: FieldElement<BaseField = Self::BaseField>>(elements: &[E]) -> Self::Digest {
+        <Self as AlgebraicSponge>::hash_elements(elements)
     }
 }

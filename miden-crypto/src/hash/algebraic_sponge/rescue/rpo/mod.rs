@@ -1,8 +1,9 @@
 use super::{
-    ARK1, ARK2, Felt, NUM_ROUNDS, STATE_WIDTH, add_constants, add_constants_and_apply_inv_sbox,
-    add_constants_and_apply_sbox, apply_inv_sbox, apply_mds, apply_sbox,
+    ARK1, ARK2, AlgebraicSponge, CAPACITY_RANGE, DIGEST_RANGE, ElementHasher, Felt, FieldElement,
+    Hasher, MDS, NUM_ROUNDS, RATE_RANGE, Range, STATE_WIDTH, Word, ZERO, add_constants,
+    add_constants_and_apply_inv_sbox, add_constants_and_apply_sbox, apply_inv_sbox, apply_mds,
+    apply_sbox,
 };
-use crate::hash::algebraic_sponge::{AlgebraicSponge, Permutation};
 
 #[cfg(test)]
 mod tests;
@@ -63,12 +64,10 @@ mod tests;
 /// ## Hashing of empty input
 /// The current implementation hashes empty input to the zero digest [0, 0, 0, 0]. This has
 /// the benefit of requiring no calls to the RPO permutation when hashing empty input.
-pub type Rpo256 = AlgebraicSponge<Rpo256Permutation>;
+#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+pub struct Rpo256();
 
-/// The Rescue Prime Optimized permutation function with 256-bit state size.
-pub struct Rpo256Permutation();
-
-impl Permutation for Rpo256Permutation {
+impl AlgebraicSponge for Rpo256 {
     // RESCUE PERMUTATION
     // --------------------------------------------------------------------------------------------
 
@@ -81,7 +80,90 @@ impl Permutation for Rpo256Permutation {
     }
 }
 
-impl Rpo256Permutation {
+impl Rpo256 {
+    // CONSTANTS
+    // --------------------------------------------------------------------------------------------
+
+    /// The number of rounds is set to 7 to target 128-bit security level.
+    pub const NUM_ROUNDS: usize = NUM_ROUNDS;
+
+    /// Sponge state is set to 12 field elements or 768 bytes; 8 elements are reserved for rate and
+    /// the remaining 4 elements are reserved for capacity.
+    pub const STATE_WIDTH: usize = STATE_WIDTH;
+
+    /// The rate portion of the state is located in elements 4 through 11 (inclusive).
+    pub const RATE_RANGE: Range<usize> = RATE_RANGE;
+
+    /// The capacity portion of the state is located in elements 0, 1, 2, and 3.
+    pub const CAPACITY_RANGE: Range<usize> = CAPACITY_RANGE;
+
+    /// The output of the hash function can be read from state elements 4, 5, 6, and 7.
+    pub const DIGEST_RANGE: Range<usize> = DIGEST_RANGE;
+
+    /// MDS matrix used for computing the linear layer in a RPO round.
+    pub const MDS: [[Felt; STATE_WIDTH]; STATE_WIDTH] = MDS;
+
+    /// Round constants added to the hasher state in the first half of the RPO round.
+    pub const ARK1: [[Felt; STATE_WIDTH]; NUM_ROUNDS] = ARK1;
+
+    /// Round constants added to the hasher state in the second half of the RPO round.
+    pub const ARK2: [[Felt; STATE_WIDTH]; NUM_ROUNDS] = ARK2;
+
+    // TRAIT PASS-THROUGH FUNCTIONS
+    // --------------------------------------------------------------------------------------------
+
+    /// Returns a hash of the provided sequence of bytes.
+    #[inline(always)]
+    pub fn hash(bytes: &[u8]) -> Word {
+        <Self as Hasher>::hash(bytes)
+    }
+
+    /// Returns a hash of two digests. This method is intended for use in construction of
+    /// Merkle trees and verification of Merkle paths.
+    #[inline(always)]
+    pub fn merge(values: &[Word; 2]) -> Word {
+        <Self as Hasher>::merge(values)
+    }
+
+    /// Returns a hash of the provided field elements.
+    #[inline(always)]
+    pub fn hash_elements<E: FieldElement<BaseField = Felt>>(elements: &[E]) -> Word {
+        <Self as ElementHasher>::hash_elements(elements)
+    }
+
+    // DOMAIN IDENTIFIER HASHING
+    // --------------------------------------------------------------------------------------------
+
+    /// Returns a hash of two digests and a domain identifier.
+    pub fn merge_in_domain(values: &[Word; 2], domain: Felt) -> Word {
+        // initialize the state by copying the digest elements into the rate portion of the state
+        // (8 total elements), and set the capacity elements to 0.
+        let mut state = [ZERO; STATE_WIDTH];
+        let it = Word::words_as_elements_iter(values.iter());
+        for (i, v) in it.enumerate() {
+            state[RATE_RANGE.start + i] = *v;
+        }
+
+        // set the second capacity element to the domain value. The first capacity element is used
+        // for padding purposes.
+        state[CAPACITY_RANGE.start + 1] = domain;
+
+        // apply the RPO permutation and return the first four elements of the state
+        Self::apply_permutation(&mut state);
+        Word::new(state[DIGEST_RANGE].try_into().unwrap())
+    }
+
+    // RESCUE PERMUTATION
+    // --------------------------------------------------------------------------------------------
+
+    /// Applies RPO permutation to the provided state.
+    #[inline(always)]
+    pub fn apply_permutation(state: &mut [Felt; STATE_WIDTH]) {
+        for i in 0..NUM_ROUNDS {
+            Self::apply_round(state, i);
+        }
+    }
+
     /// RPO round function.
     #[inline(always)]
     pub fn apply_round(state: &mut [Felt; STATE_WIDTH], round: usize) {
@@ -98,5 +180,35 @@ impl Rpo256Permutation {
             add_constants(state, &ARK2[round]);
             apply_inv_sbox(state);
         }
+    }
+}
+
+impl Hasher for Rpo256 {
+    const COLLISION_RESISTANCE: u32 = 128;
+
+    type Digest = Word;
+
+    fn hash(bytes: &[u8]) -> Self::Digest {
+        <Self as AlgebraicSponge>::hash(bytes)
+    }
+
+    fn merge(values: &[Self::Digest; 2]) -> Self::Digest {
+        <Self as AlgebraicSponge>::merge(values)
+    }
+
+    fn merge_many(values: &[Self::Digest]) -> Self::Digest {
+        <Self as AlgebraicSponge>::merge_many(values)
+    }
+
+    fn merge_with_int(seed: Self::Digest, value: u64) -> Self::Digest {
+        <Self as AlgebraicSponge>::merge_with_int(seed, value)
+    }
+}
+
+impl ElementHasher for Rpo256 {
+    type BaseField = Felt;
+
+    fn hash_elements<E: FieldElement<BaseField = Self::BaseField>>(elements: &[E]) -> Self::Digest {
+        <Self as AlgebraicSponge>::hash_elements(elements)
     }
 }

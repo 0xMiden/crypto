@@ -18,17 +18,17 @@ use crate::{Felt, Word};
 ///
 /// [1]: https://falcon-sign.info/falcon.pdf
 pub fn hash_to_point_rpo256(message: Word, nonce: &Nonce) -> Polynomial<FalconFelt> {
-    let mut state = [ZERO; Rpo256::state_width()];
+    let mut state = [ZERO; Rpo256::STATE_WIDTH];
 
     // absorb the nonce into the state
     let nonce_elements = nonce.to_elements();
-    for (&n, s) in nonce_elements.iter().zip(state[Rpo256::rate_range()].iter_mut()) {
+    for (&n, s) in nonce_elements.iter().zip(state[Rpo256::RATE_RANGE].iter_mut()) {
         *s = n;
     }
     Rpo256::apply_permutation(&mut state);
 
     // absorb message into the state
-    for (&m, s) in message.iter().zip(state[Rpo256::rate_range()].iter_mut()) {
+    for (&m, s) in message.iter().zip(state[Rpo256::RATE_RANGE].iter_mut()) {
         *s = m;
     }
 
@@ -36,7 +36,7 @@ pub fn hash_to_point_rpo256(message: Word, nonce: &Nonce) -> Polynomial<FalconFe
     let mut coefficients: Vec<FalconFelt> = Vec::with_capacity(N);
     for _ in 0..64 {
         Rpo256::apply_permutation(&mut state);
-        state[Rpo256::rate_range()]
+        state[Rpo256::RATE_RANGE]
             .iter()
             .for_each(|value| coefficients.push(felt_to_falcon_felt(*value)));
     }

@@ -1,12 +1,15 @@
 #[cfg(test)]
-use super::{ALPHA, Hasher, INV_ALPHA};
-use super::{CubeExtension, Felt, FieldElement, STATE_WIDTH, StarkField, ZERO};
+use super::{ALPHA, INV_ALPHA};
+use super::{
+    AlgebraicSponge, CAPACITY_RANGE, CubeExtension, DIGEST_RANGE, ElementHasher, Felt,
+    FieldElement, Hasher, RATE_RANGE, Range, STATE_WIDTH, StarkField, Word, ZERO,
+};
 
 mod arch;
 pub use arch::optimized::{add_constants_and_apply_inv_sbox, add_constants_and_apply_sbox};
 
 mod mds;
-use mds::apply_mds;
+use mds::{MDS, apply_mds};
 
 mod rpo;
 pub use rpo::Rpo256;

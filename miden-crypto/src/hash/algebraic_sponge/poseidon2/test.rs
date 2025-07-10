@@ -1,5 +1,5 @@
-use super::{Felt, Poseidon2Permutation, ZERO};
-use crate::hash::algebraic_sponge::Permutation;
+use super::{Felt, ZERO};
+use crate::hash::{algebraic_sponge::AlgebraicSponge, poseidon2::Poseidon2};
 
 #[test]
 fn permutation_test_vector() {
@@ -18,7 +18,7 @@ fn permutation_test_vector() {
         Felt::new(11),
     ];
 
-    <Poseidon2Permutation as Permutation>::apply_permutation(&mut elements);
+    Poseidon2::apply_permutation(&mut elements);
     let perm = elements;
     assert_eq!(perm[0], Felt::new(0x01eaef96bdf1c0c1));
     assert_eq!(perm[1], Felt::new(0x1f0d2cc525b2540c));

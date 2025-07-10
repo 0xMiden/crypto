@@ -42,7 +42,6 @@ pub fn apply_mds(state: &mut [Felt; STATE_WIDTH]) {
 // ================================================================================================
 
 /// RPO MDS matrix
-#[cfg(test)]
 pub const MDS: [[Felt; STATE_WIDTH]; STATE_WIDTH] = [
     [
         Felt::new(7),

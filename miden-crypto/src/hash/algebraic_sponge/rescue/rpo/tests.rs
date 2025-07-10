@@ -2,11 +2,10 @@ use alloc::{collections::BTreeSet, vec::Vec};
 
 use proptest::prelude::*;
 use rand_utils::rand_value;
-use winter_crypto::Hasher;
 
 use super::{
     super::{ALPHA, INV_ALPHA, apply_inv_sbox, apply_sbox},
-    Felt, Permutation, Rpo256, Rpo256Permutation, STATE_WIDTH,
+    Felt, Hasher, Rpo256, STATE_WIDTH,
 };
 use crate::{
     FieldElement, ONE, StarkField, Word, ZERO,
@@ -146,7 +145,7 @@ fn hash_padding_no_extra_permutation_call() {
     // padding when hashing bytes
     state[CAPACITY_RANGE.start] = Felt::from(RATE_WIDTH as u8);
     *state.last_mut().unwrap() = Felt::new(u64::from_le_bytes(final_chunk));
-    Rpo256Permutation::apply_permutation(&mut state);
+    Rpo256::apply_permutation(&mut state);
 
     assert_eq!(&r1[0..4], &state[DIGEST_RANGE]);
 }

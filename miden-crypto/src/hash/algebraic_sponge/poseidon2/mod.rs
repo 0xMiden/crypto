@@ -1,5 +1,7 @@
-use super::{AlgebraicSponge, Felt, FieldElement, STATE_WIDTH, ZERO};
-use crate::hash::algebraic_sponge::Permutation;
+use super::{
+    AlgebraicSponge, CAPACITY_RANGE, DIGEST_RANGE, ElementHasher, Felt, FieldElement, Hasher,
+    RATE_RANGE, Range, STATE_WIDTH, Word, ZERO,
+};
 
 mod constants;
 use constants::*;
@@ -65,12 +67,9 @@ mod test;
 /// ## Hashing of empty input
 /// The current implementation hashes empty input to the zero digest [0, 0, 0, 0]. This has
 /// the benefit of requiring no calls to the Poseidon2 permutation when hashing empty input.
-pub type Poseidon2 = AlgebraicSponge<Poseidon2Permutation>;
+pub struct Poseidon2();
 
-/// The Poseidon2 permutation function with 256-bit state size.
-pub struct Poseidon2Permutation();
-
-impl Permutation for Poseidon2Permutation {
+impl AlgebraicSponge for Poseidon2 {
     fn apply_permutation(state: &mut [Felt; STATE_WIDTH]) {
         // 1. Apply (external) linear layer to the input
         Self::apply_matmul_external(state);
@@ -86,8 +85,115 @@ impl Permutation for Poseidon2Permutation {
     }
 }
 
-impl Poseidon2Permutation {
+impl Hasher for Poseidon2 {
+    const COLLISION_RESISTANCE: u32 = 128;
+
+    type Digest = Word;
+
+    fn hash(bytes: &[u8]) -> Self::Digest {
+        <Self as AlgebraicSponge>::hash(bytes)
+    }
+
+    fn merge(values: &[Self::Digest; 2]) -> Self::Digest {
+        <Self as AlgebraicSponge>::merge(values)
+    }
+
+    fn merge_many(values: &[Self::Digest]) -> Self::Digest {
+        <Self as AlgebraicSponge>::merge_many(values)
+    }
+
+    fn merge_with_int(seed: Self::Digest, value: u64) -> Self::Digest {
+        <Self as AlgebraicSponge>::merge_with_int(seed, value)
+    }
+}
+
+impl ElementHasher for Poseidon2 {
+    type BaseField = Felt;
+
+    fn hash_elements<E: FieldElement<BaseField = Self::BaseField>>(elements: &[E]) -> Self::Digest {
+        <Self as AlgebraicSponge>::hash_elements(elements)
+    }
+}
+
+impl Poseidon2 {
+    // CONSTANTS
+    // --------------------------------------------------------------------------------------------
+
+    /// Number of initial or terminal external rounds.
+    pub const NUM_EXTERNAL_ROUNDS_HALF: usize = NUM_EXTERNAL_ROUNDS_HALF;
+    /// Number of internal rounds.
+    pub const NUM_INTERNAL_ROUNDS: usize = NUM_INTERNAL_ROUNDS;
+
+    /// Sponge state is set to 12 field elements or 768 bytes; 8 elements are reserved for rate and
+    /// the remaining 4 elements are reserved for capacity.
+    pub const STATE_WIDTH: usize = STATE_WIDTH;
+
+    /// The rate portion of the state is located in elements 4 through 11 (inclusive).
+    pub const RATE_RANGE: Range<usize> = RATE_RANGE;
+
+    /// The capacity portion of the state is located in elements 0, 1, 2, and 3.
+    pub const CAPACITY_RANGE: Range<usize> = CAPACITY_RANGE;
+
+    /// The output of the hash function can be read from state elements 4, 5, 6, and 7.
+    pub const DIGEST_RANGE: Range<usize> = DIGEST_RANGE;
+
+    /// Matrix used for computing the linear layers of internal rounds.
+    pub const MAT_DIAG: [Felt; STATE_WIDTH] = MAT_DIAG;
+
+    /// Round constants added to the hasher state.
+    pub const ARK_EXT_INITIAL: [[Felt; STATE_WIDTH]; NUM_EXTERNAL_ROUNDS_HALF] = ARK_EXT_INITIAL;
+    pub const ARK_EXT_TERMINAL: [[Felt; STATE_WIDTH]; NUM_EXTERNAL_ROUNDS_HALF] = ARK_EXT_TERMINAL;
+    pub const ARK_INT: [Felt; NUM_INTERNAL_ROUNDS] = ARK_INT;
+
+    // TRAIT PASS-THROUGH FUNCTIONS
+    // --------------------------------------------------------------------------------------------
+
+    /// Returns a hash of the provided sequence of bytes.
+    #[inline(always)]
+    pub fn hash(bytes: &[u8]) -> Word {
+        <Self as Hasher>::hash(bytes)
+    }
+
+    /// Returns a hash of two digests. This method is intended for use in construction of
+    /// Merkle trees and verification of Merkle paths.
+    #[inline(always)]
+    pub fn merge(values: &[Word; 2]) -> Word {
+        <Self as Hasher>::merge(values)
+    }
+
+    /// Returns a hash of the provided field elements.
+    #[inline(always)]
+    pub fn hash_elements<E: FieldElement<BaseField = Felt>>(elements: &[E]) -> Word {
+        <Self as ElementHasher>::hash_elements(elements)
+    }
+
+    // DOMAIN IDENTIFIER HASHING
+    // --------------------------------------------------------------------------------------------
+
+    /// Returns a hash of two digests and a domain identifier.
+    pub fn merge_in_domain(values: &[Word; 2], domain: Felt) -> Word {
+        // initialize the state by copying the digest elements into the rate portion of the state
+        // (8 total elements), and set the capacity elements to 0.
+        let mut state = [ZERO; STATE_WIDTH];
+        let it = Word::words_as_elements_iter(values.iter());
+        for (i, v) in it.enumerate() {
+            state[RATE_RANGE.start + i] = *v;
+        }
+
+        // set the second capacity element to the domain value. The first capacity element is used
+        // for padding purposes.
+        state[CAPACITY_RANGE.start + 1] = domain;
+
+        // apply the Poseidon2 permutation and return the first four elements of the state
+        Self::apply_permutation(&mut state);
+        Word::new(state[DIGEST_RANGE].try_into().unwrap())
+    }
+
+    // POSEIDON2 PERMUTATION
+    // --------------------------------------------------------------------------------------------
+
     /// Applies the initial external rounds of the permutation.
+    #[allow(clippy::needless_range_loop)]
     #[inline(always)]
     fn initial_external_rounds(state: &mut [Felt; STATE_WIDTH]) {
         for r in 0..NUM_EXTERNAL_ROUNDS_HALF {
@@ -98,6 +204,7 @@ impl Poseidon2Permutation {
     }
 
     /// Applies the internal rounds of the permutation.
+    #[allow(clippy::needless_range_loop)]
     #[inline(always)]
     fn internal_rounds(state: &mut [Felt; STATE_WIDTH]) {
         for r in 0..NUM_INTERNAL_ROUNDS {
@@ -109,6 +216,7 @@ impl Poseidon2Permutation {
 
     /// Applies the terminal external rounds of the permutation.
     #[inline(always)]
+    #[allow(clippy::needless_range_loop)]
     fn terminal_external_rounds(state: &mut [Felt; STATE_WIDTH]) {
         for r in 0..NUM_EXTERNAL_ROUNDS_HALF {
             Self::add_rc(state, &ARK_EXT_TERMINAL[r]);

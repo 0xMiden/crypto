@@ -40,22 +40,15 @@ const ALPHA: u64 = 7;
 #[cfg(test)]
 const INV_ALPHA: u64 = 10540996611094048183;
 
-// ALGEBRAIC SPONGE PRIMITIVE
+// ALGEBRAIC SPONGE
 // ================================================================================================
 
-#[derive(Debug, Copy, Clone, Eq, PartialEq)]
-pub struct AlgebraicSponge<P>(P);
-
-pub trait Permutation {
+pub trait AlgebraicSponge {
     fn apply_permutation(state: &mut [Felt; STATE_WIDTH]);
-}
 
-impl<P: Permutation> ElementHasher for AlgebraicSponge<P> {
-    type BaseField = Felt;
-
-    fn hash_elements<E>(elements: &[E]) -> Self::Digest
+    fn hash_elements<E>(elements: &[E]) -> Word
     where
-        E: FieldElement<BaseField = Self::BaseField>,
+        E: FieldElement<BaseField = Felt>,
     {
         // convert the elements into a list of base field elements
         let elements = E::slice_as_base_elements(elements);
@@ -63,7 +56,7 @@ impl<P: Permutation> ElementHasher for AlgebraicSponge<P> {
         // initialize state to all zeros, except for the first element of the capacity part, which
         // is set to `elements.len() % RATE_WIDTH`.
         let mut state = [ZERO; STATE_WIDTH];
-        state[CAPACITY_RANGE.start] = Self::BaseField::from((elements.len() % RATE_WIDTH) as u8);
+        state[CAPACITY_RANGE.start] = Felt::from((elements.len() % RATE_WIDTH) as u8);
 
         // absorb elements into the state one by one until the rate portion of the state is filled
         // up; then apply the permutation and start absorbing again; repeat until all
@@ -72,8 +65,8 @@ impl<P: Permutation> ElementHasher for AlgebraicSponge<P> {
         for &element in elements.iter() {
             state[RATE_RANGE.start + i] = element;
             i += 1;
-            if i % RATE_WIDTH == 0 {
-                P::apply_permutation(&mut state);
+            if i.is_multiple_of(RATE_WIDTH) {
+                Self::apply_permutation(&mut state);
                 i = 0;
             }
         }
@@ -86,20 +79,14 @@ impl<P: Permutation> ElementHasher for AlgebraicSponge<P> {
                 state[RATE_RANGE.start + i] = ZERO;
                 i += 1;
             }
-            P::apply_permutation(&mut state);
+            Self::apply_permutation(&mut state);
         }
 
         // return the first 4 elements of the state as hash result
         Word::new(state[DIGEST_RANGE].try_into().unwrap())
     }
-}
 
-impl<P: Permutation> Hasher for AlgebraicSponge<P> {
-    type Digest = Word;
-
-    const COLLISION_RESISTANCE: u32 = 128;
-
-    fn hash(bytes: &[u8]) -> Self::Digest {
+    fn hash(bytes: &[u8]) -> Word {
         // initialize the state with zeroes
         let mut state = [ZERO; STATE_WIDTH];
 
@@ -150,7 +137,7 @@ impl<P: Permutation> Hasher for AlgebraicSponge<P> {
             // proceed filling the range. if it's full, then we apply a permutation and reset the
             // counter to the beginning of the range.
             if rate_pos == RATE_WIDTH - 1 {
-                P::apply_permutation(&mut state);
+                Self::apply_permutation(&mut state);
                 0
             } else {
                 rate_pos + 1
@@ -164,33 +151,33 @@ impl<P: Permutation> Hasher for AlgebraicSponge<P> {
         // is not divisible by `RATE_WIDTH`.
         if rate_pos != 0 {
             state[RATE_RANGE.start + rate_pos..RATE_RANGE.end].fill(ZERO);
-            P::apply_permutation(&mut state);
+            Self::apply_permutation(&mut state);
         }
 
         // return the first 4 elements of the rate as hash result.
         Word::new(state[DIGEST_RANGE].try_into().unwrap())
     }
 
-    fn merge(values: &[Self::Digest; 2]) -> Self::Digest {
+    fn merge(values: &[Word; 2]) -> Word {
         // initialize the state by copying the digest elements into the rate portion of the state
         // (8 total elements), and set the capacity elements to 0.
         let mut state = [ZERO; STATE_WIDTH];
-        let it = Self::Digest::words_as_elements_iter(values.iter());
+        let it = Word::words_as_elements_iter(values.iter());
         for (i, v) in it.enumerate() {
             state[RATE_RANGE.start + i] = *v;
         }
 
         // apply the permutation and return the digest portion of the state
-        P::apply_permutation(&mut state);
+        Self::apply_permutation(&mut state);
         Word::new(state[DIGEST_RANGE].try_into().unwrap())
     }
 
-    fn merge_many(values: &[Self::Digest]) -> Self::Digest {
-        let elements = Self::Digest::words_as_elements(values);
+    fn merge_many(values: &[Word]) -> Word {
+        let elements = Word::words_as_elements(values);
         Self::hash_elements(elements)
     }
 
-    fn merge_with_int(seed: Self::Digest, value: u64) -> Self::Digest {
+    fn merge_with_int(seed: Word, value: u64) -> Word {
         // initialize the state as follows:
         // - seed is copied into the first 4 elements of the rate portion of the state.
         // - if the value fits into a single field element, copy it into the fifth rate element and
@@ -208,97 +195,7 @@ impl<P: Permutation> Hasher for AlgebraicSponge<P> {
         }
 
         // apply the permutation and return the digest portion of the rate
-        P::apply_permutation(&mut state);
-        Word::new(state[DIGEST_RANGE].try_into().unwrap())
-    }
-}
-
-impl<P: Permutation> AlgebraicSponge<P> {
-    // CONSTANTS GETTERS
-    // --------------------------------------------------------------------------------------------
-
-    /// Returns the width of the state.
-    pub const fn state_width() -> usize {
-        STATE_WIDTH
-    }
-
-    /// Returns the range of the rate portion of the state.
-    pub const fn rate_range() -> Range<usize> {
-        RATE_RANGE
-    }
-
-    /// Returns the width of the rate portion of the state.
-    pub const fn rate_width() -> usize {
-        RATE_WIDTH
-    }
-
-    /// Returns the range of the of first half of the rate portion of the state.
-    pub const fn input1_range() -> Range<usize> {
-        INPUT1_RANGE
-    }
-
-    /// Returns the range of the of second half of the rate portion of the state.
-    pub const fn input2_range() -> Range<usize> {
-        INPUT2_RANGE
-    }
-
-    /// Returns the range of the capacity portion of the state.
-    pub const fn capacity_range() -> Range<usize> {
-        CAPACITY_RANGE
-    }
-
-    /// Returns the range of the portion of the state from which the digest can be squeezed.
-    pub const fn digest_range() -> Range<usize> {
-        DIGEST_RANGE
-    }
-
-    // PASS-THROUGH FUNCTIONS
-    // --------------------------------------------------------------------------------------------
-
-    /// Returns a hash of the provided sequence of bytes.
-    #[inline(always)]
-    pub fn hash(bytes: &[u8]) -> Word {
-        <Self as Hasher>::hash(bytes)
-    }
-
-    /// Returns a hash of two digests. This method is intended for use in construction of
-    /// Merkle trees and verification of Merkle paths.
-    #[inline(always)]
-    pub fn merge(values: &[Word; 2]) -> Word {
-        <Self as Hasher>::merge(values)
-    }
-
-    /// Returns a hash of the provided field elements.
-    #[inline(always)]
-    pub fn hash_elements<E: FieldElement<BaseField = Felt>>(elements: &[E]) -> Word {
-        <Self as ElementHasher>::hash_elements(elements)
-    }
-
-    /// Applies the permutation to the provided state.
-    #[inline(always)]
-    pub fn apply_permutation(state: &mut [Felt; STATE_WIDTH]) {
-        P::apply_permutation(state)
-    }
-
-    // DOMAIN IDENTIFIER HASHING
-    // --------------------------------------------------------------------------------------------
-
-    /// Returns a hash of two digests and a domain identifier.
-    pub fn merge_in_domain(values: &[Word; 2], domain: Felt) -> Word {
-        // initialize the state by copying the digest elements into the rate portion of the state
-        // (8 total elements), and set the capacity elements to 0.
-        let mut state = [ZERO; STATE_WIDTH];
-        let it = Word::words_as_elements_iter(values.iter());
-        for (i, v) in it.enumerate() {
-            state[RATE_RANGE.start + i] = *v;
-        }
-
-        // set the second capacity element to the domain value. The first capacity element is used
-        // for padding purposes.
-        state[CAPACITY_RANGE.start + 1] = domain;
-
-        // apply the permutation and return the digest portion of the state
-        P::apply_permutation(&mut state);
+        Self::apply_permutation(&mut state);
         Word::new(state[DIGEST_RANGE].try_into().unwrap())
     }
 }
