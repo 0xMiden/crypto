@@ -4,10 +4,14 @@ use data::{
     EXPECTED_SIG, EXPECTED_SIG_POLYS, NUM_TEST_VECTORS, SK_POLYS, SYNC_DATA_FOR_TEST_VECTOR,
 };
 use prng::Shake256Testing;
-use rand::RngCore;
+use rand::{RngCore, SeedableRng};
+use rand_chacha::ChaCha20Rng;
 
 use super::{Serializable, math::Polynomial};
-use crate::dsa::rpo_falcon512::SecretKey;
+use crate::dsa::rpo_falcon512::{
+    PREVERSIONED_NONCE, PREVERSIONED_NONCE_LEN, SIG_NONCE_LEN, SIG_POLY_BYTE_LEN, SecretKey,
+    tests::data::DETERMINISTIC_SIGNATURE,
+};
 
 mod data;
 mod prng;
@@ -63,12 +67,60 @@ fn test_signature_gen_reference_impl() {
         assert_eq!(sig_coef, EXPECTED_SIG_POLYS[i]);
 
         // 4. compare the encoded signatures including the nonce
-        let sig_bytes = signature.to_bytes();
+        let sig_bytes = &signature.to_bytes();
         let expected_sig_bytes = EXPECTED_SIG[i];
         let hex_expected_sig_bytes = hex::decode(expected_sig_bytes).unwrap();
-        // we remove the headers when comparing as RPO_FALCON512 uses a different header format.
-        // we also remove the public key from the RPO_FALCON512 signature as this is not part of
-        // the signature in the reference implementation
-        assert_eq!(&hex_expected_sig_bytes[2..], &sig_bytes[2..2 + 664]);
+        // to compare against the test vectors we:
+        // 1. remove the headers when comparing as RPO_FALCON512 uses a different header format,
+        // 2. compare the nonce part separately as the deterministic version we use omits the
+        //    inclusion of the preversioned portion of the nonce by in its serialized format,
+        // 3. we remove the public key from the RPO_FALCON512 signature as this is not part of the
+        //    signature in the reference implementation,
+        // 4. remove the nonce version byte, in addition to the header, from `sig_bytes`.
+        let nonce = signature.nonce();
+        assert_eq!(hex_expected_sig_bytes[1..1 + SIG_NONCE_LEN], nonce.as_bytes());
+        assert_eq!(
+            &hex_expected_sig_bytes[1 + SIG_NONCE_LEN..],
+            &sig_bytes[2..2 + SIG_POLY_BYTE_LEN]
+        );
     }
+}
+
+#[test]
+fn test_signature_determinism() {
+    let seed = [0_u8; 32];
+    let mut rng = ChaCha20Rng::from_seed(seed);
+
+    let sk = SecretKey::with_rng(&mut rng);
+    let message = b"data";
+    let signature = sk.sign(message.into());
+    let serialized_signature = signature.to_bytes();
+
+    assert_eq!(serialized_signature, DETERMINISTIC_SIGNATURE);
+}
+
+#[test]
+fn check_preversioned_fixed_nonce() {
+    assert_eq!(build_preversioned_fixed_nonce(), PREVERSIONED_NONCE)
+}
+
+/// Builds the preversioned portion of the fixed nonce following [1].
+///
+/// Note that [1] uses the term salt instead of nonce.
+///
+/// [1]: https://github.com/algorand/falcon/blob/main/falcon-det.pdf
+fn build_preversioned_fixed_nonce() -> [u8; PREVERSIONED_NONCE_LEN] {
+    use crate::dsa::rpo_falcon512::LOG_N;
+
+    let mut result = [0_u8; 39];
+    result[0] = LOG_N;
+    let domain_separator = "RPO-FALCON-DET".as_bytes();
+
+    result
+        .iter_mut()
+        .skip(1)
+        .zip(domain_separator.iter())
+        .for_each(|(dst, src)| *dst = *src);
+
+    result
 }
