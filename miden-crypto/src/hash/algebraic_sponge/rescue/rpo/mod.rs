@@ -64,6 +64,7 @@ mod tests;
 /// ## Hashing of empty input
 /// The current implementation hashes empty input to the zero digest [0, 0, 0, 0]. This has
 /// the benefit of requiring no calls to the RPO permutation when hashing empty input.
+#[allow(rustdoc::private_intra_doc_links)]
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub struct Rpo256();
 
