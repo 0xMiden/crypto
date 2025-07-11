@@ -3,7 +3,7 @@
 //! These are hash functions based on the sponge construction, which itself is defined from
 //! a cryptographic permutation function and a padding rule.
 //!
-//! Throughout the module, the padding rule used is the one in https://eprint.iacr.org/2023/1045.
+//! Throughout the module, the padding rule used is the one in <https://eprint.iacr.org/2023/1045>.
 //! The core of the definition of an algebraic sponge-based hash function is then the definition
 //! of its cryptographic permutation function. This can be done by implementing the trait
 //! `[AlgebraicSponge]` which boils down to implementing the `apply_permutation` method.
