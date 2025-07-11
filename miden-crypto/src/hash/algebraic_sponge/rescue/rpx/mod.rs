@@ -1,11 +1,11 @@
-#[cfg(test)]
-use super::StarkField;
 use super::{
     ARK1, ARK2, CAPACITY_RANGE, CubeExtension, DIGEST_RANGE, ElementHasher, Felt, FieldElement,
-    Hasher, MDS, NUM_ROUNDS, RATE_RANGE, Range, STATE_WIDTH, Word, ZERO, add_constants,
+    Hasher, MDS, NUM_ROUNDS, RATE_RANGE, Range, STATE_WIDTH, Word, add_constants,
     add_constants_and_apply_inv_sbox, add_constants_and_apply_sbox, apply_inv_sbox, apply_mds,
     apply_sbox,
 };
+#[cfg(test)]
+use super::{StarkField, ZERO};
 use crate::hash::algebraic_sponge::AlgebraicSponge;
 
 #[cfg(test)]
@@ -136,26 +136,11 @@ impl Rpx256 {
         <Self as ElementHasher>::hash_elements(elements)
     }
 
-    // DOMAIN IDENTIFIER HASHING
-    // --------------------------------------------------------------------------------------------
-
     /// Returns a hash of two digests and a domain identifier.
-    pub fn merge_in_domain(values: &[Word; 2], domain: Felt) -> Word {
-        // initialize the state by copying the digest elements into the rate portion of the state
-        // (8 total elements), and set the capacity elements to 0.
-        let mut state = [ZERO; STATE_WIDTH];
-        let it = Word::words_as_elements_iter(values.iter());
-        for (i, v) in it.enumerate() {
-            state[RATE_RANGE.start + i] = *v;
-        }
-
-        // set the second capacity element to the domain value. The first capacity element is used
-        // for padding purposes.
-        state[CAPACITY_RANGE.start + 1] = domain;
-
-        // apply the RPX permutation and return the first four elements of the state
-        Self::apply_permutation(&mut state);
-        Word::new(state[DIGEST_RANGE].try_into().unwrap())
+    #[allow(dead_code)]
+    #[inline(always)]
+    fn merge_in_domain(values: &[Word; 2], domain: Felt) -> Word {
+        <Self as AlgebraicSponge>::merge_in_domain(values, domain)
     }
 
     // RPX PERMUTATION

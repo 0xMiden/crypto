@@ -3,6 +3,9 @@ use crate::hash::{algebraic_sponge::AlgebraicSponge, poseidon2::Poseidon2};
 
 #[test]
 fn permutation_test_vector() {
+    // tests that the current implementation is consistent with
+    // the reference [implementation](https://github.com/HorizenLabs/poseidon2) and uses
+    // the test vectors provided therein
     let mut elements = [
         ZERO,
         Felt::new(1),

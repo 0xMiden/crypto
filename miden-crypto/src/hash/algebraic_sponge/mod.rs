@@ -1,3 +1,17 @@
+//! Algebraic sponge-based hash functions.
+//!
+//! These are hash functions based on the sponge construction, which itself is defined from
+//! a cryptographic permutation function and a padding rule.
+//!
+//! Throughout the module, the padding rule used is the one in https://eprint.iacr.org/2023/1045.
+//! The core of the definition of an algebraic sponge-based hash function is then the definition
+//! of its cryptographic permutation function. This can be done by implementing the trait
+//! `[AlgebraicSponge]` which boils down to implementing the `apply_permutation` method.
+//!
+//! There are currently three algebraic sponge-based hash functions implemented in the module, RPO
+//! and RPX hash functions, both of which belong to the Rescue familly of hash functions, and
+//! Poseidon2 hash function.
+
 use core::ops::Range;
 
 use super::{CubeExtension, ElementHasher, Felt, FieldElement, Hasher, StarkField, Word, ZERO};
@@ -43,9 +57,10 @@ const INV_ALPHA: u64 = 10540996611094048183;
 // ALGEBRAIC SPONGE
 // ================================================================================================
 
-pub trait AlgebraicSponge {
+pub(crate) trait AlgebraicSponge {
     fn apply_permutation(state: &mut [Felt; STATE_WIDTH]);
 
+    /// Returns a hash of the provided field elements.
     fn hash_elements<E>(elements: &[E]) -> Word
     where
         E: FieldElement<BaseField = Felt>,
@@ -86,6 +101,7 @@ pub trait AlgebraicSponge {
         Word::new(state[DIGEST_RANGE].try_into().unwrap())
     }
 
+    /// Returns a hash of the provided sequence of bytes.
     fn hash(bytes: &[u8]) -> Word {
         // initialize the state with zeroes
         let mut state = [ZERO; STATE_WIDTH];
@@ -158,6 +174,8 @@ pub trait AlgebraicSponge {
         Word::new(state[DIGEST_RANGE].try_into().unwrap())
     }
 
+    /// Returns a hash of two digests. This method is intended for use in construction of
+    /// Merkle trees and verification of Merkle paths.
     fn merge(values: &[Word; 2]) -> Word {
         // initialize the state by copying the digest elements into the rate portion of the state
         // (8 total elements), and set the capacity elements to 0.
@@ -172,11 +190,13 @@ pub trait AlgebraicSponge {
         Word::new(state[DIGEST_RANGE].try_into().unwrap())
     }
 
+    /// Returns a hash of many digests.
     fn merge_many(values: &[Word]) -> Word {
         let elements = Word::words_as_elements(values);
         Self::hash_elements(elements)
     }
 
+    /// Returns hash(`seed` || `value`). This method is intended for use in PRNG and PoW contexts.
     fn merge_with_int(seed: Word, value: u64) -> Word {
         // initialize the state as follows:
         // - seed is copied into the first 4 elements of the rate portion of the state.
@@ -195,6 +215,29 @@ pub trait AlgebraicSponge {
         }
 
         // apply the permutation and return the digest portion of the rate
+        Self::apply_permutation(&mut state);
+        Word::new(state[DIGEST_RANGE].try_into().unwrap())
+    }
+
+    // DOMAIN IDENTIFIER HASHING
+    // --------------------------------------------------------------------------------------------
+
+    /// Returns a hash of two digests and a domain identifier.
+    #[allow(dead_code)]
+    fn merge_in_domain(values: &[Word; 2], domain: Felt) -> Word {
+        // initialize the state by copying the digest elements into the rate portion of the state
+        // (8 total elements), and set the capacity elements to 0.
+        let mut state = [ZERO; STATE_WIDTH];
+        let it = Word::words_as_elements_iter(values.iter());
+        for (i, v) in it.enumerate() {
+            state[RATE_RANGE.start + i] = *v;
+        }
+
+        // set the second capacity element to the domain value. The first capacity element is used
+        // for padding purposes.
+        state[CAPACITY_RANGE.start + 1] = domain;
+
+        // apply the permutation and return the first four elements of the state
         Self::apply_permutation(&mut state);
         Word::new(state[DIGEST_RANGE].try_into().unwrap())
     }
