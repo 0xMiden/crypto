@@ -6,7 +6,8 @@ use alloc::{
 use core::fmt;
 
 use super::{
-    EMPTY_WORD, InnerNodeInfo, MerkleError, MerklePath, NodeIndex, Rpo256, ValuePath, Word,
+    EMPTY_WORD, InnerNodeInfo, InnerNodeIterable, MerkleError, MerklePath, NodeIndex, Rpo256,
+    ValuePath, Word,
 };
 use crate::utils::{
     ByteReader, ByteWriter, Deserializable, DeserializationError, Serializable, word_to_hex,
@@ -255,22 +256,6 @@ impl PartialMerkleTree {
         })
     }
 
-    /// Returns an iterator over the inner nodes of this Merkle tree.
-    pub fn inner_nodes(&self) -> impl Iterator<Item = InnerNodeInfo> + '_ {
-        let inner_nodes = self.nodes.iter().filter(|(index, _)| !self.leaves.contains(index));
-        inner_nodes.map(|(index, digest)| {
-            let left_hash =
-                self.nodes.get(&index.left_child()).expect("Failed to get left child hash");
-            let right_hash =
-                self.nodes.get(&index.right_child()).expect("Failed to get right child hash");
-            InnerNodeInfo {
-                value: *digest,
-                left: *left_hash,
-                right: *right_hash,
-            }
-        })
-    }
-
     // STATE MUTATORS
     // --------------------------------------------------------------------------------------------
 
@@ -439,6 +424,27 @@ impl PartialMerkleTree {
             return Err(MerkleError::DepthTooBig(depth as u64));
         }
         Ok(())
+    }
+}
+
+// ITERATORS
+// ================================================================================================
+
+impl InnerNodeIterable for PartialMerkleTree {
+    /// Returns an iterator over the inner nodes of this Merkle tree.
+    fn inner_nodes(&self) -> impl Iterator<Item = InnerNodeInfo> {
+        let inner_nodes = self.nodes.iter().filter(|(index, _)| !self.leaves.contains(index));
+        inner_nodes.map(|(index, digest)| {
+            let left_hash =
+                self.nodes.get(&index.left_child()).expect("Failed to get left child hash");
+            let right_hash =
+                self.nodes.get(&index.right_child()).expect("Failed to get right child hash");
+            InnerNodeInfo {
+                value: *digest,
+                left: *left_hash,
+                right: *right_hash,
+            }
+        })
     }
 }
 

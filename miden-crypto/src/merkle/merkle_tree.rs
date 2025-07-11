@@ -1,7 +1,7 @@
 use alloc::{string::String, vec::Vec};
 use core::{fmt, slice};
 
-use super::{InnerNodeInfo, MerkleError, MerklePath, NodeIndex, Rpo256, Word};
+use super::{InnerNodeInfo, InnerNodeIterable, MerkleError, MerklePath, NodeIndex, Rpo256, Word};
 use crate::utils::{uninit_vector, word_to_hex};
 
 // MERKLE TREE
@@ -116,16 +116,6 @@ impl MerkleTree {
         self.nodes.iter().skip(leaves_start).enumerate().map(|(i, v)| (i as u64, v))
     }
 
-    /// Returns n iterator over every inner node of this [MerkleTree].
-    ///
-    /// The iterator order is unspecified.
-    pub fn inner_nodes(&self) -> InnerNodeIterator<'_> {
-        InnerNodeIterator {
-            nodes: &self.nodes,
-            index: 1, // index 0 is just padding, start at 1
-        }
-    }
-
     // STATE MUTATORS
     // --------------------------------------------------------------------------------------------
 
@@ -206,6 +196,18 @@ impl Iterator for InnerNodeIterator<'_> {
             })
         } else {
             None
+        }
+    }
+}
+
+impl InnerNodeIterable for MerkleTree {
+    /// Returns n iterator over every inner node of this [MerkleTree].
+    ///
+    /// The iterator order is unspecified.
+    fn inner_nodes(&self) -> impl Iterator<Item = InnerNodeInfo> {
+        InnerNodeIterator {
+            nodes: &self.nodes,
+            index: 1, // Index 0 is just padding, start at 1.
         }
     }
 }

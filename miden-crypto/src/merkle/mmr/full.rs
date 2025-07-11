@@ -17,7 +17,10 @@ use super::{
     MmrDelta, MmrError, MmrPeaks, MmrProof,
     forest::{Forest, TreeSizeIterator},
 };
-use crate::{Word, merkle::Rpo256};
+use crate::{
+    Word,
+    merkle::{InnerNodeIterable, Rpo256},
+};
 
 // MMR
 // ===============================================================================================
@@ -247,16 +250,6 @@ impl Mmr {
         Ok(MmrDelta { forest: to_forest, data: result })
     }
 
-    /// An iterator over inner nodes in the MMR. The order of iteration is unspecified.
-    pub fn inner_nodes(&self) -> MmrNodes<'_> {
-        MmrNodes {
-            mmr: self,
-            forest: 0,
-            last_right: 0,
-            index: 0,
-        }
-    }
-
     // UTILITIES
     // ============================================================================================
 
@@ -417,6 +410,18 @@ impl Iterator for MmrNodes<'_> {
             Some(node)
         } else {
             None
+        }
+    }
+}
+
+impl InnerNodeIterable for Mmr {
+    /// An iterator over inner nodes in the MMR. The order of iteration is unspecified.
+    fn inner_nodes(&self) -> impl Iterator<Item = InnerNodeInfo> {
+        MmrNodes {
+            mmr: self,
+            forest: 0,
+            last_right: 0,
+            index: 0,
         }
     }
 }
