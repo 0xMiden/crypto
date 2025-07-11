@@ -67,7 +67,6 @@ mod test;
 /// ## Hashing of empty input
 /// The current implementation hashes empty input to the zero digest [0, 0, 0, 0]. This has
 /// the benefit of requiring no calls to the Poseidon2 permutation when hashing empty input.
-#[allow(rustdoc::private_intra_doc_links)]
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub struct Poseidon2();
 
@@ -170,9 +169,8 @@ impl Poseidon2 {
     }
 
     /// Returns a hash of two digests and a domain identifier.
-    #[allow(dead_code)]
     #[inline(always)]
-    fn merge_in_domain(values: &[Word; 2], domain: Felt) -> Word {
+    pub fn merge_in_domain(values: &[Word; 2], domain: Felt) -> Word {
         <Self as AlgebraicSponge>::merge_in_domain(values, domain)
     }
 

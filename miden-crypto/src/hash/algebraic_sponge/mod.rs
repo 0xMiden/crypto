@@ -223,7 +223,6 @@ pub(crate) trait AlgebraicSponge {
     // --------------------------------------------------------------------------------------------
 
     /// Returns a hash of two digests and a domain identifier.
-    #[allow(dead_code)]
     fn merge_in_domain(values: &[Word; 2], domain: Felt) -> Word {
         // initialize the state by copying the digest elements into the rate portion of the state
         // (8 total elements), and set the capacity elements to 0.
