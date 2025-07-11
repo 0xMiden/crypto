@@ -1,21 +1,25 @@
 //! Cryptographic hash functions used by the Miden protocol.
 
-use super::{CubeExtension, Felt, FieldElement, StarkField, ZERO};
+use super::{CubeExtension, Felt, FieldElement, StarkField, Word, ZERO};
 
 /// Blake2s hash function.
 pub mod blake;
 
-mod rescue;
+pub mod poseidon2 {
+    pub use super::algebraic_sponge::poseidon2::Poseidon2;
+}
 
 /// Rescue Prime Optimized (RPO) hash function.
 pub mod rpo {
-    pub use super::rescue::Rpo256;
+    pub use super::algebraic_sponge::rescue::Rpo256;
 }
 
 /// Rescue Prime Extended (RPX) hash function.
 pub mod rpx {
-    pub use super::rescue::Rpx256;
+    pub use super::algebraic_sponge::rescue::Rpx256;
 }
+
+mod algebraic_sponge;
 
 // RE-EXPORTS
 // ================================================================================================

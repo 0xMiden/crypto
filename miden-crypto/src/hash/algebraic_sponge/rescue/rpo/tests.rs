@@ -5,11 +5,11 @@ use rand_utils::rand_value;
 
 use super::{
     super::{ALPHA, INV_ALPHA, apply_inv_sbox, apply_sbox},
-    Felt, FieldElement, Hasher, Rpo256, STATE_WIDTH, StarkField, Word, ZERO,
+    Felt, Hasher, Rpo256, STATE_WIDTH,
 };
 use crate::{
-    ONE,
-    hash::rescue::{BINARY_CHUNK_SIZE, CAPACITY_RANGE, RATE_WIDTH},
+    FieldElement, ONE, StarkField, Word, ZERO,
+    hash::algebraic_sponge::{BINARY_CHUNK_SIZE, CAPACITY_RANGE, RATE_WIDTH},
 };
 
 #[test]
@@ -131,7 +131,7 @@ fn hash_padding() {
 
 #[test]
 fn hash_padding_no_extra_permutation_call() {
-    use crate::hash::rescue::DIGEST_RANGE;
+    use crate::hash::algebraic_sponge::DIGEST_RANGE;
 
     // Implementation
     let num_bytes = BINARY_CHUNK_SIZE * RATE_WIDTH;

@@ -28,6 +28,7 @@ jobs:
       - name: Rustfmt
         run: |
           rustup update --no-self-update nightly
+          rustup default ${{ matrix.toolchain }}
           rustup +nightly component add rustfmt
           make format-check
 

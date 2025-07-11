@@ -1,3 +1,10 @@
+## 0.16.0 (TBD)
+
+- [BREAKING] Incremented MSRV to 1.88.
+- Added implementation of Poseidon2 hash function ([#429](https://github.com/0xMiden/crypto/issues/429)).
+- [BREAKING] Remove generics from `MerkleStore` and remove `KvMap` and `RecordingMap` ([#442](https://github.com/0xMiden/crypto/issues/442)).
+- [BREAKING] Rename `smt_hashmaps` feature to `hashmaps` ([#442](https://github.com/0xMiden/crypto/issues/442)).
+
 ## 0.15.5 (2025-07-10)
 
 - Added `empty()` and `is_empty()` methods to `Word`.

@@ -22,6 +22,23 @@ pub use winter_math::{
 };
 pub use word::{Word, WordError};
 
+// TYPE ALIASES
+// ================================================================================================
+
+/// An alias for a key-value map.
+///
+/// By default, this is an alias for the [`alloc::collections::BTreeMap`], however, when the
+/// `hashmaps` feature is enabled, this is an alias for the `hashbrown`'s `HashMap`.
+#[cfg(feature = "hashmaps")]
+pub type Map<K, V> = hashbrown::HashMap<K, V>;
+
+/// An alias for a key-value map.
+///
+/// By default, this is an alias for the [`alloc::collections::BTreeMap`], however, when the
+/// `hashmaps` feature is enabled, this is an alias for the `hashbrown`'s `HashMap`.
+#[cfg(not(feature = "hashmaps"))]
+pub type Map<K, V> = alloc::collections::BTreeMap<K, V>;
+
 // CONSTANTS
 // ================================================================================================
 
