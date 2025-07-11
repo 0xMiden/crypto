@@ -36,7 +36,7 @@ mod store;
 pub use store::{MerkleStore, StoreNode};
 
 mod node;
-pub use node::InnerNodeInfo;
+pub use node::{InnerNodeInfo, InnerNodeIterable};
 
 mod partial_mt;
 pub use partial_mt::PartialMerkleTree;

@@ -7,7 +7,7 @@ use super::{
 use crate::{
     Felt,
     merkle::{
-        InOrderIndex, MerklePath, MerkleTree, MmrProof, NodeIndex, int_to_node,
+        InOrderIndex, InnerNodeIterable, MerklePath, MerkleTree, MmrProof, NodeIndex, int_to_node,
         mmr::forest::{Forest, TreeSizeIterator, high_bitmask},
     },
 };

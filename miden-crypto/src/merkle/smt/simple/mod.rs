@@ -5,7 +5,7 @@ use super::{
     LeafIndex, MerkleError, MerklePath, MutationSet, NodeIndex, SMT_MAX_DEPTH, SMT_MIN_DEPTH,
     SparseMerkleTree, Word,
 };
-use crate::merkle::{SparseMerklePath, SparseValuePath};
+use crate::merkle::{InnerNodeIterable, SparseMerklePath, SparseValuePath};
 
 #[cfg(test)]
 mod tests;
@@ -193,15 +193,6 @@ impl<const DEPTH: u8> SimpleSmt<DEPTH> {
     /// Returns an iterator over the leaves of this [SimpleSmt].
     pub fn leaves(&self) -> impl Iterator<Item = (u64, &Word)> {
         self.leaves.iter().map(|(i, w)| (*i, w))
-    }
-
-    /// Returns an iterator over the inner nodes of this [SimpleSmt].
-    pub fn inner_nodes(&self) -> impl Iterator<Item = InnerNodeInfo> + '_ {
-        self.inner_nodes.values().map(|e| InnerNodeInfo {
-            value: e.hash(),
-            left: e.left,
-            right: e.right,
-        })
     }
 
     // STATE MUTATORS
@@ -422,5 +413,19 @@ impl<const DEPTH: u8> SparseMerkleTree<DEPTH> for SimpleSmt<DEPTH> {
 
     fn path_and_leaf_to_opening(path: MerklePath, leaf: Word) -> ValuePath {
         (path, leaf).into()
+    }
+}
+
+// ITERATORS
+// ================================================================================================
+
+impl<const DEPTH: u8> InnerNodeIterable for SimpleSmt<DEPTH> {
+    /// Returns an iterator over the inner nodes of this [SimpleSmt].
+    fn inner_nodes(&self) -> impl Iterator<Item = InnerNodeInfo> {
+        self.inner_nodes.values().map(|e| InnerNodeInfo {
+            value: e.hash(),
+            left: e.left,
+            right: e.right,
+        })
     }
 }

@@ -14,7 +14,7 @@ use super::{
 };
 use crate::{
     EMPTY_WORD, ONE, ZERO,
-    merkle::{LeafIndex, MerkleError, smt::Felt},
+    merkle::{InnerNodeIterable, LeafIndex, MerkleError, smt::Felt},
 };
 
 fn smtleaf_to_subtree_leaf(leaf: &SmtLeaf) -> SubtreeLeaf {

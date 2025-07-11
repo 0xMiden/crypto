@@ -4,6 +4,7 @@ use super::{
     EMPTY_WORD, EmptySubtreeRoots, Felt, InnerNode, InnerNodeInfo, InnerNodes, LeafIndex,
     MerkleError, MerklePath, MutationSet, NodeIndex, Rpo256, SparseMerkleTree, Word,
 };
+use crate::merkle::InnerNodeIterable;
 
 mod error;
 pub use error::{SmtLeafError, SmtProofError};
@@ -235,15 +236,6 @@ impl Smt {
         self.leaves().flat_map(|(_, leaf)| leaf.entries())
     }
 
-    /// Returns an iterator over the inner nodes of this [Smt].
-    pub fn inner_nodes(&self) -> impl Iterator<Item = InnerNodeInfo> + '_ {
-        self.inner_nodes.values().map(|e| InnerNodeInfo {
-            value: e.hash(),
-            left: e.left,
-            right: e.right,
-        })
-    }
-
     // STATE MUTATORS
     // --------------------------------------------------------------------------------------------
 
@@ -470,6 +462,20 @@ impl SparseMerkleTree<SMT_DEPTH> for Smt {
 impl Default for Smt {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+// ITERATORS
+// ================================================================================================
+
+impl InnerNodeIterable for Smt {
+    /// Returns an iterator over the inner nodes of this [Smt].
+    fn inner_nodes(&self) -> impl Iterator<Item = InnerNodeInfo> {
+        self.inner_nodes.values().map(|e| InnerNodeInfo {
+            value: e.hash(),
+            left: e.left,
+            right: e.right,
+        })
     }
 }
 

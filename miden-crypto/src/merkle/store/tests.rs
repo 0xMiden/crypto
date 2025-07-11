@@ -13,7 +13,10 @@ use super::{
 };
 use crate::{
     Felt, ONE, WORD_SIZE, ZERO,
-    merkle::{LeafIndex, MerkleTree, SMT_MAX_DEPTH, SimpleSmt, int_to_leaf, int_to_node},
+    merkle::{
+        InnerNodeIterable, LeafIndex, MerkleTree, SMT_MAX_DEPTH, SimpleSmt, int_to_leaf,
+        int_to_node,
+    },
 };
 
 // TEST DATA
