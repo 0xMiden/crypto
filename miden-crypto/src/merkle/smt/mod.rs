@@ -4,7 +4,7 @@ use core::hash::Hash;
 use winter_utils::{ByteReader, ByteWriter, Deserializable, DeserializationError, Serializable};
 
 use super::{EmptySubtreeRoots, InnerNodeInfo, MerkleError, MerklePath, NodeIndex};
-use crate::{EMPTY_WORD, Felt, Word, hash::rpo::Rpo256};
+use crate::{EMPTY_WORD, Felt, Map, Word, hash::rpo::Rpo256};
 
 mod full;
 pub use full::{SMT_DEPTH, Smt, SmtLeaf, SmtLeafError, SmtProof, SmtProofError};
@@ -29,14 +29,9 @@ pub const SMT_MAX_DEPTH: u8 = 64;
 // SPARSE MERKLE TREE
 // ================================================================================================
 
-/// A map whose keys are not guaranteed to be ordered.
-#[cfg(feature = "smt_hashmaps")]
-type UnorderedMap<K, V> = hashbrown::HashMap<K, V>;
-#[cfg(not(feature = "smt_hashmaps"))]
-type UnorderedMap<K, V> = alloc::collections::BTreeMap<K, V>;
-type InnerNodes = UnorderedMap<NodeIndex, InnerNode>;
-type Leaves<T> = UnorderedMap<u64, T>;
-type NodeMutations = UnorderedMap<NodeIndex, NodeMutation>;
+type InnerNodes = Map<NodeIndex, InnerNode>;
+type Leaves<T> = Map<u64, T>;
+type NodeMutations = Map<NodeIndex, NodeMutation>;
 
 /// An abstract description of a sparse Merkle tree.
 ///
@@ -187,7 +182,7 @@ pub(crate) trait SparseMerkleTree<const DEPTH: u8> {
         use NodeMutation::*;
 
         let mut new_root = self.root();
-        let mut new_pairs: UnorderedMap<Self::Key, Self::Value> = Default::default();
+        let mut new_pairs: Map<Self::Key, Self::Value> = Default::default();
         let mut node_mutations: NodeMutations = Default::default();
 
         for (key, value) in kv_pairs {
@@ -373,7 +368,7 @@ pub(crate) trait SparseMerkleTree<const DEPTH: u8> {
             }
         }
 
-        let mut reverse_pairs = UnorderedMap::new();
+        let mut reverse_pairs = Map::new();
         for (key, value) in new_pairs {
             if let Some(old_value) = self.insert_value(key.clone(), value) {
                 reverse_pairs.insert(key, old_value);
@@ -581,10 +576,10 @@ pub struct MutationSet<const DEPTH: u8, K: Eq + Hash, V> {
     /// corresponds to a [`SparseMerkleTree::remove_inner_node()`] call.
     node_mutations: NodeMutations,
     /// The set of top-level key-value pairs we're prospectively adding to the tree, including
-    /// adding empty values. The "effective" value for a key is the value in this BTreeMap, falling
+    /// adding empty values. The "effective" value for a key is the value in this Map, falling
     /// back to the existing value in the Merkle tree. Each entry corresponds to a
     /// [`SparseMerkleTree::insert_value()`] call.
-    new_pairs: UnorderedMap<K, V>,
+    new_pairs: Map<K, V>,
     /// The calculated root for the Merkle tree, given these mutations. Publicly retrievable with
     /// [`MutationSet::root()`]. Corresponds to a [`SparseMerkleTree::set_root()`]. call.
     new_root: Word,
@@ -609,7 +604,7 @@ impl<const DEPTH: u8, K: Eq + Hash, V> MutationSet<DEPTH, K, V> {
 
     /// Returns the set of top-level key-value pairs that need to be added, updated or deleted
     /// (i.e. set to `EMPTY_WORD`).
-    pub fn new_pairs(&self) -> &UnorderedMap<K, V> {
+    pub fn new_pairs(&self) -> &Map<K, V> {
         &self.new_pairs
     }
 }
@@ -706,7 +701,7 @@ impl<const DEPTH: u8, K: Deserializable + Ord + Eq + Hash, V: Deserializable> De
 
         let num_new_pairs = source.read_usize()?;
         let new_pairs = source.read_many(num_new_pairs)?;
-        let new_pairs = UnorderedMap::from_iter(new_pairs);
+        let new_pairs = Map::from_iter(new_pairs);
 
         Ok(Self {
             old_root,

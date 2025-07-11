@@ -1,6 +1,19 @@
 ## 0.16.0 (TBD)
 
-- [BREAKING] Make Falcon DSA deterministic (#436).
+- [BREAKING] Incremented MSRV to 1.88.
+- [BREAKING] Make Falcon DSA deterministic ([#436](https://github.com/0xMiden/crypto/pull/436)).
+- Added implementation of Poseidon2 hash function ([#441](https://github.com/0xMiden/crypto/pull/441)).
+- [BREAKING] Remove generics from `MerkleStore` and remove `KvMap` and `RecordingMap` ([#442](https://github.com/0xMiden/crypto/pull/442)).
+- [BREAKING] Rename `smt_hashmaps` feature to `hashmaps` ([#442](https://github.com/0xMiden/crypto/pull/442)).
+
+## 0.15.5 (2025-07-10)
+
+- Added `empty()` and `is_empty()` methods to `Word`.
+
+## 0.15.4 (2025-07-07)
+
+- Implemented `LexicographicWord` struct ([#443](https://github.com/0xMiden/crypto/pull/443/)).
+- Added `SequentialCommit` trait ([#443](https://github.com/0xMiden/crypto/pull/443/)).
 
 ## 0.15.3 (2025-06-18)
 

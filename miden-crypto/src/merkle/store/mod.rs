@@ -1,13 +1,13 @@
-use alloc::{collections::BTreeMap, vec::Vec};
+use alloc::vec::Vec;
 use core::borrow::Borrow;
 
 use super::{
     EmptySubtreeRoots, InnerNodeInfo, MerkleError, MerklePath, MerkleTree, NodeIndex,
     PartialMerkleTree, RootPath, Rpo256, SimpleSmt, Smt, ValuePath, Word, mmr::Mmr,
 };
-use crate::utils::{
-    ByteReader, ByteWriter, Deserializable, DeserializationError, Serializable,
-    collections::{KvMap, RecordingMap},
+use crate::{
+    Map,
+    utils::{ByteReader, ByteWriter, Deserializable, DeserializationError, Serializable},
 };
 
 #[cfg(test)]
@@ -15,12 +15,6 @@ mod tests;
 
 // MERKLE STORE
 // ================================================================================================
-
-/// A default [MerkleStore] which uses a simple [BTreeMap] as the backing storage.
-pub type DefaultMerkleStore = MerkleStore<BTreeMap<Word, StoreNode>>;
-
-/// A [MerkleStore] with recording capabilities which uses [RecordingMap] as the backing storage.
-pub type RecordingMerkleStore = MerkleStore<RecordingMap<Word, StoreNode>>;
 
 #[derive(Debug, Default, Copy, Clone, Eq, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
@@ -93,24 +87,24 @@ pub struct StoreNode {
 /// ```
 #[derive(Debug, Clone, Eq, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
-pub struct MerkleStore<T: KvMap<Word, StoreNode> = BTreeMap<Word, StoreNode>> {
-    nodes: T,
+pub struct MerkleStore {
+    nodes: Map<Word, StoreNode>,
 }
 
-impl<T: KvMap<Word, StoreNode>> Default for MerkleStore<T> {
+impl Default for MerkleStore {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl<T: KvMap<Word, StoreNode>> MerkleStore<T> {
+impl MerkleStore {
     // CONSTRUCTORS
     // --------------------------------------------------------------------------------------------
 
     /// Creates an empty `MerkleStore` instance.
-    pub fn new() -> MerkleStore<T> {
+    pub fn new() -> MerkleStore {
         // pre-populate the store with the empty hashes
-        let nodes = empty_hashes().into_iter().collect();
+        let nodes = empty_hashes().collect();
         MerkleStore { nodes }
     }
 
@@ -321,7 +315,7 @@ impl<T: KvMap<Word, StoreNode>> MerkleStore<T> {
     /// nodes which are descendants of the specified roots.
     ///
     /// The roots for which no descendants exist in this Merkle store are ignored.
-    pub fn subset<I, R>(&self, roots: I) -> MerkleStore<T>
+    pub fn subset<I, R>(&self, roots: I) -> MerkleStore
     where
         I: Iterator<Item = R>,
         R: Borrow<Word>,
@@ -456,16 +450,13 @@ impl<T: KvMap<Word, StoreNode>> MerkleStore<T> {
         Ok(parent)
     }
 
-    // DESTRUCTURING
+    // HELPER METHODS
     // --------------------------------------------------------------------------------------------
 
     /// Returns the inner storage of this MerkleStore while consuming `self`.
-    pub fn into_inner(self) -> T {
+    pub fn into_inner(self) -> Map<Word, StoreNode> {
         self.nodes
     }
-
-    // HELPER METHODS
-    // --------------------------------------------------------------------------------------------
 
     /// Recursively clones a tree with the specified root from the specified source into self.
     ///
@@ -486,56 +477,49 @@ impl<T: KvMap<Word, StoreNode>> MerkleStore<T> {
 // CONVERSIONS
 // ================================================================================================
 
-impl<T: KvMap<Word, StoreNode>> From<&MerkleTree> for MerkleStore<T> {
+impl From<&MerkleTree> for MerkleStore {
     fn from(value: &MerkleTree) -> Self {
         let nodes = combine_nodes_with_empty_hashes(value.inner_nodes()).collect();
         Self { nodes }
     }
 }
 
-impl<T: KvMap<Word, StoreNode>, const DEPTH: u8> From<&SimpleSmt<DEPTH>> for MerkleStore<T> {
+impl<const DEPTH: u8> From<&SimpleSmt<DEPTH>> for MerkleStore {
     fn from(value: &SimpleSmt<DEPTH>) -> Self {
         let nodes = combine_nodes_with_empty_hashes(value.inner_nodes()).collect();
         Self { nodes }
     }
 }
 
-impl<T: KvMap<Word, StoreNode>> From<&Smt> for MerkleStore<T> {
+impl From<&Smt> for MerkleStore {
     fn from(value: &Smt) -> Self {
         let nodes = combine_nodes_with_empty_hashes(value.inner_nodes()).collect();
         Self { nodes }
     }
 }
 
-impl<T: KvMap<Word, StoreNode>> From<&Mmr> for MerkleStore<T> {
+impl From<&Mmr> for MerkleStore {
     fn from(value: &Mmr) -> Self {
         let nodes = combine_nodes_with_empty_hashes(value.inner_nodes()).collect();
         Self { nodes }
     }
 }
 
-impl<T: KvMap<Word, StoreNode>> From<&PartialMerkleTree> for MerkleStore<T> {
+impl From<&PartialMerkleTree> for MerkleStore {
     fn from(value: &PartialMerkleTree) -> Self {
         let nodes = combine_nodes_with_empty_hashes(value.inner_nodes()).collect();
         Self { nodes }
     }
 }
 
-impl<T: KvMap<Word, StoreNode>> From<T> for MerkleStore<T> {
-    fn from(values: T) -> Self {
-        let nodes = values.into_iter().chain(empty_hashes()).collect();
-        Self { nodes }
-    }
-}
-
-impl<T: KvMap<Word, StoreNode>> FromIterator<InnerNodeInfo> for MerkleStore<T> {
+impl FromIterator<InnerNodeInfo> for MerkleStore {
     fn from_iter<I: IntoIterator<Item = InnerNodeInfo>>(iter: I) -> Self {
         let nodes = combine_nodes_with_empty_hashes(iter).collect();
         Self { nodes }
     }
 }
 
-impl<T: KvMap<Word, StoreNode>> FromIterator<(Word, StoreNode)> for MerkleStore<T> {
+impl FromIterator<(Word, StoreNode)> for MerkleStore {
     fn from_iter<I: IntoIterator<Item = (Word, StoreNode)>>(iter: I) -> Self {
         let nodes = iter.into_iter().chain(empty_hashes()).collect();
         Self { nodes }
@@ -544,7 +528,7 @@ impl<T: KvMap<Word, StoreNode>> FromIterator<(Word, StoreNode)> for MerkleStore<
 
 // ITERATORS
 // ================================================================================================
-impl<T: KvMap<Word, StoreNode>> Extend<InnerNodeInfo> for MerkleStore<T> {
+impl Extend<InnerNodeInfo> for MerkleStore {
     fn extend<I: IntoIterator<Item = InnerNodeInfo>>(&mut self, iter: I) {
         self.nodes.extend(
             iter.into_iter()
@@ -571,7 +555,7 @@ impl Deserializable for StoreNode {
     }
 }
 
-impl<T: KvMap<Word, StoreNode>> Serializable for MerkleStore<T> {
+impl Serializable for MerkleStore {
     fn write_into<W: ByteWriter>(&self, target: &mut W) {
         target.write_u64(self.nodes.len() as u64);
 
@@ -582,7 +566,7 @@ impl<T: KvMap<Word, StoreNode>> Serializable for MerkleStore<T> {
     }
 }
 
-impl<T: KvMap<Word, StoreNode>> Deserializable for MerkleStore<T> {
+impl Deserializable for MerkleStore {
     fn read_from<R: ByteReader>(source: &mut R) -> Result<Self, DeserializationError> {
         let len = source.read_u64()?;
         let mut nodes: Vec<(Word, StoreNode)> = Vec::with_capacity(len as usize);
@@ -601,7 +585,7 @@ impl<T: KvMap<Word, StoreNode>> Deserializable for MerkleStore<T> {
 // ================================================================================================
 
 /// Creates empty hashes for all the subtrees of a tree with a max depth of 255.
-fn empty_hashes() -> impl IntoIterator<Item = (Word, StoreNode)> {
+fn empty_hashes() -> impl Iterator<Item = (Word, StoreNode)> {
     let subtrees = EmptySubtreeRoots::empty_hashes(255);
     subtrees
         .iter()
