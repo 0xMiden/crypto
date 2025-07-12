@@ -9,3 +9,9 @@ pub struct InnerNodeInfo {
     pub left: Word,
     pub right: Word,
 }
+
+/// A trait for structures that can provide an iterator over their inner nodes.
+pub trait InnerNodeIterable {
+    /// Returns an iterator over the inner nodes by borrowing the structure.
+    fn inner_nodes(&self) -> impl Iterator<Item = InnerNodeInfo>;
+}
