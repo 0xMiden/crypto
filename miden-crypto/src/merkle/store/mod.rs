@@ -531,7 +531,7 @@ impl Extend<InnerNodeInfo> for MerkleStore {
 }
 
 impl InnerNodeIterable for MerkleStore {
-    /// Iterator over the inner nodes of the [MerkleStore].
+    /// Iterator over the inner nodes of the [`MerkleStore`].
     fn inner_nodes(&self) -> impl Iterator<Item = InnerNodeInfo> {
         self.nodes
             .iter()

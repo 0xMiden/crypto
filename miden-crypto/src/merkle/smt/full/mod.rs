@@ -473,7 +473,7 @@ impl Default for Smt {
 // ================================================================================================
 
 impl InnerNodeIterable for Smt {
-    /// Returns an iterator over the inner nodes of this [Smt].
+    /// Returns an iterator over the inner nodes of this [`Smt`].
     fn inner_nodes(&self) -> impl Iterator<Item = InnerNodeInfo> {
         self.inner_nodes.values().map(|e| InnerNodeInfo {
             value: e.hash(),
