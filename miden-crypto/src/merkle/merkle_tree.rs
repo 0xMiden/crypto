@@ -201,7 +201,7 @@ impl Iterator for InnerNodeIterator<'_> {
 }
 
 impl InnerNodeIterable for MerkleTree {
-    /// Returns n iterator over every inner node of this [MerkleTree].
+    /// Returns an iterator over every inner node of this [`MerkleTree`].
     ///
     /// The iterator order is unspecified.
     fn inner_nodes(&self) -> impl Iterator<Item = InnerNodeInfo> {

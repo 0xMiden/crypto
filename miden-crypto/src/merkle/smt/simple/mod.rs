@@ -420,7 +420,7 @@ impl<const DEPTH: u8> SparseMerkleTree<DEPTH> for SimpleSmt<DEPTH> {
 // ================================================================================================
 
 impl<const DEPTH: u8> InnerNodeIterable for SimpleSmt<DEPTH> {
-    /// Returns an iterator over the inner nodes of this [SimpleSmt].
+    /// Returns an iterator over the inner nodes of this [`SimpleSmt`].
     fn inner_nodes(&self) -> impl Iterator<Item = InnerNodeInfo> {
         self.inner_nodes.values().map(|e| InnerNodeInfo {
             value: e.hash(),
