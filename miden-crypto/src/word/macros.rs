@@ -1,4 +1,4 @@
-use super::{Felt, StarkField};
+use super::{Felt, StarkField, Word};
 
 // MACROS
 // ================================================================================================
@@ -9,17 +9,17 @@ use super::{Felt, StarkField};
 #[macro_export]
 macro_rules! word {
     ($hex:expr) => {{
-        let felts: [$crate::Felt; 4] = match $crate::word::parse_hex_string_as_word($hex) {
+        let word: Word = match $crate::word::parse_hex_string_as_word($hex) {
             Ok(v) => v,
             Err(e) => panic!("{}", e),
         };
 
-        $crate::Word::new(felts)
+        word
     }};
 }
 
-/// Parses a hex string into a `[Felt; 4]` array.
-pub const fn parse_hex_string_as_word(hex: &str) -> Result<[Felt; 4], &'static str> {
+/// Parses a hex string into a [`Word`] array.
+pub const fn parse_hex_string_as_word(hex: &str) -> Result<Word, &'static str> {
     const fn parse_hex_digit(digit: u8) -> Result<u8, &'static str> {
         match digit {
             b'0'..=b'9' => Ok(digit - b'0'),
@@ -72,10 +72,10 @@ pub const fn parse_hex_string_as_word(hex: &str) -> Result<[Felt; 4], &'static s
         idx += 1;
     }
 
-    Ok([
+    Ok(Word::new([
         Felt::new(felts[0]),
         Felt::new(felts[1]),
         Felt::new(felts[2]),
         Felt::new(felts[3]),
-    ])
+    ]))
 }
