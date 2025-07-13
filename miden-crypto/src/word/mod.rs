@@ -46,12 +46,12 @@ impl Word {
     /// The serialized size of the word in bytes.
     pub const SERIALIZED_SIZE: usize = WORD_SIZE_BYTES;
 
-    /// Creates a new [Word] from the given field elements.
+    /// Creates a new [`Word`] from the given field elements.
     pub const fn new(value: [Felt; WORD_SIZE_FELT]) -> Self {
         Self(value)
     }
 
-    /// Parses a hex string into a [`Word`] array.
+    /// Parses a hex string into a new [`Word`].
     pub const fn parse(hex: &str) -> Result<Word, &'static str> {
         const fn parse_hex_digit(digit: u8) -> Result<u8, &'static str> {
             match digit {
