@@ -52,7 +52,7 @@ impl Word {
     }
 
     /// Parses a hex string into a new [`Word`].
-    pub const fn parse(hex: &str) -> Result<Word, &'static str> {
+    pub const fn parse(hex: &str) -> Result<Self, &'static str> {
         const fn parse_hex_digit(digit: u8) -> Result<u8, &'static str> {
             match digit {
                 b'0'..=b'9' => Ok(digit - b'0'),
@@ -105,7 +105,7 @@ impl Word {
             idx += 1;
         }
 
-        Ok(Word::new([
+        Ok(Self::new([
             Felt::new(felts[0]),
             Felt::new(felts[1]),
             Felt::new(felts[2]),
