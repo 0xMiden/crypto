@@ -1,3 +1,5 @@
+use winter_utils::{Deserializable, Serializable};
+
 use super::{LeafIndex, SMT_DEPTH};
 use crate::{
     EMPTY_WORD, Word,
@@ -284,6 +286,33 @@ impl PartialSmt {
 impl Default for PartialSmt {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+// CONVERSIONS
+// ================================================================================================
+
+impl From<Smt> for PartialSmt {
+    fn from(smt: Smt) -> Self {
+        PartialSmt(smt)
+    }
+}
+
+// SERIALIZATION
+// ================================================================================================
+
+impl Serializable for PartialSmt {
+    fn write_into<W: winter_utils::ByteWriter>(&self, target: &mut W) {
+        target.write(&self.0);
+    }
+}
+
+impl Deserializable for PartialSmt {
+    fn read_from<R: winter_utils::ByteReader>(
+        source: &mut R,
+    ) -> Result<Self, winter_utils::DeserializationError> {
+        let inner: Smt = source.read()?;
+        Ok(PartialSmt(inner))
     }
 }
 
@@ -586,5 +615,21 @@ mod tests {
     #[test]
     fn partial_smt_is_empty() {
         assert!(PartialSmt::new().is_empty());
+    }
+
+    /// `PartialSmt` serde round-trip. Also tests conversion from SMT.
+    #[test]
+    fn partial_smt_serialization_roundtrip() {
+        let key = Word::new(rand_array());
+        let val = Word::new(rand_array());
+
+        let key_1 = Word::new(rand_array());
+        let val_1 = Word::new(rand_array());
+
+        let original: PartialSmt = Smt::with_entries([(key, val), (key_1, val_1)]).unwrap().into();
+        let bytes = original.to_bytes();
+        let decoded = PartialSmt::read_from_bytes(&bytes).unwrap();
+
+        assert_eq!(original, decoded);
     }
 }
