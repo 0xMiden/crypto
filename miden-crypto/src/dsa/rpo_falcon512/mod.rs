@@ -1,3 +1,36 @@
+//! A deterministic RPO Falcon512 signature over a message.
+//!
+//! This version differs from the reference implementation in its use of the RPO algebraic hash
+//! function in its hash-to-point algorithm.
+//!
+//! Another point of difference is the determinism in the signing process. The approach used to
+//! achieve this is the one proposed in [1].
+//! The main challenge in making the signing procedure deterministic is ensuring that the same
+//! secret key is never used to produce two inequivalent signatures for the same `c`.
+//! For a precise definition of equivalence of signatures see [1].
+//! The reference implementation uses a random nonce per signature in order to make sure that,
+//! with overwhelming probability, no two c-s will ever repeat and this non-repetition turns out
+//! to be enough to make the security proof of the underlying construction go through in
+//! the random-oracle model.
+//!
+//! Making the signing process deterministic means that we cannot rely on the above use of nonce
+//! in the hash-to-point algorithm, i.e., the hash-to-point algorithm is deterministic. It also
+//! means that we have to derandomize the trapdoor sampling process and use the entropy in
+//! the secret key, together with the message, as the seed of a CPRNG. This is exactly the approach
+//! taken in [2] but, as explained at length in [1], this is not enough. The reason for this
+//! is that the sampling process during signature generation must be ensured to be consistent
+//! across the entire computing stack i.e., hardware, compiler, OS, sampler implementations ...
+//!
+//! This is made even more difficult by the extensive use of floating-point arithmetic by
+//! the sampler. In relation to this point, the current implementation does not use any platform
+//! specific optimizations (e.g., AVX2, NEON, FMA ...) and relies solely on the builtin `f64` type.
+//! Moreover, as per the time of this writing, the implementation does not use any methods or
+//! functions from `std::f64` that have non-deterministic precision mentioned in their
+//! documentation.
+//!
+//! [1]: https://github.com/algorand/falcon/blob/main/falcon-det.pdf
+//! [2]: https://datatracker.ietf.org/doc/html/rfc6979#section-3.5
+
 #[cfg(test)]
 use rand::Rng;
 
@@ -86,19 +119,15 @@ type ShortLatticeBasis = [Polynomial<i16>; 4];
 
 /// Nonce of the Falcon signature.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Nonce {
-    nonce_version: u8,
-    preversioned_nonce: [u8; PREVERSIONED_NONCE_LEN],
-}
+pub struct Nonce([u8; SIG_NONCE_LEN]);
 
 impl Nonce {
     /// Returns a new [Nonce].
-    #[allow(clippy::new_without_default)]
-    pub fn new() -> Self {
-        Self {
-            nonce_version: NONCE_VERSION_BYTE,
-            preversioned_nonce: PREVERSIONED_NONCE,
-        }
+    pub fn preversioned() -> Self {
+        let mut nonce_bytes = [0u8; SIG_NONCE_LEN];
+        nonce_bytes[0] = NONCE_VERSION_BYTE;
+        nonce_bytes[1..].copy_from_slice(&PREVERSIONED_NONCE);
+        Self(nonce_bytes)
     }
 
     /// Returns a new [Nonce] drawn from the provided RNG.
@@ -114,22 +143,12 @@ impl Nonce {
 
     /// Returns the underlying concatenated bytes of this nonce.
     pub fn as_bytes(&self) -> [u8; SIG_NONCE_LEN] {
-        let mut nonce_bytes = [0u8; SIG_NONCE_LEN];
-        nonce_bytes[0] = self.nonce_version;
-        nonce_bytes
-            .iter_mut()
-            .skip(1)
-            .zip(self.preversioned_nonce.iter())
-            .for_each(|(dst, src)| *dst = *src);
-
-        nonce_bytes
+        self.0
     }
 
     /// Returns a `Nonce` given an array of bytes.
     pub fn from_bytes(nonce_bytes: [u8; SIG_NONCE_LEN]) -> Self {
-        let nonce_version = nonce_bytes[0];
-        let preversioned_nonce = (&nonce_bytes[1..]).try_into().expect("should not fail");
-        Self { nonce_version, preversioned_nonce }
+        Self(nonce_bytes)
     }
 
     /// Converts byte representation of the nonce into field element representation.
@@ -152,16 +171,18 @@ impl Nonce {
 
 impl Serializable for &Nonce {
     fn write_into<W: ByteWriter>(&self, target: &mut W) {
-        target.write_u8(self.nonce_version)
+        target.write_u8(self.0[0])
     }
 }
 
 impl Deserializable for Nonce {
     fn read_from<R: ByteReader>(source: &mut R) -> Result<Self, DeserializationError> {
-        let nonce_version = source.read()?;
-        Ok(Self {
-            nonce_version,
-            preversioned_nonce: PREVERSIONED_NONCE,
-        })
+        let nonce_version: u8 = source.read()?;
+
+        let mut nonce_bytes = [0u8; SIG_NONCE_LEN];
+        nonce_bytes[0] = nonce_version;
+        nonce_bytes[1..].copy_from_slice(&PREVERSIONED_NONCE);
+
+        Ok(Self(nonce_bytes))
     }
 }
