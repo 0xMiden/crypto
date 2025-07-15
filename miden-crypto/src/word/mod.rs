@@ -54,7 +54,8 @@ impl Word {
     /// The input must contain valid hex prefixed with `0x`. The input after the prefix
     /// must contain between 0 and 64 characters (inclusive).
     ///
-    /// The input is interpreted to have little-endian byte ordering.
+    /// The input is interpreted to have little-endian byte ordering. Nibbles are interpreted
+    /// to have big-endian ordering so that "0x10" represents Felt::new(16), not Felt::new(1).
     ///
     /// This function is usually used via the `word!` macro.
     ///
