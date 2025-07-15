@@ -54,7 +54,7 @@ impl Word {
     /// The input must contain valid hex prefixed with `0x`. The input after the prefix
     /// must contain between 0 and 64 characters (inclusive).
     ///
-    /// The input is interpreted to have little-endian byte ordering and big-endian nibble ordering.
+    /// The input is interpreted to have little-endian byte ordering.
     ///
     /// This function is usually used via the `word!` macro.
     ///
@@ -93,7 +93,7 @@ impl Word {
             };
 
             // This digit's nibble offset within the felt. We need to invert the nibbles per
-            // byte for endianness reasons i.e. ABCD -> BADC.
+            // byte to ensure little-endian ordering i.e. ABCD -> BADC.
             let inibble = if i.is_multiple_of(2) {
                 (i + 1) % 16
             } else {
