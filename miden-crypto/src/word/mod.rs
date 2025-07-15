@@ -55,11 +55,14 @@ impl Word {
     /// must contain between 0 and 64 characters (inclusive).
     ///
     /// The input is interpreted to have the same byte endianness as the resulting [`Word`].
-    /// Nibble order is reversed so that "0x10" is equivalent to `Felt::new(16)`, not `Felt::new(1)`.
+    /// Nibble order is reversed so that "0x10" is equivalent to `Felt::new(16)`, not
+    /// `Felt::new(1)`.
     ///
-    /// With input of "0x10000000000000002000000000000000300000000000000040000000000000000",
-    /// the resulting [`Word`] will have the following field elements:
-    /// `Word([Felt::new(16), Felt::new(32), Felt::new(48), Felt::new(64)])`
+    /// ```
+    /// use miden_crypto::{Felt, Word, word};
+    /// let word = word!("0x1000000000000000200000000000000030000000000000004000000000000000");
+    /// assert_eq!(word, Word::new([Felt::new(16), Felt::new(32), Felt::new(48), Felt::new(64)]));
+    /// ```
     pub const fn parse(hex: &str) -> Result<Self, &'static str> {
         const fn parse_hex_digit(digit: u8) -> Result<u8, &'static str> {
             match digit {
