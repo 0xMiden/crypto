@@ -1,5 +1,9 @@
 ## 0.15.5 (2025-07-10)
 
+- Added conversions and seralization for `PartialSmt` ([#451](https://github.com/0xMiden/crypto/pull/451/)).
+
+## 0.15.5 (2025-07-10)
+
 - Added `empty()` and `is_empty()` methods to `Word`.
 
 ## 0.15.4 (2025-07-07)
