@@ -300,7 +300,7 @@ mod tests {
     use winter_math::fields::f64::BaseElement as Felt;
 
     use super::*;
-    use crate::{EMPTY_WORD, ONE, ZERO};
+    use crate::{EMPTY_WORD, ONE, ZERO, merkle::EmptySubtreeRoots};
 
     /// Tests that a basic PartialSmt can be built from a full one and that inserting or removing
     /// values whose merkle path were added to the partial SMT results in the same root as the
@@ -574,10 +574,16 @@ mod tests {
 
         let partial_inner_nodes: BTreeSet<_> =
             partial.inner_nodes().flat_map(|node| [node.left, node.right]).collect();
+        let empty_subtree_roots: BTreeSet<_> = (0..SMT_DEPTH)
+            .map(|depth| *EmptySubtreeRoots::entry(SMT_DEPTH, depth))
+            .collect();
 
         for merkle_path in proofs.into_iter().map(|proof| proof.into_parts().0) {
             for (idx, digest) in merkle_path.into_iter().enumerate() {
-                assert!(partial_inner_nodes.contains(&digest), "failed at idx {idx}");
+                assert!(
+                    partial_inner_nodes.contains(&digest) || empty_subtree_roots.contains(&digest),
+                    "failed at idx {idx}"
+                );
             }
         }
     }
