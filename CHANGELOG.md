@@ -1,6 +1,6 @@
 ## 0.15.6 (2025-07-15)
 
-- Added conversions and seralization for `PartialSmt` ([#451](https://github.com/0xMiden/crypto/pull/451/)).
+- Added conversions and seralization for `PartialSmt` ([#451](https://github.com/0xMiden/crypto/pull/451/), [#453](https://github.com/0xMiden/crypto/pull/453/)).
 
 ## 0.15.5 (2025-07-10)
 

@@ -1,4 +1,3 @@
-
 use winter_utils::{ByteReader, ByteWriter, Deserializable, DeserializationError, Serializable};
 
 use super::{LeafIndex, SMT_DEPTH};
