@@ -4,6 +4,7 @@
 - Added implementation of Poseidon2 hash function ([#429](https://github.com/0xMiden/crypto/issues/429)).
 - [BREAKING] Remove generics from `MerkleStore` and remove `KvMap` and `RecordingMap` ([#442](https://github.com/0xMiden/crypto/issues/442)).
 - [BREAKING] Rename `smt_hashmaps` feature to `hashmaps` ([#442](https://github.com/0xMiden/crypto/issues/442)).
+- [BREAKING] Refactor `parse_hex_string_as_word()` to `Word::parse()` ([#450](https://github.com/0xMiden/crypto/issues/450)).
 - `Smt.insert_inner_nodes` does not store empty subtrees ([#452](https://github.com/0xMiden/crypto/pull/452)).
 
 ## 0.15.5 (2025-07-10)
