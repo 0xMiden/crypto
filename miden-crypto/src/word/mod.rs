@@ -58,6 +58,8 @@ impl Word {
     /// Nibble order is reversed so that "0x10" is equivalent to `Felt::new(16)`, not
     /// `Felt::new(1)`.
     ///
+    /// This function is usually used via the `word!` macro.
+    ///
     /// ```
     /// use miden_crypto::{Felt, Word, word};
     /// let word = word!("0x1000000000000000200000000000000030000000000000004000000000000000");
