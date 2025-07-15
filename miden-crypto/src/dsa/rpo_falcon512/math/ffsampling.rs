@@ -1,7 +1,5 @@
 use alloc::boxed::Box;
 
-#[cfg(not(feature = "std"))]
-use num::Float;
 use num::{One, Zero};
 use num_complex::{Complex, Complex64};
 use rand::Rng;
