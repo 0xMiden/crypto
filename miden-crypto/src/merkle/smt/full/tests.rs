@@ -183,6 +183,39 @@ fn test_smt_insert_and_remove_multiple_values() {
     assert!(smt.inner_nodes.is_empty());
 }
 
+/// Verify that the `insert_inner_node` doesn't store empty subtrees.
+#[test]
+fn test_smt_dont_store_empty_subtrees() {
+    use crate::merkle::smt::InnerNode;
+
+    let mut smt = Smt::default();
+
+    let node_index = NodeIndex::new(10, 42).unwrap();
+    let depth = node_index.depth();
+    let empty_subtree_node = EmptySubtreeRoots::get_inner_node(SMT_DEPTH, depth);
+
+    // Empty subtrees are not stored
+    assert!(!smt.inner_nodes.contains_key(&node_index));
+    let old_node = smt.insert_inner_node(node_index, empty_subtree_node.clone());
+    assert_eq!(old_node, None);
+    assert!(!smt.inner_nodes.contains_key(&node_index));
+
+    // Insert a non-empty node, then insert the empty subtree node again. This should remove the
+    // inner node.
+    let non_empty_node = InnerNode {
+        left: Word::new([ONE; 4]),
+        right: Word::new([ONE + ONE; 4]),
+    };
+    smt.insert_inner_node(node_index, non_empty_node.clone());
+    let old_node = smt.insert_inner_node(node_index, empty_subtree_node.clone());
+    assert_eq!(old_node, Some(non_empty_node));
+    assert!(!smt.inner_nodes.contains_key(&node_index));
+
+    // Verify that get_inner_node returns the correct empty subtree node
+    let retrieved_node = smt.get_inner_node(node_index);
+    assert_eq!(retrieved_node, empty_subtree_node);
+}
+
 /// This tests that inserting the empty value does indeed remove the key-value contained at the
 /// leaf. We insert & remove 3 values at the same leaf to ensure that all cases are covered (empty,
 /// single, multiple).
