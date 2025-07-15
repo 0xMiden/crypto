@@ -1,7 +1,7 @@
 use alloc::{string::ToString, vec::Vec};
-#[cfg(not(feature = "std"))]
-use num::traits::float::FloatCore;
 use num::Complex;
+#[cfg(not(feature = "std"))]
+use num::Float;
 use num_complex::Complex64;
 use rand::Rng;
 
