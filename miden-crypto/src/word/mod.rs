@@ -59,9 +59,7 @@ impl Word {
     ///
     /// With input of "0x10000000000000002000000000000000300000000000000040000000000000000",
     /// the resulting [`Word`] will have the following field elements:
-    /// ```
-    /// Word([Felt::new(16), Felt::new(32), Felt::new(48), Felt::new(64)])
-    /// ```
+    /// `Word([Felt::new(16), Felt::new(32), Felt::new(48), Felt::new(64)])`
     pub const fn parse(hex: &str) -> Result<Self, &'static str> {
         const fn parse_hex_digit(digit: u8) -> Result<u8, &'static str> {
             match digit {
