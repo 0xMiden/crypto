@@ -52,7 +52,7 @@ pub struct Smt {
     root: Word,
     // pub(super) for use in PartialSmt.
     pub(super) leaves: Leaves,
-    inner_nodes: InnerNodes,
+    pub(super) inner_nodes: InnerNodes,
 }
 
 impl Smt {

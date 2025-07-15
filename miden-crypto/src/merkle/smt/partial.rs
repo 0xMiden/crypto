@@ -1,11 +1,12 @@
-use winter_utils::{Deserializable, Serializable};
+
+use winter_utils::{ByteReader, ByteWriter, Deserializable, DeserializationError, Serializable};
 
 use super::{LeafIndex, SMT_DEPTH};
 use crate::{
     EMPTY_WORD, Word,
     merkle::{
-        InnerNode, InnerNodeInfo, MerkleError, MerklePath, Smt, SmtLeaf, SmtProof,
-        smt::SparseMerkleTree,
+        InnerNode, InnerNodeInfo, MerkleError, MerklePath, NodeIndex, Smt, SmtLeaf, SmtProof,
+        smt::{InnerNodes, Leaves, SparseMerkleTree},
     },
 };
 
@@ -302,17 +303,41 @@ impl From<Smt> for PartialSmt {
 // ================================================================================================
 
 impl Serializable for PartialSmt {
-    fn write_into<W: winter_utils::ByteWriter>(&self, target: &mut W) {
-        target.write(&self.0);
+    fn write_into<W: ByteWriter>(&self, target: &mut W) {
+        target.write(self.root());
+        target.write_usize(self.0.leaves.len());
+        for (i, leaf) in &self.0.leaves {
+            target.write_u64(*i);
+            target.write(leaf);
+        }
+        target.write_usize(self.0.inner_nodes.len());
+        for (i, n) in &self.0.inner_nodes {
+            target.write(i);
+            target.write(n);
+        }
     }
 }
 
 impl Deserializable for PartialSmt {
-    fn read_from<R: winter_utils::ByteReader>(
-        source: &mut R,
-    ) -> Result<Self, winter_utils::DeserializationError> {
-        let inner: Smt = source.read()?;
-        Ok(PartialSmt(inner))
+    fn read_from<R: ByteReader>(source: &mut R) -> Result<Self, DeserializationError> {
+        let root: Word = source.read()?;
+
+        let mut leaves = Leaves::default();
+        for _ in 0..source.read_usize()? {
+            let pos: u64 = source.read()?;
+            let leaf: SmtLeaf = source.read()?;
+            leaves.insert(pos, leaf);
+        }
+
+        let mut nodes = InnerNodes::default();
+        for _ in 0..source.read_usize()? {
+            let idx: NodeIndex = source.read()?;
+            let node: InnerNode = source.read()?;
+            nodes.insert(idx, node);
+        }
+
+        let smt = Smt::from_raw_parts(nodes, leaves, root);
+        Ok(PartialSmt(smt))
     }
 }
 
@@ -620,16 +645,26 @@ mod tests {
     /// `PartialSmt` serde round-trip. Also tests conversion from SMT.
     #[test]
     fn partial_smt_serialization_roundtrip() {
-        let key = Word::new(rand_array());
+        let key: Word = Word::new(rand_array());
         let val = Word::new(rand_array());
 
         let key_1 = Word::new(rand_array());
         let val_1 = Word::new(rand_array());
 
-        let original: PartialSmt = Smt::with_entries([(key, val), (key_1, val_1)]).unwrap().into();
-        let bytes = original.to_bytes();
+        let key_2 = Word::new(rand_array());
+        let val_2 = Word::new(rand_array());
+
+        let smt: Smt = Smt::with_entries([(key, val), (key_1, val_1), (key_2, val_2)]).unwrap();
+
+        let partial_smt = PartialSmt::from_proofs([smt.open(&key)]).unwrap();
+
+        assert_eq!(partial_smt.root(), smt.root());
+        assert_matches!(partial_smt.open(&key_1), Err(MerkleError::UntrackedKey(_)));
+        assert_matches!(partial_smt.open(&key), Ok(_));
+
+        let bytes = partial_smt.to_bytes();
         let decoded = PartialSmt::read_from_bytes(&bytes).unwrap();
 
-        assert_eq!(original, decoded);
+        assert_eq!(partial_smt, decoded);
     }
 }
