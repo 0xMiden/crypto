@@ -10,7 +10,6 @@ use core::ops::MulAssign;
 
 #[cfg(not(feature = "std"))]
 use num::Float;
-
 use num::{BigInt, FromPrimitive, One, Zero};
 use num_complex::Complex64;
 use rand::Rng;
