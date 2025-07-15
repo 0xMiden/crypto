@@ -383,7 +383,10 @@ mod tests {
     use rand::SeedableRng;
     use rand_chacha::ChaCha20Rng;
 
-    use super::{super::SecretKey, *};
+    use super::{
+        super::{SIG_SERIALIZED_LEN, SecretKey},
+        *,
+    };
 
     #[test]
     fn test_serialization_round_trip() {
@@ -393,6 +396,7 @@ mod tests {
         let sk = SecretKey::with_rng(&mut rng);
         let signature = sk.sign_with_rng(Word::default(), &mut rng);
         let serialized = signature.to_bytes();
+        assert_eq!(serialized.len(), SIG_SERIALIZED_LEN);
         let deserialized = Signature::read_from_bytes(&serialized).unwrap();
         assert_eq!(signature.sig_poly(), deserialized.sig_poly());
     }

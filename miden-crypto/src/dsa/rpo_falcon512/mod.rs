@@ -103,6 +103,10 @@ pub const SK_LEN: usize = 1281;
 /// Signature length as a u8 vector.
 const SIG_POLY_BYTE_LEN: usize = 625;
 
+/// Signature size when serialized as a u8 vector.
+#[cfg(test)]
+const SIG_SERIALIZED_LEN: usize = 1524;
+
 /// Bound on the squared-norm of the signature.
 const SIG_L2_BOUND: u64 = 34034726;
 
@@ -122,8 +126,18 @@ type ShortLatticeBasis = [Polynomial<i16>; 4];
 pub struct Nonce([u8; SIG_NONCE_LEN]);
 
 impl Nonce {
-    /// Returns a new [Nonce].
-    pub fn preversioned() -> Self {
+    /// Returns a new deterministic [Nonce].
+    ///
+    /// This is used in deterministic signing following [1] and is composed of two parts:
+    ///
+    /// 1. a byte serving as a version byte,
+    /// 2. a pre-versioned fixed nonce which is the UTF8 encoding of the domain separator
+    ///    "RPO-FALCON-DET" padded with enough zeros to make it of size 39 bytes.
+    ///
+    /// The usefulness of the notion of versioned fixed nonce is discussed in Section 2.1 in [1].
+    ///
+    /// [1]: https://github.com/algorand/falcon/blob/main/falcon-det.pdf
+    pub fn deterministic() -> Self {
         let mut nonce_bytes = [0u8; SIG_NONCE_LEN];
         nonce_bytes[0] = NONCE_VERSION_BYTE;
         nonce_bytes[1..].copy_from_slice(&PREVERSIONED_NONCE);

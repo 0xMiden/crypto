@@ -124,7 +124,7 @@ impl SecretKey {
 
     /// Signs a message with the secret key relying on the provided randomness generator.
     pub fn sign_with_rng<R: Rng>(&self, message: Word, rng: &mut R) -> Signature {
-        let nonce = Nonce::preversioned();
+        let nonce = Nonce::deterministic();
 
         let h = self.compute_pub_key_poly();
         let c = hash_to_point_rpo256(message, &nonce);
