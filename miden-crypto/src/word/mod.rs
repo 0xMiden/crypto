@@ -25,8 +25,6 @@ use crate::{
     },
 };
 
-mod macros;
-
 mod lexicographic;
 pub use lexicographic::LexicographicWord;
 
@@ -52,6 +50,11 @@ impl Word {
     }
 
     /// Parses a hex string into a new [`Word`].
+    ///
+    /// The input must contain valid hex prefixed with `0x`. The input after the prefix
+    /// must contain between 0 and 64 characters (inclusive).
+    ///
+    /// The input is interpreted to have the same byte endianness as the resulting [`Word`].
     pub const fn parse(hex: &str) -> Result<Self, &'static str> {
         const fn parse_hex_digit(digit: u8) -> Result<u8, &'static str> {
             match digit {
@@ -639,4 +642,22 @@ impl IntoIterator for Word {
     fn into_iter(self) -> Self::IntoIter {
         self.0.into_iter()
     }
+}
+
+// MACROS
+// ================================================================================================
+
+/// Construct a new [Word](super::Word) from a hex value.
+///
+/// Expects a '0x' prefixed hex string followed by up to 64 hex digits.
+#[macro_export]
+macro_rules! word {
+    ($hex:expr) => {{
+        let word: Word = match $crate::word::Word::parse($hex) {
+            Ok(v) => v,
+            Err(e) => panic!("{}", e),
+        };
+
+        word
+    }};
 }
