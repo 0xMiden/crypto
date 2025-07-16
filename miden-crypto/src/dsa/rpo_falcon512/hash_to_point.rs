@@ -54,7 +54,7 @@ pub fn hash_to_point_shake256(message: &[u8], nonce: &Nonce) -> Polynomial<Falco
     };
 
     let mut data = vec![];
-    data.extend_from_slice(nonce.as_bytes());
+    data.extend_from_slice(&nonce.as_bytes());
     data.extend_from_slice(message);
     const K: u32 = (1u32 << 16) / MODULUS as u32;
 

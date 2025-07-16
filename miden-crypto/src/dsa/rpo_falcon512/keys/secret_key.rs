@@ -17,7 +17,8 @@ use super::{
 };
 use crate::{
     Word,
-    dsa::rpo_falcon512::{SK_LEN, hash_to_point::hash_to_point_rpo256, math::ntru_gen},
+    dsa::rpo_falcon512::{LOG_N, SK_LEN, hash_to_point::hash_to_point_rpo256, math::ntru_gen},
+    hash::blake::Blake3_256,
 };
 
 // CONSTANTS
@@ -114,17 +115,18 @@ impl SecretKey {
     // --------------------------------------------------------------------------------------------
 
     /// Signs a message with this secret key.
-    #[cfg(feature = "std")]
     pub fn sign(&self, message: crate::Word) -> Signature {
-        use rand::{SeedableRng, rngs::StdRng};
+        use rand::SeedableRng;
+        use rand_chacha::ChaCha20Rng;
 
-        let mut rng = StdRng::from_os_rng();
+        let seed = self.generate_seed(&message);
+        let mut rng = ChaCha20Rng::from_seed(seed);
         self.sign_with_rng(message, &mut rng)
     }
 
     /// Signs a message with the secret key relying on the provided randomness generator.
     pub fn sign_with_rng<R: Rng>(&self, message: Word, rng: &mut R) -> Signature {
-        let nonce = Nonce::random(rng);
+        let nonce = Nonce::deterministic();
 
         let h = self.compute_pub_key_poly();
         let c = hash_to_point_rpo256(message, &nonce);
@@ -145,7 +147,7 @@ impl SecretKey {
     /// number generators for generating the nonce and in `Self::sign_helper`.
     ///
     /// These changes make the signature algorithm compliant with the reference implementation.
-    #[cfg(test)]
+    #[cfg(all(test, feature = "std"))]
     pub fn sign_with_rng_testing<R: Rng>(&self, message: &[u8], rng: &mut R) -> Signature {
         use crate::dsa::rpo_falcon512::{hash_to_point::hash_to_point_shake256, tests::ChaCha};
 
@@ -224,6 +226,29 @@ impl SecretKey {
                 return s2;
             }
         }
+    }
+
+    /// Deterministically generates a seed for seeding the PRNG used in the trapdoor sampling
+    /// algorithm used during signature generation.
+    ///
+    /// This uses the argument described in [RFC 6979](https://datatracker.ietf.org/doc/html/rfc6979#section-3.5)
+    /// § 3.5 where the concatenation of the private key and the hashed message, i.e., sk || H(m),
+    /// is used in order to construct the initial seed of a PRNG. See also [1].
+    ///
+    ///
+    /// Note that we hash in also a `log_2(N)` where `N = 512` in order to domain separate between
+    /// different versions of the Falcon DSA, see [1] Section 3.4.1.
+    ///
+    /// [1]: https://github.com/algorand/falcon/blob/main/falcon-det.pdf
+    fn generate_seed(&self, message: &Word) -> [u8; 32] {
+        let mut buffer = Vec::with_capacity(1 + SK_LEN + Word::SERIALIZED_SIZE);
+        buffer.push(LOG_N);
+        buffer.extend_from_slice(&self.to_bytes());
+        buffer.extend_from_slice(&message.to_bytes());
+
+        let digest = Blake3_256::hash(&buffer);
+
+        digest.into()
     }
 }
 
