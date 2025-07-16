@@ -310,9 +310,9 @@ impl Serializable for PartialSmt {
             target.write(leaf);
         }
         target.write_usize(self.0.inner_nodes.len());
-        for (i, n) in &self.0.inner_nodes {
-            target.write(i);
-            target.write(n);
+        for (idx, node) in &self.0.inner_nodes {
+            target.write(idx);
+            target.write(node);
         }
     }
 }
