@@ -51,6 +51,7 @@ type Leaves = super::Leaves<SmtLeaf>;
 pub struct Smt {
     root: Word,
     // pub(super) for use in PartialSmt.
+    pub(super) num_kv_pairs: usize,
     pub(super) leaves: Leaves,
     pub(super) inner_nodes: InnerNodes,
 }
@@ -72,6 +73,7 @@ impl Smt {
 
         Self {
             root,
+            num_kv_pairs: 0,
             inner_nodes: Default::default(),
             leaves: Default::default(),
         }
@@ -191,11 +193,8 @@ impl Smt {
     ///
     /// Note that this may return a different value from [Self::num_leaves()] as a single leaf may
     /// contain more than one key-value pair.
-    ///
-    /// Also note that this is currently an expensive operation as counting the number of
-    /// entries requires iterating over all leaves of the tree.
     pub fn num_entries(&self) -> usize {
-        self.entries().count()
+        self.num_kv_pairs
     }
 
     /// Returns the leaf to which `key` maps
@@ -333,10 +332,16 @@ impl Smt {
         let leaf_index: LeafIndex<SMT_DEPTH> = Self::key_to_leaf_index(&key);
 
         match self.leaves.get_mut(&leaf_index.value()) {
-            Some(leaf) => leaf.insert(key, value),
+            Some(leaf) => {
+                let prev_entries = leaf.num_entries();
+                let result = leaf.insert(key, value);
+                let current_entries = leaf.num_entries();
+                self.num_kv_pairs += (current_entries - prev_entries) as usize;
+                result
+            },
             None => {
                 self.leaves.insert(leaf_index.value(), SmtLeaf::Single((key, value)));
-
+                self.num_kv_pairs += 1;
                 None
             },
         }
@@ -347,7 +352,10 @@ impl Smt {
         let leaf_index: LeafIndex<SMT_DEPTH> = Self::key_to_leaf_index(&key);
 
         if let Some(leaf) = self.leaves.get_mut(&leaf_index.value()) {
+            let prev_entries = leaf.num_entries();
             let (old_value, is_empty) = leaf.remove(key);
+            let current_entries = leaf.num_entries();
+            self.num_kv_pairs -= (prev_entries - current_entries) as usize;
             if is_empty {
                 self.leaves.remove(&leaf_index.value());
             }
@@ -377,8 +385,8 @@ impl SparseMerkleTree<SMT_DEPTH> for Smt {
             let root_node = inner_nodes.get(&NodeIndex::root()).unwrap();
             assert_eq!(root_node.hash(), root);
         }
-
-        Ok(Self { root, inner_nodes, leaves })
+        let num_kv_pairs = leaves.iter().flat_map(|(_, leaf)| leaf.entries()).count();
+        Ok(Self { root, inner_nodes, leaves, num_kv_pairs })
     }
 
     fn root(&self) -> Word {

@@ -176,7 +176,19 @@ impl PartialSmt {
         //   PartialSmt::insert, this will not error for such empty leaves whose merkle path was
         //   added, but will error for otherwise non-existent leaves whose paths were not added,
         //   which is what we want.
+        let prev_entries = self
+            .0
+            .leaves
+            .get(&current_index.value())
+            .map(|leaf| leaf.num_entries())
+            .unwrap_or(0);
+        let current_entries = leaf.num_entries();
         self.0.leaves.insert(current_index.value(), leaf);
+        if current_entries > prev_entries {
+            self.0.num_kv_pairs += (current_entries - prev_entries) as usize;
+        } else {
+            self.0.num_kv_pairs -= (prev_entries - current_entries) as usize;
+        }
 
         for sibling_hash in path {
             // Find the index of the sibling node and compute whether it is a left or right child.
@@ -270,9 +282,6 @@ impl PartialSmt {
     ///
     /// Note that this may return a different value from [Self::num_leaves()] as a single leaf may
     /// contain more than one key-value pair.
-    ///
-    /// Also note that this is currently an expensive operation as counting the number of
-    /// entries requires iterating over all leaves of the tree.
     pub fn num_entries(&self) -> usize {
         self.0.num_entries()
     }

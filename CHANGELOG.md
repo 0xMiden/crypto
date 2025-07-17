@@ -7,6 +7,7 @@
 - [BREAKING] Refactor `parse_hex_string_as_word()` to `Word::parse()` ([#450](https://github.com/0xMiden/crypto/issues/450)).
 - [BREAKING] Make Falcon DSA deterministic (#436).
 - `Smt.insert_inner_nodes` does not store empty subtrees ([#452](https://github.com/0xMiden/crypto/pull/452)).
+- Optimized `Smt::num_entries()`.
 
 ## 0.15.6 (2025-07-15)
 
