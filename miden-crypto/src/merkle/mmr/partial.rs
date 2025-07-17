@@ -734,8 +734,8 @@ mod tests {
         assert_eq!(partial_mmr.inner_nodes([].iter().cloned()).next(), None);
 
         // build Merkle store from authentication paths in partial MMR
-        let mut store: MerkleStore = MerkleStore::new();
-        store.extend(partial_mmr.inner_nodes([(1, node1)].iter().cloned()));
+        let mut store: MerkleStore =
+            partial_mmr.inner_nodes([(1, node1)].iter().cloned()).collect();
 
         let index1 = NodeIndex::new(2, 1).unwrap();
         let path1 = store.get_path(first_peak, index1).unwrap().path;
@@ -791,8 +791,8 @@ mod tests {
         partial_mmr.track(5, node5, &proof5.merkle_path).unwrap();
 
         // build Merkle store from authentication paths in partial MMR
-        let mut store: MerkleStore = MerkleStore::new();
-        store.extend(partial_mmr.inner_nodes([(1, node1), (5, node5)].iter().cloned()));
+        let store: MerkleStore =
+            partial_mmr.inner_nodes([(1, node1), (5, node5)].iter().cloned()).collect();
 
         let index1 = NodeIndex::new(2, 1).unwrap();
         let index5 = NodeIndex::new(1, 1).unwrap();

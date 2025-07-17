@@ -4,7 +4,8 @@ use super::{LeafIndex, SMT_DEPTH};
 use crate::{
     EMPTY_WORD, Word,
     merkle::{
-        InnerNode, InnerNodeInfo, MerkleError, MerklePath, NodeIndex, Smt, SmtLeaf, SmtProof,
+        InnerNode, InnerNodeInfo, InnerNodeIterable, MerkleError, MerklePath, NodeIndex, Smt,
+        SmtLeaf, SmtProof,
         smt::{InnerNodes, Leaves, SparseMerkleTree},
     },
 };
@@ -229,11 +230,6 @@ impl PartialSmt {
         self.0.leaves.contains_key(&Smt::key_to_leaf_index(key).value())
     }
 
-    /// Returns an iterator over the inner nodes of the [`PartialSmt`].
-    pub fn inner_nodes(&self) -> impl Iterator<Item = InnerNodeInfo> + '_ {
-        self.0.inner_nodes()
-    }
-
     /// Returns an iterator over the tracked, non-empty leaves of the [`PartialSmt`] in arbitrary
     /// order.
     pub fn leaves(&self) -> impl Iterator<Item = (LeafIndex<SMT_DEPTH>, &SmtLeaf)> {
@@ -337,6 +333,16 @@ impl Deserializable for PartialSmt {
 
         let smt = Smt::from_raw_parts(nodes, leaves, root);
         Ok(PartialSmt(smt))
+    }
+}
+
+// ITERATORS
+// ================================================================================================
+
+impl InnerNodeIterable for PartialSmt {
+    /// Returns an iterator over the inner nodes of the [`PartialSmt`].
+    fn inner_nodes(&self) -> impl Iterator<Item = InnerNodeInfo> {
+        self.0.inner_nodes()
     }
 }
 
