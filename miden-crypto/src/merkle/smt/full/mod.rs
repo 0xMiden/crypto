@@ -32,6 +32,9 @@ mod tests;
 /// All leaves in this SMT are located at depth 64.
 pub const SMT_DEPTH: u8 = 64;
 
+/// The maximum number of entries allowed in a multiple leaf.
+pub const MAX_LEAF_ENTRIES: usize = 1 << 16;
+
 // SMT
 // ================================================================================================
 

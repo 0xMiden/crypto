@@ -7,7 +7,7 @@ use super::{EmptySubtreeRoots, InnerNodeInfo, MerkleError, MerklePath, NodeIndex
 use crate::{EMPTY_WORD, Felt, Map, Word, hash::rpo::Rpo256};
 
 mod full;
-pub use full::{SMT_DEPTH, Smt, SmtLeaf, SmtLeafError, SmtProof, SmtProofError};
+pub use full::{MAX_LEAF_ENTRIES, SMT_DEPTH, Smt, SmtLeaf, SmtLeafError, SmtProof, SmtProofError};
 #[cfg(feature = "internal")]
 pub use full::{SubtreeLeaf, build_subtree_for_bench};
 

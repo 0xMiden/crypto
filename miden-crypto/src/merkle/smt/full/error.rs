@@ -38,6 +38,10 @@ pub enum SmtLeafError {
     /// Multiple leaf requires at least two entries, but fewer were provided.
     #[error("multiple leaf requires at least two entries but only {0} were given")]
     MultipleLeafRequiresTwoEntries(usize),
+
+    /// Multiple leaf contains more entries than the maximum allowed.
+    #[error("multiple leaf contains {actual} entries but the maximum allowed is {max}")]
+    TooManyLeafEntries { actual: usize, max: usize },
 }
 
 // SMT PROOF ERROR
