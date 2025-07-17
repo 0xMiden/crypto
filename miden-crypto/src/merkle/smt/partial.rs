@@ -632,4 +632,13 @@ mod tests {
 
         assert_eq!(original, decoded);
     }
+
+    #[test]
+    fn partial_smt_serialization_rounfdtrip() {
+        let partial_smt = PartialSmt::new();
+        let bytes = partial_smt.to_bytes();
+        let decoded = PartialSmt::read_from_bytes(&bytes).unwrap();
+
+        assert_eq!(partial_smt, decoded);
+    }
 }
