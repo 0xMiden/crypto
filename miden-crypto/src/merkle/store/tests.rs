@@ -14,8 +14,8 @@ use super::{
 use crate::{
     Felt, ONE, WORD_SIZE, ZERO,
     merkle::{
-        InnerNodeIterable, LeafIndex, MerkleTree, SMT_MAX_DEPTH, SimpleSmt, int_to_leaf,
-        int_to_node,
+        InnerNodeIterable, IntoMerkleStore, LeafIndex, MerkleTree, SMT_MAX_DEPTH, SimpleSmt,
+        int_to_leaf, int_to_node,
     },
 };
 
@@ -42,7 +42,7 @@ const VALUES8: [Word; 8] = [
 #[test]
 fn test_root_not_in_store() -> Result<(), MerkleError> {
     let mtree = MerkleTree::new(VALUES4)?;
-    let store = MerkleStore::from(&mtree);
+    let store = mtree.to_merkle_store();
     assert_matches!(
         store.get_node(VALUES4[0], NodeIndex::make(mtree.depth(), 0)),
         Err(MerkleError::RootNotInStore(root)) if root == VALUES4[0],
@@ -60,7 +60,7 @@ fn test_root_not_in_store() -> Result<(), MerkleError> {
 #[test]
 fn test_merkle_tree() -> Result<(), MerkleError> {
     let mtree = MerkleTree::new(VALUES4)?;
-    let store = MerkleStore::from(&mtree);
+    let store = mtree.to_merkle_store();
 
     // STORE LEAVES ARE CORRECT -------------------------------------------------------------------
     // checks the leaves in the store corresponds to the expected values
@@ -207,7 +207,7 @@ fn test_leaf_paths_for_empty_trees() -> Result<(), MerkleError> {
 #[test]
 fn test_get_invalid_node() {
     let mtree = MerkleTree::new(VALUES4).expect("creating a merkle tree must work");
-    let store = MerkleStore::from(&mtree);
+    let store = mtree.to_merkle_store();
     let _ = store.get_node(mtree.root(), NodeIndex::make(mtree.depth(), 3));
 }
 
@@ -216,7 +216,7 @@ fn test_add_sparse_merkle_tree_one_level() -> Result<(), MerkleError> {
     let keys2: [u64; 2] = [0, 1];
     let leaves2: [Word; 2] = [int_to_leaf(1), int_to_leaf(2)];
     let smt = SimpleSmt::<1>::with_leaves(keys2.into_iter().zip(leaves2)).unwrap();
-    let store = MerkleStore::from(&smt);
+    let store = smt.to_merkle_store();
 
     let idx = NodeIndex::make(1, 0);
     assert_eq!(smt.get_node(idx).unwrap(), leaves2[0]);
@@ -234,7 +234,7 @@ fn test_sparse_merkle_tree() -> Result<(), MerkleError> {
     let smt =
         SimpleSmt::<SMT_MAX_DEPTH>::with_leaves(KEYS4.into_iter().zip(VALUES4.to_vec())).unwrap();
 
-    let store = MerkleStore::from(&smt);
+    let store = smt.to_merkle_store();
 
     // STORE LEAVES ARE CORRECT ==============================================================
     // checks the leaves in the store corresponds to the expected values
@@ -494,7 +494,7 @@ fn wont_open_to_different_depth_root() {
     // attempt to fetch a node on the maximum depth, and it should fail because the root shouldn't
     // exist for the set.
     let mtree = MerkleTree::new(vec![a, b]).unwrap();
-    let store = MerkleStore::from(&mtree);
+    let store = mtree.to_merkle_store();
     let index = NodeIndex::root();
     let err = store.get_node(root, index).err().unwrap();
     assert_matches!(err, MerkleError::RootNotInStore(err_root) if err_root == root);
@@ -522,7 +522,7 @@ fn store_path_opens_from_leaf() {
     let root = Rpo256::merge(&[m, n]);
 
     let mtree = MerkleTree::new(vec![a, b, c, d, e, f, g, h]).unwrap();
-    let store = MerkleStore::from(&mtree);
+    let store = mtree.to_merkle_store();
     let path = store.get_path(root, NodeIndex::make(3, 1)).unwrap().path;
 
     let expected = MerklePath::new([a, j, n].to_vec());
@@ -532,7 +532,7 @@ fn store_path_opens_from_leaf() {
 #[test]
 fn test_set_node() -> Result<(), MerkleError> {
     let mtree = MerkleTree::new(VALUES4)?;
-    let mut store = MerkleStore::from(&mtree);
+    let mut store = mtree.to_merkle_store();
     let value = int_to_node(42);
     let index = NodeIndex::make(mtree.depth(), 0);
     let new_root = store.set_node(mtree.root(), index, value)?.root;
@@ -544,7 +544,7 @@ fn test_set_node() -> Result<(), MerkleError> {
 #[test]
 fn test_constructors() -> Result<(), MerkleError> {
     let mtree = MerkleTree::new(VALUES4)?;
-    let store = MerkleStore::from(&mtree);
+    let store = mtree.to_merkle_store();
 
     let depth = mtree.depth();
     let leaves = 2u64.pow(depth.into());
@@ -556,7 +556,7 @@ fn test_constructors() -> Result<(), MerkleError> {
 
     const DEPTH: u8 = 32;
     let smt = SimpleSmt::<DEPTH>::with_leaves(KEYS4.into_iter().zip(VALUES4.to_vec())).unwrap();
-    let store = MerkleStore::from(&smt);
+    let store = smt.to_merkle_store();
 
     for key in KEYS4 {
         let index = NodeIndex::make(DEPTH, key);
@@ -868,7 +868,7 @@ fn check_mstore_subtree(store: &MerkleStore, subtree: &MerkleTree) {
 #[test]
 fn test_serialization() -> Result<(), Box<dyn Error>> {
     let mtree = MerkleTree::new(VALUES4)?;
-    let store = MerkleStore::from(&mtree);
+    let store = mtree.to_merkle_store();
     let decoded = MerkleStore::read_from_bytes(&store.to_bytes()).expect("deserialization failed");
     assert_eq!(store, decoded);
     Ok(())

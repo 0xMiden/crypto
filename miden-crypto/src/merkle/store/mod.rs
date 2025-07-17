@@ -101,11 +101,16 @@ impl MerkleStore {
     // CONSTRUCTORS
     // --------------------------------------------------------------------------------------------
 
-    /// Creates an empty `MerkleStore` instance.
+    /// Creates an empty [`MerkleStore`] instance.
     pub fn new() -> MerkleStore {
         // pre-populate the store with the empty hashes
         let nodes = empty_hashes().collect();
         MerkleStore { nodes }
+    }
+
+    /// Creates a [`MerkleStore`] instance from a list of inner nodes.
+    pub fn from_inner_nodes(inner_nodes_iterable: impl IntoIterator<Item = InnerNodeInfo>) -> Self {
+        inner_nodes_iterable.into_iter().collect()
     }
 
     // PUBLIC ACCESSORS

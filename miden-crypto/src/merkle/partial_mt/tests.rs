@@ -1,10 +1,10 @@
 use alloc::{collections::BTreeMap, vec::Vec};
 
 use super::{
-    super::{MerkleStore, MerkleTree, NodeIndex, PartialMerkleTree, int_to_node},
+    super::{MerkleTree, NodeIndex, PartialMerkleTree, int_to_node},
     Deserializable, InnerNodeInfo, Serializable, ValuePath, Word,
 };
-use crate::merkle::InnerNodeIterable;
+use crate::merkle::{InnerNodeIterable, IntoMerkleStore};
 
 // TEST DATA
 // ================================================================================================
@@ -94,7 +94,7 @@ fn get_root() {
     let mt = MerkleTree::new(VALUES8).unwrap();
     let expected_root = mt.root();
 
-    let ms = MerkleStore::from(&mt);
+    let ms = mt.to_merkle_store();
     let path33 = ms.get_path(expected_root, NODE33).unwrap();
 
     let pmt = PartialMerkleTree::with_paths([(3, path33.value, path33.path)]).unwrap();
@@ -110,7 +110,7 @@ fn add_and_get_paths() {
     let mt = MerkleTree::new(VALUES8).unwrap();
     let expected_root = mt.root();
 
-    let ms = MerkleStore::from(&mt);
+    let ms = mt.to_merkle_store();
 
     let expected_path33 = ms.get_path(expected_root, NODE33).unwrap();
     let expected_path22 = ms.get_path(expected_root, NODE22).unwrap();
@@ -134,7 +134,7 @@ fn get_node() {
     let mt = MerkleTree::new(VALUES8).unwrap();
     let expected_root = mt.root();
 
-    let ms = MerkleStore::from(&mt);
+    let ms = mt.to_merkle_store();
 
     let path33 = ms.get_path(expected_root, NODE33).unwrap();
 
@@ -151,7 +151,7 @@ fn update_leaf() {
     let mt = MerkleTree::new(VALUES8).unwrap();
     let root = mt.root();
 
-    let mut ms = MerkleStore::from(&mt);
+    let mut ms = mt.to_merkle_store();
     let path33 = ms.get_path(root, NODE33).unwrap();
 
     let mut pmt = PartialMerkleTree::with_paths([(3, path33.value, path33.path)]).unwrap();
@@ -187,7 +187,7 @@ fn get_paths() {
     let mt = MerkleTree::new(VALUES8).unwrap();
     let expected_root = mt.root();
 
-    let ms = MerkleStore::from(&mt);
+    let ms = mt.to_merkle_store();
 
     let path33 = ms.get_path(expected_root, NODE33).unwrap();
     let path22 = ms.get_path(expected_root, NODE22).unwrap();
@@ -234,7 +234,7 @@ fn leaves() {
     let mt = MerkleTree::new(VALUES8).unwrap();
     let expected_root = mt.root();
 
-    let ms = MerkleStore::from(&mt);
+    let ms = mt.to_merkle_store();
 
     let path33 = ms.get_path(expected_root, NODE33).unwrap();
     let path22 = ms.get_path(expected_root, NODE22).unwrap();
@@ -300,7 +300,7 @@ fn test_inner_node_iterator() {
     let mt = MerkleTree::new(VALUES8).unwrap();
     let expected_root = mt.root();
 
-    let ms = MerkleStore::from(&mt);
+    let ms = mt.to_merkle_store();
 
     let path33 = ms.get_path(expected_root, NODE33).unwrap();
     let path22 = ms.get_path(expected_root, NODE22).unwrap();
@@ -367,7 +367,7 @@ fn serialization() {
     let mt = MerkleTree::new(VALUES8).unwrap();
     let expected_root = mt.root();
 
-    let ms = MerkleStore::from(&mt);
+    let ms = mt.to_merkle_store();
 
     let path33 = ms.get_path(expected_root, NODE33).unwrap();
     let path22 = ms.get_path(expected_root, NODE22).unwrap();
@@ -419,7 +419,7 @@ fn err_get_node() {
     let mt = MerkleTree::new(VALUES8).unwrap();
     let expected_root = mt.root();
 
-    let ms = MerkleStore::from(&mt);
+    let ms = mt.to_merkle_store();
 
     let path33 = ms.get_path(expected_root, NODE33).unwrap();
 
@@ -437,7 +437,7 @@ fn err_get_path() {
     let mt = MerkleTree::new(VALUES8).unwrap();
     let expected_root = mt.root();
 
-    let ms = MerkleStore::from(&mt);
+    let ms = mt.to_merkle_store();
 
     let path33 = ms.get_path(expected_root, NODE33).unwrap();
 
@@ -454,7 +454,7 @@ fn err_update_leaf() {
     let mt = MerkleTree::new(VALUES8).unwrap();
     let expected_root = mt.root();
 
-    let ms = MerkleStore::from(&mt);
+    let ms = mt.to_merkle_store();
 
     let path33 = ms.get_path(expected_root, NODE33).unwrap();
 
