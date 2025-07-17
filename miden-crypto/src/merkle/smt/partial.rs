@@ -349,7 +349,7 @@ mod tests {
     use alloc::collections::{BTreeMap, BTreeSet};
 
     use assert_matches::assert_matches;
-    use rand_utils::rand_array;
+    use rand_utils::{rand_array, rand_value};
     use winter_math::fields::f64::BaseElement as Felt;
 
     use super::*;
@@ -644,14 +644,14 @@ mod tests {
     /// `PartialSmt` serde round-trip. Also tests conversion from SMT.
     #[test]
     fn partial_smt_serialization_roundtrip() {
-        let key: Word = Word::new(rand_array());
-        let val = Word::new(rand_array());
+        let key = rand_value();
+        let val = rand_value();
 
-        let key_1 = Word::new(rand_array());
-        let val_1 = Word::new(rand_array());
+        let key_1 = rand_value();
+        let val_1 = rand_value();
 
-        let key_2 = Word::new(rand_array());
-        let val_2 = Word::new(rand_array());
+        let key_2 = rand_value();
+        let val_2 = rand_value();
 
         let smt: Smt = Smt::with_entries([(key, val), (key_1, val_1), (key_2, val_2)]).unwrap();
 
