@@ -397,7 +397,11 @@ impl SparseMerkleTree<SMT_DEPTH> for Smt {
     }
 
     fn insert_inner_node(&mut self, index: NodeIndex, inner_node: InnerNode) -> Option<InnerNode> {
-        self.inner_nodes.insert(index, inner_node)
+        if inner_node == EmptySubtreeRoots::get_inner_node(SMT_DEPTH, index.depth()) {
+            self.remove_inner_node(index)
+        } else {
+            self.inner_nodes.insert(index, inner_node)
+        }
     }
 
     fn remove_inner_node(&mut self, index: NodeIndex) -> Option<InnerNode> {

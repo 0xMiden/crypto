@@ -15,7 +15,7 @@ use crate::Word;
 // FALCON SIGNATURE
 // ================================================================================================
 
-/// An RPO Falcon512 signature over a message.
+/// A deterministic RPO Falcon512 signature over a message.
 ///
 /// The signature is a pair of polynomials (s1, s2) in (Z_p\[x\]/(phi))^2 a nonce `r`, and a public
 /// key polynomial `h` where:
@@ -32,20 +32,38 @@ use crate::Word;
 ///
 /// Here h is a polynomial representing the public key and pk is its digest using the Rpo256 hash
 /// function. c is a polynomial that is the hash-to-point of the message being signed.
+///  
+///  To summarize the main points of differences with the reference implementation, we have that:
 ///
-/// The polynomial h is serialized as:
+/// 1. the hash-to-point algorithm is made deterministic by using a fixed nonce `r`. This fixed
+///    nonce is formed as `nonce_version_byte || preversioned_nonce` where `preversioned_nonce` is a
+///    39-byte string that is defined as: i. a byte representing `log_2(512)`, followed by ii. the
+///    UTF8 representation of the string "RPO-FALCON-DET", followed by iii. the required number of
+///    0_u8 padding to make the total length equal 39 bytes. Note that the above means in particular
+///    that only the `nonce_version_byte` needs to be serialized when serializing the signature.
+///    This reduces the deterministic signature compared to the reference implementation by 39
+///    bytes.
+/// 2. the RNG used in the trapdoor sampler (i.e., the ffSampling algorithm) is ChaCha20Rng seeded
+///    with the `Blake3` hash of `log_2(512) || sk || message`.
+///
+/// The signature is serialized as:
+///
+/// 1. A header byte specifying the algorithm used to encode the coefficients of the `s2` polynomial
+///    together with the degree of the irreducible polynomial phi. For RPO Falcon512, the header
+///    byte is set to `10111001` to differentiate it from the standardized instantiation of the
+///    Falcon signature.
+/// 2. 1 byte for the nonce version.
+/// 4. 625 bytes encoding the `s2` polynomial above.
+///
+/// In addition to the signature itself, the polynomial h is also serialized with the signature as:
+///
 /// 1. 1 byte representing the log2(512) i.e., 9.
 /// 2. 896 bytes for the public key itself.
 ///
-/// The signature is serialized as:
-/// 1. A header byte specifying the algorithm used to encode the coefficients of the `s2` polynomial
-///    together with the degree of the irreducible polynomial phi. For RPO Falcon512, the header
-///    byte is set to `10111001` which differentiates it from the standardized instantiation of the
-///    Falcon signature.
-/// 2. 40 bytes for the nonce.
-/// 4. 625 bytes encoding the `s2` polynomial above.
+/// The total size of the signature (including the extended public key) is 1524 bytes.
 ///
-/// The total size of the signature (including the extended public key) is 1563 bytes.
+/// [1]: https://github.com/algorand/falcon/blob/main/falcon-det.pdf
+/// [2]: https://datatracker.ietf.org/doc/html/rfc6979#section-3.5
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Signature {
     header: SignatureHeader,
@@ -365,7 +383,10 @@ mod tests {
     use rand::SeedableRng;
     use rand_chacha::ChaCha20Rng;
 
-    use super::{super::SecretKey, *};
+    use super::{
+        super::{SIG_SERIALIZED_LEN, SecretKey},
+        *,
+    };
 
     #[test]
     fn test_serialization_round_trip() {
@@ -375,6 +396,7 @@ mod tests {
         let sk = SecretKey::with_rng(&mut rng);
         let signature = sk.sign_with_rng(Word::default(), &mut rng);
         let serialized = signature.to_bytes();
+        assert_eq!(serialized.len(), SIG_SERIALIZED_LEN);
         let deserialized = Signature::read_from_bytes(&serialized).unwrap();
         assert_eq!(signature.sig_poly(), deserialized.sig_poly());
     }

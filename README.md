@@ -3,7 +3,7 @@
 [![LICENSE](https://img.shields.io/badge/license-MIT-blue.svg)](https://github.com/0xMiden/crypto/blob/main/LICENSE)
 [![test](https://github.com/0xMiden/crypto/actions/workflows/test.yml/badge.svg)](https://github.com/0xMiden/crypto/actions/workflows/test.yml)
 [![build](https://github.com/0xMiden/crypto/actions/workflows/build.yml/badge.svg)](https://github.com/0xMiden/crypto/actions/workflows/build.yml)
-[![RUST_VERSION](https://img.shields.io/badge/rustc-1.87+-lightgray.svg)](https://www.rust-lang.org/tools/install)
+[![RUST_VERSION](https://img.shields.io/badge/rustc-1.88+-lightgray.svg)](https://www.rust-lang.org/tools/install)
 [![CRATE](https://img.shields.io/crates/v/miden-crypto)](https://crates.io/crates/miden-crypto)
 
 This crate contains cryptographic primitives used in Miden.
@@ -22,7 +22,7 @@ For performance benchmarks of these hash functions and their comparison to other
 
 [Merkle module](./miden-crypto/src/merkle/) provides a set of data structures related to Merkle trees. All these data structures are implemented using the RPO hash function described above. The data structures are:
 
-- `MerkleStore`: a collection of Merkle trees of different heights designed to efficiently store trees with common subtrees. When instantiated with `RecordingMap`, a Merkle store records all accesses to the original data.
+- `MerkleStore`: a collection of Merkle trees of different heights designed to efficiently store trees with common subtrees.
 - `MerkleTree`: a regular fully-balanced binary Merkle tree. The depth of this tree can be at most 64.
 - `Mmr`: a Merkle mountain range structure designed to function as an append-only log.
 - `PartialMerkleTree`: a partial view of a Merkle tree where some sub-trees may not be known. This is similar to a collection of Merkle paths all resolving to the same root. The length of the paths can be at most 64.
@@ -63,7 +63,7 @@ This crate can be compiled with the following features:
 - `concurrent`- enabled by default; enables multi-threaded implementation of `Smt::with_entries()` which significantly improves performance on multi-core CPUs.
 - `std` - enabled by default and relies on the Rust standard library.
 - `no_std` does not rely on the Rust standard library and enables compilation to WebAssembly.
-- `smt_hashmaps` - uses hashbrown hashmaps in SMT implementation which significantly improves performance of SMT updating. Keys ordering in SMT iterators is not guaranteed when this feature is enabled.
+- `hashmaps` - uses hashbrown hashmaps in SMT and Merkle Store implementation which significantly improves performance of updates. Keys ordering in iterators is not guaranteed when this feature is enabled.
 
 All of these features imply the use of [alloc](https://doc.rust-lang.org/alloc/) to support heap-allocated collections.
 

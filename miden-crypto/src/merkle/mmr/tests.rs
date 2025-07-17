@@ -1027,7 +1027,7 @@ mod property_tests {
 
     proptest! {
         #[test]
-        fn test_last_position_is_always_contained_in_the_last_tree(leaves in any::<usize>().prop_filter("cant have an empty tree", |v| *v != 0)) {
+        fn test_last_position_is_always_contained_in_the_last_tree(leaves in any::<usize>().prop_filter("can't have an empty tree", |v| *v != 0)) {
             let last_pos = leaves - 1;
             let lowest_bit = leaves.trailing_zeros();
 

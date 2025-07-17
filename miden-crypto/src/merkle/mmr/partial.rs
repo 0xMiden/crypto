@@ -569,19 +569,17 @@ impl<I: Iterator<Item = (usize, Word)>> Iterator for InnerNodeIterator<'_, I> {
 
             // if we haven't seen this node's parent before, and the node has a sibling, return
             // the inner node defined by the parent of this node, and move up the branch
-            if new_node {
-                if let Some(sibling) = self.nodes.get(&idx.sibling()) {
-                    let (left, right) = if parent_idx.left_child() == idx {
-                        (node, *sibling)
-                    } else {
-                        (*sibling, node)
-                    };
-                    let parent = Rpo256::merge(&[left, right]);
-                    let inner_node = InnerNodeInfo { value: parent, left, right };
+            if new_node && let Some(sibling) = self.nodes.get(&idx.sibling()) {
+                let (left, right) = if parent_idx.left_child() == idx {
+                    (node, *sibling)
+                } else {
+                    (*sibling, node)
+                };
+                let parent = Rpo256::merge(&[left, right]);
+                let inner_node = InnerNodeInfo { value: parent, left, right };
 
-                    self.stack.push((parent_idx, parent));
-                    return Some(inner_node);
-                }
+                self.stack.push((parent_idx, parent));
+                return Some(inner_node);
             }
 
             // the previous leaf has been processed, try to process the next leaf

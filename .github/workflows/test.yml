@@ -17,7 +17,7 @@ jobs:
       matrix:
         toolchain: [stable, nightly]
         os: [ubuntu]
-        args: [default, smt-hashmaps, no-std]
+        args: [default, hashmaps, no-std]
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@main
@@ -25,6 +25,7 @@ jobs:
       - name: Perform tests
         run: |
           rustup update --no-self-update ${{matrix.toolchain}}
+          rustup default ${{ matrix.toolchain }}
           make test-${{matrix.args}}
 
   test-smt-concurrent:
@@ -42,6 +43,7 @@ jobs:
       - name: Perform concurrent SMT tests
         run: |
           rustup update --no-self-update ${{matrix.toolchain}}
+          rustup default ${{ matrix.toolchain }}
           make test-smt-concurrent
 
   doc-tests:
@@ -56,5 +58,5 @@ jobs:
       - name: Run doc-tests
         run: |
           rustup update --no-self-update
+          rustup default ${{ matrix.toolchain }}
           make test-docs
-
