@@ -185,9 +185,9 @@ impl PartialSmt {
         let current_entries = leaf.num_entries();
         self.0.leaves.insert(current_index.value(), leaf);
         if current_entries > prev_entries {
-            self.0.num_kv_pairs += (current_entries - prev_entries) as usize;
+            self.0.num_entries += (current_entries - prev_entries) as usize;
         } else {
-            self.0.num_kv_pairs -= (prev_entries - current_entries) as usize;
+            self.0.num_entries -= (prev_entries - current_entries) as usize;
         }
 
         for sibling_hash in path {

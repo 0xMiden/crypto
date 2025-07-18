@@ -54,7 +54,7 @@ type Leaves = super::Leaves<SmtLeaf>;
 pub struct Smt {
     root: Word,
     // pub(super) for use in PartialSmt.
-    pub(super) num_kv_pairs: usize,
+    pub(super) num_entries: usize,
     pub(super) leaves: Leaves,
     pub(super) inner_nodes: InnerNodes,
 }
@@ -76,7 +76,7 @@ impl Smt {
 
         Self {
             root,
-            num_kv_pairs: 0,
+            num_entries: 0,
             inner_nodes: Default::default(),
             leaves: Default::default(),
         }
@@ -197,7 +197,7 @@ impl Smt {
     /// Note that this may return a different value from [Self::num_leaves()] as a single leaf may
     /// contain more than one key-value pair.
     pub fn num_entries(&self) -> usize {
-        self.num_kv_pairs
+        self.num_entries
     }
 
     /// Returns the leaf to which `key` maps
@@ -339,12 +339,12 @@ impl Smt {
                 let prev_entries = leaf.num_entries();
                 let result = leaf.insert(key, value);
                 let current_entries = leaf.num_entries();
-                self.num_kv_pairs += (current_entries - prev_entries) as usize;
+                self.num_entries += (current_entries - prev_entries) as usize;
                 result
             },
             None => {
                 self.leaves.insert(leaf_index.value(), SmtLeaf::Single((key, value)));
-                self.num_kv_pairs += 1;
+                self.num_entries += 1;
                 None
             },
         }
@@ -358,7 +358,7 @@ impl Smt {
             let prev_entries = leaf.num_entries();
             let (old_value, is_empty) = leaf.remove(key);
             let current_entries = leaf.num_entries();
-            self.num_kv_pairs -= (prev_entries - current_entries) as usize;
+            self.num_entries -= (prev_entries - current_entries) as usize;
             if is_empty {
                 self.leaves.remove(&leaf_index.value());
             }
@@ -388,8 +388,8 @@ impl SparseMerkleTree<SMT_DEPTH> for Smt {
             let root_node = inner_nodes.get(&NodeIndex::root()).unwrap();
             assert_eq!(root_node.hash(), root);
         }
-        let num_kv_pairs = leaves.iter().flat_map(|(_, leaf)| leaf.entries()).count();
-        Ok(Self { root, inner_nodes, leaves, num_kv_pairs })
+        let num_entries = leaves.iter().map(|(_, leaf)| leaf.num_entries() as usize).sum();
+        Ok(Self { root, inner_nodes, leaves, num_entries })
     }
 
     fn root(&self) -> Word {

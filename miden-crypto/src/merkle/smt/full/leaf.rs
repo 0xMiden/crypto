@@ -269,9 +269,7 @@ impl SmtLeaf {
                         Some(old_value)
                     },
                     Err(pos) => {
-                        if kv_pairs.len() >= MAX_LEAF_ENTRIES {
-                            panic!("MAX_LEAF_ENTRIES exceeded");
-                        }
+                        assert!(kv_pairs.len() < MAX_LEAF_ENTRIES, "MAX_LEAF_ENTRIES exceeded");
 
                         kv_pairs.insert(pos, (key, value));
 
