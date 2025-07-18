@@ -138,13 +138,11 @@ impl SmtLeaf {
     }
 
     /// Returns the number of entries stored in the leaf
-    pub fn num_entries(&self) -> u64 {
+    pub fn num_entries(&self) -> usize {
         match self {
             SmtLeaf::Empty(_) => 0,
             SmtLeaf::Single(_) => 1,
-            SmtLeaf::Multiple(entries) => {
-                entries.len().try_into().expect("shouldn't have more than 2^64 entries")
-            },
+            SmtLeaf::Multiple(entries) => entries.len(),
         }
     }
 
@@ -330,7 +328,7 @@ impl SmtLeaf {
 impl Serializable for SmtLeaf {
     fn write_into<W: ByteWriter>(&self, target: &mut W) {
         // Write: num entries
-        self.num_entries().write_into(target);
+        (self.num_entries() as u64).write_into(target);
 
         // Write: leaf index
         let leaf_index: u64 = self.index().value();
