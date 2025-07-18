@@ -16,6 +16,8 @@ pub enum MerkleError {
     InvalidNodeIndex { depth: u8, value: u64 },
     #[error("provided node index depth {provided} does not match expected depth {expected}")]
     InvalidNodeIndexDepth { expected: u8, provided: u8 },
+    #[error("provided node list should have a minimum length of {0}")]
+    InvalidPathLength(usize),
     #[error("merkle subtree depth {subtree_depth} exceeds merkle tree depth {tree_depth}")]
     SubtreeDepthExceedsDepth { subtree_depth: u8, tree_depth: u8 },
     #[error("number of entries in the merkle tree exceeds the maximum of {0}")]

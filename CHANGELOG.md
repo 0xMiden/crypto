@@ -1,3 +1,7 @@
+# 0.15.8 (2025-07-18)
+
+- Added constructor for `SparseMerklePath` that accepts a bitmask and a vector of nodes ([#457](https://github.com/0xMiden/crypto/pull/457)).
+
 ## 0.15.7 (2025-07-18)
 
 - Fix empty SMT serialization check in testing mode ([#456](https://github.com/0xMiden/crypto/pull/456)).
