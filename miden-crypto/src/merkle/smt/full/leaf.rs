@@ -81,7 +81,7 @@ impl SmtLeaf {
     ///
     /// # Errors
     ///   - Returns an error if 2 keys in `entries` map to a different leaf index
-    ///   - Returns an error if the number of entries exceeds MAX_LEAF_ENTRIES
+    ///   - Returns an error if the number of entries exceeds [`MAX_LEAF_ENTRIES`]
     pub fn new_multiple(entries: Vec<(Word, Word)>) -> Result<Self, SmtLeafError> {
         if entries.len() < 2 {
             return Err(SmtLeafError::MultipleLeafRequiresTwoEntries(entries.len()));
