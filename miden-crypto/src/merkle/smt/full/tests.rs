@@ -2,13 +2,12 @@ use alloc::vec::Vec;
 
 use super::{EMPTY_WORD, Felt, LeafIndex, NodeIndex, Rpo256, SMT_DEPTH, Smt, SmtLeaf, Word};
 use crate::{
-    ONE, WORD_SIZE,
     merkle::{
-        EmptySubtreeRoots, MerkleStore, MutationSet,
-        smt::{Map, NodeMutation, SparseMerkleTree, full::MAX_LEAF_ENTRIES},
-    },
-    utils::{Deserializable, Serializable},
+        smt::{full::MAX_LEAF_ENTRIES, Map, NodeMutation, SparseMerkleTree}, EmptySubtreeRoots, MerkleStore, MutationSet, SmtLeafError
+    }, utils::{Deserializable, Serializable}, ONE, WORD_SIZE
 };
+use assert_matches::assert_matches;
+
 // SMT
 // --------------------------------------------------------------------------------------------
 
@@ -736,9 +735,12 @@ fn test_max_leaf_entries_validation() {
     let value = Word::new([ONE, ONE, ONE, Felt::new(MAX_LEAF_ENTRIES as u64)]);
     entries.push((key, value));
 
-    let result = SmtLeaf::new_multiple(entries);
-    assert!(result.is_err(), "Should reject more than MAX_LEAF_ENTRIES entries");
-}
+    let error = SmtLeaf::new_multiple(entries).unwrap_err();
+    assert_matches!(
+        error,
+        SmtLeafError::TooManyLeafEntries { .. },
+        "should reject more than MAX_LEAF_ENTRIES entries"
+    );}
 
 // HELPERS
 // --------------------------------------------------------------------------------------------
