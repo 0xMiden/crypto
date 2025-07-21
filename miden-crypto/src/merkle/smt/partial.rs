@@ -186,7 +186,7 @@ impl PartialSmt {
         self.0.leaves.insert(current_index.value(), leaf);
 
         // Guaranteed not to over/underflow. All variables are <= MAX_LEAF_ENTRIES and result > 0.
-        self.0.num_entries += current_entries - prev_entries;
+        self.0.num_entries = self.0.num_entries + current_entries - prev_entries;
 
         for sibling_hash in path {
             // Find the index of the sibling node and compute whether it is a left or right child.
@@ -678,5 +678,30 @@ mod tests {
         let decoded = PartialSmt::read_from_bytes(&bytes).unwrap();
 
         assert_eq!(partial_smt, decoded);
+    }
+
+    /// Tests that add_path correctly updates num_entries for both increasing and decreasing entry
+    /// counts.
+    #[test]
+    fn partial_smt_add_path_num_entries() {
+        // key0 and key1 have the same felt at index 3 so they will be placed in the same leaf.
+        let key0 = Word::from([ZERO, ZERO, ZERO, ONE]);
+        let key1 = Word::from([ONE, ONE, ONE, ONE]);
+        let value0 = Word::from(rand_array::<Felt, 4>());
+        let value1 = Word::from(rand_array::<Felt, 4>());
+
+        let full = Smt::with_entries([(key0, value0), (key1, value1)]).unwrap();
+        let mut partial = PartialSmt::new();
+
+        // Add the multi-entry leaf via add_path
+        let proof0 = full.open(&key0);
+        let (path0, leaf0) = proof0.into_parts();
+        partial.add_path(leaf0.clone(), path0.clone()).unwrap();
+        assert_eq!(partial.num_entries(), 2);
+
+        // Now, replace the multi-entry leaf with a single-entry leaf (simulate removing one entry)
+        let single_leaf = SmtLeaf::new_single(key0, value0);
+        partial.add_path(single_leaf.clone(), path0.clone()).unwrap();
+        assert_eq!(partial.num_entries(), 1);
     }
 }
