@@ -1,12 +1,16 @@
 use alloc::vec::Vec;
 
+use assert_matches::assert_matches;
+
 use super::{EMPTY_WORD, Felt, LeafIndex, NodeIndex, Rpo256, SMT_DEPTH, Smt, SmtLeaf, Word};
 use crate::{
+    ONE, WORD_SIZE,
     merkle::{
-        smt::{full::MAX_LEAF_ENTRIES, Map, NodeMutation, SparseMerkleTree}, EmptySubtreeRoots, MerkleStore, MutationSet, SmtLeafError
-    }, utils::{Deserializable, Serializable}, ONE, WORD_SIZE
+        EmptySubtreeRoots, MerkleStore, MutationSet, SmtLeafError,
+        smt::{Map, NodeMutation, SparseMerkleTree, full::MAX_LEAF_ENTRIES},
+    },
+    utils::{Deserializable, Serializable},
 };
-use assert_matches::assert_matches;
 
 // SMT
 // --------------------------------------------------------------------------------------------
@@ -740,7 +744,8 @@ fn test_max_leaf_entries_validation() {
         error,
         SmtLeafError::TooManyLeafEntries { .. },
         "should reject more than MAX_LEAF_ENTRIES entries"
-    );}
+    );
+}
 
 // HELPERS
 // --------------------------------------------------------------------------------------------

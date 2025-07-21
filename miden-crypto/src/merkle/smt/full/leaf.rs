@@ -88,10 +88,7 @@ impl SmtLeaf {
         }
 
         if entries.len() > MAX_LEAF_ENTRIES {
-            return Err(SmtLeafError::TooManyLeafEntries {
-                actual: entries.len(),
-                max: MAX_LEAF_ENTRIES,
-            });
+            return Err(SmtLeafError::TooManyLeafEntries { actual: entries.len() });
         }
 
         // Check that all keys map to the same leaf index
