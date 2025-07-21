@@ -184,11 +184,9 @@ impl PartialSmt {
             .unwrap_or(0);
         let current_entries = leaf.num_entries();
         self.0.leaves.insert(current_index.value(), leaf);
-        if current_entries > prev_entries {
-            self.0.num_entries += (current_entries - prev_entries) as usize;
-        } else {
-            self.0.num_entries -= (prev_entries - current_entries) as usize;
-        }
+
+        // Guaranteed not to over/underflow. All variables are <= MAX_LEAF_ENTRIES and result > 0.
+        self.0.num_entries += current_entries - prev_entries;
 
         for sibling_hash in path {
             // Find the index of the sibling node and compute whether it is a left or right child.
