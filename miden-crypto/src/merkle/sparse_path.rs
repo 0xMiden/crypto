@@ -35,7 +35,7 @@ pub struct SparseMerklePath {
 }
 
 impl SparseMerklePath {
-    /// Constructs a new sparse Merkle tree from a bitmask of empty nodes and a vector of non-empty
+    /// Constructs a new sparse Merkle path from a bitmask of empty nodes and a vector of non-empty
     /// nodes.
     ///
     /// The `empty_nodes_mask` is a bitmask where each set bit indicates that the node at that
@@ -46,7 +46,7 @@ impl SparseMerklePath {
     /// # Errors
     /// Returns [MerkleError::InvalidPathLength] if the provided `nodes` vector is shorter than
     /// the minimum length required by the `empty_nodes_mask`.
-    pub fn new(empty_nodes_mask: u64, nodes: Vec<Word>) -> Result<Self, MerkleError> {
+    pub fn from_parts(empty_nodes_mask: u64, nodes: Vec<Word>) -> Result<Self, MerkleError> {
         // The most significant set bit in the mask marks the minimum length of the path.
         // For every zero bit before the first set bit, there must be a corresponding node in
         // `nodes`.
@@ -56,6 +56,11 @@ impl SparseMerklePath {
 
         if nodes.len() < min_non_empty_nodes {
             return Err(MerkleError::InvalidPathLength(min_non_empty_nodes));
+        }
+
+        let depth = Self::depth_from_parts(empty_nodes_mask, &nodes);
+        if depth > SMT_MAX_DEPTH {
+            return Err(MerkleError::DepthTooBig(depth as u64));
         }
 
         Ok(Self { empty_nodes_mask, nodes })
@@ -100,7 +105,7 @@ impl SparseMerklePath {
 
     /// Returns the total depth of this path, i.e., the number of nodes this path represents.
     pub fn depth(&self) -> u8 {
-        (self.nodes.len() + self.empty_nodes_mask.count_ones() as usize) as u8
+        Self::depth_from_parts(self.empty_nodes_mask, &self.nodes)
     }
 
     /// Get a specific node in this path at a given depth.
@@ -127,6 +132,7 @@ impl SparseMerklePath {
     }
 
     /// Deconstructs this path into its component parts.
+    ///
     /// Returns a tuple containing:
     /// - a bitmask where each set bit indicates that the node at that depth is empty. The least
     ///   significant bit (bit 0) describes depth 1 node (root's children).
@@ -225,6 +231,11 @@ impl SparseMerklePath {
         let normal_index = (self.depth() - node_depth.get()) as usize;
         // subtracted by the number of empty nodes that are deeper than us.
         Some(normal_index - empty_deeper)
+    }
+
+    /// Returns the total depth of this path from its parts.
+    fn depth_from_parts(empty_nodes_mask: u64, nodes: &[Word]) -> u8 {
+        (nodes.len() + empty_nodes_mask.count_ones() as usize) as u8
     }
 }
 
