@@ -325,7 +325,7 @@ impl SmtLeaf {
 impl Serializable for SmtLeaf {
     fn write_into<W: ByteWriter>(&self, target: &mut W) {
         // Write: num entries
-        (self.num_entries() as u64).write_into(target);
+        self.num_entries().write_into(target);
 
         // Write: leaf index
         let leaf_index: u64 = self.index().value();
@@ -342,7 +342,7 @@ impl Serializable for SmtLeaf {
 impl Deserializable for SmtLeaf {
     fn read_from<R: ByteReader>(source: &mut R) -> Result<Self, DeserializationError> {
         // Read: num entries
-        let num_entries = source.read_u64()?;
+        let num_entries = source.read_usize()?;
 
         // Read: leaf index
         let leaf_index: LeafIndex<SMT_DEPTH> = {
