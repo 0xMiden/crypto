@@ -339,7 +339,7 @@ impl Smt {
                 let prev_entries = leaf.num_entries();
                 let result = leaf.insert(key, value);
                 let current_entries = leaf.num_entries();
-                self.num_entries += (current_entries - prev_entries) as usize;
+                self.num_entries += current_entries - prev_entries;
                 result
             },
             None => {
@@ -358,7 +358,7 @@ impl Smt {
             let prev_entries = leaf.num_entries();
             let (old_value, is_empty) = leaf.remove(key);
             let current_entries = leaf.num_entries();
-            self.num_entries -= (prev_entries - current_entries) as usize;
+            self.num_entries -= prev_entries - current_entries;
             if is_empty {
                 self.leaves.remove(&leaf_index.value());
             }
