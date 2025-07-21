@@ -1,4 +1,4 @@
-# 0.15.8 (2025-07-18)
+# 0.15.8 (2025-07-21)
 
 - Added constructor for `SparseMerklePath` that accepts a bitmask and a vector of nodes ([#457](https://github.com/0xMiden/crypto/pull/457)).
 
