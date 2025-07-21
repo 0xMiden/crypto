@@ -91,6 +91,10 @@ impl Smt {
     ///
     /// # Errors
     /// Returns an error if the provided entries contain multiple values for the same key.
+    ///
+    /// # Panics
+    /// Panics if inserting a key-value pair would exceed [`MAX_LEAF_ENTRIES`] (1024 entries) in a
+    /// leaf.
     pub fn with_entries(
         entries: impl IntoIterator<Item = (Word, Word)>,
     ) -> Result<Self, MerkleError> {
@@ -109,6 +113,10 @@ impl Smt {
     ///
     /// This only applies if the "concurrent" feature is enabled. Without the feature, the behavior
     /// is equivalent to `with_entiries`.
+    ///
+    /// # Panics
+    /// Panics if inserting a key-value pair would exceed [`MAX_LEAF_ENTRIES`] (1024 entries) in a
+    /// leaf.
     pub fn with_sorted_entries(
         entries: impl IntoIterator<Item = (Word, Word)>,
     ) -> Result<Self, MerkleError> {
@@ -129,6 +137,10 @@ impl Smt {
     ///
     /// # Errors
     /// Returns an error if the provided entries contain multiple values for the same key.
+    ///
+    /// # Panics
+    /// Panics if inserting a key-value pair would exceed [`MAX_LEAF_ENTRIES`] (1024 entries) in a
+    /// leaf.
     #[cfg(any(not(feature = "concurrent"), fuzzing, test))]
     fn with_entries_sequential(
         entries: impl IntoIterator<Item = (Word, Word)>,
@@ -255,6 +267,10 @@ impl Smt {
     ///
     /// This also recomputes all hashes between the leaf (associated with the key) and the root,
     /// updating the root itself.
+    ///
+    /// # Panics
+    /// Panics if inserting the key-value pair would exceed [`MAX_LEAF_ENTRIES`] (1024 entries) in
+    /// the leaf.
     pub fn insert(&mut self, key: Word, value: Word) -> Word {
         <Self as SparseMerkleTree<SMT_DEPTH>>::insert(self, key, value)
     }
@@ -329,6 +345,10 @@ impl Smt {
 
     /// Inserts `value` at leaf index pointed to by `key`. `value` is guaranteed to not be the empty
     /// value, such that this is indeed an insertion.
+    ///
+    /// # Panics
+    /// Panics if inserting the key-value pair would exceed [`MAX_LEAF_ENTRIES`] (1024 entries) in
+    /// the leaf.
     fn perform_insert(&mut self, key: Word, value: Word) -> Option<Word> {
         debug_assert_ne!(value, Self::EMPTY_VALUE);
 

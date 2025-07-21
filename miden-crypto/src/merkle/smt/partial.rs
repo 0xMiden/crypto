@@ -125,6 +125,10 @@ impl PartialSmt {
     /// - the key and its merkle path were not previously added (using [`PartialSmt::add_path`]) to
     ///   this [`PartialSmt`], which means it is almost certainly incorrect to update its value. If
     ///   an error is returned the tree is in the same state as before.
+    ///
+    /// # Panics
+    /// Panics if inserting the key-value pair would exceed [`MAX_LEAF_ENTRIES`] (1024 entries) in
+    /// the leaf.
     pub fn insert(&mut self, key: Word, value: Word) -> Result<Word, MerkleError> {
         if !self.is_leaf_tracked(&key) {
             return Err(MerkleError::UntrackedKey(key));

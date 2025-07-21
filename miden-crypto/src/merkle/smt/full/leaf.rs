@@ -227,7 +227,7 @@ impl SmtLeaf {
     /// The caller needs to ensure that `key` has the same leaf index as all other keys in the leaf
     ///
     /// # Panics
-    /// Panics if inserting the key-value pair would exceed [`MAX_LEAF_ENTRIES`] (2^16) entries in
+    /// Panics if inserting the key-value pair would exceed [`MAX_LEAF_ENTRIES`] (1024 entries) in
     /// the leaf.
     pub(super) fn insert(&mut self, key: Word, value: Word) -> Option<Word> {
         match self {
