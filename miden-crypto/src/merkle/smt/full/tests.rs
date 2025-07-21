@@ -716,9 +716,10 @@ fn test_multiple_smt_leaf_serialization_success() {
     assert_eq!(multiple_leaf, deserialized);
 }
 
+/// Test that creating a multiple leaf with exactly MAX_LEAF_ENTRIES works
+/// and that constructing a leaf with MAX_LEAF_ENTRIES + 1 returns an error.
 #[test]
 fn test_max_leaf_entries_validation() {
-    // Test that creating a multiple leaf with exactly MAX_LEAF_ENTRIES works
     let mut entries = Vec::new();
 
     for i in 0..MAX_LEAF_ENTRIES {
