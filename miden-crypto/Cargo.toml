@@ -46,8 +46,9 @@ harness = false
 
 [features]
 concurrent = ["dep:rayon", "hashbrown?/rayon"]
-default = ["std", "concurrent"]
+default = ["std", "concurrent", "serde"]
 executable = ["dep:clap", "dep:rand-utils", "std"]
+rocksdb = ["concurrent", "dep:rocksdb"]
 hashmaps = ["dep:hashbrown"]
 internal = []
 serde = ["dep:serde", "serde?/alloc", "winter-math/serde"]
@@ -64,6 +65,7 @@ std = [
 [dependencies]
 blake3 = { version = "1.8", default-features = false }
 clap = { version = "4.5", optional = true, features = ["derive"] }
+flume = { version = "0.11"}
 hashbrown = { version = "0.15", optional = true, features = ["serde"] }
 num = { version = "0.4", default-features = false, features = ["alloc", "libm"] }
 num-complex = { version = "0.4", default-features = false }
@@ -72,6 +74,7 @@ rand_chacha = { version = "0.9", default-features = false }
 rand_core = { version = "0.9", default-features = false }
 rand-utils = { version = "0.13", package = "winter-rand-utils", optional = true }
 rayon = { version = "1.10", optional = true }
+rocksdb = { version = "0.23", optional = true, default-features = false, features = ["lz4"] }
 serde = { version = "1.0", default-features = false, optional = true, features = ["derive"] }
 sha3 = { version = "0.10", default-features = false }
 thiserror = { version = "2.0", default-features = false }
@@ -90,6 +93,7 @@ rand_chacha = { version = "0.9", default-features = false }
 rand-utils = { version = "0.13", package = "winter-rand-utils" }
 rstest = { version = "0.25" }
 seq-macro = { version = "0.3" }
+tempfile = { version = "3.20" }
 
 [build-dependencies]
 cc = { version = "1.2", optional = true, features = ["parallel"] }
@@ -98,3 +102,8 @@ glob = "0.3"
 [lints.rust]
 # Suppress warnings about `cfg(fuzzing)`, which is automatically set when using `cargo-fuzz`.
 unexpected_cfgs = { level = "warn", check-cfg = ['cfg(fuzzing)'] }
+
+
+[[test]]
+name = "rocksdb_large_smt"
+required-features = ["concurrent", "rocksdb", "internal"]
