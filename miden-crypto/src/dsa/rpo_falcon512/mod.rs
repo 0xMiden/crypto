@@ -49,7 +49,7 @@ mod signature;
 mod tests;
 
 pub use self::{
-    keys::{PubKeyPoly, PublicKey, SecretKey},
+    keys::{PublicKey, SecretKey},
     math::Polynomial,
     signature::{Signature, SignatureHeader, SignaturePoly},
 };
@@ -105,7 +105,7 @@ const SIG_POLY_BYTE_LEN: usize = 625;
 
 /// Signature size when serialized as a u8 vector.
 #[cfg(test)]
-const SIG_SERIALIZED_LEN: usize = 1524;
+const SIG_SERIALIZED_LEN: usize = 627;
 
 /// Bound on the squared-norm of the signature.
 const SIG_L2_BOUND: u64 = 34034726;
