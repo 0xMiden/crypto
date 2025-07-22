@@ -405,8 +405,12 @@ impl SparseMerkleTree<SMT_DEPTH> for Smt {
         root: Word,
     ) -> Result<Self, MerkleError> {
         if cfg!(debug_assertions) {
-            let root_node = inner_nodes.get(&NodeIndex::root()).unwrap();
-            assert_eq!(root_node.hash(), root);
+            let root_node_hash = inner_nodes
+                .get(&NodeIndex::root())
+                .map(InnerNode::hash)
+                .unwrap_or(Self::EMPTY_ROOT);
+
+            assert_eq!(root_node_hash, root);
         }
         let num_entries = leaves.iter().map(|(_, leaf)| leaf.num_entries() as usize).sum();
         Ok(Self { root, inner_nodes, leaves, num_entries })

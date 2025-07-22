@@ -35,6 +35,43 @@ pub struct SparseMerklePath {
 }
 
 impl SparseMerklePath {
+    /// Constructs a new sparse Merkle path from a bitmask of empty nodes and a vector of non-empty
+    /// nodes.
+    ///
+    /// The `empty_nodes_mask` is a bitmask where each set bit indicates that the node at that
+    /// depth is empty. The least significant bit (bit 0) describes depth 1 node (root's children).
+    /// The `bit index + 1` is equal to node's depth.
+    /// The `nodes` vector must contain the non-empty nodes in depth order.
+    ///
+    /// # Errors
+    /// - [MerkleError::InvalidPathLength] if the provided `nodes` vector is shorter than the
+    ///   minimum length required by the `empty_nodes_mask`.
+    /// - [MerkleError::DepthTooBig] if the total depth of the path (calculated from the
+    ///   `empty_nodes_mask` and `nodes`) is greater than [SMT_MAX_DEPTH].
+    pub fn from_parts(empty_nodes_mask: u64, nodes: Vec<Word>) -> Result<Self, MerkleError> {
+        // The most significant set bit in the mask marks the minimum length of the path.
+        // For every zero bit before the first set bit, there must be a corresponding node in
+        // `nodes`.
+        // For example, if the mask is `0b1100`, this means that the first two nodes
+        // (depths 1 and 2) are non-empty, and the next two nodes (depths 3 and 4) are empty.
+        // The minimum length of the path is 4, and the `nodes` vector must contain at least 2
+        // nodes to account for the first two zeroes in the mask (depths 1 and 2).
+        let min_path_len = u64::BITS - empty_nodes_mask.leading_zeros();
+        let empty_nodes_count = empty_nodes_mask.count_ones();
+        let min_non_empty_nodes = (min_path_len - empty_nodes_count) as usize;
+
+        if nodes.len() < min_non_empty_nodes {
+            return Err(MerkleError::InvalidPathLength(min_non_empty_nodes));
+        }
+
+        let depth = Self::depth_from_parts(empty_nodes_mask, &nodes) as u8;
+        if depth > SMT_MAX_DEPTH {
+            return Err(MerkleError::DepthTooBig(depth as u64));
+        }
+
+        Ok(Self { empty_nodes_mask, nodes })
+    }
+
     /// Constructs a sparse Merkle path from an iterator over Merkle nodes that also knows its
     /// exact size (such as iterators created with [Vec::into_iter]). The iterator must be in order
     /// of deepest to shallowest.
@@ -74,7 +111,7 @@ impl SparseMerklePath {
 
     /// Returns the total depth of this path, i.e., the number of nodes this path represents.
     pub fn depth(&self) -> u8 {
-        (self.nodes.len() + self.empty_nodes_mask.count_ones() as usize) as u8
+        Self::depth_from_parts(self.empty_nodes_mask, &self.nodes) as u8
     }
 
     /// Get a specific node in this path at a given depth.
@@ -98,6 +135,16 @@ impl SparseMerklePath {
         };
 
         Ok(node)
+    }
+
+    /// Deconstructs this path into its component parts.
+    ///
+    /// Returns a tuple containing:
+    /// - a bitmask where each set bit indicates that the node at that depth is empty. The least
+    ///   significant bit (bit 0) describes depth 1 node (root's children).
+    /// - a vector of non-empty nodes in depth order.
+    pub fn into_parts(self) -> (u64, Vec<Word>) {
+        (self.empty_nodes_mask, self.nodes)
     }
 
     // PROVIDERS
@@ -190,6 +237,11 @@ impl SparseMerklePath {
         let normal_index = (self.depth() - node_depth.get()) as usize;
         // subtracted by the number of empty nodes that are deeper than us.
         Some(normal_index - empty_deeper)
+    }
+
+    /// Returns the total depth of this path from its parts.
+    fn depth_from_parts(empty_nodes_mask: u64, nodes: &[Word]) -> usize {
+        nodes.len() + empty_nodes_mask.count_ones() as usize
     }
 }
 
@@ -591,6 +643,42 @@ mod tests {
                 nonempty_idx += 1;
             }
         }
+    }
+
+    #[test]
+    fn from_parts() {
+        const DEPTH: u8 = 8;
+        let raw_nodes: [Word; DEPTH as usize] = [
+            // Depth 8.
+            ([8u8, 8, 8, 8].into()),
+            // Depth 7.
+            *EmptySubtreeRoots::entry(DEPTH, 7),
+            // Depth 6.
+            *EmptySubtreeRoots::entry(DEPTH, 6),
+            // Depth 5.
+            [5u8, 5, 5, 5].into(),
+            // Depth 4.
+            [4u8, 4, 4, 4].into(),
+            // Depth 3.
+            *EmptySubtreeRoots::entry(DEPTH, 3),
+            // Depth 2.
+            *EmptySubtreeRoots::entry(DEPTH, 2),
+            // Depth 1.
+            *EmptySubtreeRoots::entry(DEPTH, 1),
+            // Root is not included.
+        ];
+
+        let empty_nodes_mask = 0b0110_0111;
+        let nodes = vec![[8u8, 8, 8, 8].into(), [5u8, 5, 5, 5].into(), [4u8, 4, 4, 4].into()];
+        let insufficient_nodes = vec![[4u8, 4, 4, 4].into()];
+
+        let error = SparseMerklePath::from_parts(empty_nodes_mask, insufficient_nodes).unwrap_err();
+        assert_matches!(error, MerkleError::InvalidPathLength(2));
+
+        let iter_sparse_path = SparseMerklePath::from_sized_iter(raw_nodes).unwrap();
+        let sparse_path = SparseMerklePath::from_parts(empty_nodes_mask, nodes).unwrap();
+
+        assert_eq!(sparse_path, iter_sparse_path);
     }
 
     #[test]
