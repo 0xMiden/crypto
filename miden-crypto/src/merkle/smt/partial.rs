@@ -683,7 +683,7 @@ mod tests {
 
         assert_eq!(partial_smt, decoded);
     }
-  
+
     #[test]
     fn partial_smt_serialization_rounfdtrip() {
         let partial_smt = PartialSmt::new();
@@ -692,7 +692,7 @@ mod tests {
 
         assert_eq!(partial_smt, decoded);
     }
-  
+
     /// Tests that add_path correctly updates num_entries for both increasing and decreasing entry
     /// counts.
     #[test]
