@@ -1,6 +1,7 @@
 //! Public key types for the RPO Falcon 512 digital signature scheme used in Miden VM.
 
 use alloc::string::ToString;
+use alloc::vec::Vec;
 use core::ops::Deref;
 
 use num::Zero;
@@ -10,25 +11,28 @@ use super::{
     ByteReader, ByteWriter, Deserializable, DeserializationError, FalconFelt, Felt, Polynomial,
     Serializable, Signature,
 };
-use crate::{Word, dsa::rpo_falcon512::FALCON_ENCODING_BITS};
+use crate::{SequentialCommit, Word, dsa::rpo_falcon512::FALCON_ENCODING_BITS};
 
 // PUBLIC KEY
 // ================================================================================================
 
 /// Public key represented as a polynomial with coefficients over the Falcon prime field.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct PublicKey(pub Polynomial<FalconFelt>);
+pub struct PublicKey(Polynomial<FalconFelt>);
 
 impl PublicKey {
     /// Verifies the provided signature against provided message and this public key.
     pub fn verify(&self, message: Word, signature: &Signature) -> bool {
         signature.verify(message, self)
     }
+}
 
-    /// Returns the digest of the public key serving as a commitment to it.
-    pub fn to_word(&self) -> Word {
+impl SequentialCommit for PublicKey {
+    type Commitment = Word;
+
+    fn to_elements(&self) -> Vec<Felt> {
         let pk_felts: Polynomial<Felt> = self.0.clone().into();
-        Rpo256::hash_elements(&pk_felts.coefficients)
+        Rpo256::hash_elements(&pk_felts.coefficients).to_vec()
     }
 }
 
