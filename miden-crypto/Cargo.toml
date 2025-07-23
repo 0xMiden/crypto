@@ -64,6 +64,7 @@ std = [
 [dependencies]
 blake3 = { version = "1.8", default-features = false }
 clap = { version = "4.5", optional = true, features = ["derive"] }
+getrandom = { version = "0.2", features = ["js"] }
 hashbrown = { version = "0.15", optional = true, features = ["serde"] }
 k256 = { version = "0.13", features = ["ecdsa"] }
 num = { version = "0.4", default-features = false, features = ["alloc", "libm"] }
@@ -83,7 +84,6 @@ winter-utils = { version = "0.13", default-features = false }
 [dev-dependencies]
 assert_matches = { version = "1.5", default-features = false }
 criterion = { version = "0.6", features = ["html_reports"] }
-getrandom = { version = "0.2", features = ["js"] }
 hex = { version = "0.4", default-features = false, features = ["alloc"] }
 itertools = { version = "0.14" }
 proptest = { version = "1.7", default-features = false, features = ["alloc"] }
