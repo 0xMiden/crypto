@@ -44,6 +44,9 @@ pub use partial_mt::PartialMerkleTree;
 mod error;
 pub use error::MerkleError;
 
+#[cfg(test)]
+mod proptest_tests;
+
 impl<const DEPTH: u8> Display for LeafIndex<DEPTH> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "DEPTH={}, value={}", DEPTH, self.value())
