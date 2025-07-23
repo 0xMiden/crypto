@@ -520,13 +520,15 @@ mod tests {
     use core::num::NonZero;
 
     use assert_matches::assert_matches;
+    use winter_math::FieldElement;
 
     use super::SparseMerklePath;
     use crate::{
         Felt, ONE, Word,
         merkle::{
-            EmptySubtreeRoots, MerkleError, MerklePath, NodeIndex, SMT_DEPTH, Smt,
-            smt::SparseMerkleTree, sparse_path::path_depth_iter,
+            EmptySubtreeRoots, LeafIndex, MerkleError, MerklePath, MerkleTree, NodeIndex,
+            SMT_DEPTH, SMT_MAX_DEPTH, SimpleSmt, Smt, smt::SparseMerkleTree,
+            sparse_path::path_depth_iter,
         },
     };
 
@@ -815,6 +817,447 @@ mod tests {
             let sparse_auth_nodes = sparse_path.authenticated_nodes(index, leaf_node).unwrap();
             for (a, b) in control_auth_nodes.zip(sparse_auth_nodes) {
                 assert_eq!(a, b);
+            }
+        }
+    }
+
+    use proptest::prelude::*;
+
+    // Arbitrary instance for Word
+    impl Arbitrary for Word {
+        type Parameters = ();
+        type Strategy = BoxedStrategy<Self>;
+
+        fn arbitrary_with(_args: Self::Parameters) -> Self::Strategy {
+            prop::collection::vec(any::<u64>(), 4)
+                .prop_map(|vals| {
+                    Word::new([
+                        Felt::new(vals[0]),
+                        Felt::new(vals[1]),
+                        Felt::new(vals[2]),
+                        Felt::new(vals[3]),
+                    ])
+                })
+                .no_shrink()
+                .boxed()
+        }
+    }
+
+    // Arbitrary instance for MerklePath
+    impl Arbitrary for MerklePath {
+        type Parameters = ();
+        type Strategy = BoxedStrategy<Self>;
+
+        fn arbitrary_with(_args: Self::Parameters) -> Self::Strategy {
+            prop::collection::vec(any::<Word>(), 0..=SMT_MAX_DEPTH as usize)
+                .prop_map(MerklePath::new)
+                .boxed()
+        }
+    }
+
+    // Arbitrary instance for SparseMerklePath
+    impl Arbitrary for SparseMerklePath {
+        type Parameters = ();
+        type Strategy = BoxedStrategy<Self>;
+
+        fn arbitrary_with(_args: Self::Parameters) -> Self::Strategy {
+            (0..=SMT_MAX_DEPTH as usize)
+                .prop_flat_map(|depth| {
+                    // Generate a bitmask for empty nodes - avoid overflow
+                    let max_mask = if depth > 0 && depth < 64 {
+                        (1u64 << depth) - 1
+                    } else if depth == 64 {
+                        u64::MAX
+                    } else {
+                        0
+                    };
+                    let empty_nodes_mask =
+                        prop::num::u64::ANY.prop_map(move |mask| mask & max_mask);
+
+                    // Generate non-empty nodes based on the mask
+                    empty_nodes_mask.prop_flat_map(move |mask| {
+                        let empty_count = mask.count_ones() as usize;
+                        let non_empty_count = depth.saturating_sub(empty_count);
+
+                        prop::collection::vec(any::<Word>(), non_empty_count).prop_map(
+                            move |nodes| SparseMerklePath::from_parts(mask, nodes).unwrap(),
+                        )
+                    })
+                })
+                .boxed()
+        }
+    }
+
+    proptest! {
+        #[test]
+        fn sparse_merkle_path_roundtrip_equivalence(path in any::<MerklePath>()) {
+            // Convert MerklePath to SparseMerklePath and back
+            let sparse_result = SparseMerklePath::try_from(path.clone());
+            if path.depth() <= SMT_MAX_DEPTH {
+                let sparse = sparse_result.unwrap();
+                let reconstructed = MerklePath::from(sparse);
+                prop_assert_eq!(path, reconstructed);
+            } else {
+                prop_assert!(sparse_result.is_err());
+            }
+        }
+
+        #[test]
+        fn merkle_path_roundtrip_equivalence(sparse in any::<SparseMerklePath>()) {
+            // Convert SparseMerklePath to MerklePath and back
+            let merkle = MerklePath::from(sparse.clone());
+            let reconstructed = SparseMerklePath::try_from(merkle.clone()).unwrap();
+            prop_assert_eq!(sparse, reconstructed);
+        }
+
+        #[test]
+        fn path_equivalence_tests(path in any::<MerklePath>(), path2 in any::<MerklePath>()) {
+            if path.depth() > SMT_MAX_DEPTH {
+                return Ok(());
+            }
+
+            let sparse = SparseMerklePath::try_from(path.clone()).unwrap();
+
+            // Depth consistency
+            prop_assert_eq!(path.depth(), sparse.depth());
+
+            // Node access consistency
+            if path.depth() > 0 {
+                for depth_val in 1..=path.depth() {
+                    let depth = NonZero::new(depth_val).unwrap();
+                    let merkle_node = path.at_depth(depth);
+                    let sparse_node = sparse.at_depth(depth);
+
+                    match (merkle_node, sparse_node) {
+                        (Some(m), Ok(s)) => prop_assert_eq!(m, s),
+                        (None, Err(_)) => {},
+                        _ => prop_assert!(false, "Inconsistent node access at depth {}", depth_val),
+                    }
+                }
+            }
+
+            // Iterator consistency
+            if path.depth() > 0 {
+                let merkle_nodes: Vec<_> = path.iter().collect();
+                let sparse_nodes: Vec<_> = sparse.iter().collect();
+
+                prop_assert_eq!(merkle_nodes.len(), sparse_nodes.len());
+                for (m, s) in merkle_nodes.iter().zip(sparse_nodes.iter()) {
+                    prop_assert_eq!(*m, s);
+                }
+            }
+
+            // Test equality between different representations
+            if path2.depth() <= SMT_MAX_DEPTH {
+                let sparse2 = SparseMerklePath::try_from(path2.clone()).unwrap();
+                prop_assert_eq!(path == path2, sparse == sparse2);
+                prop_assert_eq!(path == sparse2, sparse == path2);
+            }
+        }
+
+
+        #[test]
+        fn compute_root_consistency(
+            path in any::<MerklePath>(),
+            index in any::<u64>(),
+            node in any::<Word>()
+        ) {
+            if path.depth() == 0 || path.depth() > SMT_MAX_DEPTH {
+                return Ok(());
+            }
+
+            let sparse = SparseMerklePath::try_from(path.clone()).unwrap();
+
+            let merkle_root = path.compute_root(index, node);
+            let sparse_root = sparse.compute_root(index, node);
+
+            match (merkle_root, sparse_root) {
+                (Ok(m), Ok(s)) => prop_assert_eq!(m, s),
+                (Err(e1), Err(e2)) => {
+                    // Both should have the same error type
+                    prop_assert_eq!(format!("{:?}", e1), format!("{:?}", e2));
+                },
+                _ => prop_assert!(false, "Inconsistent compute_root results"),
+            }
+        }
+
+        #[test]
+        fn verify_consistency(
+            path in any::<MerklePath>(),
+            index in any::<u64>(),
+            node in any::<Word>(),
+            root in any::<Word>()
+        ) {
+            if path.depth() == 0 || path.depth() > SMT_MAX_DEPTH {
+                return Ok(());
+            }
+
+            let sparse = SparseMerklePath::try_from(path.clone()).unwrap();
+
+            let merkle_verify = path.verify(index, node, &root);
+            let sparse_verify = sparse.verify(index, node, &root);
+
+            match (merkle_verify, sparse_verify) {
+                (Ok(()), Ok(())) => {},
+                (Err(e1), Err(e2)) => {
+                    // Both should have the same error type
+                    prop_assert_eq!(format!("{:?}", e1), format!("{:?}", e2));
+                },
+                _ => prop_assert!(false, "Inconsistent verify results"),
+            }
+        }
+
+
+        #[test]
+        fn authenticated_nodes_consistency(
+            path in any::<MerklePath>(),
+            index in any::<u64>(),
+            node in any::<Word>()
+        ) {
+            if path.depth() == 0 || path.depth() > SMT_MAX_DEPTH {
+                return Ok(());
+            }
+
+            let sparse = SparseMerklePath::try_from(path.clone()).unwrap();
+
+            let merkle_result = path.authenticated_nodes(index, node);
+            let sparse_result = sparse.authenticated_nodes(index, node);
+
+            match (merkle_result, sparse_result) {
+                (Ok(m_iter), Ok(s_iter)) => {
+                    let merkle_nodes: Vec<_> = m_iter.collect();
+                    let sparse_nodes: Vec<_> = s_iter.collect();
+                    prop_assert_eq!(merkle_nodes.len(), sparse_nodes.len());
+                    for (m, s) in merkle_nodes.iter().zip(sparse_nodes.iter()) {
+                        prop_assert_eq!(m, s);
+                    }
+                },
+                (Err(e1), Err(e2)) => {
+                    prop_assert_eq!(format!("{:?}", e1), format!("{:?}", e2));
+                },
+                _ => prop_assert!(false, "Inconsistent authenticated_nodes results"),
+            }
+        }
+    }
+
+    #[test]
+    fn test_api_differences() {
+        // This test documents API differences between MerklePath and SparseMerklePath
+
+        // 1. MerklePath has Deref/DerefMut to Vec<Word> - SparseMerklePath does not
+        let merkle = MerklePath::new(vec![Word::default(); 3]);
+        let _vec_ref: &Vec<Word> = &merkle; // This works due to Deref
+        let _vec_mut: &mut Vec<Word> = &mut merkle.clone(); // This works due to DerefMut
+
+        // 2. SparseMerklePath has from_parts() - MerklePath uses new() or from_iter()
+        let sparse = SparseMerklePath::from_parts(0b101, vec![Word::default(); 2]).unwrap();
+        assert_eq!(sparse.depth(), 4); // depth is 4 because mask has bits set up to depth 4
+
+        // 3. SparseMerklePath has from_sized_iter() - MerklePath uses from_iter()
+        let nodes = vec![Word::default(); 3];
+        let sparse_from_iter = SparseMerklePath::from_sized_iter(nodes.clone()).unwrap();
+        let merkle_from_iter = MerklePath::from_iter(nodes);
+        assert_eq!(sparse_from_iter.depth(), merkle_from_iter.depth());
+    }
+
+    // Arbitrary instance for MerkleTree with random leaves
+    #[derive(Debug, Clone)]
+    struct RandomMerkleTree {
+        tree: MerkleTree,
+        leaves: Vec<Word>,
+        indices: Vec<u64>,
+    }
+
+    impl Arbitrary for RandomMerkleTree {
+        type Parameters = ();
+        type Strategy = BoxedStrategy<Self>;
+
+        fn arbitrary_with(_args: Self::Parameters) -> Self::Strategy {
+            // Generate a small tree for testing (2,4,8 leaves - power of 2 for valid MerkleTree)
+            prop::sample::select(&[2, 4, 8])
+                .prop_flat_map(|num_leaves| {
+                    prop::collection::vec(any::<Word>(), num_leaves).prop_map(|leaves| {
+                        let tree = MerkleTree::new(leaves.clone()).unwrap();
+                        let indices: Vec<u64> = (0..leaves.len() as u64).collect();
+                        RandomMerkleTree { tree, leaves, indices }
+                    })
+                })
+                .boxed()
+        }
+    }
+
+    // Arbitrary instance for SimpleSmt with random entries
+    #[derive(Debug, Clone)]
+    struct RandomSimpleSmt {
+        tree: SimpleSmt<3>, // Depth 3 = 8 leaves
+        entries: Vec<(u64, Word)>,
+    }
+
+    impl Arbitrary for RandomSimpleSmt {
+        type Parameters = ();
+        type Strategy = BoxedStrategy<Self>;
+
+        fn arbitrary_with(_args: Self::Parameters) -> Self::Strategy {
+            (1..=8usize) // 1-8 entries in an 8-leaf tree
+                .prop_flat_map(|num_entries| {
+                    prop::collection::vec(
+                        (
+                            0..8u64, // Valid indices for 8-leaf tree
+                            any::<Word>(),
+                        ),
+                        num_entries,
+                    )
+                    .prop_map(|mut entries| {
+                        // Ensure unique indices to avoid duplicates
+                        let mut seen = std::collections::HashSet::new();
+                        entries.retain(|(idx, _)| seen.insert(*idx));
+
+                        let mut tree = SimpleSmt::new().unwrap();
+                        for (idx, value) in &entries {
+                            let leaf_idx = LeafIndex::new(*idx).unwrap();
+                            tree.insert(leaf_idx, *value);
+                        }
+                        RandomSimpleSmt { tree, entries }
+                    })
+                })
+                .boxed()
+        }
+    }
+
+    // Arbitrary instance for Smt with random entries
+    #[derive(Debug, Clone)]
+    struct RandomSmt {
+        tree: Smt,
+        entries: Vec<(Word, Word)>,
+    }
+
+    impl Arbitrary for RandomSmt {
+        type Parameters = ();
+        type Strategy = BoxedStrategy<Self>;
+
+        fn arbitrary_with(_args: Self::Parameters) -> Self::Strategy {
+            (1..=20usize) // 1-20 entries in a sparse tree
+                .prop_flat_map(|num_entries| {
+                    prop::collection::vec((any::<u64>(), any::<Word>()), num_entries).prop_map(
+                        |indices_n_values| {
+                            let entries: Vec<(Word, Word)> = indices_n_values
+                                .into_iter()
+                                .enumerate()
+                                .map(|(n, (leaf_index, value))| {
+                                    // SMT uses the most significant element (index 3) as leaf index
+                                    // Ensure we use valid leaf indices for the SMT depth
+                                    let valid_leaf_index = leaf_index % (1u64 << 60); // Use large but valid range
+                                    let key = Word::new([
+                                        Felt::new(n as u64),         // element 0
+                                        Felt::new(n as u64 + 1),     // element 1
+                                        Felt::new(n as u64 + 2),     // element 2
+                                        Felt::new(valid_leaf_index), // element 3 (leaf index)
+                                    ]);
+                                    (key, value)
+                                })
+                                .collect();
+
+                            // Ensure unique keys to avoid duplicates
+                            let mut seen = std::collections::HashSet::new();
+                            let unique_entries: Vec<_> =
+                                entries.into_iter().filter(|(key, _)| seen.insert(*key)).collect();
+
+                            let tree = Smt::with_entries(unique_entries.clone()).unwrap();
+                            RandomSmt { tree, entries: unique_entries }
+                        },
+                    )
+                })
+                .boxed()
+        }
+    }
+
+    proptest! {
+
+        #[test]
+        fn simple_smt_path_consistency(tree_data in any::<RandomSimpleSmt>()) {
+            let RandomSimpleSmt { tree, entries } = tree_data;
+
+            for (leaf_index, value) in &entries {
+                let merkle_path = tree.get_path(&LeafIndex::new(*leaf_index).unwrap());
+                let sparse_path = SparseMerklePath::from_sized_iter(merkle_path.clone().into_iter()).unwrap();
+
+                // Verify both paths have same depth
+                prop_assert_eq!(merkle_path.depth(), sparse_path.depth());
+
+                // Verify both paths produce same root for the same value
+                let merkle_root = merkle_path.compute_root(*leaf_index, *value).unwrap();
+                let sparse_root = sparse_path.compute_root(*leaf_index, *value).unwrap();
+                prop_assert_eq!(merkle_root, sparse_root);
+
+                // Verify both paths verify correctly
+                let tree_root = tree.root();
+                prop_assert!(merkle_path.verify(*leaf_index, *value, &tree_root).is_ok());
+                prop_assert!(sparse_path.verify(*leaf_index, *value, &tree_root).is_ok());
+
+                // Test with random additional leaf
+                let random_leaf = Word::new([Felt::ONE; 4]);
+                let random_index = *leaf_index ^ 1; // Ensure it's a sibling
+
+                // Both should fail verification with wrong leaf
+                let merkle_wrong = merkle_path.verify(random_index, random_leaf, &tree_root);
+                let sparse_wrong = sparse_path.verify(random_index, random_leaf, &tree_root);
+                prop_assert_eq!(merkle_wrong.is_err(), sparse_wrong.is_err());
+            }
+        }
+
+        #[test]
+        fn smt_path_consistency(tree_data in any::<RandomSmt>()) {
+            let RandomSmt { tree, entries } = tree_data;
+
+            for (key, _value) in &entries {
+                let (merkle_path, leaf) = tree.open(key).into_parts();
+                let sparse_path = SparseMerklePath::from_sized_iter(merkle_path.clone().into_iter()).unwrap();
+
+                let leaf_index = Smt::key_to_leaf_index(key).value();
+                let actual_value = leaf.hash(); // Use the actual leaf hash
+
+                // Verify both paths have same depth
+                prop_assert_eq!(merkle_path.depth(), sparse_path.depth());
+
+                // Verify both paths produce same root for the same value
+                let merkle_root = merkle_path.compute_root(leaf_index, actual_value).unwrap();
+                let sparse_root = sparse_path.compute_root(leaf_index, actual_value).unwrap();
+                prop_assert_eq!(merkle_root, sparse_root);
+
+                // Verify both paths verify correctly
+                let tree_root = tree.root();
+                prop_assert!(merkle_path.verify(leaf_index, actual_value, &tree_root).is_ok());
+                prop_assert!(sparse_path.verify(leaf_index, actual_value, &tree_root).is_ok());
+
+                // Test authenticated nodes consistency
+                let merkle_auth = merkle_path.authenticated_nodes(leaf_index, actual_value).unwrap().collect::<Vec<_>>();
+                let sparse_auth = sparse_path.authenticated_nodes(leaf_index, actual_value).unwrap().collect::<Vec<_>>();
+                prop_assert_eq!(merkle_auth, sparse_auth);
+            }
+        }
+
+        #[test]
+        fn reverse_conversion_from_sparse(tree_data in any::<RandomMerkleTree>()) {
+            let RandomMerkleTree { tree, leaves, indices } = tree_data;
+
+            for (i, &leaf_index) in indices.iter().enumerate() {
+                let leaf = leaves[i];
+                let merkle_path = tree.get_path(NodeIndex::new(tree.depth(), leaf_index).unwrap()).unwrap();
+
+                // Create SparseMerklePath first, then convert to MerklePath
+                let sparse_path = SparseMerklePath::from_sized_iter(merkle_path.clone().into_iter()).unwrap();
+                let converted_merkle = MerklePath::from(sparse_path.clone());
+
+                // Verify conversion back and forth works
+                let back_to_sparse = SparseMerklePath::try_from(converted_merkle.clone()).unwrap();
+                prop_assert_eq!(sparse_path, back_to_sparse);
+
+                // Verify all APIs work identically
+                prop_assert_eq!(merkle_path.depth(), converted_merkle.depth());
+
+                let merkle_root = merkle_path.compute_root(leaf_index, leaf).unwrap();
+                let converted_root = converted_merkle.compute_root(leaf_index, leaf).unwrap();
+                prop_assert_eq!(merkle_root, converted_root);
             }
         }
     }
