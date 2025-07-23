@@ -1,7 +1,6 @@
 //! Public key types for the RPO Falcon 512 digital signature scheme used in Miden VM.
 
-use alloc::string::ToString;
-use alloc::vec::Vec;
+use alloc::{string::ToString, vec::Vec};
 use core::ops::Deref;
 
 use num::Zero;
