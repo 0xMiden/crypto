@@ -1,6 +1,6 @@
 use thiserror::Error;
 
-use super::{NodeIndex, Word};
+use super::{MAX_LEAF_ENTRIES, NodeIndex, Word};
 
 #[derive(Debug, Error)]
 pub enum MerkleError {
@@ -22,6 +22,8 @@ pub enum MerkleError {
     SubtreeDepthExceedsDepth { subtree_depth: u8, tree_depth: u8 },
     #[error("number of entries in the merkle tree exceeds the maximum of {0}")]
     TooManyEntries(usize),
+    #[error("number of entries in a leaf ({actual}) exceeds the maximum of ({MAX_LEAF_ENTRIES})")]
+    TooManyLeafEntries { actual: usize },
     #[error("node index `{0}` not found in the tree")]
     NodeIndexNotFoundInTree(NodeIndex),
     #[error("node {0:?} with index `{1}` not found in the store")]

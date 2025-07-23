@@ -125,16 +125,14 @@ impl PartialSmt {
     /// - the key and its merkle path were not previously added (using [`PartialSmt::add_path`]) to
     ///   this [`PartialSmt`], which means it is almost certainly incorrect to update its value. If
     ///   an error is returned the tree is in the same state as before.
-    ///
-    /// # Panics
-    /// Panics if inserting the key-value pair would exceed [`super::MAX_LEAF_ENTRIES`] (1024
-    /// entries) in the leaf.
+    /// - inserting the key-value pair would exceed [`super::MAX_LEAF_ENTRIES`] (1024 entries) in
+    ///   the leaf.
     pub fn insert(&mut self, key: Word, value: Word) -> Result<Word, MerkleError> {
         if !self.is_leaf_tracked(&key) {
             return Err(MerkleError::UntrackedKey(key));
         }
 
-        let previous_value = self.0.insert(key, value);
+        let previous_value = self.0.insert(key, value)?;
 
         // If the value was removed the SmtLeaf was removed as well by the underlying Smt
         // implementation. However, we still want to consider that leaf tracked so it can be
@@ -418,9 +416,9 @@ mod tests {
         // A non-empty value for the key that was previously empty.
         let new_value_empty_key = Word::from(rand_array::<Felt, 4>());
 
-        full.insert(key0, new_value0);
-        full.insert(key2, new_value2);
-        full.insert(key_empty, new_value_empty_key);
+        full.insert(key0, new_value0).unwrap();
+        full.insert(key2, new_value2).unwrap();
+        full.insert(key_empty, new_value_empty_key).unwrap();
 
         partial.insert(key0, new_value0).unwrap();
         partial.insert(key2, new_value2).unwrap();
@@ -435,7 +433,7 @@ mod tests {
         // Remove an added key.
         // ----------------------------------------------------------------------------------------
 
-        full.insert(key0, EMPTY_WORD);
+        full.insert(key0, EMPTY_WORD).unwrap();
         partial.insert(key0, EMPTY_WORD).unwrap();
 
         assert_eq!(full.root(), partial.root());
@@ -512,8 +510,8 @@ mod tests {
         let stale_proof0 = full.open(&key0);
 
         // Insert a non-empty value so the root actually changes.
-        full.insert(key1, value1);
-        full.insert(key2, value2);
+        full.insert(key1, value1).unwrap();
+        full.insert(key2, value2).unwrap();
 
         let proof2 = full.open(&key2);
 
@@ -544,7 +542,7 @@ mod tests {
         // This proof will be stale after we insert another value.
         let stale_proof0 = full.open(&key0);
 
-        full.insert(key2, value2);
+        full.insert(key2, value2).unwrap();
 
         let proof2 = full.open(&key2);
 
