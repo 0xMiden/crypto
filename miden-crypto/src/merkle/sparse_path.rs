@@ -831,17 +831,16 @@ mod tests {
             // Depth consistency
             prop_assert_eq!(path.depth(), sparse.depth());
 
-            // Node access consistency
+            // Node access consistency including path_depth_iter
             if path.depth() > 0 {
-                for depth_val in 1..=path.depth() {
-                    let depth = NonZero::new(depth_val).unwrap();
+                for depth in path_depth_iter(path.depth()) {
                     let merkle_node = path.at_depth(depth);
                     let sparse_node = sparse.at_depth(depth);
 
                     match (merkle_node, sparse_node) {
                         (Some(m), Ok(s)) => prop_assert_eq!(m, s),
                         (None, Err(_)) => {},
-                        _ => prop_assert!(false, "Inconsistent node access at depth {}", depth_val),
+                        _ => prop_assert!(false, "Inconsistent node access at depth {}", depth.get()),
                     }
                 }
             }
