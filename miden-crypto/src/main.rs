@@ -102,7 +102,7 @@ pub fn batched_insertion(tree: &mut Smt, insertions: usize) -> Result<(), Merkle
         .collect();
 
     let now = Instant::now();
-    let mutations = tree.compute_mutations(new_pairs);
+    let mutations = tree.compute_mutations(new_pairs)?;
     let compute_elapsed = now.elapsed().as_secs_f64() * 1000_f64; // time in ms
 
     println!(
