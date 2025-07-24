@@ -901,6 +901,8 @@ mod tests {
                 prop_assert!(sparse_result.is_err());
             }
         }
+    }
+    proptest! {
 
         #[test]
         fn merkle_path_roundtrip_equivalence(sparse in any::<SparseMerklePath>()) {
@@ -909,6 +911,8 @@ mod tests {
             let reconstructed = SparseMerklePath::try_from(merkle.clone()).unwrap();
             prop_assert_eq!(sparse, reconstructed);
         }
+    }
+    proptest! {
 
         #[test]
         fn path_equivalence_tests(path in any::<MerklePath>(), path2 in any::<MerklePath>()) {
@@ -954,88 +958,103 @@ mod tests {
                 prop_assert_eq!(path == sparse2, sparse == path2);
             }
         }
-
+    }
+    // rather heavy tests
+    proptest! {
+        #![proptest_config(ProptestConfig::with_cases(100))]
 
         #[test]
         fn compute_root_consistency(
-            path in any::<MerklePath>(),
-            index in any::<u64>(),
+            tree_data in any::<RandomMerkleTree>(),
             node in any::<Word>()
         ) {
-            if path.depth() == 0 || path.depth() > SMT_MAX_DEPTH {
-                return Ok(());
-            }
+            let RandomMerkleTree { tree, leaves, indices } = tree_data;
 
-            let sparse = SparseMerklePath::try_from(path.clone()).unwrap();
+            for (i, &leaf_index) in indices.iter().enumerate() {
+                let _leaf = leaves[i];
+                let path = tree.get_path(NodeIndex::new(tree.depth(), leaf_index).unwrap()).unwrap();
+                let sparse = SparseMerklePath::from_sized_iter(path.clone().into_iter()).unwrap();
 
-            let merkle_root = path.compute_root(index, node);
-            let sparse_root = sparse.compute_root(index, node);
+                let merkle_root = path.compute_root(leaf_index, node);
+                let sparse_root = sparse.compute_root(leaf_index, node);
 
-            match (merkle_root, sparse_root) {
-                (Ok(m), Ok(s)) => prop_assert_eq!(m, s),
-                (Err(e1), Err(e2)) => {
-                    // Both should have the same error type
-                    prop_assert_eq!(format!("{:?}", e1), format!("{:?}", e2));
-                },
-                _ => prop_assert!(false, "Inconsistent compute_root results"),
+                match (merkle_root, sparse_root) {
+                    (Ok(m), Ok(s)) => prop_assert_eq!(m, s),
+                    (Err(e1), Err(e2)) => {
+                        // Both should have the same error type
+                        prop_assert_eq!(format!("{:?}", e1), format!("{:?}", e2));
+                    },
+                    _ => prop_assert!(false, "Inconsistent compute_root results"),
+                }
             }
         }
 
         #[test]
         fn verify_consistency(
-            path in any::<MerklePath>(),
-            index in any::<u64>(),
-            node in any::<Word>(),
-            root in any::<Word>()
+            tree_data in any::<RandomMerkleTree>(),
+            node in any::<Word>()
         ) {
-            if path.depth() == 0 || path.depth() > SMT_MAX_DEPTH {
-                return Ok(());
-            }
+            let RandomMerkleTree { tree, leaves, indices } = tree_data;
 
-            let sparse = SparseMerklePath::try_from(path.clone()).unwrap();
+            for (i, &leaf_index) in indices.iter().enumerate() {
+                let leaf = leaves[i];
+                let path = tree.get_path(NodeIndex::new(tree.depth(), leaf_index).unwrap()).unwrap();
+                let sparse = SparseMerklePath::from_sized_iter(path.clone().into_iter()).unwrap();
 
-            let merkle_verify = path.verify(index, node, &root);
-            let sparse_verify = sparse.verify(index, node, &root);
+                let root = tree.root();
 
-            match (merkle_verify, sparse_verify) {
-                (Ok(()), Ok(())) => {},
-                (Err(e1), Err(e2)) => {
-                    // Both should have the same error type
-                    prop_assert_eq!(format!("{:?}", e1), format!("{:?}", e2));
-                },
-                _ => prop_assert!(false, "Inconsistent verify results"),
+                let merkle_verify = path.verify(leaf_index, leaf, &root);
+                let sparse_verify = sparse.verify(leaf_index, leaf, &root);
+
+                match (merkle_verify, sparse_verify) {
+                    (Ok(()), Ok(())) => {},
+                    (Err(e1), Err(e2)) => {
+                        // Both should have the same error type
+                        prop_assert_eq!(format!("{:?}", e1), format!("{:?}", e2));
+                    },
+                    _ => prop_assert!(false, "Inconsistent verify results"),
+                }
+
+                // Test with wrong node - both should fail
+                let wrong_verify = path.verify(leaf_index, node, &root);
+                let wrong_sparse_verify = sparse.verify(leaf_index, node, &root);
+
+                match (wrong_verify, wrong_sparse_verify) {
+                    (Ok(()), Ok(())) => prop_assert!(false, "Verification should have failed with wrong node"),
+                    (Err(_), Err(_)) => {},
+                    _ => prop_assert!(false, "Inconsistent verification results with wrong node"),
+                }
             }
         }
 
-
         #[test]
         fn authenticated_nodes_consistency(
-            path in any::<MerklePath>(),
-            index in any::<u64>(),
-            node in any::<Word>()
+            tree_data in any::<RandomMerkleTree>()
         ) {
-            if path.depth() == 0 || path.depth() > SMT_MAX_DEPTH {
-                return Ok(());
-            }
+            let RandomMerkleTree { tree, leaves, indices } = tree_data;
 
-            let sparse = SparseMerklePath::try_from(path.clone()).unwrap();
+            for (i, &leaf_index) in indices.iter().enumerate() {
+                let leaf = leaves[i];
+                let path = tree.get_path(NodeIndex::new(tree.depth(), leaf_index).unwrap()).unwrap();
+                let sparse = SparseMerklePath::from_sized_iter(path.clone().into_iter()).unwrap();
 
-            let merkle_result = path.authenticated_nodes(index, node);
-            let sparse_result = sparse.authenticated_nodes(index, node);
+                let merkle_result = path.authenticated_nodes(leaf_index, leaf);
+                let sparse_result = sparse.authenticated_nodes(leaf_index, leaf);
 
-            match (merkle_result, sparse_result) {
-                (Ok(m_iter), Ok(s_iter)) => {
-                    let merkle_nodes: Vec<_> = m_iter.collect();
-                    let sparse_nodes: Vec<_> = s_iter.collect();
-                    prop_assert_eq!(merkle_nodes.len(), sparse_nodes.len());
-                    for (m, s) in merkle_nodes.iter().zip(sparse_nodes.iter()) {
-                        prop_assert_eq!(m, s);
-                    }
-                },
-                (Err(e1), Err(e2)) => {
-                    prop_assert_eq!(format!("{:?}", e1), format!("{:?}", e2));
-                },
-                _ => prop_assert!(false, "Inconsistent authenticated_nodes results"),
+                match (merkle_result, sparse_result) {
+                    (Ok(m_iter), Ok(s_iter)) => {
+                        let merkle_nodes: Vec<_> = m_iter.collect();
+                        let sparse_nodes: Vec<_> = s_iter.collect();
+                        prop_assert_eq!(merkle_nodes.len(), sparse_nodes.len());
+                        for (m, s) in merkle_nodes.iter().zip(sparse_nodes.iter()) {
+                            prop_assert_eq!(m, s);
+                        }
+                    },
+                    (Err(e1), Err(e2)) => {
+                        prop_assert_eq!(format!("{:?}", e1), format!("{:?}", e2));
+                    },
+                    _ => prop_assert!(false, "Inconsistent authenticated_nodes results"),
+                }
             }
         }
     }
@@ -1073,8 +1092,8 @@ mod tests {
         type Strategy = BoxedStrategy<Self>;
 
         fn arbitrary_with(_args: Self::Parameters) -> Self::Strategy {
-            // Generate a small tree for testing (2,4,8 leaves - power of 2 for valid MerkleTree)
-            prop::sample::select(&[2, 4, 8])
+            // Generate trees with power-of-2 leaves up to 1024 (2^10)
+            prop::sample::select(&[2, 4, 8, 16, 32, 64, 128, 256, 512, 1024])
                 .prop_flat_map(|num_leaves| {
                     prop::collection::vec(any::<Word>(), num_leaves).prop_map(|leaves| {
                         let tree = MerkleTree::new(leaves.clone()).unwrap();
@@ -1089,7 +1108,7 @@ mod tests {
     // Arbitrary instance for SimpleSmt with random entries
     #[derive(Debug, Clone)]
     struct RandomSimpleSmt {
-        tree: SimpleSmt<3>, // Depth 3 = 8 leaves
+        tree: SimpleSmt<10>, // Depth 10 = 1024 leaves
         entries: Vec<(u64, Word)>,
     }
 
@@ -1098,11 +1117,11 @@ mod tests {
         type Strategy = BoxedStrategy<Self>;
 
         fn arbitrary_with(_args: Self::Parameters) -> Self::Strategy {
-            (1..=8usize) // 1-8 entries in an 8-leaf tree
+            (1..=100usize) // 1-100 entries in an 1024-leaf tree
                 .prop_flat_map(|num_entries| {
                     prop::collection::vec(
                         (
-                            0..8u64, // Valid indices for 8-leaf tree
+                            0..1024u64, // Valid indices for 1024-leaf tree
                             any::<Word>(),
                         ),
                         num_entries,
@@ -1136,7 +1155,7 @@ mod tests {
         type Strategy = BoxedStrategy<Self>;
 
         fn arbitrary_with(_args: Self::Parameters) -> Self::Strategy {
-            (1..=20usize) // 1-20 entries in a sparse tree
+            (1..=100usize) // 1-100 entries in a sparse tree
                 .prop_flat_map(|num_entries| {
                     prop::collection::vec((any::<u64>(), any::<Word>()), num_entries).prop_map(
                         |indices_n_values| {
@@ -1172,6 +1191,7 @@ mod tests {
     }
 
     proptest! {
+        #![proptest_config(ProptestConfig::with_cases(20))]
 
         #[test]
         fn simple_smt_path_consistency(tree_data in any::<RandomSimpleSmt>()) {
