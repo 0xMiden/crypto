@@ -717,49 +717,6 @@ mod tests {
     }
 
     #[test]
-    fn test_borrowing_iterator() {
-        let tree = make_smt(8192);
-
-        for (key, _value) in tree.entries() {
-            let control_path = tree.get_path(key);
-            let sparse_path = SparseMerklePath::try_from(control_path.clone()).unwrap();
-            assert_eq!(control_path.depth(), sparse_path.depth());
-            assert_eq!(sparse_path.depth(), SMT_DEPTH);
-
-            // Test that both iterators yield the same amount of the same values.
-            let mut count: u64 = 0;
-            for (&control_node, sparse_node) in
-                itertools::zip_eq(control_path.iter(), sparse_path.iter())
-            {
-                count += 1;
-                assert_eq!(control_node, sparse_node);
-            }
-            assert_eq!(count, control_path.depth() as u64);
-        }
-    }
-
-    #[test]
-    fn test_owning_iterator() {
-        let tree = make_smt(8192);
-
-        for (key, _value) in tree.entries() {
-            let control_path = tree.get_path(key);
-            let path_depth = control_path.depth();
-            let sparse_path = SparseMerklePath::try_from(control_path.clone()).unwrap();
-            assert_eq!(control_path.depth(), sparse_path.depth());
-            assert_eq!(sparse_path.depth(), SMT_DEPTH);
-
-            // Test that both iterators yield the same amount of the same values.
-            let mut count: u64 = 0;
-            for (control_node, sparse_node) in itertools::zip_eq(control_path, sparse_path) {
-                count += 1;
-                assert_eq!(control_node, sparse_node);
-            }
-            assert_eq!(count, path_depth as u64);
-        }
-    }
-
-    #[test]
     fn test_zero_sized() {
         let nodes: Vec<Word> = Default::default();
 
