@@ -286,9 +286,9 @@ impl Smt {
     /// # use miden_crypto::merkle::{Smt, EmptySubtreeRoots, SMT_DEPTH};
     /// let mut smt = Smt::new();
     /// let pair = (Word::default(), Word::default());
-    /// let mutations = smt.compute_mutations(vec![pair]);
+    /// let mutations = smt.compute_mutations(vec![pair]).unwrap();
     /// assert_eq!(mutations.root(), *EmptySubtreeRoots::entry(SMT_DEPTH, 0));
-    /// smt.apply_mutations(mutations);
+    /// smt.apply_mutations(mutations).unwrap();
     /// assert_eq!(smt.root(), *EmptySubtreeRoots::entry(SMT_DEPTH, 0));
     /// ```
     pub fn compute_mutations(

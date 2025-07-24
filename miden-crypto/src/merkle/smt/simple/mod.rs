@@ -232,9 +232,9 @@ impl<const DEPTH: u8> SimpleSmt<DEPTH> {
     /// # use miden_crypto::merkle::{LeafIndex, SimpleSmt, EmptySubtreeRoots, SMT_DEPTH};
     /// let mut smt: SimpleSmt<3> = SimpleSmt::new().unwrap();
     /// let pair = (LeafIndex::default(), Word::default());
-    /// let mutations = smt.compute_mutations(vec![pair]);
+    /// let mutations = smt.compute_mutations(vec![pair]).unwrap();
     /// assert_eq!(mutations.root(), *EmptySubtreeRoots::entry(3, 0));
-    /// smt.apply_mutations(mutations);
+    /// smt.apply_mutations(mutations).unwrap();
     /// assert_eq!(smt.root(), *EmptySubtreeRoots::entry(3, 0));
     /// ```
     pub fn compute_mutations(
