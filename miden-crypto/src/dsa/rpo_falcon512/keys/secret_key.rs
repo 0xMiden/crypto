@@ -128,10 +128,11 @@ impl SecretKey {
     pub fn sign_with_rng<R: Rng>(&self, message: Word, rng: &mut R) -> Signature {
         let nonce = Nonce::deterministic();
 
+        let h = self.compute_pub_key_poly();
         let c = hash_to_point_rpo256(message, &nonce);
         let s2 = self.sign_helper(c, rng);
 
-        Signature::new(nonce, s2)
+        Signature::new(nonce, h, s2)
     }
 
     /// Signs a message with the secret key relying on the provided randomness generator.
@@ -152,12 +153,13 @@ impl SecretKey {
 
         let nonce = Nonce::random(rng);
 
+        let h = self.compute_pub_key_poly();
         let c = hash_to_point_shake256(message, &nonce);
 
         let mut chacha_prng = ChaCha::new(rng);
         let s2 = self.sign_helper(c, &mut chacha_prng);
 
-        Signature::new(nonce, s2)
+        Signature::new(nonce, h, s2)
     }
 
     // HELPER METHODS

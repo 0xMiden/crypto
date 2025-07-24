@@ -6,7 +6,7 @@ use core::ops::Deref;
 use num::Zero;
 
 use super::{
-    super::{LOG_N, N, PK_LEN, Rpo256},
+    super::{LOG_N, N, PK_LEN},
     ByteReader, ByteWriter, Deserializable, DeserializationError, FalconFelt, Felt, Polynomial,
     Serializable, Signature,
 };
@@ -24,14 +24,18 @@ impl PublicKey {
     pub fn verify(&self, message: Word, signature: &Signature) -> bool {
         signature.verify(message, self)
     }
+
+    /// Returns a commitment to the public key using the RPO256 hash function.
+    pub fn to_commitment(&self) -> Word {
+        <Self as SequentialCommit>::to_commitment(self)
+    }
 }
 
 impl SequentialCommit for PublicKey {
     type Commitment = Word;
 
     fn to_elements(&self) -> Vec<Felt> {
-        let pk_felts: Polynomial<Felt> = self.0.clone().into();
-        Rpo256::hash_elements(&pk_felts.coefficients).to_vec()
+        Into::<Polynomial<Felt>>::into(self.0.clone()).coefficients
     }
 }
 
