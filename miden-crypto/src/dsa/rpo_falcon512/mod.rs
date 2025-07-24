@@ -49,7 +49,7 @@ mod signature;
 mod tests;
 
 pub use self::{
-    keys::{PubKeyPoly, PublicKey, SecretKey},
+    keys::{PublicKey, SecretKey},
     math::Polynomial,
     signature::{Signature, SignatureHeader, SignaturePoly},
 };

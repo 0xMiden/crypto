@@ -13,7 +13,7 @@ use super::{
         math::{FalconFelt, FastFft, LdlTree, Polynomial, ffldl, ffsampling, gram, normalize_tree},
         signature::SignaturePoly,
     },
-    PubKeyPoly, PublicKey,
+    PublicKey,
 };
 use crate::{
     Word,
@@ -103,7 +103,7 @@ impl SecretKey {
 
     /// Returns the public key corresponding to this secret key.
     pub fn public_key(&self) -> PublicKey {
-        self.compute_pub_key_poly().into()
+        self.compute_pub_key_poly()
     }
 
     /// Returns the LDL tree associated to this secret key.
@@ -166,7 +166,7 @@ impl SecretKey {
     // --------------------------------------------------------------------------------------------
 
     /// Derives the public key corresponding to this secret key using h = g /f [mod ϕ][mod p].
-    pub fn compute_pub_key_poly(&self) -> PubKeyPoly {
+    pub fn compute_pub_key_poly(&self) -> PublicKey {
         let g: Polynomial<FalconFelt> = self.secret_key[0].clone().into();
         let g_fft = g.fft();
         let minus_f: Polynomial<FalconFelt> = self.secret_key[1].clone().into();

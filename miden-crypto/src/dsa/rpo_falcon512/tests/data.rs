@@ -1,3 +1,5 @@
+use crate::dsa::rpo_falcon512::SIG_SERIALIZED_LEN;
+
 pub(crate) const NUM_TEST_VECTORS: usize = 12;
 
 /// Helper data to indicate the number of bytes the should be draw from the SHAKE256-based PRNG
@@ -1755,7 +1757,7 @@ pub(crate) static SK_POLYS: [[[i16; 512]; 4]; NUM_TEST_VECTORS] = [
 ///
 /// This was generated on an `Intel Core i5-8279U` running on Linux kernel `5.4.0-144-generic` and
 /// built with Rust `1.88.0`.
-pub(crate) const DETERMINISTIC_SIGNATURE: [u8; 1524] = [
+pub(crate) const DETERMINISTIC_SIGNATURE: [u8; SIG_SERIALIZED_LEN] = [
     185, 1, 22, 144, 158, 211, 85, 196, 199, 194, 123, 220, 135, 121, 154, 120, 141, 154, 66, 32,
     56, 47, 239, 41, 38, 121, 124, 172, 190, 21, 238, 237, 69, 36, 36, 245, 63, 146, 222, 205, 107,
     153, 60, 69, 60, 10, 91, 243, 160, 222, 120, 21, 132, 54, 134, 200, 184, 209, 102, 174, 244,

@@ -4,10 +4,10 @@ use core::ops::Deref;
 use num::Zero;
 
 use super::{
-    ByteReader, ByteWriter, Deserializable, DeserializationError, Felt, LOG_N, MODULUS, N, Nonce,
-    Rpo256, SIG_L2_BOUND, SIG_POLY_BYTE_LEN, Serializable,
+    ByteReader, ByteWriter, Deserializable, DeserializationError, LOG_N, MODULUS, N, Nonce,
+    SIG_L2_BOUND, SIG_POLY_BYTE_LEN, Serializable,
     hash_to_point::hash_to_point_rpo256,
-    keys::PubKeyPoly,
+    keys::PublicKey,
     math::{FalconFelt, FastFft, Polynomial},
 };
 use crate::Word;
@@ -69,7 +69,7 @@ pub struct Signature {
     header: SignatureHeader,
     nonce: Nonce,
     s2: SignaturePoly,
-    h: PubKeyPoly,
+    h: PublicKey,
 }
 
 impl Signature {
@@ -78,7 +78,7 @@ impl Signature {
 
     /// Creates a new signature from the given nonce, public key polynomial, and signature
     /// polynomial.
-    pub fn new(nonce: Nonce, h: PubKeyPoly, s2: SignaturePoly) -> Signature {
+    pub fn new(nonce: Nonce, h: PublicKey, s2: SignaturePoly) -> Signature {
         Self {
             header: SignatureHeader::default(),
             nonce,
@@ -91,7 +91,7 @@ impl Signature {
     // --------------------------------------------------------------------------------------------
 
     /// Returns the public key polynomial h.
-    pub fn pk_poly(&self) -> &PubKeyPoly {
+    pub fn public_key(&self) -> &PublicKey {
         &self.h
     }
 
@@ -110,16 +110,9 @@ impl Signature {
 
     /// Returns true if this signature is a valid signature for the specified message generated
     /// against the secret key matching the specified public key commitment.
-    pub fn verify(&self, message: Word, pubkey_com: Word) -> bool {
-        // compute the hash of the public key polynomial
-        let h_felt: Polynomial<Felt> = (&**self.pk_poly()).into();
-        let h_digest: Word = Rpo256::hash_elements(&h_felt.coefficients);
-        if h_digest != pubkey_com {
-            return false;
-        }
-
+    pub fn verify(&self, message: Word, pub_key: &PublicKey) -> bool {
         let c = hash_to_point_rpo256(message, &self.nonce);
-        verify_helper(&c, &self.s2, self.pk_poly())
+        verify_helper(&c, &self.s2, pub_key)
     }
 }
 
@@ -343,7 +336,7 @@ impl Deserializable for SignaturePoly {
 /// Takes the hash-to-point polynomial `c` of a message, the signature polynomial over
 /// the message `s2` and a public key polynomial and returns `true` is the signature is a valid
 /// signature for the given parameters, otherwise it returns `false`.
-fn verify_helper(c: &Polynomial<FalconFelt>, s2: &SignaturePoly, h: &PubKeyPoly) -> bool {
+fn verify_helper(c: &Polynomial<FalconFelt>, s2: &SignaturePoly, h: &PublicKey) -> bool {
     let h_fft = h.fft();
     let s2_fft = s2.fft();
     let c_fft = c.fft();

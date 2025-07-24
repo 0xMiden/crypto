@@ -9,6 +9,7 @@
 - `Smt.insert_inner_nodes` does not store empty subtrees ([#452](https://github.com/0xMiden/crypto/pull/452)).
 - Optimized `Smt::num_entries()` ([#455](https://github.com/0xMiden/crypto/pull/455)).
 - Disallow leaves with more than 2^16 entries ([#455](https://github.com/0xMiden/crypto/pull/455)).
+- [BREAKING] Remove public key from Falcon signature ([#460])(https://github.com/0xMiden/crypto/pull/460).
 
 # 0.15.8 (2025-07-21)
 
