@@ -1,3 +1,7 @@
+# 0.15.9 (TBD)
+
+- Added serialization for `Mmr` and `Forest` ([#466](https://github.com/0xMiden/crypto/pull/466)).
+
 # 0.15.8 (2025-07-21)
 
 - Added constructor for `SparseMerklePath` that accepts a bitmask and a vector of nodes ([#457](https://github.com/0xMiden/crypto/pull/457)).
