@@ -15,6 +15,7 @@ This crate contains cryptographic primitives used in Miden.
 - [BLAKE3](https://github.com/BLAKE3-team/BLAKE3) hash function with 256-bit, 192-bit, or 160-bit output. The 192-bit and 160-bit outputs are obtained by truncating the 256-bit output of the standard BLAKE3.
 - [RPO](https://eprint.iacr.org/2022/1577) hash function with 256-bit output. This hash function is an algebraic hash function suitable for recursive STARKs.
 - [RPX](https://eprint.iacr.org/2023/1045) hash function with 256-bit output. Similar to RPO, this hash function is suitable for recursive STARKs but it is about 2x faster as compared to RPO.
+- [Poseidon2](https://eprint.iacr.org/2023/323) hash function with 256-bit output. Similar to RPO and RPX, this hash function is suitable for recursive STARKs but it is about 2x faster as compared to RPX.
 
 For performance benchmarks of these hash functions and their comparison to other popular hash functions please see [here](./miden-crypto/benches/).
 
@@ -36,7 +37,7 @@ The module also contains additional supporting components such as `NodeIndex`, `
 
 [DSA module](./miden-crypto/src/dsa) provides a set of digital signature schemes supported by default in the Miden VM. Currently, these schemes are:
 
-- `RPO Falcon512`: a variant of the [Falcon](https://falcon-sign.info/) signature scheme. This variant differs from the standard in that instead of using SHAKE256 hash function in the _hash-to-point_ algorithm we use RPO256. This makes the signature more efficient to verify in Miden VM.
+- `RPO Falcon512`: a variant of the [Falcon](https://falcon-sign.info/) signature scheme. This variant differs from the standard in that instead of using SHAKE256 hash function in the _hash-to-point_ algorithm we use RPO256. This makes the signature more efficient to verify in Miden VM. Another point of difference is with respect to the signing process, which is deterministic in our case.
 
 For the above signatures, key generation, signing, and signature verification are available for both `std` and `no_std` contexts (see [crate features](#crate-features) below). However, in `no_std` context, the user is responsible for supplying the key generation and signing procedures with a random number generator.
 
