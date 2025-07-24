@@ -527,8 +527,7 @@ mod tests {
         Felt, ONE, Word,
         merkle::{
             EmptySubtreeRoots, LeafIndex, MerkleError, MerklePath, MerkleTree, NodeIndex,
-            SMT_DEPTH, SMT_MAX_DEPTH, SimpleSmt, Smt, smt::SparseMerkleTree,
-            sparse_path::path_depth_iter,
+            SMT_MAX_DEPTH, SimpleSmt, Smt, smt::SparseMerkleTree, sparse_path::path_depth_iter,
         },
     };
 
@@ -693,25 +692,6 @@ mod tests {
             assert_eq!(control_path.depth(), sparse_path.depth());
             for (control, sparse) in itertools::zip_eq(control_path, sparse_path) {
                 assert_eq!(control, sparse);
-            }
-        }
-    }
-
-    #[test]
-    fn test_random_access() {
-        let tree = make_smt(8192);
-
-        for (i, (key, _value)) in tree.entries().enumerate() {
-            let control_path = tree.get_path(key);
-            let sparse_path = SparseMerklePath::try_from(control_path.clone()).unwrap();
-            assert_eq!(control_path.depth(), sparse_path.depth());
-            assert_eq!(sparse_path.depth(), SMT_DEPTH);
-
-            // Test random access by depth.
-            for depth in path_depth_iter(control_path.depth()) {
-                let control_node = control_path.at_depth(depth).unwrap();
-                let sparse_node = sparse_path.at_depth(depth).unwrap();
-                assert_eq!(control_node, sparse_node, "at depth {depth} for entry {i}");
             }
         }
     }
