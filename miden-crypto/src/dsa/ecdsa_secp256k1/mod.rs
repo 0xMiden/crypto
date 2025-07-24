@@ -76,9 +76,9 @@ pub struct PublicKey {
 }
 
 impl PublicKey {
-    /// Convert public key to a Word representation for use in Miden.
-    pub fn to_word(&self) -> Word {
-        self.to_commitment()
+    /// Returns a commitment to the public key using the RPO256 hash function.
+    pub fn to_commitment(&self) -> Word {
+        <Self as SequentialCommit>::to_commitment(self)
     }
 
     /// Verify a signature against this public key and message.
@@ -92,7 +92,7 @@ impl SequentialCommit for PublicKey {
     type Commitment = Word;
 
     fn to_elements(&self) -> Vec<Felt> {
-        self.to_bytes().chunks(5).map(Felt::from_bytes_with_padding).collect()
+        self.to_bytes().chunks(7).map(Felt::from_bytes_with_padding).collect()
     }
 }
 
