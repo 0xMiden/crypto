@@ -1017,7 +1017,7 @@ mod tests {
                     )
                     .prop_map(|mut entries| {
                         // Ensure unique indices to avoid duplicates
-                        let mut seen = std::collections::HashSet::new();
+                        let mut seen = alloc::collections::BTreeSet::new();
                         entries.retain(|(idx, _)| seen.insert(*idx));
 
                         let mut tree = SimpleSmt::new().unwrap();
@@ -1066,7 +1066,7 @@ mod tests {
                                 .collect();
 
                             // Ensure unique keys to avoid duplicates
-                            let mut seen = std::collections::HashSet::new();
+                            let mut seen = alloc::collections::BTreeSet::new();
                             let unique_entries: Vec<_> =
                                 entries.into_iter().filter(|(key, _)| seen.insert(*key)).collect();
 
