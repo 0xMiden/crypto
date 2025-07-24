@@ -17,18 +17,21 @@ use crate::Word;
 
 /// A deterministic RPO Falcon512 signature over a message.
 ///
-/// The signature is a pair of polynomials (s1, s2) in (Z_p\[x\]/(phi))^2 and a nonce `r`, where:
+/// The signature is a pair of polynomials (s1, s2) in (Z_p\[x\]/(phi))^2 a nonce `r`, and a public
+/// key polynomial `h` where:
 /// - p := 12289
 /// - phi := x^512 + 1
 ///
-/// The signature  verifies against a public key `h` if and only if:
+/// The signature  verifies against a public key `pk` if and only if:
 /// 1. s1 = c - s2 * h
 /// 2. |s1|^2 + |s2|^2 <= SIG_L2_BOUND
 ///
-/// where |.| is the norm and c = HashToPoint(r || message).
+/// where |.| is the norm and:
+/// - c = HashToPoint(r || message)
+/// - pk = Rpo256::hash(h)
 ///
-/// Here h is a polynomial representing the public key and c is a polynomial that is
-/// the hash-to-point of the message being signed.
+/// Here h is a polynomial representing the public key and pk is its digest using the Rpo256 hash
+/// function. c is a polynomial that is the hash-to-point of the message being signed.
 ///  
 ///  To summarize the main points of differences with the reference implementation, we have that:
 ///
@@ -52,6 +55,13 @@ use crate::Word;
 /// 2. 1 byte for the nonce version.
 /// 4. 625 bytes encoding the `s2` polynomial above.
 ///
+/// In addition to the signature itself, the polynomial h is also serialized with the signature as:
+///
+/// 1. 1 byte representing the log2(512) i.e., 9.
+/// 2. 896 bytes for the public key itself.
+///
+/// The total size of the signature (including the extended public key) is 1524 bytes.
+///
 /// [1]: https://github.com/algorand/falcon/blob/main/falcon-det.pdf
 /// [2]: https://datatracker.ietf.org/doc/html/rfc6979#section-3.5
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -59,6 +69,7 @@ pub struct Signature {
     header: SignatureHeader,
     nonce: Nonce,
     s2: SignaturePoly,
+    h: PublicKey,
 }
 
 impl Signature {
@@ -67,16 +78,22 @@ impl Signature {
 
     /// Creates a new signature from the given nonce, public key polynomial, and signature
     /// polynomial.
-    pub fn new(nonce: Nonce, s2: SignaturePoly) -> Signature {
+    pub fn new(nonce: Nonce, h: PublicKey, s2: SignaturePoly) -> Signature {
         Self {
             header: SignatureHeader::default(),
             nonce,
             s2,
+            h,
         }
     }
 
     // PUBLIC ACCESSORS
     // --------------------------------------------------------------------------------------------
+
+    /// Returns the public key polynomial h.
+    pub fn public_key(&self) -> &PublicKey {
+        &self.h
+    }
 
     /// Returns the polynomial representation of the signature in Z_p\[x\]/(phi).
     pub fn sig_poly(&self) -> &Polynomial<FalconFelt> {
@@ -104,6 +121,7 @@ impl Serializable for Signature {
         target.write(&self.header);
         target.write(&self.nonce);
         target.write(&self.s2);
+        target.write(&self.h);
     }
 }
 
@@ -112,8 +130,9 @@ impl Deserializable for Signature {
         let header = source.read()?;
         let nonce = source.read()?;
         let s2 = source.read()?;
+        let h = source.read()?;
 
-        Ok(Self { header, nonce, s2 })
+        Ok(Self { header, nonce, s2, h })
     }
 }
 
