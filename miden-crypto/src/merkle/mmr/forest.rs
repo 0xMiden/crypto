@@ -3,6 +3,8 @@ use core::{
     ops::{BitAnd, BitOr, BitXor, BitXorAssign},
 };
 
+use winter_utils::{ByteReader, ByteWriter, Deserializable, DeserializationError, Serializable};
+
 use super::InOrderIndex;
 use crate::Felt;
 
@@ -414,6 +416,22 @@ pub(crate) const fn high_bitmask(bit: u32) -> Forest {
         Forest::empty()
     } else {
         Forest::new(usize::MAX << bit)
+    }
+}
+
+// SERIALIZATION
+// ================================================================================================
+
+impl Serializable for Forest {
+    fn write_into<W: ByteWriter>(&self, target: &mut W) {
+        self.0.write_into(target);
+    }
+}
+
+impl Deserializable for Forest {
+    fn read_from<R: ByteReader>(source: &mut R) -> Result<Self, DeserializationError> {
+        let value = source.read_usize()?;
+        Ok(Self::new(value))
     }
 }
 

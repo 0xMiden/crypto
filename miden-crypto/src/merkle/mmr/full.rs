@@ -12,6 +12,8 @@
 //! reestablished.
 use alloc::vec::Vec;
 
+use winter_utils::{ByteReader, ByteWriter, Deserializable, DeserializationError, Serializable};
+
 use super::{
     super::{InnerNodeInfo, MerklePath},
     MmrDelta, MmrError, MmrPeaks, MmrProof,
@@ -339,6 +341,24 @@ where
             mmr.add(v)
         }
         mmr
+    }
+}
+
+// SERIALIZATION
+// ================================================================================================
+
+impl Serializable for Mmr {
+    fn write_into<W: ByteWriter>(&self, target: &mut W) {
+        self.forest.write_into(target);
+        self.nodes.write_into(target);
+    }
+}
+
+impl Deserializable for Mmr {
+    fn read_from<R: ByteReader>(source: &mut R) -> Result<Self, DeserializationError> {
+        let forest = Forest::read_from(source)?;
+        let nodes = source.read_many::<Word>(forest.num_leaves())?;
+        Ok(Self { forest, nodes })
     }
 }
 
