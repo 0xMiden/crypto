@@ -2,8 +2,8 @@ use alloc::vec::Vec;
 use core::borrow::Borrow;
 
 use super::{
-    EmptySubtreeRoots, InnerNodeInfo, MerkleError, MerklePath, MerkleTree, NodeIndex,
-    PartialMerkleTree, RootPath, Rpo256, SimpleSmt, Smt, ValuePath, Word, mmr::Mmr,
+    EmptySubtreeRoots, InnerNodeInfo, InnerNodeIterable, MerkleError, MerklePath, MerkleTree,
+    NodeIndex, PartialMerkleTree, RootPath, Rpo256, SimpleSmt, Smt, ValuePath, Word, mmr::Mmr,
 };
 use crate::{
     Map,
@@ -33,7 +33,7 @@ pub struct StoreNode {
 ///
 /// ```rust
 /// # use miden_crypto::{ZERO, Felt, Word};
-/// # use miden_crypto::merkle::{NodeIndex, MerkleStore, MerkleTree};
+/// # use miden_crypto::merkle::{InnerNodeIterable, NodeIndex, MerkleStore, MerkleTree};
 /// # use miden_crypto::hash::rpo::Rpo256;
 /// # const fn int_to_node(value: u64) -> Word {
 /// #     Word::new([Felt::new(value), ZERO, ZERO, ZERO])
@@ -101,11 +101,16 @@ impl MerkleStore {
     // CONSTRUCTORS
     // --------------------------------------------------------------------------------------------
 
-    /// Creates an empty `MerkleStore` instance.
+    /// Creates an empty [`MerkleStore`] instance.
     pub fn new() -> MerkleStore {
         // pre-populate the store with the empty hashes
         let nodes = empty_hashes().collect();
         MerkleStore { nodes }
+    }
+
+    /// Creates a [`MerkleStore`] instance from a list of inner nodes.
+    pub fn from_inner_nodes(inner_nodes_iterable: impl IntoIterator<Item = InnerNodeInfo>) -> Self {
+        inner_nodes_iterable.into_iter().collect()
     }
 
     // PUBLIC ACCESSORS
@@ -328,13 +333,6 @@ impl MerkleStore {
         store
     }
 
-    /// Iterator over the inner nodes of the [MerkleStore].
-    pub fn inner_nodes(&self) -> impl Iterator<Item = InnerNodeInfo> + '_ {
-        self.nodes
-            .iter()
-            .map(|(r, n)| InnerNodeInfo { value: *r, left: n.left, right: n.right })
-    }
-
     /// Iterator over the non-empty leaves of the Merkle tree associated with the specified `root`
     /// and `max_depth`.
     pub fn non_empty_leaves(
@@ -534,6 +532,15 @@ impl Extend<InnerNodeInfo> for MerkleStore {
             iter.into_iter()
                 .map(|info| (info.value, StoreNode { left: info.left, right: info.right })),
         );
+    }
+}
+
+impl InnerNodeIterable for MerkleStore {
+    /// Iterator over the inner nodes of the [`MerkleStore`].
+    fn inner_nodes(&self) -> impl Iterator<Item = InnerNodeInfo> {
+        self.nodes
+            .iter()
+            .map(|(r, n)| InnerNodeInfo { value: *r, left: n.left, right: n.right })
     }
 }
 
