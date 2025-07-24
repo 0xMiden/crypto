@@ -4,22 +4,14 @@ use alloc::string::String;
 use core::fmt::{self, Write};
 
 use thiserror::Error;
-
-mod kv_map;
-
-// RE-EXPORTS
-// ================================================================================================
-
+#[cfg(feature = "std")]
+pub use winter_utils::ReadAdapter;
 pub use winter_utils::{
     ByteReader, ByteWriter, Deserializable, DeserializationError, Serializable, SliceReader,
     uninit_vector,
 };
 
 use crate::Word;
-
-pub mod collections {
-    pub use super::kv_map::*;
-}
 
 // UTILITY FUNCTIONS
 // ================================================================================================

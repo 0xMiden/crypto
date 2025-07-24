@@ -32,6 +32,9 @@ mod tests;
 /// All leaves in this SMT are located at depth 64.
 pub const SMT_DEPTH: u8 = 64;
 
+/// The maximum number of entries allowed in a multiple leaf.
+pub const MAX_LEAF_ENTRIES: usize = 1024;
+
 // SMT
 // ================================================================================================
 
@@ -51,6 +54,7 @@ type Leaves = super::Leaves<SmtLeaf>;
 pub struct Smt {
     root: Word,
     // pub(super) for use in PartialSmt.
+    pub(super) num_entries: usize,
     pub(super) leaves: Leaves,
     pub(super) inner_nodes: InnerNodes,
 }
@@ -72,6 +76,7 @@ impl Smt {
 
         Self {
             root,
+            num_entries: 0,
             inner_nodes: Default::default(),
             leaves: Default::default(),
         }
@@ -86,6 +91,10 @@ impl Smt {
     ///
     /// # Errors
     /// Returns an error if the provided entries contain multiple values for the same key.
+    ///
+    /// # Panics
+    /// Panics if inserting a key-value pair would exceed [`MAX_LEAF_ENTRIES`] (1024 entries) in a
+    /// leaf.
     pub fn with_entries(
         entries: impl IntoIterator<Item = (Word, Word)>,
     ) -> Result<Self, MerkleError> {
@@ -104,6 +113,10 @@ impl Smt {
     ///
     /// This only applies if the "concurrent" feature is enabled. Without the feature, the behavior
     /// is equivalent to `with_entiries`.
+    ///
+    /// # Panics
+    /// Panics if inserting a key-value pair would exceed [`MAX_LEAF_ENTRIES`] (1024 entries) in a
+    /// leaf.
     pub fn with_sorted_entries(
         entries: impl IntoIterator<Item = (Word, Word)>,
     ) -> Result<Self, MerkleError> {
@@ -124,6 +137,10 @@ impl Smt {
     ///
     /// # Errors
     /// Returns an error if the provided entries contain multiple values for the same key.
+    ///
+    /// # Panics
+    /// Panics if inserting a key-value pair would exceed [`MAX_LEAF_ENTRIES`] (1024 entries) in a
+    /// leaf.
     #[cfg(any(not(feature = "concurrent"), fuzzing, test))]
     fn with_entries_sequential(
         entries: impl IntoIterator<Item = (Word, Word)>,
@@ -191,11 +208,8 @@ impl Smt {
     ///
     /// Note that this may return a different value from [Self::num_leaves()] as a single leaf may
     /// contain more than one key-value pair.
-    ///
-    /// Also note that this is currently an expensive operation as counting the number of
-    /// entries requires iterating over all leaves of the tree.
     pub fn num_entries(&self) -> usize {
-        self.entries().count()
+        self.num_entries
     }
 
     /// Returns the leaf to which `key` maps
@@ -253,6 +267,10 @@ impl Smt {
     ///
     /// This also recomputes all hashes between the leaf (associated with the key) and the root,
     /// updating the root itself.
+    ///
+    /// # Panics
+    /// Panics if inserting the key-value pair would exceed [`MAX_LEAF_ENTRIES`] (1024 entries) in
+    /// the leaf.
     pub fn insert(&mut self, key: Word, value: Word) -> Word {
         <Self as SparseMerkleTree<SMT_DEPTH>>::insert(self, key, value)
     }
@@ -327,16 +345,26 @@ impl Smt {
 
     /// Inserts `value` at leaf index pointed to by `key`. `value` is guaranteed to not be the empty
     /// value, such that this is indeed an insertion.
+    ///
+    /// # Panics
+    /// Panics if inserting the key-value pair would exceed [`MAX_LEAF_ENTRIES`] (1024 entries) in
+    /// the leaf.
     fn perform_insert(&mut self, key: Word, value: Word) -> Option<Word> {
         debug_assert_ne!(value, Self::EMPTY_VALUE);
 
         let leaf_index: LeafIndex<SMT_DEPTH> = Self::key_to_leaf_index(&key);
 
         match self.leaves.get_mut(&leaf_index.value()) {
-            Some(leaf) => leaf.insert(key, value),
+            Some(leaf) => {
+                let prev_entries = leaf.num_entries();
+                let result = leaf.insert(key, value);
+                let current_entries = leaf.num_entries();
+                self.num_entries += current_entries - prev_entries;
+                result
+            },
             None => {
                 self.leaves.insert(leaf_index.value(), SmtLeaf::Single((key, value)));
-
+                self.num_entries += 1;
                 None
             },
         }
@@ -347,7 +375,10 @@ impl Smt {
         let leaf_index: LeafIndex<SMT_DEPTH> = Self::key_to_leaf_index(&key);
 
         if let Some(leaf) = self.leaves.get_mut(&leaf_index.value()) {
+            let prev_entries = leaf.num_entries();
             let (old_value, is_empty) = leaf.remove(key);
+            let current_entries = leaf.num_entries();
+            self.num_entries -= prev_entries - current_entries;
             if is_empty {
                 self.leaves.remove(&leaf_index.value());
             }
@@ -381,8 +412,8 @@ impl SparseMerkleTree<SMT_DEPTH> for Smt {
 
             assert_eq!(root_node_hash, root);
         }
-
-        Ok(Self { root, inner_nodes, leaves })
+        let num_entries = leaves.iter().map(|(_, leaf)| leaf.num_entries() as usize).sum();
+        Ok(Self { root, inner_nodes, leaves, num_entries })
     }
 
     fn root(&self) -> Word {
@@ -401,7 +432,11 @@ impl SparseMerkleTree<SMT_DEPTH> for Smt {
     }
 
     fn insert_inner_node(&mut self, index: NodeIndex, inner_node: InnerNode) -> Option<InnerNode> {
-        self.inner_nodes.insert(index, inner_node)
+        if inner_node == EmptySubtreeRoots::get_inner_node(SMT_DEPTH, index.depth()) {
+            self.remove_inner_node(index)
+        } else {
+            self.inner_nodes.insert(index, inner_node)
+        }
     }
 
     fn remove_inner_node(&mut self, index: NodeIndex) -> Option<InnerNode> {

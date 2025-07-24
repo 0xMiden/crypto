@@ -2,7 +2,7 @@ use thiserror::Error;
 
 use crate::{
     Word,
-    merkle::{LeafIndex, SMT_DEPTH},
+    merkle::{LeafIndex, MAX_LEAF_ENTRIES, SMT_DEPTH},
 };
 
 // SMT LEAF ERROR
@@ -38,6 +38,12 @@ pub enum SmtLeafError {
     /// Multiple leaf requires at least two entries, but fewer were provided.
     #[error("multiple leaf requires at least two entries but only {0} were given")]
     MultipleLeafRequiresTwoEntries(usize),
+
+    /// Multiple leaf contains more entries than the maximum allowed.
+    #[error(
+        "multiple leaf contains {actual} entries but the maximum allowed is {MAX_LEAF_ENTRIES}"
+    )]
+    TooManyLeafEntries { actual: usize },
 }
 
 // SMT PROOF ERROR

@@ -125,6 +125,10 @@ impl PartialSmt {
     /// - the key and its merkle path were not previously added (using [`PartialSmt::add_path`]) to
     ///   this [`PartialSmt`], which means it is almost certainly incorrect to update its value. If
     ///   an error is returned the tree is in the same state as before.
+    ///
+    /// # Panics
+    /// Panics if inserting the key-value pair would exceed [`super::MAX_LEAF_ENTRIES`] (1024
+    /// entries) in the leaf.
     pub fn insert(&mut self, key: Word, value: Word) -> Result<Word, MerkleError> {
         if !self.is_leaf_tracked(&key) {
             return Err(MerkleError::UntrackedKey(key));
@@ -176,7 +180,17 @@ impl PartialSmt {
         //   PartialSmt::insert, this will not error for such empty leaves whose merkle path was
         //   added, but will error for otherwise non-existent leaves whose paths were not added,
         //   which is what we want.
+        let prev_entries = self
+            .0
+            .leaves
+            .get(&current_index.value())
+            .map(|leaf| leaf.num_entries())
+            .unwrap_or(0);
+        let current_entries = leaf.num_entries();
         self.0.leaves.insert(current_index.value(), leaf);
+
+        // Guaranteed not to over/underflow. All variables are <= MAX_LEAF_ENTRIES and result > 0.
+        self.0.num_entries = self.0.num_entries + current_entries - prev_entries;
 
         for sibling_hash in path {
             // Find the index of the sibling node and compute whether it is a left or right child.
@@ -270,9 +284,6 @@ impl PartialSmt {
     ///
     /// Note that this may return a different value from [Self::num_leaves()] as a single leaf may
     /// contain more than one key-value pair.
-    ///
-    /// Also note that this is currently an expensive operation as counting the number of
-    /// entries requires iterating over all leaves of the tree.
     pub fn num_entries(&self) -> usize {
         self.0.num_entries()
     }
@@ -353,7 +364,7 @@ mod tests {
     use winter_math::fields::f64::BaseElement as Felt;
 
     use super::*;
-    use crate::{EMPTY_WORD, ONE, ZERO};
+    use crate::{EMPTY_WORD, ONE, ZERO, merkle::EmptySubtreeRoots};
 
     /// Tests that a basic PartialSmt can be built from a full one and that inserting or removing
     /// values whose merkle path were added to the partial SMT results in the same root as the
@@ -627,10 +638,16 @@ mod tests {
 
         let partial_inner_nodes: BTreeSet<_> =
             partial.inner_nodes().flat_map(|node| [node.left, node.right]).collect();
+        let empty_subtree_roots: BTreeSet<_> = (0..SMT_DEPTH)
+            .map(|depth| *EmptySubtreeRoots::entry(SMT_DEPTH, depth))
+            .collect();
 
         for merkle_path in proofs.into_iter().map(|proof| proof.into_parts().0) {
             for (idx, digest) in merkle_path.into_iter().enumerate() {
-                assert!(partial_inner_nodes.contains(&digest), "failed at idx {idx}");
+                assert!(
+                    partial_inner_nodes.contains(&digest) || empty_subtree_roots.contains(&digest),
+                    "failed at idx {idx}"
+                );
             }
         }
     }
@@ -667,12 +684,28 @@ mod tests {
         assert_eq!(partial_smt, decoded);
     }
 
+    /// Tests that add_path correctly updates num_entries for both increasing and decreasing entry
+    /// counts.
     #[test]
-    fn partial_smt_serialization_rounfdtrip() {
-        let partial_smt = PartialSmt::new();
-        let bytes = partial_smt.to_bytes();
-        let decoded = PartialSmt::read_from_bytes(&bytes).unwrap();
+    fn partial_smt_add_path_num_entries() {
+        // key0 and key1 have the same felt at index 3 so they will be placed in the same leaf.
+        let key0 = Word::from([ZERO, ZERO, ZERO, ONE]);
+        let key1 = Word::from([ONE, ONE, ONE, ONE]);
+        let value0 = Word::from(rand_array::<Felt, 4>());
+        let value1 = Word::from(rand_array::<Felt, 4>());
 
-        assert_eq!(partial_smt, decoded);
+        let full = Smt::with_entries([(key0, value0), (key1, value1)]).unwrap();
+        let mut partial = PartialSmt::new();
+
+        // Add the multi-entry leaf via add_path
+        let proof0 = full.open(&key0);
+        let (path0, leaf0) = proof0.into_parts();
+        partial.add_path(leaf0.clone(), path0.clone()).unwrap();
+        assert_eq!(partial.num_entries(), 2);
+
+        // Now, replace the multi-entry leaf with a single-entry leaf (simulate removing one entry)
+        let single_leaf = SmtLeaf::new_single(key0, value0);
+        partial.add_path(single_leaf.clone(), path0.clone()).unwrap();
+        assert_eq!(partial.num_entries(), 1);
     }
 }

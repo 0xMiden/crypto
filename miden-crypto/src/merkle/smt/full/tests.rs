@@ -1,14 +1,17 @@
 use alloc::vec::Vec;
 
+use assert_matches::assert_matches;
+
 use super::{EMPTY_WORD, Felt, LeafIndex, NodeIndex, Rpo256, SMT_DEPTH, Smt, SmtLeaf, Word};
 use crate::{
     ONE, WORD_SIZE,
     merkle::{
-        EmptySubtreeRoots, MerkleStore, MutationSet,
-        smt::{NodeMutation, SparseMerkleTree, UnorderedMap},
+        EmptySubtreeRoots, MerkleStore, MutationSet, SmtLeafError,
+        smt::{Map, NodeMutation, SparseMerkleTree, full::MAX_LEAF_ENTRIES},
     },
     utils::{Deserializable, Serializable},
 };
+
 // SMT
 // --------------------------------------------------------------------------------------------
 
@@ -181,6 +184,39 @@ fn test_smt_insert_and_remove_multiple_values() {
     // an empty tree should have no leaves or inner nodes
     assert!(smt.leaves.is_empty());
     assert!(smt.inner_nodes.is_empty());
+}
+
+/// Verify that the `insert_inner_node` doesn't store empty subtrees.
+#[test]
+fn test_smt_dont_store_empty_subtrees() {
+    use crate::merkle::smt::InnerNode;
+
+    let mut smt = Smt::default();
+
+    let node_index = NodeIndex::new(10, 42).unwrap();
+    let depth = node_index.depth();
+    let empty_subtree_node = EmptySubtreeRoots::get_inner_node(SMT_DEPTH, depth);
+
+    // Empty subtrees are not stored
+    assert!(!smt.inner_nodes.contains_key(&node_index));
+    let old_node = smt.insert_inner_node(node_index, empty_subtree_node.clone());
+    assert_eq!(old_node, None);
+    assert!(!smt.inner_nodes.contains_key(&node_index));
+
+    // Insert a non-empty node, then insert the empty subtree node again. This should remove the
+    // inner node.
+    let non_empty_node = InnerNode {
+        left: Word::new([ONE; 4]),
+        right: Word::new([ONE + ONE; 4]),
+    };
+    smt.insert_inner_node(node_index, non_empty_node.clone());
+    let old_node = smt.insert_inner_node(node_index, empty_subtree_node.clone());
+    assert_eq!(old_node, Some(non_empty_node));
+    assert!(!smt.inner_nodes.contains_key(&node_index));
+
+    // Verify that get_inner_node returns the correct empty subtree node
+    let retrieved_node = smt.get_inner_node(node_index);
+    assert_eq!(retrieved_node, empty_subtree_node);
 }
 
 /// This tests that inserting the empty value does indeed remove the key-value contained at the
@@ -414,7 +450,7 @@ fn test_prospective_insertion() {
     assert_eq!(revert.root(), root_empty, "reverse mutations new root did not match");
     assert_eq!(
         revert.new_pairs,
-        UnorderedMap::from_iter([(key_1, EMPTY_WORD)]),
+        Map::from_iter([(key_1, EMPTY_WORD)]),
         "reverse mutations pairs did not match"
     );
     assert_eq!(
@@ -434,7 +470,7 @@ fn test_prospective_insertion() {
     assert_eq!(revert.root(), old_root, "reverse mutations new root did not match");
     assert_eq!(
         revert.new_pairs,
-        UnorderedMap::from_iter([(key_2, EMPTY_WORD), (key_3, EMPTY_WORD)]),
+        Map::from_iter([(key_2, EMPTY_WORD), (key_3, EMPTY_WORD)]),
         "reverse mutations pairs did not match"
     );
 
@@ -448,7 +484,7 @@ fn test_prospective_insertion() {
     assert_eq!(revert.root(), old_root, "reverse mutations new root did not match");
     assert_eq!(
         revert.new_pairs,
-        UnorderedMap::from_iter([(key_3, value_3)]),
+        Map::from_iter([(key_3, value_3)]),
         "reverse mutations pairs did not match"
     );
 
@@ -468,7 +504,7 @@ fn test_prospective_insertion() {
     assert_eq!(revert.root(), old_root, "reverse mutations new root did not match");
     assert_eq!(
         revert.new_pairs,
-        UnorderedMap::from_iter([(key_1, value_1), (key_2, value_2), (key_3, value_3)]),
+        Map::from_iter([(key_1, value_1), (key_2, value_2), (key_3, value_3)]),
         "reverse mutations pairs did not match"
     );
 
@@ -681,6 +717,34 @@ fn test_multiple_smt_leaf_serialization_success() {
     let deserialized = SmtLeaf::read_from_bytes(&serialized).unwrap();
 
     assert_eq!(multiple_leaf, deserialized);
+}
+
+/// Test that creating a multiple leaf with exactly MAX_LEAF_ENTRIES works
+/// and that constructing a leaf with MAX_LEAF_ENTRIES + 1 returns an error.
+#[test]
+fn test_max_leaf_entries_validation() {
+    let mut entries = Vec::new();
+
+    for i in 0..MAX_LEAF_ENTRIES {
+        let key = Word::new([ONE, ONE, Felt::new(i as u64), ONE]);
+        let value = Word::new([ONE, ONE, ONE, Felt::new(i as u64)]);
+        entries.push((key, value));
+    }
+
+    let result = SmtLeaf::new_multiple(entries.clone());
+    assert!(result.is_ok(), "Should allow exactly MAX_LEAF_ENTRIES entries");
+
+    // Test that creating a multiple leaf with more than MAX_LEAF_ENTRIES fails
+    let key = Word::new([ONE, ONE, Felt::new(MAX_LEAF_ENTRIES as u64), ONE]);
+    let value = Word::new([ONE, ONE, ONE, Felt::new(MAX_LEAF_ENTRIES as u64)]);
+    entries.push((key, value));
+
+    let error = SmtLeaf::new_multiple(entries).unwrap_err();
+    assert_matches!(
+        error,
+        SmtLeafError::TooManyLeafEntries { .. },
+        "should reject more than MAX_LEAF_ENTRIES entries"
+    );
 }
 
 // HELPERS
