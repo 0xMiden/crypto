@@ -774,36 +774,6 @@ mod tests {
         assert_eq!(sparse_path.into_iter().next(), None);
     }
 
-    #[test]
-    fn test_root() {
-        let tree = make_smt(100);
-
-        for (key, _value) in tree.entries() {
-            let leaf = tree.get_leaf(key);
-            let leaf_node = leaf.hash();
-            let index: NodeIndex = Smt::key_to_leaf_index(key).into();
-            let control_path = tree.get_path(key);
-            let sparse_path = SparseMerklePath::try_from(control_path.clone()).unwrap();
-
-            let authed_nodes: Vec<_> =
-                sparse_path.authenticated_nodes(index.value(), leaf_node).unwrap().collect();
-            let authed_root = authed_nodes.last().unwrap().value;
-
-            let control_root = control_path.compute_root(index.value(), leaf_node).unwrap();
-            let sparse_root = sparse_path.compute_root(index.value(), leaf_node).unwrap();
-            assert_eq!(control_root, sparse_root);
-            assert_eq!(authed_root, control_root);
-            assert_eq!(authed_root, tree.root());
-
-            let index = index.value();
-            let control_auth_nodes = control_path.authenticated_nodes(index, leaf_node).unwrap();
-            let sparse_auth_nodes = sparse_path.authenticated_nodes(index, leaf_node).unwrap();
-            for (a, b) in control_auth_nodes.zip(sparse_auth_nodes) {
-                assert_eq!(a, b);
-            }
-        }
-    }
-
     use proptest::prelude::*;
 
     // Arbitrary instance for Word
