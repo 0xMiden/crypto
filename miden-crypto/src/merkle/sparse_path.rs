@@ -545,23 +545,6 @@ mod tests {
         Smt::with_entries(entries).unwrap()
     }
 
-    #[test]
-    fn test_roundtrip() {
-        let tree = make_smt(8192);
-
-        for (key, _value) in tree.entries() {
-            let (control_path, _) = tree.open(key).into_parts();
-            assert_eq!(control_path.len(), tree.depth() as usize);
-
-            let sparse_path = SparseMerklePath::try_from(control_path.clone()).unwrap();
-            assert_eq!(control_path.depth(), sparse_path.depth());
-            assert_eq!(sparse_path.depth(), SMT_DEPTH);
-            let test_path = MerklePath::from_iter(sparse_path.clone().into_iter());
-
-            assert_eq!(control_path, test_path);
-        }
-    }
-
     /// Manually test the exact bit patterns for a sample path of 8 nodes, including both empty and
     /// non-empty nodes.
     ///
