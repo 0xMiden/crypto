@@ -357,7 +357,7 @@ impl Serializable for Mmr {
 impl Deserializable for Mmr {
     fn read_from<R: ByteReader>(source: &mut R) -> Result<Self, DeserializationError> {
         let forest = Forest::read_from(source)?;
-        let nodes = source.read_many::<Word>(forest.num_leaves())?;
+        let nodes = Vec::<Word>::read_from(source)?;
         Ok(Self { forest, nodes })
     }
 }
@@ -438,5 +438,29 @@ impl Iterator for MmrNodes<'_> {
         } else {
             None
         }
+    }
+}
+
+// TESTS
+// ================================================================================================
+#[cfg(test)]
+mod tests {
+    use alloc::vec::Vec;
+
+    use winter_utils::{Deserializable, Serializable};
+
+    use crate::{Felt, Word, ZERO, merkle::Mmr};
+
+    #[test]
+    fn test_serialization() {
+        let nodes = (0u64..128u64)
+            .map(|value| Word::new([ZERO, ZERO, ZERO, Felt::new(value)]))
+            .collect::<Vec<_>>();
+
+        let mmr = Mmr::from(nodes);
+        let serialized = mmr.to_bytes();
+        let deserialized = Mmr::read_from_bytes(&serialized).unwrap();
+        assert_eq!(mmr.forest, deserialized.forest);
+        assert_eq!(mmr.nodes, deserialized.nodes);
     }
 }
