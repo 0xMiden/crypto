@@ -95,6 +95,9 @@ impl Smt {
     ///
     /// 3. These subtree roots become the "leaves" for the next iteration, which processes the next
     ///    8 levels up. This continues until reaching the tree's root at depth 0.
+    ///
+    /// # Errors
+    /// Returns an error if mutations would exceed [`MAX_LEAF_ENTRIES`] (1024 entries) in a leaf.
     pub(crate) fn compute_mutations_concurrent(
         &self,
         kv_pairs: impl IntoIterator<Item = (Word, Word)>,

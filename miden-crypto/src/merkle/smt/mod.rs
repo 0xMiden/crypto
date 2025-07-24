@@ -166,6 +166,10 @@ pub(crate) trait SparseMerkleTree<const DEPTH: u8> {
     /// be queried with [`MutationSet::root()`]. Once a mutation set is returned,
     /// [`SparseMerkleTree::apply_mutations()`] can be called in order to commit these changes to
     /// the Merkle tree, or [`drop()`] to discard them.
+    ///
+    /// # Errors
+    /// If mutations would exceed [`MAX_LEAF_ENTRIES`] (1024 entries) in a leaf, returns
+    /// [`MerkleError::TooManyLeafEntries`].
     fn compute_mutations(
         &self,
         kv_pairs: impl IntoIterator<Item = (Self::Key, Self::Value)>,
@@ -280,6 +284,8 @@ pub(crate) trait SparseMerkleTree<const DEPTH: u8> {
     /// [`MerkleError::ConflictingRoots`] with a two-item [`Vec`]. The first item is the root hash
     /// the `mutations` were computed against, and the second item is the actual current root of
     /// this tree.
+    /// If mutations would exceed [`MAX_LEAF_ENTRIES`] (1024 entries) in a leaf, returns
+    /// [`MerkleError::TooManyLeafEntries`].
     fn apply_mutations(
         &mut self,
         mutations: MutationSet<DEPTH, Self::Key, Self::Value>,
@@ -453,6 +459,10 @@ pub(crate) trait SparseMerkleTree<const DEPTH: u8> {
     /// Because this method is for a prospective key-value insertion into a specific leaf,
     /// `existing_leaf` must have the same leaf index as `key` (as determined by
     /// [`SparseMerkleTree::key_to_leaf_index()`]), or the result will be meaningless.
+    ///
+    /// # Errors
+    /// If inserting the key-value pair would exceed [`MAX_LEAF_ENTRIES`] (1024 entries) in a leaf,
+    /// returns [`SmtLeafError::TooManyLeafEntries`].
     fn construct_prospective_leaf(
         &self,
         existing_leaf: Self::Leaf,

@@ -213,6 +213,10 @@ impl<const DEPTH: u8> SimpleSmt<DEPTH> {
     ///
     /// This also recomputes all hashes between the leaf (associated with the key) and the root,
     /// updating the root itself.
+    ///
+    /// # Errors
+    /// If inserting the key-value pair would exceed [`MAX_LEAF_ENTRIES`] (1024 entries) in a leaf,
+    /// returns [`MerkleError::TooManyLeafEntries`].
     pub fn insert(&mut self, key: LeafIndex<DEPTH>, value: Word) -> Result<Word, MerkleError> {
         <Self as SparseMerkleTree<DEPTH>>::insert(self, key, value)
     }
