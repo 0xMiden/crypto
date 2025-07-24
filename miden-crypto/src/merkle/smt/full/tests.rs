@@ -135,7 +135,7 @@ fn test_smt_insert_and_remove_multiple_values() {
             let leaf_node = build_empty_or_single_leaf_node(key, value);
             let tree_root = store.set_node(smt.root(), key_index, leaf_node).unwrap().root;
 
-            let _ = smt.insert(key, value).unwrap();
+            smt.insert(key, value).unwrap();
 
             assert_eq!(smt.root(), tree_root);
 
