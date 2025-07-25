@@ -87,7 +87,7 @@ impl<const DEPTH: u8> SimpleSmt<DEPTH> {
                 return Err(MerkleError::TooManyEntries(max_num_entries));
             }
 
-            let old_value = tree.insert(LeafIndex::<DEPTH>::new(key)?, value)?;
+            let old_value = tree.insert(LeafIndex::<DEPTH>::new(key)?, value);
 
             if old_value != Self::EMPTY_VALUE || key_set_to_zero.contains(&key) {
                 return Err(MerkleError::DuplicateValuesForIndex(key));
@@ -213,12 +213,11 @@ impl<const DEPTH: u8> SimpleSmt<DEPTH> {
     ///
     /// This also recomputes all hashes between the leaf (associated with the key) and the root,
     /// updating the root itself.
-    ///
-    /// # Errors
-    /// If inserting the key-value pair would exceed [`crate::merkle::MAX_LEAF_ENTRIES`] (1024
-    /// entries) in a leaf, returns [`MerkleError::TooManyLeafEntries`].
-    pub fn insert(&mut self, key: LeafIndex<DEPTH>, value: Word) -> Result<Word, MerkleError> {
+    pub fn insert(&mut self, key: LeafIndex<DEPTH>, value: Word) -> Word {
+        // SAFETY: a SimpleSmt does not contain multi-value leaves. The underlaying
+        // SimpleSmt::insert_value does not return any errors so it's safe to unwrap here.
         <Self as SparseMerkleTree<DEPTH>>::insert(self, key, value)
+            .expect("inserting a value into a simple smt never returns an error")
     }
 
     /// Computes what changes are necessary to insert the specified key-value pairs into this

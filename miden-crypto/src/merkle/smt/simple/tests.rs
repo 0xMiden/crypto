@@ -59,7 +59,7 @@ fn build_sparse_tree() {
     let key = 6;
     let new_node = int_to_leaf(7);
     values[key as usize] = new_node;
-    let old_value = smt.insert(LeafIndex::<DEPTH>::new(key).unwrap(), new_node).unwrap();
+    let old_value = smt.insert(LeafIndex::<DEPTH>::new(key).unwrap(), new_node);
     let mt2 = MerkleTree::new(values.clone()).unwrap();
     assert_eq!(mt2.root(), smt.root());
     assert_eq!(
@@ -73,7 +73,7 @@ fn build_sparse_tree() {
     let key = 2;
     let new_node = int_to_leaf(3);
     values[key as usize] = new_node;
-    let old_value = smt.insert(LeafIndex::<DEPTH>::new(key).unwrap(), new_node).unwrap();
+    let old_value = smt.insert(LeafIndex::<DEPTH>::new(key).unwrap(), new_node);
     let mt3 = MerkleTree::new(values).unwrap();
     assert_eq!(mt3.root(), smt.root());
     assert_eq!(
@@ -178,7 +178,7 @@ fn test_insert() {
     expected_values[key] = new_node;
     let expected_tree = MerkleTree::new(expected_values.clone()).unwrap();
 
-    let old_leaf = tree.insert(LeafIndex::<DEPTH>::new(key as u64).unwrap(), new_node).unwrap();
+    let old_leaf = tree.insert(LeafIndex::<DEPTH>::new(key as u64).unwrap(), new_node);
     assert_eq!(expected_tree.root(), tree.root);
     assert_eq!(old_leaf, VALUES8[key]);
     assert_eq!(tree.num_leaves(), 8);
@@ -189,7 +189,7 @@ fn test_insert() {
     expected_values[key] = new_node;
     let expected_tree = MerkleTree::new(expected_values.clone()).unwrap();
 
-    let old_leaf = tree.insert(LeafIndex::<DEPTH>::new(key as u64).unwrap(), new_node).unwrap();
+    let old_leaf = tree.insert(LeafIndex::<DEPTH>::new(key as u64).unwrap(), new_node);
     assert_eq!(expected_tree.root(), tree.root);
     assert_eq!(old_leaf, VALUES8[key]);
     assert_eq!(tree.num_leaves(), 8);
@@ -200,7 +200,7 @@ fn test_insert() {
     expected_values[key] = new_node;
     let expected_tree = MerkleTree::new(expected_values.clone()).unwrap();
 
-    let old_leaf = tree.insert(LeafIndex::<DEPTH>::new(key as u64).unwrap(), new_node).unwrap();
+    let old_leaf = tree.insert(LeafIndex::<DEPTH>::new(key as u64).unwrap(), new_node);
     assert_eq!(expected_tree.root(), tree.root);
     assert_eq!(old_leaf, VALUES8[key]);
     assert_eq!(tree.num_leaves(), 7);
