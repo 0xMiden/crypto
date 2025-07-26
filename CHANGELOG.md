@@ -8,7 +8,7 @@
 - [BREAKING] Refactor `parse_hex_string_as_word()` to `Word::parse()` ([#450](https://github.com/0xMiden/crypto/issues/450)).
 - `Smt.insert_inner_nodes` does not store empty subtrees ([#452](https://github.com/0xMiden/crypto/pull/452)).
 - Optimized `Smt::num_entries()` ([#455](https://github.com/0xMiden/crypto/pull/455)).
-- Disallow leaves with more than 2^16 entries ([#455](https://github.com/0xMiden/crypto/pull/455)).
+- [BREAKING] Disallow leaves with more than 2^16 entries ([#455](https://github.com/0xMiden/crypto/pull/455), [#462](https://github.com/0xMiden/crypto/pull/462)).
 
 # 0.15.9 (2025-07-24)
 

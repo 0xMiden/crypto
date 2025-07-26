@@ -74,7 +74,7 @@ pub fn insertion(tree: &mut Smt, insertions: usize) -> Result<(), MerkleError> {
         let test_value = Word::new([ONE, ONE, ONE, Felt::new((size + i) as u64)]);
 
         let now = Instant::now();
-        tree.insert(test_key, test_value);
+        tree.insert(test_key, test_value)?;
         let elapsed = now.elapsed();
         insertion_times.push(elapsed.as_micros());
     }
@@ -102,7 +102,7 @@ pub fn batched_insertion(tree: &mut Smt, insertions: usize) -> Result<(), Merkle
         .collect();
 
     let now = Instant::now();
-    let mutations = tree.compute_mutations(new_pairs);
+    let mutations = tree.compute_mutations(new_pairs)?;
     let compute_elapsed = now.elapsed().as_secs_f64() * 1000_f64; // time in ms
 
     println!(
@@ -161,7 +161,7 @@ pub fn batched_update(
     assert_eq!(new_pairs.len(), updates);
 
     let now = Instant::now();
-    let mutations = tree.compute_mutations(new_pairs);
+    let mutations = tree.compute_mutations(new_pairs)?;
     let compute_elapsed = now.elapsed().as_secs_f64() * 1000_f64; // time in ms
 
     let now = Instant::now();
@@ -202,7 +202,7 @@ pub fn proof_generation(tree: &mut Smt) -> Result<(), MerkleError> {
     for i in 0..NUM_PROOFS {
         let test_key = Rpo256::hash(&rand_value::<u64>().to_be_bytes());
         let test_value = Word::new([ONE, ONE, ONE, Felt::new((size + i) as u64)]);
-        tree.insert(test_key, test_value);
+        tree.insert(test_key, test_value)?;
 
         let now = Instant::now();
         let _proof = tree.open(&test_key);

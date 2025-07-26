@@ -226,14 +226,14 @@ impl SmtLeaf {
     ///
     /// The caller needs to ensure that `key` has the same leaf index as all other keys in the leaf
     ///
-    /// # Panics
-    /// Panics if inserting the key-value pair would exceed [`MAX_LEAF_ENTRIES`] (1024 entries) in
-    /// the leaf.
-    pub(super) fn insert(&mut self, key: Word, value: Word) -> Option<Word> {
+    /// # Errors
+    /// Returns an error if inserting the key-value pair would exceed [`MAX_LEAF_ENTRIES`] (1024
+    /// entries) in the leaf.
+    pub(super) fn insert(&mut self, key: Word, value: Word) -> Result<Option<Word>, SmtLeafError> {
         match self {
             SmtLeaf::Empty(_) => {
                 *self = SmtLeaf::new_single(key, value);
-                None
+                Ok(None)
             },
             SmtLeaf::Single(kv_pair) => {
                 if kv_pair.0 == key {
@@ -241,7 +241,7 @@ impl SmtLeaf {
                     // value
                     let old_value = kv_pair.1;
                     kv_pair.1 = value;
-                    Some(old_value)
+                    Ok(Some(old_value))
                 } else {
                     // Another entry is present in this leaf. Transform the entry into a list
                     // entry, and make sure the key-value pairs are sorted by key
@@ -249,10 +249,8 @@ impl SmtLeaf {
                     // single leaf
                     let mut pairs = vec![*kv_pair, (key, value)];
                     pairs.sort_by(|(key_1, _), (key_2, _)| cmp_keys(*key_1, *key_2));
-
                     *self = SmtLeaf::Multiple(pairs);
-
-                    None
+                    Ok(None)
                 }
             },
             SmtLeaf::Multiple(kv_pairs) => {
@@ -260,15 +258,16 @@ impl SmtLeaf {
                     Ok(pos) => {
                         let old_value = kv_pairs[pos].1;
                         kv_pairs[pos].1 = value;
-
-                        Some(old_value)
+                        Ok(Some(old_value))
                     },
                     Err(pos) => {
-                        assert!(kv_pairs.len() < MAX_LEAF_ENTRIES, "MAX_LEAF_ENTRIES exceeded");
-
+                        if kv_pairs.len() >= MAX_LEAF_ENTRIES {
+                            return Err(SmtLeafError::TooManyLeafEntries {
+                                actual: kv_pairs.len() + 1,
+                            });
+                        }
                         kv_pairs.insert(pos, (key, value));
-
-                        None
+                        Ok(None)
                     },
                 }
             },

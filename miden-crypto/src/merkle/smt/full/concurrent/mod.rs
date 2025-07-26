@@ -8,7 +8,10 @@ use super::{
     EmptySubtreeRoots, InnerNode, InnerNodes, Leaves, MerkleError, MutationSet, NodeIndex,
     SMT_DEPTH, Smt, SmtLeaf, SparseMerkleTree, Word, leaf,
 };
-use crate::merkle::smt::{Map, NodeMutation, NodeMutations};
+use crate::merkle::{
+    SmtLeafError,
+    smt::{Map, NodeMutation, NodeMutations},
+};
 
 #[cfg(test)]
 mod tests;
@@ -92,10 +95,13 @@ impl Smt {
     ///
     /// 3. These subtree roots become the "leaves" for the next iteration, which processes the next
     ///    8 levels up. This continues until reaching the tree's root at depth 0.
+    ///
+    /// # Errors
+    /// Returns an error if mutations would exceed [`MAX_LEAF_ENTRIES`] (1024 entries) in a leaf.
     pub(crate) fn compute_mutations_concurrent(
         &self,
         kv_pairs: impl IntoIterator<Item = (Word, Word)>,
-    ) -> MutationSet<SMT_DEPTH, Word, Word>
+    ) -> Result<MutationSet<SMT_DEPTH, Word, Word>, MerkleError>
     where
         Self: Sized + Sync,
     {
@@ -105,16 +111,16 @@ impl Smt {
 
         // Convert sorted pairs into mutated leaves and capture any new pairs
         let (mut subtree_leaves, new_pairs) =
-            self.sorted_pairs_to_mutated_subtree_leaves(sorted_kv_pairs);
+            self.sorted_pairs_to_mutated_subtree_leaves(sorted_kv_pairs)?;
 
         // If no mutations, return an empty mutation set
         if subtree_leaves.is_empty() {
-            return MutationSet {
+            return Ok(MutationSet {
                 old_root: self.root(),
                 new_root: self.root(),
                 node_mutations: NodeMutations::default(),
                 new_pairs,
-            };
+            });
         }
 
         let mut node_mutations = NodeMutations::default();
@@ -154,7 +160,7 @@ impl Smt {
             !mutation_set.node_mutations().is_empty() && !mutation_set.new_pairs().is_empty()
         );
 
-        mutation_set
+        Ok(mutation_set)
     }
 
     // SUBTREE MUTATION
@@ -335,7 +341,7 @@ impl Smt {
     fn sorted_pairs_to_mutated_subtree_leaves(
         &self,
         pairs: Vec<(Word, Word)>,
-    ) -> (MutatedSubtreeLeaves, Map<Word, Word>) {
+    ) -> Result<(MutatedSubtreeLeaves, Map<Word, Word>), MerkleError> {
         // Map to track new key-value pairs for mutated leaves
         let mut new_pairs = Map::new();
 
@@ -355,7 +361,14 @@ impl Smt {
 
                 if value != old_value {
                     // Update the leaf and track the new key-value pair
-                    leaf = self.construct_prospective_leaf(leaf, &key, &value);
+                    leaf = self.construct_prospective_leaf(leaf, &key, &value).map_err(
+                        |e| match e {
+                            SmtLeafError::TooManyLeafEntries { actual } => {
+                                MerkleError::TooManyLeafEntries { actual }
+                            },
+                            other => panic!("unexpected SmtLeaf::insert error: {:?}", other),
+                        },
+                    )?;
                     new_pairs.insert(key, value);
                     leaf_changed = true;
                 }
@@ -372,10 +385,7 @@ impl Smt {
         // The closure is the only possible source of errors.
         // Since it never returns an error - only `Ok(Some(_))` or `Ok(None)` - we can safely assume
         // `accumulator` is always `Ok(_)`.
-        (
-            accumulator.expect("process_sorted_pairs_to_leaves never fails").leaves,
-            new_pairs,
-        )
+        Ok((accumulator?.leaves, new_pairs))
     }
 
     /// Processes sorted key-value pairs to compute leaves for a subtree.
