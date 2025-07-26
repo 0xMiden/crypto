@@ -857,10 +857,9 @@ mod tests {
             tree_data in any::<RandomMerkleTree>(),
             node in any::<Word>()
         ) {
-            let RandomMerkleTree { tree, leaves, indices } = tree_data;
+            let RandomMerkleTree { tree, leaves: _,  indices } = tree_data;
 
-            for (i, &leaf_index) in indices.iter().enumerate() {
-                let _leaf = leaves[i];
+            for &leaf_index in indices.iter() {
                 let path = tree.get_path(NodeIndex::new(tree.depth(), leaf_index).unwrap()).unwrap();
                 let sparse = SparseMerklePath::from_sized_iter(path.clone().into_iter()).unwrap();
 
