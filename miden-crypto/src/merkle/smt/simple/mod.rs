@@ -235,7 +235,7 @@ impl<const DEPTH: u8> SimpleSmt<DEPTH> {
     /// # use miden_crypto::merkle::{LeafIndex, SimpleSmt, EmptySubtreeRoots, SMT_DEPTH};
     /// let mut smt: SimpleSmt<3> = SimpleSmt::new().unwrap();
     /// let pair = (LeafIndex::default(), Word::default());
-    /// let mutations = smt.compute_mutations(vec![pair]).unwrap();
+    /// let mutations = smt.compute_mutations(vec![pair]);
     /// assert_eq!(mutations.root(), *EmptySubtreeRoots::entry(3, 0));
     /// smt.apply_mutations(mutations).unwrap();
     /// assert_eq!(smt.root(), *EmptySubtreeRoots::entry(3, 0));
@@ -243,8 +243,12 @@ impl<const DEPTH: u8> SimpleSmt<DEPTH> {
     pub fn compute_mutations(
         &self,
         kv_pairs: impl IntoIterator<Item = (LeafIndex<DEPTH>, Word)>,
-    ) -> Result<MutationSet<DEPTH, LeafIndex<DEPTH>, Word>, MerkleError> {
+    ) -> MutationSet<DEPTH, LeafIndex<DEPTH>, Word> {
+        // SAFETY: a SimpleSmt does not contain multi-value leaves. The underlaying
+        // SimpleSmt::construct_prospective_leaf does not return any errors so it's safe to unwrap
+        // here.
         <Self as SparseMerkleTree<DEPTH>>::compute_mutations(self, kv_pairs)
+            .expect("computing mutations on a simple smt never returns an error")
     }
 
     /// Applies the prospective mutations computed with [`SimpleSmt::compute_mutations()`] to this
