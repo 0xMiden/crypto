@@ -4,10 +4,7 @@
 use alloc::{string::ToString, vec::Vec};
 
 use k256::{
-    ecdsa::{
-        SigningKey, VerifyingKey,
-        signature::{Signer, Verifier},
-    },
+    ecdsa::{RecoveryId, SigningKey, VerifyingKey, signature::Verifier},
     elliptic_curve::rand_core::{CryptoRng, RngCore},
 };
 
@@ -21,7 +18,8 @@ use crate::{
 
 const SECRET_KEY_BYTES: usize = 32;
 const PUBLIC_KEY_BYTES: usize = 33; // we use the compressed format
-const SIGNATURE_BYTES: usize = 64;
+const SIGNATURE_BYTES: usize = 65;
+const SCALARS_SIZE_BYTES: usize = 32;
 
 // SECRET KEY
 // ================================================================================================
@@ -60,9 +58,15 @@ impl SecretKey {
         let message_bytes: [u8; 32] = message.into();
 
         // Sign the message
-        let signature: k256::ecdsa::Signature = self.inner.sign(&message_bytes);
+        let (signature, recovery_id) =
+            self.inner.sign_recoverable(&message_bytes).expect("should not fail");
+        let (r, s) = signature.split_scalars();
 
-        Signature { inner: signature }
+        Signature {
+            r: r.to_bytes().into(),
+            s: s.to_bytes().into(),
+            v: recovery_id.into(),
+        }
     }
 }
 
@@ -81,10 +85,30 @@ impl PublicKey {
         <Self as SequentialCommit>::to_commitment(self)
     }
 
-    /// Verify a signature against this public key and message.
+    /// Verifies a signature against this public key and message.
     pub fn verify(&self, message: Word, signature: &Signature) -> bool {
         let message_bytes: [u8; 32] = message.into();
-        self.inner.verify(&message_bytes, &signature.inner).is_ok()
+        let signature = k256::ecdsa::Signature::from_scalars(signature.r, signature.s);
+
+        match signature {
+            Ok(signature) => self.inner.verify(&message_bytes, &signature).is_ok(),
+            Err(_) => false,
+        }
+    }
+
+    /// Recovers the public key associated to the secret key used to sign a message-signature pair.
+    pub fn recover_from(message: Word, signature: &Signature) -> Self {
+        let Signature { r, s, v } = signature;
+        let signature = k256::ecdsa::Signature::from_scalars(*r, *s)
+            .expect("could not build the signature from the scalars");
+        let verifying_key = k256::ecdsa::VerifyingKey::recover_from_msg(
+            &message.to_bytes(),
+            &signature,
+            RecoveryId::from_byte(*v).expect("invalid recovery id"),
+        )
+        .expect("failed to recover the public key from the message and signature");
+
+        Self { inner: verifying_key }
     }
 }
 
@@ -102,7 +126,9 @@ impl SequentialCommit for PublicKey {
 /// ECDSA signature over secp256k1 curve
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Signature {
-    inner: k256::ecdsa::Signature,
+    pub r: [u8; SCALARS_SIZE_BYTES],
+    pub s: [u8; SCALARS_SIZE_BYTES],
+    pub v: u8,
 }
 
 impl Signature {
@@ -158,19 +184,21 @@ impl Deserializable for PublicKey {
 
 impl Serializable for Signature {
     fn write_into<W: ByteWriter>(&self, target: &mut W) {
-        let bytes: [u8; SIGNATURE_BYTES] = self.inner.to_bytes().into();
+        let mut bytes = [0u8; SIGNATURE_BYTES];
+        bytes[0..SCALARS_SIZE_BYTES].copy_from_slice(&self.r);
+        bytes[SCALARS_SIZE_BYTES..2 * SCALARS_SIZE_BYTES].copy_from_slice(&self.s);
+        bytes[2 * SCALARS_SIZE_BYTES] = self.v;
         target.write_bytes(&bytes);
     }
 }
 
 impl Deserializable for Signature {
     fn read_from<R: ByteReader>(source: &mut R) -> Result<Self, DeserializationError> {
-        let bytes: [u8; SIGNATURE_BYTES] = source.read_array()?;
+        let r: [u8; SCALARS_SIZE_BYTES] = source.read_array()?;
+        let s: [u8; SCALARS_SIZE_BYTES] = source.read_array()?;
+        let v: u8 = source.read()?;
 
-        let signature = k256::ecdsa::Signature::from_slice(&bytes)
-            .map_err(|_| DeserializationError::InvalidValue("Invalid public key".to_string()))?;
-
-        Ok(Self { inner: signature })
+        Ok(Self { r, s, v })
     }
 }
 
@@ -194,6 +222,25 @@ mod tests {
         let pk_bytes = public_key.to_bytes();
         let recovered_pk = PublicKey::read_from_bytes(&pk_bytes).unwrap();
         assert_eq!(public_key, recovered_pk);
+    }
+
+    #[test]
+    fn test_public_key_recovery() {
+        let mut secret_key = SecretKey::with_rng(&mut OsRng);
+        let public_key = secret_key.public_key();
+
+        // Generate a signature using the secret key
+        let message = [Felt::new(1), Felt::new(2), Felt::new(3), Felt::new(4)].into();
+        let signature = secret_key.sign(message);
+
+        // Recover the public key
+        let recovered_pk = PublicKey::recover_from(message, &signature);
+        assert_eq!(public_key, recovered_pk);
+
+        // Using the wrong message, we shouldn't be able to recover the public key
+        let message = [Felt::new(1), Felt::new(2), Felt::new(3), Felt::new(5)].into();
+        let recovered_pk = PublicKey::recover_from(message, &signature);
+        assert!(public_key != recovered_pk);
     }
 
     #[test]
