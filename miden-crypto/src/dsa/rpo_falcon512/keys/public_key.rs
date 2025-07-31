@@ -25,6 +25,12 @@ impl PublicKey {
         signature.verify(message, self)
     }
 
+    /// Recovers from the signature the public key associated to the secret key used to sign
+    /// a message.
+    pub fn recover_from(_message: Word, signature: &Signature) -> Self {
+        signature.public_key().clone()
+    }
+
     /// Returns a commitment to the public key using the RPO256 hash function.
     pub fn to_commitment(&self) -> Word {
         <Self as SequentialCommit>::to_commitment(self)

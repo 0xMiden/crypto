@@ -111,6 +111,9 @@ impl Signature {
     /// Returns true if this signature is a valid signature for the specified message generated
     /// against the secret key matching the specified public key commitment.
     pub fn verify(&self, message: Word, pub_key: &PublicKey) -> bool {
+        if self.h != *pub_key {
+            return false;
+        }
         let c = hash_to_point_rpo256(message, &self.nonce);
         verify_helper(&c, &self.s2, pub_key)
     }
