@@ -5,7 +5,7 @@ use super::{
     LeafIndex, MerkleError, MerklePath, MutationSet, NodeIndex, SMT_MAX_DEPTH, SMT_MIN_DEPTH,
     SparseMerkleTree, Word,
 };
-use crate::merkle::{SparseMerklePath, SparseValuePath};
+use crate::merkle::{SmtLeafError, SparseMerklePath, SparseValuePath};
 
 #[cfg(test)]
 mod tests;
@@ -214,7 +214,10 @@ impl<const DEPTH: u8> SimpleSmt<DEPTH> {
     /// This also recomputes all hashes between the leaf (associated with the key) and the root,
     /// updating the root itself.
     pub fn insert(&mut self, key: LeafIndex<DEPTH>, value: Word) -> Word {
+        // SAFETY: a SimpleSmt does not contain multi-value leaves. The underlaying
+        // SimpleSmt::insert_value does not return any errors so it's safe to unwrap here.
         <Self as SparseMerkleTree<DEPTH>>::insert(self, key, value)
+            .expect("inserting a value into a simple smt never returns an error")
     }
 
     /// Computes what changes are necessary to insert the specified key-value pairs into this
@@ -234,14 +237,18 @@ impl<const DEPTH: u8> SimpleSmt<DEPTH> {
     /// let pair = (LeafIndex::default(), Word::default());
     /// let mutations = smt.compute_mutations(vec![pair]);
     /// assert_eq!(mutations.root(), *EmptySubtreeRoots::entry(3, 0));
-    /// smt.apply_mutations(mutations);
+    /// smt.apply_mutations(mutations).unwrap();
     /// assert_eq!(smt.root(), *EmptySubtreeRoots::entry(3, 0));
     /// ```
     pub fn compute_mutations(
         &self,
         kv_pairs: impl IntoIterator<Item = (LeafIndex<DEPTH>, Word)>,
     ) -> MutationSet<DEPTH, LeafIndex<DEPTH>, Word> {
+        // SAFETY: a SimpleSmt does not contain multi-value leaves. The underlaying
+        // SimpleSmt::construct_prospective_leaf does not return any errors so it's safe to unwrap
+        // here.
         <Self as SparseMerkleTree<DEPTH>>::compute_mutations(self, kv_pairs)
+            .expect("computing mutations on a simple smt never returns an error")
     }
 
     /// Applies the prospective mutations computed with [`SimpleSmt::compute_mutations()`] to this
@@ -386,12 +393,17 @@ impl<const DEPTH: u8> SparseMerkleTree<DEPTH> for SimpleSmt<DEPTH> {
         self.inner_nodes.remove(&index)
     }
 
-    fn insert_value(&mut self, key: LeafIndex<DEPTH>, value: Word) -> Option<Word> {
-        if value == Self::EMPTY_VALUE {
+    fn insert_value(
+        &mut self,
+        key: LeafIndex<DEPTH>,
+        value: Word,
+    ) -> Result<Option<Word>, MerkleError> {
+        let result = if value == Self::EMPTY_VALUE {
             self.leaves.remove(&key.value())
         } else {
             self.leaves.insert(key.value(), value)
-        }
+        };
+        Ok(result)
     }
 
     fn get_value(&self, key: &LeafIndex<DEPTH>) -> Word {
@@ -416,8 +428,8 @@ impl<const DEPTH: u8> SparseMerkleTree<DEPTH> for SimpleSmt<DEPTH> {
         _existing_leaf: Word,
         _key: &LeafIndex<DEPTH>,
         value: &Word,
-    ) -> Word {
-        *value
+    ) -> Result<Word, SmtLeafError> {
+        Ok(*value)
     }
 
     fn key_to_leaf_index(key: &LeafIndex<DEPTH>) -> LeafIndex<DEPTH> {

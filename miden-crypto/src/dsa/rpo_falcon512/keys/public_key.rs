@@ -1,71 +1,51 @@
 //! Public key types for the RPO Falcon 512 digital signature scheme used in Miden VM.
-//!
-//! This module defines two main types:
-//! - `PublicKey`: A commitment to a polynomial, represented as a hash of the polynomial’s
-//!   coefficients.
-//! - `PubKeyPoly`: A public key represented directly as a polynomial over FalconFelt coefficients.
-//!
-//! The `PublicKey` is used for signature verification.
-//! The `PubKeyPoly` provides the raw polynomial form of a public key.
 
-use alloc::string::ToString;
+use alloc::{string::ToString, vec::Vec};
 use core::ops::Deref;
 
 use num::Zero;
 
 use super::{
-    super::{LOG_N, N, PK_LEN, Rpo256},
+    super::{LOG_N, N, PK_LEN},
     ByteReader, ByteWriter, Deserializable, DeserializationError, FalconFelt, Felt, Polynomial,
     Serializable, Signature,
 };
-use crate::{Word, dsa::rpo_falcon512::FALCON_ENCODING_BITS};
+use crate::{SequentialCommit, Word, dsa::rpo_falcon512::FALCON_ENCODING_BITS};
 
 // PUBLIC KEY
 // ================================================================================================
 
-/// A public key for verifying signatures.
-///
-/// The public key is a [Word] (i.e., 4 field elements) that is the hash of the coefficients of
-/// the polynomial representing the raw bytes of the expanded public key. The hash is computed
-/// using Rpo256.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct PublicKey(Word);
+/// Public key represented as a polynomial with coefficients over the Falcon prime field.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PublicKey(Polynomial<FalconFelt>);
 
 impl PublicKey {
-    /// Returns a new [PublicKey] which is a commitment to the provided expanded public key.
-    pub fn new(pub_key: Word) -> Self {
-        Self(pub_key)
-    }
-
     /// Verifies the provided signature against provided message and this public key.
     pub fn verify(&self, message: Word, signature: &Signature) -> bool {
-        signature.verify(message, self.0)
+        signature.verify(message, self)
+    }
+
+    /// Recovers from the signature the public key associated to the secret key used to sign
+    /// a message.
+    pub fn recover_from(_message: Word, signature: &Signature) -> Self {
+        signature.public_key().clone()
+    }
+
+    /// Returns a commitment to the public key using the RPO256 hash function.
+    pub fn to_commitment(&self) -> Word {
+        <Self as SequentialCommit>::to_commitment(self)
     }
 }
 
-impl From<PubKeyPoly> for PublicKey {
-    fn from(pk_poly: PubKeyPoly) -> Self {
-        let pk_felts: Polynomial<Felt> = pk_poly.0.into();
-        let pk_digest = Rpo256::hash_elements(&pk_felts.coefficients);
-        Self(pk_digest)
+impl SequentialCommit for PublicKey {
+    type Commitment = Word;
+
+    fn to_elements(&self) -> Vec<Felt> {
+        Into::<Polynomial<Felt>>::into(self.0.clone()).coefficients
     }
 }
 
-impl From<PublicKey> for Word {
-    fn from(key: PublicKey) -> Self {
-        key.0
-    }
-}
-
-// PUBLIC KEY POLYNOMIAL
-// ================================================================================================
-
-/// Public key represented as a polynomial with coefficients over the Falcon prime field.
-/// Used in the RPO Falcon 512 signature scheme.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct PubKeyPoly(pub Polynomial<FalconFelt>);
-
-impl Deref for PubKeyPoly {
+impl Deref for PublicKey {
     type Target = Polynomial<FalconFelt>;
 
     fn deref(&self) -> &Self::Target {
@@ -73,13 +53,13 @@ impl Deref for PubKeyPoly {
     }
 }
 
-impl From<Polynomial<FalconFelt>> for PubKeyPoly {
+impl From<Polynomial<FalconFelt>> for PublicKey {
     fn from(pk_poly: Polynomial<FalconFelt>) -> Self {
         Self(pk_poly)
     }
 }
 
-impl Serializable for &PubKeyPoly {
+impl Serializable for &PublicKey {
     fn write_into<W: ByteWriter>(&self, target: &mut W) {
         let mut buf = [0_u8; PK_LEN];
         buf[0] = LOG_N;
@@ -106,7 +86,7 @@ impl Serializable for &PubKeyPoly {
     }
 }
 
-impl Deserializable for PubKeyPoly {
+impl Deserializable for PublicKey {
     fn read_from<R: ByteReader>(source: &mut R) -> Result<Self, DeserializationError> {
         let buf = source.read_array::<PK_LEN>()?;
 

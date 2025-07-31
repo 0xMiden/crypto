@@ -8,7 +8,10 @@ use super::{
     EmptySubtreeRoots, InnerNode, InnerNodes, Leaves, MerkleError, MutationSet, NodeIndex,
     SMT_DEPTH, Smt, SmtLeaf, SparseMerkleTree, Word, leaf,
 };
-use crate::merkle::smt::{NodeMutation, NodeMutations, UnorderedMap};
+use crate::merkle::{
+    SmtLeafError,
+    smt::{Map, NodeMutation, NodeMutations},
+};
 
 #[cfg(test)]
 mod tests;
@@ -92,10 +95,13 @@ impl Smt {
     ///
     /// 3. These subtree roots become the "leaves" for the next iteration, which processes the next
     ///    8 levels up. This continues until reaching the tree's root at depth 0.
+    ///
+    /// # Errors
+    /// Returns an error if mutations would exceed [`MAX_LEAF_ENTRIES`] (1024 entries) in a leaf.
     pub(crate) fn compute_mutations_concurrent(
         &self,
         kv_pairs: impl IntoIterator<Item = (Word, Word)>,
-    ) -> MutationSet<SMT_DEPTH, Word, Word>
+    ) -> Result<MutationSet<SMT_DEPTH, Word, Word>, MerkleError>
     where
         Self: Sized + Sync,
     {
@@ -105,16 +111,16 @@ impl Smt {
 
         // Convert sorted pairs into mutated leaves and capture any new pairs
         let (mut subtree_leaves, new_pairs) =
-            self.sorted_pairs_to_mutated_subtree_leaves(sorted_kv_pairs);
+            self.sorted_pairs_to_mutated_subtree_leaves(sorted_kv_pairs)?;
 
         // If no mutations, return an empty mutation set
         if subtree_leaves.is_empty() {
-            return MutationSet {
+            return Ok(MutationSet {
                 old_root: self.root(),
                 new_root: self.root(),
                 node_mutations: NodeMutations::default(),
                 new_pairs,
-            };
+            });
         }
 
         let mut node_mutations = NodeMutations::default();
@@ -154,7 +160,7 @@ impl Smt {
             !mutation_set.node_mutations().is_empty() && !mutation_set.new_pairs().is_empty()
         );
 
-        mutation_set
+        Ok(mutation_set)
     }
 
     // SUBTREE MUTATION
@@ -258,17 +264,15 @@ impl Smt {
         }
 
         for current_depth in (SUBTREE_DEPTH..=SMT_DEPTH).step_by(SUBTREE_DEPTH as usize).rev() {
-            let (nodes, mut subtree_roots): (Vec<UnorderedMap<_, _>>, Vec<SubtreeLeaf>) =
-                leaf_subtrees
-                    .into_par_iter()
-                    .map(|subtree| {
-                        debug_assert!(subtree.is_sorted());
-                        debug_assert!(!subtree.is_empty());
-                        let (nodes, subtree_root) =
-                            build_subtree(subtree, SMT_DEPTH, current_depth);
-                        (nodes, subtree_root)
-                    })
-                    .unzip();
+            let (nodes, mut subtree_roots): (Vec<Map<_, _>>, Vec<SubtreeLeaf>) = leaf_subtrees
+                .into_par_iter()
+                .map(|subtree| {
+                    debug_assert!(subtree.is_sorted());
+                    debug_assert!(!subtree.is_empty());
+                    let (nodes, subtree_root) = build_subtree(subtree, SMT_DEPTH, current_depth);
+                    (nodes, subtree_root)
+                })
+                .unzip();
 
             leaf_subtrees = SubtreeLeavesIter::from_leaves(&mut subtree_roots).collect();
             accumulated_nodes.extend(nodes.into_iter().flatten());
@@ -337,9 +341,9 @@ impl Smt {
     fn sorted_pairs_to_mutated_subtree_leaves(
         &self,
         pairs: Vec<(Word, Word)>,
-    ) -> (MutatedSubtreeLeaves, UnorderedMap<Word, Word>) {
+    ) -> Result<(MutatedSubtreeLeaves, Map<Word, Word>), MerkleError> {
         // Map to track new key-value pairs for mutated leaves
-        let mut new_pairs = UnorderedMap::new();
+        let mut new_pairs = Map::new();
 
         let accumulator = Self::process_sorted_pairs_to_leaves(pairs, |leaf_pairs| {
             let mut leaf = self.get_leaf(&leaf_pairs[0].0);
@@ -357,7 +361,14 @@ impl Smt {
 
                 if value != old_value {
                     // Update the leaf and track the new key-value pair
-                    leaf = self.construct_prospective_leaf(leaf, &key, &value);
+                    leaf = self.construct_prospective_leaf(leaf, &key, &value).map_err(
+                        |e| match e {
+                            SmtLeafError::TooManyLeafEntries { actual } => {
+                                MerkleError::TooManyLeafEntries { actual }
+                            },
+                            other => panic!("unexpected SmtLeaf::insert error: {:?}", other),
+                        },
+                    )?;
                     new_pairs.insert(key, value);
                     leaf_changed = true;
                 }
@@ -374,10 +385,7 @@ impl Smt {
         // The closure is the only possible source of errors.
         // Since it never returns an error - only `Ok(Some(_))` or `Ok(None)` - we can safely assume
         // `accumulator` is always `Ok(_)`.
-        (
-            accumulator.expect("process_sorted_pairs_to_leaves never fails").leaves,
-            new_pairs,
-        )
+        Ok((accumulator?.leaves, new_pairs))
     }
 
     /// Processes sorted key-value pairs to compute leaves for a subtree.
@@ -503,7 +511,7 @@ pub struct SubtreeLeaf {
 #[derive(Debug, Clone)]
 pub(crate) struct PairComputations<K, L> {
     /// Literal leaves to be added to the sparse Merkle tree's internal mapping.
-    pub nodes: UnorderedMap<K, L>,
+    pub nodes: Map<K, L>,
     /// "Conceptual" leaves that will be used for computations.
     pub leaves: Vec<Vec<SubtreeLeaf>>,
 }
@@ -590,7 +598,7 @@ fn build_subtree(
     mut leaves: Vec<SubtreeLeaf>,
     tree_depth: u8,
     bottom_depth: u8,
-) -> (UnorderedMap<NodeIndex, InnerNode>, SubtreeLeaf) {
+) -> (Map<NodeIndex, InnerNode>, SubtreeLeaf) {
     #[cfg(debug_assertions)]
     {
         // Ensure that all leaves have unique column indices within this subtree.
@@ -608,7 +616,7 @@ fn build_subtree(
     debug_assert!(Integer::is_multiple_of(&bottom_depth, &SUBTREE_DEPTH));
     debug_assert!(leaves.len() <= usize::pow(2, SUBTREE_DEPTH as u32));
     let subtree_root = bottom_depth - SUBTREE_DEPTH;
-    let mut inner_nodes: UnorderedMap<NodeIndex, InnerNode> = Default::default();
+    let mut inner_nodes: Map<NodeIndex, InnerNode> = Default::default();
     let mut next_leaves: Vec<SubtreeLeaf> = Vec::with_capacity(leaves.len() / 2);
     for next_depth in (subtree_root..bottom_depth).rev() {
         debug_assert!(next_depth <= bottom_depth);
@@ -714,6 +722,6 @@ pub fn build_subtree_for_bench(
     leaves: Vec<SubtreeLeaf>,
     tree_depth: u8,
     bottom_depth: u8,
-) -> (UnorderedMap<NodeIndex, InnerNode>, SubtreeLeaf) {
+) -> (Map<NodeIndex, InnerNode>, SubtreeLeaf) {
     build_subtree(leaves, tree_depth, bottom_depth)
 }

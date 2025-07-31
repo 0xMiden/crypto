@@ -1,7 +1,7 @@
 use alloc::{string::ToString, vec::Vec};
 use core::cmp::Ordering;
 
-use super::{EMPTY_WORD, Felt, LeafIndex, Rpo256, SMT_DEPTH, SmtLeafError, Word};
+use super::{EMPTY_WORD, Felt, LeafIndex, MAX_LEAF_ENTRIES, Rpo256, SMT_DEPTH, SmtLeafError, Word};
 use crate::utils::{ByteReader, ByteWriter, Deserializable, DeserializationError, Serializable};
 
 /// Represents a leaf node in the Sparse Merkle Tree.
@@ -81,9 +81,14 @@ impl SmtLeaf {
     ///
     /// # Errors
     ///   - Returns an error if 2 keys in `entries` map to a different leaf index
+    ///   - Returns an error if the number of entries exceeds [`MAX_LEAF_ENTRIES`]
     pub fn new_multiple(entries: Vec<(Word, Word)>) -> Result<Self, SmtLeafError> {
         if entries.len() < 2 {
             return Err(SmtLeafError::MultipleLeafRequiresTwoEntries(entries.len()));
+        }
+
+        if entries.len() > MAX_LEAF_ENTRIES {
+            return Err(SmtLeafError::TooManyLeafEntries { actual: entries.len() });
         }
 
         // Check that all keys map to the same leaf index
@@ -130,13 +135,11 @@ impl SmtLeaf {
     }
 
     /// Returns the number of entries stored in the leaf
-    pub fn num_entries(&self) -> u64 {
+    pub fn num_entries(&self) -> usize {
         match self {
             SmtLeaf::Empty(_) => 0,
             SmtLeaf::Single(_) => 1,
-            SmtLeaf::Multiple(entries) => {
-                entries.len().try_into().expect("shouldn't have more than 2^64 entries")
-            },
+            SmtLeaf::Multiple(entries) => entries.len(),
         }
     }
 
@@ -222,11 +225,15 @@ impl SmtLeaf {
     /// any.
     ///
     /// The caller needs to ensure that `key` has the same leaf index as all other keys in the leaf
-    pub(super) fn insert(&mut self, key: Word, value: Word) -> Option<Word> {
+    ///
+    /// # Errors
+    /// Returns an error if inserting the key-value pair would exceed [`MAX_LEAF_ENTRIES`] (1024
+    /// entries) in the leaf.
+    pub(super) fn insert(&mut self, key: Word, value: Word) -> Result<Option<Word>, SmtLeafError> {
         match self {
             SmtLeaf::Empty(_) => {
                 *self = SmtLeaf::new_single(key, value);
-                None
+                Ok(None)
             },
             SmtLeaf::Single(kv_pair) => {
                 if kv_pair.0 == key {
@@ -234,16 +241,16 @@ impl SmtLeaf {
                     // value
                     let old_value = kv_pair.1;
                     kv_pair.1 = value;
-                    Some(old_value)
+                    Ok(Some(old_value))
                 } else {
                     // Another entry is present in this leaf. Transform the entry into a list
                     // entry, and make sure the key-value pairs are sorted by key
+                    // This stays within MAX_LEAF_ENTRIES limit. We're only adding one entry to a
+                    // single leaf
                     let mut pairs = vec![*kv_pair, (key, value)];
                     pairs.sort_by(|(key_1, _), (key_2, _)| cmp_keys(*key_1, *key_2));
-
                     *self = SmtLeaf::Multiple(pairs);
-
-                    None
+                    Ok(None)
                 }
             },
             SmtLeaf::Multiple(kv_pairs) => {
@@ -251,13 +258,16 @@ impl SmtLeaf {
                     Ok(pos) => {
                         let old_value = kv_pairs[pos].1;
                         kv_pairs[pos].1 = value;
-
-                        Some(old_value)
+                        Ok(Some(old_value))
                     },
                     Err(pos) => {
+                        if kv_pairs.len() >= MAX_LEAF_ENTRIES {
+                            return Err(SmtLeafError::TooManyLeafEntries {
+                                actual: kv_pairs.len() + 1,
+                            });
+                        }
                         kv_pairs.insert(pos, (key, value));
-
-                        None
+                        Ok(None)
                     },
                 }
             },
@@ -331,7 +341,7 @@ impl Serializable for SmtLeaf {
 impl Deserializable for SmtLeaf {
     fn read_from<R: ByteReader>(source: &mut R) -> Result<Self, DeserializationError> {
         // Read: num entries
-        let num_entries = source.read_u64()?;
+        let num_entries = source.read_usize()?;
 
         // Read: leaf index
         let leaf_index: LeafIndex<SMT_DEPTH> = {
