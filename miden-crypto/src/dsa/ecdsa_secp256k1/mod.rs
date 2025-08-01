@@ -58,8 +58,10 @@ impl SecretKey {
         let message_bytes: [u8; 32] = message.into();
 
         // Sign the message
-        let (signature, recovery_id) =
-            self.inner.sign_recoverable(&message_bytes).expect("should not fail");
+        let (signature, recovery_id) = self
+            .inner
+            .sign_recoverable(&message_bytes)
+            .expect("failed to generate signature");
         let (r, s) = signature.split_scalars();
 
         Signature {
@@ -96,7 +98,7 @@ impl PublicKey {
         }
     }
 
-    /// Recovers the public key associated to the secret key used to sign a message-signature pair.
+    /// Recovers from the signature the public key associated to the secret key used to sign the message.
     pub fn recover_from(message: Word, signature: &Signature) -> Self {
         let Signature { r, s, v } = signature;
         let signature = k256::ecdsa::Signature::from_scalars(*r, *s)
