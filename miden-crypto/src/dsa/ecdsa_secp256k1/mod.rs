@@ -4,9 +4,13 @@
 use alloc::{string::ToString, vec::Vec};
 
 use k256::{
-    ecdsa::{RecoveryId, SigningKey, VerifyingKey, signature::Verifier},
+    ecdsa::{
+        RecoveryId, SigningKey, VerifyingKey,
+        signature::{self, Verifier},
+    },
     elliptic_curve::rand_core::{CryptoRng, RngCore},
 };
+use num::traits::sign;
 
 use crate::{
     Felt, SequentialCommit, StarkField, Word,
@@ -18,8 +22,32 @@ use crate::{
 
 const SECRET_KEY_BYTES: usize = 32;
 const PUBLIC_KEY_BYTES: usize = 33; // we use the compressed format
-const SIGNATURE_BYTES: usize = 65;
+const SIGNATURE_BYTES: usize = 66;
 const SCALARS_SIZE_BYTES: usize = 32;
+
+// ECDSA HASHER
+// ================================================================================================
+
+#[repr(u8)]
+#[derive(Debug, Clone, Copy)]
+pub enum EcdsaHasher {
+    Sha256 = 0,
+    Keccak = 1,
+}
+
+impl EcdsaHasher {
+    pub fn to_byte(&self) -> u8 {
+        *self as u8
+    }
+
+    pub fn from_byte(byte: u8) -> Option<Self> {
+        if byte <= 1 {
+            Some(unsafe { std::mem::transmute(byte) })
+        } else {
+            None
+        }
+    }
+}
 
 // SECRET KEY
 // ================================================================================================
@@ -53,21 +81,29 @@ impl SecretKey {
     }
 
     /// Sign a message (represented as a Word) with this secret key.
-    pub fn sign(&mut self, message: Word) -> Signature {
+    pub fn sign(&mut self, message: Word, hasher: EcdsaHasher) -> Sign {
         // Convert Word to bytes for signing
         let message_bytes: [u8; 32] = message.into();
 
         // Sign the message
-        let (signature, recovery_id) = self
-            .inner
-            .sign_recoverable(&message_bytes)
-            .expect("failed to generate signature");
-        let (r, s) = signature.split_scalars();
+        match hasher {
+            EcdsaHasher::Sha256 => {
+                let (signature, recovery_id) = self
+                    .inner
+                    .sign_recoverable(&message_bytes)
+                    .expect("failed to generate signature");
 
-        Signature {
-            r: r.to_bytes().into(),
-            s: s.to_bytes().into(),
-            v: recovery_id.into(),
+                let (r, s) = signature.split_scalars();
+
+                Sign::Sha256(Signature {
+                    r: r.to_bytes().into(),
+                    s: s.to_bytes().into(),
+                    v: recovery_id.into(),
+                })
+            },
+            EcdsaHasher::Keccak => {
+                todo!()
+            },
         }
     }
 }
@@ -88,27 +124,45 @@ impl PublicKey {
     }
 
     /// Verifies a signature against this public key and message.
-    pub fn verify(&self, message: Word, signature: &Signature) -> bool {
+    pub fn verify(&self, message: Word, signature: &Sign) -> bool {
         let message_bytes: [u8; 32] = message.into();
-        let signature = k256::ecdsa::Signature::from_scalars(signature.r, signature.s);
-
         match signature {
-            Ok(signature) => self.inner.verify(&message_bytes, &signature).is_ok(),
-            Err(_) => false,
+            Sign::Sha256(signature) => {
+                let signature = k256::ecdsa::Signature::from_scalars(signature.r, signature.s);
+
+                match signature {
+                    Ok(signature) => self.inner.verify(&message_bytes, &signature).is_ok(),
+                    Err(_) => false,
+                }
+            },
+            Sign::Keccak(signature) => {
+                let signature = k256::ecdsa::Signature::from_scalars(signature.r, signature.s);
+
+                match signature {
+                    Ok(signature) => self.inner.verify(&message_bytes, &signature).is_ok(),
+                    Err(_) => false,
+                }
+            },
         }
     }
 
     /// Recovers from the signature the public key associated to the secret key used to sign the message.
-    pub fn recover_from(message: Word, signature: &Signature) -> Self {
-        let Signature { r, s, v } = signature;
-        let signature = k256::ecdsa::Signature::from_scalars(*r, *s)
-            .expect("could not build the signature from the scalars");
-        let verifying_key = k256::ecdsa::VerifyingKey::recover_from_msg(
-            &message.to_bytes(),
-            &signature,
-            RecoveryId::from_byte(*v).expect("invalid recovery id"),
-        )
-        .expect("failed to recover the public key from the message and signature");
+    pub fn recover_from(message: Word, signature: &Sign) -> Self {
+        let verifying_key = match signature {
+            Sign::Sha256(Signature { r, s, v }) => {
+                let signature = k256::ecdsa::Signature::from_scalars(*r, *s)
+                    .expect("could not build the signature from the scalars");
+                k256::ecdsa::VerifyingKey::recover_from_msg(
+                    &message.to_bytes(),
+                    &signature,
+                    RecoveryId::from_byte(*v).expect("invalid recovery id"),
+                )
+                .expect("failed to recover the public key from the message and signature")
+            },
+            Sign::Keccak(Signature { r, s, v }) => {
+                todo!()
+            },
+        };
 
         Self { inner: verifying_key }
     }
@@ -125,6 +179,12 @@ impl SequentialCommit for PublicKey {
 // SIGNATURE
 // ================================================================================================
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Sign {
+    Sha256(Signature),
+    Keccak(Signature),
+}
+
 /// ECDSA signature over secp256k1 curve
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Signature {
@@ -133,8 +193,37 @@ pub struct Signature {
     pub v: u8,
 }
 
-impl Signature {
-    /// Verify this signature against a message and public key..
+impl Sign {
+    /// Returns the hasher associated to this signature.
+    pub fn hasher(&self) -> EcdsaHasher {
+        match self {
+            Sign::Sha256(_) => EcdsaHasher::Sha256,
+            Sign::Keccak(_) => EcdsaHasher::Keccak,
+        }
+    }
+
+    pub fn r(&self) -> &[u8; SCALARS_SIZE_BYTES] {
+        match self {
+            Sign::Sha256(Signature { r, .. }) => r,
+            Sign::Keccak(Signature { r, .. }) => r,
+        }
+    }
+
+    pub fn s(&self) -> &[u8; SCALARS_SIZE_BYTES] {
+        match self {
+            Sign::Sha256(Signature { s, .. }) => s,
+            Sign::Keccak(Signature { s, .. }) => s,
+        }
+    }
+
+    pub fn v(&self) -> u8 {
+        match self {
+            Sign::Sha256(Signature { v, .. }) => *v,
+            Sign::Keccak(Signature { v, .. }) => *v,
+        }
+    }
+
+    /// Verifies this signature against a message and public key..
     pub fn verify(&self, message: Word, pub_key: &PublicKey) -> bool {
         pub_key.verify(message, self)
     }
@@ -184,23 +273,31 @@ impl Deserializable for PublicKey {
     }
 }
 
-impl Serializable for Signature {
+impl Serializable for Sign {
     fn write_into<W: ByteWriter>(&self, target: &mut W) {
         let mut bytes = [0u8; SIGNATURE_BYTES];
-        bytes[0..SCALARS_SIZE_BYTES].copy_from_slice(&self.r);
-        bytes[SCALARS_SIZE_BYTES..2 * SCALARS_SIZE_BYTES].copy_from_slice(&self.s);
-        bytes[2 * SCALARS_SIZE_BYTES] = self.v;
+        bytes[0..SCALARS_SIZE_BYTES].copy_from_slice(self.r());
+        bytes[SCALARS_SIZE_BYTES..2 * SCALARS_SIZE_BYTES].copy_from_slice(self.s());
+        bytes[2 * SCALARS_SIZE_BYTES] = self.v();
+        bytes[2 * SCALARS_SIZE_BYTES] = self.hasher().to_byte();
         target.write_bytes(&bytes);
     }
 }
 
-impl Deserializable for Signature {
+impl Deserializable for Sign {
     fn read_from<R: ByteReader>(source: &mut R) -> Result<Self, DeserializationError> {
         let r: [u8; SCALARS_SIZE_BYTES] = source.read_array()?;
         let s: [u8; SCALARS_SIZE_BYTES] = source.read_array()?;
         let v: u8 = source.read()?;
 
-        Ok(Self { r, s, v })
+        let signature = Signature { r, s, v };
+
+        let hasher =
+            EcdsaHasher::from_byte(source.read_u8()?).expect("Not a valid EcdsaHasher variant");
+        match hasher {
+            EcdsaHasher::Sha256 => Ok(Sign::Sha256(signature)),
+            EcdsaHasher::Keccak => Ok(Sign::Keccak(signature)),
+        }
     }
 }
 
@@ -233,7 +330,7 @@ mod tests {
 
         // Generate a signature using the secret key
         let message = [Felt::new(1), Felt::new(2), Felt::new(3), Felt::new(4)].into();
-        let signature = secret_key.sign(message);
+        let signature = secret_key.sign(message, EcdsaHasher::Sha256);
 
         // Recover the public key
         let recovered_pk = PublicKey::recover_from(message, &signature);
@@ -251,7 +348,7 @@ mod tests {
         let public_key = secret_key.public_key();
 
         let message = [Felt::new(1), Felt::new(2), Felt::new(3), Felt::new(4)].into();
-        let signature = secret_key.sign(message);
+        let signature = secret_key.sign(message, EcdsaHasher::Sha256);
 
         // Verify using public key method
         assert!(public_key.verify(message, &signature));
@@ -268,10 +365,10 @@ mod tests {
     fn test_signature_serialization() {
         let mut secret_key = SecretKey::with_rng(&mut OsRng);
         let message = [Felt::new(1), Felt::new(2), Felt::new(3), Felt::new(4)].into();
-        let signature = secret_key.sign(message);
+        let signature = secret_key.sign(message, EcdsaHasher::Sha256);
 
         let sig_bytes = signature.to_bytes();
-        let recovered_sig = Signature::read_from_bytes(&sig_bytes).unwrap();
+        let recovered_sig = Sign::read_from_bytes(&sig_bytes).unwrap();
 
         assert_eq!(signature, recovered_sig);
     }
