@@ -58,7 +58,7 @@ impl EcdsaHasher {
     /// Converts a `u8` to its corresponding hasher variant.
     pub fn from_byte(byte: u8) -> Option<Self> {
         if byte <= 1 {
-            Some(unsafe { std::mem::transmute::<u8, EcdsaHasher>(byte) })
+            Some(unsafe { core::mem::transmute::<u8, EcdsaHasher>(byte) })
         } else {
             None
         }
