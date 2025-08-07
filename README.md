@@ -31,7 +31,7 @@ For performance benchmarks of these hash functions and their comparison to other
 - `SimpleSmt`: a Sparse Merkle Tree (with no compaction), mapping 64-bit keys to 4-element values.
 - `Smt`: a Sparse Merkle tree (with compaction at depth 64), mapping 4-element keys to 4-element values.
 
-The module also contains additional supporting components such as `NodeIndex`, `MerklePath`, and `MerkleError` to assist with tree indexation, opening proofs, and reporting inconsistent arguments/state.
+The module also contains additional supporting components such as `NodeIndex`, `MerklePath`, `SparseMerklePath`, and `MerkleError` to assist with tree indexation, opening proofs, and reporting inconsistent arguments/state. `SparseMerklePath` provides a memory-efficient representation for Merkle paths with nodes representing empty subtrees.
 
 ## Signatures
 

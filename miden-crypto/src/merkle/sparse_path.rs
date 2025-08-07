@@ -671,27 +671,12 @@ mod tests {
 
         for (key, _value) in tree.entries() {
             let index = NodeIndex::from(Smt::key_to_leaf_index(key));
-
-            let control_path = tree.get_path(key);
-            for (&control_node, proof_index) in
-                itertools::zip_eq(&*control_path, index.proof_indices())
-            {
-                let proof_node = tree.get_node_hash(proof_index);
-                assert_eq!(control_node, proof_node);
-            }
-
-            let sparse_path =
-                SparseMerklePath::from_sized_iter(control_path.clone().into_iter()).unwrap();
+            let sparse_path = tree.get_path(key);
             for (sparse_node, proof_idx) in
                 itertools::zip_eq(sparse_path.clone(), index.proof_indices())
             {
                 let proof_node = tree.get_node_hash(proof_idx);
                 assert_eq!(sparse_node, proof_node);
-            }
-
-            assert_eq!(control_path.depth(), sparse_path.depth());
-            for (control, sparse) in itertools::zip_eq(control_path, sparse_path) {
-                assert_eq!(control, sparse);
             }
         }
     }

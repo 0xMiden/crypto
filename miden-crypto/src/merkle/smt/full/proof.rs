@@ -1,17 +1,17 @@
 use alloc::string::ToString;
 
-use super::{MerklePath, SMT_DEPTH, SmtLeaf, SmtProofError, Word};
+use super::{SMT_DEPTH, SmtLeaf, SmtProofError, SparseMerklePath, Word};
 use crate::utils::{ByteReader, ByteWriter, Deserializable, DeserializationError, Serializable};
 
 /// A proof which can be used to assert membership (or non-membership) of key-value pairs
 /// in a [`super::Smt`] (Sparse Merkle Tree).
 ///
-/// The proof consists of a Merkle path and a leaf, which describes the node located at
+/// The proof consists of a sparse Merkle path and a leaf, which describes the node located at
 /// the base of the path.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct SmtProof {
-    /// The Merkle path from the leaf to the root.
-    path: MerklePath,
+    /// The sparse Merkle path from the leaf to the root.
+    path: SparseMerklePath,
     /// The leaf node containing one or more key-value pairs.
     leaf: SmtLeaf,
 }
@@ -25,10 +25,10 @@ impl SmtProof {
     /// # Errors
     /// Returns an error if the path length does not match the expected [`SMT_DEPTH`],
     /// which would make the proof invalid.
-    pub fn new(path: MerklePath, leaf: SmtLeaf) -> Result<Self, SmtProofError> {
-        let depth: usize = SMT_DEPTH.into();
-        if path.len() != depth {
-            return Err(SmtProofError::InvalidMerklePathLength(path.len()));
+    pub fn new(path: SparseMerklePath, leaf: SmtLeaf) -> Result<Self, SmtProofError> {
+        let depth = path.depth();
+        if depth != SMT_DEPTH {
+            return Err(SmtProofError::InvalidMerklePathLength(depth as usize));
         }
 
         Ok(Self { path, leaf })
@@ -37,7 +37,7 @@ impl SmtProof {
     /// Returns a new instance of [`SmtProof`] instantiated from the specified path and leaf.
     ///
     /// The length of the path is not checked. Reserved for internal use.
-    pub(super) fn new_unchecked(path: MerklePath, leaf: SmtLeaf) -> Self {
+    pub(super) fn new_unchecked(path: SparseMerklePath, leaf: SmtLeaf) -> Self {
         Self { path, leaf }
     }
 
@@ -85,8 +85,8 @@ impl SmtProof {
             .expect("failed to compute Merkle path root")
     }
 
-    /// Returns the proof's Merkle path.
-    pub fn path(&self) -> &MerklePath {
+    /// Returns the proof's sparse Merkle path.
+    pub fn path(&self) -> &SparseMerklePath {
         &self.path
     }
 
@@ -96,7 +96,7 @@ impl SmtProof {
     }
 
     /// Consume the proof and returns its parts.
-    pub fn into_parts(self) -> (MerklePath, SmtLeaf) {
+    pub fn into_parts(self) -> (SparseMerklePath, SmtLeaf) {
         (self.path, self.leaf)
     }
 }
@@ -110,7 +110,7 @@ impl Serializable for SmtProof {
 
 impl Deserializable for SmtProof {
     fn read_from<R: ByteReader>(source: &mut R) -> Result<Self, DeserializationError> {
-        let path = MerklePath::read_from(source)?;
+        let path = SparseMerklePath::read_from(source)?;
         let leaf = SmtLeaf::read_from(source)?;
 
         Self::new(path, leaf).map_err(|err| DeserializationError::InvalidValue(err.to_string()))
