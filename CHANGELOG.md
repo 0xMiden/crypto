@@ -10,6 +10,7 @@
 - Optimized `Smt::num_entries()` ([#455](https://github.com/0xMiden/crypto/pull/455)).
 - [BREAKING] Disallow leaves with more than 2^16 entries ([#455](https://github.com/0xMiden/crypto/pull/455), [#462](https://github.com/0xMiden/crypto/pull/462)).
 - [BREAKING] Modified the public key in Falcon DSA to be the polynomial instead of the commitment ([#460])(https://github.com/0xMiden/crypto/pull/460).
+-  Add ECDSA over secp256k1 curve ([#475](https://github.com/0xMiden/crypto/pull/475)).
 
 # 0.15.9 (2025-07-24)
 
