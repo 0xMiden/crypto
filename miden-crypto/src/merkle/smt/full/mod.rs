@@ -2,9 +2,8 @@ use alloc::{string::ToString, vec::Vec};
 
 use super::{
     EMPTY_WORD, EmptySubtreeRoots, Felt, InnerNode, InnerNodeInfo, InnerNodes, LeafIndex,
-    MerkleError, MutationSet, NodeIndex, Rpo256, SparseMerkleTree, Word,
+    MerkleError, MutationSet, NodeIndex, Rpo256, SparseMerklePath, SparseMerkleTree, Word,
 };
-use crate::merkle::SparseMerklePath;
 
 mod error;
 pub use error::{SmtLeafError, SmtProofError};

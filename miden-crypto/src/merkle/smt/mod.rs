@@ -3,8 +3,8 @@ use core::hash::Hash;
 
 use winter_utils::{ByteReader, ByteWriter, Deserializable, DeserializationError, Serializable};
 
-use super::{EmptySubtreeRoots, InnerNodeInfo, MerkleError, NodeIndex};
-use crate::{EMPTY_WORD, Felt, Map, Word, hash::rpo::Rpo256, merkle::SparseMerklePath};
+use super::{EmptySubtreeRoots, InnerNodeInfo, MerkleError, NodeIndex, SparseMerklePath};
+use crate::{EMPTY_WORD, Felt, Map, Word, hash::rpo::Rpo256};
 
 mod full;
 pub use full::{MAX_LEAF_ENTRIES, SMT_DEPTH, Smt, SmtLeaf, SmtLeafError, SmtProof, SmtProofError};
