@@ -89,16 +89,18 @@ impl EphemeralSecretKey {
 
 #[cfg(test)]
 mod test {
+    use k256::elliptic_curve::rand_core::OsRng;
+
     use crate::dsa::ecdsa_secp256k1::{SecretKey, key_agreement::EphemeralSecretKey};
 
     #[test]
     fn key_agreement() {
         // 1. Generate the static key-pair for Alice
-        let sk = SecretKey::new();
+        let sk = SecretKey::with_rng(&mut OsRng);
         let pk = sk.public_key();
 
         // 2. Generate the ephemeral key-pair for Bob
-        let sk_e = EphemeralSecretKey::new();
+        let sk_e = EphemeralSecretKey::with_rng(&mut OsRng);
         let pk_e = sk_e.ephemeral_public_key();
 
         // 3. Bob computes the shared secret key (Bob will send pk_e with the encrypted note to
