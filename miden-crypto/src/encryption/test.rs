@@ -1,10 +1,11 @@
-use super::*;
 use proptest::{
     prelude::{any, prop},
     prop_assert_eq, prop_assert_ne, prop_assume, proptest,
 };
 use rand::{RngCore, SeedableRng};
 use rand_chacha::ChaCha20Rng;
+
+use super::*;
 
 // PROPERTY-BASED TESTS
 // ================================================================================================
@@ -30,6 +31,30 @@ proptest! {
 
         let encrypted = key.encrypt_with_nonce(&data, &associated_data, &nonce);
         let decrypted = key.decrypt(&encrypted, &nonce).unwrap();
+
+        prop_assert_eq!(data, decrypted);
+    }
+
+    #[test]
+    fn test_bytes_encryption_decryption_roundtrip(
+        seed in any::<u64>(),
+        associated_data_len in 0usize..1000,
+        data_len in 0usize..1000,
+    ) {
+        let mut rng = ChaCha20Rng::seed_from_u64(seed);
+        let key = SecretKey::with_rng(&mut rng);
+        let nonce = Nonce::with_rng(&mut rng);
+
+        // Generate random bytes
+        let mut associated_data = vec![0_u8; associated_data_len];
+        rng.fill_bytes(&mut associated_data);
+
+        let mut data = vec![0_u8; data_len];
+        rng.fill_bytes(&mut data);
+
+
+        let encrypted = key.encrypt_bytes_with_nonce(&data, &associated_data, &nonce);
+        let decrypted = key.decrypt_bytes(&encrypted, &nonce).unwrap();
 
         prop_assert_eq!(data, decrypted);
     }
@@ -190,6 +215,25 @@ fn test_encryption_various_lengths() {
 }
 
 #[test]
+fn test_bytes_encryption_various_lengths() {
+    let seed = [0_u8; 32];
+    let mut rng = ChaCha20Rng::from_seed(seed);
+    let key = SecretKey::with_rng(&mut rng);
+    let nonce = Nonce::with_rng(&mut rng);
+    let associated_data: Vec<u8> = vec![1; 8];
+
+    for len in [1, 7, 8, 9, 15, 16, 17, 31, 32, 35, 39, 54, 67, 100, 1000] {
+        let mut data = vec![0_u8; len];
+        rng.fill_bytes(&mut data);
+
+        let encrypted = key.encrypt_bytes_with_nonce(&data, &associated_data, &nonce);
+        let decrypted = key.decrypt_bytes(&encrypted, &nonce).unwrap();
+
+        assert_eq!(data, decrypted, "Failed for length {}", len);
+    }
+}
+
+#[test]
 fn test_ciphertext_tampering_detection() {
     let seed = [0_u8; 32];
     let mut rng = ChaCha20Rng::from_seed(seed);
@@ -267,8 +311,9 @@ fn test_wrong_nonce_detection() {
 
 #[cfg(test)]
 mod security_tests {
-    use super::*;
     use std::collections::HashSet;
+
+    use super::*;
 
     #[test]
     fn test_key_uniqueness() {
