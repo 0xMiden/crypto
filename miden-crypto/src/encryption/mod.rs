@@ -54,18 +54,6 @@ const PADDING_BLOCK: [Felt; RATE_WIDTH] = [ONE, ZERO, ZERO, ZERO, ZERO, ZERO, ZE
 // TYPES AND STRUCTURES
 // ================================================================================================
 
-/// A 256-bit secret key represented as 4 field elements
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct SecretKey([Felt; SECRET_KEY_SIZE]);
-
-/// A 256-bit nonce represented as 4 field elements
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Nonce([Felt; NONCE_SIZE]);
-
-/// An authentication tag represented as 4 field elements
-#[derive(Debug, Default, Clone, PartialEq, Eq)]
-pub struct AuthTag([Felt; AUTH_TAG_SIZE]);
-
 /// Encrypted data with its authentication tag
 #[derive(Debug, Default, Clone, PartialEq, Eq)]
 pub struct EncryptedData {
@@ -77,74 +65,13 @@ pub struct EncryptedData {
     pub auth_tag: AuthTag,
 }
 
-/// Internal sponge state
-struct SpongeState {
-    state: [Felt; STATE_WIDTH],
-}
+/// An authentication tag represented as 4 field elements
+#[derive(Debug, Default, Clone, PartialEq, Eq)]
+pub struct AuthTag([Felt; AUTH_TAG_SIZE]);
 
-impl SpongeState {
-    /// Creates a new sponge state
-    fn new() -> Self {
-        Self { state: [ZERO; STATE_WIDTH] }
-    }
-
-    /// Duplex interface as described in Algorithm 2 in [1] with `d = 0`
-    ///
-    ///
-    /// [1]: https://eprint.iacr.org/2023/1668
-    fn duplex_overwrite(&mut self, data: &[Felt]) {
-        self.permute();
-
-        let _ = self.squeeze_rate();
-
-        for (idx, &element) in data.iter().enumerate() {
-            self.state[RATE_START + idx] = element;
-        }
-    }
-
-    /// Duplex interface as described in Algorithm 2 in [1] with `d = 1`
-    ///
-    ///
-    /// [1]: https://eprint.iacr.org/2023/1668
-    fn duplex_add(&mut self, data: &[Felt]) -> [Felt; RATE_WIDTH] {
-        self.permute();
-
-        let squeezed_data = self.squeeze_rate();
-
-        for (idx, &element) in data.iter().enumerate() {
-            self.state[RATE_START + idx] += element;
-        }
-
-        squeezed_data
-    }
-
-    /// Squeezes an authentication tag
-    fn squeeze_tag(&mut self) -> AuthTag {
-        self.permute();
-        AuthTag(
-            self.state[RATE_RANGE_FIRST_HALF]
-                .try_into()
-                .expect("failed to convert to array"),
-        )
-    }
-
-    /// Applies the RPO permutation to the sponge state
-    fn permute(&mut self) {
-        Rpo256::apply_permutation(&mut self.state);
-    }
-
-    fn initialize(&mut self, sk: &SecretKey, nonce: &Nonce) {
-        self.state[RATE_RANGE_FIRST_HALF].copy_from_slice(&sk.0);
-        self.state[RATE_RANGE_SECOND_HALF].copy_from_slice(&nonce.0);
-    }
-
-    fn squeeze_rate(&self) -> [Felt; RATE_WIDTH] {
-        self.state[RATE_RANGE].try_into().unwrap()
-    }
-}
-
-// SECRET KEY IMPLEMENTATION
-// ================================================================================================
+/// A 256-bit secret key represented as 4 field elements
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SecretKey([Felt; SECRET_KEY_SIZE]);
 
 impl SecretKey {
     /// Creates a new random secret key using the default random number generator
@@ -265,6 +192,133 @@ impl SecretKey {
     }
 }
 
+impl Distribution<SecretKey> for StandardUniform {
+    fn sample<R: rand::Rng + ?Sized>(&self, rng: &mut R) -> SecretKey {
+        let mut res = [ZERO; SECRET_KEY_SIZE];
+        let uni_dist =
+            Uniform::new(0, Felt::MODULUS).expect("should not fail given the size of the field");
+        for r in res.iter_mut() {
+            let sampled_integer = uni_dist.sample(rng);
+            *r = Felt::new(sampled_integer);
+        }
+        SecretKey(res)
+    }
+}
+
+/// Internal sponge state
+struct SpongeState {
+    state: [Felt; STATE_WIDTH],
+}
+
+impl SpongeState {
+    /// Creates a new sponge state
+    fn new() -> Self {
+        Self { state: [ZERO; STATE_WIDTH] }
+    }
+
+    /// Duplex interface as described in Algorithm 2 in [1] with `d = 0`
+    ///
+    ///
+    /// [1]: https://eprint.iacr.org/2023/1668
+    fn duplex_overwrite(&mut self, data: &[Felt]) {
+        self.permute();
+
+        let _ = self.squeeze_rate();
+
+        for (idx, &element) in data.iter().enumerate() {
+            self.state[RATE_START + idx] = element;
+        }
+    }
+
+    /// Duplex interface as described in Algorithm 2 in [1] with `d = 1`
+    ///
+    ///
+    /// [1]: https://eprint.iacr.org/2023/1668
+    fn duplex_add(&mut self, data: &[Felt]) -> [Felt; RATE_WIDTH] {
+        self.permute();
+
+        let squeezed_data = self.squeeze_rate();
+
+        for (idx, &element) in data.iter().enumerate() {
+            self.state[RATE_START + idx] += element;
+        }
+
+        squeezed_data
+    }
+
+    /// Squeezes an authentication tag
+    fn squeeze_tag(&mut self) -> AuthTag {
+        self.permute();
+        AuthTag(
+            self.state[RATE_RANGE_FIRST_HALF]
+                .try_into()
+                .expect("failed to convert to array"),
+        )
+    }
+
+    /// Applies the RPO permutation to the sponge state
+    fn permute(&mut self) {
+        Rpo256::apply_permutation(&mut self.state);
+    }
+
+    fn initialize(&mut self, sk: &SecretKey, nonce: &Nonce) {
+        self.state[RATE_RANGE_FIRST_HALF].copy_from_slice(&sk.0);
+        self.state[RATE_RANGE_SECOND_HALF].copy_from_slice(&nonce.0);
+    }
+
+    fn squeeze_rate(&self) -> [Felt; RATE_WIDTH] {
+        self.state[RATE_RANGE].try_into().unwrap()
+    }
+}
+
+/// A 256-bit nonce represented as 4 field elements
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Nonce([Felt; NONCE_SIZE]);
+
+impl Nonce {
+    /// Creates a new random nonce using the provided random number generator
+    pub fn with_rng<R: Rng>(rng: &mut R) -> Self {
+        rng.sample(StandardUniform)
+    }
+}
+
+impl Distribution<Nonce> for StandardUniform {
+    fn sample<R: rand::Rng + ?Sized>(&self, rng: &mut R) -> Nonce {
+        let mut res = [ZERO; NONCE_SIZE];
+        let uni_dist =
+            Uniform::new(0, Felt::MODULUS).expect("should not fail given the size of the field");
+        for r in res.iter_mut() {
+            let sampled_integer = uni_dist.sample(rng);
+            *r = Felt::new(sampled_integer);
+        }
+        Nonce(res)
+    }
+}
+
+// ERROR TYPES
+// ================================================================================================
+
+/// Errors that can occur during encryption/decryption operations
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum EncryptionError {
+    /// Authentication tag verification failed
+    InvalidAuthTag,
+}
+
+impl fmt::Display for EncryptionError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            EncryptionError::InvalidAuthTag => write!(f, "Authentication tag verification failed"),
+        }
+    }
+}
+
+#[cfg(feature = "std")]
+impl std::error::Error for EncryptionError {}
+
+//  HELPERS
+// ================================================================================================
+
 /// Pads the associated data.
 fn pad_associated_data(associated_data: &[Felt]) -> Vec<Felt> {
     if associated_data.len() % RATE_WIDTH == 0 {
@@ -320,60 +374,3 @@ fn unpad(plaintext: &mut Vec<Felt>) {
 
     plaintext.truncate((num_blocks - 1) * RATE_WIDTH + position);
 }
-
-impl Distribution<SecretKey> for StandardUniform {
-    fn sample<R: rand::Rng + ?Sized>(&self, rng: &mut R) -> SecretKey {
-        let mut res = [ZERO; SECRET_KEY_SIZE];
-        let uni_dist =
-            Uniform::new(0, Felt::MODULUS).expect("should not fail given the size of the field");
-        for r in res.iter_mut() {
-            let sampled_integer = uni_dist.sample(rng);
-            *r = Felt::new(sampled_integer);
-        }
-        SecretKey(res)
-    }
-}
-
-// NONCE IMPLEMENTATION
-// ================================================================================================
-
-impl Nonce {
-    /// Creates a new random nonce using the provided random number generator
-    pub fn with_rng<R: Rng>(rng: &mut R) -> Self {
-        rng.sample(StandardUniform)
-    }
-}
-
-impl Distribution<Nonce> for StandardUniform {
-    fn sample<R: rand::Rng + ?Sized>(&self, rng: &mut R) -> Nonce {
-        let mut res = [ZERO; NONCE_SIZE];
-        let uni_dist =
-            Uniform::new(0, Felt::MODULUS).expect("should not fail given the size of the field");
-        for r in res.iter_mut() {
-            let sampled_integer = uni_dist.sample(rng);
-            *r = Felt::new(sampled_integer);
-        }
-        Nonce(res)
-    }
-}
-
-// ERROR TYPES
-// ================================================================================================
-
-/// Errors that can occur during encryption/decryption operations
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum EncryptionError {
-    /// Authentication tag verification failed
-    InvalidAuthTag,
-}
-
-impl fmt::Display for EncryptionError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            EncryptionError::InvalidAuthTag => write!(f, "Authentication tag verification failed"),
-        }
-    }
-}
-
-#[cfg(feature = "std")]
-impl std::error::Error for EncryptionError {}
