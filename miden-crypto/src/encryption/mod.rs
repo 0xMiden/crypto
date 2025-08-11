@@ -1,8 +1,7 @@
 use alloc::vec::Vec;
-use num::Integer;
-
 use core::{fmt, ops::Range};
 
+use num::Integer;
 use rand::{
     Rng,
     distr::{Distribution, StandardUniform, Uniform},
@@ -54,6 +53,9 @@ const RATE_START: usize = Rpo256::RATE_RANGE.start;
 /// Padding block used when the length of the data to encrypt is a multiple of `RATE_WIDTH`
 const PADDING_BLOCK: [Felt; RATE_WIDTH] = [ONE, ZERO, ZERO, ZERO, ZERO, ZERO, ZERO, ZERO];
 
+/// Number of bytes to pack into one field element
+const BINARY_CHUNK_SIZE: usize = 7;
+
 // TYPES AND STRUCTURES
 // ================================================================================================
 
@@ -79,6 +81,7 @@ pub struct SecretKey([Felt; SECRET_KEY_SIZE]);
 impl SecretKey {
     /// Creates a new random secret key using the default random number generator
     #[cfg(feature = "std")]
+    #[allow(clippy::new_without_default)]
     pub fn new() -> Self {
         use rand::{SeedableRng, rngs::StdRng};
         let mut rng = StdRng::from_os_rng();
@@ -91,7 +94,7 @@ impl SecretKey {
         rng.sample(StandardUniform)
     }
 
-    /// Encrypts the provided data using this secret key and a random nonce
+    /// Encrypts the provided data, as Felt-s, using this secret key and a random nonce
     #[cfg(feature = "std")]
     pub fn encrypt(&self, data: &[Felt], associated_data: &[Felt]) -> EncryptedData {
         use rand::{SeedableRng, rngs::StdRng};
@@ -99,6 +102,16 @@ impl SecretKey {
         let nonce = Nonce::with_rng(&mut rng);
 
         self.encrypt_with_nonce(data, associated_data, &nonce)
+    }
+
+    /// Encrypts the provided data, as bytes, using this secret key and a random nonce
+    #[cfg(feature = "std")]
+    pub fn encrypt_bytes(&self, data: &[u8], associated_data: &[u8]) -> EncryptedData {
+        use rand::{SeedableRng, rngs::StdRng};
+        let mut rng = StdRng::from_os_rng();
+        let nonce = Nonce::with_rng(&mut rng);
+
+        self.encrypt_bytes_with_nonce(data, associated_data, &nonce)
     }
 
     /// Encrypts the provided data using this secret key and a specified nonce
@@ -114,7 +127,7 @@ impl SecretKey {
         let mut sponge = SpongeState::new();
 
         // Initialize with key and nonce
-        sponge.initialize(&self, nonce);
+        sponge.initialize(self, nonce);
 
         // Process the associated data
         let padded_associated_data = pad_associated_data(associated_data);
@@ -145,6 +158,19 @@ impl SecretKey {
             associated_data: associated_data.into(),
             auth_tag,
         }
+    }
+
+    /// Encrypts the provided data, as bytes, using this secret key and a specified nonce
+    pub fn encrypt_bytes_with_nonce(
+        &self,
+        data: &[u8],
+        associated_data: &[u8],
+        nonce: &Nonce,
+    ) -> EncryptedData {
+        let data_felt = bytes_to_felts(data);
+        let ad_felt = bytes_to_felts(associated_data);
+
+        self.encrypt_with_nonce(&data_felt, &ad_felt, nonce)
     }
 
     /// Decrypts the provided encrypted data using this secret key
@@ -179,7 +205,7 @@ impl SecretKey {
                 let plaintext_felt = ciphertext_felt - keystream[i];
                 plaintext.push(plaintext_felt);
             }
-            sponge.state[RATE_RANGE].copy_from_slice(&ciphertext_data_block);
+            sponge.state[RATE_RANGE].copy_from_slice(ciphertext_data_block);
         });
 
         // Verify authentication tag
@@ -192,6 +218,17 @@ impl SecretKey {
         unpad(&mut plaintext);
 
         Ok(plaintext)
+    }
+
+    /// Decrypts the provided encrypted data, as bytes, using this secret key
+    pub fn decrypt_bytes(
+        &self,
+        encrypted_data: &EncryptedData,
+        nonce: &Nonce,
+    ) -> Result<Vec<u8>, EncryptionError> {
+        let data_felts = self.decrypt(encrypted_data, nonce)?;
+
+        Ok(felts_to_bytes(&data_felts))
     }
 }
 
@@ -324,17 +361,78 @@ impl std::error::Error for EncryptionError {}
 //  HELPERS
 // ================================================================================================
 
+/// Converts bytes to field elements
+fn bytes_to_felts(bytes: &[u8]) -> Vec<Felt> {
+    if bytes.is_empty() {
+        return vec![];
+    }
+
+    // determine the number of field elements needed to encode `bytes` when each field element
+    // represents at most 7 bytes.
+    let num_field_elem = bytes.len().div_ceil(BINARY_CHUNK_SIZE);
+
+    // initialize a buffer to receive the little-endian elements.
+    let mut buf = [0_u8; 8];
+
+    // iterate the chunks of bytes, creating a field element from each chunk
+    let mut current_chunk_idx = 0_usize;
+    let last_chunk_idx = num_field_elem - 1;
+
+    bytes
+        .chunks(BINARY_CHUNK_SIZE)
+        .map(|chunk| {
+            // copy the chunk into the buffer
+            if current_chunk_idx != last_chunk_idx {
+                buf[..BINARY_CHUNK_SIZE].copy_from_slice(chunk);
+            } else {
+                // on the last iteration, we pad `buf` with a 1 followed by as many 0's as are
+                // needed to fill it
+                buf.fill(0);
+                buf[..chunk.len()].copy_from_slice(chunk);
+                buf[chunk.len()] = 1;
+            }
+            current_chunk_idx += 1;
+
+            Felt::new(u64::from_le_bytes(buf))
+        })
+        .collect()
+}
+
+/// Converts field elements back to bytes
+fn felts_to_bytes(felts: &[Felt]) -> Vec<u8> {
+    let number_felts = felts.len();
+    if number_felts == 0 {
+        return vec![];
+    }
+
+    let mut result = Vec::with_capacity(number_felts * BINARY_CHUNK_SIZE);
+    for felt in felts.iter().take(number_felts - 1) {
+        let felt_bytes = felt.as_int().to_le_bytes();
+        result.extend_from_slice(&felt_bytes[..BINARY_CHUNK_SIZE]);
+    }
+
+    // handle the last field element
+    let felt_bytes = felts[number_felts - 1].as_int().to_le_bytes();
+    let pos = felt_bytes
+        .iter()
+        .rposition(|entry| *entry == 1_u8)
+        .expect("padding with ONE is missing");
+
+    result.extend_from_slice(&felt_bytes[..pos]);
+    result
+}
+
 /// Pads the associated data.
 fn pad_associated_data(associated_data: &[Felt]) -> Vec<Felt> {
-    if associated_data.len() % RATE_WIDTH == 0 {
-        return associated_data.to_vec();
+    if associated_data.len().is_multiple_of(RATE_WIDTH) {
+        associated_data.to_vec()
     } else {
         let mut result = associated_data.to_vec();
 
-        while result.len() % RATE_WIDTH != 0 {
+        while !result.len().is_multiple_of(RATE_WIDTH) {
             result.push(ZERO)
         }
-        return result;
+        result
     }
 }
 
@@ -342,20 +440,17 @@ fn pad_associated_data(associated_data: &[Felt]) -> Vec<Felt> {
 fn finalize_encryption(sponge: &mut SpongeState, remaining_data: &[Felt]) -> Vec<Felt> {
     let mut ciphertext = Vec::with_capacity(RATE_WIDTH);
 
-    if remaining_data.len() == 0 {
+    if remaining_data.is_empty() {
         let keystream = sponge.duplex_add(&PADDING_BLOCK);
         for (i, &plaintext_felt) in PADDING_BLOCK.iter().enumerate() {
             ciphertext.push(plaintext_felt + keystream[i]);
         }
     } else {
-        debug_assert!(1 <= remaining_data.len() && remaining_data.len() < RATE_WIDTH);
+        debug_assert!(!remaining_data.is_empty() && remaining_data.len() < RATE_WIDTH);
         let mut chunk = [ZERO; RATE_WIDTH];
         remaining_data.iter().enumerate().for_each(|(idx, entry)| chunk[idx] = *entry);
         chunk[remaining_data.len()] = ONE;
 
-        for i in (remaining_data.len() + 1)..RATE_WIDTH {
-            chunk[i] = ZERO
-        }
         let keystream = sponge.duplex_add(&chunk);
         for (i, &plaintext_felt) in chunk.iter().enumerate() {
             ciphertext.push(plaintext_felt + keystream[i]);
