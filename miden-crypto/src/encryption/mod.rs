@@ -136,7 +136,7 @@ impl SecretKey {
         });
 
         // Encrypt the data
-        let mut ciphertext = Vec::with_capacity(data.len());
+        let mut ciphertext = Vec::with_capacity(data.len() + RATE_WIDTH);
         let mut data_block_iterator = data.chunks_exact(RATE_WIDTH);
 
         data_block_iterator.by_ref().for_each(|data_block| {
