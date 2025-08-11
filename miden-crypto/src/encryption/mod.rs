@@ -179,7 +179,9 @@ impl SecretKey {
         encrypted_data: &EncryptedData,
         nonce: &Nonce,
     ) -> Result<Vec<Felt>, EncryptionError> {
-        assert_eq!(encrypted_data.ciphertext.len() % RATE_WIDTH, 0);
+        if !encrypted_data.ciphertext.len().is_multiple_of(RATE_WIDTH) {
+            return Err(EncryptionError::CiphertextLenNotMultipleRate);
+        }
 
         if encrypted_data.ciphertext.is_empty() {
             return Ok(vec![]);
@@ -215,7 +217,7 @@ impl SecretKey {
         }
 
         // Remove padding
-        unpad(&mut plaintext);
+        unpad(&mut plaintext)?;
 
         Ok(plaintext)
     }
@@ -228,7 +230,7 @@ impl SecretKey {
     ) -> Result<Vec<u8>, EncryptionError> {
         let data_felts = self.decrypt(encrypted_data, nonce)?;
 
-        Ok(felts_to_bytes(&data_felts))
+        felts_to_bytes(&data_felts)
     }
 }
 
@@ -345,12 +347,20 @@ impl Distribution<Nonce> for StandardUniform {
 pub enum EncryptionError {
     /// Authentication tag verification failed
     InvalidAuthTag,
+    /// Ciphertext length, in field elements, is not a multiple of `RATE_WIDTH`
+    CiphertextLenNotMultipleRate,
+    /// Padding is malformed
+    MalformedPadding,
 }
 
 impl fmt::Display for EncryptionError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            EncryptionError::InvalidAuthTag => write!(f, "Authentication tag verification failed"),
+            EncryptionError::InvalidAuthTag => write!(f, "authentication tag verification failed"),
+            EncryptionError::CiphertextLenNotMultipleRate => {
+                write!(f, "ciphertext length, in field elements, is not a multiple of `RATE_WIDTH`")
+            },
+            EncryptionError::MalformedPadding => write!(f, "padding is malformed"),
         }
     }
 }
@@ -399,10 +409,10 @@ fn bytes_to_felts(bytes: &[u8]) -> Vec<Felt> {
 }
 
 /// Converts field elements back to bytes
-fn felts_to_bytes(felts: &[Felt]) -> Vec<u8> {
+fn felts_to_bytes(felts: &[Felt]) -> Result<Vec<u8>, EncryptionError> {
     let number_felts = felts.len();
     if number_felts == 0 {
-        return vec![];
+        return Ok(vec![]);
     }
 
     let mut result = Vec::with_capacity(number_felts * BINARY_CHUNK_SIZE);
@@ -413,13 +423,13 @@ fn felts_to_bytes(felts: &[Felt]) -> Vec<u8> {
 
     // handle the last field element
     let felt_bytes = felts[number_felts - 1].as_int().to_le_bytes();
-    let pos = felt_bytes
-        .iter()
-        .rposition(|entry| *entry == 1_u8)
-        .expect("padding with ONE is missing");
+    let pos = match felt_bytes.iter().rposition(|entry| *entry == 1_u8) {
+        Some(pos) => pos,
+        None => return Err(EncryptionError::MalformedPadding),
+    };
 
     result.extend_from_slice(&felt_bytes[..pos]);
-    result
+    Ok(result)
 }
 
 /// Pads the associated data.
@@ -461,16 +471,18 @@ fn finalize_encryption(sponge: &mut SpongeState, remaining_data: &[Felt]) -> Vec
 }
 
 /// Removes the padding from the decoded ciphertext.
-fn unpad(plaintext: &mut Vec<Felt>) {
+fn unpad(plaintext: &mut Vec<Felt>) -> Result<(), EncryptionError> {
     let (num_blocks, remainder) = plaintext.len().div_rem(&RATE_WIDTH);
     assert_eq!(remainder, 0);
 
     let final_block: &[Felt; RATE_WIDTH] = plaintext.last_chunk().expect("plaintext is empty");
 
-    let position = final_block
-        .iter()
-        .rposition(|entry| *entry == ONE)
-        .expect("padding with ONE is missing");
+    let pos = match final_block.iter().rposition(|entry| *entry == ONE) {
+        Some(pos) => pos,
+        None => return Err(EncryptionError::MalformedPadding),
+    };
 
-    plaintext.truncate((num_blocks - 1) * RATE_WIDTH + position);
+    plaintext.truncate((num_blocks - 1) * RATE_WIDTH + pos);
+
+    Ok(())
 }
