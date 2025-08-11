@@ -1,8 +1,10 @@
 use std::hint::black_box;
 
 use criterion::{BenchmarkId, Criterion, Throughput, criterion_group, criterion_main};
-use miden_crypto::Felt;
-use miden_crypto::encryption::rpo::{Nonce, SecretKey};
+use miden_crypto::{
+    Felt,
+    encryption::{Nonce, SecretKey},
+};
 use rand::{RngCore, SeedableRng};
 use rand_chacha::ChaCha20Rng;
 
