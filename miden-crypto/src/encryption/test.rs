@@ -13,6 +13,7 @@ proptest! {
     #[test]
     fn test_encryption_decryption_roundtrip(
         seed in any::<u64>(),
+        associated_data_len in 1usize..100,
         data_len in 1usize..100,
     ) {
         let mut rng = ChaCha20Rng::seed_from_u64(seed);
@@ -20,11 +21,14 @@ proptest! {
         let nonce = Nonce::with_rng(&mut rng);
 
         // Generate random field elements
+        let associated_data: Vec<Felt> = (0..associated_data_len)
+            .map(|_| Felt::new(rng.next_u64()))
+            .collect();
         let data: Vec<Felt> = (0..data_len)
             .map(|_| Felt::new(rng.next_u64()))
             .collect();
 
-        let encrypted = key.encrypt_with_nonce(&data, &nonce);
+        let encrypted = key.encrypt_with_nonce(&data, &associated_data, &nonce);
         let decrypted = key.decrypt(&encrypted, &nonce).unwrap();
 
         prop_assert_eq!(data, decrypted);
@@ -34,7 +38,8 @@ proptest! {
     fn test_different_keys_different_outputs(
         seed1 in any::<u64>(),
         seed2 in any::<u64>(),
-        data in prop::collection::vec(any::<u64>(), 1..50),
+        associated_data in prop::collection::vec(any::<u64>(), 1..500),
+        data in prop::collection::vec(any::<u64>(), 1..500),
     ) {
         prop_assume!(seed1 != seed2);
 
@@ -45,12 +50,15 @@ proptest! {
         let key2 = SecretKey::with_rng(&mut rng2);
         let nonce = Nonce::with_rng(&mut rng1);
 
+        let associated_data: Vec<Felt> = associated_data.into_iter()
+            .map(|x| Felt::new(x))
+            .collect();
         let data: Vec<Felt> = data.into_iter()
             .map(|x| Felt::new(x))
             .collect();
 
-        let encrypted1 = key1.encrypt_with_nonce(&data, &nonce);
-        let encrypted2 = key2.encrypt_with_nonce(&data, &nonce);
+        let encrypted1 = key1.encrypt_with_nonce(&data, &associated_data, &nonce);
+        let encrypted2 = key2.encrypt_with_nonce(&data, &associated_data, &nonce);
 
         // Different keys should produce different ciphertexts
         prop_assert_ne!(encrypted1.ciphertext, encrypted2.ciphertext);
@@ -60,6 +68,7 @@ proptest! {
     #[test]
     fn test_different_nonces_different_outputs(
         seed in any::<u64>(),
+        associated_data in prop::collection::vec(any::<u64>(), 1..50),
         data in prop::collection::vec(any::<u64>(), 1..50),
     ) {
         let mut rng = ChaCha20Rng::seed_from_u64(seed);
@@ -67,12 +76,15 @@ proptest! {
         let nonce1 = Nonce::with_rng(&mut rng);
         let nonce2 = Nonce::with_rng(&mut rng);
 
+        let associated_data: Vec<Felt> = associated_data.into_iter()
+            .map(|x| Felt::new(x ))
+            .collect();
         let data: Vec<Felt> = data.into_iter()
             .map(|x| Felt::new(x ))
             .collect();
 
-        let encrypted1 = key.encrypt_with_nonce(&data, &nonce1);
-        let encrypted2 = key.encrypt_with_nonce(&data, &nonce2);
+        let encrypted1 = key.encrypt_with_nonce(&data,&associated_data, &nonce1);
+        let encrypted2 = key.encrypt_with_nonce(&data, &associated_data, &nonce2);
 
         // Different nonces should produce different ciphertexts (with very high probability)
         if nonce1 != nonce2 {
@@ -115,8 +127,9 @@ fn test_empty_data_encryption() {
     let key = SecretKey::with_rng(&mut rng);
     let nonce = Nonce::with_rng(&mut rng);
 
+    let associated_data: Vec<Felt> = vec![ONE; 8];
     let empty_data: Vec<Felt> = vec![];
-    let encrypted = key.encrypt_with_nonce(&empty_data, &nonce);
+    let encrypted = key.encrypt_with_nonce(&empty_data, &associated_data, &nonce);
     let decrypted = key.decrypt(&encrypted, &nonce).unwrap();
 
     assert_eq!(empty_data, decrypted);
@@ -131,8 +144,9 @@ fn test_single_element_encryption() {
     let key = SecretKey::with_rng(&mut rng);
     let nonce = Nonce::with_rng(&mut rng);
 
+    let associated_data: Vec<Felt> = vec![ONE; 8];
     let data = vec![Felt::new(42)];
-    let encrypted = key.encrypt_with_nonce(&data, &nonce);
+    let encrypted = key.encrypt_with_nonce(&data, &associated_data, &nonce);
     let decrypted = key.decrypt(&encrypted, &nonce).unwrap();
 
     assert_eq!(data, decrypted);
@@ -147,10 +161,11 @@ fn test_large_data_encryption() {
     let key = SecretKey::with_rng(&mut rng);
     let nonce = Nonce::with_rng(&mut rng);
 
+    let associated_data: Vec<Felt> = vec![ONE; 8];
     // Test with data larger than rate
     let data: Vec<Felt> = (0..100).map(|i| Felt::new(i as u64)).collect();
 
-    let encrypted = key.encrypt_with_nonce(&data, &nonce);
+    let encrypted = key.encrypt_with_nonce(&data, &associated_data, &nonce);
     let decrypted = key.decrypt(&encrypted, &nonce).unwrap();
 
     assert_eq!(data, decrypted);
@@ -162,11 +177,12 @@ fn test_encryption_various_lengths() {
     let mut rng = ChaCha20Rng::from_seed(seed);
     let key = SecretKey::with_rng(&mut rng);
     let nonce = Nonce::with_rng(&mut rng);
+    let associated_data: Vec<Felt> = vec![ONE; 8];
 
     for len in [1, 7, 8, 9, 15, 16, 17, 31, 32, 35, 39, 54, 67, 100, 1000] {
         let data: Vec<Felt> = (0..len).map(|i| Felt::new(i as u64)).collect();
 
-        let encrypted = key.encrypt_with_nonce(&data, &nonce);
+        let encrypted = key.encrypt_with_nonce(&data, &associated_data, &nonce);
         let decrypted = key.decrypt(&encrypted, &nonce).unwrap();
 
         assert_eq!(data, decrypted, "Failed for length {}", len);
@@ -181,8 +197,9 @@ fn test_ciphertext_tampering_detection() {
     let key = SecretKey::with_rng(&mut rng);
     let nonce = Nonce::with_rng(&mut rng);
 
+    let associated_data: Vec<Felt> = vec![ONE; 8];
     let data = vec![Felt::new(123), Felt::new(456)];
-    let mut encrypted = key.encrypt_with_nonce(&data, &nonce);
+    let mut encrypted = key.encrypt_with_nonce(&data, &associated_data, &nonce);
 
     // Tamper with ciphertext
     encrypted.ciphertext[0] += ONE;
@@ -198,8 +215,9 @@ fn test_auth_tag_tampering_detection() {
     let key = SecretKey::with_rng(&mut rng);
     let nonce = Nonce::with_rng(&mut rng);
 
+    let associated_data: Vec<Felt> = vec![ONE; 8];
     let data = vec![Felt::new(123), Felt::new(456)];
-    let mut encrypted = key.encrypt_with_nonce(&data, &nonce);
+    let mut encrypted = key.encrypt_with_nonce(&data, &associated_data, &nonce);
 
     // Tamper with auth tag
     let mut tampered_tag = encrypted.auth_tag.0;
@@ -218,8 +236,9 @@ fn test_wrong_key_detection() {
     let key2 = SecretKey::with_rng(&mut rng);
     let nonce = Nonce::with_rng(&mut rng);
 
+    let associated_data: Vec<Felt> = vec![ONE; 8];
     let data = vec![Felt::new(123), Felt::new(456)];
-    let encrypted = key1.encrypt_with_nonce(&data, &nonce);
+    let encrypted = key1.encrypt_with_nonce(&data, &associated_data, &nonce);
 
     // Try to decrypt with wrong key
     let result = key2.decrypt(&encrypted, &nonce);
@@ -234,8 +253,9 @@ fn test_wrong_nonce_detection() {
     let nonce1 = Nonce::with_rng(&mut rng);
     let nonce2 = Nonce::with_rng(&mut rng);
 
+    let associated_data: Vec<Felt> = vec![ONE; 8];
     let data = vec![Felt::new(123), Felt::new(456)];
-    let encrypted = key.encrypt_with_nonce(&data, &nonce1);
+    let encrypted = key.encrypt_with_nonce(&data, &associated_data, &nonce1);
 
     // Try to decrypt with wrong nonce
     let result = key.decrypt(&encrypted, &nonce2);
@@ -285,12 +305,13 @@ mod security_tests {
         let key = SecretKey::with_rng(&mut rng);
 
         // Encrypt the same plaintext with different nonces
+        let associated_data: Vec<Felt> = vec![ONE; 8];
         let plaintext = vec![ZERO; 10]; // All zeros
         let mut ciphertexts = Vec::new();
 
         for _ in 0..100 {
             let nonce = Nonce::with_rng(&mut rng);
-            let encrypted = key.encrypt_with_nonce(&plaintext, &nonce);
+            let encrypted = key.encrypt_with_nonce(&plaintext, &associated_data, &nonce);
             ciphertexts.push(encrypted.ciphertext);
         }
 
