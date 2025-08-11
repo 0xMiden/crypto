@@ -28,6 +28,9 @@ pub const AUTH_TAG_SIZE: usize = 4;
 /// Size of the sponge state field elements
 const STATE_WIDTH: usize = Rpo256::STATE_WIDTH;
 
+/// Capacity portion of the sponge state.
+const CAPACITY_RANGE: Range<usize> = Rpo256::CAPACITY_RANGE;
+
 /// Rate portion of the sponge state
 const RATE_RANGE: Range<usize> = Rpo256::RATE_RANGE;
 
@@ -223,8 +226,10 @@ impl SpongeState {
     fn duplex_overwrite(&mut self, data: &[Felt]) {
         self.permute();
 
-        let _ = self.squeeze_rate();
+        // add 1 to the first capacity element
+        self.state[CAPACITY_RANGE.start] += ONE;
 
+        // overwrite the rate portion with `data`
         for (idx, &element) in data.iter().enumerate() {
             self.state[RATE_START + idx] = element;
         }
