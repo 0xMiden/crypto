@@ -9,7 +9,8 @@
 - `Smt.insert_inner_nodes` does not store empty subtrees ([#452](https://github.com/0xMiden/crypto/pull/452)).
 - Optimized `Smt::num_entries()` ([#455](https://github.com/0xMiden/crypto/pull/455)).
 - [BREAKING] Disallow leaves with more than 2^16 entries ([#455](https://github.com/0xMiden/crypto/pull/455), [#462](https://github.com/0xMiden/crypto/pull/462)).
-- [BREAKING] Modified the public key in Falcon DSA to be the polynomial instead of the commitment ([#460])(https://github.com/0xMiden/crypto/pull/460).
+- [BREAKING] Modified the public key in Falcon DSA to be the polynomial instead of the commitment ([#460](https://github.com/0xMiden/crypto/pull/460)).
+-  Arithmetization oriented authenticated encryption with associated data (AEAD) ([#480](https://github.com/0xMiden/crypto/pull/480)) 
 
 # 0.15.9 (2025-07-24)
 
