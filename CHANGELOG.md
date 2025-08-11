@@ -23,6 +23,7 @@
 - Validate `NodeIndex` depth ([#482](https://github.com/0xMiden/crypto/pull/482)).
 - [BREAKING] Rename `ValuePath` to `MerkleProof` ([#483](https://github.com/0xMiden/crypto/pull/483)).
 - Added an implementation of Keccak256 hash function ([#487](https://github.com/0xMiden/crypto/pull/487)).
+-  Arithmetization oriented authenticated encryption with associated data (AEAD) ([#480](https://github.com/0xMiden/crypto/pull/480)) 
 
 # 0.15.9 (2025-07-24)
 
