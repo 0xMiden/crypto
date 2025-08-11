@@ -1,15 +1,14 @@
-use core::fmt;
-use core::ops::Range;
-
 use alloc::vec::Vec;
-
 use num::Integer;
-use rand::Rng;
-use rand::distr::{Distribution, StandardUniform, Uniform};
-use winter_math::StarkField;
 
-use crate::hash::rpo::Rpo256;
-use crate::{Felt, ONE, ZERO};
+use core::{fmt, ops::Range};
+
+use rand::{
+    Rng,
+    distr::{Distribution, StandardUniform, Uniform},
+};
+
+use crate::{Felt, ONE, StarkField, ZERO, hash::rpo::Rpo256};
 
 #[cfg(test)]
 mod test;
@@ -70,6 +69,8 @@ pub struct AuthTag([Felt; AUTH_TAG_SIZE]);
 /// Encrypted data with its authentication tag
 #[derive(Debug, Default, Clone, PartialEq, Eq)]
 pub struct EncryptedData {
+    /// The associated data
+    pub associated_data: Vec<Felt>,
     /// The encrypted ciphertext
     pub ciphertext: Vec<Felt>,
     /// The authentication tag
@@ -162,16 +163,21 @@ impl SecretKey {
 
     /// Encrypts the provided data using this secret key and a random nonce
     #[cfg(feature = "std")]
-    pub fn encrypt(&self, data: &[Felt]) -> EncryptedData {
+    pub fn encrypt(&self, data: &[Felt], associated_data: &[Felt]) -> EncryptedData {
         use rand::{SeedableRng, rngs::StdRng};
         let mut rng = StdRng::from_os_rng();
         let nonce = Nonce::with_rng(&mut rng);
 
-        self.encrypt_with_nonce(data, &nonce)
+        self.encrypt_with_nonce(data, associated_data, &nonce)
     }
 
     /// Encrypts the provided data using this secret key and a specified nonce
-    pub fn encrypt_with_nonce(&self, data: &[Felt], nonce: &Nonce) -> EncryptedData {
+    pub fn encrypt_with_nonce(
+        &self,
+        data: &[Felt],
+        associated_data: &[Felt],
+        nonce: &Nonce,
+    ) -> EncryptedData {
         if data.is_empty() {
             return EncryptedData::default();
         }
@@ -179,6 +185,12 @@ impl SecretKey {
 
         // Initialize with key and nonce
         sponge.initialize(&self, nonce);
+
+        // Process the associated data
+        let padded_associated_data = pad_associated_data(associated_data);
+        padded_associated_data.chunks(RATE_WIDTH).for_each(|chunk| {
+            sponge.duplex_overwrite(chunk);
+        });
 
         // Encrypt the data
         let mut ciphertext = Vec::with_capacity(data.len());
@@ -198,7 +210,11 @@ impl SecretKey {
 
         let auth_tag = sponge.squeeze_tag();
 
-        EncryptedData { ciphertext, auth_tag }
+        EncryptedData {
+            ciphertext,
+            associated_data: associated_data.into(),
+            auth_tag,
+        }
     }
 
     /// Decrypts the provided encrypted data using this secret key
@@ -207,15 +223,22 @@ impl SecretKey {
         encrypted_data: &EncryptedData,
         nonce: &Nonce,
     ) -> Result<Vec<Felt>, EncryptionError> {
-        let mut sponge = SpongeState::new();
+        assert_eq!(encrypted_data.ciphertext.len() % RATE_WIDTH, 0);
 
         if encrypted_data.ciphertext.is_empty() {
             return Ok(vec![]);
         }
-        assert_eq!(encrypted_data.ciphertext.len() % RATE_WIDTH, 0);
+
+        let mut sponge = SpongeState::new();
 
         // Initialize with key and nonce (same as encryption)
         sponge.initialize(self, nonce);
+
+        // Process the associated data
+        let padded_associated_data = pad_associated_data(&encrypted_data.associated_data);
+        padded_associated_data.chunks(RATE_WIDTH).for_each(|chunk| {
+            sponge.duplex_overwrite(chunk);
+        });
 
         // Decrypt the data
         let mut plaintext = Vec::with_capacity(encrypted_data.ciphertext.len());
@@ -239,6 +262,20 @@ impl SecretKey {
         unpad(&mut plaintext);
 
         Ok(plaintext)
+    }
+}
+
+/// Pads the associated data.
+fn pad_associated_data(associated_data: &[Felt]) -> Vec<Felt> {
+    if associated_data.len() % RATE_WIDTH == 0 {
+        return associated_data.to_vec();
+    } else {
+        let mut result = associated_data.to_vec();
+
+        while result.len() % RATE_WIDTH != 0 {
+            result.push(ZERO)
+        }
+        return result;
     }
 }
 
