@@ -68,6 +68,7 @@ std = [
 [dependencies]
 blake3 = { version = "1.8", default-features = false }
 clap = { version = "4.5", optional = true, features = ["derive"] }
+aes-gcm = { version = "0.10", features = ["alloc", "stream"] }
 hashbrown = { version = "0.15", optional = true, features = ["serde"] }
 num = { version = "0.4", default-features = false, features = ["alloc", "libm"] }
 num-complex = { version = "0.4", default-features = false }
