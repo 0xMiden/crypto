@@ -128,7 +128,7 @@ impl SecretKey {
     pub fn get_shared_secret(&self, pk_e: EphemeralPublicKey) -> SharedSecret {
         let shared_secret_inner = diffie_hellman(self.inner.as_nonzero_scalar(), pk_e.as_affine());
 
-        SharedSecret::from_inner(shared_secret_inner)
+        SharedSecret::new(shared_secret_inner)
     }
 }
 

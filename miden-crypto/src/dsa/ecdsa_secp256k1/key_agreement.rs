@@ -4,19 +4,30 @@
 //! scenario. Namely, when the sender knows the (static) public key of the receiver and it
 //! uses that, together with an ephemeral secret key that it generates, to derive a shared
 //! secret.
+//!
 //! This shared secret will then be used to encrypt some message (using for example a key
 //! derivation function).
+//!
 //! The public key associated with the ephemeral secret key will be sent alongside the encrypted
 //! message.
+
+use alloc::string::ToString;
 
 use hkdf::{Hkdf, hmac::SimpleHmac};
 use k256::{
     AffinePoint,
-    elliptic_curve::rand_core::{CryptoRng, RngCore},
+    elliptic_curve::{
+        rand_core::{CryptoRng, RngCore},
+        sec1::ToEncodedPoint,
+    },
     sha2::Sha256,
 };
 
 use super::PublicKey;
+use crate::{
+    dsa::ecdsa_secp256k1::PUBLIC_KEY_BYTES,
+    utils::{ByteReader, ByteWriter, Deserializable, DeserializationError, Serializable},
+};
 
 /// A shared secret computed using the ECDH (Elliptic Curve Diffie-Hellman) key agreement.
 pub struct SharedSecret {
@@ -26,28 +37,15 @@ pub struct SharedSecret {
 impl SharedSecret {
     /// Returns a HKDF (HMAC-based Extract-and-Expand Key Derivation Function) that can be used
     /// to extract entropy from the shared secret.
+    ///
     /// This basically converts a shared secret into uniformly random values that are appropriate
     /// for use as key material.
     pub fn extract<D>(&self, salt: Option<&[u8]>) -> Hkdf<Sha256, SimpleHmac<Sha256>> {
         self.inner.extract(salt)
     }
 
-    pub(crate) fn from_inner(inner: k256::ecdh::SharedSecret) -> SharedSecret {
+    pub(crate) fn new(inner: k256::ecdh::SharedSecret) -> SharedSecret {
         Self { inner }
-    }
-}
-
-/// Ephemeral public key for ECDH key agreement over secp256k1 curve.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct EphemeralPublicKey {
-    inner: k256::PublicKey,
-}
-
-impl EphemeralPublicKey {
-    /// Returns a reference to this ephemeral public key as an elliptic curve point in affine
-    /// coordinates.
-    pub fn as_affine(&self) -> &AffinePoint {
-        self.inner.as_affine()
     }
 }
 
@@ -73,7 +71,7 @@ impl EphemeralSecretKey {
     }
 
     /// Gets the corresponding ephemeral public key for this ephemeral secret key.
-    pub fn ephemeral_public_key(&self) -> EphemeralPublicKey {
+    pub fn public_key(&self) -> EphemeralPublicKey {
         let pk = self.inner.public_key();
         EphemeralPublicKey { inner: pk }
     }
@@ -87,11 +85,48 @@ impl EphemeralSecretKey {
     }
 }
 
+/// Ephemeral public key for ECDH key agreement over secp256k1 curve.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct EphemeralPublicKey {
+    inner: k256::PublicKey,
+}
+
+impl EphemeralPublicKey {
+    /// Returns a reference to this ephemeral public key as an elliptic curve point in affine
+    /// coordinates.
+    pub fn as_affine(&self) -> &AffinePoint {
+        self.inner.as_affine()
+    }
+}
+
+impl Serializable for EphemeralPublicKey {
+    fn write_into<W: ByteWriter>(&self, target: &mut W) {
+        // Compressed format
+        let encoded = self.inner.to_encoded_point(true);
+
+        target.write_bytes(encoded.as_bytes());
+    }
+}
+
+impl Deserializable for EphemeralPublicKey {
+    fn read_from<R: ByteReader>(source: &mut R) -> Result<Self, DeserializationError> {
+        let bytes: [u8; PUBLIC_KEY_BYTES] = source.read_array()?;
+
+        let inner = k256::PublicKey::from_sec1_bytes(&bytes)
+            .map_err(|_| DeserializationError::InvalidValue("Invalid public key".to_string()))?;
+
+        Ok(Self { inner })
+    }
+}
+
 #[cfg(test)]
 mod test {
     use k256::elliptic_curve::rand_core::OsRng;
+    use winter_utils::{Deserializable, Serializable};
 
-    use crate::dsa::ecdsa_secp256k1::{SecretKey, key_agreement::EphemeralSecretKey};
+    use crate::dsa::ecdsa_secp256k1::{
+        EphemeralPublicKey, SecretKey, key_agreement::EphemeralSecretKey,
+    };
 
     #[test]
     fn key_agreement() {
@@ -101,13 +136,19 @@ mod test {
 
         // 2. Generate the ephemeral key-pair for Bob
         let sk_e = EphemeralSecretKey::with_rng(&mut OsRng);
-        let pk_e = sk_e.ephemeral_public_key();
+        let pk_e = sk_e.public_key();
 
-        // 3. Bob computes the shared secret key (Bob will send pk_e with the encrypted note to
+        // 3. Test (de)serialization
+        let pk_e_bytes = pk_e.to_bytes();
+        let pk_e_serialized = EphemeralPublicKey::read_from_bytes(&pk_e_bytes)
+            .expect("failed to desrialize ephemeral public key");
+        assert_eq!(pk_e_serialized, pk_e);
+
+        // 4. Bob computes the shared secret key (Bob will send pk_e with the encrypted note to
         //    Alice)
         let shared_secret_key_1 = sk_e.diffie_hellman(pk.into());
 
-        // 4. Alice uses its secret key and the ephemeral public key sent with the encrypted note by
+        // 5. Alice uses its secret key and the ephemeral public key sent with the encrypted note by
         //    Bob in order to create the shared secret key. This shared secet key will be used to
         //    decrypt the encrypted note
         let shared_secret_key_2 = sk.get_shared_secret(pk_e.into());
