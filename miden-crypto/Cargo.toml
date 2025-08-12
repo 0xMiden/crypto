@@ -20,10 +20,6 @@ doctest = false
 required-features = ["executable"]
 
 [[bench]]
-name = "encryption"
-harness = false
-
-[[bench]]
 name = "hash"
 harness = false
 

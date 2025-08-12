@@ -7,7 +7,10 @@ use rand::{
     distr::{Distribution, StandardUniform, Uniform},
 };
 
-use crate::{Felt, ONE, StarkField, ZERO, hash::rpo::Rpo256};
+use crate::{Felt, ONE, StarkField, ZERO, encryption::BINARY_CHUNK_SIZE, hash::rpo::Rpo256};
+
+#[cfg(test)]
+mod test;
 
 // CONSTANTS
 // ================================================================================================
@@ -49,9 +52,6 @@ const RATE_START: usize = Rpo256::RATE_RANGE.start;
 
 /// Padding block used when the length of the data to encrypt is a multiple of `RATE_WIDTH`
 const PADDING_BLOCK: [Felt; RATE_WIDTH] = [ONE, ZERO, ZERO, ZERO, ZERO, ZERO, ZERO, ZERO];
-
-/// Number of bytes to pack into one field element
-const BINARY_CHUNK_SIZE: usize = 7;
 
 // TYPES AND STRUCTURES
 // ================================================================================================
@@ -342,12 +342,15 @@ impl Distribution<Nonce> for StandardUniform {
 pub enum EncryptionError {
     /// Authentication tag verification failed
     InvalidAuthTag,
+    /// Operation failed
+    FailedOperation,
 }
 
 impl fmt::Display for EncryptionError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             EncryptionError::InvalidAuthTag => write!(f, "Authentication tag verification failed"),
+            EncryptionError::FailedOperation => write!(f, "Operation failed"),
         }
     }
 }
