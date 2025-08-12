@@ -309,7 +309,7 @@ fn test_wrong_nonce_detection() {
 // SECURITY TESTS
 // ================================================================================================
 
-#[cfg(test)]
+#[cfg(all(test, feature = "std"))]
 mod security_tests {
     use std::collections::HashSet;
 
