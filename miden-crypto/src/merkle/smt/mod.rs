@@ -12,7 +12,7 @@ pub use full::{MAX_LEAF_ENTRIES, SMT_DEPTH, Smt, SmtLeaf, SmtLeafError, SmtProof
 pub use full::{SubtreeLeaf, build_subtree_for_bench};
 
 mod simple;
-pub use simple::SimpleSmt;
+pub use simple::{SimpleSmt, SimpleSmtProof};
 
 mod partial;
 pub use partial::PartialSmt;

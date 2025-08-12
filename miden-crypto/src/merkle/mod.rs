@@ -19,12 +19,13 @@ mod path;
 pub use path::{MerklePath, RootPath, ValuePath};
 
 mod sparse_path;
-pub use sparse_path::{SparseMerklePath, SparseValuePath};
+pub use sparse_path::SparseMerklePath;
 
 mod smt;
 pub use smt::{
     InnerNode, LeafIndex, MAX_LEAF_ENTRIES, MutationSet, NodeMutation, PartialSmt, SMT_DEPTH,
-    SMT_MAX_DEPTH, SMT_MIN_DEPTH, SimpleSmt, Smt, SmtLeaf, SmtLeafError, SmtProof, SmtProofError,
+    SMT_MAX_DEPTH, SMT_MIN_DEPTH, SimpleSmt, SimpleSmtProof, Smt, SmtLeaf, SmtLeafError, SmtProof,
+    SmtProofError,
 };
 #[cfg(feature = "internal")]
 pub use smt::{SubtreeLeaf, build_subtree_for_bench};
