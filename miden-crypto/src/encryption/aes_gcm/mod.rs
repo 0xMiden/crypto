@@ -61,7 +61,7 @@ impl SecretKey {
     }
 
     /// Encrypts the provided data using this secret key and a specified nonce
-    fn encrypt_with_nonce(
+    pub fn encrypt_with_nonce(
         &self,
         data: &[Felt],
         associated_data: &[Felt],
