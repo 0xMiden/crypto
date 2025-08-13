@@ -20,9 +20,15 @@ pub use key_agreement::{EphemeralPublicKey, EphemeralSecretKey, SharedSecret};
 // CONSTANTS
 // ================================================================================================
 
+/// Length of secret key in bytes
 const SECRET_KEY_BYTES: usize = 32;
-const PUBLIC_KEY_BYTES: usize = 33; // we use the compressed format
+/// Length of public key in bytes when using compressed format encoding
+const PUBLIC_KEY_BYTES: usize = 33;
+/// Length of signature in bytes using our custom serialization
 const SIGNATURE_BYTES: usize = 66;
+/// Length of signature in bytes using standard serialization i.e., `SEC1`
+const SIGNATURE_STANDARD_BYTES: usize = 64;
+/// Length of scalars for the `secp256k1` curve
 const SCALARS_SIZE_BYTES: usize = 32;
 
 // ECDSA HASHER
@@ -61,19 +67,41 @@ impl EcdsaHasher {
 
     /// Converts a `u8` to its corresponding hasher variant.
     pub fn from_byte(byte: u8) -> Option<Self> {
-        if byte <= 1 {
-            Some(unsafe { core::mem::transmute::<u8, EcdsaHasher>(byte) })
-        } else {
-            None
+        match byte {
+            0 => Some(EcdsaHasher::Sha256),
+            1 => Some(EcdsaHasher::Keccak),
+            _ => None,
         }
     }
 }
+
+impl TryFrom<u8> for EcdsaHasher {
+    type Error = InvalidHasherError;
+
+    fn try_from(byte: u8) -> Result<Self, Self::Error> {
+        match byte {
+            0 => Ok(EcdsaHasher::Sha256),
+            1 => Ok(EcdsaHasher::Keccak),
+            _ => Err(InvalidHasherError(byte)),
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct InvalidHasherError(u8);
+
+impl core::fmt::Display for InvalidHasherError {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        write!(f, "Invalid hasher byte value: {}", self.0)
+    }
+}
+
+impl core::error::Error for InvalidHasherError {}
 
 // SECRET KEY
 // ================================================================================================
 
 /// Secret key for ECDSA signature verification over secp256k1 curve.
-#[derive(Clone)]
 pub struct SecretKey {
     inner: SigningKey,
 }
@@ -191,6 +219,21 @@ impl SequentialCommit for PublicKey {
 
 /// ECDSA signature over secp256k1 curve using either SHA256 or Keccak to hash the messages when
 /// signing.
+///
+/// ## Serialization Formats
+///
+/// This implementation supports 2 serialization formats:
+///
+/// ### Custom Format (66 bytes):
+/// - Bytes 0-31: r component (32 bytes, big-endian)
+/// - Bytes 32-63: s component (32 bytes, big-endian)
+/// - Byte 64: recovery ID (v) - values 0-3
+/// - Byte 65: hasher type (0 = SHA256, 1 = Keccak256)
+///
+/// ### SEC1 Format (64 bytes):
+/// - Bytes 0-31: r component (32 bytes, big-endian)
+/// - Bytes 32-63: s component (32 bytes, big-endian)
+/// - Note: Recovery ID and hasher type are not included
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Signature {
     Sha256(SignatureData),
@@ -241,6 +284,45 @@ impl Signature {
     /// Verifies this signature against a message and public key.
     pub fn verify(&self, message: Word, pub_key: &PublicKey) -> bool {
         pub_key.verify(message, self)
+    }
+
+    /// Converts signature to SEC1 format (standard 64-byte r||s format).
+    ///
+    /// This format is the standard one used by most ECDSA libraries but loses the recovery ID
+    /// and hasher type information.
+    pub fn to_sec1_bytes(&self) -> [u8; SIGNATURE_STANDARD_BYTES] {
+        let mut bytes = [0u8; 2 * SCALARS_SIZE_BYTES];
+        bytes[0..SCALARS_SIZE_BYTES].copy_from_slice(self.r());
+        bytes[SCALARS_SIZE_BYTES..2 * SCALARS_SIZE_BYTES].copy_from_slice(self.s());
+        bytes
+    }
+
+    /// Creates a signature from SEC1 format bytes with explicit hasher.
+    ///
+    /// # Arguments
+    /// * `bytes` - 64-byte array containing r and s components
+    /// * `hasher` - The hash function used for this signature
+    /// * `recovery_id` - recovery ID (0-3)
+    pub fn from_sec1_bytes_and_hasher(
+        bytes: [u8; SIGNATURE_STANDARD_BYTES],
+        hasher: EcdsaHasher,
+        v: u8,
+    ) -> Result<Self, DeserializationError> {
+        let mut r = [0u8; SCALARS_SIZE_BYTES];
+        let mut s = [0u8; SCALARS_SIZE_BYTES];
+        r.copy_from_slice(&bytes[0..SCALARS_SIZE_BYTES]);
+        s.copy_from_slice(&bytes[SCALARS_SIZE_BYTES..2 * SCALARS_SIZE_BYTES]);
+
+        if v > 3 {
+            return Err(DeserializationError::InvalidValue(r#"Invalid recovery ID"#.to_string()));
+        }
+
+        let sig_data = SignatureData { r, s, v };
+
+        match hasher {
+            EcdsaHasher::Sha256 => Ok(Signature::Sha256(sig_data)),
+            EcdsaHasher::Keccak => Ok(Signature::Keccak(sig_data)),
+        }
     }
 }
 
@@ -415,7 +497,7 @@ mod tests {
     }
 
     #[test]
-    fn test_signature_serialization() {
+    fn test_signature_serialization_default_sha256() {
         let mut secret_key = SecretKey::with_rng(&mut OsRng);
         let message = [Felt::new(1), Felt::new(2), Felt::new(3), Felt::new(4)].into();
         let signature = secret_key.sign(message, EcdsaHasher::Sha256);
@@ -424,5 +506,69 @@ mod tests {
         let recovered_sig = Signature::read_from_bytes(&sig_bytes).unwrap();
 
         assert_eq!(signature, recovered_sig);
+    }
+
+    #[test]
+    fn test_signature_serialization_default_keccak() {
+        let mut secret_key = SecretKey::with_rng(&mut OsRng);
+        let message = [Felt::new(1), Felt::new(2), Felt::new(3), Felt::new(4)].into();
+        let signature = secret_key.sign(message, EcdsaHasher::Keccak);
+
+        let sig_bytes = signature.to_bytes();
+        let recovered_sig = Signature::read_from_bytes(&sig_bytes).unwrap();
+
+        assert_eq!(signature, recovered_sig);
+    }
+
+    #[test]
+    fn test_signature_serialization_sec1_sha256() {
+        let mut secret_key = SecretKey::with_rng(&mut OsRng);
+        let message = [Felt::new(1), Felt::new(2), Felt::new(3), Felt::new(4)].into();
+        let signature = secret_key.sign(message, EcdsaHasher::Sha256);
+        let recovery_id = signature.v();
+
+        let sig_bytes = signature.to_sec1_bytes();
+        let recovered_sig =
+            Signature::from_sec1_bytes_and_hasher(sig_bytes, EcdsaHasher::Sha256, recovery_id)
+                .unwrap();
+
+        assert_eq!(signature, recovered_sig);
+
+        let recovery_id = (recovery_id + 1) % 4;
+        let recovered_sig =
+            Signature::from_sec1_bytes_and_hasher(sig_bytes, EcdsaHasher::Sha256, recovery_id)
+                .unwrap();
+        assert_ne!(signature, recovered_sig);
+
+        let recovered_sig =
+            Signature::from_sec1_bytes_and_hasher(sig_bytes, EcdsaHasher::Keccak, recovery_id)
+                .unwrap();
+        assert_ne!(signature, recovered_sig);
+    }
+
+    #[test]
+    fn test_signature_serialization_keccak() {
+        let mut secret_key = SecretKey::with_rng(&mut OsRng);
+        let message = [Felt::new(1), Felt::new(2), Felt::new(3), Felt::new(4)].into();
+        let signature = secret_key.sign(message, EcdsaHasher::Keccak);
+        let recovery_id = signature.v();
+
+        let sig_bytes = signature.to_sec1_bytes();
+        let recovered_sig =
+            Signature::from_sec1_bytes_and_hasher(sig_bytes, EcdsaHasher::Keccak, recovery_id)
+                .unwrap();
+
+        assert_eq!(signature, recovered_sig);
+
+        let recovery_id = (recovery_id + 1) % 4;
+        let recovered_sig =
+            Signature::from_sec1_bytes_and_hasher(sig_bytes, EcdsaHasher::Keccak, recovery_id)
+                .unwrap();
+        assert_ne!(signature, recovered_sig);
+
+        let recovered_sig =
+            Signature::from_sec1_bytes_and_hasher(sig_bytes, EcdsaHasher::Sha256, recovery_id)
+                .unwrap();
+        assert_ne!(signature, recovered_sig);
     }
 }

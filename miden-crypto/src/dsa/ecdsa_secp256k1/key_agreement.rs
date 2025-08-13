@@ -138,17 +138,11 @@ mod test {
         let sk_e = EphemeralSecretKey::with_rng(&mut OsRng);
         let pk_e = sk_e.public_key();
 
-        // 3. Test (de)serialization
-        let pk_e_bytes = pk_e.to_bytes();
-        let pk_e_serialized = EphemeralPublicKey::read_from_bytes(&pk_e_bytes)
-            .expect("failed to desrialize ephemeral public key");
-        assert_eq!(pk_e_serialized, pk_e);
-
-        // 4. Bob computes the shared secret key (Bob will send pk_e with the encrypted note to
+        // 3. Bob computes the shared secret key (Bob will send pk_e with the encrypted note to
         //    Alice)
         let shared_secret_key_1 = sk_e.diffie_hellman(pk.into());
 
-        // 5. Alice uses its secret key and the ephemeral public key sent with the encrypted note by
+        // 4. Alice uses its secret key and the ephemeral public key sent with the encrypted note by
         //    Bob in order to create the shared secret key. This shared secet key will be used to
         //    decrypt the encrypted note
         let shared_secret_key_2 = sk.get_shared_secret(pk_e.into());
@@ -158,5 +152,16 @@ mod test {
             shared_secret_key_1.inner.raw_secret_bytes(),
             shared_secret_key_2.inner.raw_secret_bytes()
         );
+    }
+
+    #[test]
+    fn test_serialization_round_trip() {
+        let sk_e = EphemeralSecretKey::with_rng(&mut OsRng);
+        let pk_e = sk_e.public_key();
+
+        let pk_e_bytes = pk_e.to_bytes();
+        let pk_e_serialized = EphemeralPublicKey::read_from_bytes(&pk_e_bytes)
+            .expect("failed to desrialize ephemeral public key");
+        assert_eq!(pk_e_serialized, pk_e);
     }
 }
