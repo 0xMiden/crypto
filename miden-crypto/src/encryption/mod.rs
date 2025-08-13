@@ -7,7 +7,7 @@ use rand::{
     distr::{Distribution, StandardUniform, Uniform},
 };
 
-use crate::{Felt, ONE, StarkField, ZERO, hash::rpo::Rpo256};
+use crate::{Felt, ONE, StarkField, Word, ZERO, hash::rpo::Rpo256};
 
 #[cfg(test)]
 mod test;
@@ -60,14 +60,18 @@ const BINARY_CHUNK_SIZE: usize = 7;
 // ================================================================================================
 
 /// Encrypted data with its authentication tag
-#[derive(Debug, Default, Clone, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq)]
 pub struct EncryptedData {
-    /// The associated data
-    pub associated_data: Vec<Felt>,
-    /// The encrypted ciphertext
-    pub ciphertext: Vec<Felt>,
-    /// The authentication tag
-    pub auth_tag: AuthTag,
+    associated_data: Vec<Felt>,
+    ciphertext: Vec<Felt>,
+    auth_tag: AuthTag,
+    nonce: Nonce,
+}
+
+impl EncryptedData {
+    pub fn associated_data(&self) -> &[Felt] {
+        &self.associated_data
+    }
 }
 
 /// An authentication tag represented as 4 field elements
@@ -101,7 +105,7 @@ impl SecretKey {
         let mut rng = StdRng::from_os_rng();
         let nonce = Nonce::with_rng(&mut rng);
 
-        self.encrypt_with_nonce(data, associated_data, &nonce)
+        self.encrypt_with_nonce(data, associated_data, nonce)
     }
 
     /// Encrypts the provided data, as bytes, using this secret key and a random nonce
@@ -111,7 +115,7 @@ impl SecretKey {
         let mut rng = StdRng::from_os_rng();
         let nonce = Nonce::with_rng(&mut rng);
 
-        self.encrypt_bytes_with_nonce(data, associated_data, &nonce)
+        self.encrypt_bytes_with_nonce(data, associated_data, nonce)
     }
 
     /// Encrypts the provided data using this secret key and a specified nonce
@@ -119,15 +123,12 @@ impl SecretKey {
         &self,
         data: &[Felt],
         associated_data: &[Felt],
-        nonce: &Nonce,
+        nonce: Nonce,
     ) -> EncryptedData {
-        if data.is_empty() {
-            return EncryptedData::default();
-        }
         let mut sponge = SpongeState::new();
 
         // Initialize with key and nonce
-        sponge.initialize(self, nonce);
+        sponge.initialize(self, &nonce);
 
         // Process the associated data
         let padded_associated_data = pad_associated_data(associated_data);
@@ -157,6 +158,7 @@ impl SecretKey {
             ciphertext,
             associated_data: associated_data.into(),
             auth_tag,
+            nonce,
         }
     }
 
@@ -165,7 +167,7 @@ impl SecretKey {
         &self,
         data: &[u8],
         associated_data: &[u8],
-        nonce: &Nonce,
+        nonce: Nonce,
     ) -> EncryptedData {
         let data_felt = bytes_to_felts(data);
         let ad_felt = bytes_to_felts(associated_data);
@@ -174,23 +176,15 @@ impl SecretKey {
     }
 
     /// Decrypts the provided encrypted data using this secret key
-    pub fn decrypt(
-        &self,
-        encrypted_data: &EncryptedData,
-        nonce: &Nonce,
-    ) -> Result<Vec<Felt>, EncryptionError> {
+    pub fn decrypt(&self, encrypted_data: &EncryptedData) -> Result<Vec<Felt>, EncryptionError> {
         if !encrypted_data.ciphertext.len().is_multiple_of(RATE_WIDTH) {
             return Err(EncryptionError::CiphertextLenNotMultipleRate);
-        }
-
-        if encrypted_data.ciphertext.is_empty() {
-            return Ok(vec![]);
         }
 
         let mut sponge = SpongeState::new();
 
         // Initialize with key and nonce (same as encryption)
-        sponge.initialize(self, nonce);
+        sponge.initialize(self, &encrypted_data.nonce);
 
         // Process the associated data
         let padded_associated_data = pad_associated_data(&encrypted_data.associated_data);
@@ -226,9 +220,8 @@ impl SecretKey {
     pub fn decrypt_bytes(
         &self,
         encrypted_data: &EncryptedData,
-        nonce: &Nonce,
     ) -> Result<Vec<u8>, EncryptionError> {
-        let data_felts = self.decrypt(encrypted_data, nonce)?;
+        let data_felts = self.decrypt(encrypted_data)?;
 
         felts_to_bytes(&data_felts)
     }
@@ -316,13 +309,18 @@ impl SpongeState {
 }
 
 /// A 256-bit nonce represented as 4 field elements
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq)]
 pub struct Nonce([Felt; NONCE_SIZE]);
 
 impl Nonce {
     /// Creates a new random nonce using the provided random number generator
     pub fn with_rng<R: Rng>(rng: &mut R) -> Self {
         rng.sample(StandardUniform)
+    }
+
+    /// Creates a new nonce from the provided array of bytes
+    pub fn from_word(word: Word) -> Self {
+        Nonce(word.into())
     }
 }
 
