@@ -1,6 +1,6 @@
 use std::hint::black_box;
 
-use criterion::{BenchmarkId, Criterion, Throughput, criterion_group, criterion_main};
+use criterion::{BatchSize, BenchmarkId, Criterion, Throughput, criterion_group, criterion_main};
 use miden_crypto::{
     Felt,
     encryption::{
@@ -107,7 +107,8 @@ fn bench_aes_gcm_encryption_felts(c: &mut Criterion) {
 
     let mut rng = OsRng;
     let key = AesSecretKey::with_rng(&mut rng);
-    let nonce = AesNonce::with_rng(&mut rng);
+    let mut nonce_bytes = [0_u8; 12];
+    rng.fill_bytes(&mut nonce_bytes);
 
     let associated_data: Vec<Felt> = (0..8).map(|_| Felt::new(rng.next_u64())).collect();
 
@@ -120,19 +121,24 @@ fn bench_aes_gcm_encryption_felts(c: &mut Criterion) {
 
         // Encryption benchmark
         group.bench_with_input(BenchmarkId::new("encrypt", size), &data, |b, data| {
-            b.iter(|| {
-                black_box(key.encrypt_with_nonce(
-                    black_box(data),
-                    black_box(&associated_data),
-                    black_box(&nonce),
-                ))
-            });
+            b.iter_batched(
+                || (AesNonce::from_slice(&nonce_bytes), data),
+                |(nonce, data)| {
+                    black_box(key.encrypt_with_nonce(
+                        black_box(data),
+                        black_box(&associated_data),
+                        black_box(nonce),
+                    ))
+                },
+                BatchSize::SmallInput,
+            );
         });
 
         // Decryption benchmark
-        let encrypted = key.encrypt_with_nonce(&data, &associated_data, &nonce);
+        let nonce = AesNonce::from_slice(&nonce_bytes);
+        let encrypted = key.encrypt_with_nonce(&data, &associated_data, nonce).unwrap();
         group.bench_with_input(BenchmarkId::new("decrypt", size), &encrypted, |b, encrypted| {
-            b.iter(|| black_box(key.decrypt(black_box(encrypted), black_box(&nonce)).unwrap()));
+            b.iter(|| black_box(key.decrypt(black_box(encrypted)).unwrap()));
         });
     }
 
@@ -145,7 +151,8 @@ fn bench_aes_gcm_encryption_bytes(c: &mut Criterion) {
 
     let mut rng = OsRng;
     let key = AesSecretKey::with_rng(&mut rng);
-    let nonce = AesNonce::with_rng(&mut rng);
+    let mut nonce_bytes = [0_u8; 12];
+    rng.fill_bytes(&mut nonce_bytes);
 
     let mut associated_data = vec![0_u8; 8];
     rng.fill_bytes(&mut associated_data);
@@ -158,21 +165,24 @@ fn bench_aes_gcm_encryption_bytes(c: &mut Criterion) {
 
         // Encryption benchmark
         group.bench_with_input(BenchmarkId::new("encrypt", size), &data, |b, data| {
-            b.iter(|| {
-                black_box(key.encrypt_bytes_with_nonce(
-                    black_box(data),
-                    black_box(&associated_data),
-                    black_box(&nonce),
-                ))
-            });
+            b.iter_batched(
+                || (AesNonce::from_slice(&nonce_bytes), data),
+                |(nonce, data)| {
+                    black_box(key.encrypt_bytes_with_nonce(
+                        black_box(data),
+                        black_box(&associated_data),
+                        black_box(nonce),
+                    ))
+                },
+                BatchSize::SmallInput,
+            );
         });
 
         // Decryption benchmark
-        let encrypted = key.encrypt_bytes_with_nonce(&data, &associated_data, &nonce);
+        let nonce = AesNonce::from_slice(&nonce_bytes);
+        let encrypted = key.encrypt_bytes_with_nonce(&data, &associated_data, nonce).unwrap();
         group.bench_with_input(BenchmarkId::new("decrypt", size), &encrypted, |b, encrypted| {
-            b.iter(|| {
-                black_box(key.decrypt_bytes(black_box(encrypted), black_box(&nonce)).unwrap())
-            });
+            b.iter(|| black_box(key.decrypt_bytes(black_box(encrypted)).unwrap()));
         });
     }
 
