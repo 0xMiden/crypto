@@ -7,8 +7,7 @@ use core::{
 use winter_utils::{Deserializable, DeserializationError, Serializable};
 
 use super::{
-    EmptySubtreeRoots, InnerNodeInfo, MerkleError, MerklePath, NodeIndex, SMT_MAX_DEPTH, ValuePath,
-    Word,
+    EmptySubtreeRoots, InnerNodeInfo, MerkleError, MerklePath, NodeIndex, SMT_MAX_DEPTH, Word,
 };
 use crate::hash::rpo::Rpo256;
 
@@ -435,66 +434,6 @@ impl PartialEq<SparseMerklePath> for MerklePath {
     }
 }
 
-// SPARSE VALUE PATH
-// ================================================================================================
-/// A container for a [crate::Word] value and its [SparseMerklePath] opening.
-#[derive(Clone, Debug, Default, PartialEq, Eq)]
-pub struct SparseValuePath {
-    /// The node value opening for `path`.
-    pub value: Word,
-    /// The path from `value` to `root` (exclusive), using an efficient memory representation for
-    /// empty nodes.
-    pub path: SparseMerklePath,
-}
-
-impl SparseValuePath {
-    /// Convenience function to construct a [SparseValuePath].
-    ///
-    /// `value` is the value `path` leads to, in the tree.
-    pub fn new(value: Word, path: SparseMerklePath) -> Self {
-        Self { value, path }
-    }
-}
-
-impl From<(SparseMerklePath, Word)> for SparseValuePath {
-    fn from((path, value): (SparseMerklePath, Word)) -> Self {
-        SparseValuePath::new(value, path)
-    }
-}
-
-impl TryFrom<ValuePath> for SparseValuePath {
-    type Error = MerkleError;
-
-    /// # Errors
-    ///
-    /// This conversion returns [MerkleError::DepthTooBig] if the path length is greater than
-    /// [`SMT_MAX_DEPTH`].
-    fn try_from(other: ValuePath) -> Result<Self, MerkleError> {
-        let ValuePath { value, path } = other;
-        let path = SparseMerklePath::try_from(path)?;
-        Ok(SparseValuePath { value, path })
-    }
-}
-
-impl From<SparseValuePath> for ValuePath {
-    fn from(other: SparseValuePath) -> Self {
-        let SparseValuePath { value, path } = other;
-        ValuePath { value, path: path.into() }
-    }
-}
-
-impl PartialEq<ValuePath> for SparseValuePath {
-    fn eq(&self, rhs: &ValuePath) -> bool {
-        self.value == rhs.value && self.path == rhs.path
-    }
-}
-
-impl PartialEq<SparseValuePath> for ValuePath {
-    fn eq(&self, rhs: &SparseValuePath) -> bool {
-        rhs == self
-    }
-}
-
 // HELPERS
 // ================================================================================================
 
@@ -671,27 +610,12 @@ mod tests {
 
         for (key, _value) in tree.entries() {
             let index = NodeIndex::from(Smt::key_to_leaf_index(key));
-
-            let control_path = tree.get_path(key);
-            for (&control_node, proof_index) in
-                itertools::zip_eq(&*control_path, index.proof_indices())
-            {
-                let proof_node = tree.get_node_hash(proof_index);
-                assert_eq!(control_node, proof_node);
-            }
-
-            let sparse_path =
-                SparseMerklePath::from_sized_iter(control_path.clone().into_iter()).unwrap();
+            let sparse_path = tree.get_path(key);
             for (sparse_node, proof_idx) in
                 itertools::zip_eq(sparse_path.clone(), index.proof_indices())
             {
                 let proof_node = tree.get_node_hash(proof_idx);
                 assert_eq!(sparse_node, proof_node);
-            }
-
-            assert_eq!(control_path.depth(), sparse_path.depth());
-            for (control, sparse) in itertools::zip_eq(control_path, sparse_path) {
-                assert_eq!(control, sparse);
             }
         }
     }
