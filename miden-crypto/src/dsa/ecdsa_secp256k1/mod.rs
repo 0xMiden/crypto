@@ -64,15 +64,6 @@ impl EcdsaHasher {
     pub fn to_byte(&self) -> u8 {
         *self as u8
     }
-
-    /// Converts a `u8` to its corresponding hasher variant.
-    pub fn from_byte(byte: u8) -> Option<Self> {
-        match byte {
-            0 => Some(EcdsaHasher::Sha256),
-            1 => Some(EcdsaHasher::Keccak),
-            _ => None,
-        }
-    }
 }
 
 impl TryFrom<u8> for EcdsaHasher {
@@ -388,9 +379,10 @@ impl Deserializable for Signature {
         let v: u8 = source.read_u8()?;
 
         let signature = SignatureData { r, s, v };
-
-        let hasher =
-            EcdsaHasher::from_byte(source.read_u8()?).expect("Not a valid EcdsaHasher variant");
+        let hasher_byte = source.read_u8()?;
+        let hasher = hasher_byte.try_into().map_err(|_| {
+            DeserializationError::InvalidValue("not a valid ECDSA hasher variant".to_string())
+        })?;
         match hasher {
             EcdsaHasher::Sha256 => Ok(Signature::Sha256(signature)),
             EcdsaHasher::Keccak => Ok(Signature::Keccak(signature)),
