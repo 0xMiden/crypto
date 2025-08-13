@@ -1,6 +1,6 @@
 use crate::{
     Word,
-    merkle::{MerkleError, SparseMerklePath, ValuePath},
+    merkle::{MerkleError, MerkleProof, SparseMerklePath},
 };
 
 /// A container for a [crate::Word] value and its [SparseMerklePath] opening.
@@ -28,34 +28,34 @@ impl From<(SparseMerklePath, Word)> for SimpleSmtProof {
     }
 }
 
-impl TryFrom<ValuePath> for SimpleSmtProof {
+impl TryFrom<MerkleProof> for SimpleSmtProof {
     type Error = MerkleError;
 
     /// # Errors
     ///
     /// This conversion returns [MerkleError::DepthTooBig] if the path length is greater than
     /// [`super::SMT_MAX_DEPTH`].
-    fn try_from(other: ValuePath) -> Result<Self, MerkleError> {
-        let ValuePath { value, path } = other;
+    fn try_from(other: MerkleProof) -> Result<Self, MerkleError> {
+        let MerkleProof { value, path } = other;
         let path = SparseMerklePath::try_from(path)?;
         Ok(SimpleSmtProof { value, path })
     }
 }
 
-impl From<SimpleSmtProof> for ValuePath {
+impl From<SimpleSmtProof> for MerkleProof {
     fn from(other: SimpleSmtProof) -> Self {
         let SimpleSmtProof { value, path } = other;
-        ValuePath { value, path: path.into() }
+        MerkleProof { value, path: path.into() }
     }
 }
 
-impl PartialEq<ValuePath> for SimpleSmtProof {
-    fn eq(&self, rhs: &ValuePath) -> bool {
+impl PartialEq<MerkleProof> for SimpleSmtProof {
+    fn eq(&self, rhs: &MerkleProof) -> bool {
         self.value == rhs.value && self.path == rhs.path
     }
 }
 
-impl PartialEq<SimpleSmtProof> for ValuePath {
+impl PartialEq<SimpleSmtProof> for MerkleProof {
     fn eq(&self, rhs: &SimpleSmtProof) -> bool {
         rhs == self
     }

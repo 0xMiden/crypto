@@ -203,23 +203,23 @@ impl Iterator for InnerNodeIterator<'_> {
 
 /// A container for a [crate::Word] value and its [MerklePath] opening.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
-pub struct ValuePath {
+pub struct MerkleProof {
     /// The node value opening for `path`.
     pub value: Word,
     /// The path from `value` to `root` (exclusive).
     pub path: MerklePath,
 }
 
-impl ValuePath {
-    /// Returns a new [ValuePath] instantiated from the specified value and path.
+impl MerkleProof {
+    /// Returns a new [MerkleProof] instantiated from the specified value and path.
     pub fn new(value: Word, path: MerklePath) -> Self {
         Self { value, path }
     }
 }
 
-impl From<(MerklePath, Word)> for ValuePath {
+impl From<(MerklePath, Word)> for MerkleProof {
     fn from((path, value): (MerklePath, Word)) -> Self {
-        ValuePath::new(value, path)
+        MerkleProof::new(value, path)
     }
 }
 
@@ -254,14 +254,14 @@ impl Deserializable for MerklePath {
     }
 }
 
-impl Serializable for ValuePath {
+impl Serializable for MerkleProof {
     fn write_into<W: winter_utils::ByteWriter>(&self, target: &mut W) {
         self.value.write_into(target);
         self.path.write_into(target);
     }
 }
 
-impl Deserializable for ValuePath {
+impl Deserializable for MerkleProof {
     fn read_from<R: ByteReader>(source: &mut R) -> Result<Self, DeserializationError> {
         let value = Word::read_from(source)?;
         let path = MerklePath::read_from(source)?;

@@ -16,7 +16,7 @@ mod merkle_tree;
 pub use merkle_tree::{MerkleTree, path_to_text, tree_to_text};
 
 mod path;
-pub use path::{MerklePath, RootPath, ValuePath};
+pub use path::{MerklePath, MerkleProof, RootPath};
 
 mod sparse_path;
 pub use sparse_path::SparseMerklePath;

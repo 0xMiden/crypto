@@ -12,6 +12,7 @@
 - [BREAKING] Modified the public key in Falcon DSA to be the polynomial instead of the commitment ([#460](https://github.com/0xMiden/crypto/pull/460)).
 - [BREAKING] Use `SparseMerklePath` in SMT proofs for better memory efficiency ([#477](https://github.com/0xMiden/crypto/pull/477)).
 - [BREAKING] Rename `SparseValuePath` to `SimpleSmtProof` ([#477](https://github.com/0xMiden/crypto/pull/477)).
+- [BREAKING] Rename `ValuePath` to `MerkleProof`.
 
 # 0.15.9 (2025-07-24)
 
