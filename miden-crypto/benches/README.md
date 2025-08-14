@@ -3,6 +3,7 @@
 ## Hash Functions
 In the Miden VM, we make use of different hash functions. Some of these are "traditional" hash functions, like `BLAKE3`, which are optimized for out-of-STARK performance, while others are algebraic hash functions, like `Rescue Prime`, and are more optimized for a better performance inside the STARK. In what follows, we benchmark several such hash functions and compare against other constructions that are used by other proving systems. More precisely, we benchmark:
 
+* **Keccak256** as specified [here](https://keccak.team/specifications.html) and implemented [here](https://github.com/RustCrypto/hashes/tree/master/sha3) (with a wrapper exposed via this crate).
 * **BLAKE3** as specified [here](https://github.com/BLAKE3-team/BLAKE3-specs/blob/master/blake3.pdf) and implemented [here](https://github.com/BLAKE3-team/BLAKE3) (with a wrapper exposed via this crate).
 * **SHA3** as specified [here](https://nvlpubs.nist.gov/nistpubs/FIPS/NIST.FIPS.202.pdf) and implemented [here](https://github.com/novifinancial/winterfell/blob/46dce1adf0/crypto/src/hash/sha/mod.rs).
 * **Rescue Prime (RP)** as specified [here](https://eprint.iacr.org/2020/1143) and implemented [here](https://github.com/novifinancial/winterfell/blob/46dce1adf0/crypto/src/hash/rescue/rp64_256/mod.rs).
@@ -11,35 +12,35 @@ In the Miden VM, we make use of different hash functions. Some of these are "tra
 * **Poseidon2** as specified [here](https://eprint.iacr.org/2023/323) and implemented in this crate.
 
 We benchmark the above hash functions using two scenarios. The first is a 2-to-1 $(a,b)\mapsto h(a,b)$ hashing where both $a$, $b$ and $h(a,b)$ are the digests corresponding to each of the hash functions.
-The second scenario is that of sequential hashing where we take a sequence of length $100$ field elements and hash these to produce a single digest. The digests are $4$ field elements in a prime field with modulus $2^{64} - 2^{32} + 1$ (i.e., 32 bytes) for Poseidon2, Rescue Prime and RPO, and an array `[u8; 32]` for SHA3 and BLAKE3.
+The second scenario is that of sequential hashing where we take a sequence of length $100$ field elements and hash these to produce a single digest. The digests are $4$ field elements in a prime field with modulus $2^{64} - 2^{32} + 1$ (i.e., 32 bytes) for Poseidon2, Rescue Prime and RPO, and an array `[u8; 32]` for SHA3, BLAKE3 and Keccak256.
 
 ### Scenario 1: 2-to-1 hashing `h(a,b)`
 
-| Function            | BLAKE3 | SHA3   | Poseidon2 | Rp64_256 | RPO_256 | RPX_256 |
-| ------------------- | ------ | ------ | --------- | -------- | ------- | ------- |
-| Apple M1 Pro        | 76 ns  | 245 ns |           | 9.1 µs   | 5.2 µs  | 2.7 µs  |
-| Apple M2 Max        | 71 ns  | 233 ns |           | 7.9 µs   | 4.6 µs  | 2.4 µs  |
-| Apple M4 Max        | 48 ns  |        | 698 ns    |          | 2.9 µs  | 1.5 µs  |
-| Amazon Graviton 3   | 108 ns |        |           |          | 5.3 µs  | 3.1 µs  |
-| Amazon Graviton 4   | 96 ns  |        |           |          | 5.1 µs  | 2.8 µs  |
-| AMD Ryzen 9 5950X   | 64 ns  | 273 ns |           | 9.1 µs   | 5.5 µs  |         |
-| AMD EPYC 9R14       | 83 ns  |        |           |          | 4.3 µs  | 2.4 µs  |
-| Intel Core i5-8279U | 68 ns  | 536 ns | 1.7 µs    | 13.6 µs  | 8.5 µs  | 4.4 µs  |
-| Intel Xeon 8375C    | 67 ns  |        |           |          | 8.2 µs  |         |
+| Function            | BLAKE3 | Keccak256 | SHA3   | Poseidon2 | Rp64_256 | RPO_256 | RPX_256 |
+| ------------------- | ------ | --------- | ------ | --------- | -------- | ------- | ------- |
+| Apple M1 Pro        | 76 ns  |           | 245 ns |           | 9.1 µs   | 5.2 µs  | 2.7 µs  |
+| Apple M2 Max        | 71 ns  |           | 233 ns |           | 7.9 µs   | 4.6 µs  | 2.4 µs  |
+| Apple M4 Max        | 48 ns  |           |        | 698 ns    |          | 2.9 µs  | 1.5 µs  |
+| Amazon Graviton 3   | 108 ns |           |        |           |          | 5.3 µs  | 3.1 µs  |
+| Amazon Graviton 4   | 96 ns  |           |        |           |          | 5.1 µs  | 2.8 µs  |
+| AMD Ryzen 9 5950X   | 64 ns  |           | 273 ns |           | 9.1 µs   | 5.5 µs  |         |
+| AMD EPYC 9R14       | 83 ns  |           |        |           |          | 4.3 µs  | 2.4 µs  |
+| Intel Core i5-8279U | 68 ns  | 514 ns    | 536 ns | 1.7 µs    | 13.6 µs  | 8.5 µs  | 4.4 µs  |
+| Intel Xeon 8375C    | 67 ns  |           |        |           |          | 8.2 µs  |         |
 
 ### Scenario 2: Sequential hashing of 100 elements `h([a_0,...,a_99])`
 
-| Function            | BLAKE3 | SHA3   | Poseidon2 | Rp64_256 | RPO_256 | RPX_256 |
-| ------------------- | ------ | ------ | --------- | -------- | ------- | ------- |
-| Apple M1 Pro        | 1.0 µs | 1.5 µs |           | 118 µs   | 69 µs   | 35 µs   |
-| Apple M2 Max        | 0.9 µs | 1.5 µs |           | 103 µs   | 60 µs   | 31 µs   |
-| Apple M4 Max        | 671 ns |        | 9.7 µs    |          | 37.5 µs | 19.4 µs |
-| Amazon Graviton 3   | 1.4 µs |        |           |          | 69 µs   | 41 µs   |
-| Amazon Graviton 4   | 1.2 µs |        |           |          | 67 µs   | 36 µs   |
-| AMD Ryzen 9 5950X   | 0.8 µs | 1.7 µs |           | 120 µs   | 72 µs   |         |
-| AMD EPYC 9R14       | 0.9 µs |        |           |          | 56 µs   | 32 µs   |
-| Intel Core i5-8279U | 0.9 µs |        | 27 µs     |          | 107 µs  | 56 µs   |
-| Intel Xeon 8375C    | 0.8 µs |        |           |          | 110 µs  |         |
+| Function            | BLAKE3 | Keccak256 | SHA3   | Poseidon2 | Rp64_256 | RPO_256 | RPX_256 |
+| ------------------- | ------ | --------- | ------ | --------- | -------- | ------- | ------- |
+| Apple M1 Pro        | 1.0 µs |           | 1.5 µs |           | 118 µs   | 69 µs   | 35 µs   |
+| Apple M2 Max        | 0.9 µs |           | 1.5 µs |           | 103 µs   | 60 µs   | 31 µs   |
+| Apple M4 Max        | 671 ns |           |        | 9.7 µs    |          | 37.5 µs | 19.4 µs |
+| Amazon Graviton 3   | 1.4 µs |           |        |           |          | 69 µs   | 41 µs   |
+| Amazon Graviton 4   | 1.2 µs |           |        |           |          | 67 µs   | 36 µs   |
+| AMD Ryzen 9 5950X   | 0.8 µs |           | 1.7 µs |           | 120 µs   | 72 µs   |         |
+| AMD EPYC 9R14       | 0.9 µs |           |        |           |          | 56 µs   | 32 µs   |
+| Intel Core i5-8279U | 0.9 µs | 3.4 µs    |        | 27 µs     |          | 107 µs  | 56 µs   |
+| Intel Xeon 8375C    | 0.8 µs |           |        |           |          | 110 µs  |         |
 
 Notes:
 - On Graviton 3 and 4, RPO256 and RPX256 are run with SVE acceleration enabled.
@@ -81,7 +82,7 @@ Notes:
 - On AMD Ryzen 9 7950X, benchmarks are run with AVX2 acceleration enabled.
 
 ## Instructions
-Before you can run the benchmarks, you'll need to make sure you have Rust [installed](https://www.rust-lang.org/tools/install). After that, to run the benchmarks for RPO, Poseidon2 and BLAKE3, clone the current repository, and from the root directory of the repo run the following:
+Before you can run the benchmarks, you'll need to make sure you have Rust [installed](https://www.rust-lang.org/tools/install). After that, to run the benchmarks for RPO, Poseidon2, BLAKE3 and Keccak256, clone the current repository, and from the root directory of the repo run the following:
 
  ```
  cargo bench hash

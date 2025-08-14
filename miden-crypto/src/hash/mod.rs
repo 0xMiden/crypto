@@ -2,8 +2,11 @@
 
 use super::{CubeExtension, Felt, FieldElement, StarkField, Word, ZERO};
 
-/// Blake2s hash function.
+/// Blake3 hash function.
 pub mod blake;
+
+/// Keccak hash function.
+pub mod keccak;
 
 pub mod poseidon2 {
     pub use super::algebraic_sponge::poseidon2::Poseidon2;
