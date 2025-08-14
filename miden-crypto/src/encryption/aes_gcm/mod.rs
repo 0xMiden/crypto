@@ -18,7 +18,7 @@ use crate::{
 #[cfg(test)]
 mod test;
 
-/// A 96-bit nonce
+/// The nonce which is of size 96-bit
 #[derive(Debug, PartialEq, Eq)]
 pub struct Nonce {
     inner: aes_gcm::Nonce<U12>,
@@ -36,7 +36,7 @@ impl Nonce {
     }
 }
 
-/// A 256-bit secret key represented
+/// A 256-bit secret key
 #[derive(Debug, PartialEq, Eq)]
 pub struct SecretKey([u8; 32]);
 
