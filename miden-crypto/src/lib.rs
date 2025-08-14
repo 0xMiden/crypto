@@ -6,6 +6,7 @@ extern crate alloc;
 #[cfg(feature = "std")]
 extern crate std;
 
+pub mod encryption;
 pub mod dsa;
 pub mod hash;
 pub mod merkle;
