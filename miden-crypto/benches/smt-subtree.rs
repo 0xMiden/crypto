@@ -1,12 +1,13 @@
-use std::{fmt::Debug, hint, time::Duration};
+use std::{hint, time::Duration};
 
 use criterion::{BatchSize, BenchmarkId, Criterion, criterion_group, criterion_main};
 use miden_crypto::{
     Felt, ONE, Word,
     merkle::{NodeIndex, SMT_DEPTH, SmtLeaf, SubtreeLeaf, build_subtree_for_bench},
 };
-use rand_utils::prng_array;
-use winter_utils::Randomizable;
+
+mod common;
+use common::data::*;
 
 const PAIR_COUNTS: [u64; 5] = [1, 64, 128, 192, 256];
 
@@ -121,18 +122,3 @@ criterion_group! {
     targets = smt_subtree_even, smt_subtree_random
 }
 criterion_main!(smt_subtree_group);
-
-// HELPER FUNCTIONS
-// --------------------------------------------------------------------------------------------
-
-fn generate_value<T: Copy + Debug + Randomizable>(seed: &mut [u8; 32]) -> T {
-    *seed = prng_array(*seed);
-    let value: [T; 1] = rand_utils::prng_array(*seed);
-    value[0]
-}
-
-fn generate_word(seed: &mut [u8; 32]) -> Word {
-    *seed = prng_array(*seed);
-    let nums: [u64; 4] = prng_array(*seed);
-    Word::new([Felt::new(nums[0]), Felt::new(nums[1]), Felt::new(nums[2]), Felt::new(nums[3])])
-}

@@ -105,3 +105,74 @@ cargo run --no-default-features --features=executable,hashmaps
 ```
 
 The benchmark parameters may also be customized with the `-s`/`--size`, `-i`/`--insertions`, and `-u`/`--updates` options.
+
+## Configuration
+
+### Common Configuration
+
+Configuration constants are defined in `benches/common/config.rs`:
+
+```rust
+// Core configuration
+pub const DEFAULT_MEASUREMENT_TIME: Duration = Duration::from_secs(20);
+pub const DEFAULT_SAMPLE_SIZE: u64 = 100;
+
+// Hash function configuration  
+pub const HASH_INPUT_SIZES: &[usize] = &[1, 2, 4, 8, 16, 32, 64, 128, 256, 512, 1024, 2048, 4096, 8192, 16384];
+pub const HASH_ELEMENT_COUNTS: &[usize] = &[0, 1, 2, 4, 8, 16, 32, 64, 100, 128, 256, 512, 1000, 2000, 5000, 10000, 20000];
+```
+
+### Input Data Generation
+
+Use the parameterized generation functions from `common::data`:
+
+```rust
+// Sequential data (deterministic)
+let sequential_bytes = generate_byte_array_sequential(1024);
+let sequential_felts = generate_felt_array_sequential(1000);
+
+// Random data (varies each run)  
+let random_bytes = generate_byte_array_random(2048);
+```
+
+## Adding New Benchmarks
+
+### Step 1: Create Benchmark File
+Create `benches/<category>.rs` for new categories following existing patterns.
+
+### Step 2: Add to Cargo.toml
+Add the bench to the workspace Cargo.toml:
+
+```toml
+[[bench]]
+name = "<category>"
+harness = false
+```
+
+### Step 3: Import Common Utilities
+```rust
+mod common;
+use common::*;
+
+// Import required configuration constants
+use crate::common::config::{HASH_INPUT_SIZES, DEFAULT_SAMPLE_SIZE};
+```
+
+### Step 4: Follow Naming Conventions
+- Functions: `<category>_<operation>_<parameter>`
+- Groups: `<category>-<operation>-<parameter>`
+- Use descriptive names that clearly indicate what's being tested
+
+### Step 5: Add Throughput Measurements
+For operations that process data, add throughput measurements:
+
+```rust
+// For byte-sized inputs
+group.throughput(criterion::Throughput::Bytes(size as u64));
+
+// For field element inputs  
+group.throughput(criterion::Throughput::Elements(count as u64));
+```
+
+### Step 6: Add to Benchmark Group
+Include the new benchmark function in the appropriate `criterion_group!` macro.

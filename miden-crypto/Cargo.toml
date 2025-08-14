@@ -44,6 +44,18 @@ harness = false
 name = "store"
 harness = false
 
+[[bench]]
+name = "dsa"
+harness = false
+
+[[bench]]
+name = "word"
+harness = false
+
+[[bench]]
+name = "rand"
+harness = false
+
 [features]
 concurrent = ["dep:rayon", "hashbrown?/rayon"]
 default = ["std", "concurrent"]

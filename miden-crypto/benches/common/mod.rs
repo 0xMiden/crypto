@@ -21,7 +21,7 @@
 //!
 //! ## Input Generation Functions  
 //! - `generate_<data_type>_<size>` (e.g., `generate_byte_array_1kb`)
-//! - `generate_<data_type>_random_<size>` (e.g., `generate_felt_array_random_100`)
+//! - `generate_<data_type>_random_<size>` (e.g., `generate_byte_array_random_1024`)
 //!
 //! ## Configuration Functions
 //! - `setup_<benchmark_group>_config()` (e.g., `setup_hash_benchmarks_config()`)
