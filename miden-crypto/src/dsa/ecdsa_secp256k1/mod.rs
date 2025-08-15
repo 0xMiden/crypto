@@ -8,6 +8,7 @@ use k256::{
     ecdsa::{RecoveryId, SigningKey, VerifyingKey, signature::hazmat::PrehashVerifier},
     elliptic_curve::rand_core::{CryptoRng, RngCore},
 };
+use thiserror::Error;
 
 use crate::{
     Felt, SequentialCommit, StarkField, Word,
@@ -67,27 +68,22 @@ impl EcdsaHasher {
 }
 
 impl TryFrom<u8> for EcdsaHasher {
-    type Error = InvalidHasherError;
+    type Error = HasherError;
 
     fn try_from(byte: u8) -> Result<Self, Self::Error> {
         match byte {
             0 => Ok(EcdsaHasher::Sha256),
             1 => Ok(EcdsaHasher::Keccak),
-            _ => Err(InvalidHasherError(byte)),
+            _ => Err(HasherError::InvalidHasher(byte)),
         }
     }
 }
 
-#[derive(Debug, Clone)]
-pub struct InvalidHasherError(u8);
-
-impl core::fmt::Display for InvalidHasherError {
-    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        write!(f, "Invalid hasher byte value: {}", self.0)
-    }
+#[derive(Debug, Error)]
+pub enum HasherError {
+    #[error("Invalid hasher byte value: {0}")]
+    InvalidHasher(u8),
 }
-
-impl core::error::Error for InvalidHasherError {}
 
 // SECRET KEY
 // ================================================================================================
@@ -201,6 +197,7 @@ impl SequentialCommit for PublicKey {
     type Commitment = Word;
 
     fn to_elements(&self) -> Vec<Felt> {
+        // we can pack at most 7 bytes into a `Felt` without overflowing
         self.to_bytes().chunks(7).map(Felt::from_bytes_with_padding).collect()
     }
 }
