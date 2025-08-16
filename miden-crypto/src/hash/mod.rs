@@ -8,6 +8,7 @@ pub mod blake;
 /// Keccak hash function.
 pub mod keccak;
 
+/// Poseidon2 hash function.
 pub mod poseidon2 {
     pub use super::algebraic_sponge::poseidon2::Poseidon2;
 }
