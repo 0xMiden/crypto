@@ -1,12 +1,12 @@
 [package]
 name = "miden-crypto"
-version = "0.16.0"
+version = "0.17.0"
 description = "Miden Cryptographic primitives"
 authors.workspace = true
 readme = "../README.md"
 license.workspace = true
 repository.workspace = true
-documentation = "https://docs.rs/miden-crypto/0.16.0"
+documentation = "https://docs.rs/miden-crypto/0.17.0"
 categories.workspace = true
 keywords.workspace = true
 edition.workspace = true
