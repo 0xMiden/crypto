@@ -6,7 +6,7 @@ use alloc::{
 use core::fmt;
 
 use super::{
-    EMPTY_WORD, InnerNodeInfo, MerkleError, MerklePath, NodeIndex, Rpo256, ValuePath, Word,
+    EMPTY_WORD, InnerNodeInfo, MerkleError, MerklePath, MerkleProof, NodeIndex, Rpo256, Word,
 };
 use crate::utils::{
     ByteReader, ByteWriter, Deserializable, DeserializationError, Serializable, word_to_hex,
@@ -196,12 +196,12 @@ impl PartialMerkleTree {
     }
 
     /// Returns a vector of paths from every leaf to the root.
-    pub fn to_paths(&self) -> Vec<(NodeIndex, ValuePath)> {
+    pub fn to_paths(&self) -> Vec<(NodeIndex, MerkleProof)> {
         let mut paths = Vec::new();
         self.leaves.iter().for_each(|&leaf| {
             paths.push((
                 leaf,
-                ValuePath {
+                MerkleProof {
                     value: self.get_node(leaf).expect("Failed to get leaf node"),
                     path: self.get_path(leaf).expect("Failed to get path"),
                 },

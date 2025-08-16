@@ -2,8 +2,8 @@ use alloc::vec::Vec;
 use core::borrow::Borrow;
 
 use super::{
-    EmptySubtreeRoots, InnerNodeInfo, MerkleError, MerklePath, MerkleTree, NodeIndex,
-    PartialMerkleTree, RootPath, Rpo256, SimpleSmt, Smt, ValuePath, Word, mmr::Mmr,
+    EmptySubtreeRoots, InnerNodeInfo, MerkleError, MerklePath, MerkleProof, MerkleTree, NodeIndex,
+    PartialMerkleTree, RootPath, Rpo256, SimpleSmt, Smt, Word, mmr::Mmr,
 };
 use crate::{
     Map,
@@ -151,7 +151,7 @@ impl MerkleStore {
     /// - `RootNotInStore` if the `root` is not present in the store.
     /// - `NodeNotInStore` if a node needed to traverse from `root` to `index` is not present in the
     ///   store.
-    pub fn get_path(&self, root: Word, index: NodeIndex) -> Result<ValuePath, MerkleError> {
+    pub fn get_path(&self, root: Word, index: NodeIndex) -> Result<MerkleProof, MerkleError> {
         let mut hash = root;
         let mut path = Vec::with_capacity(index.depth().into());
 
@@ -177,7 +177,7 @@ impl MerkleStore {
         // the path is computed from root to leaf, so it must be reversed
         path.reverse();
 
-        Ok(ValuePath::new(hash, MerklePath::new(path)))
+        Ok(MerkleProof::new(hash, MerklePath::new(path)))
     }
 
     // LEAF TRAVERSAL
@@ -430,7 +430,7 @@ impl MerkleStore {
         value: Word,
     ) -> Result<RootPath, MerkleError> {
         let node = value;
-        let ValuePath { value, path } = self.get_path(root, index)?;
+        let MerkleProof { value, path } = self.get_path(root, index)?;
 
         // performs the update only if the node value differs from the opening
         if node != value {

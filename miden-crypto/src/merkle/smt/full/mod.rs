@@ -2,7 +2,7 @@ use alloc::{string::ToString, vec::Vec};
 
 use super::{
     EMPTY_WORD, EmptySubtreeRoots, Felt, InnerNode, InnerNodeInfo, InnerNodes, LeafIndex,
-    MerkleError, MerklePath, MutationSet, NodeIndex, Rpo256, SparseMerkleTree, Word,
+    MerkleError, MutationSet, NodeIndex, Rpo256, SparseMerklePath, SparseMerkleTree, Word,
 };
 
 mod error;
@@ -506,7 +506,7 @@ impl SparseMerkleTree<SMT_DEPTH> for Smt {
         LeafIndex::new_max_depth(most_significant_felt.as_int())
     }
 
-    fn path_and_leaf_to_opening(path: MerklePath, leaf: SmtLeaf) -> SmtProof {
+    fn path_and_leaf_to_opening(path: SparseMerklePath, leaf: SmtLeaf) -> SmtProof {
         SmtProof::new_unchecked(path, leaf)
     }
 }
