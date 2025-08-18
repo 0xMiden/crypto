@@ -1,12 +1,13 @@
-
-use k256::elliptic_curve::rand_core::OsRng;
+use rand::rng;
 
 use super::*;
 use crate::Felt;
 
 #[test]
 fn test_key_generation() {
-    let secret_key = SecretKey::with_rng(&mut OsRng);
+    let mut rng = rng();
+
+    let secret_key = SecretKey::with_rng(&mut rng);
     let public_key = secret_key.public_key();
 
     // Test that we can convert to/from bytes
@@ -21,7 +22,9 @@ fn test_key_generation() {
 
 #[test]
 fn test_public_key_recovery_sha256() {
-    let mut secret_key = SecretKey::with_rng(&mut OsRng);
+    let mut rng = rng();
+
+    let mut secret_key = SecretKey::with_rng(&mut rng);
     let public_key = secret_key.public_key();
 
     // Generate a signature using the secret key
@@ -40,7 +43,9 @@ fn test_public_key_recovery_sha256() {
 
 #[test]
 fn test_public_key_recovery_keccak() {
-    let mut secret_key = SecretKey::with_rng(&mut OsRng);
+    let mut rng = rng();
+
+    let mut secret_key = SecretKey::with_rng(&mut rng);
     let public_key = secret_key.public_key();
 
     // Generate a signature using the secret key
@@ -59,7 +64,9 @@ fn test_public_key_recovery_keccak() {
 
 #[test]
 fn test_sign_and_verify_sha256() {
-    let mut secret_key = SecretKey::with_rng(&mut OsRng);
+    let mut rng = rng();
+
+    let mut secret_key = SecretKey::with_rng(&mut rng);
     let public_key = secret_key.public_key();
 
     let message = [Felt::new(1), Felt::new(2), Felt::new(3), Felt::new(4)].into();
@@ -78,7 +85,9 @@ fn test_sign_and_verify_sha256() {
 
 #[test]
 fn test_sign_and_verify_keccak() {
-    let mut secret_key = SecretKey::with_rng(&mut OsRng);
+    let mut rng = rng();
+
+    let mut secret_key = SecretKey::with_rng(&mut rng);
     let public_key = secret_key.public_key();
 
     let message = [Felt::new(1), Felt::new(2), Felt::new(3), Felt::new(4)].into();
@@ -97,7 +106,9 @@ fn test_sign_and_verify_keccak() {
 
 #[test]
 fn test_signature_serialization_default_sha256() {
-    let mut secret_key = SecretKey::with_rng(&mut OsRng);
+    let mut rng = rng();
+
+    let mut secret_key = SecretKey::with_rng(&mut rng);
     let message = [Felt::new(1), Felt::new(2), Felt::new(3), Felt::new(4)].into();
     let signature = secret_key.sign(message, EcdsaHasher::Sha256);
 
@@ -109,7 +120,9 @@ fn test_signature_serialization_default_sha256() {
 
 #[test]
 fn test_signature_serialization_default_keccak() {
-    let mut secret_key = SecretKey::with_rng(&mut OsRng);
+    let mut rng = rng();
+
+    let mut secret_key = SecretKey::with_rng(&mut rng);
     let message = [Felt::new(1), Felt::new(2), Felt::new(3), Felt::new(4)].into();
     let signature = secret_key.sign(message, EcdsaHasher::Keccak);
 
@@ -121,7 +134,9 @@ fn test_signature_serialization_default_keccak() {
 
 #[test]
 fn test_signature_serialization_sec1_sha256() {
-    let mut secret_key = SecretKey::with_rng(&mut OsRng);
+    let mut rng = rng();
+
+    let mut secret_key = SecretKey::with_rng(&mut rng);
     let message = [Felt::new(1), Felt::new(2), Felt::new(3), Felt::new(4)].into();
     let signature = secret_key.sign(message, EcdsaHasher::Sha256);
     let recovery_id = signature.v();
@@ -144,7 +159,9 @@ fn test_signature_serialization_sec1_sha256() {
 
 #[test]
 fn test_signature_serialization_keccak() {
-    let mut secret_key = SecretKey::with_rng(&mut OsRng);
+    let mut rng = rng();
+
+    let mut secret_key = SecretKey::with_rng(&mut rng);
     let message = [Felt::new(1), Felt::new(2), Felt::new(3), Felt::new(4)].into();
     let signature = secret_key.sign(message, EcdsaHasher::Keccak);
     let recovery_id = signature.v();

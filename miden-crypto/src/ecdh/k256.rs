@@ -15,18 +15,11 @@
 use alloc::string::ToString;
 
 use hkdf::{Hkdf, hmac::SimpleHmac};
-use k256::{
-    AffinePoint,
-    elliptic_curve::{
-        rand_core::{CryptoRng, RngCore},
-        sec1::ToEncodedPoint,
-    },
-    sha2::Sha256,
-};
+use k256::{AffinePoint, elliptic_curve::sec1::ToEncodedPoint, sha2::Sha256};
+use rand::{CryptoRng, RngCore};
 
-use crate::dsa::ecdsa_secp256k1::PublicKey;
 use crate::{
-    dsa::ecdsa_secp256k1::PUBLIC_KEY_BYTES,
+    dsa::ecdsa_secp256k1::{PUBLIC_KEY_BYTES, PublicKey},
     utils::{ByteReader, ByteWriter, Deserializable, DeserializationError, Serializable},
 };
 
@@ -60,14 +53,16 @@ impl EphemeralSecretKey {
     #[cfg(feature = "std")]
     #[allow(clippy::new_without_default)]
     pub fn new() -> Self {
-        let mut rng = k256::elliptic_curve::rand_core::OsRng;
+        let mut rng = rand::rng();
 
         Self::with_rng(&mut rng)
     }
 
     /// Generates a new ephemeral secret key using the provided random number generator.
-    pub fn with_rng<R: CryptoRng + RngCore>(rng: &mut R) -> Self {
-        let sk_e = k256::ecdh::EphemeralSecret::random(rng);
+    pub fn with_rng<R: CryptoRng + RngCore>(_rng: &mut R) -> Self {
+        let mut rng = k256::elliptic_curve::rand_core::OsRng;
+
+        let sk_e = k256::ecdh::EphemeralSecret::random(&mut rng);
         Self { inner: sk_e }
     }
 
@@ -122,7 +117,7 @@ impl Deserializable for EphemeralPublicKey {
 
 #[cfg(test)]
 mod test {
-    use k256::elliptic_curve::rand_core::OsRng;
+    use rand::rng;
     use winter_utils::{Deserializable, Serializable};
 
     use super::{EphemeralPublicKey, EphemeralSecretKey};
@@ -130,12 +125,14 @@ mod test {
 
     #[test]
     fn key_agreement() {
+        let mut rng = rng();
+
         // 1. Generate the static key-pair for Alice
-        let sk = SecretKey::with_rng(&mut OsRng);
+        let sk = SecretKey::with_rng(&mut rng);
         let pk = sk.public_key();
 
         // 2. Generate the ephemeral key-pair for Bob
-        let sk_e = EphemeralSecretKey::with_rng(&mut OsRng);
+        let sk_e = EphemeralSecretKey::with_rng(&mut rng);
         let pk_e = sk_e.public_key();
 
         // 3. Bob computes the shared secret key (Bob will send pk_e with the encrypted note to
@@ -156,7 +153,9 @@ mod test {
 
     #[test]
     fn test_serialization_round_trip() {
-        let sk_e = EphemeralSecretKey::with_rng(&mut OsRng);
+        let mut rng = rng();
+
+        let sk_e = EphemeralSecretKey::with_rng(&mut rng);
         let pk_e = sk_e.public_key();
 
         let pk_e_bytes = pk_e.to_bytes();

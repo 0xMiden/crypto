@@ -3,17 +3,18 @@
 
 use alloc::{string::ToString, vec::Vec};
 
+use k256::{
+    ecdh::diffie_hellman,
+    ecdsa::{RecoveryId, SigningKey, VerifyingKey, signature::hazmat::PrehashVerifier},
+};
+use rand::{CryptoRng, RngCore};
+use thiserror::Error;
+
 use crate::{
     Felt, SequentialCommit, StarkField, Word,
     ecdh::{EphemeralPublicKey, SharedSecret},
     utils::{ByteReader, ByteWriter, Deserializable, DeserializationError, Serializable},
 };
-use k256::{
-    ecdh::diffie_hellman,
-    ecdsa::{RecoveryId, SigningKey, VerifyingKey, signature::hazmat::PrehashVerifier},
-    elliptic_curve::rand_core::{CryptoRng, RngCore},
-};
-use thiserror::Error;
 
 #[cfg(test)]
 mod tests;
@@ -98,14 +99,16 @@ impl SecretKey {
     #[cfg(feature = "std")]
     #[allow(clippy::new_without_default)]
     pub fn new() -> Self {
-        let mut rng = k256::elliptic_curve::rand_core::OsRng;
+        let mut rng = rand::rng();
 
         Self::with_rng(&mut rng)
     }
 
     /// Generates a new secret key using the provided random number generator.
-    pub fn with_rng<R: CryptoRng + RngCore>(rng: &mut R) -> Self {
-        let signing_key = SigningKey::random(rng);
+    pub fn with_rng<R: CryptoRng + RngCore>(_rng: &mut R) -> Self {
+        let mut rng = k256::elliptic_curve::rand_core::OsRng;
+
+        let signing_key = SigningKey::random(&mut rng);
         Self { inner: signing_key }
     }
 
