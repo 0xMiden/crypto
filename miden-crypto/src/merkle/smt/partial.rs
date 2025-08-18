@@ -4,7 +4,7 @@ use super::{LeafIndex, SMT_DEPTH};
 use crate::{
     EMPTY_WORD, Word,
     merkle::{
-        InnerNode, InnerNodeInfo, MerkleError, MerklePath, NodeIndex, Smt, SmtLeaf, SmtProof,
+        InnerNode, InnerNodeInfo, MerkleError, NodeIndex, Smt, SmtLeaf, SmtProof, SparseMerklePath,
         smt::{InnerNodes, Leaves, SparseMerkleTree},
     },
 };
@@ -154,7 +154,7 @@ impl PartialSmt {
         self.add_path(leaf, path)
     }
 
-    /// Adds a leaf and its merkle path to this [`PartialSmt`].
+    /// Adds a leaf and its sparse merkle path to this [`PartialSmt`].
     ///
     /// If this function was called, any key that is part of the `leaf` can subsequently be updated
     /// to a new value and produce a correct new tree root.
@@ -165,7 +165,7 @@ impl PartialSmt {
     /// - the new root after the insertion of the leaf and the path does not match the existing root
     ///   (except when the first leaf is added). If an error is returned, the tree is left in an
     ///   inconsistent state.
-    pub fn add_path(&mut self, leaf: SmtLeaf, path: MerklePath) -> Result<(), MerkleError> {
+    pub fn add_path(&mut self, leaf: SmtLeaf, path: SparseMerklePath) -> Result<(), MerkleError> {
         let mut current_index = leaf.index().index;
 
         let mut node_hash_at_current_index = leaf.hash();

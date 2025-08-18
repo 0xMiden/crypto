@@ -35,9 +35,13 @@ impl NodeIndex {
     /// Creates a new node index.
     ///
     /// # Errors
-    /// Returns an error if the `value` is greater than or equal to 2^{depth}.
+    /// Returns an error if:
+    /// - `depth` is greater than 64.
+    /// - `value` is greater than or equal to 2^{depth}.
     pub const fn new(depth: u8, value: u64) -> Result<Self, MerkleError> {
-        if (64 - value.leading_zeros()) > depth as u32 {
+        if depth > 64 {
+            Err(MerkleError::DepthTooBig(depth as u64))
+        } else if (64 - value.leading_zeros()) > depth as u32 {
             Err(MerkleError::InvalidNodeIndex { depth, value })
         } else {
             Ok(Self { depth, value })
@@ -46,6 +50,7 @@ impl NodeIndex {
 
     /// Creates a new node index without checking its validity.
     pub const fn new_unchecked(depth: u8, value: u64) -> Self {
+        debug_assert!(depth <= 64);
         debug_assert!((64 - value.leading_zeros()) <= depth as u32);
         Self { depth, value }
     }
@@ -63,7 +68,7 @@ impl NodeIndex {
     ///
     /// # Errors
     /// Returns an error if:
-    /// - `depth` doesn't fit in a `u8`.
+    /// - `depth` is greater than 64.
     /// - `value` is greater than or equal to 2^{depth}.
     pub fn from_elements(depth: &Felt, value: &Felt) -> Result<Self, MerkleError> {
         let depth = depth.as_int();

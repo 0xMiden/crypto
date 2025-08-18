@@ -1,4 +1,6 @@
-## 0.16.0 (TBD)
+## 0.17.0 (TBD)
+
+## 0.16.0 (2025-08-15)
 
 - [BREAKING] Incremented MSRV to 1.88.
 - Added implementation of Poseidon2 hash function ([#429](https://github.com/0xMiden/crypto/issues/429)).
@@ -9,8 +11,13 @@
 - `Smt.insert_inner_nodes` does not store empty subtrees ([#452](https://github.com/0xMiden/crypto/pull/452)).
 - Optimized `Smt::num_entries()` ([#455](https://github.com/0xMiden/crypto/pull/455)).
 - [BREAKING] Disallow leaves with more than 2^16 entries ([#455](https://github.com/0xMiden/crypto/pull/455), [#462](https://github.com/0xMiden/crypto/pull/462)).
-- [BREAKING] Modified the public key in Falcon DSA to be the polynomial instead of the commitment ([#460])(https://github.com/0xMiden/crypto/pull/460).
 -  Add ECDSA over secp256k1 curve ([#475](https://github.com/0xMiden/crypto/pull/475)).
+- [BREAKING] Modified the public key in Falcon DSA to be the polynomial instead of the commitment ([#460](https://github.com/0xMiden/crypto/pull/460)).
+- [BREAKING] Use `SparseMerklePath` in SMT proofs for better memory efficiency ([#477](https://github.com/0xMiden/crypto/pull/477)).
+- [BREAKING] Rename `SparseValuePath` to `SimpleSmtProof` ([#477](https://github.com/0xMiden/crypto/pull/477)).
+- Validate `NodeIndex` depth ([#482](https://github.com/0xMiden/crypto/pull/482)).
+- [BREAKING] Rename `ValuePath` to `MerkleProof` ([#483](https://github.com/0xMiden/crypto/pull/483)).
+- Added an implementation of Keccak256 hash function ([#487](https://github.com/0xMiden/crypto/pull/487)).
 
 # 0.15.9 (2025-07-24)
 

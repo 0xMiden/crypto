@@ -330,7 +330,7 @@ where
     } else {
         let mut hasher = blake3::Hasher::new();
 
-        // BLAKE3 state is 64 bytes - so, we can absorb 64 bytes into the state in a single
+        // BLAKE3 rate is 64 bytes - so, we can absorb 64 bytes into the state in a single
         // permutation. we move the elements into the hasher via the buffer to give the CPU
         // a chance to process multiple element-to-byte conversions in parallel
         let mut buf = [0_u8; 64];

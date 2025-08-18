@@ -3,7 +3,7 @@ use core::hash::Hash;
 
 use winter_utils::{ByteReader, ByteWriter, Deserializable, DeserializationError, Serializable};
 
-use super::{EmptySubtreeRoots, InnerNodeInfo, MerkleError, MerklePath, NodeIndex};
+use super::{EmptySubtreeRoots, InnerNodeInfo, MerkleError, NodeIndex, SparseMerklePath};
 use crate::{EMPTY_WORD, Felt, Map, Word, hash::rpo::Rpo256};
 
 mod full;
@@ -12,7 +12,7 @@ pub use full::{MAX_LEAF_ENTRIES, SMT_DEPTH, Smt, SmtLeaf, SmtLeafError, SmtProof
 pub use full::{SubtreeLeaf, build_subtree_for_bench};
 
 mod simple;
-pub use simple::SimpleSmt;
+pub use simple::{SimpleSmt, SimpleSmtProof};
 
 mod partial;
 pub use partial::PartialSmt;
@@ -71,12 +71,17 @@ pub(crate) trait SparseMerkleTree<const DEPTH: u8> {
     // PROVIDED METHODS
     // ---------------------------------------------------------------------------------------------
 
-    /// Returns a [MerklePath] to the specified key.
+    /// Returns a [SparseMerklePath] to the specified key.
     ///
     /// Mostly this is an implementation detail of [`Self::open()`].
-    fn get_path(&self, key: &Self::Key) -> MerklePath {
+    fn get_path(&self, key: &Self::Key) -> SparseMerklePath {
         let index = NodeIndex::from(Self::key_to_leaf_index(key));
-        index.proof_indices().map(|index| self.get_node_hash(index)).collect()
+
+        // SAFETY: this is guaranteed to have depth <= SMT_MAX_DEPTH
+        SparseMerklePath::from_sized_iter(
+            index.proof_indices().map(|index| self.get_node_hash(index)),
+        )
+        .expect("failed to convert to SparseMerklePath")
     }
 
     /// Get the hash of a node at an arbitrary index, including the root or leaf hashes.
@@ -94,8 +99,8 @@ pub(crate) trait SparseMerkleTree<const DEPTH: u8> {
         if index_is_right { right } else { left }
     }
 
-    /// Returns an opening of the leaf associated with `key`. Conceptually, an opening is a Merkle
-    /// path to the leaf, as well as the leaf itself.
+    /// Returns an opening of the leaf associated with `key`. Conceptually, an opening is a sparse
+    /// Merkle path to the leaf, as well as the leaf itself.
     fn open(&self, key: &Self::Key) -> Self::Opening {
         let leaf = self.get_leaf(key);
         let merkle_path = self.get_path(key);
@@ -473,10 +478,10 @@ pub(crate) trait SparseMerkleTree<const DEPTH: u8> {
     /// Maps a key to a leaf index
     fn key_to_leaf_index(key: &Self::Key) -> LeafIndex<DEPTH>;
 
-    /// Maps a (MerklePath, Self::Leaf) to an opening.
+    /// Maps a (SparseMerklePath, Self::Leaf) to an opening.
     ///
     /// The length `path` is guaranteed to be equal to `DEPTH`
-    fn path_and_leaf_to_opening(path: MerklePath, leaf: Self::Leaf) -> Self::Opening;
+    fn path_and_leaf_to_opening(path: SparseMerklePath, leaf: Self::Leaf) -> Self::Opening;
 }
 
 // INNER NODE

@@ -2,7 +2,7 @@ use alloc::{collections::BTreeMap, vec::Vec};
 
 use super::{
     super::{MerkleStore, MerkleTree, NodeIndex, PartialMerkleTree, int_to_node},
-    Deserializable, InnerNodeInfo, Serializable, ValuePath, Word,
+    Deserializable, InnerNodeInfo, MerkleProof, Serializable, Word,
 };
 
 // TEST DATA
@@ -209,12 +209,12 @@ fn get_paths() {
     // for each leaf.
 
     let leaves = [NODE20, NODE22, NODE23, NODE32, NODE33];
-    let expected_paths: Vec<(NodeIndex, ValuePath)> = leaves
+    let expected_paths: Vec<(NodeIndex, MerkleProof)> = leaves
         .iter()
         .map(|&leaf| {
             (
                 leaf,
-                ValuePath {
+                MerkleProof {
                     value: mt.get_node(leaf).unwrap(),
                     path: mt.get_path(leaf).unwrap(),
                 },
