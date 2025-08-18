@@ -1,4 +1,5 @@
-//! ECDH (Elliptic Curve Diffie-Hellman) key agreement implementation over secp256k1 curve.
+//! ECDH (Elliptic Curve Diffie-Hellman) key agreement implementation over k256
+//! i.e., secp256k1 curve.
 //!
 //! Note that the intended use is in the context of a one-way, sender initiated key agreement
 //! scenario. Namely, when the sender knows the (static) public key of the receiver and it
@@ -23,7 +24,7 @@ use k256::{
     sha2::Sha256,
 };
 
-use super::PublicKey;
+use crate::dsa::ecdsa_secp256k1::PublicKey;
 use crate::{
     dsa::ecdsa_secp256k1::PUBLIC_KEY_BYTES,
     utils::{ByteReader, ByteWriter, Deserializable, DeserializationError, Serializable},
@@ -31,10 +32,14 @@ use crate::{
 
 /// A shared secret computed using the ECDH (Elliptic Curve Diffie-Hellman) key agreement.
 pub struct SharedSecret {
-    inner: k256::ecdh::SharedSecret,
+    pub(crate) inner: k256::ecdh::SharedSecret,
 }
 
 impl SharedSecret {
+    pub(crate) fn new(inner: k256::ecdh::SharedSecret) -> SharedSecret {
+        Self { inner }
+    }
+
     /// Returns a HKDF (HMAC-based Extract-and-Expand Key Derivation Function) that can be used
     /// to extract entropy from the shared secret.
     ///
@@ -42,10 +47,6 @@ impl SharedSecret {
     /// for use as key material.
     pub fn extract<D>(&self, salt: Option<&[u8]>) -> Hkdf<Sha256, SimpleHmac<Sha256>> {
         self.inner.extract(salt)
-    }
-
-    pub(crate) fn new(inner: k256::ecdh::SharedSecret) -> SharedSecret {
-        Self { inner }
     }
 }
 
@@ -88,7 +89,7 @@ impl EphemeralSecretKey {
 /// Ephemeral public key for ECDH key agreement over secp256k1 curve.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct EphemeralPublicKey {
-    inner: k256::PublicKey,
+    pub(crate) inner: k256::PublicKey,
 }
 
 impl EphemeralPublicKey {
@@ -124,9 +125,8 @@ mod test {
     use k256::elliptic_curve::rand_core::OsRng;
     use winter_utils::{Deserializable, Serializable};
 
-    use crate::dsa::ecdsa_secp256k1::{
-        EphemeralPublicKey, SecretKey, key_agreement::EphemeralSecretKey,
-    };
+    use super::{EphemeralPublicKey, EphemeralSecretKey};
+    use crate::dsa::ecdsa_secp256k1::SecretKey;
 
     #[test]
     fn key_agreement() {
