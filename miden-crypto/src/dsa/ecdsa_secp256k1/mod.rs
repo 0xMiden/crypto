@@ -176,7 +176,7 @@ impl PublicKey {
 
     /// Recovers from the signature the public key associated to the secret key used to sign the
     /// message.
-    pub fn recover_from(message: Word, signature: &Signature) -> Self {
+    pub fn recover_from(message: Word, signature: &Signature) -> Result<Self, PublicKeyError> {
         let message_bytes: [u8; 32] = message.into();
         let message_digest = signature.hasher().hash(&message_bytes);
         let signature_data = k256::ecdsa::Signature::from_scalars(*signature.r(), *signature.s())
@@ -187,9 +187,9 @@ impl PublicKey {
             &signature_data,
             RecoveryId::from_byte(signature.v()).expect("invalid recovery id"),
         )
-        .expect("failed to recover the public key from the message and signature");
+        .map_err(|_| PublicKeyError::RecoveryFailed)?;
 
-        Self { inner: verifying_key }
+        Ok(Self { inner: verifying_key })
     }
 }
 
@@ -200,6 +200,12 @@ impl SequentialCommit for PublicKey {
         // we can pack at most 7 bytes into a `Felt` without overflowing
         self.to_bytes().chunks(7).map(Felt::from_bytes_with_padding).collect()
     }
+}
+
+#[derive(Debug, Error)]
+pub enum PublicKeyError {
+    #[error("Could not recover the public key from the message and signature")]
+    RecoveryFailed,
 }
 
 // SIGNATURE
@@ -419,12 +425,12 @@ mod tests {
         let signature = secret_key.sign(message, EcdsaHasher::Sha256);
 
         // Recover the public key
-        let recovered_pk = PublicKey::recover_from(message, &signature);
+        let recovered_pk = PublicKey::recover_from(message, &signature).unwrap();
         assert_eq!(public_key, recovered_pk);
 
         // Using the wrong message, we shouldn't be able to recover the public key
         let message = [Felt::new(1), Felt::new(2), Felt::new(3), Felt::new(5)].into();
-        let recovered_pk = PublicKey::recover_from(message, &signature);
+        let recovered_pk = PublicKey::recover_from(message, &signature).unwrap();
         assert!(public_key != recovered_pk);
     }
 
@@ -438,12 +444,12 @@ mod tests {
         let signature = secret_key.sign(message, EcdsaHasher::Keccak);
 
         // Recover the public key
-        let recovered_pk = PublicKey::recover_from(message, &signature);
+        let recovered_pk = PublicKey::recover_from(message, &signature).unwrap();
         assert_eq!(public_key, recovered_pk);
 
         // Using the wrong message, we shouldn't be able to recover the public key
         let message = [Felt::new(1), Felt::new(2), Felt::new(3), Felt::new(5)].into();
-        let recovered_pk = PublicKey::recover_from(message, &signature);
+        let recovered_pk = PublicKey::recover_from(message, &signature).unwrap();
         assert!(public_key != recovered_pk);
     }
 
