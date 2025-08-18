@@ -138,6 +138,7 @@ impl SecretKey {
 
         // Encrypt the data
         let mut ciphertext = Vec::with_capacity(data.len() + RATE_WIDTH);
+        let data = pad_plaintext(data);
         let mut data_block_iterator = data.chunks_exact(RATE_WIDTH);
 
         data_block_iterator.by_ref().for_each(|data_block| {
@@ -147,11 +148,7 @@ impl SecretKey {
             }
         });
 
-        // Finalize and generate authentication tag
-        let final_uneven_block = data_block_iterator.remainder();
-        let final_uneven_ciphertext_block = finalize_encryption(&mut sponge, final_uneven_block);
-        ciphertext.extend_from_slice(&final_uneven_ciphertext_block);
-
+        // Generate authentication tag
         let auth_tag = sponge.squeeze_tag();
 
         EncryptedData {
@@ -444,28 +441,25 @@ fn pad_associated_data(associated_data: &[Felt]) -> Vec<Felt> {
     }
 }
 
-/// Finalizes encryption by performing the padding and encryption of the final block.
-fn finalize_encryption(sponge: &mut SpongeState, remaining_data: &[Felt]) -> Vec<Felt> {
-    let mut ciphertext = Vec::with_capacity(RATE_WIDTH);
+/// Pads the plaintext.
+fn pad_plaintext(data: &[Felt]) -> Vec<Felt> {
+    let data_len = data.len();
+    let num_elem_final_block = data_len % RATE_WIDTH;
 
-    if remaining_data.is_empty() {
-        let keystream = sponge.duplex_add(&PADDING_BLOCK);
-        for (i, &plaintext_felt) in PADDING_BLOCK.iter().enumerate() {
-            ciphertext.push(plaintext_felt + keystream[i]);
-        }
+    let mut result = Vec::with_capacity(data_len + RATE_WIDTH);
+    result.extend_from_slice(data);
+
+    if num_elem_final_block == 0 {
+        result.extend_from_slice(&PADDING_BLOCK);
     } else {
-        debug_assert!(!remaining_data.is_empty() && remaining_data.len() < RATE_WIDTH);
-        let mut chunk = [ZERO; RATE_WIDTH];
-        remaining_data.iter().enumerate().for_each(|(idx, entry)| chunk[idx] = *entry);
-        chunk[remaining_data.len()] = ONE;
+        result.push(ONE);
 
-        let keystream = sponge.duplex_add(&chunk);
-        for (i, &plaintext_felt) in chunk.iter().enumerate() {
-            ciphertext.push(plaintext_felt + keystream[i]);
+        while !result.len().is_multiple_of(RATE_WIDTH) {
+            result.push(ZERO);
         }
     }
 
-    ciphertext
+    result
 }
 
 /// Removes the padding from the decoded ciphertext.
