@@ -3,7 +3,7 @@ use std::hint::black_box;
 use criterion::{BenchmarkId, Criterion, Throughput, criterion_group, criterion_main};
 use miden_crypto::{
     Felt, ONE,
-    encryption::{Nonce, SecretKey},
+    encryption::aead_rpo::{Nonce, SecretKey},
 };
 use rand::{RngCore, SeedableRng};
 use rand_chacha::ChaCha20Rng;
