@@ -1,6 +1,6 @@
 #[cfg(target_feature = "sve")]
 pub mod optimized {
-    use crate::{Felt, hash::rescue::STATE_WIDTH};
+    use crate::{Felt, hash::algebraic_sponge::rescue::STATE_WIDTH};
 
     mod ffi {
         #[link(name = "rpo_sve", kind = "static")]
@@ -51,7 +51,7 @@ pub mod optimized {
     use super::x86_64_avx2::{apply_inv_sbox, apply_sbox};
     use crate::{
         Felt,
-        hash::rescue::{STATE_WIDTH, add_constants},
+        hash::algebraic_sponge::rescue::{STATE_WIDTH, add_constants},
     };
 
     #[inline(always)]

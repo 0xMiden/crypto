@@ -1,5 +1,7 @@
 ## 0.17.0 (TBD)
 
+- Fix broken imports in CPU-specific `rescue` implementations (AVX2, SVE) ([#492](https://github.com/0xMiden/crypto/pull/492/)).
+
 ## 0.16.0 (2025-08-15)
 
 - [BREAKING] Incremented MSRV to 1.88.
