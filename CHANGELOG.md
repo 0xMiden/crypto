@@ -1,3 +1,7 @@
+## 0.16.1 (TBD)
+
+- Added `{Smt,PartialSmt}::inner_node_indices` to make inner nodes accessible ([#494](https://github.com/0xMiden/crypto/pull/494)).
+
 ## 0.16.0 (2025-08-15)
 
 - [BREAKING] Incremented MSRV to 1.88.
@@ -15,7 +19,6 @@
 - Validate `NodeIndex` depth ([#482](https://github.com/0xMiden/crypto/pull/482)).
 - [BREAKING] Rename `ValuePath` to `MerkleProof` ([#483](https://github.com/0xMiden/crypto/pull/483)).
 - Added an implementation of Keccak256 hash function ([#487](https://github.com/0xMiden/crypto/pull/487)).
-- Added `{Smt,PartialSmt}::inner_node_indices` to make inner nodes accessible ([#494](https://github.com/0xMiden/crypto/pull/494)).
 
 # 0.15.9 (2025-07-24)
 
