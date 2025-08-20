@@ -246,6 +246,12 @@ impl PartialSmt {
         self.0.inner_nodes()
     }
 
+    /// Returns an iterator over the [`InnerNode`] and the respective [`NodeIndex`] of the
+    /// [`PartialSmt`].
+    pub fn inner_node_indicies(&self) -> impl Iterator<Item = (NodeIndex, InnerNode)> + '_ {
+        self.0.inner_node_indices()
+    }
+
     /// Returns an iterator over the tracked, non-empty leaves of the [`PartialSmt`] in arbitrary
     /// order.
     pub fn leaves(&self) -> impl Iterator<Item = (LeafIndex<SMT_DEPTH>, &SmtLeaf)> {
