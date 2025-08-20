@@ -254,8 +254,7 @@ impl Smt {
         })
     }
 
-    /// Returns an iterator over the [`InnerNode`] and the respective [`NodeIndex`] of the
-    /// [`Smt`].
+    /// Returns an iterator over the [`InnerNode`] and the respective [`NodeIndex`] of the [`Smt`].
     pub fn inner_node_indices(&self) -> impl Iterator<Item = (NodeIndex, InnerNode)> + '_ {
         self.inner_nodes.iter().map(|(idx, inner)| (*idx, inner.clone()))
     }
