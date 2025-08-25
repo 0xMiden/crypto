@@ -4,8 +4,8 @@ use criterion::{BatchSize, BenchmarkId, Criterion, Throughput, criterion_group, 
 use miden_crypto::{
     Felt,
     encryption::{
-        aes_gcm::{Nonce as AesNonce, SecretKey as AesSecretKey},
         rpo::{Nonce, SecretKey},
+        xchacha::{Nonce as AesNonce, SecretKey as AesSecretKey},
     },
 };
 use rand::{RngCore, SeedableRng};
@@ -103,11 +103,10 @@ fn bench_miden_encryption_bytes(c: &mut Criterion) {
 
 fn bench_aes_gcm_encryption_felts(c: &mut Criterion) {
     let mut group = c.benchmark_group("aes_gcm_encryption_felts");
-    use aes_gcm::aead::{OsRng, rand_core::RngCore};
 
-    let mut rng = OsRng;
+    let mut rng = rand::rng();
     let key = AesSecretKey::with_rng(&mut rng);
-    let mut nonce_bytes = [0_u8; 12];
+    let mut nonce_bytes = [0_u8; 24];
     rng.fill_bytes(&mut nonce_bytes);
 
     let associated_data: Vec<Felt> = (0..8).map(|_| Felt::new(rng.next_u64())).collect();
@@ -147,11 +146,10 @@ fn bench_aes_gcm_encryption_felts(c: &mut Criterion) {
 
 fn bench_aes_gcm_encryption_bytes(c: &mut Criterion) {
     let mut group = c.benchmark_group("aes_gcm_encryption_bytes");
-    use aes_gcm::aead::{OsRng, rand_core::RngCore};
 
-    let mut rng = OsRng;
+    let mut rng = rand::rng();
     let key = AesSecretKey::with_rng(&mut rng);
-    let mut nonce_bytes = [0_u8; 12];
+    let mut nonce_bytes = [0_u8; 24];
     rng.fill_bytes(&mut nonce_bytes);
 
     let mut associated_data = vec![0_u8; 8];

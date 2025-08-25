@@ -1,8 +1,8 @@
-use aes_gcm::aead::{OsRng, rand_core::RngCore};
 use proptest::{
     prelude::{any, prop},
     prop_assert_eq, prop_assert_ne, proptest,
 };
+use rand::TryRngCore;
 
 use super::*;
 use crate::ONE;
@@ -16,16 +16,16 @@ proptest! {
         associated_data_len in 1usize..1000,
         data_len in 1usize..1000,
     ) {
-        let mut rng = OsRng;
+        let mut rng = rand::rng();
         let key = SecretKey::with_rng(&mut rng);
         let nonce = Nonce::with_rng(&mut rng);
 
         // Generate random field elements
         let associated_data: Vec<Felt> = (0..associated_data_len)
-            .map(|_| Felt::new(rng.next_u64()))
+            .map(|_| Felt::new(rng.try_next_u64().unwrap()))
             .collect();
         let data: Vec<Felt> = (0..data_len)
-            .map(|_| Felt::new(rng.next_u64()))
+            .map(|_| Felt::new(rng.try_next_u64().unwrap()))
             .collect();
 
         let encrypted = key.encrypt_with_nonce(&data, &associated_data, nonce).unwrap();
@@ -39,16 +39,16 @@ proptest! {
         associated_data_len in 0usize..1000,
         data_len in 0usize..1000,
     ) {
-        let mut rng = OsRng;
+        let mut rng = rand::rng();
         let key = SecretKey::with_rng(&mut rng);
         let nonce = Nonce::with_rng(&mut rng);
 
         // Generate random bytes
         let mut associated_data = vec![0_u8; associated_data_len];
-        rng.fill_bytes(&mut associated_data);
+        let _ =  rng.try_fill_bytes(&mut associated_data);
 
         let mut data = vec![0_u8; data_len];
-        rng.fill_bytes(&mut data);
+        let _ =  rng.try_fill_bytes(&mut data);
 
 
         let encrypted = key.encrypt_bytes_with_nonce(&data, &associated_data, nonce).unwrap();
@@ -63,13 +63,13 @@ proptest! {
         data in prop::collection::vec(any::<u64>(), 1..500),
     ) {
 
-        let mut rng1 = OsRng;
-        let mut rng2 = OsRng;
+        let mut rng1 = rand::rng();
+        let mut rng2 = rand::rng();
 
         let key1 = SecretKey::with_rng(&mut rng1);
         let key2 = SecretKey::with_rng(&mut rng2);
-        let mut nonce_bytes = [0_u8; 12];
-        rng2.fill_bytes(&mut nonce_bytes);
+        let mut nonce_bytes = [0_u8; 24];
+        let _ = rng2.try_fill_bytes(&mut nonce_bytes);
         let nonce1 = Nonce::from_slice(&nonce_bytes);
         let nonce2 = Nonce::from_slice(&nonce_bytes);
 
@@ -92,12 +92,12 @@ proptest! {
         associated_data in prop::collection::vec(any::<u64>(), 1..50),
         data in prop::collection::vec(any::<u64>(), 1..50),
     ) {
-        let mut rng = OsRng;
+        let mut rng = rand::rng();
         let key = SecretKey::with_rng(&mut rng);
-        let mut nonce_bytes = [0_u8; 12];
-        rng.fill_bytes(&mut nonce_bytes);
+        let mut nonce_bytes = [0_u8; 24];
+        let _ = rng.try_fill_bytes(&mut nonce_bytes);
         let nonce1 = Nonce::from_slice(&nonce_bytes);
-        rng.fill_bytes(&mut nonce_bytes);
+        let _ = rng.try_fill_bytes(&mut nonce_bytes);
         let nonce2 = Nonce::from_slice(&nonce_bytes);
 
         let associated_data: Vec<Felt> = associated_data.into_iter()
@@ -120,7 +120,7 @@ proptest! {
 
 #[test]
 fn test_secret_key_creation() {
-    let mut rng = OsRng;
+    let mut rng = rand::rng();
     let key1 = SecretKey::with_rng(&mut rng);
     let key2 = SecretKey::with_rng(&mut rng);
 
@@ -130,7 +130,7 @@ fn test_secret_key_creation() {
 
 #[test]
 fn test_secret_key_serialization() {
-    let mut rng = OsRng;
+    let mut rng = rand::rng();
     let key = SecretKey::with_rng(&mut rng);
 
     let key_bytes = key.to_bytes();
@@ -142,7 +142,7 @@ fn test_secret_key_serialization() {
 
 #[test]
 fn test_nonce_creation() {
-    let mut rng = OsRng;
+    let mut rng = rand::rng();
 
     let nonce1 = Nonce::with_rng(&mut rng);
     let nonce2 = Nonce::with_rng(&mut rng);
@@ -153,7 +153,7 @@ fn test_nonce_creation() {
 
 #[test]
 fn test_empty_data_encryption() {
-    let mut rng = OsRng;
+    let mut rng = rand::rng();
     let key = SecretKey::with_rng(&mut rng);
     let nonce = Nonce::with_rng(&mut rng);
 
@@ -167,7 +167,7 @@ fn test_empty_data_encryption() {
 
 #[test]
 fn test_single_element_encryption() {
-    let mut rng = OsRng;
+    let mut rng = rand::rng();
 
     let key = SecretKey::with_rng(&mut rng);
     let nonce = Nonce::with_rng(&mut rng);
@@ -182,7 +182,7 @@ fn test_single_element_encryption() {
 
 #[test]
 fn test_large_data_encryption() {
-    let mut rng = OsRng;
+    let mut rng = rand::rng();
 
     let key = SecretKey::with_rng(&mut rng);
     let nonce = Nonce::with_rng(&mut rng);
@@ -199,7 +199,7 @@ fn test_large_data_encryption() {
 
 #[test]
 fn test_encryption_various_lengths() {
-    let mut rng = OsRng;
+    let mut rng = rand::rng();
     let key = SecretKey::with_rng(&mut rng);
     let associated_data: Vec<Felt> = vec![ONE; 8];
 
@@ -216,13 +216,13 @@ fn test_encryption_various_lengths() {
 
 #[test]
 fn test_bytes_encryption_various_lengths() {
-    let mut rng = OsRng;
+    let mut rng = rand::rng();
     let key = SecretKey::with_rng(&mut rng);
     let associated_data: Vec<u8> = vec![1; 8];
 
     for len in [1, 7, 8, 9, 15, 16, 17, 31, 32, 35, 39, 54, 67, 100, 1000] {
         let mut data = vec![0_u8; len];
-        rng.fill_bytes(&mut data);
+        let _ = rng.try_fill_bytes(&mut data);
 
         let nonce = Nonce::with_rng(&mut rng);
         let encrypted = key.encrypt_bytes_with_nonce(&data, &associated_data, nonce).unwrap();
@@ -235,7 +235,7 @@ fn test_bytes_encryption_various_lengths() {
 
 #[test]
 fn test_encrypted_data_serialization() {
-    let mut rng = OsRng;
+    let mut rng = rand::rng();
     let key = SecretKey::with_rng(&mut rng);
     let associated_data: Vec<Felt> = vec![ONE; 8];
 
@@ -255,7 +255,7 @@ fn test_encrypted_data_serialization() {
 
 #[test]
 fn test_ciphertext_tampering_detection() {
-    let mut rng = OsRng;
+    let mut rng = rand::rng();
 
     let key = SecretKey::with_rng(&mut rng);
     let nonce = Nonce::with_rng(&mut rng);
@@ -273,7 +273,7 @@ fn test_ciphertext_tampering_detection() {
 
 #[test]
 fn test_wrong_key_detection() {
-    let mut rng = OsRng;
+    let mut rng = rand::rng();
     let key1 = SecretKey::with_rng(&mut rng);
     let key2 = SecretKey::with_rng(&mut rng);
     let nonce = Nonce::with_rng(&mut rng);
@@ -289,7 +289,7 @@ fn test_wrong_key_detection() {
 
 #[test]
 fn test_wrong_nonce_detection() {
-    let mut rng = OsRng;
+    let mut rng = rand::rng();
     let key = SecretKey::with_rng(&mut rng);
     let nonce1 = Nonce::with_rng(&mut rng);
     let nonce2 = Nonce::with_rng(&mut rng);
@@ -316,7 +316,7 @@ mod security_tests {
 
     #[test]
     fn test_key_uniqueness() {
-        let mut rng = OsRng;
+        let mut rng = rand::rng();
         let mut keys = HashSet::new();
 
         // Generate 1000 keys and ensure they're all unique
@@ -329,7 +329,7 @@ mod security_tests {
 
     #[test]
     fn test_nonce_uniqueness() {
-        let mut rng = OsRng;
+        let mut rng = rand::rng();
         let mut nonces = HashSet::new();
 
         // Generate 1000 nonces and ensure they're all unique
@@ -342,7 +342,7 @@ mod security_tests {
 
     #[test]
     fn test_ciphertext_appears_random() {
-        let mut rng = OsRng;
+        let mut rng = rand::rng();
         let key = SecretKey::with_rng(&mut rng);
 
         // Encrypt the same plaintext with different nonces

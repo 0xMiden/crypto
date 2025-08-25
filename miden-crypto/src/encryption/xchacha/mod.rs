@@ -1,13 +1,10 @@
 use alloc::vec::Vec;
 
-use aes_gcm::{
-    Aes256Gcm, Error,
-    aead::{
-        Aead, AeadCore, KeyInit,
-        rand_core::{CryptoRng, RngCore},
-    },
+use chacha20poly1305::{
+    Error, XChaCha20Poly1305,
+    aead::{Aead, AeadCore, KeyInit},
 };
-use sha3::digest::consts::U12;
+use rand::{CryptoRng, RngCore};
 use winter_utils::{ByteReader, ByteWriter, Deserializable, DeserializationError, Serializable};
 
 use crate::{
@@ -18,20 +15,25 @@ use crate::{
 #[cfg(test)]
 mod test;
 
-/// The nonce which is of size 96-bit
+/// A 192-bit nonce
+///
+/// Note: This should be drawn randomly from a CSPRNG.
 #[derive(Debug, PartialEq, Eq)]
 pub struct Nonce {
-    inner: aes_gcm::Nonce<U12>,
+    inner: chacha20poly1305::XNonce,
 }
 
 impl Nonce {
     /// Creates a new random nonce using the provided random number generator
-    pub fn with_rng<R: RngCore + CryptoRng>(rng: &mut R) -> Self {
-        Nonce { inner: Aes256Gcm::generate_nonce(rng) }
+    pub fn with_rng<R: RngCore + CryptoRng>(_rng: &mut R) -> Self {
+        let rng = chacha20poly1305::aead::rand_core::OsRng;
+        Nonce {
+            inner: XChaCha20Poly1305::generate_nonce(rng),
+        }
     }
 
     /// Creates a new nonce from the provided array of bytes
-    pub fn from_slice(bytes: &[u8; 12]) -> Self {
+    pub fn from_slice(bytes: &[u8; 24]) -> Self {
         Nonce { inner: (*bytes).into() }
     }
 }
@@ -45,13 +47,15 @@ impl SecretKey {
     #[cfg(feature = "std")]
     #[allow(clippy::new_without_default)]
     pub fn new() -> Self {
-        use aes_gcm::aead::rand_core::OsRng;
-        Self::with_rng(&mut OsRng)
+        let mut rng = rand::rng();
+        Self::with_rng(&mut rng)
     }
 
     /// Creates a new random secret key using the provided random number generator
-    pub fn with_rng<R: RngCore + CryptoRng>(rng: &mut R) -> Self {
-        let key = Aes256Gcm::generate_key(rng);
+    pub fn with_rng<R: RngCore + CryptoRng>(_rng: &mut R) -> Self {
+        let rng = chacha20poly1305::aead::rand_core::OsRng;
+
+        let key = XChaCha20Poly1305::generate_key(rng);
         Self(key.into())
     }
 
@@ -62,11 +66,9 @@ impl SecretKey {
         data: &[Felt],
         associated_data: &[Felt],
     ) -> Result<EncryptedData, EncryptionError> {
-        use aes_gcm::aead::rand_core::OsRng;
+        let mut rng = rand::rng();
 
-        let mut rng = OsRng;
         let nonce = Nonce::with_rng(&mut rng);
-
         self.encrypt_with_nonce(data, associated_data, nonce)
     }
 
@@ -79,9 +81,9 @@ impl SecretKey {
     ) -> Result<EncryptedData, EncryptionError> {
         let data_byte = felts_to_bytes(data);
         let ad_byte = felts_to_bytes(associated_data);
-        let payload = aes_gcm::aead::Payload { msg: &data_byte, aad: &ad_byte };
+        let payload = chacha20poly1305::aead::Payload { msg: &data_byte, aad: &ad_byte };
 
-        let cipher = Aes256Gcm::new(&self.0.into());
+        let cipher = XChaCha20Poly1305::new(&self.0.into());
 
         let ciphertext = cipher
             .encrypt(&nonce.inner, payload)
@@ -101,7 +103,7 @@ impl SecretKey {
         data: &[u8],
         associated_data: &[u8],
     ) -> Result<EncryptedData, EncryptionError> {
-        let mut rng = aes_gcm::aead::OsRng;
+        let mut rng = rand::rng();
         let nonce = Nonce::with_rng(&mut rng);
 
         self.encrypt_bytes_with_nonce(data, associated_data, nonce)
@@ -114,9 +116,9 @@ impl SecretKey {
         associated_data: &[u8],
         nonce: Nonce,
     ) -> Result<EncryptedData, EncryptionError> {
-        let payload = aes_gcm::aead::Payload { msg: data, aad: associated_data };
+        let payload = chacha20poly1305::aead::Payload { msg: data, aad: associated_data };
 
-        let cipher = Aes256Gcm::new(&self.0.into());
+        let cipher = XChaCha20Poly1305::new(&self.0.into());
 
         let ciphertext = cipher
             .encrypt(&nonce.inner, payload)
@@ -132,9 +134,9 @@ impl SecretKey {
     /// Decrypts the provided encrypted data using this secret key
     pub fn decrypt(&self, encrypted_data: &EncryptedData) -> Result<Vec<Felt>, EncryptionError> {
         let EncryptedData { associated_data, ciphertext, nonce } = encrypted_data;
-        let payload = aes_gcm::aead::Payload { msg: ciphertext, aad: associated_data };
+        let payload = chacha20poly1305::aead::Payload { msg: ciphertext, aad: associated_data };
 
-        let cipher = Aes256Gcm::new(&self.0.into());
+        let cipher = XChaCha20Poly1305::new(&self.0.into());
 
         let plaintext = cipher.decrypt(&nonce.inner, payload)?;
         let plaintext_felt = bytes_to_felts(&plaintext);
@@ -148,9 +150,9 @@ impl SecretKey {
         encrypted_data: &EncryptedData,
     ) -> Result<Vec<u8>, EncryptionError> {
         let EncryptedData { associated_data, ciphertext, nonce } = encrypted_data;
-        let payload = aes_gcm::aead::Payload { msg: ciphertext, aad: associated_data };
+        let payload = chacha20poly1305::aead::Payload { msg: ciphertext, aad: associated_data };
 
-        let cipher = Aes256Gcm::new(&self.0.into());
+        let cipher = XChaCha20Poly1305::new(&self.0.into());
 
         Ok(cipher.decrypt(&nonce.inner, payload)?)
     }
@@ -213,7 +215,7 @@ impl Deserializable for EncryptedData {
         let ciphertext_len = source.read_u64()?;
         let ciphertext = source.read_vec(ciphertext_len as usize)?;
 
-        let inner: [u8; 12] = source.read_array()?;
+        let inner: [u8; 24] = source.read_array()?;
 
         Ok(Self {
             associated_data,
