@@ -5,7 +5,7 @@ use miden_crypto::{
     Felt,
     encryption::{
         rpo::{Nonce, SecretKey},
-        xchacha::{Nonce as AesNonce, SecretKey as AesSecretKey},
+        xchacha::{Nonce as ChaChaNonce, SecretKey as ChaChaSecretKey},
     },
 };
 use rand::{RngCore, SeedableRng};
@@ -101,11 +101,11 @@ fn bench_miden_encryption_bytes(c: &mut Criterion) {
     group.finish();
 }
 
-fn bench_aes_gcm_encryption_felts(c: &mut Criterion) {
-    let mut group = c.benchmark_group("aes_gcm_encryption_felts");
+fn bench_xchacha_encryption_felts(c: &mut Criterion) {
+    let mut group = c.benchmark_group("xchacha_encryption_felts");
 
     let mut rng = rand::rng();
-    let key = AesSecretKey::with_rng(&mut rng);
+    let key = ChaChaSecretKey::with_rng(&mut rng);
     let mut nonce_bytes = [0_u8; 24];
     rng.fill_bytes(&mut nonce_bytes);
 
@@ -121,7 +121,7 @@ fn bench_aes_gcm_encryption_felts(c: &mut Criterion) {
         // Encryption benchmark
         group.bench_with_input(BenchmarkId::new("encrypt", size), &data, |b, data| {
             b.iter_batched(
-                || (AesNonce::from_slice(&nonce_bytes), data),
+                || (ChaChaNonce::from_slice(&nonce_bytes), data),
                 |(nonce, data)| {
                     black_box(key.encrypt_with_nonce(
                         black_box(data),
@@ -134,7 +134,7 @@ fn bench_aes_gcm_encryption_felts(c: &mut Criterion) {
         });
 
         // Decryption benchmark
-        let nonce = AesNonce::from_slice(&nonce_bytes);
+        let nonce = ChaChaNonce::from_slice(&nonce_bytes);
         let encrypted = key.encrypt_with_nonce(&data, &associated_data, nonce).unwrap();
         group.bench_with_input(BenchmarkId::new("decrypt", size), &encrypted, |b, encrypted| {
             b.iter(|| black_box(key.decrypt(black_box(encrypted)).unwrap()));
@@ -144,11 +144,11 @@ fn bench_aes_gcm_encryption_felts(c: &mut Criterion) {
     group.finish();
 }
 
-fn bench_aes_gcm_encryption_bytes(c: &mut Criterion) {
-    let mut group = c.benchmark_group("aes_gcm_encryption_bytes");
+fn bench_xchacha_encryption_bytes(c: &mut Criterion) {
+    let mut group = c.benchmark_group("xchacha_encryption_bytes");
 
     let mut rng = rand::rng();
-    let key = AesSecretKey::with_rng(&mut rng);
+    let key = ChaChaSecretKey::with_rng(&mut rng);
     let mut nonce_bytes = [0_u8; 24];
     rng.fill_bytes(&mut nonce_bytes);
 
@@ -164,7 +164,7 @@ fn bench_aes_gcm_encryption_bytes(c: &mut Criterion) {
         // Encryption benchmark
         group.bench_with_input(BenchmarkId::new("encrypt", size), &data, |b, data| {
             b.iter_batched(
-                || (AesNonce::from_slice(&nonce_bytes), data),
+                || (ChaChaNonce::from_slice(&nonce_bytes), data),
                 |(nonce, data)| {
                     black_box(key.encrypt_bytes_with_nonce(
                         black_box(data),
@@ -177,7 +177,7 @@ fn bench_aes_gcm_encryption_bytes(c: &mut Criterion) {
         });
 
         // Decryption benchmark
-        let nonce = AesNonce::from_slice(&nonce_bytes);
+        let nonce = ChaChaNonce::from_slice(&nonce_bytes);
         let encrypted = key.encrypt_bytes_with_nonce(&data, &associated_data, nonce).unwrap();
         group.bench_with_input(BenchmarkId::new("decrypt", size), &encrypted, |b, encrypted| {
             b.iter(|| black_box(key.decrypt_bytes(black_box(encrypted)).unwrap()));
@@ -191,8 +191,8 @@ criterion_group!(
     encryption_group,
     bench_miden_encryption_felts,
     bench_miden_encryption_bytes,
-    bench_aes_gcm_encryption_felts,
-    bench_aes_gcm_encryption_bytes
+    bench_xchacha_encryption_felts,
+    bench_xchacha_encryption_bytes
 );
 
 criterion_main!(encryption_group);
