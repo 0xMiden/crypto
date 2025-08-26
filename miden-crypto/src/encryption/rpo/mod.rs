@@ -1,5 +1,5 @@
 use alloc::vec::Vec;
-use core::{fmt, ops::Range};
+use core::ops::Range;
 
 use num::Integer;
 use rand::{
@@ -7,7 +7,11 @@ use rand::{
     distr::{Distribution, StandardUniform, Uniform},
 };
 
-use crate::{Felt, ONE, StarkField, ZERO, encryption::BINARY_CHUNK_SIZE, hash::rpo::Rpo256};
+use crate::{
+    Felt, ONE, StarkField, ZERO,
+    encryption::{BINARY_CHUNK_SIZE, EncryptionError},
+    hash::rpo::Rpo256,
+};
 
 #[cfg(test)]
 mod test;
@@ -333,30 +337,6 @@ impl Distribution<Nonce> for StandardUniform {
         Nonce(res)
     }
 }
-
-// ERROR TYPES
-// ================================================================================================
-
-/// Errors that can occur during encryption/decryption operations
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum EncryptionError {
-    /// Authentication tag verification failed
-    InvalidAuthTag,
-    /// Operation failed
-    FailedOperation,
-}
-
-impl fmt::Display for EncryptionError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            EncryptionError::InvalidAuthTag => write!(f, "Authentication tag verification failed"),
-            EncryptionError::FailedOperation => write!(f, "Operation failed"),
-        }
-    }
-}
-
-#[cfg(feature = "std")]
-impl std::error::Error for EncryptionError {}
 
 //  HELPERS
 // ================================================================================================

@@ -247,7 +247,7 @@ fn test_encrypted_data_serialization() {
         let encrypted_data_bytes = encrypted.to_bytes();
 
         let encrypted_data_serialized =
-            EncryptedData::read_from_bytes(&encrypted_data_bytes).unwrap();
+            EncryptedDataFelt::read_from_bytes(&encrypted_data_bytes).unwrap();
 
         assert_eq!(encrypted, encrypted_data_serialized, "Failed for length {}", len);
     }
@@ -265,7 +265,7 @@ fn test_ciphertext_tampering_detection() {
     let mut encrypted = key.encrypt_with_nonce(&data, &associated_data, nonce).unwrap();
 
     // Tamper with ciphertext
-    encrypted.ciphertext[0] += 1;
+    encrypted.ciphertext[0] += ONE;
 
     let result = key.decrypt(&encrypted);
     assert!(result.is_err());
@@ -294,13 +294,13 @@ fn test_wrong_nonce_detection() {
     let nonce1 = Nonce::with_rng(&mut rng);
     let nonce2 = Nonce::with_rng(&mut rng);
 
-    let associated_data: Vec<Felt> = vec![ONE; 8];
-    let data = vec![Felt::new(123), Felt::new(456)];
-    let mut encrypted = key.encrypt_with_nonce(&data, &associated_data, nonce1).unwrap();
+    let associated_data: Vec<u8> = vec![1; 8];
+    let data = vec![(123), (55)];
+    let mut encrypted = key.encrypt_bytes_with_nonce(&data, &associated_data, nonce1).unwrap();
 
     // Try to decrypt with wrong nonce
     encrypted.nonce = nonce2;
-    let result = key.decrypt(&encrypted);
+    let result = key.decrypt_bytes(&encrypted);
     assert!(result.is_err());
 }
 
