@@ -259,9 +259,7 @@ impl SpongeState {
         self.state[CAPACITY_RANGE.start] += ONE;
 
         // overwrite the rate portion with `data`
-        for (idx, &element) in data.iter().enumerate() {
-            self.state[RATE_START + idx] = element;
-        }
+        self.state[RATE_RANGE].copy_from_slice(data);
     }
 
     /// Duplex interface as described in Algorithm 2 in [1] with `d = 1`
@@ -380,12 +378,12 @@ fn bytes_to_felts(bytes: &[u8]) -> Vec<Felt> {
     let mut buf = [0_u8; 8];
 
     // iterate the chunks of bytes, creating a field element from each chunk
-    let mut current_chunk_idx = 0_usize;
     let last_chunk_idx = num_field_elem - 1;
 
     bytes
         .chunks(BINARY_CHUNK_SIZE)
-        .map(|chunk| {
+        .enumerate()
+        .map(|(current_chunk_idx, chunk)| {
             // copy the chunk into the buffer
             if current_chunk_idx != last_chunk_idx {
                 buf[..BINARY_CHUNK_SIZE].copy_from_slice(chunk);
@@ -396,7 +394,6 @@ fn bytes_to_felts(bytes: &[u8]) -> Vec<Felt> {
                 buf[..chunk.len()].copy_from_slice(chunk);
                 buf[chunk.len()] = 1;
             }
-            current_chunk_idx += 1;
 
             Felt::new(u64::from_le_bytes(buf))
         })
@@ -427,7 +424,7 @@ fn felts_to_bytes(felts: &[Felt]) -> Result<Vec<u8>, EncryptionError> {
     Ok(result)
 }
 
-/// Pads the associated data.
+/// Pads the associated data to the next multiple of the [`RATE_WIDTH`]
 fn pad_associated_data(associated_data: &[Felt]) -> Vec<Felt> {
     if associated_data.len().is_multiple_of(RATE_WIDTH) {
         associated_data.to_vec()
@@ -441,7 +438,7 @@ fn pad_associated_data(associated_data: &[Felt]) -> Vec<Felt> {
     }
 }
 
-/// Pads the plaintext.
+/// Pads the plaintext
 fn pad_plaintext(data: &[Felt]) -> Vec<Felt> {
     let data_len = data.len();
     let num_elem_final_block = data_len % RATE_WIDTH;
