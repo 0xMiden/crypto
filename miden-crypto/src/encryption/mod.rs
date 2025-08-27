@@ -1,3 +1,5 @@
+//! AEAD (authenticated encryption with associated data) schemes.
+
 use alloc::vec::Vec;
 
 use rand::{CryptoRng, RngCore};
@@ -9,7 +11,7 @@ use crate::{
     utils::{Deserializable, Serializable},
 };
 
-pub mod rpo;
+pub mod aead_rpo;
 
 pub mod xchacha;
 

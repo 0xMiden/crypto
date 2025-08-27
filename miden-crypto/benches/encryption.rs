@@ -2,9 +2,9 @@ use std::hint::black_box;
 
 use criterion::{BatchSize, BenchmarkId, Criterion, Throughput, criterion_group, criterion_main};
 use miden_crypto::{
-    Felt,
+    Felt, ONE,
     encryption::{
-        rpo::{Nonce, SecretKey},
+        aead_rpo::{Nonce, SecretKey},
         xchacha::{Nonce as ChaChaNonce, SecretKey as ChaChaSecretKey},
     },
 };
@@ -30,7 +30,7 @@ fn bench_miden_encryption_felts(c: &mut Criterion) {
 
     let mut rng = ChaCha20Rng::seed_from_u64(42);
     let key = SecretKey::with_rng(&mut rng);
-    let nonce = Nonce::with_rng(&mut rng);
+    let nonce_word = [ONE; 4].into();
 
     let associated_data: Vec<Felt> = (0..8).map(|_| Felt::new(rng.next_u64())).collect();
 
@@ -47,15 +47,16 @@ fn bench_miden_encryption_felts(c: &mut Criterion) {
                 black_box(key.encrypt_with_nonce(
                     black_box(data),
                     black_box(&associated_data),
-                    black_box(&nonce),
+                    black_box(Nonce::from_word(nonce_word)),
                 ))
             });
         });
 
         // Decryption benchmark
-        let encrypted = key.encrypt_with_nonce(&data, &associated_data, &nonce);
+        let encrypted =
+            key.encrypt_with_nonce(&data, &associated_data, Nonce::from_word(nonce_word));
         group.bench_with_input(BenchmarkId::new("decrypt", size), &encrypted, |b, encrypted| {
-            b.iter(|| black_box(key.decrypt(black_box(encrypted), black_box(&nonce)).unwrap()));
+            b.iter(|| black_box(key.decrypt(black_box(encrypted)).unwrap()));
         });
     }
 
@@ -67,7 +68,7 @@ fn bench_miden_encryption_bytes(c: &mut Criterion) {
 
     let mut rng = ChaCha20Rng::seed_from_u64(42);
     let key = SecretKey::with_rng(&mut rng);
-    let nonce = Nonce::with_rng(&mut rng);
+    let nonce_word = [ONE; 4].into();
 
     let mut associated_data = vec![0_u8; 8];
     rng.fill_bytes(&mut associated_data);
@@ -84,17 +85,16 @@ fn bench_miden_encryption_bytes(c: &mut Criterion) {
                 black_box(key.encrypt_bytes_with_nonce(
                     black_box(data),
                     black_box(&associated_data),
-                    black_box(&nonce),
+                    black_box(Nonce::from_word(nonce_word)),
                 ))
             });
         });
 
         // Decryption benchmark
-        let encrypted = key.encrypt_bytes_with_nonce(&data, &associated_data, &nonce);
+        let encrypted =
+            key.encrypt_bytes_with_nonce(&data, &associated_data, Nonce::from_word(nonce_word));
         group.bench_with_input(BenchmarkId::new("decrypt", size), &encrypted, |b, encrypted| {
-            b.iter(|| {
-                black_box(key.decrypt_bytes(black_box(encrypted), black_box(&nonce)).unwrap())
-            });
+            b.iter(|| black_box(key.decrypt_bytes(black_box(encrypted)).unwrap()));
         });
     }
 
