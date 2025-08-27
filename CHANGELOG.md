@@ -1,3 +1,5 @@
+## 0.17.0 (TBD)
+
 ## 0.16.1 (2025-08-21)
 
 - Fix broken imports in CPU-specific `rescue` implementations (AVX2, SVE) ([#492](https://github.com/0xMiden/crypto/pull/492/)).
