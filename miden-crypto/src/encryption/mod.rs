@@ -84,12 +84,12 @@ pub enum IesError {
 }
 
 /// Errors that can occur during encryption/decryption operations
-#[derive(Clone, Debug, Error, PartialEq, Eq)]
+#[derive(Debug, Error)]
 pub enum EncryptionError {
     /// Authentication tag verification failed
-    #[error("Authentication tag verification failed")]
+    #[error("authentication tag verification failed")]
     InvalidAuthTag,
     /// Operation failed
-    #[error("Operation failed")]
+    #[error("operation failed")]
     FailedOperation,
 }

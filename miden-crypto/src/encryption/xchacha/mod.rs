@@ -41,7 +41,7 @@ impl Nonce {
 }
 
 /// A 256-bit secret key
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Zeroize)]
 pub struct SecretKey([u8; 32]);
 
 impl SecretKey {
@@ -168,12 +168,6 @@ impl SecretKey {
 impl AsRef<[u8]> for SecretKey {
     fn as_ref(&self) -> &[u8] {
         &self.0
-    }
-}
-
-impl Zeroize for SecretKey {
-    fn zeroize(&mut self) {
-        self.0.zeroize();
     }
 }
 
