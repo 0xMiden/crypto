@@ -20,8 +20,8 @@
 //!   `merkle_mmr_proof_generation`)
 //!
 //! ## Input Generation Functions  
-//! - `generate_<data_type>_<size>` (e.g., `generate_byte_array_1kb`)
-//! - `generate_<data_type>_random_<size>` (e.g., `generate_byte_array_random_1024`)
+//! - `generate_<data_type>_<size>` (e.g., `generate_byte_array_896` for 896 bytes)
+//! - `generate_<data_type>_random_<size>` (e.g., `generate_byte_array_random_1024` for 1KB)
 //!
 //! ## Configuration Functions
 //! - `setup_<benchmark_group>_config()` (e.g., `setup_hash_benchmarks_config()`)

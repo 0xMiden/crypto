@@ -26,7 +26,7 @@ use criterion::{Criterion, criterion_group, criterion_main};
 // Import DSA modules
 use miden_crypto::{
     Felt, Word,
-    dsa::rpo_falcon512::{Nonce, PublicKey, SecretKey, Signature},
+    dsa::rpo_falcon512::{PublicKey, SecretKey, Signature},
 };
 use rand::rng;
 
@@ -177,52 +177,6 @@ benchmark_with_setup_data! {
     },
 }
 
-// === Hash-to-Point Benchmarks ===
-
-// === Nonce Operations Benchmarks ===
-
-// Nonce generation with RNG
-benchmark_with_setup_data! {
-    dsa_nonce_generation,
-    DEFAULT_MEASUREMENT_TIME,
-    DEFAULT_SAMPLE_SIZE,
-    "nonce_random",
-    || {
-
-        rand::rngs::ThreadRng::default()
-    },
-    |b: &mut criterion::Bencher, rng: &rand::rngs::ThreadRng| {
-        b.iter(|| {
-            let _rng_clone = rng.clone();
-            let _nonce = Nonce::deterministic();
-        })
-    },
-}
-
-// Nonce conversion to field elements
-benchmark_with_setup_data! {
-    dsa_nonce_to_elements,
-    DEFAULT_MEASUREMENT_TIME,
-    DEFAULT_SAMPLE_SIZE,
-    "nonce_to_elements",
-    || {
-        let nonces: Vec<Nonce> = (0..KEYGEN_ITERATIONS)
-            .map(|_| {
-                let _rng = rand::rngs::ThreadRng::default();
-                Nonce::deterministic()
-            })
-            .collect();
-        nonces
-    },
-    |b: &mut criterion::Bencher, nonces: &Vec<Nonce>| {
-        b.iter(|| {
-            for nonce in nonces {
-                let _elements = nonce.to_elements();
-            }
-        })
-    },
-}
-
 // === Benchmark Group Configuration ===
 
 criterion_group!(
@@ -236,9 +190,6 @@ criterion_group!(
     dsa_sign_with_rng,
     // Verification benchmarks
     dsa_verify,
-    // Nonce operation benchmarks
-    dsa_nonce_generation,
-    dsa_nonce_to_elements,
 );
 
 criterion_main!(dsa_benchmark_group);

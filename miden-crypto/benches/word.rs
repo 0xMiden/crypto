@@ -109,71 +109,14 @@ benchmark_with_setup! {
 
 // === Type Conversion Benchmarks ===
 
-// Conversion to bool array
-benchmark_with_setup! {
-    word_convert_bool,
-    DEFAULT_MEASUREMENT_TIME,
-    DEFAULT_SAMPLE_SIZE,
-    "try_from_to_bool",
-    || {},
-    |b: &mut criterion::Bencher| {
-        b.iter(|| {
-            for word in &TEST_WORDS {
-                let _result: Result<[bool; 4], _> = word.try_into();
-            }
-        })
-    },
-}
+// Basic type conversions (bool, u8, u16, u32, u64)
+benchmark_word_conversions!(
+    word_convert_basic,
+    &[0u8, 1u8, 2u8, 3u8, 4u8], // Type indices: 0=bool, 1=u8, 2=u16, 3=u32, 4=u64
+    &TEST_WORDS
+);
 
-// Conversion to u8 array
-benchmark_with_setup! {
-    word_convert_u8,
-    DEFAULT_MEASUREMENT_TIME,
-    DEFAULT_SAMPLE_SIZE,
-    "try_from_to_u8",
-    || {},
-    |b: &mut criterion::Bencher| {
-        b.iter(|| {
-            for word in &TEST_WORDS {
-                let _result: Result<[u8; 4], _> = word.try_into();
-            }
-        })
-    },
-}
-
-// Conversion to u16 array
-benchmark_with_setup! {
-    word_convert_u16,
-    DEFAULT_MEASUREMENT_TIME,
-    DEFAULT_SAMPLE_SIZE,
-    "try_from_to_u16",
-    || {},
-    |b: &mut criterion::Bencher| {
-        b.iter(|| {
-            for word in &TEST_WORDS {
-                let _result: Result<[u16; 4], _> = word.try_into();
-            }
-        })
-    },
-}
-
-// Conversion to u32 array
-benchmark_with_setup! {
-    word_convert_u32,
-    DEFAULT_MEASUREMENT_TIME,
-    DEFAULT_SAMPLE_SIZE,
-    "try_from_to_u32",
-    || {},
-    |b: &mut criterion::Bencher| {
-        b.iter(|| {
-            for word in &TEST_WORDS {
-                let _result: Result<[u32; 4], _> = word.try_into();
-            }
-        })
-    },
-}
-
-// Conversion to u64 array
+// Conversion to u64 array using Into trait
 benchmark_with_setup! {
     word_convert_u64,
     DEFAULT_MEASUREMENT_TIME,
@@ -370,11 +313,8 @@ criterion_group!(
     word_new,
     word_access_elements,
     word_access_bytes,
-    // Type conversion benchmarks
-    word_convert_bool,
-    word_convert_u8,
-    word_convert_u16,
-    word_convert_u32,
+    // Type conversion benchmarks (consolidated)
+    word_convert_basic,
     word_convert_u64,
     word_convert_felt,
     word_convert_bytes,

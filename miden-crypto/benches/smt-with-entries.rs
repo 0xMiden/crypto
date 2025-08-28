@@ -44,4 +44,4 @@ criterion_group! {
 criterion_main!(smt_with_entries_group);
 
 // HELPER FUNCTIONS
-// --------------------------------------------------------------------------------------------
+// === Helper Functions ===

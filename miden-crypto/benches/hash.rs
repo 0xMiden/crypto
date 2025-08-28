@@ -22,7 +22,7 @@ use std::hint::black_box;
 
 use criterion::{BenchmarkId, Criterion, criterion_group, criterion_main};
 use miden_crypto::{
-    Felt, Word,
+    Felt,
     hash::{
         blake::{Blake3_160, Blake3_192, Blake3_256},
         keccak::Keccak256,
@@ -52,11 +52,7 @@ benchmark_hash!(
     "single",
     HASH_INPUT_SIZES,
     |b: &mut criterion::Bencher, size| {
-        let data = if size <= 64 {
-            generate_byte_array_sequential(size)
-        } else {
-            generate_byte_array_random(size)
-        };
+        let data = generate_byte_array_sequential(size);
         b.iter(|| Rpo256::hash(black_box(&data)))
     },
     size,
@@ -107,16 +103,12 @@ benchmark_hash_merge_with_int!(
     "rpo256",
     &[32, 64, 256],
     MERGE_INT_SIZES,
-    |b: &mut criterion::Bencher, (size, int_size)| {
+    |b: &mut criterion::Bencher, (size, _int_size)| {
         let data = generate_byte_array_sequential(size);
         let digest = Rpo256::hash(&data);
-        let int = match int_size {
-            1 => 0u8 as u64,
-            2 => 0u16 as u64,
-            4 => 0u32 as u64,
-            8 => 0u64,
-            _ => 0u64,
-        };
+        // Use zero as the integer value since we're testing merge operation performance,
+        // not the specific integer value being merged.
+        let int = 0u64;
         b.iter(|| Rpo256::merge_with_int(black_box(digest), int))
     }
 );
@@ -132,17 +124,7 @@ benchmark_hash_merge_many!(
             let data = generate_byte_array_sequential(64);
             digests.push(Rpo256::hash(&data));
         }
-        match digest_count {
-            1 => {
-                let digest_array: [Word; 2] = [digests[0], digests[0]]; // Use digest twice for merge
-                b.iter(|| Rpo256::merge(black_box(&digest_array)))
-            },
-            2 => {
-                let digest_array: [Word; 2] = [digests[0], digests[1]];
-                b.iter(|| Rpo256::merge(black_box(&digest_array)))
-            },
-            _ => panic!("Unsupported digest count"),
-        }
+        b.iter(|| Rpo256::merge_many(black_box(&digests)))
     }
 );
 
@@ -155,11 +137,7 @@ benchmark_hash!(
     "single",
     HASH_INPUT_SIZES,
     |b: &mut criterion::Bencher, size| {
-        let data = if size <= 64 {
-            generate_byte_array_sequential(size)
-        } else {
-            generate_byte_array_random(size)
-        };
+        let data = generate_byte_array_sequential(size);
         b.iter(|| Rpx256::hash(black_box(&data)))
     },
     size,
@@ -210,16 +188,12 @@ benchmark_hash_merge_with_int!(
     "rpx256",
     &[32, 64, 256],
     MERGE_INT_SIZES,
-    |b: &mut criterion::Bencher, (size, int_size)| {
+    |b: &mut criterion::Bencher, (size, _int_size)| {
         let data = generate_byte_array_sequential(size);
         let digest = Rpx256::hash(&data);
-        let int = match int_size {
-            1 => 0u8 as u64,
-            2 => 0u16 as u64,
-            4 => 0u32 as u64,
-            8 => 0u64,
-            _ => 0u64,
-        };
+        // Use zero as the integer value since we're testing merge operation performance,
+        // not the specific integer value being merged.
+        let int = 0u64;
         b.iter(|| Rpx256::merge_with_int(black_box(digest), int))
     }
 );
@@ -235,17 +209,7 @@ benchmark_hash_merge_many!(
             let data = generate_byte_array_sequential(64);
             digests.push(Rpx256::hash(&data));
         }
-        match digest_count {
-            1 => {
-                let digest_array: [Word; 2] = [digests[0], digests[0]]; // Use digest twice for merge
-                b.iter(|| Rpx256::merge(black_box(&digest_array)))
-            },
-            2 => {
-                let digest_array: [Word; 2] = [digests[0], digests[1]];
-                b.iter(|| Rpx256::merge(black_box(&digest_array)))
-            },
-            _ => panic!("Unsupported digest count"),
-        }
+        b.iter(|| Rpx256::merge_many(black_box(&digests)))
     }
 );
 
@@ -258,11 +222,7 @@ benchmark_hash!(
     "single",
     HASH_INPUT_SIZES,
     |b: &mut criterion::Bencher, size| {
-        let data = if size <= 64 {
-            generate_byte_array_sequential(size)
-        } else {
-            generate_byte_array_random(size)
-        };
+        let data = generate_byte_array_sequential(size);
         b.iter(|| Blake3_256::hash(black_box(&data)))
     },
     size,
@@ -303,11 +263,7 @@ benchmark_hash!(
     "single",
     HASH_INPUT_SIZES,
     |b: &mut criterion::Bencher, size| {
-        let data = if size <= 64 {
-            generate_byte_array_sequential(size)
-        } else {
-            generate_byte_array_random(size)
-        };
+        let data = generate_byte_array_sequential(size);
         b.iter(|| Blake3_192::hash(black_box(&data)))
     },
     size,
@@ -348,11 +304,7 @@ benchmark_hash!(
     "single",
     HASH_INPUT_SIZES,
     |b: &mut criterion::Bencher, size| {
-        let data = if size <= 64 {
-            generate_byte_array_sequential(size)
-        } else {
-            generate_byte_array_random(size)
-        };
+        let data = generate_byte_array_sequential(size);
         b.iter(|| Blake3_160::hash(black_box(&data)))
     },
     size,

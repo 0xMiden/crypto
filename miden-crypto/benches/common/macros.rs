@@ -826,3 +826,131 @@ macro_rules! benchmark_rand_fill_bytes {
         }
     };
 }
+
+// Creates a comprehensive benchmark group for random coin implementations
+//
+// This macro generates all common random coin benchmarks for a given coin type:
+// - Initialization
+// - Element drawing
+// - Word drawing
+// - Reseeding
+// - Integer drawing
+// - Leading zero checking
+// - Byte filling
+//
+// # Usage
+// ```no_run
+// benchmark_rand_comprehensive!(
+//     rand_rpo_,
+//     RpoRandomCoin,
+//     TEST_SEED,
+//     PRNG_OUTPUT_SIZES,
+//     &[1, 32, 64, 128, 256, 512, 1024]
+// );
+// ```
+#[macro_export]
+macro_rules! benchmark_rand_comprehensive {
+    ($prefix:ident, $coin_type:ty, $seed:expr, $output_sizes:expr, $byte_sizes:expr) => {
+        // Initialization benchmark
+        $crate::benchmark_rand_new!($prefix new, $coin_type, $seed);
+
+        // Element drawing benchmarks
+        $crate::benchmark_rand_draw!(
+            $prefix draw_elements,
+            $coin_type,
+            $seed,
+            "draw_element",
+            $output_sizes,
+            |_b, coin: &mut $coin_type, count| {
+                for _ in 0..count {
+                    let _element = coin.draw_element();
+                }
+            }
+        );
+
+        // Word drawing benchmarks
+        $crate::benchmark_rand_draw!(
+            $prefix draw_words,
+            $coin_type,
+            $seed,
+            "draw_word",
+            $output_sizes,
+            |_b, coin: &mut $coin_type, count| {
+                for _ in 0..count {
+                    let _word = coin.draw_word();
+                }
+            }
+        );
+
+        // Reseeding benchmark
+        $crate::benchmark_rand_reseed!($prefix reseeding, $coin_type, $seed);
+
+        // Integer drawing benchmark
+        $crate::benchmark_rand_draw_integers!($prefix draw_integers, $coin_type, $seed);
+
+        // Leading zero checking benchmark
+        $crate::benchmark_rand_check_leading_zeros!($prefix check_leading_zeros, $coin_type, $seed);
+
+        // Byte filling benchmark
+        $crate::benchmark_rand_fill_bytes!(
+            $prefix fill_bytes,
+            $coin_type,
+            $seed,
+            $byte_sizes
+        );
+    };
+}
+
+// Creates benchmarks for word type conversions with minimal repetition
+//
+// This macro generates conversion benchmarks for multiple target types in one call.
+// It's useful for benchmarking Word::try_into() for various integer types.
+//
+// # Usage
+// ```no_run
+// benchmark_word_conversions!(
+//     word_convert_basic,
+//     &[bool::default(), u8::default(), u16::default(), u32::default(), u64::default()],
+//     TEST_WORDS
+// );
+// ```
+#[macro_export]
+macro_rules! benchmark_word_conversions {
+    ($func_name:ident, $types:expr, $test_data:expr) => {
+        fn $func_name(c: &mut Criterion) {
+            let mut group = c.benchmark_group("word-conversions-basic");
+            group.measurement_time($crate::common::config::DEFAULT_MEASUREMENT_TIME);
+            group.sample_size($crate::common::config::DEFAULT_SAMPLE_SIZE);
+
+            group.bench_function("conversions_batch", |b| {
+                b.iter(|| {
+                    for word in $test_data {
+                        for &type_template in $types {
+                            match type_template {
+                                // Handle each type conversion
+                                0 => {
+                                    let _result: Result<[bool; 4], _> = word.try_into();
+                                },
+                                1 => {
+                                    let _result: Result<[u8; 4], _> = word.try_into();
+                                },
+                                2 => {
+                                    let _result: Result<[u16; 4], _> = word.try_into();
+                                },
+                                3 => {
+                                    let _result: Result<[u32; 4], _> = word.try_into();
+                                },
+                                4 => {
+                                    let _result: Result<[u64; 4], _> = word.try_into();
+                                },
+                                _ => {},
+                            }
+                        }
+                    }
+                })
+            });
+
+            group.finish();
+        }
+    };
+}
