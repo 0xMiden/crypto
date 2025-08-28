@@ -9,7 +9,9 @@ use std::{hint, time::Duration};
 
 use criterion::{BatchSize, Criterion, criterion_group, criterion_main};
 use miden_crypto::{Felt, ONE, Word, merkle::MerkleTree};
-use rand_utils::prng_array;
+
+mod common;
+use common::data::*;
 
 fn balanced_merkle_even(c: &mut Criterion) {
     c.bench_function("balanced-merkle-even", |b| {
@@ -55,12 +57,3 @@ criterion_group! {
     targets = balanced_merkle_even, balanced_merkle_rand
 }
 criterion_main!(smt_subtree_group);
-
-// HELPER FUNCTIONS
-// --------------------------------------------------------------------------------------------
-
-fn generate_word(seed: &mut [u8; 32]) -> Word {
-    *seed = prng_array(*seed);
-    let nums: [u64; 4] = prng_array(*seed);
-    Word::new([Felt::new(nums[0]), Felt::new(nums[1]), Felt::new(nums[2]), Felt::new(nums[3])])
-}

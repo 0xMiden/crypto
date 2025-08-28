@@ -685,7 +685,8 @@ mod tests {
         let tracked_leaves = partial
             .nodes
             .iter()
-            .filter_map(|(index, _)| (index.is_leaf()).then(|| index.sibling()))
+            .filter(|&(index, _)| index.is_leaf())
+            .map(|(index, _)| index.sibling())
             .collect::<Vec<_>>();
         let nodes_before = partial.nodes.clone();
 
