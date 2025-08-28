@@ -14,6 +14,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@main
+      - name: Install LLVM/Clang
+        uses: KyleMayes/install-llvm-action@v2
+        with:
+          version: "17"
       - name: Clippy
         run: |
           rustup update --no-self-update nightly
@@ -28,7 +32,6 @@ jobs:
       - name: Rustfmt
         run: |
           rustup update --no-self-update nightly
-          rustup default ${{ matrix.toolchain }}
           rustup +nightly component add rustfmt
           make format-check
 
@@ -37,6 +40,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@main
+      - name: Install LLVM/Clang
+        uses: KyleMayes/install-llvm-action@v2
+        with:
+          version: "17"
       - name: Build docs
         run: |
           rustup update --no-self-update

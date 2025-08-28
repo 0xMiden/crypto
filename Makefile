@@ -44,7 +44,7 @@ doc: ## Generate and check documentation
 
 .PHONY: test-default
 test-default: ## Run tests with default features
-	$(DEBUG_OVERFLOW_INFO) cargo nextest run --profile default --release --all-features
+	$(DEBUG_OVERFLOW_INFO) cargo nextest run --profile default --release
 
 .PHONY: test-hashmaps
 test-hashmaps: ## Run tests with `hashmaps` feature enabled
@@ -56,14 +56,18 @@ test-no-std: ## Run tests with `no-default-features` (std)
 
 .PHONY: test-smt-concurrent
 test-smt-concurrent: ## Run only concurrent SMT tests
-	$(DEBUG_OVERFLOW_INFO) cargo nextest run --profile smt-concurrent --release --all-features
+	$(DEBUG_OVERFLOW_INFO) cargo nextest run --profile smt-concurrent --release
 
 .PHONY: test-docs
 test-docs:
 	$(DEBUG_OVERFLOW_INFO) cargo test --doc --all-features
 
+.PHONY: test-large-smt
+test-large-smt: ## Run only large SMT tests
+	$(DEBUG_OVERFLOW_INFO) cargo nextest run --success-output immediate  --profile large-smt --release --features hashmaps,rocksdb
+
 .PHONY: test
-test: test-default test-smt-hashmaps test-no-std test-docs ## Run all tests except concurrent SMT tests
+test: test-default test-hashmaps test-no-std test-docs test-large-smt ## Run all tests except concurrent SMT tests
 
 # --- checking ------------------------------------------------------------------------------------
 
@@ -98,6 +102,18 @@ bench: ## Run crypto benchmarks
 .PHONY: bench-smt-concurrent
 bench-smt-concurrent: ## Run SMT benchmarks with concurrent feature
 	cargo run --release --features concurrent,executable -- --size 1000000
+
+.PHONY: bench-large-smt-memory
+bench-large-smt-memory: ## Run large SMT benchmarks with memory storage
+	cargo run --release --features concurrent,hashmaps,executable -- --size 1000000
+
+.PHONY: bench-large-smt-rocksdb
+bench-large-smt-rocksdb: ## Run large SMT benchmarks with rocksdb storage
+	cargo run --release --features concurrent,hashmaps,rocksdb,executable -- --storage rocksdb --size 1000000
+
+.PHONY: bench-large-smt-rocksdb-open
+bench-large-smt-rocksdb-open: ## Run large SMT benchmarks with rocksdb storage and open existing database
+	cargo run --release --features concurrent,hashmaps,rocksdb,executable -- --open
 
 # --- fuzzing --------------------------------------------------------------------------------
 
