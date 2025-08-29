@@ -59,8 +59,13 @@ impl EphemeralSecretKey {
     }
 
     /// Generates a new ephemeral secret key using the provided random number generator.
-    pub fn with_rng<R: CryptoRng + RngCore>(_rng: &mut R) -> Self {
-        let mut rng = k256::elliptic_curve::rand_core::OsRng;
+    pub fn with_rng<R: CryptoRng + RngCore>(rng: &mut R) -> Self {
+        use k256::elliptic_curve::rand_core::SeedableRng;
+
+        let mut seed = [0_u8; 32];
+        rand::RngCore::fill_bytes(rng, &mut seed);
+
+        let mut rng = rand_hc::Hc128Rng::from_seed(seed);
 
         let sk_e = k256::ecdh::EphemeralSecret::random(&mut rng);
         Self { inner: sk_e }

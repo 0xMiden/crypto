@@ -8,7 +8,6 @@ use k256::{
     ecdsa::{RecoveryId, SigningKey, VerifyingKey, signature::hazmat::PrehashVerifier},
 };
 use rand::{CryptoRng, RngCore};
-use rand_hc::Hc128Rng;
 use thiserror::Error;
 
 use crate::{
@@ -59,7 +58,7 @@ impl SecretKey {
         let mut seed = [0_u8; 32];
         rand::RngCore::fill_bytes(rng, &mut seed);
 
-        let mut rng = Hc128Rng::from_seed(seed);
+        let mut rng = rand_hc::Hc128Rng::from_seed(seed);
 
         let signing_key = SigningKey::random(&mut rng);
         Self { inner: signing_key }
