@@ -33,59 +33,6 @@ const SIGNATURE_STANDARD_BYTES: usize = 64;
 /// Length of scalars for the `secp256k1` curve
 const SCALARS_SIZE_BYTES: usize = 32;
 
-// ECDSA HASHER
-// ================================================================================================
-
-#[repr(u8)]
-#[derive(Debug, Clone, Copy)]
-pub enum EcdsaHasher {
-    Sha256 = 0,
-    Keccak = 1,
-}
-
-impl EcdsaHasher {
-    /// Hashes a message using the variant of the ECDSA hasher.
-    fn hash(&self, message: &[u8]) -> [u8; 32] {
-        match self {
-            EcdsaHasher::Sha256 => {
-                use k256::sha2::{Digest, Sha256};
-                let mut hasher = Sha256::new();
-                hasher.update(message);
-                hasher.finalize().into()
-            },
-            EcdsaHasher::Keccak => {
-                use sha3::{Digest, Keccak256};
-                let mut hasher = Keccak256::new();
-                hasher.update(message);
-                hasher.finalize().into()
-            },
-        }
-    }
-
-    /// Converts the hasher variant to a `u8`.
-    pub fn to_byte(&self) -> u8 {
-        *self as u8
-    }
-}
-
-impl TryFrom<u8> for EcdsaHasher {
-    type Error = HasherError;
-
-    fn try_from(byte: u8) -> Result<Self, Self::Error> {
-        match byte {
-            0 => Ok(EcdsaHasher::Sha256),
-            1 => Ok(EcdsaHasher::Keccak),
-            _ => Err(HasherError::InvalidHasher(byte)),
-        }
-    }
-}
-
-#[derive(Debug, Error)]
-pub enum HasherError {
-    #[error("Invalid hasher byte value: {0}")]
-    InvalidHasher(u8),
-}
-
 // SECRET KEY
 // ================================================================================================
 
@@ -119,9 +66,8 @@ impl SecretKey {
     }
 
     /// Signs a message (represented as a Word) with this secret key.
-    pub fn sign(&mut self, message: Word, hasher: EcdsaHasher) -> Signature {
-        let message_bytes: [u8; 32] = message.into();
-        let message_digest = hasher.hash(&message_bytes);
+    pub fn sign(&mut self, message: Word) -> Signature {
+        let message_digest = hash_message(message);
 
         let (signature_inner, recovery_id) = self
             .inner
@@ -129,15 +75,11 @@ impl SecretKey {
             .expect("failed to generate signature");
 
         let (r, s) = signature_inner.split_scalars();
-        let signature_data = SignatureData {
+
+        Signature {
             r: r.to_bytes().into(),
             s: s.to_bytes().into(),
             v: recovery_id.into(),
-        };
-
-        match hasher {
-            EcdsaHasher::Sha256 => Signature::Sha256(signature_data),
-            EcdsaHasher::Keccak => Signature::Keccak(signature_data),
         }
     }
 
@@ -167,8 +109,7 @@ impl PublicKey {
 
     /// Verifies a signature against this public key and message.
     pub fn verify(&self, message: Word, signature: &Signature) -> bool {
-        let message_bytes: [u8; 32] = message.into();
-        let message_digest = signature.hasher().hash(&message_bytes);
+        let message_digest = hash_message(message);
         let signature_inner = k256::ecdsa::Signature::from_scalars(*signature.r(), *signature.s());
 
         match signature_inner {
@@ -180,8 +121,7 @@ impl PublicKey {
     /// Recovers from the signature the public key associated to the secret key used to sign the
     /// message.
     pub fn recover_from(message: Word, signature: &Signature) -> Result<Self, PublicKeyError> {
-        let message_bytes: [u8; 32] = message.into();
-        let message_digest = signature.hasher().hash(&message_bytes);
+        let message_digest = hash_message(message);
         let signature_data = k256::ecdsa::Signature::from_scalars(*signature.r(), *signature.s())
             .expect("could not build the signature from the scalars");
 
@@ -214,8 +154,7 @@ pub enum PublicKeyError {
 // SIGNATURE
 // ================================================================================================
 
-/// ECDSA signature over secp256k1 curve using either SHA256 or Keccak to hash the messages when
-/// signing.
+/// ECDSA signature over secp256k1 curve using Keccak to hash the messages when signing.
 ///
 /// ## Serialization Formats
 ///
@@ -225,57 +164,32 @@ pub enum PublicKeyError {
 /// - Bytes 0-31: r component (32 bytes, big-endian)
 /// - Bytes 32-63: s component (32 bytes, big-endian)
 /// - Byte 64: recovery ID (v) - values 0-3
-/// - Byte 65: hasher type (0 = SHA256, 1 = Keccak256)
 ///
 /// ### SEC1 Format (64 bytes):
 /// - Bytes 0-31: r component (32 bytes, big-endian)
 /// - Bytes 32-63: s component (32 bytes, big-endian)
-/// - Note: Recovery ID and hasher type are not included
+/// - Note: Recovery ID
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum Signature {
-    Sha256(SignatureData),
-    Keccak(SignatureData),
-}
-
-/// ECDSA signature over secp256k1 curve.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct SignatureData {
+pub struct Signature {
     r: [u8; SCALARS_SIZE_BYTES],
     s: [u8; SCALARS_SIZE_BYTES],
     v: u8,
 }
 
 impl Signature {
-    /// Returns the hasher associated to this signature.
-    pub fn hasher(&self) -> EcdsaHasher {
-        match self {
-            Signature::Sha256(_) => EcdsaHasher::Sha256,
-            Signature::Keccak(_) => EcdsaHasher::Keccak,
-        }
-    }
-
     /// Returns the `r` scalar of this signature.
     pub fn r(&self) -> &[u8; SCALARS_SIZE_BYTES] {
-        match self {
-            Signature::Sha256(SignatureData { r, .. }) => r,
-            Signature::Keccak(SignatureData { r, .. }) => r,
-        }
+        &self.r
     }
 
     /// Returns the `s` scalar of this signature.
     pub fn s(&self) -> &[u8; SCALARS_SIZE_BYTES] {
-        match self {
-            Signature::Sha256(SignatureData { s, .. }) => s,
-            Signature::Keccak(SignatureData { s, .. }) => s,
-        }
+        &self.s
     }
 
     /// Returns the `v` component of this signature, which is a `u8` representing the recovery id.
     pub fn v(&self) -> u8 {
-        match self {
-            Signature::Sha256(SignatureData { v, .. }) => *v,
-            Signature::Keccak(SignatureData { v, .. }) => *v,
-        }
+        self.v
     }
 
     /// Verifies this signature against a message and public key.
@@ -285,8 +199,7 @@ impl Signature {
 
     /// Converts signature to SEC1 format (standard 64-byte r||s format).
     ///
-    /// This format is the standard one used by most ECDSA libraries but loses the recovery ID
-    /// and hasher type information.
+    /// This format is the standard one used by most ECDSA libraries but loses the recovery ID.
     pub fn to_sec1_bytes(&self) -> [u8; SIGNATURE_STANDARD_BYTES] {
         let mut bytes = [0u8; 2 * SCALARS_SIZE_BYTES];
         bytes[0..SCALARS_SIZE_BYTES].copy_from_slice(self.r());
@@ -294,15 +207,13 @@ impl Signature {
         bytes
     }
 
-    /// Creates a signature from SEC1 format bytes with explicit hasher.
+    /// Creates a signature from SEC1 format bytes with a given recovery id.
     ///
     /// # Arguments
     /// * `bytes` - 64-byte array containing r and s components
-    /// * `hasher` - The hash function used for this signature
     /// * `recovery_id` - recovery ID (0-3)
-    pub fn from_sec1_bytes_and_hasher(
+    pub fn from_sec1_bytes_and_recovery_id(
         bytes: [u8; SIGNATURE_STANDARD_BYTES],
-        hasher: EcdsaHasher,
         v: u8,
     ) -> Result<Self, DeserializationError> {
         let mut r = [0u8; SCALARS_SIZE_BYTES];
@@ -314,12 +225,7 @@ impl Signature {
             return Err(DeserializationError::InvalidValue(r#"Invalid recovery ID"#.to_string()));
         }
 
-        let sig_data = SignatureData { r, s, v };
-
-        match hasher {
-            EcdsaHasher::Sha256 => Ok(Signature::Sha256(sig_data)),
-            EcdsaHasher::Keccak => Ok(Signature::Keccak(sig_data)),
-        }
+        Ok(Signature { r, s, v })
     }
 }
 
@@ -373,7 +279,6 @@ impl Serializable for Signature {
         bytes[0..SCALARS_SIZE_BYTES].copy_from_slice(self.r());
         bytes[SCALARS_SIZE_BYTES..2 * SCALARS_SIZE_BYTES].copy_from_slice(self.s());
         bytes[2 * SCALARS_SIZE_BYTES] = self.v();
-        bytes[2 * SCALARS_SIZE_BYTES + 1] = self.hasher().to_byte();
         target.write_bytes(&bytes);
     }
 }
@@ -384,14 +289,18 @@ impl Deserializable for Signature {
         let s: [u8; SCALARS_SIZE_BYTES] = source.read_array()?;
         let v: u8 = source.read_u8()?;
 
-        let signature = SignatureData { r, s, v };
-        let hasher_byte = source.read_u8()?;
-        let hasher = hasher_byte.try_into().map_err(|_| {
-            DeserializationError::InvalidValue("not a valid ECDSA hasher variant".to_string())
-        })?;
-        match hasher {
-            EcdsaHasher::Sha256 => Ok(Signature::Sha256(signature)),
-            EcdsaHasher::Keccak => Ok(Signature::Keccak(signature)),
-        }
+        Ok(Signature { r, s, v })
     }
+}
+
+// HELPER
+// ================================================================================================
+
+/// Hashes a word message using Keccak.
+fn hash_message(message: Word) -> [u8; 32] {
+    use sha3::{Digest, Keccak256};
+    let mut hasher = Keccak256::new();
+    let message_bytes: [u8; 32] = message.into();
+    hasher.update(message_bytes);
+    hasher.finalize().into()
 }

@@ -21,7 +21,7 @@ fn test_key_generation() {
 }
 
 #[test]
-fn test_public_key_recovery_sha256() {
+fn test_public_key_recovery() {
     let mut rng = rng();
 
     let mut secret_key = SecretKey::with_rng(&mut rng);
@@ -29,7 +29,7 @@ fn test_public_key_recovery_sha256() {
 
     // Generate a signature using the secret key
     let message = [Felt::new(1), Felt::new(2), Felt::new(3), Felt::new(4)].into();
-    let signature = secret_key.sign(message, EcdsaHasher::Sha256);
+    let signature = secret_key.sign(message);
 
     // Recover the public key
     let recovered_pk = PublicKey::recover_from(message, &signature).unwrap();
@@ -42,35 +42,14 @@ fn test_public_key_recovery_sha256() {
 }
 
 #[test]
-fn test_public_key_recovery_keccak() {
-    let mut rng = rng();
-
-    let mut secret_key = SecretKey::with_rng(&mut rng);
-    let public_key = secret_key.public_key();
-
-    // Generate a signature using the secret key
-    let message = [Felt::new(1), Felt::new(2), Felt::new(3), Felt::new(4)].into();
-    let signature = secret_key.sign(message, EcdsaHasher::Keccak);
-
-    // Recover the public key
-    let recovered_pk = PublicKey::recover_from(message, &signature).unwrap();
-    assert_eq!(public_key, recovered_pk);
-
-    // Using the wrong message, we shouldn't be able to recover the public key
-    let message = [Felt::new(1), Felt::new(2), Felt::new(3), Felt::new(5)].into();
-    let recovered_pk = PublicKey::recover_from(message, &signature).unwrap();
-    assert!(public_key != recovered_pk);
-}
-
-#[test]
-fn test_sign_and_verify_sha256() {
+fn test_sign_and_verify() {
     let mut rng = rng();
 
     let mut secret_key = SecretKey::with_rng(&mut rng);
     let public_key = secret_key.public_key();
 
     let message = [Felt::new(1), Felt::new(2), Felt::new(3), Felt::new(4)].into();
-    let signature = secret_key.sign(message, EcdsaHasher::Sha256);
+    let signature = secret_key.sign(message);
 
     // Verify using public key method
     assert!(public_key.verify(message, &signature));
@@ -84,33 +63,12 @@ fn test_sign_and_verify_sha256() {
 }
 
 #[test]
-fn test_sign_and_verify_keccak() {
-    let mut rng = rng();
-
-    let mut secret_key = SecretKey::with_rng(&mut rng);
-    let public_key = secret_key.public_key();
-
-    let message = [Felt::new(1), Felt::new(2), Felt::new(3), Felt::new(4)].into();
-    let signature = secret_key.sign(message, EcdsaHasher::Keccak);
-
-    // Verify using public key method
-    assert!(public_key.verify(message, &signature));
-
-    // Verify using signature method
-    assert!(signature.verify(message, &public_key));
-
-    // Test with wrong message
-    let wrong_message = [Felt::new(5), Felt::new(6), Felt::new(7), Felt::new(8)].into();
-    assert!(!public_key.verify(wrong_message, &signature));
-}
-
-#[test]
-fn test_signature_serialization_default_sha256() {
+fn test_signature_serialization_default() {
     let mut rng = rng();
 
     let mut secret_key = SecretKey::with_rng(&mut rng);
     let message = [Felt::new(1), Felt::new(2), Felt::new(3), Felt::new(4)].into();
-    let signature = secret_key.sign(message, EcdsaHasher::Sha256);
+    let signature = secret_key.sign(message);
 
     let sig_bytes = signature.to_bytes();
     let recovered_sig = Signature::read_from_bytes(&sig_bytes).unwrap();
@@ -119,65 +77,23 @@ fn test_signature_serialization_default_sha256() {
 }
 
 #[test]
-fn test_signature_serialization_default_keccak() {
+fn test_signature_serialization() {
     let mut rng = rng();
 
     let mut secret_key = SecretKey::with_rng(&mut rng);
     let message = [Felt::new(1), Felt::new(2), Felt::new(3), Felt::new(4)].into();
-    let signature = secret_key.sign(message, EcdsaHasher::Keccak);
-
-    let sig_bytes = signature.to_bytes();
-    let recovered_sig = Signature::read_from_bytes(&sig_bytes).unwrap();
-
-    assert_eq!(signature, recovered_sig);
-}
-
-#[test]
-fn test_signature_serialization_sec1_sha256() {
-    let mut rng = rng();
-
-    let mut secret_key = SecretKey::with_rng(&mut rng);
-    let message = [Felt::new(1), Felt::new(2), Felt::new(3), Felt::new(4)].into();
-    let signature = secret_key.sign(message, EcdsaHasher::Sha256);
+    let signature = secret_key.sign(message);
     let recovery_id = signature.v();
 
     let sig_bytes = signature.to_sec1_bytes();
-    let recovered_sig =
-        Signature::from_sec1_bytes_and_hasher(sig_bytes, EcdsaHasher::Sha256, recovery_id).unwrap();
+    let recovered_sig = Signature::from_sec1_bytes_and_recovery_id(sig_bytes, recovery_id).unwrap();
 
     assert_eq!(signature, recovered_sig);
 
     let recovery_id = (recovery_id + 1) % 4;
-    let recovered_sig =
-        Signature::from_sec1_bytes_and_hasher(sig_bytes, EcdsaHasher::Sha256, recovery_id).unwrap();
+    let recovered_sig = Signature::from_sec1_bytes_and_recovery_id(sig_bytes, recovery_id).unwrap();
     assert_ne!(signature, recovered_sig);
 
-    let recovered_sig =
-        Signature::from_sec1_bytes_and_hasher(sig_bytes, EcdsaHasher::Keccak, recovery_id).unwrap();
-    assert_ne!(signature, recovered_sig);
-}
-
-#[test]
-fn test_signature_serialization_keccak() {
-    let mut rng = rng();
-
-    let mut secret_key = SecretKey::with_rng(&mut rng);
-    let message = [Felt::new(1), Felt::new(2), Felt::new(3), Felt::new(4)].into();
-    let signature = secret_key.sign(message, EcdsaHasher::Keccak);
-    let recovery_id = signature.v();
-
-    let sig_bytes = signature.to_sec1_bytes();
-    let recovered_sig =
-        Signature::from_sec1_bytes_and_hasher(sig_bytes, EcdsaHasher::Keccak, recovery_id).unwrap();
-
-    assert_eq!(signature, recovered_sig);
-
-    let recovery_id = (recovery_id + 1) % 4;
-    let recovered_sig =
-        Signature::from_sec1_bytes_and_hasher(sig_bytes, EcdsaHasher::Keccak, recovery_id).unwrap();
-    assert_ne!(signature, recovered_sig);
-
-    let recovered_sig =
-        Signature::from_sec1_bytes_and_hasher(sig_bytes, EcdsaHasher::Sha256, recovery_id).unwrap();
+    let recovered_sig = Signature::from_sec1_bytes_and_recovery_id(sig_bytes, recovery_id).unwrap();
     assert_ne!(signature, recovered_sig);
 }
