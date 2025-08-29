@@ -708,6 +708,7 @@ dependencies = [
  "rand",
  "rand_chacha",
  "rand_core 0.9.3",
+ "rand_hc",
  "rayon",
  "rstest",
  "seq-macro",
@@ -954,6 +955,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "99d9a13982dcf210057a8a78572b2217b667c3beacbf3a0d8b454f6f82837d38"
 dependencies = [
  "getrandom 0.3.3",
+]
+
+[[package]]
+name = "rand_hc"
+version = "0.3.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7b363d4f6370f88d62bf586c80405657bde0f0e1b8945d47d2ad59b906cb4f54"
+dependencies = [
+ "rand_core 0.6.4",
 ]
 
 [[package]]
