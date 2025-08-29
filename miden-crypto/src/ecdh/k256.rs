@@ -19,7 +19,7 @@ use k256::{AffinePoint, elliptic_curve::sec1::ToEncodedPoint, sha2::Sha256};
 use rand::{CryptoRng, RngCore};
 
 use crate::{
-    dsa::ecdsa_secp256k1::{PUBLIC_KEY_BYTES, PublicKey},
+    dsa::ecdsa_k256::{PUBLIC_KEY_BYTES, PublicKey},
     utils::{ByteReader, ByteWriter, Deserializable, DeserializationError, Serializable},
 };
 
@@ -121,7 +121,7 @@ mod test {
     use winter_utils::{Deserializable, Serializable};
 
     use super::{EphemeralPublicKey, EphemeralSecretKey};
-    use crate::dsa::ecdsa_secp256k1::SecretKey;
+    use crate::dsa::ecdsa_k256::SecretKey;
 
     #[test]
     fn key_agreement() {
