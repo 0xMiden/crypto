@@ -51,7 +51,7 @@ benchmark_rand_draw!(
     TEST_SEED,
     "draw_element",
     PRNG_OUTPUT_SIZES,
-    |_b, coin: &mut RpoRandomCoin, count| {
+    |coin: &mut RpoRandomCoin, count| {
         for _ in 0..count {
             let _element = coin.draw_element();
         }
@@ -63,7 +63,7 @@ benchmark_rand_draw!(
     TEST_SEED,
     "draw_word",
     PRNG_OUTPUT_SIZES,
-    |_b, coin: &mut RpoRandomCoin, count| {
+    |coin: &mut RpoRandomCoin, count| {
         for _ in 0..count {
             let _word = coin.draw_word();
         }
@@ -89,7 +89,7 @@ benchmark_rand_draw!(
     TEST_SEED,
     "draw_element",
     PRNG_OUTPUT_SIZES,
-    |_b, coin: &mut RpxRandomCoin, count| {
+    |coin: &mut RpxRandomCoin, count| {
         for _ in 0..count {
             let _element = coin.draw_element();
         }
@@ -101,7 +101,7 @@ benchmark_rand_draw!(
     TEST_SEED,
     "draw_word",
     PRNG_OUTPUT_SIZES,
-    |_b, coin: &mut RpxRandomCoin, count| {
+    |coin: &mut RpxRandomCoin, count| {
         for _ in 0..count {
             let _word = coin.draw_word();
         }

@@ -344,7 +344,7 @@ macro_rules! benchmark_rand_core {
                     BenchmarkId::new($operation, count),
                     &count,
                     |b: &mut criterion::Bencher, &count_param: &usize| {
-                        $closure(b, &mut coin, count_param)
+                        b.iter(|| $closure(&mut coin, count_param))
                     },
                 );
 
