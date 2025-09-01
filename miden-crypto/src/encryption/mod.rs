@@ -2,8 +2,6 @@
 
 use thiserror::Error;
 
-pub mod aead_rpo;
-
 pub mod xchacha;
 
 // CONSTANTS
