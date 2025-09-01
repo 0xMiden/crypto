@@ -13,7 +13,7 @@ DEBUG_OVERFLOW_INFO=RUSTFLAGS="-C debug-assertions -C overflow-checks -C debugin
 
 .PHONY: clippy
 clippy: ## Run Clippy with configs
-	$(WARNINGS) cargo +nightly clippy --workspace --all-targets --all-features
+	$(WARNINGS) cargo clippy --workspace --all-targets --all-features
 
 
 .PHONY: fix
