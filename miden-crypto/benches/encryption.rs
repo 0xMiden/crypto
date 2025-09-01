@@ -57,7 +57,12 @@ fn bench_xchacha_encryption_felts(c: &mut Criterion) {
         let nonce = ChaChaNonce::from_slice(&nonce_bytes);
         let encrypted = key.encrypt_with_nonce(&data, &associated_data, nonce).unwrap();
         group.bench_with_input(BenchmarkId::new("decrypt", size), &encrypted, |b, encrypted| {
-            b.iter(|| black_box(key.decrypt(black_box(encrypted)).unwrap()));
+            b.iter(|| {
+                black_box(
+                    key.decrypt_with_associated_data(black_box(encrypted), &associated_data)
+                        .unwrap(),
+                )
+            });
         });
     }
 
@@ -100,7 +105,12 @@ fn bench_xchacha_encryption_bytes(c: &mut Criterion) {
         let nonce = ChaChaNonce::from_slice(&nonce_bytes);
         let encrypted = key.encrypt_bytes_with_nonce(&data, &associated_data, nonce).unwrap();
         group.bench_with_input(BenchmarkId::new("decrypt", size), &encrypted, |b, encrypted| {
-            b.iter(|| black_box(key.decrypt_bytes(black_box(encrypted)).unwrap()));
+            b.iter(|| {
+                black_box(
+                    key.decrypt_bytes_with_associated_data(black_box(encrypted), &associated_data)
+                        .unwrap(),
+                )
+            });
         });
     }
 

@@ -22,4 +22,6 @@ pub enum EncryptionError {
     /// Operation failed
     #[error("operation failed")]
     FailedOperation,
+    #[error("malformed padding")]
+    MalformedPadding,
 }
