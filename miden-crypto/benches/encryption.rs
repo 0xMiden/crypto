@@ -53,7 +53,7 @@ fn bench_miden_encryption_felts(c: &mut Criterion) {
         let encrypted =
             key.encrypt_with_nonce(&data, &associated_data, Nonce::from_word(nonce_word));
         group.bench_with_input(BenchmarkId::new("decrypt", size), &encrypted, |b, encrypted| {
-            b.iter(|| black_box(key.decrypt(black_box(encrypted)).unwrap()));
+            b.iter(|| black_box(key.decrypt(black_box(encrypted), &associated_data).unwrap()));
         });
     }
 
@@ -91,7 +91,9 @@ fn bench_miden_encryption_bytes(c: &mut Criterion) {
         let encrypted =
             key.encrypt_bytes_with_nonce(&data, &associated_data, Nonce::from_word(nonce_word));
         group.bench_with_input(BenchmarkId::new("decrypt", size), &encrypted, |b, encrypted| {
-            b.iter(|| black_box(key.decrypt_bytes(black_box(encrypted)).unwrap()));
+            b.iter(|| {
+                black_box(key.decrypt_bytes(black_box(encrypted), &associated_data).unwrap())
+            });
         });
     }
 

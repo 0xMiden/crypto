@@ -1,3 +1,12 @@
+//! # Arithmetization Oriented AEAD
+//!
+//! This module implements an AEAD scheme optimized for spped within SNARKs/STARKs.
+//! The design is described in [1] and is based on the MonkeySpongeWrap construction combined
+//! using the RPO (Rescue Prime Optimized) permutation, creating an encryption scheme that is
+//! highly efficient when executed within zero-knowledge proof systems.
+//!
+//! [1] https://eprint.iacr.org/2023/1668
+
 use alloc::vec::Vec;
 use core::{fmt, ops::Range};
 
@@ -7,7 +16,11 @@ use rand::{
     distr::{Distribution, StandardUniform, Uniform},
 };
 
-use crate::{Felt, ONE, StarkField, Word, ZERO, hash::rpo::Rpo256};
+use crate::{
+    Felt, ONE, StarkField, Word, ZERO,
+    hash::rpo::Rpo256,
+    utils::{ByteReader, ByteWriter, Deserializable, DeserializationError, Serializable},
+};
 
 #[cfg(test)]
 mod test;
@@ -62,16 +75,9 @@ const BINARY_CHUNK_SIZE: usize = 7;
 /// Encrypted data with its authentication tag
 #[derive(Debug, PartialEq, Eq)]
 pub struct EncryptedData {
-    associated_data: Vec<Felt>,
     ciphertext: Vec<Felt>,
     auth_tag: AuthTag,
     nonce: Nonce,
-}
-
-impl EncryptedData {
-    pub fn associated_data(&self) -> &[Felt] {
-        &self.associated_data
-    }
 }
 
 /// An authentication tag represented as 4 field elements
@@ -98,9 +104,21 @@ impl SecretKey {
         rng.sample(StandardUniform)
     }
 
-    /// Encrypts the provided data, as Felt-s, using this secret key and a random nonce
+    /// Encrypts, as Felt-s, and authenticates the provided data using this secret key and a random
+    /// nonce
     #[cfg(feature = "std")]
-    pub fn encrypt(&self, data: &[Felt], associated_data: &[Felt]) -> EncryptedData {
+    pub fn encrypt(&self, data: &[Felt]) -> EncryptedData {
+        self.encrypt_with_associated_data(data, &[])
+    }
+
+    /// Encrypts, as Felt-s, the provided data and authenticate both the ciphertext as well as
+    /// the provided associated data using this secret key and a random nonce
+    #[cfg(feature = "std")]
+    pub fn encrypt_with_associated_data(
+        &self,
+        data: &[Felt],
+        associated_data: &[Felt],
+    ) -> EncryptedData {
         use rand::{SeedableRng, rngs::StdRng};
         let mut rng = StdRng::from_os_rng();
         let nonce = Nonce::with_rng(&mut rng);
@@ -108,9 +126,21 @@ impl SecretKey {
         self.encrypt_with_nonce(data, associated_data, nonce)
     }
 
-    /// Encrypts the provided data, as bytes, using this secret key and a random nonce
+    /// Encrypts, as bytes, and authenticates the provided data using this secret key and a random
+    /// nonce
     #[cfg(feature = "std")]
-    pub fn encrypt_bytes(&self, data: &[u8], associated_data: &[u8]) -> EncryptedData {
+    pub fn encrypt_bytes(&self, data: &[u8]) -> EncryptedData {
+        self.encrypt_bytes_with_associated_data(data, &[])
+    }
+
+    /// Encrypts, as bytes, the provided data and authenticate both the ciphertext as well as
+    /// the provided associated data using this secret key and a random nonce
+    #[cfg(feature = "std")]
+    pub fn encrypt_bytes_with_associated_data(
+        &self,
+        data: &[u8],
+        associated_data: &[u8],
+    ) -> EncryptedData {
         use rand::{SeedableRng, rngs::StdRng};
         let mut rng = StdRng::from_os_rng();
         let nonce = Nonce::with_rng(&mut rng);
@@ -125,20 +155,18 @@ impl SecretKey {
         associated_data: &[Felt],
         nonce: Nonce,
     ) -> EncryptedData {
-        let mut sponge = SpongeState::new();
-
-        // Initialize with key and nonce
-        sponge.initialize(self, &nonce);
+        // Initialize as sponge state with key and nonce
+        let mut sponge = SpongeState::new(self, &nonce);
 
         // Process the associated data
-        let padded_associated_data = pad_associated_data(associated_data);
+        let padded_associated_data = pad(associated_data);
         padded_associated_data.chunks(RATE_WIDTH).for_each(|chunk| {
             sponge.duplex_overwrite(chunk);
         });
 
         // Encrypt the data
         let mut ciphertext = Vec::with_capacity(data.len() + RATE_WIDTH);
-        let data = pad_plaintext(data);
+        let data = pad(data);
         let mut data_block_iterator = data.chunks_exact(RATE_WIDTH);
 
         data_block_iterator.by_ref().for_each(|data_block| {
@@ -151,12 +179,7 @@ impl SecretKey {
         // Generate authentication tag
         let auth_tag = sponge.squeeze_tag();
 
-        EncryptedData {
-            ciphertext,
-            associated_data: associated_data.into(),
-            auth_tag,
-            nonce,
-        }
+        EncryptedData { ciphertext, auth_tag, nonce }
     }
 
     /// Encrypts the provided data, as bytes, using this secret key and a specified nonce
@@ -173,18 +196,20 @@ impl SecretKey {
     }
 
     /// Decrypts the provided encrypted data using this secret key
-    pub fn decrypt(&self, encrypted_data: &EncryptedData) -> Result<Vec<Felt>, EncryptionError> {
+    pub fn decrypt(
+        &self,
+        encrypted_data: &EncryptedData,
+        associated_data: &[Felt],
+    ) -> Result<Vec<Felt>, EncryptionError> {
         if !encrypted_data.ciphertext.len().is_multiple_of(RATE_WIDTH) {
             return Err(EncryptionError::CiphertextLenNotMultipleRate);
         }
 
-        let mut sponge = SpongeState::new();
-
-        // Initialize with key and nonce (same as encryption)
-        sponge.initialize(self, &encrypted_data.nonce);
+        // Initialize as sponge state with key and nonce
+        let mut sponge = SpongeState::new(self, &encrypted_data.nonce);
 
         // Process the associated data
-        let padded_associated_data = pad_associated_data(&encrypted_data.associated_data);
+        let padded_associated_data = pad(associated_data);
         padded_associated_data.chunks(RATE_WIDTH).for_each(|chunk| {
             sponge.duplex_overwrite(chunk);
         });
@@ -217,8 +242,10 @@ impl SecretKey {
     pub fn decrypt_bytes(
         &self,
         encrypted_data: &EncryptedData,
+        associated_data: &[u8],
     ) -> Result<Vec<u8>, EncryptionError> {
-        let data_felts = self.decrypt(encrypted_data)?;
+        let ad_felt = bytes_to_felts(associated_data);
+        let data_felts = self.decrypt(encrypted_data, &ad_felt)?;
 
         felts_to_bytes(&data_felts)
     }
@@ -244,8 +271,13 @@ struct SpongeState {
 
 impl SpongeState {
     /// Creates a new sponge state
-    fn new() -> Self {
-        Self { state: [ZERO; STATE_WIDTH] }
+    fn new(sk: &SecretKey, nonce: &Nonce) -> Self {
+        let mut state = [ZERO; STATE_WIDTH];
+
+        state[RATE_RANGE_FIRST_HALF].copy_from_slice(&sk.0);
+        state[RATE_RANGE_SECOND_HALF].copy_from_slice(&nonce.0);
+
+        Self { state }
     }
 
     /// Duplex interface as described in Algorithm 2 in [1] with `d = 0`
@@ -293,11 +325,7 @@ impl SpongeState {
         Rpo256::apply_permutation(&mut self.state);
     }
 
-    fn initialize(&mut self, sk: &SecretKey, nonce: &Nonce) {
-        self.state[RATE_RANGE_FIRST_HALF].copy_from_slice(&sk.0);
-        self.state[RATE_RANGE_SECOND_HALF].copy_from_slice(&nonce.0);
-    }
-
+    /// Squeeze the rate portion of the state
     fn squeeze_rate(&self) -> [Felt; RATE_WIDTH] {
         self.state[RATE_RANGE].try_into().unwrap()
     }
@@ -329,6 +357,42 @@ impl Distribution<Nonce> for StandardUniform {
             *r = Felt::new(sampled_integer);
         }
         Nonce(res)
+    }
+}
+
+// SERIALIZATION / DESERIALIZATION
+// ================================================================================================
+
+impl Serializable for EncryptedData {
+    fn write_into<W: ByteWriter>(&self, target: &mut W) {
+        target.write_usize(self.ciphertext.len());
+        target.write_many(&felts_to_u64(&self.ciphertext));
+        target.write_many(&felts_to_u64(&self.nonce.0));
+        target.write_many(&felts_to_u64(&self.auth_tag.0));
+    }
+}
+
+impl Deserializable for EncryptedData {
+    fn read_from<R: ByteReader>(source: &mut R) -> Result<Self, DeserializationError> {
+        let ciphertext_len = source.read_usize()?;
+        let ciphertext_bytes: Vec<u64> = source.read_many(ciphertext_len)?;
+        let ciphertext = felts_from_u64(&ciphertext_bytes);
+
+        let nonce = source.read_many(NONCE_SIZE)?;
+        let nonce: [Felt; NONCE_SIZE] = felts_from_u64(&nonce)
+            .try_into()
+            .expect("should not fail given the size of the vector");
+
+        let tag = source.read_many(AUTH_TAG_SIZE)?;
+        let tag: [Felt; AUTH_TAG_SIZE] = felts_from_u64(&tag)
+            .try_into()
+            .expect("should not fail given the size of the vector");
+
+        Ok(Self {
+            ciphertext,
+            nonce: Nonce(nonce),
+            auth_tag: AuthTag(tag),
+        })
     }
 }
 
@@ -424,22 +488,32 @@ fn felts_to_bytes(felts: &[Felt]) -> Result<Vec<u8>, EncryptionError> {
     Ok(result)
 }
 
-/// Pads the associated data to the next multiple of the [`RATE_WIDTH`]
-fn pad_associated_data(associated_data: &[Felt]) -> Vec<Felt> {
-    if associated_data.len().is_multiple_of(RATE_WIDTH) {
-        associated_data.to_vec()
-    } else {
-        let mut result = associated_data.to_vec();
-
-        while !result.len().is_multiple_of(RATE_WIDTH) {
-            result.push(ZERO)
-        }
-        result
-    }
-}
-
-/// Pads the plaintext
-fn pad_plaintext(data: &[Felt]) -> Vec<Felt> {
+/// Performs padding on either the plaintext or associated data
+///
+/// # Padding Scheme
+///
+/// This AEAD implementation uses an injective padding scheme to ensure that different plaintexts
+/// always produce different ciphertexts, preventing ambiguity during decryption.
+///
+/// ## Data Padding
+///
+/// Plaintext data is padded using a 10* padding scheme:
+///
+/// - A padding separator (field element `ONE`) is appended to the message
+/// - The message is then zero-padded to reach the next rate boundary
+/// - **Security guarantee**: `[ONE]` and `[ONE, ZERO]` will produce different ciphertexts
+///   because after padding they become `[ONE, ONE, 0, 0, ...]` and `[ONE, ZERO, ONE, 0, ...]`
+///   respectively, ensuring injectivity
+///
+/// ## Associated Data Padding
+///
+/// Associated data follows the same injective padding scheme:
+///
+/// - Padding separator (`ONE`) is appended
+/// - Zero-padded to rate boundary
+/// - **Security guarantee**: Different associated data inputs (like `[ONE]` vs `[ONE, ZERO]`)
+///   produce different authentication tags due to the injective padding
+fn pad(data: &[Felt]) -> Vec<Felt> {
     let data_len = data.len();
     let num_elem_final_block = data_len % RATE_WIDTH;
 
@@ -474,4 +548,21 @@ fn unpad(plaintext: &mut Vec<Felt>) -> Result<(), EncryptionError> {
     plaintext.truncate((num_blocks - 1) * RATE_WIDTH + pos);
 
     Ok(())
+}
+
+/// Converts a vector of field elements to a vector of containg their u64 canonical representations.
+fn felts_to_u64(elements: &[Felt]) -> Vec<u64> {
+    elements.iter().map(|e| e.as_int()).collect()
+}
+
+/// Given a vector of u64 values assumed to represent canoncial values of field elements,
+/// produces a vector of field elements
+fn felts_from_u64(input: &[u64]) -> Vec<Felt> {
+    input
+        .iter()
+        .map(|e| {
+            debug_assert!(e < &Felt::MODULUS);
+            Felt::new(*e)
+        })
+        .collect()
 }
