@@ -107,7 +107,7 @@ impl SecretKey {
     /// Encrypts, as Felt-s, and authenticates the provided data using this secret key and a random
     /// nonce
     #[cfg(feature = "std")]
-    pub fn encrypt(&self, data: &[Felt]) -> EncryptedData {
+    pub fn encrypt(&self, data: &[Felt]) -> Result<EncryptedData, EncryptionError> {
         self.encrypt_with_associated_data(data, &[])
     }
 
@@ -118,7 +118,7 @@ impl SecretKey {
         &self,
         data: &[Felt],
         associated_data: &[Felt],
-    ) -> EncryptedData {
+    ) -> Result<EncryptedData, EncryptionError> {
         use rand::{SeedableRng, rngs::StdRng};
         let mut rng = StdRng::from_os_rng();
         let nonce = Nonce::with_rng(&mut rng);
@@ -129,7 +129,7 @@ impl SecretKey {
     /// Encrypts, as bytes, and authenticates the provided data using this secret key and a random
     /// nonce
     #[cfg(feature = "std")]
-    pub fn encrypt_bytes(&self, data: &[u8]) -> EncryptedData {
+    pub fn encrypt_bytes(&self, data: &[u8]) -> Result<EncryptedData, EncryptionError> {
         self.encrypt_bytes_with_associated_data(data, &[])
     }
 
@@ -140,7 +140,7 @@ impl SecretKey {
         &self,
         data: &[u8],
         associated_data: &[u8],
-    ) -> EncryptedData {
+    ) -> Result<EncryptedData, EncryptionError> {
         use rand::{SeedableRng, rngs::StdRng};
         let mut rng = StdRng::from_os_rng();
         let nonce = Nonce::with_rng(&mut rng);
@@ -154,7 +154,7 @@ impl SecretKey {
         data: &[Felt],
         associated_data: &[Felt],
         nonce: Nonce,
-    ) -> EncryptedData {
+    ) -> Result<EncryptedData, EncryptionError> {
         // Initialize as sponge state with key and nonce
         let mut sponge = SpongeState::new(self, &nonce);
 
@@ -179,7 +179,7 @@ impl SecretKey {
         // Generate authentication tag
         let auth_tag = sponge.squeeze_tag();
 
-        EncryptedData { ciphertext, auth_tag, nonce }
+        Ok(EncryptedData { ciphertext, auth_tag, nonce })
     }
 
     /// Encrypts the provided data, as bytes, using this secret key and a specified nonce
@@ -188,7 +188,7 @@ impl SecretKey {
         data: &[u8],
         associated_data: &[u8],
         nonce: Nonce,
-    ) -> EncryptedData {
+    ) -> Result<EncryptedData, EncryptionError> {
         let data_felt = bytes_to_felts(data);
         let ad_felt = bytes_to_felts(associated_data);
 

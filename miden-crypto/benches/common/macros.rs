@@ -1004,7 +1004,7 @@ macro_rules! benchmark_aead {
                                         black_box(data),
                                         black_box(&associated_data),
                                         black_box(nonce),
-                                    ));
+                                    ).unwrap());
                                 },
                                 criterion::BatchSize::SmallInput,
                             );
@@ -1013,7 +1013,7 @@ macro_rules! benchmark_aead {
 
                     // Pre-encrypt data for decryption benchmark
                     let nonce = Nonce::with_rng(&mut rng);
-                    let encrypted = key.encrypt_with_nonce(&data, &associated_data, nonce.clone());
+                    let encrypted = key.encrypt_with_nonce(&data, &associated_data, nonce.clone()).unwrap();
 
                     // Decryption benchmark
                     group.bench_with_input(
@@ -1061,7 +1061,7 @@ macro_rules! benchmark_aead {
                                         black_box(data),
                                         black_box(&associated_data),
                                         black_box(nonce),
-                                    ));
+                                    ).unwrap());
                                 },
                                 criterion::BatchSize::SmallInput,
                             );
@@ -1070,7 +1070,7 @@ macro_rules! benchmark_aead {
 
                     // Pre-encrypt data for decryption benchmark
                     let nonce = Nonce::with_rng(&mut rng);
-                    let encrypted = key.encrypt_bytes_with_nonce(&data, &associated_data, nonce.clone());
+                    let encrypted = key.encrypt_bytes_with_nonce(&data, &associated_data, nonce.clone()).unwrap();
 
                     // Decryption benchmark
                     group.bench_with_input(
