@@ -954,3 +954,140 @@ macro_rules! benchmark_word_conversions {
         }
     };
 }
+
+/// Generates comprehensive AEAD benchmarks for both field elements and bytes operations.
+///
+/// This macro creates benchmarks for encryption and decryption operations
+/// using the new standardized approach with consistent data generation,
+/// throughput measurement, and reduced boilerplate.
+///
+/// # Arguments
+/// * `$aead_module` - The AEAD module name (e.g., aead_rpo)
+/// * `$group_prefix` - Human-readable prefix for benchmark group names
+///
+/// # Generated benchmarks
+/// - `benchmark_<module>_felts` - Field element encryption/decryption
+/// - `benchmark_<module>_bytes` - Byte array encryption/decryption
+#[macro_export]
+macro_rules! benchmark_aead {
+    ($aead_module:ident, $group_prefix:expr) => {
+        paste::paste! {
+            /// Benchmark AEAD operations on field elements
+            fn [<benchmark_ $aead_module _felts>](c: &mut Criterion) {
+                use miden_crypto::encryption::$aead_module::{Nonce, SecretKey};
+                use rand_chacha::ChaCha20Rng;
+                use rand_core::SeedableRng;
+
+                let group_name = format!("{} - Field Elements", $group_prefix);
+                let mut group = c.benchmark_group(&group_name);
+                let mut rng = ChaCha20Rng::seed_from_u64(42);
+
+                // Setup common test data
+                let key = SecretKey::with_rng(&mut rng);
+                let associated_data: Vec<Felt> = generate_felt_array_sequential(8);
+
+                for &size in FELT_SIZES {
+                    let data: Vec<Felt> = generate_felt_array_random(size);
+                    group.throughput(Throughput::Elements(size as u64));
+
+                    // Encryption benchmark
+                    group.bench_with_input(
+                        BenchmarkId::new("encrypt", size),
+                        &data,
+                        |b, data| {
+                            b.iter_batched(
+                                || {
+                                    Nonce::with_rng(&mut rng)
+                                },
+                                |nonce| {
+                                    black_box(key.encrypt_with_nonce(
+                                        black_box(data),
+                                        black_box(&associated_data),
+                                        black_box(nonce),
+                                    ));
+                                },
+                                criterion::BatchSize::SmallInput,
+                            );
+                        },
+                    );
+
+                    // Pre-encrypt data for decryption benchmark
+                    let nonce = Nonce::with_rng(&mut rng);
+                    let encrypted = key.encrypt_with_nonce(&data, &associated_data, nonce.clone());
+
+                    // Decryption benchmark
+                    group.bench_with_input(
+                        BenchmarkId::new("decrypt", size),
+                        &encrypted,
+                        |b, encrypted| {
+                            b.iter(|| {
+                                black_box(key.decrypt_with_associated_data(black_box(encrypted), &associated_data).unwrap())
+                            });
+                        },
+                    );
+                }
+
+                group.finish();
+            }
+
+            /// Benchmark AEAD operations on byte arrays
+            fn [<benchmark_ $aead_module _bytes>](c: &mut Criterion) {
+                use miden_crypto::encryption::$aead_module::{Nonce, SecretKey};
+                use rand_chacha::ChaCha20Rng;
+                use rand_core::SeedableRng;
+
+                let group_name = format!("{} - Byte Arrays", $group_prefix);
+                let mut group = c.benchmark_group(&group_name);
+                let mut rng = ChaCha20Rng::seed_from_u64(42);
+
+                let key = SecretKey::with_rng(&mut rng);
+                let associated_data = generate_byte_array_sequential(8);
+
+                for &size in DATA_SIZES {
+                    let data = generate_byte_array_random(size);
+                    group.throughput(Throughput::Bytes(size as u64));
+
+                    // Encryption benchmark
+                    group.bench_with_input(
+                        BenchmarkId::new("encrypt", size),
+                        &data,
+                        |b, data| {
+                            b.iter_batched(
+                                || {
+                                    Nonce::with_rng(&mut rng)
+                                },
+                                |nonce| {
+                                    black_box(key.encrypt_bytes_with_nonce(
+                                        black_box(data),
+                                        black_box(&associated_data),
+                                        black_box(nonce),
+                                    ));
+                                },
+                                criterion::BatchSize::SmallInput,
+                            );
+                        },
+                    );
+
+                    // Pre-encrypt data for decryption benchmark
+                    let nonce = Nonce::with_rng(&mut rng);
+                    let encrypted = key.encrypt_bytes_with_nonce(&data, &associated_data, nonce.clone());
+
+                    // Decryption benchmark
+                    group.bench_with_input(
+                        BenchmarkId::new("decrypt", size),
+                        &encrypted,
+                        |b, encrypted| {
+                            b.iter(|| {
+                                black_box(key.decrypt_bytes_with_associated_data(black_box(encrypted), &associated_data).unwrap())
+                            });
+                        },
+                    );
+                }
+
+                group.finish();
+            }
+
+            criterion_group!([<$aead_module _group>], [<benchmark_ $aead_module _felts>], [<benchmark_ $aead_module _bytes>]);
+        }
+    };
+}

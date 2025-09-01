@@ -68,7 +68,7 @@ proptest! {
             .collect();
 
         let encrypted = key.encrypt_with_nonce(&data, &associated_data, nonce);
-        let decrypted = key.decrypt(&encrypted, &associated_data).unwrap();
+        let decrypted = key.decrypt_with_associated_data(&encrypted, &associated_data).unwrap();
 
         prop_assert_eq!(data, decrypted);
     }
@@ -92,7 +92,7 @@ proptest! {
 
 
         let encrypted = key.encrypt_bytes_with_nonce(&data, &associated_data, nonce);
-        let decrypted = key.decrypt_bytes(&encrypted, &associated_data).unwrap();
+        let decrypted = key.decrypt_bytes_with_associated_data(&encrypted, &associated_data).unwrap();
 
         prop_assert_eq!(data, decrypted);
     }
@@ -193,7 +193,7 @@ fn test_empty_data_encryption() {
     let associated_data: Vec<Felt> = vec![ONE; 8];
     let empty_data: Vec<Felt> = vec![];
     let encrypted = key.encrypt_with_nonce(&empty_data, &associated_data, nonce);
-    let decrypted = key.decrypt(&encrypted, &associated_data).unwrap();
+    let decrypted = key.decrypt_with_associated_data(&encrypted, &associated_data).unwrap();
 
     assert_eq!(empty_data, decrypted);
     assert!(!encrypted.ciphertext.is_empty());
@@ -210,7 +210,7 @@ fn test_single_element_encryption() {
     let associated_data: Vec<Felt> = vec![ZERO; 8];
     let data = vec![Felt::new(42)];
     let encrypted = key.encrypt_with_nonce(&data, &associated_data, nonce);
-    let decrypted = key.decrypt(&encrypted, &associated_data).unwrap();
+    let decrypted = key.decrypt_with_associated_data(&encrypted, &associated_data).unwrap();
 
     assert_eq!(data, decrypted);
     assert_eq!(encrypted.ciphertext.len(), 8);
@@ -229,7 +229,7 @@ fn test_large_data_encryption() {
     let data: Vec<Felt> = (0..100).map(|i| Felt::new(i as u64)).collect();
 
     let encrypted = key.encrypt_with_nonce(&data, &associated_data, nonce);
-    let decrypted = key.decrypt(&encrypted, &associated_data).unwrap();
+    let decrypted = key.decrypt_with_associated_data(&encrypted, &associated_data).unwrap();
 
     assert_eq!(data, decrypted);
 }
@@ -246,7 +246,7 @@ fn test_encryption_various_lengths() {
 
         let nonce = Nonce::with_rng(&mut rng);
         let encrypted = key.encrypt_with_nonce(&data, &associated_data, nonce);
-        let decrypted = key.decrypt(&encrypted, &associated_data).unwrap();
+        let decrypted = key.decrypt_with_associated_data(&encrypted, &associated_data).unwrap();
 
         assert_eq!(data, decrypted, "Failed for length {}", len);
     }
@@ -265,7 +265,8 @@ fn test_bytes_encryption_various_lengths() {
 
         let nonce = Nonce::with_rng(&mut rng);
         let encrypted = key.encrypt_bytes_with_nonce(&data, &associated_data, nonce);
-        let decrypted = key.decrypt_bytes(&encrypted, &associated_data).unwrap();
+        let decrypted =
+            key.decrypt_bytes_with_associated_data(&encrypted, &associated_data).unwrap();
 
         assert_eq!(data, decrypted, "Failed for length {}", len);
     }
@@ -286,7 +287,7 @@ fn test_ciphertext_tampering_detection() {
     // Tamper with ciphertext
     encrypted.ciphertext[0] += ONE;
 
-    let result = key.decrypt(&encrypted, &associated_data);
+    let result = key.decrypt_with_associated_data(&encrypted, &associated_data);
     assert!(matches!(result, Err(EncryptionError::InvalidAuthTag)));
 }
 
@@ -306,7 +307,7 @@ fn test_auth_tag_tampering_detection() {
     tampered_tag[0] += ONE;
     encrypted.auth_tag = AuthTag(tampered_tag);
 
-    let result = key.decrypt(&encrypted, &associated_data);
+    let result = key.decrypt_with_associated_data(&encrypted, &associated_data);
     assert!(matches!(result, Err(EncryptionError::InvalidAuthTag)));
 }
 
@@ -323,7 +324,7 @@ fn test_wrong_key_detection() {
     let encrypted = key1.encrypt_with_nonce(&data, &associated_data, nonce);
 
     // Try to decrypt with wrong key
-    let result = key2.decrypt(&encrypted, &associated_data);
+    let result = key2.decrypt_with_associated_data(&encrypted, &associated_data);
     assert!(matches!(result, Err(EncryptionError::InvalidAuthTag)));
 }
 
@@ -341,7 +342,7 @@ fn test_wrong_nonce_detection() {
 
     // Try to decrypt with wrong nonce
     encrypted.nonce = nonce2;
-    let result = key.decrypt(&encrypted, &associated_data);
+    let result = key.decrypt_with_associated_data(&encrypted, &associated_data);
     assert!(matches!(result, Err(EncryptionError::InvalidAuthTag)));
 }
 

@@ -196,7 +196,12 @@ impl SecretKey {
     }
 
     /// Decrypts the provided encrypted data using this secret key
-    pub fn decrypt(
+    pub fn decrypt(&self, encrypted_data: &EncryptedData) -> Result<Vec<Felt>, EncryptionError> {
+        self.decrypt_with_associated_data(encrypted_data, &[])
+    }
+
+    /// Decrypts the provided encrypted data, given some associated data, using this secret key
+    pub fn decrypt_with_associated_data(
         &self,
         encrypted_data: &EncryptedData,
         associated_data: &[Felt],
@@ -242,10 +247,19 @@ impl SecretKey {
     pub fn decrypt_bytes(
         &self,
         encrypted_data: &EncryptedData,
+    ) -> Result<Vec<u8>, EncryptionError> {
+        self.decrypt_bytes_with_associated_data(encrypted_data, &[])
+    }
+
+    /// Decrypts the provided encrypted data, as bytes, given some associated data using
+    /// this secret key
+    pub fn decrypt_bytes_with_associated_data(
+        &self,
+        encrypted_data: &EncryptedData,
         associated_data: &[u8],
     ) -> Result<Vec<u8>, EncryptionError> {
         let ad_felt = bytes_to_felts(associated_data);
-        let data_felts = self.decrypt(encrypted_data, &ad_felt)?;
+        let data_felts = self.decrypt_with_associated_data(encrypted_data, &ad_felt)?;
 
         felts_to_bytes(&data_felts)
     }
@@ -332,7 +346,7 @@ impl SpongeState {
 }
 
 /// A 256-bit nonce represented as 4 field elements
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Nonce([Felt; NONCE_SIZE]);
 
 impl Nonce {
