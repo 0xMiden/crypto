@@ -92,3 +92,18 @@ pub const PRNG_OUTPUT_SIZES: &[usize] = &[
     100,  // Small array
     1000, // Medium array
 ];
+
+// === Encryption Configuration ===
+// Plaintext sizes in bytes
+pub const DATA_SIZES: &[usize] = &[16, 64, 256, 1024, 4096, 16384, 65536, 262144];
+
+// Plaintext sizes in field elements
+pub const FELT_SIZES: &[usize] = &[
+    4,     // 32 bytes equivalent
+    16,    // 128 bytes equivalent
+    64,    // 512 bytes equivalent
+    256,   // 2KB equivalent
+    1024,  // 8KB equivalent
+    4096,  // 32KB equivalent
+    16384, // 128KB equivalent
+];

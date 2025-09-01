@@ -366,9 +366,9 @@ impl Distribution<Nonce> for StandardUniform {
 impl Serializable for EncryptedData {
     fn write_into<W: ByteWriter>(&self, target: &mut W) {
         target.write_usize(self.ciphertext.len());
-        target.write_many(&felts_to_u64(&self.ciphertext));
-        target.write_many(&felts_to_u64(&self.nonce.0));
-        target.write_many(&felts_to_u64(&self.auth_tag.0));
+        target.write_many(felts_to_u64(&self.ciphertext));
+        target.write_many(felts_to_u64(&self.nonce.0));
+        target.write_many(felts_to_u64(&self.auth_tag.0));
     }
 }
 
@@ -501,9 +501,9 @@ fn felts_to_bytes(felts: &[Felt]) -> Result<Vec<u8>, EncryptionError> {
 ///
 /// - A padding separator (field element `ONE`) is appended to the message
 /// - The message is then zero-padded to reach the next rate boundary
-/// - **Security guarantee**: `[ONE]` and `[ONE, ZERO]` will produce different ciphertexts
-///   because after padding they become `[ONE, ONE, 0, 0, ...]` and `[ONE, ZERO, ONE, 0, ...]`
-///   respectively, ensuring injectivity
+/// - **Security guarantee**: `[ONE]` and `[ONE, ZERO]` will produce different ciphertexts because
+///   after padding they become `[ONE, ONE, 0, 0, ...]` and `[ONE, ZERO, ONE, 0, ...]` respectively,
+///   ensuring injectivity
 ///
 /// ## Associated Data Padding
 ///
