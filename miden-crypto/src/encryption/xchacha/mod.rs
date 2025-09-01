@@ -14,7 +14,7 @@
 //! # Usage
 //!
 //! ```rust
-//! use crate::encryption::xchacha::SecretKey;
+//! use miden_crypto::encryption::xchacha::SecretKey;
 //!
 //! // Generate a new secret key
 //! let key = SecretKey::new();
@@ -26,7 +26,7 @@
 //! // Decrypt the data
 //! let decrypted = key.decrypt_bytes(&encrypted)?;
 //! assert_eq!(data, &decrypted[..]);
-//! `
+//! ```
 use alloc::vec::Vec;
 
 use chacha20poly1305::{
@@ -37,10 +37,9 @@ use rand::{CryptoRng, RngCore};
 use winter_math::FieldElement;
 use zeroize::Zeroize;
 
-use crate::encryption::EncryptionError;
 use crate::{
     Felt,
-    encryption::BINARY_CHUNK_SIZE,
+    encryption::{BINARY_CHUNK_SIZE, EncryptionError},
     utils::{ByteReader, ByteWriter, Deserializable, DeserializationError, Serializable},
 };
 
