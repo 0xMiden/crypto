@@ -10,23 +10,6 @@
 //! - [`Nonce`]: A 192-bit nonce that should be sampled randomly per encryption operation
 //! - [`EncryptedData`]: Encrypted data stored as bytes
 //! - [`EncryptedFeltData`]: Encrypted data stored as field elements
-//!
-//! # Usage
-//!
-//! ```rust
-//! use miden_crypto::encryption::xchacha::SecretKey;
-//!
-//! // Generate a new secret key
-//! let key = SecretKey::new();
-//!
-//! // Encrypt some data
-//! let data = b"Hello, world!";
-//! let encrypted = key.encrypt_bytes(data)?;
-//!
-//! // Decrypt the data
-//! let decrypted = key.decrypt_bytes(&encrypted)?;
-//! assert_eq!(data, &decrypted[..]);
-//! ```
 use alloc::vec::Vec;
 
 use chacha20poly1305::{
