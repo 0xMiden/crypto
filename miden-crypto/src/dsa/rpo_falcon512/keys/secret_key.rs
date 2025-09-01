@@ -302,11 +302,6 @@ impl Deserializable for SecretKey {
     fn read_from<R: ByteReader>(source: &mut R) -> Result<Self, DeserializationError> {
         let byte_vector: [u8; SK_LEN] = source.read_array()?;
 
-        // check length
-        if byte_vector.len() < 2 {
-            return  Err(DeserializationError::InvalidValue("Invalid encoding length: Failed to decode as length is different from the one expected".to_string()));
-        }
-
         // read fields
         let header = byte_vector[0];
 
@@ -324,10 +319,6 @@ impl Deserializable for SecretKey {
             return Err(DeserializationError::InvalidValue(
                 "Unsupported Falcon DSA variant".to_string(),
             ));
-        }
-
-        if byte_vector.len() != SK_LEN {
-            return Err(DeserializationError::InvalidValue("Invalid encoding length: Failed to decode as length is different from the one expected".to_string()));
         }
 
         let chunk_size_f = ((n * WIDTH_SMALL_POLY_COEFFICIENT) + 7) >> 3;

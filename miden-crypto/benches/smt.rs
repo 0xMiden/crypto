@@ -1,12 +1,11 @@
 use std::hint::black_box;
 
 use criterion::{Criterion, criterion_group, criterion_main};
-use miden_crypto::{
-    Felt, Word,
-    merkle::{LeafIndex, SimpleSmt},
-};
-use rand_utils::prng_array;
+use miden_crypto::merkle::{LeafIndex, SimpleSmt};
 use seq_macro::seq;
+
+mod common;
+use common::data::*;
 
 fn smt_rpo(c: &mut Criterion) {
     // setup trees
@@ -66,12 +65,3 @@ fn smt_rpo(c: &mut Criterion) {
 
 criterion_group!(smt_group, smt_rpo);
 criterion_main!(smt_group);
-
-// HELPER FUNCTIONS
-// --------------------------------------------------------------------------------------------
-
-fn generate_word(seed: &mut [u8; 32]) -> Word {
-    *seed = prng_array(*seed);
-    let nums: [u64; 4] = prng_array(*seed);
-    Word::new([Felt::new(nums[0]), Felt::new(nums[1]), Felt::new(nums[2]), Felt::new(nums[3])])
-}

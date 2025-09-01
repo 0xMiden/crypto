@@ -1,11 +1,13 @@
 use alloc::collections::BTreeSet;
 
 use super::{
-    super::ValuePath, EMPTY_WORD, EmptySubtreeRoots, InnerNode, InnerNodeInfo, InnerNodes,
-    LeafIndex, MerkleError, MerklePath, MutationSet, NodeIndex, SMT_MAX_DEPTH, SMT_MIN_DEPTH,
-    SparseMerkleTree, Word,
+    EMPTY_WORD, EmptySubtreeRoots, InnerNode, InnerNodeInfo, InnerNodes, LeafIndex, MerkleError,
+    MutationSet, NodeIndex, SMT_MAX_DEPTH, SMT_MIN_DEPTH, SparseMerkleTree, Word,
 };
-use crate::merkle::{SmtLeafError, SparseMerklePath, SparseValuePath};
+use crate::merkle::{SmtLeafError, SparseMerklePath};
+
+mod proof;
+pub use proof::SimpleSmtProof;
 
 #[cfg(test)]
 mod tests;
@@ -170,7 +172,7 @@ impl<const DEPTH: u8> SimpleSmt<DEPTH> {
 
     /// Returns an opening of the leaf associated with `key`. Conceptually, an opening is a Merkle
     /// path to the leaf, as well as the leaf itself.
-    pub fn open(&self, key: &LeafIndex<DEPTH>) -> SparseValuePath {
+    pub fn open(&self, key: &LeafIndex<DEPTH>) -> SimpleSmtProof {
         let value = self.get_value(key);
         let nodes = key.index.proof_indices().map(|index| self.get_node_hash(index));
         // `from_sized_iter()` returns an error if there are more nodes than `SMT_MAX_DEPTH`, but
@@ -178,7 +180,7 @@ impl<const DEPTH: u8> SimpleSmt<DEPTH> {
         // guarded against in `SimpleSmt::new()`.
         let path = SparseMerklePath::from_sized_iter(nodes).unwrap();
 
-        SparseValuePath { value, path }
+        SimpleSmtProof { value, path }
     }
 
     /// Returns a boolean value indicating whether the SMT is empty.
@@ -348,7 +350,7 @@ impl<const DEPTH: u8> SparseMerkleTree<DEPTH> for SimpleSmt<DEPTH> {
     type Key = LeafIndex<DEPTH>;
     type Value = Word;
     type Leaf = Word;
-    type Opening = ValuePath;
+    type Opening = SimpleSmtProof;
 
     const EMPTY_VALUE: Self::Value = EMPTY_WORD;
     const EMPTY_ROOT: Word = *EmptySubtreeRoots::entry(DEPTH, 0);
@@ -436,7 +438,7 @@ impl<const DEPTH: u8> SparseMerkleTree<DEPTH> for SimpleSmt<DEPTH> {
         *key
     }
 
-    fn path_and_leaf_to_opening(path: MerklePath, leaf: Word) -> ValuePath {
+    fn path_and_leaf_to_opening(path: SparseMerklePath, leaf: Word) -> SimpleSmtProof {
         (path, leaf).into()
     }
 }

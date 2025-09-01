@@ -1,12 +1,12 @@
 [package]
 name = "miden-crypto"
-version = "0.16.0"
+version = "0.17.0"
 description = "Miden Cryptographic primitives"
 authors.workspace = true
 readme = "../README.md"
 license.workspace = true
 repository.workspace = true
-documentation = "https://docs.rs/miden-crypto/0.16.0"
+documentation = "https://docs.rs/miden-crypto/0.17.0"
 categories.workspace = true
 keywords.workspace = true
 edition.workspace = true
@@ -46,6 +46,18 @@ harness = false
 
 [[bench]]
 name = "store"
+harness = false
+
+[[bench]]
+name = "dsa"
+harness = false
+
+[[bench]]
+name = "word"
+harness = false
+
+[[bench]]
+name = "rand"
 harness = false
 
 [features]
@@ -90,13 +102,14 @@ chacha20 = "0.9.1"
 
 [dev-dependencies]
 assert_matches = { version = "1.5", default-features = false }
-criterion = { version = "0.6", features = ["html_reports"] }
+criterion = { version = "0.7", features = ["html_reports"] }
+getrandom = { version = "0.3", default-features = false }
 hex = { version = "0.4", default-features = false, features = ["alloc"] }
 itertools = { version = "0.14" }
 proptest = { version = "1.7", default-features = false, features = ["alloc"] }
 rand_chacha = { version = "0.9", default-features = false }
 rand-utils = { version = "0.13", package = "winter-rand-utils" }
-rstest = { version = "0.25" }
+rstest = { version = "0.26" }
 seq-macro = { version = "0.3" }
 
 [build-dependencies]
