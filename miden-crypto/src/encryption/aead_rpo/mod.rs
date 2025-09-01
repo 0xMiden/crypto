@@ -5,7 +5,7 @@
 //! using the RPO (Rescue Prime Optimized) permutation, creating an encryption scheme that is
 //! highly efficient when executed within zero-knowledge proof systems.
 //!
-//! [1] <https://eprint.iacr.org/2023/1668>
+//! \[1\] <https://eprint.iacr.org/2023/1668>
 
 use alloc::vec::Vec;
 use core::{fmt, ops::Range};
