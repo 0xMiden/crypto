@@ -172,7 +172,7 @@ fn test_empty_roots() {
 fn test_leaf_paths_for_empty_trees() -> Result<(), MerkleError> {
     let store = MerkleStore::default();
 
-    // Starts at 1 because leafs are not included in the store.
+    // Starts at 1 because leaves are not included in the store.
     // Ends at 64 because it is not possible to represent an index of a depth greater than 64,
     // because a u64 is used to index the leaf.
     seq!(DEPTH in 1_u8..64_u8 {
