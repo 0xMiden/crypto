@@ -1,122 +1,18 @@
 use std::hint::black_box;
 
-use criterion::{BatchSize, BenchmarkId, Criterion, Throughput, criterion_group, criterion_main};
-use miden_crypto::{
-    Felt,
-    encryption::xchacha::{Nonce as ChaChaNonce, SecretKey as ChaChaSecretKey},
+use criterion::{BenchmarkId, Criterion, Throughput, criterion_group, criterion_main};
+use miden_crypto::Felt;
+
+mod common;
+use common::{
+    config::{DATA_SIZES, FELT_SIZES},
+    data::{
+        generate_byte_array_random, generate_byte_array_sequential, generate_felt_array_random,
+        generate_felt_array_sequential,
+    },
 };
-use rand::RngCore;
 
-// Test data sizes in bytes
-const DATA_SIZES: &[usize] = &[16, 64, 256, 1024, 4096, 16384, 65536, 262144];
+benchmark_aead!(xchacha, "AEAD XChaCha20-Poly1305");
 
-// Field element data sizes
-const FELT_SIZES: &[usize] = &[
-    4,     // 32 bytes equivalent
-    16,    // 128 bytes equivalent
-    64,    // 512 bytes equivalent
-    256,   // 2KB equivalent
-    1024,  // 8KB equivalent
-    4096,  // 32KB equivalent
-    16384, // 128KB equivalent
-];
-
-fn bench_xchacha_encryption_felts(c: &mut Criterion) {
-    let mut group = c.benchmark_group("xchacha_encryption_felts");
-
-    let mut rng = rand::rng();
-    let key = ChaChaSecretKey::with_rng(&mut rng);
-    let mut nonce_bytes = [0_u8; 24];
-    rng.fill_bytes(&mut nonce_bytes);
-
-    let associated_data: Vec<Felt> = (0..8).map(|_| Felt::new(rng.next_u64())).collect();
-
-    for &size in FELT_SIZES {
-        // Generate random field elements
-
-        let data: Vec<Felt> = (0..size).map(|_| Felt::new(rng.next_u64())).collect();
-
-        group.throughput(Throughput::Elements(size as u64));
-
-        // Encryption benchmark
-        group.bench_with_input(BenchmarkId::new("encrypt", size), &data, |b, data| {
-            b.iter_batched(
-                || (ChaChaNonce::from_slice(&nonce_bytes), data),
-                |(nonce, data)| {
-                    black_box(key.encrypt_with_nonce(
-                        black_box(data),
-                        black_box(&associated_data),
-                        black_box(nonce),
-                    ))
-                },
-                BatchSize::SmallInput,
-            );
-        });
-
-        // Decryption benchmark
-        let nonce = ChaChaNonce::from_slice(&nonce_bytes);
-        let encrypted = key.encrypt_with_nonce(&data, &associated_data, nonce).unwrap();
-        group.bench_with_input(BenchmarkId::new("decrypt", size), &encrypted, |b, encrypted| {
-            b.iter(|| {
-                black_box(
-                    key.decrypt_with_associated_data(black_box(encrypted), &associated_data)
-                        .unwrap(),
-                )
-            });
-        });
-    }
-
-    group.finish();
-}
-
-fn bench_xchacha_encryption_bytes(c: &mut Criterion) {
-    let mut group = c.benchmark_group("xchacha_encryption_bytes");
-
-    let mut rng = rand::rng();
-    let key = ChaChaSecretKey::with_rng(&mut rng);
-    let mut nonce_bytes = [0_u8; 24];
-    rng.fill_bytes(&mut nonce_bytes);
-
-    let mut associated_data = vec![0_u8; 8];
-    rng.fill_bytes(&mut associated_data);
-
-    for &size in DATA_SIZES {
-        let mut data = vec![0u8; size];
-        rng.fill_bytes(&mut data);
-
-        group.throughput(Throughput::Bytes(size as u64));
-
-        // Encryption benchmark
-        group.bench_with_input(BenchmarkId::new("encrypt", size), &data, |b, data| {
-            b.iter_batched(
-                || (ChaChaNonce::from_slice(&nonce_bytes), data),
-                |(nonce, data)| {
-                    black_box(key.encrypt_bytes_with_nonce(
-                        black_box(data),
-                        black_box(&associated_data),
-                        black_box(nonce),
-                    ))
-                },
-                BatchSize::SmallInput,
-            );
-        });
-
-        // Decryption benchmark
-        let nonce = ChaChaNonce::from_slice(&nonce_bytes);
-        let encrypted = key.encrypt_bytes_with_nonce(&data, &associated_data, nonce).unwrap();
-        group.bench_with_input(BenchmarkId::new("decrypt", size), &encrypted, |b, encrypted| {
-            b.iter(|| {
-                black_box(
-                    key.decrypt_bytes_with_associated_data(black_box(encrypted), &associated_data)
-                        .unwrap(),
-                )
-            });
-        });
-    }
-
-    group.finish();
-}
-
-criterion_group!(encryption_group, bench_xchacha_encryption_felts, bench_xchacha_encryption_bytes);
-
-criterion_main!(encryption_group);
+criterion_group!(xchacha_encryption_group, benchmark_xchacha_felts, benchmark_xchacha_bytes);
+criterion_main!(xchacha_encryption_group);

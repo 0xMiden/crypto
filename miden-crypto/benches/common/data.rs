@@ -38,6 +38,11 @@ pub fn generate_felt_array_sequential(size: usize) -> Vec<Felt> {
     (0..size).map(|i| Felt::new(i as u64)).collect()
 }
 
+/// Generate byte array of specified size with random data
+pub fn generate_felt_array_random(size: usize) -> Vec<Felt> {
+    iter::from_fn(|| Some(Felt::new(rand_value::<u64>()))).take(size).collect()
+}
+
 // === Word and Value Generation ===
 
 /// Generate a Word from seed using PRNG
