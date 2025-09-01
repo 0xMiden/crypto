@@ -18,3 +18,6 @@ doc   = false
 name  = "smt"
 path  = "fuzz_targets/smt.rs"
 test  = false
+
+[lints]
+workspace = true

@@ -11,3 +11,6 @@ keywords     = ["crypto", "hash", "merkle", "miden"]
 license      = "MIT OR Apache-2.0"
 repository   = "https://github.com/0xMiden/crypto"
 rust-version = "1.88"
+
+[workspace.lints.rust]
+# Suppress warnings about `cfg(fuzzing)`, which is automatically set when using `cargo-fuzz`.unexpected_cfgs = { check-cfg = ['cfg(fuzzing)'], level = "warn" }

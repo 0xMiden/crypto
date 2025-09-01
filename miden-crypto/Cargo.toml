@@ -107,6 +107,5 @@ seq-macro      = { version = "0.3" }
 cc   = { features = ["parallel"], optional = true, version = "1.2" }
 glob = "0.3"
 
-[lints.rust]
-# Suppress warnings about `cfg(fuzzing)`, which is automatically set when using `cargo-fuzz`.
-unexpected_cfgs = { check-cfg = ['cfg(fuzzing)'], level = "warn" }
+[lints]
+workspace = true

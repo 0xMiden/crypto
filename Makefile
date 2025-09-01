@@ -46,6 +46,10 @@ toml-check: ## Runs Format for all TOML files but only in check mode
 typos-check: ## Runs spellchecker
 	typos
 
+.PHONY: workspace-check
+workspace-check: ## Runs a check that all packages have `lints.workspace = true`
+	cargo workspace-lints
+
 .PHONY: lint
 lint: format fix clippy toml typos-check machete ## Run all linting tasks at once (Clippy, fixing, formatting, machete)
 
