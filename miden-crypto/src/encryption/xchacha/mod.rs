@@ -37,7 +37,6 @@ use rand::{CryptoRng, RngCore};
 use winter_math::FieldElement;
 use zeroize::Zeroize;
 
-#[cfg(feature = "std")]
 use crate::encryption::EncryptionError;
 use crate::{
     Felt,
