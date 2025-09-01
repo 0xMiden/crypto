@@ -1,6 +1,6 @@
 //! AEAD (authenticated encryption with associated data) schemes.
 
-use thiserror::Error;
+use core::fmt;
 
 pub mod xchacha;
 
@@ -14,14 +14,23 @@ const BINARY_CHUNK_SIZE: usize = 7;
 // ================================================================================================
 
 /// Errors that can occur during encryption/decryption operations
-#[derive(Debug, Error)]
+#[derive(Debug)]
 pub enum EncryptionError {
     /// Authentication tag verification failed
-    #[error("authentication tag verification failed")]
     InvalidAuthTag,
     /// Operation failed
-    #[error("operation failed")]
     FailedOperation,
-    #[error("malformed padding")]
     MalformedPadding,
 }
+
+impl fmt::Display for EncryptionError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            EncryptionError::InvalidAuthTag => write!(f, "authentication tag verification failed"),
+            EncryptionError::FailedOperation => write!(f, "operation failed"),
+            EncryptionError::MalformedPadding => write!(f, "malformed padding"),
+        }
+    }
+}
+
+impl core::error::Error for EncryptionError {}
