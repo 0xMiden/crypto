@@ -1,5 +1,5 @@
 //! ECDSA (Elliptic Curve Digital Signature Algorithm) signature implementation over secp256k1
-//! curve.
+//! curve using Keccak to hash the messages when signing.
 
 use alloc::{string::ToString, vec::Vec};
 
@@ -11,9 +11,12 @@ use rand::{CryptoRng, RngCore};
 use thiserror::Error;
 
 use crate::{
-    Felt, SequentialCommit, StarkField, Word,
+    Felt, SequentialCommit, Word,
     ecdh::{EphemeralPublicKey, SharedSecret},
-    utils::{ByteReader, ByteWriter, Deserializable, DeserializationError, Serializable},
+    utils::{
+        ByteReader, ByteWriter, Deserializable, DeserializationError, Serializable,
+        bytes_to_elements,
+    },
 };
 
 #[cfg(test)]
@@ -53,11 +56,13 @@ impl SecretKey {
 
     /// Generates a new secret key using the provided random number generator.
     pub fn with_rng<R: CryptoRng + RngCore>(rng: &mut R) -> Self {
+        // we use a seedable CSPRNG and seed it with `rng`
+        // this is a work around the fact that the version of the `rand` dependency in our crate
+        // is different than the one used in the `k256` one. This solution will no longer be needed
+        // once `k256` gets a new release with a version of the `rand` dependency matching ours
         use k256::elliptic_curve::rand_core::SeedableRng;
-
         let mut seed = [0_u8; 32];
         rand::RngCore::fill_bytes(rng, &mut seed);
-
         let mut rng = rand_hc::Hc128Rng::from_seed(seed);
 
         let signing_key = SigningKey::random(&mut rng);
@@ -128,12 +133,12 @@ impl PublicKey {
     pub fn recover_from(message: Word, signature: &Signature) -> Result<Self, PublicKeyError> {
         let message_digest = hash_message(message);
         let signature_data = k256::ecdsa::Signature::from_scalars(*signature.r(), *signature.s())
-            .expect("could not build the signature from the scalars");
+            .map_err(|_| PublicKeyError::RecoveryFailed)?;
 
         let verifying_key = k256::ecdsa::VerifyingKey::recover_from_prehash(
             &message_digest,
             &signature_data,
-            RecoveryId::from_byte(signature.v()).expect("invalid recovery id"),
+            RecoveryId::from_byte(signature.v()).ok_or(PublicKeyError::RecoveryFailed)?,
         )
         .map_err(|_| PublicKeyError::RecoveryFailed)?;
 
@@ -145,8 +150,7 @@ impl SequentialCommit for PublicKey {
     type Commitment = Word;
 
     fn to_elements(&self) -> Vec<Felt> {
-        // we can pack at most 7 bytes into a `Felt` without overflowing
-        self.to_bytes().chunks(7).map(Felt::from_bytes_with_padding).collect()
+        bytes_to_elements(&self.to_bytes())
     }
 }
 

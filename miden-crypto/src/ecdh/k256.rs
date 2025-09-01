@@ -19,7 +19,7 @@ use k256::{AffinePoint, elliptic_curve::sec1::ToEncodedPoint, sha2::Sha256};
 use rand::{CryptoRng, RngCore};
 
 use crate::{
-    dsa::ecdsa_k256::{PUBLIC_KEY_BYTES, PublicKey},
+    dsa::ecdsa_k256_keccak::{PUBLIC_KEY_BYTES, PublicKey},
     utils::{ByteReader, ByteWriter, Deserializable, DeserializationError, Serializable},
 };
 
@@ -60,11 +60,13 @@ impl EphemeralSecretKey {
 
     /// Generates a new ephemeral secret key using the provided random number generator.
     pub fn with_rng<R: CryptoRng + RngCore>(rng: &mut R) -> Self {
+        // we use a seedable CSPRNG and seed it with `rng`
+        // this is a work around the fact that the version of the `rand` dependency in our crate
+        // is different than the one used in the `k256` one. This solution will no longer be needed
+        // once `k256` gets a new release with a version of the `rand` dependency matching ours
         use k256::elliptic_curve::rand_core::SeedableRng;
-
         let mut seed = [0_u8; 32];
         rand::RngCore::fill_bytes(rng, &mut seed);
-
         let mut rng = rand_hc::Hc128Rng::from_seed(seed);
 
         let sk_e = k256::ecdh::EphemeralSecret::random(&mut rng);
@@ -120,13 +122,16 @@ impl Deserializable for EphemeralPublicKey {
     }
 }
 
+// TESTS
+// ================================================================================================
+
 #[cfg(test)]
 mod test {
     use rand::rng;
     use winter_utils::{Deserializable, Serializable};
 
     use super::{EphemeralPublicKey, EphemeralSecretKey};
-    use crate::dsa::ecdsa_k256::SecretKey;
+    use crate::dsa::ecdsa_k256_keccak::SecretKey;
 
     #[test]
     fn key_agreement() {
