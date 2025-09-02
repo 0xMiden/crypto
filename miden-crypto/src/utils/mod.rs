@@ -87,21 +87,46 @@ pub fn hex_to_bytes<const N: usize>(value: &str) -> Result<[u8; N], HexParseErro
     Ok(decoded)
 }
 
-/// Converts bytes to field elements with padding.
+/// Converts a byte slice into a vector of field elements.
+///
+/// Packs bytes into chunks of 7 bytes each (the maximum that fits in a `Felt`
+/// without overflow) and converts each chunk to a `Felt` using 0 padding.
+///
+/// # Arguments
+/// * `bytes` - The byte slice to convert
+///
+/// # Returns
+/// A vector of `Felt` elements, where each contains up to 7 bytes from the input
+///
+/// # Example
+/// ```
+/// use miden_crypto::utils::bytes_to_elements;
+///
+/// let data = b"Hello";
+/// let elements = bytes_to_elements(data);
+/// ```
+pub fn bytes_to_elements(bytes: &[u8]) -> Vec<Felt> {
+    // we can pack at most 7 bytes into a `Felt` without overflowing
+    bytes.chunks(BINARY_CHUNK_SIZE).map(Felt::from_bytes_with_padding).collect()
+}
+
+/// Converts a sequence of bytes into vector field elements with padding. This guarantees that no
+/// two sequences or bytes map to the same sequence of field elements.
 ///
 /// Packs bytes into chunks of `BINARY_CHUNK_SIZE` and adds padding to the final chunk using a `1`
-/// bit followed by zeros. This ensures the original bytes can be recovered during decoding
-/// without any ambiguity.
-/// Note that by the endianess of the conversion as well as the fact that we
-/// are packing at most `56 = 7 * 8` bits in each field element, the padding
-/// above with `1` should never overflow the field size.
+/// bit followed by zeros. This ensures the original bytes can be recovered during decoding without
+/// any ambiguity.
+///
+/// Note that by the endianness of the conversion as well as the fact that we are packing at most
+/// `56 = 7 * 8` bits in each field element, the padding above with `1` should never overflow the
+/// field size.
 ///
 /// # Arguments
 /// * `bytes` - Byte slice to encode
 ///
 /// # Returns
 /// Vector of `Felt` elements with the last element containing padding
-pub fn bytes_to_felts(bytes: &[u8]) -> Vec<Felt> {
+pub fn bytes_to_elements_with_padding(bytes: &[u8]) -> Vec<Felt> {
     if bytes.is_empty() {
         return vec![];
     }
@@ -136,14 +161,14 @@ pub fn bytes_to_felts(bytes: &[u8]) -> Vec<Felt> {
         .collect()
 }
 
-/// Converts padded field elements back to the original bytes.
+/// Converts a sequence of padded field elements back to the original bytes.
 ///
-/// Reconstructs the original byte sequence by removing the padding added by
-/// `bytes_to_felts`. The padding consists of a `1` bit followed by zeros in
-/// the final field element.
-/// Note that by the endianess of the conversion as well as the fact that we
-/// are packing at most `56 = 7 * 8` bits in each field element, the padding
-/// above with `1` should never overflow the field size.
+/// Reconstructs the original byte sequence by removing the padding added by `bytes_to_felts`.
+/// The padding consists of a `1` bit followed by zeros in the final field element.
+///
+/// Note that by the endianness of the conversion as well as the fact that we are packing at most
+/// `56 = 7 * 8` bits in each field element, the padding above with `1` should never overflow the
+/// field size.
 ///
 /// # Arguments
 /// * `felts` - Slice of field elements with padding in the last element
@@ -151,7 +176,7 @@ pub fn bytes_to_felts(bytes: &[u8]) -> Vec<Felt> {
 /// # Returns
 /// * `Some(Vec<u8>)` - The original byte sequence with padding removed
 /// * `None` - If no padding marker (`1` bit) is found
-pub fn felts_to_bytes(felts: &[Felt]) -> Option<Vec<u8>> {
+pub fn padded_elements_to_bytes(felts: &[Felt]) -> Option<Vec<u8>> {
     let number_felts = felts.len();
     if number_felts == 0 {
         return Some(vec![]);
@@ -169,27 +194,4 @@ pub fn felts_to_bytes(felts: &[Felt]) -> Option<Vec<u8>> {
 
     result.extend_from_slice(&felt_bytes[..pos]);
     Some(result)
-}
-
-/// Converts a byte slice into a vector of field elements.
-///
-/// Packs bytes into chunks of 7 bytes each (the maximum that fits in a `Felt`
-/// without overflow) and converts each chunk to a `Felt` using 0 padding.
-///
-/// # Arguments
-/// * `bytes` - The byte slice to convert
-///
-/// # Returns
-/// A vector of `Felt` elements, where each contains up to 7 bytes from the input
-///
-/// # Example
-/// ```
-/// use miden_crypto::utils::bytes_to_elements;
-///
-/// let data = b"Hello";
-/// let elements = bytes_to_elements(data);
-/// ```
-pub fn bytes_to_elements(bytes: &[u8]) -> Vec<Felt> {
-    // we can pack at most 7 bytes into a `Felt` without overflowing
-    bytes.chunks(BINARY_CHUNK_SIZE).map(Felt::from_bytes_with_padding).collect()
 }

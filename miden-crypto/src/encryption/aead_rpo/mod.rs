@@ -20,8 +20,8 @@ use crate::{
     Felt, ONE, StarkField, Word, ZERO,
     hash::rpo::Rpo256,
     utils::{
-        ByteReader, ByteWriter, Deserializable, DeserializationError, Serializable, bytes_to_felts,
-        felts_to_bytes,
+        ByteReader, ByteWriter, Deserializable, DeserializationError, Serializable,
+        bytes_to_elements_with_padding, padded_elements_to_bytes,
     },
 };
 
@@ -204,8 +204,8 @@ impl SecretKey {
         associated_data: &[u8],
         nonce: Nonce,
     ) -> Result<EncryptedData, EncryptionError> {
-        let data_felt = bytes_to_felts(data);
-        let ad_felt = bytes_to_felts(associated_data);
+        let data_felt = bytes_to_elements_with_padding(data);
+        let ad_felt = bytes_to_elements_with_padding(associated_data);
 
         self.encrypt_with_nonce(&data_felt, &ad_felt, nonce)
     }
@@ -291,10 +291,10 @@ impl SecretKey {
         encrypted_data: &EncryptedData,
         associated_data: &[u8],
     ) -> Result<Vec<u8>, EncryptionError> {
-        let ad_felt = bytes_to_felts(associated_data);
+        let ad_felt = bytes_to_elements_with_padding(associated_data);
         let data_felts = self.decrypt_with_associated_data(encrypted_data, &ad_felt)?;
 
-        match felts_to_bytes(&data_felts) {
+        match padded_elements_to_bytes(&data_felts) {
             Some(bytes) => Ok(bytes),
             None => Err(EncryptionError::MalformedPadding),
         }
