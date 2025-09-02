@@ -11,12 +11,12 @@ pub use winter_utils::{
     uninit_vector,
 };
 
-use crate::{Felt, Word};
+use crate::{Felt, StarkField, Word};
 
 // CONSTANTS
 // ================================================================================================
 
-/// Number of bytes to pack into one field element
+/// The number of byte chunks that can be safely embedded in a field element
 const BINARY_CHUNK_SIZE: usize = 7;
 
 // UTILITY FUNCTIONS
@@ -169,4 +169,27 @@ pub fn felts_to_bytes(felts: &[Felt]) -> Option<Vec<u8>> {
 
     result.extend_from_slice(&felt_bytes[..pos]);
     Some(result)
+}
+
+/// Converts a byte slice into a vector of field elements.
+///
+/// Packs bytes into chunks of 7 bytes each (the maximum that fits in a `Felt`
+/// without overflow) and converts each chunk to a `Felt` using 0 padding.
+///
+/// # Arguments
+/// * `bytes` - The byte slice to convert
+///
+/// # Returns
+/// A vector of `Felt` elements, where each contains up to 7 bytes from the input
+///
+/// # Example
+/// ```
+/// use miden_crypto::utils::bytes_to_elements;
+///
+/// let data = b"Hello";
+/// let elements = bytes_to_elements(data);
+/// ```
+pub fn bytes_to_elements(bytes: &[u8]) -> Vec<Felt> {
+    // we can pack at most 7 bytes into a `Felt` without overflowing
+    bytes.chunks(BINARY_CHUNK_SIZE).map(Felt::from_bytes_with_padding).collect()
 }

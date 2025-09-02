@@ -80,12 +80,16 @@ std = [
 [dependencies]
 blake3 = { version = "1.8", default-features = false }
 clap = { version = "4.5", optional = true, features = ["derive"] }
+getrandom = { version = "0.2", features = ["js"] }
 hashbrown = { version = "0.15", optional = true, features = ["serde"] }
+hkdf = { version = "0.12", default-features = false }
+k256 = { version = "0.13", features = ["ecdsa", "ecdh"] }
 num = { version = "0.4", default-features = false, features = ["alloc", "libm"] }
 num-complex = { version = "0.4", default-features = false }
 rand = { version = "0.9", default-features = false }
 rand_chacha = { version = "0.9", default-features = false }
 rand_core = { version = "0.9", default-features = false }
+rand_hc = { version = "0.3" }
 rand-utils = { version = "0.13", package = "winter-rand-utils", optional = true }
 rayon = { version = "1.10", optional = true }
 serde = { version = "1.0", default-features = false, optional = true, features = ["derive"] }
@@ -98,7 +102,6 @@ winter-utils = { version = "0.13", default-features = false }
 [dev-dependencies]
 assert_matches = { version = "1.5", default-features = false }
 criterion = { version = "0.7", features = ["html_reports"] }
-getrandom = { version = "0.3", default-features = false }
 hex = { version = "0.4", default-features = false, features = ["alloc"] }
 itertools = { version = "0.14" }
 paste = { version = "1.0" }
