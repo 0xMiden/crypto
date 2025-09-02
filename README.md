@@ -8,6 +8,12 @@
 
 This crate contains cryptographic primitives used in Miden.
 
+## Authenticated Encryption
+
+[AEAD module](./miden-crypto/src/encryption) provides authenticated encryption with associated data (AEAD) schemes. Currently, this includes:
+
+- [XChaCha20Poly1305](https://datatracker.ietf.org/doc/html/draft-irtf-cfrg-xchacha): Extended nonce variant of ChaCha20Poly1305 providing both confidentiality and authenticity. This implementation offers significant performance advantages, showing approximately 100x faster encryption/decryption compared to the arithmetization-friendly alternative based on the RPO permutation.
+
 ## Hash
 
 [Hash module](./miden-crypto/src/hash) provides a set of cryptographic hash functions which are used by the Miden protocol. Currently, these functions are:
