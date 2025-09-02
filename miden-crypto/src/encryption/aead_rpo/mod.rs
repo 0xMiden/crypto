@@ -89,7 +89,10 @@ pub struct AuthTag([Felt; AUTH_TAG_SIZE]);
 pub struct SecretKey([Felt; SECRET_KEY_SIZE]);
 
 impl SecretKey {
-    /// Creates a new random secret key using the default random number generator
+    // CONSTRUCTORS
+    // --------------------------------------------------------------------------------------------
+
+    /// Creates a new random secret key using the default random number generator.
     #[cfg(feature = "std")]
     #[allow(clippy::new_without_default)]
     pub fn new() -> Self {
@@ -99,20 +102,23 @@ impl SecretKey {
         Self::with_rng(&mut rng)
     }
 
-    /// Creates a new random secret key using the provided random number generator
+    /// Creates a new random secret key using the provided random number generator.
     pub fn with_rng<R: Rng>(rng: &mut R) -> Self {
         rng.sample(StandardUniform)
     }
 
-    /// Encrypts, as Felt-s, and authenticates the provided data using this secret key and a random
-    /// nonce
+    // ENCRYPTION
+    // --------------------------------------------------------------------------------------------
+
+    /// Encrypts and authenticates the provided sequence of field elements using this secret key
+    /// and a random nonce.
     #[cfg(feature = "std")]
     pub fn encrypt(&self, data: &[Felt]) -> Result<EncryptedData, EncryptionError> {
         self.encrypt_with_associated_data(data, &[])
     }
 
-    /// Encrypts, as Felt-s, the provided data and authenticate both the ciphertext as well as
-    /// the provided associated data using this secret key and a random nonce
+    /// Encrypts the provided sequence of field elements and authenticates both the ciphertext as
+    /// well as the provided associated data using this secret key and a random nonce.
     #[cfg(feature = "std")]
     pub fn encrypt_with_associated_data(
         &self,
@@ -126,15 +132,19 @@ impl SecretKey {
         self.encrypt_with_nonce(data, associated_data, nonce)
     }
 
-    /// Encrypts, as bytes, and authenticates the provided data using this secret key and a random
-    /// nonce
+    /// Encrypts and authenticates the provided data using this secret key and a random nonce.
+    ///
+    /// Before encryption, the bytestring is converted to a sequence of field elements.
     #[cfg(feature = "std")]
     pub fn encrypt_bytes(&self, data: &[u8]) -> Result<EncryptedData, EncryptionError> {
         self.encrypt_bytes_with_associated_data(data, &[])
     }
 
-    /// Encrypts, as bytes, the provided data and authenticate both the ciphertext as well as
-    /// the provided associated data using this secret key and a random nonce
+    /// Encrypts the provided data and authenticates both the ciphertext as well as the provided
+    /// associated data using this secret key and a random nonce.
+    ///
+    /// Before encryption, both the data and the associated data are converted to sequences of
+    /// field elements.
     #[cfg(feature = "std")]
     pub fn encrypt_bytes_with_associated_data(
         &self,
@@ -148,7 +158,8 @@ impl SecretKey {
         self.encrypt_bytes_with_nonce(data, associated_data, nonce)
     }
 
-    /// Encrypts the provided data using this secret key and a specified nonce
+    /// Encrypts the provided sequence of field elements and authenticates both the ciphertext as
+    /// well as the provided associated data using this secret key and the specified nonce.
     pub fn encrypt_with_nonce(
         &self,
         data: &[Felt],
@@ -182,7 +193,11 @@ impl SecretKey {
         Ok(EncryptedData { ciphertext, auth_tag, nonce })
     }
 
-    /// Encrypts the provided data, as bytes, using this secret key and a specified nonce
+    /// Encrypts the provided data and authenticates both the ciphertext as well as the provided
+    /// associated data using this secret key and the specified nonce.
+    ///
+    /// Before encryption, both the data and the associated data are converted to sequences of
+    /// field elements.
     pub fn encrypt_bytes_with_nonce(
         &self,
         data: &[u8],
@@ -195,12 +210,23 @@ impl SecretKey {
         self.encrypt_with_nonce(&data_felt, &ad_felt, nonce)
     }
 
-    /// Decrypts the provided encrypted data using this secret key
+    // DECRYPTION
+    // --------------------------------------------------------------------------------------------
+
+    /// Decrypts the provided encrypted data using this secret key.
+    ///
+    /// Note that if the original data was encrypted as bytes (e.g., using [Self::encrypt_bytes()]
+    /// method), the decryption will still succeed but an additional step will need to be taken to
+    /// convert the returned field elements into the original bytestring.
     pub fn decrypt(&self, encrypted_data: &EncryptedData) -> Result<Vec<Felt>, EncryptionError> {
         self.decrypt_with_associated_data(encrypted_data, &[])
     }
 
-    /// Decrypts the provided encrypted data, given some associated data, using this secret key
+    /// Decrypts the provided encrypted data, given some associated data, using this secret key.
+    ///
+    /// Note that if the original data was encrypted as bytes (e.g., using [Self::encrypt_bytes()]
+    /// method), the decryption will still succeed but an additional step will need to be taken to
+    /// convert the returned field elements into the original bytestring.
     pub fn decrypt_with_associated_data(
         &self,
         encrypted_data: &EncryptedData,
@@ -237,13 +263,16 @@ impl SecretKey {
             return Err(EncryptionError::InvalidAuthTag);
         }
 
-        // Remove padding
-        unpad(&mut plaintext)?;
-
-        Ok(plaintext)
+        // Remove padding and return
+        unpad(plaintext)
     }
 
-    /// Decrypts the provided encrypted data, as bytes, using this secret key
+    /// Decrypts the provided encrypted data, as bytes, using this secret key.
+    ///
+    ///
+    /// If the original data was a sequence of field elements encrypted with [Self::encrypt()] or
+    /// [Self::encrypt_with_associated_data()], decryption may fail. In such cases [Self::decrypt()]
+    /// or [Self::decrypt_with_associated_data()] methods should be used for decryption.
     pub fn decrypt_bytes(
         &self,
         encrypted_data: &EncryptedData,
@@ -251,8 +280,12 @@ impl SecretKey {
         self.decrypt_bytes_with_associated_data(encrypted_data, &[])
     }
 
-    /// Decrypts the provided encrypted data, as bytes, given some associated data using
-    /// this secret key
+    /// Decrypts the provided encrypted data, as bytes, given some associated data using this
+    /// secret key.
+    ///
+    /// If the original data was a sequence of field elements encrypted with [Self::encrypt()] or
+    /// [Self::encrypt_with_associated_data()], decryption may fail. In such cases [Self::decrypt()]
+    /// or [Self::decrypt_with_associated_data()] methods should be used for decryption.
     pub fn decrypt_bytes_with_associated_data(
         &self,
         encrypted_data: &EncryptedData,
@@ -280,6 +313,9 @@ impl Distribution<SecretKey> for StandardUniform {
         SecretKey(res)
     }
 }
+
+// SPONGE STATE
+// ================================================================================================
 
 /// Internal sponge state
 struct SpongeState {
@@ -348,6 +384,9 @@ impl SpongeState {
     }
 }
 
+// NONCE
+// ================================================================================================
+
 /// A 256-bit nonce represented as 4 field elements
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Nonce([Felt; NONCE_SIZE]);
@@ -382,26 +421,30 @@ impl Distribution<Nonce> for StandardUniform {
 
 impl Serializable for EncryptedData {
     fn write_into<W: ByteWriter>(&self, target: &mut W) {
+        // we serialize field elements in their canonical form
         target.write_usize(self.ciphertext.len());
-        target.write_many(felts_to_u64(&self.ciphertext));
-        target.write_many(felts_to_u64(&self.nonce.0));
-        target.write_many(felts_to_u64(&self.auth_tag.0));
+        target.write_many(self.ciphertext.iter().map(Felt::as_int));
+        target.write_many(self.nonce.0.iter().map(Felt::as_int));
+        target.write_many(self.auth_tag.0.iter().map(Felt::as_int));
     }
 }
 
 impl Deserializable for EncryptedData {
     fn read_from<R: ByteReader>(source: &mut R) -> Result<Self, DeserializationError> {
         let ciphertext_len = source.read_usize()?;
-        let ciphertext_bytes: Vec<u64> = source.read_many(ciphertext_len)?;
-        let ciphertext = felts_from_u64(&ciphertext_bytes);
+        let ciphertext_bytes = source.read_many(ciphertext_len)?;
+        let ciphertext =
+            felts_from_u64(ciphertext_bytes).map_err(DeserializationError::InvalidValue)?;
 
         let nonce = source.read_many(NONCE_SIZE)?;
-        let nonce: [Felt; NONCE_SIZE] = felts_from_u64(&nonce)
+        let nonce: [Felt; NONCE_SIZE] = felts_from_u64(nonce)
+            .map_err(DeserializationError::InvalidValue)?
             .try_into()
             .expect("should not fail given the size of the vector");
 
         let tag = source.read_many(AUTH_TAG_SIZE)?;
-        let tag: [Felt; AUTH_TAG_SIZE] = felts_from_u64(&tag)
+        let tag: [Felt; AUTH_TAG_SIZE] = felts_from_u64(tag)
+            .map_err(DeserializationError::InvalidValue)?
             .try_into()
             .expect("should not fail given the size of the vector");
 
@@ -445,7 +488,7 @@ impl std::error::Error for EncryptionError {}
 //  HELPERS
 // ================================================================================================
 
-/// Performs padding on either the plaintext or associated data
+/// Performs padding on either the plaintext or associated data.
 ///
 /// # Padding Scheme
 ///
@@ -456,42 +499,33 @@ impl std::error::Error for EncryptionError {}
 ///
 /// Plaintext data is padded using a 10* padding scheme:
 ///
-/// - A padding separator (field element `ONE`) is appended to the message
-/// - The message is then zero-padded to reach the next rate boundary
+/// - A padding separator (field element `ONE`) is appended to the message.
+/// - The message is then zero-padded to reach the next rate boundary.
 /// - **Security guarantee**: `[ONE]` and `[ONE, ZERO]` will produce different ciphertexts because
 ///   after padding they become `[ONE, ONE, 0, 0, ...]` and `[ONE, ZERO, ONE, 0, ...]` respectively,
-///   ensuring injectivity
+///   ensuring injectivity.
 ///
 /// ## Associated Data Padding
 ///
 /// Associated data follows the same injective padding scheme:
 ///
-/// - Padding separator (`ONE`) is appended
-/// - Zero-padded to rate boundary
+/// - Padding separator (`ONE`) is appended.
+/// - Zero-padded to rate boundary.
 /// - **Security guarantee**: Different associated data inputs (like `[ONE]` vs `[ONE, ZERO]`)
-///   produce different authentication tags due to the injective padding
+///   produce different authentication tags due to the injective padding.
 fn pad(data: &[Felt]) -> Vec<Felt> {
-    let data_len = data.len();
-    let num_elem_final_block = data_len % RATE_WIDTH;
+    // if data length is a multiple of 8, padding_elements will be 8
+    let num_elem_final_block = data.len() % RATE_WIDTH;
+    let padding_elements = RATE_WIDTH - num_elem_final_block;
 
-    let mut result = Vec::with_capacity(data_len + RATE_WIDTH);
-    result.extend_from_slice(data);
-
-    if num_elem_final_block == 0 {
-        result.extend_from_slice(&PADDING_BLOCK);
-    } else {
-        result.push(ONE);
-
-        while !result.len().is_multiple_of(RATE_WIDTH) {
-            result.push(ZERO);
-        }
-    }
+    let mut result = data.to_vec();
+    result.extend_from_slice(&PADDING_BLOCK[..padding_elements]);
 
     result
 }
 
 /// Removes the padding from the decoded ciphertext.
-fn unpad(plaintext: &mut Vec<Felt>) -> Result<(), EncryptionError> {
+fn unpad(mut plaintext: Vec<Felt>) -> Result<Vec<Felt>, EncryptionError> {
     let (num_blocks, remainder) = plaintext.len().div_rem(&RATE_WIDTH);
     assert_eq!(remainder, 0);
 
@@ -504,22 +538,11 @@ fn unpad(plaintext: &mut Vec<Felt>) -> Result<(), EncryptionError> {
 
     plaintext.truncate((num_blocks - 1) * RATE_WIDTH + pos);
 
-    Ok(())
+    Ok(plaintext)
 }
 
-/// Converts a vector of field elements to a vector of containg their u64 canonical representations.
-fn felts_to_u64(elements: &[Felt]) -> Vec<u64> {
-    elements.iter().map(|e| e.as_int()).collect()
-}
-
-/// Given a vector of u64 values assumed to represent canoncial values of field elements,
-/// produces a vector of field elements
-fn felts_from_u64(input: &[u64]) -> Vec<Felt> {
-    input
-        .iter()
-        .map(|e| {
-            debug_assert!(e < &Felt::MODULUS);
-            Felt::new(*e)
-        })
-        .collect()
+/// Converts a vector of u64 values into a vector of filed elements, returning an error if any of
+/// the u64 values is not a valid field element.
+fn felts_from_u64(input: Vec<u64>) -> Result<Vec<Felt>, alloc::string::String> {
+    input.into_iter().map(Felt::try_from).collect()
 }

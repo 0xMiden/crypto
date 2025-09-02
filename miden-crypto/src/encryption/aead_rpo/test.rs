@@ -116,10 +116,10 @@ proptest! {
         let nonce2 = Nonce::from_word(nonce_word.into());
 
         let associated_data: Vec<Felt> = associated_data.into_iter()
-            .map(|x| Felt::new(x))
+            .map(Felt::new)
             .collect();
         let data: Vec<Felt> = data.into_iter()
-            .map(|x| Felt::new(x))
+            .map(Felt::new)
             .collect();
 
         let encrypted1 = key1.encrypt_with_nonce(&data, &associated_data, nonce1).unwrap();
@@ -142,10 +142,10 @@ proptest! {
         let nonce2 = Nonce::from_word([ONE; 4].into());
 
         let associated_data: Vec<Felt> = associated_data.into_iter()
-            .map(|x| Felt::new(x))
+            .map(Felt::new)
             .collect();
         let data: Vec<Felt> = data.into_iter()
-            .map(|x| Felt::new(x))
+            .map(Felt::new)
             .collect();
 
         let encrypted1 = key.encrypt_with_nonce(&data,&associated_data, nonce1).unwrap();

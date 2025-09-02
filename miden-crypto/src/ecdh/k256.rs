@@ -147,12 +147,12 @@ mod test {
 
         // 3. Bob computes the shared secret key (Bob will send pk_e with the encrypted note to
         //    Alice)
-        let shared_secret_key_1 = sk_e.diffie_hellman(pk.into());
+        let shared_secret_key_1 = sk_e.diffie_hellman(pk);
 
         // 4. Alice uses its secret key and the ephemeral public key sent with the encrypted note by
-        //    Bob in order to create the shared secret key. This shared secet key will be used to
+        //    Bob in order to create the shared secret key. This shared secret key will be used to
         //    decrypt the encrypted note
-        let shared_secret_key_2 = sk.get_shared_secret(pk_e.into());
+        let shared_secret_key_2 = sk.get_shared_secret(pk_e);
 
         // Check that the computed shared secret keys are equal
         assert_eq!(
