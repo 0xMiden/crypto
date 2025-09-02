@@ -19,7 +19,10 @@ use rand::{
 use crate::{
     Felt, ONE, StarkField, Word, ZERO,
     hash::rpo::Rpo256,
-    utils::{ByteReader, ByteWriter, Deserializable, DeserializationError, Serializable},
+    utils::{
+        ByteReader, ByteWriter, Deserializable, DeserializationError, Serializable, bytes_to_felts,
+        felts_to_bytes,
+    },
 };
 
 #[cfg(test)]
@@ -65,9 +68,6 @@ const RATE_START: usize = Rpo256::RATE_RANGE.start;
 
 /// Padding block used when the length of the data to encrypt is a multiple of `RATE_WIDTH`
 const PADDING_BLOCK: [Felt; RATE_WIDTH] = [ONE, ZERO, ZERO, ZERO, ZERO, ZERO, ZERO, ZERO];
-
-/// Number of bytes to pack into one field element
-const BINARY_CHUNK_SIZE: usize = 7;
 
 // TYPES AND STRUCTURES
 // ================================================================================================
@@ -261,7 +261,10 @@ impl SecretKey {
         let ad_felt = bytes_to_felts(associated_data);
         let data_felts = self.decrypt_with_associated_data(encrypted_data, &ad_felt)?;
 
-        felts_to_bytes(&data_felts)
+        match felts_to_bytes(&data_felts) {
+            Some(bytes) => Ok(bytes),
+            None => Err(EncryptionError::MalformedPadding),
+        }
     }
 }
 
@@ -441,66 +444,6 @@ impl std::error::Error for EncryptionError {}
 
 //  HELPERS
 // ================================================================================================
-
-/// Converts bytes to field elements
-fn bytes_to_felts(bytes: &[u8]) -> Vec<Felt> {
-    if bytes.is_empty() {
-        return vec![];
-    }
-
-    // determine the number of field elements needed to encode `bytes` when each field element
-    // represents at most 7 bytes.
-    let num_field_elem = bytes.len().div_ceil(BINARY_CHUNK_SIZE);
-
-    // initialize a buffer to receive the little-endian elements.
-    let mut buf = [0_u8; 8];
-
-    // iterate the chunks of bytes, creating a field element from each chunk
-    let last_chunk_idx = num_field_elem - 1;
-
-    bytes
-        .chunks(BINARY_CHUNK_SIZE)
-        .enumerate()
-        .map(|(current_chunk_idx, chunk)| {
-            // copy the chunk into the buffer
-            if current_chunk_idx != last_chunk_idx {
-                buf[..BINARY_CHUNK_SIZE].copy_from_slice(chunk);
-            } else {
-                // on the last iteration, we pad `buf` with a 1 followed by as many 0's as are
-                // needed to fill it
-                buf.fill(0);
-                buf[..chunk.len()].copy_from_slice(chunk);
-                buf[chunk.len()] = 1;
-            }
-
-            Felt::new(u64::from_le_bytes(buf))
-        })
-        .collect()
-}
-
-/// Converts field elements back to bytes
-fn felts_to_bytes(felts: &[Felt]) -> Result<Vec<u8>, EncryptionError> {
-    let number_felts = felts.len();
-    if number_felts == 0 {
-        return Ok(vec![]);
-    }
-
-    let mut result = Vec::with_capacity(number_felts * BINARY_CHUNK_SIZE);
-    for felt in felts.iter().take(number_felts - 1) {
-        let felt_bytes = felt.as_int().to_le_bytes();
-        result.extend_from_slice(&felt_bytes[..BINARY_CHUNK_SIZE]);
-    }
-
-    // handle the last field element
-    let felt_bytes = felts[number_felts - 1].as_int().to_le_bytes();
-    let pos = match felt_bytes.iter().rposition(|entry| *entry == 1_u8) {
-        Some(pos) => pos,
-        None => return Err(EncryptionError::MalformedPadding),
-    };
-
-    result.extend_from_slice(&felt_bytes[..pos]);
-    Ok(result)
-}
 
 /// Performs padding on either the plaintext or associated data
 ///
