@@ -13,6 +13,12 @@ pub use winter_utils::{
 
 use crate::{Felt, StarkField, Word};
 
+// CONSTANTS
+// ================================================================================================
+
+/// The number of byte chunks that can be safely embedded in a field element
+const BINARY_CHUNK_SIZE: usize = 7;
+
 // UTILITY FUNCTIONS
 // ================================================================================================
 
@@ -101,5 +107,5 @@ pub fn hex_to_bytes<const N: usize>(value: &str) -> Result<[u8; N], HexParseErro
 /// ```
 pub fn bytes_to_elements(bytes: &[u8]) -> Vec<Felt> {
     // we can pack at most 7 bytes into a `Felt` without overflowing
-    bytes.chunks(7).map(Felt::from_bytes_with_padding).collect()
+    bytes.chunks(BINARY_CHUNK_SIZE).map(Felt::from_bytes_with_padding).collect()
 }
