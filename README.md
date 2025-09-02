@@ -45,7 +45,7 @@ For the above signatures, key generation, signing, and signature verification ar
 
 ## Key Exchange
 
-[DH module](./miden-crypto/src/ecdh) provides elliptic curve key exchange algorithms for secure key agreement. Implementations in this module make use of ephemeral keys for a "sealed box" approach where the sender generates an ephemeral secret key, derives a shared secret with the receiver's static public key, and includes the ephemeral public key alongside the encrypted message. This design enables secure communication without requiring prior interaction between parties.
+[ECDH module](./miden-crypto/src/ecdh) provides elliptic curve key exchange algorithms for secure key agreement. Implementations in this module make use of ephemeral keys for a "sealed box" approach where the sender generates an ephemeral secret key, derives a shared secret with the receiver's static public key, and includes the ephemeral public key alongside the encrypted message. This design enables secure communication without requiring prior interaction between parties.
 Currently, the module includes the following implementations:
 
 - `ECDH k256`: Elliptic Curve Diffie-Hellman key exchange using the `k256` curve (also known as `secp256k1`). 
