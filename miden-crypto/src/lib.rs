@@ -7,8 +7,8 @@ extern crate alloc;
 extern crate std;
 
 pub mod dsa;
-pub mod encryption;
 pub mod ecdh;
+pub mod encryption;
 pub mod hash;
 pub mod merkle;
 pub mod rand;
