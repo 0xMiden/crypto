@@ -4,12 +4,6 @@ use core::fmt;
 
 pub mod xchacha;
 
-// CONSTANTS
-// ================================================================================================
-
-/// Number of bytes to pack into one field element
-const BINARY_CHUNK_SIZE: usize = 7;
-
 // ERROR TYPES
 // ================================================================================================
 

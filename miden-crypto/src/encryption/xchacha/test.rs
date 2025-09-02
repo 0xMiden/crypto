@@ -5,54 +5,11 @@ use proptest::{
 use rand::TryRngCore;
 
 use super::*;
-use crate::ONE;
 
 // PROPERTY-BASED TESTS
 // ================================================================================================
 
 proptest! {
-    #[test]
-    fn test_encryption_decryption_roundtrip(
-        data_len in 1usize..1000,
-    ) {
-        let mut rng = rand::rng();
-        let key = SecretKey::with_rng(&mut rng);
-        let nonce = Nonce::with_rng(&mut rng);
-
-        // Generate random field elements
-        let data: Vec<Felt> = (0..data_len)
-            .map(|_| Felt::new(rng.try_next_u64().unwrap()))
-            .collect();
-
-        let encrypted = key.encrypt_with_nonce(&data, &[], nonce).unwrap();
-        let decrypted = key.decrypt(&encrypted).unwrap();
-
-        prop_assert_eq!(data, decrypted);
-    }
-
-    #[test]
-    fn test_encryption_decryption_with_ad_roundtrip(
-        associated_data_len in 1usize..1000,
-        data_len in 1usize..1000,
-    ) {
-        let mut rng = rand::rng();
-        let key = SecretKey::with_rng(&mut rng);
-        let nonce = Nonce::with_rng(&mut rng);
-
-        // Generate random field elements
-        let associated_data: Vec<Felt> = (0..associated_data_len)
-            .map(|_| Felt::new(rng.try_next_u64().unwrap()))
-            .collect();
-        let data: Vec<Felt> = (0..data_len)
-            .map(|_| Felt::new(rng.try_next_u64().unwrap()))
-            .collect();
-
-        let encrypted = key.encrypt_with_nonce(&data, &associated_data, nonce).unwrap();
-        let decrypted = key.decrypt_with_associated_data(&encrypted, &associated_data).unwrap();
-
-        prop_assert_eq!(data, decrypted);
-    }
-
     #[test]
     fn test_bytes_encryption_decryption_roundtrip(
         data_len in 0usize..1000,
@@ -65,8 +22,8 @@ proptest! {
         let mut data = vec![0_u8; data_len];
         let _ =  rng.try_fill_bytes(&mut data);
 
-        let encrypted = key.encrypt_bytes_with_nonce(&data, &[], nonce).unwrap();
-        let decrypted = key.decrypt_bytes(&encrypted).unwrap();
+        let encrypted = key.encrypt_with_nonce(&data, &[], nonce).unwrap();
+        let decrypted = key.decrypt(&encrypted).unwrap();
 
         prop_assert_eq!(data, decrypted);
     }
@@ -88,16 +45,16 @@ proptest! {
         let _ =  rng.try_fill_bytes(&mut data);
 
 
-        let encrypted = key.encrypt_bytes_with_nonce(&data, &associated_data, nonce).unwrap();
-        let decrypted = key.decrypt_bytes_with_associated_data(&encrypted, &associated_data).unwrap();
+        let encrypted = key.encrypt_with_nonce(&data, &associated_data, nonce).unwrap();
+        let decrypted = key.decrypt_with_associated_data(&encrypted, &associated_data).unwrap();
 
         prop_assert_eq!(data, decrypted);
     }
 
     #[test]
     fn test_different_keys_different_outputs(
-        associated_data in prop::collection::vec(any::<u64>(), 1..500),
-        data in prop::collection::vec(any::<u64>(), 1..500),
+        associated_data in prop::collection::vec(any::<u8>(), 1..500),
+        data in prop::collection::vec(any::<u8>(), 1..500),
     ) {
 
         let mut rng1 = rand::rng();
@@ -110,13 +67,6 @@ proptest! {
         let nonce1 = Nonce::from_slice(&nonce_bytes);
         let nonce2 = Nonce::from_slice(&nonce_bytes);
 
-        let associated_data: Vec<Felt> = associated_data.into_iter()
-            .map(|x| Felt::new(x))
-            .collect();
-        let data: Vec<Felt> = data.into_iter()
-            .map(|x| Felt::new(x))
-            .collect();
-
         let encrypted1 = key1.encrypt_with_nonce(&data, &associated_data, nonce1).unwrap();
         let encrypted2 = key2.encrypt_with_nonce(&data, &associated_data, nonce2).unwrap();
 
@@ -126,8 +76,8 @@ proptest! {
 
     #[test]
     fn test_different_nonces_different_outputs(
-        associated_data in prop::collection::vec(any::<u64>(), 1..50),
-        data in prop::collection::vec(any::<u64>(), 1..50),
+        associated_data in prop::collection::vec(any::<u8>(), 1..500),
+        data in prop::collection::vec(any::<u8>(), 1..500),
     ) {
         let mut rng = rand::rng();
         let key = SecretKey::with_rng(&mut rng);
@@ -136,13 +86,6 @@ proptest! {
         let nonce1 = Nonce::from_slice(&nonce_bytes);
         let _ = rng.try_fill_bytes(&mut nonce_bytes);
         let nonce2 = Nonce::from_slice(&nonce_bytes);
-
-        let associated_data: Vec<Felt> = associated_data.into_iter()
-            .map(|x| Felt::new(x ))
-            .collect();
-        let data: Vec<Felt> = data.into_iter()
-            .map(|x| Felt::new(x ))
-            .collect();
 
         let encrypted1 = key.encrypt_with_nonce(&data,&associated_data, nonce1).unwrap();
         let encrypted2 = key.encrypt_with_nonce(&data, &associated_data, nonce2).unwrap();
@@ -194,8 +137,8 @@ fn test_empty_data_encryption() {
     let key = SecretKey::with_rng(&mut rng);
     let nonce = Nonce::with_rng(&mut rng);
 
-    let associated_data: Vec<Felt> = vec![ONE; 8];
-    let empty_data: Vec<Felt> = vec![];
+    let associated_data = vec![1; 8];
+    let empty_data = vec![];
     let encrypted = key.encrypt_with_nonce(&empty_data, &associated_data, nonce).unwrap();
     let decrypted = key.decrypt_with_associated_data(&encrypted, &associated_data).unwrap();
 
@@ -209,8 +152,8 @@ fn test_single_element_encryption() {
     let key = SecretKey::with_rng(&mut rng);
     let nonce = Nonce::with_rng(&mut rng);
 
-    let associated_data: Vec<Felt> = vec![ONE; 8];
-    let data = vec![Felt::new(42)];
+    let associated_data = vec![1; 8];
+    let data = vec![42];
     let encrypted = key.encrypt_with_nonce(&data, &associated_data, nonce).unwrap();
     let decrypted = key.decrypt_with_associated_data(&encrypted, &associated_data).unwrap();
 
@@ -224,9 +167,9 @@ fn test_large_data_encryption() {
     let key = SecretKey::with_rng(&mut rng);
     let nonce = Nonce::with_rng(&mut rng);
 
-    let associated_data: Vec<Felt> = vec![ONE; 8];
+    let associated_data = vec![1; 8];
     // Test with data larger than rate
-    let data: Vec<Felt> = (0..100).map(|i| Felt::new(i as u64)).collect();
+    let data: Vec<_> = (0..100).collect();
 
     let encrypted = key.encrypt_with_nonce(&data, &associated_data, nonce).unwrap();
     let decrypted = key.decrypt_with_associated_data(&encrypted, &associated_data).unwrap();
@@ -238,10 +181,10 @@ fn test_large_data_encryption() {
 fn test_encryption_various_lengths() {
     let mut rng = rand::rng();
     let key = SecretKey::with_rng(&mut rng);
-    let associated_data: Vec<Felt> = vec![ONE; 8];
+    let associated_data = vec![1; 8];
 
-    for len in [1, 7, 8, 9, 15, 16, 17, 31, 32, 35, 39, 54, 67, 100, 1000] {
-        let data: Vec<Felt> = (0..len).map(|i| Felt::new(i as u64)).collect();
+    for len in [1, 7, 8, 9, 15, 16, 17, 31, 32, 35, 39, 54, 67, 100, 255] {
+        let data: Vec<_> = (0..len).collect();
 
         let nonce = Nonce::with_rng(&mut rng);
         let encrypted = key.encrypt_with_nonce(&data, &associated_data, nonce).unwrap();
@@ -252,39 +195,20 @@ fn test_encryption_various_lengths() {
 }
 
 #[test]
-fn test_bytes_encryption_various_lengths() {
-    let mut rng = rand::rng();
-    let key = SecretKey::with_rng(&mut rng);
-    let associated_data: Vec<u8> = vec![1; 8];
-
-    for len in [1, 7, 8, 9, 15, 16, 17, 31, 32, 35, 39, 54, 67, 100, 1000] {
-        let mut data = vec![0_u8; len];
-        let _ = rng.try_fill_bytes(&mut data);
-
-        let nonce = Nonce::with_rng(&mut rng);
-        let encrypted = key.encrypt_bytes_with_nonce(&data, &associated_data, nonce).unwrap();
-        let decrypted =
-            key.decrypt_bytes_with_associated_data(&encrypted, &associated_data).unwrap();
-
-        assert_eq!(data, decrypted, "Failed for length {}", len);
-    }
-}
-
-#[test]
 fn test_encrypted_data_serialization() {
     let mut rng = rand::rng();
     let key = SecretKey::with_rng(&mut rng);
-    let associated_data: Vec<Felt> = vec![ONE; 8];
+    let associated_data = vec![1; 8];
 
-    for len in [1, 7, 8, 9, 15, 16, 17, 31, 32, 35, 39, 54, 67, 100, 1000] {
-        let data: Vec<Felt> = (0..len).map(|i| Felt::new(i as u64)).collect();
+    for len in [1, 7, 8, 9, 15, 16, 17, 31, 32, 35, 39, 54, 67, 100, 255] {
+        let data: Vec<_> = (0..len).collect();
 
         let nonce = Nonce::with_rng(&mut rng);
         let encrypted = key.encrypt_with_nonce(&data, &associated_data, nonce).unwrap();
         let encrypted_data_bytes = encrypted.to_bytes();
 
         let encrypted_data_serialized =
-            EncryptedFeltData::read_from_bytes(&encrypted_data_bytes).unwrap();
+            EncryptedData::read_from_bytes(&encrypted_data_bytes).unwrap();
 
         assert_eq!(encrypted, encrypted_data_serialized, "Failed for length {}", len);
     }
@@ -297,12 +221,12 @@ fn test_ciphertext_tampering_detection() {
     let key = SecretKey::with_rng(&mut rng);
     let nonce = Nonce::with_rng(&mut rng);
 
-    let associated_data: Vec<Felt> = vec![ONE; 8];
-    let data = vec![Felt::new(123), Felt::new(456)];
+    let associated_data = vec![1; 8];
+    let data = vec![123, 45];
     let mut encrypted = key.encrypt_with_nonce(&data, &associated_data, nonce).unwrap();
 
     // Tamper with ciphertext
-    encrypted.ciphertext[0] += ONE;
+    encrypted.ciphertext[0] += 1;
 
     let result = key.decrypt_with_associated_data(&encrypted, &associated_data);
     assert!(result.is_err());
@@ -315,8 +239,8 @@ fn test_wrong_key_detection() {
     let key2 = SecretKey::with_rng(&mut rng);
     let nonce = Nonce::with_rng(&mut rng);
 
-    let associated_data: Vec<Felt> = vec![ONE; 8];
-    let data = vec![Felt::new(123), Felt::new(456)];
+    let associated_data = vec![1; 8];
+    let data = vec![123, 45];
     let encrypted = key1.encrypt_with_nonce(&data, &associated_data, nonce).unwrap();
 
     // Try to decrypt with wrong key
@@ -332,12 +256,12 @@ fn test_wrong_nonce_detection() {
     let nonce2 = Nonce::with_rng(&mut rng);
 
     let associated_data: Vec<u8> = vec![1; 8];
-    let data = vec![(123), (55)];
-    let mut encrypted = key.encrypt_bytes_with_nonce(&data, &associated_data, nonce1).unwrap();
+    let data = vec![123, 55];
+    let mut encrypted = key.encrypt_with_nonce(&data, &associated_data, nonce1).unwrap();
 
     // Try to decrypt with wrong nonce
     encrypted.nonce = nonce2;
-    let result = key.decrypt_bytes_with_associated_data(&encrypted, &associated_data);
+    let result = key.decrypt_with_associated_data(&encrypted, &associated_data);
     assert!(result.is_err());
 }
 
@@ -349,7 +273,6 @@ mod security_tests {
     use std::collections::HashSet;
 
     use super::*;
-    use crate::ZERO;
 
     #[test]
     fn test_key_uniqueness() {
@@ -383,8 +306,8 @@ mod security_tests {
         let key = SecretKey::with_rng(&mut rng);
 
         // Encrypt the same plaintext with different nonces
-        let associated_data: Vec<Felt> = vec![ONE; 8];
-        let plaintext = vec![ZERO; 10]; // All zeros
+        let associated_data = vec![1; 8];
+        let plaintext = vec![3; 10];
         let mut ciphertexts = Vec::new();
 
         for _ in 0..100 {
