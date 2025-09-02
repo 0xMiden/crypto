@@ -274,7 +274,7 @@ impl Zeroize for SecretKey {
 /// Encrypted data as bytes
 #[derive(Debug, PartialEq, Eq)]
 pub struct EncryptedData {
-    /// The encrypted ciphertext
+    /// The encrypted ciphertext, including the authentication tag
     ciphertext: Vec<u8>,
     /// The nonce used during encryption
     nonce: Nonce,
@@ -283,7 +283,7 @@ pub struct EncryptedData {
 /// Encrypted data as field elements
 #[derive(Debug, PartialEq, Eq)]
 pub struct EncryptedFeltData {
-    /// The encrypted ciphertext
+    /// The encrypted ciphertext, including the authentication tag
     ciphertext: Vec<Felt>,
     /// The nonce used during encryption
     nonce: [Felt; NONCE_SIZE_FELT],
