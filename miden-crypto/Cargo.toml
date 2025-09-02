@@ -82,8 +82,11 @@ blake3 = { version = "1.8", default-features = false }
 chacha20 = { version = "0.9", default-features = false }
 chacha20poly1305  = { version = "0.10", features = ["alloc", "stream"] }
 clap = { version = "4.5", optional = true, features = ["derive"] }
+getrandom = { version = "0.2", features = ["js"] }
 hashbrown = { version = "0.15", optional = true, features = ["serde"] }
 getrandom = { version = "0.2", features = ["js"] }
+hkdf = { version = "0.12", default-features = false }
+k256 = { version = "0.13", features = ["ecdsa", "ecdh"] }
 num = { version = "0.4", default-features = false, features = ["alloc", "libm"] }
 num-complex = { version = "0.4", default-features = false }
 rand = { version = "0.9", default-features = false }
@@ -103,7 +106,6 @@ zeroize = { version = "1.8", default-features = false }
 [dev-dependencies]
 assert_matches = { version = "1.5", default-features = false }
 criterion = { version = "0.7", features = ["html_reports"] }
-getrandom = { version = "0.3", default-features = false }
 hex = { version = "0.4", default-features = false, features = ["alloc"] }
 itertools = { version = "0.14" }
 paste = { version = "1.0" }
