@@ -1,9 +1,9 @@
 //! # Arithmetization Oriented AEAD
 //!
-//! This module implements an AEAD scheme optimized for spped within SNARKs/STARKs.
-//! The design is described in \[1\] and is based on the MonkeySpongeWrap construction combined
-//! using the RPO (Rescue Prime Optimized) permutation, creating an encryption scheme that is
-//! highly efficient when executed within zero-knowledge proof systems.
+//! This module implements an AEAD scheme optimized for speed within SNARKs/STARKs.
+//! The design is described in \[1\] and is based on the MonkeySpongeWrap construction and uses
+//! the RPO (Rescue Prime Optimized) permutation, creating an encryption scheme that is highly
+//! efficient when executed within zero-knowledge proof systems.
 //!
 //! \[1\] <https://eprint.iacr.org/2023/1668>
 
@@ -541,7 +541,7 @@ fn unpad(mut plaintext: Vec<Felt>) -> Result<Vec<Felt>, EncryptionError> {
     Ok(plaintext)
 }
 
-/// Converts a vector of u64 values into a vector of filed elements, returning an error if any of
+/// Converts a vector of u64 values into a vector of field elements, returning an error if any of
 /// the u64 values is not a valid field element.
 fn felts_from_u64(input: Vec<u64>) -> Result<Vec<Felt>, alloc::string::String> {
     input.into_iter().map(Felt::try_from).collect()

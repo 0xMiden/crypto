@@ -8,6 +8,12 @@
 
 This crate contains cryptographic primitives used in Miden.
 
+## Authenticated Encryption
+
+[AEAD module](./miden-crypto/src/encryption) provides authenticated encryption with associated data (AEAD) schemes. Currently, this includes:
+
+- [AEAD-RPO](https://eprint.iacr.org/2023/1668): a scheme optimized for speed within SNARKs/STARKs. The design is based on the MonkeySpongeWrap construction and uses the RPO (Rescue Prime Optimized) permutation, creating an encryption scheme that is highly efficient when executed within zero-knowledge proof systems.
+
 ## Hash
 
 [Hash module](./miden-crypto/src/hash) provides a set of cryptographic hash functions which are used by the Miden protocol. Currently, these functions are:
