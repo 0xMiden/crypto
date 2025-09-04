@@ -21,11 +21,11 @@ required-features = ["executable"]
 
 [[bench]]
 harness = false
-name = "encryption"
+name    = "encryption"
 
 [[bench]]
 harness = false
-name = "hash"
+name    = "hash"
 
 [[bench]]
 harness = false

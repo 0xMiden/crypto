@@ -248,7 +248,7 @@ fn test_encryption_various_lengths() {
         let encrypted = key.encrypt_with_nonce(&data, &associated_data, nonce).unwrap();
         let decrypted = key.decrypt_with_associated_data(&encrypted, &associated_data).unwrap();
 
-        assert_eq!(data, decrypted, "Failed for length {}", len);
+        assert_eq!(data, decrypted, "Failed for length {len}");
     }
 }
 
@@ -268,7 +268,7 @@ fn test_bytes_encryption_various_lengths() {
         let decrypted =
             key.decrypt_bytes_with_associated_data(&encrypted, &associated_data).unwrap();
 
-        assert_eq!(data, decrypted, "Failed for length {}", len);
+        assert_eq!(data, decrypted, "Failed for length {len}");
     }
 }
 
@@ -405,8 +405,7 @@ mod security_tests {
             for j in i + 1..ciphertexts.len() {
                 assert_ne!(
                     ciphertexts[i], ciphertexts[j],
-                    "Ciphertexts {} and {} are identical!",
-                    i, j
+                    "Ciphertexts {i} and {j} are identical!",
                 );
             }
         }
