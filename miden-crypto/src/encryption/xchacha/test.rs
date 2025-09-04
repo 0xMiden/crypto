@@ -2,7 +2,8 @@ use proptest::{
     prelude::{any, prop},
     prop_assert_eq, prop_assert_ne, proptest,
 };
-use rand::TryRngCore;
+use rand::{SeedableRng, TryRngCore};
+use rand_chacha::ChaCha20Rng;
 
 use super::*;
 
@@ -100,7 +101,8 @@ proptest! {
 
 #[test]
 fn test_secret_key_creation() {
-    let mut rng = rand::rng();
+    let seed = [0_u8; 32];
+    let mut rng = ChaCha20Rng::from_seed(seed);
     let key1 = SecretKey::with_rng(&mut rng);
     let key2 = SecretKey::with_rng(&mut rng);
 
@@ -110,11 +112,11 @@ fn test_secret_key_creation() {
 
 #[test]
 fn test_secret_key_serialization() {
-    let mut rng = rand::rng();
+    let seed = [0_u8; 32];
+    let mut rng = ChaCha20Rng::from_seed(seed);
+
     let key = SecretKey::with_rng(&mut rng);
-
     let key_bytes = key.to_bytes();
-
     let key_serialized = SecretKey::read_from_bytes(&key_bytes).unwrap();
 
     assert_eq!(key, key_serialized);
@@ -122,7 +124,8 @@ fn test_secret_key_serialization() {
 
 #[test]
 fn test_nonce_creation() {
-    let mut rng = rand::rng();
+    let seed = [0_u8; 32];
+    let mut rng = ChaCha20Rng::from_seed(seed);
 
     let nonce1 = Nonce::with_rng(&mut rng);
     let nonce2 = Nonce::with_rng(&mut rng);
@@ -133,7 +136,9 @@ fn test_nonce_creation() {
 
 #[test]
 fn test_empty_data_encryption() {
-    let mut rng = rand::rng();
+    let seed = [0_u8; 32];
+    let mut rng = ChaCha20Rng::from_seed(seed);
+
     let key = SecretKey::with_rng(&mut rng);
     let nonce = Nonce::with_rng(&mut rng);
 
@@ -147,7 +152,8 @@ fn test_empty_data_encryption() {
 
 #[test]
 fn test_single_element_encryption() {
-    let mut rng = rand::rng();
+    let seed = [0_u8; 32];
+    let mut rng = ChaCha20Rng::from_seed(seed);
 
     let key = SecretKey::with_rng(&mut rng);
     let nonce = Nonce::with_rng(&mut rng);
@@ -162,7 +168,8 @@ fn test_single_element_encryption() {
 
 #[test]
 fn test_large_data_encryption() {
-    let mut rng = rand::rng();
+    let seed = [0_u8; 32];
+    let mut rng = ChaCha20Rng::from_seed(seed);
 
     let key = SecretKey::with_rng(&mut rng);
     let nonce = Nonce::with_rng(&mut rng);
@@ -179,7 +186,9 @@ fn test_large_data_encryption() {
 
 #[test]
 fn test_encryption_various_lengths() {
-    let mut rng = rand::rng();
+    let seed = [0_u8; 32];
+    let mut rng = ChaCha20Rng::from_seed(seed);
+
     let key = SecretKey::with_rng(&mut rng);
     let associated_data = vec![1; 8];
 
@@ -190,13 +199,15 @@ fn test_encryption_various_lengths() {
         let encrypted = key.encrypt_with_nonce(&data, &associated_data, nonce).unwrap();
         let decrypted = key.decrypt_with_associated_data(&encrypted, &associated_data).unwrap();
 
-        assert_eq!(data, decrypted, "Failed for length {}", len);
+        assert_eq!(data, decrypted, "Failed for length {len}");
     }
 }
 
 #[test]
 fn test_encrypted_data_serialization() {
-    let mut rng = rand::rng();
+    let seed = [0_u8; 32];
+    let mut rng = ChaCha20Rng::from_seed(seed);
+
     let key = SecretKey::with_rng(&mut rng);
     let associated_data = vec![1; 8];
 
@@ -210,13 +221,14 @@ fn test_encrypted_data_serialization() {
         let encrypted_data_serialized =
             EncryptedData::read_from_bytes(&encrypted_data_bytes).unwrap();
 
-        assert_eq!(encrypted, encrypted_data_serialized, "Failed for length {}", len);
+        assert_eq!(encrypted, encrypted_data_serialized, "Failed for length {len}");
     }
 }
 
 #[test]
 fn test_ciphertext_tampering_detection() {
-    let mut rng = rand::rng();
+    let seed = [0_u8; 32];
+    let mut rng = ChaCha20Rng::from_seed(seed);
 
     let key = SecretKey::with_rng(&mut rng);
     let nonce = Nonce::with_rng(&mut rng);
@@ -226,7 +238,7 @@ fn test_ciphertext_tampering_detection() {
     let mut encrypted = key.encrypt_with_nonce(&data, &associated_data, nonce).unwrap();
 
     // Tamper with ciphertext
-    encrypted.ciphertext[0] += 1;
+    encrypted.ciphertext[0] = encrypted.ciphertext[0].wrapping_add(1);
 
     let result = key.decrypt_with_associated_data(&encrypted, &associated_data);
     assert!(result.is_err());
@@ -234,7 +246,9 @@ fn test_ciphertext_tampering_detection() {
 
 #[test]
 fn test_wrong_key_detection() {
-    let mut rng = rand::rng();
+    let seed = [0_u8; 32];
+    let mut rng = ChaCha20Rng::from_seed(seed);
+
     let key1 = SecretKey::with_rng(&mut rng);
     let key2 = SecretKey::with_rng(&mut rng);
     let nonce = Nonce::with_rng(&mut rng);
@@ -250,7 +264,9 @@ fn test_wrong_key_detection() {
 
 #[test]
 fn test_wrong_nonce_detection() {
-    let mut rng = rand::rng();
+    let seed = [0_u8; 32];
+    let mut rng = ChaCha20Rng::from_seed(seed);
+
     let key = SecretKey::with_rng(&mut rng);
     let nonce1 = Nonce::with_rng(&mut rng);
     let nonce2 = Nonce::with_rng(&mut rng);
@@ -276,7 +292,9 @@ mod security_tests {
 
     #[test]
     fn test_key_uniqueness() {
-        let mut rng = rand::rng();
+        let seed = [0_u8; 32];
+        let mut rng = ChaCha20Rng::from_seed(seed);
+
         let mut keys = HashSet::new();
 
         // Generate 1000 keys and ensure they're all unique
@@ -289,10 +307,11 @@ mod security_tests {
 
     #[test]
     fn test_nonce_uniqueness() {
-        let mut rng = rand::rng();
-        let mut nonces = HashSet::new();
+        let seed = [0_u8; 32];
+        let mut rng = ChaCha20Rng::from_seed(seed);
 
         // Generate 1000 nonces and ensure they're all unique
+        let mut nonces = HashSet::new();
         for _ in 0..1000 {
             let nonce = Nonce::with_rng(&mut rng);
             let nonce_bytes = format!("{:?}", nonce.inner);
@@ -302,7 +321,8 @@ mod security_tests {
 
     #[test]
     fn test_ciphertext_appears_random() {
-        let mut rng = rand::rng();
+        let seed = [0_u8; 32];
+        let mut rng = ChaCha20Rng::from_seed(seed);
         let key = SecretKey::with_rng(&mut rng);
 
         // Encrypt the same plaintext with different nonces
@@ -321,8 +341,7 @@ mod security_tests {
             for j in i + 1..ciphertexts.len() {
                 assert_ne!(
                     ciphertexts[i], ciphertexts[j],
-                    "Ciphertexts {} and {} are identical!",
-                    i, j
+                    "Ciphertexts {i} and {j} are identical!"
                 );
             }
         }
