@@ -218,7 +218,7 @@ impl SecretKey {
     /// Note that if the original data was encrypted as bytes (e.g., using [Self::encrypt()]
     /// method), the decryption will still succeed but an additional step will need to be taken to
     /// convert the returned field elements into the original bytestring.
-    pub fn decrypt_felt(
+    pub fn decrypt_felts(
         &self,
         encrypted_data: &EncryptedData,
     ) -> Result<Vec<Felt>, EncryptionError> {
