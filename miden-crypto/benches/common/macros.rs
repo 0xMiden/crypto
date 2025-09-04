@@ -955,7 +955,7 @@ macro_rules! benchmark_word_conversions {
     };
 }
 
-/// Generates comprehensive AEAD benchmarks for both field elements and bytes operations.
+/// Generates comprehensive AEAD benchmarks for bytes operations.
 ///
 /// This macro creates benchmarks for encryption and decryption operations
 /// using the new standardized approach with consistent data generation,
@@ -965,20 +965,17 @@ macro_rules! benchmark_word_conversions {
 /// * `$aead_module` - The AEAD module name (e.g., aead_rpo)
 /// * `$group_prefix` - Human-readable prefix for benchmark group names
 /// * `$bytes_fn` - The name of the benchmark function to generate for bytes
-/// * `$felts_fn` - The name of the benchmark function to generate for Felts
 /// * `$group_ident` - The identifier for the criterion group
 ///
 /// # Generated benchmarks
 /// - `$bytes_fn` - Function containing byte array encryption/decryption benchmarks
-/// - `$felts_fn` - Function containing Felt array encryption/decryption benchmarks
 /// - `$group_ident` - Criterion group for the benchmarks
 #[macro_export]
-macro_rules! benchmark_aead {
+macro_rules! benchmark_aead_bytes {
     (
         $aead_module:ident,
         $group_prefix:expr,
         $bytes_fn:ident,
-        $felts_fn:ident,
         $group_ident:ident
     ) => {
         /// Benchmark AEAD operations on byte arrays
@@ -1042,6 +1039,33 @@ macro_rules! benchmark_aead {
             group.finish();
         }
 
+        criterion_group!($group_ident, $bytes_fn);
+    };
+}
+
+/// Generates comprehensive AEAD benchmarks for field elements.
+///
+/// This macro creates benchmarks for encryption and decryption operations
+/// using the new standardized approach with consistent data generation,
+/// throughput measurement, and reduced boilerplate.
+///
+/// # Arguments
+/// * `$aead_module` - The AEAD module name (e.g., aead_rpo)
+/// * `$group_prefix` - Human-readable prefix for benchmark group names
+/// * `$felts_fn` - The name of the benchmark function to generate for Felts
+/// * `$group_ident` - The identifier for the criterion group
+///
+/// # Generated benchmarks
+/// - `$felts_fn` - Function containing Felt array encryption/decryption benchmarks
+/// - `$group_ident` - Criterion group for the benchmarks
+#[macro_export]
+macro_rules! benchmark_aead_field {
+    (
+        $aead_module:ident,
+        $group_prefix:expr,
+        $felts_fn:ident,
+        $group_ident:ident
+    ) => {
         /// Benchmark AEAD operations on field elements
         fn $felts_fn(c: &mut Criterion) {
             use miden_crypto::encryption::$aead_module::{Nonce, SecretKey};
@@ -1104,6 +1128,6 @@ macro_rules! benchmark_aead {
             group.finish();
         }
 
-        criterion_group!($group_ident, $bytes_fn, $felts_fn);
+        criterion_group!($group_ident, $felts_fn);
     };
 }

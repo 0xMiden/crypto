@@ -12,5 +12,9 @@ use common::{
     },
 };
 
-benchmark_aead!(aead_rpo, "AEAD RPO", bench_aead_rpo_bytes, bench_aead_rpo_felts, aead_rpo_group);
+benchmark_aead_field!(aead_rpo, "AEAD RPO", bench_aead_rpo_felts, aead_rpo_group);
+benchmark_aead_bytes!(aead_rpo, "AEAD RPO", bench_aead_rpo_bytes, aead_rpo_group);
 criterion_main!(aead_rpo_group);
+
+benchmark_aead_bytes!(xchacha, "AEAD XChaCha20-Poly1305", bench_aead_xchacha_bytes, aead_xchacha_group);
+criterion_main!(aead_xchacha_group);

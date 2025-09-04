@@ -13,6 +13,7 @@ This crate contains cryptographic primitives used in Miden.
 [AEAD module](./miden-crypto/src/encryption) provides authenticated encryption with associated data (AEAD) schemes. Currently, this includes:
 
 - [AEAD-RPO](https://eprint.iacr.org/2023/1668): a scheme optimized for speed within SNARKs/STARKs. The design is based on the MonkeySpongeWrap construction and uses the RPO (Rescue Prime Optimized) permutation, creating an encryption scheme that is highly efficient when executed within zero-knowledge proof systems.
+- [XChaCha20Poly1305](https://datatracker.ietf.org/doc/html/draft-irtf-cfrg-xchacha): Extended nonce variant of ChaCha20Poly1305 providing both confidentiality and authenticity. This implementation offers significant performance advantages, showing approximately 100x faster encryption/decryption compared to the arithmetization-friendly alternative based on the RPO permutation.
 
 ## Hash
 
