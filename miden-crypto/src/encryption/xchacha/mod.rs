@@ -141,7 +141,7 @@ impl SecretKey {
 
         let ciphertext = cipher
             .encrypt(&nonce.inner, payload)
-            .map_err(|_| (EncryptionError::FailedOperation))?;
+            .map_err(|_| EncryptionError::FailedOperation)?;
 
         Ok(EncryptedData { ciphertext, nonce })
     }
