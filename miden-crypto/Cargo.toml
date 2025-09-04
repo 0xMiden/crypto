@@ -20,12 +20,12 @@ path              = "src/main.rs"
 required-features = ["executable"]
 
 [[bench]]
-name = "encryption"
 harness = false
+name = "encryption"
 
 [[bench]]
-name = "hash"
 harness = false
+name = "hash"
 
 [[bench]]
 harness = false
