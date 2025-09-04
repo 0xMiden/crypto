@@ -107,7 +107,6 @@ assert_matches = { version = "1.5", default-features = false }
 criterion = { version = "0.7", features = ["html_reports"] }
 hex = { version = "0.4", default-features = false, features = ["alloc"] }
 itertools = { version = "0.14" }
-paste = { version = "1.0" }
 proptest = { version = "1.7", default-features = false, features = ["alloc"] }
 rand_chacha = { version = "0.9", default-features = false }
 rand-utils = { version = "0.13", package = "winter-rand-utils" }
