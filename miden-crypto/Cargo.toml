@@ -1,22 +1,22 @@
 [package]
-name = "miden-crypto"
-version = "0.17.0"
-description = "Miden Cryptographic primitives"
-authors.workspace = true
-readme = "../README.md"
-license.workspace = true
-repository.workspace = true
-documentation = "https://docs.rs/miden-crypto/0.17.0"
-categories.workspace = true
-keywords.workspace = true
-edition.workspace = true
+authors.workspace      = true
+categories.workspace   = true
+description            = "Miden Cryptographic primitives"
+documentation          = "https://docs.rs/miden-crypto/0.17.0"
+edition.workspace      = true
+keywords.workspace     = true
+license.workspace      = true
+name                   = "miden-crypto"
+readme                 = "../README.md"
+repository.workspace   = true
 rust-version.workspace = true
+version                = "0.17.0"
 
 [[bin]]
-name = "miden-crypto"
-path = "src/main.rs"
-bench = false
-doctest = false
+bench             = false
+doctest           = false
+name              = "miden-crypto"
+path              = "src/main.rs"
 required-features = ["executable"]
 
 [[bench]]
@@ -26,95 +26,97 @@ harness = false
 [[bench]]
 name = "hash"
 harness = false
+name    = "hash"
 
 [[bench]]
-name = "smt"
 harness = false
+name    = "smt"
 
 [[bench]]
-name = "smt-subtree"
-harness = false
+harness           = false
+name              = "smt-subtree"
 required-features = ["internal"]
 
 [[bench]]
-name = "merkle"
 harness = false
+name    = "merkle"
 
 [[bench]]
-name = "smt-with-entries"
 harness = false
+name    = "smt-with-entries"
 
 [[bench]]
-name = "store"
 harness = false
+name    = "store"
 
 [[bench]]
-name = "dsa"
 harness = false
+name    = "dsa"
 
 [[bench]]
-name = "word"
 harness = false
+name    = "word"
 
 [[bench]]
-name = "rand"
 harness = false
+name    = "rand"
 
 [features]
 concurrent = ["dep:rayon", "hashbrown?/rayon"]
-default = ["std", "concurrent"]
+default = ["concurrent", "std"]
 executable = ["dep:clap", "dep:rand-utils", "std"]
 hashmaps = ["dep:hashbrown"]
 internal = []
 serde = ["dep:serde", "serde?/alloc", "winter-math/serde"]
 std = [
-    "blake3/std",
-    "dep:cc",
-    "rand/std",
-    "rand/thread_rng",
-    "winter-crypto/std",
-    "winter-math/std",
-    "winter-utils/std",
+  "blake3/std",
+  "dep:cc",
+  "rand/std",
+  "rand/thread_rng",
+  "winter-crypto/std",
+  "winter-math/std",
+  "winter-utils/std",
 ]
 
 [dependencies]
-blake3 = { version = "1.8", default-features = false }
-clap = { version = "4.5", optional = true, features = ["derive"] }
-getrandom = { version = "0.2", features = ["js"] }
-hashbrown = { version = "0.15", optional = true, features = ["serde"] }
-hkdf = { version = "0.12", default-features = false }
-k256 = { version = "0.13", features = ["ecdsa", "ecdh"] }
-num = { version = "0.4", default-features = false, features = ["alloc", "libm"] }
-num-complex = { version = "0.4", default-features = false }
-rand = { version = "0.9", default-features = false }
-rand_chacha = { version = "0.9", default-features = false }
-rand_core = { version = "0.9", default-features = false }
-rand_hc = { version = "0.3" }
-rand-utils = { version = "0.13", package = "winter-rand-utils", optional = true }
-rayon = { version = "1.10", optional = true }
-serde = { version = "1.0", default-features = false, optional = true, features = ["derive"] }
-sha3 = { version = "0.10", default-features = false }
-thiserror = { version = "2.0", default-features = false }
-winter-crypto = { version = "0.13", default-features = false }
-winter-math = { version = "0.13", default-features = false }
-winter-utils = { version = "0.13", default-features = false }
+blake3        = { default-features = false, version = "1.8" }
+clap          = { features = ["derive"], optional = true, version = "4.5" }
+getrandom     = { features = ["js"], version = "0.2" }
+hashbrown     = { features = ["serde"], optional = true, version = "0.15" }
+hkdf          = { default-features = false, version = "0.12" }
+k256          = { features = ["ecdh", "ecdsa"], version = "0.13" }
+num           = { default-features = false, features = ["alloc", "libm"], version = "0.4" }
+num-complex   = { default-features = false, version = "0.4" }
+rand          = { default-features = false, version = "0.9" }
+rand-utils    = { optional = true, package = "winter-rand-utils", version = "0.13" }
+rand_chacha   = { default-features = false, version = "0.9" }
+rand_core     = { default-features = false, version = "0.9" }
+rand_hc       = { version = "0.3" }
+rayon         = { optional = true, version = "1.10" }
+serde         = { default-features = false, features = ["derive"], optional = true, version = "1.0" }
+sha3          = { default-features = false, version = "0.10" }
+thiserror     = { default-features = false, version = "2.0" }
+winter-crypto = { default-features = false, version = "0.13" }
+winter-math   = { default-features = false, version = "0.13" }
+winter-utils  = { default-features = false, version = "0.13" }
 
 [dev-dependencies]
-assert_matches = { version = "1.5", default-features = false }
-criterion = { version = "0.7", features = ["html_reports"] }
-hex = { version = "0.4", default-features = false, features = ["alloc"] }
-itertools = { version = "0.14" }
-paste = { version = "1.0" }
-proptest = { version = "1.7", default-features = false, features = ["alloc"] }
-rand_chacha = { version = "0.9", default-features = false }
-rand-utils = { version = "0.13", package = "winter-rand-utils" }
-rstest = { version = "0.26" }
-seq-macro = { version = "0.3" }
+assert_matches = { default-features = false, version = "1.5" }
+criterion      = { features = ["html_reports"], version = "0.7" }
+hex            = { default-features = false, features = ["alloc"], version = "0.4" }
+itertools      = { version = "0.14" }
+proptest       = { default-features = false, features = ["alloc"], version = "1.7" }
+rand-utils     = { package = "winter-rand-utils", version = "0.13" }
+rand_chacha    = { default-features = false, version = "0.9" }
+rstest         = { version = "0.26" }
+seq-macro      = { version = "0.3" }
 
 [build-dependencies]
-cc = { version = "1.2", optional = true, features = ["parallel"] }
+cc   = { features = ["parallel"], optional = true, version = "1.2" }
 glob = "0.3"
 
-[lints.rust]
-# Suppress warnings about `cfg(fuzzing)`, which is automatically set when using `cargo-fuzz`.
-unexpected_cfgs = { level = "warn", check-cfg = ['cfg(fuzzing)'] }
+[lints]
+workspace = true
+
+[package.metadata.cargo-machete]
+ignored = ["getrandom"]

@@ -9,7 +9,7 @@
 //! `[AlgebraicSponge]` which boils down to implementing the `apply_permutation` method.
 //!
 //! There are currently three algebraic sponge-based hash functions implemented in the module, RPO
-//! and RPX hash functions, both of which belong to the Rescue familly of hash functions, and
+//! and RPX hash functions, both of which belong to the Rescue family of hash functions, and
 //! Poseidon2 hash function.
 
 use core::ops::Range;
