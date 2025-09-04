@@ -8,7 +8,7 @@ use common::{
     data::{generate_byte_array_random, generate_byte_array_sequential},
 };
 
-benchmark_aead!(xchacha, "AEAD XChaCha20-Poly1305");
+benchmark_aead!(xchacha, "AEAD XChaCha20-Poly1305", bench_aead_xchacha_bytes, aead_xchacha_group);
 
-criterion_group!(xchacha_encryption_group, benchmark_xchacha_bytes);
+criterion_group!(xchacha_encryption_group, bench_aead_xchacha_bytes);
 criterion_main!(xchacha_encryption_group);
