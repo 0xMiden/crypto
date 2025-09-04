@@ -972,12 +972,7 @@ macro_rules! benchmark_word_conversions {
 /// - `$group_ident` - Criterion group for the benchmarks
 #[macro_export]
 macro_rules! benchmark_aead_bytes {
-    (
-        $aead_module:ident,
-        $group_prefix:expr,
-        $bytes_fn:ident,
-        $group_ident:ident
-    ) => {
+    ($aead_module:ident, $group_prefix:expr, $bytes_fn:ident, $group_ident:ident) => {
         /// Benchmark AEAD operations on byte arrays
         fn $bytes_fn(c: &mut Criterion) {
             use miden_crypto::encryption::$aead_module::{Nonce, SecretKey};
@@ -1001,7 +996,7 @@ macro_rules! benchmark_aead_bytes {
                         || Nonce::with_rng(&mut rng),
                         |nonce| {
                             black_box(
-                                key.encrypt_bytes_with_nonce(
+                                key.encrypt_with_nonce(
                                     black_box(data),
                                     black_box(&associated_data),
                                     black_box(nonce),
@@ -1016,7 +1011,7 @@ macro_rules! benchmark_aead_bytes {
                 // Pre-encrypt data for decryption benchmark
                 let nonce = Nonce::with_rng(&mut rng);
                 let encrypted =
-                    key.encrypt_bytes_with_nonce(&data, &associated_data, nonce.clone()).unwrap();
+                    key.encrypt_with_nonce(&data, &associated_data, nonce.clone()).unwrap();
 
                 // Decryption benchmark
                 group.bench_with_input(
@@ -1025,7 +1020,7 @@ macro_rules! benchmark_aead_bytes {
                     |b, encrypted| {
                         b.iter(|| {
                             black_box(
-                                key.decrypt_bytes_with_associated_data(
+                                key.decrypt_with_associated_data(
                                     black_box(encrypted),
                                     &associated_data,
                                 )
@@ -1060,12 +1055,7 @@ macro_rules! benchmark_aead_bytes {
 /// - `$group_ident` - Criterion group for the benchmarks
 #[macro_export]
 macro_rules! benchmark_aead_field {
-    (
-        $aead_module:ident,
-        $group_prefix:expr,
-        $felts_fn:ident,
-        $group_ident:ident
-    ) => {
+    ($aead_module:ident, $group_prefix:expr, $felts_fn:ident, $group_ident:ident) => {
         /// Benchmark AEAD operations on field elements
         fn $felts_fn(c: &mut Criterion) {
             use miden_crypto::encryption::$aead_module::{Nonce, SecretKey};
@@ -1090,7 +1080,7 @@ macro_rules! benchmark_aead_field {
                         || Nonce::with_rng(&mut rng),
                         |nonce| {
                             black_box(
-                                key.encrypt_with_nonce(
+                                key.encrypt_felts_with_nonce(
                                     black_box(data),
                                     black_box(&associated_data),
                                     black_box(nonce),
@@ -1105,7 +1095,7 @@ macro_rules! benchmark_aead_field {
                 // Pre-encrypt data for decryption benchmark
                 let nonce = Nonce::with_rng(&mut rng);
                 let encrypted =
-                    key.encrypt_with_nonce(&data, &associated_data, nonce.clone()).unwrap();
+                    key.encrypt_felts_with_nonce(&data, &associated_data, nonce.clone()).unwrap();
 
                 // Decryption benchmark
                 group.bench_with_input(
@@ -1114,7 +1104,7 @@ macro_rules! benchmark_aead_field {
                     |b, encrypted| {
                         b.iter(|| {
                             black_box(
-                                key.decrypt_with_associated_data(
+                                key.decrypt_felts_with_associated_data(
                                     black_box(encrypted),
                                     &associated_data,
                                 )
