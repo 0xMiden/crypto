@@ -12,7 +12,5 @@ use common::{
     },
 };
 
-benchmark_aead!(aead_rpo, "AEAD RPO");
-
-criterion_group!(aead_encryption_group, benchmark_aead_rpo_felts, benchmark_aead_rpo_bytes);
-criterion_main!(aead_encryption_group);
+benchmark_aead!(aead_rpo, "AEAD RPO", bench_aead_rpo_bytes, bench_aead_rpo_felts, aead_rpo_group);
+criterion_main!(aead_rpo_group);
