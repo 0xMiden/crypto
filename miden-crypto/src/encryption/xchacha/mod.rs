@@ -9,8 +9,10 @@
 //! - [`SecretKey`]: A 256-bit secret key for encryption and decryption operations
 //! - [`Nonce`]: A 192-bit nonce that should be sampled randomly per encryption operation
 //! - [`EncryptedData`]: Encrypted data
+
 use alloc::vec::Vec;
 
+use blake3::KEY_LEN;
 use chacha20poly1305::{
     XChaCha20Poly1305,
     aead::{Aead, AeadCore, KeyInit},
@@ -19,7 +21,7 @@ use rand::{CryptoRng, RngCore};
 use zeroize::Zeroize;
 
 use crate::{
-    encryption::EncryptionError,
+    encryption::{AeadScheme, EncryptionError},
     utils::{ByteReader, ByteWriter, Deserializable, DeserializationError, Serializable},
 };
 
@@ -184,6 +186,47 @@ impl Drop for SecretKey {
 impl Zeroize for SecretKey {
     fn zeroize(&mut self) {
         self.0.zeroize();
+    }
+}
+
+pub struct XChaCha;
+
+impl AeadScheme for XChaCha {
+    const KEY_SIZE: usize = KEY_LEN;
+
+    type Key = SecretKey;
+
+    type Nonce = Nonce;
+
+    fn key_from_bytes(bytes: &[u8]) -> Self::Key {
+        SecretKey::read_from_bytes(bytes).unwrap()
+    }
+
+    fn generate_nonce<R: CryptoRng + RngCore>(rng: &mut R) -> Self::Nonce {
+        Nonce::with_rng(rng)
+    }
+
+    fn encrypt_bytes(
+        key: &Self::Key,
+        nonce: &Self::Nonce,
+        plaintext: &[u8],
+        associated_data: &[u8],
+    ) -> Result<Vec<u8>, EncryptionError> {
+        let encrypted_data = key.encrypt_with_nonce(plaintext, associated_data, nonce.clone())?;
+        Ok(encrypted_data.ciphertext)
+    }
+
+    fn decrypt_bytes(
+        key: &Self::Key,
+        nonce: &Self::Nonce,
+        ciphertext: &[u8],
+        associated_data: &[u8],
+    ) -> Result<Vec<u8>, EncryptionError> {
+        let encrypted_data = &EncryptedData {
+            ciphertext: ciphertext.to_vec(),
+            nonce: nonce.clone(),
+        };
+        key.decrypt_with_associated_data(encrypted_data, associated_data)
     }
 }
 
