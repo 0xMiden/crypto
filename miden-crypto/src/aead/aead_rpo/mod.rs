@@ -107,20 +107,20 @@ impl SecretKey {
         rng.sample(StandardUniform)
     }
 
-    // ENCRYPTION
+    // ELEMENT ENCRYPTION
     // --------------------------------------------------------------------------------------------
 
     /// Encrypts and authenticates the provided sequence of field elements using this secret key
     /// and a random nonce.
     #[cfg(feature = "std")]
-    pub fn encrypt_felts(&self, data: &[Felt]) -> Result<EncryptedData, EncryptionError> {
-        self.encrypt_felts_with_associated_data(data, &[])
+    pub fn encrypt_elements(&self, data: &[Felt]) -> Result<EncryptedData, EncryptionError> {
+        self.encrypt_elements_with_associated_data(data, &[])
     }
 
     /// Encrypts the provided sequence of field elements and authenticates both the ciphertext as
     /// well as the provided associated data using this secret key and a random nonce.
     #[cfg(feature = "std")]
-    pub fn encrypt_felts_with_associated_data(
+    pub fn encrypt_elements_with_associated_data(
         &self,
         data: &[Felt],
         associated_data: &[Felt],
@@ -129,38 +129,12 @@ impl SecretKey {
         let mut rng = StdRng::from_os_rng();
         let nonce = Nonce::with_rng(&mut rng);
 
-        self.encrypt_felts_with_nonce(data, associated_data, nonce)
-    }
-
-    /// Encrypts and authenticates the provided data using this secret key and a random nonce.
-    ///
-    /// Before encryption, the bytestring is converted to a sequence of field elements.
-    #[cfg(feature = "std")]
-    pub fn encrypt(&self, data: &[u8]) -> Result<EncryptedData, EncryptionError> {
-        self.encrypt_with_associated_data(data, &[])
-    }
-
-    /// Encrypts the provided data and authenticates both the ciphertext as well as the provided
-    /// associated data using this secret key and a random nonce.
-    ///
-    /// Before encryption, both the data and the associated data are converted to sequences of
-    /// field elements.
-    #[cfg(feature = "std")]
-    pub fn encrypt_with_associated_data(
-        &self,
-        data: &[u8],
-        associated_data: &[u8],
-    ) -> Result<EncryptedData, EncryptionError> {
-        use rand::{SeedableRng, rngs::StdRng};
-        let mut rng = StdRng::from_os_rng();
-        let nonce = Nonce::with_rng(&mut rng);
-
-        self.encrypt_with_nonce(data, associated_data, nonce)
+        self.encrypt_elements_with_nonce(data, associated_data, nonce)
     }
 
     /// Encrypts the provided sequence of field elements and authenticates both the ciphertext as
     /// well as the provided associated data using this secret key and the specified nonce.
-    pub fn encrypt_felts_with_nonce(
+    pub fn encrypt_elements_with_nonce(
         &self,
         data: &[Felt],
         associated_data: &[Felt],
@@ -193,12 +167,41 @@ impl SecretKey {
         Ok(EncryptedData { ciphertext, auth_tag, nonce })
     }
 
+    // BYTE ENCRYPTION
+    // --------------------------------------------------------------------------------------------
+
+    /// Encrypts and authenticates the provided data using this secret key and a random nonce.
+    ///
+    /// Before encryption, the bytestring is converted to a sequence of field elements.
+    #[cfg(feature = "std")]
+    pub fn encrypt_bytes(&self, data: &[u8]) -> Result<EncryptedData, EncryptionError> {
+        self.encrypt_bytes_with_associated_data(data, &[])
+    }
+
+    /// Encrypts the provided data and authenticates both the ciphertext as well as the provided
+    /// associated data using this secret key and a random nonce.
+    ///
+    /// Before encryption, both the data and the associated data are converted to sequences of
+    /// field elements.
+    #[cfg(feature = "std")]
+    pub fn encrypt_bytes_with_associated_data(
+        &self,
+        data: &[u8],
+        associated_data: &[u8],
+    ) -> Result<EncryptedData, EncryptionError> {
+        use rand::{SeedableRng, rngs::StdRng};
+        let mut rng = StdRng::from_os_rng();
+        let nonce = Nonce::with_rng(&mut rng);
+
+        self.encrypt_bytes_with_nonce(data, associated_data, nonce)
+    }
+
     /// Encrypts the provided data and authenticates both the ciphertext as well as the provided
     /// associated data using this secret key and the specified nonce.
     ///
     /// Before encryption, both the data and the associated data are converted to sequences of
     /// field elements.
-    pub fn encrypt_with_nonce(
+    pub fn encrypt_bytes_with_nonce(
         &self,
         data: &[u8],
         associated_data: &[u8],
@@ -207,10 +210,10 @@ impl SecretKey {
         let data_felt = bytes_to_elements_with_padding(data);
         let ad_felt = bytes_to_elements_with_padding(associated_data);
 
-        self.encrypt_felts_with_nonce(&data_felt, &ad_felt, nonce)
+        self.encrypt_elements_with_nonce(&data_felt, &ad_felt, nonce)
     }
 
-    // DECRYPTION
+    // ELEMENT DECRYPTION
     // --------------------------------------------------------------------------------------------
 
     /// Decrypts the provided encrypted data using this secret key.
@@ -218,11 +221,11 @@ impl SecretKey {
     /// Note that if the original data was encrypted as bytes (e.g., using [Self::encrypt()]
     /// method), the decryption will still succeed but an additional step will need to be taken to
     /// convert the returned field elements into the original bytestring.
-    pub fn decrypt_felts(
+    pub fn decrypt_elements(
         &self,
         encrypted_data: &EncryptedData,
     ) -> Result<Vec<Felt>, EncryptionError> {
-        self.decrypt_felts_with_associated_data(encrypted_data, &[])
+        self.decrypt_elements_with_associated_data(encrypted_data, &[])
     }
 
     /// Decrypts the provided encrypted data, given some associated data, using this secret key.
@@ -230,7 +233,7 @@ impl SecretKey {
     /// Note that if the original data was encrypted as bytes (e.g., using [Self::encrypt()]
     /// method), the decryption will still succeed but an additional step will need to be taken to
     /// convert the returned field elements into the original bytestring.
-    pub fn decrypt_felts_with_associated_data(
+    pub fn decrypt_elements_with_associated_data(
         &self,
         encrypted_data: &EncryptedData,
         associated_data: &[Felt],
@@ -270,31 +273,37 @@ impl SecretKey {
         unpad(plaintext)
     }
 
+    // BYTE DECRYPTION
+    // --------------------------------------------------------------------------------------------
+
     /// Decrypts the provided encrypted data, as bytes, using this secret key.
     ///
     ///
-    /// If the original data was a sequence of field elements encrypted with [Self::encrypt_felts()]
-    /// or [Self::encrypt_felts_with_associated_data()], decryption may fail. In such cases
-    /// [Self::decrypt_felts()] or [Self::decrypt_felts_with_associated_data()] methods should
-    /// be used for decryption.
-    pub fn decrypt(&self, encrypted_data: &EncryptedData) -> Result<Vec<u8>, EncryptionError> {
-        self.decrypt_with_associated_data(encrypted_data, &[])
+    /// If the original data was a sequence of field elements encrypted with
+    /// [Self::encrypt_elements()] or [Self::encrypt_elements_with_associated_data()], decryption
+    /// may fail. In such cases [Self::decrypt_elements()] or
+    /// [Self::decrypt_elements_with_associated_data()] methods should be used for decryption.
+    pub fn decrypt_bytes(
+        &self,
+        encrypted_data: &EncryptedData,
+    ) -> Result<Vec<u8>, EncryptionError> {
+        self.decrypt_bytes_with_associated_data(encrypted_data, &[])
     }
 
     /// Decrypts the provided encrypted data, as bytes, given some associated data using this
     /// secret key.
     ///
-    /// If the original data was a sequence of field elements encrypted with [Self::encrypt_felts()]
-    /// or [Self::encrypt_felts_with_associated_data()], decryption may fail. In such cases
-    /// [Self::decrypt_felts()] or [Self::decrypt_felts_with_associated_data()] methods should
-    /// be used for decryption.
-    pub fn decrypt_with_associated_data(
+    /// If the original data was a sequence of field elements encrypted with
+    /// [Self::encrypt_elements()] or [Self::encrypt_elements_with_associated_data()], decryption
+    /// may fail. In such cases [Self::decrypt_elements()] or
+    /// [Self::decrypt_elements_with_associated_data()] methods should be used for decryption.
+    pub fn decrypt_bytes_with_associated_data(
         &self,
         encrypted_data: &EncryptedData,
         associated_data: &[u8],
     ) -> Result<Vec<u8>, EncryptionError> {
         let ad_felt = bytes_to_elements_with_padding(associated_data);
-        let data_felts = self.decrypt_felts_with_associated_data(encrypted_data, &ad_felt)?;
+        let data_felts = self.decrypt_elements_with_associated_data(encrypted_data, &ad_felt)?;
 
         match padded_elements_to_bytes(&data_felts) {
             Some(bytes) => Ok(bytes),

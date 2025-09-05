@@ -6,9 +6,9 @@ extern crate alloc;
 #[cfg(feature = "std")]
 extern crate std;
 
+pub mod aead;
 pub mod dsa;
 pub mod ecdh;
-pub mod aead;
 pub mod hash;
 pub mod merkle;
 pub mod rand;

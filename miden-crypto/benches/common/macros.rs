@@ -996,7 +996,7 @@ macro_rules! benchmark_aead_bytes {
                         || Nonce::with_rng(&mut rng),
                         |nonce| {
                             black_box(
-                                key.encrypt_with_nonce(
+                                key.encrypt_bytes_with_nonce(
                                     black_box(data),
                                     black_box(&associated_data),
                                     black_box(nonce),
@@ -1011,7 +1011,7 @@ macro_rules! benchmark_aead_bytes {
                 // Pre-encrypt data for decryption benchmark
                 let nonce = Nonce::with_rng(&mut rng);
                 let encrypted =
-                    key.encrypt_with_nonce(&data, &associated_data, nonce.clone()).unwrap();
+                    key.encrypt_bytes_with_nonce(&data, &associated_data, nonce.clone()).unwrap();
 
                 // Decryption benchmark
                 group.bench_with_input(
@@ -1020,7 +1020,7 @@ macro_rules! benchmark_aead_bytes {
                     |b, encrypted| {
                         b.iter(|| {
                             black_box(
-                                key.decrypt_with_associated_data(
+                                key.decrypt_bytes_with_associated_data(
                                     black_box(encrypted),
                                     &associated_data,
                                 )
@@ -1080,7 +1080,7 @@ macro_rules! benchmark_aead_field {
                         || Nonce::with_rng(&mut rng),
                         |nonce| {
                             black_box(
-                                key.encrypt_felts_with_nonce(
+                                key.encrypt_elements_with_nonce(
                                     black_box(data),
                                     black_box(&associated_data),
                                     black_box(nonce),
@@ -1094,8 +1094,9 @@ macro_rules! benchmark_aead_field {
 
                 // Pre-encrypt data for decryption benchmark
                 let nonce = Nonce::with_rng(&mut rng);
-                let encrypted =
-                    key.encrypt_felts_with_nonce(&data, &associated_data, nonce.clone()).unwrap();
+                let encrypted = key
+                    .encrypt_elements_with_nonce(&data, &associated_data, nonce.clone())
+                    .unwrap();
 
                 // Decryption benchmark
                 group.bench_with_input(
@@ -1104,7 +1105,7 @@ macro_rules! benchmark_aead_field {
                     |b, encrypted| {
                         b.iter(|| {
                             black_box(
-                                key.decrypt_felts_with_associated_data(
+                                key.decrypt_elements_with_associated_data(
                                     black_box(encrypted),
                                     &associated_data,
                                 )

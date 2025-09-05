@@ -83,6 +83,9 @@ impl Nonce {
 pub struct SecretKey([u8; SK_SIZE_BYTES]);
 
 impl SecretKey {
+    // CONSTRUCTORS
+    // --------------------------------------------------------------------------------------------
+
     /// Creates a new random secret key using the default random number generator
     #[cfg(feature = "std")]
     #[allow(clippy::new_without_default)]
@@ -107,10 +110,13 @@ impl SecretKey {
         Self(key.into())
     }
 
+    // BYTE ENCRYPTION
+    // --------------------------------------------------------------------------------------------
+
     /// Encrypts and authenticates the provided data using this secret key and a random
     /// nonce
     #[cfg(feature = "std")]
-    pub fn encrypt(&self, data: &[u8]) -> Result<EncryptedData, EncryptionError> {
+    pub fn encrypt_bytes(&self, data: &[u8]) -> Result<EncryptedData, EncryptionError> {
         self.encrypt_with_associated_data(data, &[])
     }
 
@@ -125,11 +131,11 @@ impl SecretKey {
         let mut rng = rand::rng();
         let nonce = Nonce::with_rng(&mut rng);
 
-        self.encrypt_with_nonce(data, associated_data, nonce)
+        self.encrypt_bytes_with_nonce(data, associated_data, nonce)
     }
 
     /// Encrypts the provided data using this secret key and a specified nonce
-    pub fn encrypt_with_nonce(
+    pub fn encrypt_bytes_with_nonce(
         &self,
         data: &[u8],
         associated_data: &[u8],
@@ -146,14 +152,20 @@ impl SecretKey {
         Ok(EncryptedData { ciphertext, nonce })
     }
 
+    // DECRYPTION
+    // --------------------------------------------------------------------------------------------
+
     /// Decrypts the provided encrypted data using this secret key
-    pub fn decrypt(&self, encrypted_data: &EncryptedData) -> Result<Vec<u8>, EncryptionError> {
-        self.decrypt_with_associated_data(encrypted_data, &[])
+    pub fn decrypt_bytes(
+        &self,
+        encrypted_data: &EncryptedData,
+    ) -> Result<Vec<u8>, EncryptionError> {
+        self.decrypt_bytes_with_associated_data(encrypted_data, &[])
     }
 
     /// Decrypts the provided encrypted data given some associated data using
     /// this secret key
-    pub fn decrypt_with_associated_data(
+    pub fn decrypt_bytes_with_associated_data(
         &self,
         encrypted_data: &EncryptedData,
         associated_data: &[u8],
