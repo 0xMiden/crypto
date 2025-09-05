@@ -19,7 +19,7 @@ use rand::{CryptoRng, RngCore};
 use zeroize::Zeroize;
 
 use crate::{
-    encryption::EncryptionError,
+    aead::EncryptionError,
     utils::{ByteReader, ByteWriter, Deserializable, DeserializationError, Serializable},
 };
 
