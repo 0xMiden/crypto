@@ -20,7 +20,7 @@
 //! 3. Add to the appropriate benchmark group
 //! 4. Update input size arrays in config.rs if needed
 
-use criterion::{BenchmarkId, Criterion, criterion_group, criterion_main};
+use criterion::{Criterion, criterion_group, criterion_main};
 // Import Word modules
 use miden_crypto::{Felt, Word, word::LexicographicWord};
 
@@ -54,13 +54,13 @@ benchmark_with_setup_data! {
     DEFAULT_SAMPLE_SIZE,
     "new_from_elements",
     || {
-        let test_elements: Vec<[Felt; 4]> = (0..100)
+        let test_elements: Vec<[Felt; 4]> = (0u64..100)
             .map(|i| {
                 [
-                    Felt::new(i as u64),
-                    Felt::new((i + 1) as u64),
-                    Felt::new((i + 2) as u64),
-                    Felt::new((i + 3) as u64),
+                    Felt::new(i),
+                    Felt::new(i + 1),
+                    Felt::new(i + 2),
+                    Felt::new(i + 3),
                 ]
             })
             .collect();

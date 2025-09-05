@@ -74,3 +74,54 @@ pub fn prepare_smt_entries(pair_count: u64, seed: &mut [u8; 32]) -> Vec<(Word, W
         .collect();
     entries
 }
+
+/// Generate test key-value pairs for SMT benchmarks (sequential)
+pub fn generate_smt_entries_sequential(count: usize) -> Vec<(Word, Word)> {
+    (0..count)
+        .map(|i| {
+            let key = Word::new([
+                Felt::new(i as u64),
+                Felt::new((i + 1) as u64),
+                Felt::new((i + 2) as u64),
+                Felt::new((i + 3) as u64),
+            ]);
+            let value = Word::new([
+                Felt::new((i + 4) as u64),
+                Felt::new((i + 5) as u64),
+                Felt::new((i + 6) as u64),
+                Felt::new((i + 7) as u64),
+            ]);
+            (key, value)
+        })
+        .collect()
+}
+
+/// Generate test entries for SimpleSmt benchmarks (sequential)
+pub fn generate_simple_smt_entries_sequential(count: usize) -> Vec<(u64, Word)> {
+    (0..count)
+        .map(|i| {
+            let key = i as u64;
+            let value = Word::new([
+                Felt::new(i as u64),
+                Felt::new((i + 1) as u64),
+                Felt::new((i + 2) as u64),
+                Felt::new((i + 3) as u64),
+            ]);
+            (key, value)
+        })
+        .collect()
+}
+
+/// Generate test keys for lookup operations (sequential)
+pub fn generate_test_keys_sequential(count: usize) -> Vec<Word> {
+    (0..count)
+        .map(|i| {
+            Word::new([
+                Felt::new(i as u64),
+                Felt::new((i + 1) as u64),
+                Felt::new((i + 2) as u64),
+                Felt::new((i + 3) as u64),
+            ])
+        })
+        .collect()
+}
