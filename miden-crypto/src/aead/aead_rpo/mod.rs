@@ -218,7 +218,7 @@ impl SecretKey {
 
     /// Decrypts the provided encrypted data using this secret key.
     ///
-    /// Note that if the original data was encrypted as bytes (e.g., using [Self::encrypt()]
+    /// Note that if the original data was encrypted as bytes (e.g., using [Self::encrypt_bytes()]
     /// method), the decryption will still succeed but an additional step will need to be taken to
     /// convert the returned field elements into the original bytestring.
     pub fn decrypt_elements(
@@ -230,7 +230,7 @@ impl SecretKey {
 
     /// Decrypts the provided encrypted data, given some associated data, using this secret key.
     ///
-    /// Note that if the original data was encrypted as bytes (e.g., using [Self::encrypt()]
+    /// Note that if the original data was encrypted as bytes (e.g., using [Self::encrypt_bytes()]
     /// method), the decryption will still succeed but an additional step will need to be taken to
     /// convert the returned field elements into the original bytestring.
     pub fn decrypt_elements_with_associated_data(
