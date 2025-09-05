@@ -600,7 +600,7 @@ pub struct MutationSet<const DEPTH: u8, K: Eq + Hash, V> {
     old_root: Word,
     /// The set of nodes that need to be removed or added. The "effective" node at an index is the
     /// Merkle tree's existing node at that index, with the [`NodeMutation`] in this map at that
-    /// index overlayed, if any. Each [`NodeMutation::Addition`] corresponds to a
+    /// index overlaid, if any. Each [`NodeMutation::Addition`] corresponds to a
     /// [`SparseMerkleTree::insert_inner_node()`] call, and each [`NodeMutation::Removal`]
     /// corresponds to a [`SparseMerkleTree::remove_inner_node()`] call.
     node_mutations: NodeMutations,

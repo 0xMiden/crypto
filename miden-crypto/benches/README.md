@@ -1,6 +1,8 @@
 # Benchmarks
 
-## Hash Functions
+## Benchmark Results
+
+### Hash Functions
 
 In the Miden VM, we make use of different hash functions. Some of these are "traditional" hash functions, like `BLAKE3`, which are optimized for out-of-STARK performance, while others are algebraic hash functions, like `Rescue Prime`, and are more optimized for a better performance inside the STARK. In what follows, we benchmark several such hash functions and compare against other constructions that are used by other proving systems. More precisely, we benchmark:
 
@@ -45,7 +47,7 @@ Notes:
 - On Graviton 3 and 4, RPO256 and RPX256 are run with SVE acceleration enabled.
 - On AMD EPYC 9R14, RPO256 and RPX256 are run with AVX2 acceleration enabled.
 
-## Sparse Merkle Tree
+### Sparse Merkle Tree
 
 We build cryptographic data structures incorporating these hash functions. What follows are benchmarks of operations on sparse Merkle trees (SMTs) which use the above `RPO_256` hash function. We perform a batched modification of 1,000 values in a tree with 1,000,000 leaves (with the `hashmaps` feature to use the `hashbrown` crate).
 
@@ -79,7 +81,10 @@ We build cryptographic data structures incorporating these hash functions. What 
 Notes:
 - On AMD Ryzen 9 7950X, benchmarks are run with AVX2 acceleration enabled.
 
-## Instructions
+## Benchmark Explanations
+
+### Instructions
+
 Before you can run the benchmarks, you'll need to make sure you have Rust [installed](https://www.rust-lang.org/tools/install). After that, to run the benchmarks for RPO, Poseidon2, BLAKE3 and Keccak256, clone the current repository, and from the root directory of the repo run the following:
 
  ```
@@ -105,3 +110,74 @@ cargo run --no-default-features --features=executable,hashmaps
 ```
 
 The benchmark parameters may also be customized with the `-s`/`--size`, `-i`/`--insertions`, and `-u`/`--updates` options.
+
+### Configuration
+
+#### Common Configuration
+
+Configuration constants are defined in `benches/common/config.rs`:
+
+```rust
+// Core configuration
+pub const DEFAULT_MEASUREMENT_TIME: Duration = Duration::from_secs(20);
+pub const DEFAULT_SAMPLE_SIZE: u64 = 100;
+
+// Hash function configuration  
+pub const HASH_INPUT_SIZES: &[usize] = &[1, 2, 4, 8, 16, 32, 64, 128, 256, 512, 1024, 2048, 4096, 8192, 16384];
+pub const HASH_ELEMENT_COUNTS: &[usize] = &[0, 1, 2, 4, 8, 16, 32, 64, 100, 128, 256, 512, 1000, 2000, 5000, 10000, 20000];
+```
+
+#### Input Data Generation
+
+Use the parameterized generation functions from `common::data`:
+
+```rust
+// Sequential data (deterministic)
+let sequential_bytes = generate_byte_array_sequential(1024);
+let sequential_felts = generate_felt_array_sequential(1000);
+
+// Random data (varies each run)  
+let random_bytes = generate_byte_array_random(2048);
+```
+
+### Adding New Benchmarks
+
+#### Step 1: Create Benchmark File
+Create `benches/<category>.rs` for new categories following existing patterns.
+
+#### Step 2: Add to Cargo.toml
+Add the bench to the workspace Cargo.toml:
+
+```toml
+[[bench]]
+name = "<category>"
+harness = false
+```
+
+#### Step 3: Import Common Utilities
+```rust
+mod common;
+use common::*;
+
+// Import required configuration constants
+use crate::common::config::{HASH_INPUT_SIZES, DEFAULT_SAMPLE_SIZE};
+```
+
+#### Step 4: Follow Naming Conventions
+- Functions: `<category>_<operation>_<parameter>`
+- Groups: `<category>-<operation>-<parameter>`
+- Use descriptive names that clearly indicate what's being tested
+
+#### Step 5: Add Throughput Measurements
+For operations that process data, add throughput measurements:
+
+```rust
+// For byte-sized inputs
+group.throughput(criterion::Throughput::Bytes(size as u64));
+
+// For field element inputs  
+group.throughput(criterion::Throughput::Elements(count as u64));
+```
+
+#### Step 6: Add to Benchmark Group
+Include the new benchmark function in the appropriate `criterion_group!` macro.

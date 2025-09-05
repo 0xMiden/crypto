@@ -1,17 +1,17 @@
 [workspace]
-members = [
-    "miden-crypto"
-]
-exclude = [
-    "miden-crypto-fuzz"
-]
-resolver = "3"  # Use the edition 2024 dependency resolver
+exclude  = ["miden-crypto-fuzz"]
+members  = ["miden-crypto"]
+resolver = "3"                   # Use the edition 2024 dependency resolver
 
 [workspace.package]
-authors = ["miden contributors"]
-license = "MIT OR Apache-2.0"
-repository = "https://github.com/0xMiden/crypto"
-categories = ["cryptography", "no-std"]
-keywords = ["miden", "crypto", "hash", "merkle"]
-edition = "2024"
+authors      = ["miden contributors"]
+categories   = ["cryptography", "no-std"]
+edition      = "2024"
+keywords     = ["crypto", "hash", "merkle", "miden"]
+license      = "MIT OR Apache-2.0"
+repository   = "https://github.com/0xMiden/crypto"
 rust-version = "1.88"
+
+[workspace.lints.rust]
+# Suppress warnings about `cfg(fuzzing)`, which is automatically set when using `cargo-fuzz`.
+unexpected_cfgs = { check-cfg = ['cfg(fuzzing)'], level = "warn" }

@@ -216,7 +216,7 @@ impl<const DEPTH: u8> SimpleSmt<DEPTH> {
     /// This also recomputes all hashes between the leaf (associated with the key) and the root,
     /// updating the root itself.
     pub fn insert(&mut self, key: LeafIndex<DEPTH>, value: Word) -> Word {
-        // SAFETY: a SimpleSmt does not contain multi-value leaves. The underlaying
+        // SAFETY: a SimpleSmt does not contain multi-value leaves. The underlying
         // SimpleSmt::insert_value does not return any errors so it's safe to unwrap here.
         <Self as SparseMerkleTree<DEPTH>>::insert(self, key, value)
             .expect("inserting a value into a simple smt never returns an error")
@@ -246,7 +246,7 @@ impl<const DEPTH: u8> SimpleSmt<DEPTH> {
         &self,
         kv_pairs: impl IntoIterator<Item = (LeafIndex<DEPTH>, Word)>,
     ) -> MutationSet<DEPTH, LeafIndex<DEPTH>, Word> {
-        // SAFETY: a SimpleSmt does not contain multi-value leaves. The underlaying
+        // SAFETY: a SimpleSmt does not contain multi-value leaves. The underlying
         // SimpleSmt::construct_prospective_leaf does not return any errors so it's safe to unwrap
         // here.
         <Self as SparseMerkleTree<DEPTH>>::compute_mutations(self, kv_pairs)

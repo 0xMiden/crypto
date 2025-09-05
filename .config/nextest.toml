@@ -1,9 +1,9 @@
 [profile.default]
-failure-output = "immediate-final"
-fail-fast = false
 default-filter = 'not test(merkle::smt::full::concurrent)'
+fail-fast      = false
+failure-output = "immediate-final"
 
 [profile.smt-concurrent]
-failure-output = "immediate-final"
-fail-fast = false
 default-filter = 'test(merkle::smt::full::concurrent)'
+fail-fast      = false
+failure-output = "immediate-final"

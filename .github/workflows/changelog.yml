@@ -3,9 +3,17 @@
 
 name: changelog
 
+# Limits workflow concurrency to only the latest commit in the PR.
+concurrency:
+  group: "${{ github.workflow }} @ ${{ github.event.pull_request.head.label || github.head_ref || github.ref }}"
+  cancel-in-progress: true
+
 on:
   pull_request:
     types: [opened, reopened, synchronize, labeled, unlabeled]
+
+permissions:
+  contents: read
 
 jobs:
   changelog:
