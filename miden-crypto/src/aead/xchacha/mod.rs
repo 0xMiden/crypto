@@ -117,13 +117,13 @@ impl SecretKey {
     /// nonce
     #[cfg(feature = "std")]
     pub fn encrypt_bytes(&self, data: &[u8]) -> Result<EncryptedData, EncryptionError> {
-        self.encrypt_with_associated_data(data, &[])
+        self.encrypt_bytes_with_associated_data(data, &[])
     }
 
     /// Encrypts the provided data and authenticates both the ciphertext as well as
     /// the provided associated data using this secret key and a random nonce
     #[cfg(feature = "std")]
-    pub fn encrypt_with_associated_data(
+    pub fn encrypt_bytes_with_associated_data(
         &self,
         data: &[u8],
         associated_data: &[u8],
