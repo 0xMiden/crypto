@@ -8,8 +8,18 @@ use crate::{EMPTY_WORD, Felt, Map, Word, hash::rpo::Rpo256};
 
 mod full;
 pub use full::{MAX_LEAF_ENTRIES, SMT_DEPTH, Smt, SmtLeaf, SmtLeafError, SmtProof, SmtProofError};
+
+#[cfg(feature = "concurrent")]
+mod large;
 #[cfg(feature = "internal")]
-pub use full::{SubtreeLeaf, build_subtree_for_bench};
+pub use full::concurrent::{SubtreeLeaf, build_subtree_for_bench};
+#[cfg(feature = "concurrent")]
+pub use large::{
+    LargeSmt, LargeSmtError, MemoryStorage, SmtStorage, StorageUpdateParts, StorageUpdates,
+    Subtree, SubtreeError,
+};
+#[cfg(feature = "rocksdb")]
+pub use large::{RocksDbConfig, RocksDbStorage};
 
 mod simple;
 pub use simple::{SimpleSmt, SimpleSmtProof};

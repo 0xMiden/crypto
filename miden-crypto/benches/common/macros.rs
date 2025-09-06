@@ -606,9 +606,11 @@ macro_rules! benchmark_batch {
 
             for size_ref in $sizes {
                 let size = *size_ref;
-                group.bench_with_input(BenchmarkId::new("batch", size), &size, |b, &size| {
-                    $closure(b, size)
-                });
+                group.bench_with_input(
+                    criterion::BenchmarkId::new("batch", size),
+                    &size,
+                    |b, &size| $closure(b, size),
+                );
 
                 let throughput = $throughput(size);
                 if let Some(ref t) = throughput {

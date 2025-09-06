@@ -1,6 +1,7 @@
 ## 0.17.0 (TBD)
 
 - Added XChaCha20-Poly1305 AEAD scheme ([#484](https://github.com/0xMiden/crypto/pull/484))
+- Added `LargeSmt`, SMT backed by RocksDB ([#438](https://github.com/0xMiden/miden-crypto/pull/438)).
 
 ## 0.16.1 (2025-08-21)
 

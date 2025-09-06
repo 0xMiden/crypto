@@ -37,7 +37,7 @@ impl SmtProof {
     /// Returns a new instance of [`SmtProof`] instantiated from the specified path and leaf.
     ///
     /// The length of the path is not checked. Reserved for internal use.
-    pub(super) fn new_unchecked(path: SparseMerklePath, leaf: SmtLeaf) -> Self {
+    pub(in crate::merkle::smt) fn new_unchecked(path: SparseMerklePath, leaf: SmtLeaf) -> Self {
         Self { path, leaf }
     }
 
