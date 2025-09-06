@@ -1,6 +1,8 @@
 ## 0.17.0 (TBD)
 
-- Added XChaCha20-Poly1305 AEAD scheme ([#484](https://github.com/0xMiden/crypto/pull/484))
+- added arithmetization oriented authenticated encryption with associated data (AEAD) scheme ([#480](https://github.com/0xMiden/crypto/pull/480)).
+- Added XChaCha20-Poly1305 AEAD scheme ([#484](https://github.com/0xMiden/crypto/pull/484)).
+- [BREAKING] `SmtLeaf::entries()` now returns an iterator ([#521](https://github.com/0xMiden/crypto/pull/521)).
 
 ## 0.16.1 (2025-08-21)
 
@@ -26,7 +28,6 @@
 - Validate `NodeIndex` depth ([#482](https://github.com/0xMiden/crypto/pull/482)).
 - [BREAKING] Rename `ValuePath` to `MerkleProof` ([#483](https://github.com/0xMiden/crypto/pull/483)).
 - Added an implementation of Keccak256 hash function ([#487](https://github.com/0xMiden/crypto/pull/487)).
--  Arithmetization oriented authenticated encryption with associated data (AEAD) ([#480](https://github.com/0xMiden/crypto/pull/480)) 
 
 # 0.15.9 (2025-07-24)
 
