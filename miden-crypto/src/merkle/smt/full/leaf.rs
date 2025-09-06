@@ -158,12 +158,12 @@ impl SmtLeaf {
     // ITERATORS
     // ---------------------------------------------------------------------------------------------
 
-    /// Returns the key-value pairs in the leaf
-    pub fn entries(&self) -> Vec<&(Word, Word)> {
+    /// Returns an iterator over the key-value pairs in the leaf.
+    pub fn entries(&self) -> impl Iterator<Item = &(Word, Word)> {
         match self {
-            SmtLeaf::Empty(_) => Vec::new(),
-            SmtLeaf::Single(kv_pair) => vec![kv_pair],
-            SmtLeaf::Multiple(kv_pairs) => kv_pairs.iter().collect(),
+            SmtLeaf::Empty(_) => [].iter(),
+            SmtLeaf::Single(kv_pair) => core::slice::from_ref(kv_pair).iter(),
+            SmtLeaf::Multiple(kv_pairs) => kv_pairs.iter(),
         }
     }
 
