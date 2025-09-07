@@ -159,11 +159,11 @@ impl SmtLeaf {
     // ---------------------------------------------------------------------------------------------
 
     /// Returns an iterator over the key-value pairs in the leaf.
-    pub fn entries(&self) -> impl Iterator<Item = &(Word, Word)> {
+    pub fn entries(&self) -> &[(Word, Word)] {
         match self {
-            SmtLeaf::Empty(_) => [].iter(),
-            SmtLeaf::Single(kv_pair) => core::slice::from_ref(kv_pair).iter(),
-            SmtLeaf::Multiple(kv_pairs) => kv_pairs.iter(),
+            SmtLeaf::Empty(_) => &[],
+            SmtLeaf::Single(kv_pair) => core::slice::from_ref(kv_pair),
+            SmtLeaf::Multiple(kv_pairs) => kv_pairs,
         }
     }
 
