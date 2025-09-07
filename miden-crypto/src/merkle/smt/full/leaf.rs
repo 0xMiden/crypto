@@ -158,7 +158,7 @@ impl SmtLeaf {
     // ITERATORS
     // ---------------------------------------------------------------------------------------------
 
-    /// Returns an iterator over the key-value pairs in the leaf.
+    /// Returns a slice with key-value pairs in the leaf.
     pub fn entries(&self) -> &[(Word, Word)] {
         match self {
             SmtLeaf::Empty(_) => &[],
