@@ -2,7 +2,7 @@ use alloc::{
     collections::{BTreeMap, BTreeSet},
     vec::Vec,
 };
-
+use p3_field::{PrimeCharacteristicRing, PrimeField64};
 use assert_matches::assert_matches;
 use proptest::prelude::*;
 use rand::{Rng, prelude::IteratorRandom, rng};
@@ -28,16 +28,16 @@ fn smtleaf_to_subtree_leaf(leaf: &SmtLeaf) -> SubtreeLeaf {
 fn test_sorted_pairs_to_leaves() {
     let entries: Vec<(RpoDigest, Word)> = vec![
         // Subtree 0.
-        (RpoDigest::new([ONE, ONE, ONE, Felt::new(16)]), [ONE; 4]),
-        (RpoDigest::new([ONE, ONE, ONE, Felt::new(17)]), [ONE; 4]),
+        (RpoDigest::new([ONE, ONE, ONE, Felt::from_u64(16)]), [ONE; 4]),
+        (RpoDigest::new([ONE, ONE, ONE, Felt::from_u64(17)]), [ONE; 4]),
         // Leaf index collision.
-        (RpoDigest::new([ONE, ONE, Felt::new(10), Felt::new(20)]), [ONE; 4]),
-        (RpoDigest::new([ONE, ONE, Felt::new(20), Felt::new(20)]), [ONE; 4]),
+        (RpoDigest::new([ONE, ONE, Felt::from_u64(10), Felt::from_u64(20)]), [ONE; 4]),
+        (RpoDigest::new([ONE, ONE, Felt::from_u64(20), Felt::from_u64(20)]), [ONE; 4]),
         // Subtree 1. Normal single leaf again.
-        (RpoDigest::new([ONE, ONE, ONE, Felt::new(400)]), [ONE; 4]), // Subtree boundary.
-        (RpoDigest::new([ONE, ONE, ONE, Felt::new(401)]), [ONE; 4]),
+        (RpoDigest::new([ONE, ONE, ONE, Felt::from_u64(400)]), [ONE; 4]), // Subtree boundary.
+        (RpoDigest::new([ONE, ONE, ONE, Felt::from_u64(401)]), [ONE; 4]),
         // Subtree 2. Another normal leaf.
-        (RpoDigest::new([ONE, ONE, ONE, Felt::new(1024)]), [ONE; 4]),
+        (RpoDigest::new([ONE, ONE, ONE, Felt::from_u64(1024)]), [ONE; 4]),
     ];
 
     let control = Smt::with_entries_sequential(entries.clone()).unwrap();
@@ -105,8 +105,8 @@ fn generate_entries(pair_count: u64) -> Vec<(RpoDigest, Word)> {
     (0..pair_count)
         .map(|i| {
             let leaf_index = ((i as f64 / pair_count as f64) * (pair_count as f64)) as u64;
-            let key = RpoDigest::new([ONE, ONE, Felt::new(i), Felt::new(leaf_index)]);
-            let value = [ONE, ONE, ONE, Felt::new(i)];
+            let key = RpoDigest::new([ONE, ONE, Felt::from_u64(i), Felt::from_u64(leaf_index)]);
+            let value = [ONE, ONE, ONE, Felt::from_u64(i)];
             (key, value)
         })
         .collect()
@@ -128,7 +128,7 @@ fn generate_updates(entries: Vec<(RpoDigest, Word)>, updates: usize) -> Vec<(Rpo
             let value = if rng.random_bool(REMOVAL_PROBABILITY) {
                 EMPTY_WORD
             } else {
-                [ONE, ONE, ONE, Felt::new(rng.random())]
+                [ONE, ONE, ONE, Felt::from_u64(rng.random())]
             };
             (key, value)
         })
@@ -474,7 +474,7 @@ fn test_compute_mutations_parallel() {
 #[test]
 fn test_smt_construction_with_entries_unsorted() {
     let entries = [
-        (RpoDigest::new([ONE, ONE, Felt::new(2_u64), ONE]), [ONE; 4]),
+        (RpoDigest::new([ONE, ONE, Felt::from_u64(2_u64), ONE]), [ONE; 4]),
         (RpoDigest::new([ONE; 4]), [ONE; 4]),
     ];
     let control = Smt::with_entries_sequential(entries).unwrap();
@@ -486,9 +486,9 @@ fn test_smt_construction_with_entries_unsorted() {
 #[test]
 fn test_smt_construction_with_entries_duplicate_keys() {
     let entries = [
-        (RpoDigest::new([ONE, ONE, ONE, Felt::new(16)]), [ONE; 4]),
+        (RpoDigest::new([ONE, ONE, ONE, Felt::from_u64(16)]), [ONE; 4]),
         (RpoDigest::new([ONE; 4]), [ONE; 4]),
-        (RpoDigest::new([ONE, ONE, ONE, Felt::new(16)]), [ONE; 4]),
+        (RpoDigest::new([ONE, ONE, ONE, Felt::from_u64(16)]), [ONE; 4]),
     ];
     let expected_col = Smt::key_to_leaf_index(&entries[0].0).index.value();
     let err = Smt::with_entries(entries).unwrap_err();
@@ -499,7 +499,7 @@ fn test_smt_construction_with_entries_duplicate_keys() {
 fn test_smt_construction_with_some_empty_values() {
     let entries = [
         (RpoDigest::new([ONE, ONE, ONE, ONE]), Smt::EMPTY_VALUE),
-        (RpoDigest::new([ONE, ONE, ONE, Felt::new(2)]), [ONE; 4]),
+        (RpoDigest::new([ONE, ONE, ONE, Felt::from_u64(2)]), [ONE; 4]),
     ];
 
     let result = Smt::with_entries(entries);
@@ -542,7 +542,7 @@ fn test_smt_construction_with_no_entries() {
 }
 
 fn arb_felt() -> impl Strategy<Value = Felt> {
-    prop_oneof![any::<u64>().prop_map(Felt::new), Just(ZERO), Just(ONE),]
+    prop_oneof![any::<u64>().prop_map(Felt::from_u64), Just(ZERO), Just(ONE),]
 }
 
 /// Generate entries that are guaranteed to be in different subtrees
@@ -553,8 +553,8 @@ fn generate_cross_subtree_entries() -> impl Strategy<Value = Vec<(RpoDigest, Wor
         offsets
             .into_iter()
             .map(|base_col| {
-                let key = RpoDigest::new([ONE, ONE, ONE, Felt::new(base_col)]);
-                let value = [ONE, ONE, ONE, Felt::new(base_col)];
+                let key = RpoDigest::new([ONE, ONE, ONE, Felt::from_u64(base_col)]);
+                let value = [ONE, ONE, ONE, Felt::from_u64(base_col)];
                 (key, value)
             })
             .collect()
@@ -574,8 +574,8 @@ fn arb_entries() -> impl Strategy<Value = Vec<(RpoDigest, Word)>> {
                 ),
                 // Edge case values
                 (
-                    Just(RpoDigest::new([ONE, ONE, ONE, Felt::new(0)])),
-                    Just([ONE, ONE, ONE, Felt::new(u64::MAX)])
+                    Just(RpoDigest::new([ONE, ONE, ONE, Felt::from_u64(0)])),
+                    Just([ONE, ONE, ONE, Felt::from_u64(u64::MAX)])
                 )
             ],
             1..1000,

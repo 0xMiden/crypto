@@ -1,15 +1,14 @@
 use core::ops::Range;
+use std::{borrow::ToOwned, vec::Vec};
 
 use super::{
-    ARK1, ARK2, BINARY_CHUNK_SIZE, CAPACITY_RANGE, DIGEST_BYTES, DIGEST_RANGE, DIGEST_SIZE, Digest,
-    ElementHasher, Felt, FieldElement, Hasher, INPUT1_RANGE, INPUT2_RANGE, MDS, NUM_ROUNDS,
-    RATE_RANGE, RATE_WIDTH, STATE_WIDTH, StarkField, ZERO, add_constants,
-    add_constants_and_apply_inv_sbox, add_constants_and_apply_sbox, apply_inv_sbox, apply_mds,
-    apply_sbox,
+   Felt, add_constants, add_constants_and_apply_inv_sbox, add_constants_and_apply_sbox, apply_inv_sbox, apply_mds, apply_sbox, Hasher, ARK1, ARK2, BINARY_CHUNK_SIZE, CAPACITY_RANGE, DIGEST_RANGE, INPUT1_RANGE, INPUT2_RANGE, NUM_ROUNDS, RATE_RANGE, RATE_WIDTH, STATE_WIDTH, ZERO
 };
-
+use p3_challenger::DuplexChallenger;
+use p3_field::{ExtensionField, PrimeCharacteristicRing, PrimeField64};
 mod digest;
 pub use digest::{RpoDigest, RpoDigestError};
+use p3_symmetric::{CryptographicHasher, CryptographicPermutation, PaddingFreeSponge, Permutation, PseudoCompressionFunction, TruncatedPermutation};
 
 #[cfg(test)]
 mod tests;
@@ -70,7 +69,7 @@ mod tests;
 /// ## Hashing of empty input
 /// The current implementation hashes empty input to the zero digest [0, 0, 0, 0]. This has
 /// the benefit of requiring no calls to the RPO permutation when hashing empty input.
-#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+#[derive(Debug, Default, Copy, Clone, Eq, PartialEq)]
 pub struct Rpo256();
 
 impl Hasher for Rpo256 {
@@ -92,7 +91,7 @@ impl Hasher for Rpo256 {
         // 1. Domain separating hashing of `[u8]` from hashing of `[Felt]`.
         // 2. Avoiding collisions at the `[Felt]` representation of the encoded bytes.
         state[CAPACITY_RANGE.start] =
-            Felt::from((RATE_WIDTH + (num_field_elem % RATE_WIDTH)) as u8);
+            Felt::from_u8((RATE_WIDTH + (num_field_elem % RATE_WIDTH)) as u8);
 
         // initialize a buffer to receive the little-endian elements.
         let mut buf = [0_u8; 8];
@@ -125,7 +124,7 @@ impl Hasher for Rpo256 {
 
             // set the current rate element to the input. since we take at most 7 bytes, we are
             // guaranteed that the inputs data will fit into a single field element.
-            state[RATE_RANGE.start + rate_pos] = Felt::new(u64::from_le_bytes(buf));
+            state[RATE_RANGE.start + rate_pos] = Felt::from_u64(u64::from_le_bytes(buf));
 
             // proceed filling the range. if it's full, then we apply a permutation and reset the
             // counter to the beginning of the range.
@@ -166,7 +165,7 @@ impl Hasher for Rpo256 {
     }
 
     fn merge_many(values: &[Self::Digest]) -> Self::Digest {
-        Self::hash_elements(Self::Digest::digests_as_elements(values))
+       Self::hash_elements(Self::Digest::digests_as_elements(values))
     }
 
     fn merge_with_int(seed: Self::Digest, value: u64) -> Self::Digest {
@@ -178,12 +177,12 @@ impl Hasher for Rpo256 {
         //   copy them into rate elements 5 and 6 and set the first capacity element to 6.
         let mut state = [ZERO; STATE_WIDTH];
         state[INPUT1_RANGE].copy_from_slice(seed.as_elements());
-        state[INPUT2_RANGE.start] = Felt::new(value);
-        if value < Felt::MODULUS {
-            state[CAPACITY_RANGE.start] = Felt::from(5_u8);
+        state[INPUT2_RANGE.start] = Felt::from_u64(value);
+        if value < Felt::ORDER_U64 {
+            state[CAPACITY_RANGE.start] = Felt::from_u8(5_u8);
         } else {
-            state[INPUT2_RANGE.start + 1] = Felt::new(value / Felt::MODULUS);
-            state[CAPACITY_RANGE.start] = Felt::from(6_u8);
+            state[INPUT2_RANGE.start + 1] = Felt::from_u64(value / Felt::ORDER_U64);
+            state[CAPACITY_RANGE.start] = Felt::from_u8(6_u8);
         }
 
         // apply the RPO permutation and return the first four elements of the rate
@@ -192,17 +191,139 @@ impl Hasher for Rpo256 {
     }
 }
 
-impl ElementHasher for Rpo256 {
-    type BaseField = Felt;
+// HASH FUNCTION IMPLEMENTATION
+// ================================================================================================
 
-    fn hash_elements<E: FieldElement<BaseField = Self::BaseField>>(elements: &[E]) -> Self::Digest {
+impl Rpo256 {
+    // CONSTANTS
+    // --------------------------------------------------------------------------------------------
+
+    /// The number of rounds is set to 7 to target 128-bit security level.
+    pub const NUM_ROUNDS: usize = NUM_ROUNDS;
+
+    /// Sponge state is set to 12 field elements or 768 bytes; 8 elements are reserved for rate and
+    /// the remaining 4 elements are reserved for capacity.
+    pub const STATE_WIDTH: usize = STATE_WIDTH;
+
+    /// The rate portion of the state is located in elements 4 through 11 (inclusive).
+    pub const RATE_RANGE: Range<usize> = RATE_RANGE;
+
+    /// The capacity portion of the state is located in elements 0, 1, 2, and 3.
+    pub const CAPACITY_RANGE: Range<usize> = CAPACITY_RANGE;
+
+    /// The output of the hash function can be read from state elements 4, 5, 6, and 7.
+    pub const DIGEST_RANGE: Range<usize> = DIGEST_RANGE;
+
+    // TRAIT PASS-THROUGH FUNCTIONS
+    // --------------------------------------------------------------------------------------------
+
+    /// Returns a hash of the provided sequence of bytes.
+    #[inline(always)]
+    pub fn hash(bytes: &[u8]) -> RpoDigest {
+       // initialize the state with zeroes
+       let mut state = [ZERO; STATE_WIDTH];
+
+       // determine the number of field elements needed to encode `bytes` when each field element
+       // represents at most 7 bytes.
+       let num_field_elem = bytes.len().div_ceil(BINARY_CHUNK_SIZE);
+
+       // set the first capacity element to `RATE_WIDTH + (num_field_elem % RATE_WIDTH)`. We do
+       // this to achieve:
+       // 1. Domain separating hashing of `[u8]` from hashing of `[Felt]`.
+       // 2. Avoiding collisions at the `[Felt]` representation of the encoded bytes.
+       state[CAPACITY_RANGE.start] =
+           Felt::from_u8((RATE_WIDTH + (num_field_elem % RATE_WIDTH)) as u8);
+
+       // initialize a buffer to receive the little-endian elements.
+       let mut buf = [0_u8; 8];
+
+       // iterate the chunks of bytes, creating a field element from each chunk and copying it
+       // into the state.
+       //
+       // every time the rate range is filled, a permutation is performed. if the final value of
+       // `rate_pos` is not zero, then the chunks count wasn't enough to fill the state range,
+       // and an additional permutation must be performed.
+       let mut current_chunk_idx = 0_usize;
+       // handle the case of an empty `bytes`
+       let last_chunk_idx = if num_field_elem == 0 {
+           current_chunk_idx
+       } else {
+           num_field_elem - 1
+       };
+       let rate_pos = bytes.chunks(BINARY_CHUNK_SIZE).fold(0, |rate_pos, chunk| {
+           // copy the chunk into the buffer
+           if current_chunk_idx != last_chunk_idx {
+               buf[..BINARY_CHUNK_SIZE].copy_from_slice(chunk);
+           } else {
+               // on the last iteration, we pad `buf` with a 1 followed by as many 0's as are
+               // needed to fill it
+               buf.fill(0);
+               buf[..chunk.len()].copy_from_slice(chunk);
+               buf[chunk.len()] = 1;
+           }
+           current_chunk_idx += 1;
+
+           // set the current rate element to the input. since we take at most 7 bytes, we are
+           // guaranteed that the inputs data will fit into a single field element.
+           state[RATE_RANGE.start + rate_pos] = Felt::from_u64(u64::from_le_bytes(buf));
+
+           // proceed filling the range. if it's full, then we apply a permutation and reset the
+           // counter to the beginning of the range.
+           if rate_pos == RATE_WIDTH - 1 {
+               Self::apply_permutation(&mut state);
+               0
+           } else {
+               rate_pos + 1
+           }
+       });
+
+       // if we absorbed some elements but didn't apply a permutation to them (would happen when
+       // the number of elements is not a multiple of RATE_WIDTH), apply the RPO permutation. we
+       // don't need to apply any extra padding because the first capacity element contains a
+       // flag indicating the number of field elements constituting the last block when the latter
+       // is not divisible by `RATE_WIDTH`.
+       if rate_pos != 0 {
+           state[RATE_RANGE.start + rate_pos..RATE_RANGE.end].fill(ZERO);
+           Self::apply_permutation(&mut state);
+       }
+
+       // return the first 4 elements of the rate as hash result.
+       RpoDigest::new(state[DIGEST_RANGE].try_into().unwrap())
+    }
+
+    /// Returns a hash of two digests. This method is intended for use in construction of
+    /// Merkle trees and verification of Merkle paths.
+    #[inline(always)]
+    pub fn merge(values: &[RpoDigest; 2]) -> RpoDigest {
+        //let compressor = RpoCompression::new(RpoPermutation256);
+        //compressor.compress([values[0].into(), values[1].into()]).into()
+
+        // initialize the state by copying the digest elements into the rate portion of the state
+        // (8 total elements), and set the capacity elements to 0.
+        let mut state = [ZERO; STATE_WIDTH];
+        let it: Vec<Felt> = values.into_iter().flat_map(|&digest| {let tmp: [Felt; 4] = digest.into(); tmp}).collect();
+        for (i, v) in it.iter().enumerate() {
+            state[RATE_RANGE.start + i] = *v;
+        }
+
+        // apply the RPO permutation and return the first four elements of the state
+        Self::apply_permutation(&mut state);
+        RpoDigest::new(state[DIGEST_RANGE].try_into().unwrap())
+    }
+
+    /// Returns a hash of the provided field elements.
+    #[inline(always)]
+    pub fn hash_elements<E: ExtensionField<Felt>>(elements: &[E]) -> RpoDigest {
+        //let hasher = RpoHasher::new(RpoPermutation256);
+        //let it = elements.into_iter().flat_map(|elem| E::as_basis_coefficients_slice(&elem).to_owned());
+        //hasher.hash_iter(it ).into()
+
         // convert the elements into a list of base field elements
-        let elements = E::slice_as_base_elements(elements);
-
+        let elements: Vec<Felt> = elements.into_iter().flat_map(|elem| E::as_basis_coefficients_slice(&elem).to_owned()).collect();
         // initialize state to all zeros, except for the first element of the capacity part, which
         // is set to `elements.len() % RATE_WIDTH`.
         let mut state = [ZERO; STATE_WIDTH];
-        state[CAPACITY_RANGE.start] = Self::BaseField::from((elements.len() % RATE_WIDTH) as u8);
+        state[CAPACITY_RANGE.start] = Felt::from_u8((elements.len() % RATE_WIDTH) as u8);
 
         // absorb elements into the state one by one until the rate portion of the state is filled
         // up; then apply the Rescue permutation and start absorbing again; repeat until all
@@ -231,62 +352,7 @@ impl ElementHasher for Rpo256 {
         // return the first 4 elements of the state as hash result
         RpoDigest::new(state[DIGEST_RANGE].try_into().unwrap())
     }
-}
-
-// HASH FUNCTION IMPLEMENTATION
-// ================================================================================================
-
-impl Rpo256 {
-    // CONSTANTS
-    // --------------------------------------------------------------------------------------------
-
-    /// The number of rounds is set to 7 to target 128-bit security level.
-    pub const NUM_ROUNDS: usize = NUM_ROUNDS;
-
-    /// Sponge state is set to 12 field elements or 768 bytes; 8 elements are reserved for rate and
-    /// the remaining 4 elements are reserved for capacity.
-    pub const STATE_WIDTH: usize = STATE_WIDTH;
-
-    /// The rate portion of the state is located in elements 4 through 11 (inclusive).
-    pub const RATE_RANGE: Range<usize> = RATE_RANGE;
-
-    /// The capacity portion of the state is located in elements 0, 1, 2, and 3.
-    pub const CAPACITY_RANGE: Range<usize> = CAPACITY_RANGE;
-
-    /// The output of the hash function can be read from state elements 4, 5, 6, and 7.
-    pub const DIGEST_RANGE: Range<usize> = DIGEST_RANGE;
-
-    /// MDS matrix used for computing the linear layer in a RPO round.
-    pub const MDS: [[Felt; STATE_WIDTH]; STATE_WIDTH] = MDS;
-
-    /// Round constants added to the hasher state in the first half of the RPO round.
-    pub const ARK1: [[Felt; STATE_WIDTH]; NUM_ROUNDS] = ARK1;
-
-    /// Round constants added to the hasher state in the second half of the RPO round.
-    pub const ARK2: [[Felt; STATE_WIDTH]; NUM_ROUNDS] = ARK2;
-
-    // TRAIT PASS-THROUGH FUNCTIONS
-    // --------------------------------------------------------------------------------------------
-
-    /// Returns a hash of the provided sequence of bytes.
-    #[inline(always)]
-    pub fn hash(bytes: &[u8]) -> RpoDigest {
-        <Self as Hasher>::hash(bytes)
-    }
-
-    /// Returns a hash of two digests. This method is intended for use in construction of
-    /// Merkle trees and verification of Merkle paths.
-    #[inline(always)]
-    pub fn merge(values: &[RpoDigest; 2]) -> RpoDigest {
-        <Self as Hasher>::merge(values)
-    }
-
-    /// Returns a hash of the provided field elements.
-    #[inline(always)]
-    pub fn hash_elements<E: FieldElement<BaseField = Felt>>(elements: &[E]) -> RpoDigest {
-        <Self as ElementHasher>::hash_elements(elements)
-    }
-
+ 
     // DOMAIN IDENTIFIER
     // --------------------------------------------------------------------------------------------
 
@@ -336,5 +402,94 @@ impl Rpo256 {
             add_constants(state, &ARK2[round]);
             apply_inv_sbox(state);
         }
+    }
+}
+
+impl CryptographicHasher<Felt, [Felt; 4]>
+    for Rpo256
+{
+    fn hash_iter<I>(&self, input: I) -> [Felt; 4]
+    where
+        I: IntoIterator<Item = Felt> {
+            let elements: Vec<Felt> = input.into_iter().collect();
+            Self::hash_elements(&elements).into()
+
+    }
+}
+
+impl PseudoCompressionFunction<[Felt; 4], 2>
+    for Rpo256
+ 
+{
+    fn compress(&self, input: [[Felt; 4]; 2]) -> [Felt; 4] {
+        self.hash_iter(input.into_iter().flatten())
+    }
+}
+
+
+impl CryptographicPermutation<[Felt; Rpo256::STATE_WIDTH]> for RpoPermutation256 { }
+pub type RpoHasher = PaddingFreeSponge<RpoPermutation256, 12, 8, 4>;
+pub type RpoCompression = TruncatedPermutation<RpoPermutation256, 2, 4, 12>;
+pub type RpoChallenger<F> =  DuplexChallenger<F, RpoPermutation256, 12, 8>;
+
+#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+pub struct RpoPermutation256;
+
+impl RpoPermutation256 {
+    // CONSTANTS
+    // --------------------------------------------------------------------------------------------
+
+    /// The number of rounds is set to 7 to target 128-bit security level.
+    pub const NUM_ROUNDS: usize = NUM_ROUNDS;
+
+    /// Sponge state is set to 12 field elements or 768 bytes; 8 elements are reserved for rate and
+    /// the remaining 4 elements are reserved for capacity.
+    pub const STATE_WIDTH: usize = STATE_WIDTH;
+
+    /// The rate portion of the state is located in elements 4 through 11 (inclusive).
+    pub const RATE_RANGE: Range<usize> = RATE_RANGE;
+
+    /// The capacity portion of the state is located in elements 0, 1, 2, and 3.
+    pub const CAPACITY_RANGE: Range<usize> = CAPACITY_RANGE;
+
+    /// The output of the hash function can be read from state elements 4, 5, 6, and 7.
+    pub const DIGEST_RANGE: Range<usize> = DIGEST_RANGE;
+
+    // RESCUE PERMUTATION
+    // --------------------------------------------------------------------------------------------
+
+    /// Applies RPO permutation to the provided state.
+    #[inline(always)]
+    pub fn apply_permutation(state: &mut [Felt; STATE_WIDTH]) {
+
+        for i in 0..NUM_ROUNDS {
+            Self::apply_round(state, i);
+        }
+    }
+
+    /// RPO round function.
+    #[inline(always)]
+    pub fn apply_round(state: &mut [Felt; STATE_WIDTH], round: usize) {
+        // apply first half of RPO round
+        apply_mds(state);
+        if !add_constants_and_apply_sbox(state, &ARK1[round]) {
+            add_constants(state, &ARK1[round]);
+            apply_sbox(state);
+        }
+
+        // apply second half of RPO round
+        apply_mds(state);
+        if !add_constants_and_apply_inv_sbox(state, &ARK2[round]) {
+            add_constants(state, &ARK2[round]);
+            apply_inv_sbox(state);
+        }
+    }
+}
+
+impl Permutation<[Felt; Rpo256::STATE_WIDTH]>
+    for RpoPermutation256
+{
+    fn permute_mut(&self, state: &mut [Felt; Rpo256::STATE_WIDTH]) {
+        Self::apply_permutation(state);
     }
 }

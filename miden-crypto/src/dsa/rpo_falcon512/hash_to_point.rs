@@ -1,7 +1,7 @@
 use alloc::vec::Vec;
 
 use num::Zero;
-
+use p3_field::PrimeField64;
 use super::{MODULUS, N, Nonce, Polynomial, Rpo256, Word, ZERO, math::FalconFelt};
 
 // HASH-TO-POINT FUNCTIONS
@@ -29,8 +29,8 @@ pub fn hash_to_point_rpo256(message: Word, nonce: &Nonce) -> Polynomial<FalconFe
     let mut res = [FalconFelt::zero(); N];
     for _ in 0..64 {
         Rpo256::apply_permutation(&mut state);
-        for a in &state[Rpo256::RATE_RANGE] {
-            res[i] = FalconFelt::new((a.as_int() % MODULUS as u64) as i16);
+        for &a in &state[Rpo256::RATE_RANGE] {
+            res[i] = FalconFelt::new((a.as_canonical_u64() % MODULUS as u64) as i16);
             i += 1;
         }
     }

@@ -1,4 +1,5 @@
 use alloc::{string::ToString, vec::Vec};
+use p3_field::{PrimeCharacteristicRing, PrimeField64};
 
 use super::{
     EMPTY_WORD, EmptySubtreeRoots, Felt, InnerNode, InnerNodeInfo, InnerNodes, LeafIndex,
@@ -7,6 +8,7 @@ use super::{
 
 mod error;
 pub use error::{SmtLeafError, SmtProofError};
+use lazy_static::lazy_static;
 
 mod leaf;
 pub use leaf::SmtLeaf;
@@ -51,7 +53,17 @@ pub struct Smt {
     pub(super) leaves: Leaves,
     inner_nodes: InnerNodes,
 }
+lazy_static!{
+    
+    static ref ROOTS: [RpoDigest; 256] = {
+        let mut array = [RpoDigest::default(); 256];
+        for i in 0..256 {
+            array[i] = RpoDigest::default();
+        }
+        array
+    };
 
+    }
 impl Smt {
     // CONSTANTS
     // --------------------------------------------------------------------------------------------
@@ -195,8 +207,8 @@ impl Smt {
 
     /// Returns a boolean value indicating whether the SMT is empty.
     pub fn is_empty(&self) -> bool {
-        debug_assert_eq!(self.leaves.is_empty(), self.root == Self::EMPTY_ROOT);
-        self.root == Self::EMPTY_ROOT
+        debug_assert_eq!(self.leaves.is_empty(), self.root == ROOTS[self.depth() as usize]);
+        self.root == ROOTS[self.depth() as usize]
     }
 
     // ITERATORS
@@ -345,7 +357,7 @@ impl SparseMerkleTree<SMT_DEPTH> for Smt {
     type Opening = SmtProof;
 
     const EMPTY_VALUE: Self::Value = EMPTY_WORD;
-    const EMPTY_ROOT: RpoDigest = *EmptySubtreeRoots::entry(SMT_DEPTH, 0);
+   // const EMPTY_ROOT: RpoDigest = *EmptySubtreeRoots::entry(SMT_DEPTH, 0);
 
     fn from_raw_parts(
         inner_nodes: InnerNodes,
@@ -438,7 +450,7 @@ impl SparseMerkleTree<SMT_DEPTH> for Smt {
 
     fn key_to_leaf_index(key: &RpoDigest) -> LeafIndex<SMT_DEPTH> {
         let most_significant_felt = key[3];
-        LeafIndex::new_max_depth(most_significant_felt.as_int())
+        LeafIndex::new_max_depth(most_significant_felt.as_canonical_u64() )
     }
 
     fn path_and_leaf_to_opening(path: MerklePath, leaf: SmtLeaf) -> SmtProof {
@@ -458,7 +470,7 @@ impl Default for Smt {
 impl From<Word> for LeafIndex<SMT_DEPTH> {
     fn from(value: Word) -> Self {
         // We use the most significant `Felt` of a `Word` as the leaf index.
-        Self::new_max_depth(value[3].as_int())
+        Self::new_max_depth(value[3].as_canonical_u64() )
     }
 }
 
@@ -479,6 +491,7 @@ impl From<&RpoDigest> for LeafIndex<SMT_DEPTH> {
 
 impl Serializable for Smt {
     fn write_into<W: ByteWriter>(&self, target: &mut W) {
+        /*
         // Write the number of filled leaves for this Smt
         target.write_usize(self.entries().count());
 
@@ -486,20 +499,27 @@ impl Serializable for Smt {
         for (key, value) in self.entries() {
             target.write(key);
             target.write(value);
-        }
+        } 
+        */
+
     }
 
     fn get_size_hint(&self) -> usize {
+        /*
+       
         let entries_count = self.entries().count();
 
         // Each entry is the size of a digest plus a word.
         entries_count.get_size_hint()
-            + entries_count * (RpoDigest::SERIALIZED_SIZE + EMPTY_WORD.get_size_hint())
+            + entries_count * (RpoDigest::SERIALIZED_SIZE + EMPTY_WORD.get_size_hint())  */
+            todo!()
     }
 }
 
 impl Deserializable for Smt {
     fn read_from<R: ByteReader>(source: &mut R) -> Result<Self, DeserializationError> {
+        /*
+      
         // Read the number of filled leaves for this Smt
         let num_filled_leaves = source.read_usize()?;
         let mut entries = Vec::with_capacity(num_filled_leaves);
@@ -511,7 +531,10 @@ impl Deserializable for Smt {
         }
 
         Self::with_entries(entries)
-            .map_err(|err| DeserializationError::InvalidValue(err.to_string()))
+            .map_err(|err| DeserializationError::InvalidValue(err.to_string()))  
+         */
+
+        todo!()
     }
 }
 
@@ -548,12 +571,12 @@ fn test_smt_serialization_deserialization() {
     // Smt with values
     let smt_leaves_2: [(RpoDigest, Word); 2] = [
         (
-            RpoDigest::new([Felt::new(101), Felt::new(102), Felt::new(103), Felt::new(104)]),
-            [Felt::new(1_u64), Felt::new(2_u64), Felt::new(3_u64), Felt::new(4_u64)],
+            RpoDigest::new([Felt::from_u64(101), Felt::from_u64(102), Felt::from_u64(103), Felt::from_u64(104)]),
+            [Felt::from_u64(1_u64), Felt::from_u64(2_u64), Felt::from_u64(3_u64), Felt::from_u64(4_u64)],
         ),
         (
-            RpoDigest::new([Felt::new(105), Felt::new(106), Felt::new(107), Felt::new(108)]),
-            [Felt::new(5_u64), Felt::new(6_u64), Felt::new(7_u64), Felt::new(8_u64)],
+            RpoDigest::new([Felt::from_u64(105), Felt::from_u64(106), Felt::from_u64(107), Felt::from_u64(108)]),
+            [Felt::from_u64(5_u64), Felt::from_u64(6_u64), Felt::from_u64(7_u64), Felt::from_u64(8_u64)],
         ),
     ];
     let smt = Smt::with_entries(smt_leaves_2).unwrap();

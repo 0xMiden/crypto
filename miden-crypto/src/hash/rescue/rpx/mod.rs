@@ -1,20 +1,19 @@
 use core::ops::Range;
+use std::{borrow::ToOwned, vec::Vec};
 
 use super::{
-    ARK1, ARK2, BINARY_CHUNK_SIZE, CAPACITY_RANGE, CubeExtension, DIGEST_BYTES, DIGEST_RANGE,
-    DIGEST_SIZE, Digest, ElementHasher, Felt, FieldElement, Hasher, INPUT1_RANGE, INPUT2_RANGE,
-    MDS, NUM_ROUNDS, RATE_RANGE, RATE_WIDTH, STATE_WIDTH, StarkField, ZERO, add_constants,
-    add_constants_and_apply_inv_sbox, add_constants_and_apply_sbox, apply_inv_sbox, apply_mds,
-    apply_sbox,
+    Felt, add_constants, add_constants_and_apply_inv_sbox, add_constants_and_apply_sbox, apply_inv_sbox, apply_mds, apply_sbox, CubeExtension, Hasher, ARK1, ARK2, BINARY_CHUNK_SIZE, CAPACITY_RANGE, DIGEST_RANGE, INPUT1_RANGE, INPUT2_RANGE, RATE_RANGE, RATE_WIDTH, STATE_WIDTH, ZERO
 };
 
 mod digest;
 pub use digest::{RpxDigest, RpxDigestError};
+use p3_field::{extension::BinomialExtensionField, PrimeCharacteristicRing, PrimeField64, BasedVectorSpace};
+ 
 
 #[cfg(test)]
 mod tests;
 
-pub type CubicExtElement = CubeExtension<Felt>;
+pub type CubicExtElement = BinomialExtensionField<Felt, 5>;
 
 // HASHER IMPLEMENTATION
 // ================================================================================================
@@ -97,7 +96,7 @@ impl Hasher for Rpx256 {
         // 1. Domain separating hashing of `[u8]` from hashing of `[Felt]`.
         // 2. Avoiding collisions at the `[Felt]` representation of the encoded bytes.
         state[CAPACITY_RANGE.start] =
-            Felt::from((RATE_WIDTH + (num_field_elem % RATE_WIDTH)) as u8);
+            Felt::from_u8((RATE_WIDTH + (num_field_elem % RATE_WIDTH)) as u8);
 
         // initialize a buffer to receive the little-endian elements.
         let mut buf = [0_u8; 8];
@@ -130,7 +129,7 @@ impl Hasher for Rpx256 {
 
             // set the current rate element to the input. since we take at most 7 bytes, we are
             // guaranteed that the inputs data will fit into a single field element.
-            state[RATE_RANGE.start + rate_pos] = Felt::new(u64::from_le_bytes(buf));
+            state[RATE_RANGE.start + rate_pos] = Felt::from_u64(u64::from_le_bytes(buf));
 
             // proceed filling the range. if it's full, then we apply a permutation and reset the
             // counter to the beginning of the range.
@@ -183,12 +182,12 @@ impl Hasher for Rpx256 {
         //   copy them into rate elements 5 and 6 and set the first capacity element to 6.
         let mut state = [ZERO; STATE_WIDTH];
         state[INPUT1_RANGE].copy_from_slice(seed.as_elements());
-        state[INPUT2_RANGE.start] = Felt::new(value);
-        if value < Felt::MODULUS {
-            state[CAPACITY_RANGE.start] = Felt::from(5_u8);
+        state[INPUT2_RANGE.start] = Felt::from_u64(value);
+        if value < Felt::ORDER_U64 {
+            state[CAPACITY_RANGE.start] = Felt::from_u8(5_u8);
         } else {
-            state[INPUT2_RANGE.start + 1] = Felt::new(value / Felt::MODULUS);
-            state[CAPACITY_RANGE.start] = Felt::from(6_u8);
+            state[INPUT2_RANGE.start + 1] = Felt::from_u64(value / Felt::ORDER_U64);
+            state[CAPACITY_RANGE.start] = Felt::from_u8(6_u8);
         }
 
         // apply the RPX permutation and return the first four elements of the rate
@@ -197,17 +196,54 @@ impl Hasher for Rpx256 {
     }
 }
 
-impl ElementHasher for Rpx256 {
-    type BaseField = Felt;
 
-    fn hash_elements<E: FieldElement<BaseField = Self::BaseField>>(elements: &[E]) -> Self::Digest {
+// HASH FUNCTION IMPLEMENTATION
+// ================================================================================================
+
+impl Rpx256 {
+    // CONSTANTS
+    // --------------------------------------------------------------------------------------------
+
+    /// Sponge state is set to 12 field elements or 768 bytes; 8 elements are reserved for rate and
+    /// the remaining 4 elements are reserved for capacity.
+    pub const STATE_WIDTH: usize = STATE_WIDTH;
+
+    /// The rate portion of the state is located in elements 4 through 11 (inclusive).
+    pub const RATE_RANGE: Range<usize> = RATE_RANGE;
+
+    /// The capacity portion of the state is located in elements 0, 1, 2, and 3.
+    pub const CAPACITY_RANGE: Range<usize> = CAPACITY_RANGE;
+
+    /// The output of the hash function can be read from state elements 4, 5, 6, and 7.
+    pub const DIGEST_RANGE: Range<usize> = DIGEST_RANGE;
+
+    // TRAIT PASS-THROUGH FUNCTIONS
+    // --------------------------------------------------------------------------------------------
+
+    /// Returns a hash of the provided sequence of bytes.
+    #[inline(always)]
+    pub fn hash(bytes: &[u8]) -> RpxDigest {
+        <Self as Hasher>::hash(bytes)
+    }
+
+    /// Returns a hash of two digests. This method is intended for use in construction of
+    /// Merkle trees and verification of Merkle paths.
+    #[inline(always)]
+    pub fn merge(values: &[RpxDigest; 2]) -> RpxDigest {
+        <Self as Hasher>::merge(values)
+    }
+
+    /// Returns a hash of the provided field elements.
+    /// Returns a hash of the provided field elements.
+    #[inline(always)]
+    pub fn hash_elements<E: BasedVectorSpace<Felt>>(elements: &[E]) -> RpxDigest {
         // convert the elements into a list of base field elements
-        let elements = E::slice_as_base_elements(elements);
+        let elements: Vec<Felt> = elements.into_iter().flat_map(|elem| E::as_basis_coefficients_slice(&elem).to_owned()).collect();
 
         // initialize state to all zeros, except for the first element of the capacity part, which
         // is set to `elements.len() % RATE_WIDTH`.
         let mut state = [ZERO; STATE_WIDTH];
-        state[CAPACITY_RANGE.start] = Self::BaseField::from((elements.len() % RATE_WIDTH) as u8);
+        state[CAPACITY_RANGE.start] = Felt::from_u8((elements.len() % RATE_WIDTH) as u8);
 
         // absorb elements into the state one by one until the rate portion of the state is filled
         // up; then apply the Rescue permutation and start absorbing again; repeat until all
@@ -236,58 +272,8 @@ impl ElementHasher for Rpx256 {
         // return the first 4 elements of the state as hash result
         RpxDigest::new(state[DIGEST_RANGE].try_into().unwrap())
     }
-}
 
-// HASH FUNCTION IMPLEMENTATION
-// ================================================================================================
 
-impl Rpx256 {
-    // CONSTANTS
-    // --------------------------------------------------------------------------------------------
-
-    /// Sponge state is set to 12 field elements or 768 bytes; 8 elements are reserved for rate and
-    /// the remaining 4 elements are reserved for capacity.
-    pub const STATE_WIDTH: usize = STATE_WIDTH;
-
-    /// The rate portion of the state is located in elements 4 through 11 (inclusive).
-    pub const RATE_RANGE: Range<usize> = RATE_RANGE;
-
-    /// The capacity portion of the state is located in elements 0, 1, 2, and 3.
-    pub const CAPACITY_RANGE: Range<usize> = CAPACITY_RANGE;
-
-    /// The output of the hash function can be read from state elements 4, 5, 6, and 7.
-    pub const DIGEST_RANGE: Range<usize> = DIGEST_RANGE;
-
-    /// MDS matrix used for computing the linear layer in the (FB) and (E) rounds.
-    pub const MDS: [[Felt; STATE_WIDTH]; STATE_WIDTH] = MDS;
-
-    /// Round constants added to the hasher state in the first half of the round.
-    pub const ARK1: [[Felt; STATE_WIDTH]; NUM_ROUNDS] = ARK1;
-
-    /// Round constants added to the hasher state in the second half of the round.
-    pub const ARK2: [[Felt; STATE_WIDTH]; NUM_ROUNDS] = ARK2;
-
-    // TRAIT PASS-THROUGH FUNCTIONS
-    // --------------------------------------------------------------------------------------------
-
-    /// Returns a hash of the provided sequence of bytes.
-    #[inline(always)]
-    pub fn hash(bytes: &[u8]) -> RpxDigest {
-        <Self as Hasher>::hash(bytes)
-    }
-
-    /// Returns a hash of two digests. This method is intended for use in construction of
-    /// Merkle trees and verification of Merkle paths.
-    #[inline(always)]
-    pub fn merge(values: &[RpxDigest; 2]) -> RpxDigest {
-        <Self as Hasher>::merge(values)
-    }
-
-    /// Returns a hash of the provided field elements.
-    #[inline(always)]
-    pub fn hash_elements<E: FieldElement<BaseField = Felt>>(elements: &[E]) -> RpxDigest {
-        <Self as ElementHasher>::hash_elements(elements)
-    }
 
     // DOMAIN IDENTIFIER
     // --------------------------------------------------------------------------------------------
@@ -351,19 +337,23 @@ impl Rpx256 {
         // add constants
         add_constants(state, &ARK1[round]);
 
+ 
         // decompose the state into 4 elements in the cubic extension field and apply the power 7
         // map to each of the elements
-        let [s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11] = *state;
-        let ext0 = Self::exp7(CubicExtElement::new(s0, s1, s2));
-        let ext1 = Self::exp7(CubicExtElement::new(s3, s4, s5));
-        let ext2 = Self::exp7(CubicExtElement::new(s6, s7, s8));
-        let ext3 = Self::exp7(CubicExtElement::new(s9, s10, s11));
+        let [s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11] = *state; 
+        let ext0 = Self::exp7(CubicExtElement::from_basis_coefficients_iter([s0, s1, s2, ZERO, ZERO].into_iter()).unwrap());
+        let ext1 = Self::exp7(CubicExtElement::from_basis_coefficients_iter([s3, s4, s5, ZERO, ZERO] .into_iter()).unwrap());
+        let ext2 = Self::exp7(CubicExtElement::from_basis_coefficients_iter([s6, s7, s8, ZERO, ZERO] .into_iter()).unwrap());
+        let ext3 = Self::exp7(CubicExtElement::from_basis_coefficients_iter([s9, s10, s11, ZERO, ZERO] .into_iter()).unwrap());
 
         // decompose the state back into 12 base field elements
         let arr_ext = [ext0, ext1, ext2, ext3];
-        *state = CubicExtElement::slice_as_base_elements(&arr_ext)
+        *state = arr_ext.into_iter().flat_map(|arr| (&CubicExtElement::as_basis_coefficients_slice(&arr)[..3]).to_owned()).collect::<Vec<_>>()
             .try_into()
             .expect("shouldn't fail");
+
+
+
     }
 
     /// (M) round function.
@@ -375,9 +365,9 @@ impl Rpx256 {
 
     /// Computes an exponentiation to the power 7 in cubic extension field.
     #[inline(always)]
-    pub fn exp7(x: CubeExtension<Felt>) -> CubeExtension<Felt> {
-        let x2 = x.square();
-        let x4 = x2.square();
+    pub fn exp7(x: CubeExtension) -> CubeExtension {
+        let x2 = x * x;
+        let x4 = x2 * x2;
 
         let x3 = x2 * x;
         x3 * x4

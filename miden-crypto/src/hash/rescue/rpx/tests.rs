@@ -1,14 +1,15 @@
 use alloc::{collections::BTreeSet, vec::Vec};
 
+use p3_field::{PrimeCharacteristicRing, PrimeField64};
 use proptest::prelude::*;
 use rand_utils::rand_value;
 
-use super::{Felt, Hasher, Rpx256, StarkField, ZERO};
+use super::{Felt, Hasher, Rpx256, ZERO};
 use crate::{ONE, hash::rescue::RpxDigest};
 
 #[test]
 fn hash_elements_vs_merge() {
-    let elements = [Felt::new(rand_value()); 8];
+    let elements = [Felt::from_u64(rand_value()); 8];
 
     let digests: [RpxDigest; 2] = [
         RpxDigest::new(elements[..4].try_into().unwrap()),
@@ -22,7 +23,7 @@ fn hash_elements_vs_merge() {
 
 #[test]
 fn merge_vs_merge_in_domain() {
-    let elements = [Felt::new(rand_value()); 8];
+    let elements = [Felt::from_u64(rand_value()); 8];
 
     let digests: [RpxDigest; 2] = [
         RpxDigest::new(elements[..4].try_into().unwrap()),
@@ -49,12 +50,12 @@ fn merge_vs_merge_in_domain() {
 
 #[test]
 fn hash_elements_vs_merge_with_int() {
-    let tmp = [Felt::new(rand_value()); 4];
+    let tmp = [Felt::from_u64(rand_value()); 4];
     let seed = RpxDigest::new(tmp);
 
     // ----- value fits into a field element ------------------------------------------------------
-    let val: Felt = Felt::new(rand_value());
-    let m_result = Rpx256::merge_with_int(seed, val.as_int());
+    let val: Felt = Felt::from_u64(rand_value());
+    let m_result = Rpx256::merge_with_int(seed, val.as_canonical_u64());
 
     let mut elements = seed.as_elements().to_vec();
     elements.push(val);
@@ -63,11 +64,11 @@ fn hash_elements_vs_merge_with_int() {
     assert_eq!(m_result, h_result);
 
     // ----- value does not fit into a field element ----------------------------------------------
-    let val = Felt::MODULUS + 2;
+    let val = Felt::ORDER_U64 + 2;
     let m_result = Rpx256::merge_with_int(seed, val);
 
     let mut elements = seed.as_elements().to_vec();
-    elements.push(Felt::new(val));
+    elements.push(Felt::from_u64(val));
     elements.push(ONE);
     let h_result = Rpx256::hash_elements(&elements);
 
@@ -99,7 +100,7 @@ fn hash_padding() {
 
 #[test]
 fn hash_elements_padding() {
-    let e1 = [Felt::new(rand_value()); 2];
+    let e1 = [Felt::from_u64(rand_value()); 2];
     let e2 = [e1[0], e1[1], ZERO];
 
     let r1 = Rpx256::hash_elements(&e1);
@@ -112,12 +113,12 @@ fn hash_elements() {
     let elements = [
         ZERO,
         ONE,
-        Felt::new(2),
-        Felt::new(3),
-        Felt::new(4),
-        Felt::new(5),
-        Felt::new(6),
-        Felt::new(7),
+        Felt::from_u64(2),
+        Felt::from_u64(3),
+        Felt::from_u64(4),
+        Felt::from_u64(5),
+        Felt::from_u64(6),
+        Felt::from_u64(7),
     ];
 
     let digests: [RpxDigest; 2] = [
@@ -162,7 +163,7 @@ fn sponge_bytes_with_remainder_length_wont_panic() {
 #[test]
 fn sponge_collision_for_wrapped_field_element() {
     let a = Rpx256::hash(&[0; 8]);
-    let b = Rpx256::hash(&Felt::MODULUS.to_le_bytes());
+    let b = Rpx256::hash(&Felt::ORDER_U64.to_le_bytes());
     assert_ne!(a, b);
 }
 

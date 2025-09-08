@@ -1,11 +1,14 @@
 use alloc::{string::String, vec::Vec};
+use p3_field::BasedVectorSpace;
+use p3_goldilocks::Goldilocks as Felt;
 use core::{
     mem::{size_of, transmute, transmute_copy},
     ops::Deref,
     slice::{self, from_raw_parts},
 };
-
-use super::{Digest, ElementHasher, Felt, FieldElement, Hasher};
+use std::borrow::ToOwned;
+use p3_field::PrimeField64;
+use super::{Digest, Hasher};
 use crate::utils::{
     ByteReader, ByteWriter, Deserializable, DeserializationError, HexParseError, Serializable,
     bytes_to_hex_string, hex_to_bytes,
@@ -134,6 +137,42 @@ impl Hasher for Blake3_256 {
     }
 }
 
+impl Blake3_256 {
+    pub fn hash(bytes: &[u8]) -> Blake3Digest<32>{
+        Blake3Digest(blake3::hash(bytes).into())
+    }
+
+    pub fn merge(values: &[Blake3Digest<32>; 2]) -> Blake3Digest<32>{
+        Self::hash(prepare_merge(values))
+    }
+
+    pub fn merge_many(values: &[Blake3Digest<32>]) -> Blake3Digest<32>{
+        Blake3Digest(blake3::hash(Blake3Digest::digests_as_bytes(values)).into())
+    }
+
+    pub fn merge_with_int(seed: Blake3Digest<32>, value: u64) -> Blake3Digest<32>{
+        let mut hasher = blake3::Hasher::new();
+        hasher.update(&seed.0);
+        hasher.update(&value.to_le_bytes());
+        Blake3Digest(hasher.finalize().into())
+    }
+
+
+    /// Returns a hash of the provided field elements.
+    #[inline(always)]
+    pub fn hash_elements<E: BasedVectorSpace<Felt>>(elements: &[E]) ->  Blake3Digest<32>{
+        //let hasher = RpoHasher::new(RpoPermutation256);
+        //let it = elements.into_iter().flat_map(|elem| E::as_basis_coefficients_slice(&elem).to_owned());
+        //hasher.hash_iter(it ).into()
+
+        // convert the elements into a list of base field elements
+        let elements: Vec<Felt> = elements.into_iter().flat_map(|elem| E::as_basis_coefficients_slice(&elem).to_owned()).collect();
+
+        Blake3Digest(hash_elements(&elements))
+    }
+}
+
+/* 
 impl ElementHasher for Blake3_256 {
     type BaseField = Felt;
 
@@ -168,7 +207,7 @@ impl Blake3_256 {
         <Self as ElementHasher>::hash_elements(elements)
     }
 }
-
+*/
 // BLAKE3 192-BIT OUTPUT
 // ================================================================================================
 
@@ -202,7 +241,7 @@ impl Hasher for Blake3_192 {
         Blake3Digest(*shrink_bytes(&hasher.finalize().into()))
     }
 }
-
+/* 
 impl ElementHasher for Blake3_192 {
     type BaseField = Felt;
 
@@ -237,7 +276,7 @@ impl Blake3_192 {
         <Self as ElementHasher>::hash_elements(elements)
     }
 }
-
+*/
 // BLAKE3 160-BIT OUTPUT
 // ================================================================================================
 
@@ -271,7 +310,7 @@ impl Hasher for Blake3_160 {
         Blake3Digest(*shrink_bytes(&hasher.finalize().into()))
     }
 }
-
+/* 
 impl ElementHasher for Blake3_160 {
     type BaseField = Felt;
 
@@ -306,7 +345,7 @@ impl Blake3_160 {
         <Self as ElementHasher>::hash_elements(elements)
     }
 }
-
+*/
 // HELPER FUNCTIONS
 // ================================================================================================
 
@@ -321,29 +360,28 @@ fn shrink_bytes<const M: usize, const N: usize>(bytes: &[u8; M]) -> &[u8; N] {
 /// Hash the elements into bytes and shrink the output.
 fn hash_elements<const N: usize, E>(elements: &[E]) -> [u8; N]
 where
-    E: FieldElement<BaseField = Felt>,
+    E: BasedVectorSpace<Felt>,
 {
     // don't leak assumptions from felt and check its actual implementation.
     // this is a compile-time branch so it is for free
-    let digest = if Felt::IS_CANONICAL {
-        blake3::hash(E::elements_as_bytes(elements))
-    } else {
+    let digest = {
         let mut hasher = blake3::Hasher::new();
 
         // BLAKE3 state is 64 bytes - so, we can absorb 64 bytes into the state in a single
         // permutation. we move the elements into the hasher via the buffer to give the CPU
         // a chance to process multiple element-to-byte conversions in parallel
         let mut buf = [0_u8; 64];
-        let mut chunk_iter = E::slice_as_base_elements(elements).chunks_exact(8);
-        for chunk in chunk_iter.by_ref() {
+        let elements_base = elements.into_iter().flat_map(|elem| E::as_basis_coefficients_slice(&elem).to_owned()).collect::<Vec<Felt>>();
+        let mut chunks_iter = elements_base.chunks_exact(8);
+        for chunk in chunks_iter.by_ref() {
             for i in 0..8 {
-                buf[i * 8..(i + 1) * 8].copy_from_slice(&chunk[i].as_int().to_le_bytes());
+                buf[i * 8..(i + 1) * 8].copy_from_slice(&chunk[i].as_canonical_u64().to_le_bytes());
             }
             hasher.update(&buf);
         }
 
-        for element in chunk_iter.remainder() {
-            hasher.update(&element.as_int().to_le_bytes());
+        for element in chunks_iter.remainder() {
+            hasher.update(&element.as_canonical_u64().to_le_bytes());
         }
 
         hasher.finalize()

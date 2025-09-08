@@ -1,11 +1,9 @@
-use alloc::{string::ToString, vec::Vec};
-
 use rand_core::impls;
-
-use super::{Felt, FeltRng, FieldElement, RandomCoin, RandomCoinError, RngCore, Word, ZERO};
+use p3_field::PrimeField64;
+use super::{FeltRng, RngCore, ZERO, Felt};
 use crate::{
-    hash::rpo::{Rpo256, RpoDigest},
-    utils::{ByteReader, ByteWriter, Deserializable, DeserializationError, Serializable},
+    hash::rpo::Rpo256,
+    utils::{ByteReader, ByteWriter, Deserializable, DeserializationError, Serializable}, Word,
 };
 
 // CONSTANTS
@@ -15,7 +13,6 @@ const STATE_WIDTH: usize = Rpo256::STATE_WIDTH;
 const RATE_START: usize = Rpo256::RATE_RANGE.start;
 const RATE_END: usize = Rpo256::RATE_RANGE.end;
 const HALF_RATE_WIDTH: usize = (Rpo256::RATE_RANGE.end - Rpo256::RATE_RANGE.start) / 2;
-
 // RPO RANDOM COIN
 // ================================================================================================
 /// A simplified version of the `SPONGE_PRG` reseedable pseudo-random number generator algorithm
@@ -82,6 +79,7 @@ impl RpoRandomCoin {
 
 // RANDOM COIN IMPLEMENTATION
 // ------------------------------------------------------------------------------------------------
+/* 
 
 impl RandomCoin for RpoRandomCoin {
     type BaseField = Felt;
@@ -109,7 +107,7 @@ impl RandomCoin for RpoRandomCoin {
     }
 
     fn check_leading_zeros(&self, value: u64) -> u32 {
-        let value = Felt::new(value);
+        let value = Felt::from_wrapped_u64(value);
         let mut state_tmp = self.state;
 
         state_tmp[RATE_START] += value;
@@ -141,7 +139,7 @@ impl RandomCoin for RpoRandomCoin {
         assert!(num_values < domain_size, "number of values must be smaller than domain size");
 
         // absorb the nonce
-        let nonce = Felt::new(nonce);
+        let nonce = Felt::from_wrapped_u64(nonce);
         self.state[RATE_START] += nonce;
         Rpo256::apply_permutation(&mut self.state);
 
@@ -175,7 +173,7 @@ impl RandomCoin for RpoRandomCoin {
         Ok(values)
     }
 }
-
+*/
 // FELT RNG IMPLEMENTATION
 // ------------------------------------------------------------------------------------------------
 
@@ -198,7 +196,7 @@ impl FeltRng for RpoRandomCoin {
 
 impl RngCore for RpoRandomCoin {
     fn next_u32(&mut self) -> u32 {
-        self.draw_basefield().as_int() as u32
+        self.draw_basefield().as_canonical_u64() as u32
     }
 
     fn next_u64(&mut self) -> u64 {
@@ -215,14 +213,16 @@ impl RngCore for RpoRandomCoin {
 
 impl Serializable for RpoRandomCoin {
     fn write_into<W: ByteWriter>(&self, target: &mut W) {
+        /*
         self.state.iter().for_each(|v| v.write_into(target));
         // casting to u8 is OK because `current` is always between 4 and 12.
-        target.write_u8(self.current as u8);
+        target.write_u8(self.current as u8); */
     }
 }
 
 impl Deserializable for RpoRandomCoin {
     fn read_from<R: ByteReader>(source: &mut R) -> Result<Self, DeserializationError> {
+        /*
         let state = [
             Felt::read_from(source)?,
             Felt::read_from(source)?,
@@ -243,7 +243,9 @@ impl Deserializable for RpoRandomCoin {
                 "current value outside of valid range".to_string(),
             ));
         }
-        Ok(Self { state, current })
+        Ok(Self { state, current }) 
+        */
+        todo!()
     }
 }
 

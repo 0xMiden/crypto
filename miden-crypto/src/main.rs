@@ -6,6 +6,7 @@ use miden_crypto::{
     hash::rpo::{Rpo256, RpoDigest},
     merkle::{MerkleError, Smt},
 };
+use p3_field::PrimeCharacteristicRing;
 use rand::{Rng, prelude::IteratorRandom, rng};
 use rand_utils::rand_value;
 
@@ -39,7 +40,7 @@ pub fn benchmark_smt() {
     let mut entries = Vec::new();
     for i in 0..tree_size {
         let key = rand_value::<RpoDigest>();
-        let value = [ONE, ONE, ONE, Felt::new(i as u64)];
+        let value = [ONE, ONE, ONE, Felt::from_u64(i as u64)];
         entries.push((key, value));
     }
 
@@ -71,7 +72,7 @@ pub fn insertion(tree: &mut Smt, insertions: usize) -> Result<(), MerkleError> {
 
     for i in 0..insertions {
         let test_key = Rpo256::hash(&rand_value::<u64>().to_be_bytes());
-        let test_value = [ONE, ONE, ONE, Felt::new((size + i) as u64)];
+        let test_value = [ONE, ONE, ONE, Felt::from_u64((size + i) as u64)];
 
         let now = Instant::now();
         tree.insert(test_key, test_value);
@@ -96,7 +97,7 @@ pub fn batched_insertion(tree: &mut Smt, insertions: usize) -> Result<(), Merkle
     let new_pairs: Vec<(RpoDigest, Word)> = (0..insertions)
         .map(|i| {
             let key = Rpo256::hash(&rand_value::<u64>().to_be_bytes());
-            let value = [ONE, ONE, ONE, Felt::new((size + i) as u64)];
+            let value = [ONE, ONE, ONE, Felt::from_u64((size + i) as u64)];
             (key, value)
         })
         .collect();
@@ -152,7 +153,7 @@ pub fn batched_update(
                 let value = if rng.random_bool(REMOVAL_PROBABILITY) {
                     EMPTY_WORD
                 } else {
-                    [ONE, ONE, ONE, Felt::new(rng.random())]
+                    [ONE, ONE, ONE, Felt::from_u64(rng.random())]
                 };
 
                 (key, value)
@@ -201,7 +202,7 @@ pub fn proof_generation(tree: &mut Smt) -> Result<(), MerkleError> {
 
     for i in 0..NUM_PROOFS {
         let test_key = Rpo256::hash(&rand_value::<u64>().to_be_bytes());
-        let test_value = [ONE, ONE, ONE, Felt::new((size + i) as u64)];
+        let test_value = [ONE, ONE, ONE, Felt::from_u64((size + i) as u64)];
         tree.insert(test_key, test_value);
 
         let now = Instant::now();

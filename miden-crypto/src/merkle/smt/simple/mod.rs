@@ -1,5 +1,7 @@
 use alloc::collections::BTreeSet;
 
+use crate::ZERO;
+use lazy_static::lazy_static;
 use super::{
     super::ValuePath, EMPTY_WORD, EmptySubtreeRoots, InnerNode, InnerNodeInfo, InnerNodes,
     LeafIndex, MerkleError, MerklePath, MutationSet, NodeIndex, RpoDigest, SMT_MAX_DEPTH,
@@ -30,7 +32,7 @@ impl<const DEPTH: u8> SimpleSmt<DEPTH> {
     // --------------------------------------------------------------------------------------------
 
     /// The default value used to compute the hash of empty leaves
-    pub const EMPTY_VALUE: Word = <Self as SparseMerkleTree<DEPTH>>::EMPTY_VALUE;
+    const EMPTY_VALUE: Word = <Self as SparseMerkleTree<DEPTH>>::EMPTY_VALUE;
 
     // CONSTRUCTORS
     // --------------------------------------------------------------------------------------------
@@ -175,8 +177,8 @@ impl<const DEPTH: u8> SimpleSmt<DEPTH> {
 
     /// Returns a boolean value indicating whether the SMT is empty.
     pub fn is_empty(&self) -> bool {
-        debug_assert_eq!(self.leaves.is_empty(), self.root == Self::EMPTY_ROOT);
-        self.root == Self::EMPTY_ROOT
+        debug_assert_eq!(self.leaves.is_empty(), self.root == ROOTS[DEPTH as usize]);
+        self.root == ROOTS[DEPTH as usize]
     }
 
     // ITERATORS
@@ -328,7 +330,17 @@ impl<const DEPTH: u8> SimpleSmt<DEPTH> {
         Ok(self.root)
     }
 }
+lazy_static!{
+    
+    static ref ROOTS: [RpoDigest; 256] = {
+        let mut array = [RpoDigest::default(); 256];
+        for i in 0..256 {
+            array[i] = RpoDigest::default();
+        }
+        array
+    };
 
+    }
 impl<const DEPTH: u8> SparseMerkleTree<DEPTH> for SimpleSmt<DEPTH> {
     type Key = LeafIndex<DEPTH>;
     type Value = Word;
@@ -336,8 +348,7 @@ impl<const DEPTH: u8> SparseMerkleTree<DEPTH> for SimpleSmt<DEPTH> {
     type Opening = ValuePath;
 
     const EMPTY_VALUE: Self::Value = EMPTY_WORD;
-    const EMPTY_ROOT: RpoDigest = *EmptySubtreeRoots::entry(DEPTH, 0);
-
+    //const EMPTY_ROOT: RpoDigest = ROOTS[DEPTH];
     fn from_raw_parts(
         inner_nodes: InnerNodes,
         leaves: Leaves,

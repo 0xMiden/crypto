@@ -1,6 +1,6 @@
 use alloc::{string::ToString, vec::Vec};
 use core::cmp::Ordering;
-
+use p3_field::PrimeField64;
 use super::{EMPTY_WORD, Felt, LeafIndex, Rpo256, RpoDigest, SMT_DEPTH, SmtLeafError, Word};
 use crate::utils::{ByteReader, ByteWriter, Deserializable, DeserializationError, Serializable};
 
@@ -136,7 +136,7 @@ impl SmtLeaf {
 
     /// Computes the hash of the leaf
     pub fn hash(&self) -> RpoDigest {
-        match self {
+          match self {
             SmtLeaf::Empty(_) => EMPTY_WORD.into(),
             SmtLeaf::Single((key, value)) => Rpo256::merge(&[*key, value.into()]),
             SmtLeaf::Multiple(kvs) => {
@@ -144,6 +144,7 @@ impl SmtLeaf {
                 Rpo256::hash_elements(&elements)
             },
         }
+
     }
 
     // ITERATORS
@@ -307,6 +308,10 @@ impl SmtLeaf {
 
 impl Serializable for SmtLeaf {
     fn write_into<W: ByteWriter>(&self, target: &mut W) {
+
+        /*
+        
+       
         // Write: num entries
         self.num_entries().write_into(target);
 
@@ -318,12 +323,17 @@ impl Serializable for SmtLeaf {
         for (key, value) in self.entries() {
             key.write_into(target);
             value.write_into(target);
-        }
+        } 
+        
+         */
     }
 }
 
 impl Deserializable for SmtLeaf {
     fn read_from<R: ByteReader>(source: &mut R) -> Result<Self, DeserializationError> {
+        /*
+        
+        
         // Read: num entries
         let num_entries = source.read_u64()?;
 
@@ -344,6 +354,9 @@ impl Deserializable for SmtLeaf {
 
         Self::new(entries, leaf_index)
             .map_err(|err| DeserializationError::InvalidValue(err.to_string()))
+         */
+
+        todo!()
     }
 }
 
@@ -362,8 +375,8 @@ pub(crate) fn kv_to_elements((key, value): (RpoDigest, Word)) -> impl Iterator<I
 /// the most significant element.
 pub(crate) fn cmp_keys(key_1: RpoDigest, key_2: RpoDigest) -> Ordering {
     for (v1, v2) in key_1.iter().zip(key_2.iter()).rev() {
-        let v1 = v1.as_int();
-        let v2 = v2.as_int();
+        let v1 = (*v1).as_canonical_u64() ;
+        let v2 = (*v2).as_canonical_u64() ;
         if v1 != v2 {
             return v1.cmp(&v2);
         }

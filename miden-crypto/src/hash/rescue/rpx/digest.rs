@@ -1,15 +1,16 @@
 use alloc::string::String;
+use p3_goldilocks::Goldilocks as Felt;
+use winter_crypto::Digest;
 use core::{cmp::Ordering, fmt::Display, ops::Deref, slice};
 
 use thiserror::Error;
+use p3_field::{PrimeCharacteristicRing, PrimeField64};
 
-use super::{DIGEST_BYTES, DIGEST_SIZE, Digest, Felt, StarkField, ZERO};
+
 use crate::{
-    rand::Randomizable,
-    utils::{
-        ByteReader, ByteWriter, Deserializable, DeserializationError, HexParseError, Serializable,
-        bytes_to_hex_string, hex_to_bytes,
-    },
+    hash::rescue::{DIGEST_BYTES, DIGEST_SIZE}, rand::Randomizable, utils::{
+        bytes_to_hex_string, hex_to_bytes, ByteReader, ByteWriter, Deserializable, DeserializationError, HexParseError, Serializable
+    }, ZERO
 };
 
 // DIGEST TRAIT IMPLEMENTATIONS
@@ -59,10 +60,10 @@ impl Digest for RpxDigest {
     fn as_bytes(&self) -> [u8; DIGEST_BYTES] {
         let mut result = [0; DIGEST_BYTES];
 
-        result[..8].copy_from_slice(&self.0[0].as_int().to_le_bytes());
-        result[8..16].copy_from_slice(&self.0[1].as_int().to_le_bytes());
-        result[16..24].copy_from_slice(&self.0[2].as_int().to_le_bytes());
-        result[24..].copy_from_slice(&self.0[3].as_int().to_le_bytes());
+        result[..8].copy_from_slice(&self.0[0].as_canonical_u64().to_le_bytes());
+        result[8..16].copy_from_slice(&self.0[1].as_canonical_u64().to_le_bytes());
+        result[16..24].copy_from_slice(&self.0[2].as_canonical_u64().to_le_bytes());
+        result[24..].copy_from_slice(&self.0[3].as_canonical_u64().to_le_bytes());
 
         result
     }
@@ -89,7 +90,7 @@ impl Ord for RpxDigest {
         // finally, we use `Felt::inner` instead of `Felt::as_int` so we avoid performing a
         // montgomery reduction for every limb. that is safe because every inner element of the
         // digest is guaranteed to be in its canonical form (that is, `x in [0,p)`).
-        self.0.iter().map(Felt::inner).zip(other.0.iter().map(Felt::inner)).fold(
+        self.0.iter().map(Felt::as_canonical_u64).zip(other.0.iter().map(Felt::as_canonical_u64)).fold(
             Ordering::Equal,
             |ord, (a, b)| match ord {
                 Ordering::Equal => a.cmp(&b),
@@ -154,10 +155,10 @@ impl TryFrom<RpxDigest> for [bool; DIGEST_SIZE] {
         }
 
         Ok([
-            to_bool(value.0[0].as_int()).ok_or(RpxDigestError::TypeConversion("bool"))?,
-            to_bool(value.0[1].as_int()).ok_or(RpxDigestError::TypeConversion("bool"))?,
-            to_bool(value.0[2].as_int()).ok_or(RpxDigestError::TypeConversion("bool"))?,
-            to_bool(value.0[3].as_int()).ok_or(RpxDigestError::TypeConversion("bool"))?,
+            to_bool(value.0[0].as_canonical_u64()).ok_or(RpxDigestError::TypeConversion("bool"))?,
+            to_bool(value.0[1].as_canonical_u64()).ok_or(RpxDigestError::TypeConversion("bool"))?,
+            to_bool(value.0[2].as_canonical_u64()).ok_or(RpxDigestError::TypeConversion("bool"))?,
+            to_bool(value.0[3].as_canonical_u64()).ok_or(RpxDigestError::TypeConversion("bool"))?,
         ])
     }
 }
@@ -176,19 +177,19 @@ impl TryFrom<RpxDigest> for [u8; DIGEST_SIZE] {
     fn try_from(value: RpxDigest) -> Result<Self, Self::Error> {
         Ok([
             value.0[0]
-                .as_int()
+                .as_canonical_u64()
                 .try_into()
                 .map_err(|_| RpxDigestError::TypeConversion("u8"))?,
             value.0[1]
-                .as_int()
+                .as_canonical_u64()
                 .try_into()
                 .map_err(|_| RpxDigestError::TypeConversion("u8"))?,
             value.0[2]
-                .as_int()
+                .as_canonical_u64()
                 .try_into()
                 .map_err(|_| RpxDigestError::TypeConversion("u8"))?,
             value.0[3]
-                .as_int()
+                .as_canonical_u64()
                 .try_into()
                 .map_err(|_| RpxDigestError::TypeConversion("u8"))?,
         ])
@@ -209,19 +210,19 @@ impl TryFrom<RpxDigest> for [u16; DIGEST_SIZE] {
     fn try_from(value: RpxDigest) -> Result<Self, Self::Error> {
         Ok([
             value.0[0]
-                .as_int()
+                .as_canonical_u64()
                 .try_into()
                 .map_err(|_| RpxDigestError::TypeConversion("u16"))?,
             value.0[1]
-                .as_int()
+                .as_canonical_u64()
                 .try_into()
                 .map_err(|_| RpxDigestError::TypeConversion("u16"))?,
             value.0[2]
-                .as_int()
+                .as_canonical_u64()
                 .try_into()
                 .map_err(|_| RpxDigestError::TypeConversion("u16"))?,
             value.0[3]
-                .as_int()
+                .as_canonical_u64()
                 .try_into()
                 .map_err(|_| RpxDigestError::TypeConversion("u16"))?,
         ])
@@ -242,19 +243,19 @@ impl TryFrom<RpxDigest> for [u32; DIGEST_SIZE] {
     fn try_from(value: RpxDigest) -> Result<Self, Self::Error> {
         Ok([
             value.0[0]
-                .as_int()
+                .as_canonical_u64()
                 .try_into()
                 .map_err(|_| RpxDigestError::TypeConversion("u32"))?,
             value.0[1]
-                .as_int()
+                .as_canonical_u64()
                 .try_into()
                 .map_err(|_| RpxDigestError::TypeConversion("u32"))?,
             value.0[2]
-                .as_int()
+                .as_canonical_u64()
                 .try_into()
                 .map_err(|_| RpxDigestError::TypeConversion("u32"))?,
             value.0[3]
-                .as_int()
+                .as_canonical_u64()
                 .try_into()
                 .map_err(|_| RpxDigestError::TypeConversion("u32"))?,
         ])
@@ -270,10 +271,10 @@ impl From<&RpxDigest> for [u64; DIGEST_SIZE] {
 impl From<RpxDigest> for [u64; DIGEST_SIZE] {
     fn from(value: RpxDigest) -> Self {
         [
-            value.0[0].as_int(),
-            value.0[1].as_int(),
-            value.0[2].as_int(),
-            value.0[3].as_int(),
+            value.0[0].as_canonical_u64(),
+            value.0[1].as_canonical_u64(),
+            value.0[2].as_canonical_u64(),
+            value.0[3].as_canonical_u64(),
         ]
     }
 }
@@ -339,7 +340,8 @@ impl From<&[u8; DIGEST_SIZE]> for RpxDigest {
 
 impl From<[u8; DIGEST_SIZE]> for RpxDigest {
     fn from(value: [u8; DIGEST_SIZE]) -> Self {
-        Self([value[0].into(), value[1].into(), value[2].into(), value[3].into()])
+        
+        Self([Felt::from_u8(value[0]), Felt::from_u8(value[1]), Felt::from_u8(value[2]), Felt::from_u8(value[3])])
     }
 }
 
@@ -351,7 +353,8 @@ impl From<&[u16; DIGEST_SIZE]> for RpxDigest {
 
 impl From<[u16; DIGEST_SIZE]> for RpxDigest {
     fn from(value: [u16; DIGEST_SIZE]) -> Self {
-        Self([value[0].into(), value[1].into(), value[2].into(), value[3].into()])
+
+        Self([Felt::from_u16(value[0]), Felt::from_u16(value[1]), Felt::from_u16(value[2]), Felt::from_u16(value[3])])
     }
 }
 
@@ -363,7 +366,7 @@ impl From<&[u32; DIGEST_SIZE]> for RpxDigest {
 
 impl From<[u32; DIGEST_SIZE]> for RpxDigest {
     fn from(value: [u32; DIGEST_SIZE]) -> Self {
-        Self([value[0].into(), value[1].into(), value[2].into(), value[3].into()])
+        Self([Felt::from_u32(value[0]), Felt::from_u32(value[1]), Felt::from_u32(value[2]), Felt::from_u32(value[3])])
     }
 }
 
@@ -380,10 +383,10 @@ impl TryFrom<[u64; DIGEST_SIZE]> for RpxDigest {
 
     fn try_from(value: [u64; DIGEST_SIZE]) -> Result<Self, RpxDigestError> {
         Ok(Self([
-            value[0].try_into().map_err(RpxDigestError::InvalidFieldElement)?,
-            value[1].try_into().map_err(RpxDigestError::InvalidFieldElement)?,
-            value[2].try_into().map_err(RpxDigestError::InvalidFieldElement)?,
-            value[3].try_into().map_err(RpxDigestError::InvalidFieldElement)?,
+            Felt::from_u64(value[0]),
+            Felt::from_u64(value[1]),
+            Felt::from_u64(value[2]),
+            Felt::from_u64(value[3]),
         ]))
     }
 }
@@ -419,11 +422,11 @@ impl TryFrom<[u8; DIGEST_BYTES]> for RpxDigest {
         let c = u64::from_le_bytes(value[16..24].try_into().unwrap());
         let d = u64::from_le_bytes(value[24..32].try_into().unwrap());
 
-        if [a, b, c, d].iter().any(|v| *v >= Felt::MODULUS) {
+        if [a, b, c, d].iter().any(|v| *v >= Felt::ORDER_U64) {
             return Err(HexParseError::OutOfRange);
         }
 
-        Ok(RpxDigest([Felt::new(a), Felt::new(b), Felt::new(c), Felt::new(d)]))
+        Ok(RpxDigest([Felt::from_u64(a), Felt::from_u64(b), Felt::from_u64(c), Felt::from_u64(d)]))
     }
 }
 
@@ -480,12 +483,12 @@ impl Deserializable for RpxDigest {
         let mut inner: [Felt; DIGEST_SIZE] = [ZERO; DIGEST_SIZE];
         for inner in inner.iter_mut() {
             let e = source.read_u64()?;
-            if e >= Felt::MODULUS {
+            if e >= Felt::ORDER_U64 {
                 return Err(DeserializationError::InvalidValue(String::from(
                     "Value not in the appropriate range",
                 )));
             }
-            *inner = Felt::new(e);
+            *inner = Felt::from_u64(e);
         }
 
         Ok(Self(inner))
@@ -510,6 +513,7 @@ impl IntoIterator for RpxDigest {
 mod tests {
     use alloc::string::String;
 
+    use p3_field::PrimeCharacteristicRing;
     use rand_utils::rand_value;
 
     use super::{DIGEST_BYTES, DIGEST_SIZE, Deserializable, Felt, RpxDigest, Serializable};
@@ -517,10 +521,10 @@ mod tests {
 
     #[test]
     fn digest_serialization() {
-        let e1 = Felt::new(rand_value());
-        let e2 = Felt::new(rand_value());
-        let e3 = Felt::new(rand_value());
-        let e4 = Felt::new(rand_value());
+        let e1 = Felt::from_u64(rand_value());
+        let e2 = Felt::from_u64(rand_value());
+        let e3 = Felt::from_u64(rand_value());
+        let e4 = Felt::from_u64(rand_value());
 
         let d1 = RpxDigest([e1, e2, e3, e4]);
 
@@ -538,10 +542,10 @@ mod tests {
     #[test]
     fn digest_encoding() {
         let digest = RpxDigest([
-            Felt::new(rand_value()),
-            Felt::new(rand_value()),
-            Felt::new(rand_value()),
-            Felt::new(rand_value()),
+            Felt::from_u64(rand_value()),
+            Felt::from_u64(rand_value()),
+            Felt::from_u64(rand_value()),
+            Felt::from_u64(rand_value()),
         ]);
 
         let string: String = digest.into();
@@ -553,10 +557,10 @@ mod tests {
     #[test]
     fn test_conversions() {
         let digest = RpxDigest([
-            Felt::new(rand_value()),
-            Felt::new(rand_value()),
-            Felt::new(rand_value()),
-            Felt::new(rand_value()),
+            Felt::from_u64(rand_value()),
+            Felt::from_u64(rand_value()),
+            Felt::from_u64(rand_value()),
+            Felt::from_u64(rand_value()),
         ]);
 
         // BY VALUE

@@ -1,10 +1,8 @@
-use alloc::{string::ToString, vec::Vec};
-
 use rand_core::impls;
-
-use super::{Felt, FeltRng, FieldElement, RandomCoin, RandomCoinError, RngCore, Word, ZERO};
+use p3_field::PrimeField64;
+use super::{Felt, FeltRng, RngCore, Word, ZERO};
 use crate::{
-    hash::rpx::{Rpx256, RpxDigest},
+    hash::rpx::Rpx256,
     utils::{ByteReader, ByteWriter, Deserializable, DeserializationError, Serializable},
 };
 
@@ -82,7 +80,7 @@ impl RpxRandomCoin {
 
 // RANDOM COIN IMPLEMENTATION
 // ------------------------------------------------------------------------------------------------
-
+/*
 impl RandomCoin for RpxRandomCoin {
     type BaseField = Felt;
     type Hasher = Rpx256;
@@ -173,7 +171,7 @@ impl RandomCoin for RpxRandomCoin {
         Ok(values)
     }
 }
-
+ */
 // FELT RNG IMPLEMENTATION
 // ------------------------------------------------------------------------------------------------
 
@@ -196,7 +194,7 @@ impl FeltRng for RpxRandomCoin {
 
 impl RngCore for RpxRandomCoin {
     fn next_u32(&mut self) -> u32 {
-        self.draw_basefield().as_int() as u32
+        self.draw_basefield().as_canonical_u64() as u32
     }
 
     fn next_u64(&mut self) -> u64 {
@@ -213,14 +211,18 @@ impl RngCore for RpxRandomCoin {
 
 impl Serializable for RpxRandomCoin {
     fn write_into<W: ByteWriter>(&self, target: &mut W) {
+        /*
+
         self.state.iter().for_each(|v| v.write_into(target));
         // casting to u8 is OK because `current` is always between 4 and 12.
-        target.write_u8(self.current as u8);
+        target.write_u8(self.current as u8);        
+         */
     }
 }
 
 impl Deserializable for RpxRandomCoin {
     fn read_from<R: ByteReader>(source: &mut R) -> Result<Self, DeserializationError> {
+        /*
         let state = [
             Felt::read_from(source)?,
             Felt::read_from(source)?,
@@ -241,7 +243,9 @@ impl Deserializable for RpxRandomCoin {
                 "current value outside of valid range".to_string(),
             ));
         }
-        Ok(Self { state, current })
+        Ok(Self { state, current }) 
+        */
+        todo!()
     }
 }
 

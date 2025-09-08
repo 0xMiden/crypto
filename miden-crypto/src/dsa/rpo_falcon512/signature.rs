@@ -1,11 +1,13 @@
 use alloc::{string::ToString, vec::Vec};
+use p3_goldilocks::Goldilocks as Felt;
 use core::ops::Deref;
 
 use num::Zero;
+use crate::hash::rpo::Rpo256;
 
 use super::{
-    ByteReader, ByteWriter, Deserializable, DeserializationError, Felt, LOG_N, MODULUS, N, Nonce,
-    Rpo256, SIG_L2_BOUND, SIG_POLY_BYTE_LEN, Serializable, Word,
+    ByteReader, ByteWriter, Deserializable, DeserializationError, LOG_N, MODULUS, N, Nonce,
+    SIG_L2_BOUND, SIG_POLY_BYTE_LEN, Serializable, Word,
     hash_to_point::hash_to_point_rpo256,
     keys::PubKeyPoly,
     math::{FalconFelt, FastFft, Polynomial},

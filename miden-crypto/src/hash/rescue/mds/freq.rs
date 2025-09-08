@@ -159,6 +159,7 @@ const fn block3(x: [i64; 3], y: [i64; 3]) -> [i64; 3] {
 
 #[cfg(test)]
 mod tests {
+    use p3_field::PrimeCharacteristicRing;
     use proptest::prelude::*;
 
     use super::super::{Felt, MDS, ZERO, apply_mds};
@@ -168,8 +169,8 @@ mod tests {
     #[inline(always)]
     fn apply_mds_naive(state: &mut [Felt; STATE_WIDTH]) {
         let mut result = [ZERO; STATE_WIDTH];
-        result.iter_mut().zip(MDS).for_each(|(r, mds_row)| {
-            state.iter().zip(mds_row).for_each(|(&s, m)| {
+        result.iter_mut().zip(MDS.iter()).for_each(|(r, mds_row)| {
+            state.iter().zip(mds_row).for_each(|(&s, &m)| {
                 *r += m * s;
             });
         });
@@ -184,7 +185,7 @@ mod tests {
             let mut v2;
 
             for i in 0..STATE_WIDTH {
-                v1[i] = Felt::new(a[i]);
+                v1[i] = Felt::from_u64(a[i]);
             }
             v2 = v1;
 

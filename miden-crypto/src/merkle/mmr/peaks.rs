@@ -1,6 +1,7 @@
 use alloc::vec::Vec;
 
-use super::{super::ZERO, Felt, MmrError, MmrProof, Rpo256, RpoDigest, Word};
+use super::{super::ZERO, MmrError, MmrProof, Rpo256, RpoDigest, Word};
+use p3_goldilocks::Goldilocks as Felt;
 
 // MMR PEAKS
 // ================================================================================================

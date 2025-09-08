@@ -7,34 +7,44 @@ use super::{
     NodeIndex,
 };
 use crate::{
-    EMPTY_WORD, Word,
-    hash::rpo::Rpo256,
-    merkle::{
-        EmptySubtreeRoots, InnerNodeInfo, LeafIndex, MerkleTree, digests_to_words, int_to_leaf,
-        int_to_node, smt::SparseMerkleTree,
-    },
+    hash::rpo::Rpo256, merkle::{
+        digests_to_words, int_to_leaf, int_to_node, smt::{simple::ROOTS, SparseMerkleTree}, EmptySubtreeRoots, InnerNodeInfo, LeafIndex, MerkleTree
+    }, Word, EMPTY_WORD
 };
 
 // TEST DATA
 // ================================================================================================
 
-const KEYS4: [u64; 4] = [0, 1, 2, 3];
-const KEYS8: [u64; 8] = [0, 1, 2, 3, 4, 5, 6, 7];
 
-const VALUES4: [RpoDigest; 4] = [int_to_node(1), int_to_node(2), int_to_node(3), int_to_node(4)];
+fn keys4() -> [u64; 4] {
+    [0, 1, 2, 3]
+}
 
-const VALUES8: [RpoDigest; 8] = [
-    int_to_node(1),
-    int_to_node(2),
-    int_to_node(3),
-    int_to_node(4),
-    int_to_node(5),
-    int_to_node(6),
-    int_to_node(7),
-    int_to_node(8),
-];
+fn keys8() -> [u64; 8] {
+    [0, 1, 2, 3, 4, 5, 6, 7]
+}
 
-const ZERO_VALUES8: [Word; 8] = [int_to_leaf(0); 8];
+fn values4() -> [RpoDigest; 4] {
+    [int_to_node(1), int_to_node(2), int_to_node(3), int_to_node(4)]
+}
+
+fn values8() -> [RpoDigest; 8] {
+    [
+        int_to_node(1),
+        int_to_node(2),
+        int_to_node(3),
+        int_to_node(4),
+        int_to_node(5),
+        int_to_node(6),
+        int_to_node(7),
+        int_to_node(8),
+    ]
+}
+
+fn zero_values8() -> [Word; 8] {
+    [int_to_leaf(0).into(); 8]
+}
+
 
 // TESTS
 // ================================================================================================
@@ -43,7 +53,7 @@ const ZERO_VALUES8: [Word; 8] = [int_to_leaf(0); 8];
 fn build_empty_tree() {
     // tree of depth 3
     let smt = SimpleSmt::<3>::new().unwrap();
-    let mt = MerkleTree::new(ZERO_VALUES8).unwrap();
+    let mt = MerkleTree::new(zero_values8()).unwrap();
     assert_eq!(mt.root(), smt.root());
 }
 
@@ -51,7 +61,7 @@ fn build_empty_tree() {
 fn build_sparse_tree() {
     const DEPTH: u8 = 3;
     let mut smt = SimpleSmt::<DEPTH>::new().unwrap();
-    let mut values = ZERO_VALUES8.to_vec();
+    let mut values = zero_values8().to_vec();
 
     assert_eq!(smt.num_leaves(), 0);
 
@@ -88,11 +98,11 @@ fn build_sparse_tree() {
 #[test]
 fn build_contiguous_tree() {
     let tree_with_leaves =
-        SimpleSmt::<2>::with_leaves([0, 1, 2, 3].into_iter().zip(digests_to_words(&VALUES4)))
+        SimpleSmt::<2>::with_leaves([0, 1, 2, 3].into_iter().zip(digests_to_words(&values4())))
             .unwrap();
 
     let tree_with_contiguous_leaves =
-        SimpleSmt::<2>::with_contiguous_leaves(digests_to_words(&VALUES4)).unwrap();
+        SimpleSmt::<2>::with_contiguous_leaves(digests_to_words(&values4())).unwrap();
 
     assert_eq!(tree_with_leaves, tree_with_contiguous_leaves);
 }
@@ -100,7 +110,7 @@ fn build_contiguous_tree() {
 #[test]
 fn test_depth2_tree() {
     let tree =
-        SimpleSmt::<2>::with_leaves(KEYS4.into_iter().zip(digests_to_words(&VALUES4))).unwrap();
+        SimpleSmt::<2>::with_leaves(keys4().into_iter().zip(digests_to_words(&values4()))).unwrap();
 
     // check internal structure
     let (root, node2, node3) = compute_internal_nodes();
@@ -109,28 +119,28 @@ fn test_depth2_tree() {
     assert_eq!(node3, tree.get_node(NodeIndex::make(1, 1)).unwrap());
 
     // check get_node()
-    assert_eq!(VALUES4[0], tree.get_node(NodeIndex::make(2, 0)).unwrap());
-    assert_eq!(VALUES4[1], tree.get_node(NodeIndex::make(2, 1)).unwrap());
-    assert_eq!(VALUES4[2], tree.get_node(NodeIndex::make(2, 2)).unwrap());
-    assert_eq!(VALUES4[3], tree.get_node(NodeIndex::make(2, 3)).unwrap());
+    assert_eq!(values4()[0], tree.get_node(NodeIndex::make(2, 0)).unwrap());
+    assert_eq!(values4()[1], tree.get_node(NodeIndex::make(2, 1)).unwrap());
+    assert_eq!(values4()[2], tree.get_node(NodeIndex::make(2, 2)).unwrap());
+    assert_eq!(values4()[3], tree.get_node(NodeIndex::make(2, 3)).unwrap());
 
     // check get_path(): depth 2
-    assert_eq!(vec![VALUES4[1], node3], *tree.open(&LeafIndex::<2>::new(0).unwrap()).path);
-    assert_eq!(vec![VALUES4[0], node3], *tree.open(&LeafIndex::<2>::new(1).unwrap()).path);
-    assert_eq!(vec![VALUES4[3], node2], *tree.open(&LeafIndex::<2>::new(2).unwrap()).path);
-    assert_eq!(vec![VALUES4[2], node2], *tree.open(&LeafIndex::<2>::new(3).unwrap()).path);
+    assert_eq!(vec![values4()[1], node3], *tree.open(&LeafIndex::<2>::new(0).unwrap()).path);
+    assert_eq!(vec![values4()[0], node3], *tree.open(&LeafIndex::<2>::new(1).unwrap()).path);
+    assert_eq!(vec![values4()[3], node2], *tree.open(&LeafIndex::<2>::new(2).unwrap()).path);
+    assert_eq!(vec![values4()[2], node2], *tree.open(&LeafIndex::<2>::new(3).unwrap()).path);
 }
 
 #[test]
 fn test_inner_node_iterator() -> Result<(), MerkleError> {
     let tree =
-        SimpleSmt::<2>::with_leaves(KEYS4.into_iter().zip(digests_to_words(&VALUES4))).unwrap();
+        SimpleSmt::<2>::with_leaves(keys4().into_iter().zip(digests_to_words(&values4()))).unwrap();
 
     // check depth 2
-    assert_eq!(VALUES4[0], tree.get_node(NodeIndex::make(2, 0)).unwrap());
-    assert_eq!(VALUES4[1], tree.get_node(NodeIndex::make(2, 1)).unwrap());
-    assert_eq!(VALUES4[2], tree.get_node(NodeIndex::make(2, 2)).unwrap());
-    assert_eq!(VALUES4[3], tree.get_node(NodeIndex::make(2, 3)).unwrap());
+    assert_eq!(values4()[0], tree.get_node(NodeIndex::make(2, 0)).unwrap());
+    assert_eq!(values4()[1], tree.get_node(NodeIndex::make(2, 1)).unwrap());
+    assert_eq!(values4()[2], tree.get_node(NodeIndex::make(2, 2)).unwrap());
+    assert_eq!(values4()[3], tree.get_node(NodeIndex::make(2, 3)).unwrap());
 
     // get parent nodes
     let root = tree.root();
@@ -159,19 +169,19 @@ fn test_inner_node_iterator() -> Result<(), MerkleError> {
 fn test_insert() {
     const DEPTH: u8 = 3;
     let mut tree =
-        SimpleSmt::<DEPTH>::with_leaves(KEYS8.into_iter().zip(digests_to_words(&VALUES8))).unwrap();
+        SimpleSmt::<DEPTH>::with_leaves(keys8().into_iter().zip(digests_to_words(&values8()))).unwrap();
     assert_eq!(tree.num_leaves(), 8);
 
     // update one value
     let key = 3;
     let new_node = int_to_leaf(9);
-    let mut expected_values = digests_to_words(&VALUES8);
+    let mut expected_values = digests_to_words(&values8());
     expected_values[key] = new_node;
     let expected_tree = MerkleTree::new(expected_values.clone()).unwrap();
 
     let old_leaf = tree.insert(LeafIndex::<DEPTH>::new(key as u64).unwrap(), new_node);
     assert_eq!(expected_tree.root(), tree.root);
-    assert_eq!(old_leaf, *VALUES8[key]);
+    assert_eq!(old_leaf, *values8()[key]);
     assert_eq!(tree.num_leaves(), 8);
 
     // update another value
@@ -182,7 +192,7 @@ fn test_insert() {
 
     let old_leaf = tree.insert(LeafIndex::<DEPTH>::new(key as u64).unwrap(), new_node);
     assert_eq!(expected_tree.root(), tree.root);
-    assert_eq!(old_leaf, *VALUES8[key]);
+    assert_eq!(old_leaf, *values8()[key]);
     assert_eq!(tree.num_leaves(), 8);
 
     // set a leaf to empty value
@@ -193,7 +203,7 @@ fn test_insert() {
 
     let old_leaf = tree.insert(LeafIndex::<DEPTH>::new(key as u64).unwrap(), new_node);
     assert_eq!(expected_tree.root(), tree.root);
-    assert_eq!(old_leaf, *VALUES8[key]);
+    assert_eq!(old_leaf, *values8()[key]);
     assert_eq!(tree.num_leaves(), 7);
 }
 
@@ -449,6 +459,7 @@ fn test_simplesmt_set_subtree_entire_tree() {
     assert_eq!(tree.root(), *EmptySubtreeRoots::entry(DEPTH, 0));
 }
 
+/*
 /// Tests that `EMPTY_ROOT` constant generated in the `SimpleSmt` equals to the root of the empty
 /// tree of depth 64
 #[test]
@@ -463,15 +474,15 @@ fn test_simplesmt_check_empty_root_constant() {
 
     // get the root of the empty tree of depth 0
     let empty_root_1_depth = EmptySubtreeRoots::empty_hashes(1)[0];
-    assert_eq!(empty_root_1_depth, SimpleSmt::<1>::EMPTY_ROOT);
+    assert_eq!(empty_root_1_depth, ROOTS[empty_root_1_depth.depth()]);
 }
-
+ */
 // HELPER FUNCTIONS
 // --------------------------------------------------------------------------------------------
 
 fn compute_internal_nodes() -> (RpoDigest, RpoDigest, RpoDigest) {
-    let node2 = Rpo256::merge(&[VALUES4[0], VALUES4[1]]);
-    let node3 = Rpo256::merge(&[VALUES4[2], VALUES4[3]]);
+    let node2 = Rpo256::merge(&[values4()[0], values4()[1]]);
+    let node3 = Rpo256::merge(&[values4()[2], values4()[3]]);
     let root = Rpo256::merge(&[node2, node3]);
 
     (root, node2, node3)

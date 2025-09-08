@@ -18,7 +18,6 @@ pub(crate) use secret_key::{WIDTH_BIG_POLY_COEFFICIENT, WIDTH_SMALL_POLY_COEFFIC
 mod tests {
     use rand::SeedableRng;
     use rand_chacha::ChaCha20Rng;
-    use winter_math::FieldElement;
     use winter_utils::{Deserializable, Serializable};
 
     use crate::{ONE, Word, dsa::rpo_falcon512::SecretKey};
@@ -46,7 +45,7 @@ mod tests {
         assert!(pk.verify(message, &signature));
 
         // a signature should not verify against a wrong message
-        let message2: Word = [ONE.double(); 4];
+        let message2: Word = [ONE + ONE; 4];
         assert!(!pk.verify(message2, &signature));
 
         // a signature should not verify against a wrong public key

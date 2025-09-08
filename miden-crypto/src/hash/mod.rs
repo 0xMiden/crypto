@@ -1,12 +1,12 @@
 //! Cryptographic hash functions used by the Miden VM and the Miden rollup.
 
-use super::{CubeExtension, Felt, FieldElement, StarkField, ZERO};
+use super::{Felt, ZERO};
 
 pub mod blake;
 
 mod rescue;
 pub mod rpo {
-    pub use super::rescue::{Rpo256, RpoDigest, RpoDigestError};
+    pub use super::rescue::{Rpo256, RpoDigest, RpoDigestError, RpoHasher, RpoChallenger, RpoCompression, RpoPermutation256};
 }
 
 pub mod rpx {

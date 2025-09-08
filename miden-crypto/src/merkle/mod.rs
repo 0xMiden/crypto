@@ -47,13 +47,17 @@ pub use error::MerkleError;
 // ================================================================================================
 
 #[cfg(test)]
-const fn int_to_node(value: u64) -> RpoDigest {
-    RpoDigest::new([Felt::new(value), ZERO, ZERO, ZERO])
+fn int_to_node(value: u64) -> RpoDigest {
+    use p3_field::PrimeCharacteristicRing;
+
+    RpoDigest::new([Felt::from_u64(value), ZERO, ZERO, ZERO])
 }
 
 #[cfg(test)]
-const fn int_to_leaf(value: u64) -> Word {
-    [Felt::new(value), ZERO, ZERO, ZERO]
+fn int_to_leaf(value: u64) -> Word {
+    use p3_field::integers::QuotientMap;
+
+    [Felt::from_int(value), ZERO, ZERO, ZERO]
 }
 
 #[cfg(test)]

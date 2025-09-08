@@ -236,35 +236,40 @@ impl Default for PartialSmt {
 
 #[cfg(test)]
 mod tests {
-
     use assert_matches::assert_matches;
-    use rand_utils::rand_array;
+    use p3_goldilocks::Goldilocks  ;
+    use rand::{distr::StandardUniform, Rng, RngCore, SeedableRng};
+    use rand_chacha::ChaCha20Rng;
 
     use super::*;
     use crate::{EMPTY_WORD, ONE, ZERO};
 
+    fn random_array<T: RngCore>(rng: &mut T) -> [Goldilocks; 4] {
+        rng.sample(StandardUniform)
+    }
     /// Tests that a basic PartialSmt can be built from a full one and that inserting or removing
     /// values whose merkle path were added to the partial SMT results in the same root as the
     /// equivalent update in the full tree.
     #[test]
     fn partial_smt_insert_and_remove() {
-        let key0 = RpoDigest::from(Word::from(rand_array()));
-        let key1 = RpoDigest::from(Word::from(rand_array()));
-        let key2 = RpoDigest::from(Word::from(rand_array()));
+        let mut rng =  ChaCha20Rng::seed_from_u64(0);
+        let key0 = RpoDigest::from(Word::from(random_array(&mut rng)));
+        let key1 = RpoDigest::from(Word::from(random_array(&mut rng)));
+        let key2 = RpoDigest::from(Word::from(random_array(&mut rng)));
         // A key for which we won't add a value so it will be empty.
-        let key_empty = RpoDigest::from(Word::from(rand_array()));
+        let key_empty = RpoDigest::from(Word::from(random_array(&mut rng)));
 
-        let value0 = Word::from(rand_array());
-        let value1 = Word::from(rand_array());
-        let value2 = Word::from(rand_array());
+        let value0 = Word::from(random_array(&mut rng));
+        let value1 = Word::from(random_array(&mut rng));
+        let value2 = Word::from(random_array(&mut rng));
 
         let mut kv_pairs = vec![(key0, value0), (key1, value1), (key2, value2)];
 
         // Add more random leaves.
         kv_pairs.reserve(1000);
         for _ in 0..1000 {
-            let key = RpoDigest::from(Word::from(rand_array()));
-            let value = Word::from(rand_array());
+            let key = RpoDigest::from(Word::from(random_array(&mut rng)));
+            let value = Word::from(random_array(&mut rng));
             kv_pairs.push((key, value));
         }
 
@@ -290,10 +295,10 @@ mod tests {
         // Insert new values for added keys with empty and non-empty values.
         // ----------------------------------------------------------------------------------------
 
-        let new_value0 = Word::from(rand_array());
-        let new_value2 = Word::from(rand_array());
+        let new_value0 = Word::from(random_array(&mut rng));
+        let new_value2 = Word::from(random_array(&mut rng));
         // A non-empty value for the key that was previously empty.
-        let new_value_empty_key = Word::from(rand_array());
+        let new_value_empty_key = Word::from(random_array(&mut rng));
 
         full.insert(key0, new_value0);
         full.insert(key2, new_value2);
@@ -329,7 +334,7 @@ mod tests {
         // Attempting to update a key whose merkle path was not added is an error.
         // ----------------------------------------------------------------------------------------
 
-        let error = partial.clone().insert(key1, Word::from(rand_array())).unwrap_err();
+        let error = partial.clone().insert(key1, Word::from(random_array(&mut rng))).unwrap_err();
         assert_matches!(error, MerkleError::UntrackedKey(_));
 
         let error = partial.insert(key1, EMPTY_WORD).unwrap_err();
@@ -339,14 +344,15 @@ mod tests {
     /// Test that we can add an SmtLeaf::Multiple variant to a partial SMT.
     #[test]
     fn partial_smt_multiple_leaf_success() {
+        let mut rng =  ChaCha20Rng::seed_from_u64(0);
         // key0 and key1 have the same felt at index 3 so they will be placed in the same leaf.
         let key0 = RpoDigest::from(Word::from([ZERO, ZERO, ZERO, ONE]));
         let key1 = RpoDigest::from(Word::from([ONE, ONE, ONE, ONE]));
-        let key2 = RpoDigest::from(Word::from(rand_array()));
+        let key2 = RpoDigest::from(Word::from(random_array(&mut rng)));
 
-        let value0 = Word::from(rand_array());
-        let value1 = Word::from(rand_array());
-        let value2 = Word::from(rand_array());
+        let value0 = Word::from(random_array(&mut rng));
+        let value1 = Word::from(random_array(&mut rng));
+        let value2 = Word::from(random_array(&mut rng));
 
         let full = Smt::with_entries([(key0, value0), (key1, value1), (key2, value2)]).unwrap();
 
@@ -374,12 +380,13 @@ mod tests {
     /// This test uses only empty values in the partial SMT.
     #[test]
     fn partial_smt_root_mismatch_on_empty_values() {
-        let key0 = RpoDigest::from(Word::from(rand_array()));
-        let key1 = RpoDigest::from(Word::from(rand_array()));
-        let key2 = RpoDigest::from(Word::from(rand_array()));
+        let mut rng =  ChaCha20Rng::seed_from_u64(0);
+        let key0 = RpoDigest::from(Word::from(random_array(&mut rng)));
+        let key1 = RpoDigest::from(Word::from(random_array(&mut rng)));
+        let key2 = RpoDigest::from(Word::from(random_array(&mut rng)));
 
         let value0 = EMPTY_WORD;
-        let value1 = Word::from(rand_array());
+        let value1 = Word::from(random_array(&mut rng));
         let value2 = EMPTY_WORD;
 
         let kv_pairs = vec![(key0, value0)];
@@ -407,13 +414,14 @@ mod tests {
     /// This test uses only non-empty values in the partial SMT.
     #[test]
     fn partial_smt_root_mismatch_on_non_empty_values() {
-        let key0 = RpoDigest::from(Word::from(rand_array()));
-        let key1 = RpoDigest::from(Word::from(rand_array()));
-        let key2 = RpoDigest::from(Word::from(rand_array()));
+        let mut rng =  ChaCha20Rng::seed_from_u64(0);
+        let key0 = RpoDigest::from(Word::from(random_array(&mut rng)));
+        let key1 = RpoDigest::from(Word::from(random_array(&mut rng)));
+        let key2 = RpoDigest::from(Word::from(random_array(&mut rng)));
 
-        let value0 = Word::from(rand_array());
-        let value1 = Word::from(rand_array());
-        let value2 = Word::from(rand_array());
+        let value0 = Word::from(random_array(&mut rng));
+        let value1 = Word::from(random_array(&mut rng));
+        let value2 = Word::from(random_array(&mut rng));
 
         let kv_pairs = vec![(key0, value0), (key1, value1)];
 
