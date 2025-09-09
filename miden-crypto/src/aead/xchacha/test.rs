@@ -12,6 +12,48 @@ use super::*;
 
 proptest! {
     #[test]
+    fn test_encryption_decryption_roundtrip(
+        data_len in 1usize..1000,
+    ) {
+        let mut rng = rand::rng();
+        let key = SecretKey::with_rng(&mut rng);
+        let nonce = Nonce::with_rng(&mut rng);
+
+        // Generate random field elements
+        let data: Vec<Felt> = (0..data_len)
+            .map(|_| Felt::new(rng.try_next_u64().unwrap()))
+            .collect();
+
+        let encrypted = key.encrypt_elements_with_nonce(&data, &[], nonce).unwrap();
+        let decrypted = key.decrypt_elements(&encrypted).unwrap();
+
+        prop_assert_eq!(data, decrypted);
+    }
+
+    #[test]
+    fn test_encryption_decryption_with_ad_roundtrip(
+        associated_data_len in 1usize..1000,
+        data_len in 1usize..1000,
+    ) {
+        let mut rng = rand::rng();
+        let key = SecretKey::with_rng(&mut rng);
+        let nonce = Nonce::with_rng(&mut rng);
+
+        // Generate random field elements
+        let associated_data: Vec<Felt> = (0..associated_data_len)
+            .map(|_| Felt::new(rng.try_next_u64().unwrap()))
+            .collect();
+        let data: Vec<Felt> = (0..data_len)
+            .map(|_| Felt::new(rng.try_next_u64().unwrap()))
+            .collect();
+
+        let encrypted = key.encrypt_elements_with_nonce(&data, &associated_data, nonce).unwrap();
+        let decrypted = key.decrypt_elements_with_associated_data(&encrypted, &associated_data).unwrap();
+
+        prop_assert_eq!(data, decrypted);
+    }
+
+    #[test]
     fn test_bytes_encryption_decryption_roundtrip(
         data_len in 0usize..1000,
     ) {

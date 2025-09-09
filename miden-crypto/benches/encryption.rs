@@ -12,16 +12,27 @@ use common::{
     },
 };
 
-benchmark_aead_field!(aead_rpo, "AEAD RPO", bench_aead_rpo_felts, aead_rpo_felts_group);
 benchmark_aead_bytes!(aead_rpo, "AEAD RPO", bench_aead_rpo_bytes, aead_rpo_bytes_group);
+benchmark_aead_field!(aead_rpo, "AEAD RPO", bench_aead_rpo_felts, aead_rpo_felts_group);
 
 benchmark_aead_bytes!(
     xchacha,
     "AEAD XChaCha20-Poly1305",
     bench_aead_xchacha_bytes,
-    aead_xchacha_group
+    aead_xchacha_bytes_group
+);
+benchmark_aead_field!(
+    xchacha,
+    "AEAD XChaCha20-Poly1305",
+    bench_aead_xchacha_felts,
+    aead_xchacha_felts_group
 );
 
 // Running the benchmarks:
 
-criterion_main!(aead_rpo_bytes_group, aead_rpo_felts_group, aead_xchacha_group);
+criterion_main!(
+    aead_rpo_bytes_group,
+    aead_rpo_felts_group,
+    aead_xchacha_bytes_group,
+    aead_xchacha_felts_group
+);

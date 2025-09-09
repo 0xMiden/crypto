@@ -2,6 +2,7 @@
 
 use alloc::{string::String, vec::Vec};
 use core::fmt::{self, Write};
+use winter_math::FieldElement;
 
 use thiserror::Error;
 #[cfg(feature = "std")]
@@ -194,4 +195,50 @@ pub fn padded_elements_to_bytes(felts: &[Felt]) -> Option<Vec<u8>> {
 
     result.extend_from_slice(&felt_bytes[..pos]);
     Some(result)
+}
+
+/// Converts field elements back to their raw byte representation.
+///
+/// Each `Felt` is converted to its full `ELEMENT_BYTES` representation without
+/// any padding removal or validation. This is the inverse of `bytes_to_felts_unchecked`.
+///
+/// # Arguments
+/// * `felts` - Slice of field elements to convert
+///
+/// # Returns
+/// Vector containing the raw bytes from all field elements
+pub fn elements_to_bytes_unchecked(felts: &[Felt]) -> Vec<u8> {
+    let number_felts = felts.len();
+    let mut result = Vec::with_capacity(number_felts * Felt::ELEMENT_BYTES);
+    for felt in felts.iter().take(number_felts) {
+        let felt_bytes = felt.as_int().to_le_bytes();
+        result.extend_from_slice(&felt_bytes);
+    }
+
+    result
+}
+
+/// Converts bytes to field elements without validation.
+///
+/// Assumes the input bytes originated from a vector of `Felt` elements and uses
+/// the full `ELEMENT_BYTES` capacity per field element. This function will panic
+/// if the assumption doesn't hold (e.g., if chunk size doesn't match `ELEMENT_BYTES`).
+///
+/// # Arguments
+/// * `bytes` - Byte slice that must be a multiple of `Felt::ELEMENT_BYTES` in length
+///
+/// # Returns
+/// Vector of `Felt` elements reconstructed from the byte chunks
+///
+/// # Panics
+/// Panics if any chunk cannot be converted to `ELEMENT_BYTES` array
+pub fn bytes_to_elements_unchecked(bytes: &[u8]) -> Vec<Felt> {
+    bytes
+        .chunks(Felt::ELEMENT_BYTES)
+        .map(|chunk| {
+            Felt::new(u64::from_le_bytes(
+                chunk.try_into().expect("should not fail by construction"),
+            ))
+        })
+        .collect()
 }
