@@ -2,7 +2,6 @@
 
 use alloc::{string::String, vec::Vec};
 use core::fmt::{self, Write};
-use winter_math::FieldElement;
 
 use thiserror::Error;
 #[cfg(feature = "std")]
@@ -12,7 +11,7 @@ pub use winter_utils::{
     uninit_vector,
 };
 
-use crate::{Felt, StarkField, Word};
+use crate::{Felt, FieldElement, StarkField, Word};
 
 // CONSTANTS
 // ================================================================================================
