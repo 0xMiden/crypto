@@ -11,7 +11,7 @@ mod test;
 
 /// Implementation of the Poseidon2 hash function with 256-bit output.
 ///
-/// The implementation follows the orignal [specification](https://eprint.iacr.org/2023/323) and
+/// The implementation follows the original [specification](https://eprint.iacr.org/2023/323) and
 /// its accompanying reference [implementation](https://github.com/HorizenLabs/poseidon2).
 ///
 /// The parameters used to instantiate the function are:

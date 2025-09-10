@@ -1,9 +1,14 @@
 [profile.default]
+default-filter = 'not (test(merkle::smt::full::concurrent) or test(merkle::smt::full::large) or binary(rocksdb_large_smt))'
+fail-fast      = false
 failure-output = "immediate-final"
-fail-fast = false
-default-filter = 'not test(merkle::smt::full::concurrent)'
 
 [profile.smt-concurrent]
-failure-output = "immediate-final"
-fail-fast = false
 default-filter = 'test(merkle::smt::full::concurrent)'
+fail-fast      = false
+failure-output = "immediate-final"
+
+[profile.large-smt]
+default-filter = '(test(merkle::smt::full::large) or binary(rocksdb_large_smt))'
+fail-fast      = false
+failure-output = "immediate-final"

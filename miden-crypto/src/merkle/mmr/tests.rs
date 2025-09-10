@@ -30,7 +30,7 @@ fn test_empty_partial_mmr() {
 }
 
 #[test]
-fn test_position_equal_or_higher_than_leafs_is_never_contained() {
+fn test_position_equal_or_higher_than_leaves_is_never_contained() {
     let empty_forest = 0;
     for pos in 1..1024 {
         // pos is index, 0 based

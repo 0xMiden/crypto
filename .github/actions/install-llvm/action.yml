@@ -1,0 +1,43 @@
+name: "Install LLVM"
+description: "Install a specific LLVM/Clang version"
+inputs:
+  version:
+    description: "LLVM major version to install"
+    default: "17"
+
+runs:
+  using: "composite"
+  steps:
+    - shell: bash
+      run: |
+        set -eux
+        CODENAME="$(. /etc/os-release && echo "$UBUNTU_CODENAME")"
+
+        # Add apt.llvm.org repo
+        curl -fsSL https://apt.llvm.org/llvm-snapshot.gpg.key | \
+          sudo gpg --dearmor -o /usr/share/keyrings/llvm-archive-keyring.gpg
+        echo "deb [signed-by=/usr/share/keyrings/llvm-archive-keyring.gpg] \
+          http://apt.llvm.org/${CODENAME}/ llvm-toolchain-${CODENAME}-${{ inputs.version }} main" | \
+          sudo tee /etc/apt/sources.list.d/llvm.list
+
+        sudo apt-get update
+        sudo apt-get install -y \
+          clang-17 \
+          lld-17 \
+          llvm-17-dev \
+          libclang-17-dev
+
+        sudo ln -sf /usr/lib/llvm-${{ inputs.version }}/lib/libclang-${{ inputs.version }}.so \
+                    /usr/lib/llvm-${{ inputs.version }}/lib/libclang.so
+
+        echo "/usr/lib/llvm-${{ inputs.version }}/lib" | \
+          sudo tee /etc/ld.so.conf.d/llvm-${{ inputs.version }}.conf
+        sudo ldconfig
+
+        # Env for build scripts & tools
+        echo "LIBCLANG_PATH=/usr/lib/llvm-${{ inputs.version }}/lib" >> "$GITHUB_ENV"
+        echo "LIBRARY_PATH=/usr/lib/llvm-${{ inputs.version }}/lib:${LIBRARY_PATH:-}" >> "$GITHUB_ENV"
+        echo "LD_LIBRARY_PATH=/usr/lib/llvm-${{ inputs.version }}/lib:${LD_LIBRARY_PATH:-}" >> "$GITHUB_ENV"
+        echo "/usr/lib/llvm-${{ inputs.version }}/bin" >> "$GITHUB_PATH"
+        echo "CC=clang-${{ inputs.version }}"   >> "$GITHUB_ENV"
+        echo "CXX=clang++-${{ inputs.version }}" >> "$GITHUB_ENV"

@@ -10,8 +10,9 @@ This crate contains cryptographic primitives used in Miden.
 
 ## Authenticated Encryption
 
-[AEAD module](./miden-crypto/src/encryption) provides authenticated encryption with associated data (AEAD) schemes. Currently, this includes:
+[AEAD module](./miden-crypto/src/aead) provides authenticated encryption with associated data (AEAD) schemes. Currently, this includes:
 
+- [AEAD-RPO](https://eprint.iacr.org/2023/1668): a scheme optimized for speed within SNARKs/STARKs. The design is based on the MonkeySpongeWrap construction and uses the RPO (Rescue Prime Optimized) permutation, creating an encryption scheme that is highly efficient when executed within zero-knowledge proof systems.
 - [XChaCha20Poly1305](https://datatracker.ietf.org/doc/html/draft-irtf-cfrg-xchacha): Extended nonce variant of ChaCha20Poly1305 providing both confidentiality and authenticity. This implementation offers significant performance advantages, showing approximately 100x faster encryption/decryption compared to the arithmetization-friendly alternative based on the RPO permutation.
 
 ## Hash
@@ -37,16 +38,36 @@ For performance benchmarks of these hash functions and their comparison to other
 - `PartialMmr`: a partial view of a Merkle mountain range structure.
 - `SimpleSmt`: a Sparse Merkle Tree (with no compaction), mapping 64-bit keys to 4-element values.
 - `Smt`: a Sparse Merkle tree (with compaction at depth 64), mapping 4-element keys to 4-element values.
+- `LargeSmt`: a large-scale Sparse Merkle tree backed by pluggable storage (e.g., [RocksDB](https://github.com/facebook/rocksdb)), optimized for datasets that exceed available memory.
 
 The module also contains additional supporting components such as `NodeIndex`, `MerklePath`, `SparseMerklePath`, and `MerkleError` to assist with tree indexation, opening proofs, and reporting inconsistent arguments/state. `SparseMerklePath` provides a memory-efficient representation for Merkle paths with nodes representing empty subtrees.
+
+### Large Sparse Merkle Tree (LargeSmt)
+
+`LargeSmt` (available only when the `concurrent` feature is enabled) is a sparse Merkle tree for very large key-value sets. It keeps only the upper part of the tree (depths 0–23) in memory for fast access while storing the deeper levels (depths 24–64) in external storage as fixed-size subtrees. This hybrid layout enables scaling beyond RAM limits while maintaining good performance for inserts, updates, and openings.
+
+Key properties:
+- In-memory top: a flat array of inner nodes for depths 0–23.
+- Storage-backed bottom: Lower depths are organized in subtrees and stored via a storage interface. We provide an in-memory implementation and RocksDB backend behind a feature flag.
+- Supports batch construction and mutation sets for efficient batched updates.
+
+When the `rocksdb` feature is enabled, `LargeSmt` can persist the lower subtrees and leaves to disk using [RocksDB](https://github.com/facebook/rocksdb). On reopen, the in-memory top (depths 0–23) is reconstructed from persisted subtree roots. Without `rocksdb`, an in-memory storage implementation is available for testing and smaller datasets.
 
 ## Signatures
 
 [DSA module](./miden-crypto/src/dsa) provides a set of digital signature schemes supported by default in the Miden VM. Currently, these schemes are:
 
+- `ECDSA k256`: Elliptic Curve Digital Signature Algorithm using the `k256` curve (also known as `secp256k1`) using `Keccak` to hash messages. This is a widely adopted signature scheme known for its compact key and signature sizes, making it efficient for storage and transmission.
 - `RPO Falcon512`: a variant of the [Falcon](https://falcon-sign.info/) signature scheme. This variant differs from the standard in that instead of using SHAKE256 hash function in the _hash-to-point_ algorithm we use RPO256. This makes the signature more efficient to verify in Miden VM. Another point of difference is with respect to the signing process, which is deterministic in our case.
 
 For the above signatures, key generation, signing, and signature verification are available for both `std` and `no_std` contexts (see [crate features](#crate-features) below). However, in `no_std` context, the user is responsible for supplying the key generation and signing procedures with a random number generator.
+
+## Key Exchange
+
+[ECDH module](./miden-crypto/src/ecdh) provides elliptic curve key exchange algorithms for secure key agreement. Implementations in this module make use of ephemeral keys for a "sealed box" approach where the sender generates an ephemeral secret key, derives a shared secret with the receiver's static public key, and includes the ephemeral public key alongside the encrypted message. This design enables secure communication without requiring prior interaction between parties.
+Currently, the module includes the following implementations:
+
+- `ECDH k256`: Elliptic Curve Diffie-Hellman key exchange using the `k256` curve (also known as `secp256k1`). 
 
 ## Pseudo-Random Element Generator
 
@@ -72,6 +93,7 @@ This crate can be compiled with the following features:
 - `std` - enabled by default and relies on the Rust standard library.
 - `no_std` does not rely on the Rust standard library and enables compilation to WebAssembly.
 - `hashmaps` - uses hashbrown hashmaps in SMT and Merkle Store implementation which significantly improves performance of updates. Keys ordering in iterators is not guaranteed when this feature is enabled.
+- `rocksdb` - enables the RocksDB-backed storage for `LargeSmt` and related utilities. Implies `concurrent`.
 
 All of these features imply the use of [alloc](https://doc.rust-lang.org/alloc/) to support heap-allocated collections.
 

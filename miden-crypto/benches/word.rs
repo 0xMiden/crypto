@@ -20,7 +20,7 @@
 //! 3. Add to the appropriate benchmark group
 //! 4. Update input size arrays in config.rs if needed
 
-use criterion::{BenchmarkId, Criterion, criterion_group, criterion_main};
+use criterion::{Criterion, criterion_group, criterion_main};
 // Import Word modules
 use miden_crypto::{Felt, Word, word::LexicographicWord};
 

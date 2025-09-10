@@ -248,7 +248,7 @@ impl PartialSmt {
 
     /// Returns an iterator over the [`InnerNode`] and the respective [`NodeIndex`] of the
     /// [`PartialSmt`].
-    pub fn inner_node_indicies(&self) -> impl Iterator<Item = (NodeIndex, InnerNode)> + '_ {
+    pub fn inner_node_indices(&self) -> impl Iterator<Item = (NodeIndex, InnerNode)> + '_ {
         self.0.inner_node_indices()
     }
 

@@ -158,12 +158,12 @@ impl SmtLeaf {
     // ITERATORS
     // ---------------------------------------------------------------------------------------------
 
-    /// Returns the key-value pairs in the leaf
-    pub fn entries(&self) -> Vec<&(Word, Word)> {
+    /// Returns a slice with key-value pairs in the leaf.
+    pub fn entries(&self) -> &[(Word, Word)] {
         match self {
-            SmtLeaf::Empty(_) => Vec::new(),
-            SmtLeaf::Single(kv_pair) => vec![kv_pair],
-            SmtLeaf::Multiple(kv_pairs) => kv_pairs.iter().collect(),
+            SmtLeaf::Empty(_) => &[],
+            SmtLeaf::Single(kv_pair) => core::slice::from_ref(kv_pair),
+            SmtLeaf::Multiple(kv_pairs) => kv_pairs,
         }
     }
 
@@ -194,7 +194,7 @@ impl SmtLeaf {
 
     /// Returns the value associated with `key` in the leaf, or `None` if `key` maps to another
     /// leaf.
-    pub(super) fn get_value(&self, key: &Word) -> Option<Word> {
+    pub(in crate::merkle::smt) fn get_value(&self, key: &Word) -> Option<Word> {
         // Ensure that `key` maps to this leaf
         if self.index() != (*key).into() {
             return None;
@@ -229,7 +229,11 @@ impl SmtLeaf {
     /// # Errors
     /// Returns an error if inserting the key-value pair would exceed [`MAX_LEAF_ENTRIES`] (1024
     /// entries) in the leaf.
-    pub(super) fn insert(&mut self, key: Word, value: Word) -> Result<Option<Word>, SmtLeafError> {
+    pub(in crate::merkle::smt) fn insert(
+        &mut self,
+        key: Word,
+        value: Word,
+    ) -> Result<Option<Word>, SmtLeafError> {
         match self {
             SmtLeaf::Empty(_) => {
                 *self = SmtLeaf::new_single(key, value);
@@ -277,7 +281,7 @@ impl SmtLeaf {
     /// Removes key-value pair from the leaf stored at key; returns the previous value associated
     /// with `key`, if any. Also returns an `is_empty` flag, indicating whether the leaf became
     /// empty, and must be removed from the data structure it is contained in.
-    pub(super) fn remove(&mut self, key: Word) -> (Option<Word>, bool) {
+    pub(in crate::merkle::smt) fn remove(&mut self, key: Word) -> (Option<Word>, bool) {
         match self {
             SmtLeaf::Empty(_) => (None, false),
             SmtLeaf::Single((key_at_leaf, value_at_leaf)) => {

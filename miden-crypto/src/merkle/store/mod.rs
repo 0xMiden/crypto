@@ -72,7 +72,7 @@ pub struct StoreNode {
 ///     assert_eq!(d0, d1, "Both trees have the same leaf at pos {i}");
 /// }
 ///
-/// // The leafs A-B-C-D are the same for both trees, so are their 2 immediate parents
+/// // The leaves A-B-C-D are the same for both trees, so are their 2 immediate parents
 /// for i in 0..4 {
 ///     let idx0 = NodeIndex::new(3, i).unwrap();
 ///     let d0 = store.get_path(ROOT0, idx0).unwrap();
@@ -442,7 +442,7 @@ impl MerkleStore {
 
     /// Merges two elements and adds the resulting node into the store.
     ///
-    /// Merges arbitrary values. They may be leafs, nodes, or a mixture of both.
+    /// Merges arbitrary values. They may be leaves, nodes, or a mixture of both.
     pub fn merge_roots(&mut self, left_root: Word, right_root: Word) -> Result<Word, MerkleError> {
         let parent = Rpo256::merge(&[left_root, right_root]);
         self.nodes.insert(parent, StoreNode { left: left_root, right: right_root });

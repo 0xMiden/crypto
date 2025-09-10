@@ -8,8 +8,18 @@ use crate::{EMPTY_WORD, Felt, Map, Word, hash::rpo::Rpo256};
 
 mod full;
 pub use full::{MAX_LEAF_ENTRIES, SMT_DEPTH, Smt, SmtLeaf, SmtLeafError, SmtProof, SmtProofError};
+
+#[cfg(feature = "concurrent")]
+mod large;
 #[cfg(feature = "internal")]
-pub use full::{SubtreeLeaf, build_subtree_for_bench};
+pub use full::concurrent::{SubtreeLeaf, build_subtree_for_bench};
+#[cfg(feature = "concurrent")]
+pub use large::{
+    LargeSmt, LargeSmtError, MemoryStorage, SmtStorage, StorageUpdateParts, StorageUpdates,
+    Subtree, SubtreeError,
+};
+#[cfg(feature = "rocksdb")]
+pub use large::{RocksDbConfig, RocksDbStorage};
 
 mod simple;
 pub use simple::{SimpleSmt, SimpleSmtProof};
@@ -600,7 +610,7 @@ pub struct MutationSet<const DEPTH: u8, K: Eq + Hash, V> {
     old_root: Word,
     /// The set of nodes that need to be removed or added. The "effective" node at an index is the
     /// Merkle tree's existing node at that index, with the [`NodeMutation`] in this map at that
-    /// index overlayed, if any. Each [`NodeMutation::Addition`] corresponds to a
+    /// index overlaid, if any. Each [`NodeMutation::Addition`] corresponds to a
     /// [`SparseMerkleTree::insert_inner_node()`] call, and each [`NodeMutation::Removal`]
     /// corresponds to a [`SparseMerkleTree::remove_inner_node()`] call.
     node_mutations: NodeMutations,

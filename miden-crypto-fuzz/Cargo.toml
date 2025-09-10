@@ -1,20 +1,23 @@
 [package]
-name = "miden-crypto-fuzz"
-version = "0.0.0"
-publish = false
 edition = "2024"
+name    = "miden-crypto-fuzz"
+publish = false
+version = "0.0.0"
 
 [package.metadata]
 cargo-fuzz = true
 
 [dependencies]
 libfuzzer-sys = "0.4"
-miden-crypto = { path = "../miden-crypto", features = ["concurrent"] }
-rand = { version = "0.9", default-features = false }
+miden-crypto  = { features = ["concurrent"], path = "../miden-crypto" }
+rand          = { default-features = false, version = "0.9" }
 
 [[bin]]
-name = "smt"
-path = "fuzz_targets/smt.rs"
-test = false
-doc = false
 bench = false
+doc   = false
+name  = "smt"
+path  = "fuzz_targets/smt.rs"
+test  = false
+
+[lints]
+workspace = true
