@@ -4,10 +4,7 @@ use alloc::vec::Vec;
 use winter_utils::Serializable;
 
 use crate::{
-    ecdh::K256,
-    ecdh::KeyAgreementScheme,
-    encryption::xchacha::XChaCha,
-    utils::Deserializable,
+    ecdh::K256, ecdh::KeyAgreementScheme, encryption::xchacha::XChaCha, utils::Deserializable,
 };
 
 use super::crypto_box::{CryptoBox, RawSealedMessage};
@@ -16,7 +13,6 @@ use super::message::{CryptoAlgorithm, SealedMessage};
 
 /// A CryptoBox instantiation: K256 + XChaCha20Poly1305
 pub type K256XChaCha20Poly1305 = CryptoBox<K256, XChaCha>;
-
 
 /// Public key for sealing messages to a recipient.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -34,7 +30,8 @@ impl SealingKey {
     ) -> Result<SealedMessage, IntegratedEncryptionSchemeError> {
         match self {
             SealingKey::K256XChaCha20Poly1305(key) => {
-                let raw = K256XChaCha20Poly1305::seal(rng, key, plaintext, associated_data).unwrap();
+                let raw =
+                    K256XChaCha20Poly1305::seal(rng, key, plaintext, associated_data).unwrap();
 
                 let ephemeral = <K256 as KeyAgreementScheme>::EphemeralPublicKey::read_from_bytes(
                     &raw.ephemeral_public_key,

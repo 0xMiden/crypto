@@ -1,7 +1,11 @@
 use alloc::vec::Vec;
 
-use super::{error::IntegratedEncryptionSchemeError, keys::EphemeralPublicKey};
-use crate::utils::{ByteReader, ByteWriter, Deserializable, DeserializationError, Serializable};
+use super::keys::EphemeralPublicKey;
+use crate::{
+    utils::{ByteReader, ByteWriter, Deserializable, DeserializationError, Serializable},
+};
+use super::error::IntegratedEncryptionSchemeError;
+use core::convert::TryFrom;
 
 /// Supported algorithms for IES
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -10,14 +14,29 @@ pub enum CryptoAlgorithm {
     K256XChaCha20Poly1305 = 0,
 }
 
-impl CryptoAlgorithm {
-    pub fn from_u8(value: u8) -> Result<Self, IntegratedEncryptionSchemeError> {
+impl TryFrom<u8> for CryptoAlgorithm {
+    type Error = IntegratedEncryptionSchemeError;
+    fn try_from(value: u8) -> Result<Self, Self::Error> {
         match value {
             0 => Ok(CryptoAlgorithm::K256XChaCha20Poly1305),
             _ => Err(IntegratedEncryptionSchemeError::UnsupportedAlgorithm),
         }
     }
+}
 
+impl From<CryptoAlgorithm> for u8 {
+    fn from(algo: CryptoAlgorithm) -> Self {
+        algo as u8
+    }
+}
+
+impl core::fmt::Display for CryptoAlgorithm {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        write!(f, "{}", self.name())
+    }
+}
+
+impl CryptoAlgorithm {
     pub fn name(self) -> &'static str {
         match self {
             CryptoAlgorithm::K256XChaCha20Poly1305 => "K256+XChaCha20-Poly1305",
@@ -70,8 +89,10 @@ impl Serializable for SealedMessage {
 
 impl Deserializable for SealedMessage {
     fn read_from<R: ByteReader>(source: &mut R) -> Result<Self, DeserializationError> {
-        let algorithm = source.read_u8()?;
-        let algorithm = CryptoAlgorithm::from_u8(algorithm).unwrap();
+        let algorithm = match CryptoAlgorithm::try_from(source.read_u8()?) {
+            Ok(a) => a,
+            Err(_) => return Err(DeserializationError::InvalidValue("Unsupported algorithm".into())),
+        };
 
         let eph_key_len = source.read_usize()?;
         let eph_key_bytes = source.read_vec(eph_key_len)?;
