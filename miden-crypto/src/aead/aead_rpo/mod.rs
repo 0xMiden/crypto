@@ -7,8 +7,7 @@
 //!
 //! \[1\] <https://eprint.iacr.org/2023/1668>
 
-use alloc::string::ToString;
-use alloc::vec::Vec;
+use alloc::{string::ToString, vec::Vec};
 use core::ops::Range;
 
 use num::Integer;
