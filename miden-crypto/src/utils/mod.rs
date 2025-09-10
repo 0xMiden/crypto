@@ -175,8 +175,9 @@ pub fn padded_elements_to_bytes(felts: &[Felt]) -> Option<Vec<u8>> {
 
 /// Converts field elements to raw byte representation.
 ///
-/// Each `Felt` is converted to its full `ELEMENT_BYTES` representation without
-/// any padding removal or validation. This is the inverse of `bytes_to_elements`.
+/// Each `Felt` is converted to its full `ELEMENT_BYTES` representation, in little-endian form
+/// and canonical form, without any padding removal or validation. This is the inverse
+/// of `bytes_to_elements_exact`.
 ///
 /// # Arguments
 /// * `felts` - Slice of field elements to convert
@@ -205,7 +206,7 @@ pub fn elements_to_bytes(felts: &[Felt]) -> Vec<u8> {
 ///
 /// # Returns
 /// `Option<Vec<Felt>>` - Vector of `Felt` elements if all validations pass, or None otherwise
-pub fn bytes_to_elements(bytes: &[u8]) -> Option<Vec<Felt>> {
+pub fn bytes_to_elements_exact(bytes: &[u8]) -> Option<Vec<Felt>> {
     // Check that the length is divisible by ELEMENT_BYTES
     if !bytes.len().is_multiple_of(Felt::ELEMENT_BYTES) {
         return None;

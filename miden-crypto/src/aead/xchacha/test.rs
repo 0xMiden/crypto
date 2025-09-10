@@ -89,7 +89,7 @@ proptest! {
 
 
         let encrypted = key.encrypt_bytes_with_nonce(&data, &associated_data, nonce).unwrap();
-        let decrypted = key.decrypt_bytes_with_associated_data(&encrypted, &associated_data).unwrap();
+        let decrypted = key.decrypt_bytes_with_associated_data_unchecked(&encrypted, &associated_data).unwrap();
 
         prop_assert_eq!(data, decrypted);
     }
@@ -187,7 +187,9 @@ fn test_empty_data_encryption() {
     let associated_data = vec![1; 8];
     let empty_data = vec![];
     let encrypted = key.encrypt_bytes_with_nonce(&empty_data, &associated_data, nonce).unwrap();
-    let decrypted = key.decrypt_bytes_with_associated_data(&encrypted, &associated_data).unwrap();
+    let decrypted = key
+        .decrypt_bytes_with_associated_data_unchecked(&encrypted, &associated_data)
+        .unwrap();
 
     assert_eq!(empty_data, decrypted);
 }
@@ -203,7 +205,9 @@ fn test_single_element_encryption() {
     let associated_data = vec![1; 8];
     let data = vec![42];
     let encrypted = key.encrypt_bytes_with_nonce(&data, &associated_data, nonce).unwrap();
-    let decrypted = key.decrypt_bytes_with_associated_data(&encrypted, &associated_data).unwrap();
+    let decrypted = key
+        .decrypt_bytes_with_associated_data_unchecked(&encrypted, &associated_data)
+        .unwrap();
 
     assert_eq!(data, decrypted);
 }
@@ -221,7 +225,9 @@ fn test_large_data_encryption() {
     let data: Vec<_> = (0..100).collect();
 
     let encrypted = key.encrypt_bytes_with_nonce(&data, &associated_data, nonce).unwrap();
-    let decrypted = key.decrypt_bytes_with_associated_data(&encrypted, &associated_data).unwrap();
+    let decrypted = key
+        .decrypt_bytes_with_associated_data_unchecked(&encrypted, &associated_data)
+        .unwrap();
 
     assert_eq!(data, decrypted);
 }
@@ -239,8 +245,9 @@ fn test_encryption_various_lengths() {
 
         let nonce = Nonce::with_rng(&mut rng);
         let encrypted = key.encrypt_bytes_with_nonce(&data, &associated_data, nonce).unwrap();
-        let decrypted =
-            key.decrypt_bytes_with_associated_data(&encrypted, &associated_data).unwrap();
+        let decrypted = key
+            .decrypt_bytes_with_associated_data_unchecked(&encrypted, &associated_data)
+            .unwrap();
 
         assert_eq!(data, decrypted, "Failed for length {len}");
     }
@@ -283,7 +290,7 @@ fn test_ciphertext_tampering_detection() {
     // Tamper with ciphertext
     encrypted.ciphertext[0] = encrypted.ciphertext[0].wrapping_add(1);
 
-    let result = key.decrypt_bytes_with_associated_data(&encrypted, &associated_data);
+    let result = key.decrypt_bytes_with_associated_data_unchecked(&encrypted, &associated_data);
     assert!(result.is_err());
 }
 
@@ -301,7 +308,7 @@ fn test_wrong_key_detection() {
     let encrypted = key1.encrypt_bytes_with_nonce(&data, &associated_data, nonce).unwrap();
 
     // Try to decrypt with wrong key
-    let result = key2.decrypt_bytes_with_associated_data(&encrypted, &associated_data);
+    let result = key2.decrypt_bytes_with_associated_data_unchecked(&encrypted, &associated_data);
     assert!(result.is_err());
 }
 
@@ -320,7 +327,7 @@ fn test_wrong_nonce_detection() {
 
     // Try to decrypt with wrong nonce
     encrypted.nonce = nonce2;
-    let result = key.decrypt_bytes_with_associated_data(&encrypted, &associated_data);
+    let result = key.decrypt_bytes_with_associated_data_unchecked(&encrypted, &associated_data);
     assert!(result.is_err());
 }
 

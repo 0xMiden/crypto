@@ -24,7 +24,7 @@ use crate::{
     aead::{DataType, EncryptionError},
     utils::{
         ByteReader, ByteWriter, Deserializable, DeserializationError, Serializable,
-        bytes_to_elements, elements_to_bytes,
+        bytes_to_elements_exact, elements_to_bytes,
     },
 };
 
@@ -45,12 +45,12 @@ const SK_SIZE_BYTES: usize = 32;
 /// Encrypted data
 #[derive(Debug, PartialEq, Eq)]
 pub struct EncryptedData {
+    /// Indicates the original format of the data before encryption
+    data_type: DataType,
     /// The encrypted ciphertext, including the authentication tag
     ciphertext: Vec<u8>,
     /// The nonce used during encryption
     nonce: Nonce,
-    /// Indicates the original format of the data before encryption
-    data_type: DataType,
 }
 
 /// A 192-bit nonce
@@ -215,9 +215,25 @@ impl SecretKey {
         self.decrypt_bytes_with_associated_data(encrypted_data, &[])
     }
 
+    /// Decrypts the provided encrypted data given some associated data using this secret key,
+    /// after checking the `DataType` of the encrypted data.
+    pub fn decrypt_bytes_with_associated_data(
+        &self,
+        encrypted_data: &EncryptedData,
+        associated_data: &[u8],
+    ) -> Result<Vec<u8>, EncryptionError> {
+        if encrypted_data.data_type != DataType::Bytes {
+            return Err(EncryptionError::InvalidDataType {
+                expected: DataType::Elements,
+                found: encrypted_data.data_type,
+            });
+        }
+        self.decrypt_bytes_with_associated_data_unchecked(encrypted_data, associated_data)
+    }
+
     /// Decrypts the provided encrypted data given some associated data using
     /// this secret key
-    pub fn decrypt_bytes_with_associated_data(
+    fn decrypt_bytes_with_associated_data_unchecked(
         &self,
         encrypted_data: &EncryptedData,
         associated_data: &[u8],
@@ -260,14 +276,15 @@ impl SecretKey {
         if encrypted_data.data_type != DataType::Elements {
             return Err(EncryptionError::InvalidDataType {
                 expected: DataType::Elements,
-                found: encrypted_data.data_type.clone(),
+                found: encrypted_data.data_type,
             });
         }
 
         let ad_bytes = elements_to_bytes(associated_data);
 
-        let plaintext_bytes = self.decrypt_bytes_with_associated_data(encrypted_data, &ad_bytes)?;
-        match bytes_to_elements(&plaintext_bytes) {
+        let plaintext_bytes =
+            self.decrypt_bytes_with_associated_data_unchecked(encrypted_data, &ad_bytes)?;
+        match bytes_to_elements_exact(&plaintext_bytes) {
             Some(elements) => Ok(elements),
             None => Err(EncryptionError::FailedBytesToElementsConversion),
         }
@@ -332,7 +349,7 @@ impl Serializable for EncryptedData {
 
         target.write_bytes(&self.nonce.inner);
 
-        target.write_u8(self.data_type.clone() as u8);
+        target.write_u8(self.data_type as u8);
     }
 }
 

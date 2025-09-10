@@ -76,10 +76,15 @@ const PADDING_BLOCK: [Felt; RATE_WIDTH] = [ONE, ZERO, ZERO, ZERO, ZERO, ZERO, ZE
 /// Encrypted data with its authentication tag
 #[derive(Debug, PartialEq, Eq)]
 pub struct EncryptedData {
-    ciphertext: Vec<Felt>,
-    auth_tag: AuthTag,
-    nonce: Nonce,
+    /// Indicates the original format of the data before encryption
     data_type: DataType,
+    /// The encrypted ciphertext
+    ciphertext: Vec<Felt>,
+    /// The authentication tag attesting to the integrity of the ciphertext, and the associated
+    /// data if it exists
+    auth_tag: AuthTag,
+    /// The nonce used during encryption
+    nonce: Nonce,
 }
 
 /// An authentication tag represented as 4 field elements
@@ -237,12 +242,28 @@ impl SecretKey {
         self.decrypt_elements_with_associated_data(encrypted_data, &[])
     }
 
+    /// Decrypts the provided encrypted data, given some associated data, using this secret key,
+    /// after checking the `DataType` of the encrypted data.
+    pub fn decrypt_elements_with_associated_data(
+        &self,
+        encrypted_data: &EncryptedData,
+        associated_data: &[Felt],
+    ) -> Result<Vec<Felt>, EncryptionError> {
+        if encrypted_data.data_type != DataType::Elements {
+            return Err(EncryptionError::InvalidDataType {
+                expected: DataType::Elements,
+                found: encrypted_data.data_type,
+            });
+        }
+        self.decrypt_elements_with_associated_data_unchecked(encrypted_data, associated_data)
+    }
+
     /// Decrypts the provided encrypted data, given some associated data, using this secret key.
     ///
     /// Note that if the original data was encrypted as bytes (e.g., using [Self::encrypt_bytes()]
     /// method), the decryption will still succeed but an additional step will need to be taken to
     /// convert the returned field elements into the original bytestring.
-    pub fn decrypt_elements_with_associated_data(
+    fn decrypt_elements_with_associated_data_unchecked(
         &self,
         encrypted_data: &EncryptedData,
         associated_data: &[Felt],
@@ -314,12 +335,13 @@ impl SecretKey {
         if encrypted_data.data_type != DataType::Bytes {
             return Err(EncryptionError::InvalidDataType {
                 expected: DataType::Bytes,
-                found: encrypted_data.data_type.clone(),
+                found: encrypted_data.data_type,
             });
         }
 
         let ad_felt = bytes_to_elements_with_padding(associated_data);
-        let data_felts = self.decrypt_elements_with_associated_data(encrypted_data, &ad_felt)?;
+        let data_felts =
+            self.decrypt_elements_with_associated_data_unchecked(encrypted_data, &ad_felt)?;
 
         match padded_elements_to_bytes(&data_felts) {
             Some(bytes) => Ok(bytes),
@@ -453,7 +475,7 @@ impl Serializable for EncryptedData {
         target.write_many(self.ciphertext.iter().map(Felt::as_int));
         target.write_many(self.nonce.0.iter().map(Felt::as_int));
         target.write_many(self.auth_tag.0.iter().map(Felt::as_int));
-        target.write_u8(self.data_type.clone() as u8);
+        target.write_u8(self.data_type as u8);
     }
 }
 

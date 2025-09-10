@@ -7,7 +7,7 @@ pub mod xchacha;
 
 /// Indicates whether encrypted data originated from field elements or raw bytes.
 #[repr(u8)]
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum DataType {
     Elements,
     Bytes,
