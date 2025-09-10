@@ -173,10 +173,10 @@ pub fn padded_elements_to_bytes(felts: &[Felt]) -> Option<Vec<u8>> {
     Some(result)
 }
 
-/// Converts field elements back to their raw byte representation.
+/// Converts field elements to raw byte representation.
 ///
 /// Each `Felt` is converted to its full `ELEMENT_BYTES` representation without
-/// any padding removal or validation. This is the inverse of `bytes_to_felts_unchecked`.
+/// any padding removal or validation. This is the inverse of `bytes_to_elements`.
 ///
 /// # Arguments
 /// * `felts` - Slice of field elements to convert
