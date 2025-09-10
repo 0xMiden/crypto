@@ -893,7 +893,6 @@ dependencies = [
  "k256",
  "num",
  "num-complex",
- "paste",
  "proptest",
  "rand",
  "rand_chacha",
