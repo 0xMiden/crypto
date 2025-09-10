@@ -5,6 +5,26 @@ use core::fmt;
 pub mod aead_rpo;
 pub mod xchacha;
 
+/// Indicates whether encrypted data originated from field elements or raw bytes.
+#[repr(u8)]
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum DataType {
+    Elements,
+    Bytes,
+}
+
+impl TryFrom<u8> for DataType {
+    type Error = InvalidDataTypeError;
+
+    fn try_from(value: u8) -> Result<Self, Self::Error> {
+        match value {
+            0 => Ok(DataType::Elements),
+            1 => Ok(DataType::Bytes),
+            _ => Err(InvalidDataTypeError { value }),
+        }
+    }
+}
+
 // ERROR TYPES
 // ================================================================================================
 
@@ -17,6 +37,19 @@ pub enum EncryptionError {
     FailedOperation,
     /// Padding is malformed
     MalformedPadding,
+    InvalidDataType {
+        expected: DataType,
+        found: DataType,
+    },
+    InvalidLength {
+        expected_multiple_of: usize,
+        actual: usize,
+    },
+    InvalidFieldElement {
+        position: usize,
+        value: u64,
+    },
+    FailedBytesToElementsConversion,
 }
 
 impl fmt::Display for EncryptionError {
@@ -25,8 +58,37 @@ impl fmt::Display for EncryptionError {
             EncryptionError::InvalidAuthTag => write!(f, "authentication tag verification failed"),
             EncryptionError::FailedOperation => write!(f, "operation failed"),
             EncryptionError::MalformedPadding => write!(f, "malformed padding"),
+            EncryptionError::InvalidDataType { expected, found } => {
+                write!(f, "Invalid data type: expected {expected:?}, found {found:?}")
+            },
+            EncryptionError::InvalidLength { expected_multiple_of, actual } => write!(
+                f,
+                "Invalid length: expected multiple of {expected_multiple_of}, got {actual}"
+            ),
+            EncryptionError::InvalidFieldElement { position, value } => write!(
+                f,
+                "Invalid field element at position {position}: value {value} exceeds field modulus"
+            ),
+            EncryptionError::FailedBytesToElementsConversion => write!(
+                f,
+                "failed to convert bytes, that are supposed to originate from field elements, back to field elements"
+            ),
         }
     }
 }
 
 impl core::error::Error for EncryptionError {}
+
+/// Error type for invalid `DataType` conversions.
+#[derive(Debug, Clone, PartialEq)]
+pub struct InvalidDataTypeError {
+    pub value: u8,
+}
+
+impl fmt::Display for InvalidDataTypeError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "Invalid data type value: (expected 0 for Elements or 1 for Bytes)")
+    }
+}
+
+impl core::error::Error for InvalidDataTypeError {}

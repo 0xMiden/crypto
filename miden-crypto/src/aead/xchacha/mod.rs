@@ -9,6 +9,8 @@
 //! - [`SecretKey`]: A 256-bit secret key for encryption and decryption operations
 //! - [`Nonce`]: A 192-bit nonce that should be sampled randomly per encryption operation
 //! - [`EncryptedData`]: Encrypted data
+
+use alloc::string::ToString;
 use alloc::vec::Vec;
 
 use chacha20poly1305::{
@@ -20,10 +22,10 @@ use zeroize::Zeroize;
 
 use crate::{
     Felt,
-    aead::EncryptionError,
+    aead::{DataType, EncryptionError},
     utils::{
         ByteReader, ByteWriter, Deserializable, DeserializationError, Serializable,
-        bytes_to_elements_unchecked, elements_to_bytes_unchecked,
+        bytes_to_elements, elements_to_bytes,
     },
 };
 
@@ -48,6 +50,8 @@ pub struct EncryptedData {
     ciphertext: Vec<u8>,
     /// The nonce used during encryption
     nonce: Nonce,
+    /// Indicates the original format of the data before encryption
+    data_type: DataType,
 }
 
 /// A 192-bit nonce
@@ -153,7 +157,11 @@ impl SecretKey {
             .encrypt(&nonce.inner, payload)
             .map_err(|_| EncryptionError::FailedOperation)?;
 
-        Ok(EncryptedData { ciphertext, nonce })
+        Ok(EncryptedData {
+            ciphertext,
+            nonce,
+            data_type: DataType::Bytes,
+        })
     }
 
     // ELEMENT ENCRYPTION
@@ -189,10 +197,12 @@ impl SecretKey {
         associated_data: &[Felt],
         nonce: Nonce,
     ) -> Result<EncryptedData, EncryptionError> {
-        let data_bytes = elements_to_bytes_unchecked(data);
-        let ad_bytes = elements_to_bytes_unchecked(associated_data);
+        let data_bytes = elements_to_bytes(data);
+        let ad_bytes = elements_to_bytes(associated_data);
 
-        self.encrypt_bytes_with_nonce(&data_bytes, &ad_bytes, nonce)
+        let mut encrypted_data = self.encrypt_bytes_with_nonce(&data_bytes, &ad_bytes, nonce)?;
+        encrypted_data.data_type = DataType::Elements;
+        Ok(encrypted_data)
     }
 
     // BYTE DECRYPTION
@@ -213,7 +223,7 @@ impl SecretKey {
         encrypted_data: &EncryptedData,
         associated_data: &[u8],
     ) -> Result<Vec<u8>, EncryptionError> {
-        let EncryptedData { ciphertext, nonce } = encrypted_data;
+        let EncryptedData { ciphertext, nonce, data_type: _ } = encrypted_data;
         let payload = chacha20poly1305::aead::Payload { msg: ciphertext, aad: associated_data };
 
         let cipher = XChaCha20Poly1305::new(&self.0.into());
@@ -248,11 +258,20 @@ impl SecretKey {
         encrypted_data: &EncryptedData,
         associated_data: &[Felt],
     ) -> Result<Vec<Felt>, EncryptionError> {
-        let ad_bytes = elements_to_bytes_unchecked(associated_data);
+        if encrypted_data.data_type != DataType::Elements {
+            return Err(EncryptionError::InvalidDataType {
+                expected: DataType::Bytes,
+                found: encrypted_data.data_type.clone(),
+            });
+        }
+
+        let ad_bytes = elements_to_bytes(associated_data);
 
         let plaintext_bytes = self.decrypt_bytes_with_associated_data(encrypted_data, &ad_bytes)?;
-
-        Ok(bytes_to_elements_unchecked(&plaintext_bytes))
+        match bytes_to_elements(&plaintext_bytes) {
+            Some(elements) => Ok(elements),
+            None => Err(EncryptionError::FailedBytesToElementsConversion),
+        }
     }
 }
 
@@ -313,6 +332,8 @@ impl Serializable for EncryptedData {
         target.write_bytes(&self.ciphertext);
 
         target.write_bytes(&self.nonce.inner);
+
+        target.write_u8(self.data_type.clone() as u8);
     }
 }
 
@@ -323,9 +344,15 @@ impl Deserializable for EncryptedData {
 
         let inner: [u8; NONCE_SIZE_BYTES] = source.read_array()?;
 
+        let data_type_value: u8 = source.read_u8()?;
+        let data_type = data_type_value.try_into().map_err(|_| {
+            DeserializationError::InvalidValue("invalid data type value".to_string())
+        })?;
+
         Ok(Self {
             ciphertext,
             nonce: Nonce { inner: inner.into() },
+            data_type,
         })
     }
 }

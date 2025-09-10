@@ -15,7 +15,7 @@ use crate::{
     ecdh::{EphemeralPublicKey, SharedSecret},
     utils::{
         ByteReader, ByteWriter, Deserializable, DeserializationError, Serializable,
-        bytes_to_elements,
+        bytes_to_elements_with_padding,
     },
 };
 
@@ -150,7 +150,7 @@ impl SequentialCommit for PublicKey {
     type Commitment = Word;
 
     fn to_elements(&self) -> Vec<Felt> {
-        bytes_to_elements(&self.to_bytes())
+        bytes_to_elements_with_padding(&self.to_bytes())
     }
 }
 
