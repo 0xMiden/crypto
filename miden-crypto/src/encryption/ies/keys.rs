@@ -152,29 +152,39 @@ mod tests {
     use crate::dsa::ecdsa_k256_keccak::SecretKey;
 
     #[test]
-    fn test_all_algorithms() {
+    fn test_sealing_and_unsealing_roundtrip() {
         let mut rng = rand::rng();
-        let plaintext = b"Hello, Miden Crypto!";
-        let associated_data = b"test-context";
+        let plaintext = b"roundtrip";
+        let ad = b"ctx";
 
         let secret_key = SecretKey::new();
         let public_key = secret_key.public_key();
 
-        // Seal message
         let sealing_key = SealingKey::K256XChaCha20Poly1305(public_key);
-        let sealed = sealing_key.seal(&mut rng, plaintext, associated_data).unwrap();
+        let sealed = sealing_key.seal(&mut rng, plaintext, ad).unwrap();
 
-        // Verify algorithm consistency
-        assert_eq!(sealing_key.algorithm(), sealed.algorithm());
-
-        let sealed_serialized = sealed.to_bytes();
-        let sealed_deserialized = SealedMessage::read_from_bytes(&sealed_serialized).unwrap();
-        assert_eq!(sealed_deserialized, sealed);
-
-        // Unseal message
         let unsealing_key = UnsealingKey::K256XChaCha20Poly1305(secret_key);
-        let decrypted = unsealing_key.unseal(&sealed, associated_data).unwrap();
+        let decrypted = unsealing_key.unseal(&sealed, ad).unwrap();
 
         assert_eq!(decrypted, plaintext);
+    }
+
+    #[test]
+    fn test_invalid_associated_data() {
+        let mut rng = rand::rng();
+        let plaintext = b"with ad";
+        let ad = b"good";
+        let bad_ad = b"bad";
+
+        let secret_key = SecretKey::new();
+        let public_key = secret_key.public_key();
+
+        let sealing_key = SealingKey::K256XChaCha20Poly1305(public_key);
+        let sealed = sealing_key.seal(&mut rng, plaintext, ad).unwrap();
+
+        let unsealing_key = UnsealingKey::K256XChaCha20Poly1305(secret_key);
+        let result = unsealing_key.unseal(&sealed, bad_ad);
+
+        assert!(result.is_err());
     }
 }

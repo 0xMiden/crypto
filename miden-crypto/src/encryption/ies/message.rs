@@ -1,10 +1,8 @@
 use alloc::vec::Vec;
 
-use super::keys::EphemeralPublicKey;
-use crate::{
-    utils::{ByteReader, ByteWriter, Deserializable, DeserializationError, Serializable},
-};
 use super::error::IntegratedEncryptionSchemeError;
+use super::keys::EphemeralPublicKey;
+use crate::utils::{ByteReader, ByteWriter, Deserializable, DeserializationError, Serializable};
 use core::convert::TryFrom;
 
 /// Supported algorithms for IES
@@ -91,7 +89,9 @@ impl Deserializable for SealedMessage {
     fn read_from<R: ByteReader>(source: &mut R) -> Result<Self, DeserializationError> {
         let algorithm = match CryptoAlgorithm::try_from(source.read_u8()?) {
             Ok(a) => a,
-            Err(_) => return Err(DeserializationError::InvalidValue("Unsupported algorithm".into())),
+            Err(_) => {
+                return Err(DeserializationError::InvalidValue("Unsupported algorithm".into()));
+            },
         };
 
         let eph_key_len = source.read_usize()?;
