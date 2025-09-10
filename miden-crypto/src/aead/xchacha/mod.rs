@@ -260,7 +260,7 @@ impl SecretKey {
     ) -> Result<Vec<Felt>, EncryptionError> {
         if encrypted_data.data_type != DataType::Elements {
             return Err(EncryptionError::InvalidDataType {
-                expected: DataType::Bytes,
+                expected: DataType::Elements,
                 found: encrypted_data.data_type.clone(),
             });
         }

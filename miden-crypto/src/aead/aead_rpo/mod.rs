@@ -7,8 +7,9 @@
 //!
 //! \[1\] <https://eprint.iacr.org/2023/1668>
 
+use alloc::string::ToString;
 use alloc::vec::Vec;
-use core::{fmt, ops::Range};
+use core::ops::Range;
 
 use num::Integer;
 use rand::{
@@ -18,6 +19,7 @@ use rand::{
 
 use crate::{
     Felt, ONE, StarkField, Word, ZERO,
+    aead::{DataType, EncryptionError},
     hash::rpo::Rpo256,
     utils::{
         ByteReader, ByteWriter, Deserializable, DeserializationError, Serializable,
@@ -78,6 +80,7 @@ pub struct EncryptedData {
     ciphertext: Vec<Felt>,
     auth_tag: AuthTag,
     nonce: Nonce,
+    data_type: DataType,
 }
 
 /// An authentication tag represented as 4 field elements
@@ -164,7 +167,12 @@ impl SecretKey {
         // Generate authentication tag
         let auth_tag = sponge.squeeze_tag();
 
-        Ok(EncryptedData { ciphertext, auth_tag, nonce })
+        Ok(EncryptedData {
+            ciphertext,
+            auth_tag,
+            nonce,
+            data_type: DataType::Elements,
+        })
     }
 
     // BYTE ENCRYPTION
@@ -210,7 +218,9 @@ impl SecretKey {
         let data_felt = bytes_to_elements_with_padding(data);
         let ad_felt = bytes_to_elements_with_padding(associated_data);
 
-        self.encrypt_elements_with_nonce(&data_felt, &ad_felt, nonce)
+        let mut encrypted_data = self.encrypt_elements_with_nonce(&data_felt, &ad_felt, nonce)?;
+        encrypted_data.data_type = DataType::Bytes;
+        Ok(encrypted_data)
     }
 
     // ELEMENT DECRYPTION
@@ -302,6 +312,13 @@ impl SecretKey {
         encrypted_data: &EncryptedData,
         associated_data: &[u8],
     ) -> Result<Vec<u8>, EncryptionError> {
+        if encrypted_data.data_type != DataType::Bytes {
+            return Err(EncryptionError::InvalidDataType {
+                expected: DataType::Bytes,
+                found: encrypted_data.data_type.clone(),
+            });
+        }
+
         let ad_felt = bytes_to_elements_with_padding(associated_data);
         let data_felts = self.decrypt_elements_with_associated_data(encrypted_data, &ad_felt)?;
 
@@ -437,6 +454,7 @@ impl Serializable for EncryptedData {
         target.write_many(self.ciphertext.iter().map(Felt::as_int));
         target.write_many(self.nonce.0.iter().map(Felt::as_int));
         target.write_many(self.auth_tag.0.iter().map(Felt::as_int));
+        target.write_u8(self.data_type.clone() as u8);
     }
 }
 
@@ -459,42 +477,19 @@ impl Deserializable for EncryptedData {
             .try_into()
             .expect("should not fail given the size of the vector");
 
+        let data_type_value: u8 = source.read_u8()?;
+        let data_type = data_type_value.try_into().map_err(|_| {
+            DeserializationError::InvalidValue("invalid data type value".to_string())
+        })?;
+
         Ok(Self {
             ciphertext,
             nonce: Nonce(nonce),
             auth_tag: AuthTag(tag),
+            data_type,
         })
     }
 }
-
-// ERROR TYPES
-// ================================================================================================
-
-/// Errors that can occur during encryption/decryption operations
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum EncryptionError {
-    /// Authentication tag verification failed
-    InvalidAuthTag,
-    /// Ciphertext length, in field elements, is not a multiple of `RATE_WIDTH`
-    CiphertextLenNotMultipleRate,
-    /// Padding is malformed
-    MalformedPadding,
-}
-
-impl fmt::Display for EncryptionError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            EncryptionError::InvalidAuthTag => write!(f, "authentication tag verification failed"),
-            EncryptionError::CiphertextLenNotMultipleRate => {
-                write!(f, "ciphertext length, in field elements, is not a multiple of `RATE_WIDTH`")
-            },
-            EncryptionError::MalformedPadding => write!(f, "padding is malformed"),
-        }
-    }
-}
-
-#[cfg(feature = "std")]
-impl std::error::Error for EncryptionError {}
 
 //  HELPERS
 // ================================================================================================

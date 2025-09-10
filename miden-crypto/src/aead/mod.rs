@@ -37,18 +37,11 @@ pub enum EncryptionError {
     FailedOperation,
     /// Padding is malformed
     MalformedPadding,
-    InvalidDataType {
-        expected: DataType,
-        found: DataType,
-    },
-    InvalidLength {
-        expected_multiple_of: usize,
-        actual: usize,
-    },
-    InvalidFieldElement {
-        position: usize,
-        value: u64,
-    },
+    /// Ciphertext length, in field elements, is not a multiple of `RATE_WIDTH`
+    CiphertextLenNotMultipleRate,
+    /// Wrong decryption method used for the given data type
+    InvalidDataType { expected: DataType, found: DataType },
+    /// Failed to convert a sequence of bytes, supposed to originate from a sequence of field elements
     FailedBytesToElementsConversion,
 }
 
@@ -58,17 +51,12 @@ impl fmt::Display for EncryptionError {
             EncryptionError::InvalidAuthTag => write!(f, "authentication tag verification failed"),
             EncryptionError::FailedOperation => write!(f, "operation failed"),
             EncryptionError::MalformedPadding => write!(f, "malformed padding"),
+            EncryptionError::CiphertextLenNotMultipleRate => {
+                write!(f, "ciphertext length, in field elements, is not a multiple of `RATE_WIDTH`")
+            },
             EncryptionError::InvalidDataType { expected, found } => {
                 write!(f, "Invalid data type: expected {expected:?}, found {found:?}")
             },
-            EncryptionError::InvalidLength { expected_multiple_of, actual } => write!(
-                f,
-                "Invalid length: expected multiple of {expected_multiple_of}, got {actual}"
-            ),
-            EncryptionError::InvalidFieldElement { position, value } => write!(
-                f,
-                "Invalid field element at position {position}: value {value} exceeds field modulus"
-            ),
             EncryptionError::FailedBytesToElementsConversion => write!(
                 f,
                 "failed to convert bytes, that are supposed to originate from field elements, back to field elements"
