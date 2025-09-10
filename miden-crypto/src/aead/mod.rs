@@ -9,8 +9,8 @@ pub mod xchacha;
 #[repr(u8)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum DataType {
-    Elements,
-    Bytes,
+    Elements = 0,
+    Bytes = 1,
 }
 
 impl TryFrom<u8> for DataType {
@@ -56,7 +56,7 @@ impl fmt::Display for EncryptionError {
                 write!(f, "ciphertext length, in field elements, is not a multiple of `RATE_WIDTH`")
             },
             EncryptionError::InvalidDataType { expected, found } => {
-                write!(f, "Invalid data type: expected {expected:?}, found {found:?}")
+                write!(f, "invalid data type: expected {expected:?}, found {found:?}")
             },
             EncryptionError::FailedBytesToElementsConversion => write!(
                 f,
@@ -76,7 +76,7 @@ pub struct InvalidDataTypeError {
 
 impl fmt::Display for InvalidDataTypeError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "Invalid data type value: (expected 0 for Elements or 1 for Bytes)")
+        write!(f, "invalid data type value: (expected 0 for Elements or 1 for Bytes)")
     }
 }
 

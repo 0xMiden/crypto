@@ -172,10 +172,10 @@ impl SecretKey {
         let auth_tag = sponge.squeeze_tag();
 
         Ok(EncryptedData {
+            data_type: DataType::Elements,
             ciphertext,
             auth_tag,
             nonce,
-            data_type: DataType::Elements,
         })
     }
 
@@ -232,9 +232,9 @@ impl SecretKey {
 
     /// Decrypts the provided encrypted data using this secret key.
     ///
-    /// Note that if the original data was encrypted as bytes (e.g., using [Self::encrypt_bytes()]
-    /// method), the decryption will still succeed but an additional step will need to be taken to
-    /// convert the returned field elements into the original bytestring.
+    /// # Errors
+    /// Returns an error if decryption fails or if the underlying data was encrypted as bytes
+    /// rather than as field elements.
     pub fn decrypt_elements(
         &self,
         encrypted_data: &EncryptedData,
@@ -242,8 +242,11 @@ impl SecretKey {
         self.decrypt_elements_with_associated_data(encrypted_data, &[])
     }
 
-    /// Decrypts the provided encrypted data, given some associated data, using this secret key,
-    /// after checking the `DataType` of the encrypted data.
+    /// Decrypts the provided encrypted data, given some associated data, using this secret key.
+    ///
+    /// # Errors
+    /// Returns an error if decryption fails or if the underlying data was encrypted as bytes
+    /// rather than as field elements.
     pub fn decrypt_elements_with_associated_data(
         &self,
         encrypted_data: &EncryptedData,
@@ -259,10 +262,6 @@ impl SecretKey {
     }
 
     /// Decrypts the provided encrypted data, given some associated data, using this secret key.
-    ///
-    /// Note that if the original data was encrypted as bytes (e.g., using [Self::encrypt_bytes()]
-    /// method), the decryption will still succeed but an additional step will need to be taken to
-    /// convert the returned field elements into the original bytestring.
     fn decrypt_elements_with_associated_data_unchecked(
         &self,
         encrypted_data: &EncryptedData,
@@ -309,10 +308,9 @@ impl SecretKey {
     /// Decrypts the provided encrypted data, as bytes, using this secret key.
     ///
     ///
-    /// If the original data was a sequence of field elements encrypted with
-    /// [Self::encrypt_elements()] or [Self::encrypt_elements_with_associated_data()], decryption
-    /// may fail. In such cases [Self::decrypt_elements()] or
-    /// [Self::decrypt_elements_with_associated_data()] methods should be used for decryption.
+    /// # Errors
+    /// Returns an error if decryption fails or if the underlying data was encrypted as elements
+    /// rather than as bytes.
     pub fn decrypt_bytes(
         &self,
         encrypted_data: &EncryptedData,
@@ -323,10 +321,9 @@ impl SecretKey {
     /// Decrypts the provided encrypted data, as bytes, given some associated data using this
     /// secret key.
     ///
-    /// If the original data was a sequence of field elements encrypted with
-    /// [Self::encrypt_elements()] or [Self::encrypt_elements_with_associated_data()], decryption
-    /// may fail. In such cases [Self::decrypt_elements()] or
-    /// [Self::decrypt_elements_with_associated_data()] methods should be used for decryption.
+    /// # Errors
+    /// Returns an error if decryption fails or if the underlying data was encrypted as elements
+    /// rather than as bytes.
     pub fn decrypt_bytes_with_associated_data(
         &self,
         encrypted_data: &EncryptedData,
@@ -471,16 +468,21 @@ impl Distribution<Nonce> for StandardUniform {
 impl Serializable for EncryptedData {
     fn write_into<W: ByteWriter>(&self, target: &mut W) {
         // we serialize field elements in their canonical form
+        target.write_u8(self.data_type as u8);
         target.write_usize(self.ciphertext.len());
         target.write_many(self.ciphertext.iter().map(Felt::as_int));
         target.write_many(self.nonce.0.iter().map(Felt::as_int));
         target.write_many(self.auth_tag.0.iter().map(Felt::as_int));
-        target.write_u8(self.data_type as u8);
     }
 }
 
 impl Deserializable for EncryptedData {
     fn read_from<R: ByteReader>(source: &mut R) -> Result<Self, DeserializationError> {
+        let data_type_value: u8 = source.read_u8()?;
+        let data_type = data_type_value.try_into().map_err(|_| {
+            DeserializationError::InvalidValue("invalid data type value".to_string())
+        })?;
+
         let ciphertext_len = source.read_usize()?;
         let ciphertext_bytes = source.read_many(ciphertext_len)?;
         let ciphertext =
@@ -497,11 +499,6 @@ impl Deserializable for EncryptedData {
             .map_err(DeserializationError::InvalidValue)?
             .try_into()
             .expect("should not fail given the size of the vector");
-
-        let data_type_value: u8 = source.read_u8()?;
-        let data_type = data_type_value.try_into().map_err(|_| {
-            DeserializationError::InvalidValue("invalid data type value".to_string())
-        })?;
 
         Ok(Self {
             ciphertext,
