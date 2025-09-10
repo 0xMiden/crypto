@@ -41,7 +41,8 @@ pub enum EncryptionError {
     CiphertextLenNotMultipleRate,
     /// Wrong decryption method used for the given data type
     InvalidDataType { expected: DataType, found: DataType },
-    /// Failed to convert a sequence of bytes, supposed to originate from a sequence of field elements
+    /// Failed to convert a sequence of bytes, supposed to originate from a sequence of field
+    /// elements
     FailedBytesToElementsConversion,
 }
 
