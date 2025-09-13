@@ -1,6 +1,5 @@
 use alloc::collections::BTreeSet;
 
-use crate::ZERO;
 use lazy_static::lazy_static;
 use super::{
     super::ValuePath, EMPTY_WORD, EmptySubtreeRoots, InnerNode, InnerNodeInfo, InnerNodes,

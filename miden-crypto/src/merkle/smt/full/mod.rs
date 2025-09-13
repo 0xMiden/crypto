@@ -1,5 +1,4 @@
-use alloc::{string::ToString, vec::Vec};
-use p3_field::{PrimeCharacteristicRing, PrimeField64};
+use p3_field::PrimeField64;
 
 use super::{
     EMPTY_WORD, EmptySubtreeRoots, Felt, InnerNode, InnerNodeInfo, InnerNodes, LeafIndex,
@@ -490,7 +489,8 @@ impl From<&RpoDigest> for LeafIndex<SMT_DEPTH> {
 // ================================================================================================
 
 impl Serializable for Smt {
-    fn write_into<W: ByteWriter>(&self, target: &mut W) {
+    fn write_into<W: ByteWriter>(&self, _target: &mut W) {
+        // TODO: Implement serialization for plonky3 migration
         /*
         // Write the number of filled leaves for this Smt
         target.write_usize(self.entries().count());
@@ -499,27 +499,27 @@ impl Serializable for Smt {
         for (key, value) in self.entries() {
             target.write(key);
             target.write(value);
-        } 
+        }
         */
-
     }
 
     fn get_size_hint(&self) -> usize {
+        // TODO: Implement size hint for plonky3 migration
         /*
-       
         let entries_count = self.entries().count();
 
         // Each entry is the size of a digest plus a word.
         entries_count.get_size_hint()
-            + entries_count * (RpoDigest::SERIALIZED_SIZE + EMPTY_WORD.get_size_hint())  */
-            todo!()
+            + entries_count * (RpoDigest::SERIALIZED_SIZE + EMPTY_WORD.get_size_hint())
+        */
+        0
     }
 }
 
 impl Deserializable for Smt {
-    fn read_from<R: ByteReader>(source: &mut R) -> Result<Self, DeserializationError> {
+    fn read_from<R: ByteReader>(_source: &mut R) -> Result<Self, DeserializationError> {
+        // TODO: Implement deserialization for plonky3 migration
         /*
-      
         // Read the number of filled leaves for this Smt
         let num_filled_leaves = source.read_usize()?;
         let mut entries = Vec::with_capacity(num_filled_leaves);
@@ -531,9 +531,8 @@ impl Deserializable for Smt {
         }
 
         Self::with_entries(entries)
-            .map_err(|err| DeserializationError::InvalidValue(err.to_string()))  
-         */
-
+            .map_err(|err| DeserializationError::InvalidValue(err.to_string()))
+        */
         todo!()
     }
 }
@@ -562,6 +561,8 @@ impl Smt {
 
 #[test]
 fn test_smt_serialization_deserialization() {
+    use p3_field::PrimeCharacteristicRing;
+
     // Smt for default types (empty map)
     let smt_default = Smt::default();
     let bytes = smt_default.to_bytes();

@@ -40,6 +40,7 @@ proptest! {
 // HELPER FUNCTIONS
 // ================================================================================================
 
+#[allow(dead_code)]
 fn compute_expected_element_hash(elements: &[Felt]) -> blake3::Hash {
     let mut bytes = Vec::new();
     for element in elements.iter() {

@@ -2,7 +2,7 @@ use alloc::{
     collections::{BTreeMap, BTreeSet},
     vec::Vec,
 };
-use p3_field::{PrimeCharacteristicRing, PrimeField64};
+use p3_field::PrimeCharacteristicRing;
 use assert_matches::assert_matches;
 use proptest::prelude::*;
 use rand::{Rng, prelude::IteratorRandom, rng};

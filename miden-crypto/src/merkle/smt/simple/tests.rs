@@ -7,14 +7,16 @@ use super::{
     NodeIndex,
 };
 use crate::{
-    hash::rpo::Rpo256, merkle::{
-        digests_to_words, int_to_leaf, int_to_node, smt::{simple::ROOTS, SparseMerkleTree}, EmptySubtreeRoots, InnerNodeInfo, LeafIndex, MerkleTree
-    }, Word, EMPTY_WORD
+    EMPTY_WORD, Word,
+    hash::rpo::Rpo256,
+    merkle::{
+        EmptySubtreeRoots, InnerNodeInfo, LeafIndex, MerkleTree, digests_to_words, int_to_leaf,
+        int_to_node, smt::SparseMerkleTree,
+    },
 };
 
 // TEST DATA
 // ================================================================================================
-
 
 fn keys4() -> [u64; 4] {
     [0, 1, 2, 3]
@@ -44,7 +46,6 @@ fn values8() -> [RpoDigest; 8] {
 fn zero_values8() -> [Word; 8] {
     [int_to_leaf(0).into(); 8]
 }
-
 
 // TESTS
 // ================================================================================================
@@ -169,7 +170,8 @@ fn test_inner_node_iterator() -> Result<(), MerkleError> {
 fn test_insert() {
     const DEPTH: u8 = 3;
     let mut tree =
-        SimpleSmt::<DEPTH>::with_leaves(keys8().into_iter().zip(digests_to_words(&values8()))).unwrap();
+        SimpleSmt::<DEPTH>::with_leaves(keys8().into_iter().zip(digests_to_words(&values8())))
+            .unwrap();
     assert_eq!(tree.num_leaves(), 8);
 
     // update one value

@@ -210,18 +210,19 @@ impl RngCore for RpxRandomCoin {
 // ------------------------------------------------------------------------------------------------
 
 impl Serializable for RpxRandomCoin {
-    fn write_into<W: ByteWriter>(&self, target: &mut W) {
+    fn write_into<W: ByteWriter>(&self, _target: &mut W) {
+        // TODO: Implement serialization for plonky3 migration
         /*
-
         self.state.iter().for_each(|v| v.write_into(target));
         // casting to u8 is OK because `current` is always between 4 and 12.
-        target.write_u8(self.current as u8);        
-         */
+        target.write_u8(self.current as u8);
+        */
     }
 }
 
 impl Deserializable for RpxRandomCoin {
-    fn read_from<R: ByteReader>(source: &mut R) -> Result<Self, DeserializationError> {
+    fn read_from<R: ByteReader>(_source: &mut R) -> Result<Self, DeserializationError> {
+        // TODO: Implement deserialization for plonky3 migration
         /*
         let state = [
             Felt::read_from(source)?,
@@ -243,7 +244,7 @@ impl Deserializable for RpxRandomCoin {
                 "current value outside of valid range".to_string(),
             ));
         }
-        Ok(Self { state, current }) 
+        Ok(Self { state, current })
         */
         todo!()
     }
