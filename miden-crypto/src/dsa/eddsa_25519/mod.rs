@@ -1,5 +1,4 @@
-use alloc::vec::Vec;
-use std::string::ToString;
+use alloc::{string::ToString, vec::Vec};
 
 use ed25519_dalek::{Signer, Verifier};
 use rand::{CryptoRng, RngCore};
@@ -40,9 +39,10 @@ impl SecretKey {
     pub fn with_rng<R: CryptoRng + RngCore>(rng: &mut R) -> Self {
         let mut seed = [0u8; SECRET_KEY_BYTES];
         rand::RngCore::fill_bytes(rng, &mut seed);
-        let x_inner = x25519_dalek::StaticSecret::from(seed);
-        let keypair = ed25519_dalek::SigningKey::from_bytes(&seed);
-        Self { inner: keypair, inner_x: x_inner }
+
+        let inner = ed25519_dalek::SigningKey::from_bytes(&seed);
+        let inner_x = x25519_dalek::StaticSecret::from(seed);
+        Self { inner, inner_x }
     }
 
     /// Gets the corresponding public key for this secret key.
@@ -126,18 +126,15 @@ impl Signature {
 impl Serializable for SecretKey {
     fn write_into<W: ByteWriter>(&self, target: &mut W) {
         target.write_bytes(&self.inner.to_bytes());
-        target.write_bytes(&self.inner_x.to_bytes());
     }
 }
 
 impl Deserializable for SecretKey {
     fn read_from<R: ByteReader>(source: &mut R) -> Result<Self, DeserializationError> {
         let bytes: [u8; SECRET_KEY_BYTES] = source.read_array()?;
-        let bytes_x = source.read_array()?;
-        Ok(Self {
-            inner: ed25519_dalek::SigningKey::from_bytes(&bytes),
-            inner_x: x25519_dalek::StaticSecret::from(bytes_x),
-        })
+        let inner_x = x25519_dalek::StaticSecret::from(bytes);
+        let inner = ed25519_dalek::SigningKey::from_bytes(&bytes);
+        Ok(Self { inner, inner_x })
     }
 }
 
