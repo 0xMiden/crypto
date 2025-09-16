@@ -166,9 +166,6 @@ const NUM_SUBTREE_LEVELS: usize = 5;
 ///   allow larger batches that maximise I/O throughput instead of fine-grained rollback safety.
 const CONSTRUCTION_SUBTREE_BATCH_SIZE: usize = 10_000;
 
-/// Subtree depths for the subtrees stored in storage
-const SUBTREE_DEPTHS: [u8; 5] = [56, 48, 40, 32, 24];
-
 // TYPES
 // ================================================================================================
 
@@ -203,8 +200,11 @@ pub struct LargeSmt<S: SmtStorage> {
 impl<S: SmtStorage> LargeSmt<S> {
     // CONSTANTS
     // --------------------------------------------------------------------------------------------
-    /// The default value used to compute the hash of empty leaves
+    /// The default value used to compute the hash of empty leaves.
     pub const EMPTY_VALUE: Word = <Self as SparseMerkleTree<SMT_DEPTH>>::EMPTY_VALUE;
+
+    /// Subtree depths for the subtrees stored in storage.
+    pub const SUBTREE_DEPTHS: [u8; 5] = [56, 48, 40, 32, 24];
 
     // CONSTRUCTORS
     // --------------------------------------------------------------------------------------------

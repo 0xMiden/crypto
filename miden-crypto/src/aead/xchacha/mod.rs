@@ -9,7 +9,8 @@
 //! - [`SecretKey`]: A 256-bit secret key for encryption and decryption operations
 //! - [`Nonce`]: A 192-bit nonce that should be sampled randomly per encryption operation
 //! - [`EncryptedData`]: Encrypted data
-use alloc::vec::Vec;
+
+use alloc::{string::ToString, vec::Vec};
 
 use chacha20poly1305::{
     XChaCha20Poly1305,
@@ -19,8 +20,12 @@ use rand::{CryptoRng, RngCore};
 use zeroize::Zeroize;
 
 use crate::{
-    aead::EncryptionError,
-    utils::{ByteReader, ByteWriter, Deserializable, DeserializationError, Serializable},
+    Felt,
+    aead::{DataType, EncryptionError},
+    utils::{
+        ByteReader, ByteWriter, Deserializable, DeserializationError, Serializable,
+        bytes_to_elements_exact, elements_to_bytes,
+    },
 };
 
 #[cfg(test)]
@@ -40,6 +45,8 @@ const SK_SIZE_BYTES: usize = 32;
 /// Encrypted data
 #[derive(Debug, PartialEq, Eq)]
 pub struct EncryptedData {
+    /// Indicates the original format of the data before encryption
+    data_type: DataType,
     /// The encrypted ciphertext, including the authentication tag
     ciphertext: Vec<u8>,
     /// The nonce used during encryption
@@ -149,13 +156,62 @@ impl SecretKey {
             .encrypt(&nonce.inner, payload)
             .map_err(|_| EncryptionError::FailedOperation)?;
 
-        Ok(EncryptedData { ciphertext, nonce })
+        Ok(EncryptedData {
+            data_type: DataType::Bytes,
+            ciphertext,
+            nonce,
+        })
     }
 
-    // DECRYPTION
+    // ELEMENT ENCRYPTION
     // --------------------------------------------------------------------------------------------
 
-    /// Decrypts the provided encrypted data using this secret key
+    /// Encrypts and authenticates the provided sequence of field elements using this secret key
+    /// and a random nonce.
+    #[cfg(feature = "std")]
+    pub fn encrypt_elements(&self, data: &[Felt]) -> Result<EncryptedData, EncryptionError> {
+        self.encrypt_elements_with_associated_data(data, &[])
+    }
+
+    /// Encrypts the provided sequence of field elements and authenticates both the ciphertext as
+    /// well as the provided associated data using this secret key and a random nonce.
+    #[cfg(feature = "std")]
+    pub fn encrypt_elements_with_associated_data(
+        &self,
+        data: &[Felt],
+        associated_data: &[Felt],
+    ) -> Result<EncryptedData, EncryptionError> {
+        use rand::{SeedableRng, rngs::StdRng};
+        let mut rng = StdRng::from_os_rng();
+        let nonce = Nonce::with_rng(&mut rng);
+
+        self.encrypt_elements_with_nonce(data, associated_data, nonce)
+    }
+
+    /// Encrypts the provided sequence of field elements and authenticates both the ciphertext as
+    /// well as the provided associated data using this secret key and the specified nonce.
+    pub fn encrypt_elements_with_nonce(
+        &self,
+        data: &[Felt],
+        associated_data: &[Felt],
+        nonce: Nonce,
+    ) -> Result<EncryptedData, EncryptionError> {
+        let data_bytes = elements_to_bytes(data);
+        let ad_bytes = elements_to_bytes(associated_data);
+
+        let mut encrypted_data = self.encrypt_bytes_with_nonce(&data_bytes, &ad_bytes, nonce)?;
+        encrypted_data.data_type = DataType::Elements;
+        Ok(encrypted_data)
+    }
+
+    // BYTE DECRYPTION
+    // --------------------------------------------------------------------------------------------
+
+    /// Decrypts the provided encrypted data using this secret key.
+    ///
+    /// # Errors
+    /// Returns an error if decryption fails or if the underlying data was encrypted as elements
+    /// rather than as bytes.
     pub fn decrypt_bytes(
         &self,
         encrypted_data: &EncryptedData,
@@ -163,14 +219,32 @@ impl SecretKey {
         self.decrypt_bytes_with_associated_data(encrypted_data, &[])
     }
 
-    /// Decrypts the provided encrypted data given some associated data using
-    /// this secret key
+    /// Decrypts the provided encrypted data given some associated data using this secret key.
+    ///
+    /// # Errors
+    /// Returns an error if decryption fails or if the underlying data was encrypted as elements
+    /// rather than as bytes.
     pub fn decrypt_bytes_with_associated_data(
         &self,
         encrypted_data: &EncryptedData,
         associated_data: &[u8],
     ) -> Result<Vec<u8>, EncryptionError> {
-        let EncryptedData { ciphertext, nonce } = encrypted_data;
+        if encrypted_data.data_type != DataType::Bytes {
+            return Err(EncryptionError::InvalidDataType {
+                expected: DataType::Elements,
+                found: encrypted_data.data_type,
+            });
+        }
+        self.decrypt_bytes_with_associated_data_unchecked(encrypted_data, associated_data)
+    }
+
+    /// Decrypts the provided encrypted data given some associated data using this secret key.
+    fn decrypt_bytes_with_associated_data_unchecked(
+        &self,
+        encrypted_data: &EncryptedData,
+        associated_data: &[u8],
+    ) -> Result<Vec<u8>, EncryptionError> {
+        let EncryptedData { ciphertext, nonce, data_type: _ } = encrypted_data;
         let payload = chacha20poly1305::aead::Payload { msg: ciphertext, aad: associated_data };
 
         let cipher = XChaCha20Poly1305::new(&self.0.into());
@@ -178,6 +252,48 @@ impl SecretKey {
         cipher
             .decrypt(&nonce.inner, payload)
             .map_err(|_| EncryptionError::FailedOperation)
+    }
+
+    // ELEMENT DECRYPTION
+    // --------------------------------------------------------------------------------------------
+
+    /// Decrypts the provided encrypted data using this secret key.
+    ///
+    /// # Errors
+    /// Returns an error if decryption fails or if the underlying data was encrypted as bytes
+    /// rather than as field elements.
+    pub fn decrypt_elements(
+        &self,
+        encrypted_data: &EncryptedData,
+    ) -> Result<Vec<Felt>, EncryptionError> {
+        self.decrypt_elements_with_associated_data(encrypted_data, &[])
+    }
+
+    /// Decrypts the provided encrypted data, given some associated data, using this secret key.
+    ///
+    /// # Errors
+    /// Returns an error if decryption fails or if the underlying data was encrypted as bytes
+    /// rather than as field elements.
+    pub fn decrypt_elements_with_associated_data(
+        &self,
+        encrypted_data: &EncryptedData,
+        associated_data: &[Felt],
+    ) -> Result<Vec<Felt>, EncryptionError> {
+        if encrypted_data.data_type != DataType::Elements {
+            return Err(EncryptionError::InvalidDataType {
+                expected: DataType::Elements,
+                found: encrypted_data.data_type,
+            });
+        }
+
+        let ad_bytes = elements_to_bytes(associated_data);
+
+        let plaintext_bytes =
+            self.decrypt_bytes_with_associated_data_unchecked(encrypted_data, &ad_bytes)?;
+        match bytes_to_elements_exact(&plaintext_bytes) {
+            Some(elements) => Ok(elements),
+            None => Err(EncryptionError::FailedBytesToElementsConversion),
+        }
     }
 }
 
@@ -234,15 +350,20 @@ impl Deserializable for Nonce {
 
 impl Serializable for EncryptedData {
     fn write_into<W: ByteWriter>(&self, target: &mut W) {
+        target.write_u8(self.data_type as u8);
         target.write_usize(self.ciphertext.len());
         target.write_bytes(&self.ciphertext);
-
         target.write_bytes(&self.nonce.inner);
     }
 }
 
 impl Deserializable for EncryptedData {
     fn read_from<R: ByteReader>(source: &mut R) -> Result<Self, DeserializationError> {
+        let data_type_value: u8 = source.read_u8()?;
+        let data_type = data_type_value.try_into().map_err(|_| {
+            DeserializationError::InvalidValue("invalid data type value".to_string())
+        })?;
+
         let ciphertext_len = source.read_usize()?;
         let ciphertext = source.read_vec(ciphertext_len)?;
 
@@ -251,6 +372,7 @@ impl Deserializable for EncryptedData {
         Ok(Self {
             ciphertext,
             nonce: Nonce { inner: inner.into() },
+            data_type,
         })
     }
 }

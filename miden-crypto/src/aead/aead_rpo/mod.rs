@@ -7,8 +7,8 @@
 //!
 //! \[1\] <https://eprint.iacr.org/2023/1668>
 
-use alloc::vec::Vec;
-use core::{fmt, ops::Range};
+use alloc::{string::ToString, vec::Vec};
+use core::ops::Range;
 
 use num::Integer;
 use rand::{
@@ -18,6 +18,7 @@ use rand::{
 
 use crate::{
     Felt, ONE, StarkField, Word, ZERO,
+    aead::{DataType, EncryptionError},
     hash::rpo::Rpo256,
     utils::{
         ByteReader, ByteWriter, Deserializable, DeserializationError, Serializable,
@@ -75,8 +76,14 @@ const PADDING_BLOCK: [Felt; RATE_WIDTH] = [ONE, ZERO, ZERO, ZERO, ZERO, ZERO, ZE
 /// Encrypted data with its authentication tag
 #[derive(Debug, PartialEq, Eq)]
 pub struct EncryptedData {
+    /// Indicates the original format of the data before encryption
+    data_type: DataType,
+    /// The encrypted ciphertext
     ciphertext: Vec<Felt>,
+    /// The authentication tag attesting to the integrity of the ciphertext, and the associated
+    /// data if it exists
     auth_tag: AuthTag,
+    /// The nonce used during encryption
     nonce: Nonce,
 }
 
@@ -164,7 +171,12 @@ impl SecretKey {
         // Generate authentication tag
         let auth_tag = sponge.squeeze_tag();
 
-        Ok(EncryptedData { ciphertext, auth_tag, nonce })
+        Ok(EncryptedData {
+            data_type: DataType::Elements,
+            ciphertext,
+            auth_tag,
+            nonce,
+        })
     }
 
     // BYTE ENCRYPTION
@@ -210,7 +222,9 @@ impl SecretKey {
         let data_felt = bytes_to_elements_with_padding(data);
         let ad_felt = bytes_to_elements_with_padding(associated_data);
 
-        self.encrypt_elements_with_nonce(&data_felt, &ad_felt, nonce)
+        let mut encrypted_data = self.encrypt_elements_with_nonce(&data_felt, &ad_felt, nonce)?;
+        encrypted_data.data_type = DataType::Bytes;
+        Ok(encrypted_data)
     }
 
     // ELEMENT DECRYPTION
@@ -218,9 +232,9 @@ impl SecretKey {
 
     /// Decrypts the provided encrypted data using this secret key.
     ///
-    /// Note that if the original data was encrypted as bytes (e.g., using [Self::encrypt_bytes()]
-    /// method), the decryption will still succeed but an additional step will need to be taken to
-    /// convert the returned field elements into the original bytestring.
+    /// # Errors
+    /// Returns an error if decryption fails or if the underlying data was encrypted as bytes
+    /// rather than as field elements.
     pub fn decrypt_elements(
         &self,
         encrypted_data: &EncryptedData,
@@ -230,10 +244,25 @@ impl SecretKey {
 
     /// Decrypts the provided encrypted data, given some associated data, using this secret key.
     ///
-    /// Note that if the original data was encrypted as bytes (e.g., using [Self::encrypt_bytes()]
-    /// method), the decryption will still succeed but an additional step will need to be taken to
-    /// convert the returned field elements into the original bytestring.
+    /// # Errors
+    /// Returns an error if decryption fails or if the underlying data was encrypted as bytes
+    /// rather than as field elements.
     pub fn decrypt_elements_with_associated_data(
+        &self,
+        encrypted_data: &EncryptedData,
+        associated_data: &[Felt],
+    ) -> Result<Vec<Felt>, EncryptionError> {
+        if encrypted_data.data_type != DataType::Elements {
+            return Err(EncryptionError::InvalidDataType {
+                expected: DataType::Elements,
+                found: encrypted_data.data_type,
+            });
+        }
+        self.decrypt_elements_with_associated_data_unchecked(encrypted_data, associated_data)
+    }
+
+    /// Decrypts the provided encrypted data, given some associated data, using this secret key.
+    fn decrypt_elements_with_associated_data_unchecked(
         &self,
         encrypted_data: &EncryptedData,
         associated_data: &[Felt],
@@ -279,10 +308,9 @@ impl SecretKey {
     /// Decrypts the provided encrypted data, as bytes, using this secret key.
     ///
     ///
-    /// If the original data was a sequence of field elements encrypted with
-    /// [Self::encrypt_elements()] or [Self::encrypt_elements_with_associated_data()], decryption
-    /// may fail. In such cases [Self::decrypt_elements()] or
-    /// [Self::decrypt_elements_with_associated_data()] methods should be used for decryption.
+    /// # Errors
+    /// Returns an error if decryption fails or if the underlying data was encrypted as elements
+    /// rather than as bytes.
     pub fn decrypt_bytes(
         &self,
         encrypted_data: &EncryptedData,
@@ -293,17 +321,24 @@ impl SecretKey {
     /// Decrypts the provided encrypted data, as bytes, given some associated data using this
     /// secret key.
     ///
-    /// If the original data was a sequence of field elements encrypted with
-    /// [Self::encrypt_elements()] or [Self::encrypt_elements_with_associated_data()], decryption
-    /// may fail. In such cases [Self::decrypt_elements()] or
-    /// [Self::decrypt_elements_with_associated_data()] methods should be used for decryption.
+    /// # Errors
+    /// Returns an error if decryption fails or if the underlying data was encrypted as elements
+    /// rather than as bytes.
     pub fn decrypt_bytes_with_associated_data(
         &self,
         encrypted_data: &EncryptedData,
         associated_data: &[u8],
     ) -> Result<Vec<u8>, EncryptionError> {
+        if encrypted_data.data_type != DataType::Bytes {
+            return Err(EncryptionError::InvalidDataType {
+                expected: DataType::Bytes,
+                found: encrypted_data.data_type,
+            });
+        }
+
         let ad_felt = bytes_to_elements_with_padding(associated_data);
-        let data_felts = self.decrypt_elements_with_associated_data(encrypted_data, &ad_felt)?;
+        let data_felts =
+            self.decrypt_elements_with_associated_data_unchecked(encrypted_data, &ad_felt)?;
 
         match padded_elements_to_bytes(&data_felts) {
             Some(bytes) => Ok(bytes),
@@ -433,6 +468,7 @@ impl Distribution<Nonce> for StandardUniform {
 impl Serializable for EncryptedData {
     fn write_into<W: ByteWriter>(&self, target: &mut W) {
         // we serialize field elements in their canonical form
+        target.write_u8(self.data_type as u8);
         target.write_usize(self.ciphertext.len());
         target.write_many(self.ciphertext.iter().map(Felt::as_int));
         target.write_many(self.nonce.0.iter().map(Felt::as_int));
@@ -442,6 +478,11 @@ impl Serializable for EncryptedData {
 
 impl Deserializable for EncryptedData {
     fn read_from<R: ByteReader>(source: &mut R) -> Result<Self, DeserializationError> {
+        let data_type_value: u8 = source.read_u8()?;
+        let data_type = data_type_value.try_into().map_err(|_| {
+            DeserializationError::InvalidValue("invalid data type value".to_string())
+        })?;
+
         let ciphertext_len = source.read_usize()?;
         let ciphertext_bytes = source.read_many(ciphertext_len)?;
         let ciphertext =
@@ -463,38 +504,10 @@ impl Deserializable for EncryptedData {
             ciphertext,
             nonce: Nonce(nonce),
             auth_tag: AuthTag(tag),
+            data_type,
         })
     }
 }
-
-// ERROR TYPES
-// ================================================================================================
-
-/// Errors that can occur during encryption/decryption operations
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum EncryptionError {
-    /// Authentication tag verification failed
-    InvalidAuthTag,
-    /// Ciphertext length, in field elements, is not a multiple of `RATE_WIDTH`
-    CiphertextLenNotMultipleRate,
-    /// Padding is malformed
-    MalformedPadding,
-}
-
-impl fmt::Display for EncryptionError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            EncryptionError::InvalidAuthTag => write!(f, "authentication tag verification failed"),
-            EncryptionError::CiphertextLenNotMultipleRate => {
-                write!(f, "ciphertext length, in field elements, is not a multiple of `RATE_WIDTH`")
-            },
-            EncryptionError::MalformedPadding => write!(f, "padding is malformed"),
-        }
-    }
-}
-
-#[cfg(feature = "std")]
-impl std::error::Error for EncryptionError {}
 
 //  HELPERS
 // ================================================================================================

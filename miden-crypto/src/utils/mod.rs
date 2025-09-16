@@ -11,7 +11,7 @@ pub use winter_utils::{
     uninit_vector,
 };
 
-use crate::{Felt, StarkField, Word};
+use crate::{Felt, FieldElement, StarkField, Word};
 
 // CONSTANTS
 // ================================================================================================
@@ -85,29 +85,6 @@ pub fn hex_to_bytes<const N: usize>(value: &str) -> Result<[u8; N], HexParseErro
     }
 
     Ok(decoded)
-}
-
-/// Converts a byte slice into a vector of field elements.
-///
-/// Packs bytes into chunks of 7 bytes each (the maximum that fits in a `Felt`
-/// without overflow) and converts each chunk to a `Felt` using 0 padding.
-///
-/// # Arguments
-/// * `bytes` - The byte slice to convert
-///
-/// # Returns
-/// A vector of `Felt` elements, where each contains up to 7 bytes from the input
-///
-/// # Example
-/// ```
-/// use miden_crypto::utils::bytes_to_elements;
-///
-/// let data = b"Hello";
-/// let elements = bytes_to_elements(data);
-/// ```
-pub fn bytes_to_elements(bytes: &[u8]) -> Vec<Felt> {
-    // we can pack at most 7 bytes into a `Felt` without overflowing
-    bytes.chunks(BINARY_CHUNK_SIZE).map(Felt::from_bytes_with_padding).collect()
 }
 
 /// Converts a sequence of bytes into vector field elements with padding. This guarantees that no
@@ -193,5 +170,63 @@ pub fn padded_elements_to_bytes(felts: &[Felt]) -> Option<Vec<u8>> {
     let pos = felt_bytes.iter().rposition(|entry| *entry == 1_u8)?;
 
     result.extend_from_slice(&felt_bytes[..pos]);
+    Some(result)
+}
+
+/// Converts field elements to raw byte representation.
+///
+/// Each `Felt` is converted to its full `ELEMENT_BYTES` representation, in little-endian form
+/// and canonical form, without any padding removal or validation. This is the inverse
+/// of `bytes_to_elements_exact`.
+///
+/// # Arguments
+/// * `felts` - Slice of field elements to convert
+///
+/// # Returns
+/// Vector containing the raw bytes from all field elements
+pub fn elements_to_bytes(felts: &[Felt]) -> Vec<u8> {
+    let number_felts = felts.len();
+    let mut result = Vec::with_capacity(number_felts * Felt::ELEMENT_BYTES);
+    for felt in felts.iter().take(number_felts) {
+        let felt_bytes = felt.as_int().to_le_bytes();
+        result.extend_from_slice(&felt_bytes);
+    }
+
+    result
+}
+
+/// Converts bytes to field elements with validation.
+///
+/// This function validates that:
+/// - The input bytes length is divisible by `Felt::ELEMENT_BYTES`
+/// - All `Felt::ELEMENT_BYTES`-byte sequences represent valid field elements
+///
+/// # Arguments
+/// * `bytes` - Byte slice that must be a multiple of `Felt::ELEMENT_BYTES` in length
+///
+/// # Returns
+/// `Option<Vec<Felt>>` - Vector of `Felt` elements if all validations pass, or None otherwise
+pub fn bytes_to_elements_exact(bytes: &[u8]) -> Option<Vec<Felt>> {
+    // Check that the length is divisible by ELEMENT_BYTES
+    if !bytes.len().is_multiple_of(Felt::ELEMENT_BYTES) {
+        return None;
+    }
+
+    let mut result = Vec::with_capacity(bytes.len() / Felt::ELEMENT_BYTES);
+
+    for chunk in bytes.chunks_exact(Felt::ELEMENT_BYTES) {
+        let chunk_array: [u8; Felt::ELEMENT_BYTES] =
+            chunk.try_into().expect("should succeed given the length check above");
+
+        let value = u64::from_le_bytes(chunk_array);
+
+        // Validate that the value represents a valid field element
+        if value >= Felt::MODULUS {
+            return None;
+        }
+
+        result.push(Felt::new(value));
+    }
+
     Some(result)
 }

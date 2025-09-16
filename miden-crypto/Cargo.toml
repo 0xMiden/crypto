@@ -2,7 +2,7 @@
 authors.workspace      = true
 categories.workspace   = true
 description            = "Miden Cryptographic primitives"
-documentation          = "https://docs.rs/miden-crypto/0.17.0"
+documentation          = "https://docs.rs/miden-crypto/0.18.0"
 edition.workspace      = true
 keywords.workspace     = true
 license.workspace      = true
@@ -10,7 +10,7 @@ name                   = "miden-crypto"
 readme                 = "../README.md"
 repository.workspace   = true
 rust-version.workspace = true
-version                = "0.17.0"
+version                = "0.18.0"
 
 [[bin]]
 bench             = false
