@@ -1,9 +1,8 @@
 use alloc::vec::Vec;
-
-use super::error::IntegratedEncryptionSchemeError;
-use super::keys::EphemeralPublicKey;
-use crate::utils::{ByteReader, ByteWriter, Deserializable, DeserializationError, Serializable};
 use core::convert::TryFrom;
+
+use super::{error::IntegratedEncryptionSchemeError, keys::EphemeralPublicKey};
+use crate::utils::{ByteReader, ByteWriter, Deserializable, DeserializationError, Serializable};
 
 /// Supported algorithms for IES
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

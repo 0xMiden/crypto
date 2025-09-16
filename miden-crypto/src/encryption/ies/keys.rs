@@ -1,16 +1,17 @@
 use alloc::vec::Vec;
 
+use rand::{CryptoRng, RngCore};
+
+use super::{
+    crypto_box::{CryptoBox, RawSealedMessage},
+    error::IntegratedEncryptionSchemeError,
+    message::{CryptoAlgorithm, SealedMessage},
+};
 use crate::{
-    ecdh::K256,
-    ecdh::KeyAgreementScheme,
+    ecdh::{K256, KeyAgreementScheme},
     encryption::xchacha::XChaCha,
     utils::{Deserializable, Serializable},
 };
-use rand::{CryptoRng, RngCore};
-
-use super::crypto_box::{CryptoBox, RawSealedMessage};
-use super::error::IntegratedEncryptionSchemeError;
-use super::message::{CryptoAlgorithm, SealedMessage};
 
 /// Instantiation of sealed box using K256 + XChaCha20Poly1305
 type K256XChaCha20Poly1305 = CryptoBox<K256, XChaCha>;

@@ -8,16 +8,16 @@
 //! in raw form.
 
 use alloc::vec::Vec;
+
 use rand::{CryptoRng, RngCore};
 use zeroize::Zeroize;
 
+use super::error::IntegratedEncryptionSchemeError;
 use crate::{
     ecdh::KeyAgreementScheme,
     encryption::AeadScheme,
     utils::{Deserializable, Serializable},
 };
-
-use super::error::IntegratedEncryptionSchemeError;
 
 /// A generic CryptoBox primitive parameterized by key agreement and AEAD schemes
 pub(crate) struct CryptoBox<K: KeyAgreementScheme, A: AeadScheme> {
