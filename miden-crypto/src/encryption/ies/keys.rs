@@ -1,18 +1,19 @@
-use rand::{CryptoRng, RngCore};
-
 use alloc::vec::Vec;
-use winter_utils::Serializable;
 
 use crate::{
-    ecdh::K256, ecdh::KeyAgreementScheme, encryption::xchacha::XChaCha, utils::Deserializable,
+    ecdh::K256,
+    ecdh::KeyAgreementScheme,
+    encryption::xchacha::XChaCha,
+    utils::{Deserializable, Serializable},
 };
+use rand::{CryptoRng, RngCore};
 
 use super::crypto_box::{CryptoBox, RawSealedMessage};
 use super::error::IntegratedEncryptionSchemeError;
 use super::message::{CryptoAlgorithm, SealedMessage};
 
-/// A CryptoBox instantiation: K256 + XChaCha20Poly1305
-pub type K256XChaCha20Poly1305 = CryptoBox<K256, XChaCha>;
+/// Instantiation of sealed box using K256 + XChaCha20Poly1305
+type K256XChaCha20Poly1305 = CryptoBox<K256, XChaCha>;
 
 /// Public key for sealing messages to a recipient.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -29,27 +30,21 @@ impl SealingKey {
         associated_data: &[u8],
     ) -> Result<SealedMessage, IntegratedEncryptionSchemeError> {
         match self {
-            SealingKey::K256XChaCha20Poly1305(key) => {
-                let raw =
-                    K256XChaCha20Poly1305::seal(rng, key, plaintext, associated_data).unwrap();
+            &SealingKey::K256XChaCha20Poly1305(ref key) => {
+                let raw = K256XChaCha20Poly1305::seal(rng, key, plaintext, associated_data)?;
 
                 let ephemeral = <K256 as KeyAgreementScheme>::EphemeralPublicKey::read_from_bytes(
                     &raw.ephemeral_public_key,
                 )
-                .unwrap();
+                .map_err(|_| {
+                    IntegratedEncryptionSchemeError::EphemeralPublicKeyDeserializationFailed
+                })?;
                 Ok(SealedMessage {
                     ephemeral_key: EphemeralPublicKey::K256XChaCha20Poly1305(ephemeral),
                     ciphertext: raw.ciphertext,
                     nonce: raw.nonce,
                 })
             },
-        }
-    }
-
-    /// Get algorithm identifier for this sealing key
-    pub fn algorithm(&self) -> CryptoAlgorithm {
-        match self {
-            SealingKey::K256XChaCha20Poly1305(_) => CryptoAlgorithm::K256XChaCha20Poly1305,
         }
     }
 }
@@ -63,26 +58,24 @@ impl UnsealingKey {
     /// Unseal a sealed message
     pub fn unseal(
         &self,
-        sealed_message: &SealedMessage,
+        sealed_message: SealedMessage,
         associated_data: &[u8],
     ) -> Result<Vec<u8>, IntegratedEncryptionSchemeError> {
-        // Check algorithm compatibility
-        let compatible = match (self, &sealed_message.ephemeral_key) {
-            (
-                UnsealingKey::K256XChaCha20Poly1305(_),
-                EphemeralPublicKey::K256XChaCha20Poly1305(_),
-            ) => true,
-        };
+        // Check algorithm compatibility using constant-time comparison
+        let self_algo = self.algorithm() as u8;
+        let msg_algo = sealed_message.ephemeral_key.algorithm() as u8;
 
+        let compatible = self_algo == msg_algo;
         if !compatible {
             return Err(IntegratedEncryptionSchemeError::AlgorithmMismatch);
         }
 
-        // Convert to internal format and delegate
+        // Destructure and serialize the ephemeral key
+        let SealedMessage { ephemeral_key, ciphertext, nonce } = sealed_message;
         let raw_sealed = RawSealedMessage {
-            ephemeral_public_key: sealed_message.ephemeral_key.to_bytes(),
-            nonce: sealed_message.nonce.clone(),
-            ciphertext: sealed_message.ciphertext.to_vec(),
+            ephemeral_public_key: ephemeral_key.to_bytes(),
+            nonce,
+            ciphertext,
         };
 
         match self {
@@ -93,7 +86,7 @@ impl UnsealingKey {
     }
 
     /// Get algorithm identifier for this secret key
-    pub fn algorithm(&self) -> CryptoAlgorithm {
+    fn algorithm(&self) -> CryptoAlgorithm {
         match self {
             UnsealingKey::K256XChaCha20Poly1305(_) => CryptoAlgorithm::K256XChaCha20Poly1305,
         }
@@ -107,7 +100,7 @@ impl UnsealingKey {
 
 /// Ephemeral public key, part of sealed messages
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum EphemeralPublicKey {
+pub(crate) enum EphemeralPublicKey {
     K256XChaCha20Poly1305(crate::ecdh::EphemeralPublicKey),
 }
 
@@ -117,11 +110,6 @@ impl EphemeralPublicKey {
         match self {
             EphemeralPublicKey::K256XChaCha20Poly1305(_) => CryptoAlgorithm::K256XChaCha20Poly1305,
         }
-    }
-
-    /// Get algorithm name for this ephemeral key
-    pub fn algorithm_name(&self) -> &'static str {
-        self.algorithm().name()
     }
 
     /// Serialize to bytes
@@ -139,7 +127,9 @@ impl EphemeralPublicKey {
         match algorithm {
             CryptoAlgorithm::K256XChaCha20Poly1305 => {
                 let key = <K256 as KeyAgreementScheme>::EphemeralPublicKey::read_from_bytes(bytes)
-                    .unwrap();
+                    .map_err(|_| {
+                        IntegratedEncryptionSchemeError::EphemeralPublicKeyDeserializationFailed
+                    })?;
                 Ok(EphemeralPublicKey::K256XChaCha20Poly1305(key))
             },
         }
@@ -164,7 +154,7 @@ mod tests {
         let sealed = sealing_key.seal(&mut rng, plaintext, ad).unwrap();
 
         let unsealing_key = UnsealingKey::K256XChaCha20Poly1305(secret_key);
-        let decrypted = unsealing_key.unseal(&sealed, ad).unwrap();
+        let decrypted = unsealing_key.unseal(sealed, ad).unwrap();
 
         assert_eq!(decrypted, plaintext);
     }
@@ -183,7 +173,7 @@ mod tests {
         let sealed = sealing_key.seal(&mut rng, plaintext, ad).unwrap();
 
         let unsealing_key = UnsealingKey::K256XChaCha20Poly1305(secret_key);
-        let result = unsealing_key.unseal(&sealed, bad_ad);
+        let result = unsealing_key.unseal(sealed, bad_ad);
 
         assert!(result.is_err());
     }

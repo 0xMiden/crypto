@@ -19,31 +19,30 @@ use crate::{
 
 use super::error::IntegratedEncryptionSchemeError;
 
-/// A generic CryptoBox primitive parameterized by KeyAgreement and AEAD schemes
-pub struct CryptoBox<K: KeyAgreementScheme, A: AeadScheme> {
+/// A generic CryptoBox primitive parameterized by key agreement and AEAD schemes
+pub(crate) struct CryptoBox<K: KeyAgreementScheme, A: AeadScheme> {
     _phantom: core::marker::PhantomData<(K, A)>,
 }
 
 /// Internal raw sealed message representation
 #[derive(Debug)]
-pub struct RawSealedMessage {
+pub(crate) struct RawSealedMessage {
     pub ephemeral_public_key: Vec<u8>,
     pub nonce: Vec<u8>,
     pub ciphertext: Vec<u8>,
 }
 
 impl<K: KeyAgreementScheme, A: AeadScheme> CryptoBox<K, A> {
-    pub fn seal<R: CryptoRng + RngCore>(
+    pub(crate) fn seal<R: CryptoRng + RngCore>(
         rng: &mut R,
         recipient_public_key: &K::PublicKey,
         plaintext: &[u8],
         associated_data: &[u8],
     ) -> Result<RawSealedMessage, IntegratedEncryptionSchemeError> {
-        let (mut ephemeral_private, ephemeral_public) = K::generate_ephemeral_keypair(rng);
+        let (ephemeral_private, ephemeral_public) = K::generate_ephemeral_keypair(rng);
 
-        let mut shared_secret =
-            K::exchange_ephemeral_static(&ephemeral_private, recipient_public_key)
-                .map_err(|_| IntegratedEncryptionSchemeError::KeyAgreementFailed)?;
+        let shared_secret = K::exchange_ephemeral_static(ephemeral_private, recipient_public_key)
+            .map_err(|_| IntegratedEncryptionSchemeError::KeyAgreementFailed)?;
 
         let encryption_key_bytes =
             K::extract_key_material(&shared_secret, <A as AeadScheme>::KEY_SIZE);
@@ -53,8 +52,6 @@ impl<K: KeyAgreementScheme, A: AeadScheme> CryptoBox<K, A> {
         let ciphertext = A::encrypt_bytes(&encryption_key, &nonce, plaintext, associated_data)
             .map_err(|_| IntegratedEncryptionSchemeError::EncryptionFailed)?;
 
-        ephemeral_private.zeroize();
-        shared_secret.zeroize();
         encryption_key.zeroize();
 
         Ok(RawSealedMessage {
@@ -64,7 +61,7 @@ impl<K: KeyAgreementScheme, A: AeadScheme> CryptoBox<K, A> {
         })
     }
 
-    pub fn unseal(
+    pub(crate) fn unseal(
         recipient_private_key: &K::SecretKey,
         sealed_message: &RawSealedMessage,
         associated_data: &[u8],
@@ -74,9 +71,8 @@ impl<K: KeyAgreementScheme, A: AeadScheme> CryptoBox<K, A> {
         )
         .map_err(|_| IntegratedEncryptionSchemeError::EphemeralPublicKeyDeserializationFailed)?;
 
-        let mut shared_secret =
-            K::exchange_static_ephemeral(recipient_private_key, &ephemeral_public)
-                .map_err(|_| IntegratedEncryptionSchemeError::KeyAgreementFailed)?;
+        let shared_secret = K::exchange_static_ephemeral(recipient_private_key, &ephemeral_public)
+            .map_err(|_| IntegratedEncryptionSchemeError::KeyAgreementFailed)?;
 
         let decryption_key_bytes =
             K::extract_key_material(&shared_secret, <A as AeadScheme>::KEY_SIZE);
@@ -88,7 +84,6 @@ impl<K: KeyAgreementScheme, A: AeadScheme> CryptoBox<K, A> {
             A::decrypt_bytes(&decryption_key, &nonce, &sealed_message.ciphertext, associated_data)
                 .map_err(|_| IntegratedEncryptionSchemeError::DecryptionFailed)?;
 
-        shared_secret.zeroize();
         decryption_key.zeroize();
 
         Ok(result)

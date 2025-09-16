@@ -13,6 +13,8 @@ pub enum IntegratedEncryptionSchemeError {
     UnsupportedAlgorithm,
 }
 
+impl std::error::Error for IntegratedEncryptionSchemeError {}
+
 impl fmt::Display for IntegratedEncryptionSchemeError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {

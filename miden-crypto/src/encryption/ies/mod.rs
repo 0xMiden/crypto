@@ -15,7 +15,6 @@ pub mod error;
 pub mod keys;
 pub mod message;
 
-pub use crypto_box::*;
 pub use error::*;
-pub use keys::*;
-pub use message::*;
+pub use keys::{SealingKey, UnsealingKey};
+pub use message::SealedMessage;

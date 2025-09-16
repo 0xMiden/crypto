@@ -17,7 +17,7 @@ use alloc::{string::ToString, vec::Vec};
 use hkdf::{Hkdf, hmac::SimpleHmac};
 use k256::{AffinePoint, FieldBytes, elliptic_curve::sec1::ToEncodedPoint, sha2::Sha256};
 use rand::{CryptoRng, RngCore};
-use zeroize::Zeroize;
+use zeroize::{Zeroize, ZeroizeOnDrop};
 
 use crate::{
     dsa::ecdsa_k256_keccak::{PUBLIC_KEY_BYTES, PublicKey, SecretKey},
@@ -26,9 +26,14 @@ use crate::{
 };
 
 /// A shared secret computed using the ECDH (Elliptic Curve Diffie-Hellman) key agreement.
+///
+/// This type implements `ZeroizeOnDrop` because the inner `k256::ecdh::SharedSecret`
+/// implements it, ensuring the shared secret is securely wiped from memory when dropped.
 pub struct SharedSecret {
     pub(crate) inner: k256::ecdh::SharedSecret,
 }
+
+impl ZeroizeOnDrop for SharedSecret {}
 
 impl SharedSecret {
     pub(crate) fn new(inner: k256::ecdh::SharedSecret) -> SharedSecret {
@@ -61,6 +66,9 @@ impl Zeroize for SharedSecret {
 }
 
 /// Ephemeral secret key for ECDH key agreement over secp256k1 curve.
+///
+/// This type implements `ZeroizeOnDrop` because the inner `k256::ecdh::EphemeralSecret`
+/// implements it, ensuring the secret key material is securely wiped from memory when dropped.
 pub struct EphemeralSecretKey {
     inner: k256::ecdh::EphemeralSecret,
 }
@@ -105,11 +113,7 @@ impl EphemeralSecretKey {
     }
 }
 
-impl Zeroize for EphemeralSecretKey {
-    fn zeroize(&mut self) {
-        self.inner.zeroize();
-    }
-}
+impl ZeroizeOnDrop for EphemeralSecretKey {}
 
 /// Ephemeral public key for ECDH key agreement over secp256k1 curve.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -166,7 +170,7 @@ impl KeyAgreementScheme for K256 {
     }
 
     fn exchange_ephemeral_static(
-        ephemeral_sk: &Self::EphemeralSecretKey,
+        ephemeral_sk: Self::EphemeralSecretKey,
         static_pk: &Self::PublicKey,
     ) -> Result<Self::SharedSecret, super::KeyAgreementError> {
         Ok(ephemeral_sk.diffie_hellman(static_pk.clone()))

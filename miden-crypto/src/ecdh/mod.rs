@@ -2,10 +2,10 @@
 
 use alloc::vec::Vec;
 use core::fmt;
+use zeroize::ZeroizeOnDrop;
 
 use rand::{CryptoRng, RngCore};
 use winter_utils::{Deserializable, Serializable};
-use zeroize::Zeroize;
 
 mod k256;
 pub use k256::{EphemeralPublicKey, EphemeralSecretKey, K256, SharedSecret};
@@ -14,13 +14,13 @@ pub use k256::{EphemeralPublicKey, EphemeralSecretKey, K256, SharedSecret};
 // ================================================================================================
 
 pub trait KeyAgreementScheme {
-    type EphemeralSecretKey: Zeroize;
+    type EphemeralSecretKey: ZeroizeOnDrop;
     type EphemeralPublicKey: Serializable + Deserializable;
 
     type SecretKey;
     type PublicKey: Clone;
 
-    type SharedSecret: Zeroize + AsRef<[u8]>;
+    type SharedSecret: AsRef<[u8]> + ZeroizeOnDrop;
 
     fn generate_ephemeral_keypair<R: CryptoRng + RngCore>(
         rng: &mut R,
@@ -28,7 +28,7 @@ pub trait KeyAgreementScheme {
 
     /// Perform key exchange between ephemeral secret and static public key
     fn exchange_ephemeral_static(
-        ephemeral_sk: &Self::EphemeralSecretKey,
+        ephemeral_sk: Self::EphemeralSecretKey,
         static_pk: &Self::PublicKey,
     ) -> Result<Self::SharedSecret, KeyAgreementError>;
 

@@ -8,7 +8,7 @@ use core::convert::TryFrom;
 /// Supported algorithms for IES
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(u8)]
-pub enum CryptoAlgorithm {
+pub(crate) enum CryptoAlgorithm {
     K256XChaCha20Poly1305 = 0,
 }
 
@@ -46,16 +46,16 @@ impl CryptoAlgorithm {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SealedMessage {
     /// Ephemeral public key (determines algorithm and provides key material)
-    pub ephemeral_key: EphemeralPublicKey,
+    pub(crate) ephemeral_key: EphemeralPublicKey,
     /// Encrypted ciphertext with authentication tag
-    pub ciphertext: Vec<u8>,
+    pub(crate) ciphertext: Vec<u8>,
     /// Nonce used for encryption
-    pub nonce: Vec<u8>,
+    pub(crate) nonce: Vec<u8>,
 }
 
 impl SealedMessage {
     /// Get the algorithm used to create this sealed message
-    pub fn algorithm(&self) -> CryptoAlgorithm {
+    pub(crate) fn algorithm(&self) -> CryptoAlgorithm {
         self.ephemeral_key.algorithm()
     }
 
@@ -96,7 +96,10 @@ impl Deserializable for SealedMessage {
 
         let eph_key_len = source.read_usize()?;
         let eph_key_bytes = source.read_vec(eph_key_len)?;
-        let ephemeral_key = EphemeralPublicKey::from_bytes(algorithm, &eph_key_bytes).unwrap();
+        let ephemeral_key =
+            EphemeralPublicKey::from_bytes(algorithm, &eph_key_bytes).map_err(|e| {
+                DeserializationError::InvalidValue(format!("Invalid ephemeral key: {e}"))
+            })?;
 
         let ciphertext_len = source.read_usize()?;
         let ciphertext = source.read_vec(ciphertext_len)?;
