@@ -26,6 +26,7 @@ impl SharedSecret {
     }
 }
 
+// Safe to derive ZeroizeOnDrop because the inner field already implements it.
 impl ZeroizeOnDrop for SharedSecret {}
 
 impl AsRef<[u8]> for SharedSecret {
