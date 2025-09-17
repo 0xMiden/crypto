@@ -20,7 +20,7 @@ proptest! {
 
         // Generate random bytes
         let mut data = vec![0_u8; data_len];
-        let _ =  rng.try_fill_bytes(&mut data);
+        assert!(rng.try_fill_bytes(&mut data).is_ok());
 
         let encrypted = key.encrypt_with_nonce(&data, &[], nonce).unwrap();
         let decrypted = key.decrypt(&encrypted).unwrap();
@@ -39,10 +39,10 @@ proptest! {
 
         // Generate random bytes
         let mut associated_data = vec![0_u8; associated_data_len];
-        let _ =  rng.try_fill_bytes(&mut associated_data);
+        assert!(rng.try_fill_bytes(&mut associated_data).is_ok());
 
         let mut data = vec![0_u8; data_len];
-        let _ =  rng.try_fill_bytes(&mut data);
+        assert!(rng.try_fill_bytes(&mut data).is_ok());
 
 
         let encrypted = key.encrypt_with_nonce(&data, &associated_data, nonce).unwrap();
@@ -63,7 +63,7 @@ proptest! {
         let key1 = SecretKey::with_rng(&mut rng1);
         let key2 = SecretKey::with_rng(&mut rng2);
         let mut nonce_bytes = [0_u8; 24];
-        let _ = rng2.try_fill_bytes(&mut nonce_bytes);
+        assert!(rng2.try_fill_bytes(&mut nonce_bytes).is_ok());
         let nonce1 = Nonce::from_slice(&nonce_bytes);
         let nonce2 = Nonce::from_slice(&nonce_bytes);
 
@@ -82,9 +82,9 @@ proptest! {
         let mut rng = rand::rng();
         let key = SecretKey::with_rng(&mut rng);
         let mut nonce_bytes = [0_u8; 24];
-        let _ = rng.try_fill_bytes(&mut nonce_bytes);
+        assert!(rng.try_fill_bytes(&mut nonce_bytes).is_ok());
         let nonce1 = Nonce::from_slice(&nonce_bytes);
-        let _ = rng.try_fill_bytes(&mut nonce_bytes);
+        assert!(rng.try_fill_bytes(&mut nonce_bytes).is_ok());
         let nonce2 = Nonce::from_slice(&nonce_bytes);
 
         let encrypted1 = key.encrypt_with_nonce(&data,&associated_data, nonce1).unwrap();

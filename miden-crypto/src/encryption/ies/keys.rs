@@ -148,7 +148,7 @@ mod tests {
         let plaintext = b"roundtrip";
         let ad = b"ctx";
 
-        let secret_key = SecretKey::new();
+        let secret_key = SecretKey::with_rng(&mut rng);
         let public_key = secret_key.public_key();
 
         let sealing_key = SealingKey::K256XChaCha20Poly1305(public_key);
@@ -167,7 +167,7 @@ mod tests {
         let ad = b"good";
         let bad_ad = b"bad";
 
-        let secret_key = SecretKey::new();
+        let secret_key = SecretKey::with_rng(&mut rng);
         let public_key = secret_key.public_key();
 
         let sealing_key = SealingKey::K256XChaCha20Poly1305(public_key);

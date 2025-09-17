@@ -1,10 +1,10 @@
 //! Core cryptographic primitive for Integrated Encryption Scheme (IES).
 //!
-//! This module defines the generic [`CryptoBox`] abstraction that combines a key agreement scheme
+//! This module defines the generic `CryptoBox` abstraction that combines a key agreement scheme
 //! (e.g. K256 ECDH) with an AEAD scheme (e.g. XChaCha20-Poly1305) to provide authenticated
 //! encryption.
 //!
-//! It also defines the [`RawSealedMessage`] which carries ephemeral keys, nonce, and ciphertext
+//! It also defines the `RawSealedMessage` which carries ephemeral keys, nonce, and ciphertext
 //! in raw form.
 
 use alloc::vec::Vec;
