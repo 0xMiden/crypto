@@ -5,7 +5,7 @@
 //! scheme for message encryption.
 //!
 //! The implementation is split across four submodules:
-//! - [`crypto_box`] - Core [`CryptoBox`] primitive & raw message format
+//! - [`crypto_box`] - Core `CryptoBox` primitive & raw message format
 //! - [`keys`] - Public/private key wrappers and sealing/unsealing API
 //! - [`message`] - Sealed message format and algorithm identifiers
 //! - [`error`] - Error types for IES operations
