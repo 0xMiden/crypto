@@ -12,6 +12,7 @@ pub enum IntegratedEncryptionSchemeError {
     AlgorithmMismatch,
     UnsupportedAlgorithm,
     FailedExtractKeyMaterial,
+    EncryptionKeyCreationFailed,
 }
 
 #[cfg(feature = "std")]
@@ -37,6 +38,10 @@ impl fmt::Display for IntegratedEncryptionSchemeError {
             IntegratedEncryptionSchemeError::FailedExtractKeyMaterial => {
                 write!(f, "failed to extract key material for encryption/decryption")
             },
+            IntegratedEncryptionSchemeError::EncryptionKeyCreationFailed => write!(
+                f,
+                "failed to construct the encryption/decryption key from the provided bytes"
+            ),
         }
     }
 }

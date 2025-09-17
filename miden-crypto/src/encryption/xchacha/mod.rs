@@ -12,7 +12,6 @@
 
 use alloc::vec::Vec;
 
-use blake3::KEY_LEN;
 use chacha20poly1305::{
     XChaCha20Poly1305,
     aead::{Aead, AeadCore, KeyInit},
@@ -192,14 +191,14 @@ impl Zeroize for SecretKey {
 pub struct XChaCha;
 
 impl AeadScheme for XChaCha {
-    const KEY_SIZE: usize = KEY_LEN;
+    const KEY_SIZE: usize = SK_SIZE_BYTES;
 
     type Key = SecretKey;
 
     type Nonce = Nonce;
 
-    fn key_from_bytes(bytes: &[u8]) -> Self::Key {
-        SecretKey::read_from_bytes(bytes).unwrap()
+    fn key_from_bytes(bytes: &[u8]) -> Result<Self::Key, EncryptionError> {
+        SecretKey::read_from_bytes(bytes).map_err(|_| EncryptionError::FailedOperation)
     }
 
     fn generate_nonce<R: CryptoRng + RngCore>(rng: &mut R) -> Self::Nonce {

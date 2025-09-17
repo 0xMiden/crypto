@@ -47,7 +47,8 @@ impl<K: KeyAgreementScheme, A: AeadScheme> CryptoBox<K, A> {
         let encryption_key_bytes =
             K::extract_key_material(&shared_secret, <A as AeadScheme>::KEY_SIZE)
                 .map_err(|_| IntegratedEncryptionSchemeError::FailedExtractKeyMaterial)?;
-        let mut encryption_key = A::key_from_bytes(&encryption_key_bytes);
+        let mut encryption_key = A::key_from_bytes(&encryption_key_bytes)
+            .map_err(|_| IntegratedEncryptionSchemeError::EncryptionKeyCreationFailed)?;
 
         let nonce = A::generate_nonce(rng);
         let ciphertext = A::encrypt_bytes(&encryption_key, &nonce, plaintext, associated_data)
@@ -78,7 +79,8 @@ impl<K: KeyAgreementScheme, A: AeadScheme> CryptoBox<K, A> {
         let decryption_key_bytes =
             K::extract_key_material(&shared_secret, <A as AeadScheme>::KEY_SIZE)
                 .map_err(|_| IntegratedEncryptionSchemeError::FailedExtractKeyMaterial)?;
-        let mut decryption_key = A::key_from_bytes(&decryption_key_bytes);
+        let mut decryption_key = A::key_from_bytes(&decryption_key_bytes)
+            .map_err(|_| IntegratedEncryptionSchemeError::EncryptionKeyCreationFailed)?;
 
         let nonce = A::Nonce::read_from_bytes(&sealed_message.nonce)
             .map_err(|_| IntegratedEncryptionSchemeError::InvalidNonce)?;

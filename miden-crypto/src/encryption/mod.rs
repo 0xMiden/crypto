@@ -22,7 +22,7 @@ pub trait AeadScheme {
     type Key: Deserializable + Zeroize;
     type Nonce: Clone + Serializable + Deserializable;
 
-    fn key_from_bytes(bytes: &[u8]) -> Self::Key;
+    fn key_from_bytes(bytes: &[u8]) -> Result<Self::Key, EncryptionError>;
 
     fn generate_nonce<R: CryptoRng + RngCore>(rng: &mut R) -> Self::Nonce;
 
