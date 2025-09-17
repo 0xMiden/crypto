@@ -390,7 +390,7 @@ impl<S: SmtStorage> LargeSmt<S> {
         Ok(leaves_iter.flat_map(|(_, leaf)| {
             // Collect the (Word, Word) tuples into an owned Vec
             // This ensures they outlive the 'leaf' from which they are derived.
-            let owned_entries: Vec<(Word, Word)> = leaf.entries().into_iter().copied().collect();
+            let owned_entries: Vec<(Word, Word)> = leaf.entries().to_vec();
             // Return an iterator over this owned Vec
             owned_entries.into_iter()
         }))

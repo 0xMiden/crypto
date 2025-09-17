@@ -31,7 +31,7 @@ impl SealingKey {
         associated_data: &[u8],
     ) -> Result<SealedMessage, IntegratedEncryptionSchemeError> {
         match self {
-            &SealingKey::K256XChaCha20Poly1305(ref key) => {
+            SealingKey::K256XChaCha20Poly1305(key) => {
                 let raw = K256XChaCha20Poly1305::seal(rng, key, plaintext, associated_data)?;
 
                 let ephemeral = <K256 as KeyAgreementScheme>::EphemeralPublicKey::read_from_bytes(

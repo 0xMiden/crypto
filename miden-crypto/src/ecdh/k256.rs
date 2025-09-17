@@ -245,7 +245,7 @@ mod test {
 
         // 3. Bob computes the shared secret key (Bob will send pk_e with the encrypted note to
         //    Alice)
-        let mut shared_secret_key_1 = sk_e.diffie_hellman(pk.into());
+        let mut shared_secret_key_1 = sk_e.diffie_hellman(pk);
 
         // 4. Zeroize the shared secret and check the result
         shared_secret_key_1.zeroize();
