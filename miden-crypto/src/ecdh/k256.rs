@@ -54,8 +54,7 @@ impl AsRef<[u8]> for SharedSecret {
     }
 }
 
-// Safe to derive ZeroizeOnDrop because the inner field(s) of SharedSecret
-// already implement Zeroize (and thus can be securely zeroed on drop).
+// Safe to derive ZeroizeOnDrop because the inner field already implements it.
 impl ZeroizeOnDrop for SharedSecret {}
 
 /// Ephemeral secret key for ECDH key agreement over secp256k1 curve.
