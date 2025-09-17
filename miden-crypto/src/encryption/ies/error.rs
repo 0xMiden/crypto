@@ -13,6 +13,7 @@ pub enum IntegratedEncryptionSchemeError {
     UnsupportedAlgorithm,
 }
 
+#[cfg(feature = "std")]
 impl std::error::Error for IntegratedEncryptionSchemeError {}
 
 impl fmt::Display for IntegratedEncryptionSchemeError {
