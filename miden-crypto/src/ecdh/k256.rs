@@ -175,10 +175,15 @@ impl KeyAgreementScheme for K256 {
         Ok(static_sk.get_shared_secret(ephemeral_pk.clone()))
     }
 
-    fn extract_key_material(shared_secret: &Self::SharedSecret, length: usize) -> Vec<u8> {
+    fn extract_key_material(
+        shared_secret: &Self::SharedSecret,
+        length: usize,
+    ) -> Result<Vec<u8>, super::KeyAgreementError> {
+        let hkdf = shared_secret.extract(None);
         let mut buf = vec![0_u8; length];
-        let _ = shared_secret.extract(None).expand(&[], &mut buf);
-        buf
+        hkdf.expand(&[], &mut buf)
+            .map_err(|_| super::KeyAgreementError::HkdfExpansionFailed)?;
+        Ok(buf)
     }
 }
 

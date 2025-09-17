@@ -11,6 +11,7 @@ pub enum IntegratedEncryptionSchemeError {
     EphemeralPublicKeyDeserializationFailed,
     AlgorithmMismatch,
     UnsupportedAlgorithm,
+    FailedExtractKeyMaterial,
 }
 
 #[cfg(feature = "std")]
@@ -32,6 +33,9 @@ impl fmt::Display for IntegratedEncryptionSchemeError {
             IntegratedEncryptionSchemeError::AlgorithmMismatch => write!(f, "algorithm mismatch"),
             IntegratedEncryptionSchemeError::UnsupportedAlgorithm => {
                 write!(f, "unsupported algorithm")
+            },
+            IntegratedEncryptionSchemeError::FailedExtractKeyMaterial => {
+                write!(f, "failed to extract key material for encryption/decryption")
             },
         }
     }

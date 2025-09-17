@@ -39,7 +39,10 @@ pub trait KeyAgreementScheme {
     ) -> Result<Self::SharedSecret, KeyAgreementError>;
 
     /// Extract key material from shared secret
-    fn extract_key_material(shared_secret: &Self::SharedSecret, length: usize) -> Vec<u8>;
+    fn extract_key_material(
+        shared_secret: &Self::SharedSecret,
+        length: usize,
+    ) -> Result<Vec<u8>, KeyAgreementError>;
 }
 
 // ERROR TYPES
@@ -50,6 +53,7 @@ pub trait KeyAgreementScheme {
 pub enum KeyAgreementError {
     FailedKeyAgreement,
     PublicKeyDeserializationFailed,
+    HkdfExpansionFailed,
 }
 
 impl fmt::Display for KeyAgreementError {
@@ -60,6 +64,9 @@ impl fmt::Display for KeyAgreementError {
             },
             KeyAgreementError::PublicKeyDeserializationFailed => {
                 write!(f, "deserialization of public key failed")
+            },
+            KeyAgreementError::HkdfExpansionFailed => {
+                write!(f, "hkdf expansion failed")
             },
         }
     }
