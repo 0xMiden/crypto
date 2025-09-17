@@ -15,9 +15,9 @@
 use alloc::{string::ToString, vec::Vec};
 
 use hkdf::{Hkdf, hmac::SimpleHmac};
-use k256::{AffinePoint, FieldBytes, elliptic_curve::sec1::ToEncodedPoint, sha2::Sha256};
+use k256::{AffinePoint, elliptic_curve::sec1::ToEncodedPoint, sha2::Sha256};
 use rand::{CryptoRng, RngCore};
-use zeroize::{Zeroize, ZeroizeOnDrop};
+use zeroize::ZeroizeOnDrop;
 
 use crate::{
     dsa::ecdsa_k256_keccak::{PUBLIC_KEY_BYTES, PublicKey, SecretKey},
@@ -32,8 +32,6 @@ use crate::{
 pub struct SharedSecret {
     pub(crate) inner: k256::ecdh::SharedSecret,
 }
-
-impl ZeroizeOnDrop for SharedSecret {}
 
 impl SharedSecret {
     pub(crate) fn new(inner: k256::ecdh::SharedSecret) -> SharedSecret {
@@ -56,14 +54,9 @@ impl AsRef<[u8]> for SharedSecret {
     }
 }
 
-impl Zeroize for SharedSecret {
-    fn zeroize(&mut self) {
-        let zero_bytes = FieldBytes::default();
-        let dummy_secret: k256::ecdh::SharedSecret = zero_bytes.into();
-
-        self.inner = dummy_secret;
-    }
-}
+// Safe to derive ZeroizeOnDrop because the inner field(s) of SharedSecret
+// already implement Zeroize (and thus can be securely zeroed on drop).
+impl ZeroizeOnDrop for SharedSecret {}
 
 /// Ephemeral secret key for ECDH key agreement over secp256k1 curve.
 ///
@@ -195,11 +188,9 @@ impl KeyAgreementScheme for K256 {
 
 #[cfg(test)]
 mod test {
-    use std::vec::Vec;
 
     use rand::rng;
     use winter_utils::{Deserializable, Serializable};
-    use zeroize::Zeroize;
 
     use super::{EphemeralPublicKey, EphemeralSecretKey};
     use crate::dsa::ecdsa_k256_keccak::SecretKey;
@@ -230,27 +221,6 @@ mod test {
             shared_secret_key_1.inner.raw_secret_bytes(),
             shared_secret_key_2.inner.raw_secret_bytes()
         );
-    }
-
-    #[test]
-    fn shared_secret_zeroize() {
-        let mut rng = rng();
-
-        // 1. Generate the static key-pair for Alice
-        let sk = SecretKey::with_rng(&mut rng);
-        let pk = sk.public_key();
-
-        // 2. Generate the ephemeral secret key for Bob
-        let sk_e = EphemeralSecretKey::with_rng(&mut rng);
-
-        // 3. Bob computes the shared secret key (Bob will send pk_e with the encrypted note to
-        //    Alice)
-        let mut shared_secret_key_1 = sk_e.diffie_hellman(pk);
-
-        // 4. Zeroize the shared secret and check the result
-        shared_secret_key_1.zeroize();
-        let inner_bytes: Vec<u8> = shared_secret_key_1.inner.raw_secret_bytes().to_vec();
-        assert!(inner_bytes.iter().all(|byte| *byte == 0));
     }
 
     #[test]
