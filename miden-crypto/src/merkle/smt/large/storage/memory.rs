@@ -85,7 +85,7 @@ impl SmtStorage for MemoryStorage {
 
     /// Gets the total number of key-value entries currently stored.
     fn entry_count(&self) -> Result<usize, StorageError> {
-        Ok(self.leaves.read()?.iter().map(|(_, leaf)| leaf.num_entries()).sum())
+        Ok(self.leaves.read()?.values().map(|leaf| leaf.num_entries()).sum())
     }
 
     /// Inserts a key-value pair into the leaf at the given index.

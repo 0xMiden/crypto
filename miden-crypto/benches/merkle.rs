@@ -9,7 +9,7 @@ use std::{hint, time::Duration};
 
 use criterion::{BatchSize, Bencher, Criterion, criterion_group, criterion_main};
 use miden_crypto::{
-    Felt, ONE, Word,
+    Word,
     merkle::{MerklePath, MerkleTree, NodeIndex},
 };
 
@@ -23,9 +23,7 @@ benchmark_multi!(
     |b: &mut Bencher<'_>, num_leaves: &usize| {
         b.iter_batched(
             || {
-                let entries: Vec<Word> = (0..*num_leaves)
-                    .map(|i| Word::new([Felt::new(i as u64), ONE, ONE, Felt::new(i as u64)]))
-                    .collect();
+                let entries = generate_words_merkle_std(*num_leaves);
                 assert_eq!(entries.len(), *num_leaves);
                 entries
             },
@@ -69,8 +67,7 @@ benchmark_with_setup_data!(
     10,
     "merkle-tree-root",
     || {
-        let entries: Vec<Word> =
-            (0..256).map(|i| Word::new([Felt::new(i), ONE, ONE, Felt::new(i)])).collect();
+        let entries = generate_words_merkle_std(256);
         MerkleTree::new(&entries).unwrap()
     },
     |b: &mut criterion::Bencher<'_>, tree: &MerkleTree| {
@@ -81,8 +78,7 @@ benchmark_with_setup_data!(
 );
 
 fn merkle_tree_depth(c: &mut Criterion) {
-    let entries: Vec<Word> =
-        (0u64..256).map(|i| Word::new([Felt::new(i), ONE, ONE, Felt::new(i)])).collect();
+    let entries = generate_words_merkle_std(256);
     let tree = MerkleTree::new(hint::black_box(&entries)).unwrap();
 
     c.bench_function("merkle-tree-depth", |b| {
@@ -93,8 +89,7 @@ fn merkle_tree_depth(c: &mut Criterion) {
 }
 
 fn merkle_tree_get_node(c: &mut Criterion) {
-    let entries: Vec<Word> =
-        (0u64..256).map(|i| Word::new([Felt::new(i), ONE, ONE, Felt::new(i)])).collect();
+    let entries = generate_words_merkle_std(256);
     let tree = MerkleTree::new(hint::black_box(&entries)).unwrap();
     let index = NodeIndex::new(8, 0).unwrap();
 
@@ -106,8 +101,7 @@ fn merkle_tree_get_node(c: &mut Criterion) {
 }
 
 fn merkle_tree_get_path(c: &mut Criterion) {
-    let entries: Vec<Word> =
-        (0u64..256).map(|i| Word::new([Felt::new(i), ONE, ONE, Felt::new(i)])).collect();
+    let entries = generate_words_merkle_std(256);
     let tree = MerkleTree::new(hint::black_box(&entries)).unwrap();
     let index = NodeIndex::new(8, 0).unwrap();
 
@@ -119,8 +113,7 @@ fn merkle_tree_get_path(c: &mut Criterion) {
 }
 
 fn merkle_tree_leaves(c: &mut Criterion) {
-    let entries: Vec<Word> =
-        (0u64..256).map(|i| Word::new([Felt::new(i), ONE, ONE, Felt::new(i)])).collect();
+    let entries = generate_words_merkle_std(256);
     let tree = MerkleTree::new(&entries).unwrap();
 
     c.bench_function("merkle-tree-leaves", |b| {
@@ -131,8 +124,7 @@ fn merkle_tree_leaves(c: &mut Criterion) {
 }
 
 fn merkle_tree_inner_nodes(c: &mut Criterion) {
-    let entries: Vec<Word> =
-        (0u64..256).map(|i| Word::new([Felt::new(i), ONE, ONE, Felt::new(i)])).collect();
+    let entries = generate_words_merkle_std(256);
     let tree = MerkleTree::new(&entries).unwrap();
 
     c.bench_function("merkle-tree-inner-nodes", |b| {
@@ -146,8 +138,7 @@ benchmark_batch!(
     merkle_tree_update_leaf,
     &[1, 16, 32, 64, 128],
     |b: &mut Bencher<'_>, leaf_count: usize| {
-        let entries: Vec<Word> =
-            (0u64..256).map(|i| Word::new([Felt::new(i), ONE, ONE, Felt::new(i)])).collect();
+        let entries = generate_words_merkle_std(256);
         let mut tree = MerkleTree::new(&entries).unwrap();
         let mut seed = [0u8; 32];
         b.iter(|| {
@@ -163,8 +154,7 @@ benchmark_batch!(
 // ================================================================================================
 
 fn merkle_path_new(c: &mut Criterion) {
-    let entries: Vec<Word> =
-        (0u64..256).map(|i| Word::new([Felt::new(i), ONE, ONE, Felt::new(i)])).collect();
+    let entries = generate_words_merkle_std(256);
     let tree = MerkleTree::new(&entries).unwrap();
     let index = NodeIndex::new(8, 0).unwrap();
     let path_nodes = tree.get_path(index).unwrap();
@@ -177,8 +167,7 @@ fn merkle_path_new(c: &mut Criterion) {
 }
 
 fn merkle_path_compute_root(c: &mut Criterion) {
-    let entries: Vec<Word> =
-        (0u64..256).map(|i| Word::new([Felt::new(i), ONE, ONE, Felt::new(i)])).collect();
+    let entries = generate_words_merkle_std(256);
     let tree = MerkleTree::new(&entries).unwrap();
     let index = NodeIndex::new(8, 0).unwrap();
     let path = tree.get_path(index).unwrap();
@@ -192,8 +181,7 @@ fn merkle_path_compute_root(c: &mut Criterion) {
 }
 
 fn merkle_path_verify(c: &mut Criterion) {
-    let entries: Vec<Word> =
-        (0u64..256).map(|i| Word::new([Felt::new(i), ONE, ONE, Felt::new(i)])).collect();
+    let entries = generate_words_merkle_std(256);
     let tree = MerkleTree::new(&entries).unwrap();
     let index = NodeIndex::new(8, 0).unwrap();
     let path = tree.get_path(index).unwrap();
@@ -208,8 +196,7 @@ fn merkle_path_verify(c: &mut Criterion) {
 }
 
 fn merkle_path_authenticated_nodes(c: &mut Criterion) {
-    let entries: Vec<Word> =
-        (0u64..256).map(|i| Word::new([Felt::new(i), ONE, ONE, Felt::new(i)])).collect();
+    let entries = generate_words_merkle_std(256);
     let tree = MerkleTree::new(&entries).unwrap();
     let index = NodeIndex::new(8, 0).unwrap();
     let path = tree.get_path(index).unwrap();

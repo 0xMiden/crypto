@@ -236,10 +236,7 @@ macro_rules! benchmark_hash_merge_domain {
                 for domain_ref in $domains {
                     let domain = *domain_ref;
                     group.bench_with_input(
-                        criterion::BenchmarkId::new(
-                            "merge_in_domain",
-                            format!("{}_{}", size, domain),
-                        ),
+                        criterion::BenchmarkId::new("merge_in_domain", format!("{size}_{domain}")),
                         &(size, domain),
                         |b: &mut criterion::Bencher, param_ref: &(usize, u64)| {
                             let (size_param, domain_param) = *param_ref;
@@ -267,10 +264,7 @@ macro_rules! benchmark_hash_merge_with_int {
                 for int_size_ref in $int_sizes {
                     let int_size = *int_size_ref;
                     group.bench_with_input(
-                        criterion::BenchmarkId::new(
-                            "merge_with_int",
-                            format!("{}_{}", size, int_size),
-                        ),
+                        criterion::BenchmarkId::new("merge_with_int", format!("{size}_{int_size}")),
                         &(size, int_size),
                         |b: &mut criterion::Bencher, param_ref: &(usize, usize)| {
                             let (size_param, int_size_param) = *param_ref;
@@ -746,7 +740,7 @@ macro_rules! benchmark_rand_draw_integers {
                         group.bench_with_input(
                             criterion::BenchmarkId::new(
                                 "draw_integers",
-                                format!("{}_{}", num_values, domain_size),
+                                format!("{num_values}_{domain_size}"),
                             ),
                             &(num_values, domain_size),
                             |b, &(num_values, domain_size)| {
@@ -785,7 +779,7 @@ macro_rules! benchmark_rand_check_leading_zeros {
             group.sample_size($crate::common::config::DEFAULT_SAMPLE_SIZE);
 
             let coin = <$coin_type>::new($seed);
-            let test_values: Vec<u64> = (0u64..100).map(|i| i as u64).collect();
+            let test_values: Vec<u64> = (0u64..100).collect();
 
             group.bench_function("check_leading_zeros", |b| {
                 b.iter(|| {
