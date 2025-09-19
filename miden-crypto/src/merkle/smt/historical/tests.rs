@@ -34,8 +34,7 @@ fn create_mutation_sets(
     let old_root1 = smt1.root();
 
     let (key6, value6) = test_pair(6);
-    let (key2, value2_new) =
-        (test_pair(2).0, Rpo256::new([2.into(), 20.into(), 0.into(), 0.into()]).into());
+    let (key2, value2_new) = (test_pair(2).0, Rpo256::hash(&[2u8, 20, 0, 0]));
 
     smt1.insert(key6, value6);
     smt1.insert(key2, value2_new);
@@ -59,14 +58,8 @@ fn create_mutation_sets(
     let old_root3 = smt3.root();
 
     let (key8, value8) = test_pair(8);
-    let (key1, value1_new) = (
-        test_pair(1).0,
-        RpoDigest::new([1.into(), 100.into(), 0.into(), 0.into()]).into(),
-    );
-    let (key4, value4_new) = (
-        test_pair(4).0,
-        RpoDigest::new([4.into(), 400.into(), 0.into(), 0.into()]).into(),
-    );
+    let (key1, value1_new) = (test_pair(1).0, Rpo256::hash(&[1u8, 100, 0, 0]));
+    let (key4, value4_new) = (test_pair(4).0, Rpo256::hash(&[4u8, 44, 0, 0]));
 
     smt3.insert(key8, value8);
     smt3.insert(key1, value1_new);
@@ -109,11 +102,11 @@ fn test_historical_view_cache() {
     // Add overlays (in reverse order since they represent going backwards)
     let overlay3 = Overlay::inverted(&final_smt, &mutations3).unwrap();
     let mut smt_after_2 = final_smt.clone();
-    smt_after_2.apply_mutations(overlay3.clone().into()).unwrap();
+    smt_after_2.apply_mutations(mutations3).unwrap();
 
     let overlay2 = Overlay::inverted(&smt_after_2, &mutations2).unwrap();
     let mut smt_after_1 = smt_after_2.clone();
-    smt_after_1.apply_mutations(overlay2.clone().into()).unwrap();
+    smt_after_1.apply_mutations(mutations2).unwrap();
 
     let overlay1 = Overlay::inverted(&smt_after_1, &mutations1).unwrap();
 
@@ -210,13 +203,13 @@ fn test_get_value_across_overlays() {
     let overlay3 = Overlay::inverted(&final_smt, &mutations3).unwrap();
     let overlay2_smt = {
         let mut s = final_smt.clone();
-        s.apply_mutations(overlay3.clone().into()).unwrap();
+        s.apply_mutations(mutations3).unwrap();
         s
     };
     let overlay2 = Overlay::inverted(&overlay2_smt, &mutations2).unwrap();
     let overlay1_smt = {
         let mut s = overlay2_smt.clone();
-        s.apply_mutations(overlay2.clone().into()).unwrap();
+        s.apply_mutations(mutations2).unwrap();
         s
     };
     let overlay1 = Overlay::inverted(&overlay1_smt, &mutations1).unwrap();
@@ -245,7 +238,7 @@ fn test_overlay_cleanup() {
     let mut smt_with_overlays = SmtWithOverlays::new(smt.clone(), 100);
 
     // Add more than MAX_OVERLAYS overlays
-    for i in 0..40 {
+    for _i in 0..SmtWithOverlays::MAX_OVERLAYS * 2 {
         let overlay = Overlay {
             old_root: EMPTY_WORD,
             new_root: EMPTY_WORD,

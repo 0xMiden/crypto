@@ -204,6 +204,10 @@ impl SmtWithOverlays {
         }
     }
 
+    pub(crate) fn key_to_leaf_index(key: &Word) -> LeafIndex<SMT_DEPTH> {
+        <Smt as SparseMerkleTree<SMT_DEPTH>>::key_to_leaf_index(key)
+    }
+
     /// Add an overlay. Commonly called whenever we apply some new mutations to the _latest_ tree.
     pub fn add_overlay(&mut self, overlay: Overlay) {
         self.overlays.push_front(overlay);
