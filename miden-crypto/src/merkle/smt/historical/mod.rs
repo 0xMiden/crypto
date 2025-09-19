@@ -236,7 +236,7 @@ impl HistoricalTreeView<'_> {
     }
 
     /// Wrapper.
-    fn key_to_leaf_index(key: &Word) -> LeafIndex<SMT_DEPTH> {
+    pub(crate) fn key_to_leaf_index(key: &Word) -> LeafIndex<SMT_DEPTH> {
         <Smt as SparseMerkleTree<SMT_DEPTH>>::key_to_leaf_index(key)
     }
 
