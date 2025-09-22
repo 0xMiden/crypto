@@ -11,8 +11,8 @@ use crate::{
     EMPTY_WORD, Word,
     hash::rpo::Rpo256,
     merkle::{
-        InnerNode, LeafIndex, MerklePath, MutationSet, NodeIndex, SMT_DEPTH, Smt, SmtLeaf,
-        SmtProof, SparseMerklePath, smt::SparseMerkleTree,
+        EmptySubtreeRoots, InnerNode, LeafIndex, MerklePath, MutationSet, NodeIndex, SMT_DEPTH,
+        Smt, SmtLeaf, SmtProof, SparseMerklePath, smt::SparseMerkleTree,
     },
 };
 
@@ -50,27 +50,8 @@ impl Overlay {
 }
 
 impl Overlay {
-    pub fn new(current: &Smt, premutated: MutationSet<SMT_DEPTH, Word, Word>) -> Self {
-        todo!()
-        // let mut inverse_mutations = HashMap::new();
-
-        // for (key, _) in set.new_pairs() {
-        //     inverse_mutations.insert(*key, current.get_leaf(key));
-        // }
-
-        // let poisoned_tree_leaves =
-        //     Vec::from_iter(inverse_mutations.values().map(|leaf| leaf.index()));
-
-        // Overlay {
-        //     new_root: preinverted.new_root,
-        //     old_root: preinverted.old_root,
-        //     mutated: preinverted,
-        //     poisoned_tree_leaves,
-        // }
-    }
-
     /// Create the inversion of the given mutation
-    pub fn inverted(
+    pub fn walkback(
         current: &Smt,
         set: &MutationSet<SMT_DEPTH, Word, Word>,
     ) -> Result<Self, OverlayError> {
@@ -123,13 +104,16 @@ pub enum HistoricalOffset {
     OverlayIdx(usize),
     Latest,
     TooAncient,
+    FutureBlock,
 }
 
 #[derive(Debug, Clone)]
 pub struct SmtWithOverlays {
     /// The tip of the chain `AccountTree`
     latest: Smt,
-    /// Overlays in order from latest to newest
+    /// Overlays in order from latest to newest, meaning new ones are pushed via `push_front` and
+    /// dropped via `pop_back`. Now this means the newer the smaller the index, so the index
+    /// becomes a relative history offset.
     overlays: VecDeque<Overlay>,
     /// The block number of the oldest overlay
     base_block_number: u32,
@@ -156,19 +140,27 @@ impl SmtWithOverlays {
         }
     }
 
+    pub fn root(&self) -> Word {
+        self.latest.root()
+    }
+
+    pub fn open(&self, key: &Word) -> SmtProof {
+        self.latest.open(key)
+    }
+
     pub fn oldest(&self) -> u32 {
         self.base_block_number
     }
 
-    // obtain the index on the in-memory overlays
-
-    pub fn overlay_idx(latest: u32, requested: u32) -> HistoricalOffset {
-        let Some(idx) = latest.checked_sub(requested) else {
-            return HistoricalOffset::TooAncient;
+    // obtain the index on the in-memory overlays based on the _desired_ block num given the latest
+    // block number.
+    pub fn overlay_idx(latest_blocknum: u32, requested_blocknum: u32) -> HistoricalOffset {
+        let Some(offset_from_latest) = latest_blocknum.checked_sub(requested_blocknum) else {
+            return HistoricalOffset::FutureBlock;
         };
-        match idx {
+        match offset_from_latest as usize {
             0 => HistoricalOffset::Latest,
-            1..33 => HistoricalOffset::OverlayIdx(idx as usize - 1),
+            1..Self::MAX_OVERLAYS => HistoricalOffset::OverlayIdx(offset_from_latest as usize - 1),
             _ => HistoricalOffset::TooAncient,
         }
     }
@@ -177,8 +169,10 @@ impl SmtWithOverlays {
     /// available.
     pub fn historical_view<'a>(&'a self, height: u32) -> Option<HistoricalTreeView<'a>> {
         // FIXME use a shared one per height
+        use std::dbg;
         let cache = self.cache.clone();
-        match Self::overlay_idx(self.base_block_number, height) {
+        match Self::overlay_idx(dbg!(self.base_block_number), dbg!(height)) {
+            HistoricalOffset::FutureBlock => None,
             HistoricalOffset::Latest => Some(HistoricalTreeView {
                 block_number: height,
                 latest: &self.latest,
@@ -189,11 +183,17 @@ impl SmtWithOverlays {
                 block_number: height,
                 latest: &self.latest,
                 stacks: {
+                    dbg!(self.overlays.len());
                     let (a, b) = self.overlays.as_slices();
-                    if a.len() < idx {
+                    dbg!(a.len());
+                    dbg!(b.len());
+                    if idx < a.len() {
                         (&a[idx..], &b[..])
                     } else if idx < (a.len() + b.len()) {
                         (&[], &b[(idx - a.len())..])
+                    } else if self.overlays.len() < idx {
+                        // we might not have sufficent index despite the index being small enough
+                        return None;
                     } else {
                         unreachable!("Index must never be out of bounds of combined length")
                     }
@@ -209,9 +209,21 @@ impl SmtWithOverlays {
     }
 
     /// Add an overlay. Commonly called whenever we apply some new mutations to the _latest_ tree.
-    pub fn add_overlay(&mut self, overlay: Overlay) {
+    fn add_overlay(&mut self, overlay: Overlay) {
         self.overlays.push_front(overlay);
         self.cleanup();
+    }
+
+    pub fn apply_mutations(
+        &mut self,
+        mutation_set: MutationSet<SMT_DEPTH, Word, Word>,
+    ) -> Result<(), OverlayError> {
+        let overlay = Overlay::walkback(&self.latest, &mutation_set)?;
+        self.add_overlay(overlay);
+        self.latest
+            .apply_mutations(mutation_set)
+            .map_err(|_fixme| OverlayError("merkle error FIXME"))?;
+        Ok(())
     }
 }
 
@@ -272,7 +284,9 @@ impl HistoricalTreeView<'_> {
 
         q.push_back(index_to_get_value_for);
 
+        dbg!("walk down the tree");
         while let Some(current) = q.pop_front() {
+            dbg!(current);
             if digest_cache.contains_key(&current) {
                 continue;
             } else {
@@ -280,6 +294,10 @@ impl HistoricalTreeView<'_> {
                     // leaves are always available
                     continue;
                 }
+                // XXX TODO FIXME prevent re-hashing of empty subtrees
+                // let _equivalent_empty_hash = EmptySubtreeRoots::entry(SMT_DEPTH,
+                // current.depth());
+
                 compute_backlog.push_back(current);
 
                 // enqueue both again
@@ -293,9 +311,19 @@ impl HistoricalTreeView<'_> {
                 }
             }
         }
+        drop(cache);
 
+        // TODO use the `EmptySubtreeRoots::empty_hashes(depth)` to create empty tree set
+        dbg!(
+            ">>>>>>>>>>>>>>>>>>>>>>>>>>>
+            >>>>>>>>>>>>>>>>>>>>>>>>>
+            >>>>>>>>>>>>>>>>>>>>>>
+            >>>>>>>>>>>>>>>>>>>"
+        );
+        use std::dbg;
         // Now compute from deepest to lowest
         while let Some(node) = compute_backlog.pop_back() {
+            dbg!(node);
             let mut cache = self.cache.borrow_mut();
             let digest_cache = cache.entry(latest_affected_block_num).or_default();
             if node.depth() == SMT_DEPTH {
@@ -317,7 +345,8 @@ impl HistoricalTreeView<'_> {
                     digest_cache.insert(left, hash);
                     hash
                 } else {
-                    unreachable!("By definition we have computed all previous hashes");
+                    // FIXME ensure we don't call this accidentally via logic errors
+                    self.latest.get_node_hash(node)
                 };
 
                 let right_hash = if let Some(hash) = digest_cache.get(&right).copied() {
@@ -328,11 +357,9 @@ impl HistoricalTreeView<'_> {
                     digest_cache.insert(right, hash);
                     hash
                 } else {
-                    unreachable!("By definition we have computed all previous hashes");
+                    // FIXME ensure we don't call this accidentally via logic errors
+                    self.latest.get_node_hash(node)
                 };
-
-                let mut cache = self.cache.borrow_mut();
-                let digest_cache = cache.entry(latest_affected_block_num).or_default();
 
                 // Merge the hashes to get parent hash
                 let digest = Rpo256::merge(&[left_hash, right_hash]);
@@ -399,14 +426,24 @@ impl HistoricalTreeView<'_> {
             self.overlay_iter().map(|overlay| overlay.is_part_of_poisoned_tree(index)),
         );
 
+        use std::dbg;
+
+        dbg!(&poison_stack);
+
         if let Some(offset) = poison_stack.iter().position(|&x| x == true) {
             let latest_affected_block_num = self.block_number.checked_sub(offset as u32)
                 .expect("By definition offset is at most 33 and cannot be larger than the number of blocks produced since genesis");
             let _ = self.recalc_inner_digest_with_cache(index, latest_affected_block_num);
             let mut cache = self.cache.borrow_mut();
             let cache_inner = cache.entry(latest_affected_block_num).or_default();
-            let left = cache_inner.get(&index.left_child()).copied().unwrap();
-            let right = cache_inner.get(&index.right_child()).copied().unwrap();
+            let left = cache_inner
+                .get(&index.left_child())
+                .copied()
+                .unwrap_or_else(|| self.latest.get_node_hash(index.left_child()));
+            let right = cache_inner
+                .get(&index.right_child())
+                .copied()
+                .unwrap_or_else(|| self.latest.get_node_hash(index.right_child()));
             InnerNode { left, right }
         } else {
             // nothing touched that index ever
@@ -450,10 +487,8 @@ impl HistoricalTreeView<'_> {
 
     pub fn get_leaf(&self, key: &Word) -> SmtLeaf {
         for overlay in self.overlay_iter() {
-            if let Some(leaf) = overlay.mutated.get(&key) {
-                if !leaf.is_empty() {
-                    return leaf.clone();
-                }
+            if let Some(value) = overlay.mutated.get(&key) {
+                return value.clone();
             }
         }
         self.latest.get_leaf(key)
