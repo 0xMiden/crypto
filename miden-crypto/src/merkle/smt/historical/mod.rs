@@ -17,8 +17,6 @@ pub enum HistoricalError {
     MerkleError(#[from] MerkleError),
 }
 
-use std::dbg;
-
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum HistoricalOffset {
     ReversionsIdx(usize),
