@@ -8,6 +8,237 @@ struct TestKV {
     value: Word,
 }
 
+// vanilla
+// [miden-crypto/src/merkle/smt/mod.rs:90:21] NodeIndex::from(Self::key_to_leaf_index(key)) =
+// NodeIndex {     depth: 64,
+//     value: 2543931020103820759,
+// }
+//
+// [miden-crypto/src/merkle/smt/mod.rs:96:57] vanilla_index = NodeIndex {
+//     depth: 64,
+//     value: 2543931020103820758,
+// }
+// [miden-crypto/src/merkle/smt/mod.rs:98:21] vanilla_node_digest = Word(
+//     [
+//         0,
+//         0,
+//         0,
+//         0,
+//     ],
+// )
+// [miden-crypto/src/merkle/smt/mod.rs:96:57] vanilla_index = NodeIndex {
+//     depth: 63,
+//     value: 1271965510051910378,
+// }
+// [miden-crypto/src/merkle/smt/mod.rs:98:21] vanilla_node_digest = Word(
+//     [
+//         8635338869442206704,
+//         11671305615285950885,
+//         15253023094703789604,
+//         7398108415970215319,
+//     ],
+// )
+// [miden-crypto/src/merkle/smt/mod.rs:96:57] vanilla_index = NodeIndex {
+//     depth: 62,
+//     value: 635982755025955188,
+// }
+// [miden-crypto/src/merkle/smt/mod.rs:98:21] vanilla_node_digest = Word(
+//     [
+//         18185978518863914335,
+//         936586966360019113,
+//         497299419609993926,
+//         1977881506773614749,
+//     ],
+// )
+
+// XXXXXXXXXXXXXXXXXX
+
+// [miden-crypto/src/merkle/smt/mod.rs:96:57] vanilla_index = NodeIndex {
+//     depth: 4,
+//     value: 3,
+// }
+// [miden-crypto/src/merkle/smt/mod.rs:98:21] vanilla_node_digest = Word(
+//     [
+//         1299421782687082884,
+//         9938699043036414489,
+//         10193025806762503939,
+//         12073246492422971113,
+//     ],
+// )
+// [miden-crypto/src/merkle/smt/mod.rs:96:57] vanilla_index = NodeIndex {
+//     depth: 3,
+//     value: 0,
+// }
+// [miden-crypto/src/merkle/smt/mod.rs:98:21] vanilla_node_digest = Word(
+//     [
+//         7829641133220670678,
+//         6170216088031698405,
+//         11814483661801576435,
+//         1762887097744793975,
+//     ],
+// )
+// [miden-crypto/src/merkle/smt/mod.rs:96:57] vanilla_index = NodeIndex {
+//     depth: 2,
+//     value: 1,
+// }
+// [miden-crypto/src/merkle/smt/mod.rs:98:21] vanilla_node_digest = Word(
+//     [
+//         15220380953028059006,
+//         2981707349961006045,
+//         7409523958661360004,
+//         2816116826688969892,
+//     ],
+// )
+// [miden-crypto/src/merkle/smt/mod.rs:96:57] vanilla_index = NodeIndex {
+//     depth: 1,
+//     value: 1,
+// }
+// [miden-crypto/src/merkle/smt/mod.rs:98:21] vanilla_node_digest = Word(
+//     [
+//         8622462148726214754,
+//         14134446827065174607,
+//         1257430119520851801,
+//         5890040041877426253,
+//     ],
+// )
+
+// <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+// <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+// <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+// <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+// <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+// <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+//
+// haxx0r
+// [miden-crypto/src/merkle/smt/historical/mod.rs:525:24] leaf.index() = LeafIndex {
+//     index: NodeIndex {
+//         depth: 64,
+//         value: 2543931020103820759,
+//     },
+// }
+//
+// [miden-crypto/src/merkle/smt/historical/mod.rs:531:54] haxx0r_idx = NodeIndex {
+//     depth: 64,
+//     value: 2543931020103820758,
+// }
+// [miden-crypto/src/merkle/smt/historical/mod.rs:533:21] haxx0r_node_digest = Word(
+//     [
+//         0,
+//         0,
+//         0,
+//         0,
+//     ],
+// )
+// [miden-crypto/src/merkle/smt/historical/mod.rs:531:54] haxx0r_idx = NodeIndex {
+//     depth: 63,
+//     value: 1271965510051910378,
+// }
+// [miden-crypto/src/merkle/smt/historical/mod.rs:533:21] haxx0r_node_digest = Word(
+//     [
+//         8635338869442206704,
+//         11671305615285950885,
+//         15253023094703789604,
+//         7398108415970215319,
+//     ],
+// )
+// [miden-crypto/src/merkle/smt/historical/mod.rs:531:54] haxx0r_idx = NodeIndex {
+//     depth: 62,
+//     value: 635982755025955188,
+// }
+// [miden-crypto/src/merkle/smt/historical/mod.rs:533:21] haxx0r_node_digest = Word(
+//     [
+//         18185978518863914335,
+//         936586966360019113,
+//         497299419609993926,
+//         1977881506773614749,
+//     ],
+// )
+// [miden-crypto/src/merkle/smt/historical/mod.rs:531:54] haxx0r_idx = NodeIndex {
+//     depth: 61,
+//     value: 317991377512977595,
+// }
+// [miden-crypto/src/merkle/smt/historical/mod.rs:533:21] haxx0r_node_digest = Word(
+//     [
+//         14827447693720375746,
+//         17296925942589213350,
+//         13524332314559504765,
+//         15663886706087995199,
+//     ],
+// )
+// [miden-crypto/src/merkle/smt/historical/mod.rs:531:54] haxx0r_idx = NodeIndex {
+//     depth: 60,
+//     value: 158995688756488796,
+// }
+
+// XXXXXXXX
+
+// [miden-crypto/src/merkle/smt/historical/mod.rs:531:54] haxx0r_idx = NodeIndex {
+//     depth: 4,
+//     value: 3,
+// }
+// [miden-crypto/src/merkle/smt/historical/mod.rs:50:21] poisoned_leaf_ancestor.depth() = 64
+// [miden-crypto/src/merkle/smt/historical/mod.rs:50:61] node_index.depth() = 3
+// [miden-crypto/src/merkle/smt/historical/mod.rs:451:9] &poison_stack = [
+//     true,
+// ]
+// [miden-crypto/src/merkle/smt/historical/mod.rs:533:21] haxx0r_node_digest = Word(
+//     [
+//         1299421782687082884,
+//         9938699043036414489,
+//         10193025806762503939,
+//         12073246492422971113,
+//     ],
+// )
+// [miden-crypto/src/merkle/smt/historical/mod.rs:531:54] haxx0r_idx = NodeIndex {
+//     depth: 3,
+//     value: 0,
+// }
+// [miden-crypto/src/merkle/smt/historical/mod.rs:50:21] poisoned_leaf_ancestor.depth() = 64
+// [miden-crypto/src/merkle/smt/historical/mod.rs:50:61] node_index.depth() = 2
+// [miden-crypto/src/merkle/smt/historical/mod.rs:451:9] &poison_stack = [
+//     true,
+// ]
+// [miden-crypto/src/merkle/smt/historical/mod.rs:533:21] haxx0r_node_digest = Word(
+//     [
+//         15220380953028059006,
+//         2981707349961006045,
+//         7409523958661360004,
+//         2816116826688969892,
+//     ],
+// )
+// [miden-crypto/src/merkle/smt/historical/mod.rs:531:54] haxx0r_idx = NodeIndex {
+//     depth: 2,
+//     value: 1,
+// }
+// [miden-crypto/src/merkle/smt/historical/mod.rs:50:21] poisoned_leaf_ancestor.depth() = 64
+// [miden-crypto/src/merkle/smt/historical/mod.rs:50:61] node_index.depth() = 1
+// [miden-crypto/src/merkle/smt/historical/mod.rs:451:9] &poison_stack = [
+//     true,
+// ]
+// [miden-crypto/src/merkle/smt/historical/mod.rs:533:21] haxx0r_node_digest = Word(
+//     [
+//         15220380953028059006,
+//         2981707349961006045,
+//         7409523958661360004,
+//         2816116826688969892,
+//     ],
+// )
+// [miden-crypto/src/merkle/smt/historical/mod.rs:531:54] haxx0r_idx = NodeIndex {
+//     depth: 1,
+//     value: 1,
+// }
+// [miden-crypto/src/merkle/smt/historical/mod.rs:451:9] &poison_stack = [
+//     true,
+// ]
+// [miden-crypto/src/merkle/smt/historical/mod.rs:533:21] haxx0r_node_digest = Word(
+//     [
+//         2537976933358268228,
+//         17318266107987595268,
+//         16794222307022281622,
+//         14574441290781062638,
+//     ],
+// )
+
 impl TestKV {
     fn new(n: u8) -> Self {
         let key = Rpo256::hash([n, 0, 0, 0].as_slice());
@@ -18,7 +249,7 @@ impl TestKV {
         let Self { key, value } = self;
         (key, value)
     }
-    fn with_value(mut self, value: &[u8]) -> Self {
+    fn with_value(self, value: &[u8]) -> Self {
         Self {
             key: self.key,
             value: Rpo256::hash(value),
@@ -163,13 +394,12 @@ fn test_historical_view_cache() {
 
     assert_eq!(smt_with_overlays.root(), final_smt.root());
 
-    // Get historical view at block 97 (3 overlays back)
-    let historical_view = smt_with_overlays.historical_view(98).unwrap();
+    // Get historical view at 2 overlays back (base state)
+    let historical_view = smt_with_overlays.historical_view(2).unwrap();
 
     // Test that cache is being used by checking same node multiple times
     let test_key = TestKV::new(1).key;
-    let leaf_index = SmtWithOverlays::key_to_leaf_index(&test_key);
-    let node_index = NodeIndex::from(leaf_index).parent();
+    let _leaf_index = SmtWithOverlays::key_to_leaf_index(&test_key);
 
     // First access should populate cache
     let hash1 = historical_view.get_value(&test_key);
@@ -185,35 +415,33 @@ fn test_historical_view_cache() {
     let historical_root = historical_view.root();
     assert_eq!(
         historical_root, base_root,
-        "Historical root at block 97 should match base SMT root"
+        "Historical root at 2 overlays back should match base SMT root"
     );
 }
 
 #[test]
 fn opening_works_no_mutations() {
     let base_smt = create_mock_smt();
-    let (mutations1, mutations2, _) = create_mutation_sets(&base_smt);
+    let (mutations1, ..) = create_mutation_sets(&base_smt);
 
     // Create intermediate SMT states
     let mut smt_after_1 = base_smt.clone();
     smt_after_1.apply_mutations(mutations1.clone()).unwrap();
 
-    let mut smt_after_2 = smt_after_1.clone();
-    smt_after_2.apply_mutations(mutations2.clone()).unwrap();
-
-    let mut smt_with_overlays = SmtWithOverlays::new(base_smt.clone(), 100);
+    let smt_with_overlays = SmtWithOverlays::new(base_smt.clone());
 
     let test_key = TestKV::new(1).key;
     let base_proof = base_smt.open(&test_key);
     let htv = smt_with_overlays.historical_view(0).unwrap();
     let historic_proof = htv.open(&test_key);
+    assert_eq!(base_smt.root(), htv.root());
     assert_eq!(base_proof, historic_proof);
 }
 
 #[test]
 fn opening_works_post_1_mutations() {
     let base_smt = create_mock_smt();
-    let (mutations1, mutations2, _) = create_mutation_sets(&base_smt);
+    let (mutations1, ..) = create_mutation_sets(&base_smt);
 
     // Create intermediate SMT states
     let mut smt_after_1 = base_smt.clone();
@@ -224,8 +452,46 @@ fn opening_works_post_1_mutations() {
 
     let test_key = TestKV::new(3).key; // doesn't exist in base, so empty key
     let base_proof = base_smt.open(&test_key);
-    let htv = smt_with_overlays.historical_view(2).unwrap();
+
+    let htv = smt_with_overlays.historical_view(1).unwrap();
     let historic_proof = htv.open(&test_key);
+
+    // historic
+    let leaf = htv.get_leaf(&test_key);
+    let mut xxx = {
+        let leaf_idx = leaf.index();
+        leaf_idx
+            .index
+            .proof_indices()
+            .map(|haxx0r_idx| (haxx0r_idx, htv.get_inner_node(haxx0r_idx)))
+    };
+
+    let mut vanilla = {
+        let index = NodeIndex::from(Smt::key_to_leaf_index(&test_key));
+        index
+            .proof_indices()
+            .map(|vanilla_index| (vanilla_index, base_smt.get_inner_node(vanilla_index)))
+    };
+
+    vanilla
+        .zip(xxx)
+        .enumerate()
+        .inspect(|(i, ((vanilla_idx, vanilla), (haxx_idx, haxx)))| {
+            std::println!(
+                "[{i}]: test {vanilla_hash} @ {vanilla_idx}== {haxx_hash} @ {haxx_idx} when it should, {vanilla:?} vs {haxx:?}",
+                vanilla_hash = vanilla.hash(),
+                haxx_hash = haxx.hash(),
+            )
+        })
+        .for_each(|(i, ((vanilla_idx, vanilla), (haxx_idx, haxx)))| {
+            assert_eq!(vanilla_idx, haxx_idx);
+            assert_eq!(
+                vanilla.hash(), haxx.hash(),
+                "iterator item {i} does not equality: {vanilla:?} != {haxx:?} when it should"
+            )
+        });
+
+    assert_eq!(base_smt.root(), htv.root());
     assert_eq!(base_proof, historic_proof);
 }
 
@@ -249,6 +515,8 @@ fn opening_works_post_2_mutations() {
     let base_proof = base_smt.open(&test_key);
     let htv = smt_with_overlays.historical_view(2).unwrap();
     let historic_proof = htv.open(&test_key);
+    println!("base smt root {} vs {}", base_smt.root(), htv.root());
+    assert_eq!(base_smt.root(), htv.root());
     assert_eq!(base_proof, historic_proof);
 }
 
@@ -265,7 +533,7 @@ fn test_opening_comparison_with_vanilla_smt() {
     smt_after_2.apply_mutations(mutations2.clone()).unwrap();
 
     // Create historical SMT
-    let mut smt_with_overlays = SmtWithOverlays::new(base_smt.clone(), 100);
+    let mut smt_with_overlays = SmtWithOverlays::new(base_smt.clone());
 
     smt_with_overlays.apply_mutations(mutations1).unwrap();
     smt_with_overlays.apply_mutations(mutations2).unwrap();
@@ -275,29 +543,29 @@ fn test_opening_comparison_with_vanilla_smt() {
         vec![TestKV::new(1).key, TestKV::new(2).key, TestKV::new(3).key, TestKV::new(6).key];
 
     for key in test_keys {
-        // Compare at block 100 (current state)
-        let current_view = smt_with_overlays.historical_view(100).unwrap();
+        // Compare at current state (0 overlays back)
+        let current_view = smt_with_overlays.historical_view(0).unwrap();
         let current_proof = current_view.open(&key);
         let vanilla_proof = smt_after_2.open(&key);
 
         assert_eq!(current_proof.leaf(), vanilla_proof.leaf());
         assert_eq!(current_proof.path(), vanilla_proof.path());
 
-        // Compare at block 99 (after first mutation)
-        let historical_view_99 = smt_with_overlays.historical_view(99).unwrap();
-        let historical_proof_99 = historical_view_99.open(&key);
-        let vanilla_proof_99 = smt_after_1.open(&key);
+        // Compare at 1 overlay back (after first mutation)
+        let historical_view_1 = smt_with_overlays.historical_view(1).unwrap();
+        let historical_proof_1 = historical_view_1.open(&key);
+        let vanilla_proof_1 = smt_after_1.open(&key);
 
-        assert_eq!(historical_proof_99.leaf(), vanilla_proof_99.leaf());
-        assert_eq!(historical_proof_99.path(), vanilla_proof_99.path());
+        assert_eq!(historical_proof_1.leaf(), vanilla_proof_1.leaf());
+        assert_eq!(historical_proof_1.path(), vanilla_proof_1.path());
 
-        // Compare at block 98 (base state)
-        let historical_view_98 = smt_with_overlays.historical_view(98).unwrap();
-        let historical_proof_98 = historical_view_98.open(&key);
-        let vanilla_proof_98 = base_smt.open(&key);
+        // Compare at 2 overlays back (base state)
+        let historical_view_2 = smt_with_overlays.historical_view(2).unwrap();
+        let historical_proof_2 = historical_view_2.open(&key);
+        let vanilla_proof_2 = base_smt.open(&key);
 
-        assert_eq!(historical_proof_98.leaf(), vanilla_proof_98.leaf());
-        assert_eq!(historical_proof_98.path(), vanilla_proof_98.path());
+        assert_eq!(historical_proof_2.leaf(), vanilla_proof_2.leaf());
+        assert_eq!(historical_proof_2.path(), vanilla_proof_2.path());
     }
 }
 
@@ -317,7 +585,7 @@ fn test_get_value_across_overlays() {
     final_smt.apply_mutations(mutations3.clone()).unwrap();
 
     // Setup historical SMT
-    let mut smt_with_overlays = SmtWithOverlays::new(base_smt.clone(), 100);
+    let mut smt_with_overlays = SmtWithOverlays::new(base_smt.clone());
 
     smt_with_overlays.apply_mutations(mutations1).unwrap();
     smt_with_overlays.apply_mutations(mutations2).unwrap();
@@ -326,26 +594,30 @@ fn test_get_value_across_overlays() {
     // Test getting values at different historical points
     let key2 = TestKV::new(2).key;
 
-    // At block 100 (current), key2 should have updated value from mutations1
-    let view_100 = smt_with_overlays.historical_view(100).unwrap();
-    let value_100 = view_100.get_value(&key2);
+    // At current state (0 overlays back), key2 should have updated value from mutations1
+    let view_current = smt_with_overlays.historical_view(0).unwrap();
+    let value_current = view_current.get_value(&key2);
     assert_eq!(
-        value_100,
+        value_current,
         final_smt.get_value(&key2),
-        "Value at block 100 should match final SMT"
+        "Value at current state should match final SMT"
     );
 
-    // At block 97 (3 overlays back = base state), key2 should have original value
-    let view_97 = smt_with_overlays.historical_view(97).unwrap();
-    let value_97 = view_97.get_value(&key2);
-    assert_eq!(value_97, base_smt.get_value(&key2), "Value at block 97 should match base SMT");
+    // At 3 overlays back (base state), key2 should have original value
+    let view_base = smt_with_overlays.historical_view(3).unwrap();
+    let value_base = view_base.get_value(&key2);
+    assert_eq!(
+        value_base,
+        base_smt.get_value(&key2),
+        "Value at base state should match base SMT"
+    );
 
     // Also test a key that was added in mutations1 (key6)
     let key6 = TestKV::new(6).key;
-    let view_100_key6 = view_100.get_value(&key6);
-    let view_97_key6 = view_97.get_value(&key6);
-    assert_eq!(view_100_key6, TestKV::new(6).value, "Key6 should exist at block 100");
-    assert_eq!(view_97_key6, EMPTY_WORD, "Key6 should not exist at block 97");
+    let view_current_key6 = view_current.get_value(&key6);
+    let view_base_key6 = view_base.get_value(&key6);
+    assert_eq!(view_current_key6, TestKV::new(6).value, "Key6 should exist at current state");
+    assert_eq!(view_base_key6, EMPTY_WORD, "Key6 should not exist at base state");
 }
 
 #[test]
@@ -370,46 +642,34 @@ fn test_overlay_cleanup() {
 
 #[test]
 fn test_overlay_idx_latest() {
-    // When requested == latest, should return Latest
-    assert_eq!(SmtWithOverlays::overlay_idx(100, 100), HistoricalOffset::Latest);
-    assert_eq!(SmtWithOverlays::overlay_idx(0, 0), HistoricalOffset::Latest);
-    assert_eq!(SmtWithOverlays::overlay_idx(42, 42), HistoricalOffset::Latest);
+    // When offset is 0, should return Latest
+    assert_eq!(SmtWithOverlays::overlay_idx(0), HistoricalOffset::Latest);
 }
 
 #[test]
 fn test_overlay_idx_recent() {
-    // When difference is 1-32, should return OverlayIdx
-    assert_eq!(SmtWithOverlays::overlay_idx(100, 99), HistoricalOffset::OverlayIdx(0));
-    assert_eq!(SmtWithOverlays::overlay_idx(100, 98), HistoricalOffset::OverlayIdx(1));
-    assert_eq!(SmtWithOverlays::overlay_idx(100, 68), HistoricalOffset::OverlayIdx(31));
-    assert_eq!(SmtWithOverlays::overlay_idx(32, 0), HistoricalOffset::OverlayIdx(31));
+    // When offset is 1-32, should return OverlayIdx
+    assert_eq!(SmtWithOverlays::overlay_idx(1), HistoricalOffset::OverlayIdx(0));
+    assert_eq!(SmtWithOverlays::overlay_idx(2), HistoricalOffset::OverlayIdx(1));
+    assert_eq!(SmtWithOverlays::overlay_idx(32), HistoricalOffset::OverlayIdx(31));
 }
 
 #[test]
 fn test_overlay_idx_too_ancient() {
-    // When difference is >= 33, should return TooAncient
-    assert_eq!(SmtWithOverlays::overlay_idx(100, 67), HistoricalOffset::TooAncient);
-    assert_eq!(SmtWithOverlays::overlay_idx(33, 0), HistoricalOffset::TooAncient);
-    assert_eq!(SmtWithOverlays::overlay_idx(1000, 900), HistoricalOffset::TooAncient);
-}
-
-#[test]
-fn test_overlay_idx_future() {
-    // When requested > latest (future block), should return TooAncient
-    assert_eq!(SmtWithOverlays::overlay_idx(100, 101), HistoricalOffset::FutureBlock);
-    assert_eq!(SmtWithOverlays::overlay_idx(0, 1), HistoricalOffset::FutureBlock);
-    assert_eq!(SmtWithOverlays::overlay_idx(50, 100), HistoricalOffset::FutureBlock);
+    // When offset is > 32, should return TooAncient
+    assert_eq!(SmtWithOverlays::overlay_idx(33), HistoricalOffset::TooAncient);
+    assert_eq!(SmtWithOverlays::overlay_idx(100), HistoricalOffset::TooAncient);
 }
 
 #[test]
 fn test_overlay_idx_edge_cases() {
     // Edge case: exactly 32 blocks ago
-    assert_eq!(SmtWithOverlays::overlay_idx(32, 0), HistoricalOffset::OverlayIdx(31));
+    assert_eq!(SmtWithOverlays::overlay_idx(32), HistoricalOffset::OverlayIdx(31));
 
     // Edge case: exactly 33 blocks ago (too ancient)
-    assert_eq!(SmtWithOverlays::overlay_idx(33, 0), HistoricalOffset::TooAncient);
+    assert_eq!(SmtWithOverlays::overlay_idx(33), HistoricalOffset::TooAncient);
 
     // Edge case: small numbers
-    assert_eq!(SmtWithOverlays::overlay_idx(1, 0), HistoricalOffset::OverlayIdx(0));
-    assert_eq!(SmtWithOverlays::overlay_idx(2, 0), HistoricalOffset::OverlayIdx(1));
+    assert_eq!(SmtWithOverlays::overlay_idx(1), HistoricalOffset::OverlayIdx(0));
+    assert_eq!(SmtWithOverlays::overlay_idx(2), HistoricalOffset::OverlayIdx(1));
 }

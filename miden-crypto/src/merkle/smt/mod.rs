@@ -87,11 +87,16 @@ pub(crate) trait SparseMerkleTree<const DEPTH: u8> {
     ///
     /// Mostly this is an implementation detail of [`Self::open()`].
     fn get_path(&self, key: &Self::Key) -> SparseMerklePath {
-        let index = NodeIndex::from(Self::key_to_leaf_index(key));
+        let index = std::dbg!(NodeIndex::from(Self::key_to_leaf_index(key)));
 
         // SAFETY: this is guaranteed to have depth <= SMT_MAX_DEPTH
         SparseMerklePath::from_sized_iter(
-            index.proof_indices().map(|index| self.get_node_hash(index)),
+            index
+                .proof_indices()
+                .map(|vanilla_index| self.get_node_hash(std::dbg!(vanilla_index)))
+                .inspect(|vanilla_node_digest| {
+                    std::dbg!(vanilla_node_digest);
+                }),
         )
         .expect("failed to convert to SparseMerklePath")
     }

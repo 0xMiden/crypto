@@ -4,6 +4,7 @@
 use core::cell::RefCell;
 use std::{
     collections::{BTreeMap, HashMap, HashSet, VecDeque},
+    hash::RandomState,
     println,
     vec::Vec,
 };
@@ -104,14 +105,13 @@ impl Overlay {
 //     }
 // }
 
-pub type InnerNodeHashCache = indexmap::IndexMap<usize, HashMap<NodeIndex, Word>>;
+pub type InnerNodeHashCache = indexmap::IndexMap<usize, HashMap<NodeIndex, Word>, RandomState>;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum HistoricalOffset {
     OverlayIdx(usize),
     Latest,
     TooAncient,
-    FutureBlock,
 }
 
 #[derive(Debug, Clone)]
@@ -176,7 +176,6 @@ impl SmtWithOverlays {
         use std::dbg;
         let cache = self.cache.clone();
         match Self::overlay_idx(dbg!(past_offset)) {
-            HistoricalOffset::FutureBlock => None,
             HistoricalOffset::Latest => Some(HistoricalTreeView {
                 historical_overlay_offset: 0,
                 latest: &self.latest,
@@ -231,8 +230,9 @@ impl SmtWithOverlays {
     ) -> Result<(), OverlayError> {
         let overlay = Overlay::walkback(&self.latest, &mutation_set)?;
         self.add_overlay(overlay);
-        self.latest
-            .apply_mutations(mutation_set)
+        let _reversions = self
+            .latest
+            .apply_mutations_with_reversion(mutation_set)
             .map_err(|_fixme| OverlayError("merkle error FIXME"))?;
         Ok(())
     }
@@ -272,18 +272,21 @@ impl HistoricalTreeView<'_> {
 
     // Dynamically calculate the inner node cache, used for `SmtProof` deduction, and child hashes
     // required to do so. Call this for every entry in the `MerklePath`.
-    fn recalc_inner_digest_with_cache(
+    // FIXME after fixing all issues, this has become too slowto be practical, and needs to lookup
+    // more subtree poisioning before decending
+    fn dyn_inner_node_hash(
         &self,
         index_to_get_value_for: NodeIndex,
         oldest_historic_offset: usize,
     ) -> Word {
         // If we already have the value cached, return it
-        if let Some(&cached_value) = self
+        if let Some(cached_value) = self
             .cache
             .borrow_mut()
             .entry(oldest_historic_offset)
             .or_default()
             .get(&index_to_get_value_for)
+            .copied()
         {
             println!("EARLY EXIT found cached value for: {}", index_to_get_value_for);
 
@@ -313,6 +316,7 @@ impl HistoricalTreeView<'_> {
                 continue;
             }
             if !dedup.insert(current) {
+                println!("Already has current");
                 continue;
             }
 
@@ -320,20 +324,17 @@ impl HistoricalTreeView<'_> {
 
             // enqueue both again
             let left = current.left_child();
-            let right = current.left_child();
-
             if !digest_cache.contains_key(&left) {
-                if !dedup.contains(&left) {
-                    q.push_back(left);
-                }
+                q.push_back(left);
             }
+            let right = current.right_child();
             if !digest_cache.contains_key(&right) {
-                if !dedup.contains(&left) {
-                    q.push_back(right);
-                }
+                q.push_back(right);
             }
+            println!("runrunlooparound {current}");
         }
         drop(cache);
+        println!("walk down the tree XXXX");
 
         // Now compute from leaves to root
         while let Some(node) = compute_backlog.pop_back() {
@@ -358,6 +359,10 @@ impl HistoricalTreeView<'_> {
                 let left_hash = if let Some(hash) = digest_cache.get(&left).copied() {
                     println!("Found child (left) in cache at: {}", left);
                     hash
+                } else if left.depth() == SMT_DEPTH {
+                    // Handle leaf nodes specially
+                    let leaf_index = LeafIndex::<SMT_DEPTH>::new(left.value() as u64).unwrap();
+                    self.get_leaf_hash_at_index(leaf_index)
                 } else {
                     // FIXME ensure we don't call this accidentally via logic errors
                     println!("Fetching latest (left) at: {}", left);
@@ -365,16 +370,20 @@ impl HistoricalTreeView<'_> {
                     // no decendent value present under this node. Otherwise we
                     // have to calculate the node anyways, and hence we do not
                     // need to deal with that optimization in this file's scope.
-                    self.latest.get_node_hash(node)
+                    self.latest.get_node_hash(left)
                 };
 
                 let right_hash = if let Some(hash) = digest_cache.get(&right).copied() {
                     println!("Found child (right) in cache at: {}", right);
                     hash
+                } else if right.depth() == SMT_DEPTH {
+                    // Handle leaf nodes specially
+                    let leaf_index = LeafIndex::<SMT_DEPTH>::new(right.value() as u64).unwrap();
+                    self.get_leaf_hash_at_index(leaf_index)
                 } else {
                     // FIXME ensure we don't call this accidentally via logic errors
                     println!("Fetching latest (right) at: {}", right.depth());
-                    self.latest.get_node_hash(node)
+                    self.latest.get_node_hash(right)
                 };
 
                 // Merge the hashes to get parent hash
@@ -457,19 +466,12 @@ impl HistoricalTreeView<'_> {
             // of blocks produced since genesis");
 
             println!(
-                "FOund some offset {oldest_historic_offset} supposedly poisned, so we want to use the cache"
+                "FOund some offset {oldest_historic_offset} supposedly poisned, so we want to use
+            the cache"
             );
-            let _ = self.recalc_inner_digest_with_cache(index, oldest_historic_offset); // FIXME
-            let mut cache = self.cache.borrow_mut();
-            let cache_inner = cache.entry(oldest_historic_offset).or_default();
-            let left = cache_inner
-                .get(&index.left_child())
-                .copied()
-                .unwrap_or_else(|| self.latest.get_node_hash(index.left_child()));
-            let right = cache_inner
-                .get(&index.right_child())
-                .copied()
-                .unwrap_or_else(|| self.latest.get_node_hash(index.right_child()));
+
+            let left = { self.dyn_inner_node_hash(index.left_child(), oldest_historic_offset) }; // FIXME
+            let right = { self.dyn_inner_node_hash(index.right_child(), oldest_historic_offset) };
             InnerNode { left, right }
         } else {
             println!("No poisioning detected, use the latest");
@@ -523,12 +525,19 @@ impl HistoricalTreeView<'_> {
 
     pub fn open(&self, key: &Word) -> SmtProof {
         let leaf = self.get_leaf(key);
-        let leaf_idx = leaf.index();
+        let leaf_idx = dbg!(leaf.index());
 
-        let path = MerklePath::new(Vec::from_iter(
-            leaf_idx.index.proof_indices().map(|idx| self.get_node_hash(idx)),
-        ));
+        let path = SparseMerklePath::from_sized_iter(
+            leaf_idx
+                .index
+                .proof_indices()
+                .map(|haxx0r_idx| self.get_node_hash(dbg!(haxx0r_idx)))
+                .inspect(|haxx0r_node_digest| {
+                    dbg!(haxx0r_node_digest);
+                }),
+        )
+        .expect("By definition, we only construct SMT_DEPTH depths trees");
 
-        SmtProof::new(SparseMerklePath::try_from(path).unwrap(), leaf).unwrap()
+        SmtProof::new(path, leaf).unwrap()
     }
 }
