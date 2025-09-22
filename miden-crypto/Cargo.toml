@@ -108,6 +108,7 @@ winter-crypto    = { default-features = false, version = "0.13" }
 winter-math      = { default-features = false, version = "0.13" }
 winter-utils     = { default-features = false, version = "0.13" }
 zeroize          = { default-features = false, version = "1.8" }
+indexmap         = { default-features = false, version = "2" }
 
 [dev-dependencies]
 assert_matches = { default-features = false, version = "1.5" }

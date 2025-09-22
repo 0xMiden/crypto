@@ -1,6 +1,7 @@
 use super::*;
 use crate::merkle::Smt;
 
+// Helper to construct key value pairs
 #[derive(Debug)]
 struct TestKV {
     key: Word,
@@ -17,6 +18,15 @@ impl TestKV {
         let Self { key, value } = self;
         (key, value)
     }
+    fn with_value(mut self, value: &[u8]) -> Self {
+        Self {
+            key: self.key,
+            value: Rpo256::hash(value),
+        }
+    }
+    fn empty(self) -> Self {
+        Self { key: self.key, value: EMPTY_WORD }
+    }
 }
 
 // Create a mock SMT with some initial data
@@ -24,7 +34,7 @@ fn create_mock_smt() -> Smt {
     let mut smt = Smt::new();
 
     // Insert some initial values
-    for i in 1..=5 {
+    for i in 1..=3 {
         let TestKV { key, value } = TestKV::new(i);
         smt.insert(key, value).unwrap();
     }
@@ -44,12 +54,12 @@ fn create_mutation_sets(
 ) {
     // First mutation set: Update existing keys and add new ones
     let smt0 = smt.clone();
-    let _old_root1 = dbg!(smt0.root());
+    let _old_root1 = smt0.root();
 
-    let TestKV { key: key6, value: value6 } = TestKV::new(6);
-    let (key2, value2_new) = (TestKV::new(2).key, Rpo256::hash(&[2u8, 20, 0, 0]));
+    let kv6 = TestKV::new(6);
+    let kv2 = TestKV::new(2).with_value(&[2u8, 20]);
 
-    let mutations1 = smt0.compute_mutations(vec![(key6, value6), (key2, value2_new)]).unwrap();
+    let mutations1 = smt0.compute_mutations(vec![kv6.tup(), kv2.tup()]).unwrap();
 
     assert_eq!(mutations1.old_root, smt.root());
 
@@ -60,22 +70,20 @@ fn create_mutation_sets(
 
     // Second mutation set: Remove a key (set to empty) and add another
     let kv7 = TestKV::new(7);
-    let key3 = TestKV::new(3).key;
+    let kv3 = TestKV::new(3).empty();
 
-    let mutations2 = smt1.compute_mutations(vec![kv7.tup(), (key3, EMPTY_WORD)]).unwrap();
+    let mutations2 = smt1.compute_mutations(vec![kv7.tup(), kv3.tup()]).unwrap();
 
     // Apply mutations to get SMT after second mutations
     let mut smt2 = smt1.clone();
     smt2.apply_mutations(mutations2.clone()).unwrap();
 
     // Third mutation set: Multiple updates
-    let (key8, value8) = TestKV::new(8).tup();
-    let (key1, value1_new) = (TestKV::new(1).key, Rpo256::hash(&[1u8, 100, 0, 0]));
-    let (key4, value4_new) = (TestKV::new(4).key, Rpo256::hash(&[4u8, 44, 0, 0]));
+    let kv8 = TestKV::new(3).with_value(&[99u8, 128]);
+    let kv1 = TestKV::new(1).with_value(&[1u8, 100]);
+    let kv4 = TestKV::new(4).with_value(&[4u8, 44]);
 
-    let mutations3 = smt2
-        .compute_mutations(vec![(key8, value8), (key1, value1_new), (key4, value4_new)])
-        .unwrap();
+    let mutations3 = smt2.compute_mutations(vec![kv8.tup(), kv1.tup(), kv4.tup()]).unwrap();
 
     let mut smt3 = smt2.clone();
     smt3.apply_mutations(mutations3.clone()).unwrap();
@@ -147,7 +155,7 @@ fn test_historical_view_cache() {
     assert_ne!(root0, final_smt.root());
 
     // Create historical SMT with overlays
-    let mut smt_with_overlays = SmtWithOverlays::new(base_smt.clone(), 100);
+    let mut smt_with_overlays = SmtWithOverlays::new(base_smt.clone());
 
     // but we need to add them in the block order
     smt_with_overlays.apply_mutations(mutations1).unwrap();
@@ -182,7 +190,7 @@ fn test_historical_view_cache() {
 }
 
 #[test]
-fn opening_works() {
+fn opening_works_no_mutations() {
     let base_smt = create_mock_smt();
     let (mutations1, mutations2, _) = create_mutation_sets(&base_smt);
 
@@ -193,25 +201,55 @@ fn opening_works() {
     let mut smt_after_2 = smt_after_1.clone();
     smt_after_2.apply_mutations(mutations2.clone()).unwrap();
 
-    // Create historical SMT
     let mut smt_with_overlays = SmtWithOverlays::new(base_smt.clone(), 100);
 
+    let test_key = TestKV::new(1).key;
+    let base_proof = base_smt.open(&test_key);
+    let htv = smt_with_overlays.historical_view(0).unwrap();
+    let historic_proof = htv.open(&test_key);
+    assert_eq!(base_proof, historic_proof);
+}
+
+#[test]
+fn opening_works_post_1_mutations() {
+    let base_smt = create_mock_smt();
+    let (mutations1, mutations2, _) = create_mutation_sets(&base_smt);
+
+    // Create intermediate SMT states
+    let mut smt_after_1 = base_smt.clone();
+    smt_after_1.apply_mutations(mutations1.clone()).unwrap();
+
+    let mut smt_with_overlays = SmtWithOverlays::new(base_smt.clone());
+    smt_with_overlays.apply_mutations(mutations1.clone()).unwrap();
+
+    let test_key = TestKV::new(3).key; // doesn't exist in base, so empty key
+    let base_proof = base_smt.open(&test_key);
+    let htv = smt_with_overlays.historical_view(2).unwrap();
+    let historic_proof = htv.open(&test_key);
+    assert_eq!(base_proof, historic_proof);
+}
+
+#[test]
+fn opening_works_post_2_mutations() {
+    let base_smt = create_mock_smt();
+    let (mutations1, mutations2, _) = create_mutation_sets(&base_smt);
+
+    // Create intermediate SMT states
+    let mut smt_after_1 = base_smt.clone();
+    smt_after_1.apply_mutations(mutations1.clone()).unwrap();
+
+    let mut smt_after_2 = smt_after_1.clone();
+    smt_after_2.apply_mutations(mutations2.clone()).unwrap();
+
+    let mut smt_with_overlays = SmtWithOverlays::new(base_smt.clone());
     smt_with_overlays.apply_mutations(mutations1.clone()).unwrap();
     smt_with_overlays.apply_mutations(mutations2.clone()).unwrap();
 
-    let test_key = mutations1.new_pairs().iter().next().unwrap().0;
-    let proof_vanilla = smt_after_1.open(&test_key);
-    let view99 = smt_with_overlays.historical_view(99).unwrap();
-    let proof_historic = view99.open(&test_key);
-    assert_eq!(proof_vanilla, proof_historic);
-
-    let test_key = mutations2.new_pairs().iter().last().unwrap().0;
-    let proof_vanilla = smt_after_2.open(&test_key);
-    let current = smt_with_overlays.open(&test_key);
-    let pseudo_view = smt_with_overlays.historical_view(100).unwrap();
-    let psuedo_historic = pseudo_view.open(&test_key);
-    assert_eq!(psuedo_historic, current);
-    assert_eq!(proof_vanilla, psuedo_historic);
+    let test_key = TestKV::new(3).key; // doesn't exist in base, so empty key
+    let base_proof = base_smt.open(&test_key);
+    let htv = smt_with_overlays.historical_view(2).unwrap();
+    let historic_proof = htv.open(&test_key);
+    assert_eq!(base_proof, historic_proof);
 }
 
 #[test]
@@ -313,7 +351,7 @@ fn test_get_value_across_overlays() {
 #[test]
 fn test_overlay_cleanup() {
     let smt = create_mock_smt();
-    let mut smt_with_overlays = SmtWithOverlays::new(smt.clone(), 100);
+    let mut smt_with_overlays = SmtWithOverlays::new(smt.clone());
 
     // Add more than MAX_OVERLAYS overlays
     for _i in 0..SmtWithOverlays::MAX_OVERLAYS * 2 {

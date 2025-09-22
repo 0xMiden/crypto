@@ -3,7 +3,8 @@
 
 use core::cell::RefCell;
 use std::{
-    collections::{BTreeMap, HashMap, VecDeque},
+    collections::{BTreeMap, HashMap, HashSet, VecDeque},
+    println,
     vec::Vec,
 };
 
@@ -34,12 +35,18 @@ pub struct Overlay {
     poisoned_tree_leaves: Vec<LeafIndex<SMT_DEPTH>>,
 }
 
+use std::dbg;
+
 impl Overlay {
     // XXX scales linearly with `poisoned_tree_leaves`, but its all int-ops, so should be fairly
     // fast
     fn is_part_of_poisoned_tree(&self, node_index: NodeIndex) -> bool {
+        if node_index.depth() == 0 {
+            return true;
+        }
         for &poisoned_tree_leaf in self.poisoned_tree_leaves.iter() {
             let mut poisoned_leaf_ancestor = NodeIndex::from(poisoned_tree_leaf);
+            assert!(dbg!(poisoned_leaf_ancestor.depth()) >= dbg!(node_index.depth()));
             poisoned_leaf_ancestor.move_up_to(node_index.depth());
             if poisoned_leaf_ancestor == node_index {
                 return true;
@@ -97,7 +104,7 @@ impl Overlay {
 //     }
 // }
 
-pub type InnerNodeHashCache = HashMap<u32, BTreeMap<NodeIndex, Word>>;
+pub type InnerNodeHashCache = indexmap::IndexMap<usize, HashMap<NodeIndex, Word>>;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum HistoricalOffset {
@@ -115,21 +122,18 @@ pub struct SmtWithOverlays {
     /// dropped via `pop_back`. Now this means the newer the smaller the index, so the index
     /// becomes a relative history offset.
     overlays: VecDeque<Overlay>,
-    /// The block number of the oldest overlay
-    base_block_number: u32,
 
-    // TODO use Arc<_>
+    // TODO use Arc<ReadWriteLock<InnerNodeHashCache>>
     cache: RefCell<InnerNodeHashCache>,
 }
 
 impl SmtWithOverlays {
     const MAX_OVERLAYS: usize = 33;
 
-    pub fn new(latest: Smt, base_block_number: u32) -> Self {
+    pub fn new(latest: Smt) -> Self {
         Self {
             latest,
             overlays: VecDeque::new(),
-            base_block_number,
             cache: RefCell::new(Default::default()),
         }
     }
@@ -148,41 +152,41 @@ impl SmtWithOverlays {
         self.latest.open(key)
     }
 
-    pub fn oldest(&self) -> u32 {
-        self.base_block_number
+    /// Delta offset into the pat
+    pub fn oldest(&self) -> usize {
+        // assumes continues overlays! This holds, since otherwise `apply_..` would fail much
+        // earlier
+        self.overlays.len()
     }
 
     // obtain the index on the in-memory overlays based on the _desired_ block num given the latest
     // block number.
-    pub fn overlay_idx(latest_blocknum: u32, requested_blocknum: u32) -> HistoricalOffset {
-        let Some(offset_from_latest) = latest_blocknum.checked_sub(requested_blocknum) else {
-            return HistoricalOffset::FutureBlock;
-        };
-        match offset_from_latest as usize {
+    pub fn overlay_idx(past_offset: usize) -> HistoricalOffset {
+        match past_offset {
             0 => HistoricalOffset::Latest,
-            1..Self::MAX_OVERLAYS => HistoricalOffset::OverlayIdx(offset_from_latest as usize - 1),
+            1..Self::MAX_OVERLAYS => HistoricalOffset::OverlayIdx(past_offset as usize - 1),
             _ => HistoricalOffset::TooAncient,
         }
     }
 
     /// Construct a new historical view on the account tree, if the relevant overlays are still
     /// available.
-    pub fn historical_view<'a>(&'a self, height: u32) -> Option<HistoricalTreeView<'a>> {
+    pub fn historical_view<'a>(&'a self, past_offset: usize) -> Option<HistoricalTreeView<'a>> {
         // FIXME use a shared one per height
         use std::dbg;
         let cache = self.cache.clone();
-        match Self::overlay_idx(dbg!(self.base_block_number), dbg!(height)) {
+        match Self::overlay_idx(dbg!(past_offset)) {
             HistoricalOffset::FutureBlock => None,
             HistoricalOffset::Latest => Some(HistoricalTreeView {
-                block_number: height,
+                historical_overlay_offset: 0,
                 latest: &self.latest,
-                stacks: (&[], &[]),
+                overlays: (&[], &[]),
                 cache,
             }),
             HistoricalOffset::OverlayIdx(idx) => Some(HistoricalTreeView {
-                block_number: height,
+                historical_overlay_offset: idx,
                 latest: &self.latest,
-                stacks: {
+                overlays: {
                     dbg!(self.overlays.len());
                     let (a, b) = self.overlays.as_slices();
                     dbg!(a.len());
@@ -208,12 +212,19 @@ impl SmtWithOverlays {
         <Smt as SparseMerkleTree<SMT_DEPTH>>::key_to_leaf_index(key)
     }
 
-    /// Add an overlay. Commonly called whenever we apply some new mutations to the _latest_ tree.
+    /// Adds an overly to the _front_ (the first one to be applied to latest), but does _not_
+    /// modify `self.latest`. Care must be taken to retain a coherent inner state when calling
+    /// this!
     fn add_overlay(&mut self, overlay: Overlay) {
+        // FIXME move the cache entries as well
         self.overlays.push_front(overlay);
         self.cleanup();
     }
 
+    /// Apply the given mutation set to the interior [`Smt`].
+    ///
+    /// Creates an `Overlay` to be able to reconstruct the previous state of the `Smt`
+    /// on-demand and applies the delta as expected using [`Smt::apply_mutations`].
     pub fn apply_mutations(
         &mut self,
         mutation_set: MutationSet<SMT_DEPTH, Word, Word>,
@@ -227,12 +238,15 @@ impl SmtWithOverlays {
     }
 }
 
-///Pretend we were still at `block_number` of the `Smt`/`AccountTree`
+/// A historical view of the `Smt`
+///
+/// Pretend we were still at `block_number` of the `Smt`/`AccountTree` in a limited scope of
+/// `MAX_HISTORY` entries. The entries are labelled with relative offsets, commonly a `BlockNumber`.
 pub struct HistoricalTreeView<'a> {
-    block_number: u32,
+    historical_overlay_offset: usize,
     latest: &'a Smt,
     // 0 is top, nth is bottom, so if we query we query from the top
-    stacks: (&'a [Overlay], &'a [Overlay]),
+    overlays: (&'a [Overlay], &'a [Overlay]),
 
     cache: RefCell<InnerNodeHashCache>,
 }
@@ -240,7 +254,7 @@ pub struct HistoricalTreeView<'a> {
 impl HistoricalTreeView<'_> {
     /// An overlay for the stacks
     fn overlay_iter<'b>(&'b self) -> impl Iterator<Item = &'b Overlay> {
-        self.stacks.0.iter().chain(self.stacks.1.iter())
+        self.overlays.0.iter().chain(self.overlays.1.iter())
     }
 
     /// Root of all overlays combined with latest.
@@ -261,22 +275,24 @@ impl HistoricalTreeView<'_> {
     fn recalc_inner_digest_with_cache(
         &self,
         index_to_get_value_for: NodeIndex,
-        latest_affected_block_num: u32,
+        oldest_historic_offset: usize,
     ) -> Word {
         // If we already have the value cached, return it
         if let Some(&cached_value) = self
             .cache
             .borrow_mut()
-            .entry(latest_affected_block_num)
+            .entry(oldest_historic_offset)
             .or_default()
             .get(&index_to_get_value_for)
         {
+            println!("EARLY EXIT found cached value for: {}", index_to_get_value_for);
+
             return cached_value;
         }
 
-        // Walk down from the target node to find what needs to be computed
+        // Walk towards the leaves from the given node index to find what needs to be computed
         let mut cache = self.cache.borrow_mut();
-        let digest_cache = cache.entry(latest_affected_block_num).or_default();
+        let digest_cache = cache.entry(oldest_historic_offset).or_default();
 
         // bfs from the provided index
         let mut compute_backlog = VecDeque::new();
@@ -284,91 +300,91 @@ impl HistoricalTreeView<'_> {
 
         q.push_back(index_to_get_value_for);
 
-        dbg!("walk down the tree");
+        let mut dedup = HashSet::new();
+
+        println!("walk down the tree");
         while let Some(current) = q.pop_front() {
-            dbg!(current);
-            if digest_cache.contains_key(&current) {
+            if current.depth() >= SMT_DEPTH {
+                // leaves are always available
                 continue;
-            } else {
-                if current.depth() == SMT_DEPTH {
-                    // leaves are always available
-                    continue;
-                }
-                // XXX TODO FIXME prevent re-hashing of empty subtrees
-                // let _equivalent_empty_hash = EmptySubtreeRoots::entry(SMT_DEPTH,
-                // current.depth());
+            }
+            if digest_cache.contains_key(&current) {
+                println!("Key exists in cache at: {}", current);
+                continue;
+            }
+            if !dedup.insert(current) {
+                continue;
+            }
 
-                compute_backlog.push_back(current);
+            compute_backlog.push_back(current);
 
-                // enqueue both again
-                let left = current.left_child();
-                let right = current.left_child();
-                if !digest_cache.contains_key(&left) {
+            // enqueue both again
+            let left = current.left_child();
+            let right = current.left_child();
+
+            if !digest_cache.contains_key(&left) {
+                if !dedup.contains(&left) {
                     q.push_back(left);
                 }
-                if !digest_cache.contains_key(&right) {
+            }
+            if !digest_cache.contains_key(&right) {
+                if !dedup.contains(&left) {
                     q.push_back(right);
                 }
             }
         }
         drop(cache);
 
-        // TODO use the `EmptySubtreeRoots::empty_hashes(depth)` to create empty tree set
-        dbg!(
-            ">>>>>>>>>>>>>>>>>>>>>>>>>>>
-            >>>>>>>>>>>>>>>>>>>>>>>>>
-            >>>>>>>>>>>>>>>>>>>>>>
-            >>>>>>>>>>>>>>>>>>>"
-        );
-        use std::dbg;
-        // Now compute from deepest to lowest
+        // Now compute from leaves to root
         while let Some(node) = compute_backlog.pop_back() {
-            dbg!(node);
             let mut cache = self.cache.borrow_mut();
-            let digest_cache = cache.entry(latest_affected_block_num).or_default();
+            let digest_cache = cache.entry(oldest_historic_offset).or_default();
             if node.depth() == SMT_DEPTH {
                 // Leaf level - get the leaf hash
                 let leaf_index = LeafIndex::<SMT_DEPTH>::new(node.value() as u64).unwrap();
                 let hash = self.get_leaf_hash_at_index(leaf_index);
                 digest_cache.insert(node, hash);
+                println!("Retrieved LEAF at: {}", node);
             } else {
+                assert!(
+                    node.depth() < SMT_DEPTH,
+                    "Ordering constraint always holds, leaves to root"
+                );
                 // Inner node - compute from children
                 let left = node.left_child();
                 let right = node.right_child();
 
                 // Recursively ensure children are computed
                 let left_hash = if let Some(hash) = digest_cache.get(&left).copied() {
-                    hash
-                } else if left.depth() == SMT_DEPTH {
-                    let leaf_index = LeafIndex::<SMT_DEPTH>::new(left.value() as u64).unwrap();
-                    let hash = self.get_leaf_hash_at_index(leaf_index);
-                    digest_cache.insert(left, hash);
+                    println!("Found child (left) in cache at: {}", left);
                     hash
                 } else {
                     // FIXME ensure we don't call this accidentally via logic errors
+                    println!("Fetching latest (left) at: {}", left);
+                    // by definition, we use the `EmptyRoots` optimization if and only if there is
+                    // no decendent value present under this node. Otherwise we
+                    // have to calculate the node anyways, and hence we do not
+                    // need to deal with that optimization in this file's scope.
                     self.latest.get_node_hash(node)
                 };
 
                 let right_hash = if let Some(hash) = digest_cache.get(&right).copied() {
-                    hash
-                } else if right.depth() == SMT_DEPTH {
-                    let leaf_index = LeafIndex::<SMT_DEPTH>::new(right.value() as u64).unwrap();
-                    let hash = self.get_leaf_hash_at_index(leaf_index);
-                    digest_cache.insert(right, hash);
+                    println!("Found child (right) in cache at: {}", right);
                     hash
                 } else {
                     // FIXME ensure we don't call this accidentally via logic errors
+                    println!("Fetching latest (right) at: {}", right.depth());
                     self.latest.get_node_hash(node)
                 };
 
                 // Merge the hashes to get parent hash
-                let digest = Rpo256::merge(&[left_hash, right_hash]);
+                let digest = InnerNode { left: left_hash, right: right_hash }.hash();
                 digest_cache.insert(node, digest);
             }
         }
 
         let mut cache = self.cache.borrow_mut();
-        let digest_cache = cache.entry(latest_affected_block_num).or_default();
+        let digest_cache = cache.entry(oldest_historic_offset).or_default();
         digest_cache
             .get(&index_to_get_value_for)
             .copied()
@@ -415,13 +431,18 @@ impl HistoricalTreeView<'_> {
         MerklePath::from_iter(index
             .proof_indices()
             // iterates from leaves towards the root
-            .map(|index| { self.get_node_hash(index)
+            .map(|index| {
+                println!("GET NODE HASH: {index}");
+                let h = self.get_node_hash(index);
+                println!("GET NODE HASH == DONE DONE DEAL: {index}");
+                h
             }))
     }
 
     fn get_inner_node(&self, index: NodeIndex) -> InnerNode {
-        // we know these contain modifications, 'poisoning' the `latest` stack,
-        // so we skip all non-poisoned ones and do lookups from the last poisoning
+        // we know these contain modifications, 'poisoning' the `latest` stack and rendering inner
+        // nodes of `latest` uesless for the sake of hash derivation.
+        // We want to skip all non-poisoned ones and do lookups from the last poisoning
         let poison_stack = Vec::from_iter(
             self.overlay_iter().map(|overlay| overlay.is_part_of_poisoned_tree(index)),
         );
@@ -430,12 +451,17 @@ impl HistoricalTreeView<'_> {
 
         dbg!(&poison_stack);
 
-        if let Some(offset) = poison_stack.iter().position(|&x| x == true) {
-            let latest_affected_block_num = self.block_number.checked_sub(offset as u32)
-                .expect("By definition offset is at most 33 and cannot be larger than the number of blocks produced since genesis");
-            let _ = self.recalc_inner_digest_with_cache(index, latest_affected_block_num);
+        if let Some(oldest_historic_offset) = poison_stack.iter().position(|&x| x == true) {
+            // let latest_affected_block_num = self.block_number.checked_sub(offset as u32)
+            //     .expect("By definition offset is at most 33 and cannot be larger than the number
+            // of blocks produced since genesis");
+
+            println!(
+                "FOund some offset {oldest_historic_offset} supposedly poisned, so we want to use the cache"
+            );
+            let _ = self.recalc_inner_digest_with_cache(index, oldest_historic_offset); // FIXME
             let mut cache = self.cache.borrow_mut();
-            let cache_inner = cache.entry(latest_affected_block_num).or_default();
+            let cache_inner = cache.entry(oldest_historic_offset).or_default();
             let left = cache_inner
                 .get(&index.left_child())
                 .copied()
@@ -446,6 +472,7 @@ impl HistoricalTreeView<'_> {
                 .unwrap_or_else(|| self.latest.get_node_hash(index.right_child()));
             InnerNode { left, right }
         } else {
+            println!("No poisioning detected, use the latest");
             // nothing touched that index ever
             self.latest.get_inner_node(index)
         }
