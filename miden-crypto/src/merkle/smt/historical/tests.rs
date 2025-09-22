@@ -1,4 +1,7 @@
+use std::vec::Vec;
+
 use super::*;
+use crate::hash::rpo::Rpo256;
 
 // Helper to construct key value pairs
 #[derive(Debug)]
@@ -242,7 +245,7 @@ impl TestKV {
     fn new(n: u8) -> Self {
         let key = Rpo256::hash([n, 0, 0, 0].as_slice());
         let value = Rpo256::hash([n, n, 0, 0].as_slice());
-        dbg!(TestKV { key, value })
+        TestKV { key, value }
     }
     fn tup(self) -> (Word, Word) {
         let Self { key, value } = self;
@@ -271,8 +274,6 @@ fn create_mock_smt() -> Smt {
 
     smt
 }
-
-use std::dbg;
 
 // Create test mutation sets
 fn create_mutation_sets(
@@ -346,7 +347,6 @@ fn create_mutation_sets(
 #[test]
 fn test_reversion_mutation_sets() {
     let smt = create_mock_smt();
-    dbg!(smt.root());
     let (mutations1, ..) = create_mutation_sets(&smt);
 
     assert_eq!(mutations1.old_root(), smt.root());
@@ -479,9 +479,6 @@ fn opening_works_post_1_mutations() {
     vanilla
         .zip(xxx)
         .enumerate()
-        .inspect(|(i, ((vanilla_idx, vanilla), (haxx_idx, haxx)))| {
-            std::println!("[{i}]: test {vanilla:?} @ {vanilla_idx} == {haxx:?} @ {haxx_idx}")
-        })
         .for_each(|(i, ((vanilla_idx, vanilla), (haxx_idx, haxx)))| {
             assert_eq!(vanilla_idx, haxx_idx);
             assert_eq!(
@@ -497,7 +494,7 @@ fn opening_works_post_1_mutations() {
 #[test]
 fn opening_works_post_2_mutations() {
     let base_smt = create_mock_smt();
-    let (mutations1, mutations2, mutations3) = create_mutation_sets(&base_smt);
+    let (mutations1, mutations2, _mutations3) = create_mutation_sets(&base_smt);
 
     // Create intermediate SMT states
     let mut smt_after_1 = base_smt.clone();
@@ -514,7 +511,6 @@ fn opening_works_post_2_mutations() {
     let base_proof = base_smt.open(&test_key);
     let htv = smt_with_history.historical_view(2).unwrap();
     let historic_proof = htv.open(&test_key);
-    println!("base smt root {} vs {}", base_smt.root(), htv.root());
     assert_eq!(base_smt.root(), htv.root());
     assert_eq!(base_proof, historic_proof);
 }
@@ -543,7 +539,6 @@ fn opening_works_post_3_mutations() {
     let base_proof = base_smt.open(&test_key);
     let htv = smt_with_history.historical_view(3).unwrap();
     let historic_proof = htv.open(&test_key);
-    println!("base smt root {} vs {}", base_smt.root(), htv.root());
     assert_eq!(base_smt.root(), htv.root());
     assert_eq!(base_proof, historic_proof);
 }
