@@ -71,7 +71,7 @@ impl EphemeralSecretKey {
     /// Computes a Diffie-Hellman shared secret from this ephemeral secret key and the other party's
     /// static public key.
     pub fn diffie_hellman(self, pk_other: &PublicKey) -> SharedSecret {
-        let shared = self.inner.diffie_hellman(&pk_other.inner_x);
+        let shared = self.inner.diffie_hellman(&pk_other.to_x25519());
         SharedSecret::new(shared)
     }
 }
