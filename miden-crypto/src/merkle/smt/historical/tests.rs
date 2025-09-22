@@ -1,5 +1,4 @@
 use super::*;
-use crate::merkle::Smt;
 
 // Helper to construct key value pairs
 #[derive(Debug)]
@@ -292,12 +291,12 @@ fn create_mutation_sets(
 
     let mutations1 = smt0.compute_mutations(vec![kv6.tup(), kv2.tup()]).unwrap();
 
-    assert_eq!(mutations1.old_root, smt.root());
+    assert_eq!(mutations1.old_root(), smt.root());
 
     // Apply mutations to get SMT after first mutations
     let mut smt1 = smt0.clone();
     smt1.apply_mutations(mutations1.clone()).unwrap();
-    assert_eq!(mutations1.new_root, smt1.root());
+    assert_eq!(mutations1.root(), smt1.root());
 
     // Second mutation set: Remove a key (set to empty) and add another
     let kv7 = TestKV::new(7);
@@ -345,25 +344,29 @@ fn create_mutation_sets(
 }
 
 #[test]
-fn test_overlay_creation_and_inversion() {
+fn test_reversion_mutation_sets() {
     let smt = create_mock_smt();
     dbg!(smt.root());
     let (mutations1, ..) = create_mutation_sets(&smt);
 
-    assert_eq!(mutations1.old_root, smt.root());
-
-    assert_ne!(mutations1.old_root, mutations1.new_root);
+    assert_eq!(mutations1.old_root(), smt.root());
+    assert_ne!(mutations1.old_root(), mutations1.root());
 
     // Apply mutations to get the new state
     let mut smt_after = smt.clone();
     smt_after.apply_mutations(mutations1.clone()).unwrap();
 
-    // Test creating an inverted overlay
-    let overlay = Overlay::walkback(&smt_after, &mutations1).unwrap();
+    // The reversion mutation set should be able to restore the original state
+    let mut smt_with_history = SmtWithHistory::new(smt.clone());
+    smt_with_history.apply_mutations(mutations1.clone()).unwrap();
 
-    // Verify that old and new roots are swapped
-    assert_eq!(overlay.old_root(), mutations1.root());
-    assert_eq!(overlay.root(), mutations1.old_root());
+    // Check that we have one reversion stored
+    assert_eq!(smt_with_history.reversions.len(), 1);
+
+    // The reversion should be able to restore the original root when applied
+    let reversion = &smt_with_history.reversions[0];
+    assert_eq!(reversion.old_root(), smt_after.root());
+    assert_eq!(reversion.root(), smt.root());
 }
 
 #[test]
@@ -386,20 +389,20 @@ fn test_historical_view_cache() {
     assert_ne!(root0, final_smt.root());
 
     // Create historical SMT with overlays
-    let mut smt_with_overlays = SmtWithOverlays::new(base_smt.clone());
+    let mut smt_with_history = SmtWithHistory::new(base_smt.clone());
 
     // but we need to add them in the block order
-    smt_with_overlays.apply_mutations(mutations1).unwrap();
-    smt_with_overlays.apply_mutations(mutations2).unwrap();
+    smt_with_history.apply_mutations(mutations1).unwrap();
+    smt_with_history.apply_mutations(mutations2).unwrap();
 
-    assert_eq!(smt_with_overlays.root(), final_smt.root());
+    assert_eq!(smt_with_history.root(), final_smt.root());
 
     // Get historical view at 2 overlays back (base state)
-    let historical_view = smt_with_overlays.historical_view(2).unwrap();
+    let historical_view = smt_with_history.historical_view(2).unwrap();
 
     // Test that cache is being used by checking same node multiple times
     let test_key = TestKV::new(1).key;
-    let _leaf_index = SmtWithOverlays::key_to_leaf_index(&test_key);
+    let _leaf_index = SmtWithHistory::key_to_leaf_index(&test_key);
 
     // First access should populate cache
     let hash1 = historical_view.get_value(&test_key);
@@ -428,11 +431,11 @@ fn opening_works_no_mutations() {
     let mut smt_after_1 = base_smt.clone();
     smt_after_1.apply_mutations(mutations1.clone()).unwrap();
 
-    let smt_with_overlays = SmtWithOverlays::new(base_smt.clone());
+    let smt_with_history = SmtWithHistory::new(base_smt.clone());
 
     let test_key = TestKV::new(1).key;
     let base_proof = base_smt.open(&test_key);
-    let htv = smt_with_overlays.historical_view(0).unwrap();
+    let htv = smt_with_history.historical_view(0).unwrap();
     let historic_proof = htv.open(&test_key);
     assert_eq!(base_smt.root(), htv.root());
     assert_eq!(base_proof, historic_proof);
@@ -447,46 +450,42 @@ fn opening_works_post_1_mutations() {
     let mut smt_after_1 = base_smt.clone();
     smt_after_1.apply_mutations(mutations1.clone()).unwrap();
 
-    let mut smt_with_overlays = SmtWithOverlays::new(base_smt.clone());
-    smt_with_overlays.apply_mutations(mutations1.clone()).unwrap();
+    let mut smt_with_history = SmtWithHistory::new(base_smt.clone());
+    smt_with_history.apply_mutations(mutations1.clone()).unwrap();
 
     let test_key = TestKV::new(3).key; // doesn't exist in base, so empty key
     let base_proof = base_smt.open(&test_key);
 
-    let htv = smt_with_overlays.historical_view(1).unwrap();
+    let htv = smt_with_history.historical_view(1).unwrap();
     let historic_proof = htv.open(&test_key);
 
     // historic
     let leaf = htv.get_leaf(&test_key);
-    let mut xxx = {
+    let xxx = {
         let leaf_idx = leaf.index();
         leaf_idx
             .index
             .proof_indices()
-            .map(|haxx0r_idx| (haxx0r_idx, htv.get_inner_node(haxx0r_idx)))
+            .map(|haxx0r_idx| (haxx0r_idx, htv.get_node_hash(haxx0r_idx)))
     };
 
-    let mut vanilla = {
+    let vanilla = {
         let index = NodeIndex::from(Smt::key_to_leaf_index(&test_key));
         index
             .proof_indices()
-            .map(|vanilla_index| (vanilla_index, base_smt.get_inner_node(vanilla_index)))
+            .map(|vanilla_index| (vanilla_index, base_smt.get_node_hash(vanilla_index)))
     };
 
     vanilla
         .zip(xxx)
         .enumerate()
         .inspect(|(i, ((vanilla_idx, vanilla), (haxx_idx, haxx)))| {
-            std::println!(
-                "[{i}]: test {vanilla_hash} @ {vanilla_idx}== {haxx_hash} @ {haxx_idx} when it should, {vanilla:?} vs {haxx:?}",
-                vanilla_hash = vanilla.hash(),
-                haxx_hash = haxx.hash(),
-            )
+            std::println!("[{i}]: test {vanilla:?} @ {vanilla_idx} == {haxx:?} @ {haxx_idx}")
         })
         .for_each(|(i, ((vanilla_idx, vanilla), (haxx_idx, haxx)))| {
             assert_eq!(vanilla_idx, haxx_idx);
             assert_eq!(
-                vanilla.hash(), haxx.hash(),
+                vanilla, haxx,
                 "iterator item {i} does not equality: {vanilla:?} != {haxx:?} when it should"
             )
         });
@@ -498,7 +497,7 @@ fn opening_works_post_1_mutations() {
 #[test]
 fn opening_works_post_2_mutations() {
     let base_smt = create_mock_smt();
-    let (mutations1, mutations2, _) = create_mutation_sets(&base_smt);
+    let (mutations1, mutations2, mutations3) = create_mutation_sets(&base_smt);
 
     // Create intermediate SMT states
     let mut smt_after_1 = base_smt.clone();
@@ -507,13 +506,42 @@ fn opening_works_post_2_mutations() {
     let mut smt_after_2 = smt_after_1.clone();
     smt_after_2.apply_mutations(mutations2.clone()).unwrap();
 
-    let mut smt_with_overlays = SmtWithOverlays::new(base_smt.clone());
-    smt_with_overlays.apply_mutations(mutations1.clone()).unwrap();
-    smt_with_overlays.apply_mutations(mutations2.clone()).unwrap();
+    let mut smt_with_history = SmtWithHistory::new(base_smt.clone());
+    smt_with_history.apply_mutations(mutations1.clone()).unwrap();
+    smt_with_history.apply_mutations(mutations2.clone()).unwrap();
 
-    let test_key = TestKV::new(3).key; // doesn't exist in base, so empty key
+    let test_key = TestKV::new(3).key; // key 3 exists in base
     let base_proof = base_smt.open(&test_key);
-    let htv = smt_with_overlays.historical_view(2).unwrap();
+    let htv = smt_with_history.historical_view(2).unwrap();
+    let historic_proof = htv.open(&test_key);
+    println!("base smt root {} vs {}", base_smt.root(), htv.root());
+    assert_eq!(base_smt.root(), htv.root());
+    assert_eq!(base_proof, historic_proof);
+}
+
+#[test]
+fn opening_works_post_3_mutations() {
+    let base_smt = create_mock_smt();
+    let (mutations1, mutations2, mutations3) = create_mutation_sets(&base_smt);
+
+    // Create intermediate SMT states
+    let mut smt_after_1 = base_smt.clone();
+    smt_after_1.apply_mutations(mutations1.clone()).unwrap();
+
+    let mut smt_after_2 = smt_after_1.clone();
+    smt_after_2.apply_mutations(mutations2.clone()).unwrap();
+
+    let mut smt_after_3 = smt_after_2.clone();
+    smt_after_3.apply_mutations(mutations3.clone()).unwrap();
+
+    let mut smt_with_history = SmtWithHistory::new(base_smt.clone());
+    smt_with_history.apply_mutations(mutations1.clone()).unwrap();
+    smt_with_history.apply_mutations(mutations2.clone()).unwrap();
+    smt_with_history.apply_mutations(mutations3.clone()).unwrap();
+
+    let test_key = TestKV::new(3).key; // key 3 exists in base
+    let base_proof = base_smt.open(&test_key);
+    let htv = smt_with_history.historical_view(3).unwrap();
     let historic_proof = htv.open(&test_key);
     println!("base smt root {} vs {}", base_smt.root(), htv.root());
     assert_eq!(base_smt.root(), htv.root());
@@ -533,10 +561,10 @@ fn test_opening_comparison_with_vanilla_smt() {
     smt_after_2.apply_mutations(mutations2.clone()).unwrap();
 
     // Create historical SMT
-    let mut smt_with_overlays = SmtWithOverlays::new(base_smt.clone());
+    let mut smt_with_history = SmtWithHistory::new(base_smt.clone());
 
-    smt_with_overlays.apply_mutations(mutations1).unwrap();
-    smt_with_overlays.apply_mutations(mutations2).unwrap();
+    smt_with_history.apply_mutations(mutations1).unwrap();
+    smt_with_history.apply_mutations(mutations2).unwrap();
 
     // Test opening for same keys at different historical points
     let test_keys =
@@ -544,7 +572,7 @@ fn test_opening_comparison_with_vanilla_smt() {
 
     for key in test_keys {
         // Compare at current state (0 overlays back)
-        let current_view = smt_with_overlays.historical_view(0).unwrap();
+        let current_view = smt_with_history.historical_view(0).unwrap();
         let current_proof = current_view.open(&key);
         let vanilla_proof = smt_after_2.open(&key);
 
@@ -552,7 +580,7 @@ fn test_opening_comparison_with_vanilla_smt() {
         assert_eq!(current_proof.path(), vanilla_proof.path());
 
         // Compare at 1 overlay back (after first mutation)
-        let historical_view_1 = smt_with_overlays.historical_view(1).unwrap();
+        let historical_view_1 = smt_with_history.historical_view(1).unwrap();
         let historical_proof_1 = historical_view_1.open(&key);
         let vanilla_proof_1 = smt_after_1.open(&key);
 
@@ -560,7 +588,7 @@ fn test_opening_comparison_with_vanilla_smt() {
         assert_eq!(historical_proof_1.path(), vanilla_proof_1.path());
 
         // Compare at 2 overlays back (base state)
-        let historical_view_2 = smt_with_overlays.historical_view(2).unwrap();
+        let historical_view_2 = smt_with_history.historical_view(2).unwrap();
         let historical_proof_2 = historical_view_2.open(&key);
         let vanilla_proof_2 = base_smt.open(&key);
 
@@ -585,17 +613,17 @@ fn test_get_value_across_overlays() {
     final_smt.apply_mutations(mutations3.clone()).unwrap();
 
     // Setup historical SMT
-    let mut smt_with_overlays = SmtWithOverlays::new(base_smt.clone());
+    let mut smt_with_history = SmtWithHistory::new(base_smt.clone());
 
-    smt_with_overlays.apply_mutations(mutations1).unwrap();
-    smt_with_overlays.apply_mutations(mutations2).unwrap();
-    smt_with_overlays.apply_mutations(mutations3).unwrap();
+    smt_with_history.apply_mutations(mutations1).unwrap();
+    smt_with_history.apply_mutations(mutations2).unwrap();
+    smt_with_history.apply_mutations(mutations3).unwrap();
 
     // Test getting values at different historical points
     let key2 = TestKV::new(2).key;
 
     // At current state (0 overlays back), key2 should have updated value from mutations1
-    let view_current = smt_with_overlays.historical_view(0).unwrap();
+    let view_current = smt_with_history.historical_view(0).unwrap();
     let value_current = view_current.get_value(&key2);
     assert_eq!(
         value_current,
@@ -604,7 +632,7 @@ fn test_get_value_across_overlays() {
     );
 
     // At 3 overlays back (base state), key2 should have original value
-    let view_base = smt_with_overlays.historical_view(3).unwrap();
+    let view_base = smt_with_history.historical_view(3).unwrap();
     let value_base = view_base.get_value(&key2);
     assert_eq!(
         value_base,
@@ -621,55 +649,55 @@ fn test_get_value_across_overlays() {
 }
 
 #[test]
-fn test_overlay_cleanup() {
+fn test_reversion_cleanup() {
     let smt = create_mock_smt();
-    let mut smt_with_overlays = SmtWithOverlays::new(smt.clone());
+    let mut smt_with_history = SmtWithHistory::new(smt.clone());
 
-    // Add more than MAX_OVERLAYS overlays
-    for _i in 0..SmtWithOverlays::MAX_OVERLAYS * 2 {
-        let overlay = Overlay {
-            old_root: EMPTY_WORD,
-            new_root: EMPTY_WORD,
-            mutated: HashMap::new(),
-            poisoned_tree_leaves: Vec::new(),
-        };
-        smt_with_overlays.add_overlay(overlay);
+    // Create a simple mutation for testing
+    let test_kv = TestKV::new(99);
+
+    // Add more than MAX_OVERLAYS reversions by applying mutations
+    for i in 0..SmtWithHistory::MAX_HISTORY * 2 {
+        // Create a unique mutation for each iteration
+        let kv = TestKV::new((i % 255) as u8);
+        let mutations = smt_with_history.latest.compute_mutations(vec![kv.tup()]).unwrap();
+        smt_with_history.apply_mutations(mutations).unwrap();
     }
 
     // Verify that only MAX_OVERLAYS are kept
-    assert_eq!(smt_with_overlays.overlays.len(), SmtWithOverlays::MAX_OVERLAYS);
+    assert_eq!(smt_with_history.reversions.len(), SmtWithHistory::MAX_HISTORY);
 }
 
 #[test]
-fn test_overlay_idx_latest() {
+fn test_historical_offset_latest() {
     // When offset is 0, should return Latest
-    assert_eq!(SmtWithOverlays::overlay_idx(0), HistoricalOffset::Latest);
+    assert_eq!(SmtWithHistory::historical_offset(0), HistoricalOffset::Latest);
 }
 
 #[test]
-fn test_overlay_idx_recent() {
-    // When offset is 1-32, should return OverlayIdx
-    assert_eq!(SmtWithOverlays::overlay_idx(1), HistoricalOffset::OverlayIdx(0));
-    assert_eq!(SmtWithOverlays::overlay_idx(2), HistoricalOffset::OverlayIdx(1));
-    assert_eq!(SmtWithOverlays::overlay_idx(32), HistoricalOffset::OverlayIdx(31));
+fn test_historical_offset_recent() {
+    // When offset is 1-32, should return ReversionsIdx
+    assert_eq!(SmtWithHistory::historical_offset(1), HistoricalOffset::ReversionsIdx(0));
+    assert_eq!(SmtWithHistory::historical_offset(2), HistoricalOffset::ReversionsIdx(1));
+    assert_eq!(SmtWithHistory::historical_offset(32), HistoricalOffset::ReversionsIdx(31));
 }
 
 #[test]
-fn test_overlay_idx_too_ancient() {
+fn test_historical_offset_too_ancient() {
     // When offset is > 32, should return TooAncient
-    assert_eq!(SmtWithOverlays::overlay_idx(33), HistoricalOffset::TooAncient);
-    assert_eq!(SmtWithOverlays::overlay_idx(100), HistoricalOffset::TooAncient);
+    assert_eq!(SmtWithHistory::historical_offset(33), HistoricalOffset::TooAncient);
+    assert_eq!(SmtWithHistory::historical_offset(100), HistoricalOffset::TooAncient);
 }
 
 #[test]
-fn test_overlay_idx_edge_cases() {
+fn test_historical_offset_edge_cases() {
     // Edge case: exactly 32 blocks ago
-    assert_eq!(SmtWithOverlays::overlay_idx(32), HistoricalOffset::OverlayIdx(31));
+    assert_eq!(SmtWithHistory::historical_offset(32), HistoricalOffset::ReversionsIdx(31));
 
     // Edge case: exactly 33 blocks ago (too ancient)
-    assert_eq!(SmtWithOverlays::overlay_idx(33), HistoricalOffset::TooAncient);
+    assert_eq!(SmtWithHistory::historical_offset(33), HistoricalOffset::TooAncient);
 
     // Edge case: small numbers
-    assert_eq!(SmtWithOverlays::overlay_idx(1), HistoricalOffset::OverlayIdx(0));
-    assert_eq!(SmtWithOverlays::overlay_idx(2), HistoricalOffset::OverlayIdx(1));
+    assert_eq!(SmtWithHistory::historical_offset(1), HistoricalOffset::ReversionsIdx(0));
+    assert_eq!(SmtWithHistory::historical_offset(2), HistoricalOffset::ReversionsIdx(1));
 }
