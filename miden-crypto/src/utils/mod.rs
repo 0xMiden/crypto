@@ -52,7 +52,7 @@ pub enum HexParseError {
     InvalidLength { expected: usize, actual: usize },
     #[error("hex encoded data must start with 0x prefix")]
     MissingPrefix,
-    #[error("hex encoded data must contain only characters [a-zA-Z0-9]")]
+    #[error("hex encoded data must contain only characters [0-9a-fA-F]")]
     InvalidChar,
     #[error("hex encoded values of a Digest must be inside the field modulus")]
     OutOfRange,
