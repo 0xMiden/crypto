@@ -231,7 +231,7 @@ impl SecretKey {
     ) -> Result<Vec<u8>, EncryptionError> {
         if encrypted_data.data_type != DataType::Bytes {
             return Err(EncryptionError::InvalidDataType {
-                expected: DataType::Elements,
+                expected: DataType::Bytes,
                 found: encrypted_data.data_type,
             });
         }
