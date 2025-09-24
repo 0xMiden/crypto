@@ -20,7 +20,7 @@ pub use large::{
 };
 #[cfg(feature = "rocksdb")]
 pub use large::{RocksDbConfig, RocksDbStorage};
-// #[cfg(feature = "historical")]
+#[cfg(feature = "std")]
 pub mod historical;
 
 mod simple;

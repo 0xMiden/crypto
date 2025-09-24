@@ -11,12 +11,14 @@ use crate::{
 #[cfg(test)]
 mod tests;
 
+#[allow(missing_docs)]
 #[derive(thiserror::Error, Debug)]
 pub enum HistoricalError {
     #[error(transparent)]
     MerkleError(#[from] MerkleError),
 }
 
+/// The offset enum representing the offset relative to the `latest` `Smt`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum HistoricalOffset {
     ReversionsIdx(usize),
@@ -45,6 +47,10 @@ impl SmtWithHistory {
         while self.reversions.len() > Self::MAX_HISTORY {
             self.reversions.pop_back();
         }
+    }
+
+    pub fn history_len(&self) -> usize {
+        self.reversions.len()
     }
 
     pub fn root(&self) -> Word {
@@ -117,6 +123,13 @@ impl SmtWithHistory {
         self.cleanup();
     }
 
+    pub fn compute_mutations(
+        &self,
+        kv_pairs: impl IntoIterator<Item = (Word, Word)>,
+    ) -> Result<MutationSet<SMT_DEPTH, Word, Word>, HistoricalError> {
+        Ok(self.latest.compute_mutations(kv_pairs)?)
+    }
+
     /// Apply the given mutation set to the interior [`Smt`].
     ///
     /// Creates a reversion `MutationSet` to be able to reconstruct the previous state of the `Smt`
@@ -142,7 +155,9 @@ impl SmtWithHistory {
 /// Pretend we were still at `block_number` of the `Smt`/`AccountTree` in a limited scope of
 /// `MAX_HISTORY` entries. The entries are labelled with relative offsets, commonly a `BlockNumber`.
 pub struct HistoricalTreeView<'a> {
+    /// The index relative to the latest version at the time.
     historical_offset: usize,
+    /// The latest and greatest variant.
     latest: &'a Smt,
     /// The set over reversions
     ///
@@ -159,9 +174,7 @@ impl HistoricalTreeView<'_> {
     /// An iterator for the reversion stack
     ///
     /// Traverses them in order to be applied, from 0 (the first to be applied, one step in the
-    /// past) to the highest index (`MAX_HISTORY`).
-    ///
-    /// Returns a concrete iterator type that implements DoubleEndedIterator
+    /// past) to the highest index (`MAX_HISTORY` at most).
     fn reversion_iter<'b>(
         &'b self,
     ) -> impl DoubleEndedIterator<Item = &'b MutationSet<SMT_DEPTH, Word, Word>> {

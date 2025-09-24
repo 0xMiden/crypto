@@ -35,6 +35,8 @@ pub use smt::{
 pub use smt::{RocksDbConfig, RocksDbStorage};
 #[cfg(feature = "internal")]
 pub use smt::{SubtreeLeaf, build_subtree_for_bench};
+#[cfg(feature = "std")]
+pub use smt::historical;
 
 mod mmr;
 pub use mmr::{Forest, InOrderIndex, Mmr, MmrDelta, MmrError, MmrPeaks, MmrProof, PartialMmr};

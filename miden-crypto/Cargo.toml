@@ -32,6 +32,10 @@ harness = false
 name    = "smt"
 
 [[bench]]
+harness = false
+name    = "smt-historical"
+
+[[bench]]
 harness           = false
 name              = "smt-subtree"
 required-features = ["internal"]
