@@ -46,12 +46,22 @@ pub struct EphemeralSecretKey {
 impl ZeroizeOnDrop for EphemeralSecretKey {}
 
 impl EphemeralSecretKey {
+    /// Generates a new random ephemeral secret key using the OS random number generator.
+    #[cfg(feature = "std")]
+    #[allow(clippy::new_without_default)]
+    pub fn new() -> Self {
+        let mut rng = rand::rng();
+
+        Self::with_rng(&mut rng)
+    }
+
     /// Generates a new random ephemeral secret key using the provided RNG.
     pub fn with_rng<R: CryptoRng + RngCore>(rng: &mut R) -> Self {
         // we use a seedable CSPRNG and seed it with `rng`
         // this is a work around the fact that the version of the `rand` dependency in our crate
-        // is different than the one used in the `k256` one. This solution will no longer be needed
-        // once `k256` gets a new release with a version of the `rand` dependency matching ours
+        // is different than the one used in the `x25519_dalek` one. This solution will no longer be
+        // needed once `x25519_dalek` gets a new release with a version of the `rand`
+        // dependency matching ours
         use k256::elliptic_curve::rand_core::SeedableRng;
         let mut seed = [0_u8; 32];
         rand::RngCore::fill_bytes(rng, &mut seed);
@@ -96,6 +106,9 @@ impl Deserializable for EphemeralPublicKey {
         })
     }
 }
+
+// TESTS
+// ================================================================================================
 
 #[cfg(test)]
 mod tests {

@@ -12,7 +12,7 @@ use thiserror::Error;
 
 use crate::{
     Felt, SequentialCommit, Word,
-    ecdh::{EphemeralPublicKey, SharedSecret},
+    ecdh::k256::{EphemeralPublicKey, SharedSecret},
     utils::{
         ByteReader, ByteWriter, Deserializable, DeserializationError, Serializable,
         bytes_to_elements_with_padding,
