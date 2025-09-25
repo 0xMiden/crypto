@@ -109,6 +109,14 @@ impl PublicKey {
     }
 
     /// Convert to a X25519 public key which can be used in a DH key exchange protocol.
+    ///
+    /// # ⚠️ Security Warning
+    ///
+    /// **Do not reuse the same secret key for both Ed25519 signatures and X25519 key exchange.**
+    /// This conversion is primarily intended for sealed box primitives where an Ed25519 public key
+    /// is used to generate the shared key for encryption given an ephemeral X25519 key pair.
+    ///
+    /// In all other uses, prefer generating dedicated X25519 keys directly.
     pub(crate) fn to_x25519(&self) -> x25519_dalek::PublicKey {
         let mont_point = self.inner.to_montgomery();
         x25519_dalek::PublicKey::from(mont_point.to_bytes())
