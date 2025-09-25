@@ -1,3 +1,17 @@
+//! X25519 (Elliptic Curve Diffie-Hellman) key agreement implementation using
+//! Curve25519.
+//!
+//! Note that the intended use is in the context of a one-way, sender initiated key agreement
+//! scenario. Namely, when the sender knows the (static) public key of the receiver and it
+//! uses that, together with an ephemeral secret key that it generates, to derive a shared
+//! secret.
+//!
+//! This shared secret will then be used to encrypt some message (using for example a key
+//! derivation function).
+//!
+//! The public key associated with the ephemeral secret key will be sent alongside the encrypted
+//! message.
+
 use hkdf::{Hkdf, hmac::SimpleHmac};
 use k256::sha2::Sha256;
 use rand::{CryptoRng, RngCore};

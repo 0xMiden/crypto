@@ -1,3 +1,6 @@
+//! Ed25519 (EdDSA) signature implementation using Curve25519 and SHA-512 to hash
+//! the messages when signing.
+
 use alloc::{string::ToString, vec::Vec};
 
 use ed25519_dalek::{Signer, Verifier};
