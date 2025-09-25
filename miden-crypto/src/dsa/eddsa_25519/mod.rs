@@ -6,6 +6,7 @@ use alloc::{string::ToString, vec::Vec};
 use ed25519_dalek::{Signer, Verifier};
 use rand::{CryptoRng, RngCore};
 use thiserror::Error;
+use zeroize::Zeroize;
 
 use crate::{
     Felt, SequentialCommit, Word,
@@ -22,6 +23,7 @@ mod tests;
 // CONSTANTS
 // ================================================================================================
 
+/// Length of secret key in bytes
 const SECRET_KEY_BYTES: usize = 32;
 /// Length of public key in bytes
 pub(crate) const PUBLIC_KEY_BYTES: usize = 32;
@@ -154,8 +156,10 @@ impl Serializable for SecretKey {
 
 impl Deserializable for SecretKey {
     fn read_from<R: ByteReader>(source: &mut R) -> Result<Self, DeserializationError> {
-        let bytes: [u8; SECRET_KEY_BYTES] = source.read_array()?;
+        let mut bytes: [u8; SECRET_KEY_BYTES] = source.read_array()?;
         let inner = ed25519_dalek::SigningKey::from_bytes(&bytes);
+        bytes.zeroize();
+
         Ok(Self { inner })
     }
 }

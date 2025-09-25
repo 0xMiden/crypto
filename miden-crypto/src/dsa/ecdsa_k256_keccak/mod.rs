@@ -9,6 +9,7 @@ use k256::{
 };
 use rand::{CryptoRng, RngCore};
 use thiserror::Error;
+use zeroize::Zeroize;
 
 use crate::{
     Felt, SequentialCommit, Word,
@@ -253,10 +254,11 @@ impl Serializable for SecretKey {
 
 impl Deserializable for SecretKey {
     fn read_from<R: ByteReader>(source: &mut R) -> Result<Self, DeserializationError> {
-        let bytes: [u8; SECRET_KEY_BYTES] = source.read_array()?;
+        let mut bytes: [u8; SECRET_KEY_BYTES] = source.read_array()?;
 
         let signing_key = SigningKey::from_slice(&bytes)
             .map_err(|_| DeserializationError::InvalidValue("Invalid secret key".to_string()))?;
+        bytes.zeroize();
 
         Ok(Self { inner: signing_key })
     }
