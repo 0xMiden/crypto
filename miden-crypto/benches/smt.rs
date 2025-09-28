@@ -8,9 +8,10 @@
 //! The benchmarks are organized by:
 //! 1. Full SMT benchmarks (Smt struct)
 //! 2. Simple SMT benchmarks (SimpleSmt const-generic)
-//! 3. Proof verification benchmarks
-//! 4. Mutation computation and application
-//! 5. Batch operations
+//! 3. SMT subtree construction benchmarks
+//! 4. Proof verification benchmarks
+//! 5. Mutation computation and application
+//! 6. Batch operations
 //!
 //! # Benchmarking Strategy
 //!
@@ -30,20 +31,21 @@ use std::hint;
 
 use criterion::{Criterion, criterion_group, criterion_main};
 use miden_crypto::{
-    Felt, Word,
-    merkle::{LeafIndex, SimpleSmt, Smt},
+    Felt, ONE, Word,
+    merkle::{LeafIndex, SimpleSmt, Smt, SmtLeaf, SubtreeLeaf, build_subtree_for_bench},
 };
 
 mod common;
 use common::*;
 
 // === Test Data Generation ===
-use crate::data::generate_smt_entries_sequential as generate_smt_entries;
 use crate::{
     config::{DEFAULT_MEASUREMENT_TIME, DEFAULT_SAMPLE_SIZE},
     data::{
-        generate_simple_smt_entries_sequential as generate_simple_smt_entries,
-        generate_test_keys_sequential as generate_test_keys,
+        WordPattern, generate_simple_smt_entries_sequential as generate_simple_smt_entries,
+        generate_smt_entries_mixed, generate_smt_entries_sequential as generate_smt_entries,
+        generate_test_keys_sequential as generate_test_keys, generate_value, generate_word,
+        generate_word_pattern,
     },
 };
 
@@ -179,28 +181,23 @@ benchmark_with_setup_data! {
 benchmark_multi! {
     smt_creation_sizes,
     "creation-sizes",
-    &[16, 64, 256, 1024],
+    &[16, 64, 256, 1024, 4096, 65536, 1_048_576],
     |b: &mut criterion::Bencher, num_entries: &usize| {
-        b.iter(|| {
-            let entries: Vec<(Word, Word)> = (0..*num_entries)
-                .map(|i| {
-                    let key = Word::new([
-                        Felt::new(i as u64),
-                        Felt::new((i + 1) as u64),
-                        Felt::new((i + 2) as u64),
-                        Felt::new((i + 3) as u64),
-                    ]);
-                    let value = Word::new([
-                        Felt::new((i + 4) as u64),
-                        Felt::new((i + 5) as u64),
-                        Felt::new((i + 6) as u64),
-                        Felt::new((i + 7) as u64),
-                    ]);
-                    (key, value)
-                })
-                .collect();
-            hint::black_box(Smt::with_entries(entries).unwrap());
-        })
+        b.iter_batched(
+            || {
+                let entries = if *num_entries <= 4096 {
+                    generate_smt_entries(*num_entries)
+                } else {
+                    // Use mixed pattern for larger datasets to be more realistic
+                    generate_smt_entries_mixed(*num_entries)
+                };
+                entries
+            },
+            |entries| {
+                Smt::with_entries(hint::black_box(entries)).unwrap()
+            },
+            criterion::BatchSize::SmallInput,
+        )
     }
 }
 
@@ -386,18 +383,8 @@ benchmark_batch! {
         let mut smt = Smt::with_entries(entries).unwrap();
         let update_pairs: Vec<(Word, Word)> = (0..update_count)
             .map(|i| {
-                let key = Word::new([
-                    Felt::new((1000 + i) as u64),
-                    Felt::new((1001 + i) as u64),
-                    Felt::new((1002 + i) as u64),
-                    Felt::new((1003 + i) as u64),
-                ]);
-                let value = Word::new([
-                    Felt::new((1004 + i) as u64),
-                    Felt::new((1005 + i) as u64),
-                    Felt::new((1006 + i) as u64),
-                    Felt::new((1007 + i) as u64),
-                ]);
+                let key = generate_word_pattern((1000 + i) as u64, WordPattern::Sequential);
+                let value = generate_word_pattern((1004 + i) as u64, WordPattern::Sequential);
                 (key, value)
             })
             .collect();
@@ -440,6 +427,106 @@ benchmark_batch! {
     |size| Some(criterion::Throughput::Elements(size as u64))
 }
 
+// === SMT Subtree Benchmarks ===
+
+const PAIR_COUNTS: [u64; 5] = [1, 64, 128, 192, 256];
+
+// SMT subtree construction with even distribution
+benchmark_multi! {
+    smt_subtree_even,
+    "subtree8-even",
+    &PAIR_COUNTS,
+    |b: &mut criterion::Bencher, &pair_count: &u64| {
+        let mut seed = [0u8; 32];
+
+        b.iter_batched(
+            || {
+                let entries: Vec<(Word, Word)> = (0..pair_count)
+                    .map(|n| {
+                        // A single depth-8 subtree can have a maximum of 255 leaves.
+                        let leaf_index = ((n as f64 / pair_count as f64) * 255.0) as u64;
+                        let key = Word::new([
+                            generate_value(&mut seed),
+                            ONE,
+                            Felt::new(n as u64),
+                            Felt::new(leaf_index),
+                        ]);
+                        let value = generate_word(&mut seed);
+                        (key, value)
+                    })
+                    .collect();
+
+                let mut leaves: Vec<_> = entries
+                    .iter()
+                    .map(|(key, value)| {
+                        let leaf = SmtLeaf::new_single(*key, *value);
+                        let col = leaf.index().value();
+                        let hash = leaf.hash();
+                        SubtreeLeaf { col, hash }
+                    })
+                    .collect();
+                leaves.sort();
+                leaves.dedup_by_key(|leaf| leaf.col);
+                leaves
+            },
+            |leaves| {
+                let (subtree, _) = build_subtree_for_bench(
+                    hint::black_box(leaves),
+                    hint::black_box(8),  // SMT_DEPTH
+                    hint::black_box(8),   // SMT_DEPTH
+                );
+                assert!(!subtree.is_empty());
+            },
+            criterion::BatchSize::SmallInput,
+        );
+    }
+}
+
+// SMT subtree construction with random distribution
+benchmark_multi! {
+    smt_subtree_random,
+    "subtree8-rand",
+    &PAIR_COUNTS,
+    |b: &mut criterion::Bencher, &pair_count: &u64| {
+        let mut seed = [0u8; 32];
+
+        b.iter_batched(
+            || {
+                let entries: Vec<(Word, Word)> = (0..pair_count)
+                    .map(|i| {
+                        let leaf_index: u8 = generate_value(&mut seed);
+                        let key = Word::new([ONE, ONE, Felt::new(i as u64), Felt::new(leaf_index as u64)]);
+                        let value = generate_word(&mut seed);
+                        (key, value)
+                    })
+                    .collect();
+
+                let mut leaves: Vec<_> = entries
+                    .iter()
+                    .map(|(key, value)| {
+                        let leaf = SmtLeaf::new_single(*key, *value);
+                        let col = leaf.index().value();
+                        let hash = leaf.hash();
+                        SubtreeLeaf { col, hash }
+                    })
+                    .collect();
+                leaves.sort();
+                leaves.dedup_by_key(|leaf| leaf.col);
+                leaves
+            },
+            |leaves| {
+                let (subtree, _) = build_subtree_for_bench(
+                    hint::black_box(leaves),
+                    hint::black_box(8),  // SMT_DEPTH
+                    hint::black_box(8),   // SMT_DEPTH
+                );
+                assert!(!subtree.is_empty());
+            },
+            criterion::BatchSize::SmallInput,
+        );
+    }
+}
+
 // === Benchmark Group Configuration ===
 
 criterion_group!(
@@ -461,6 +548,9 @@ criterion_group!(
     simple_smt_insert,
     simple_smt_open,
     simple_smt_leaves,
+    // SMT subtree benchmarks
+    smt_subtree_even,
+    smt_subtree_random,
     // Mutation benchmarks
     smt_compute_mutations,
     smt_apply_mutations,
