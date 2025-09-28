@@ -1,4 +1,4 @@
-use alloc::{string::String, vec::Vec};
+use alloc::string::String;
 use core::{
     mem::{size_of, transmute, transmute_copy},
     ops::Deref,
@@ -187,8 +187,8 @@ impl Hasher for Blake3_192 {
     }
 
     fn merge_many(values: &[Self::Digest]) -> Self::Digest {
-        let bytes: Vec<u8> = values.iter().flat_map(|v| v.as_bytes()).collect();
-        Blake3Digest(*shrink_bytes(&blake3::hash(&bytes).into()))
+        let bytes = Blake3Digest::digests_as_bytes(values);
+        Blake3Digest(*shrink_bytes(&blake3::hash(bytes).into()))
     }
 
     fn merge(values: &[Self::Digest; 2]) -> Self::Digest {
@@ -260,8 +260,8 @@ impl Hasher for Blake3_160 {
     }
 
     fn merge_many(values: &[Self::Digest]) -> Self::Digest {
-        let bytes: Vec<u8> = values.iter().flat_map(|v| v.as_bytes()).collect();
-        Blake3Digest(*shrink_bytes(&blake3::hash(&bytes).into()))
+        let bytes = Blake3Digest::digests_as_bytes(values);
+        Blake3Digest(*shrink_bytes(&blake3::hash(bytes).into()))
     }
 
     fn merge_with_int(seed: Self::Digest, value: u64) -> Self::Digest {
