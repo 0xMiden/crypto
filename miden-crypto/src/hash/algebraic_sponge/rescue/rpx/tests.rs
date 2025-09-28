@@ -178,6 +178,23 @@ fn sponge_zeroes_collision() {
     });
 }
 
+#[test]
+fn ext_round_matches_reference_many() {
+    for _ in 0..200 {
+        let mut state = [Felt::new(rand_value()); Rpx256::STATE_WIDTH];
+        for round in 0..7 {
+            let mut got = state;
+            let mut want = state;
+
+            Rpx256::apply_ext_round(&mut got, round);
+            Rpx256::apply_ext_round_ref(&mut want, round);
+
+            assert_eq!(got, want, "mismatch at round {round}");
+            state = got; // advance to catch chaining issues
+        }
+    }
+}
+
 proptest! {
     #[test]
     fn rpo256_wont_panic_with_arbitrary_input(ref bytes in any::<Vec<u8>>()) {

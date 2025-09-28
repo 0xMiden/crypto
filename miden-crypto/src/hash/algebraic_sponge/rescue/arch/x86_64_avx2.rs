@@ -326,3 +326,133 @@ pub unsafe fn apply_inv_sbox(buffer: &mut [u64; 12]) {
     state = do_apply_inv_sbox(state);
     avx2_store(buffer, state);
 }
+
+// RPX E-round
+// ================================================================================================
+
+#[inline(always)]
+unsafe fn load_ext(buf: &[u64; 12]) -> (__m256i, __m256i, __m256i) {
+    // a0 = [s0,s3,s6,s9], a1 = [s1,s4,s7,s10], a2 = [s2,s5,s8,s11]
+    let a0 = _mm256_setr_epi64x(buf[0] as i64, buf[3] as i64, buf[6] as i64, buf[9] as i64);
+    let a1 = _mm256_setr_epi64x(buf[1] as i64, buf[4] as i64, buf[7] as i64, buf[10] as i64);
+    let a2 = _mm256_setr_epi64x(buf[2] as i64, buf[5] as i64, buf[8] as i64, buf[11] as i64);
+    (a0, a1, a2)
+}
+
+#[inline(always)]
+unsafe fn store_ext(buf: &mut [u64; 12], a0: __m256i, a1: __m256i, a2: __m256i) {
+    let mut t0 = [0i64; 4];
+    let mut t1 = [0i64; 4];
+    let mut t2 = [0i64; 4];
+    _mm256_storeu_si256(t0.as_mut_ptr().cast(), a0);
+    _mm256_storeu_si256(t1.as_mut_ptr().cast(), a1);
+    _mm256_storeu_si256(t2.as_mut_ptr().cast(), a2);
+
+    buf[0] = t0[0] as u64;
+    buf[3] = t0[1] as u64;
+    buf[6] = t0[2] as u64;
+    buf[9] = t0[3] as u64;
+    buf[1] = t1[0] as u64;
+    buf[4] = t1[1] as u64;
+    buf[7] = t1[2] as u64;
+    buf[10] = t1[3] as u64;
+    buf[2] = t2[0] as u64;
+    buf[5] = t2[1] as u64;
+    buf[8] = t2[2] as u64;
+    buf[11] = t2[3] as u64;
+}
+
+#[inline(always)]
+unsafe fn add_mod(x: __m256i, y: __m256i) -> __m256i {
+    let res_wrapped = _mm256_add_epi64(x, y);
+    let sign = _mm256_set1_epi64x(i64::MIN);
+    let x_s = _mm256_xor_si256(x, sign);
+    let r_s = _mm256_xor_si256(res_wrapped, sign);
+    let carry_mask = _mm256_cmpgt_epi32(x_s, r_s);
+    let wrapback = _mm256_srli_epi64::<32>(carry_mask);
+    _mm256_add_epi64(res_wrapped, wrapback)
+}
+
+#[inline(always)]
+unsafe fn sub_mod(x: __m256i, y: __m256i) -> __m256i {
+    let res_wrapped = _mm256_sub_epi64(x, y);
+    let sign = _mm256_set1_epi64x(i64::MIN);
+    let x_s = _mm256_xor_si256(x, sign);
+    let r_s = _mm256_xor_si256(res_wrapped, sign);
+    let borrow_mask = _mm256_cmpgt_epi32(r_s, x_s);
+    let adj = _mm256_srli_epi64::<32>(borrow_mask);
+    _mm256_sub_epi64(res_wrapped, adj)
+}
+
+#[inline(always)]
+unsafe fn dbl_mod(x: __m256i) -> __m256i {
+    add_mod(x, x)
+}
+
+#[inline(always)]
+unsafe fn ext_square(a0: __m256i, a1: __m256i, a2: __m256i) -> (__m256i, __m256i, __m256i) {
+    let (a0_sq, a1_sq, a2_sq) = square_reduce((a0, a1, a2));
+    let (a1a2, a0a1, a0a2) = mul_reduce((a1, a0, a0), (a2, a1, a2));
+
+    let two_a1a2 = dbl_mod(a1a2);
+    let two_a0a2 = dbl_mod(a0a2);
+
+    let out0 = add_mod(a0_sq, two_a1a2);
+
+    let a0a1_plus_a1a2 = add_mod(a0a1, a1a2);
+    let two_sum = dbl_mod(a0a1_plus_a1a2);
+    let out1 = add_mod(two_sum, a2_sq);
+
+    let out2 = add_mod(add_mod(two_a0a2, a1_sq), a2_sq);
+    (out0, out1, out2)
+}
+
+#[inline(always)]
+unsafe fn ext_mul(
+    a0: __m256i,
+    a1: __m256i,
+    a2: __m256i,
+    b0: __m256i,
+    b1: __m256i,
+    b2: __m256i,
+) -> (__m256i, __m256i, __m256i) {
+    let (a0b0, a1b1, a2b2) = mul_reduce((a0, a1, a2), (b0, b1, b2));
+
+    let t01a = add_mod(a0, a1);
+    let t01b = add_mod(b0, b1);
+    let a0b0_a0b1_a1b0_a1b1 = mul_reduce((t01a, t01a, t01a), (t01b, t01b, t01b)).0;
+
+    let t02a = add_mod(a0, a2);
+    let t02b = add_mod(b0, b2);
+    let a0b0_a0b2_a2b0_a2b2 = mul_reduce((t02a, t02a, t02a), (t02b, t02b, t02b)).0;
+
+    let t12a = add_mod(a1, a2);
+    let t12b = add_mod(b1, b2);
+    let a1b1_a1b2_a2b1_a2b2 = mul_reduce((t12a, t12a, t12a), (t12b, t12b, t12b)).0;
+
+    let a0b0_minus_a1b1 = sub_mod(a0b0, a1b1);
+
+    let out0 = sub_mod(add_mod(a1b1_a1b2_a2b1_a2b2, a0b0_minus_a1b1), a2b2);
+
+    let dbl_a1b1 = dbl_mod(a1b1);
+    let tmp1 = add_mod(a0b0_a0b1_a1b0_a1b1, a1b1_a1b2_a2b1_a2b2);
+    let out1 = sub_mod(sub_mod(tmp1, dbl_a1b1), a0b0);
+
+    let out2 = sub_mod(a0b0_a0b2_a2b0_a2b2, a0b0_minus_a1b1);
+    (out0, out1, out2)
+}
+
+#[inline(always)]
+unsafe fn ext_exp7(a0: __m256i, a1: __m256i, a2: __m256i) -> (__m256i, __m256i, __m256i) {
+    let (x2_0, x2_1, x2_2) = ext_square(a0, a1, a2);
+    let (x4_0, x4_1, x4_2) = ext_square(x2_0, x2_1, x2_2);
+    let (x3_0, x3_1, x3_2) = ext_mul(x2_0, x2_1, x2_2, a0, a1, a2);
+    ext_mul(x3_0, x3_1, x3_2, x4_0, x4_1, x4_2)
+}
+
+#[inline(always)]
+pub unsafe fn apply_ext_round(buf: &mut [u64; 12]) {
+    let (mut a0, mut a1, mut a2) = load_ext(buf);
+    (a0, a1, a2) = ext_exp7(a0, a1, a2);
+    store_ext(buf, a0, a1, a2);
+}
