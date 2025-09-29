@@ -7,8 +7,9 @@ use rand::{CryptoRng, RngCore};
 use winter_utils::{Deserializable, Serializable};
 use zeroize::ZeroizeOnDrop;
 
-mod k256;
-pub use k256::{EphemeralPublicKey, EphemeralSecretKey, K256, SharedSecret};
+pub mod k256;
+pub mod x25519;
+
 
 // KEY AGREEMENT TRAIT
 // ================================================================================================

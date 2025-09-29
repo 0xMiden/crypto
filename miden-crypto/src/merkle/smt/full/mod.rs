@@ -47,6 +47,54 @@ type Leaves = super::Leaves<SmtLeaf>;
 /// A leaf is either empty, or holds one or more key-value pairs. An empty leaf hashes to the empty
 /// word. Otherwise, a leaf hashes to the hash of its key-value pairs, ordered by key first, value
 /// second.
+///
+/// ```text
+/// depth
+/// T  0                  Root
+/// │  .                  /  \
+/// │  1              left   right
+/// │  .             /  \    /  \
+/// │
+/// │          .. .. .. .. .. .. .. ..
+/// │
+/// │  63
+/// │           /  \        /   \           \
+/// │  ￬       /    \      /     \           \
+/// │  64   Leaf₀  Leaf₁  Leaf₂  Leaf₃  ...  Leaf₂⁶⁴₋₂³²
+///        0x0..0 0x0..1 0x0..2 0x0..3      0xFFFFFFFF00000000
+///
+/// The digest is 256 bits, or 4 field elements:
+/// [elem₀, elem₁, elem₂, elem₃]
+///                         ↑
+///         Most significant element determines leaf
+///         index, mapping into the actual Leaf lookup
+///         table where the values are stored.
+///
+/// Zooming into a leaf, i.e. Leaf₁:
+/// ┌─────────────────────────────────────────────────┐
+/// │            Leaf₁ (index: 0x0..1)                │
+/// ├─────────────────────────────────────────────────┤
+/// │ Possible states:                                │
+/// │                                                 │
+/// │ 1. Empty leaf:                                  │
+/// │    └─ hash = EMPTY_WORD                         │
+/// │                                                 │
+/// │ 2. Single entry:                                │
+/// │    └─ (key₁, value₁)                            │
+/// │    └─ hash = H(key₁, value₁)                    │
+/// │                                                 │
+/// │ 3. Multiple entries:                            │
+/// │    └─ (key₁, value₁)                            │
+/// │    └─ (key₂, value₂)                            │
+/// │    └─ ...                                       │
+/// │    └─ hash = H(key₁, value₁, key₂, value₂, ...) │
+/// └─────────────────────────────────────────────────┘
+///
+/// Leaf states:
+/// - Empty: hashes to EMPTY_WORD
+/// - Non-empty: contains (key, value) pairs
+///              hash = H(key₁, value₁, key₂, value₂, ...)
+/// ```
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 pub struct Smt {
