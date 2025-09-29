@@ -8,7 +8,7 @@ use super::{
     message::{CryptoAlgorithm, SealedMessage},
 };
 use crate::{
-    ecdh::{K256, KeyAgreementScheme},
+    ecdh::{KeyAgreementScheme, k256::K256},
     encryption::xchacha::XChaCha,
     utils::{Deserializable, Serializable},
 };
@@ -102,7 +102,7 @@ impl UnsealingKey {
 /// Ephemeral public key, part of sealed messages
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) enum EphemeralPublicKey {
-    K256XChaCha20Poly1305(crate::ecdh::EphemeralPublicKey),
+    K256XChaCha20Poly1305(crate::ecdh::k256::EphemeralPublicKey),
 }
 
 impl EphemeralPublicKey {
