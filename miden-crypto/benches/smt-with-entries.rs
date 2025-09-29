@@ -1,10 +1,9 @@
-use std::{fmt::Debug, hint, mem, time::Duration};
+use std::{hint, time::Duration};
 
 use criterion::{BatchSize, BenchmarkId, Criterion, criterion_group, criterion_main};
-use miden_crypto::{Felt, ONE, Word, hash::rpo::RpoDigest, merkle::Smt};
-use rand_utils::prng_array;
-use winter_utils::Randomizable;
-
+use miden_crypto::{Felt, ONE, PrimeCharacteristicRing, Word, hash::rpo::RpoDigest, merkle::Smt};
+use rand::{RngCore, SeedableRng};
+use rand_chacha::ChaCha20Rng;
 // 2^0, 2^4, 2^8, 2^12, 2^16
 const PAIR_COUNTS: [u64; 6] = [1, 16, 256, 4096, 65536, 1_048_576];
 
@@ -46,26 +45,29 @@ criterion_main!(smt_with_entries_group);
 // --------------------------------------------------------------------------------------------
 
 fn prepare_entries(pair_count: u64, seed: &mut [u8; 32]) -> Vec<(RpoDigest, [Felt; 4])> {
+    let mut rng = ChaCha20Rng::from_seed(*seed);
     let entries: Vec<(RpoDigest, Word)> = (0..pair_count)
         .map(|i| {
             let count = pair_count as f64;
             let idx = ((i as f64 / count) * (count)) as u64;
-            let key = RpoDigest::new([generate_value(seed), ONE, Felt::new(i), Felt::new(idx)]);
-            let value = generate_word(seed);
+            let key = RpoDigest::new([
+                Felt::from_u64(rng.next_u64()),
+                ONE,
+                Felt::from_u64(i),
+                Felt::from_u64(idx),
+            ]);
+            let value = generate_word(&mut rng);
             (key, value)
         })
         .collect();
     entries
 }
 
-fn generate_value<T: Copy + Debug + Randomizable>(seed: &mut [u8; 32]) -> T {
-    mem::swap(seed, &mut prng_array(*seed));
-    let value: [T; 1] = rand_utils::prng_array(*seed);
-    value[0]
-}
-
-fn generate_word(seed: &mut [u8; 32]) -> Word {
-    mem::swap(seed, &mut prng_array(*seed));
-    let nums: [u64; 4] = prng_array(*seed);
-    [Felt::new(nums[0]), Felt::new(nums[1]), Felt::new(nums[2]), Felt::new(nums[3])]
+fn generate_word<R: RngCore>(rng: &mut R) -> Word {
+    [
+        Felt::from_u64(rng.next_u64()),
+        Felt::from_u64(rng.next_u64()),
+        Felt::from_u64(rng.next_u64()),
+        Felt::from_u64(rng.next_u64()),
+    ]
 }

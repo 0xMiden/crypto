@@ -11,23 +11,22 @@ use super::{
 // TEST DATA
 // ================================================================================================
 
-fn node_at(depth:u8, value: u64) -> NodeIndex {
+fn node_at(depth: u8, value: u64) -> NodeIndex {
     NodeIndex::new_unchecked(depth, value)
 }
 
 fn values8() -> [RpoDigest; 8] {
     [
-    int_to_node(30),
-    int_to_node(31),
-    int_to_node(32),
-    int_to_node(33),
-    int_to_node(34),
-    int_to_node(35),
-    int_to_node(36),
-    int_to_node(37),
-]
+        int_to_node(30),
+        int_to_node(31),
+        int_to_node(32),
+        int_to_node(33),
+        int_to_node(34),
+        int_to_node(35),
+        int_to_node(36),
+        int_to_node(37),
+    ]
 }
-
 
 // TESTS
 // ================================================================================================
@@ -136,8 +135,14 @@ fn get_node() {
 
     let pmt = PartialMerkleTree::with_paths([(3, path33.value, path33.path)]).unwrap();
 
-    assert_eq!(ms.get_node(expected_root, node_at(3, 2)).unwrap(), pmt.get_node(node_at(3, 2)).unwrap());
-    assert_eq!(ms.get_node(expected_root, node_at(1,0)).unwrap(), pmt.get_node(node_at(1,0)).unwrap());
+    assert_eq!(
+        ms.get_node(expected_root, node_at(3, 2)).unwrap(),
+        pmt.get_node(node_at(3, 2)).unwrap()
+    );
+    assert_eq!(
+        ms.get_node(expected_root, node_at(1, 0)).unwrap(),
+        pmt.get_node(node_at(1, 0)).unwrap()
+    );
 }
 
 /// Updates leaves of the PMT using `update_leaf()` function and checks that new root of the tree
@@ -253,7 +258,12 @@ fn leaves() {
     let value32 = mt.get_node(node_at(3, 2)).unwrap();
     let value33 = mt.get_node(node_at(3, 3)).unwrap();
 
-    let leaves = [(node_at(1, 1), value11), (node_at(2, 0), value20), (node_at(3, 2), value32), (node_at(3, 3), value33)];
+    let leaves = [
+        (node_at(1, 1), value11),
+        (node_at(2, 0), value20),
+        (node_at(3, 2), value32),
+        (node_at(3, 3), value33),
+    ];
 
     let expected_leaves = leaves.iter().copied();
     assert!(expected_leaves.eq(pmt.leaves()));
@@ -307,7 +317,7 @@ fn test_inner_node_iterator() {
     let actual: Vec<InnerNodeInfo> = pmt.inner_nodes().collect();
 
     let expected_n00 = mt.root();
-    let expected_n10 = mt.get_node(node_at(1,0)).unwrap();
+    let expected_n10 = mt.get_node(node_at(1, 0)).unwrap();
     let expected_n11 = mt.get_node(node_at(1, 1)).unwrap();
     let expected_n20 = mt.get_node(node_at(2, 0)).unwrap();
     let expected_n21 = mt.get_node(node_at(2, 1)).unwrap();

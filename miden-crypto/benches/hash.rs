@@ -1,6 +1,6 @@
 use criterion::{BatchSize, Criterion, black_box, criterion_group, criterion_main};
 use miden_crypto::{
-    Felt,
+    Felt, PrimeCharacteristicRing,
     hash::{
         blake::Blake3_256,
         rpo::{Rpo256, RpoDigest},
@@ -32,7 +32,7 @@ fn rpo256_2to1(c: &mut Criterion) {
 
 fn rpo256_sequential(c: &mut Criterion) {
     let v: [Felt; 100] = (0..100)
-        .map(Felt::new)
+        .map(Felt::from_u64)
         .collect::<Vec<Felt>>()
         .try_into()
         .expect("should not fail");
@@ -44,7 +44,7 @@ fn rpo256_sequential(c: &mut Criterion) {
         bench.iter_batched(
             || {
                 let v: [Felt; 100] = (0..100)
-                    .map(|_| Felt::new(rand_value()))
+                    .map(|_| Felt::from_u64(rand_value()))
                     .collect::<Vec<Felt>>()
                     .try_into()
                     .expect("should not fail");
@@ -78,7 +78,7 @@ fn rpx256_2to1(c: &mut Criterion) {
 
 fn rpx256_sequential(c: &mut Criterion) {
     let v: [Felt; 100] = (0..100)
-        .map(Felt::new)
+        .map(Felt::from_u64)
         .collect::<Vec<Felt>>()
         .try_into()
         .expect("should not fail");
@@ -90,7 +90,7 @@ fn rpx256_sequential(c: &mut Criterion) {
         bench.iter_batched(
             || {
                 let v: [Felt; 100] = (0..100)
-                    .map(|_| Felt::new(rand_value()))
+                    .map(|_| Felt::from_u64(rand_value()))
                     .collect::<Vec<Felt>>()
                     .try_into()
                     .expect("should not fail");
@@ -125,7 +125,7 @@ fn blake3_2to1(c: &mut Criterion) {
 
 fn blake3_sequential(c: &mut Criterion) {
     let v: [Felt; 100] = (0..100)
-        .map(Felt::new)
+        .map(Felt::from_u64)
         .collect::<Vec<Felt>>()
         .try_into()
         .expect("should not fail");
@@ -137,7 +137,7 @@ fn blake3_sequential(c: &mut Criterion) {
         bench.iter_batched(
             || {
                 let v: [Felt; 100] = (0..100)
-                    .map(|_| Felt::new(rand_value()))
+                    .map(|_| Felt::from_u64(rand_value()))
                     .collect::<Vec<Felt>>()
                     .try_into()
                     .expect("should not fail");

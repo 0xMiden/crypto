@@ -237,8 +237,8 @@ impl Default for PartialSmt {
 #[cfg(test)]
 mod tests {
     use assert_matches::assert_matches;
-    use p3_goldilocks::Goldilocks  ;
-    use rand::{distr::StandardUniform, Rng, RngCore, SeedableRng};
+    use p3_goldilocks::Goldilocks;
+    use rand::{Rng, RngCore, SeedableRng, distr::StandardUniform};
     use rand_chacha::ChaCha20Rng;
 
     use super::*;
@@ -252,7 +252,7 @@ mod tests {
     /// equivalent update in the full tree.
     #[test]
     fn partial_smt_insert_and_remove() {
-        let mut rng =  ChaCha20Rng::seed_from_u64(0);
+        let mut rng = ChaCha20Rng::seed_from_u64(0);
         let key0 = RpoDigest::from(Word::from(random_array(&mut rng)));
         let key1 = RpoDigest::from(Word::from(random_array(&mut rng)));
         let key2 = RpoDigest::from(Word::from(random_array(&mut rng)));
@@ -344,7 +344,7 @@ mod tests {
     /// Test that we can add an SmtLeaf::Multiple variant to a partial SMT.
     #[test]
     fn partial_smt_multiple_leaf_success() {
-        let mut rng =  ChaCha20Rng::seed_from_u64(0);
+        let mut rng = ChaCha20Rng::seed_from_u64(0);
         // key0 and key1 have the same felt at index 3 so they will be placed in the same leaf.
         let key0 = RpoDigest::from(Word::from([ZERO, ZERO, ZERO, ONE]));
         let key1 = RpoDigest::from(Word::from([ONE, ONE, ONE, ONE]));
@@ -380,7 +380,7 @@ mod tests {
     /// This test uses only empty values in the partial SMT.
     #[test]
     fn partial_smt_root_mismatch_on_empty_values() {
-        let mut rng =  ChaCha20Rng::seed_from_u64(0);
+        let mut rng = ChaCha20Rng::seed_from_u64(0);
         let key0 = RpoDigest::from(Word::from(random_array(&mut rng)));
         let key1 = RpoDigest::from(Word::from(random_array(&mut rng)));
         let key2 = RpoDigest::from(Word::from(random_array(&mut rng)));
@@ -414,7 +414,7 @@ mod tests {
     /// This test uses only non-empty values in the partial SMT.
     #[test]
     fn partial_smt_root_mismatch_on_non_empty_values() {
-        let mut rng =  ChaCha20Rng::seed_from_u64(0);
+        let mut rng = ChaCha20Rng::seed_from_u64(0);
         let key0 = RpoDigest::from(Word::from(random_array(&mut rng)));
         let key1 = RpoDigest::from(Word::from(random_array(&mut rng)));
         let key2 = RpoDigest::from(Word::from(random_array(&mut rng)));

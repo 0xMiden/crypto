@@ -133,7 +133,7 @@ impl MerkleTree {
     /// Returns n iterator over every inner node of this [MerkleTree].
     ///
     /// The iterator order is unspecified.
-    pub fn inner_nodes(&self) -> InnerNodeIterator {
+    pub fn inner_nodes(&self) -> InnerNodeIterator<'_> {
         InnerNodeIterator {
             nodes: &self.nodes,
             index: 1, // index 0 is just padding, start at 1
@@ -301,20 +301,19 @@ mod tests {
 
     fn leaves8() -> [RpoDigest; 8] {
         [
-        int_to_node(1),
-        int_to_node(2),
-        int_to_node(3),
-        int_to_node(4),
-        int_to_node(5),
-        int_to_node(6),
-        int_to_node(7),
-        int_to_node(8),
-    ]
+            int_to_node(1),
+            int_to_node(2),
+            int_to_node(3),
+            int_to_node(4),
+            int_to_node(5),
+            int_to_node(6),
+            int_to_node(7),
+            int_to_node(8),
+        ]
     }
     #[test]
     fn build_merkle_tree() {
-
-    let tree = super::MerkleTree::new(digests_to_words(&leaves4())).unwrap();
+        let tree = super::MerkleTree::new(digests_to_words(&leaves4())).unwrap();
         assert_eq!(8, tree.nodes.len());
 
         // leaves were copied correctly
@@ -332,7 +331,7 @@ mod tests {
     }
 
     #[test]
-    fn get_leaf() {   
+    fn get_leaf() {
         let tree = super::MerkleTree::new(digests_to_words(&leaves4())).unwrap();
 
         // check depth 2
@@ -349,7 +348,7 @@ mod tests {
     }
 
     #[test]
-    fn get_path() { 
+    fn get_path() {
         let tree = super::MerkleTree::new(digests_to_words(&leaves4())).unwrap();
 
         let (_, node2, node3) = compute_internal_nodes();
@@ -366,7 +365,7 @@ mod tests {
     }
 
     #[test]
-    fn update_leaf() {  
+    fn update_leaf() {
         let mut tree = super::MerkleTree::new(digests_to_words(&leaves8())).unwrap();
 
         // update one leaf
@@ -390,7 +389,7 @@ mod tests {
     }
 
     #[test]
-    fn nodes() -> Result<(), MerkleError> { 
+    fn nodes() -> Result<(), MerkleError> {
         let tree = super::MerkleTree::new(digests_to_words(&leaves4())).unwrap();
         let root = tree.root();
         let l1n0 = tree.get_node(NodeIndex::make(1, 0))?;
@@ -442,7 +441,7 @@ mod tests {
     // HELPER FUNCTIONS
     // --------------------------------------------------------------------------------------------
 
-    fn compute_internal_nodes() -> (RpoDigest, RpoDigest, RpoDigest) { 
+    fn compute_internal_nodes() -> (RpoDigest, RpoDigest, RpoDigest) {
         let node2 =
             Rpo256::hash_elements(&[Word::from(leaves4()[0]), Word::from(leaves4()[1])].concat());
         let node3 =

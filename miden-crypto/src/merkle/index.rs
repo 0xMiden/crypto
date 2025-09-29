@@ -1,5 +1,7 @@
 use core::fmt::Display;
+
 use p3_field::PrimeField64;
+
 use super::{Felt, MerkleError, RpoDigest};
 use crate::utils::{ByteReader, ByteWriter, Deserializable, DeserializationError, Serializable};
 

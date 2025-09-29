@@ -1,6 +1,8 @@
 use alloc::vec::Vec;
 use core::cmp::Ordering;
+
 use p3_field::PrimeField64;
+
 use super::{EMPTY_WORD, Felt, LeafIndex, Rpo256, RpoDigest, SMT_DEPTH, SmtLeafError, Word};
 use crate::utils::{ByteReader, ByteWriter, Deserializable, DeserializationError, Serializable};
 
@@ -136,7 +138,7 @@ impl SmtLeaf {
 
     /// Computes the hash of the leaf
     pub fn hash(&self) -> RpoDigest {
-          match self {
+        match self {
             SmtLeaf::Empty(_) => EMPTY_WORD.into(),
             SmtLeaf::Single((key, value)) => Rpo256::merge(&[*key, value.into()]),
             SmtLeaf::Multiple(kvs) => {
@@ -144,7 +146,6 @@ impl SmtLeaf {
                 Rpo256::hash_elements(&elements)
             },
         }
-
     }
 
     // ITERATORS
@@ -372,8 +373,8 @@ pub(crate) fn kv_to_elements((key, value): (RpoDigest, Word)) -> impl Iterator<I
 /// the most significant element.
 pub(crate) fn cmp_keys(key_1: RpoDigest, key_2: RpoDigest) -> Ordering {
     for (v1, v2) in key_1.iter().zip(key_2.iter()).rev() {
-        let v1 = (*v1).as_canonical_u64() ;
-        let v2 = (*v2).as_canonical_u64() ;
+        let v1 = (*v1).as_canonical_u64();
+        let v2 = (*v2).as_canonical_u64();
         if v1 != v2 {
             return v1.cmp(&v2);
         }

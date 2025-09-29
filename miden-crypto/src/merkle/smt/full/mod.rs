@@ -52,8 +52,7 @@ pub struct Smt {
     pub(super) leaves: Leaves,
     inner_nodes: InnerNodes,
 }
-lazy_static!{
-    
+lazy_static! {
     static ref ROOTS: [RpoDigest; 256] = {
         let mut array = [RpoDigest::default(); 256];
         for i in 0..256 {
@@ -61,8 +60,7 @@ lazy_static!{
         }
         array
     };
-
-    }
+}
 impl Smt {
     // CONSTANTS
     // --------------------------------------------------------------------------------------------
@@ -356,7 +354,7 @@ impl SparseMerkleTree<SMT_DEPTH> for Smt {
     type Opening = SmtProof;
 
     const EMPTY_VALUE: Self::Value = EMPTY_WORD;
-   // const EMPTY_ROOT: RpoDigest = *EmptySubtreeRoots::entry(SMT_DEPTH, 0);
+    // const EMPTY_ROOT: RpoDigest = *EmptySubtreeRoots::entry(SMT_DEPTH, 0);
 
     fn from_raw_parts(
         inner_nodes: InnerNodes,
@@ -449,7 +447,7 @@ impl SparseMerkleTree<SMT_DEPTH> for Smt {
 
     fn key_to_leaf_index(key: &RpoDigest) -> LeafIndex<SMT_DEPTH> {
         let most_significant_felt = key[3];
-        LeafIndex::new_max_depth(most_significant_felt.as_canonical_u64() )
+        LeafIndex::new_max_depth(most_significant_felt.as_canonical_u64())
     }
 
     fn path_and_leaf_to_opening(path: MerklePath, leaf: SmtLeaf) -> SmtProof {
@@ -469,7 +467,7 @@ impl Default for Smt {
 impl From<Word> for LeafIndex<SMT_DEPTH> {
     fn from(value: Word) -> Self {
         // We use the most significant `Felt` of a `Word` as the leaf index.
-        Self::new_max_depth(value[3].as_canonical_u64() )
+        Self::new_max_depth(value[3].as_canonical_u64())
     }
 }
 
@@ -572,12 +570,32 @@ fn test_smt_serialization_deserialization() {
     // Smt with values
     let smt_leaves_2: [(RpoDigest, Word); 2] = [
         (
-            RpoDigest::new([Felt::from_u64(101), Felt::from_u64(102), Felt::from_u64(103), Felt::from_u64(104)]),
-            [Felt::from_u64(1_u64), Felt::from_u64(2_u64), Felt::from_u64(3_u64), Felt::from_u64(4_u64)],
+            RpoDigest::new([
+                Felt::from_u64(101),
+                Felt::from_u64(102),
+                Felt::from_u64(103),
+                Felt::from_u64(104),
+            ]),
+            [
+                Felt::from_u64(1_u64),
+                Felt::from_u64(2_u64),
+                Felt::from_u64(3_u64),
+                Felt::from_u64(4_u64),
+            ],
         ),
         (
-            RpoDigest::new([Felt::from_u64(105), Felt::from_u64(106), Felt::from_u64(107), Felt::from_u64(108)]),
-            [Felt::from_u64(5_u64), Felt::from_u64(6_u64), Felt::from_u64(7_u64), Felt::from_u64(8_u64)],
+            RpoDigest::new([
+                Felt::from_u64(105),
+                Felt::from_u64(106),
+                Felt::from_u64(107),
+                Felt::from_u64(108),
+            ]),
+            [
+                Felt::from_u64(5_u64),
+                Felt::from_u64(6_u64),
+                Felt::from_u64(7_u64),
+                Felt::from_u64(8_u64),
+            ],
         ),
     ];
     let smt = Smt::with_entries(smt_leaves_2).unwrap();

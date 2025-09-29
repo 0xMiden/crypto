@@ -2,13 +2,17 @@ use core::ops::Range;
 use std::{borrow::ToOwned, vec::Vec};
 
 use super::{
-    Felt, add_constants, add_constants_and_apply_inv_sbox, add_constants_and_apply_sbox, apply_inv_sbox, apply_mds, apply_sbox, CubeExtension, Hasher, ARK1, ARK2, BINARY_CHUNK_SIZE, CAPACITY_RANGE, DIGEST_RANGE, INPUT1_RANGE, INPUT2_RANGE, RATE_RANGE, RATE_WIDTH, STATE_WIDTH, ZERO
+    ARK1, ARK2, BINARY_CHUNK_SIZE, CAPACITY_RANGE, CubeExtension, DIGEST_RANGE, Felt, Hasher,
+    INPUT1_RANGE, INPUT2_RANGE, RATE_RANGE, RATE_WIDTH, STATE_WIDTH, ZERO, add_constants,
+    add_constants_and_apply_inv_sbox, add_constants_and_apply_sbox, apply_inv_sbox, apply_mds,
+    apply_sbox,
 };
 
 mod digest;
 pub use digest::{RpxDigest, RpxDigestError};
-use p3_field::{extension::BinomialExtensionField, PrimeCharacteristicRing, PrimeField64, BasedVectorSpace};
- 
+use p3_field::{
+    BasedVectorSpace, PrimeCharacteristicRing, PrimeField64, extension::BinomialExtensionField,
+};
 
 #[cfg(test)]
 mod tests;
@@ -196,7 +200,6 @@ impl Hasher for Rpx256 {
     }
 }
 
-
 // HASH FUNCTION IMPLEMENTATION
 // ================================================================================================
 
@@ -238,7 +241,10 @@ impl Rpx256 {
     #[inline(always)]
     pub fn hash_elements<E: BasedVectorSpace<Felt>>(elements: &[E]) -> RpxDigest {
         // convert the elements into a list of base field elements
-        let elements: Vec<Felt> = elements.into_iter().flat_map(|elem| E::as_basis_coefficients_slice(&elem).to_owned()).collect();
+        let elements: Vec<Felt> = elements
+            .into_iter()
+            .flat_map(|elem| E::as_basis_coefficients_slice(&elem).to_owned())
+            .collect();
 
         // initialize state to all zeros, except for the first element of the capacity part, which
         // is set to `elements.len() % RATE_WIDTH`.
@@ -272,8 +278,6 @@ impl Rpx256 {
         // return the first 4 elements of the state as hash result
         RpxDigest::new(state[DIGEST_RANGE].try_into().unwrap())
     }
-
-
 
     // DOMAIN IDENTIFIER
     // --------------------------------------------------------------------------------------------
@@ -337,23 +341,34 @@ impl Rpx256 {
         // add constants
         add_constants(state, &ARK1[round]);
 
- 
         // decompose the state into 4 elements in the cubic extension field and apply the power 7
         // map to each of the elements
-        let [s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11] = *state; 
-        let ext0 = Self::exp7(CubicExtElement::from_basis_coefficients_iter([s0, s1, s2, ZERO, ZERO].into_iter()).unwrap());
-        let ext1 = Self::exp7(CubicExtElement::from_basis_coefficients_iter([s3, s4, s5, ZERO, ZERO] .into_iter()).unwrap());
-        let ext2 = Self::exp7(CubicExtElement::from_basis_coefficients_iter([s6, s7, s8, ZERO, ZERO] .into_iter()).unwrap());
-        let ext3 = Self::exp7(CubicExtElement::from_basis_coefficients_iter([s9, s10, s11, ZERO, ZERO] .into_iter()).unwrap());
+        let [s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11] = *state;
+        let ext0 = Self::exp7(
+            CubicExtElement::from_basis_coefficients_iter([s0, s1, s2, ZERO, ZERO].into_iter())
+                .unwrap(),
+        );
+        let ext1 = Self::exp7(
+            CubicExtElement::from_basis_coefficients_iter([s3, s4, s5, ZERO, ZERO].into_iter())
+                .unwrap(),
+        );
+        let ext2 = Self::exp7(
+            CubicExtElement::from_basis_coefficients_iter([s6, s7, s8, ZERO, ZERO].into_iter())
+                .unwrap(),
+        );
+        let ext3 = Self::exp7(
+            CubicExtElement::from_basis_coefficients_iter([s9, s10, s11, ZERO, ZERO].into_iter())
+                .unwrap(),
+        );
 
         // decompose the state back into 12 base field elements
         let arr_ext = [ext0, ext1, ext2, ext3];
-        *state = arr_ext.into_iter().flat_map(|arr| (&CubicExtElement::as_basis_coefficients_slice(&arr)[..3]).to_owned()).collect::<Vec<_>>()
+        *state = arr_ext
+            .into_iter()
+            .flat_map(|arr| (&CubicExtElement::as_basis_coefficients_slice(&arr)[..3]).to_owned())
+            .collect::<Vec<_>>()
             .try_into()
             .expect("shouldn't fail");
-
-
-
     }
 
     /// (M) round function.

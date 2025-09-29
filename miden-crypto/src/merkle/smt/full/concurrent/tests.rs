@@ -2,8 +2,9 @@ use alloc::{
     collections::{BTreeMap, BTreeSet},
     vec::Vec,
 };
-use p3_field::PrimeCharacteristicRing;
+
 use assert_matches::assert_matches;
+use p3_field::PrimeCharacteristicRing;
 use proptest::prelude::*;
 use rand::{Rng, prelude::IteratorRandom, rng};
 

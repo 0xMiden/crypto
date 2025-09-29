@@ -1,7 +1,8 @@
 use core::ops::Range;
 
-use super::{Felt, Hasher, ZERO};
 use lazy_static::lazy_static;
+
+use super::{Felt, Hasher, ZERO};
 mod arch;
 pub use arch::optimized::{add_constants_and_apply_inv_sbox, add_constants_and_apply_sbox};
 
@@ -9,8 +10,10 @@ mod mds;
 use mds::apply_mds;
 
 mod rpo;
-use p3_field::{extension::BinomialExtensionField, Field, PrimeCharacteristicRing};
-pub use rpo::{Rpo256, RpoDigest, RpoDigestError, RpoHasher, RpoChallenger, RpoCompression, RpoPermutation256};
+use p3_field::{Field, PrimeCharacteristicRing, extension::BinomialExtensionField};
+pub use rpo::{
+    Rpo256, RpoChallenger, RpoCompression, RpoDigest, RpoDigestError, RpoHasher, RpoPermutation256,
+};
 
 mod rpx;
 pub use rpx::{Rpx256, RpxDigest, RpxDigestError};
@@ -19,8 +22,6 @@ pub use rpx::{Rpx256, RpxDigest, RpxDigestError};
 mod tests;
 
 type CubeExtension = BinomialExtensionField<Felt, 5>;
-
-
 
 // CONSTANTS
 // ================================================================================================
@@ -123,10 +124,7 @@ fn apply_inv_sbox(state: &mut [Felt; STATE_WIDTH]) {
     }
 
     #[inline(always)]
-    fn exp_acc<B: Field, const N: usize, const M: usize>(
-        base: [B; N],
-        tail: [B; N],
-    ) -> [B; N] {
+    fn exp_acc<B: Field, const N: usize, const M: usize>(base: [B; N], tail: [B; N]) -> [B; N] {
         let mut result = base;
         for _ in 0..M {
             result.iter_mut().for_each(|r| *r = r.square());
@@ -144,14 +142,13 @@ fn add_constants(state: &mut [Felt; STATE_WIDTH], ark: &[Felt; STATE_WIDTH]) {
 // ROUND CONSTANTS
 // ================================================================================================
 
-
-lazy_static!{
+lazy_static! {
 /// Rescue round constants;
 /// computed as in [specifications](https://github.com/ASDiscreteMathematics/rpo)
 ///
 /// The constants are broken up into two arrays ARK1 and ARK2; ARK1 contains the constants for the
 /// first half of RPO round, and ARK2 contains constants for the second half of RPO round.
-/// 
+///
 
     static ref ARK1: [[Felt; STATE_WIDTH]; NUM_ROUNDS] = [
     [
@@ -255,105 +252,105 @@ lazy_static!{
     ];
 }
 
-lazy_static!{
+lazy_static! {
     static ref ARK2: [[Felt; STATE_WIDTH]; NUM_ROUNDS] = [
-    [
-        Felt::from_u64(6077062762357204287),
-        Felt::from_u64(15277620170502011191),
-        Felt::from_u64(5358738125714196705),
-        Felt::from_u64(14233283787297595718),
-        Felt::from_u64(13792579614346651365),
-        Felt::from_u64(11614812331536767105),
-        Felt::from_u64(14871063686742261166),
-        Felt::from_u64(10148237148793043499),
-        Felt::from_u64(4457428952329675767),
-        Felt::from_u64(15590786458219172475),
-        Felt::from_u64(10063319113072092615),
-        Felt::from_u64(14200078843431360086),
-    ],
-    [
-        Felt::from_u64(6202948458916099932),
-        Felt::from_u64(17690140365333231091),
-        Felt::from_u64(3595001575307484651),
-        Felt::from_u64(373995945117666487),
-        Felt::from_u64(1235734395091296013),
-        Felt::from_u64(14172757457833931602),
-        Felt::from_u64(707573103686350224),
-        Felt::from_u64(15453217512188187135),
-        Felt::from_u64(219777875004506018),
-        Felt::from_u64(17876696346199469008),
-        Felt::from_u64(17731621626449383378),
-        Felt::from_u64(2897136237748376248),
-    ],
-    [
-        Felt::from_u64(8023374565629191455),
-        Felt::from_u64(15013690343205953430),
-        Felt::from_u64(4485500052507912973),
-        Felt::from_u64(12489737547229155153),
-        Felt::from_u64(9500452585969030576),
-        Felt::from_u64(2054001340201038870),
-        Felt::from_u64(12420704059284934186),
-        Felt::from_u64(355990932618543755),
-        Felt::from_u64(9071225051243523860),
-        Felt::from_u64(12766199826003448536),
-        Felt::from_u64(9045979173463556963),
-        Felt::from_u64(12934431667190679898),
-    ],
-    [
-        Felt::from_u64(18389244934624494276),
-        Felt::from_u64(16731736864863925227),
-        Felt::from_u64(4440209734760478192),
-        Felt::from_u64(17208448209698888938),
-        Felt::from_u64(8739495587021565984),
-        Felt::from_u64(17000774922218161967),
-        Felt::from_u64(13533282547195532087),
-        Felt::from_u64(525402848358706231),
-        Felt::from_u64(16987541523062161972),
-        Felt::from_u64(5466806524462797102),
-        Felt::from_u64(14512769585918244983),
-        Felt::from_u64(10973956031244051118),
-    ],
-    [
-        Felt::from_u64(6982293561042362913),
-        Felt::from_u64(14065426295947720331),
-        Felt::from_u64(16451845770444974180),
-        Felt::from_u64(7139138592091306727),
-        Felt::from_u64(9012006439959783127),
-        Felt::from_u64(14619614108529063361),
-        Felt::from_u64(1394813199588124371),
-        Felt::from_u64(4635111139507788575),
-        Felt::from_u64(16217473952264203365),
-        Felt::from_u64(10782018226466330683),
-        Felt::from_u64(6844229992533662050),
-        Felt::from_u64(7446486531695178711),
-    ],
-    [
-        Felt::from_u64(3736792340494631448),
-        Felt::from_u64(577852220195055341),
-        Felt::from_u64(6689998335515779805),
-        Felt::from_u64(13886063479078013492),
-        Felt::from_u64(14358505101923202168),
-        Felt::from_u64(7744142531772274164),
-        Felt::from_u64(16135070735728404443),
-        Felt::from_u64(12290902521256031137),
-        Felt::from_u64(12059913662657709804),
-        Felt::from_u64(16456018495793751911),
-        Felt::from_u64(4571485474751953524),
-        Felt::from_u64(17200392109565783176),
-    ],
-    [
-        Felt::from_u64(17130398059294018733),
-        Felt::from_u64(519782857322261988),
-        Felt::from_u64(9625384390925085478),
-        Felt::from_u64(1664893052631119222),
-        Felt::from_u64(7629576092524553570),
-        Felt::from_u64(3485239601103661425),
-        Felt::from_u64(9755891797164033838),
-        Felt::from_u64(15218148195153269027),
-        Felt::from_u64(16460604813734957368),
-        Felt::from_u64(9643968136937729763),
-        Felt::from_u64(3611348709641382851),
-        Felt::from_u64(18256379591337759196),
-    ],
+        [
+            Felt::from_u64(6077062762357204287),
+            Felt::from_u64(15277620170502011191),
+            Felt::from_u64(5358738125714196705),
+            Felt::from_u64(14233283787297595718),
+            Felt::from_u64(13792579614346651365),
+            Felt::from_u64(11614812331536767105),
+            Felt::from_u64(14871063686742261166),
+            Felt::from_u64(10148237148793043499),
+            Felt::from_u64(4457428952329675767),
+            Felt::from_u64(15590786458219172475),
+            Felt::from_u64(10063319113072092615),
+            Felt::from_u64(14200078843431360086),
+        ],
+        [
+            Felt::from_u64(6202948458916099932),
+            Felt::from_u64(17690140365333231091),
+            Felt::from_u64(3595001575307484651),
+            Felt::from_u64(373995945117666487),
+            Felt::from_u64(1235734395091296013),
+            Felt::from_u64(14172757457833931602),
+            Felt::from_u64(707573103686350224),
+            Felt::from_u64(15453217512188187135),
+            Felt::from_u64(219777875004506018),
+            Felt::from_u64(17876696346199469008),
+            Felt::from_u64(17731621626449383378),
+            Felt::from_u64(2897136237748376248),
+        ],
+        [
+            Felt::from_u64(8023374565629191455),
+            Felt::from_u64(15013690343205953430),
+            Felt::from_u64(4485500052507912973),
+            Felt::from_u64(12489737547229155153),
+            Felt::from_u64(9500452585969030576),
+            Felt::from_u64(2054001340201038870),
+            Felt::from_u64(12420704059284934186),
+            Felt::from_u64(355990932618543755),
+            Felt::from_u64(9071225051243523860),
+            Felt::from_u64(12766199826003448536),
+            Felt::from_u64(9045979173463556963),
+            Felt::from_u64(12934431667190679898),
+        ],
+        [
+            Felt::from_u64(18389244934624494276),
+            Felt::from_u64(16731736864863925227),
+            Felt::from_u64(4440209734760478192),
+            Felt::from_u64(17208448209698888938),
+            Felt::from_u64(8739495587021565984),
+            Felt::from_u64(17000774922218161967),
+            Felt::from_u64(13533282547195532087),
+            Felt::from_u64(525402848358706231),
+            Felt::from_u64(16987541523062161972),
+            Felt::from_u64(5466806524462797102),
+            Felt::from_u64(14512769585918244983),
+            Felt::from_u64(10973956031244051118),
+        ],
+        [
+            Felt::from_u64(6982293561042362913),
+            Felt::from_u64(14065426295947720331),
+            Felt::from_u64(16451845770444974180),
+            Felt::from_u64(7139138592091306727),
+            Felt::from_u64(9012006439959783127),
+            Felt::from_u64(14619614108529063361),
+            Felt::from_u64(1394813199588124371),
+            Felt::from_u64(4635111139507788575),
+            Felt::from_u64(16217473952264203365),
+            Felt::from_u64(10782018226466330683),
+            Felt::from_u64(6844229992533662050),
+            Felt::from_u64(7446486531695178711),
+        ],
+        [
+            Felt::from_u64(3736792340494631448),
+            Felt::from_u64(577852220195055341),
+            Felt::from_u64(6689998335515779805),
+            Felt::from_u64(13886063479078013492),
+            Felt::from_u64(14358505101923202168),
+            Felt::from_u64(7744142531772274164),
+            Felt::from_u64(16135070735728404443),
+            Felt::from_u64(12290902521256031137),
+            Felt::from_u64(12059913662657709804),
+            Felt::from_u64(16456018495793751911),
+            Felt::from_u64(4571485474751953524),
+            Felt::from_u64(17200392109565783176),
+        ],
+        [
+            Felt::from_u64(17130398059294018733),
+            Felt::from_u64(519782857322261988),
+            Felt::from_u64(9625384390925085478),
+            Felt::from_u64(1664893052631119222),
+            Felt::from_u64(7629576092524553570),
+            Felt::from_u64(3485239601103661425),
+            Felt::from_u64(9755891797164033838),
+            Felt::from_u64(15218148195153269027),
+            Felt::from_u64(16460604813734957368),
+            Felt::from_u64(9643968136937729763),
+            Felt::from_u64(3611348709641382851),
+            Felt::from_u64(18256379591337759196),
+        ],
     ];
 }

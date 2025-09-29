@@ -1,8 +1,8 @@
 use core::slice;
 
-
-use p3_field::PrimeCharacteristicRing;
 use lazy_static::lazy_static;
+use p3_field::PrimeCharacteristicRing;
+
 use super::{EMPTY_WORD, Felt, RpoDigest, smt::InnerNode};
 
 // EMPTY NODES SUBTREES
@@ -41,8 +41,7 @@ impl EmptySubtreeRoots {
     }
 }
 
-lazy_static!{
-    
+lazy_static! {
     static ref EMPTY_SUBTREES: [RpoDigest; 256] = [
         RpoDigest::new([
             Felt::from_u64(0xee3d94db86d48dc4),

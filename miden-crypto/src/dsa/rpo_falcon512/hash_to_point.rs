@@ -2,6 +2,7 @@ use alloc::vec::Vec;
 
 use num::Zero;
 use p3_field::PrimeField64;
+
 use super::{MODULUS, N, Nonce, Polynomial, Rpo256, Word, ZERO, math::FalconFelt};
 
 // HASH-TO-POINT FUNCTIONS

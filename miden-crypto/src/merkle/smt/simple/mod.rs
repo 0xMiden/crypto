@@ -1,6 +1,7 @@
 use alloc::collections::BTreeSet;
 
 use lazy_static::lazy_static;
+
 use super::{
     super::ValuePath, EMPTY_WORD, EmptySubtreeRoots, InnerNode, InnerNodeInfo, InnerNodes,
     LeafIndex, MerkleError, MerklePath, MutationSet, NodeIndex, RpoDigest, SMT_MAX_DEPTH,
@@ -329,8 +330,7 @@ impl<const DEPTH: u8> SimpleSmt<DEPTH> {
         Ok(self.root)
     }
 }
-lazy_static!{
-    
+lazy_static! {
     static ref ROOTS: [RpoDigest; 256] = {
         let mut array = [RpoDigest::default(); 256];
         for i in 0..256 {
@@ -338,8 +338,7 @@ lazy_static!{
         }
         array
     };
-
-    }
+}
 impl<const DEPTH: u8> SparseMerkleTree<DEPTH> for SimpleSmt<DEPTH> {
     type Key = LeafIndex<DEPTH>;
     type Value = Word;

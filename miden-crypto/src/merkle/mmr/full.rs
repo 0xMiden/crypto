@@ -274,7 +274,7 @@ impl Mmr {
     }
 
     /// An iterator over inner nodes in the MMR. The order of iteration is unspecified.
-    pub fn inner_nodes(&self) -> MmrNodes {
+    pub fn inner_nodes(&self) -> MmrNodes<'_> {
         MmrNodes {
             mmr: self,
             forest: 0,

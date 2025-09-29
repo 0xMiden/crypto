@@ -1,26 +1,39 @@
 use criterion::{BatchSize, BenchmarkId, Criterion, black_box, criterion_group, criterion_main};
 use miden_crypto::{
-    Felt, Word,
+    Felt, PrimeCharacteristicRing, Word,
     hash::rpo::RpoDigest,
     merkle::{
         DefaultMerkleStore as MerkleStore, LeafIndex, MerkleTree, NodeIndex, SMT_MAX_DEPTH,
         SimpleSmt,
     },
 };
-use rand_utils::{rand_array, rand_value};
+use rand::{RngCore, SeedableRng};
+use rand_chacha::ChaCha20Rng;
+use rand_utils::rand_value;
 
 /// Since MerkleTree can only be created when a power-of-two number of elements is used, the sample
 /// sizes are limited to that.
 static BATCH_SIZES: [usize; 3] = [2usize.pow(4), 2usize.pow(7), 2usize.pow(10)];
 
 /// Generates a random `RpoDigest`.
-fn random_rpo_digest() -> RpoDigest {
-    rand_array::<Felt, 4>().into()
+fn random_rpo_digest<R: RngCore>(rng: &mut R) -> RpoDigest {
+    [
+        Felt::from_u64(rng.next_u64()),
+        Felt::from_u64(rng.next_u64()),
+        Felt::from_u64(rng.next_u64()),
+        Felt::from_u64(rng.next_u64()),
+    ]
+    .into()
 }
 
 /// Generates a random `Word`.
-fn random_word() -> Word {
-    rand_array::<Felt, 4>()
+fn random_word<R: RngCore>(rng: &mut R) -> Word {
+    [
+        Felt::from_u64(rng.next_u64()),
+        Felt::from_u64(rng.next_u64()),
+        Felt::from_u64(rng.next_u64()),
+        Felt::from_u64(rng.next_u64()),
+    ]
 }
 
 /// Generates an index at the specified depth in `0..range`.
@@ -63,8 +76,12 @@ fn get_empty_leaf_simplesmt(c: &mut Criterion) {
 fn get_leaf_merkletree(c: &mut Criterion) {
     let mut group = c.benchmark_group("get_leaf_merkletree");
 
+    let seed = [0u8; 32];
+    let mut rng = ChaCha20Rng::from_seed(seed);
+
     let random_data_size = BATCH_SIZES.into_iter().max().unwrap();
-    let random_data: Vec<RpoDigest> = (0..random_data_size).map(|_| random_rpo_digest()).collect();
+    let random_data: Vec<RpoDigest> =
+        (0..random_data_size).map(|_| random_rpo_digest(&mut rng)).collect();
 
     for size in BATCH_SIZES {
         let leaves = &random_data[..size];
@@ -98,8 +115,11 @@ fn get_leaf_merkletree(c: &mut Criterion) {
 fn get_leaf_simplesmt(c: &mut Criterion) {
     let mut group = c.benchmark_group("get_leaf_simplesmt");
 
+    let seed = [0u8; 32];
+    let mut rng = ChaCha20Rng::from_seed(seed);
     let random_data_size = BATCH_SIZES.into_iter().max().unwrap();
-    let random_data: Vec<RpoDigest> = (0..random_data_size).map(|_| random_rpo_digest()).collect();
+    let random_data: Vec<RpoDigest> =
+        (0..random_data_size).map(|_| random_rpo_digest(&mut rng)).collect();
 
     for size in BATCH_SIZES {
         let leaves = &random_data[..size];
@@ -169,8 +189,11 @@ fn get_node_of_empty_simplesmt(c: &mut Criterion) {
 fn get_node_merkletree(c: &mut Criterion) {
     let mut group = c.benchmark_group("get_node_merkletree");
 
+    let seed = [0u8; 32];
+    let mut rng = ChaCha20Rng::from_seed(seed);
     let random_data_size = BATCH_SIZES.into_iter().max().unwrap();
-    let random_data: Vec<RpoDigest> = (0..random_data_size).map(|_| random_rpo_digest()).collect();
+    let random_data: Vec<RpoDigest> =
+        (0..random_data_size).map(|_| random_rpo_digest(&mut rng)).collect();
 
     for size in BATCH_SIZES {
         let leaves = &random_data[..size];
@@ -205,8 +228,11 @@ fn get_node_merkletree(c: &mut Criterion) {
 fn get_node_simplesmt(c: &mut Criterion) {
     let mut group = c.benchmark_group("get_node_simplesmt");
 
+    let seed = [0u8; 32];
+    let mut rng = ChaCha20Rng::from_seed(seed);
     let random_data_size = BATCH_SIZES.into_iter().max().unwrap();
-    let random_data: Vec<RpoDigest> = (0..random_data_size).map(|_| random_rpo_digest()).collect();
+    let random_data: Vec<RpoDigest> =
+        (0..random_data_size).map(|_| random_rpo_digest(&mut rng)).collect();
 
     for size in BATCH_SIZES {
         let leaves = &random_data[..size];
@@ -244,8 +270,11 @@ fn get_node_simplesmt(c: &mut Criterion) {
 fn get_leaf_path_merkletree(c: &mut Criterion) {
     let mut group = c.benchmark_group("get_leaf_path_merkletree");
 
+    let seed = [0u8; 32];
+    let mut rng = ChaCha20Rng::from_seed(seed);
     let random_data_size = BATCH_SIZES.into_iter().max().unwrap();
-    let random_data: Vec<RpoDigest> = (0..random_data_size).map(|_| random_rpo_digest()).collect();
+    let random_data: Vec<RpoDigest> =
+        (0..random_data_size).map(|_| random_rpo_digest(&mut rng)).collect();
 
     for size in BATCH_SIZES {
         let leaves = &random_data[..size];
@@ -279,8 +308,11 @@ fn get_leaf_path_merkletree(c: &mut Criterion) {
 fn get_leaf_path_simplesmt(c: &mut Criterion) {
     let mut group = c.benchmark_group("get_leaf_path_simplesmt");
 
+    let seed = [0u8; 32];
+    let mut rng = ChaCha20Rng::from_seed(seed);
     let random_data_size = BATCH_SIZES.into_iter().max().unwrap();
-    let random_data: Vec<RpoDigest> = (0..random_data_size).map(|_| random_rpo_digest()).collect();
+    let random_data: Vec<RpoDigest> =
+        (0..random_data_size).map(|_| random_rpo_digest(&mut rng)).collect();
 
     for size in BATCH_SIZES {
         let leaves = &random_data[..size];
@@ -319,8 +351,11 @@ fn get_leaf_path_simplesmt(c: &mut Criterion) {
 fn new(c: &mut Criterion) {
     let mut group = c.benchmark_group("new");
 
+    let seed = [0u8; 32];
+    let mut rng = ChaCha20Rng::from_seed(seed);
     let random_data_size = BATCH_SIZES.into_iter().max().unwrap();
-    let random_data: Vec<RpoDigest> = (0..random_data_size).map(|_| random_rpo_digest()).collect();
+    let random_data: Vec<RpoDigest> =
+        (0..random_data_size).map(|_| random_rpo_digest(&mut rng)).collect();
 
     for size in BATCH_SIZES {
         let leaves = &random_data[..size];
@@ -385,8 +420,11 @@ fn new(c: &mut Criterion) {
 fn update_leaf_merkletree(c: &mut Criterion) {
     let mut group = c.benchmark_group("update_leaf_merkletree");
 
+    let seed = [0u8; 32];
+    let mut rng = ChaCha20Rng::from_seed(seed);
     let random_data_size = BATCH_SIZES.into_iter().max().unwrap();
-    let random_data: Vec<RpoDigest> = (0..random_data_size).map(|_| random_rpo_digest()).collect();
+    let random_data: Vec<RpoDigest> =
+        (0..random_data_size).map(|_| random_rpo_digest(&mut rng)).collect();
 
     for size in BATCH_SIZES {
         let leaves = &random_data[..size];
@@ -400,7 +438,7 @@ fn update_leaf_merkletree(c: &mut Criterion) {
 
         group.bench_function(BenchmarkId::new("MerkleTree", size), |b| {
             b.iter_batched(
-                || (rand_value::<u64>() % size_u64, random_word()),
+                || (rand_value::<u64>() % size_u64, random_word(&mut rng)),
                 |(index, value)| black_box(mtree.update_leaf(index, value)),
                 BatchSize::SmallInput,
             )
@@ -409,7 +447,7 @@ fn update_leaf_merkletree(c: &mut Criterion) {
         let mut store_root = root;
         group.bench_function(BenchmarkId::new("MerkleStore", size), |b| {
             b.iter_batched(
-                || (random_index(size_u64, depth), random_word()),
+                || (random_index(size_u64, depth), random_word(&mut rng)),
                 |(index, value)| {
                     // The MerkleTree automatically updates its internal root, the Store maintains
                     // the old root and adds the new one. Here we update the root to have a fair
@@ -427,8 +465,11 @@ fn update_leaf_merkletree(c: &mut Criterion) {
 fn update_leaf_simplesmt(c: &mut Criterion) {
     let mut group = c.benchmark_group("update_leaf_simplesmt");
 
+    let seed = [0u8; 32];
+    let mut rng = ChaCha20Rng::from_seed(seed);
     let random_data_size = BATCH_SIZES.into_iter().max().unwrap();
-    let random_data: Vec<RpoDigest> = (0..random_data_size).map(|_| random_rpo_digest()).collect();
+    let random_data: Vec<RpoDigest> =
+        (0..random_data_size).map(|_| random_rpo_digest(&mut rng)).collect();
 
     for size in BATCH_SIZES {
         let leaves = &random_data[..size];
@@ -445,7 +486,7 @@ fn update_leaf_simplesmt(c: &mut Criterion) {
 
         group.bench_function(BenchmarkId::new("SimpleSMT", size), |b| {
             b.iter_batched(
-                || (rand_value::<u64>() % size_u64, random_word()),
+                || (rand_value::<u64>() % size_u64, random_word(&mut rng)),
                 |(index, value)| {
                     black_box(smt.insert(LeafIndex::<SMT_MAX_DEPTH>::new(index).unwrap(), value))
                 },
@@ -456,7 +497,7 @@ fn update_leaf_simplesmt(c: &mut Criterion) {
         let mut store_root = root;
         group.bench_function(BenchmarkId::new("MerkleStore", size), |b| {
             b.iter_batched(
-                || (random_index(size_u64, SMT_MAX_DEPTH), random_word()),
+                || (random_index(size_u64, SMT_MAX_DEPTH), random_word(&mut rng)),
                 |(index, value)| {
                     // The MerkleTree automatically updates its internal root, the Store maintains
                     // the old root and adds the new one. Here we update the root to have a fair

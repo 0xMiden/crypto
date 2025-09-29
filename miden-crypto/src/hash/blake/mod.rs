@@ -1,13 +1,14 @@
 use alloc::{string::String, vec::Vec};
-use p3_field::BasedVectorSpace;
-use p3_goldilocks::Goldilocks as Felt;
 use core::{
     mem::{size_of, transmute, transmute_copy},
     ops::Deref,
     slice::{self, from_raw_parts},
 };
 use std::borrow::ToOwned;
-use p3_field::PrimeField64;
+
+use p3_field::{BasedVectorSpace, PrimeField64};
+use p3_goldilocks::Goldilocks as Felt;
+
 use super::{Digest, Hasher};
 use crate::utils::{
     ByteReader, ByteWriter, Deserializable, DeserializationError, HexParseError, Serializable,
@@ -19,7 +20,6 @@ mod tests;
 
 // CONSTANTS
 // ================================================================================================
-
 
 // BLAKE3 N-BIT OUTPUT
 // ================================================================================================
@@ -135,41 +135,43 @@ impl Hasher for Blake3_256 {
 }
 
 impl Blake3_256 {
-    pub fn hash(bytes: &[u8]) -> Blake3Digest<32>{
+    pub fn hash(bytes: &[u8]) -> Blake3Digest<32> {
         Blake3Digest(blake3::hash(bytes).into())
     }
 
-    pub fn merge(values: &[Blake3Digest<32>; 2]) -> Blake3Digest<32>{
+    pub fn merge(values: &[Blake3Digest<32>; 2]) -> Blake3Digest<32> {
         Self::hash(prepare_merge(values))
     }
 
-    pub fn merge_many(values: &[Blake3Digest<32>]) -> Blake3Digest<32>{
+    pub fn merge_many(values: &[Blake3Digest<32>]) -> Blake3Digest<32> {
         Blake3Digest(blake3::hash(Blake3Digest::digests_as_bytes(values)).into())
     }
 
-    pub fn merge_with_int(seed: Blake3Digest<32>, value: u64) -> Blake3Digest<32>{
+    pub fn merge_with_int(seed: Blake3Digest<32>, value: u64) -> Blake3Digest<32> {
         let mut hasher = blake3::Hasher::new();
         hasher.update(&seed.0);
         hasher.update(&value.to_le_bytes());
         Blake3Digest(hasher.finalize().into())
     }
 
-
     /// Returns a hash of the provided field elements.
     #[inline(always)]
-    pub fn hash_elements<E: BasedVectorSpace<Felt>>(elements: &[E]) ->  Blake3Digest<32>{
+    pub fn hash_elements<E: BasedVectorSpace<Felt>>(elements: &[E]) -> Blake3Digest<32> {
         //let hasher = RpoHasher::new(RpoPermutation256);
-        //let it = elements.into_iter().flat_map(|elem| E::as_basis_coefficients_slice(&elem).to_owned());
-        //hasher.hash_iter(it ).into()
+        //let it = elements.into_iter().flat_map(|elem|
+        // E::as_basis_coefficients_slice(&elem).to_owned()); hasher.hash_iter(it ).into()
 
         // convert the elements into a list of base field elements
-        let elements: Vec<Felt> = elements.into_iter().flat_map(|elem| E::as_basis_coefficients_slice(&elem).to_owned()).collect();
+        let elements: Vec<Felt> = elements
+            .into_iter()
+            .flat_map(|elem| E::as_basis_coefficients_slice(&elem).to_owned())
+            .collect();
 
         Blake3Digest(hash_elements(&elements))
     }
 }
 
-/* 
+/*
 impl ElementHasher for Blake3_256 {
     type BaseField = Felt;
 
@@ -238,7 +240,7 @@ impl Hasher for Blake3_192 {
         Blake3Digest(*shrink_bytes(&hasher.finalize().into()))
     }
 }
-/* 
+/*
 impl ElementHasher for Blake3_192 {
     type BaseField = Felt;
 
@@ -307,7 +309,7 @@ impl Hasher for Blake3_160 {
         Blake3Digest(*shrink_bytes(&hasher.finalize().into()))
     }
 }
-/* 
+/*
 impl ElementHasher for Blake3_160 {
     type BaseField = Felt;
 
@@ -368,7 +370,10 @@ where
         // permutation. we move the elements into the hasher via the buffer to give the CPU
         // a chance to process multiple element-to-byte conversions in parallel
         let mut buf = [0_u8; 64];
-        let elements_base = elements.into_iter().flat_map(|elem| E::as_basis_coefficients_slice(&elem).to_owned()).collect::<Vec<Felt>>();
+        let elements_base = elements
+            .into_iter()
+            .flat_map(|elem| E::as_basis_coefficients_slice(&elem).to_owned())
+            .collect::<Vec<Felt>>();
         let mut chunks_iter = elements_base.chunks_exact(8);
         for chunk in chunks_iter.by_ref() {
             for i in 0..8 {

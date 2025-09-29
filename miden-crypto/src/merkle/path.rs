@@ -80,7 +80,7 @@ impl MerklePath {
         &self,
         index: u64,
         node: RpoDigest,
-    ) -> Result<InnerNodeIterator, MerkleError> {
+    ) -> Result<InnerNodeIterator<'_>, MerkleError> {
         Ok(InnerNodeIterator {
             nodes: &self.nodes,
             index: NodeIndex::new(self.depth(), index)?,

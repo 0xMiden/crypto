@@ -17,11 +17,14 @@ pub mod utils;
 
 //pub use winter_math::{
 //    FieldElement, StarkField,
- //   fields::{CubeExtension, QuadExtension, f64::BaseElement as Felt},
+//   fields::{CubeExtension, QuadExtension, f64::BaseElement as Felt},
 // };
-pub use p3_goldilocks::{Goldilocks as Felt, Poseidon2Goldilocks};
-pub use p3_field::{batch_multiplicative_inverse, PrimeCharacteristicRing, PrimeField64, Field, BasedVectorSpace,extension::{BinomialExtensionField}, ExtensionField};
 pub use p3_air::*;
+pub use p3_field::{
+    BasedVectorSpace, ExtensionField, Field, PrimeCharacteristicRing, PrimeField64,
+    batch_multiplicative_inverse, extension::BinomialExtensionField,
+};
+pub use p3_goldilocks::{Goldilocks as Felt, Poseidon2Goldilocks};
 
 // TYPE ALIASES
 // ================================================================================================
@@ -73,10 +76,9 @@ fn overflow_panics_for_test() {
     assert_ne!(a << b, 0);
 }
 
-
-/// A simple single-threaded implementation of Montgomery's trick. Since not all `PrimeCharacteristicRing`s
-/// support inversion, this takes a custom inversion function.
-pub  fn batch_multiplicative_inverse_general<F, Inv>(x: &[F], result: &mut [F], inv: Inv)
+/// A simple single-threaded implementation of Montgomery's trick. Since not all
+/// `PrimeCharacteristicRing`s support inversion, this takes a custom inversion function.
+pub fn batch_multiplicative_inverse_general<F, Inv>(x: &[F], result: &mut [F], inv: Inv)
 where
     F: PrimeCharacteristicRing + Copy,
     Inv: Fn(F) -> F,

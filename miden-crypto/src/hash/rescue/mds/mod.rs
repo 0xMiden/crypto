@@ -1,8 +1,9 @@
-use super::{Felt, STATE_WIDTH, ZERO};
 use p3_field::{PrimeCharacteristicRing, PrimeField64};
+
+use super::{Felt, STATE_WIDTH, ZERO};
 mod freq;
-use lazy_static::lazy_static;
 pub use freq::mds_multiply_freq;
+use lazy_static::lazy_static;
 
 // MDS MULTIPLICATION
 // ================================================================================================
@@ -41,7 +42,7 @@ pub fn apply_mds(state: &mut [Felt; STATE_WIDTH]) {
 
 // MDS MATRIX
 // ================================================================================================
-lazy_static!{
+lazy_static! {
 /// RPO MDS matrix
     static ref MDS: [[Felt; STATE_WIDTH]; STATE_WIDTH] = [
     [

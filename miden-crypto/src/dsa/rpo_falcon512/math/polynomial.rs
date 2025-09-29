@@ -1,5 +1,4 @@
 use alloc::vec::Vec;
-use p3_field::PrimeCharacteristicRing;
 use core::{
     default::Default,
     fmt::Debug,
@@ -7,6 +6,7 @@ use core::{
 };
 
 use num::{One, Zero};
+use p3_field::PrimeCharacteristicRing;
 
 use super::{Inverse, field::FalconFelt};
 use crate::{

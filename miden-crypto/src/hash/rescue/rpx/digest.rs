@@ -1,16 +1,19 @@
 use alloc::string::String;
-use p3_goldilocks::Goldilocks as Felt;
-use winter_crypto::Digest;
 use core::{cmp::Ordering, fmt::Display, ops::Deref, slice};
 
-use thiserror::Error;
 use p3_field::{PrimeCharacteristicRing, PrimeField64};
-
+use p3_goldilocks::Goldilocks as Felt;
+use thiserror::Error;
+use winter_crypto::Digest;
 
 use crate::{
-    hash::rescue::{DIGEST_BYTES, DIGEST_SIZE}, rand::Randomizable, utils::{
-        bytes_to_hex_string, hex_to_bytes, ByteReader, ByteWriter, Deserializable, DeserializationError, HexParseError, Serializable
-    }, ZERO
+    ZERO,
+    hash::rescue::{DIGEST_BYTES, DIGEST_SIZE},
+    rand::Randomizable,
+    utils::{
+        ByteReader, ByteWriter, Deserializable, DeserializationError, HexParseError, Serializable,
+        bytes_to_hex_string, hex_to_bytes,
+    },
 };
 
 // DIGEST TRAIT IMPLEMENTATIONS
@@ -90,13 +93,14 @@ impl Ord for RpxDigest {
         // finally, we use `Felt::inner` instead of `Felt::as_int` so we avoid performing a
         // montgomery reduction for every limb. that is safe because every inner element of the
         // digest is guaranteed to be in its canonical form (that is, `x in [0,p)`).
-        self.0.iter().map(Felt::as_canonical_u64).zip(other.0.iter().map(Felt::as_canonical_u64)).fold(
-            Ordering::Equal,
-            |ord, (a, b)| match ord {
+        self.0
+            .iter()
+            .map(Felt::as_canonical_u64)
+            .zip(other.0.iter().map(Felt::as_canonical_u64))
+            .fold(Ordering::Equal, |ord, (a, b)| match ord {
                 Ordering::Equal => a.cmp(&b),
                 _ => ord,
-            },
-        )
+            })
     }
 }
 
@@ -340,8 +344,12 @@ impl From<&[u8; DIGEST_SIZE]> for RpxDigest {
 
 impl From<[u8; DIGEST_SIZE]> for RpxDigest {
     fn from(value: [u8; DIGEST_SIZE]) -> Self {
-        
-        Self([Felt::from_u8(value[0]), Felt::from_u8(value[1]), Felt::from_u8(value[2]), Felt::from_u8(value[3])])
+        Self([
+            Felt::from_u8(value[0]),
+            Felt::from_u8(value[1]),
+            Felt::from_u8(value[2]),
+            Felt::from_u8(value[3]),
+        ])
     }
 }
 
@@ -353,8 +361,12 @@ impl From<&[u16; DIGEST_SIZE]> for RpxDigest {
 
 impl From<[u16; DIGEST_SIZE]> for RpxDigest {
     fn from(value: [u16; DIGEST_SIZE]) -> Self {
-
-        Self([Felt::from_u16(value[0]), Felt::from_u16(value[1]), Felt::from_u16(value[2]), Felt::from_u16(value[3])])
+        Self([
+            Felt::from_u16(value[0]),
+            Felt::from_u16(value[1]),
+            Felt::from_u16(value[2]),
+            Felt::from_u16(value[3]),
+        ])
     }
 }
 
@@ -366,7 +378,12 @@ impl From<&[u32; DIGEST_SIZE]> for RpxDigest {
 
 impl From<[u32; DIGEST_SIZE]> for RpxDigest {
     fn from(value: [u32; DIGEST_SIZE]) -> Self {
-        Self([Felt::from_u32(value[0]), Felt::from_u32(value[1]), Felt::from_u32(value[2]), Felt::from_u32(value[3])])
+        Self([
+            Felt::from_u32(value[0]),
+            Felt::from_u32(value[1]),
+            Felt::from_u32(value[2]),
+            Felt::from_u32(value[3]),
+        ])
     }
 }
 
@@ -426,7 +443,12 @@ impl TryFrom<[u8; DIGEST_BYTES]> for RpxDigest {
             return Err(HexParseError::OutOfRange);
         }
 
-        Ok(RpxDigest([Felt::from_u64(a), Felt::from_u64(b), Felt::from_u64(c), Felt::from_u64(d)]))
+        Ok(RpxDigest([
+            Felt::from_u64(a),
+            Felt::from_u64(b),
+            Felt::from_u64(c),
+            Felt::from_u64(d),
+        ]))
     }
 }
 

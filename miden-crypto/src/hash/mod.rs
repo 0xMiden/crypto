@@ -6,7 +6,10 @@ pub mod blake;
 
 mod rescue;
 pub mod rpo {
-    pub use super::rescue::{Rpo256, RpoDigest, RpoDigestError, RpoHasher, RpoChallenger, RpoCompression, RpoPermutation256};
+    pub use super::rescue::{
+        Rpo256, RpoChallenger, RpoCompression, RpoDigest, RpoDigestError, RpoHasher,
+        RpoPermutation256,
+    };
 }
 
 pub mod rpx {

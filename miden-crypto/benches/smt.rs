@@ -1,25 +1,26 @@
-use core::mem::swap;
-
 use criterion::{Criterion, black_box, criterion_group, criterion_main};
 use miden_crypto::{
-    Felt, Word,
+    Felt, PrimeCharacteristicRing, Word,
     merkle::{LeafIndex, SimpleSmt},
 };
-use rand_utils::prng_array;
+use rand::{RngCore, SeedableRng};
+use rand_chacha::ChaCha20Rng;
 use seq_macro::seq;
 
 fn smt_rpo(c: &mut Criterion) {
     // setup trees
 
-    let mut seed = [0u8; 32];
-    let leaf = generate_word(&mut seed);
+    let seed = [0u8; 32];
+    let mut rng = ChaCha20Rng::from_seed(seed);
+    let leaf = generate_word(&mut rng);
 
     seq!(DEPTH in 14..=20 {
         let leaves = ((1 << DEPTH) - 1) as u64;
         for count in [1, leaves / 2, leaves] {
+
             let entries: Vec<_> = (0..count)
                 .map(|i| {
-                    let word = generate_word(&mut seed);
+                    let word = generate_word(&mut rng);
                     (i, word)
                 })
                 .collect();
@@ -70,8 +71,11 @@ criterion_main!(smt_group);
 // HELPER FUNCTIONS
 // --------------------------------------------------------------------------------------------
 
-fn generate_word(seed: &mut [u8; 32]) -> Word {
-    swap(seed, &mut prng_array(*seed));
-    let nums: [u64; 4] = prng_array(*seed);
-    [Felt::new(nums[0]), Felt::new(nums[1]), Felt::new(nums[2]), Felt::new(nums[3])]
+fn generate_word<R: RngCore>(rng: &mut R) -> Word {
+    [
+        Felt::from_u64(rng.next_u64()),
+        Felt::from_u64(rng.next_u64()),
+        Felt::from_u64(rng.next_u64()),
+        Felt::from_u64(rng.next_u64()),
+    ]
 }

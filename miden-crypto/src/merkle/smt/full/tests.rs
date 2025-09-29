@@ -1,4 +1,5 @@
 use alloc::vec::Vec;
+
 use p3_field::PrimeCharacteristicRing;
 
 use super::{EMPTY_WORD, Felt, LeafIndex, NodeIndex, Rpo256, RpoDigest, SMT_DEPTH, Smt, SmtLeaf};
@@ -62,8 +63,12 @@ fn test_smt_insert_at_same_key_2() {
     // The most significant u64 used for both keys (to ensure they map to the same leaf)
     let key_msb: u64 = 42;
 
-    let key_already_present: RpoDigest =
-        RpoDigest::from([Felt::from_u64(2), Felt::from_u64(2), Felt::from_u64(2), Felt::from_u64(key_msb)]);
+    let key_already_present: RpoDigest = RpoDigest::from([
+        Felt::from_u64(2),
+        Felt::from_u64(2),
+        Felt::from_u64(2),
+        Felt::from_u64(key_msb),
+    ]);
     let key_already_present_index: NodeIndex =
         LeafIndex::<SMT_DEPTH>::from(key_already_present).into();
     let value_already_present = [ONE + ONE + ONE; WORD_SIZE];
@@ -194,10 +199,18 @@ fn test_smt_removal() {
     let raw = 0b_01101001_01101100_00011111_11111111_10010110_10010011_11100000_00000000_u64;
 
     let key_1: RpoDigest = RpoDigest::from([ONE, ONE, ONE, Felt::from_u64(raw)]);
-    let key_2: RpoDigest =
-        RpoDigest::from([Felt::from_u64(2), Felt::from_u64(2), Felt::from_u64(2), Felt::from_u64(raw)]);
-    let key_3: RpoDigest =
-        RpoDigest::from([Felt::from_u32(3_u32), Felt::from_u32(3_u32), Felt::from_u32(3_u32), Felt::from_u64(raw)]);
+    let key_2: RpoDigest = RpoDigest::from([
+        Felt::from_u64(2),
+        Felt::from_u64(2),
+        Felt::from_u64(2),
+        Felt::from_u64(raw),
+    ]);
+    let key_3: RpoDigest = RpoDigest::from([
+        Felt::from_u32(3_u32),
+        Felt::from_u32(3_u32),
+        Felt::from_u32(3_u32),
+        Felt::from_u64(raw),
+    ]);
 
     let value_1 = [ONE; WORD_SIZE];
     let value_2 = [Felt::from_u64(2); WORD_SIZE];
@@ -271,11 +284,19 @@ fn test_prospective_hash() {
     let raw = 0b_01101001_01101100_00011111_11111111_10010110_10010011_11100000_00000000_u64;
 
     let key_1: RpoDigest = RpoDigest::from([ONE, ONE, ONE, Felt::from_u64(raw)]);
-    let key_2: RpoDigest =
-        RpoDigest::from([Felt::from_u64(2), Felt::from_u64(2), Felt::from_u64(2), Felt::from_u64(raw)]);
+    let key_2: RpoDigest = RpoDigest::from([
+        Felt::from_u64(2),
+        Felt::from_u64(2),
+        Felt::from_u64(2),
+        Felt::from_u64(raw),
+    ]);
     // Sort key_3 before key_1, to test non-append insertion.
-    let key_3: RpoDigest =
-        RpoDigest::from([Felt::from_u32(0_u32), Felt::from_u32(0_u32), Felt::from_u32(0_u32), Felt::from_u64(raw)]);
+    let key_3: RpoDigest = RpoDigest::from([
+        Felt::from_u32(0_u32),
+        Felt::from_u32(0_u32),
+        Felt::from_u32(0_u32),
+        Felt::from_u64(raw),
+    ]);
 
     let value_1 = [ONE; WORD_SIZE];
     let value_2 = [Felt::from_u64(2); WORD_SIZE];
@@ -382,11 +403,19 @@ fn test_prospective_insertion() {
     let raw = 0b_01101001_01101100_00011111_11111111_10010110_10010011_11100000_00000000_u64;
 
     let key_1: RpoDigest = RpoDigest::from([ONE, ONE, ONE, Felt::from_u64(raw)]);
-    let key_2: RpoDigest =
-        RpoDigest::from([Felt::from_u64(2), Felt::from_u64(2), Felt::from_u64(2), Felt::from_u64(raw)]);
+    let key_2: RpoDigest = RpoDigest::from([
+        Felt::from_u64(2),
+        Felt::from_u64(2),
+        Felt::from_u64(2),
+        Felt::from_u64(raw),
+    ]);
     // Sort key_3 before key_1, to test non-append insertion.
-    let key_3: RpoDigest =
-        RpoDigest::from([Felt::from_u32(0_u32), Felt::from_u32(0_u32), Felt::from_u32(0_u32), Felt::from_u64(raw)]);
+    let key_3: RpoDigest = RpoDigest::from([
+        Felt::from_u32(0_u32),
+        Felt::from_u32(0_u32),
+        Felt::from_u32(0_u32),
+        Felt::from_u64(raw),
+    ]);
 
     let value_1 = [ONE; WORD_SIZE];
     let value_2 = [Felt::from_u64(2); WORD_SIZE];
@@ -505,10 +534,18 @@ fn test_mutations_revert() {
     let mut smt = Smt::default();
 
     let key_1: RpoDigest = RpoDigest::from([ONE, ONE, ONE, Felt::from_u64(1)]);
-    let key_2: RpoDigest =
-        RpoDigest::from([Felt::from_u64(2), Felt::from_u64(2), Felt::from_u64(2), Felt::from_u64(2)]);
-    let key_3: RpoDigest =
-        RpoDigest::from([Felt::from_u32(0_u32), Felt::from_u32(0_u32), Felt::from_u32(0_u32), Felt::from_u64(3)]);
+    let key_2: RpoDigest = RpoDigest::from([
+        Felt::from_u64(2),
+        Felt::from_u64(2),
+        Felt::from_u64(2),
+        Felt::from_u64(2),
+    ]);
+    let key_3: RpoDigest = RpoDigest::from([
+        Felt::from_u32(0_u32),
+        Felt::from_u32(0_u32),
+        Felt::from_u32(0_u32),
+        Felt::from_u64(3),
+    ]);
 
     let value_1 = [ONE; WORD_SIZE];
     let value_2 = [Felt::from_u64(2); WORD_SIZE];
@@ -530,7 +567,7 @@ fn test_mutations_revert() {
 
     assert_eq!(smt, original, "SMT with applied revert mutations did not match original SMT");
 }
-/* 
+/*
 #[test]
 fn test_mutation_set_serialization() {
     let mut smt = Smt::default();
@@ -572,8 +609,12 @@ fn test_smt_path_to_keys_in_same_leaf_are_equal() {
     let raw = 0b_01101001_01101100_00011111_11111111_10010110_10010011_11100000_00000000_u64;
 
     let key_1: RpoDigest = RpoDigest::from([ONE, ONE, ONE, Felt::from_u64(raw)]);
-    let key_2: RpoDigest =
-        RpoDigest::from([Felt::from_u64(2), Felt::from_u64(2), Felt::from_u64(2), Felt::from_u64(raw)]);
+    let key_2: RpoDigest = RpoDigest::from([
+        Felt::from_u64(2),
+        Felt::from_u64(2),
+        Felt::from_u64(2),
+        Felt::from_u64(raw),
+    ]);
 
     let value_1 = [ONE; WORD_SIZE];
     let value_2 = [Felt::from_u64(2); WORD_SIZE];
@@ -664,7 +705,12 @@ fn test_empty_smt_leaf_serialization() {
 fn test_single_smt_leaf_serialization() {
     let single_leaf = SmtLeaf::new_single(
         RpoDigest::from([10_u32, 11_u32, 12_u32, 13_u32]),
-        [Felt::from_u32(1_u32), Felt::from_u64(2), Felt::from_u32(3_u32), Felt::from_u32(4_u32)],
+        [
+            Felt::from_u32(1_u32),
+            Felt::from_u64(2),
+            Felt::from_u32(3_u32),
+            Felt::from_u32(4_u32),
+        ],
     );
 
     let mut serialized = single_leaf.to_bytes();
@@ -680,11 +726,21 @@ fn test_multiple_smt_leaf_serialization_success() {
     let multiple_leaf = SmtLeaf::new_multiple(vec![
         (
             RpoDigest::from([10_u32, 11_u32, 12_u32, 13_u32]),
-            [Felt::from_u32(1_u32), Felt::from_u64(2), Felt::from_u32(3_u32), Felt::from_u32(4_u32)],
+            [
+                Felt::from_u32(1_u32),
+                Felt::from_u64(2),
+                Felt::from_u32(3_u32),
+                Felt::from_u32(4_u32),
+            ],
         ),
         (
             RpoDigest::from([100_u32, 101_u32, 102_u32, 13_u32]),
-            [Felt::from_u32(11_u32), Felt::from_u64(12), Felt::from_u32(13_u32), Felt::from_u32(14_u32)],
+            [
+                Felt::from_u32(11_u32),
+                Felt::from_u64(12),
+                Felt::from_u32(13_u32),
+                Felt::from_u32(14_u32),
+            ],
         ),
     ])
     .unwrap();
@@ -700,7 +756,6 @@ fn test_multiple_smt_leaf_serialization_success() {
 // HELPERS
 // --------------------------------------------------------------------------------------------
 
-
 fn build_multiple_leaf_node(kv_pairs: &[(RpoDigest, Word)]) -> RpoDigest {
     let elements: Vec<Felt> = kv_pairs
         .iter()
@@ -714,7 +769,7 @@ fn build_multiple_leaf_node(kv_pairs: &[(RpoDigest, Word)]) -> RpoDigest {
 
     Rpo256::hash_elements(&elements)
 }
- 
+
 /// Applies mutations with and without reversion to the given SMT, comparing resulting SMTs,
 /// returning mutation set for reversion.
 fn apply_mutations(

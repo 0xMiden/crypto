@@ -650,18 +650,17 @@ mod tests {
     };
     use crate::merkle::{MerkleStore, Mmr, NodeIndex, int_to_node};
 
-    fn leaves() -> [RpoDigest; 7]{
+    fn leaves() -> [RpoDigest; 7] {
         [
-        int_to_node(0),
-        int_to_node(1),
-        int_to_node(2),
-        int_to_node(3),
-        int_to_node(4),
-        int_to_node(5),
-        int_to_node(6),
-    ]
-    } 
-
+            int_to_node(0),
+            int_to_node(1),
+            int_to_node(2),
+            int_to_node(3),
+            int_to_node(4),
+            int_to_node(5),
+            int_to_node(6),
+        ]
+    }
 
     #[test]
     fn test_forest_to_root_index() {

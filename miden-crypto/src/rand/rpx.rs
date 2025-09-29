@@ -1,5 +1,6 @@
-use rand_core::impls;
 use p3_field::PrimeField64;
+use rand_core::impls;
+
 use super::{Felt, FeltRng, RngCore, Word, ZERO};
 use crate::{
     hash::rpx::Rpx256,
@@ -78,100 +79,6 @@ impl RpxRandomCoin {
     }
 }
 
-// RANDOM COIN IMPLEMENTATION
-// ------------------------------------------------------------------------------------------------
-/*
-impl RandomCoin for RpxRandomCoin {
-    type BaseField = Felt;
-    type Hasher = Rpx256;
-
-    fn new(seed: &[Self::BaseField]) -> Self {
-        let digest: Word = Rpx256::hash_elements(seed).into();
-        Self::new(digest)
-    }
-
-    fn reseed(&mut self, data: RpxDigest) {
-        // Reset buffer
-        self.current = RATE_START;
-
-        // Add the new seed material to the first half of the rate portion of the RPX state
-        let data: Word = data.into();
-
-        self.state[RATE_START] += data[0];
-        self.state[RATE_START + 1] += data[1];
-        self.state[RATE_START + 2] += data[2];
-        self.state[RATE_START + 3] += data[3];
-
-        // Absorb
-        Rpx256::apply_permutation(&mut self.state);
-    }
-
-    fn check_leading_zeros(&self, value: u64) -> u32 {
-        let value = Felt::new(value);
-        let mut state_tmp = self.state;
-
-        state_tmp[RATE_START] += value;
-
-        Rpx256::apply_permutation(&mut state_tmp);
-
-        let first_rate_element = state_tmp[RATE_START].as_int();
-        first_rate_element.trailing_zeros()
-    }
-
-    fn draw<E: FieldElement<BaseField = Felt>>(&mut self) -> Result<E, RandomCoinError> {
-        let ext_degree = E::EXTENSION_DEGREE;
-        let mut result = vec![ZERO; ext_degree];
-        for r in result.iter_mut().take(ext_degree) {
-            *r = self.draw_basefield();
-        }
-
-        let result = E::slice_from_base_elements(&result);
-        Ok(result[0])
-    }
-
-    fn draw_integers(
-        &mut self,
-        num_values: usize,
-        domain_size: usize,
-        nonce: u64,
-    ) -> Result<Vec<usize>, RandomCoinError> {
-        assert!(domain_size.is_power_of_two(), "domain size must be a power of two");
-        assert!(num_values < domain_size, "number of values must be smaller than domain size");
-
-        // absorb the nonce
-        let nonce = Felt::new(nonce);
-        self.state[RATE_START] += nonce;
-        Rpx256::apply_permutation(&mut self.state);
-
-        // reset the buffer
-        self.current = RATE_START;
-
-        // determine how many bits are needed to represent valid values in the domain
-        let v_mask = (domain_size - 1) as u64;
-
-        // draw values from PRNG until we get as many unique values as specified by num_queries
-        let mut values = Vec::new();
-        for _ in 0..1000 {
-            // get the next pseudo-random field element
-            let value = self.draw_basefield().as_int();
-
-            // use the mask to get a value within the range
-            let value = (value & v_mask) as usize;
-
-            values.push(value);
-            if values.len() == num_values {
-                break;
-            }
-        }
-
-        if values.len() < num_values {
-            return Err(RandomCoinError::FailedToDrawIntegers(num_values, values.len(), 1000));
-        }
-
-        Ok(values)
-    }
-}
- */
 // FELT RNG IMPLEMENTATION
 // ------------------------------------------------------------------------------------------------
 

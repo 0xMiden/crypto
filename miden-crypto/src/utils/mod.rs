@@ -27,12 +27,11 @@ pub mod collections {
 /// Converts a [Word] into hex.
 pub fn word_to_hex(_w: &Word) -> Result<String, fmt::Error> {
     let s = String::new();
-/*
-    for byte in w.iter().flat_map(|e| e.to_bytes()) {
-        write!(s, "{byte:02x}")?;
-    }
-*/
-
+    /*
+        for byte in w.iter().flat_map(|e| e.to_bytes()) {
+            write!(s, "{byte:02x}")?;
+        }
+    */
 
     Ok(s)
 }

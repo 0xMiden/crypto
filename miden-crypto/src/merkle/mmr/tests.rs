@@ -105,16 +105,16 @@ fn test_nodes_in_forest_single_bit() {
     }
 }
 
-fn leaves() -> [RpoDigest; 7]{
+fn leaves() -> [RpoDigest; 7] {
     [
-    int_to_node(0),
-    int_to_node(1),
-    int_to_node(2),
-    int_to_node(3),
-    int_to_node(4),
-    int_to_node(5),
-    int_to_node(6),
-]
+        int_to_node(0),
+        int_to_node(1),
+        int_to_node(2),
+        int_to_node(3),
+        int_to_node(4),
+        int_to_node(5),
+        int_to_node(6),
+    ]
 }
 
 #[test]
@@ -675,8 +675,8 @@ fn test_mmr_delta() {
         "one sibling, two peaks"
     );
 
-    // missing half of the first tree, only send the computed element (not the leaves()), and the new
-    // peaks
+    // missing half of the first tree, only send the computed element (not the leaves()), and the
+    // new peaks
     assert_eq!(
         mmr.get_delta(2, mmr.forest()).unwrap().data,
         vec![mmr.nodes[5], acc.peaks()[1], acc.peaks()[2]],
