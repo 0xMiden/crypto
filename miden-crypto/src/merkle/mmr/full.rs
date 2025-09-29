@@ -97,6 +97,12 @@ impl Mmr {
     /// - The specified leaf position is out of bounds for this MMR.
     /// - The specified `forest` value is not valid for this MMR.
     pub fn open_at(&self, pos: usize, forest: Forest) -> Result<MmrProof, MmrError> {
+        if forest > self.forest {
+            return Err(MmrError::InvalidPeaks(format!(
+                "requested forest {forest} exceeds current forest {}",
+                self.forest
+            )));
+        }
         let (_, path) = self.collect_merkle_path_and_value(pos, forest)?;
 
         Ok(MmrProof {
