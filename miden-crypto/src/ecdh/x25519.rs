@@ -12,13 +12,16 @@
 //! The public key associated with the ephemeral secret key will be sent alongside the encrypted
 //! message.
 
+use alloc::vec::Vec;
+
 use hkdf::{Hkdf, hmac::SimpleHmac};
 use k256::sha2::Sha256;
 use rand::{CryptoRng, RngCore};
 use zeroize::ZeroizeOnDrop;
 
 use crate::{
-    dsa::eddsa_25519::PublicKey,
+    dsa::eddsa_25519::{PublicKey, SecretKey},
+    ecdh::KeyAgreementScheme,
     utils::{ByteReader, ByteWriter, Deserializable, DeserializationError, Serializable},
 };
 
@@ -118,6 +121,52 @@ impl Deserializable for EphemeralPublicKey {
         Ok(Self {
             inner: x25519_dalek::PublicKey::from(bytes),
         })
+    }
+}
+
+pub struct X25519;
+
+impl KeyAgreementScheme for X25519 {
+    type EphemeralSecretKey = EphemeralSecretKey;
+    type EphemeralPublicKey = EphemeralPublicKey;
+
+    type SecretKey = SecretKey;
+    type PublicKey = PublicKey;
+
+    type SharedSecret = SharedSecret;
+
+    fn generate_ephemeral_keypair<R: CryptoRng + RngCore>(
+        rng: &mut R,
+    ) -> (Self::EphemeralSecretKey, Self::EphemeralPublicKey) {
+        let sk = EphemeralSecretKey::with_rng(rng);
+        let pk = sk.public_key();
+
+        (sk, pk)
+    }
+
+    fn exchange_ephemeral_static(
+        ephemeral_sk: Self::EphemeralSecretKey,
+        static_pk: &Self::PublicKey,
+    ) -> Result<Self::SharedSecret, super::KeyAgreementError> {
+        Ok(ephemeral_sk.diffie_hellman(static_pk))
+    }
+
+    fn exchange_static_ephemeral(
+        static_sk: &Self::SecretKey,
+        ephemeral_pk: &Self::EphemeralPublicKey,
+    ) -> Result<Self::SharedSecret, super::KeyAgreementError> {
+        Ok(static_sk.get_shared_secret(ephemeral_pk.clone()))
+    }
+
+    fn extract_key_material(
+        shared_secret: &Self::SharedSecret,
+        length: usize,
+    ) -> Result<Vec<u8>, super::KeyAgreementError> {
+        let hkdf = shared_secret.extract(None);
+        let mut buf = vec![0_u8; length];
+        hkdf.expand(&[], &mut buf)
+            .map_err(|_| super::KeyAgreementError::HkdfExpansionFailed)?;
+        Ok(buf)
     }
 }
 

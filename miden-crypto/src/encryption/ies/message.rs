@@ -9,6 +9,7 @@ use crate::utils::{ByteReader, ByteWriter, Deserializable, DeserializationError,
 #[repr(u8)]
 pub(crate) enum CryptoAlgorithm {
     K256XChaCha20Poly1305 = 0,
+    X25519XChaCha20Poly1305 = 1,
 }
 
 impl TryFrom<u8> for CryptoAlgorithm {
@@ -16,6 +17,7 @@ impl TryFrom<u8> for CryptoAlgorithm {
     fn try_from(value: u8) -> Result<Self, Self::Error> {
         match value {
             0 => Ok(CryptoAlgorithm::K256XChaCha20Poly1305),
+            1 => Ok(CryptoAlgorithm::X25519XChaCha20Poly1305),
             _ => Err(IntegratedEncryptionSchemeError::UnsupportedAlgorithm),
         }
     }
@@ -37,6 +39,7 @@ impl CryptoAlgorithm {
     pub fn name(self) -> &'static str {
         match self {
             CryptoAlgorithm::K256XChaCha20Poly1305 => "K256+XChaCha20-Poly1305",
+            CryptoAlgorithm::X25519XChaCha20Poly1305 => "X25519+XChaCha20-Poly1305",
         }
     }
 }
