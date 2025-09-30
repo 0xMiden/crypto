@@ -98,10 +98,7 @@ impl Mmr {
     /// - The specified `forest` value is not valid for this MMR.
     pub fn open_at(&self, pos: usize, forest: Forest) -> Result<MmrProof, MmrError> {
         if forest > self.forest {
-            return Err(MmrError::ForestOutOfBounds(format!(
-                "requested forest {forest} exceeds current forest {}",
-                self.forest
-            )));
+            return Err(MmrError::ForestOutOfBounds(forest.num_leaves(), self.forest.num_leaves()));
         }
         let (_, path) = self.collect_merkle_path_and_value(pos, forest)?;
 
@@ -156,10 +153,7 @@ impl Mmr {
     /// Returns an error if the specified `forest` value is not valid for this MMR.
     pub fn peaks_at(&self, forest: Forest) -> Result<MmrPeaks, MmrError> {
         if forest > self.forest {
-            return Err(MmrError::ForestOutOfBounds(format!(
-                "requested forest {forest} exceeds current forest {}",
-                self.forest
-            )));
+            return Err(MmrError::ForestOutOfBounds(forest.num_leaves(), self.forest.num_leaves()));
         }
 
         let peaks: Vec<Word> = TreeSizeIterator::new(forest)
@@ -183,11 +177,17 @@ impl Mmr {
     /// The result is a packed sequence of the authentication elements required to update the trees
     /// that have been merged together, followed by the new peaks of the [Mmr].
     pub fn get_delta(&self, from_forest: Forest, to_forest: Forest) -> Result<MmrDelta, MmrError> {
-        if to_forest > self.forest || from_forest > to_forest {
-            return Err(MmrError::ForestOutOfBounds(format!(
-                "to_forest {to_forest} exceeds the current forest {} or from_forest {from_forest} exceeds to_forest",
-                self.forest
-            )));
+        if to_forest > self.forest {
+            return Err(MmrError::ForestOutOfBounds(
+                to_forest.num_leaves(),
+                self.forest.num_leaves(),
+            ));
+        }
+        if from_forest > to_forest {
+            return Err(MmrError::ForestOutOfBounds(
+                from_forest.num_leaves(),
+                to_forest.num_leaves(),
+            ));
         }
 
         if from_forest == to_forest {
