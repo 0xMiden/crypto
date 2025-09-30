@@ -60,7 +60,8 @@ benchmark_with_setup! {
     || {},
     |b: &mut criterion::Bencher| {
         b.iter(|| {
-            let _smt = Smt::new();
+            // Prevent dead code elimination of tree creation
+            hint::black_box(Smt::new());
         })
     },
 }
@@ -76,7 +77,8 @@ benchmark_with_setup_data! {
     },
     |b: &mut criterion::Bencher, entries: &Vec<(Word, Word)>| {
         b.iter(|| {
-            let _smt = Smt::with_entries(entries.clone()).unwrap();
+            // Prevent dead code elimination of tree creation with entries
+            hint::black_box(Smt::with_entries(entries.clone()).unwrap());
         })
     },
 }
@@ -212,7 +214,8 @@ benchmark_with_setup! {
     || {},
     |b: &mut criterion::Bencher| {
         b.iter(|| {
-            let _smt = SimpleSmt::<32>::new().unwrap();
+            // Prevent dead code elimination of tree creation
+            hint::black_box(SimpleSmt::<32>::new().unwrap());
         })
     },
 }
@@ -228,7 +231,8 @@ benchmark_with_setup_data! {
     },
     |b: &mut criterion::Bencher, entries: &Vec<(u64, Word)>| {
         b.iter(|| {
-            let _smt = SimpleSmt::<32>::with_leaves(entries.clone()).unwrap();
+            // Prevent dead code elimination of tree creation with leaves
+            hint::black_box(SimpleSmt::<32>::with_leaves(entries.clone()).unwrap());
         })
     },
 }
@@ -327,7 +331,8 @@ benchmark_with_setup_data! {
     },
     |b: &mut criterion::Bencher, smt: &SimpleSmt<32>| {
         b.iter(|| {
-            let _count = smt.leaves().count();
+            // Prevent dead code elimination of leaves counting
+            hint::black_box(smt.leaves().count());
         })
     },
 }
