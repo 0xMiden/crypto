@@ -306,7 +306,7 @@ fn test_prospective_hash() {
     {
         let prospective =
             smt.construct_prospective_leaf(smt.get_leaf(&key_1), &key_1, &value_1).hash();
-        smt.insert(key_1, value_1);
+        let _ = smt.insert(key_1, value_1);
 
         let leaf = smt.get_leaf(&key_1);
         assert_eq!(
@@ -320,7 +320,7 @@ fn test_prospective_hash() {
     {
         let prospective =
             smt.construct_prospective_leaf(smt.get_leaf(&key_2), &key_2, &value_2).hash();
-        smt.insert(key_2, value_2);
+        let _ = smt.insert(key_2, value_2);
 
         let leaf = smt.get_leaf(&key_2);
         assert_eq!(
@@ -334,7 +334,7 @@ fn test_prospective_hash() {
     {
         let prospective =
             smt.construct_prospective_leaf(smt.get_leaf(&key_3), &key_3, &value_3).hash();
-        smt.insert(key_3, value_3);
+        let _ = smt.insert(key_3, value_3);
 
         let leaf = smt.get_leaf(&key_3);
         assert_eq!(
@@ -424,17 +424,17 @@ fn test_prospective_insertion() {
     let root_empty = smt.root();
 
     let root_1 = {
-        smt.insert(key_1, value_1);
+        let _ = smt.insert(key_1, value_1);
         smt.root()
     };
 
     let root_2 = {
-        smt.insert(key_2, value_2);
+        let _ = smt.insert(key_2, value_2);
         smt.root()
     };
 
     let root_3 = {
-        smt.insert(key_3, value_3);
+        let _ = smt.insert(key_3, value_3);
         smt.root()
     };
 
@@ -551,8 +551,8 @@ fn test_mutations_revert() {
     let value_2 = [Felt::from_u64(2); WORD_SIZE];
     let value_3 = [Felt::from_u32(3_u32); WORD_SIZE];
 
-    smt.insert(key_1, value_1);
-    smt.insert(key_2, value_2);
+    let _ = smt.insert(key_1, value_1);
+    let _ = smt.insert(key_2, value_2);
 
     let mutations =
         smt.compute_mutations(vec![(key_1, EMPTY_WORD), (key_2, value_1), (key_3, value_3)]);

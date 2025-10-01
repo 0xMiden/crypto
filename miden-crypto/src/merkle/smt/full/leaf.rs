@@ -1,4 +1,4 @@
-use alloc::vec::Vec;
+use alloc::{string::ToString, vec::Vec};
 use core::cmp::Ordering;
 
 use p3_field::PrimeField64;
@@ -287,7 +287,7 @@ impl SmtLeaf {
                     Ok(pos) => {
                         let old_value = kv_pairs[pos].1;
 
-                        kv_pairs.remove(pos);
+                        let _ = kv_pairs.remove(pos);
                         debug_assert!(!kv_pairs.is_empty());
 
                         if kv_pairs.len() == 1 {
@@ -308,10 +308,7 @@ impl SmtLeaf {
 }
 
 impl Serializable for SmtLeaf {
-    fn write_into<W: ByteWriter>(&self, _target: &mut W) {
-        // TODO: Implement serialization for plonky3 migration
-        // Original implementation commented out until Goldilocks implements Serializable
-        /*
+    fn write_into<W: ByteWriter>(&self, target: &mut W) {
         // Write: num entries
         self.num_entries().write_into(target);
 
@@ -324,15 +321,11 @@ impl Serializable for SmtLeaf {
             key.write_into(target);
             value.write_into(target);
         }
-        */
     }
 }
 
 impl Deserializable for SmtLeaf {
-    fn read_from<R: ByteReader>(_source: &mut R) -> Result<Self, DeserializationError> {
-        // TODO: Implement deserialization for plonky3 migration
-        // Original implementation commented out until Goldilocks implements Deserializable
-        /*
+    fn read_from<R: ByteReader>(source: &mut R) -> Result<Self, DeserializationError> {
         // Read: num entries
         let num_entries = source.read_u64()?;
 
@@ -353,8 +346,6 @@ impl Deserializable for SmtLeaf {
 
         Self::new(entries, leaf_index)
             .map_err(|err| DeserializationError::InvalidValue(err.to_string()))
-        */
-        todo!()
     }
 }
 

@@ -300,14 +300,14 @@ mod tests {
         // A non-empty value for the key that was previously empty.
         let new_value_empty_key = Word::from(random_array(&mut rng));
 
-        full.insert(key0, new_value0);
-        full.insert(key2, new_value2);
-        full.insert(key_empty, new_value_empty_key);
+        let _ = full.insert(key0, new_value0);
+        let _ = full.insert(key2, new_value2);
+        let _ = full.insert(key_empty, new_value_empty_key);
 
-        partial.insert(key0, new_value0).unwrap();
-        partial.insert(key2, new_value2).unwrap();
+        let _ = partial.insert(key0, new_value0).unwrap();
+        let _ = partial.insert(key2, new_value2).unwrap();
         // This updates a key whose value was previously empty.
-        partial.insert(key_empty, new_value_empty_key).unwrap();
+        let _ = partial.insert(key_empty, new_value_empty_key).unwrap();
 
         assert_eq!(full.root(), partial.root());
         assert_eq!(partial.get_value(&key0).unwrap(), new_value0);
@@ -317,8 +317,8 @@ mod tests {
         // Remove an added key.
         // ----------------------------------------------------------------------------------------
 
-        full.insert(key0, EMPTY_WORD);
-        partial.insert(key0, EMPTY_WORD).unwrap();
+        let _ = full.insert(key0, EMPTY_WORD);
+        let _ = partial.insert(key0, EMPTY_WORD).unwrap();
 
         assert_eq!(full.root(), partial.root());
         assert_eq!(partial.get_value(&key0).unwrap(), EMPTY_WORD);
@@ -396,8 +396,8 @@ mod tests {
         let stale_proof0 = full.open(&key0);
 
         // Insert a non-empty value so the root actually changes.
-        full.insert(key1, value1);
-        full.insert(key2, value2);
+        let _ = full.insert(key1, value1);
+        let _ = full.insert(key2, value2);
 
         let proof2 = full.open(&key2);
 
@@ -429,7 +429,7 @@ mod tests {
         // This proof will be stale after we insert another value.
         let stale_proof0 = full.open(&key0);
 
-        full.insert(key2, value2);
+        let _ = full.insert(key2, value2);
 
         let proof2 = full.open(&key2);
 

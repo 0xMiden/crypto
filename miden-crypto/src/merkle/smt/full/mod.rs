@@ -1,3 +1,5 @@
+use alloc::{string::ToString, vec::Vec};
+
 use p3_field::PrimeField64;
 
 use super::{
@@ -487,9 +489,7 @@ impl From<&RpoDigest> for LeafIndex<SMT_DEPTH> {
 // ================================================================================================
 
 impl Serializable for Smt {
-    fn write_into<W: ByteWriter>(&self, _target: &mut W) {
-        // TODO: Implement serialization for plonky3 migration
-        /*
+    fn write_into<W: ByteWriter>(&self, target: &mut W) {
         // Write the number of filled leaves for this Smt
         target.write_usize(self.entries().count());
 
@@ -498,26 +498,24 @@ impl Serializable for Smt {
             target.write(key);
             target.write(value);
         }
-        */
     }
 
     fn get_size_hint(&self) -> usize {
-        // TODO: Implement size hint for plonky3 migration
-        /*
         let entries_count = self.entries().count();
 
         // Each entry is the size of a digest plus a word.
+
+        ark_std::println!("entry cnt: {}", entries_count.get_size_hint());
+        ark_std::println!("word size: {}", EMPTY_WORD.get_size_hint());
+        ark_std::println!("RpoDigest: {}", RpoDigest::SERIALIZED_SIZE);
+
         entries_count.get_size_hint()
             + entries_count * (RpoDigest::SERIALIZED_SIZE + EMPTY_WORD.get_size_hint())
-        */
-        0
     }
 }
 
 impl Deserializable for Smt {
-    fn read_from<R: ByteReader>(_source: &mut R) -> Result<Self, DeserializationError> {
-        // TODO: Implement deserialization for plonky3 migration
-        /*
+    fn read_from<R: ByteReader>(source: &mut R) -> Result<Self, DeserializationError> {
         // Read the number of filled leaves for this Smt
         let num_filled_leaves = source.read_usize()?;
         let mut entries = Vec::with_capacity(num_filled_leaves);
@@ -530,8 +528,6 @@ impl Deserializable for Smt {
 
         Self::with_entries(entries)
             .map_err(|err| DeserializationError::InvalidValue(err.to_string()))
-        */
-        todo!()
     }
 }
 
@@ -602,5 +598,6 @@ fn test_smt_serialization_deserialization() {
 
     let bytes = smt.to_bytes();
     assert_eq!(smt, Smt::read_from_bytes(&bytes).unwrap());
+    ark_std::println!("bytes: {:?}", bytes);
     assert_eq!(bytes.len(), smt.get_size_hint());
 }

@@ -56,8 +56,6 @@ std = [
     "dep:cc",
     "rand/std",
     "rand/thread_rng",
-    #"winter-crypto/std",
-    #"winter-math/std",
     "winter-utils/std",
 ]
 
@@ -75,14 +73,25 @@ serde = { version = "1.0", default-features = false, optional = true, features =
 sha3 = { version = "0.10", default-features = false }
 thiserror = { version = "2.0", default-features = false }
 winter-crypto = { version = "0.12", default-features = false }
-#winter-math = { version = "0.12", default-features = false }
 winter-utils = { version = "0.12", default-features = false }
-p3-field = { version = "0.3.0" }
-p3-goldilocks = { version = "0.3.0" }
-p3-symmetric = { version = "0.3.0" }
-p3-merkle-tree = { version = "0.3.0" }
-p3-air = { version = "0.3.0" }
-p3-challenger = { version = "0.3.0" }
+
+# FIXME: switch to release version of plonky3 once the changes are upstreamed
+# p3-field = { version = "0.3.0" }
+# p3-goldilocks = { version = "0.3.0" }
+# p3-symmetric = { version = "0.3.0" }
+# p3-merkle-tree = { version = "0.3.0" }
+# p3-air = { version = "0.3.0" }
+# p3-challenger = { version = "0.3.0" }
+
+# FIXME: Remove
+ark-std = "0.5.0"
+p3-field = { path = "../../Plonky3/field", default-features =  false }
+p3-goldilocks = { path = "../../Plonky3/goldilocks", default-features =  false }
+p3-symmetric = { path = "../../Plonky3/symmetric", default-features =  false }
+p3-merkle-tree = { path = "../../Plonky3/merkle-tree", default-features =  false }
+p3-air = { path = "../../Plonky3/air", default-features =  false }
+p3-challenger = { path = "../../Plonky3/challenger", default-features =  false }
+
 
 lazy_static = "1.4"
 
