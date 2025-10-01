@@ -37,6 +37,14 @@ impl<K: KeyAgreementScheme, A: AeadScheme> CryptoBox<K, A> {
         rng: &mut R,
         recipient_public_key: &K::PublicKey,
         plaintext: &[u8],
+    ) -> Result<RawSealedMessage, IntegratedEncryptionSchemeError> {
+        CryptoBox::<K, A>::seal_with_associated_data(rng, recipient_public_key, plaintext, &[])
+    }
+
+    pub(crate) fn seal_with_associated_data<R: CryptoRng + RngCore>(
+        rng: &mut R,
+        recipient_public_key: &K::PublicKey,
+        plaintext: &[u8],
         associated_data: &[u8],
     ) -> Result<RawSealedMessage, IntegratedEncryptionSchemeError> {
         let (ephemeral_private, ephemeral_public) = K::generate_ephemeral_keypair(rng);
@@ -65,6 +73,13 @@ impl<K: KeyAgreementScheme, A: AeadScheme> CryptoBox<K, A> {
     }
 
     pub(crate) fn unseal(
+        recipient_private_key: &K::SecretKey,
+        sealed_message: &RawSealedMessage,
+    ) -> Result<Vec<u8>, IntegratedEncryptionSchemeError> {
+        CryptoBox::<K, A>::unseal_with_associated_data(recipient_private_key, sealed_message, &[])
+    }
+
+    pub(crate) fn unseal_with_associated_data(
         recipient_private_key: &K::SecretKey,
         sealed_message: &RawSealedMessage,
         associated_data: &[u8],

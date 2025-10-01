@@ -31,11 +31,10 @@ impl SealingKey {
         &self,
         rng: &mut R,
         plaintext: &[u8],
-        associated_data: &[u8],
     ) -> Result<SealedMessage, IntegratedEncryptionSchemeError> {
         match self {
             SealingKey::K256XChaCha20Poly1305(key) => {
-                let raw = K256XChaCha20Poly1305::seal(rng, key, plaintext, associated_data)?;
+                let raw = K256XChaCha20Poly1305::seal(rng, key, plaintext)?;
 
                 let ephemeral = <K256 as KeyAgreementScheme>::EphemeralPublicKey::read_from_bytes(
                     &raw.ephemeral_public_key,
@@ -50,7 +49,58 @@ impl SealingKey {
                 })
             },
             SealingKey::X25519XChaCha20Poly1305(key) => {
-                let raw = X25519XChaCha20Poly1305::seal(rng, key, plaintext, associated_data)?;
+                let raw = X25519XChaCha20Poly1305::seal(rng, key, plaintext)?;
+                let ephemeral =
+                    <X25519 as KeyAgreementScheme>::EphemeralPublicKey::read_from_bytes(
+                        &raw.ephemeral_public_key,
+                    )
+                    .map_err(|_| {
+                        IntegratedEncryptionSchemeError::EphemeralPublicKeyDeserializationFailed
+                    })?;
+                Ok(SealedMessage {
+                    ephemeral_key: EphemeralPublicKey::X25519XChaCha20Poly1305(ephemeral),
+                    ciphertext: raw.ciphertext,
+                    nonce: raw.nonce,
+                })
+            },
+        }
+    }
+
+    /// Seal (encrypt and authenticate) data for this recipient given some associated data
+    pub fn seal_with_associated_data<R: CryptoRng + RngCore>(
+        &self,
+        rng: &mut R,
+        plaintext: &[u8],
+        associated_data: &[u8],
+    ) -> Result<SealedMessage, IntegratedEncryptionSchemeError> {
+        match self {
+            SealingKey::K256XChaCha20Poly1305(key) => {
+                let raw = K256XChaCha20Poly1305::seal_with_associated_data(
+                    rng,
+                    key,
+                    plaintext,
+                    associated_data,
+                )?;
+
+                let ephemeral = <K256 as KeyAgreementScheme>::EphemeralPublicKey::read_from_bytes(
+                    &raw.ephemeral_public_key,
+                )
+                .map_err(|_| {
+                    IntegratedEncryptionSchemeError::EphemeralPublicKeyDeserializationFailed
+                })?;
+                Ok(SealedMessage {
+                    ephemeral_key: EphemeralPublicKey::K256XChaCha20Poly1305(ephemeral),
+                    ciphertext: raw.ciphertext,
+                    nonce: raw.nonce,
+                })
+            },
+            SealingKey::X25519XChaCha20Poly1305(key) => {
+                let raw = X25519XChaCha20Poly1305::seal_with_associated_data(
+                    rng,
+                    key,
+                    plaintext,
+                    associated_data,
+                )?;
                 let ephemeral =
                     <X25519 as KeyAgreementScheme>::EphemeralPublicKey::read_from_bytes(
                         &raw.ephemeral_public_key,
@@ -79,6 +129,38 @@ impl UnsealingKey {
     pub fn unseal(
         &self,
         sealed_message: SealedMessage,
+    ) -> Result<Vec<u8>, IntegratedEncryptionSchemeError> {
+        // Check algorithm compatibility using constant-time comparison
+        let self_algo = self.algorithm() as u8;
+        let msg_algo = sealed_message.ephemeral_key.algorithm() as u8;
+
+        let compatible = self_algo == msg_algo;
+        if !compatible {
+            return Err(IntegratedEncryptionSchemeError::AlgorithmMismatch);
+        }
+
+        // Destructure and serialize the ephemeral key
+        let SealedMessage { ephemeral_key, ciphertext, nonce } = sealed_message;
+        let raw_sealed = RawSealedMessage {
+            ephemeral_public_key: ephemeral_key.to_bytes(),
+            nonce,
+            ciphertext,
+        };
+
+        match self {
+            UnsealingKey::K256XChaCha20Poly1305(key) => {
+                K256XChaCha20Poly1305::unseal(key, &raw_sealed)
+            },
+            UnsealingKey::X25519XChaCha20Poly1305(key) => {
+                X25519XChaCha20Poly1305::unseal(key, &raw_sealed)
+            },
+        }
+    }
+
+    /// Unseal a sealed message given its associated data
+    pub fn unseal_with_associated_data(
+        &self,
+        sealed_message: SealedMessage,
         associated_data: &[u8],
     ) -> Result<Vec<u8>, IntegratedEncryptionSchemeError> {
         // Check algorithm compatibility using constant-time comparison
@@ -100,10 +182,18 @@ impl UnsealingKey {
 
         match self {
             UnsealingKey::K256XChaCha20Poly1305(key) => {
-                K256XChaCha20Poly1305::unseal(key, &raw_sealed, associated_data)
+                K256XChaCha20Poly1305::unseal_with_associated_data(
+                    key,
+                    &raw_sealed,
+                    associated_data,
+                )
             },
             UnsealingKey::X25519XChaCha20Poly1305(key) => {
-                X25519XChaCha20Poly1305::unseal(key, &raw_sealed, associated_data)
+                X25519XChaCha20Poly1305::unseal_with_associated_data(
+                    key,
+                    &raw_sealed,
+                    associated_data,
+                )
             },
         }
     }
@@ -186,10 +276,10 @@ mod tests {
         let public_key = secret_key.public_key();
 
         let sealing_key = SealingKey::K256XChaCha20Poly1305(public_key);
-        let sealed = sealing_key.seal(&mut rng, plaintext, ad).unwrap();
+        let sealed = sealing_key.seal_with_associated_data(&mut rng, plaintext, ad).unwrap();
 
         let unsealing_key = UnsealingKey::K256XChaCha20Poly1305(secret_key);
-        let decrypted = unsealing_key.unseal(sealed, ad).unwrap();
+        let decrypted = unsealing_key.unseal_with_associated_data(sealed, ad).unwrap();
 
         assert_eq!(decrypted, plaintext);
     }
@@ -205,10 +295,10 @@ mod tests {
         let public_key = secret_key.public_key();
 
         let sealing_key = SealingKey::K256XChaCha20Poly1305(public_key);
-        let sealed = sealing_key.seal(&mut rng, plaintext, ad).unwrap();
+        let sealed = sealing_key.seal_with_associated_data(&mut rng, plaintext, ad).unwrap();
 
         let unsealing_key = UnsealingKey::K256XChaCha20Poly1305(secret_key);
-        let result = unsealing_key.unseal(sealed, bad_ad);
+        let result = unsealing_key.unseal_with_associated_data(sealed, bad_ad);
 
         assert!(result.is_err());
     }
@@ -223,10 +313,10 @@ mod tests {
         let public_key = secret_key.public_key();
 
         let sealing_key = SealingKey::X25519XChaCha20Poly1305(public_key);
-        let sealed = sealing_key.seal(&mut rng, plaintext, ad).unwrap();
+        let sealed = sealing_key.seal_with_associated_data(&mut rng, plaintext, ad).unwrap();
 
         let unsealing_key = UnsealingKey::X25519XChaCha20Poly1305(secret_key);
-        let decrypted = unsealing_key.unseal(sealed, ad).unwrap();
+        let decrypted = unsealing_key.unseal_with_associated_data(sealed, ad).unwrap();
 
         assert_eq!(decrypted, plaintext);
     }
@@ -242,10 +332,10 @@ mod tests {
         let public_key = secret_key.public_key();
 
         let sealing_key = SealingKey::X25519XChaCha20Poly1305(public_key);
-        let sealed = sealing_key.seal(&mut rng, plaintext, ad).unwrap();
+        let sealed = sealing_key.seal_with_associated_data(&mut rng, plaintext, ad).unwrap();
 
         let unsealing_key = UnsealingKey::X25519XChaCha20Poly1305(secret_key);
-        let result = unsealing_key.unseal(sealed, bad_ad);
+        let result = unsealing_key.unseal_with_associated_data(sealed, bad_ad);
 
         assert!(result.is_err());
     }
@@ -256,7 +346,7 @@ mod tests {
         let secret_key = SecretKey::with_rng(&mut rng);
         let public_key = secret_key.public_key();
         let sealing_key = SealingKey::K256XChaCha20Poly1305(public_key);
-        let sealed = sealing_key.seal(&mut rng, b"msg", b"ad").unwrap();
+        let sealed = sealing_key.seal_with_associated_data(&mut rng, b"msg", b"ad").unwrap();
 
         let original = sealed.ephemeral_key.clone();
         let bytes = original.to_bytes();
@@ -271,7 +361,7 @@ mod tests {
         let secret_key = SecretKey25519::with_rng(&mut rng);
         let public_key = secret_key.public_key();
         let sealing_key = SealingKey::X25519XChaCha20Poly1305(public_key);
-        let sealed = sealing_key.seal(&mut rng, b"msg", b"ad").unwrap();
+        let sealed = sealing_key.seal_with_associated_data(&mut rng, b"msg", b"ad").unwrap();
 
         let original = sealed.ephemeral_key.clone();
         let bytes = original.to_bytes();
