@@ -111,12 +111,41 @@ On platforms with [AVX2](https://en.wikipedia.org/wiki/Advanced_Vector_Extension
 make build-avx2
 ```
 
+### AVX512 acceleration
+
+On platforms with [AVX-512](https://en.wikipedia.org/wiki/AVX-512) support, RPO and RPX hash functions can be accelerated by using the vector processing unit. To enable AVX-512 acceleration, the code needs to be compiled with the appropriate target features enabled.  
+
+The minimal set of required features is:
+
+- `avx512f` (AVX-512 foundation)  
+- `avx512dq` (doubleword and quadword operations, required for 64-bit multiplies and comparisons)
+
+For example:
+```shell
+make build-avx512
+```
+
 ### SVE acceleration
 
 On platforms with [SVE](<https://en.wikipedia.org/wiki/AArch64#Scalable_Vector_Extension_(SVE)>) support, RPO and RPX hash function can be accelerated by using the vector processing unit. To enable SVE acceleration, the code needs to be compiled with the `sve` target feature enabled. For example:
 
 ```shell
 make build-sve
+```
+
+### Fastest performance
+
+For users who want the fastest possible performance on their own machine (not portable builds), you can let the compiler automatically enable all CPU features supported by your processor (AVX2, AVX-512, etc.) by building with:
+
+```shell
+RUSTFLAGS="-C target-cpu=native" cargo build --release
+```
+
+You can also make this permanent by adding it to your Cargo configuration file (`~/.cargo/config.toml`):
+
+```toml
+[build]
+rustflags = ["-C", "target-cpu=native"]
 ```
 
 ## Testing

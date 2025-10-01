@@ -1,6 +1,7 @@
 ## 0.18.0 (TBD)
 
 - [BREAKING] Incremented MSRV to 1.89.
+- Added `AVX512` acceleration for RPO and RPX hash functions, including parallelized E-rounds for RPX ([#551](https://github.com/0xMiden/crypto/pull/551)).
 
 ## 0.17.0 (2025-09-12)
 

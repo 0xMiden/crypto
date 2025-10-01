@@ -1,3 +1,6 @@
+// SVE OPTIMIZATIONS
+// ================================================================================================
+
 #[cfg(target_feature = "sve")]
 pub mod optimized {
     use crate::{Felt, hash::algebraic_sponge::rescue::STATE_WIDTH};
@@ -43,58 +46,19 @@ pub mod optimized {
     }
 }
 
-#[cfg(all(target_feature = "avx2", not(target_feature = "avx512f")))]
+// AVX2 OPTIMIZATIONS
+// ================================================================================================
+
+#[cfg(all(
+    target_feature = "avx2",
+    not(all(target_feature = "avx512f", target_feature = "avx512dq"))
+))]
 mod x86_64_avx2;
 
-#[cfg(target_feature = "avx512f")]
-mod x86_64_avx512;
-
-#[cfg(target_feature = "avx512f")]
-pub mod optimized {
-    use super::x86_64_avx512::{apply_ext_round, apply_inv_sbox, apply_sbox};
-    use crate::{
-        Felt,
-        hash::algebraic_sponge::rescue::{STATE_WIDTH, add_constants},
-    };
-
-    #[inline(always)]
-    pub fn add_constants_and_apply_sbox(
-        state: &mut [Felt; STATE_WIDTH],
-        ark: &[Felt; STATE_WIDTH],
-    ) -> bool {
-        add_constants(state, ark);
-        unsafe {
-            apply_sbox(core::mem::transmute(state));
-        }
-        true
-    }
-
-    #[inline(always)]
-    pub fn add_constants_and_apply_inv_sbox(
-        state: &mut [Felt; STATE_WIDTH],
-        ark: &[Felt; STATE_WIDTH],
-    ) -> bool {
-        add_constants(state, ark);
-        unsafe {
-            apply_inv_sbox(core::mem::transmute(state));
-        }
-        true
-    }
-
-    #[inline(always)]
-    pub fn add_constants_and_apply_ext_round(
-        state: &mut [Felt; STATE_WIDTH],
-        ark: &[Felt; STATE_WIDTH],
-    ) -> bool {
-        add_constants(state, ark);
-        unsafe {
-            apply_ext_round(core::mem::transmute(state));
-        }
-        true
-    }
-}
-
-#[cfg(all(target_feature = "avx2", not(target_feature = "avx512f")))]
+#[cfg(all(
+    target_feature = "avx2",
+    not(all(target_feature = "avx512f", target_feature = "avx512dq"))
+))]
 pub mod optimized {
     use super::x86_64_avx2::{apply_ext_round, apply_inv_sbox, apply_sbox};
     use crate::{
@@ -139,7 +103,66 @@ pub mod optimized {
     }
 }
 
-#[cfg(not(any(target_feature = "avx2", target_feature = "avx512f", target_feature = "sve")))]
+// AVX512 OPTIMIZATIONS
+// ================================================================================================
+
+#[cfg(all(target_feature = "avx512f", target_feature = "avx512dq"))]
+mod x86_64_avx512;
+
+#[cfg(all(target_feature = "avx512f", target_feature = "avx512dq"))]
+pub mod optimized {
+    use super::x86_64_avx512::{apply_ext_round, apply_inv_sbox, apply_sbox};
+    use crate::{
+        Felt,
+        hash::algebraic_sponge::rescue::{STATE_WIDTH, add_constants},
+    };
+
+    #[inline(always)]
+    pub fn add_constants_and_apply_sbox(
+        state: &mut [Felt; STATE_WIDTH],
+        ark: &[Felt; STATE_WIDTH],
+    ) -> bool {
+        add_constants(state, ark);
+        unsafe {
+            apply_sbox(core::mem::transmute(state));
+        }
+        true
+    }
+
+    #[inline(always)]
+    pub fn add_constants_and_apply_inv_sbox(
+        state: &mut [Felt; STATE_WIDTH],
+        ark: &[Felt; STATE_WIDTH],
+    ) -> bool {
+        add_constants(state, ark);
+        unsafe {
+            apply_inv_sbox(core::mem::transmute(state));
+        }
+        true
+    }
+
+    #[inline(always)]
+    pub fn add_constants_and_apply_ext_round(
+        state: &mut [Felt; STATE_WIDTH],
+        ark: &[Felt; STATE_WIDTH],
+    ) -> bool {
+        add_constants(state, ark);
+        unsafe {
+            apply_ext_round(core::mem::transmute(state));
+        }
+        true
+    }
+}
+
+// NO OPTIMIZATIONS
+// ================================================================================================
+
+#[cfg(not(any(
+    target_feature = "avx2",
+    target_feature = "avx512f",
+    target_feature = "avx512dq",
+    target_feature = "sve"
+)))]
 pub mod optimized {
     use crate::{Felt, hash::algebraic_sponge::rescue::STATE_WIDTH};
 

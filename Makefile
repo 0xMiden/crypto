@@ -109,6 +109,10 @@ build-no-std: ## Build without the standard library
 build-avx2: ## Build with avx2 support
 	RUSTFLAGS="-C target-feature=+avx2" cargo build --release
 
+.PHONY: build-avx512
+build-avx512: ## Build with avx512 support
+	RUSTFLAGS="-C target-feature=+avx512f,+avx512dq" cargo build --release
+
 .PHONY: build-sve
 build-sve: ## Build with sve support
 	RUSTFLAGS="-C target-feature=+sve" cargo build --release
