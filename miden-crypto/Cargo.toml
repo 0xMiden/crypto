@@ -37,16 +37,12 @@ name    = "smt-historical"
 
 [[bench]]
 harness           = false
-name              = "smt-subtree"
+name              = "smt"
 required-features = ["internal"]
 
 [[bench]]
 harness = false
 name    = "merkle"
-
-[[bench]]
-harness = false
-name    = "smt-with-entries"
 
 [[bench]]
 harness           = false
