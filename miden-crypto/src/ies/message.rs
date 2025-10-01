@@ -49,10 +49,8 @@ impl IesAlgorithm {
 pub struct SealedMessage {
     /// Ephemeral public key (determines algorithm and provides key material)
     pub(crate) ephemeral_key: EphemeralPublicKey,
-    /// Encrypted ciphertext with authentication tag
+    /// Encrypted ciphertext with authentication tag and nonce
     pub(crate) ciphertext: Vec<u8>,
-    /// Nonce used for encryption
-    pub(crate) nonce: Vec<u8>,
 }
 
 impl SealedMessage {
@@ -81,9 +79,6 @@ impl Serializable for SealedMessage {
 
         target.write_usize(self.ciphertext.len());
         target.write_bytes(&self.ciphertext);
-
-        target.write_usize(self.nonce.len());
-        target.write_bytes(&self.nonce);
     }
 }
 
@@ -106,9 +101,6 @@ impl Deserializable for SealedMessage {
         let ciphertext_len = source.read_usize()?;
         let ciphertext = source.read_vec(ciphertext_len)?;
 
-        let nonce_len = source.read_usize()?;
-        let nonce = source.read_vec(nonce_len)?;
-
-        Ok(Self { ephemeral_key, ciphertext, nonce })
+        Ok(Self { ephemeral_key, ciphertext })
     }
 }

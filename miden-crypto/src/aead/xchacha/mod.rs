@@ -325,39 +325,27 @@ impl AeadScheme for XChaCha {
 
     type Key = SecretKey;
 
-    type Nonce = Nonce;
-
     fn key_from_bytes(bytes: &[u8]) -> Result<Self::Key, EncryptionError> {
         SecretKey::read_from_bytes(bytes).map_err(|_| EncryptionError::FailedOperation)
     }
 
-    fn generate_nonce<R: CryptoRng + RngCore>(rng: &mut R) -> Self::Nonce {
-        Nonce::with_rng(rng)
-    }
-
-    fn encrypt_bytes_with_nonce(
+    fn encrypt_bytes(
         key: &Self::Key,
-        nonce: &Self::Nonce,
         plaintext: &[u8],
         associated_data: &[u8],
     ) -> Result<Vec<u8>, EncryptionError> {
         let encrypted_data = key
-            .encrypt_bytes_with_nonce(plaintext, associated_data, nonce.clone())
+            .encrypt_bytes_with_associated_data(plaintext, associated_data)
             .map_err(|_| EncryptionError::FailedOperation)?;
-        Ok(encrypted_data.ciphertext)
+        Ok(encrypted_data.to_bytes())
     }
 
     fn decrypt_bytes_with_associated_data(
         key: &Self::Key,
-        nonce: &Self::Nonce,
         ciphertext: &[u8],
         associated_data: &[u8],
     ) -> Result<Vec<u8>, EncryptionError> {
-        let encrypted_data = &EncryptedData {
-            ciphertext: ciphertext.to_vec(),
-            nonce: nonce.clone(),
-            data_type: DataType::Bytes,
-        };
+        let encrypted_data = &EncryptedData::read_from_bytes(ciphertext).unwrap();
         key.decrypt_bytes_with_associated_data(encrypted_data, associated_data)
             .map_err(|_| EncryptionError::FailedOperation)
     }

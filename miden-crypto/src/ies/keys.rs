@@ -45,7 +45,6 @@ impl SealingKey {
                 Ok(SealedMessage {
                     ephemeral_key: EphemeralPublicKey::K256XChaCha20Poly1305(ephemeral),
                     ciphertext: raw.ciphertext,
-                    nonce: raw.nonce,
                 })
             },
             SealingKey::X25519XChaCha20Poly1305(key) => {
@@ -60,7 +59,6 @@ impl SealingKey {
                 Ok(SealedMessage {
                     ephemeral_key: EphemeralPublicKey::X25519XChaCha20Poly1305(ephemeral),
                     ciphertext: raw.ciphertext,
-                    nonce: raw.nonce,
                 })
             },
         }
@@ -91,7 +89,6 @@ impl SealingKey {
                 Ok(SealedMessage {
                     ephemeral_key: EphemeralPublicKey::K256XChaCha20Poly1305(ephemeral),
                     ciphertext: raw.ciphertext,
-                    nonce: raw.nonce,
                 })
             },
             SealingKey::X25519XChaCha20Poly1305(key) => {
@@ -111,7 +108,6 @@ impl SealingKey {
                 Ok(SealedMessage {
                     ephemeral_key: EphemeralPublicKey::X25519XChaCha20Poly1305(ephemeral),
                     ciphertext: raw.ciphertext,
-                    nonce: raw.nonce,
                 })
             },
         }
@@ -140,10 +136,9 @@ impl UnsealingKey {
         }
 
         // Destructure and serialize the ephemeral key
-        let SealedMessage { ephemeral_key, ciphertext, nonce } = sealed_message;
+        let SealedMessage { ephemeral_key, ciphertext } = sealed_message;
         let raw_sealed = RawSealedMessage {
             ephemeral_public_key: ephemeral_key.to_bytes(),
-            nonce,
             ciphertext,
         };
 
@@ -173,10 +168,9 @@ impl UnsealingKey {
         }
 
         // Destructure and serialize the ephemeral key
-        let SealedMessage { ephemeral_key, ciphertext, nonce } = sealed_message;
+        let SealedMessage { ephemeral_key, ciphertext } = sealed_message;
         let raw_sealed = RawSealedMessage {
             ephemeral_public_key: ephemeral_key.to_bytes(),
-            nonce,
             ciphertext,
         };
 

@@ -28,7 +28,6 @@ pub(crate) struct CryptoBox<K: KeyAgreementScheme, A: AeadScheme> {
 #[derive(Debug)]
 pub(crate) struct RawSealedMessage {
     pub ephemeral_public_key: Vec<u8>,
-    pub nonce: Vec<u8>,
     pub ciphertext: Vec<u8>,
 }
 
@@ -58,16 +57,13 @@ impl<K: KeyAgreementScheme, A: AeadScheme> CryptoBox<K, A> {
         let mut encryption_key = A::key_from_bytes(&encryption_key_bytes)
             .map_err(|_| IntegratedEncryptionSchemeError::EncryptionKeyCreationFailed)?;
 
-        let nonce = A::generate_nonce(rng);
-        let ciphertext =
-            A::encrypt_bytes_with_nonce(&encryption_key, &nonce, plaintext, associated_data)
-                .map_err(|_| IntegratedEncryptionSchemeError::EncryptionFailed)?;
+        let ciphertext = A::encrypt_bytes(&encryption_key, plaintext, associated_data)
+            .map_err(|_| IntegratedEncryptionSchemeError::EncryptionFailed)?;
 
         encryption_key.zeroize();
 
         Ok(RawSealedMessage {
             ciphertext,
-            nonce: nonce.to_bytes(),
             ephemeral_public_key: ephemeral_public.to_bytes(),
         })
     }
@@ -98,11 +94,8 @@ impl<K: KeyAgreementScheme, A: AeadScheme> CryptoBox<K, A> {
         let mut decryption_key = A::key_from_bytes(&decryption_key_bytes)
             .map_err(|_| IntegratedEncryptionSchemeError::EncryptionKeyCreationFailed)?;
 
-        let nonce = A::Nonce::read_from_bytes(&sealed_message.nonce)
-            .map_err(|_| IntegratedEncryptionSchemeError::InvalidNonce)?;
         let result = A::decrypt_bytes_with_associated_data(
             &decryption_key,
-            &nonce,
             &sealed_message.ciphertext,
             associated_data,
         )

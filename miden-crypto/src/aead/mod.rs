@@ -39,22 +39,17 @@ pub(crate) trait AeadScheme {
     const KEY_SIZE: usize;
 
     type Key: Deserializable + Zeroize;
-    type Nonce: Clone + Serializable + Deserializable;
 
     fn key_from_bytes(bytes: &[u8]) -> Result<Self::Key, EncryptionError>;
 
-    fn generate_nonce<R: CryptoRng + RngCore>(rng: &mut R) -> Self::Nonce;
-
-    fn encrypt_bytes_with_nonce(
+    fn encrypt_bytes(
         key: &Self::Key,
-        nonce: &Self::Nonce,
         plaintext: &[u8],
         associated_data: &[u8],
     ) -> Result<Vec<u8>, EncryptionError>;
 
     fn decrypt_bytes_with_associated_data(
         key: &Self::Key,
-        nonce: &Self::Nonce,
         ciphertext: &[u8],
         associated_data: &[u8],
     ) -> Result<Vec<u8>, EncryptionError>;

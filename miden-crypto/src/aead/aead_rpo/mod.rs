@@ -9,6 +9,7 @@
 
 use alloc::{string::ToString, vec::Vec};
 use core::ops::Range;
+use winter_math::FieldElement;
 
 use num::Integer;
 use rand::{
@@ -16,13 +17,17 @@ use rand::{
     distr::{Distribution, StandardUniform, Uniform},
 };
 
+use rand::{CryptoRng, RngCore};
+use zeroize::Zeroize;
+
 use crate::{
     Felt, ONE, StarkField, Word, ZERO,
-    aead::{DataType, EncryptionError},
+    aead::{AeadScheme, DataType, EncryptionError},
     hash::rpo::Rpo256,
     utils::{
         ByteReader, ByteWriter, Deserializable, DeserializationError, Serializable,
-        bytes_to_elements_with_padding, padded_elements_to_bytes,
+        bytes_to_elements_exact, bytes_to_elements_with_padding, elements_to_bytes,
+        padded_elements_to_bytes,
     },
 };
 
@@ -35,8 +40,14 @@ mod test;
 /// Size of a secret key in field elements
 pub const SECRET_KEY_SIZE: usize = 4;
 
+/// Size of a secret key in bytes
+pub const SK_SIZE_BYTES: usize = SECRET_KEY_SIZE * Felt::ELEMENT_BYTES;
+
 /// Size of a nonce in field elements
 pub const NONCE_SIZE: usize = 4;
+
+/// Size of a nonce in bytes
+pub const NONCE_SIZE_BYTES: usize = NONCE_SIZE * Felt::ELEMENT_BYTES;
 
 /// Size of an authentication tag in field elements
 pub const AUTH_TAG_SIZE: usize = 4;
@@ -360,6 +371,18 @@ impl Distribution<SecretKey> for StandardUniform {
     }
 }
 
+impl Drop for SecretKey {
+    fn drop(&mut self) {
+        self.zeroize();
+    }
+}
+
+impl Zeroize for SecretKey {
+    fn zeroize(&mut self) {
+        todo!()
+    }
+}
+
 // SPONGE STATE
 // ================================================================================================
 
@@ -465,6 +488,52 @@ impl Distribution<Nonce> for StandardUniform {
 // SERIALIZATION / DESERIALIZATION
 // ================================================================================================
 
+impl Serializable for SecretKey {
+    fn write_into<W: ByteWriter>(&self, target: &mut W) {
+        let bytes = elements_to_bytes(&self.0);
+        target.write_bytes(&bytes);
+    }
+}
+
+impl Deserializable for SecretKey {
+    fn read_from<R: ByteReader>(source: &mut R) -> Result<Self, DeserializationError> {
+        let bytes: [u8; SK_SIZE_BYTES] = source.read_array()?;
+
+        match bytes_to_elements_exact(&bytes) {
+            Some(inner) => {
+                let inner: [Felt; 4] = inner.try_into().map_err(|_| {
+                    DeserializationError::InvalidValue("malformed secret key".to_string())
+                })?;
+                Ok(Self(inner))
+            },
+            None => Err(DeserializationError::InvalidValue("malformed secret key".to_string())),
+        }
+    }
+}
+
+impl Serializable for Nonce {
+    fn write_into<W: ByteWriter>(&self, target: &mut W) {
+        let bytes = elements_to_bytes(&self.0);
+        target.write_bytes(&bytes);
+    }
+}
+
+impl Deserializable for Nonce {
+    fn read_from<R: ByteReader>(source: &mut R) -> Result<Self, DeserializationError> {
+        let bytes: [u8; SK_SIZE_BYTES] = source.read_array()?;
+
+        match bytes_to_elements_exact(&bytes) {
+            Some(inner) => {
+                let inner: [Felt; 4] = inner.try_into().map_err(|_| {
+                    DeserializationError::InvalidValue("malformed secret key".to_string())
+                })?;
+                Ok(Self(inner))
+            },
+            None => Err(DeserializationError::InvalidValue("malformed secret key".to_string())),
+        }
+    }
+}
+
 impl Serializable for EncryptedData {
     fn write_into<W: ByteWriter>(&self, target: &mut W) {
         // we serialize field elements in their canonical form
@@ -508,6 +577,9 @@ impl Deserializable for EncryptedData {
         })
     }
 }
+
+// IES IMPLEMENTATION
+// ================================================================================================
 
 //  HELPERS
 // ================================================================================================
