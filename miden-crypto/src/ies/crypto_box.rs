@@ -14,8 +14,8 @@ use zeroize::Zeroize;
 
 use super::error::IntegratedEncryptionSchemeError;
 use crate::{
+    aead::AeadScheme,
     ecdh::KeyAgreementScheme,
-    encryption::AeadScheme,
     utils::{Deserializable, Serializable},
 };
 
@@ -51,8 +51,9 @@ impl<K: KeyAgreementScheme, A: AeadScheme> CryptoBox<K, A> {
             .map_err(|_| IntegratedEncryptionSchemeError::EncryptionKeyCreationFailed)?;
 
         let nonce = A::generate_nonce(rng);
-        let ciphertext = A::encrypt_bytes(&encryption_key, &nonce, plaintext, associated_data)
-            .map_err(|_| IntegratedEncryptionSchemeError::EncryptionFailed)?;
+        let ciphertext =
+            A::encrypt_bytes_with_nonce(&encryption_key, &nonce, plaintext, associated_data)
+                .map_err(|_| IntegratedEncryptionSchemeError::EncryptionFailed)?;
 
         encryption_key.zeroize();
 
@@ -84,9 +85,13 @@ impl<K: KeyAgreementScheme, A: AeadScheme> CryptoBox<K, A> {
 
         let nonce = A::Nonce::read_from_bytes(&sealed_message.nonce)
             .map_err(|_| IntegratedEncryptionSchemeError::InvalidNonce)?;
-        let result =
-            A::decrypt_bytes(&decryption_key, &nonce, &sealed_message.ciphertext, associated_data)
-                .map_err(|_| IntegratedEncryptionSchemeError::DecryptionFailed)?;
+        let result = A::decrypt_bytes_with_associated_data(
+            &decryption_key,
+            &nonce,
+            &sealed_message.ciphertext,
+            associated_data,
+        )
+        .map_err(|_| IntegratedEncryptionSchemeError::DecryptionFailed)?;
 
         decryption_key.zeroize();
 

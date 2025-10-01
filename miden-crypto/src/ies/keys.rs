@@ -5,11 +5,11 @@ use rand::{CryptoRng, RngCore};
 use super::{
     crypto_box::{CryptoBox, RawSealedMessage},
     error::IntegratedEncryptionSchemeError,
-    message::{CryptoAlgorithm, SealedMessage},
+    message::{IesAlgorithm, SealedMessage},
 };
 use crate::{
+    aead::xchacha::XChaCha,
     ecdh::{KeyAgreementScheme, k256::K256, x25519::X25519},
-    encryption::xchacha::XChaCha,
     utils::{Deserializable, Serializable},
 };
 
@@ -109,10 +109,10 @@ impl UnsealingKey {
     }
 
     /// Get algorithm identifier for this secret key
-    fn algorithm(&self) -> CryptoAlgorithm {
+    fn algorithm(&self) -> IesAlgorithm {
         match self {
-            UnsealingKey::K256XChaCha20Poly1305(_) => CryptoAlgorithm::K256XChaCha20Poly1305,
-            UnsealingKey::X25519XChaCha20Poly1305(_) => CryptoAlgorithm::X25519XChaCha20Poly1305,
+            UnsealingKey::K256XChaCha20Poly1305(_) => IesAlgorithm::K256XChaCha20Poly1305,
+            UnsealingKey::X25519XChaCha20Poly1305(_) => IesAlgorithm::X25519XChaCha20Poly1305,
         }
     }
 
@@ -131,12 +131,10 @@ pub(crate) enum EphemeralPublicKey {
 
 impl EphemeralPublicKey {
     /// Get algorithm identifier for this ephemeral key
-    pub fn algorithm(&self) -> CryptoAlgorithm {
+    pub fn algorithm(&self) -> IesAlgorithm {
         match self {
-            EphemeralPublicKey::K256XChaCha20Poly1305(_) => CryptoAlgorithm::K256XChaCha20Poly1305,
-            EphemeralPublicKey::X25519XChaCha20Poly1305(_) => {
-                CryptoAlgorithm::X25519XChaCha20Poly1305
-            },
+            EphemeralPublicKey::K256XChaCha20Poly1305(_) => IesAlgorithm::K256XChaCha20Poly1305,
+            EphemeralPublicKey::X25519XChaCha20Poly1305(_) => IesAlgorithm::X25519XChaCha20Poly1305,
         }
     }
 
@@ -150,18 +148,18 @@ impl EphemeralPublicKey {
 
     /// Deserialize from bytes with explicit algorithm
     pub fn from_bytes(
-        algorithm: CryptoAlgorithm,
+        algorithm: IesAlgorithm,
         bytes: &[u8],
     ) -> Result<Self, IntegratedEncryptionSchemeError> {
         match algorithm {
-            CryptoAlgorithm::K256XChaCha20Poly1305 => {
+            IesAlgorithm::K256XChaCha20Poly1305 => {
                 let key = <K256 as KeyAgreementScheme>::EphemeralPublicKey::read_from_bytes(bytes)
                     .map_err(|_| {
                         IntegratedEncryptionSchemeError::EphemeralPublicKeyDeserializationFailed
                     })?;
                 Ok(EphemeralPublicKey::K256XChaCha20Poly1305(key))
             },
-            CryptoAlgorithm::X25519XChaCha20Poly1305 => {
+            IesAlgorithm::X25519XChaCha20Poly1305 => {
                 let key =
                     <X25519 as KeyAgreementScheme>::EphemeralPublicKey::read_from_bytes(bytes)
                         .map_err(|_| {

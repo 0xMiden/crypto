@@ -7,39 +7,39 @@ use crate::utils::{ByteReader, ByteWriter, Deserializable, DeserializationError,
 /// Supported algorithms for IES
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(u8)]
-pub(crate) enum CryptoAlgorithm {
+pub(crate) enum IesAlgorithm {
     K256XChaCha20Poly1305 = 0,
     X25519XChaCha20Poly1305 = 1,
 }
 
-impl TryFrom<u8> for CryptoAlgorithm {
+impl TryFrom<u8> for IesAlgorithm {
     type Error = IntegratedEncryptionSchemeError;
     fn try_from(value: u8) -> Result<Self, Self::Error> {
         match value {
-            0 => Ok(CryptoAlgorithm::K256XChaCha20Poly1305),
-            1 => Ok(CryptoAlgorithm::X25519XChaCha20Poly1305),
+            0 => Ok(IesAlgorithm::K256XChaCha20Poly1305),
+            1 => Ok(IesAlgorithm::X25519XChaCha20Poly1305),
             _ => Err(IntegratedEncryptionSchemeError::UnsupportedAlgorithm),
         }
     }
 }
 
-impl From<CryptoAlgorithm> for u8 {
-    fn from(algo: CryptoAlgorithm) -> Self {
+impl From<IesAlgorithm> for u8 {
+    fn from(algo: IesAlgorithm) -> Self {
         algo as u8
     }
 }
 
-impl core::fmt::Display for CryptoAlgorithm {
+impl core::fmt::Display for IesAlgorithm {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         write!(f, "{}", self.name())
     }
 }
 
-impl CryptoAlgorithm {
+impl IesAlgorithm {
     pub fn name(self) -> &'static str {
         match self {
-            CryptoAlgorithm::K256XChaCha20Poly1305 => "K256+XChaCha20-Poly1305",
-            CryptoAlgorithm::X25519XChaCha20Poly1305 => "X25519+XChaCha20-Poly1305",
+            IesAlgorithm::K256XChaCha20Poly1305 => "K256+XChaCha20-Poly1305",
+            IesAlgorithm::X25519XChaCha20Poly1305 => "X25519+XChaCha20-Poly1305",
         }
     }
 }
@@ -57,7 +57,7 @@ pub struct SealedMessage {
 
 impl SealedMessage {
     /// Get the algorithm used to create this sealed message
-    pub(crate) fn algorithm(&self) -> CryptoAlgorithm {
+    pub(crate) fn algorithm(&self) -> IesAlgorithm {
         self.ephemeral_key.algorithm()
     }
 
@@ -89,7 +89,7 @@ impl Serializable for SealedMessage {
 
 impl Deserializable for SealedMessage {
     fn read_from<R: ByteReader>(source: &mut R) -> Result<Self, DeserializationError> {
-        let algorithm = match CryptoAlgorithm::try_from(source.read_u8()?) {
+        let algorithm = match IesAlgorithm::try_from(source.read_u8()?) {
             Ok(a) => a,
             Err(_) => {
                 return Err(DeserializationError::InvalidValue("Unsupported algorithm".into()));

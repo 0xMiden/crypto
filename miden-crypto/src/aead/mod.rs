@@ -1,6 +1,12 @@
 //! AEAD (authenticated encryption with associated data) schemes.
 
+use alloc::vec::Vec;
 use core::fmt;
+
+use rand::{CryptoRng, RngCore};
+use zeroize::Zeroize;
+
+use crate::utils::{Deserializable, Serializable};
 
 pub mod aead_rpo;
 pub mod xchacha;
@@ -23,6 +29,35 @@ impl TryFrom<u8> for DataType {
             _ => Err(InvalidDataTypeError { value }),
         }
     }
+}
+
+// AEAD TRAIT
+// ================================================================================================
+
+/// Authenticated encryption with associated data (AEAD) scheme
+pub(crate) trait AeadScheme {
+    const KEY_SIZE: usize;
+
+    type Key: Deserializable + Zeroize;
+    type Nonce: Clone + Serializable + Deserializable;
+
+    fn key_from_bytes(bytes: &[u8]) -> Result<Self::Key, EncryptionError>;
+
+    fn generate_nonce<R: CryptoRng + RngCore>(rng: &mut R) -> Self::Nonce;
+
+    fn encrypt_bytes_with_nonce(
+        key: &Self::Key,
+        nonce: &Self::Nonce,
+        plaintext: &[u8],
+        associated_data: &[u8],
+    ) -> Result<Vec<u8>, EncryptionError>;
+
+    fn decrypt_bytes_with_associated_data(
+        key: &Self::Key,
+        nonce: &Self::Nonce,
+        ciphertext: &[u8],
+        associated_data: &[u8],
+    ) -> Result<Vec<u8>, EncryptionError>;
 }
 
 // ERROR TYPES
