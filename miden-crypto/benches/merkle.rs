@@ -87,7 +87,7 @@ benchmark_with_setup_data!(
     },
     |b: &mut criterion::Bencher<'_>, (tree, index): &(MerkleTree, NodeIndex)| {
         b.iter(|| {
-            let _path = tree.get_path(hint::black_box(*index)).unwrap();
+            let _path = hint::black_box(tree.get_path(*index)).unwrap();
         })
     },
 );
@@ -101,7 +101,7 @@ benchmark_batch!(
 
         b.iter(|| {
             for (i, new_leaf) in new_leaves.iter().enumerate() {
-                tree.update_leaf(i as u64, hint::black_box(*new_leaf)).unwrap();
+                hint::black_box(tree.update_leaf(i as u64, *new_leaf)).unwrap();
             }
         })
     },

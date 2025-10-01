@@ -161,7 +161,7 @@ pub fn generate_smt_entries_mixed(count: usize) -> Vec<(Word, Word)> {
     (0..count as u64)
         .map(|i| {
             // Use different patterns for keys based on index to create more realistic distribution
-            let key_pattern = match i % 4 {
+            let key_pattern = match rand_value::<u8>() % 4 {
                 0 => WordPattern::Sequential,
                 1 => WordPattern::SpreadSequential,
                 2 => WordPattern::MerkleStandard,
