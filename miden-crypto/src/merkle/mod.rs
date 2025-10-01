@@ -22,6 +22,8 @@ mod sparse_path;
 pub use sparse_path::SparseMerklePath;
 
 mod smt;
+#[cfg(feature = "std")]
+pub use smt::historical;
 pub use smt::{
     InnerNode, LeafIndex, MAX_LEAF_ENTRIES, MutationSet, NodeMutation, PartialSmt, SMT_DEPTH,
     SMT_MAX_DEPTH, SMT_MIN_DEPTH, SimpleSmt, SimpleSmtProof, Smt, SmtLeaf, SmtLeafError, SmtProof,
@@ -35,8 +37,6 @@ pub use smt::{
 pub use smt::{RocksDbConfig, RocksDbStorage};
 #[cfg(feature = "internal")]
 pub use smt::{SubtreeLeaf, build_subtree_for_bench};
-#[cfg(feature = "std")]
-pub use smt::historical;
 
 mod mmr;
 pub use mmr::{Forest, InOrderIndex, Mmr, MmrDelta, MmrError, MmrPeaks, MmrProof, PartialMmr};
