@@ -3,10 +3,9 @@
 use alloc::vec::Vec;
 use core::fmt;
 
-use rand::{CryptoRng, RngCore};
 use zeroize::Zeroize;
 
-use crate::utils::{Deserializable, Serializable};
+use crate::{Felt, utils::Deserializable};
 
 pub mod aead_rpo;
 pub mod xchacha;
@@ -42,6 +41,9 @@ pub(crate) trait AeadScheme {
 
     fn key_from_bytes(bytes: &[u8]) -> Result<Self::Key, EncryptionError>;
 
+    // BYTE METHODS
+    // ================================================================================================
+
     fn encrypt_bytes(
         key: &Self::Key,
         plaintext: &[u8],
@@ -53,6 +55,36 @@ pub(crate) trait AeadScheme {
         ciphertext: &[u8],
         associated_data: &[u8],
     ) -> Result<Vec<u8>, EncryptionError>;
+
+    // FELT METHODS
+    // ================================================================================================
+
+    /// Encrypts field elements with associated data. Default implementation converts to bytes.
+    fn encrypt_elements(
+        key: &Self::Key,
+        plaintext: &[Felt],
+        associated_data: &[Felt],
+    ) -> Result<Vec<u8>, EncryptionError> {
+        let plaintext_bytes = crate::utils::elements_to_bytes(plaintext);
+        let ad_bytes = crate::utils::elements_to_bytes(associated_data);
+
+        Self::encrypt_bytes(key, &plaintext_bytes, &ad_bytes)
+    }
+
+    /// Decrypts field elements with associated data. Default implementation uses byte decryption.
+    fn decrypt_elements_with_associated_data(
+        key: &Self::Key,
+        ciphertext: &[u8],
+        associated_data: &[Felt],
+    ) -> Result<Vec<Felt>, EncryptionError> {
+        let ad_bytes = crate::utils::elements_to_bytes(associated_data);
+        let plaintext_bytes = Self::decrypt_bytes_with_associated_data(key, ciphertext, &ad_bytes)?;
+
+        match crate::utils::bytes_to_elements_exact(&plaintext_bytes) {
+            Some(elements) => Ok(elements),
+            None => Err(EncryptionError::FailedBytesToElementsConversion),
+        }
+    }
 }
 
 // ERROR TYPES

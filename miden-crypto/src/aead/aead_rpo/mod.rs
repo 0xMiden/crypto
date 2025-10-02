@@ -9,19 +9,16 @@
 
 use alloc::{string::ToString, vec::Vec};
 use core::ops::Range;
-use winter_math::FieldElement;
 
 use num::Integer;
 use rand::{
     Rng,
     distr::{Distribution, StandardUniform, Uniform},
 };
-
-use rand::{CryptoRng, RngCore};
 use zeroize::Zeroize;
 
 use crate::{
-    Felt, ONE, StarkField, Word, ZERO,
+    Felt, FieldElement, ONE, StarkField, Word, ZERO,
     aead::{AeadScheme, DataType, EncryptionError},
     hash::rpo::Rpo256,
     utils::{
@@ -378,8 +375,19 @@ impl Drop for SecretKey {
 }
 
 impl Zeroize for SecretKey {
+    /// Securely zeros the secret key using volatile writes and memory barriers.
+    ///
+    /// This implementation follows the same methodology as the `zeroize` crate:
+    /// - Uses `write_volatile` to prevent compiler optimizations from eliminating the zeroing
+    /// - Includes a compiler fence to prevent instruction reordering
+    /// - Ensures cryptographic key material is reliably cleared from memory
     fn zeroize(&mut self) {
-        todo!()
+        for element in self.0.iter_mut() {
+            unsafe {
+                core::ptr::write_volatile(element, ZERO);
+            }
+        }
+        core::sync::atomic::compiler_fence(core::sync::atomic::Ordering::SeqCst);
     }
 }
 
@@ -641,4 +649,85 @@ fn unpad(mut plaintext: Vec<Felt>) -> Result<Vec<Felt>, EncryptionError> {
 /// the u64 values is not a valid field element.
 fn felts_from_u64(input: Vec<u64>) -> Result<Vec<Felt>, alloc::string::String> {
     input.into_iter().map(Felt::try_from).collect()
+}
+
+// AEAD SCHEME IMPLEMENTATION
+// ================================================================================================
+
+/// RPO256-based AEAD scheme implementation
+pub struct AeadRpo;
+
+impl AeadScheme for AeadRpo {
+    const KEY_SIZE: usize = SK_SIZE_BYTES;
+
+    type Key = SecretKey;
+
+    fn key_from_bytes(bytes: &[u8]) -> Result<Self::Key, EncryptionError> {
+        if bytes.len() != SK_SIZE_BYTES {
+            return Err(EncryptionError::FailedOperation);
+        }
+
+        let bytes_array: [u8; SK_SIZE_BYTES] =
+            bytes.try_into().map_err(|_| EncryptionError::FailedOperation)?;
+
+        match bytes_to_elements_exact(&bytes_array) {
+            Some(elements) => {
+                let elements_array: [Felt; SECRET_KEY_SIZE] =
+                    elements.try_into().map_err(|_| EncryptionError::FailedOperation)?;
+                Ok(SecretKey(elements_array))
+            },
+            None => Err(EncryptionError::FailedOperation),
+        }
+    }
+
+    fn encrypt_bytes(
+        key: &Self::Key,
+        plaintext: &[u8],
+        associated_data: &[u8],
+    ) -> Result<Vec<u8>, EncryptionError> {
+        let encrypted_data = key
+            .encrypt_bytes_with_associated_data(plaintext, associated_data)
+            .map_err(|_| EncryptionError::FailedOperation)?;
+        let result = encrypted_data.to_bytes();
+
+        Ok(result)
+    }
+
+    fn decrypt_bytes_with_associated_data(
+        key: &Self::Key,
+        ciphertext: &[u8],
+        associated_data: &[u8],
+    ) -> Result<Vec<u8>, EncryptionError> {
+        let encrypted_data = EncryptedData::read_from_bytes(ciphertext)
+            .map_err(|_| EncryptionError::FailedOperation)?;
+
+        key.decrypt_bytes_with_associated_data(&encrypted_data, associated_data)
+    }
+
+    // OPTIMIZED FELT METHODS
+    // ================================================================================================
+
+    fn encrypt_elements(
+        key: &Self::Key,
+        plaintext: &[Felt],
+        associated_data: &[Felt],
+    ) -> Result<Vec<u8>, EncryptionError> {
+        let encrypted_data = key
+            .encrypt_elements_with_associated_data(plaintext, associated_data)
+            .map_err(|_| EncryptionError::FailedOperation)?;
+        let result = encrypted_data.to_bytes();
+
+        Ok(result)
+    }
+
+    fn decrypt_elements_with_associated_data(
+        key: &Self::Key,
+        ciphertext: &[u8],
+        associated_data: &[Felt],
+    ) -> Result<Vec<Felt>, EncryptionError> {
+        let encrypted_data = EncryptedData::read_from_bytes(ciphertext)
+            .map_err(|_| EncryptionError::FailedOperation)?;
+
+        key.decrypt_elements_with_associated_data(&encrypted_data, associated_data)
+    }
 }
