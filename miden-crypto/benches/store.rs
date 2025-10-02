@@ -2,15 +2,9 @@ use std::hint::black_box;
 
 use criterion::{BatchSize, BenchmarkId, Criterion, criterion_group, criterion_main};
 use miden_crypto::{
-    Felt, PrimeCharacteristicRing, Word,
-    hash::rpo::Word,
-    merkle::{
-        DefaultMerkleStore as MerkleStore, LeafIndex, MerkleTree, NodeIndex, SMT_MAX_DEPTH,
-        SimpleSmt,
-    },
+    Felt, Word,
+    merkle::{LeafIndex, MerkleStore, MerkleTree, NodeIndex, SMT_MAX_DEPTH, SimpleSmt},
 };
-use rand::{RngCore, SeedableRng};
-use rand_chacha::ChaCha20Rng;
 use rand_utils::{rand_array, rand_value};
 
 /// Since MerkleTree can only be created when a power-of-two number of elements is used, the sample

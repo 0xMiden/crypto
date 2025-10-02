@@ -59,7 +59,7 @@ const INV_ALPHA: u64 = 10540996611094048183;
 // ALGEBRAIC SPONGE
 // ================================================================================================
 
-pub(crate) trait AlgebraicSponge {
+pub trait AlgebraicSponge {
     fn apply_permutation(state: &mut [Felt; STATE_WIDTH]);
 
     /// Returns a hash of the provided field elements.

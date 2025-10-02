@@ -26,7 +26,7 @@ pub use p3_field::{
 pub use p3_goldilocks::{Goldilocks as Felt, Poseidon2Goldilocks};
 pub use word::{Word, WordError};
 
-use crate::hash::algebraic_sponge::AlgebraicSponge;
+pub use crate::hash::algebraic_sponge::AlgebraicSponge;
 
 // TYPE ALIASES
 // ================================================================================================
