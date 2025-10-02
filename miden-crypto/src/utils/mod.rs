@@ -11,7 +11,7 @@ pub use winter_utils::{
     uninit_vector,
 };
 
-use crate::{Felt, FieldElement, StarkField, Word};
+use crate::{Felt, Word};
 
 // CONSTANTS
 // ================================================================================================
@@ -133,7 +133,7 @@ pub fn bytes_to_elements_with_padding(bytes: &[u8]) -> Vec<Felt> {
                 buf[chunk.len()] = 1;
             }
 
-            Felt::new(u64::from_le_bytes(buf))
+            Felt::from_u64(u64::from_le_bytes(buf))
         })
         .collect()
 }
@@ -225,7 +225,7 @@ pub fn bytes_to_elements_exact(bytes: &[u8]) -> Option<Vec<Felt>> {
             return None;
         }
 
-        result.push(Felt::new(value));
+        result.push(Felt::from_u64(value));
     }
 
     Some(result)

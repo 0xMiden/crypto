@@ -16,7 +16,7 @@ use winter_math::FieldElement;
 const WORD_SIZE_FELT: usize = 4;
 const WORD_SIZE_BYTES: usize = 32;
 
-use super::{Felt, StarkField, ZERO};
+use super::{Felt, ZERO};
 use crate::{
     rand::Randomizable,
     utils::{
@@ -55,14 +55,18 @@ impl Word {
     /// must contain between 0 and 64 characters (inclusive).
     ///
     /// The input is interpreted to have little-endian byte ordering. Nibbles are interpreted
-    /// to have big-endian ordering so that "0x10" represents Felt::new(16), not Felt::new(1).
+    /// to have big-endian ordering so that "0x10" represents Felt::from_u64(16), not
+    /// Felt::from_u64(1).
     ///
     /// This function is usually used via the `word!` macro.
     ///
     /// ```
     /// use miden_crypto::{Felt, Word, word};
     /// let word = word!("0x1000000000000000200000000000000030000000000000004000000000000000");
-    /// assert_eq!(word, Word::new([Felt::new(16), Felt::new(32), Felt::new(48), Felt::new(64)]));
+    /// assert_eq!(
+    ///     word,
+    ///     Word::new([Felt::from_u64(16), Felt::from_u64(32), Felt::from_u64(48), Felt::from_u64(64)])
+    /// );
     /// ```
     pub const fn parse(hex: &str) -> Result<Self, &'static str> {
         const fn parse_hex_digit(digit: u8) -> Result<u8, &'static str> {
@@ -107,7 +111,7 @@ impl Word {
             i += 1;
         }
 
-        // Ensure each felt is within bounds as `Felt::new` silently wraps around.
+        // Ensure each felt is within bounds as `Felt::from_u64` silently wraps around.
         // This matches the behavior of `Word::try_from(String)`.
         let mut idx = 0;
         while idx < felts.len() {
@@ -118,10 +122,10 @@ impl Word {
         }
 
         Ok(Self::new([
-            Felt::new(felts[0]),
-            Felt::new(felts[1]),
-            Felt::new(felts[2]),
-            Felt::new(felts[3]),
+            Felt::from_u64(felts[0]),
+            Felt::from_u64(felts[1]),
+            Felt::from_u64(felts[2]),
+            Felt::from_u64(felts[3]),
         ]))
     }
 
@@ -635,7 +639,7 @@ impl Deserializable for Word {
                     "value not in the appropriate range",
                 )));
             }
-            *inner = Felt::new(e);
+            *inner = Felt::from_u64(e);
         }
 
         Ok(Self(inner))

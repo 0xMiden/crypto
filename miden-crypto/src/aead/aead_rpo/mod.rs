@@ -17,7 +17,7 @@ use rand::{
 };
 
 use crate::{
-    Felt, ONE, StarkField, Word, ZERO,
+    Felt, ONE, Word, ZERO,
     aead::{DataType, EncryptionError},
     hash::rpo::Rpo256,
     utils::{
@@ -354,7 +354,7 @@ impl Distribution<SecretKey> for StandardUniform {
             Uniform::new(0, Felt::MODULUS).expect("should not fail given the size of the field");
         for r in res.iter_mut() {
             let sampled_integer = uni_dist.sample(rng);
-            *r = Felt::new(sampled_integer);
+            *r = Felt::from_u64(sampled_integer);
         }
         SecretKey(res)
     }
@@ -456,7 +456,7 @@ impl Distribution<Nonce> for StandardUniform {
             Uniform::new(0, Felt::MODULUS).expect("should not fail given the size of the field");
         for r in res.iter_mut() {
             let sampled_integer = uni_dist.sample(rng);
-            *r = Felt::new(sampled_integer);
+            *r = Felt::from_u64(sampled_integer);
         }
         Nonce(res)
     }

@@ -3,8 +3,9 @@ use alloc::string::ToString;
 use p3_field::PrimeField64;
 use rand_core::impls;
 
-use super::{Felt, FeltRng, RngCore, Word, ZERO};
+use super::{Felt, FeltRng, RngCore, Word};
 use crate::{
+    ZERO,
     hash::rpx::Rpx256,
     utils::{ByteReader, ByteWriter, Deserializable, DeserializationError, Serializable},
 };

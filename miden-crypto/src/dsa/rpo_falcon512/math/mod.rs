@@ -100,7 +100,7 @@ pub(crate) fn ntru_gen<R: Rng>(n: usize, rng: &mut R) -> [Polynomial<i16>; 4] {
             continue;
         }
 
-        let f_ntt = f.map(|&i| FalconFelt::new(i)).fft();
+        let f_ntt = f.map(|&i| FalconFelt::from_u64(i)).fft();
         if f_ntt.coefficients.iter().any(|e| e.is_zero()) {
             continue;
         }

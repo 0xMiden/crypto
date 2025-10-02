@@ -20,8 +20,9 @@ fn setup_storage() -> (RocksDbStorage, TempDir) {
 fn generate_entries(pair_count: usize) -> Vec<(Word, Word)> {
     (0..pair_count)
         .map(|i| {
-            let key = Word::new([ONE, ONE, Felt::new(i as u64), Felt::new(i as u64 % 1000)]);
-            let value = Word::new([ONE, ONE, ONE, Felt::new(i as u64)]);
+            let key =
+                Word::new([ONE, ONE, Felt::from_u64(i as u64), Felt::from_u64(i as u64 % 1000)]);
+            let value = Word::new([ONE, ONE, ONE, Felt::from_u64(i as u64)]);
             (key, value)
         })
         .collect()
@@ -74,7 +75,8 @@ fn rocksdb_persistence_after_insertion() {
 
     let mut smt = LargeSmt::<RocksDbStorage>::with_entries(initial_storage, entries).unwrap();
     let key = Word::new([ONE, ONE, ONE, ONE]);
-    let new_value = Word::new([Felt::new(2), Felt::new(2), Felt::new(2), Felt::new(2)]);
+    let new_value =
+        Word::new([Felt::from_u64(2), Felt::from_u64(2), Felt::from_u64(2), Felt::from_u64(2)]);
     smt.insert(key, new_value).unwrap();
     let root = smt.root().unwrap();
 

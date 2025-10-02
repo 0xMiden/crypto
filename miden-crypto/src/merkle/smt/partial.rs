@@ -364,6 +364,9 @@ mod tests {
     use alloc::collections::{BTreeMap, BTreeSet};
 
     use assert_matches::assert_matches;
+    use p3_goldilocks::Goldilocks;
+    use rand::{RngCore, distr::StandardUniform};
+    use rand_chacha::ChaCha20Rng;
     use rand_utils::{rand_array, rand_value};
     use winter_math::fields::f64::BaseElement as Felt;
 
@@ -379,11 +382,11 @@ mod tests {
     #[test]
     fn partial_smt_insert_and_remove() {
         let mut rng = ChaCha20Rng::seed_from_u64(0);
-        let key0 = RpoDigest::from(Word::from(random_array(&mut rng)));
-        let key1 = RpoDigest::from(Word::from(random_array(&mut rng)));
-        let key2 = RpoDigest::from(Word::from(random_array(&mut rng)));
+        let key0 = Word::from(Word::from(random_array(&mut rng)));
+        let key1 = Word::from(Word::from(random_array(&mut rng)));
+        let key2 = Word::from(Word::from(random_array(&mut rng)));
         // A key for which we won't add a value so it will be empty.
-        let key_empty = RpoDigest::from(Word::from(random_array(&mut rng)));
+        let key_empty = Word::from(Word::from(random_array(&mut rng)));
 
         let value0 = Word::from(random_array(&mut rng));
         let value1 = Word::from(random_array(&mut rng));
@@ -394,7 +397,7 @@ mod tests {
         // Add more random leaves.
         kv_pairs.reserve(1000);
         for _ in 0..1000 {
-            let key = RpoDigest::from(Word::from(random_array(&mut rng)));
+            let key = Word::from(Word::from(random_array(&mut rng)));
             let value = Word::from(random_array(&mut rng));
             kv_pairs.push((key, value));
         }
@@ -472,9 +475,9 @@ mod tests {
     fn partial_smt_multiple_leaf_success() {
         let mut rng = ChaCha20Rng::seed_from_u64(0);
         // key0 and key1 have the same felt at index 3 so they will be placed in the same leaf.
-        let key0 = RpoDigest::from(Word::from([ZERO, ZERO, ZERO, ONE]));
-        let key1 = RpoDigest::from(Word::from([ONE, ONE, ONE, ONE]));
-        let key2 = RpoDigest::from(Word::from(random_array(&mut rng)));
+        let key0 = Word::from(Word::from([ZERO, ZERO, ZERO, ONE]));
+        let key1 = Word::from(Word::from([ONE, ONE, ONE, ONE]));
+        let key2 = Word::from(Word::from(random_array(&mut rng)));
 
         let value0 = Word::from(random_array(&mut rng));
         let value1 = Word::from(random_array(&mut rng));
@@ -507,9 +510,9 @@ mod tests {
     #[test]
     fn partial_smt_root_mismatch_on_empty_values() {
         let mut rng = ChaCha20Rng::seed_from_u64(0);
-        let key0 = RpoDigest::from(Word::from(random_array(&mut rng)));
-        let key1 = RpoDigest::from(Word::from(random_array(&mut rng)));
-        let key2 = RpoDigest::from(Word::from(random_array(&mut rng)));
+        let key0 = Word::from(Word::from(random_array(&mut rng)));
+        let key1 = Word::from(Word::from(random_array(&mut rng)));
+        let key2 = Word::from(Word::from(random_array(&mut rng)));
 
         let value0 = EMPTY_WORD;
         let value1 = Word::from(random_array(&mut rng));
@@ -541,9 +544,9 @@ mod tests {
     #[test]
     fn partial_smt_root_mismatch_on_non_empty_values() {
         let mut rng = ChaCha20Rng::seed_from_u64(0);
-        let key0 = RpoDigest::from(Word::from(random_array(&mut rng)));
-        let key1 = RpoDigest::from(Word::from(random_array(&mut rng)));
-        let key2 = RpoDigest::from(Word::from(random_array(&mut rng)));
+        let key0 = Word::from(Word::from(random_array(&mut rng)));
+        let key1 = Word::from(Word::from(random_array(&mut rng)));
+        let key2 = Word::from(Word::from(random_array(&mut rng)));
 
         let value0 = Word::from(random_array(&mut rng));
         let value1 = Word::from(random_array(&mut rng));

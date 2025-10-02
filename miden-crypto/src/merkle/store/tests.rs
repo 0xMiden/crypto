@@ -28,11 +28,11 @@ fn keys8() -> [u64; 8] {
     [0, 1, 2, 3, 4, 5, 6, 7]
 }
 
-fn values4() -> [RpoDigest; 4] {
+fn values4() -> [Word; 4] {
     [int_to_node(1), int_to_node(2), int_to_node(3), int_to_node(4)]
 }
 
-fn values8() -> [RpoDigest; 8] {
+fn values8() -> [Word; 8] {
     [
         int_to_node(1),
         int_to_node(2),
@@ -50,7 +50,7 @@ fn values8() -> [RpoDigest; 8] {
 
 #[test]
 fn test_root_not_in_store() -> Result<(), MerkleError> {
-    let mtree = MerkleTree::new(digests_to_words(&values4()))?;
+    let mtree = MerkleTree::new(&values4())?;
     let store = MerkleStore::from(&mtree);
     assert_matches!(
         store.get_node(values4()[0], NodeIndex::make(mtree.depth(), 0)),
@@ -219,8 +219,7 @@ fn test_leaf_paths_for_empty_trees() -> Result<(), MerkleError> {
 
 #[test]
 fn test_get_invalid_node() {
-    let mtree =
-        MerkleTree::new(digests_to_words(&values4())).expect("creating a merkle tree must work");
+    let mtree = MerkleTree::new(&values4()).expect("creating a merkle tree must work");
     let store = MerkleStore::from(&mtree);
     let _ = store.get_node(mtree.root(), NodeIndex::make(mtree.depth(), 3));
 }
@@ -245,10 +244,7 @@ fn test_add_sparse_merkle_tree_one_level() -> Result<(), MerkleError> {
 
 #[test]
 fn test_sparse_merkle_tree() -> Result<(), MerkleError> {
-    let smt = SimpleSmt::<SMT_MAX_DEPTH>::with_leaves(
-        keys4().into_iter().zip(digests_to_words(&values4())),
-    )
-    .unwrap();
+    let smt = SimpleSmt::<SMT_MAX_DEPTH>::with_leaves(keys4().into_iter().zip(&values4())).unwrap();
 
     let store = MerkleStore::from(&smt);
 
@@ -375,7 +371,7 @@ fn test_sparse_merkle_tree() -> Result<(), MerkleError> {
 
 #[test]
 fn test_add_merkle_paths() -> Result<(), MerkleError> {
-    let mtree = MerkleTree::new(digests_to_words(&values4()))?;
+    let mtree = MerkleTree::new(&values4())?;
 
     let i0 = 0;
     let p0 = mtree.get_path(NodeIndex::make(2, i0)).unwrap();
@@ -555,7 +551,7 @@ fn store_path_opens_from_leaf() {
 
 #[test]
 fn test_set_node() -> Result<(), MerkleError> {
-    let mtree = MerkleTree::new(digests_to_words(&values4()))?;
+    let mtree = MerkleTree::new(&values4())?;
     let mut store = MerkleStore::from(&mtree);
     let value = int_to_node(42);
     let index = NodeIndex::make(mtree.depth(), 0);
@@ -567,7 +563,7 @@ fn test_set_node() -> Result<(), MerkleError> {
 
 #[test]
 fn test_constructors() -> Result<(), MerkleError> {
-    let mtree = MerkleTree::new(digests_to_words(&values4()))?;
+    let mtree = MerkleTree::new(&values4())?;
     let store = MerkleStore::from(&mtree);
 
     let depth = mtree.depth();
@@ -579,9 +575,7 @@ fn test_constructors() -> Result<(), MerkleError> {
     }
 
     const DEPTH: u8 = 32;
-    let smt =
-        SimpleSmt::<DEPTH>::with_leaves(keys4().into_iter().zip(digests_to_words(&values4())))
-            .unwrap();
+    let smt = SimpleSmt::<DEPTH>::with_leaves(keys4().into_iter().zip(&values4())).unwrap();
     let store = MerkleStore::from(&smt);
 
     for key in keys4() {
@@ -630,7 +624,7 @@ fn node_path_should_be_truncated_by_midtier_insert() {
 
     // insert first node - works as expected
     let depth = 64;
-    let node = RpoDigest::from([Felt::from_int(key); WORD_SIZE]);
+    let node = Word::from([Felt::from_int(key); WORD_SIZE]);
     let index = NodeIndex::new(depth, key).unwrap();
     let root = store.set_node(root, index, node).unwrap().root;
     let result = store.get_node(root, index).unwrap();
@@ -643,7 +637,7 @@ fn node_path_should_be_truncated_by_midtier_insert() {
     let key = key ^ (1 << 63);
     let key = key >> 8;
     let depth = 56;
-    let node = RpoDigest::from([Felt::from_int(key); WORD_SIZE]);
+    let node = Word::from([Felt::from_int(key); WORD_SIZE]);
     let index = NodeIndex::new(depth, key).unwrap();
     let root = store.set_node(root, index, node).unwrap().root;
     let result = store.get_node(root, index).unwrap();
@@ -671,7 +665,7 @@ fn get_leaf_depth_works_depth_64() {
     // this will create a rainbow tree and test all opening to depth 64
     for d in 0..64 {
         let k = key & (u64::MAX >> d);
-        let node = RpoDigest::from([Felt::from_int(k); WORD_SIZE]);
+        let node = Word::from([Felt::from_int(k); WORD_SIZE]);
         let index = NodeIndex::new(64, k).unwrap();
 
         // assert the leaf doesn't exist before the insert. the returned depth should always
@@ -695,7 +689,7 @@ fn get_leaf_depth_works_with_incremental_depth() {
     assert_eq!(0, store.get_leaf_depth(root, 64, key).unwrap());
     let depth = 64;
     let index = NodeIndex::new(depth, key).unwrap();
-    let node = RpoDigest::from([Felt::from_int(key); WORD_SIZE]);
+    let node = Word::from([Felt::from_int(key); WORD_SIZE]);
     root = store.set_node(root, index, node).unwrap().root;
     assert_eq!(depth, store.get_leaf_depth(root, 64, key).unwrap());
 
@@ -704,7 +698,7 @@ fn get_leaf_depth_works_with_incremental_depth() {
     assert_eq!(1, store.get_leaf_depth(root, 64, key).unwrap());
     let depth = 16;
     let index = NodeIndex::new(depth, key >> (64 - depth)).unwrap();
-    let node = RpoDigest::from([Felt::from_int(key); WORD_SIZE]);
+    let node = Word::from([Felt::from_int(key); WORD_SIZE]);
     root = store.set_node(root, index, node).unwrap().root;
     assert_eq!(depth, store.get_leaf_depth(root, 64, key).unwrap());
 
@@ -712,7 +706,7 @@ fn get_leaf_depth_works_with_incremental_depth() {
     let key = 0b11001011_10110111_00000000_00000000_00000000_00000000_00000000_00000000_u64;
     assert_eq!(16, store.get_leaf_depth(root, 64, key).unwrap());
     let index = NodeIndex::new(depth, key >> (64 - depth)).unwrap();
-    let node = RpoDigest::from([Felt::from_int(key); WORD_SIZE]);
+    let node = Word::from([Felt::from_int(key); WORD_SIZE]);
     root = store.set_node(root, index, node).unwrap().root;
     assert_eq!(depth, store.get_leaf_depth(root, 64, key).unwrap());
 
@@ -721,7 +715,7 @@ fn get_leaf_depth_works_with_incremental_depth() {
     assert_eq!(15, store.get_leaf_depth(root, 64, key).unwrap());
     let depth = 17;
     let index = NodeIndex::new(depth, key >> (64 - depth)).unwrap();
-    let node = RpoDigest::from([Felt::from_int(key); WORD_SIZE]);
+    let node = Word::from([Felt::from_int(key); WORD_SIZE]);
     root = store.set_node(root, index, node).unwrap().root;
     assert_eq!(depth, store.get_leaf_depth(root, 64, key).unwrap());
 }
@@ -739,7 +733,7 @@ fn get_leaf_depth_works_with_depth_8() {
 
     for k in [a, b, c, d] {
         let index = NodeIndex::new(8, k).unwrap();
-        let node = RpoDigest::from([Felt::from_int(k); WORD_SIZE]);
+        let node = Word::from([Felt::from_int(k); WORD_SIZE]);
         root = store.set_node(root, index, node).unwrap().root;
     }
 
@@ -839,16 +833,16 @@ fn find_lone_leaf() {
 #[test]
 fn mstore_subset() {
     // add a Merkle tree of depth 3 to the store
-    let mtree = MerkleTree::new(digests_to_words(&values8())).unwrap();
+    let mtree = MerkleTree::new(&values8()).unwrap();
     let mut store = MerkleStore::default();
     let empty_store_num_nodes = store.nodes.len();
     store.extend(mtree.inner_nodes());
 
     // build 3 subtrees contained within the above Merkle tree; note that subtree2 is a subset
     // of subtree1
-    let subtree1 = MerkleTree::new(digests_to_words(&values8()[..4])).unwrap();
-    let subtree2 = MerkleTree::new(digests_to_words(&values8()[2..4])).unwrap();
-    let subtree3 = MerkleTree::new(digests_to_words(&values8()[6..])).unwrap();
+    let subtree1 = MerkleTree::new(&values8()[..4]).unwrap();
+    let subtree2 = MerkleTree::new(&values8()[2..4]).unwrap();
+    let subtree3 = MerkleTree::new(&values8()[6..]).unwrap();
 
     // --- extract all 3 subtrees ---------------------------------------------
 
@@ -893,7 +887,7 @@ fn check_mstore_subtree(store: &MerkleStore, subtree: &MerkleTree) {
 #[cfg(feature = "std")]
 #[test]
 fn test_serialization() -> Result<(), Box<dyn Error>> {
-    let mtree = MerkleTree::new(digests_to_words(&values4()))?;
+    let mtree = MerkleTree::new(&values4())?;
     let store = MerkleStore::from(&mtree);
     let decoded = MerkleStore::read_from_bytes(&store.to_bytes()).expect("deserialization failed");
     assert_eq!(store, decoded);
@@ -905,7 +899,7 @@ fn test_serialization() -> Result<(), Box<dyn Error>> {
 #[test]
 fn test_recorder() {
     // instantiate recorder from MerkleTree and SimpleSmt
-    let mtree = MerkleTree::new(digests_to_words(&values4())).unwrap();
+    let mtree = MerkleTree::new(&values4()).unwrap();
 
     const TREE_DEPTH: u8 = 64;
     let smtree = SimpleSmt::<TREE_DEPTH>::with_leaves(

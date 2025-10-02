@@ -3,8 +3,11 @@ use core::cmp::Ordering;
 
 use p3_field::PrimeField64;
 
-use super::{EMPTY_WORD, Felt, LeafIndex, Rpo256, RpoDigest, SMT_DEPTH, SmtLeafError, Word};
-use crate::utils::{ByteReader, ByteWriter, Deserializable, DeserializationError, Serializable};
+use super::{EMPTY_WORD, Felt, LeafIndex, Rpo256, SMT_DEPTH, SmtLeafError, Word};
+use crate::{
+    merkle::MAX_LEAF_ENTRIES,
+    utils::{ByteReader, ByteWriter, Deserializable, DeserializationError, Serializable},
+};
 
 /// Represents a leaf node in the Sparse Merkle Tree.
 ///

@@ -1,6 +1,6 @@
 use alloc::{string::ToString, vec::Vec};
 
-use p3_field::PrimeField64;
+use p3_field::{PrimeCharacteristicRing, PrimeField64};
 
 use super::{
     EMPTY_WORD, EmptySubtreeRoots, Felt, InnerNode, InnerNodeInfo, InnerNodes, LeafIndex,
@@ -108,7 +108,7 @@ pub struct Smt {
     pub(super) inner_nodes: InnerNodes,
 }
 lazy_static! {
-    static ref ROOTS: [RpoDigest; 256] = [RpoDigest::default(); 256];
+    static ref ROOTS: [Word; 256] = [Word::default(); 256];
 }
 impl Smt {
     // CONSTANTS
@@ -454,7 +454,6 @@ impl SparseMerkleTree<SMT_DEPTH> for Smt {
     type Opening = SmtProof;
 
     const EMPTY_VALUE: Self::Value = EMPTY_WORD;
-    // const EMPTY_ROOT: RpoDigest = *EmptySubtreeRoots::entry(SMT_DEPTH, 0);
 
     fn from_raw_parts(
         inner_nodes: InnerNodes,
@@ -659,7 +658,7 @@ fn test_smt_serialization_deserialization() {
     // Smt with values
     let smt_leaves_2: [(Word, Word); 2] = [
         (
-            RpoDigest::new([
+            Word::new([
                 Felt::from_u64(101),
                 Felt::from_u64(102),
                 Felt::from_u64(103),
@@ -673,7 +672,7 @@ fn test_smt_serialization_deserialization() {
             ],
         ),
         (
-            RpoDigest::new([
+            Word::new([
                 Felt::from_u64(105),
                 Felt::from_u64(106),
                 Felt::from_u64(107),
@@ -699,12 +698,34 @@ fn smt_with_sorted_entries() {
     // Smt with sorted values
     let smt_leaves_2: [(Word, Word); 2] = [
         (
-            Word::new([Felt::new(101), Felt::new(102), Felt::new(103), Felt::new(104)]),
-            [Felt::new(1_u64), Felt::new(2_u64), Felt::new(3_u64), Felt::new(4_u64)].into(),
+            Word::new([
+                Felt::from_u64(101),
+                Felt::from_u64(102),
+                Felt::from_u64(103),
+                Felt::from_u64(104),
+            ]),
+            [
+                Felt::from_u64(1_u64),
+                Felt::from_u64(2_u64),
+                Felt::from_u64(3_u64),
+                Felt::from_u64(4_u64),
+            ]
+            .into(),
         ),
         (
-            Word::new([Felt::new(105), Felt::new(106), Felt::new(107), Felt::new(108)]),
-            [Felt::new(5_u64), Felt::new(6_u64), Felt::new(7_u64), Felt::new(8_u64)].into(),
+            Word::new([
+                Felt::from_u64(105),
+                Felt::from_u64(106),
+                Felt::from_u64(107),
+                Felt::from_u64(108),
+            ]),
+            [
+                Felt::from_u64(5_u64),
+                Felt::from_u64(6_u64),
+                Felt::from_u64(7_u64),
+                Felt::from_u64(8_u64),
+            ]
+            .into(),
         ),
     ];
 

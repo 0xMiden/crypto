@@ -269,14 +269,14 @@ mod tests {
     use super::*;
     use crate::{
         Felt,
-        merkle::{digests_to_words, int_to_leaf, int_to_node},
+        merkle::{int_to_leaf, int_to_node},
     };
 
-    fn leaves4() -> [RpoDigest; 4] {
+    fn leaves4() -> [Word; 4] {
         [int_to_node(1), int_to_node(2), int_to_node(3), int_to_node(4)]
     }
 
-    fn leaves8() -> [RpoDigest; 8] {
+    fn leaves8() -> [Word; 8] {
         [
             int_to_node(1),
             int_to_node(2),
@@ -290,7 +290,7 @@ mod tests {
     }
     #[test]
     fn build_merkle_tree() {
-        let tree = super::MerkleTree::new(digests_to_words(&leaves4())).unwrap();
+        let tree = super::MerkleTree::new(&leaves4()).unwrap();
         assert_eq!(8, tree.nodes.len());
 
         // leaves were copied correctly
@@ -309,7 +309,7 @@ mod tests {
 
     #[test]
     fn get_leaf() {
-        let tree = super::MerkleTree::new(digests_to_words(&leaves4())).unwrap();
+        let tree = super::MerkleTree::new(&leaves4()).unwrap();
 
         // check depth 2
         assert_eq!(leaves4()[0], tree.get_node(NodeIndex::make(2, 0)).unwrap());
@@ -326,7 +326,7 @@ mod tests {
 
     #[test]
     fn get_path() {
-        let tree = super::MerkleTree::new(digests_to_words(&leaves4())).unwrap();
+        let tree = super::MerkleTree::new(&leaves4()).unwrap();
 
         let (_, node2, node3) = compute_internal_nodes();
 
@@ -343,12 +343,12 @@ mod tests {
 
     #[test]
     fn update_leaf() {
-        let mut tree = super::MerkleTree::new(digests_to_words(&leaves8())).unwrap();
+        let mut tree = super::MerkleTree::new(&leaves8()).unwrap();
 
         // update one leaf
         let value = 3;
         let new_node = int_to_leaf(9);
-        let mut expected_leaves = digests_to_words(&leaves8());
+        let mut expected_leaves = &leaves8();
         expected_leaves[value as usize] = new_node;
         let expected_tree = super::MerkleTree::new(expected_leaves.clone()).unwrap();
 
@@ -367,7 +367,7 @@ mod tests {
 
     #[test]
     fn nodes() -> Result<(), MerkleError> {
-        let tree = super::MerkleTree::new(digests_to_words(&leaves4())).unwrap();
+        let tree = super::MerkleTree::new(&leaves4()).unwrap();
         let root = tree.root();
         let l1n0 = tree.get_node(NodeIndex::make(1, 0))?;
         let l1n1 = tree.get_node(NodeIndex::make(1, 1))?;
@@ -401,7 +401,7 @@ mod tests {
 
             // build a word and copy it to another address as digest
             let word = [Felt::from_u64(a), Felt::from_u64(b), Felt::from_u64(c), Felt::from_u64(d)];
-            let digest = RpoDigest::from(word);
+            let digest = Word::from(word);
 
             // assert the addresses are different
             let word_ptr = word.as_ptr() as *const u8;
@@ -418,7 +418,7 @@ mod tests {
     // HELPER FUNCTIONS
     // --------------------------------------------------------------------------------------------
 
-    fn compute_internal_nodes() -> (RpoDigest, RpoDigest, RpoDigest) {
+    fn compute_internal_nodes() -> (Word, Word, Word) {
         let node2 =
             Rpo256::hash_elements(&[Word::from(leaves4()[0]), Word::from(leaves4()[1])].concat());
         let node3 =

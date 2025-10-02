@@ -406,7 +406,7 @@ impl From<Felt> for Forest {
 
 impl From<Forest> for Felt {
     fn from(value: Forest) -> Self {
-        Felt::new(value.0 as u64)
+        Felt::from_u64(value.0 as u64)
     }
 }
 

@@ -3,16 +3,14 @@
 //! This module benchmarks the creation and operations of Merkle trees,
 //! including tree construction, path computation, updates, and verification.
 
-use criterion::{BatchSize, Criterion, criterion_group, criterion_main};
-use miden_crypto::{Felt, ONE, PrimeCharacteristicRing, Word, merkle::MerkleTree};
-use rand_utils::prng_array;
 use std::hint;
 
 use criterion::{BatchSize, Bencher, Criterion, criterion_group, criterion_main};
 use miden_crypto::{
-    Word,
+    Felt, ONE, PrimeCharacteristicRing, Word,
     merkle::{MerklePath, MerkleTree, NodeIndex},
 };
+use rand_utils::prng_array;
 
 mod common;
 use common::{

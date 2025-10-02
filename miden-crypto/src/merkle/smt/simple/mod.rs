@@ -348,10 +348,10 @@ impl<const DEPTH: u8> SimpleSmt<DEPTH> {
     }
 }
 lazy_static! {
-    static ref ROOTS: [RpoDigest; 256] = {
-        let mut array = [RpoDigest::default(); 256];
+    static ref ROOTS: [Word; 256] = {
+        let mut array = [Word::default(); 256];
         for i in 0..256 {
-            array[i] = RpoDigest::default();
+            array[i] = Word::default();
         }
         array
     };

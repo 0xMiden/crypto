@@ -155,7 +155,7 @@ mod tests {
 
     #[test]
     fn lexicographic_serialization() {
-        let word = Word::from([1u64, 2, 3, 4].map(Felt::new));
+        let word = Word::from([1u64, 2, 3, 4].map(Felt::from_u64));
         let key = LexicographicWord::new(word);
         let bytes = key.to_bytes();
         let deserialized_key = LexicographicWord::<Word>::read_from_bytes(&bytes).unwrap();

@@ -15,8 +15,8 @@ fn generate_entries(pair_count: u64) -> Vec<(crate::Word, crate::Word)> {
     (0..pair_count)
         .map(|i| {
             let leaf_index = ((i as f64 / pair_count as f64) * (pair_count as f64)) as u64;
-            let key = crate::Word::new([ONE, ONE, Felt::new(i), Felt::new(leaf_index)]);
-            let value = crate::Word::new([ONE, ONE, ONE, Felt::new(i)]);
+            let key = crate::Word::new([ONE, ONE, Felt::from_u64(i), Felt::from_u64(leaf_index)]);
+            let value = crate::Word::new([ONE, ONE, ONE, Felt::from_u64(i)]);
             (key, value)
         })
         .collect()
@@ -40,7 +40,7 @@ fn generate_updates(
             let value = if rng.random_bool(REMOVAL_PROBABILITY) {
                 EMPTY_WORD
             } else {
-                crate::Word::new([ONE, ONE, ONE, Felt::new(rng.random())])
+                crate::Word::new([ONE, ONE, ONE, Felt::from_u64(rng.random())])
             };
             (key, value)
         })
@@ -362,11 +362,11 @@ fn test_mutations_revert() {
     let storage = MemoryStorage::new();
     let mut smt = LargeSmt::<_>::new(storage).unwrap();
 
-    let key_1: crate::Word = crate::Word::new([ONE, ONE, ONE, Felt::new(1)]);
+    let key_1: crate::Word = crate::Word::new([ONE, ONE, ONE, Felt::from_u64(1)]);
     let key_2: crate::Word =
-        crate::Word::new([2_u32.into(), 2_u32.into(), 2_u32.into(), Felt::new(2)]);
+        crate::Word::new([2_u32.into(), 2_u32.into(), 2_u32.into(), Felt::from_u64(2)]);
     let key_3: crate::Word =
-        crate::Word::new([0_u32.into(), 0_u32.into(), 0_u32.into(), Felt::new(3)]);
+        crate::Word::new([0_u32.into(), 0_u32.into(), 0_u32.into(), Felt::from_u64(3)]);
 
     let value_1 = crate::Word::new([ONE; WORD_SIZE]);
     let value_2 = crate::Word::new([2_u32.into(); WORD_SIZE]);

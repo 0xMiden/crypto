@@ -35,7 +35,7 @@ const VALUES8: [Word; 8] = [
     int_to_node(8),
 ];
 
-fn values8() -> [RpoDigest; 8] {
+fn values8() -> [Word; 8] {
     [
         int_to_node(1),
         int_to_node(2),
@@ -491,7 +491,7 @@ fn test_simplesmt_check_empty_root_constant() {
 // HELPER FUNCTIONS
 // --------------------------------------------------------------------------------------------
 
-fn compute_internal_nodes() -> (RpoDigest, RpoDigest, RpoDigest) {
+fn compute_internal_nodes() -> (Word, Word, Word) {
     let node2 = Rpo256::merge(&[values4()[0], values4()[1]]);
     let node3 = Rpo256::merge(&[values4()[2], values4()[3]]);
     let root = Rpo256::merge(&[node2, node3]);

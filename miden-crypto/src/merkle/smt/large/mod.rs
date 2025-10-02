@@ -40,12 +40,22 @@
 //! // Prepare initial entries
 //! let entries = vec![
 //!     (
-//!         Word::new([Felt::new(1), Felt::new(0), Felt::new(0), Felt::new(0)]),
-//!         Word::new([Felt::new(10), Felt::new(20), Felt::new(30), Felt::new(40)]),
+//!         Word::new([Felt::from_u64(1), Felt::from_u64(0), Felt::from_u64(0), Felt::from_u64(0)]),
+//!         Word::new([
+//!             Felt::from_u64(10),
+//!             Felt::from_u64(20),
+//!             Felt::from_u64(30),
+//!             Felt::from_u64(40),
+//!         ]),
 //!     ),
 //!     (
-//!         Word::new([Felt::new(2), Felt::new(0), Felt::new(0), Felt::new(0)]),
-//!         Word::new([Felt::new(11), Felt::new(22), Felt::new(33), Felt::new(44)]),
+//!         Word::new([Felt::from_u64(2), Felt::from_u64(0), Felt::from_u64(0), Felt::from_u64(0)]),
+//!         Word::new([
+//!             Felt::from_u64(11),
+//!             Felt::from_u64(22),
+//!             Felt::from_u64(33),
+//!             Felt::from_u64(44),
+//!         ]),
 //!     ),
 //! ];
 //!
@@ -67,11 +77,16 @@
 //! let storage = RocksDbStorage::open(RocksDbConfig::new("/path/to/db"))?;
 //! let mut smt = LargeSmt::new(storage)?;
 //!
-//! let k1 = Word::new([Felt::new(101), Felt::new(0), Felt::new(0), Felt::new(0)]);
-//! let v1 = Word::new([Felt::new(1), Felt::new(2), Felt::new(3), Felt::new(4)]);
-//! let k2 = Word::new([Felt::new(202), Felt::new(0), Felt::new(0), Felt::new(0)]);
-//! let k3 = Word::new([Felt::new(303), Felt::new(0), Felt::new(0), Felt::new(0)]);
-//! let v3 = Word::new([Felt::new(7), Felt::new(7), Felt::new(7), Felt::new(7)]);
+//! let k1 =
+//!     Word::new([Felt::from_u64(101), Felt::from_u64(0), Felt::from_u64(0), Felt::from_u64(0)]);
+//! let v1 =
+//!     Word::new([Felt::from_u64(1), Felt::from_u64(2), Felt::from_u64(3), Felt::from_u64(4)]);
+//! let k2 =
+//!     Word::new([Felt::from_u64(202), Felt::from_u64(0), Felt::from_u64(0), Felt::from_u64(0)]);
+//! let k3 =
+//!     Word::new([Felt::from_u64(303), Felt::from_u64(0), Felt::from_u64(0), Felt::from_u64(0)]);
+//! let v3 =
+//!     Word::new([Felt::from_u64(7), Felt::from_u64(7), Felt::from_u64(7), Felt::from_u64(7)]);
 //!
 //! // EMPTY_WORD marks deletions.
 //! let updates = vec![(k1, v1), (k2, EMPTY_WORD), (k3, v3)];
@@ -100,12 +115,22 @@
 //! let storage = RocksDbStorage::open(RocksDbConfig::new(path))?;
 //! let entries = vec![
 //!     (
-//!         Word::new([Felt::new(1), Felt::new(0), Felt::new(0), Felt::new(0)]),
-//!         Word::new([Felt::new(10), Felt::new(20), Felt::new(30), Felt::new(40)]),
+//!         Word::new([Felt::from_u64(1), Felt::from_u64(0), Felt::from_u64(0), Felt::from_u64(0)]),
+//!         Word::new([
+//!             Felt::from_u64(10),
+//!             Felt::from_u64(20),
+//!             Felt::from_u64(30),
+//!             Felt::from_u64(40),
+//!         ]),
 //!     ),
 //!     (
-//!         Word::new([Felt::new(2), Felt::new(0), Felt::new(0), Felt::new(0)]),
-//!         Word::new([Felt::new(11), Felt::new(22), Felt::new(33), Felt::new(44)]),
+//!         Word::new([Felt::from_u64(2), Felt::from_u64(0), Felt::from_u64(0), Felt::from_u64(0)]),
+//!         Word::new([
+//!             Felt::from_u64(11),
+//!             Felt::from_u64(22),
+//!             Felt::from_u64(33),
+//!             Felt::from_u64(44),
+//!         ]),
 //!     ),
 //! ];
 //! let _smt = LargeSmt::with_entries(storage, entries)?;
@@ -1022,7 +1047,6 @@ impl<S: SmtStorage> SparseMerkleTree<SMT_DEPTH> for LargeSmt<S> {
     type Opening = SmtProof;
 
     const EMPTY_VALUE: Self::Value = EMPTY_WORD;
-    const EMPTY_ROOT: Word = *EmptySubtreeRoots::entry(SMT_DEPTH, 0);
 
     fn from_raw_parts(
         _inner_nodes: InnerNodes,

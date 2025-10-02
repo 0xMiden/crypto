@@ -106,7 +106,7 @@ impl DivAssign for FalconFelt {
 
 impl Zero for FalconFelt {
     fn zero() -> Self {
-        FalconFelt::new(0)
+        FalconFelt::from_u64(0)
     }
 
     fn is_zero(&self) -> bool {
@@ -116,7 +116,7 @@ impl Zero for FalconFelt {
 
 impl One for FalconFelt {
     fn one() -> Self {
-        FalconFelt::new(1)
+        FalconFelt::from_u64(1)
     }
 }
 
@@ -152,7 +152,7 @@ impl CyclotomicFourier for FalconFelt {
         let log2n = n.ilog2();
         assert!(log2n <= 12);
         // and 1331 is a twelfth root of unity
-        let mut a = FalconFelt::new(1331);
+        let mut a = FalconFelt::from_u64(1331);
         let num_squarings = 12 - n.ilog2();
         for _ in 0..num_squarings {
             a *= a;
@@ -168,7 +168,7 @@ impl TryFrom<u32> for FalconFelt {
         if value >= MODULUS as u32 {
             Err(format!("value {value} is greater than or equal to the field modulus {MODULUS}"))
         } else {
-            Ok(FalconFelt::new(value as i16))
+            Ok(FalconFelt::from_u64(value as i16))
         }
     }
 }

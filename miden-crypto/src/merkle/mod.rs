@@ -62,10 +62,10 @@ impl<const DEPTH: u8> Display for LeafIndex<DEPTH> {
 
 #[cfg(test)]
 const fn int_to_node(value: u64) -> Word {
-    Word::new([Felt::new(value), ZERO, ZERO, ZERO])
+    Word::new([Felt::from_u64(value), ZERO, ZERO, ZERO])
 }
 
 #[cfg(test)]
 const fn int_to_leaf(value: u64) -> Word {
-    Word::new([Felt::new(value), ZERO, ZERO, ZERO])
+    Word::new([Felt::from_u64(value), ZERO, ZERO, ZERO])
 }

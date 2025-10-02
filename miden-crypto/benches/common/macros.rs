@@ -698,7 +698,7 @@ macro_rules! benchmark_rand_reseed {
 
             let mut coin = <$coin_type>::new($seed);
             let new_seeds: Vec<miden_crypto::Word> = (0u64..10)
-                .map(|i| miden_crypto::Word::new([miden_crypto::Felt::new((i + 1) as u64); 4]))
+                .map(|i| miden_crypto::Word::new([miden_crypto::Felt::from_u64((i + 1) as u64); 4]))
                 .collect();
 
             group.bench_function("reseed", |b| {

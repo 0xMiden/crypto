@@ -50,7 +50,7 @@ fn merge_vs_merge_in_domain() {
 
 #[test]
 fn hash_elements_vs_merge_with_int() {
-    let tmp = [Felt::new(rand_value()); 4];
+    let tmp = [Felt::from_u64(rand_value()); 4];
     let seed = Word::new(tmp);
 
     // ----- value fits into a field element ------------------------------------------------------

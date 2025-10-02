@@ -538,28 +538,30 @@ impl From<&Polynomial<FalconFelt>> for Polynomial<Felt> {
 
 impl From<Polynomial<i16>> for Polynomial<FalconFelt> {
     fn from(item: Polynomial<i16>) -> Self {
-        let res: Vec<FalconFelt> = item.coefficients.iter().map(|&a| FalconFelt::new(a)).collect();
+        let res: Vec<FalconFelt> =
+            item.coefficients.iter().map(|&a| FalconFelt::from_u64(a)).collect();
         Polynomial::new(res)
     }
 }
 
 impl From<&Polynomial<i16>> for Polynomial<FalconFelt> {
     fn from(item: &Polynomial<i16>) -> Self {
-        let res: Vec<FalconFelt> = item.coefficients.iter().map(|&a| FalconFelt::new(a)).collect();
+        let res: Vec<FalconFelt> =
+            item.coefficients.iter().map(|&a| FalconFelt::from_u64(a)).collect();
         Polynomial::new(res)
     }
 }
 
 impl From<Vec<i16>> for Polynomial<FalconFelt> {
     fn from(item: Vec<i16>) -> Self {
-        let res: Vec<FalconFelt> = item.iter().map(|&a| FalconFelt::new(a)).collect();
+        let res: Vec<FalconFelt> = item.iter().map(|&a| FalconFelt::from_u64(a)).collect();
         Polynomial::new(res)
     }
 }
 
 impl From<&Vec<i16>> for Polynomial<FalconFelt> {
     fn from(item: &Vec<i16>) -> Self {
-        let res: Vec<FalconFelt> = item.iter().map(|&a| FalconFelt::new(a)).collect();
+        let res: Vec<FalconFelt> = item.iter().map(|&a| FalconFelt::from_u64(a)).collect();
         Polynomial::new(res)
     }
 }
@@ -612,7 +614,7 @@ impl Polynomial<FalconFelt> {
             let neg_ai = (modulus - ai as u16) % modulus;
 
             let bi = (a[i] % modulus as u64) as u16;
-            c[i] = FalconFelt::new(((neg_ai + bi) % modulus) as i16);
+            c[i] = FalconFelt::from_u64(((neg_ai + bi) % modulus) as i16);
         }
 
         Self::new(c.to_vec())
@@ -629,7 +631,10 @@ impl Polynomial<Felt> {
 impl Polynomial<i16> {
     /// Returns the balanced values of the coefficients of this polynomial.
     pub fn to_balanced_values(&self) -> Vec<i16> {
-        self.coefficients.iter().map(|c| FalconFelt::new(*c).balanced_value()).collect()
+        self.coefficients
+            .iter()
+            .map(|c| FalconFelt::from_u64(*c).balanced_value())
+            .collect()
     }
 }
 
@@ -645,8 +650,10 @@ mod tests {
         let coef1: [u8; N] = rand_utils::rand_array();
         let coef2: [u8; N] = rand_utils::rand_array();
 
-        let poly1 = Polynomial::new(coef1.iter().map(|&a| FalconFelt::new(a as i16)).collect());
-        let poly2 = Polynomial::new(coef2.iter().map(|&a| FalconFelt::new(a as i16)).collect());
+        let poly1 =
+            Polynomial::new(coef1.iter().map(|&a| FalconFelt::from_u64(a as i16)).collect());
+        let poly2 =
+            Polynomial::new(coef2.iter().map(|&a| FalconFelt::from_u64(a as i16)).collect());
         let prod = poly1.clone() * poly2.clone();
 
         assert_eq!(

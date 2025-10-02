@@ -1,17 +1,15 @@
 //! Pseudo-random element generation.
 
-use p3_field::PrimeCharacteristicRing;
-//use crate::{Felt, FieldElement, Word, ZERO};
-use p3_goldilocks::Goldilocks as Felt;
 use rand::RngCore;
 pub use winter_crypto::{DefaultRandomCoin as WinterRandomCoin, RandomCoin, RandomCoinError};
 pub use winter_utils::Randomizable;
-pub const ZERO: Felt = Felt::ZERO;
-pub type Word = [Felt; 4];
+
 mod rpo;
 mod rpx;
 pub use rpo::RpoRandomCoin;
 pub use rpx::RpxRandomCoin;
+
+use crate::{Felt, Word};
 
 /// Pseudo-random element generator.
 ///
@@ -21,5 +19,5 @@ pub trait FeltRng: RngCore {
     fn draw_element(&mut self) -> Felt;
 
     /// Draw, uniformly at random, a [Word].
-    fn draw_word(&mut self) -> [Felt; 4];
+    fn draw_word(&mut self) -> Word;
 }
