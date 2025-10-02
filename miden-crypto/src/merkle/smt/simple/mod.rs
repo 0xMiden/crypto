@@ -363,6 +363,7 @@ impl<const DEPTH: u8> SparseMerkleTree<DEPTH> for SimpleSmt<DEPTH> {
     type Opening = SimpleSmtProof;
 
     const EMPTY_VALUE: Self::Value = EMPTY_WORD;
+    const EMPTY_ROOT: Word = *EmptySubtreeRoots::entry(DEPTH, 0);
 
     fn from_raw_parts(
         inner_nodes: InnerNodes,

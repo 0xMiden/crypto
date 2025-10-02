@@ -454,6 +454,7 @@ impl SparseMerkleTree<SMT_DEPTH> for Smt {
     type Opening = SmtProof;
 
     const EMPTY_VALUE: Self::Value = EMPTY_WORD;
+    const EMPTY_ROOT: Word = *EmptySubtreeRoots::entry(SMT_DEPTH, 0);
 
     fn from_raw_parts(
         inner_nodes: InnerNodes,

@@ -8,10 +8,10 @@ pub mod blake;
 /// Keccak hash function.
 pub mod keccak;
 
-// /// Poseidon2 hash function.
-// pub mod poseidon2 {
-//     pub use super::algebraic_sponge::poseidon2::Poseidon2;
-// }
+/// Poseidon2 hash function.
+pub mod poseidon2 {
+    pub use super::algebraic_sponge::poseidon2::Poseidon2;
+}
 
 /// Rescue Prime Optimized (RPO) hash function.
 pub mod rpo {
@@ -23,7 +23,7 @@ pub mod rpx {
     pub use super::algebraic_sponge::rescue::Rpx256;
 }
 
-mod algebraic_sponge;
+pub mod algebraic_sponge;
 
 // RE-EXPORTS
 // ================================================================================================

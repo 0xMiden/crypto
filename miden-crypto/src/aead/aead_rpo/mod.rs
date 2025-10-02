@@ -8,8 +8,8 @@
 //! \[1\] <https://eprint.iacr.org/2023/1668>
 
 use alloc::{string::ToString, vec::Vec};
-use p3_field::PrimeField64;
 use core::ops::Range;
+use p3_field::PrimeField64;
 
 use num::Integer;
 use rand::{
