@@ -26,6 +26,8 @@ pub use p3_field::{
 pub use p3_goldilocks::{Goldilocks as Felt, Poseidon2Goldilocks};
 pub use word::{Word, WordError};
 
+use crate::hash::algebraic_sponge::AlgebraicSponge;
+
 // TYPE ALIASES
 // ================================================================================================
 
@@ -71,8 +73,7 @@ pub trait SequentialCommit {
     /// The default implementation of this function uses RPO256 hash function to hash the sequence
     /// of elements returned from [Self::to_elements()].
     fn to_commitment(&self) -> Self::Commitment {
-        // hash::rpo::Rpo256::hash_elements(&self.to_elements()).into()
-        todo!()
+        hash::rpo::Rpo256::hash_elements(&self.to_elements()).into()
     }
 
     /// Returns a representation of the object as a sequence of fields elements.

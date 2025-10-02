@@ -1,11 +1,10 @@
-use p3_field::PrimeCharacteristicRing;
+use p3_field::{Field, PrimeCharacteristicRing};
 
 #[cfg(test)]
 use super::{ALPHA, INV_ALPHA};
 use super::{
     AlgebraicSponge, CAPACITY_RANGE, DIGEST_RANGE, Felt, RATE_RANGE, Range, STATE_WIDTH, Word, ZERO,
 };
-use p3_field::Field;
 
 mod arch;
 pub use arch::optimized::{add_constants_and_apply_inv_sbox, add_constants_and_apply_sbox};

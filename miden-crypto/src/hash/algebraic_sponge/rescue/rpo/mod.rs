@@ -128,12 +128,6 @@ impl Rpo256 {
         <Self as Hasher>::merge(values)
     }
 
-    // /// Returns a hash of the provided field elements.
-    // #[inline(always)]
-    // pub fn hash_elements<E: FieldElement<BaseField = Felt>>(elements: &[E]) -> Word {
-    //     <Self as ElementHasher>::hash_elements(elements)
-    // }
-
     /// Returns a hash of two digests and a domain identifier.
     #[inline(always)]
     pub fn merge_in_domain(values: &[Word; 2], domain: Felt) -> Word {
@@ -191,13 +185,3 @@ impl Hasher for Rpo256 {
         <Self as AlgebraicSponge>::merge_with_int(seed, value)
     }
 }
-
-// impl ElementHasher for Rpo256 {
-//     type BaseField = Felt;
-
-//     fn hash_elements<E: FieldElement<BaseField = Self::BaseField>>(
-//         elements: &[E],
-//     ) -> <Self as Hasher>::Digest {
-//         <Self as AlgebraicSponge>::hash_elements(elements)
-//     }
-// }

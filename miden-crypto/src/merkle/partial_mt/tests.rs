@@ -8,9 +8,8 @@ use super::{
 // TEST DATA
 // ================================================================================================
 
-fn node_at(depth: u8, value: u64) -> NodeIndex {
-    NodeIndex::new_unchecked(depth, value)
-}
+const NODE10: NodeIndex = NodeIndex::new_unchecked(1, 0);
+const NODE11: NodeIndex = NodeIndex::new_unchecked(1, 1);
 
 const NODE20: NodeIndex = NodeIndex::new_unchecked(2, 0);
 const NODE21: NodeIndex = NodeIndex::new_unchecked(2, 1);
@@ -58,11 +57,11 @@ fn with_leaves() {
     let expected_root = mt.root();
 
     let leaf_nodes_vec = vec![
-        (node_at(2, 0), mt.get_node(node_at(2, 0)).unwrap()),
-        (node_at(3, 2), mt.get_node(node_at(3, 2)).unwrap()),
-        (node_at(3, 3), mt.get_node(node_at(3, 3)).unwrap()),
-        (node_at(2, 2), mt.get_node(node_at(2, 2)).unwrap()),
-        (node_at(2, 3), mt.get_node(node_at(2, 3)).unwrap()),
+        (NODE20, mt.get_node(NODE20).unwrap()),
+        (NODE32, mt.get_node(NODE32).unwrap()),
+        (NODE33, mt.get_node(NODE33).unwrap()),
+        (NODE22, mt.get_node(NODE22).unwrap()),
+        (NODE23, mt.get_node(NODE23).unwrap()),
     ];
 
     let leaf_nodes: BTreeMap<NodeIndex, Word> = leaf_nodes_vec.into_iter().collect();
@@ -75,12 +74,12 @@ fn with_leaves() {
 /// Checks that `with_leaves()` function returns an error when using incomplete set of nodes.
 #[test]
 fn err_with_leaves() {
-    // node_at(2, 2) is missing
+    // NODE22 is missing
     let leaf_nodes_vec = vec![
-        (node_at(2, 0), int_to_node(20)),
-        (node_at(3, 2), int_to_node(32)),
-        (node_at(3, 3), int_to_node(33)),
-        (node_at(2, 3), int_to_node(23)),
+        (NODE20, int_to_node(20)),
+        (NODE32, int_to_node(32)),
+        (NODE33, int_to_node(33)),
+        (NODE23, int_to_node(23)),
     ];
 
     let leaf_nodes: BTreeMap<NodeIndex, Word> = leaf_nodes_vec.into_iter().collect();
@@ -95,7 +94,7 @@ fn get_root() {
     let expected_root = mt.root();
 
     let ms = MerkleStore::from(&mt);
-    let path33 = ms.get_path(expected_root, node_at(3, 3)).unwrap();
+    let path33 = ms.get_path(expected_root, NODE33).unwrap();
 
     let pmt = PartialMerkleTree::with_paths([(3, path33.value, path33.path)]).unwrap();
 
@@ -112,15 +111,15 @@ fn add_and_get_paths() {
 
     let ms = MerkleStore::from(&mt);
 
-    let expected_path33 = ms.get_path(expected_root, node_at(3, 3)).unwrap();
-    let expected_path22 = ms.get_path(expected_root, node_at(2, 2)).unwrap();
+    let expected_path33 = ms.get_path(expected_root, NODE33).unwrap();
+    let expected_path22 = ms.get_path(expected_root, NODE22).unwrap();
 
     let mut pmt = PartialMerkleTree::new();
     pmt.add_path(3, expected_path33.value, expected_path33.path.clone()).unwrap();
     pmt.add_path(2, expected_path22.value, expected_path22.path.clone()).unwrap();
 
-    let path33 = pmt.get_path(node_at(3, 3)).unwrap();
-    let path22 = pmt.get_path(node_at(2, 2)).unwrap();
+    let path33 = pmt.get_path(NODE33).unwrap();
+    let path22 = pmt.get_path(NODE22).unwrap();
     let actual_root = pmt.root();
 
     assert_eq!(expected_path33.path, path33);
@@ -136,18 +135,12 @@ fn get_node() {
 
     let ms = MerkleStore::from(&mt);
 
-    let path33 = ms.get_path(expected_root, node_at(3, 3)).unwrap();
+    let path33 = ms.get_path(expected_root, NODE33).unwrap();
 
     let pmt = PartialMerkleTree::with_paths([(3, path33.value, path33.path)]).unwrap();
 
-    assert_eq!(
-        ms.get_node(expected_root, node_at(3, 2)).unwrap(),
-        pmt.get_node(node_at(3, 2)).unwrap()
-    );
-    assert_eq!(
-        ms.get_node(expected_root, node_at(1, 0)).unwrap(),
-        pmt.get_node(node_at(1, 0)).unwrap()
-    );
+    assert_eq!(ms.get_node(expected_root, NODE32).unwrap(), pmt.get_node(NODE32).unwrap());
+    assert_eq!(ms.get_node(expected_root, NODE10).unwrap(), pmt.get_node(NODE10).unwrap());
 }
 
 /// Updates leaves of the PMT using `update_leaf()` function and checks that new root of the tree
@@ -158,12 +151,12 @@ fn update_leaf() {
     let root = mt.root();
 
     let mut ms = MerkleStore::from(&mt);
-    let path33 = ms.get_path(root, node_at(3, 3)).unwrap();
+    let path33 = ms.get_path(root, NODE33).unwrap();
 
     let mut pmt = PartialMerkleTree::with_paths([(3, path33.value, path33.path)]).unwrap();
 
     let new_value32 = int_to_node(132);
-    let expected_root = ms.set_node(root, node_at(3, 2), new_value32).unwrap().root;
+    let expected_root = ms.set_node(root, NODE32, new_value32).unwrap().root;
 
     pmt.update_leaf(2, new_value32).unwrap();
     let actual_root = pmt.root();
@@ -171,7 +164,7 @@ fn update_leaf() {
     assert_eq!(expected_root, actual_root);
 
     let new_value20 = int_to_node(120);
-    let expected_root = ms.set_node(expected_root, node_at(2, 0), new_value20).unwrap().root;
+    let expected_root = ms.set_node(expected_root, NODE20, new_value20).unwrap().root;
 
     pmt.update_leaf(0, new_value20).unwrap();
     let actual_root = pmt.root();
@@ -179,7 +172,7 @@ fn update_leaf() {
     assert_eq!(expected_root, actual_root);
 
     let new_value11 = int_to_node(111);
-    let expected_root = ms.set_node(expected_root, node_at(1, 1), new_value11).unwrap().root;
+    let expected_root = ms.set_node(expected_root, NODE11, new_value11).unwrap().root;
 
     pmt.update_leaf(6, new_value11).unwrap();
     let actual_root = pmt.root();
@@ -195,8 +188,8 @@ fn get_paths() {
 
     let ms = MerkleStore::from(&mt);
 
-    let path33 = ms.get_path(expected_root, node_at(3, 3)).unwrap();
-    let path22 = ms.get_path(expected_root, node_at(2, 2)).unwrap();
+    let path33 = ms.get_path(expected_root, NODE33).unwrap();
+    let path22 = ms.get_path(expected_root, NODE22).unwrap();
 
     let mut pmt = PartialMerkleTree::new();
     pmt.add_path(3, path33.value, path33.path).unwrap();
@@ -242,8 +235,8 @@ fn leaves() {
 
     let ms = MerkleStore::from(&mt);
 
-    let path33 = ms.get_path(expected_root, node_at(3, 3)).unwrap();
-    let path22 = ms.get_path(expected_root, node_at(2, 2)).unwrap();
+    let path33 = ms.get_path(expected_root, NODE33).unwrap();
+    let path22 = ms.get_path(expected_root, NODE22).unwrap();
 
     let mut pmt = PartialMerkleTree::with_paths([(3, path33.value, path33.path)]).unwrap();
     // After PMT creation with path33 (33; 32, 20, 11) we will have this tree:
@@ -258,17 +251,12 @@ fn leaves() {
     //
     // Which have leaf nodes 11, 20, 32 and 33.
 
-    let value11 = mt.get_node(node_at(1, 1)).unwrap();
-    let value20 = mt.get_node(node_at(2, 0)).unwrap();
-    let value32 = mt.get_node(node_at(3, 2)).unwrap();
-    let value33 = mt.get_node(node_at(3, 3)).unwrap();
+    let value11 = mt.get_node(NODE11).unwrap();
+    let value20 = mt.get_node(NODE20).unwrap();
+    let value32 = mt.get_node(NODE32).unwrap();
+    let value33 = mt.get_node(NODE33).unwrap();
 
-    let leaves = [
-        (node_at(1, 1), value11),
-        (node_at(2, 0), value20),
-        (node_at(3, 2), value32),
-        (node_at(3, 3), value33),
-    ];
+    let leaves = [(NODE11, value11), (NODE20, value20), (NODE32, value32), (NODE33, value33)];
 
     let expected_leaves = leaves.iter().copied();
     assert!(expected_leaves.eq(pmt.leaves()));
@@ -286,18 +274,18 @@ fn leaves() {
     //
     // Which have leaf nodes 20, 22, 23, 32 and 33.
 
-    let value20 = mt.get_node(node_at(2, 0)).unwrap();
-    let value22 = mt.get_node(node_at(2, 2)).unwrap();
-    let value23 = mt.get_node(node_at(2, 3)).unwrap();
-    let value32 = mt.get_node(node_at(3, 2)).unwrap();
-    let value33 = mt.get_node(node_at(3, 3)).unwrap();
+    let value20 = mt.get_node(NODE20).unwrap();
+    let value22 = mt.get_node(NODE22).unwrap();
+    let value23 = mt.get_node(NODE23).unwrap();
+    let value32 = mt.get_node(NODE32).unwrap();
+    let value33 = mt.get_node(NODE33).unwrap();
 
     let leaves = vec![
-        (node_at(2, 0), value20),
-        (node_at(2, 2), value22),
-        (node_at(2, 3), value23),
-        (node_at(3, 2), value32),
-        (node_at(3, 3), value33),
+        (NODE20, value20),
+        (NODE22, value22),
+        (NODE23, value23),
+        (NODE32, value32),
+        (NODE33, value33),
     ];
 
     let expected_leaves = leaves.iter().copied();
@@ -313,8 +301,8 @@ fn test_inner_node_iterator() {
 
     let ms = MerkleStore::from(&mt);
 
-    let path33 = ms.get_path(expected_root, node_at(3, 3)).unwrap();
-    let path22 = ms.get_path(expected_root, node_at(2, 2)).unwrap();
+    let path33 = ms.get_path(expected_root, NODE33).unwrap();
+    let path22 = ms.get_path(expected_root, NODE22).unwrap();
 
     let mut pmt = PartialMerkleTree::with_paths([(3, path33.value, path33.path)]).unwrap();
 
@@ -322,12 +310,12 @@ fn test_inner_node_iterator() {
     let actual: Vec<InnerNodeInfo> = pmt.inner_nodes().collect();
 
     let expected_n00 = mt.root();
-    let expected_n10 = mt.get_node(node_at(1, 0)).unwrap();
-    let expected_n11 = mt.get_node(node_at(1, 1)).unwrap();
-    let expected_n20 = mt.get_node(node_at(2, 0)).unwrap();
-    let expected_n21 = mt.get_node(node_at(2, 1)).unwrap();
-    let expected_n32 = mt.get_node(node_at(3, 2)).unwrap();
-    let expected_n33 = mt.get_node(node_at(3, 3)).unwrap();
+    let expected_n10 = mt.get_node(NODE10).unwrap();
+    let expected_n11 = mt.get_node(NODE11).unwrap();
+    let expected_n20 = mt.get_node(NODE20).unwrap();
+    let expected_n21 = mt.get_node(NODE21).unwrap();
+    let expected_n32 = mt.get_node(NODE32).unwrap();
+    let expected_n33 = mt.get_node(NODE33).unwrap();
 
     // create vector of the expected inner nodes
     let mut expected = vec![
@@ -356,8 +344,8 @@ fn test_inner_node_iterator() {
     // get new actual inner nodes
     let actual: Vec<InnerNodeInfo> = pmt.inner_nodes().collect();
 
-    let expected_n22 = mt.get_node(node_at(2, 2)).unwrap();
-    let expected_n23 = mt.get_node(node_at(2, 3)).unwrap();
+    let expected_n22 = mt.get_node(NODE22).unwrap();
+    let expected_n23 = mt.get_node(NODE23).unwrap();
 
     let info_11 = InnerNodeInfo {
         value: expected_n11,
@@ -380,8 +368,8 @@ fn serialization() {
 
     let ms = MerkleStore::from(&mt);
 
-    let path33 = ms.get_path(expected_root, node_at(3, 3)).unwrap();
-    let path22 = ms.get_path(expected_root, node_at(2, 2)).unwrap();
+    let path33 = ms.get_path(expected_root, NODE33).unwrap();
+    let path22 = ms.get_path(expected_root, NODE22).unwrap();
 
     let pmt = PartialMerkleTree::with_paths([
         (3, path33.value, path33.path),
@@ -399,10 +387,10 @@ fn serialization() {
 #[test]
 fn err_deserialization() {
     let mut tree_bytes: Vec<u8> = vec![5];
-    tree_bytes.append(&mut node_at(2, 0).to_bytes());
+    tree_bytes.append(&mut NODE20.to_bytes());
     tree_bytes.append(&mut int_to_node(20).to_bytes());
 
-    tree_bytes.append(&mut node_at(2, 1).to_bytes());
+    tree_bytes.append(&mut NODE21.to_bytes());
     tree_bytes.append(&mut int_to_node(21).to_bytes());
 
     // node with depth 1 could have index 0 or 1, but it has 2
@@ -432,14 +420,14 @@ fn err_get_node() {
 
     let ms = MerkleStore::from(&mt);
 
-    let path33 = ms.get_path(expected_root, node_at(3, 3)).unwrap();
+    let path33 = ms.get_path(expected_root, NODE33).unwrap();
 
     let pmt = PartialMerkleTree::with_paths([(3, path33.value, path33.path)]).unwrap();
 
-    assert!(pmt.get_node(node_at(2, 2)).is_err());
-    assert!(pmt.get_node(node_at(2, 3)).is_err());
-    assert!(pmt.get_node(node_at(3, 0)).is_err());
-    assert!(pmt.get_node(node_at(3, 1)).is_err());
+    assert!(pmt.get_node(NODE22).is_err());
+    assert!(pmt.get_node(NODE23).is_err());
+    assert!(pmt.get_node(NODE30).is_err());
+    assert!(pmt.get_node(NODE31).is_err());
 }
 
 /// Checks that the request of the path from the leaf which is not in the PMT will cause an error.
@@ -450,14 +438,14 @@ fn err_get_path() {
 
     let ms = MerkleStore::from(&mt);
 
-    let path33 = ms.get_path(expected_root, node_at(3, 3)).unwrap();
+    let path33 = ms.get_path(expected_root, NODE33).unwrap();
 
     let pmt = PartialMerkleTree::with_paths([(3, path33.value, path33.path)]).unwrap();
 
-    assert!(pmt.get_path(node_at(2, 2)).is_err());
-    assert!(pmt.get_path(node_at(2, 3)).is_err());
-    assert!(pmt.get_path(node_at(3, 0)).is_err());
-    assert!(pmt.get_path(node_at(3, 1)).is_err());
+    assert!(pmt.get_path(NODE22).is_err());
+    assert!(pmt.get_path(NODE23).is_err());
+    assert!(pmt.get_path(NODE30).is_err());
+    assert!(pmt.get_path(NODE31).is_err());
 }
 
 #[test]
@@ -467,7 +455,7 @@ fn err_update_leaf() {
 
     let ms = MerkleStore::from(&mt);
 
-    let path33 = ms.get_path(expected_root, node_at(3, 3)).unwrap();
+    let path33 = ms.get_path(expected_root, NODE33).unwrap();
 
     let mut pmt = PartialMerkleTree::with_paths([(3, path33.value, path33.path)]).unwrap();
 
