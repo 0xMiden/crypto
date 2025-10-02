@@ -9,12 +9,12 @@ use proptest::prelude::*;
 use rand::{Rng, prelude::IteratorRandom, rng};
 
 use super::{
-    COLS_PER_SUBTREE, InnerNode, NodeIndex, NodeMutations, PairComputations, RpoDigest, SMT_DEPTH,
-    SUBTREE_DEPTH, Smt, SmtLeaf, SparseMerkleTree, SubtreeLeaf, SubtreeLeavesIter, UnorderedMap,
+    COLS_PER_SUBTREE, InnerNode, Map, NodeIndex, NodeMutations, PairComputations, SMT_DEPTH,
+    SUBTREE_DEPTH, Smt, SmtLeaf, SparseMerkleTree, SubtreeLeaf, SubtreeLeavesIter, Word,
     build_subtree,
 };
 use crate::{
-    EMPTY_WORD, ONE, Word, ZERO,
+    EMPTY_WORD, ONE, ZERO,
     merkle::{LeafIndex, MerkleError, smt::Felt},
 };
 
@@ -27,7 +27,7 @@ fn smtleaf_to_subtree_leaf(leaf: &SmtLeaf) -> SubtreeLeaf {
 
 #[test]
 fn test_sorted_pairs_to_leaves() {
-    let entries: Vec<(RpoDigest, Word)> = vec![
+    let entries: Vec<(Word, Word)> = vec![
         // Subtree 0.
         (RpoDigest::new([ONE, ONE, ONE, Felt::from_u64(16)]), [ONE; 4]),
         (RpoDigest::new([ONE, ONE, ONE, Felt::from_u64(17)]), [ONE; 4]),
@@ -102,7 +102,7 @@ fn test_sorted_pairs_to_leaves() {
 }
 
 // Helper for the below tests.
-fn generate_entries(pair_count: u64) -> Vec<(RpoDigest, Word)> {
+fn generate_entries(pair_count: u64) -> Vec<(Word, Word)> {
     (0..pair_count)
         .map(|i| {
             let leaf_index = ((i as f64 / pair_count as f64) * (pair_count as f64)) as u64;
@@ -113,7 +113,7 @@ fn generate_entries(pair_count: u64) -> Vec<(RpoDigest, Word)> {
         .collect()
 }
 
-fn generate_updates(entries: Vec<(RpoDigest, Word)>, updates: usize) -> Vec<(RpoDigest, Word)> {
+fn generate_updates(entries: Vec<(Word, Word)>, updates: usize) -> Vec<(Word, Word)> {
     const REMOVAL_PROBABILITY: f64 = 0.2;
     let mut rng = rng();
     // Assertion to ensure input keys are unique
@@ -121,7 +121,7 @@ fn generate_updates(entries: Vec<(RpoDigest, Word)>, updates: usize) -> Vec<(Rpo
         entries.iter().map(|(key, _)| key).collect::<BTreeSet<_>>().len() == entries.len(),
         "Input entries contain duplicate keys!"
     );
-    let mut sorted_entries: Vec<(RpoDigest, Word)> = entries
+    let mut sorted_entries: Vec<(Word, Word)> = entries
         .into_iter()
         .choose_multiple(&mut rng, updates)
         .into_iter()
@@ -228,7 +228,7 @@ fn test_singlethreaded_subtrees() {
     } = Smt::sorted_pairs_to_leaves(entries).unwrap();
     for current_depth in (SUBTREE_DEPTH..=SMT_DEPTH).step_by(SUBTREE_DEPTH as usize).rev() {
         // There's no flat_map_unzip(), so this is the best we can do.
-        let (nodes, mut subtree_roots): (Vec<UnorderedMap<_, _>>, Vec<SubtreeLeaf>) = leaf_subtrees
+        let (nodes, mut subtree_roots): (Vec<Map<_, _>>, Vec<SubtreeLeaf>) = leaf_subtrees
             .into_iter()
             .enumerate()
             .map(|(i, subtree)| {
@@ -248,8 +248,7 @@ fn test_singlethreaded_subtrees() {
                     let control_node = control.get_inner_node(index);
                     assert_eq!(
                         test_node, &control_node,
-                        "depth {} subtree {}: test node does not match control at index {:?}",
-                        current_depth, i, index,
+                        "depth {current_depth} subtree {i}: test node does not match control at index {index:?}",
                     );
                 }
                 (nodes, subtree_root)
@@ -311,7 +310,7 @@ fn test_multithreaded_subtrees() {
         nodes: test_leaves,
     } = Smt::sorted_pairs_to_leaves(entries).unwrap();
     for current_depth in (SUBTREE_DEPTH..=SMT_DEPTH).step_by(SUBTREE_DEPTH as usize).rev() {
-        let (nodes, mut subtree_roots): (Vec<UnorderedMap<_, _>>, Vec<SubtreeLeaf>) = leaf_subtrees
+        let (nodes, mut subtree_roots): (Vec<Map<_, _>>, Vec<SubtreeLeaf>) = leaf_subtrees
             .into_par_iter()
             .enumerate()
             .map(|(i, subtree)| {
@@ -330,8 +329,7 @@ fn test_multithreaded_subtrees() {
                     let control_node = control.get_inner_node(index);
                     assert_eq!(
                         test_node, &control_node,
-                        "depth {} subtree {}: test node does not match control at index {:?}",
-                        current_depth, i, index,
+                        "depth {current_depth} subtree {i}: test node does not match control at index {index:?}",
                     );
                 }
                 (nodes, subtree_root)
@@ -403,9 +401,10 @@ fn test_singlethreaded_subtree_mutations() {
     let entries = generate_entries(PAIR_COUNT);
     let updates = generate_updates(entries.clone(), 1000);
     let tree = Smt::with_entries_sequential(entries.clone()).unwrap();
-    let control = tree.compute_mutations_sequential(updates.clone());
+    let control = tree.compute_mutations_sequential(updates.clone()).unwrap();
     let mut node_mutations = NodeMutations::default();
-    let (mut subtree_leaves, new_pairs) = tree.sorted_pairs_to_mutated_subtree_leaves(updates);
+    let (mut subtree_leaves, new_pairs) =
+        tree.sorted_pairs_to_mutated_subtree_leaves(updates).unwrap();
     for current_depth in (SUBTREE_DEPTH..=SMT_DEPTH).step_by(SUBTREE_DEPTH as usize).rev() {
         // There's no flat_map_unzip(), so this is the best we can do.
         let (mutations_per_subtree, mut subtree_roots): (Vec<_>, Vec<_>) = subtree_leaves
@@ -429,8 +428,7 @@ fn test_singlethreaded_subtree_mutations() {
                     let control_mutation = control.node_mutations().get(&index).unwrap();
                     assert_eq!(
                         control_mutation, mutation,
-                        "depth {} subtree {}: mutation does not match control at index {:?}",
-                        current_depth, i, index,
+                        "depth {current_depth} subtree {i}: mutation does not match control at index {index:?}",
                     );
                 }
                 (mutations_per_subtree, subtree_root)
@@ -464,8 +462,8 @@ fn test_compute_mutations_parallel() {
     let entries = generate_entries(PAIR_COUNT);
     let tree = Smt::with_entries(entries.clone()).unwrap();
     let updates = generate_updates(entries, 1000);
-    let control = tree.compute_mutations_sequential(updates.clone());
-    let mutations = tree.compute_mutations(updates);
+    let control = tree.compute_mutations_sequential(updates.clone()).unwrap();
+    let mutations = tree.compute_mutations(updates).unwrap();
     assert_eq!(mutations.root(), control.root());
     assert_eq!(mutations.old_root(), control.old_root());
     assert_eq!(mutations.node_mutations(), control.node_mutations());
@@ -516,7 +514,7 @@ fn test_smt_construction_with_some_empty_values() {
 
 #[test]
 fn test_smt_construction_with_all_empty_values() {
-    let entries = [(RpoDigest::new([ONE, ONE, ONE, ONE]), Smt::EMPTY_VALUE)];
+    let entries = [([ONE, ONE, ONE, ONE].into(), Smt::EMPTY_VALUE)];
 
     let result = Smt::with_entries(entries);
     assert!(result.is_ok(), "SMT construction failed with all empty values");
@@ -533,7 +531,7 @@ fn test_smt_construction_with_all_empty_values() {
 
 #[test]
 fn test_smt_construction_with_no_entries() {
-    let entries: [(RpoDigest, Word); 0] = [];
+    let entries: [(Word, Word); 0] = [];
 
     let result = Smt::with_entries(entries);
     assert!(result.is_ok(), "SMT construction failed with no entries");
@@ -546,8 +544,38 @@ fn arb_felt() -> impl Strategy<Value = Felt> {
     prop_oneof![any::<u64>().prop_map(Felt::from_u64), Just(ZERO), Just(ONE),]
 }
 
+/// Test that the debug assertion panics on unsorted entries.
+#[test]
+#[should_panic = "is_sorted_by_key"]
+fn smt_with_sorted_entries_panics_on_unsorted_entries() {
+    // Unsorted keys.
+    let smt_leaves_2: [(Word, Word); 2] = [
+        (
+            Word::new([Felt::new(105), Felt::new(106), Felt::new(107), Felt::new(108)]),
+            [Felt::new(5_u64), Felt::new(6_u64), Felt::new(7_u64), Felt::new(8_u64)].into(),
+        ),
+        (
+            Word::new([Felt::new(101), Felt::new(102), Felt::new(103), Felt::new(104)]),
+            [Felt::new(1_u64), Felt::new(2_u64), Felt::new(3_u64), Felt::new(4_u64)].into(),
+        ),
+    ];
+
+    // Should panic because entries are not sorted.
+    Smt::with_sorted_entries(smt_leaves_2).unwrap();
+}
+
+#[test]
+fn test_with_sorted_entries_large_num_leaves() {
+    const PAIR_COUNT: u64 = COLS_PER_SUBTREE * 8;
+    let entries = generate_entries(PAIR_COUNT);
+    let control = Smt::with_entries_sequential(entries.clone()).unwrap();
+    // `entries` should already be sorted by nature of how we constructed it.
+    let actual = Smt::with_sorted_entries(entries).unwrap();
+    assert_eq!(actual, control);
+}
+
 /// Generate entries that are guaranteed to be in different subtrees
-fn generate_cross_subtree_entries() -> impl Strategy<Value = Vec<(RpoDigest, Word)>> {
+fn generate_cross_subtree_entries() -> impl Strategy<Value = Vec<(Word, Word)>> {
     let subtree_offsets = prop::collection::vec(0..(COLS_PER_SUBTREE * 4), 1..100);
 
     subtree_offsets.prop_map(|offsets| {
@@ -562,7 +590,7 @@ fn generate_cross_subtree_entries() -> impl Strategy<Value = Vec<(RpoDigest, Wor
     })
 }
 
-fn arb_entries() -> impl Strategy<Value = Vec<(RpoDigest, Word)>> {
+fn arb_entries() -> impl Strategy<Value = Vec<(Word, Word)>> {
     // Combine random entries with guaranteed cross-subtree entries
     prop_oneof![
         // Original random entry generation
@@ -570,8 +598,8 @@ fn arb_entries() -> impl Strategy<Value = Vec<(RpoDigest, Word)>> {
             prop_oneof![
                 // Random values case
                 (
-                    prop::array::uniform4(arb_felt()).prop_map(RpoDigest::new),
-                    prop::array::uniform4(arb_felt())
+                    prop::array::uniform4(arb_felt()).prop_map(Word::new),
+                    prop::array::uniform4(arb_felt()).prop_map(Word::new)
                 ),
                 // Edge case values
                 (
@@ -588,8 +616,8 @@ fn arb_entries() -> impl Strategy<Value = Vec<(RpoDigest, Word)>> {
             generate_cross_subtree_entries(),
             prop::collection::vec(
                 (
-                    prop::array::uniform4(arb_felt()).prop_map(RpoDigest::new),
-                    prop::array::uniform4(arb_felt())
+                    prop::array::uniform4(arb_felt()).prop_map(Word::new),
+                    prop::array::uniform4(arb_felt()).prop_map(Word::new)
                 ),
                 1..1000,
             )
@@ -641,8 +669,8 @@ proptest! {
             }
         });
 
-        let sequential = tree.compute_mutations_sequential(update_entries.clone());
-        let concurrent = tree.compute_mutations(update_entries.clone());
+        let sequential = tree.compute_mutations_sequential(update_entries.clone()).unwrap();
+        let concurrent = tree.compute_mutations(update_entries.clone()).unwrap();
 
         // If there are real changes, the root should change
         if has_real_changes {

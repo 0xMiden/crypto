@@ -1,13 +1,13 @@
-use alloc::{collections::BTreeMap, vec::Vec};
+use alloc::vec::Vec;
 use core::borrow::Borrow;
 
 use super::{
-    EmptySubtreeRoots, InnerNodeInfo, MerkleError, MerklePath, MerkleTree, NodeIndex,
-    PartialMerkleTree, RootPath, Rpo256, RpoDigest, SimpleSmt, Smt, ValuePath, mmr::Mmr,
+    EmptySubtreeRoots, InnerNodeInfo, MerkleError, MerklePath, MerkleProof, MerkleTree, NodeIndex,
+    PartialMerkleTree, RootPath, Rpo256, SimpleSmt, Smt, Word, mmr::Mmr,
 };
-use crate::utils::{
-    ByteReader, ByteWriter, Deserializable, DeserializationError, Serializable,
-    collections::{KvMap, RecordingMap},
+use crate::{
+    Map,
+    utils::{ByteReader, ByteWriter, Deserializable, DeserializationError, Serializable},
 };
 
 #[cfg(test)]
@@ -16,17 +16,11 @@ mod tests;
 // MERKLE STORE
 // ================================================================================================
 
-/// A default [MerkleStore] which uses a simple [BTreeMap] as the backing storage.
-pub type DefaultMerkleStore = MerkleStore<BTreeMap<RpoDigest, StoreNode>>;
-
-/// A [MerkleStore] with recording capabilities which uses [RecordingMap] as the backing storage.
-pub type RecordingMerkleStore = MerkleStore<RecordingMap<RpoDigest, StoreNode>>;
-
 #[derive(Debug, Default, Copy, Clone, Eq, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 pub struct StoreNode {
-    left: RpoDigest,
-    right: RpoDigest,
+    left: Word,
+    right: Word,
 }
 
 /// An in-memory data store for Merkelized data.
@@ -79,7 +73,7 @@ pub struct StoreNode {
 ///     assert_eq!(d0, d1, "Both trees have the same leaf at pos {i}");
 /// }
 ///
-/// // The leafs A-B-C-D are the same for both trees, so are their 2 immediate parents
+/// // The leaves A-B-C-D are the same for both trees, so are their 2 immediate parents
 /// for i in 0..4 {
 ///     let idx0 = NodeIndex::new(3, i).unwrap();
 ///     let d0 = store.get_path(ROOT0, idx0).unwrap();
@@ -94,24 +88,24 @@ pub struct StoreNode {
 /// ```
 #[derive(Debug, Clone, Eq, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
-pub struct MerkleStore<T: KvMap<RpoDigest, StoreNode> = BTreeMap<RpoDigest, StoreNode>> {
-    nodes: T,
+pub struct MerkleStore {
+    nodes: Map<Word, StoreNode>,
 }
 
-impl<T: KvMap<RpoDigest, StoreNode>> Default for MerkleStore<T> {
+impl Default for MerkleStore {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl<T: KvMap<RpoDigest, StoreNode>> MerkleStore<T> {
+impl MerkleStore {
     // CONSTRUCTORS
     // --------------------------------------------------------------------------------------------
 
     /// Creates an empty `MerkleStore` instance.
-    pub fn new() -> MerkleStore<T> {
+    pub fn new() -> MerkleStore {
         // pre-populate the store with the empty hashes
-        let nodes = empty_hashes().into_iter().collect();
+        let nodes = empty_hashes().collect();
         MerkleStore { nodes }
     }
 
@@ -130,7 +124,7 @@ impl<T: KvMap<RpoDigest, StoreNode>> MerkleStore<T> {
     /// - `RootNotInStore` if the `root` is not present in the store.
     /// - `NodeNotInStore` if a node needed to traverse from `root` to `index` is not present in the
     ///   store.
-    pub fn get_node(&self, root: RpoDigest, index: NodeIndex) -> Result<RpoDigest, MerkleError> {
+    pub fn get_node(&self, root: Word, index: NodeIndex) -> Result<Word, MerkleError> {
         let mut hash = root;
 
         // corner case: check the root is in the store when called with index `NodeIndex::root()`
@@ -158,7 +152,7 @@ impl<T: KvMap<RpoDigest, StoreNode>> MerkleStore<T> {
     /// - `RootNotInStore` if the `root` is not present in the store.
     /// - `NodeNotInStore` if a node needed to traverse from `root` to `index` is not present in the
     ///   store.
-    pub fn get_path(&self, root: RpoDigest, index: NodeIndex) -> Result<ValuePath, MerkleError> {
+    pub fn get_path(&self, root: Word, index: NodeIndex) -> Result<MerkleProof, MerkleError> {
         let mut hash = root;
         let mut path = Vec::with_capacity(index.depth().into());
 
@@ -184,7 +178,7 @@ impl<T: KvMap<RpoDigest, StoreNode>> MerkleStore<T> {
         // the path is computed from root to leaf, so it must be reversed
         path.reverse();
 
-        Ok(ValuePath::new(hash, MerklePath::new(path)))
+        Ok(MerkleProof::new(hash, MerklePath::new(path)))
     }
 
     // LEAF TRAVERSAL
@@ -204,7 +198,7 @@ impl<T: KvMap<RpoDigest, StoreNode>> MerkleStore<T> {
     /// - No leaf or an empty node was found while traversing the tree down to `tree_depth`.
     pub fn get_leaf_depth(
         &self,
-        root: RpoDigest,
+        root: Word,
         tree_depth: u8,
         index: u64,
     ) -> Result<u8, MerkleError> {
@@ -263,10 +257,10 @@ impl<T: KvMap<RpoDigest, StoreNode>> MerkleStore<T> {
     /// - A lone node at depth `tree_depth` is not a leaf node.
     pub fn find_lone_leaf(
         &self,
-        root: RpoDigest,
+        root: Word,
         root_index: NodeIndex,
         tree_depth: u8,
-    ) -> Result<Option<(NodeIndex, RpoDigest)>, MerkleError> {
+    ) -> Result<Option<(NodeIndex, Word)>, MerkleError> {
         // we set max depth at u64::BITS as this is the largest meaningful value for a 64-bit index
         const MAX_DEPTH: u8 = u64::BITS as u8;
         if tree_depth > MAX_DEPTH {
@@ -322,10 +316,10 @@ impl<T: KvMap<RpoDigest, StoreNode>> MerkleStore<T> {
     /// nodes which are descendants of the specified roots.
     ///
     /// The roots for which no descendants exist in this Merkle store are ignored.
-    pub fn subset<I, R>(&self, roots: I) -> MerkleStore<T>
+    pub fn subset<I, R>(&self, roots: I) -> MerkleStore
     where
         I: Iterator<Item = R>,
-        R: Borrow<RpoDigest>,
+        R: Borrow<Word>,
     {
         let mut store = MerkleStore::new();
         for root in roots {
@@ -346,9 +340,9 @@ impl<T: KvMap<RpoDigest, StoreNode>> MerkleStore<T> {
     /// and `max_depth`.
     pub fn non_empty_leaves(
         &self,
-        root: RpoDigest,
+        root: Word,
         max_depth: u8,
-    ) -> impl Iterator<Item = (NodeIndex, RpoDigest)> + '_ {
+    ) -> impl Iterator<Item = (NodeIndex, Word)> + '_ {
         let empty_roots = EmptySubtreeRoots::empty_hashes(max_depth);
         let mut stack = Vec::new();
         stack.push((NodeIndex::new_unchecked(0, 0), root));
@@ -391,13 +385,13 @@ impl<T: KvMap<RpoDigest, StoreNode>> MerkleStore<T> {
     pub fn add_merkle_path(
         &mut self,
         index: u64,
-        node: RpoDigest,
+        node: Word,
         path: MerklePath,
-    ) -> Result<RpoDigest, MerkleError> {
-        let root = path.inner_nodes(index, node)?.fold(RpoDigest::default(), |_, node| {
-            let value: RpoDigest = node.value;
-            let left: RpoDigest = node.left;
-            let right: RpoDigest = node.right;
+    ) -> Result<Word, MerkleError> {
+        let root = path.authenticated_nodes(index, node)?.fold(Word::default(), |_, node| {
+            let value: Word = node.value;
+            let left: Word = node.left;
+            let right: Word = node.right;
 
             debug_assert_eq!(Rpo256::merge(&[left, right]), value);
             self.nodes.insert(value, StoreNode { left, right });
@@ -415,7 +409,7 @@ impl<T: KvMap<RpoDigest, StoreNode>> MerkleStore<T> {
     /// For further reference, check [MerkleStore::add_merkle_path].
     pub fn add_merkle_paths<I>(&mut self, paths: I) -> Result<(), MerkleError>
     where
-        I: IntoIterator<Item = (u64, RpoDigest, MerklePath)>,
+        I: IntoIterator<Item = (u64, Word, MerklePath)>,
     {
         for (index_value, node, path) in paths.into_iter() {
             self.add_merkle_path(index_value, node, path)?;
@@ -432,12 +426,12 @@ impl<T: KvMap<RpoDigest, StoreNode>> MerkleStore<T> {
     ///   store.
     pub fn set_node(
         &mut self,
-        mut root: RpoDigest,
+        mut root: Word,
         index: NodeIndex,
-        value: RpoDigest,
+        value: Word,
     ) -> Result<RootPath, MerkleError> {
         let node = value;
-        let ValuePath { value, path } = self.get_path(root, index)?;
+        let MerkleProof { value, path } = self.get_path(root, index)?;
 
         // performs the update only if the node value differs from the opening
         if node != value {
@@ -449,33 +443,26 @@ impl<T: KvMap<RpoDigest, StoreNode>> MerkleStore<T> {
 
     /// Merges two elements and adds the resulting node into the store.
     ///
-    /// Merges arbitrary values. They may be leafs, nodes, or a mixture of both.
-    pub fn merge_roots(
-        &mut self,
-        left_root: RpoDigest,
-        right_root: RpoDigest,
-    ) -> Result<RpoDigest, MerkleError> {
+    /// Merges arbitrary values. They may be leaves, nodes, or a mixture of both.
+    pub fn merge_roots(&mut self, left_root: Word, right_root: Word) -> Result<Word, MerkleError> {
         let parent = Rpo256::merge(&[left_root, right_root]);
         self.nodes.insert(parent, StoreNode { left: left_root, right: right_root });
 
         Ok(parent)
     }
 
-    // DESTRUCTURING
+    // HELPER METHODS
     // --------------------------------------------------------------------------------------------
 
     /// Returns the inner storage of this MerkleStore while consuming `self`.
-    pub fn into_inner(self) -> T {
+    pub fn into_inner(self) -> Map<Word, StoreNode> {
         self.nodes
     }
-
-    // HELPER METHODS
-    // --------------------------------------------------------------------------------------------
 
     /// Recursively clones a tree with the specified root from the specified source into self.
     ///
     /// If the source store does not contain a tree with the specified root, this is a noop.
-    fn clone_tree_from(&mut self, root: RpoDigest, source: &Self) {
+    fn clone_tree_from(&mut self, root: Word, source: &Self) {
         // process the node only if it is in the source
         if let Some(node) = source.nodes.get(&root) {
             // if the node has already been inserted, no need to process it further as all of its
@@ -491,57 +478,50 @@ impl<T: KvMap<RpoDigest, StoreNode>> MerkleStore<T> {
 // CONVERSIONS
 // ================================================================================================
 
-impl<T: KvMap<RpoDigest, StoreNode>> From<&MerkleTree> for MerkleStore<T> {
+impl From<&MerkleTree> for MerkleStore {
     fn from(value: &MerkleTree) -> Self {
         let nodes = combine_nodes_with_empty_hashes(value.inner_nodes()).collect();
         Self { nodes }
     }
 }
 
-impl<T: KvMap<RpoDigest, StoreNode>, const DEPTH: u8> From<&SimpleSmt<DEPTH>> for MerkleStore<T> {
+impl<const DEPTH: u8> From<&SimpleSmt<DEPTH>> for MerkleStore {
     fn from(value: &SimpleSmt<DEPTH>) -> Self {
         let nodes = combine_nodes_with_empty_hashes(value.inner_nodes()).collect();
         Self { nodes }
     }
 }
 
-impl<T: KvMap<RpoDigest, StoreNode>> From<&Smt> for MerkleStore<T> {
+impl From<&Smt> for MerkleStore {
     fn from(value: &Smt) -> Self {
         let nodes = combine_nodes_with_empty_hashes(value.inner_nodes()).collect();
         Self { nodes }
     }
 }
 
-impl<T: KvMap<RpoDigest, StoreNode>> From<&Mmr> for MerkleStore<T> {
+impl From<&Mmr> for MerkleStore {
     fn from(value: &Mmr) -> Self {
         let nodes = combine_nodes_with_empty_hashes(value.inner_nodes()).collect();
         Self { nodes }
     }
 }
 
-impl<T: KvMap<RpoDigest, StoreNode>> From<&PartialMerkleTree> for MerkleStore<T> {
+impl From<&PartialMerkleTree> for MerkleStore {
     fn from(value: &PartialMerkleTree) -> Self {
         let nodes = combine_nodes_with_empty_hashes(value.inner_nodes()).collect();
         Self { nodes }
     }
 }
 
-impl<T: KvMap<RpoDigest, StoreNode>> From<T> for MerkleStore<T> {
-    fn from(values: T) -> Self {
-        let nodes = values.into_iter().chain(empty_hashes()).collect();
-        Self { nodes }
-    }
-}
-
-impl<T: KvMap<RpoDigest, StoreNode>> FromIterator<InnerNodeInfo> for MerkleStore<T> {
+impl FromIterator<InnerNodeInfo> for MerkleStore {
     fn from_iter<I: IntoIterator<Item = InnerNodeInfo>>(iter: I) -> Self {
         let nodes = combine_nodes_with_empty_hashes(iter).collect();
         Self { nodes }
     }
 }
 
-impl<T: KvMap<RpoDigest, StoreNode>> FromIterator<(RpoDigest, StoreNode)> for MerkleStore<T> {
-    fn from_iter<I: IntoIterator<Item = (RpoDigest, StoreNode)>>(iter: I) -> Self {
+impl FromIterator<(Word, StoreNode)> for MerkleStore {
+    fn from_iter<I: IntoIterator<Item = (Word, StoreNode)>>(iter: I) -> Self {
         let nodes = iter.into_iter().chain(empty_hashes()).collect();
         Self { nodes }
     }
@@ -549,7 +529,7 @@ impl<T: KvMap<RpoDigest, StoreNode>> FromIterator<(RpoDigest, StoreNode)> for Me
 
 // ITERATORS
 // ================================================================================================
-impl<T: KvMap<RpoDigest, StoreNode>> Extend<InnerNodeInfo> for MerkleStore<T> {
+impl Extend<InnerNodeInfo> for MerkleStore {
     fn extend<I: IntoIterator<Item = InnerNodeInfo>>(&mut self, iter: I) {
         self.nodes.extend(
             iter.into_iter()
@@ -570,13 +550,13 @@ impl Serializable for StoreNode {
 
 impl Deserializable for StoreNode {
     fn read_from<R: ByteReader>(source: &mut R) -> Result<Self, DeserializationError> {
-        let left = RpoDigest::read_from(source)?;
-        let right = RpoDigest::read_from(source)?;
+        let left = Word::read_from(source)?;
+        let right = Word::read_from(source)?;
         Ok(StoreNode { left, right })
     }
 }
 
-impl<T: KvMap<RpoDigest, StoreNode>> Serializable for MerkleStore<T> {
+impl Serializable for MerkleStore {
     fn write_into<W: ByteWriter>(&self, target: &mut W) {
         target.write_u64(self.nodes.len() as u64);
 
@@ -587,13 +567,13 @@ impl<T: KvMap<RpoDigest, StoreNode>> Serializable for MerkleStore<T> {
     }
 }
 
-impl<T: KvMap<RpoDigest, StoreNode>> Deserializable for MerkleStore<T> {
+impl Deserializable for MerkleStore {
     fn read_from<R: ByteReader>(source: &mut R) -> Result<Self, DeserializationError> {
         let len = source.read_u64()?;
-        let mut nodes: Vec<(RpoDigest, StoreNode)> = Vec::with_capacity(len as usize);
+        let mut nodes: Vec<(Word, StoreNode)> = Vec::with_capacity(len as usize);
 
         for _ in 0..len {
-            let key = RpoDigest::read_from(source)?;
+            let key = Word::read_from(source)?;
             let value = StoreNode::read_from(source)?;
             nodes.push((key, value));
         }
@@ -606,7 +586,7 @@ impl<T: KvMap<RpoDigest, StoreNode>> Deserializable for MerkleStore<T> {
 // ================================================================================================
 
 /// Creates empty hashes for all the subtrees of a tree with a max depth of 255.
-fn empty_hashes() -> impl IntoIterator<Item = (RpoDigest, StoreNode)> {
+fn empty_hashes() -> impl Iterator<Item = (Word, StoreNode)> {
     let subtrees = EmptySubtreeRoots::empty_hashes(255);
     subtrees
         .iter()
@@ -620,7 +600,7 @@ fn empty_hashes() -> impl IntoIterator<Item = (RpoDigest, StoreNode)> {
 /// which includes the nodes associate with roots of empty subtrees up to a depth of 255.
 fn combine_nodes_with_empty_hashes(
     nodes: impl IntoIterator<Item = InnerNodeInfo>,
-) -> impl Iterator<Item = (RpoDigest, StoreNode)> {
+) -> impl Iterator<Item = (Word, StoreNode)> {
     nodes
         .into_iter()
         .map(|info| (info.value, StoreNode { left: info.left, right: info.right }))

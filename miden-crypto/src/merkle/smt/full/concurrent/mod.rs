@@ -6,14 +6,17 @@ use rayon::prelude::*;
 
 use super::{
     EmptySubtreeRoots, InnerNode, InnerNodes, Leaves, MerkleError, MutationSet, NodeIndex,
-    RpoDigest, SMT_DEPTH, Smt, SmtLeaf, SparseMerkleTree, Word, leaf,
+    SMT_DEPTH, Smt, SmtLeaf, SparseMerkleTree, Word, leaf,
 };
-use crate::merkle::smt::{NodeMutation, NodeMutations, UnorderedMap};
+use crate::merkle::{
+    SmtLeafError,
+    smt::{Map, NodeMutation, NodeMutations},
+};
 
 #[cfg(test)]
 mod tests;
 
-type MutatedSubtreeLeaves = Vec<Vec<SubtreeLeaf>>;
+pub(in crate::merkle::smt) type MutatedSubtreeLeaves = Vec<Vec<SubtreeLeaf>>;
 
 // CONCURRENT IMPLEMENTATIONS
 // ================================================================================================
@@ -38,15 +41,36 @@ impl Smt {
     /// # Errors
     /// Returns an error if the provided entries contain multiple values for the same key.
     pub(crate) fn with_entries_concurrent(
-        entries: impl IntoIterator<Item = (RpoDigest, Word)>,
+        entries: impl IntoIterator<Item = (Word, Word)>,
     ) -> Result<Self, MerkleError> {
-        let entries: Vec<(RpoDigest, Word)> = entries.into_iter().collect();
+        let entries: Vec<(Word, Word)> = entries.into_iter().collect();
 
         if entries.is_empty() {
             return Ok(Self::default());
         }
 
         let (inner_nodes, leaves) = Self::build_subtrees(entries)?;
+
+        // All the leaves are empty
+        if inner_nodes.is_empty() {
+            return Ok(Self::default());
+        }
+
+        let root = inner_nodes.get(&NodeIndex::root()).unwrap().hash();
+        <Self as SparseMerkleTree<SMT_DEPTH>>::from_raw_parts(inner_nodes, leaves, root)
+    }
+
+    /// Similar to `with_entries_concurrent` but used for pre-sorted entries to avoid overhead.
+    pub(crate) fn with_sorted_entries_concurrent(
+        entries: impl IntoIterator<Item = (Word, Word)>,
+    ) -> Result<Self, MerkleError> {
+        let entries: Vec<(Word, Word)> = entries.into_iter().collect();
+
+        if entries.is_empty() {
+            return Ok(Self::default());
+        }
+
+        let (inner_nodes, leaves) = build_subtrees_from_sorted_entries(entries)?;
 
         // All the leaves are empty
         if inner_nodes.is_empty() {
@@ -71,10 +95,13 @@ impl Smt {
     ///
     /// 3. These subtree roots become the "leaves" for the next iteration, which processes the next
     ///    8 levels up. This continues until reaching the tree's root at depth 0.
+    ///
+    /// # Errors
+    /// Returns an error if mutations would exceed [`MAX_LEAF_ENTRIES`] (1024 entries) in a leaf.
     pub(crate) fn compute_mutations_concurrent(
         &self,
-        kv_pairs: impl IntoIterator<Item = (RpoDigest, Word)>,
-    ) -> MutationSet<SMT_DEPTH, RpoDigest, Word>
+        kv_pairs: impl IntoIterator<Item = (Word, Word)>,
+    ) -> Result<MutationSet<SMT_DEPTH, Word, Word>, MerkleError>
     where
         Self: Sized + Sync,
     {
@@ -84,16 +111,16 @@ impl Smt {
 
         // Convert sorted pairs into mutated leaves and capture any new pairs
         let (mut subtree_leaves, new_pairs) =
-            self.sorted_pairs_to_mutated_subtree_leaves(sorted_kv_pairs);
+            self.sorted_pairs_to_mutated_subtree_leaves(sorted_kv_pairs)?;
 
         // If no mutations, return an empty mutation set
         if subtree_leaves.is_empty() {
-            return MutationSet {
+            return Ok(MutationSet {
                 old_root: self.root(),
                 new_root: self.root(),
                 node_mutations: NodeMutations::default(),
                 new_pairs,
-            };
+            });
         }
 
         let mut node_mutations = NodeMutations::default();
@@ -133,7 +160,7 @@ impl Smt {
             !mutation_set.node_mutations().is_empty() && !mutation_set.new_pairs().is_empty()
         );
 
-        mutation_set
+        Ok(mutation_set)
     }
 
     // SUBTREE MUTATION
@@ -206,57 +233,12 @@ impl Smt {
     ///
     /// # Errors
     /// Returns an error if the provided entries contain multiple values for the same key.
-    fn build_subtrees(
-        mut entries: Vec<(RpoDigest, Word)>,
-    ) -> Result<(InnerNodes, Leaves), MerkleError> {
+    fn build_subtrees(mut entries: Vec<(Word, Word)>) -> Result<(InnerNodes, Leaves), MerkleError> {
         entries.par_sort_unstable_by_key(|item| {
             let index = Self::key_to_leaf_index(&item.0);
             index.value()
         });
-        Self::build_subtrees_from_sorted_entries(entries)
-    }
-
-    /// Computes the raw parts for a new sparse Merkle tree from a set of key-value pairs.
-    ///
-    /// This function is mostly an implementation detail of
-    /// [`Smt::with_entries_concurrent()`].
-    ///
-    /// # Errors
-    /// Returns an error if the provided entries contain multiple values for the same key.
-    fn build_subtrees_from_sorted_entries(
-        entries: Vec<(RpoDigest, Word)>,
-    ) -> Result<(InnerNodes, Leaves), MerkleError> {
-        let mut accumulated_nodes: InnerNodes = Default::default();
-
-        let PairComputations {
-            leaves: mut leaf_subtrees,
-            nodes: initial_leaves,
-        } = Self::sorted_pairs_to_leaves(entries)?;
-
-        // If there are no leaves, we can return early
-        if initial_leaves.is_empty() {
-            return Ok((accumulated_nodes, initial_leaves));
-        }
-
-        for current_depth in (SUBTREE_DEPTH..=SMT_DEPTH).step_by(SUBTREE_DEPTH as usize).rev() {
-            let (nodes, mut subtree_roots): (Vec<UnorderedMap<_, _>>, Vec<SubtreeLeaf>) =
-                leaf_subtrees
-                    .into_par_iter()
-                    .map(|subtree| {
-                        debug_assert!(subtree.is_sorted());
-                        debug_assert!(!subtree.is_empty());
-                        let (nodes, subtree_root) =
-                            build_subtree(subtree, SMT_DEPTH, current_depth);
-                        (nodes, subtree_root)
-                    })
-                    .unzip();
-
-            leaf_subtrees = SubtreeLeavesIter::from_leaves(&mut subtree_roots).collect();
-            accumulated_nodes.extend(nodes.into_iter().flatten());
-
-            debug_assert!(!leaf_subtrees.is_empty());
-        }
-        Ok((accumulated_nodes, initial_leaves))
+        build_subtrees_from_sorted_entries(entries)
     }
 
     // LEAF NODE CONSTRUCTION
@@ -275,10 +257,10 @@ impl Smt {
     /// # Panics
     /// With debug assertions on, this function panics if it detects that `pairs` is not correctly
     /// sorted. Without debug assertions, the returned computations will be incorrect.
-    fn sorted_pairs_to_leaves(
-        pairs: Vec<(RpoDigest, Word)>,
+    pub(in crate::merkle::smt) fn sorted_pairs_to_leaves(
+        pairs: Vec<(Word, Word)>,
     ) -> Result<PairComputations<u64, SmtLeaf>, MerkleError> {
-        Self::process_sorted_pairs_to_leaves(pairs, Self::pairs_to_leaf)
+        process_sorted_pairs_to_leaves(pairs, Self::pairs_to_leaf)
     }
 
     /// Constructs a single leaf from an arbitrary amount of key-value pairs.
@@ -291,7 +273,7 @@ impl Smt {
     /// # Returns
     /// - `Ok(Some(SmtLeaf))` if a valid leaf is constructed.
     /// - `Ok(None)` if the only provided value is `Self::EMPTY_VALUE`.
-    fn pairs_to_leaf(mut pairs: Vec<(RpoDigest, Word)>) -> Result<Option<SmtLeaf>, MerkleError> {
+    fn pairs_to_leaf(mut pairs: Vec<(Word, Word)>) -> Result<Option<SmtLeaf>, MerkleError> {
         assert!(!pairs.is_empty());
 
         if pairs.len() > 1 {
@@ -317,12 +299,12 @@ impl Smt {
     /// Derived from `sorted_pairs_to_leaves`
     fn sorted_pairs_to_mutated_subtree_leaves(
         &self,
-        pairs: Vec<(RpoDigest, Word)>,
-    ) -> (MutatedSubtreeLeaves, UnorderedMap<RpoDigest, Word>) {
+        pairs: Vec<(Word, Word)>,
+    ) -> Result<(MutatedSubtreeLeaves, Map<Word, Word>), MerkleError> {
         // Map to track new key-value pairs for mutated leaves
-        let mut new_pairs = UnorderedMap::new();
+        let mut new_pairs = Map::new();
 
-        let accumulator = Self::process_sorted_pairs_to_leaves(pairs, |leaf_pairs| {
+        let accumulator = process_sorted_pairs_to_leaves(pairs, |leaf_pairs| {
             let mut leaf = self.get_leaf(&leaf_pairs[0].0);
 
             let mut leaf_changed = false;
@@ -338,7 +320,14 @@ impl Smt {
 
                 if value != old_value {
                     // Update the leaf and track the new key-value pair
-                    leaf = self.construct_prospective_leaf(leaf, &key, &value);
+                    leaf = self.construct_prospective_leaf(leaf, &key, &value).map_err(
+                        |e| match e {
+                            SmtLeafError::TooManyLeafEntries { actual } => {
+                                MerkleError::TooManyLeafEntries { actual }
+                            },
+                            other => panic!("unexpected SmtLeaf::insert error: {:?}", other),
+                        },
+                    )?;
                     new_pairs.insert(key, value);
                     leaf_changed = true;
                 }
@@ -355,107 +344,7 @@ impl Smt {
         // The closure is the only possible source of errors.
         // Since it never returns an error - only `Ok(Some(_))` or `Ok(None)` - we can safely assume
         // `accumulator` is always `Ok(_)`.
-        (
-            accumulator.expect("process_sorted_pairs_to_leaves never fails").leaves,
-            new_pairs,
-        )
-    }
-
-    /// Processes sorted key-value pairs to compute leaves for a subtree.
-    ///
-    /// This function groups key-value pairs by their corresponding column index and processes each
-    /// group to construct leaves. The actual construction of the leaf is delegated to the
-    /// `process_leaf` callback, allowing flexibility for different use cases (e.g., creating
-    /// new leaves or mutating existing ones).
-    ///
-    /// # Parameters
-    /// - `pairs`: A vector of sorted key-value pairs. The pairs *must* be sorted by leaf index
-    ///   column (not simply by key). If the input is not sorted correctly, the function will
-    ///   produce incorrect results and may panic in debug mode.
-    /// - `process_leaf`: A callback function used to process each group of key-value pairs
-    ///   corresponding to the same column index. The callback takes a vector of key-value pairs for
-    ///   a single column and returns the constructed leaf for that column.
-    ///
-    /// # Returns
-    /// A `PairComputations<u64, Self::Leaf>` containing:
-    /// - `nodes`: A mapping of column indices to the constructed leaves.
-    /// - `leaves`: A collection of `SubtreeLeaf` structures representing the processed leaves. Each
-    ///   `SubtreeLeaf` includes the column index and the hash of the corresponding leaf.
-    ///
-    /// # Errors
-    /// Returns an error if the `process_leaf` callback fails.
-    ///
-    /// # Panics
-    /// This function will panic in debug mode if the input `pairs` are not sorted by column index.
-    fn process_sorted_pairs_to_leaves<F>(
-        pairs: Vec<(RpoDigest, Word)>,
-        mut process_leaf: F,
-    ) -> Result<PairComputations<u64, SmtLeaf>, MerkleError>
-    where
-        F: FnMut(Vec<(RpoDigest, Word)>) -> Result<Option<SmtLeaf>, MerkleError>,
-    {
-        debug_assert!(pairs.is_sorted_by_key(|(key, _)| Self::key_to_leaf_index(key).value()));
-
-        let mut accumulator: PairComputations<u64, SmtLeaf> = Default::default();
-
-        // As we iterate, we'll keep track of the kv-pairs we've seen so far that correspond to a
-        // single leaf. When we see a pair that's in a different leaf, we'll swap these pairs
-        // out and store them in our accumulated leaves.
-        let mut current_leaf_buffer: Vec<(RpoDigest, Word)> = Default::default();
-
-        let mut iter = pairs.into_iter().peekable();
-        while let Some((key, value)) = iter.next() {
-            let col = Self::key_to_leaf_index(&key).index.value();
-            let peeked_col = iter.peek().map(|(key, _v)| {
-                let index = Self::key_to_leaf_index(key);
-                let next_col = index.index.value();
-                // We panic if `pairs` is not sorted by column.
-                debug_assert!(next_col >= col);
-                next_col
-            });
-            current_leaf_buffer.push((key, value));
-
-            // If the next pair is the same column as this one, then we're done after adding this
-            // pair to the buffer.
-            if peeked_col == Some(col) {
-                continue;
-            }
-
-            // Otherwise, the next pair is a different column, or there is no next pair. Either way
-            // it's time to swap out our buffer.
-            let leaf_pairs = mem::take(&mut current_leaf_buffer);
-
-            // Process leaf and propagate any errors
-            match process_leaf(leaf_pairs) {
-                Ok(Some(leaf)) => {
-                    accumulator.nodes.insert(col, leaf);
-                },
-                Ok(None) => {
-                    // No leaf was constructed for this column. The column will be skipped.
-                },
-                Err(e) => return Err(e),
-            }
-
-            debug_assert!(current_leaf_buffer.is_empty());
-        }
-
-        // Compute the leaves from the nodes concurrently
-        let mut accumulated_leaves: Vec<SubtreeLeaf> = accumulator
-            .nodes
-            .clone()
-            .into_par_iter()
-            .map(|(col, leaf)| SubtreeLeaf { col, hash: Self::hash_leaf(&leaf) })
-            .collect();
-
-        // Sort the leaves by column
-        accumulated_leaves.par_sort_by_key(|leaf| leaf.col);
-
-        // TODO: determine is there is any notable performance difference between computing
-        // subtree boundaries after the fact as an iterator adapter (like this), versus computing
-        // subtree boundaries as we go. Either way this function is only used at the beginning of a
-        // parallel construction, so it should not be a critical path.
-        accumulator.leaves = SubtreeLeavesIter::from_leaves(&mut accumulated_leaves).collect();
-        Ok(accumulator)
+        Ok((accumulator?.leaves, new_pairs))
     }
 }
 
@@ -463,10 +352,10 @@ impl Smt {
 // ================================================================================================
 
 /// A subtree is of depth 8.
-const SUBTREE_DEPTH: u8 = 8;
+pub(in crate::merkle::smt) const SUBTREE_DEPTH: u8 = 8;
 
 /// A depth-8 subtree contains 256 "columns" that can possibly be occupied.
-const COLS_PER_SUBTREE: u64 = u64::pow(2, SUBTREE_DEPTH as u32);
+pub(in crate::merkle::smt) const COLS_PER_SUBTREE: u64 = u64::pow(2, SUBTREE_DEPTH as u32);
 
 /// Helper struct for organizing the data we care about when computing Merkle subtrees.
 ///
@@ -477,14 +366,14 @@ pub struct SubtreeLeaf {
     /// The 'value' field of [`NodeIndex`]. When computing a subtree, the depth is already known.
     pub col: u64,
     /// The hash of the node this `SubtreeLeaf` represents.
-    pub hash: RpoDigest,
+    pub hash: Word,
 }
 
 /// Helper struct to organize the return value of [`Smt::sorted_pairs_to_leaves()`].
 #[derive(Debug, Clone)]
-pub(crate) struct PairComputations<K, L> {
+pub(in crate::merkle::smt) struct PairComputations<K, L> {
     /// Literal leaves to be added to the sparse Merkle tree's internal mapping.
-    pub nodes: UnorderedMap<K, L>,
+    pub nodes: Map<K, L>,
     /// "Conceptual" leaves that will be used for computations.
     pub leaves: Vec<Vec<SubtreeLeaf>>,
 }
@@ -500,12 +389,12 @@ impl<K, L> Default for PairComputations<K, L> {
 }
 
 #[derive(Debug)]
-pub(crate) struct SubtreeLeavesIter<'s> {
+pub(in crate::merkle::smt) struct SubtreeLeavesIter<'s> {
     leaves: core::iter::Peekable<alloc::vec::Drain<'s, SubtreeLeaf>>,
 }
 
 impl<'s> SubtreeLeavesIter<'s> {
-    fn from_leaves(leaves: &'s mut Vec<SubtreeLeaf>) -> Self {
+    pub(crate) fn from_leaves(leaves: &'s mut Vec<SubtreeLeaf>) -> Self {
         // TODO: determine if there is any notable performance difference between taking a Vec,
         // which many need flattening first, vs storing a `Box<dyn Iterator<Item = SubtreeLeaf>>`.
         // The latter may have self-referential properties that are impossible to express in purely
@@ -554,6 +443,129 @@ impl Iterator for SubtreeLeavesIter<'_> {
 // HELPER FUNCTIONS
 // ================================================================================================
 
+/// Processes sorted key-value pairs to compute leaves for a subtree.
+///
+/// This function groups key-value pairs by their corresponding column index and processes each
+/// group to construct leaves. The actual construction of the leaf is delegated to the
+/// `process_leaf` callback, allowing flexibility for different use cases (e.g., creating
+/// new leaves or mutating existing ones).
+///
+/// # Parameters
+/// - `pairs`: A vector of sorted key-value pairs. The pairs *must* be sorted by leaf index column
+///   (not simply by key). If the input is not sorted correctly, the function will produce incorrect
+///   results and may panic in debug mode.
+/// - `process_leaf`: A callback function used to process each group of key-value pairs
+///   corresponding to the same column index. The callback takes a vector of key-value pairs for a
+///   single column and returns the constructed leaf for that column.
+///
+/// # Returns
+/// A `PairComputations<u64, Self::Leaf>` containing:
+/// - `nodes`: A mapping of column indices to the constructed leaves.
+/// - `leaves`: A collection of `SubtreeLeaf` structures representing the processed leaves. Each
+///   `SubtreeLeaf` includes the column index and the hash of the corresponding leaf.
+///
+/// # Errors
+/// Returns an error if the `process_leaf` callback fails.
+///
+/// # Panics
+/// This function will panic in debug mode if the input `pairs` are not sorted by column index.
+pub(crate) fn process_sorted_pairs_to_leaves<F>(
+    pairs: Vec<(Word, Word)>,
+    mut process_leaf: F,
+) -> Result<PairComputations<u64, SmtLeaf>, MerkleError>
+where
+    F: FnMut(Vec<(Word, Word)>) -> Result<Option<SmtLeaf>, MerkleError>,
+{
+    debug_assert!(pairs.is_sorted_by_key(|(key, _)| Smt::key_to_leaf_index(key).value()));
+    let mut accumulator: PairComputations<u64, SmtLeaf> = Default::default();
+    // As we iterate, we'll keep track of the kv-pairs we've seen so far that correspond to a
+    // single leaf. When we see a pair that's in a different leaf, we'll swap these pairs
+    // out and store them in our accumulated leaves.
+    let mut current_leaf_buffer: Vec<(Word, Word)> = Default::default();
+    let mut iter = pairs.into_iter().peekable();
+    while let Some((key, value)) = iter.next() {
+        let col = Smt::key_to_leaf_index(&key).index.value();
+        let peeked_col = iter.peek().map(|(key, _v)| {
+            let index = Smt::key_to_leaf_index(key);
+            let next_col = index.index.value();
+            // We panic if `pairs` is not sorted by column.
+            debug_assert!(next_col >= col);
+            next_col
+        });
+        current_leaf_buffer.push((key, value));
+        // If the next pair is the same column as this one, then we're done after adding this
+        // pair to the buffer.
+        if peeked_col == Some(col) {
+            continue;
+        }
+        // Otherwise, the next pair is a different column, or there is no next pair. Either way
+        // it's time to swap out our buffer.
+        let leaf_pairs = mem::take(&mut current_leaf_buffer);
+        // Process leaf and propagate any errors
+        match process_leaf(leaf_pairs) {
+            Ok(Some(leaf)) => {
+                accumulator.nodes.insert(col, leaf);
+            },
+            Ok(None) => {
+                // No leaf was constructed for this column. The column will be skipped.
+            },
+            Err(e) => return Err(e),
+        }
+        debug_assert!(current_leaf_buffer.is_empty());
+    }
+    // Compute the leaves from the nodes concurrently
+    let mut accumulated_leaves: Vec<SubtreeLeaf> = accumulator
+        .nodes
+        .clone()
+        .into_par_iter()
+        .map(|(col, leaf)| SubtreeLeaf { col, hash: Smt::hash_leaf(&leaf) })
+        .collect();
+    // Sort the leaves by column
+    accumulated_leaves.par_sort_by_key(|leaf| leaf.col);
+    // TODO: determine is there is any notable performance difference between computing
+    // subtree boundaries after the fact as an iterator adapter (like this), versus computing
+    // subtree boundaries as we go. Either way this function is only used at the beginning of a
+    // parallel construction, so it should not be a critical path.
+    accumulator.leaves = SubtreeLeavesIter::from_leaves(&mut accumulated_leaves).collect();
+    Ok(accumulator)
+}
+
+/// Computes the raw parts for a new sparse Merkle tree from a set of key-value pairs.
+///
+/// This function is mostly an implementation detail of
+/// [`Smt::with_entries_concurrent()`].
+///
+/// # Errors
+/// Returns an error if the provided entries contain multiple values for the same key.
+fn build_subtrees_from_sorted_entries(
+    entries: Vec<(Word, Word)>,
+) -> Result<(InnerNodes, Leaves), MerkleError> {
+    let mut accumulated_nodes: InnerNodes = Default::default();
+    let PairComputations {
+        leaves: mut leaf_subtrees,
+        nodes: initial_leaves,
+    } = Smt::sorted_pairs_to_leaves(entries)?;
+    // If there are no leaves, we can return early
+    if initial_leaves.is_empty() {
+        return Ok((accumulated_nodes, initial_leaves));
+    }
+    for current_depth in (SUBTREE_DEPTH..=SMT_DEPTH).step_by(SUBTREE_DEPTH as usize).rev() {
+        let (nodes, mut subtree_roots): (Vec<Map<_, _>>, Vec<SubtreeLeaf>) = leaf_subtrees
+            .into_par_iter()
+            .map(|subtree| {
+                debug_assert!(subtree.is_sorted());
+                debug_assert!(!subtree.is_empty());
+                let (nodes, subtree_root) = build_subtree(subtree, SMT_DEPTH, current_depth);
+                (nodes, subtree_root)
+            })
+            .unzip();
+        leaf_subtrees = SubtreeLeavesIter::from_leaves(&mut subtree_roots).collect();
+        accumulated_nodes.extend(nodes.into_iter().flatten());
+        debug_assert!(!leaf_subtrees.is_empty());
+    }
+    Ok((accumulated_nodes, initial_leaves))
+}
+
 /// Builds Merkle nodes from a bottom layer of "leaves" -- represented by a horizontal index and
 /// the hash of the leaf at that index. `leaves` *must* be sorted by horizontal index, and
 /// `leaves` must not contain more than one depth-8 subtree's worth of leaves.
@@ -567,11 +579,11 @@ impl Iterator for SubtreeLeavesIter<'_> {
 /// more entries than can fit in a depth-8 subtree, if `leaves` contains leaves belonging to
 /// different depth-8 subtrees, if `bottom_depth` is lower in the tree than the specified
 /// maximum depth (`DEPTH`), or if `leaves` is not sorted.
-fn build_subtree(
+pub(crate) fn build_subtree(
     mut leaves: Vec<SubtreeLeaf>,
     tree_depth: u8,
     bottom_depth: u8,
-) -> (UnorderedMap<NodeIndex, InnerNode>, SubtreeLeaf) {
+) -> (Map<NodeIndex, InnerNode>, SubtreeLeaf) {
     #[cfg(debug_assertions)]
     {
         // Ensure that all leaves have unique column indices within this subtree.
@@ -589,7 +601,7 @@ fn build_subtree(
     debug_assert!(Integer::is_multiple_of(&bottom_depth, &SUBTREE_DEPTH));
     debug_assert!(leaves.len() <= usize::pow(2, SUBTREE_DEPTH as u32));
     let subtree_root = bottom_depth - SUBTREE_DEPTH;
-    let mut inner_nodes: UnorderedMap<NodeIndex, InnerNode> = Default::default();
+    let mut inner_nodes: Map<NodeIndex, InnerNode> = Default::default();
     let mut next_leaves: Vec<SubtreeLeaf> = Vec::with_capacity(leaves.len() / 2);
     for next_depth in (subtree_root..bottom_depth).rev() {
         debug_assert!(next_depth <= bottom_depth);
@@ -661,7 +673,7 @@ fn build_subtree(
 ///   or copied from the `parent_node`.
 ///
 /// Returns the `InnerNode` containing the hashes of the sibling pair.
-fn fetch_sibling_pair(
+pub(crate) fn fetch_sibling_pair(
     iter: &mut core::iter::Peekable<alloc::vec::Drain<SubtreeLeaf>>,
     first_leaf: SubtreeLeaf,
     parent_node: InnerNode,
@@ -695,6 +707,6 @@ pub fn build_subtree_for_bench(
     leaves: Vec<SubtreeLeaf>,
     tree_depth: u8,
     bottom_depth: u8,
-) -> (UnorderedMap<NodeIndex, InnerNode>, SubtreeLeaf) {
+) -> (Map<NodeIndex, InnerNode>, SubtreeLeaf) {
     build_subtree(leaves, tree_depth, bottom_depth)
 }

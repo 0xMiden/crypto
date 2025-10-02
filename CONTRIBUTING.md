@@ -4,10 +4,10 @@
 
 We want to make contributing to this project as easy and transparent as possible, whether it's:
 
-- Reporting a [bug](https://github.com/0xPolygonMiden/crypto/issues/new)
-- Taking part in [discussions](https://github.com/0xPolygonMiden/crypto/discussions)
-- Submitting a [fix](https://github.com/0xPolygonMiden/crypto/pulls)
-- Proposing new [features](https://github.com/0xPolygonMiden/crypto/issues/new)
+- Reporting a [bug](https://github.com/0xMiden/crypto/issues/new)
+- Taking part in [discussions](https://github.com/0xMiden/crypto/discussions)
+- Submitting a [fix](https://github.com/0xMiden/crypto/pulls)
+- Proposing new [features](https://github.com/0xMiden/crypto/issues/new)
 
 &nbsp;
 
@@ -105,4 +105,4 @@ We use [semver](https://semver.org/) naming convention.
 &nbsp;
 
 ## Any contributions you make will be under the MIT Software License
-In short, when you submit code changes, your submissions are understood to be under the same [MIT License](http://choosealicense.com/licenses/mit/) that covers the project. Feel free to contact the maintainers if that's a concern.
+In short, when you submit code changes, your submissions are understood to be under the dual [MIT](./LICENSE-MIT) and [Apache 2.0](./LICENSE-APACHE) license that covers the project. Feel free to contact the maintainers if that's a concern.

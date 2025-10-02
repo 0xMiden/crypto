@@ -2,11 +2,19 @@
 
 name: build
 
+# Limits workflow concurrency to only the latest commit in the PR.
+concurrency:
+  group: "${{ github.workflow }} @ ${{ github.event.pull_request.head.label || github.head_ref || github.ref }}"
+  cancel-in-progress: true
+
 on:
   push:
     branches: [main, next]
   pull_request:
     types: [opened, reopened, synchronize]
+
+permissions:
+  contents: read
 
 jobs:
   no-std:
@@ -21,5 +29,6 @@ jobs:
       - name: Build for no-std
         run: |
           rustup update --no-self-update ${{ matrix.toolchain }}
+          rustup default ${{ matrix.toolchain }}
           rustup target add wasm32-unknown-unknown
           make build-no-std

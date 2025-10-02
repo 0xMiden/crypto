@@ -3,10 +3,13 @@ use alloc::collections::BTreeSet;
 use lazy_static::lazy_static;
 
 use super::{
-    super::ValuePath, EMPTY_WORD, EmptySubtreeRoots, InnerNode, InnerNodeInfo, InnerNodes,
-    LeafIndex, MerkleError, MerklePath, MutationSet, NodeIndex, RpoDigest, SMT_MAX_DEPTH,
-    SMT_MIN_DEPTH, SparseMerkleTree, Word,
+    EMPTY_WORD, EmptySubtreeRoots, InnerNode, InnerNodeInfo, InnerNodes, LeafIndex, MerkleError,
+    MutationSet, NodeIndex, SMT_MAX_DEPTH, SMT_MIN_DEPTH, SparseMerkleTree, Word,
 };
+use crate::merkle::{SmtLeafError, SparseMerklePath};
+
+mod proof;
+pub use proof::SimpleSmtProof;
 
 #[cfg(test)]
 mod tests;
@@ -22,7 +25,7 @@ type Leaves = super::Leaves<Word>;
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 pub struct SimpleSmt<const DEPTH: u8> {
-    root: RpoDigest,
+    root: Word,
     inner_nodes: InnerNodes,
     leaves: Leaves,
 }
@@ -109,7 +112,7 @@ impl<const DEPTH: u8> SimpleSmt<DEPTH> {
     /// # Panics
     /// With debug assertions on, this function panics if `root` does not match the root node in
     /// `inner_nodes`.
-    pub fn from_raw_parts(inner_nodes: InnerNodes, leaves: Leaves, root: RpoDigest) -> Self {
+    pub fn from_raw_parts(inner_nodes: InnerNodes, leaves: Leaves, root: Word) -> Self {
         // Our particular implementation of `from_raw_parts()` never returns `Err`.
         <Self as SparseMerkleTree<DEPTH>>::from_raw_parts(inner_nodes, leaves, root).unwrap()
     }
@@ -136,7 +139,7 @@ impl<const DEPTH: u8> SimpleSmt<DEPTH> {
     }
 
     /// Returns the root of the tree
-    pub fn root(&self) -> RpoDigest {
+    pub fn root(&self) -> Word {
         <Self as SparseMerkleTree<DEPTH>>::root(self)
     }
 
@@ -155,7 +158,7 @@ impl<const DEPTH: u8> SimpleSmt<DEPTH> {
     /// # Errors
     /// Returns an error if the specified index has depth set to 0 or the depth is greater than
     /// the depth of this Merkle tree.
-    pub fn get_node(&self, index: NodeIndex) -> Result<RpoDigest, MerkleError> {
+    pub fn get_node(&self, index: NodeIndex) -> Result<Word, MerkleError> {
         if index.is_root() {
             Err(MerkleError::DepthTooSmall(index.depth()))
         } else if index.depth() > DEPTH {
@@ -163,7 +166,7 @@ impl<const DEPTH: u8> SimpleSmt<DEPTH> {
         } else if index.depth() == DEPTH {
             let leaf = self.get_leaf(&LeafIndex::<DEPTH>::try_from(index)?);
 
-            Ok(leaf.into())
+            Ok(leaf)
         } else {
             Ok(self.get_inner_node(index).hash())
         }
@@ -171,8 +174,15 @@ impl<const DEPTH: u8> SimpleSmt<DEPTH> {
 
     /// Returns an opening of the leaf associated with `key`. Conceptually, an opening is a Merkle
     /// path to the leaf, as well as the leaf itself.
-    pub fn open(&self, key: &LeafIndex<DEPTH>) -> ValuePath {
-        <Self as SparseMerkleTree<DEPTH>>::open(self, key)
+    pub fn open(&self, key: &LeafIndex<DEPTH>) -> SimpleSmtProof {
+        let value = self.get_value(key);
+        let nodes = key.index.proof_indices().map(|index| self.get_node_hash(index));
+        // `from_sized_iter()` returns an error if there are more nodes than `SMT_MAX_DEPTH`, but
+        // this could only happen if we have more levels than `SMT_MAX_DEPTH` ourselves, which is
+        // guarded against in `SimpleSmt::new()`.
+        let path = SparseMerklePath::from_sized_iter(nodes).unwrap();
+
+        SimpleSmtProof { value, path }
     }
 
     /// Returns a boolean value indicating whether the SMT is empty.
@@ -208,7 +218,10 @@ impl<const DEPTH: u8> SimpleSmt<DEPTH> {
     /// This also recomputes all hashes between the leaf (associated with the key) and the root,
     /// updating the root itself.
     pub fn insert(&mut self, key: LeafIndex<DEPTH>, value: Word) -> Word {
+        // SAFETY: a SimpleSmt does not contain multi-value leaves. The underlying
+        // SimpleSmt::insert_value does not return any errors so it's safe to unwrap here.
         <Self as SparseMerkleTree<DEPTH>>::insert(self, key, value)
+            .expect("inserting a value into a simple smt never returns an error")
     }
 
     /// Computes what changes are necessary to insert the specified key-value pairs into this
@@ -222,20 +235,24 @@ impl<const DEPTH: u8> SimpleSmt<DEPTH> {
     ///
     /// # Example
     /// ```
-    /// # use miden_crypto::{hash::rpo::RpoDigest, Felt, Word};
+    /// # use miden_crypto::{Felt, Word};
     /// # use miden_crypto::merkle::{LeafIndex, SimpleSmt, EmptySubtreeRoots, SMT_DEPTH};
     /// let mut smt: SimpleSmt<3> = SimpleSmt::new().unwrap();
     /// let pair = (LeafIndex::default(), Word::default());
     /// let mutations = smt.compute_mutations(vec![pair]);
     /// assert_eq!(mutations.root(), *EmptySubtreeRoots::entry(3, 0));
-    /// smt.apply_mutations(mutations);
+    /// smt.apply_mutations(mutations).unwrap();
     /// assert_eq!(smt.root(), *EmptySubtreeRoots::entry(3, 0));
     /// ```
     pub fn compute_mutations(
         &self,
         kv_pairs: impl IntoIterator<Item = (LeafIndex<DEPTH>, Word)>,
     ) -> MutationSet<DEPTH, LeafIndex<DEPTH>, Word> {
+        // SAFETY: a SimpleSmt does not contain multi-value leaves. The underlying
+        // SimpleSmt::construct_prospective_leaf does not return any errors so it's safe to unwrap
+        // here.
         <Self as SparseMerkleTree<DEPTH>>::compute_mutations(self, kv_pairs)
+            .expect("computing mutations on a simple smt never returns an error")
     }
 
     /// Applies the prospective mutations computed with [`SimpleSmt::compute_mutations()`] to this
@@ -278,7 +295,7 @@ impl<const DEPTH: u8> SimpleSmt<DEPTH> {
         &mut self,
         subtree_insertion_index: u64,
         subtree: SimpleSmt<SUBTREE_DEPTH>,
-    ) -> Result<RpoDigest, MerkleError> {
+    ) -> Result<Word, MerkleError> {
         if SUBTREE_DEPTH > DEPTH {
             return Err(MerkleError::SubtreeDepthExceedsDepth {
                 subtree_depth: SUBTREE_DEPTH,
@@ -343,28 +360,32 @@ impl<const DEPTH: u8> SparseMerkleTree<DEPTH> for SimpleSmt<DEPTH> {
     type Key = LeafIndex<DEPTH>;
     type Value = Word;
     type Leaf = Word;
-    type Opening = ValuePath;
+    type Opening = SimpleSmtProof;
 
     const EMPTY_VALUE: Self::Value = EMPTY_WORD;
 
     fn from_raw_parts(
         inner_nodes: InnerNodes,
         leaves: Leaves,
-        root: RpoDigest,
+        root: Word,
     ) -> Result<Self, MerkleError> {
         if cfg!(debug_assertions) {
-            let root_node = inner_nodes.get(&NodeIndex::root()).unwrap();
-            assert_eq!(root_node.hash(), root);
+            let root_node_hash = inner_nodes
+                .get(&NodeIndex::root())
+                .map(InnerNode::hash)
+                .unwrap_or(Self::EMPTY_ROOT);
+
+            assert_eq!(root_node_hash, root);
         }
 
         Ok(Self { root, inner_nodes, leaves })
     }
 
-    fn root(&self) -> RpoDigest {
+    fn root(&self) -> Word {
         self.root
     }
 
-    fn set_root(&mut self, root: RpoDigest) {
+    fn set_root(&mut self, root: Word) {
         self.root = root;
     }
 
@@ -383,12 +404,17 @@ impl<const DEPTH: u8> SparseMerkleTree<DEPTH> for SimpleSmt<DEPTH> {
         self.inner_nodes.remove(&index)
     }
 
-    fn insert_value(&mut self, key: LeafIndex<DEPTH>, value: Word) -> Option<Word> {
-        if value == Self::EMPTY_VALUE {
+    fn insert_value(
+        &mut self,
+        key: LeafIndex<DEPTH>,
+        value: Word,
+    ) -> Result<Option<Word>, MerkleError> {
+        let result = if value == Self::EMPTY_VALUE {
             self.leaves.remove(&key.value())
         } else {
             self.leaves.insert(key.value(), value)
-        }
+        };
+        Ok(result)
     }
 
     fn get_value(&self, key: &LeafIndex<DEPTH>) -> Word {
@@ -403,9 +429,9 @@ impl<const DEPTH: u8> SparseMerkleTree<DEPTH> for SimpleSmt<DEPTH> {
         }
     }
 
-    fn hash_leaf(leaf: &Word) -> RpoDigest {
+    fn hash_leaf(leaf: &Word) -> Word {
         // `SimpleSmt` takes the leaf value itself as the hash
-        leaf.into()
+        *leaf
     }
 
     fn construct_prospective_leaf(
@@ -413,15 +439,15 @@ impl<const DEPTH: u8> SparseMerkleTree<DEPTH> for SimpleSmt<DEPTH> {
         _existing_leaf: Word,
         _key: &LeafIndex<DEPTH>,
         value: &Word,
-    ) -> Word {
-        *value
+    ) -> Result<Word, SmtLeafError> {
+        Ok(*value)
     }
 
     fn key_to_leaf_index(key: &LeafIndex<DEPTH>) -> LeafIndex<DEPTH> {
         *key
     }
 
-    fn path_and_leaf_to_opening(path: MerklePath, leaf: Word) -> ValuePath {
+    fn path_and_leaf_to_opening(path: SparseMerklePath, leaf: Word) -> SimpleSmtProof {
         (path, leaf).into()
     }
 }

@@ -6,12 +6,18 @@ use p3_field::PrimeField64;
 use super::{EMPTY_WORD, Felt, LeafIndex, Rpo256, RpoDigest, SMT_DEPTH, SmtLeafError, Word};
 use crate::utils::{ByteReader, ByteWriter, Deserializable, DeserializationError, Serializable};
 
+/// Represents a leaf node in the Sparse Merkle Tree.
+///
+/// A leaf can be empty, hold a single key-value pair, or multiple key-value pairs.
 #[derive(Clone, Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 pub enum SmtLeaf {
+    /// An empty leaf at the specified index.
     Empty(LeafIndex<SMT_DEPTH>),
-    Single((RpoDigest, Word)),
-    Multiple(Vec<(RpoDigest, Word)>),
+    /// A leaf containing a single key-value pair.
+    Single((Word, Word)),
+    /// A leaf containing multiple key-value pairs.
+    Multiple(Vec<(Word, Word)>),
 }
 
 impl SmtLeaf {
@@ -25,7 +31,7 @@ impl SmtLeaf {
     ///   - Returns an error if 1 or more keys in `entries` map to a leaf index different from
     ///     `leaf_index`
     pub fn new(
-        entries: Vec<(RpoDigest, Word)>,
+        entries: Vec<(Word, Word)>,
         leaf_index: LeafIndex<SMT_DEPTH>,
     ) -> Result<Self, SmtLeafError> {
         match entries.len() {
@@ -68,7 +74,7 @@ impl SmtLeaf {
 
     /// Returns a new single leaf with the specified entry. The leaf index is derived from the
     /// entry's key.
-    pub fn new_single(key: RpoDigest, value: Word) -> Self {
+    pub fn new_single(key: Word, value: Word) -> Self {
         Self::Single((key, value))
     }
 
@@ -77,9 +83,14 @@ impl SmtLeaf {
     ///
     /// # Errors
     ///   - Returns an error if 2 keys in `entries` map to a different leaf index
-    pub fn new_multiple(entries: Vec<(RpoDigest, Word)>) -> Result<Self, SmtLeafError> {
+    ///   - Returns an error if the number of entries exceeds [`MAX_LEAF_ENTRIES`]
+    pub fn new_multiple(entries: Vec<(Word, Word)>) -> Result<Self, SmtLeafError> {
         if entries.len() < 2 {
             return Err(SmtLeafError::MultipleLeafRequiresTwoEntries(entries.len()));
+        }
+
+        if entries.len() > MAX_LEAF_ENTRIES {
+            return Err(SmtLeafError::TooManyLeafEntries { actual: entries.len() });
         }
 
         // Check that all keys map to the same leaf index
@@ -116,7 +127,7 @@ impl SmtLeaf {
     pub fn index(&self) -> LeafIndex<SMT_DEPTH> {
         match self {
             SmtLeaf::Empty(leaf_index) => *leaf_index,
-            SmtLeaf::Single((key, _)) => key.into(),
+            SmtLeaf::Single((key, _)) => (*key).into(),
             SmtLeaf::Multiple(entries) => {
                 // Note: All keys are guaranteed to have the same leaf index
                 let (first_key, _) = entries[0];
@@ -126,21 +137,19 @@ impl SmtLeaf {
     }
 
     /// Returns the number of entries stored in the leaf
-    pub fn num_entries(&self) -> u64 {
+    pub fn num_entries(&self) -> usize {
         match self {
             SmtLeaf::Empty(_) => 0,
             SmtLeaf::Single(_) => 1,
-            SmtLeaf::Multiple(entries) => {
-                entries.len().try_into().expect("shouldn't have more than 2^64 entries")
-            },
+            SmtLeaf::Multiple(entries) => entries.len(),
         }
     }
 
     /// Computes the hash of the leaf
-    pub fn hash(&self) -> RpoDigest {
+    pub fn hash(&self) -> Word {
         match self {
-            SmtLeaf::Empty(_) => EMPTY_WORD.into(),
-            SmtLeaf::Single((key, value)) => Rpo256::merge(&[*key, value.into()]),
+            SmtLeaf::Empty(_) => EMPTY_WORD,
+            SmtLeaf::Single((key, value)) => Rpo256::merge(&[*key, *value]),
             SmtLeaf::Multiple(kvs) => {
                 let elements: Vec<Felt> = kvs.iter().copied().flat_map(kv_to_elements).collect();
                 Rpo256::hash_elements(&elements)
@@ -151,12 +160,12 @@ impl SmtLeaf {
     // ITERATORS
     // ---------------------------------------------------------------------------------------------
 
-    /// Returns the key-value pairs in the leaf
-    pub fn entries(&self) -> Vec<&(RpoDigest, Word)> {
+    /// Returns a slice with key-value pairs in the leaf.
+    pub fn entries(&self) -> &[(Word, Word)] {
         match self {
-            SmtLeaf::Empty(_) => Vec::new(),
-            SmtLeaf::Single(kv_pair) => vec![kv_pair],
-            SmtLeaf::Multiple(kv_pairs) => kv_pairs.iter().collect(),
+            SmtLeaf::Empty(_) => &[],
+            SmtLeaf::Single(kv_pair) => core::slice::from_ref(kv_pair),
+            SmtLeaf::Multiple(kv_pairs) => kv_pairs,
         }
     }
 
@@ -174,7 +183,7 @@ impl SmtLeaf {
     }
 
     /// Converts a leaf the key-value pairs in the leaf
-    pub fn into_entries(self) -> Vec<(RpoDigest, Word)> {
+    pub fn into_entries(self) -> Vec<(Word, Word)> {
         match self {
             SmtLeaf::Empty(_) => Vec::new(),
             SmtLeaf::Single(kv_pair) => vec![kv_pair],
@@ -187,9 +196,9 @@ impl SmtLeaf {
 
     /// Returns the value associated with `key` in the leaf, or `None` if `key` maps to another
     /// leaf.
-    pub(super) fn get_value(&self, key: &RpoDigest) -> Option<Word> {
+    pub(in crate::merkle::smt) fn get_value(&self, key: &Word) -> Option<Word> {
         // Ensure that `key` maps to this leaf
-        if self.index() != key.into() {
+        if self.index() != (*key).into() {
             return None;
         }
 
@@ -218,11 +227,19 @@ impl SmtLeaf {
     /// any.
     ///
     /// The caller needs to ensure that `key` has the same leaf index as all other keys in the leaf
-    pub(super) fn insert(&mut self, key: RpoDigest, value: Word) -> Option<Word> {
+    ///
+    /// # Errors
+    /// Returns an error if inserting the key-value pair would exceed [`MAX_LEAF_ENTRIES`] (1024
+    /// entries) in the leaf.
+    pub(in crate::merkle::smt) fn insert(
+        &mut self,
+        key: Word,
+        value: Word,
+    ) -> Result<Option<Word>, SmtLeafError> {
         match self {
             SmtLeaf::Empty(_) => {
                 *self = SmtLeaf::new_single(key, value);
-                None
+                Ok(None)
             },
             SmtLeaf::Single(kv_pair) => {
                 if kv_pair.0 == key {
@@ -230,16 +247,16 @@ impl SmtLeaf {
                     // value
                     let old_value = kv_pair.1;
                     kv_pair.1 = value;
-                    Some(old_value)
+                    Ok(Some(old_value))
                 } else {
                     // Another entry is present in this leaf. Transform the entry into a list
                     // entry, and make sure the key-value pairs are sorted by key
+                    // This stays within MAX_LEAF_ENTRIES limit. We're only adding one entry to a
+                    // single leaf
                     let mut pairs = vec![*kv_pair, (key, value)];
                     pairs.sort_by(|(key_1, _), (key_2, _)| cmp_keys(*key_1, *key_2));
-
                     *self = SmtLeaf::Multiple(pairs);
-
-                    None
+                    Ok(None)
                 }
             },
             SmtLeaf::Multiple(kv_pairs) => {
@@ -247,13 +264,16 @@ impl SmtLeaf {
                     Ok(pos) => {
                         let old_value = kv_pairs[pos].1;
                         kv_pairs[pos].1 = value;
-
-                        Some(old_value)
+                        Ok(Some(old_value))
                     },
                     Err(pos) => {
+                        if kv_pairs.len() >= MAX_LEAF_ENTRIES {
+                            return Err(SmtLeafError::TooManyLeafEntries {
+                                actual: kv_pairs.len() + 1,
+                            });
+                        }
                         kv_pairs.insert(pos, (key, value));
-
-                        None
+                        Ok(None)
                     },
                 }
             },
@@ -263,7 +283,7 @@ impl SmtLeaf {
     /// Removes key-value pair from the leaf stored at key; returns the previous value associated
     /// with `key`, if any. Also returns an `is_empty` flag, indicating whether the leaf became
     /// empty, and must be removed from the data structure it is contained in.
-    pub(super) fn remove(&mut self, key: RpoDigest) -> (Option<Word>, bool) {
+    pub(in crate::merkle::smt) fn remove(&mut self, key: Word) -> (Option<Word>, bool) {
         match self {
             SmtLeaf::Empty(_) => (None, false),
             SmtLeaf::Single((key_at_leaf, value_at_leaf)) => {
@@ -327,7 +347,7 @@ impl Serializable for SmtLeaf {
 impl Deserializable for SmtLeaf {
     fn read_from<R: ByteReader>(source: &mut R) -> Result<Self, DeserializationError> {
         // Read: num entries
-        let num_entries = source.read_u64()?;
+        let num_entries = source.read_usize()?;
 
         // Read: leaf index
         let leaf_index: LeafIndex<SMT_DEPTH> = {
@@ -336,9 +356,9 @@ impl Deserializable for SmtLeaf {
         };
 
         // Read: entries
-        let mut entries: Vec<(RpoDigest, Word)> = Vec::new();
+        let mut entries: Vec<(Word, Word)> = Vec::new();
         for _ in 0..num_entries {
-            let key: RpoDigest = source.read()?;
+            let key: Word = source.read()?;
             let value: Word = source.read()?;
 
             entries.push((key, value));
@@ -353,7 +373,7 @@ impl Deserializable for SmtLeaf {
 // ================================================================================================
 
 /// Converts a key-value tuple to an iterator of `Felt`s
-pub(crate) fn kv_to_elements((key, value): (RpoDigest, Word)) -> impl Iterator<Item = Felt> {
+pub(crate) fn kv_to_elements((key, value): (Word, Word)) -> impl Iterator<Item = Felt> {
     let key_elements = key.into_iter();
     let value_elements = value.into_iter();
 
@@ -362,7 +382,7 @@ pub(crate) fn kv_to_elements((key, value): (RpoDigest, Word)) -> impl Iterator<I
 
 /// Compares two keys, compared element-by-element using their integer representations starting with
 /// the most significant element.
-pub(crate) fn cmp_keys(key_1: RpoDigest, key_2: RpoDigest) -> Ordering {
+pub(crate) fn cmp_keys(key_1: Word, key_2: Word) -> Ordering {
     for (v1, v2) in key_1.iter().zip(key_2.iter()).rev() {
         let v1 = (*v1).as_canonical_u64();
         let v2 = (*v2).as_canonical_u64();

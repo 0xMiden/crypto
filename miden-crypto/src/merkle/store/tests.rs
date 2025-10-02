@@ -9,14 +9,12 @@ use {
 };
 
 use super::{
-    DefaultMerkleStore as MerkleStore, EmptySubtreeRoots, MerkleError, MerklePath, NodeIndex,
-    PartialMerkleTree, RecordingMerkleStore, Rpo256, RpoDigest,
+    EmptySubtreeRoots, MerkleError, MerklePath, MerkleStore, NodeIndex, PartialMerkleTree, Rpo256,
+    Word,
 };
 use crate::{
-    Felt, ONE, WORD_SIZE, Word, ZERO,
-    merkle::{
-        LeafIndex, MerkleTree, SMT_MAX_DEPTH, SimpleSmt, digests_to_words, int_to_leaf, int_to_node,
-    },
+    Felt, ONE, WORD_SIZE, ZERO,
+    merkle::{LeafIndex, MerkleTree, SMT_MAX_DEPTH, SimpleSmt, int_to_leaf, int_to_node},
 };
 
 // TEST DATA
@@ -175,7 +173,7 @@ fn test_merkle_tree() -> Result<(), MerkleError> {
 #[test]
 fn test_empty_roots() {
     let store = MerkleStore::default();
-    let mut root = RpoDigest::default();
+    let mut root = Word::default();
 
     for depth in 0..255 {
         root = Rpo256::merge(&[root; 2]);
@@ -190,7 +188,7 @@ fn test_empty_roots() {
 fn test_leaf_paths_for_empty_trees() -> Result<(), MerkleError> {
     let store = MerkleStore::default();
 
-    // Starts at 1 because leafs are not included in the store.
+    // Starts at 1 because leaves are not included in the store.
     // Ends at 64 because it is not possible to represent an index of a depth greater than 64,
     // because a u64 is used to index the leaf.
     seq!(DEPTH in 1_u8..64_u8 {
@@ -201,7 +199,7 @@ fn test_leaf_paths_for_empty_trees() -> Result<(), MerkleError> {
         let smt_path = smt.open(&LeafIndex::<DEPTH>::new(0)?).path;
         assert_eq!(
             store_path.value,
-            RpoDigest::default(),
+            Word::default(),
             "the leaf of an empty tree is always ZERO"
         );
         assert_eq!(
@@ -209,7 +207,7 @@ fn test_leaf_paths_for_empty_trees() -> Result<(), MerkleError> {
             "the returned merkle path does not match the computed values"
         );
         assert_eq!(
-            store_path.path.compute_root(DEPTH.into(), RpoDigest::default()).unwrap(),
+            store_path.path.compute_root(DEPTH.into(), Word::default()).unwrap(),
             smt.root(),
             "computed root from the path must match the empty tree root"
         );
@@ -235,11 +233,11 @@ fn test_add_sparse_merkle_tree_one_level() -> Result<(), MerkleError> {
     let store = MerkleStore::from(&smt);
 
     let idx = NodeIndex::make(1, 0);
-    assert_eq!(smt.get_node(idx).unwrap(), leaves2[0].into());
+    assert_eq!(smt.get_node(idx).unwrap(), leaves2[0]);
     assert_eq!(store.get_node(smt.root(), idx).unwrap(), smt.get_node(idx).unwrap());
 
     let idx = NodeIndex::make(1, 1);
-    assert_eq!(smt.get_node(idx).unwrap(), leaves2[1].into());
+    assert_eq!(smt.get_node(idx).unwrap(), leaves2[1]);
     assert_eq!(store.get_node(smt.root(), idx).unwrap(), smt.get_node(idx).unwrap());
 
     Ok(())
@@ -278,7 +276,7 @@ fn test_sparse_merkle_tree() -> Result<(), MerkleError> {
     );
     assert_eq!(
         store.get_node(smt.root(), NodeIndex::make(SMT_MAX_DEPTH, 4)).unwrap(),
-        RpoDigest::default(),
+        Word::default(),
         "unmodified node 4 must be ZERO"
     );
 
@@ -362,7 +360,7 @@ fn test_sparse_merkle_tree() -> Result<(), MerkleError> {
 
     let result = store.get_path(smt.root(), NodeIndex::make(SMT_MAX_DEPTH, 4)).unwrap();
     assert_eq!(
-        RpoDigest::default(),
+        Word::default(),
         result.value,
         "Value for merkle path at index 4 must match leaf value"
     );
@@ -511,7 +509,7 @@ fn wont_open_to_different_depth_root() {
     // Compute the root for a different depth. We cherry-pick this specific depth to prevent a
     // regression to a bug in the past that allowed the user to fetch a node at a depth lower than
     // the inserted path of a Merkle tree.
-    let mut root = Rpo256::merge(&[a.into(), b.into()]);
+    let mut root = Rpo256::merge(&[a, b]);
     for depth in (1..=63).rev() {
         root = Rpo256::merge(&[root, empty[depth]]);
     }
@@ -537,10 +535,10 @@ fn store_path_opens_from_leaf() {
     let g = [Felt::from_int(7); 4];
     let h = [Felt::from_int(8); 4];
 
-    let i = Rpo256::merge(&[a.into(), b.into()]);
-    let j = Rpo256::merge(&[c.into(), d.into()]);
-    let k = Rpo256::merge(&[e.into(), f.into()]);
-    let l = Rpo256::merge(&[g.into(), h.into()]);
+    let i = Rpo256::merge(&[a, b]);
+    let j = Rpo256::merge(&[c, d]);
+    let k = Rpo256::merge(&[e, f]);
+    let l = Rpo256::merge(&[g, h]);
 
     let m = Rpo256::merge(&[i, j]);
     let n = Rpo256::merge(&[k, l]);
@@ -551,7 +549,7 @@ fn store_path_opens_from_leaf() {
     let store = MerkleStore::from(&mtree);
     let path = store.get_path(root, NodeIndex::make(3, 1)).unwrap().path;
 
-    let expected = MerklePath::new([a.into(), j, n].to_vec());
+    let expected = MerklePath::new([a, j, n].to_vec());
     assert_eq!(path, expected);
 }
 
@@ -628,7 +626,7 @@ fn node_path_should_be_truncated_by_midtier_insert() {
     let key = 0b11010010_11001100_11001100_11001100_11001100_11001100_11001100_11001100_u64;
 
     let mut store = MerkleStore::new();
-    let root: RpoDigest = EmptySubtreeRoots::empty_hashes(64)[0];
+    let root: Word = EmptySubtreeRoots::empty_hashes(64)[0];
 
     // insert first node - works as expected
     let depth = 64;
@@ -667,7 +665,7 @@ fn node_path_should_be_truncated_by_midtier_insert() {
 #[test]
 fn get_leaf_depth_works_depth_64() {
     let mut store = MerkleStore::new();
-    let mut root: RpoDigest = EmptySubtreeRoots::empty_hashes(64)[0];
+    let mut root: Word = EmptySubtreeRoots::empty_hashes(64)[0];
     let key = u64::MAX;
 
     // this will create a rainbow tree and test all opening to depth 64
@@ -690,7 +688,7 @@ fn get_leaf_depth_works_depth_64() {
 #[test]
 fn get_leaf_depth_works_with_incremental_depth() {
     let mut store = MerkleStore::new();
-    let mut root: RpoDigest = EmptySubtreeRoots::empty_hashes(64)[0];
+    let mut root: Word = EmptySubtreeRoots::empty_hashes(64)[0];
 
     // insert some path to the left of the root and assert it
     let key = 0b01001011_10110110_00001101_01110100_00111011_10101101_00000100_01000001_u64;
@@ -731,7 +729,7 @@ fn get_leaf_depth_works_with_incremental_depth() {
 #[test]
 fn get_leaf_depth_works_with_depth_8() {
     let mut store = MerkleStore::new();
-    let mut root: RpoDigest = EmptySubtreeRoots::empty_hashes(8)[0];
+    let mut root: Word = EmptySubtreeRoots::empty_hashes(8)[0];
 
     // insert some random, 8 depth keys. `a` diverges from the first bit
     let a = 0b01101001_u64;
@@ -778,12 +776,12 @@ fn get_leaf_depth_works_with_depth_8() {
 fn find_lone_leaf() {
     let mut store = MerkleStore::new();
     let empty = EmptySubtreeRoots::empty_hashes(64);
-    let mut root: RpoDigest = empty[0];
+    let mut root: Word = empty[0];
 
     // insert a single leaf into the store at depth 64
     let key_a = 0b01010101_10101010_00001111_01110100_00111011_10101101_00000100_01000001_u64;
     let idx_a = NodeIndex::make(64, key_a);
-    let val_a = RpoDigest::from([ONE, ONE, ONE, ONE]);
+    let val_a = Word::from([ONE, ONE, ONE, ONE]);
     root = store.set_node(root, idx_a, val_a).unwrap().root;
 
     // for every ancestor of A, A should be a long leaf
@@ -798,7 +796,7 @@ fn find_lone_leaf() {
     // insert another leaf into the store such that it has the same 8 bit prefix as A
     let key_b = 0b01010101_01111010_00001111_01110100_00111011_10101101_00000100_01000001_u64;
     let idx_b = NodeIndex::make(64, key_b);
-    let val_b = RpoDigest::from([ONE, ONE, ONE, ZERO]);
+    let val_b = Word::from([ONE, ONE, ONE, ZERO]);
     root = store.set_node(root, idx_b, val_b).unwrap().root;
 
     // for any node which is common between A and B, find_lone_leaf() should return None as the
@@ -882,7 +880,7 @@ fn check_mstore_subtree(store: &MerkleStore, subtree: &MerkleTree) {
     for (i, value) in subtree.leaves() {
         let index = NodeIndex::new(subtree.depth(), i).unwrap();
         let path1 = store.get_path(subtree.root(), index).unwrap();
-        assert_eq!(*path1.value, *value);
+        assert_eq!(path1.value, *value);
 
         let path2 = subtree.get_path(index).unwrap();
         assert_eq!(path1.path, path2);

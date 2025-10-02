@@ -94,7 +94,7 @@ impl FeltRng for RpoRandomCoin {
         for o in output.iter_mut() {
             *o = self.draw_basefield();
         }
-        output
+        Word::new(output)
     }
 }
 
@@ -158,14 +158,14 @@ impl Deserializable for RpoRandomCoin {
 #[cfg(test)]
 mod tests {
     use super::{Deserializable, FeltRng, RpoRandomCoin, Serializable, ZERO};
-    use crate::ONE;
+    use crate::{ONE, Word};
 
     #[test]
     fn test_feltrng_felt() {
-        let mut rpocoin = RpoRandomCoin::new([ZERO; 4]);
+        let mut rpocoin = RpoRandomCoin::new([ZERO; 4].into());
         let output = rpocoin.draw_element();
 
-        let mut rpocoin = RpoRandomCoin::new([ZERO; 4]);
+        let mut rpocoin = RpoRandomCoin::new([ZERO; 4].into());
         let expected = rpocoin.draw_basefield();
 
         assert_eq!(output, expected);
@@ -173,14 +173,15 @@ mod tests {
 
     #[test]
     fn test_feltrng_word() {
-        let mut rpocoin = RpoRandomCoin::new([ZERO; 4]);
+        let mut rpocoin = RpoRandomCoin::new([ZERO; 4].into());
         let output = rpocoin.draw_word();
 
-        let mut rpocoin = RpoRandomCoin::new([ZERO; 4]);
+        let mut rpocoin = RpoRandomCoin::new([ZERO; 4].into());
         let mut expected = [ZERO; 4];
         for o in expected.iter_mut() {
             *o = rpocoin.draw_basefield();
         }
+        let expected = Word::new(expected);
 
         assert_eq!(output, expected);
     }

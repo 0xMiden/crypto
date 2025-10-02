@@ -1,16 +1,20 @@
 use alloc::vec::Vec;
 
+use assert_matches::assert_matches;
 use p3_field::PrimeCharacteristicRing;
 
-use super::{EMPTY_WORD, Felt, LeafIndex, NodeIndex, Rpo256, RpoDigest, SMT_DEPTH, Smt, SmtLeaf};
+use super::{
+    EMPTY_WORD, Felt, LeafIndex, NodeIndex, Rpo256, RpoDigest, SMT_DEPTH, Smt, SmtLeaf, Word,
+};
 use crate::{
-    ONE, WORD_SIZE, Word,
+    ONE, WORD_SIZE,
     merkle::{
-        EmptySubtreeRoots, MerkleStore, MutationSet,
-        smt::{NodeMutation, SparseMerkleTree, UnorderedMap},
+        EmptySubtreeRoots, MerkleStore, MutationSet, SmtLeafError,
+        smt::{Map, NodeMutation, SparseMerkleTree, full::MAX_LEAF_ENTRIES},
     },
     utils::{Deserializable, Serializable},
 };
+
 // SMT
 // --------------------------------------------------------------------------------------------
 
@@ -23,22 +27,22 @@ fn test_smt_insert_at_same_key() {
 
     assert_eq!(smt.root(), *EmptySubtreeRoots::entry(SMT_DEPTH, 0));
 
-    let key_1: RpoDigest = {
+    let key_1: Word = {
         let raw = 0b_01101001_01101100_00011111_11111111_10010110_10010011_11100000_00000000_u64;
 
         RpoDigest::from([ONE, ONE, ONE, Felt::from_u64(raw)])
     };
     let key_1_index: NodeIndex = LeafIndex::<SMT_DEPTH>::from(key_1).into();
 
-    let value_1 = [ONE; WORD_SIZE];
-    let value_2 = [ONE + ONE; WORD_SIZE];
+    let value_1 = Word::new([ONE; WORD_SIZE]);
+    let value_2 = Word::new([ONE + ONE; WORD_SIZE]);
 
     // Insert value 1 and ensure root is as expected
     {
         let leaf_node = build_empty_or_single_leaf_node(key_1, value_1);
         let tree_root = store.set_node(smt.root(), key_1_index, leaf_node).unwrap().root;
 
-        let old_value_1 = smt.insert(key_1, value_1);
+        let old_value_1 = smt.insert(key_1, value_1).unwrap();
         assert_eq!(old_value_1, EMPTY_WORD);
 
         assert_eq!(smt.root(), tree_root);
@@ -49,7 +53,7 @@ fn test_smt_insert_at_same_key() {
         let leaf_node = build_empty_or_single_leaf_node(key_1, value_2);
         let tree_root = store.set_node(smt.root(), key_1_index, leaf_node).unwrap().root;
 
-        let old_value_2 = smt.insert(key_1, value_2);
+        let old_value_2 = smt.insert(key_1, value_2).unwrap();
         assert_eq!(old_value_2, value_1);
 
         assert_eq!(smt.root(), tree_root);
@@ -71,7 +75,7 @@ fn test_smt_insert_at_same_key_2() {
     ]);
     let key_already_present_index: NodeIndex =
         LeafIndex::<SMT_DEPTH>::from(key_already_present).into();
-    let value_already_present = [ONE + ONE + ONE; WORD_SIZE];
+    let value_already_present = Word::new([ONE + ONE + ONE; WORD_SIZE]);
 
     let mut smt =
         Smt::with_entries(core::iter::once((key_already_present, value_already_present))).unwrap();
@@ -90,8 +94,8 @@ fn test_smt_insert_at_same_key_2() {
 
     assert_eq!(key_1_index, key_already_present_index);
 
-    let value_1 = [ONE; WORD_SIZE];
-    let value_2 = [ONE + ONE; WORD_SIZE];
+    let value_1 = Word::new([ONE; WORD_SIZE]);
+    let value_2 = Word::new([ONE + ONE; WORD_SIZE]);
 
     // Insert value 1 and ensure root is as expected
     {
@@ -102,7 +106,7 @@ fn test_smt_insert_at_same_key_2() {
         ]);
         let tree_root = store.set_node(smt.root(), key_1_index, leaf_node).unwrap().root;
 
-        let old_value_1 = smt.insert(key_1, value_1);
+        let old_value_1 = smt.insert(key_1, value_1).unwrap();
         assert_eq!(old_value_1, EMPTY_WORD);
 
         assert_eq!(smt.root(), tree_root);
@@ -116,7 +120,7 @@ fn test_smt_insert_at_same_key_2() {
         ]);
         let tree_root = store.set_node(smt.root(), key_1_index, leaf_node).unwrap().root;
 
-        let old_value_2 = smt.insert(key_1, value_2);
+        let old_value_2 = smt.insert(key_1, value_2).unwrap();
         assert_eq!(old_value_2, value_1);
 
         assert_eq!(smt.root(), tree_root);
@@ -130,7 +134,7 @@ fn test_smt_insert_and_remove_multiple_values() {
     fn insert_values_and_assert_path(
         smt: &mut Smt,
         store: &mut MerkleStore,
-        key_values: &[(RpoDigest, Word)],
+        key_values: &[(Word, Word)],
     ) {
         for &(key, value) in key_values {
             let key_index: NodeIndex = LeafIndex::<SMT_DEPTH>::from(key).into();
@@ -138,7 +142,7 @@ fn test_smt_insert_and_remove_multiple_values() {
             let leaf_node = build_empty_or_single_leaf_node(key, value);
             let tree_root = store.set_node(smt.root(), key_index, leaf_node).unwrap().root;
 
-            let _ = smt.insert(key, value);
+            smt.insert(key, value).unwrap();
 
             assert_eq!(smt.root(), tree_root);
 
@@ -151,27 +155,27 @@ fn test_smt_insert_and_remove_multiple_values() {
 
     assert_eq!(smt.root(), *EmptySubtreeRoots::entry(SMT_DEPTH, 0));
 
-    let key_1: RpoDigest = {
+    let key_1: Word = {
         let raw = 0b_01101001_01101100_00011111_11111111_10010110_10010011_11100000_00000000_u64;
 
         RpoDigest::from([ONE, ONE, ONE, Felt::from_u64(raw)])
     };
 
-    let key_2: RpoDigest = {
+    let key_2: Word = {
         let raw = 0b_11111111_11111111_11111111_11111111_11111111_11111111_11111111_11111111_u64;
 
         RpoDigest::from([ONE, ONE, ONE, Felt::from_u64(raw)])
     };
 
-    let key_3: RpoDigest = {
+    let key_3: Word = {
         let raw = 0b_00000000_00000000_00000000_00000000_00000000_00000000_00000000_00000000_u64;
 
         RpoDigest::from([ONE, ONE, ONE, Felt::from_u64(raw)])
     };
 
-    let value_1 = [ONE; WORD_SIZE];
-    let value_2 = [ONE + ONE; WORD_SIZE];
-    let value_3 = [ONE + ONE + ONE; WORD_SIZE];
+    let value_1 = Word::new([ONE; WORD_SIZE]);
+    let value_2 = Word::new([ONE + ONE; WORD_SIZE]);
+    let value_3 = Word::new([ONE + ONE + ONE; WORD_SIZE]);
 
     // Insert values in the tree
     let key_values = [(key_1, value_1), (key_2, value_2), (key_3, value_3)];
@@ -187,6 +191,39 @@ fn test_smt_insert_and_remove_multiple_values() {
     // an empty tree should have no leaves or inner nodes
     assert!(smt.leaves.is_empty());
     assert!(smt.inner_nodes.is_empty());
+}
+
+/// Verify that the `insert_inner_node` doesn't store empty subtrees.
+#[test]
+fn test_smt_dont_store_empty_subtrees() {
+    use crate::merkle::smt::InnerNode;
+
+    let mut smt = Smt::default();
+
+    let node_index = NodeIndex::new(10, 42).unwrap();
+    let depth = node_index.depth();
+    let empty_subtree_node = EmptySubtreeRoots::get_inner_node(SMT_DEPTH, depth);
+
+    // Empty subtrees are not stored
+    assert!(!smt.inner_nodes.contains_key(&node_index));
+    let old_node = smt.insert_inner_node(node_index, empty_subtree_node.clone());
+    assert_eq!(old_node, None);
+    assert!(!smt.inner_nodes.contains_key(&node_index));
+
+    // Insert a non-empty node, then insert the empty subtree node again. This should remove the
+    // inner node.
+    let non_empty_node = InnerNode {
+        left: Word::new([ONE; 4]),
+        right: Word::new([ONE + ONE; 4]),
+    };
+    smt.insert_inner_node(node_index, non_empty_node.clone());
+    let old_node = smt.insert_inner_node(node_index, empty_subtree_node.clone());
+    assert_eq!(old_node, Some(non_empty_node));
+    assert!(!smt.inner_nodes.contains_key(&node_index));
+
+    // Verify that get_inner_node returns the correct empty subtree node
+    let retrieved_node = smt.get_inner_node(node_index);
+    assert_eq!(retrieved_node, empty_subtree_node);
 }
 
 /// This tests that inserting the empty value does indeed remove the key-value contained at the
@@ -218,7 +255,7 @@ fn test_smt_removal() {
 
     // insert key-value 1
     {
-        let old_value_1 = smt.insert(key_1, value_1);
+        let old_value_1 = smt.insert(key_1, value_1).unwrap();
         assert_eq!(old_value_1, EMPTY_WORD);
 
         assert_eq!(smt.get_leaf(&key_1), SmtLeaf::Single((key_1, value_1)));
@@ -226,7 +263,7 @@ fn test_smt_removal() {
 
     // insert key-value 2
     {
-        let old_value_2 = smt.insert(key_2, value_2);
+        let old_value_2 = smt.insert(key_2, value_2).unwrap();
         assert_eq!(old_value_2, EMPTY_WORD);
 
         assert_eq!(
@@ -237,7 +274,7 @@ fn test_smt_removal() {
 
     // insert key-value 3
     {
-        let old_value_3 = smt.insert(key_3, value_3);
+        let old_value_3 = smt.insert(key_3, value_3).unwrap();
         assert_eq!(old_value_3, EMPTY_WORD);
 
         assert_eq!(
@@ -248,7 +285,7 @@ fn test_smt_removal() {
 
     // remove key 3
     {
-        let old_value_3 = smt.insert(key_3, EMPTY_WORD);
+        let old_value_3 = smt.insert(key_3, EMPTY_WORD).unwrap();
         assert_eq!(old_value_3, value_3);
 
         assert_eq!(
@@ -259,7 +296,7 @@ fn test_smt_removal() {
 
     // remove key 2
     {
-        let old_value_2 = smt.insert(key_2, EMPTY_WORD);
+        let old_value_2 = smt.insert(key_2, EMPTY_WORD).unwrap();
         assert_eq!(old_value_2, value_2);
 
         assert_eq!(smt.get_leaf(&key_2), SmtLeaf::Single((key_1, value_1)));
@@ -267,7 +304,7 @@ fn test_smt_removal() {
 
     // remove key 1
     {
-        let old_value_1 = smt.insert(key_1, EMPTY_WORD);
+        let old_value_1 = smt.insert(key_1, EMPTY_WORD).unwrap();
         assert_eq!(old_value_1, value_1);
 
         assert_eq!(smt.get_leaf(&key_1), SmtLeaf::new_empty(key_1.into()));
@@ -347,10 +384,11 @@ fn test_prospective_hash() {
     // remove key 3
     {
         let old_leaf = smt.get_leaf(&key_3);
-        let old_value_3 = smt.insert(key_3, EMPTY_WORD);
+        let old_value_3 = smt.insert(key_3, EMPTY_WORD).unwrap();
         assert_eq!(old_value_3, value_3);
-        let prospective_leaf =
-            smt.construct_prospective_leaf(smt.get_leaf(&key_3), &key_3, &old_value_3);
+        let prospective_leaf = smt
+            .construct_prospective_leaf(smt.get_leaf(&key_3), &key_3, &old_value_3)
+            .unwrap();
 
         assert_eq!(
             old_leaf.hash(),
@@ -364,10 +402,11 @@ fn test_prospective_hash() {
     // remove key 2
     {
         let old_leaf = smt.get_leaf(&key_2);
-        let old_value_2 = smt.insert(key_2, EMPTY_WORD);
+        let old_value_2 = smt.insert(key_2, EMPTY_WORD).unwrap();
         assert_eq!(old_value_2, value_2);
-        let prospective_leaf =
-            smt.construct_prospective_leaf(smt.get_leaf(&key_2), &key_2, &old_value_2);
+        let prospective_leaf = smt
+            .construct_prospective_leaf(smt.get_leaf(&key_2), &key_2, &old_value_2)
+            .unwrap();
 
         assert_eq!(
             old_leaf.hash(),
@@ -381,10 +420,11 @@ fn test_prospective_hash() {
     // remove key 1
     {
         let old_leaf = smt.get_leaf(&key_1);
-        let old_value_1 = smt.insert(key_1, EMPTY_WORD);
+        let old_value_1 = smt.insert(key_1, EMPTY_WORD).unwrap();
         assert_eq!(old_value_1, value_1);
-        let prospective_leaf =
-            smt.construct_prospective_leaf(smt.get_leaf(&key_1), &key_1, &old_value_1);
+        let prospective_leaf = smt
+            .construct_prospective_leaf(smt.get_leaf(&key_1), &key_1, &old_value_1)
+            .unwrap();
         assert_eq!(
             old_leaf.hash(),
             prospective_leaf.hash(),
@@ -442,7 +482,7 @@ fn test_prospective_insertion() {
 
     let mut smt = Smt::default();
 
-    let mutations = smt.compute_mutations(vec![(key_1, value_1)]);
+    let mutations = smt.compute_mutations(vec![(key_1, value_1)]).unwrap();
     assert_eq!(mutations.root(), root_1, "prospective root 1 did not match actual root 1");
     let revert = apply_mutations(&mut smt, mutations);
     assert_eq!(smt.root(), root_1, "mutations before and after apply did not match");
@@ -450,7 +490,7 @@ fn test_prospective_insertion() {
     assert_eq!(revert.root(), root_empty, "reverse mutations new root did not match");
     assert_eq!(
         revert.new_pairs,
-        UnorderedMap::from_iter([(key_1, EMPTY_WORD)]),
+        Map::from_iter([(key_1, EMPTY_WORD)]),
         "reverse mutations pairs did not match"
     );
     assert_eq!(
@@ -459,10 +499,11 @@ fn test_prospective_insertion() {
         "reverse mutations inner nodes did not match"
     );
 
-    let mutations = smt.compute_mutations(vec![(key_2, value_2)]);
+    let mutations = smt.compute_mutations(vec![(key_2, value_2)]).unwrap();
     assert_eq!(mutations.root(), root_2, "prospective root 2 did not match actual root 2");
-    let mutations =
-        smt.compute_mutations(vec![(key_3, EMPTY_WORD), (key_2, value_2), (key_3, value_3)]);
+    let mutations = smt
+        .compute_mutations(vec![(key_3, EMPTY_WORD), (key_2, value_2), (key_3, value_3)])
+        .unwrap();
     assert_eq!(mutations.root(), root_3, "mutations before and after apply did not match");
     let old_root = smt.root();
     let revert = apply_mutations(&mut smt, mutations);
@@ -470,12 +511,12 @@ fn test_prospective_insertion() {
     assert_eq!(revert.root(), old_root, "reverse mutations new root did not match");
     assert_eq!(
         revert.new_pairs,
-        UnorderedMap::from_iter([(key_2, EMPTY_WORD), (key_3, EMPTY_WORD)]),
+        Map::from_iter([(key_2, EMPTY_WORD), (key_3, EMPTY_WORD)]),
         "reverse mutations pairs did not match"
     );
 
     // Edge case: multiple values at the same key, where a later pair restores the original value.
-    let mutations = smt.compute_mutations(vec![(key_3, EMPTY_WORD), (key_3, value_3)]);
+    let mutations = smt.compute_mutations(vec![(key_3, EMPTY_WORD), (key_3, value_3)]).unwrap();
     assert_eq!(mutations.root(), root_3);
     let old_root = smt.root();
     let revert = apply_mutations(&mut smt, mutations);
@@ -484,14 +525,14 @@ fn test_prospective_insertion() {
     assert_eq!(revert.root(), old_root, "reverse mutations new root did not match");
     assert_eq!(
         revert.new_pairs,
-        UnorderedMap::from_iter([(key_3, value_3)]),
+        Map::from_iter([(key_3, value_3)]),
         "reverse mutations pairs did not match"
     );
 
     // Test batch updates, and that the order doesn't matter.
     let pairs =
         vec![(key_3, value_2), (key_2, EMPTY_WORD), (key_1, EMPTY_WORD), (key_3, EMPTY_WORD)];
-    let mutations = smt.compute_mutations(pairs);
+    let mutations = smt.compute_mutations(pairs).unwrap();
     assert_eq!(
         mutations.root(),
         root_empty,
@@ -504,12 +545,12 @@ fn test_prospective_insertion() {
     assert_eq!(revert.root(), old_root, "reverse mutations new root did not match");
     assert_eq!(
         revert.new_pairs,
-        UnorderedMap::from_iter([(key_1, value_1), (key_2, value_2), (key_3, value_3)]),
+        Map::from_iter([(key_1, value_1), (key_2, value_2), (key_3, value_3)]),
         "reverse mutations pairs did not match"
     );
 
     let pairs = vec![(key_3, value_3), (key_1, value_1), (key_2, value_2)];
-    let mutations = smt.compute_mutations(pairs);
+    let mutations = smt.compute_mutations(pairs).unwrap();
     assert_eq!(mutations.root(), root_3);
     smt.apply_mutations(mutations).unwrap();
     assert_eq!(smt.root(), root_3);
@@ -517,12 +558,12 @@ fn test_prospective_insertion() {
 
 #[test]
 fn test_mutations_no_mutations() {
-    let key = RpoDigest::from([ONE, ONE, ONE, ONE]);
-    let value = [ONE; WORD_SIZE];
+    let key = Word::from([ONE, ONE, ONE, ONE]);
+    let value = Word::new([ONE; WORD_SIZE]);
     let entries = [(key, value)];
 
     let tree = Smt::with_entries(entries).unwrap();
-    let mutations = tree.compute_mutations(entries);
+    let mutations = tree.compute_mutations(entries).unwrap();
 
     assert_eq!(mutations.root(), mutations.old_root(), "Root should not change");
     assert!(mutations.node_mutations().is_empty(), "Node mutations should be empty");
@@ -554,8 +595,9 @@ fn test_mutations_revert() {
     let _ = smt.insert(key_1, value_1);
     let _ = smt.insert(key_2, value_2);
 
-    let mutations =
-        smt.compute_mutations(vec![(key_1, EMPTY_WORD), (key_2, value_1), (key_3, value_3)]);
+    let mutations = smt
+        .compute_mutations(vec![(key_1, EMPTY_WORD), (key_2, value_1), (key_3, value_3)])
+        .unwrap();
 
     let original = smt.clone();
 
@@ -593,20 +635,19 @@ fn test_mutation_set_serialization() {
     let _ = smt.insert(key_1, value_1);
     let _ = smt.insert(key_2, value_2);
 
-    let mutations =
-        smt.compute_mutations(vec![(key_1, EMPTY_WORD), (key_2, value_1), (key_3, value_3)]);
+    let mutations = smt
+        .compute_mutations(vec![(key_1, EMPTY_WORD), (key_2, value_1), (key_3, value_3)])
+        .unwrap();
 
     let serialized = mutations.to_bytes();
-    let deserialized =
-        MutationSet::<SMT_DEPTH, RpoDigest, Word>::read_from_bytes(&serialized).unwrap();
+    let deserialized = MutationSet::<SMT_DEPTH, Word, Word>::read_from_bytes(&serialized).unwrap();
 
     assert_eq!(deserialized, mutations, "deserialized mutations did not match original");
 
     let revert = smt.apply_mutations_with_reversion(mutations).unwrap();
 
     let serialized = revert.to_bytes();
-    let deserialized =
-        MutationSet::<SMT_DEPTH, RpoDigest, Word>::read_from_bytes(&serialized).unwrap();
+    let deserialized = MutationSet::<SMT_DEPTH, Word, Word>::read_from_bytes(&serialized).unwrap();
 
     assert_eq!(deserialized, revert, "deserialized mutations did not match original");
 }
@@ -637,15 +678,15 @@ fn test_smt_path_to_keys_in_same_leaf_are_equal() {
 fn test_empty_leaf_hash() {
     let smt = Smt::default();
 
-    let leaf = smt.get_leaf(&RpoDigest::default());
-    assert_eq!(leaf.hash(), EMPTY_WORD.into());
+    let leaf = smt.get_leaf(&Word::default());
+    assert_eq!(leaf.hash(), EMPTY_WORD);
 }
 
 /// Tests that `get_value()` works as expected
 #[test]
 fn test_smt_get_value() {
-    let key_1: RpoDigest = RpoDigest::from([ONE, ONE, ONE, ONE]);
-    let key_2: RpoDigest = RpoDigest::from([2_u32, 2_u32, 2_u32, 2_u32]);
+    let key_1: Word = Word::from([ONE, ONE, ONE, ONE]);
+    let key_2: Word = Word::from([2_u32, 2_u32, 2_u32, 2_u32]);
 
     let value_1 = [ONE; WORD_SIZE];
     let value_2 = [Felt::from_u64(2); WORD_SIZE];
@@ -659,7 +700,7 @@ fn test_smt_get_value() {
     assert_eq!(value_2, returned_value_2);
 
     // Check that a key with no inserted value returns the empty word
-    let key_no_value = RpoDigest::from([42_u32, 42_u32, 42_u32, 42_u32]);
+    let key_no_value = Word::from([42_u32, 42_u32, 42_u32, 42_u32]);
 
     assert_eq!(EMPTY_WORD, smt.get_value(&key_no_value));
 }
@@ -667,8 +708,8 @@ fn test_smt_get_value() {
 /// Tests that `entries()` works as expected
 #[test]
 fn test_smt_entries() {
-    let key_1 = RpoDigest::from([ONE, ONE, ONE, ONE]);
-    let key_2 = RpoDigest::from([2_u32, 2_u32, 2_u32, 2_u32]);
+    let key_1 = Word::from([ONE, ONE, ONE, ONE]);
+    let key_2 = Word::from([2_u32, 2_u32, 2_u32, 2_u32]);
 
     let value_1 = [ONE; WORD_SIZE];
     let value_2 = [Felt::from_u64(2); WORD_SIZE];
@@ -751,10 +792,38 @@ fn test_multiple_smt_leaf_serialization_success() {
     assert_eq!(multiple_leaf, deserialized);
 }
 
+/// Test that creating a multiple leaf with exactly MAX_LEAF_ENTRIES works
+/// and that constructing a leaf with MAX_LEAF_ENTRIES + 1 returns an error.
+#[test]
+fn test_max_leaf_entries_validation() {
+    let mut entries = Vec::new();
+
+    for i in 0..MAX_LEAF_ENTRIES {
+        let key = Word::new([ONE, ONE, Felt::new(i as u64), ONE]);
+        let value = Word::new([ONE, ONE, ONE, Felt::new(i as u64)]);
+        entries.push((key, value));
+    }
+
+    let result = SmtLeaf::new_multiple(entries.clone());
+    assert!(result.is_ok(), "Should allow exactly MAX_LEAF_ENTRIES entries");
+
+    // Test that creating a multiple leaf with more than MAX_LEAF_ENTRIES fails
+    let key = Word::new([ONE, ONE, Felt::new(MAX_LEAF_ENTRIES as u64), ONE]);
+    let value = Word::new([ONE, ONE, ONE, Felt::new(MAX_LEAF_ENTRIES as u64)]);
+    entries.push((key, value));
+
+    let error = SmtLeaf::new_multiple(entries).unwrap_err();
+    assert_matches!(
+        error,
+        SmtLeafError::TooManyLeafEntries { .. },
+        "should reject more than MAX_LEAF_ENTRIES entries"
+    );
+}
+
 // HELPERS
 // --------------------------------------------------------------------------------------------
 
-fn build_empty_or_single_leaf_node(key: RpoDigest, value: Word) -> RpoDigest {
+fn build_empty_or_single_leaf_node(key: Word, value: Word) -> Word {
     if value == EMPTY_WORD {
         SmtLeaf::new_empty(key.into()).hash()
     } else {
@@ -762,7 +831,7 @@ fn build_empty_or_single_leaf_node(key: RpoDigest, value: Word) -> RpoDigest {
     }
 }
 
-fn build_multiple_leaf_node(kv_pairs: &[(RpoDigest, Word)]) -> RpoDigest {
+fn build_multiple_leaf_node(kv_pairs: &[(Word, Word)]) -> Word {
     let elements: Vec<Felt> = kv_pairs
         .iter()
         .flat_map(|(key, value)| {
@@ -780,8 +849,8 @@ fn build_multiple_leaf_node(kv_pairs: &[(RpoDigest, Word)]) -> RpoDigest {
 /// returning mutation set for reversion.
 fn apply_mutations(
     smt: &mut Smt,
-    mutation_set: MutationSet<SMT_DEPTH, RpoDigest, Word>,
-) -> MutationSet<SMT_DEPTH, RpoDigest, Word> {
+    mutation_set: MutationSet<SMT_DEPTH, Word, Word>,
+) -> MutationSet<SMT_DEPTH, Word, Word> {
     let mut smt2 = smt.clone();
 
     let reversion = smt.apply_mutations_with_reversion(mutation_set.clone()).unwrap();

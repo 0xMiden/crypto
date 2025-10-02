@@ -1,6 +1,6 @@
-mod bit;
 mod delta;
 mod error;
+mod forest;
 mod full;
 mod inorder;
 mod partial;
@@ -14,6 +14,7 @@ mod tests;
 // ================================================================================================
 pub use delta::MmrDelta;
 pub use error::MmrError;
+pub use forest::Forest;
 pub use full::Mmr;
 pub use inorder::InOrderIndex;
 pub use partial::PartialMmr;

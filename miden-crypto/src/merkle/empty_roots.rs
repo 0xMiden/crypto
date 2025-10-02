@@ -1593,7 +1593,7 @@ fn all_depths_opens_to_zero() {
         assert_eq!(depth as usize + 1, subtree.len());
 
         // assert the opening is zero
-        let initial = RpoDigest::new(EMPTY_WORD);
+        let initial = EMPTY_WORD;
         assert_eq!(initial, subtree.remove(0));
 
         // compute every node of the path manually and compare with the output
@@ -1611,7 +1611,7 @@ fn all_depths_opens_to_zero() {
 fn test_entry() {
     // check the leaf is always the empty work
     for depth in 0..255 {
-        assert_eq!(EmptySubtreeRoots::entry(depth, depth), &RpoDigest::new(EMPTY_WORD));
+        assert_eq!(EmptySubtreeRoots::entry(depth, depth), &EMPTY_WORD);
     }
 
     // check the root matches the first element of empty_hashes

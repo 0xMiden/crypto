@@ -1,3 +1,5 @@
+//! Generic polynomial type and operations used in Falcon.
+
 use alloc::vec::Vec;
 use core::{
     default::Default,
@@ -14,8 +16,10 @@ use crate::{
     dsa::rpo_falcon512::{MODULUS, N},
 };
 
+/// Represents a polynomial with coefficients of type F.
 #[derive(Debug, Clone, Default)]
 pub struct Polynomial<F> {
+    /// Coefficients of the polynomial, ordered from lowest to highest degree.
     pub coefficients: Vec<F>,
 }
 
@@ -23,6 +27,7 @@ impl<F> Polynomial<F>
 where
     F: Clone,
 {
+    /// Creates a new polynomial from the provided coefficients.
     pub fn new(coefficients: Vec<F>) -> Self {
         Self { coefficients }
     }
@@ -31,6 +36,7 @@ where
 impl<F: Mul<Output = F> + Sub<Output = F> + AddAssign + Zero + Div<Output = F> + Clone + Inverse>
     Polynomial<F>
 {
+    /// Multiplies two polynomials coefficient-wise (Hadamard multiplication).
     pub fn hadamard_mul(&self, other: &Self) -> Self {
         Polynomial::new(
             self.coefficients
@@ -40,6 +46,7 @@ impl<F: Mul<Output = F> + Sub<Output = F> + AddAssign + Zero + Div<Output = F> +
                 .collect(),
         )
     }
+    /// Divides two polynomials coefficient-wise (Hadamard division).
     pub fn hadamard_div(&self, other: &Self) -> Self {
         let other_coefficients_inverse = F::batch_inverse_or_zero(&other.coefficients);
         Polynomial::new(
@@ -51,6 +58,7 @@ impl<F: Mul<Output = F> + Sub<Output = F> + AddAssign + Zero + Div<Output = F> +
         )
     }
 
+    /// Computes the coefficient-wise inverse (Hadamard inverse).
     pub fn hadamard_inv(&self) -> Self {
         let coefficients_inverse = F::batch_inverse_or_zero(&self.coefficients);
         Polynomial::new(coefficients_inverse)
@@ -58,6 +66,7 @@ impl<F: Mul<Output = F> + Sub<Output = F> + AddAssign + Zero + Div<Output = F> +
 }
 
 impl<F: Zero + PartialEq + Clone> Polynomial<F> {
+    /// Returns the degree of the polynomial.
     pub fn degree(&self) -> Option<usize> {
         if self.coefficients.is_empty() {
             return None;
@@ -73,6 +82,7 @@ impl<F: Zero + PartialEq + Clone> Polynomial<F> {
         Some(max_index)
     }
 
+    /// Returns the leading coefficient of the polynomial.
     pub fn lc(&self) -> F {
         match self.degree() {
             Some(non_negative_degree) => self.coefficients[non_negative_degree].clone(),
@@ -100,7 +110,7 @@ impl<
         let mut coefficients = vec![F::zero(); n];
         let mut sign = -F::one();
         for (i, c) in self.coefficients.iter().cloned().enumerate() {
-            if i % n == 0 {
+            if i.is_multiple_of(n) {
                 sign *= -F::one();
             }
             coefficients[i % n] += sign.clone() * c;
@@ -147,7 +157,13 @@ impl<
             self.coefficients
                 .iter()
                 .enumerate()
-                .map(|(i, c)| if i % 2 == 0 { c.clone() } else { c.clone().neg() })
+                .map(|(i, c)| {
+                    if i.is_multiple_of(2) {
+                        c.clone()
+                    } else {
+                        c.clone().neg()
+                    }
+                })
                 .collect(),
         )
     }
@@ -393,20 +409,24 @@ where
 }
 
 impl<F: Zero + Clone> Polynomial<F> {
+    /// Shifts the polynomial by the specified amount (adds leading zeros).
     pub fn shift(&self, shamt: usize) -> Self {
         Self {
             coefficients: [vec![F::zero(); shamt], self.coefficients.clone()].concat(),
         }
     }
 
+    /// Creates a constant polynomial with a single coefficient.
     pub fn constant(f: F) -> Self {
         Self { coefficients: vec![f] }
     }
 
+    /// Applies a function to each coefficient and returns a new polynomial.
     pub fn map<G: Clone, C: FnMut(&F) -> G>(&self, closure: C) -> Polynomial<G> {
         Polynomial::<G>::new(self.coefficients.iter().map(closure).collect())
     }
 
+    /// Folds the coefficients using the provided function and initial value.
     pub fn fold<G, C: FnMut(G, &F) -> G + Clone>(&self, mut initial_value: G, closure: C) -> G {
         for c in self.coefficients.iter() {
             initial_value = (closure.clone())(initial_value, c);
@@ -545,6 +565,7 @@ impl From<&Vec<i16>> for Polynomial<FalconFelt> {
 }
 
 impl Polynomial<FalconFelt> {
+    /// Computes the squared L2 norm of the polynomial.
     pub fn norm_squared(&self) -> u64 {
         self.coefficients
             .iter()

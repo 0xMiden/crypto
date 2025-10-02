@@ -6,11 +6,14 @@ extern crate alloc;
 #[cfg(feature = "std")]
 extern crate std;
 
+pub mod aead;
 pub mod dsa;
+pub mod ecdh;
 pub mod hash;
 pub mod merkle;
 pub mod rand;
 pub mod utils;
+pub mod word;
 
 // RE-EXPORTS
 // ================================================================================================
@@ -21,12 +24,24 @@ pub use p3_field::{
     batch_multiplicative_inverse, extension::BinomialExtensionField,
 };
 pub use p3_goldilocks::{Goldilocks as Felt, Poseidon2Goldilocks};
+pub use word::{Word, WordError};
 
 // TYPE ALIASES
 // ================================================================================================
 
-/// A group of four field elements in the Miden base field.
-pub type Word = [Felt; WORD_SIZE];
+/// An alias for a key-value map.
+///
+/// By default, this is an alias for the [`alloc::collections::BTreeMap`], however, when the
+/// `hashmaps` feature is enabled, this is an alias for the `hashbrown`'s `HashMap`.
+#[cfg(feature = "hashmaps")]
+pub type Map<K, V> = hashbrown::HashMap<K, V>;
+
+/// An alias for a key-value map.
+///
+/// By default, this is an alias for the [`alloc::collections::BTreeMap`], however, when the
+/// `hashmaps` feature is enabled, this is an alias for the `hashbrown`'s `HashMap`.
+#[cfg(not(feature = "hashmaps"))]
+pub type Map<K, V> = alloc::collections::BTreeMap<K, V>;
 
 // CONSTANTS
 // ================================================================================================
@@ -41,7 +56,27 @@ pub const ZERO: Felt = Felt::ZERO;
 pub const ONE: Felt = Felt::ONE;
 
 /// Array of field elements representing word of ZEROs in the Miden base field.
-pub const EMPTY_WORD: [Felt; 4] = [ZERO; WORD_SIZE];
+pub const EMPTY_WORD: Word = Word::new([ZERO; WORD_SIZE]);
+
+// TRAITS
+// ================================================================================================
+
+/// Defines how to compute a commitment to an object represented as a sequence of field elements.
+pub trait SequentialCommit {
+    /// A type of the commitment which must be derivable from [Word].
+    type Commitment: From<Word>;
+
+    /// Computes the commitment to the object.
+    ///
+    /// The default implementation of this function uses RPO256 hash function to hash the sequence
+    /// of elements returned from [Self::to_elements()].
+    fn to_commitment(&self) -> Self::Commitment {
+        hash::rpo::Rpo256::hash_elements(&self.to_elements()).into()
+    }
+
+    /// Returns a representation of the object as a sequence of fields elements.
+    fn to_elements(&self) -> alloc::vec::Vec<Felt>;
+}
 
 // TESTS
 // ================================================================================================
@@ -55,7 +90,7 @@ fn debug_assert_is_checked() {
     // downstream.
     //
     // for reference, check
-    // https://github.com/0xPolygonMiden/miden-vm/issues/433
+    // https://github.com/0xMiden/miden-vm/issues/433
     debug_assert!(false);
 }
 

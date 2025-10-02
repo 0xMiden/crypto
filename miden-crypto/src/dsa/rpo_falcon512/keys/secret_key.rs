@@ -9,14 +9,16 @@ use rand::Rng;
 use super::{
     super::{
         ByteReader, ByteWriter, Deserializable, DeserializationError, MODULUS, N, Nonce,
-        SIG_L2_BOUND, SIGMA, Serializable, ShortLatticeBasis, Signature, Word,
+        SIG_L2_BOUND, SIGMA, Serializable, ShortLatticeBasis, Signature,
         math::{FalconFelt, FastFft, LdlTree, Polynomial, ffldl, ffsampling, gram, normalize_tree},
         signature::SignaturePoly,
     },
-    PubKeyPoly, PublicKey,
+    PublicKey,
 };
-use crate::dsa::rpo_falcon512::{
-    SIG_NONCE_LEN, SK_LEN, hash_to_point::hash_to_point_rpo256, math::ntru_gen,
+use crate::{
+    Word,
+    dsa::rpo_falcon512::{LOG_N, SK_LEN, hash_to_point::hash_to_point_rpo256, math::ntru_gen},
+    hash::blake::Blake3_256,
 };
 
 // CONSTANTS
@@ -79,7 +81,7 @@ impl SecretKey {
     }
 
     /// Given a short basis [[g, -f], [G, -F]], computes the normalized LDL tree i.e., Falcon tree.
-    fn from_short_lattice_basis(basis: ShortLatticeBasis) -> SecretKey {
+    pub(crate) fn from_short_lattice_basis(basis: ShortLatticeBasis) -> SecretKey {
         // FFT each polynomial of the short basis.
         let basis_fft = to_complex_fft(&basis);
         // compute the Gram matrix.
@@ -101,7 +103,7 @@ impl SecretKey {
 
     /// Returns the public key corresponding to this secret key.
     pub fn public_key(&self) -> PublicKey {
-        self.compute_pub_key_poly().into()
+        self.compute_pub_key_poly()
     }
 
     /// Returns the LDL tree associated to this secret key.
@@ -113,19 +115,18 @@ impl SecretKey {
     // --------------------------------------------------------------------------------------------
 
     /// Signs a message with this secret key.
-    #[cfg(feature = "std")]
-    pub fn sign(&self, message: Word) -> Signature {
-        use rand::{SeedableRng, rngs::StdRng};
+    pub fn sign(&self, message: crate::Word) -> Signature {
+        use rand::SeedableRng;
+        use rand_chacha::ChaCha20Rng;
 
-        let mut rng = StdRng::from_os_rng();
+        let seed = self.generate_seed(&message);
+        let mut rng = ChaCha20Rng::from_seed(seed);
         self.sign_with_rng(message, &mut rng)
     }
 
     /// Signs a message with the secret key relying on the provided randomness generator.
     pub fn sign_with_rng<R: Rng>(&self, message: Word, rng: &mut R) -> Signature {
-        let mut nonce_bytes = [0u8; SIG_NONCE_LEN];
-        rng.fill_bytes(&mut nonce_bytes);
-        let nonce = Nonce::new(nonce_bytes);
+        let nonce = Nonce::deterministic();
 
         let h = self.compute_pub_key_poly();
         let c = hash_to_point_rpo256(message, &nonce);
@@ -134,11 +135,38 @@ impl SecretKey {
         Signature::new(nonce, h, s2)
     }
 
+    /// Signs a message with the secret key relying on the provided randomness generator.
+    ///
+    /// This is similar to [SecretKey::sign_with_rng()] and is used only for testing with
+    /// the main difference being that this method:
+    ///
+    /// 1. uses `SHAKE256` for the hash-to-point algorithm, and
+    /// 2. uses `ChaCha20` in `Self::sign_helper`.
+    ///
+    /// Hence, in contrast to `Self::sign_with_rng`, the current method uses different random
+    /// number generators for generating the nonce and in `Self::sign_helper`.
+    ///
+    /// These changes make the signature algorithm compliant with the reference implementation.
+    #[cfg(all(test, feature = "std"))]
+    pub fn sign_with_rng_testing<R: Rng>(&self, message: &[u8], rng: &mut R) -> Signature {
+        use crate::dsa::rpo_falcon512::{hash_to_point::hash_to_point_shake256, tests::ChaCha};
+
+        let nonce = Nonce::random(rng);
+
+        let h = self.compute_pub_key_poly();
+        let c = hash_to_point_shake256(message, &nonce);
+
+        let mut chacha_prng = ChaCha::new(rng);
+        let s2 = self.sign_helper(c, &mut chacha_prng);
+
+        Signature::new(nonce, h, s2)
+    }
+
     // HELPER METHODS
     // --------------------------------------------------------------------------------------------
 
     /// Derives the public key corresponding to this secret key using h = g /f [mod ϕ][mod p].
-    pub fn compute_pub_key_poly(&self) -> PubKeyPoly {
+    fn compute_pub_key_poly(&self) -> PublicKey {
         let g: Polynomial<FalconFelt> = self.secret_key[0].clone().into();
         let g_fft = g.fft();
         let minus_f: Polynomial<FalconFelt> = self.secret_key[1].clone().into();
@@ -199,6 +227,29 @@ impl SecretKey {
             }
         }
     }
+
+    /// Deterministically generates a seed for seeding the PRNG used in the trapdoor sampling
+    /// algorithm used during signature generation.
+    ///
+    /// This uses the argument described in [RFC 6979](https://datatracker.ietf.org/doc/html/rfc6979#section-3.5)
+    /// § 3.5 where the concatenation of the private key and the hashed message, i.e., sk || H(m),
+    /// is used in order to construct the initial seed of a PRNG. See also [1].
+    ///
+    ///
+    /// Note that we hash in also a `log_2(N)` where `N = 512` in order to domain separate between
+    /// different versions of the Falcon DSA, see [1] Section 3.4.1.
+    ///
+    /// [1]: https://github.com/algorand/falcon/blob/main/falcon-det.pdf
+    fn generate_seed(&self, message: &Word) -> [u8; 32] {
+        let mut buffer = Vec::with_capacity(1 + SK_LEN + Word::SERIALIZED_SIZE);
+        buffer.push(LOG_N);
+        buffer.extend_from_slice(&self.to_bytes());
+        buffer.extend_from_slice(&message.to_bytes());
+
+        let digest = Blake3_256::hash(&buffer);
+
+        digest.into()
+    }
 }
 
 // SERIALIZATION / DESERIALIZATION
@@ -251,11 +302,6 @@ impl Deserializable for SecretKey {
     fn read_from<R: ByteReader>(source: &mut R) -> Result<Self, DeserializationError> {
         let byte_vector: [u8; SK_LEN] = source.read_array()?;
 
-        // check length
-        if byte_vector.len() < 2 {
-            return  Err(DeserializationError::InvalidValue("Invalid encoding length: Failed to decode as length is different from the one expected".to_string()));
-        }
-
         // read fields
         let header = byte_vector[0];
 
@@ -273,10 +319,6 @@ impl Deserializable for SecretKey {
             return Err(DeserializationError::InvalidValue(
                 "Unsupported Falcon DSA variant".to_string(),
             ));
-        }
-
-        if byte_vector.len() != SK_LEN {
-            return Err(DeserializationError::InvalidValue("Invalid encoding length: Failed to decode as length is different from the one expected".to_string()));
         }
 
         let chunk_size_f = ((n * WIDTH_SMALL_POLY_COEFFICIENT) + 7) >> 3;

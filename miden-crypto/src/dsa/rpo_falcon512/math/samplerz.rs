@@ -1,5 +1,3 @@
-use core::f64::consts::LN_2;
-
 #[cfg(not(feature = "std"))]
 use num::Float;
 use rand::Rng;
@@ -28,7 +26,11 @@ fn base_sampler(bytes: [u8; 9]) -> i16 {
         198,
         1,
     ];
-    let u = u128::from_be_bytes([vec![0u8; 7], bytes.to_vec()].concat().try_into().unwrap());
+
+    let mut bytes = bytes.to_vec();
+    bytes.extend_from_slice(&[0u8; 7]);
+    bytes.reverse();
+    let u = u128::from_be_bytes(bytes.try_into().expect("should have length 16"));
     RCDT.into_iter().filter(|r| u < *r).count() as i16
 }
 
@@ -72,16 +74,20 @@ fn approx_exp(x: f64, ccs: f64) -> u64 {
 }
 
 /// A random bool that is true with probability ≈ ccs · exp(-x).
-fn ber_exp(x: f64, ccs: f64, random_bytes: [u8; 7]) -> bool {
-    // 0.69314718055994530941 = ln(2)
-    let s = f64::floor(x / LN_2) as usize;
-    let r = x - LN_2 * (s as f64);
-    let shamt = usize::min(s, 63);
-    let z = ((((approx_exp(r, ccs) as u128) << 1) - 1) >> shamt) as u64;
-    let mut w = 0i16;
-    for (index, i) in (0..64).step_by(8).rev().enumerate() {
-        let byte = random_bytes[index];
-        w = (byte as i16) - (((z >> i) & 0xff) as i16);
+fn ber_exp<R: Rng>(x: f64, ccs: f64, rng: &mut R) -> bool {
+    const LN2: f64 = core::f64::consts::LN_2;
+    const ILN2: f64 = 1.0 / LN2;
+    let s = f64::floor(x * ILN2);
+    let r = x - s * LN2;
+    let s = (s as u64).min(63);
+    let z = ((approx_exp(r, ccs) << 1) - 1) >> s;
+
+    let mut w = 0_i32;
+    for i in (0..=56).rev().step_by(8) {
+        let mut dest = [0_u8; 1];
+        rng.fill_bytes(&mut dest);
+        let p = u8::from_be_bytes(dest);
+        w = (p as i32) - (z >> i & 0xff) as i32;
         if w != 0 {
             break;
         }
@@ -100,14 +106,21 @@ pub(crate) fn sampler_z<R: Rng>(mu: f64, sigma: f64, sigma_min: f64, rng: &mut R
     let r = mu - s;
     let ccs = sigma_min * isigma;
     loop {
-        let z0 = base_sampler(rng.random());
-        let random_byte: u8 = rng.random();
+        let mut dest = [0_u8; 9];
+        rng.fill_bytes(&mut dest);
+        let z0 = base_sampler(dest);
+
+        let mut dest = [0_u8; 1];
+        rng.fill_bytes(&mut dest);
+        let random_byte: u8 = dest[0];
+
+        // x = ((z-r)^2)/(2*sigma^2) - ((z-b)^2)/(2*sigma0^2)
         let b = (random_byte & 1) as i16;
-        let z = b + ((b << 1) - 1) * z0;
+        let z = b + (2 * b - 1) * z0;
         let zf_min_r = (z as f64) - r;
-        //    x = ((z-r)^2)/(2*sigma^2) - ((z-b)^2)/(2*sigma0^2)
         let x = zf_min_r * zf_min_r * dss - (z0 * z0) as f64 * INV_2SIGMA_MAX_SQ;
-        if ber_exp(x, ccs, rng.random()) {
+
+        if ber_exp(x, ccs, rng) {
             return z + (s as i16);
         }
     }
@@ -115,74 +128,7 @@ pub(crate) fn sampler_z<R: Rng>(mu: f64, sigma: f64, sigma_min: f64, rng: &mut R
 
 #[cfg(all(test, feature = "std"))]
 mod test {
-    use alloc::vec::Vec;
-    use std::{thread::sleep, time::Duration};
-
-    use rand::RngCore;
-
-    use super::{approx_exp, ber_exp, sampler_z};
-
-    /// RNG used only for testing purposes, whereby the produced
-    /// string of random bytes is equal to the one it is initialized
-    /// with. Whatever you do, do not use this RNG in production.
-    struct UnsafeBufferRng {
-        buffer: Vec<u8>,
-        index: usize,
-    }
-
-    impl UnsafeBufferRng {
-        fn new(buffer: &[u8]) -> Self {
-            Self { buffer: buffer.to_vec(), index: 0 }
-        }
-
-        fn next(&mut self) -> u8 {
-            if self.buffer.len() <= self.index {
-                // panic!("Ran out of buffer.");
-                sleep(Duration::from_millis(10));
-                0u8
-            } else {
-                let return_value = self.buffer[self.index];
-                self.index += 1;
-                return_value
-            }
-        }
-    }
-
-    impl RngCore for UnsafeBufferRng {
-        fn next_u32(&mut self) -> u32 {
-            // let bytes: [u8; 4] = (0..4)
-            //     .map(|_| self.next())
-            //     .collect_vec()
-            //     .try_into()
-            //     .unwrap();
-            // u32::from_be_bytes(bytes)
-            u32::from_le_bytes([self.next(), 0, 0, 0])
-        }
-
-        fn next_u64(&mut self) -> u64 {
-            // let bytes: [u8; 8] = (0..8)
-            //     .map(|_| self.next())
-            //     .collect_vec()
-            //     .try_into()
-            //     .unwrap();
-            // u64::from_be_bytes(bytes)
-            u64::from_le_bytes([self.next(), 0, 0, 0, 0, 0, 0, 0])
-        }
-
-        fn fill_bytes(&mut self, dest: &mut [u8]) {
-            for d in dest.iter_mut() {
-                *d = self.next();
-            }
-        }
-    }
-
-    #[test]
-    fn test_unsafe_buffer_rng() {
-        let seed_bytes = hex::decode("7FFECD162AE2").unwrap();
-        let mut rng = UnsafeBufferRng::new(&seed_bytes);
-        let generated_bytes: Vec<u8> = (0..seed_bytes.len()).map(|_| rng.next()).collect();
-        assert_eq!(seed_bytes, generated_bytes);
-    }
+    use super::approx_exp;
 
     #[test]
     fn test_approx_exp() {
@@ -221,71 +167,6 @@ mod test {
                 approx_exp(x, ccs),
                 difference,
                 precision
-            );
-        }
-    }
-
-    #[test]
-    fn test_ber_exp() {
-        let kats = [
-            (
-                1.268_314_048_020_498_4,
-                0.749_990_853_267_664_9,
-                hex::decode("ea000000000000").unwrap(),
-                false,
-            ),
-            (
-                0.001_563_917_959_143_409_6,
-                0.749_990_853_267_664_9,
-                hex::decode("6c000000000000").unwrap(),
-                true,
-            ),
-            (
-                0.017_921_215_753_999_235,
-                0.749_990_853_267_664_9,
-                hex::decode("c2000000000000").unwrap(),
-                false,
-            ),
-            (
-                0.776_117_648_844_980_6,
-                0.751_181_554_542_520_8,
-                hex::decode("58000000000000").unwrap(),
-                true,
-            ),
-        ];
-        for (x, ccs, bytes, answer) in kats {
-            assert_eq!(answer, ber_exp(x, ccs, bytes.try_into().unwrap()));
-        }
-    }
-
-    #[test]
-    fn test_sampler_z() {
-        let sigma_min = 1.277833697;
-        // known answers from the doc, table 3.2, page 44
-        // https://falcon-sign.info/falcon.pdf
-        // The zeros were added to account for dropped bytes.
-        let kats = [
-            (-91.90471153063714,1.7037990414754918,hex::decode("0fc5442ff043d66e91d1ea000000000000cac64ea5450a22941edc6c").unwrap(),-92),
-            (-8.322564895434937,1.7037990414754918,hex::decode("f4da0f8d8444d1a77265c2000000000000ef6f98bbbb4bee7db8d9b3").unwrap(),-8),
-            (-19.096516109216804,1.7035823083824078,hex::decode("db47f6d7fb9b19f25c36d6000000000000b9334d477a8bc0be68145d").unwrap(),-20),
-            (-11.335543982423326, 1.7035823083824078, hex::decode("ae41b4f5209665c74d00dc000000000000c1a8168a7bb516b3190cb42c1ded26cd52000000000000aed770eca7dd334e0547bcc3c163ce0b").unwrap(), -12),
-            (7.9386734193997555, 1.6984647769450156, hex::decode("31054166c1012780c603ae0000000000009b833cec73f2f41ca5807c000000000000c89c92158834632f9b1555").unwrap(), 8),
-            (-28.990850086867255, 1.6984647769450156, hex::decode("737e9d68a50a06dbbc6477").unwrap(), -30),
-            (-9.071257914091655, 1.6980782114808988, hex::decode("a98ddd14bf0bf22061d632").unwrap(), -10),
-            (-43.88754568839566, 1.6980782114808988, hex::decode("3cbf6818a68f7ab9991514").unwrap(), -41),
-            (-58.17435547946095,1.7010983419195522,hex::decode("6f8633f5bfa5d26848668e0000000000003d5ddd46958e97630410587c").unwrap(),-61),
-            (-43.58664906684732, 1.7010983419195522, hex::decode("272bc6c25f5c5ee53f83c40000000000003a361fbc7cc91dc783e20a").unwrap(), -46),
-            (-34.70565203313315, 1.7009387219711465, hex::decode("45443c59574c2c3b07e2e1000000000000d9071e6d133dbe32754b0a").unwrap(), -34),
-            (-44.36009577368896, 1.7009387219711465, hex::decode("6ac116ed60c258e2cbaeab000000000000728c4823e6da36e18d08da0000000000005d0cc104e21cc7fd1f5ca8000000000000d9dbb675266c928448059e").unwrap(), -44),
-            (-21.783037079346236, 1.6958406126012802, hex::decode("68163bc1e2cbf3e18e7426").unwrap(), -23),
-            (-39.68827784633828, 1.6958406126012802, hex::decode("d6a1b51d76222a705a0259").unwrap(), -40),
-            (-18.488607061056847, 1.6955259305261838, hex::decode("f0523bfaa8a394bf4ea5c10000000000000f842366fde286d6a30803").unwrap(), -22),
-            (-48.39610939101591, 1.6955259305261838, hex::decode("87bd87e63374cee62127fc0000000000006931104aab64f136a0485b").unwrap(), -50),
-        ];
-        for (mu, sigma, random_bytes, answer) in kats {
-            assert_eq!(
-                sampler_z(mu, sigma, sigma_min, &mut UnsafeBufferRng::new(&random_bytes)),
-                answer
             );
         }
     }

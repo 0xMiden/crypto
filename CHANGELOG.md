@@ -1,3 +1,101 @@
+## 0.18.0 (TBD)
+
+- [BREAKING] Incremented MSRV to 1.89.
+- [BREAKING] Adds DSA (EdDSA25519) and ECDH (X25519) using Curve25519 ([#537](https://github.com/0xMiden/crypto/pull/537)).
+
+## 0.17.0 (2025-09-12)
+
+- Added `LargeSmt`, SMT backed by RocksDB ([#438](https://github.com/0xMiden/miden-crypto/pull/438)).
+- Added ECDSA and ECDH modules ([#475](https://github.com/0xMiden/crypto/pull/475)).
+- added arithmetization oriented authenticated encryption with associated data (AEAD) scheme ([#480](https://github.com/0xMiden/crypto/pull/480)).
+- Added XChaCha20-Poly1305 AEAD scheme ([#484](https://github.com/0xMiden/crypto/pull/484)).
+- [BREAKING] `SmtLeaf::entries()` now returns a slice ([#521](https://github.com/0xMiden/crypto/pull/521)).
+
+## 0.16.1 (2025-08-21)
+
+- Fix broken imports in CPU-specific `rescue` implementations (AVX2, SVE) ([#492](https://github.com/0xMiden/crypto/pull/492/)).
+- Added `{Smt,PartialSmt}::inner_node_indices` to make inner nodes accessible ([#494](https://github.com/0xMiden/crypto/pull/494)).
+- Added various benchmarks & related bench utilities ([#503](https://github.com/0xMiden/crypto/pull/503))
+
+## 0.16.0 (2025-08-15)
+
+- [BREAKING] Incremented MSRV to 1.88.
+- Added implementation of Poseidon2 hash function ([#429](https://github.com/0xMiden/crypto/issues/429)).
+- [BREAKING] Make Falcon DSA deterministic ([#436](https://github.com/0xMiden/crypto/pull/436)).
+- [BREAKING] Remove generics from `MerkleStore` and remove `KvMap` and `RecordingMap` ([#442](https://github.com/0xMiden/crypto/issues/442)).
+- [BREAKING] Rename `smt_hashmaps` feature to `hashmaps` ([#442](https://github.com/0xMiden/crypto/issues/442)).
+- [BREAKING] Refactor `parse_hex_string_as_word()` to `Word::parse()` ([#450](https://github.com/0xMiden/crypto/issues/450)).
+- `Smt.insert_inner_nodes` does not store empty subtrees ([#452](https://github.com/0xMiden/crypto/pull/452)).
+- Optimized `Smt::num_entries()` ([#455](https://github.com/0xMiden/crypto/pull/455)).
+- [BREAKING] Disallow leaves with more than 2^16 entries ([#455](https://github.com/0xMiden/crypto/pull/455), [#462](https://github.com/0xMiden/crypto/pull/462)).
+-  Add ECDSA over secp256k1 curve ([#475](https://github.com/0xMiden/crypto/pull/475)).
+- [BREAKING] Modified the public key in Falcon DSA to be the polynomial instead of the commitment ([#460](https://github.com/0xMiden/crypto/pull/460)).
+- [BREAKING] Use `SparseMerklePath` in SMT proofs for better memory efficiency ([#477](https://github.com/0xMiden/crypto/pull/477)).
+- [BREAKING] Rename `SparseValuePath` to `SimpleSmtProof` ([#477](https://github.com/0xMiden/crypto/pull/477)).
+- Validate `NodeIndex` depth ([#482](https://github.com/0xMiden/crypto/pull/482)).
+- [BREAKING] Rename `ValuePath` to `MerkleProof` ([#483](https://github.com/0xMiden/crypto/pull/483)).
+- Added an implementation of Keccak256 hash function ([#487](https://github.com/0xMiden/crypto/pull/487)).
+
+# 0.15.9 (2025-07-24)
+
+- Added serialization for `Mmr` and `Forest` ([#466](https://github.com/0xMiden/crypto/pull/466)).
+
+# 0.15.8 (2025-07-21)
+
+- Added constructor for `SparseMerklePath` that accepts a bitmask and a vector of nodes ([#457](https://github.com/0xMiden/crypto/pull/457)).
+
+## 0.15.7 (2025-07-18)
+
+- Fix empty SMT serialization check in testing mode ([#456](https://github.com/0xMiden/crypto/pull/456)).
+
+## 0.15.6 (2025-07-15)
+
+- Added conversions and serialization for `PartialSmt` ([#451](https://github.com/0xMiden/crypto/pull/451/), [#453](https://github.com/0xMiden/crypto/pull/453/)).
+
+## 0.15.5 (2025-07-10)
+
+- Added `empty()` and `is_empty()` methods to `Word`.
+
+## 0.15.4 (2025-07-07)
+
+- Implemented `LexicographicWord` struct ([#443](https://github.com/0xMiden/crypto/pull/443/)).
+- Added `SequentialCommit` trait ([#443](https://github.com/0xMiden/crypto/pull/443/)).
+
+## 0.15.3 (2025-06-18)
+
+- Fixed conversion error from a slice of bytes into `Word`.
+- Added from element slice into `Word` conversion.
+
+## 0.15.2 (2025-06-18)
+
+- Added `to_vec()` method to `Word`.
+
+## 0.15.1 (2025-06-18)
+
+- Implemented `DerefMut`, `Index`, and `IndexMut` for `Word` (#434).
+
+## 0.15.0 (2025-06-17)
+
+- [BREAKING] Use a rich newtype for Merkle mountain range types' forest values (#400).
+- Allow pre-sorted entries in `Smt` (#406).
+- Added module and function documentation. (#408).
+- Added default constructors to `MmrPeaks` and `PartialMmr` (#409).
+- Added module and function documentation-2 (#410).
+- [BREAKING] Replaced `RpoDigest` with `Word` struct (#411).
+- Replaced deprecated #[clap(...)] with #[command(...)] and #[arg(...)] (#413).
+- [BREAKING] Renamed `MerklePath::inner_nodes()` to `authenticated_nodes()` to better reflect its functionality (#415).
+- Added `compute_root()`, `verify()`, and `authenticated_nodes()` to `SparseMerklePath` for parity with `MerklePath` (#415).
+- [BREAKING] Replaced `RpxDigest` with `Word` struct (#420).
+- Added `word!` macro to `miden-crypto` (#423).
+- Added test vectors for RpoFalcon512 (#425).
+- [BREAKING] Updated Winterfell dependency to v0.13 and licensed the project under the Apache 2.0 license (in addition to the MIT)(#433).
+- [BREAKING] Incremented MSRV to 1.87.
+
+## 0.14.1 (2025-05-31)
+
+- Add module and function documentation. (#408).
+- Added missing `PartialSmt` APIs (#417).
+
 ## 0.14.0 (2025-03-15)
 
 - Added parallel implementation of `Smt::compute_mutations` with better performance (#365).
@@ -9,10 +107,11 @@
 - Added property-based testing (proptest) and fuzzing for `Smt::with_entries` and `Smt::compute_mutations` (#385).
 - Sort keys in a leaf in the concurrent implementation of `Smt::with_entries`, ensuring consistency with the sequential version (#385).
 - Skip unchanged leaves in the concurrent implementation of `Smt::compute_mutations` (#385).
-- Add range checks to `ntru_gen` for Falcon DSA (#391).
+- Added range checks to `ntru_gen` for Falcon DSA (#391).
 - Optimized duplicate key detection in `Smt::with_entries_concurrent` (#395).
 - [BREAKING] Moved `rand` to version `0.9` removing the `try_fill_bytes` method (#398).
 - [BREAKING] Increment minimum supported Rust version to 1.85 (#399).
+- Added `SparseMerklePath`, a compact representation of `MerklePath` which compacts empty nodes into a bitmask (#389).
 
 ## 0.13.3 (2025-02-18)
 

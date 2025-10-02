@@ -1,8 +1,9 @@
-use core::ops::Range;
-
-use lazy_static::lazy_static;
-
-use super::{Felt, Hasher, ZERO};
+#[cfg(test)]
+use super::{ALPHA, INV_ALPHA};
+use super::{
+    AlgebraicSponge, CAPACITY_RANGE, CubeExtension, DIGEST_RANGE, ElementHasher, Felt,
+    FieldElement, Hasher, RATE_RANGE, Range, STATE_WIDTH, StarkField, Word, ZERO,
+};
 mod arch;
 pub use arch::optimized::{add_constants_and_apply_inv_sbox, add_constants_and_apply_sbox};
 
@@ -10,13 +11,10 @@ mod mds;
 use mds::apply_mds;
 
 mod rpo;
-use p3_field::{Field, PrimeCharacteristicRing, extension::BinomialExtensionField};
-pub use rpo::{
-    Rpo256, RpoChallenger, RpoCompression, RpoDigest, RpoDigestError, RpoHasher, RpoPermutation256,
-};
+pub use rpo::Rpo256;
 
 mod rpx;
-pub use rpx::{Rpx256, RpxDigest, RpxDigestError};
+pub use rpx::Rpx256;
 
 #[cfg(test)]
 mod tests;
@@ -26,45 +24,9 @@ type CubeExtension = BinomialExtensionField<Felt, 5>;
 // CONSTANTS
 // ================================================================================================
 
-/// The number of rounds is set to 7. For the RPO hash functions all rounds are uniform. For the
+/// The number of rounds is set to 7. For the RPO hash function all rounds are uniform. For the
 /// RPX hash function, there are 3 different types of rounds.
 const NUM_ROUNDS: usize = 7;
-
-/// Sponge state is set to 12 field elements or 96 bytes; 8 elements are reserved for rate and
-/// the remaining 4 elements are reserved for capacity.
-const STATE_WIDTH: usize = 12;
-
-/// The rate portion of the state is located in elements 4 through 11.
-const RATE_RANGE: Range<usize> = 4..12;
-const RATE_WIDTH: usize = RATE_RANGE.end - RATE_RANGE.start;
-
-const INPUT1_RANGE: Range<usize> = 4..8;
-const INPUT2_RANGE: Range<usize> = 8..12;
-
-/// The capacity portion of the state is located in elements 0, 1, 2, and 3.
-const CAPACITY_RANGE: Range<usize> = 0..4;
-
-/// The output of the hash function is a digest which consists of 4 field elements or 32 bytes.
-///
-/// The digest is returned from state elements 4, 5, 6, and 7 (the first four elements of the
-/// rate portion).
-const DIGEST_RANGE: Range<usize> = 4..8;
-const DIGEST_SIZE: usize = DIGEST_RANGE.end - DIGEST_RANGE.start;
-
-/// The number of bytes needed to encoded a digest
-const DIGEST_BYTES: usize = 32;
-
-/// The number of byte chunks defining a field element when hashing a sequence of bytes
-const BINARY_CHUNK_SIZE: usize = 7;
-
-/// S-Box and Inverse S-Box powers;
-///
-/// The constants are defined for tests only because the exponentiations in the code are unrolled
-/// for efficiency reasons.
-#[cfg(test)]
-const ALPHA: u64 = 7;
-#[cfg(test)]
-const INV_ALPHA: u64 = 10540996611094048183;
 
 // SBOX FUNCTION
 // ================================================================================================

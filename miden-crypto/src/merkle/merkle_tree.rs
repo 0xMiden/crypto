@@ -1,7 +1,7 @@
 use alloc::{string::String, vec::Vec};
-use core::{fmt, ops::Deref, slice};
+use core::{fmt, slice};
 
-use super::{InnerNodeInfo, MerkleError, MerklePath, NodeIndex, Rpo256, RpoDigest, Word};
+use super::{InnerNodeInfo, MerkleError, MerklePath, NodeIndex, Rpo256, Word};
 use crate::utils::{uninit_vector, word_to_hex};
 
 // MERKLE TREE
@@ -11,7 +11,7 @@ use crate::utils::{uninit_vector, word_to_hex};
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 pub struct MerkleTree {
-    nodes: Vec<RpoDigest>,
+    nodes: Vec<Word>,
 }
 
 impl MerkleTree {
@@ -35,17 +35,17 @@ impl MerkleTree {
 
         // create un-initialized vector to hold all tree nodes
         let mut nodes = unsafe { uninit_vector(2 * n) };
-        nodes[0] = RpoDigest::default();
+        nodes[0] = Word::default();
 
         // copy leaves into the second part of the nodes vector
         nodes[n..].iter_mut().zip(leaves).for_each(|(node, leaf)| {
-            *node = RpoDigest::from(*leaf);
+            *node = *leaf;
         });
 
         // re-interpret nodes as an array of two nodes fused together
         // Safety: `nodes` will never move here as it is not bound to an external lifetime (i.e.
         // `self`).
-        let ptr = nodes.as_ptr() as *const [RpoDigest; 2];
+        let ptr = nodes.as_ptr() as *const [Word; 2];
         let pairs = unsafe { slice::from_raw_parts(ptr, n) };
 
         // calculate all internal tree nodes
@@ -60,7 +60,7 @@ impl MerkleTree {
     // --------------------------------------------------------------------------------------------
 
     /// Returns the root of this Merkle tree.
-    pub fn root(&self) -> RpoDigest {
+    pub fn root(&self) -> Word {
         self.nodes[1]
     }
 
@@ -77,7 +77,7 @@ impl MerkleTree {
     /// Returns an error if:
     /// * The specified depth is greater than the depth of the tree.
     /// * The specified index is not valid for the specified depth.
-    pub fn get_node(&self, index: NodeIndex) -> Result<RpoDigest, MerkleError> {
+    pub fn get_node(&self, index: NodeIndex) -> Result<Word, MerkleError> {
         if index.is_root() {
             return Err(MerkleError::DepthTooSmall(index.depth()));
         } else if index.depth() > self.depth() {
@@ -95,26 +95,16 @@ impl MerkleTree {
     /// Returns an error if:
     /// * The specified depth is greater than the depth of the tree.
     /// * The specified value is not valid for the specified depth.
-    pub fn get_path(&self, mut index: NodeIndex) -> Result<MerklePath, MerkleError> {
+    pub fn get_path(&self, index: NodeIndex) -> Result<MerklePath, MerkleError> {
         if index.is_root() {
             return Err(MerkleError::DepthTooSmall(index.depth()));
         } else if index.depth() > self.depth() {
             return Err(MerkleError::DepthTooBig(index.depth() as u64));
         }
 
-        // TODO should we create a helper in `NodeIndex` that will encapsulate traversal to root so
-        // we always use inlined `for` instead of `while`? the reason to use `for` is because its
-        // easier for the compiler to vectorize.
-        let mut path = Vec::with_capacity(index.depth() as usize);
-        for _ in 0..index.depth() {
-            let sibling = index.sibling().to_scalar_index() as usize;
-            path.push(self.nodes[sibling]);
-            index.move_up();
-        }
-
-        debug_assert!(index.is_root(), "the path walk must go all the way to the root");
-
-        Ok(path.into())
+        Ok(MerklePath::from(Vec::from_iter(
+            index.proof_indices().map(|index| self.get_node(index).unwrap()),
+        )))
     }
 
     // ITERATORS
@@ -123,11 +113,7 @@ impl MerkleTree {
     /// Returns an iterator over the leaves of this [MerkleTree].
     pub fn leaves(&self) -> impl Iterator<Item = (u64, &Word)> {
         let leaves_start = self.nodes.len() / 2;
-        self.nodes
-            .iter()
-            .skip(leaves_start)
-            .enumerate()
-            .map(|(i, v)| (i as u64, v.deref()))
+        self.nodes.iter().skip(leaves_start).enumerate().map(|(i, v)| (i as u64, v))
     }
 
     /// Returns n iterator over every inner node of this [MerkleTree].
@@ -161,12 +147,12 @@ impl MerkleTree {
         // `self.nodes` will be moved only if `pairs` is moved as well. also, the algorithm is
         // logically guaranteed to not overlap write positions as the write index is always half
         // the index from which we read the digest input.
-        let ptr = self.nodes.as_ptr() as *const [RpoDigest; 2];
-        let pairs: &'a [[RpoDigest; 2]] = unsafe { slice::from_raw_parts(ptr, n) };
+        let ptr = self.nodes.as_ptr() as *const [Word; 2];
+        let pairs: &'a [[Word; 2]] = unsafe { slice::from_raw_parts(ptr, n) };
 
         // update the current node
         let pos = index.to_scalar_index() as usize;
-        self.nodes[pos] = value.into();
+        self.nodes[pos] = value;
 
         // traverse to the root, updating each node with the merged values of its parents
         for _ in 0..index.depth() {
@@ -191,15 +177,6 @@ impl TryFrom<&[Word]> for MerkleTree {
     }
 }
 
-impl TryFrom<&[RpoDigest]> for MerkleTree {
-    type Error = MerkleError;
-
-    fn try_from(value: &[RpoDigest]) -> Result<Self, Self::Error> {
-        let value: Vec<Word> = value.iter().map(|v| *v.deref()).collect();
-        MerkleTree::new(value)
-    }
-}
-
 // ITERATORS
 // ================================================================================================
 
@@ -207,7 +184,7 @@ impl TryFrom<&[RpoDigest]> for MerkleTree {
 ///
 /// Use this to extract the data of the tree, there is no guarantee on the order of the elements.
 pub struct InnerNodeIterator<'a> {
-    nodes: &'a Vec<RpoDigest>,
+    nodes: &'a Vec<Word>,
     index: usize,
 }
 
@@ -433,7 +410,7 @@ mod tests {
 
             // compare the bytes representation
             let word_bytes = unsafe { slice::from_raw_parts(word_ptr, size_of::<Word>()) };
-            let digest_bytes = unsafe { slice::from_raw_parts(digest_ptr, size_of::<RpoDigest>()) };
+            let digest_bytes = unsafe { slice::from_raw_parts(digest_ptr, size_of::<Word>()) };
             assert_eq!(word_bytes, digest_bytes);
         }
     }

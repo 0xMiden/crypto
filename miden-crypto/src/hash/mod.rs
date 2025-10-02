@@ -1,20 +1,29 @@
-//! Cryptographic hash functions used by the Miden VM and the Miden rollup.
+//! Cryptographic hash functions used by the Miden protocol.
 
-use super::{Felt, ZERO};
+use super::{CubeExtension, Felt, FieldElement, StarkField, Word, ZERO};
 
+/// Blake3 hash function.
 pub mod blake;
 
-mod rescue;
-pub mod rpo {
-    pub use super::rescue::{
-        Rpo256, RpoChallenger, RpoCompression, RpoDigest, RpoDigestError, RpoHasher,
-        RpoPermutation256,
-    };
+/// Keccak hash function.
+pub mod keccak;
+
+/// Poseidon2 hash function.
+pub mod poseidon2 {
+    pub use super::algebraic_sponge::poseidon2::Poseidon2;
 }
 
-pub mod rpx {
-    pub use super::rescue::{Rpx256, RpxDigest, RpxDigestError};
+/// Rescue Prime Optimized (RPO) hash function.
+pub mod rpo {
+    pub use super::algebraic_sponge::rescue::Rpo256;
 }
+
+/// Rescue Prime Extended (RPX) hash function.
+pub mod rpx {
+    pub use super::algebraic_sponge::rescue::Rpx256;
+}
+
+mod algebraic_sponge;
 
 // RE-EXPORTS
 // ================================================================================================

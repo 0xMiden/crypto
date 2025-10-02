@@ -1,4 +1,6 @@
-use criterion::{BatchSize, BenchmarkId, Criterion, black_box, criterion_group, criterion_main};
+use std::hint::black_box;
+
+use criterion::{BatchSize, BenchmarkId, Criterion, criterion_group, criterion_main};
 use miden_crypto::{
     Felt, PrimeCharacteristicRing, Word,
     hash::rpo::RpoDigest,
@@ -86,8 +88,7 @@ fn get_leaf_merkletree(c: &mut Criterion) {
     for size in BATCH_SIZES {
         let leaves = &random_data[..size];
 
-        let mtree_leaves: Vec<Word> = leaves.iter().map(|v| v.into()).collect();
-        let mtree = MerkleTree::new(mtree_leaves.clone()).unwrap();
+        let mtree = MerkleTree::new(leaves).unwrap();
         let store = MerkleStore::from(&mtree);
         let depth = mtree.depth();
         let root = mtree.root();
@@ -127,7 +128,7 @@ fn get_leaf_simplesmt(c: &mut Criterion) {
         let smt_leaves = leaves
             .iter()
             .enumerate()
-            .map(|(c, v)| (c.try_into().unwrap(), v.into()))
+            .map(|(c, &v)| (c.try_into().unwrap(), v))
             .collect::<Vec<(u64, Word)>>();
         let smt = SimpleSmt::<SMT_MAX_DEPTH>::with_leaves(smt_leaves.clone()).unwrap();
         let store = MerkleStore::from(&smt);
@@ -198,8 +199,7 @@ fn get_node_merkletree(c: &mut Criterion) {
     for size in BATCH_SIZES {
         let leaves = &random_data[..size];
 
-        let mtree_leaves: Vec<Word> = leaves.iter().map(|v| v.into()).collect();
-        let mtree = MerkleTree::new(mtree_leaves.clone()).unwrap();
+        let mtree = MerkleTree::new(leaves).unwrap();
         let store = MerkleStore::from(&mtree);
         let root = mtree.root();
         let half_depth = mtree.depth() / 2;
@@ -240,7 +240,7 @@ fn get_node_simplesmt(c: &mut Criterion) {
         let smt_leaves = leaves
             .iter()
             .enumerate()
-            .map(|(c, v)| (c.try_into().unwrap(), v.into()))
+            .map(|(c, &v)| (c.try_into().unwrap(), v))
             .collect::<Vec<(u64, Word)>>();
         let smt = SimpleSmt::<SMT_MAX_DEPTH>::with_leaves(smt_leaves.clone()).unwrap();
         let store = MerkleStore::from(&smt);
@@ -279,8 +279,7 @@ fn get_leaf_path_merkletree(c: &mut Criterion) {
     for size in BATCH_SIZES {
         let leaves = &random_data[..size];
 
-        let mtree_leaves: Vec<Word> = leaves.iter().map(|v| v.into()).collect();
-        let mtree = MerkleTree::new(mtree_leaves.clone()).unwrap();
+        let mtree = MerkleTree::new(leaves).unwrap();
         let store = MerkleStore::from(&mtree);
         let depth = mtree.depth();
         let root = mtree.root();
@@ -320,7 +319,7 @@ fn get_leaf_path_simplesmt(c: &mut Criterion) {
         let smt_leaves = leaves
             .iter()
             .enumerate()
-            .map(|(c, v)| (c.try_into().unwrap(), v.into()))
+            .map(|(c, &v)| (c.try_into().unwrap(), v))
             .collect::<Vec<(u64, Word)>>();
         let smt = SimpleSmt::<SMT_MAX_DEPTH>::with_leaves(smt_leaves.clone()).unwrap();
         let store = MerkleStore::from(&smt);
@@ -363,18 +362,14 @@ fn new(c: &mut Criterion) {
         // MerkleTree constructor is optimized to work with vectors. Create a new copy of the data
         // and pass it to the benchmark function
         group.bench_function(BenchmarkId::new("MerkleTree::new", size), |b| {
-            b.iter_batched(
-                || leaves.iter().map(|v| v.into()).collect::<Vec<Word>>(),
-                |l| black_box(MerkleTree::new(l)),
-                BatchSize::SmallInput,
-            )
+            b.iter_batched(|| leaves, |l| black_box(MerkleTree::new(l)), BatchSize::SmallInput)
         });
 
         // This could be done with `bench_with_input`, however to remove variables while comparing
         // with MerkleTree it is using `iter_batched`
         group.bench_function(BenchmarkId::new("MerkleStore::extend::MerkleTree", size), |b| {
             b.iter_batched(
-                || leaves.iter().map(|v| v.into()).collect::<Vec<Word>>(),
+                || leaves,
                 |l| {
                     let mtree = MerkleTree::new(l).unwrap();
                     black_box(MerkleStore::from(&mtree));
@@ -389,7 +384,7 @@ fn new(c: &mut Criterion) {
                     leaves
                         .iter()
                         .enumerate()
-                        .map(|(c, v)| (c.try_into().unwrap(), v.into()))
+                        .map(|(c, &v)| (c.try_into().unwrap(), v))
                         .collect::<Vec<(u64, Word)>>()
                 },
                 |l| black_box(SimpleSmt::<SMT_MAX_DEPTH>::with_leaves(l)),
@@ -403,7 +398,7 @@ fn new(c: &mut Criterion) {
                     leaves
                         .iter()
                         .enumerate()
-                        .map(|(c, v)| (c.try_into().unwrap(), v.into()))
+                        .map(|(c, &v)| (c.try_into().unwrap(), v))
                         .collect::<Vec<(u64, Word)>>()
                 },
                 |l| {
@@ -429,8 +424,7 @@ fn update_leaf_merkletree(c: &mut Criterion) {
     for size in BATCH_SIZES {
         let leaves = &random_data[..size];
 
-        let mtree_leaves: Vec<Word> = leaves.iter().map(|v| v.into()).collect();
-        let mut mtree = MerkleTree::new(mtree_leaves.clone()).unwrap();
+        let mut mtree = MerkleTree::new(leaves).unwrap();
         let mut store = MerkleStore::from(&mtree);
         let depth = mtree.depth();
         let root = mtree.root();
@@ -452,7 +446,7 @@ fn update_leaf_merkletree(c: &mut Criterion) {
                     // The MerkleTree automatically updates its internal root, the Store maintains
                     // the old root and adds the new one. Here we update the root to have a fair
                     // comparison
-                    store_root = store.set_node(root, index, value.into()).unwrap().root;
+                    store_root = store.set_node(root, index, value).unwrap().root;
                     black_box(store_root)
                 },
                 BatchSize::SmallInput,
@@ -477,7 +471,7 @@ fn update_leaf_simplesmt(c: &mut Criterion) {
         let smt_leaves = leaves
             .iter()
             .enumerate()
-            .map(|(c, v)| (c.try_into().unwrap(), v.into()))
+            .map(|(c, &v)| (c.try_into().unwrap(), v))
             .collect::<Vec<(u64, Word)>>();
         let mut smt = SimpleSmt::<SMT_MAX_DEPTH>::with_leaves(smt_leaves.clone()).unwrap();
         let mut store = MerkleStore::from(&smt);
@@ -502,7 +496,7 @@ fn update_leaf_simplesmt(c: &mut Criterion) {
                     // The MerkleTree automatically updates its internal root, the Store maintains
                     // the old root and adds the new one. Here we update the root to have a fair
                     // comparison
-                    store_root = store.set_node(root, index, value.into()).unwrap().root;
+                    store_root = store.set_node(root, index, value).unwrap().root;
                     black_box(store_root)
                 },
                 BatchSize::SmallInput,
