@@ -2,9 +2,9 @@ use alloc::{string::ToString, vec::Vec};
 use core::cmp::Ordering;
 
 use super::{EMPTY_WORD, Felt, LeafIndex, Rpo256, SMT_DEPTH, SmtLeafError, Word};
-use crate::hash::algebraic_sponge::AlgebraicSponge;
 use crate::{
     PrimeField64,
+    hash::algebraic_sponge::AlgebraicSponge,
     merkle::MAX_LEAF_ENTRIES,
     utils::{ByteReader, ByteWriter, Deserializable, DeserializationError, Serializable},
 };

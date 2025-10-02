@@ -1,12 +1,11 @@
 use alloc::{collections::BTreeSet, vec::Vec};
 
-use crate::hash::algebraic_sponge::AlgebraicSponge;
 use p3_field::{PrimeCharacteristicRing, PrimeField64};
 use proptest::prelude::*;
 use rand_utils::rand_value;
 
 use super::{Felt, Hasher, Rpx256, ZERO};
-use crate::{ONE, Word};
+use crate::{ONE, Word, hash::algebraic_sponge::AlgebraicSponge};
 
 #[test]
 fn hash_elements_vs_merge() {

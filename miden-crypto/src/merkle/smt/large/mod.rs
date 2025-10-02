@@ -41,21 +41,11 @@
 //! let entries = vec![
 //!     (
 //!         Word::new([Felt::from_u64(1), Felt::new(0), Felt::new(0), Felt::new(0)]),
-//!         Word::new([
-//!             Felt::new(10),
-//!             Felt::new(20),
-//!             Felt::new(30),
-//!             Felt::new(40),
-//!         ]),
+//!         Word::new([Felt::new(10), Felt::new(20), Felt::new(30), Felt::new(40)]),
 //!     ),
 //!     (
 //!         Word::new([Felt::from_u64(2), Felt::new(0), Felt::new(0), Felt::new(0)]),
-//!         Word::new([
-//!             Felt::new(11),
-//!             Felt::new(22),
-//!             Felt::new(33),
-//!             Felt::new(44),
-//!         ]),
+//!         Word::new([Felt::new(11), Felt::new(22), Felt::new(33), Felt::new(44)]),
 //!     ),
 //! ];
 //!
@@ -77,16 +67,11 @@
 //! let storage = RocksDbStorage::open(RocksDbConfig::new("/path/to/db"))?;
 //! let mut smt = LargeSmt::new(storage)?;
 //!
-//! let k1 =
-//!     Word::new([Felt::from_u64(101), Felt::new(0), Felt::new(0), Felt::new(0)]);
-//! let v1 =
-//!     Word::new([Felt::from_u64(1), Felt::new(2), Felt::new(3), Felt::new(4)]);
-//! let k2 =
-//!     Word::new([Felt::from_u64(202), Felt::new(0), Felt::new(0), Felt::new(0)]);
-//! let k3 =
-//!     Word::new([Felt::from_u64(303), Felt::new(0), Felt::new(0), Felt::new(0)]);
-//! let v3 =
-//!     Word::new([Felt::from_u64(7), Felt::new(7), Felt::new(7), Felt::new(7)]);
+//! let k1 = Word::new([Felt::from_u64(101), Felt::new(0), Felt::new(0), Felt::new(0)]);
+//! let v1 = Word::new([Felt::from_u64(1), Felt::new(2), Felt::new(3), Felt::new(4)]);
+//! let k2 = Word::new([Felt::from_u64(202), Felt::new(0), Felt::new(0), Felt::new(0)]);
+//! let k3 = Word::new([Felt::from_u64(303), Felt::new(0), Felt::new(0), Felt::new(0)]);
+//! let v3 = Word::new([Felt::from_u64(7), Felt::new(7), Felt::new(7), Felt::new(7)]);
 //!
 //! // EMPTY_WORD marks deletions.
 //! let updates = vec![(k1, v1), (k2, EMPTY_WORD), (k3, v3)];
@@ -116,21 +101,11 @@
 //! let entries = vec![
 //!     (
 //!         Word::new([Felt::from_u64(1), Felt::new(0), Felt::new(0), Felt::new(0)]),
-//!         Word::new([
-//!             Felt::new(10),
-//!             Felt::new(20),
-//!             Felt::new(30),
-//!             Felt::new(40),
-//!         ]),
+//!         Word::new([Felt::new(10), Felt::new(20), Felt::new(30), Felt::new(40)]),
 //!     ),
 //!     (
 //!         Word::new([Felt::from_u64(2), Felt::new(0), Felt::new(0), Felt::new(0)]),
-//!         Word::new([
-//!             Felt::new(11),
-//!             Felt::new(22),
-//!             Felt::new(33),
-//!             Felt::new(44),
-//!         ]),
+//!         Word::new([Felt::new(11), Felt::new(22), Felt::new(33), Felt::new(44)]),
 //!     ),
 //! ];
 //! let _smt = LargeSmt::with_entries(storage, entries)?;
@@ -148,12 +123,14 @@ use super::{
     MutationSet, NodeIndex, Rpo256, SMT_DEPTH, Smt, SmtLeaf, SmtLeafError, SmtProof,
     SparseMerklePath, SparseMerkleTree, Word,
 };
-use crate::PrimeField64;
-use crate::merkle::smt::{
-    Map, NodeMutation, NodeMutations,
-    full::concurrent::{
-        MutatedSubtreeLeaves, PairComputations, SUBTREE_DEPTH, SubtreeLeaf, SubtreeLeavesIter,
-        build_subtree, fetch_sibling_pair, process_sorted_pairs_to_leaves,
+use crate::{
+    PrimeField64,
+    merkle::smt::{
+        Map, NodeMutation, NodeMutations,
+        full::concurrent::{
+            MutatedSubtreeLeaves, PairComputations, SUBTREE_DEPTH, SubtreeLeaf, SubtreeLeavesIter,
+            build_subtree, fetch_sibling_pair, process_sorted_pairs_to_leaves,
+        },
     },
 };
 

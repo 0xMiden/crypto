@@ -1,11 +1,12 @@
 use super::{
-    AlgebraicSponge, CAPACITY_RANGE, DIGEST_RANGE,  Felt, 
-    RATE_RANGE, Range, STATE_WIDTH, Word, ZERO,
+    AlgebraicSponge, CAPACITY_RANGE, DIGEST_RANGE, Felt, RATE_RANGE, Range, STATE_WIDTH, Word, ZERO,
 };
+use crate::PrimeCharacteristicRing;
 
 mod constants;
 use constants::*;
-use winter_crypto::{ElementHasher, Hasher};
+use winter_crypto::Hasher;
+// use winter_crypto::{ElementHasher, Hasher};
 
 #[cfg(test)]
 mod test;
@@ -156,11 +157,11 @@ impl Poseidon2 {
         <Self as Hasher>::merge(values)
     }
 
-    /// Returns a hash of the provided field elements.
-    #[inline(always)]
-    pub fn hash_elements<E: FieldElement<BaseField = Felt>>(elements: &[E]) -> Word {
-        <Self as ElementHasher>::hash_elements(elements)
-    }
+    // /// Returns a hash of the provided field elements.
+    // #[inline(always)]
+    // pub fn hash_elements<E: FieldElement<BaseField = Felt>>(elements: &[E]) -> Word {
+    //     <Self as ElementHasher>::hash_elements(elements)
+    // }
 
     /// Returns a hash of two digests and a domain identifier.
     #[inline(always)]
@@ -188,7 +189,7 @@ impl Poseidon2 {
     fn internal_rounds(state: &mut [Felt; STATE_WIDTH]) {
         for r in 0..NUM_INTERNAL_ROUNDS {
             state[0] += ARK_INT[r];
-            state[0] = state[0].exp7();
+            state[0] = state[0].exp_const_u64::<7>();
             Self::matmul_internal(state, MAT_DIAG);
         }
     }
@@ -253,8 +254,8 @@ impl Poseidon2 {
             let t2 = two_b + t1;
             let t3 = two_d + t0;
 
-            let t4 = t1.mul_small(4) + t3;
-            let t5 = t0.mul_small(4) + t2;
+            let t4 = t1.double().double() + t3;
+            let t5 = t0.double().double() + t2;
 
             let t6 = t3 + t5;
             let t7 = t2 + t4;
@@ -292,17 +293,17 @@ impl Poseidon2 {
     /// Applies the sbox entry-wise to the state.
     #[inline(always)]
     fn apply_sbox(state: &mut [Felt; STATE_WIDTH]) {
-        state[0] = state[0].exp7();
-        state[1] = state[1].exp7();
-        state[2] = state[2].exp7();
-        state[3] = state[3].exp7();
-        state[4] = state[4].exp7();
-        state[5] = state[5].exp7();
-        state[6] = state[6].exp7();
-        state[7] = state[7].exp7();
-        state[8] = state[8].exp7();
-        state[9] = state[9].exp7();
-        state[10] = state[10].exp7();
-        state[11] = state[11].exp7();
+        state[0] = state[0].exp_const_u64::<7>();
+        state[1] = state[1].exp_const_u64::<7>();
+        state[2] = state[2].exp_const_u64::<7>();
+        state[3] = state[3].exp_const_u64::<7>();
+        state[4] = state[4].exp_const_u64::<7>();
+        state[5] = state[5].exp_const_u64::<7>();
+        state[6] = state[6].exp_const_u64::<7>();
+        state[7] = state[7].exp_const_u64::<7>();
+        state[8] = state[8].exp_const_u64::<7>();
+        state[9] = state[9].exp_const_u64::<7>();
+        state[10] = state[10].exp_const_u64::<7>();
+        state[11] = state[11].exp_const_u64::<7>();
     }
 }

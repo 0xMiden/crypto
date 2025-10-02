@@ -1,9 +1,9 @@
 use core::slice;
 
-use crate::PrimeCharacteristicRing;
 use lazy_static::lazy_static;
 
 use super::{EMPTY_WORD, Felt, Word, smt::InnerNode};
+use crate::PrimeCharacteristicRing;
 
 // EMPTY NODES SUBTREES
 // ================================================================================================

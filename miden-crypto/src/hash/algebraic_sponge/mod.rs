@@ -18,7 +18,7 @@ use core::ops::Range;
 use super::{Felt, Word, ZERO};
 use crate::{BasedVectorSpace, PrimeField64};
 
-// pub(crate) mod poseidon2;
+pub(crate) mod poseidon2;
 pub(crate) mod rescue;
 
 // CONSTANTS

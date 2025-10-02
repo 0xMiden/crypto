@@ -9,9 +9,9 @@
 
 use alloc::{string::ToString, vec::Vec};
 use core::ops::Range;
-use p3_field::PrimeField64;
 
 use num::Integer;
+use p3_field::PrimeField64;
 use rand::{
     Rng,
     distr::{Distribution, StandardUniform, Uniform},

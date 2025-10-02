@@ -6,8 +6,7 @@ use core::{
 use winter_utils::{ByteReader, ByteWriter, Deserializable, DeserializationError, Serializable};
 
 use super::InOrderIndex;
-use crate::Felt;
-use crate::PrimeField64;
+use crate::{Felt, PrimeField64};
 
 /// A compact representation of trees in a forest. Used in the Merkle forest (MMR).
 ///

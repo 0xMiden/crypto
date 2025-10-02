@@ -7,7 +7,7 @@ use core::{
 
 use p3_field::BasedVectorSpace;
 use sha3::Digest as Sha3Digest;
-use winter_crypto::{Digest, ElementHasher, Hasher};
+use winter_crypto::{Digest, Hasher};
 
 use crate::{
     Felt, PrimeField64,
