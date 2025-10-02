@@ -43,33 +43,6 @@ use crate::common::config::{
     HASH_ELEMENT_COUNTS, HASH_INPUT_SIZES, MERGE_INPUT_SIZES, MERGE_INT_SIZES,
 };
 
-<<<<<<< HEAD
-fn rpo256_sequential(c: &mut Criterion) {
-    let v: [Felt; 100] = (0..100)
-        .map(Felt::from_u64)
-        .collect::<Vec<Felt>>()
-        .try_into()
-        .expect("should not fail");
-    c.bench_function("RPO256 sequential hashing (cached)", |bench| {
-        bench.iter(|| Rpo256::hash_elements(black_box(&v)))
-    });
-
-    c.bench_function("RPO256 sequential hashing (random)", |bench| {
-        bench.iter_batched(
-            || {
-                let v: [Felt; 100] = (0..100)
-                    .map(|_| Felt::from_u64(rand_value()))
-                    .collect::<Vec<Felt>>()
-                    .try_into()
-                    .expect("should not fail");
-                v
-            },
-            |state| Rpo256::hash_elements(&state),
-            BatchSize::SmallInput,
-        )
-    });
-}
-=======
 // === RPO256 Hash Benchmarks ===
 
 // Single hash operation with parameterized input sizes
@@ -85,7 +58,6 @@ benchmark_hash!(
     size,
     |size| Some(criterion::Throughput::Bytes(size as u64))
 );
->>>>>>> origin/next
 
 // 2-to-1 hash merge with parameterized inputs
 benchmark_hash_merge!(
@@ -111,33 +83,6 @@ benchmark_hash_felt!(
     |count| Some(criterion::Throughput::Elements(count as u64))
 );
 
-<<<<<<< HEAD
-fn rpx256_sequential(c: &mut Criterion) {
-    let v: [Felt; 100] = (0..100)
-        .map(Felt::from_u64)
-        .collect::<Vec<Felt>>()
-        .try_into()
-        .expect("should not fail");
-    c.bench_function("RPX256 sequential hashing (cached)", |bench| {
-        bench.iter(|| Rpx256::hash_elements(black_box(&v)))
-    });
-
-    c.bench_function("RPX256 sequential hashing (random)", |bench| {
-        bench.iter_batched(
-            || {
-                let v: [Felt; 100] = (0..100)
-                    .map(|_| Felt::from_u64(rand_value()))
-                    .collect::<Vec<Felt>>()
-                    .try_into()
-                    .expect("should not fail");
-                v
-            },
-            |state| Rpx256::hash_elements(&state),
-            BatchSize::SmallInput,
-        )
-    });
-}
-=======
 // Domain-separated merging with parameterized inputs
 benchmark_hash_merge_domain!(
     hash_rpo256_merge_in_domain,
@@ -167,7 +112,6 @@ benchmark_hash_merge_with_int!(
         b.iter(|| Rpo256::merge_with_int(black_box(digest), int))
     }
 );
->>>>>>> origin/next
 
 // Multi-digest merging with parameterized digest counts
 benchmark_hash_merge_many!(
@@ -186,33 +130,6 @@ benchmark_hash_merge_many!(
 
 // === RPX256 Hash Benchmarks ===
 
-<<<<<<< HEAD
-fn blake3_sequential(c: &mut Criterion) {
-    let v: [Felt; 100] = (0..100)
-        .map(Felt::from_u64)
-        .collect::<Vec<Felt>>()
-        .try_into()
-        .expect("should not fail");
-    c.bench_function("Blake3 sequential hashing (cached)", |bench| {
-        bench.iter(|| Blake3_256::hash_elements(black_box(&v)))
-    });
-
-    c.bench_function("Blake3 sequential hashing (random)", |bench| {
-        bench.iter_batched(
-            || {
-                let v: [Felt; 100] = (0..100)
-                    .map(|_| Felt::from_u64(rand_value()))
-                    .collect::<Vec<Felt>>()
-                    .try_into()
-                    .expect("should not fail");
-                v
-            },
-            |state| Blake3_256::hash_elements(&state),
-            BatchSize::SmallInput,
-        )
-    });
-}
-=======
 // Single hash operation with parameterized input sizes
 benchmark_hash!(
     hash_rpx256_single,
@@ -445,7 +362,6 @@ benchmark_hash_felt!(
     },
     |count| Some(criterion::Throughput::Elements(count as u64))
 );
->>>>>>> origin/next
 
 criterion_group!(
     hash_benchmark_group,
