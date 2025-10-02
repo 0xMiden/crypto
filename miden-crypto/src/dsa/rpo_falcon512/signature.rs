@@ -322,7 +322,7 @@ impl Deserializable for SignaturePoly {
             }
 
             let felt = if s != 0 { (MODULUS as u32 - m) as u16 } else { m as u16 };
-            *c = FalconFelt::from_u64(felt as i16);
+            *c = FalconFelt::new(felt as i16);
         }
 
         if (acc & ((1 << acc_len) - 1)) != 0 {

@@ -3,7 +3,7 @@ use std::hint::black_box;
 use criterion::{BatchSize, BenchmarkId, Criterion, criterion_group, criterion_main};
 use miden_crypto::{
     Felt, PrimeCharacteristicRing, Word,
-    hash::rpo::RpoDigest,
+    hash::rpo::Word,
     merkle::{
         DefaultMerkleStore as MerkleStore, LeafIndex, MerkleTree, NodeIndex, SMT_MAX_DEPTH,
         SimpleSmt,
@@ -17,8 +17,8 @@ use rand_utils::{rand_array, rand_value};
 /// sizes are limited to that.
 static BATCH_SIZES: [usize; 3] = [2usize.pow(4), 2usize.pow(7), 2usize.pow(10)];
 
-// /// Generates a random `RpoDigest`.
-// fn random_rpo_digest<R: RngCore>(rng: &mut R) -> RpoDigest {
+// /// Generates a random `Word`.
+// fn random_rpo_digest<R: RngCore>(rng: &mut R) -> Word {
 //     [
 //         Felt::from_u64(rng.next_u64()),
 //         Felt::from_u64(rng.next_u64()),
@@ -83,11 +83,11 @@ fn get_empty_leaf_simplesmt(c: &mut Criterion) {
 fn get_leaf_merkletree(c: &mut Criterion) {
     let mut group = c.benchmark_group("get_leaf_merkletree");
 
-    let seed = [0u8; 32];
-    let mut rng = ChaCha20Rng::from_seed(seed);
+    // let seed = [0u8; 32];
+    // let mut rng = ChaCha20Rng::from_seed(seed);
 
     let random_data_size = BATCH_SIZES.into_iter().max().unwrap();
-    let random_data: Vec<RpoDigest> = (0..random_data_size).map(|_| random_word()).collect();
+    let random_data: Vec<Word> = (0..random_data_size).map(|_| random_word()).collect();
 
     for size in BATCH_SIZES {
         let leaves = &random_data[..size];
@@ -120,10 +120,10 @@ fn get_leaf_merkletree(c: &mut Criterion) {
 fn get_leaf_simplesmt(c: &mut Criterion) {
     let mut group = c.benchmark_group("get_leaf_simplesmt");
 
-    let seed = [0u8; 32];
-    let mut rng = ChaCha20Rng::from_seed(seed);
+    // let seed = [0u8; 32];
+    // let mut rng = ChaCha20Rng::from_seed(seed);
     let random_data_size = BATCH_SIZES.into_iter().max().unwrap();
-    let random_data: Vec<RpoDigest> = (0..random_data_size).map(|_| random_word()).collect();
+    let random_data: Vec<Word> = (0..random_data_size).map(|_| random_word()).collect();
 
     for size in BATCH_SIZES {
         let leaves = &random_data[..size];
@@ -193,10 +193,10 @@ fn get_node_of_empty_simplesmt(c: &mut Criterion) {
 fn get_node_merkletree(c: &mut Criterion) {
     let mut group = c.benchmark_group("get_node_merkletree");
 
-    let seed = [0u8; 32];
-    let mut rng = ChaCha20Rng::from_seed(seed);
+    // let seed = [0u8; 32];
+    // let mut rng = ChaCha20Rng::from_seed(seed);
     let random_data_size = BATCH_SIZES.into_iter().max().unwrap();
-    let random_data: Vec<RpoDigest> = (0..random_data_size).map(|_| random_word()).collect();
+    let random_data: Vec<Word> = (0..random_data_size).map(|_| random_word()).collect();
 
     for size in BATCH_SIZES {
         let leaves = &random_data[..size];
@@ -230,10 +230,10 @@ fn get_node_merkletree(c: &mut Criterion) {
 fn get_node_simplesmt(c: &mut Criterion) {
     let mut group = c.benchmark_group("get_node_simplesmt");
 
-    let seed = [0u8; 32];
-    let mut rng = ChaCha20Rng::from_seed(seed);
+    // let seed = [0u8; 32];
+    // let mut rng = ChaCha20Rng::from_seed(seed);
     let random_data_size = BATCH_SIZES.into_iter().max().unwrap();
-    let random_data: Vec<RpoDigest> = (0..random_data_size).map(|_| random_word()).collect();
+    let random_data: Vec<Word> = (0..random_data_size).map(|_| random_word()).collect();
 
     for size in BATCH_SIZES {
         let leaves = &random_data[..size];
@@ -271,10 +271,10 @@ fn get_node_simplesmt(c: &mut Criterion) {
 fn get_leaf_path_merkletree(c: &mut Criterion) {
     let mut group = c.benchmark_group("get_leaf_path_merkletree");
 
-    let seed = [0u8; 32];
-    let mut rng = ChaCha20Rng::from_seed(seed);
+    // let seed = [0u8; 32];
+    // let mut rng = ChaCha20Rng::from_seed(seed);
     let random_data_size = BATCH_SIZES.into_iter().max().unwrap();
-    let random_data: Vec<RpoDigest> = (0..random_data_size).map(|_| random_word()).collect();
+    let random_data: Vec<Word> = (0..random_data_size).map(|_| random_word()).collect();
 
     for size in BATCH_SIZES {
         let leaves = &random_data[..size];
@@ -307,10 +307,10 @@ fn get_leaf_path_merkletree(c: &mut Criterion) {
 fn get_leaf_path_simplesmt(c: &mut Criterion) {
     let mut group = c.benchmark_group("get_leaf_path_simplesmt");
 
-    let seed = [0u8; 32];
-    let mut rng = ChaCha20Rng::from_seed(seed);
+    // let seed = [0u8; 32];
+    // let mut rng = ChaCha20Rng::from_seed(seed);
     let random_data_size = BATCH_SIZES.into_iter().max().unwrap();
-    let random_data: Vec<RpoDigest> = (0..random_data_size).map(|_| random_word()).collect();
+    let random_data: Vec<Word> = (0..random_data_size).map(|_| random_word()).collect();
 
     for size in BATCH_SIZES {
         let leaves = &random_data[..size];
@@ -349,10 +349,10 @@ fn get_leaf_path_simplesmt(c: &mut Criterion) {
 fn new(c: &mut Criterion) {
     let mut group = c.benchmark_group("new");
 
-    let seed = [0u8; 32];
-    let mut rng = ChaCha20Rng::from_seed(seed);
+    // let seed = [0u8; 32];
+    // let mut rng = ChaCha20Rng::from_seed(seed);
     let random_data_size = BATCH_SIZES.into_iter().max().unwrap();
-    let random_data: Vec<RpoDigest> = (0..random_data_size).map(|_| random_word()).collect();
+    let random_data: Vec<Word> = (0..random_data_size).map(|_| random_word()).collect();
 
     for size in BATCH_SIZES {
         let leaves = &random_data[..size];
@@ -413,10 +413,10 @@ fn new(c: &mut Criterion) {
 fn update_leaf_merkletree(c: &mut Criterion) {
     let mut group = c.benchmark_group("update_leaf_merkletree");
 
-    let seed = [0u8; 32];
-    let mut rng = ChaCha20Rng::from_seed(seed);
+    // let seed = [0u8; 32];
+    // let mut rng = ChaCha20Rng::from_seed(seed);
     let random_data_size = BATCH_SIZES.into_iter().max().unwrap();
-    let random_data: Vec<RpoDigest> = (0..random_data_size).map(|_| random_word()).collect();
+    let random_data: Vec<Word> = (0..random_data_size).map(|_| random_word()).collect();
 
     for size in BATCH_SIZES {
         let leaves = &random_data[..size];
@@ -456,10 +456,10 @@ fn update_leaf_merkletree(c: &mut Criterion) {
 fn update_leaf_simplesmt(c: &mut Criterion) {
     let mut group = c.benchmark_group("update_leaf_simplesmt");
 
-    let seed = [0u8; 32];
-    let mut rng = ChaCha20Rng::from_seed(seed);
+    // let seed = [0u8; 32];
+    // let mut rng = ChaCha20Rng::from_seed(seed);
     let random_data_size = BATCH_SIZES.into_iter().max().unwrap();
-    let random_data: Vec<RpoDigest> = (0..random_data_size).map(|_| random_word()).collect();
+    let random_data: Vec<Word> = (0..random_data_size).map(|_| random_word()).collect();
 
     for size in BATCH_SIZES {
         let leaves = &random_data[..size];

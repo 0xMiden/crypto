@@ -274,7 +274,7 @@ impl Serializable for SecretKey {
         let f_i8: Vec<i8> = neg_f
             .coefficients
             .iter()
-            .map(|&a| FalconFelt::from_u64(-a).balanced_value() as i8)
+            .map(|&a| FalconFelt::new(-a).balanced_value() as i8)
             .collect();
         let f_i8_encoded = encode_i8(&f_i8, WIDTH_SMALL_POLY_COEFFICIENT).unwrap();
         buffer.extend_from_slice(&f_i8_encoded);
@@ -282,7 +282,7 @@ impl Serializable for SecretKey {
         let g_i8: Vec<i8> = g
             .coefficients
             .iter()
-            .map(|&a| FalconFelt::from_u64(a).balanced_value() as i8)
+            .map(|&a| FalconFelt::new(a).balanced_value() as i8)
             .collect();
         let g_i8_encoded = encode_i8(&g_i8, WIDTH_SMALL_POLY_COEFFICIENT).unwrap();
         buffer.extend_from_slice(&g_i8_encoded);
@@ -290,7 +290,7 @@ impl Serializable for SecretKey {
         let big_f_i8: Vec<i8> = neg_big_f
             .coefficients
             .iter()
-            .map(|&a| FalconFelt::from_u64(-a).balanced_value() as i8)
+            .map(|&a| FalconFelt::new(-a).balanced_value() as i8)
             .collect();
         let big_f_i8_encoded = encode_i8(&big_f_i8, WIDTH_BIG_POLY_COEFFICIENT).unwrap();
         buffer.extend_from_slice(&big_f_i8_encoded);
@@ -338,10 +338,10 @@ impl Deserializable for SecretKey {
         )
         .unwrap();
 
-        let f = Polynomial::new(f.iter().map(|&c| FalconFelt::from_u64(c.into())).collect());
-        let g = Polynomial::new(g.iter().map(|&c| FalconFelt::from_u64(c.into())).collect());
+        let f = Polynomial::new(f.iter().map(|&c| FalconFelt::new(c.into())).collect());
+        let g = Polynomial::new(g.iter().map(|&c| FalconFelt::new(c.into())).collect());
         let big_f =
-            Polynomial::new(big_f.iter().map(|&c| FalconFelt::from_u64(c.into())).collect());
+            Polynomial::new(big_f.iter().map(|&c| FalconFelt::new(c.into())).collect());
 
         // big_g * f - g * big_f = p (mod X^n + 1)
         let big_g = g.fft().hadamard_div(&f.fft()).hadamard_mul(&big_f.fft()).ifft();
