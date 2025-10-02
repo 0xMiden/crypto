@@ -131,8 +131,8 @@ benchmark_batch! {
     |b: &mut criterion::Bencher, insert_count: usize| {
         let entries = generate_smt_entries(256);
         let mut smt = Smt::with_entries(entries).unwrap();
-        let new_key = Word::new([Felt::from_u64(999), Felt::new(1000), Felt::new(1001), Felt::new(1002)]);
-        let new_value = Word::new([Felt::from_u64(1003), Felt::new(1004), Felt::new(1005), Felt::new(1006)]);
+        let new_key = Word::new([Felt::new(999), Felt::new(1000), Felt::new(1001), Felt::new(1002)]);
+        let new_value = Word::new([Felt::new(1003), Felt::new(1004), Felt::new(1005), Felt::new(1006)]);
 
         b.iter(|| {
             for _ in 0..insert_count {

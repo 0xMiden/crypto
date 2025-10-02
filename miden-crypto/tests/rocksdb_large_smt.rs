@@ -74,7 +74,7 @@ fn rocksdb_persistence_after_insertion() {
 
     let mut smt = LargeSmt::<RocksDbStorage>::with_entries(initial_storage, entries).unwrap();
     let key = Word::new([ONE, ONE, ONE, ONE]);
-    let new_value = Word::new([Felt::from_u64(2), Felt::new(2), Felt::new(2), Felt::new(2)]);
+    let new_value = Word::new([Felt::new(2), Felt::new(2), Felt::new(2), Felt::new(2)]);
     smt.insert(key, new_value).unwrap();
     let root = smt.root().unwrap();
 

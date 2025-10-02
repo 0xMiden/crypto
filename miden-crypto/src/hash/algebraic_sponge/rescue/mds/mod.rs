@@ -1,9 +1,8 @@
-use p3_field::{PrimeCharacteristicRing, PrimeField64};
+use p3_field::PrimeField64;
 
 use super::{Felt, STATE_WIDTH, ZERO};
 mod freq;
 pub use freq::mds_multiply_freq;
-use lazy_static::lazy_static;
 
 // MDS MULTIPLICATION
 // ================================================================================================

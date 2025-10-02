@@ -159,7 +159,6 @@ const fn block3(x: [i64; 3], y: [i64; 3]) -> [i64; 3] {
 
 #[cfg(test)]
 mod tests {
-    use p3_field::PrimeCharacteristicRing;
     use proptest::prelude::*;
 
     use super::super::{Felt, MDS, ZERO, apply_mds};

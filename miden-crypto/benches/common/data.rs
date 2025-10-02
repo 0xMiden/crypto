@@ -53,7 +53,7 @@ pub fn generate_felt_array_sequential(size: usize) -> Vec<Felt> {
 
 /// Generate byte array of specified size with random data
 pub fn generate_felt_array_random(size: usize) -> Vec<Felt> {
-    iter::from_fn(|| Some(Felt::from_u64(rand_value::<u64>()))).take(size).collect()
+    iter::from_fn(|| Some(Felt::new(rand_value::<u64>()))).take(size).collect()
 }
 
 // === Word and Value Generation ===
@@ -90,7 +90,7 @@ pub fn generate_value<T: winter_utils::Randomizable + std::fmt::Debug + Clone>(
 /// Generate word using specified pattern
 pub fn generate_word_pattern(i: u64, pattern: WordPattern) -> Word {
     match pattern {
-        WordPattern::MerkleStandard => Word::new([Felt::from_u64(i), ONE, ONE, Felt::new(i)]),
+        WordPattern::MerkleStandard => Word::new([Felt::new(i), ONE, ONE, Felt::new(i)]),
         WordPattern::Sequential => {
             Word::new([Felt::new(i), Felt::new(i + 1), Felt::new(i + 2), Felt::new(i + 3)])
         },

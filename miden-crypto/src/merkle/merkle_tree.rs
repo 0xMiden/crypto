@@ -263,7 +263,6 @@ pub fn path_to_text(path: &MerklePath) -> Result<String, fmt::Error> {
 mod tests {
     use core::mem::size_of;
 
-    use p3_field::PrimeCharacteristicRing;
     use proptest::prelude::*;
 
     use super::*;
@@ -399,7 +398,7 @@ mod tests {
             // that assumes this equivalence.
 
             // build a word and copy it to another address as digest
-            let word = [Felt::from_u64(a), Felt::new(b), Felt::new(c), Felt::new(d)];
+            let word = [Felt::new(a), Felt::new(b), Felt::new(c), Felt::new(d)];
             let digest = Word::from(word);
 
             // assert the addresses are different

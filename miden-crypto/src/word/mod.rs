@@ -63,10 +63,7 @@ impl Word {
     /// ```
     /// use miden_crypto::{Felt, Word, word};
     /// let word = word!("0x1000000000000000200000000000000030000000000000004000000000000000");
-    /// assert_eq!(
-    ///     word,
-    ///     Word::new([Felt::from_u64(16), Felt::new(32), Felt::new(48), Felt::new(64)])
-    /// );
+    /// assert_eq!(word, Word::new([Felt::new(16), Felt::new(32), Felt::new(48), Felt::new(64)]));
     /// ```
     pub const fn parse(hex: &str) -> Result<Self, &'static str> {
         const fn parse_hex_digit(digit: u8) -> Result<u8, &'static str> {
@@ -111,7 +108,7 @@ impl Word {
             i += 1;
         }
 
-        // Ensure each felt is within bounds as `Felt::from_u64` silently wraps around.
+        // Ensure each felt is within bounds as `Felt::new` silently wraps around.
         // This matches the behavior of `Word::try_from(String)`.
         let mut idx = 0;
         while idx < felts.len() {

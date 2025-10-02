@@ -107,7 +107,7 @@ benchmark_with_setup_data! {
     || {
         let secret_keys: Vec<SecretKey> = (0..KEYGEN_ITERATIONS).map(|_| SecretKey::new()).collect();
         let messages: Vec<Word> =
-            (0..KEYGEN_ITERATIONS).map(|i| Word::new([Felt::from_u64(i as u64); 4])).collect();
+            (0..KEYGEN_ITERATIONS).map(|i| Word::new([Felt::new(i as u64); 4])).collect();
         (secret_keys, messages)
     },
     |b: &mut criterion::Bencher, (secret_keys, messages): &(Vec<SecretKey>, Vec<Word>)| {
@@ -128,7 +128,7 @@ benchmark_with_setup_data! {
     || {
         let secret_keys: Vec<SecretKey> = (0..KEYGEN_ITERATIONS).map(|_| SecretKey::new()).collect();
         let messages: Vec<Word> =
-            (0..KEYGEN_ITERATIONS).map(|i| Word::new([Felt::from_u64(i as u64); 4])).collect();
+            (0..KEYGEN_ITERATIONS).map(|i| Word::new([Felt::new(i as u64); 4])).collect();
         let rngs: Vec<_> = (0..KEYGEN_ITERATIONS).map(|_| rng()).collect();
         (secret_keys, messages, rngs)
     },
@@ -158,7 +158,7 @@ benchmark_with_setup_data! {
             (0..KEYGEN_ITERATIONS).map(|_| SecretKey::with_rng(&mut rng)).collect();
         let public_keys: Vec<PublicKey> = secret_keys.iter().map(|sk| sk.public_key()).collect();
         let messages: Vec<Word> =
-            (0..KEYGEN_ITERATIONS).map(|i| Word::new([Felt::from_u64(i as u64); 4])).collect();
+            (0..KEYGEN_ITERATIONS).map(|i| Word::new([Felt::new(i as u64); 4])).collect();
         let signatures: Vec<Signature> = secret_keys
             .iter()
             .zip(messages.iter())

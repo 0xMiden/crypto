@@ -1,7 +1,5 @@
 use alloc::collections::BTreeSet;
 
-use lazy_static::lazy_static;
-
 use super::{
     EMPTY_WORD, EmptySubtreeRoots, InnerNode, InnerNodeInfo, InnerNodes, LeafIndex, MerkleError,
     MutationSet, NodeIndex, SMT_MAX_DEPTH, SMT_MIN_DEPTH, SparseMerkleTree, Word,
@@ -187,8 +185,8 @@ impl<const DEPTH: u8> SimpleSmt<DEPTH> {
 
     /// Returns a boolean value indicating whether the SMT is empty.
     pub fn is_empty(&self) -> bool {
-        debug_assert_eq!(self.leaves.is_empty(), self.root == ROOTS[DEPTH as usize]);
-        self.root == ROOTS[DEPTH as usize]
+        debug_assert_eq!(self.leaves.is_empty(), self.root == Self::EMPTY_ROOT);
+        self.root == Self::EMPTY_ROOT
     }
 
     // ITERATORS
@@ -347,15 +345,7 @@ impl<const DEPTH: u8> SimpleSmt<DEPTH> {
         Ok(self.root)
     }
 }
-lazy_static! {
-    static ref ROOTS: [Word; 256] = {
-        let mut array = [Word::default(); 256];
-        for i in 0..256 {
-            array[i] = Word::default();
-        }
-        array
-    };
-}
+
 impl<const DEPTH: u8> SparseMerkleTree<DEPTH> for SimpleSmt<DEPTH> {
     type Key = LeafIndex<DEPTH>;
     type Value = Word;

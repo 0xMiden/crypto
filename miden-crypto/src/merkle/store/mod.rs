@@ -37,7 +37,7 @@ pub struct StoreNode {
 /// # use miden_crypto::hash::rpo::Rpo256;
 /// # use miden_crypto::PrimeCharacteristicRing;
 /// # fn int_to_node(value: u64) -> Word {
-/// #     [Felt::from_u64(value), ZERO, ZERO, ZERO]
+/// #     [Felt::new(value), ZERO, ZERO, ZERO]
 /// # }
 /// # let A = int_to_node(1);
 /// # let B = int_to_node(2);

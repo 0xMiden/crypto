@@ -33,12 +33,12 @@ use crate::config::{DEFAULT_MEASUREMENT_TIME, DEFAULT_SAMPLE_SIZE, FIELD_BATCH_S
 
 /// Configuration for Word testing
 const TEST_WORDS: [Word; 10] = [
-    Word::new([Felt::from_u64(0), Felt::new(0), Felt::new(0), Felt::new(0)]),
-    Word::new([Felt::from_u64(1), Felt::new(0), Felt::new(0), Felt::new(0)]),
-    Word::new([Felt::from_u64(0), Felt::new(1), Felt::new(0), Felt::new(0)]),
-    Word::new([Felt::from_u64(0), Felt::new(0), Felt::new(1), Felt::new(0)]),
-    Word::new([Felt::from_u64(0), Felt::new(0), Felt::new(0), Felt::new(1)]),
-    Word::new([Felt::from_u64(1), Felt::new(1), Felt::new(1), Felt::new(1)]),
+    Word::new([Felt::new(0), Felt::new(0), Felt::new(0), Felt::new(0)]),
+    Word::new([Felt::new(1), Felt::new(0), Felt::new(0), Felt::new(0)]),
+    Word::new([Felt::new(0), Felt::new(1), Felt::new(0), Felt::new(0)]),
+    Word::new([Felt::new(0), Felt::new(0), Felt::new(1), Felt::new(0)]),
+    Word::new([Felt::new(0), Felt::new(0), Felt::new(0), Felt::new(1)]),
+    Word::new([Felt::new(1), Felt::new(1), Felt::new(1), Felt::new(1)]),
     Word::new([Felt::new(u64::MAX), Felt::new(0), Felt::new(0), Felt::new(0)]),
     Word::new([Felt::new(0), Felt::new(u64::MAX), Felt::new(0), Felt::new(0)]),
     Word::new([Felt::new(0), Felt::new(0), Felt::new(u64::MAX), Felt::new(0)]),

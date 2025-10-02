@@ -2,7 +2,6 @@ use alloc::{string::ToString, vec::Vec};
 use core::ops::Deref;
 
 use num::Zero;
-use p3_goldilocks::Goldilocks as Felt;
 
 use super::{
     ByteReader, ByteWriter, Deserializable, DeserializationError, LOG_N, MODULUS, N, Nonce,

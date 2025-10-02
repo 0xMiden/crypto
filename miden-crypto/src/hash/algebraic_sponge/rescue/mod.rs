@@ -1,4 +1,3 @@
-use lazy_static::lazy_static;
 use p3_field::PrimeCharacteristicRing;
 
 #[cfg(test)]

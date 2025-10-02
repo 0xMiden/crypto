@@ -9,7 +9,7 @@ use crate::{ONE, Word, hash::algebraic_sponge::AlgebraicSponge};
 
 #[test]
 fn hash_elements_vs_merge() {
-    let elements = [Felt::from_u64(rand_value()); 8];
+    let elements = [Felt::new(rand_value()); 8];
 
     let digests: [Word; 2] = [
         Word::new(elements[..4].try_into().unwrap()),
@@ -23,7 +23,7 @@ fn hash_elements_vs_merge() {
 
 #[test]
 fn merge_vs_merge_in_domain() {
-    let elements = [Felt::from_u64(rand_value()); 8];
+    let elements = [Felt::new(rand_value()); 8];
 
     let digests: [Word; 2] = [
         Word::new(elements[..4].try_into().unwrap()),
@@ -50,7 +50,7 @@ fn merge_vs_merge_in_domain() {
 
 #[test]
 fn hash_elements_vs_merge_with_int() {
-    let tmp = [Felt::from_u64(rand_value()); 4];
+    let tmp = [Felt::new(rand_value()); 4];
     let seed = Word::new(tmp);
 
     // ----- value fits into a field element ------------------------------------------------------
@@ -68,7 +68,7 @@ fn hash_elements_vs_merge_with_int() {
     let m_result = <Rpx256 as Hasher>::merge_with_int(seed, val);
 
     let mut elements = seed.as_elements().to_vec();
-    elements.push(Felt::from_u64(val));
+    elements.push(Felt::new(val));
     elements.push(ONE);
     let h_result = Rpx256::hash_elements(&elements);
 
@@ -100,7 +100,7 @@ fn hash_padding() {
 
 #[test]
 fn hash_elements_padding() {
-    let e1 = [Felt::from_u64(rand_value()); 2];
+    let e1 = [Felt::new(rand_value()); 2];
     let e2 = [e1[0], e1[1], ZERO];
 
     let r1 = Rpx256::hash_elements(&e1);

@@ -1,6 +1,6 @@
 use alloc::{string::ToString, vec::Vec};
 
-use p3_field::{PrimeCharacteristicRing, PrimeField64};
+use p3_field::PrimeField64;
 
 use super::{
     EMPTY_WORD, EmptySubtreeRoots, Felt, InnerNode, InnerNodeInfo, InnerNodes, LeafIndex,
@@ -9,7 +9,6 @@ use super::{
 
 mod error;
 pub use error::{SmtLeafError, SmtProofError};
-use lazy_static::lazy_static;
 
 mod leaf;
 pub use leaf::SmtLeaf;
@@ -107,9 +106,7 @@ pub struct Smt {
     pub(super) leaves: Leaves,
     pub(super) inner_nodes: InnerNodes,
 }
-lazy_static! {
-    static ref ROOTS: [Word; 256] = [Word::default(); 256];
-}
+
 impl Smt {
     // CONSTANTS
     // --------------------------------------------------------------------------------------------
@@ -277,8 +274,8 @@ impl Smt {
 
     /// Returns a boolean value indicating whether the SMT is empty.
     pub fn is_empty(&self) -> bool {
-        debug_assert_eq!(self.leaves.is_empty(), self.root == ROOTS[self.depth() as usize]);
-        self.root == ROOTS[self.depth() as usize]
+        debug_assert_eq!(self.leaves.is_empty(), self.root == Self::EMPTY_ROOT);
+        self.root == Self::EMPTY_ROOT
     }
 
     // ITERATORS
