@@ -53,7 +53,7 @@ impl<K: KeyAgreementScheme, A: AeadScheme> CryptoBox<K, A> {
         let mut encryption_key = A::key_from_bytes(&encryption_key_bytes)
             .map_err(|_| IntegratedEncryptionSchemeError::EncryptionKeyCreationFailed)?;
 
-        let ciphertext = A::encrypt_bytes(&encryption_key, plaintext, associated_data)
+        let ciphertext = A::encrypt_bytes(&encryption_key, rng, plaintext, associated_data)
             .map_err(|_| IntegratedEncryptionSchemeError::EncryptionFailed)?;
 
         encryption_key.zeroize();
@@ -116,7 +116,7 @@ impl<K: KeyAgreementScheme, A: AeadScheme> CryptoBox<K, A> {
         let mut encryption_key = A::key_from_bytes(&encryption_key_bytes)
             .map_err(|_| IntegratedEncryptionSchemeError::EncryptionKeyCreationFailed)?;
 
-        let ciphertext = A::encrypt_elements(&encryption_key, plaintext, associated_data)
+        let ciphertext = A::encrypt_elements(&encryption_key, rng, plaintext, associated_data)
             .map_err(|_| IntegratedEncryptionSchemeError::EncryptionFailed)?;
 
         encryption_key.zeroize();

@@ -329,13 +329,15 @@ impl AeadScheme for XChaCha {
         SecretKey::read_from_bytes(bytes).map_err(|_| EncryptionError::FailedOperation)
     }
 
-    fn encrypt_bytes(
+    fn encrypt_bytes<R: rand::CryptoRng + rand::RngCore>(
         key: &Self::Key,
+        rng: &mut R,
         plaintext: &[u8],
         associated_data: &[u8],
     ) -> Result<Vec<u8>, EncryptionError> {
+        let nonce = Nonce::with_rng(rng);
         let encrypted_data = key
-            .encrypt_bytes_with_associated_data(plaintext, associated_data)
+            .encrypt_bytes_with_nonce(plaintext, associated_data, nonce)
             .map_err(|_| EncryptionError::FailedOperation)?;
         Ok(encrypted_data.to_bytes())
     }

@@ -44,8 +44,9 @@ pub(crate) trait AeadScheme {
     // BYTE METHODS
     // ================================================================================================
 
-    fn encrypt_bytes(
+    fn encrypt_bytes<R: rand::CryptoRng + rand::RngCore>(
         key: &Self::Key,
+        rng: &mut R,
         plaintext: &[u8],
         associated_data: &[u8],
     ) -> Result<Vec<u8>, EncryptionError>;
@@ -60,15 +61,16 @@ pub(crate) trait AeadScheme {
     // ================================================================================================
 
     /// Encrypts field elements with associated data. Default implementation converts to bytes.
-    fn encrypt_elements(
+    fn encrypt_elements<R: rand::CryptoRng + rand::RngCore>(
         key: &Self::Key,
+        rng: &mut R,
         plaintext: &[Felt],
         associated_data: &[Felt],
     ) -> Result<Vec<u8>, EncryptionError> {
         let plaintext_bytes = crate::utils::elements_to_bytes(plaintext);
         let ad_bytes = crate::utils::elements_to_bytes(associated_data);
 
-        Self::encrypt_bytes(key, &plaintext_bytes, &ad_bytes)
+        Self::encrypt_bytes(key, rng, &plaintext_bytes, &ad_bytes)
     }
 
     /// Decrypts field elements with associated data. Default implementation uses byte decryption.

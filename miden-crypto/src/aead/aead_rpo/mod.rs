@@ -680,13 +680,15 @@ impl AeadScheme for AeadRpo {
         }
     }
 
-    fn encrypt_bytes(
+    fn encrypt_bytes<R: rand::CryptoRng + rand::RngCore>(
         key: &Self::Key,
+        rng: &mut R,
         plaintext: &[u8],
         associated_data: &[u8],
     ) -> Result<Vec<u8>, EncryptionError> {
+        let nonce = Nonce::with_rng(rng);
         let encrypted_data = key
-            .encrypt_bytes_with_associated_data(plaintext, associated_data)
+            .encrypt_bytes_with_nonce(plaintext, associated_data, nonce)
             .map_err(|_| EncryptionError::FailedOperation)?;
         let result = encrypted_data.to_bytes();
 
@@ -707,13 +709,15 @@ impl AeadScheme for AeadRpo {
     // OPTIMIZED FELT METHODS
     // ================================================================================================
 
-    fn encrypt_elements(
+    fn encrypt_elements<R: rand::CryptoRng + rand::RngCore>(
         key: &Self::Key,
+        rng: &mut R,
         plaintext: &[Felt],
         associated_data: &[Felt],
     ) -> Result<Vec<u8>, EncryptionError> {
+        let nonce = Nonce::with_rng(rng);
         let encrypted_data = key
-            .encrypt_elements_with_associated_data(plaintext, associated_data)
+            .encrypt_elements_with_nonce(plaintext, associated_data, nonce)
             .map_err(|_| EncryptionError::FailedOperation)?;
         let result = encrypted_data.to_bytes();
 
