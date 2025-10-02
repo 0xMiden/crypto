@@ -648,8 +648,6 @@ impl Smt {
 
 #[test]
 fn test_smt_serialization_deserialization() {
-    use p3_field::PrimeCharacteristicRing;
-
     // Smt for default types (empty map)
     let smt_default = Smt::default();
     let bytes = smt_default.to_bytes();
@@ -659,12 +657,12 @@ fn test_smt_serialization_deserialization() {
     // Smt with values
     let smt_leaves_2: [(Word, Word); 2] = [
         (
-            Word::new([Felt::new(101), Felt::new(102), Felt::new(103), Felt::new(104)]),
-            [Felt::new(1_u64), Felt::new(2_u64), Felt::new(3_u64), Felt::new(4_u64)],
+            Word::new([Felt::new(105), Felt::new(106), Felt::new(107), Felt::new(108)]),
+            [Felt::new(5_u64), Felt::new(6_u64), Felt::new(7_u64), Felt::new(8_u64)].into(),
         ),
         (
-            Word::new([Felt::new(105), Felt::new(106), Felt::new(107), Felt::new(108)]),
-            [Felt::new(5_u64), Felt::new(6_u64), Felt::new(7_u64), Felt::new(8_u64)],
+            Word::new([Felt::new(101), Felt::new(102), Felt::new(103), Felt::new(104)]),
+            [Felt::new(1_u64), Felt::new(2_u64), Felt::new(3_u64), Felt::new(4_u64)].into(),
         ),
     ];
     let smt = Smt::with_entries(smt_leaves_2).unwrap();

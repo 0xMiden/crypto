@@ -364,40 +364,33 @@ mod tests {
     use alloc::collections::{BTreeMap, BTreeSet};
 
     use assert_matches::assert_matches;
-    use p3_goldilocks::Goldilocks as Felt;
-    use rand::{RngCore, distr::StandardUniform};
-    use rand_chacha::ChaCha20Rng;
     use rand_utils::{rand_array, rand_value};
 
     use super::*;
-    use crate::{EMPTY_WORD, ONE, ZERO, merkle::EmptySubtreeRoots};
+    use crate::{EMPTY_WORD, Felt, ONE, ZERO, merkle::EmptySubtreeRoots};
 
-    fn random_array<T: RngCore>(rng: &mut T) -> [Felt; 4] {
-        rng.sample(StandardUniform)
-    }
     /// Tests that a basic PartialSmt can be built from a full one and that inserting or removing
     /// values whose merkle path were added to the partial SMT results in the same root as the
     /// equivalent update in the full tree.
     #[test]
     fn partial_smt_insert_and_remove() {
-        let mut rng = ChaCha20Rng::seed_from_u64(0);
-        let key0 = Word::from(Word::from(random_array(&mut rng)));
-        let key1 = Word::from(Word::from(random_array(&mut rng)));
-        let key2 = Word::from(Word::from(random_array(&mut rng)));
+        let key0 = Word::from(rand_array::<Felt, 4>());
+        let key1 = Word::from(rand_array::<Felt, 4>());
+        let key2 = Word::from(rand_array::<Felt, 4>());
         // A key for which we won't add a value so it will be empty.
-        let key_empty = Word::from(Word::from(random_array(&mut rng)));
+        let key_empty = Word::from(rand_array::<Felt, 4>());
 
-        let value0 = Word::from(random_array(&mut rng));
-        let value1 = Word::from(random_array(&mut rng));
-        let value2 = Word::from(random_array(&mut rng));
+        let value0 = Word::from(rand_array::<Felt, 4>());
+        let value1 = Word::from(rand_array::<Felt, 4>());
+        let value2 = Word::from(rand_array::<Felt, 4>());
 
         let mut kv_pairs = vec![(key0, value0), (key1, value1), (key2, value2)];
 
         // Add more random leaves.
         kv_pairs.reserve(1000);
         for _ in 0..1000 {
-            let key = Word::from(Word::from(random_array(&mut rng)));
-            let value = Word::from(random_array(&mut rng));
+            let key = Word::from(rand_array::<Felt, 4>());
+            let value = Word::from(rand_array::<Felt, 4>());
             kv_pairs.push((key, value));
         }
 
@@ -423,19 +416,19 @@ mod tests {
         // Insert new values for added keys with empty and non-empty values.
         // ----------------------------------------------------------------------------------------
 
-        let new_value0 = Word::from(random_array(&mut rng));
-        let new_value2 = Word::from(random_array(&mut rng));
+        let new_value0 = Word::from(rand_array::<Felt, 4>());
+        let new_value2 = Word::from(rand_array::<Felt, 4>());
         // A non-empty value for the key that was previously empty.
-        let new_value_empty_key = Word::from(random_array(&mut rng));
+        let new_value_empty_key = Word::from(rand_array::<Felt, 4>());
 
-        let _ = full.insert(key0, new_value0);
-        let _ = full.insert(key2, new_value2);
-        let _ = full.insert(key_empty, new_value_empty_key);
+        full.insert(key0, new_value0).unwrap();
+        full.insert(key2, new_value2).unwrap();
+        full.insert(key_empty, new_value_empty_key).unwrap();
 
-        let _ = partial.insert(key0, new_value0).unwrap();
-        let _ = partial.insert(key2, new_value2).unwrap();
+        partial.insert(key0, new_value0).unwrap();
+        partial.insert(key2, new_value2).unwrap();
         // This updates a key whose value was previously empty.
-        let _ = partial.insert(key_empty, new_value_empty_key).unwrap();
+        partial.insert(key_empty, new_value_empty_key).unwrap();
 
         assert_eq!(full.root(), partial.root());
         assert_eq!(partial.get_value(&key0).unwrap(), new_value0);
@@ -445,8 +438,8 @@ mod tests {
         // Remove an added key.
         // ----------------------------------------------------------------------------------------
 
-        let _ = full.insert(key0, EMPTY_WORD);
-        let _ = partial.insert(key0, EMPTY_WORD).unwrap();
+        full.insert(key0, EMPTY_WORD).unwrap();
+        partial.insert(key0, EMPTY_WORD).unwrap();
 
         assert_eq!(full.root(), partial.root());
         assert_eq!(partial.get_value(&key0).unwrap(), EMPTY_WORD);
@@ -462,7 +455,7 @@ mod tests {
         // Attempting to update a key whose merkle path was not added is an error.
         // ----------------------------------------------------------------------------------------
 
-        let error = partial.clone().insert(key1, Word::from(random_array(&mut rng))).unwrap_err();
+        let error = partial.clone().insert(key1, Word::from(rand_array::<Felt, 4>())).unwrap_err();
         assert_matches!(error, MerkleError::UntrackedKey(_));
 
         let error = partial.insert(key1, EMPTY_WORD).unwrap_err();
@@ -472,15 +465,14 @@ mod tests {
     /// Test that we can add an SmtLeaf::Multiple variant to a partial SMT.
     #[test]
     fn partial_smt_multiple_leaf_success() {
-        let mut rng = ChaCha20Rng::seed_from_u64(0);
         // key0 and key1 have the same felt at index 3 so they will be placed in the same leaf.
-        let key0 = Word::from(Word::from([ZERO, ZERO, ZERO, ONE]));
-        let key1 = Word::from(Word::from([ONE, ONE, ONE, ONE]));
-        let key2 = Word::from(Word::from(random_array(&mut rng)));
+        let key0 = Word::from([ZERO, ZERO, ZERO, ONE]);
+        let key1 = Word::from([ONE, ONE, ONE, ONE]);
+        let key2 = Word::from(rand_array::<Felt, 4>());
 
-        let value0 = Word::from(random_array(&mut rng));
-        let value1 = Word::from(random_array(&mut rng));
-        let value2 = Word::from(random_array(&mut rng));
+        let value0 = Word::from(rand_array::<Felt, 4>());
+        let value1 = Word::from(rand_array::<Felt, 4>());
+        let value2 = Word::from(rand_array::<Felt, 4>());
 
         let full = Smt::with_entries([(key0, value0), (key1, value1), (key2, value2)]).unwrap();
 
@@ -508,13 +500,12 @@ mod tests {
     /// This test uses only empty values in the partial SMT.
     #[test]
     fn partial_smt_root_mismatch_on_empty_values() {
-        let mut rng = ChaCha20Rng::seed_from_u64(0);
-        let key0 = Word::from(Word::from(random_array(&mut rng)));
-        let key1 = Word::from(Word::from(random_array(&mut rng)));
-        let key2 = Word::from(Word::from(random_array(&mut rng)));
+        let key0 = Word::from(rand_array::<Felt, 4>());
+        let key1 = Word::from(rand_array::<Felt, 4>());
+        let key2 = Word::from(rand_array::<Felt, 4>());
 
         let value0 = EMPTY_WORD;
-        let value1 = Word::from(random_array(&mut rng));
+        let value1 = Word::from(rand_array::<Felt, 4>());
         let value2 = EMPTY_WORD;
 
         let kv_pairs = vec![(key0, value0)];
@@ -524,8 +515,8 @@ mod tests {
         let stale_proof0 = full.open(&key0);
 
         // Insert a non-empty value so the root actually changes.
-        let _ = full.insert(key1, value1);
-        let _ = full.insert(key2, value2);
+        full.insert(key1, value1).unwrap();
+        full.insert(key2, value2).unwrap();
 
         let proof2 = full.open(&key2);
 
@@ -542,14 +533,13 @@ mod tests {
     /// This test uses only non-empty values in the partial SMT.
     #[test]
     fn partial_smt_root_mismatch_on_non_empty_values() {
-        let mut rng = ChaCha20Rng::seed_from_u64(0);
-        let key0 = Word::from(Word::from(random_array(&mut rng)));
-        let key1 = Word::from(Word::from(random_array(&mut rng)));
-        let key2 = Word::from(Word::from(random_array(&mut rng)));
+        let key0 = Word::new(rand_array());
+        let key1 = Word::new(rand_array());
+        let key2 = Word::new(rand_array());
 
-        let value0 = Word::from(random_array(&mut rng));
-        let value1 = Word::from(random_array(&mut rng));
-        let value2 = Word::from(random_array(&mut rng));
+        let value0 = Word::new(rand_array());
+        let value1 = Word::new(rand_array());
+        let value2 = Word::new(rand_array());
 
         let kv_pairs = vec![(key0, value0), (key1, value1)];
 
@@ -557,7 +547,7 @@ mod tests {
         // This proof will be stale after we insert another value.
         let stale_proof0 = full.open(&key0);
 
-        let _ = full.insert(key2, value2);
+        full.insert(key2, value2).unwrap();
 
         let proof2 = full.open(&key2);
 

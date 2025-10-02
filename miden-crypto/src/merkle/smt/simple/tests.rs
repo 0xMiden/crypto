@@ -34,22 +34,7 @@ const VALUES8: [Word; 8] = [
     int_to_node(8),
 ];
 
-fn values8() -> [Word; 8] {
-    [
-        int_to_node(1),
-        int_to_node(2),
-        int_to_node(3),
-        int_to_node(4),
-        int_to_node(5),
-        int_to_node(6),
-        int_to_node(7),
-        int_to_node(8),
-    ]
-}
-
-fn zero_values8() -> [Word; 8] {
-    [int_to_leaf(0).into(); 8]
-}
+const ZERO_VALUES8: [Word; 8] = [int_to_leaf(0); 8];
 
 // TESTS
 // ================================================================================================
@@ -58,7 +43,7 @@ fn zero_values8() -> [Word; 8] {
 fn build_empty_tree() {
     // tree of depth 3
     let smt = SimpleSmt::<3>::new().unwrap();
-    let mt = MerkleTree::new(zero_values8()).unwrap();
+    let mt = MerkleTree::new(ZERO_VALUES8).unwrap();
     assert_eq!(mt.root(), smt.root());
 }
 
@@ -66,7 +51,7 @@ fn build_empty_tree() {
 fn build_sparse_tree() {
     const DEPTH: u8 = 3;
     let mut smt = SimpleSmt::<DEPTH>::new().unwrap();
-    let mut values = zero_values8().to_vec();
+    let mut values = ZERO_VALUES8.to_vec();
 
     assert_eq!(smt.num_leaves(), 0);
 
@@ -122,10 +107,10 @@ fn test_depth2_tree() {
     assert_eq!(node3, tree.get_node(NodeIndex::make(1, 1)).unwrap());
 
     // check get_node()
-    assert_eq!(values4()[0], tree.get_node(NodeIndex::make(2, 0)).unwrap());
-    assert_eq!(values4()[1], tree.get_node(NodeIndex::make(2, 1)).unwrap());
-    assert_eq!(values4()[2], tree.get_node(NodeIndex::make(2, 2)).unwrap());
-    assert_eq!(values4()[3], tree.get_node(NodeIndex::make(2, 3)).unwrap());
+    assert_eq!(VALUES4[0], tree.get_node(NodeIndex::make(2, 0)).unwrap());
+    assert_eq!(VALUES4[1], tree.get_node(NodeIndex::make(2, 1)).unwrap());
+    assert_eq!(VALUES4[2], tree.get_node(NodeIndex::make(2, 2)).unwrap());
+    assert_eq!(VALUES4[3], tree.get_node(NodeIndex::make(2, 3)).unwrap());
 
     // check get_path(): depth 2
     assert_eq!(
@@ -151,10 +136,10 @@ fn test_inner_node_iterator() -> Result<(), MerkleError> {
     let tree = SimpleSmt::<2>::with_leaves(KEYS4.into_iter().zip(VALUES4.to_vec())).unwrap();
 
     // check depth 2
-    assert_eq!(values4()[0], tree.get_node(NodeIndex::make(2, 0)).unwrap());
-    assert_eq!(values4()[1], tree.get_node(NodeIndex::make(2, 1)).unwrap());
-    assert_eq!(values4()[2], tree.get_node(NodeIndex::make(2, 2)).unwrap());
-    assert_eq!(values4()[3], tree.get_node(NodeIndex::make(2, 3)).unwrap());
+    assert_eq!(VALUES4[0], tree.get_node(NodeIndex::make(2, 0)).unwrap());
+    assert_eq!(VALUES4[1], tree.get_node(NodeIndex::make(2, 1)).unwrap());
+    assert_eq!(VALUES4[2], tree.get_node(NodeIndex::make(2, 2)).unwrap());
+    assert_eq!(VALUES4[3], tree.get_node(NodeIndex::make(2, 3)).unwrap());
 
     // get parent nodes
     let root = tree.root();
@@ -469,7 +454,6 @@ fn test_simplesmt_set_subtree_entire_tree() {
     assert_eq!(tree.root(), *EmptySubtreeRoots::entry(DEPTH, 0));
 }
 
-/*
 /// Tests that `EMPTY_ROOT` constant generated in the `SimpleSmt` equals to the root of the empty
 /// tree of depth 64
 #[test]
@@ -484,15 +468,15 @@ fn test_simplesmt_check_empty_root_constant() {
 
     // get the root of the empty tree of depth 0
     let empty_root_1_depth = EmptySubtreeRoots::empty_hashes(1)[0];
-    assert_eq!(empty_root_1_depth, ROOTS[empty_root_1_depth.depth()]);
+    assert_eq!(empty_root_1_depth, SimpleSmt::<1>::EMPTY_ROOT);
 }
- */
+
 // HELPER FUNCTIONS
 // --------------------------------------------------------------------------------------------
 
 fn compute_internal_nodes() -> (Word, Word, Word) {
-    let node2 = Rpo256::merge(&[values4()[0], values4()[1]]);
-    let node3 = Rpo256::merge(&[values4()[2], values4()[3]]);
+    let node2 = Rpo256::merge(&[VALUES4[0], VALUES4[1]]);
+    let node3 = Rpo256::merge(&[VALUES4[2], VALUES4[3]]);
     let root = Rpo256::merge(&[node2, node3]);
 
     (root, node2, node3)

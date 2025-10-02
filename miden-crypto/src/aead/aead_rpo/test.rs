@@ -116,10 +116,10 @@ proptest! {
         let nonce2 = Nonce::from_word(nonce_word.into());
 
         let associated_data: Vec<Felt> = associated_data.into_iter()
-            .map(Felt::from_u64)
+            .map(Felt::new)
             .collect();
         let data: Vec<Felt> = data.into_iter()
-            .map(Felt::from_u64)
+            .map(Felt::new)
             .collect();
 
         let encrypted1 = key1.encrypt_elements_with_nonce(&data, &associated_data, nonce1).unwrap();
@@ -142,10 +142,10 @@ proptest! {
         let nonce2 = Nonce::from_word([ONE; 4].into());
 
         let associated_data: Vec<Felt> = associated_data.into_iter()
-            .map(Felt::from_u64)
+            .map(Felt::new)
             .collect();
         let data: Vec<Felt> = data.into_iter()
-            .map(Felt::from_u64)
+            .map(Felt::new)
             .collect();
 
         let encrypted1 = key.encrypt_elements_with_nonce(&data,&associated_data, nonce1).unwrap();
@@ -209,7 +209,7 @@ fn test_single_element_encryption() {
     let nonce = Nonce::with_rng(&mut rng);
 
     let associated_data: Vec<Felt> = vec![ZERO; 8];
-    let data = vec![Felt::from_u64(42)];
+    let data = vec![Felt::new(42)];
     let encrypted = key.encrypt_elements_with_nonce(&data, &associated_data, nonce).unwrap();
     let decrypted =
         key.decrypt_elements_with_associated_data(&encrypted, &associated_data).unwrap();
@@ -285,7 +285,7 @@ fn test_ciphertext_tampering_detection() {
     let nonce = Nonce::with_rng(&mut rng);
 
     let associated_data: Vec<Felt> = vec![ONE; 8];
-    let data = vec![Felt::from_u64(123), Felt::new(456)];
+    let data = vec![Felt::new(123), Felt::new(456)];
     let mut encrypted = key.encrypt_elements_with_nonce(&data, &associated_data, nonce).unwrap();
 
     // Tamper with ciphertext
@@ -303,7 +303,7 @@ fn test_auth_tag_tampering_detection() {
     let nonce = Nonce::with_rng(&mut rng);
 
     let associated_data: Vec<Felt> = vec![ONE; 8];
-    let data = vec![Felt::from_u64(123), Felt::new(456)];
+    let data = vec![Felt::new(123), Felt::new(456)];
     let mut encrypted = key.encrypt_elements_with_nonce(&data, &associated_data, nonce).unwrap();
 
     // Tamper with auth tag
@@ -324,7 +324,7 @@ fn test_wrong_key_detection() {
     let nonce = Nonce::with_rng(&mut rng);
 
     let associated_data: Vec<Felt> = vec![ONE; 8];
-    let data = vec![Felt::from_u64(123), Felt::new(456)];
+    let data = vec![Felt::new(123), Felt::new(456)];
     let encrypted = key1.encrypt_elements_with_nonce(&data, &associated_data, nonce).unwrap();
 
     // Try to decrypt with wrong key
@@ -341,7 +341,7 @@ fn test_wrong_nonce_detection() {
     let nonce2 = Nonce::with_rng(&mut rng);
 
     let associated_data: Vec<Felt> = vec![ONE; 8];
-    let data = vec![Felt::from_u64(123), Felt::new(456)];
+    let data = vec![Felt::new(123), Felt::new(456)];
     let mut encrypted = key.encrypt_elements_with_nonce(&data, &associated_data, nonce1).unwrap();
 
     // Try to decrypt with wrong nonce

@@ -4,7 +4,6 @@ use alloc::{
 };
 
 use assert_matches::assert_matches;
-use p3_field::PrimeCharacteristicRing;
 use proptest::prelude::*;
 use rand::{Rng, prelude::IteratorRandom, rng};
 
@@ -29,16 +28,16 @@ fn smtleaf_to_subtree_leaf(leaf: &SmtLeaf) -> SubtreeLeaf {
 fn test_sorted_pairs_to_leaves() {
     let entries: Vec<(Word, Word)> = vec![
         // Subtree 0.
-        (Word::new([ONE, ONE, ONE, Felt::new(16)]), [ONE; 4]),
-        (Word::new([ONE, ONE, ONE, Felt::new(17)]), [ONE; 4]),
+        ([ONE, ONE, ONE, Felt::new(16)].into(), [ONE; 4].into()),
+        ([ONE, ONE, ONE, Felt::new(17)].into(), [ONE; 4].into()),
         // Leaf index collision.
-        (Word::new([ONE, ONE, Felt::new(10), Felt::new(20)]), [ONE; 4]),
-        (Word::new([ONE, ONE, Felt::new(20), Felt::new(20)]), [ONE; 4]),
+        ([ONE, ONE, Felt::new(10), Felt::new(20)].into(), [ONE; 4].into()),
+        ([ONE, ONE, Felt::new(20), Felt::new(20)].into(), [ONE; 4].into()),
         // Subtree 1. Normal single leaf again.
-        (Word::new([ONE, ONE, ONE, Felt::new(400)]), [ONE; 4]), // Subtree boundary.
-        (Word::new([ONE, ONE, ONE, Felt::new(401)]), [ONE; 4]),
+        ([ONE, ONE, ONE, Felt::new(400)].into(), [ONE; 4].into()), // Subtree boundary.
+        ([ONE, ONE, ONE, Felt::new(401)].into(), [ONE; 4].into()),
         // Subtree 2. Another normal leaf.
-        (Word::new([ONE, ONE, ONE, Felt::new(1024)]), [ONE; 4]),
+        ([ONE, ONE, ONE, Felt::new(1024)].into(), [ONE; 4].into()),
     ];
 
     let control = Smt::with_entries_sequential(entries.clone()).unwrap();
@@ -107,7 +106,7 @@ fn generate_entries(pair_count: u64) -> Vec<(Word, Word)> {
         .map(|i| {
             let leaf_index = ((i as f64 / pair_count as f64) * (pair_count as f64)) as u64;
             let key = Word::new([ONE, ONE, Felt::new(i), Felt::new(leaf_index)]);
-            let value = [ONE, ONE, ONE, Felt::new(i)];
+            let value = Word::new([ONE, ONE, ONE, Felt::new(i)]);
             (key, value)
         })
         .collect()
@@ -129,7 +128,7 @@ fn generate_updates(entries: Vec<(Word, Word)>, updates: usize) -> Vec<(Word, Wo
             let value = if rng.random_bool(REMOVAL_PROBABILITY) {
                 EMPTY_WORD
             } else {
-                [ONE, ONE, ONE, Felt::new(rng.random())]
+                Word::new([ONE, ONE, ONE, Felt::new(rng.random())])
             };
             (key, value)
         })
@@ -473,8 +472,8 @@ fn test_compute_mutations_parallel() {
 #[test]
 fn test_smt_construction_with_entries_unsorted() {
     let entries = [
-        (Word::new([ONE, ONE, Felt::new(2_u64), ONE]), [ONE; 4]),
-        (Word::new([ONE; 4]), [ONE; 4]),
+        ([ONE, ONE, Felt::new(2_u64), ONE].into(), [ONE; 4].into()),
+        ([ONE; 4].into(), [ONE; 4].into()),
     ];
     let control = Smt::with_entries_sequential(entries).unwrap();
     let smt = Smt::with_entries(entries).unwrap();
@@ -485,9 +484,9 @@ fn test_smt_construction_with_entries_unsorted() {
 #[test]
 fn test_smt_construction_with_entries_duplicate_keys() {
     let entries = [
-        (Word::new([ONE, ONE, ONE, Felt::new(16)]), [ONE; 4]),
-        (Word::new([ONE; 4]), [ONE; 4]),
-        (Word::new([ONE, ONE, ONE, Felt::new(16)]), [ONE; 4]),
+        ([ONE, ONE, ONE, Felt::new(16)].into(), [ONE; 4].into()),
+        ([ONE; 4].into(), [ONE; 4].into()),
+        ([ONE, ONE, ONE, Felt::new(16)].into(), [ONE; 4].into()),
     ];
     let expected_col = Smt::key_to_leaf_index(&entries[0].0).index.value();
     let err = Smt::with_entries(entries).unwrap_err();
@@ -497,8 +496,8 @@ fn test_smt_construction_with_entries_duplicate_keys() {
 #[test]
 fn test_smt_construction_with_some_empty_values() {
     let entries = [
-        (Word::new([ONE, ONE, ONE, ONE]), Smt::EMPTY_VALUE),
-        (Word::new([ONE, ONE, ONE, Felt::new(2)]), [ONE; 4]),
+        ([ONE, ONE, ONE, ONE].into(), Smt::EMPTY_VALUE),
+        ([ONE, ONE, ONE, Felt::new(2)].into(), [ONE; 4].into()),
     ];
 
     let result = Smt::with_entries(entries);
@@ -541,7 +540,7 @@ fn test_smt_construction_with_no_entries() {
 }
 
 fn arb_felt() -> impl Strategy<Value = Felt> {
-    prop_oneof![any::<u64>().prop_map(Felt::from_u64), Just(ZERO), Just(ONE),]
+    prop_oneof![any::<u64>().prop_map(Felt::new), Just(ZERO), Just(ONE),]
 }
 
 /// Test that the debug assertion panics on unsorted entries.
@@ -583,7 +582,7 @@ fn generate_cross_subtree_entries() -> impl Strategy<Value = Vec<(Word, Word)>> 
             .into_iter()
             .map(|base_col| {
                 let key = Word::new([ONE, ONE, ONE, Felt::new(base_col)]);
-                let value = [ONE, ONE, ONE, Felt::new(base_col)];
+                let value = Word::new([ONE, ONE, ONE, Felt::new(base_col)]);
                 (key, value)
             })
             .collect()
@@ -603,8 +602,8 @@ fn arb_entries() -> impl Strategy<Value = Vec<(Word, Word)>> {
                 ),
                 // Edge case values
                 (
-                    Just(Word::new([ONE, ONE, ONE, Felt::new(0)])),
-                    Just([ONE, ONE, ONE, Felt::new(u64::MAX)])
+                    Just([ONE, ONE, ONE, Felt::new(0)].into()),
+                    Just([ONE, ONE, ONE, Felt::new(u64::MAX)].into())
                 )
             ],
             1..1000,

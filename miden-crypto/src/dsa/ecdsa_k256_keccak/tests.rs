@@ -28,7 +28,7 @@ fn test_public_key_recovery() {
     let public_key = secret_key.public_key();
 
     // Generate a signature using the secret key
-    let message = [Felt::from_u64(1), Felt::new(2), Felt::new(3), Felt::new(4)].into();
+    let message = [Felt::new(1), Felt::new(2), Felt::new(3), Felt::new(4)].into();
     let signature = secret_key.sign(message);
 
     // Recover the public key
@@ -36,7 +36,7 @@ fn test_public_key_recovery() {
     assert_eq!(public_key, recovered_pk);
 
     // Using the wrong message, we shouldn't be able to recover the public key
-    let message = [Felt::from_u64(1), Felt::new(2), Felt::new(3), Felt::new(5)].into();
+    let message = [Felt::new(1), Felt::new(2), Felt::new(3), Felt::new(5)].into();
     let recovered_pk = PublicKey::recover_from(message, &signature).unwrap();
     assert!(public_key != recovered_pk);
 }
@@ -48,7 +48,7 @@ fn test_sign_and_verify() {
     let mut secret_key = SecretKey::with_rng(&mut rng);
     let public_key = secret_key.public_key();
 
-    let message = [Felt::from_u64(1), Felt::new(2), Felt::new(3), Felt::new(4)].into();
+    let message = [Felt::new(1), Felt::new(2), Felt::new(3), Felt::new(4)].into();
     let signature = secret_key.sign(message);
 
     // Verify using public key method
@@ -58,7 +58,7 @@ fn test_sign_and_verify() {
     assert!(signature.verify(message, &public_key));
 
     // Test with wrong message
-    let wrong_message = [Felt::from_u64(5), Felt::new(6), Felt::new(7), Felt::new(8)].into();
+    let wrong_message = [Felt::new(5), Felt::new(6), Felt::new(7), Felt::new(8)].into();
     assert!(!public_key.verify(wrong_message, &signature));
 }
 
@@ -67,7 +67,7 @@ fn test_signature_serialization_default() {
     let mut rng = rng();
 
     let mut secret_key = SecretKey::with_rng(&mut rng);
-    let message = [Felt::from_u64(1), Felt::new(2), Felt::new(3), Felt::new(4)].into();
+    let message = [Felt::new(1), Felt::new(2), Felt::new(3), Felt::new(4)].into();
     let signature = secret_key.sign(message);
 
     let sig_bytes = signature.to_bytes();
@@ -81,7 +81,7 @@ fn test_signature_serialization() {
     let mut rng = rng();
 
     let mut secret_key = SecretKey::with_rng(&mut rng);
-    let message = [Felt::from_u64(1), Felt::new(2), Felt::new(3), Felt::new(4)].into();
+    let message = [Felt::new(1), Felt::new(2), Felt::new(3), Felt::new(4)].into();
     let signature = secret_key.sign(message);
     let recovery_id = signature.v();
 
