@@ -39,8 +39,7 @@ use common::*;
 use crate::config::PRNG_OUTPUT_SIZES;
 
 /// Configuration for random coin testing
-const TEST_SEED: Word =
-    Word::new([Felt::from_u64(1), Felt::from_u64(2), Felt::from_u64(3), Felt::from_u64(4)]);
+const TEST_SEED: Word = Word::new([Felt::from_u64(1), Felt::new(2), Felt::new(3), Felt::new(4)]);
 
 // === RPO Random Coin Benchmarks ===
 

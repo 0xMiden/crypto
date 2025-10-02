@@ -92,7 +92,7 @@ benchmark_hash_merge_domain!(
     |b: &mut criterion::Bencher, (size, domain)| {
         let data = generate_byte_array_sequential(size);
         let digest = Rpo256::hash(&data);
-        let domain_felt = Felt::from_u64(domain);
+        let domain_felt = Felt::new(domain);
         b.iter(|| Rpo256::merge_in_domain(black_box(&[digest, digest]), domain_felt))
     }
 );
@@ -177,7 +177,7 @@ benchmark_hash_merge_domain!(
     |b: &mut criterion::Bencher, (size, domain)| {
         let data = generate_byte_array_sequential(size);
         let digest = Rpx256::hash(&data);
-        let domain_felt = Felt::from_u64(domain);
+        let domain_felt = Felt::new(domain);
         b.iter(|| Rpx256::merge_in_domain(black_box(&[digest, digest]), domain_felt))
     }
 );

@@ -10,7 +10,7 @@ pub mod aead;
 pub mod dsa;
 pub mod ecdh;
 pub mod hash;
-pub mod merkle;
+// pub mod merkle;
 pub mod rand;
 pub mod utils;
 pub mod word;
@@ -71,7 +71,8 @@ pub trait SequentialCommit {
     /// The default implementation of this function uses RPO256 hash function to hash the sequence
     /// of elements returned from [Self::to_elements()].
     fn to_commitment(&self) -> Self::Commitment {
-        hash::rpo::Rpo256::hash_elements(&self.to_elements()).into()
+        // hash::rpo::Rpo256::hash_elements(&self.to_elements()).into()
+        todo!()
     }
 
     /// Returns a representation of the object as a sequence of fields elements.

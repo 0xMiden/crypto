@@ -10,10 +10,10 @@ use crate::{utils::SliceReader, word};
 
 #[test]
 fn word_serialization() {
-    let e1 = Felt::from_u64(rand_value());
-    let e2 = Felt::from_u64(rand_value());
-    let e3 = Felt::from_u64(rand_value());
-    let e4 = Felt::from_u64(rand_value());
+    let e1 = Felt::new(rand_value());
+    let e2 = Felt::new(rand_value());
+    let e3 = Felt::new(rand_value());
+    let e4 = Felt::new(rand_value());
 
     let d1 = Word([e1, e2, e3, e4]);
 
@@ -31,10 +31,10 @@ fn word_serialization() {
 #[test]
 fn word_encoding() {
     let word = Word([
-        Felt::from_u64(rand_value()),
-        Felt::from_u64(rand_value()),
-        Felt::from_u64(rand_value()),
-        Felt::from_u64(rand_value()),
+        Felt::new(rand_value()),
+        Felt::new(rand_value()),
+        Felt::new(rand_value()),
+        Felt::new(rand_value()),
     ]);
 
     let string: String = word.into();
@@ -46,10 +46,10 @@ fn word_encoding() {
 #[test]
 fn test_conversions() {
     let word = Word([
-        Felt::from_u64(rand_value()),
-        Felt::from_u64(rand_value()),
-        Felt::from_u64(rand_value()),
-        Felt::from_u64(rand_value()),
+        Felt::new(rand_value()),
+        Felt::new(rand_value()),
+        Felt::new(rand_value()),
+        Felt::new(rand_value()),
     ]);
 
     // BY VALUE
@@ -194,10 +194,10 @@ fn word_macro(#[case] input: &str) {
 }
 
 #[rstest::rstest]
-#[case::first_nibble("0x1000000000000000000000000000000000000000000000000000000000000000", crate::Word::new([Felt::from_u64(16), Felt::from_u64(0), Felt::from_u64(0), Felt::from_u64(0)]))]
-#[case::second_nibble("0x0100000000000000000000000000000000000000000000000000000000000000", crate::Word::new([Felt::from_u64(1), Felt::from_u64(0), Felt::from_u64(0), Felt::from_u64(0)]))]
-#[case::all_first_nibbles("0x1000000000000000100000000000000010000000000000001000000000000000", crate::Word::new([Felt::from_u64(16), Felt::from_u64(16), Felt::from_u64(16), Felt::from_u64(16)]))]
-#[case::all_first_nibbles_asc("0x1000000000000000200000000000000030000000000000004000000000000000", crate::Word::new([Felt::from_u64(16), Felt::from_u64(32), Felt::from_u64(48), Felt::from_u64(64)]))]
+#[case::first_nibble("0x1000000000000000000000000000000000000000000000000000000000000000", crate::Word::new([Felt::new(16), Felt::new(0), Felt::new(0), Felt::new(0)]))]
+#[case::second_nibble("0x0100000000000000000000000000000000000000000000000000000000000000", crate::Word::new([Felt::new(1), Felt::new(0), Felt::new(0), Felt::new(0)]))]
+#[case::all_first_nibbles("0x1000000000000000100000000000000010000000000000001000000000000000", crate::Word::new([Felt::new(16), Felt::new(16), Felt::new(16), Felt::new(16)]))]
+#[case::all_first_nibbles_asc("0x1000000000000000200000000000000030000000000000004000000000000000", crate::Word::new([Felt::new(16), Felt::new(32), Felt::new(48), Felt::new(64)]))]
 fn word_macro_endianness(#[case] input: &str, #[case] expected: crate::Word) {
     let uut = word!(input);
     assert_eq!(uut, expected);

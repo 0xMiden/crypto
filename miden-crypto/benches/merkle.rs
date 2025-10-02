@@ -97,10 +97,10 @@ benchmark_with_setup_data!(
 //     mem::swap(seed, &mut prng_array(*seed));
 //     let nums: [u64; 4] = prng_array(*seed);
 //     [
-//         Felt::from_u64(nums[0]),
-//         Felt::from_u64(nums[1]),
-//         Felt::from_u64(nums[2]),
-//         Felt::from_u64(nums[3]),
+//         Felt::new(nums[0]),
+//         Felt::new(nums[1]),
+//         Felt::new(nums[2]),
+//         Felt::new(nums[3]),
 //     ]
 // }
 benchmark_batch!(

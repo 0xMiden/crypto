@@ -992,7 +992,7 @@ dependencies = [
  "thiserror",
  "winter-crypto",
  "winter-rand-utils",
- "winter-utils 0.13.1",
+ "winter-utils",
  "x25519-dalek",
  "zeroize",
 ]
@@ -1123,7 +1123,7 @@ checksum = "c08d65885ee38876c4f86fa503fb49d7b507c2b62552df7c70b2fce627e06381"
 [[package]]
 name = "p3-air"
 version = "0.3.0"
-source = "git+https://github.com/0xMiden/Plonky3/?branch=zz%2Fmigrate-plonky3#a8e0a5fdd775b6749d17b8d9dc0b1a79e931b03d"
+source = "git+https://github.com/0xMiden/Plonky3/?branch=zz%2Fmigrate-plonky3#0b67a10dc7ecba7dfb583b4965261e22b6f6458b"
 dependencies = [
  "p3-field",
  "p3-matrix",
@@ -1132,7 +1132,7 @@ dependencies = [
 [[package]]
 name = "p3-challenger"
 version = "0.3.0"
-source = "git+https://github.com/0xMiden/Plonky3/?branch=zz%2Fmigrate-plonky3#a8e0a5fdd775b6749d17b8d9dc0b1a79e931b03d"
+source = "git+https://github.com/0xMiden/Plonky3/?branch=zz%2Fmigrate-plonky3#0b67a10dc7ecba7dfb583b4965261e22b6f6458b"
 dependencies = [
  "p3-field",
  "p3-maybe-rayon",
@@ -1144,7 +1144,7 @@ dependencies = [
 [[package]]
 name = "p3-commit"
 version = "0.3.0"
-source = "git+https://github.com/0xMiden/Plonky3/?branch=zz%2Fmigrate-plonky3#a8e0a5fdd775b6749d17b8d9dc0b1a79e931b03d"
+source = "git+https://github.com/0xMiden/Plonky3/?branch=zz%2Fmigrate-plonky3#0b67a10dc7ecba7dfb583b4965261e22b6f6458b"
 dependencies = [
  "itertools 0.14.0",
  "p3-challenger",
@@ -1158,7 +1158,7 @@ dependencies = [
 [[package]]
 name = "p3-dft"
 version = "0.3.0"
-source = "git+https://github.com/0xMiden/Plonky3/?branch=zz%2Fmigrate-plonky3#a8e0a5fdd775b6749d17b8d9dc0b1a79e931b03d"
+source = "git+https://github.com/0xMiden/Plonky3/?branch=zz%2Fmigrate-plonky3#0b67a10dc7ecba7dfb583b4965261e22b6f6458b"
 dependencies = [
  "itertools 0.14.0",
  "p3-field",
@@ -1171,7 +1171,7 @@ dependencies = [
 [[package]]
 name = "p3-field"
 version = "0.3.0"
-source = "git+https://github.com/0xMiden/Plonky3/?branch=zz%2Fmigrate-plonky3#a8e0a5fdd775b6749d17b8d9dc0b1a79e931b03d"
+source = "git+https://github.com/0xMiden/Plonky3/?branch=zz%2Fmigrate-plonky3#0b67a10dc7ecba7dfb583b4965261e22b6f6458b"
 dependencies = [
  "itertools 0.14.0",
  "num-bigint",
@@ -1186,7 +1186,7 @@ dependencies = [
 [[package]]
 name = "p3-goldilocks"
 version = "0.3.0"
-source = "git+https://github.com/0xMiden/Plonky3/?branch=zz%2Fmigrate-plonky3#a8e0a5fdd775b6749d17b8d9dc0b1a79e931b03d"
+source = "git+https://github.com/0xMiden/Plonky3/?branch=zz%2Fmigrate-plonky3#0b67a10dc7ecba7dfb583b4965261e22b6f6458b"
 dependencies = [
  "num-bigint",
  "p3-dft",
@@ -1198,13 +1198,13 @@ dependencies = [
  "paste",
  "rand",
  "serde",
- "winter-utils 0.12.0",
+ "winter-utils",
 ]
 
 [[package]]
 name = "p3-matrix"
 version = "0.3.0"
-source = "git+https://github.com/0xMiden/Plonky3/?branch=zz%2Fmigrate-plonky3#a8e0a5fdd775b6749d17b8d9dc0b1a79e931b03d"
+source = "git+https://github.com/0xMiden/Plonky3/?branch=zz%2Fmigrate-plonky3#0b67a10dc7ecba7dfb583b4965261e22b6f6458b"
 dependencies = [
  "itertools 0.14.0",
  "p3-field",
@@ -1219,12 +1219,12 @@ dependencies = [
 [[package]]
 name = "p3-maybe-rayon"
 version = "0.3.0"
-source = "git+https://github.com/0xMiden/Plonky3/?branch=zz%2Fmigrate-plonky3#a8e0a5fdd775b6749d17b8d9dc0b1a79e931b03d"
+source = "git+https://github.com/0xMiden/Plonky3/?branch=zz%2Fmigrate-plonky3#0b67a10dc7ecba7dfb583b4965261e22b6f6458b"
 
 [[package]]
 name = "p3-mds"
 version = "0.3.0"
-source = "git+https://github.com/0xMiden/Plonky3/?branch=zz%2Fmigrate-plonky3#a8e0a5fdd775b6749d17b8d9dc0b1a79e931b03d"
+source = "git+https://github.com/0xMiden/Plonky3/?branch=zz%2Fmigrate-plonky3#0b67a10dc7ecba7dfb583b4965261e22b6f6458b"
 dependencies = [
  "p3-dft",
  "p3-field",
@@ -1236,7 +1236,7 @@ dependencies = [
 [[package]]
 name = "p3-merkle-tree"
 version = "0.3.0"
-source = "git+https://github.com/0xMiden/Plonky3/?branch=zz%2Fmigrate-plonky3#a8e0a5fdd775b6749d17b8d9dc0b1a79e931b03d"
+source = "git+https://github.com/0xMiden/Plonky3/?branch=zz%2Fmigrate-plonky3#0b67a10dc7ecba7dfb583b4965261e22b6f6458b"
 dependencies = [
  "itertools 0.14.0",
  "p3-commit",
@@ -1253,7 +1253,7 @@ dependencies = [
 [[package]]
 name = "p3-poseidon2"
 version = "0.3.0"
-source = "git+https://github.com/0xMiden/Plonky3/?branch=zz%2Fmigrate-plonky3#a8e0a5fdd775b6749d17b8d9dc0b1a79e931b03d"
+source = "git+https://github.com/0xMiden/Plonky3/?branch=zz%2Fmigrate-plonky3#0b67a10dc7ecba7dfb583b4965261e22b6f6458b"
 dependencies = [
  "p3-field",
  "p3-mds",
@@ -1265,7 +1265,7 @@ dependencies = [
 [[package]]
 name = "p3-symmetric"
 version = "0.3.0"
-source = "git+https://github.com/0xMiden/Plonky3/?branch=zz%2Fmigrate-plonky3#a8e0a5fdd775b6749d17b8d9dc0b1a79e931b03d"
+source = "git+https://github.com/0xMiden/Plonky3/?branch=zz%2Fmigrate-plonky3#0b67a10dc7ecba7dfb583b4965261e22b6f6458b"
 dependencies = [
  "itertools 0.14.0",
  "p3-field",
@@ -1275,7 +1275,7 @@ dependencies = [
 [[package]]
 name = "p3-util"
 version = "0.3.0"
-source = "git+https://github.com/0xMiden/Plonky3/?branch=zz%2Fmigrate-plonky3#a8e0a5fdd775b6749d17b8d9dc0b1a79e931b03d"
+source = "git+https://github.com/0xMiden/Plonky3/?branch=zz%2Fmigrate-plonky3#0b67a10dc7ecba7dfb583b4965261e22b6f6458b"
 dependencies = [
  "serde",
 ]
@@ -2160,7 +2160,7 @@ dependencies = [
  "blake3",
  "sha3",
  "winter-math",
- "winter-utils 0.13.1",
+ "winter-utils",
 ]
 
 [[package]]
@@ -2169,7 +2169,7 @@ version = "0.13.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7aecfb48ee6a8b4746392c8ff31e33e62df8528a3b5628c5af27b92b14aef1ea"
 dependencies = [
- "winter-utils 0.13.1",
+ "winter-utils",
 ]
 
 [[package]]
@@ -2179,14 +2179,8 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a4ff3b651754a7bd216f959764d0a5ab6f4b551c9a3a08fb9ccecbed594b614a"
 dependencies = [
  "rand",
- "winter-utils 0.13.1",
+ "winter-utils",
 ]
-
-[[package]]
-name = "winter-utils"
-version = "0.12.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2d47518e6931955dcac73a584cacb04550b82ab2f45c72880cbbbdbe13adb63c"
 
 [[package]]
 name = "winter-utils"

@@ -1,4 +1,4 @@
-use alloc::string::String;
+use alloc::{string::String, vec::Vec};
 use core::{
     mem::size_of,
     ops::Deref,
@@ -10,7 +10,7 @@ use sha3::Digest as Sha3Digest;
 use winter_crypto::{Digest, ElementHasher, Hasher};
 
 use crate::{
-    Felt,
+    Felt, PrimeField64,
     utils::{
         ByteReader, ByteWriter, Deserializable, DeserializationError, HexParseError, Serializable,
         bytes_to_hex_string, hex_to_bytes,
@@ -170,7 +170,7 @@ impl Keccak256 {
     where
         E: BasedVectorSpace<Felt>,
     {
-        <Self as ElementHasher>::hash_elements(elements)
+        hash_elements(elements).into()
     }
 }
 
@@ -184,11 +184,7 @@ where
 {
     // don't leak assumptions from felt and check its actual implementation.
     // this is a compile-time branch so it is for free
-    let digest = if Felt::IS_CANONICAL {
-        let mut hasher = sha3::Keccak256::new();
-        hasher.update(E::elements_as_bytes(elements));
-        hasher.finalize()
-    } else {
+    let digest = {
         let mut hasher = sha3::Keccak256::new();
         // The Keccak-p permutation has a state of size 1600 bits. For Keccak256, the capacity
         // is set to 512 bits and the rate is thus of size 1088 bits.
@@ -197,16 +193,23 @@ where
         // we move the elements into the hasher via the buffer to give the CPU a chance to process
         // multiple element-to-byte conversions in parallel
         let mut buf = [0_u8; 136];
-        let mut chunk_iter = E::slice_as_base_elements(elements).chunks_exact(17);
+
+        let elements_base = elements
+            .into_iter()
+            .flat_map(|elem| E::as_basis_coefficients_slice(&elem))
+            .copied()
+            .collect::<Vec<Felt>>();
+
+        let mut chunk_iter = elements_base.chunks_exact(17);
         for chunk in chunk_iter.by_ref() {
             for i in 0..17 {
-                buf[i * 8..(i + 1) * 8].copy_from_slice(&chunk[i].as_int().to_le_bytes());
+                buf[i * 8..(i + 1) * 8].copy_from_slice(&chunk[i].as_canonical_u64().to_le_bytes());
             }
             hasher.update(buf);
         }
 
         for element in chunk_iter.remainder() {
-            hasher.update(element.as_int().to_le_bytes());
+            hasher.update(element.as_canonical_u64().to_le_bytes());
         }
 
         hasher.finalize()

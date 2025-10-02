@@ -400,7 +400,7 @@ mod tests {
             // that assumes this equivalence.
 
             // build a word and copy it to another address as digest
-            let word = [Felt::from_u64(a), Felt::from_u64(b), Felt::from_u64(c), Felt::from_u64(d)];
+            let word = [Felt::from_u64(a), Felt::new(b), Felt::new(c), Felt::new(d)];
             let digest = Word::from(word);
 
             // assert the addresses are different

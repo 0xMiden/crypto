@@ -48,7 +48,7 @@ pub fn generate_byte_array_random(size: usize) -> Vec<u8> {
 
 /// Generate field element array with sequential values
 pub fn generate_felt_array_sequential(size: usize) -> Vec<Felt> {
-    (0..size).map(|i| Felt::from_u64(i as u64)).collect()
+    (0..size).map(|i| Felt::new(i as u64)).collect()
 }
 
 /// Generate byte array of specified size with random data
@@ -75,12 +75,7 @@ pub enum WordPattern {
 pub fn generate_word(seed: &mut [u8; 32]) -> Word {
     *seed = prng_array(*seed);
     let nums: [u64; 4] = prng_array(*seed);
-    Word::new([
-        Felt::from_u64(nums[0]),
-        Felt::from_u64(nums[1]),
-        Felt::from_u64(nums[2]),
-        Felt::from_u64(nums[3]),
-    ])
+    Word::new([Felt::new(nums[0]), Felt::new(nums[1]), Felt::new(nums[2]), Felt::new(nums[3])])
 }
 
 /// Generate a generic value from seed using PRNG
@@ -95,19 +90,13 @@ pub fn generate_value<T: winter_utils::Randomizable + std::fmt::Debug + Clone>(
 /// Generate word using specified pattern
 pub fn generate_word_pattern(i: u64, pattern: WordPattern) -> Word {
     match pattern {
-        WordPattern::MerkleStandard => Word::new([Felt::from_u64(i), ONE, ONE, Felt::from_u64(i)]),
-        WordPattern::Sequential => Word::new([
-            Felt::from_u64(i),
-            Felt::from_u64(i + 1),
-            Felt::from_u64(i + 2),
-            Felt::from_u64(i + 3),
-        ]),
-        WordPattern::SpreadSequential => Word::new([
-            Felt::from_u64(i),
-            Felt::from_u64(i + 4),
-            Felt::from_u64(i + 8),
-            Felt::from_u64(i + 12),
-        ]),
+        WordPattern::MerkleStandard => Word::new([Felt::from_u64(i), ONE, ONE, Felt::new(i)]),
+        WordPattern::Sequential => {
+            Word::new([Felt::new(i), Felt::new(i + 1), Felt::new(i + 2), Felt::new(i + 3)])
+        },
+        WordPattern::SpreadSequential => {
+            Word::new([Felt::new(i), Felt::new(i + 4), Felt::new(i + 8), Felt::new(i + 12)])
+        },
         WordPattern::Random => {
             let mut seed = [0u8; 32];
             seed[0..8].copy_from_slice(&i.to_le_bytes());
@@ -132,8 +121,7 @@ pub fn prepare_smt_entries(pair_count: u64, seed: &mut [u8; 32]) -> Vec<(Word, W
         .map(|i| {
             let count = pair_count as f64;
             let idx = ((i as f64 / count) * (count)) as u64;
-            let key =
-                Word::new([generate_value(seed), ONE, Felt::from_u64(i), Felt::from_u64(idx)]);
+            let key = Word::new([generate_value(seed), ONE, Felt::new(i), Felt::new(idx)]);
             let value = generate_word(seed);
             (key, value)
         })

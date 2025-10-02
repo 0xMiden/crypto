@@ -1,10 +1,10 @@
 use alloc::{collections::BTreeSet, vec::Vec};
 
 use p3_field::{PrimeCharacteristicRing, PrimeField64};
-use proptest::prelude::*;
+use proptest::prelude::*;use crate::hash::algebraic_sponge::AlgebraicSponge;
 use rand_utils::rand_value;
 
-use super::{Felt, Hasher, Rpx256, StarkField, ZERO};
+use super::{Felt, Hasher, Rpx256,  ZERO};
 use crate::{ONE, Word};
 
 #[test]
@@ -54,7 +54,7 @@ fn hash_elements_vs_merge_with_int() {
     let seed = Word::new(tmp);
 
     // ----- value fits into a field element ------------------------------------------------------
-    let val: Felt = Felt::from_u64(rand_value());
+    let val: Felt = Felt::new(rand_value());
     let m_result = Rpx256::merge_with_int(seed, val.as_canonical_u64());
 
     let mut elements = seed.as_elements().to_vec();
@@ -113,12 +113,12 @@ fn hash_elements() {
     let elements = [
         ZERO,
         ONE,
-        Felt::from_u64(2),
-        Felt::from_u64(3),
-        Felt::from_u64(4),
-        Felt::from_u64(5),
-        Felt::from_u64(6),
-        Felt::from_u64(7),
+        Felt::new(2),
+        Felt::new(3),
+        Felt::new(4),
+        Felt::new(5),
+        Felt::new(6),
+        Felt::new(7),
     ];
 
     let digests: [Word; 2] = [

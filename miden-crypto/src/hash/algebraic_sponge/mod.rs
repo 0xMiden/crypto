@@ -12,11 +12,11 @@
 //! and RPX hash functions, both of which belong to the Rescue family of hash functions, and
 //! Poseidon2 hash function.
 
+use alloc::vec::Vec;
 use core::ops::Range;
 
-use p3_field::BasedVectorSpace;
-
 use super::{Felt, Word, ZERO};
+use crate::{BasedVectorSpace, PrimeField64};
 
 // pub(crate) mod poseidon2;
 pub(crate) mod rescue;
@@ -68,7 +68,11 @@ pub(crate) trait AlgebraicSponge {
         E: BasedVectorSpace<Felt>,
     {
         // convert the elements into a list of base field elements
-        let elements = E::slice_as_base_elements(elements);
+        let elements = elements
+            .into_iter()
+            .flat_map(|elem| E::as_basis_coefficients_slice(&elem))
+            .copied()
+            .collect::<Vec<Felt>>();
 
         // initialize state to all zeros, except for the first element of the capacity part, which
         // is set to `elements.len() % RATE_WIDTH`.
@@ -150,7 +154,7 @@ pub(crate) trait AlgebraicSponge {
 
             // set the current rate element to the input. since we take at most 7 bytes, we are
             // guaranteed that the inputs data will fit into a single field element.
-            state[RATE_RANGE.start + rate_pos] = Felt::from_u64(u64::from_le_bytes(buf));
+            state[RATE_RANGE.start + rate_pos] = Felt::new(u64::from_le_bytes(buf));
 
             // proceed filling the range. if it's full, then we apply a permutation and reset the
             // counter to the beginning of the range.
@@ -208,11 +212,11 @@ pub(crate) trait AlgebraicSponge {
         //   copy them into rate elements 5 and 6 and set the first capacity element to 6.
         let mut state = [ZERO; STATE_WIDTH];
         state[INPUT1_RANGE].copy_from_slice(seed.as_elements());
-        state[INPUT2_RANGE.start] = Felt::from_u64(value);
-        if value < Felt::MODULUS {
+        state[INPUT2_RANGE.start] = Felt::new(value);
+        if value < Felt::ORDER_U64 {
             state[CAPACITY_RANGE.start] = Felt::from(5_u8);
         } else {
-            state[INPUT2_RANGE.start + 1] = Felt::from_u64(value / Felt::MODULUS);
+            state[INPUT2_RANGE.start + 1] = Felt::new(value / Felt::ORDER_U64);
             state[CAPACITY_RANGE.start] = Felt::from(6_u8);
         }
 

@@ -20,10 +20,10 @@ static BATCH_SIZES: [usize; 3] = [2usize.pow(4), 2usize.pow(7), 2usize.pow(10)];
 // /// Generates a random `Word`.
 // fn random_rpo_digest<R: RngCore>(rng: &mut R) -> Word {
 //     [
-//         Felt::from_u64(rng.next_u64()),
-//         Felt::from_u64(rng.next_u64()),
-//         Felt::from_u64(rng.next_u64()),
-//         Felt::from_u64(rng.next_u64()),
+//         Felt::new(rng.next_u64()),
+//         Felt::new(rng.next_u64()),
+//         Felt::new(rng.next_u64()),
+//         Felt::new(rng.next_u64()),
 //     ]
 //     .into()
 // }
@@ -36,10 +36,10 @@ fn random_word() -> Word {
 // fn random_word<R: RngCore>(rng: &mut R) -> Word {
 //     rand_array::<Felt, 4>().into()
 //     // [
-//     //     Felt::from_u64(rng.next_u64()),
-//     //     Felt::from_u64(rng.next_u64()),
-//     //     Felt::from_u64(rng.next_u64()),
-//     //     Felt::from_u64(rng.next_u64()),
+//     //     Felt::new(rng.next_u64()),
+//     //     Felt::new(rng.next_u64()),
+//     //     Felt::new(rng.next_u64()),
+//     //     Felt::new(rng.next_u64()),
 //     // ]
 // }
 

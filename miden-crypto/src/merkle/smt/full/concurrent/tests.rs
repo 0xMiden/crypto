@@ -29,16 +29,16 @@ fn smtleaf_to_subtree_leaf(leaf: &SmtLeaf) -> SubtreeLeaf {
 fn test_sorted_pairs_to_leaves() {
     let entries: Vec<(Word, Word)> = vec![
         // Subtree 0.
-        (Word::new([ONE, ONE, ONE, Felt::from_u64(16)]), [ONE; 4]),
-        (Word::new([ONE, ONE, ONE, Felt::from_u64(17)]), [ONE; 4]),
+        (Word::new([ONE, ONE, ONE, Felt::new(16)]), [ONE; 4]),
+        (Word::new([ONE, ONE, ONE, Felt::new(17)]), [ONE; 4]),
         // Leaf index collision.
-        (Word::new([ONE, ONE, Felt::from_u64(10), Felt::from_u64(20)]), [ONE; 4]),
-        (Word::new([ONE, ONE, Felt::from_u64(20), Felt::from_u64(20)]), [ONE; 4]),
+        (Word::new([ONE, ONE, Felt::new(10), Felt::new(20)]), [ONE; 4]),
+        (Word::new([ONE, ONE, Felt::new(20), Felt::new(20)]), [ONE; 4]),
         // Subtree 1. Normal single leaf again.
-        (Word::new([ONE, ONE, ONE, Felt::from_u64(400)]), [ONE; 4]), // Subtree boundary.
-        (Word::new([ONE, ONE, ONE, Felt::from_u64(401)]), [ONE; 4]),
+        (Word::new([ONE, ONE, ONE, Felt::new(400)]), [ONE; 4]), // Subtree boundary.
+        (Word::new([ONE, ONE, ONE, Felt::new(401)]), [ONE; 4]),
         // Subtree 2. Another normal leaf.
-        (Word::new([ONE, ONE, ONE, Felt::from_u64(1024)]), [ONE; 4]),
+        (Word::new([ONE, ONE, ONE, Felt::new(1024)]), [ONE; 4]),
     ];
 
     let control = Smt::with_entries_sequential(entries.clone()).unwrap();
@@ -106,8 +106,8 @@ fn generate_entries(pair_count: u64) -> Vec<(Word, Word)> {
     (0..pair_count)
         .map(|i| {
             let leaf_index = ((i as f64 / pair_count as f64) * (pair_count as f64)) as u64;
-            let key = Word::new([ONE, ONE, Felt::from_u64(i), Felt::from_u64(leaf_index)]);
-            let value = [ONE, ONE, ONE, Felt::from_u64(i)];
+            let key = Word::new([ONE, ONE, Felt::new(i), Felt::new(leaf_index)]);
+            let value = [ONE, ONE, ONE, Felt::new(i)];
             (key, value)
         })
         .collect()
@@ -129,7 +129,7 @@ fn generate_updates(entries: Vec<(Word, Word)>, updates: usize) -> Vec<(Word, Wo
             let value = if rng.random_bool(REMOVAL_PROBABILITY) {
                 EMPTY_WORD
             } else {
-                [ONE, ONE, ONE, Felt::from_u64(rng.random())]
+                [ONE, ONE, ONE, Felt::new(rng.random())]
             };
             (key, value)
         })
@@ -473,7 +473,7 @@ fn test_compute_mutations_parallel() {
 #[test]
 fn test_smt_construction_with_entries_unsorted() {
     let entries = [
-        (Word::new([ONE, ONE, Felt::from_u64(2_u64), ONE]), [ONE; 4]),
+        (Word::new([ONE, ONE, Felt::new(2_u64), ONE]), [ONE; 4]),
         (Word::new([ONE; 4]), [ONE; 4]),
     ];
     let control = Smt::with_entries_sequential(entries).unwrap();
@@ -485,9 +485,9 @@ fn test_smt_construction_with_entries_unsorted() {
 #[test]
 fn test_smt_construction_with_entries_duplicate_keys() {
     let entries = [
-        (Word::new([ONE, ONE, ONE, Felt::from_u64(16)]), [ONE; 4]),
+        (Word::new([ONE, ONE, ONE, Felt::new(16)]), [ONE; 4]),
         (Word::new([ONE; 4]), [ONE; 4]),
-        (Word::new([ONE, ONE, ONE, Felt::from_u64(16)]), [ONE; 4]),
+        (Word::new([ONE, ONE, ONE, Felt::new(16)]), [ONE; 4]),
     ];
     let expected_col = Smt::key_to_leaf_index(&entries[0].0).index.value();
     let err = Smt::with_entries(entries).unwrap_err();
@@ -498,7 +498,7 @@ fn test_smt_construction_with_entries_duplicate_keys() {
 fn test_smt_construction_with_some_empty_values() {
     let entries = [
         (Word::new([ONE, ONE, ONE, ONE]), Smt::EMPTY_VALUE),
-        (Word::new([ONE, ONE, ONE, Felt::from_u64(2)]), [ONE; 4]),
+        (Word::new([ONE, ONE, ONE, Felt::new(2)]), [ONE; 4]),
     ];
 
     let result = Smt::with_entries(entries);
@@ -551,34 +551,12 @@ fn smt_with_sorted_entries_panics_on_unsorted_entries() {
     // Unsorted keys.
     let smt_leaves_2: [(Word, Word); 2] = [
         (
-            Word::new([
-                Felt::from_u64(105),
-                Felt::from_u64(106),
-                Felt::from_u64(107),
-                Felt::from_u64(108),
-            ]),
-            [
-                Felt::from_u64(5_u64),
-                Felt::from_u64(6_u64),
-                Felt::from_u64(7_u64),
-                Felt::from_u64(8_u64),
-            ]
-            .into(),
+            Word::new([Felt::new(105), Felt::new(106), Felt::new(107), Felt::new(108)]),
+            [Felt::new(5_u64), Felt::new(6_u64), Felt::new(7_u64), Felt::new(8_u64)].into(),
         ),
         (
-            Word::new([
-                Felt::from_u64(101),
-                Felt::from_u64(102),
-                Felt::from_u64(103),
-                Felt::from_u64(104),
-            ]),
-            [
-                Felt::from_u64(1_u64),
-                Felt::from_u64(2_u64),
-                Felt::from_u64(3_u64),
-                Felt::from_u64(4_u64),
-            ]
-            .into(),
+            Word::new([Felt::new(101), Felt::new(102), Felt::new(103), Felt::new(104)]),
+            [Felt::new(1_u64), Felt::new(2_u64), Felt::new(3_u64), Felt::new(4_u64)].into(),
         ),
     ];
 
@@ -604,8 +582,8 @@ fn generate_cross_subtree_entries() -> impl Strategy<Value = Vec<(Word, Word)>> 
         offsets
             .into_iter()
             .map(|base_col| {
-                let key = Word::new([ONE, ONE, ONE, Felt::from_u64(base_col)]);
-                let value = [ONE, ONE, ONE, Felt::from_u64(base_col)];
+                let key = Word::new([ONE, ONE, ONE, Felt::new(base_col)]);
+                let value = [ONE, ONE, ONE, Felt::new(base_col)];
                 (key, value)
             })
             .collect()
@@ -625,8 +603,8 @@ fn arb_entries() -> impl Strategy<Value = Vec<(Word, Word)>> {
                 ),
                 // Edge case values
                 (
-                    Just(Word::new([ONE, ONE, ONE, Felt::from_u64(0)])),
-                    Just([ONE, ONE, ONE, Felt::from_u64(u64::MAX)])
+                    Just(Word::new([ONE, ONE, ONE, Felt::new(0)])),
+                    Just([ONE, ONE, ONE, Felt::new(u64::MAX)])
                 )
             ],
             1..1000,

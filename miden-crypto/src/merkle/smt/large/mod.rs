@@ -40,21 +40,21 @@
 //! // Prepare initial entries
 //! let entries = vec![
 //!     (
-//!         Word::new([Felt::from_u64(1), Felt::from_u64(0), Felt::from_u64(0), Felt::from_u64(0)]),
+//!         Word::new([Felt::from_u64(1), Felt::new(0), Felt::new(0), Felt::new(0)]),
 //!         Word::new([
-//!             Felt::from_u64(10),
-//!             Felt::from_u64(20),
-//!             Felt::from_u64(30),
-//!             Felt::from_u64(40),
+//!             Felt::new(10),
+//!             Felt::new(20),
+//!             Felt::new(30),
+//!             Felt::new(40),
 //!         ]),
 //!     ),
 //!     (
-//!         Word::new([Felt::from_u64(2), Felt::from_u64(0), Felt::from_u64(0), Felt::from_u64(0)]),
+//!         Word::new([Felt::from_u64(2), Felt::new(0), Felt::new(0), Felt::new(0)]),
 //!         Word::new([
-//!             Felt::from_u64(11),
-//!             Felt::from_u64(22),
-//!             Felt::from_u64(33),
-//!             Felt::from_u64(44),
+//!             Felt::new(11),
+//!             Felt::new(22),
+//!             Felt::new(33),
+//!             Felt::new(44),
 //!         ]),
 //!     ),
 //! ];
@@ -78,15 +78,15 @@
 //! let mut smt = LargeSmt::new(storage)?;
 //!
 //! let k1 =
-//!     Word::new([Felt::from_u64(101), Felt::from_u64(0), Felt::from_u64(0), Felt::from_u64(0)]);
+//!     Word::new([Felt::from_u64(101), Felt::new(0), Felt::new(0), Felt::new(0)]);
 //! let v1 =
-//!     Word::new([Felt::from_u64(1), Felt::from_u64(2), Felt::from_u64(3), Felt::from_u64(4)]);
+//!     Word::new([Felt::from_u64(1), Felt::new(2), Felt::new(3), Felt::new(4)]);
 //! let k2 =
-//!     Word::new([Felt::from_u64(202), Felt::from_u64(0), Felt::from_u64(0), Felt::from_u64(0)]);
+//!     Word::new([Felt::from_u64(202), Felt::new(0), Felt::new(0), Felt::new(0)]);
 //! let k3 =
-//!     Word::new([Felt::from_u64(303), Felt::from_u64(0), Felt::from_u64(0), Felt::from_u64(0)]);
+//!     Word::new([Felt::from_u64(303), Felt::new(0), Felt::new(0), Felt::new(0)]);
 //! let v3 =
-//!     Word::new([Felt::from_u64(7), Felt::from_u64(7), Felt::from_u64(7), Felt::from_u64(7)]);
+//!     Word::new([Felt::from_u64(7), Felt::new(7), Felt::new(7), Felt::new(7)]);
 //!
 //! // EMPTY_WORD marks deletions.
 //! let updates = vec![(k1, v1), (k2, EMPTY_WORD), (k3, v3)];
@@ -115,21 +115,21 @@
 //! let storage = RocksDbStorage::open(RocksDbConfig::new(path))?;
 //! let entries = vec![
 //!     (
-//!         Word::new([Felt::from_u64(1), Felt::from_u64(0), Felt::from_u64(0), Felt::from_u64(0)]),
+//!         Word::new([Felt::from_u64(1), Felt::new(0), Felt::new(0), Felt::new(0)]),
 //!         Word::new([
-//!             Felt::from_u64(10),
-//!             Felt::from_u64(20),
-//!             Felt::from_u64(30),
-//!             Felt::from_u64(40),
+//!             Felt::new(10),
+//!             Felt::new(20),
+//!             Felt::new(30),
+//!             Felt::new(40),
 //!         ]),
 //!     ),
 //!     (
-//!         Word::new([Felt::from_u64(2), Felt::from_u64(0), Felt::from_u64(0), Felt::from_u64(0)]),
+//!         Word::new([Felt::from_u64(2), Felt::new(0), Felt::new(0), Felt::new(0)]),
 //!         Word::new([
-//!             Felt::from_u64(11),
-//!             Felt::from_u64(22),
-//!             Felt::from_u64(33),
-//!             Felt::from_u64(44),
+//!             Felt::new(11),
+//!             Felt::new(22),
+//!             Felt::new(33),
+//!             Felt::new(44),
 //!         ]),
 //!     ),
 //! ];
@@ -148,6 +148,7 @@ use super::{
     MutationSet, NodeIndex, Rpo256, SMT_DEPTH, Smt, SmtLeaf, SmtLeafError, SmtProof,
     SparseMerklePath, SparseMerkleTree, Word,
 };
+use crate::PrimeField64;
 use crate::merkle::smt::{
     Map, NodeMutation, NodeMutations,
     full::concurrent::{
@@ -1236,7 +1237,7 @@ impl<S: SmtStorage> SparseMerkleTree<SMT_DEPTH> for LargeSmt<S> {
 
     fn key_to_leaf_index(key: &Word) -> LeafIndex<SMT_DEPTH> {
         let most_significant_felt = key[3];
-        LeafIndex::new_max_depth(most_significant_felt.as_int())
+        LeafIndex::new_max_depth(most_significant_felt.as_canonical_u64())
     }
 
     fn path_and_leaf_to_opening(path: SparseMerklePath, leaf: SmtLeaf) -> SmtProof {

@@ -33,36 +33,16 @@ use crate::config::{DEFAULT_MEASUREMENT_TIME, DEFAULT_SAMPLE_SIZE, FIELD_BATCH_S
 
 /// Configuration for Word testing
 const TEST_WORDS: [Word; 10] = [
-    Word::new([Felt::from_u64(0), Felt::from_u64(0), Felt::from_u64(0), Felt::from_u64(0)]),
-    Word::new([Felt::from_u64(1), Felt::from_u64(0), Felt::from_u64(0), Felt::from_u64(0)]),
-    Word::new([Felt::from_u64(0), Felt::from_u64(1), Felt::from_u64(0), Felt::from_u64(0)]),
-    Word::new([Felt::from_u64(0), Felt::from_u64(0), Felt::from_u64(1), Felt::from_u64(0)]),
-    Word::new([Felt::from_u64(0), Felt::from_u64(0), Felt::from_u64(0), Felt::from_u64(1)]),
-    Word::new([Felt::from_u64(1), Felt::from_u64(1), Felt::from_u64(1), Felt::from_u64(1)]),
-    Word::new([
-        Felt::from_u64(u64::MAX),
-        Felt::from_u64(0),
-        Felt::from_u64(0),
-        Felt::from_u64(0),
-    ]),
-    Word::new([
-        Felt::from_u64(0),
-        Felt::from_u64(u64::MAX),
-        Felt::from_u64(0),
-        Felt::from_u64(0),
-    ]),
-    Word::new([
-        Felt::from_u64(0),
-        Felt::from_u64(0),
-        Felt::from_u64(u64::MAX),
-        Felt::from_u64(0),
-    ]),
-    Word::new([
-        Felt::from_u64(0),
-        Felt::from_u64(0),
-        Felt::from_u64(0),
-        Felt::from_u64(u64::MAX),
-    ]),
+    Word::new([Felt::from_u64(0), Felt::new(0), Felt::new(0), Felt::new(0)]),
+    Word::new([Felt::from_u64(1), Felt::new(0), Felt::new(0), Felt::new(0)]),
+    Word::new([Felt::from_u64(0), Felt::new(1), Felt::new(0), Felt::new(0)]),
+    Word::new([Felt::from_u64(0), Felt::new(0), Felt::new(1), Felt::new(0)]),
+    Word::new([Felt::from_u64(0), Felt::new(0), Felt::new(0), Felt::new(1)]),
+    Word::new([Felt::from_u64(1), Felt::new(1), Felt::new(1), Felt::new(1)]),
+    Word::new([Felt::new(u64::MAX), Felt::new(0), Felt::new(0), Felt::new(0)]),
+    Word::new([Felt::new(0), Felt::new(u64::MAX), Felt::new(0), Felt::new(0)]),
+    Word::new([Felt::new(0), Felt::new(0), Felt::new(u64::MAX), Felt::new(0)]),
+    Word::new([Felt::new(0), Felt::new(0), Felt::new(0), Felt::new(u64::MAX)]),
 ];
 
 // === Word Creation and Basic Operations ===
@@ -77,10 +57,10 @@ benchmark_with_setup_data! {
         let test_elements: Vec<[Felt; 4]> = (0u64..100)
             .map(|i| {
                 [
-                    Felt::from_u64(i),
-                    Felt::from_u64(i + 1),
-                    Felt::from_u64(i + 2),
-                    Felt::from_u64(i + 3),
+                    Felt::new(i),
+                    Felt::new(i + 1),
+                    Felt::new(i + 2),
+                    Felt::new(i + 3),
                 ]
             })
             .collect();
@@ -310,10 +290,10 @@ benchmark_batch! {
         let words: Vec<Word> = (0..count)
             .map(|i| {
                 Word::new([
-                    Felt::from_u64(i as u64),
-                    Felt::from_u64((i + 1) as u64),
-                    Felt::from_u64((i + 2) as u64),
-                    Felt::from_u64((i + 3) as u64),
+                    Felt::new(i as u64),
+                    Felt::new((i + 1) as u64),
+                    Felt::new((i + 2) as u64),
+                    Felt::new((i + 3) as u64),
                 ])
             })
             .collect();

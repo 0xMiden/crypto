@@ -3,6 +3,7 @@
 use alloc::{string::String, vec::Vec};
 use core::fmt::{self, Write};
 
+use p3_field::RawDataSerializable;
 use thiserror::Error;
 #[cfg(feature = "std")]
 pub use winter_utils::ReadAdapter;
@@ -11,7 +12,7 @@ pub use winter_utils::{
     uninit_vector,
 };
 
-use crate::{Felt, Word};
+use crate::{Felt, PrimeField64, Word};
 
 // CONSTANTS
 // ================================================================================================
@@ -26,7 +27,7 @@ const BINARY_CHUNK_SIZE: usize = 7;
 pub fn word_to_hex(w: &Word) -> Result<String, fmt::Error> {
     let mut s = String::new();
 
-    for byte in w.iter().flat_map(|e| e.to_bytes()) {
+    for byte in w.iter().flat_map(|&e| e.to_bytes()) {
         write!(s, "{byte:02x}")?;
     }
 
@@ -133,7 +134,7 @@ pub fn bytes_to_elements_with_padding(bytes: &[u8]) -> Vec<Felt> {
                 buf[chunk.len()] = 1;
             }
 
-            Felt::from_u64(u64::from_le_bytes(buf))
+            Felt::new(u64::from_le_bytes(buf))
         })
         .collect()
 }
@@ -161,12 +162,12 @@ pub fn padded_elements_to_bytes(felts: &[Felt]) -> Option<Vec<u8>> {
 
     let mut result = Vec::with_capacity(number_felts * BINARY_CHUNK_SIZE);
     for felt in felts.iter().take(number_felts - 1) {
-        let felt_bytes = felt.as_int().to_le_bytes();
+        let felt_bytes = felt.as_canonical_u64().to_le_bytes();
         result.extend_from_slice(&felt_bytes[..BINARY_CHUNK_SIZE]);
     }
 
     // handle the last field element
-    let felt_bytes = felts[number_felts - 1].as_int().to_le_bytes();
+    let felt_bytes = felts[number_felts - 1].as_canonical_u64().to_le_bytes();
     let pos = felt_bytes.iter().rposition(|entry| *entry == 1_u8)?;
 
     result.extend_from_slice(&felt_bytes[..pos]);
@@ -175,7 +176,7 @@ pub fn padded_elements_to_bytes(felts: &[Felt]) -> Option<Vec<u8>> {
 
 /// Converts field elements to raw byte representation.
 ///
-/// Each `Felt` is converted to its full `ELEMENT_BYTES` representation, in little-endian form
+/// Each `Felt` is converted to its full `NUM_BYTES` representation, in little-endian form
 /// and canonical form, without any padding removal or validation. This is the inverse
 /// of `bytes_to_elements_exact`.
 ///
@@ -186,9 +187,9 @@ pub fn padded_elements_to_bytes(felts: &[Felt]) -> Option<Vec<u8>> {
 /// Vector containing the raw bytes from all field elements
 pub fn elements_to_bytes(felts: &[Felt]) -> Vec<u8> {
     let number_felts = felts.len();
-    let mut result = Vec::with_capacity(number_felts * Felt::ELEMENT_BYTES);
+    let mut result = Vec::with_capacity(number_felts * Felt::NUM_BYTES);
     for felt in felts.iter().take(number_felts) {
-        let felt_bytes = felt.as_int().to_le_bytes();
+        let felt_bytes = felt.as_canonical_u64().to_le_bytes();
         result.extend_from_slice(&felt_bytes);
     }
 
@@ -198,34 +199,34 @@ pub fn elements_to_bytes(felts: &[Felt]) -> Vec<u8> {
 /// Converts bytes to field elements with validation.
 ///
 /// This function validates that:
-/// - The input bytes length is divisible by `Felt::ELEMENT_BYTES`
-/// - All `Felt::ELEMENT_BYTES`-byte sequences represent valid field elements
+/// - The input bytes length is divisible by `Felt::NUM_BYTES`
+/// - All `Felt::NUM_BYTES`-byte sequences represent valid field elements
 ///
 /// # Arguments
-/// * `bytes` - Byte slice that must be a multiple of `Felt::ELEMENT_BYTES` in length
+/// * `bytes` - Byte slice that must be a multiple of `Felt::NUM_BYTES` in length
 ///
 /// # Returns
 /// `Option<Vec<Felt>>` - Vector of `Felt` elements if all validations pass, or None otherwise
 pub fn bytes_to_elements_exact(bytes: &[u8]) -> Option<Vec<Felt>> {
-    // Check that the length is divisible by ELEMENT_BYTES
-    if !bytes.len().is_multiple_of(Felt::ELEMENT_BYTES) {
+    // Check that the length is divisible by NUM_BYTES
+    if !bytes.len().is_multiple_of(Felt::NUM_BYTES) {
         return None;
     }
 
-    let mut result = Vec::with_capacity(bytes.len() / Felt::ELEMENT_BYTES);
+    let mut result = Vec::with_capacity(bytes.len() / Felt::NUM_BYTES);
 
-    for chunk in bytes.chunks_exact(Felt::ELEMENT_BYTES) {
-        let chunk_array: [u8; Felt::ELEMENT_BYTES] =
+    for chunk in bytes.chunks_exact(Felt::NUM_BYTES) {
+        let chunk_array: [u8; Felt::NUM_BYTES] =
             chunk.try_into().expect("should succeed given the length check above");
 
         let value = u64::from_le_bytes(chunk_array);
 
         // Validate that the value represents a valid field element
-        if value >= Felt::MODULUS {
+        if value >= Felt::ORDER_U64 {
             return None;
         }
 
-        result.push(Felt::from_u64(value));
+        result.push(Felt::new(value));
     }
 
     Some(result)

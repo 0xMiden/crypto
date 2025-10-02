@@ -1,15 +1,16 @@
 use alloc::vec::Vec;
 
-use p3_field::extension::BinomialExtensionField;
 use winter_crypto::Hasher;
 
 use super::{
-    ARK1, ARK2, CAPACITY_RANGE, CubeExtension, DIGEST_RANGE,  Felt, 
-     NUM_ROUNDS, RATE_RANGE, Range, STATE_WIDTH, Word, add_constants,
-    add_constants_and_apply_inv_sbox, add_constants_and_apply_sbox, apply_inv_sbox, apply_mds,
-    apply_sbox,
+    ARK1, ARK2, CAPACITY_RANGE, CubeExtension, DIGEST_RANGE, Felt, MDS, NUM_ROUNDS, RATE_RANGE,
+    Range, STATE_WIDTH, Word, add_constants, add_constants_and_apply_inv_sbox,
+    add_constants_and_apply_sbox, apply_inv_sbox, apply_mds, apply_sbox,
 };
-use crate::{ZERO, hash::algebraic_sponge::AlgebraicSponge};
+use crate::{
+    BasedVectorSpace, BinomialExtensionField, ZERO, alloc::borrow::ToOwned,
+    hash::algebraic_sponge::AlgebraicSponge,
+};
 
 #[cfg(test)]
 mod tests;

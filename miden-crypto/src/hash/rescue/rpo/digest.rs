@@ -411,10 +411,10 @@ impl TryFrom<[u64; DIGEST_SIZE]> for RpoDigest {
 
     fn try_from(value: [u64; DIGEST_SIZE]) -> Result<Self, RpoDigestError> {
         Ok(Self([
-            Felt::from_u64(value[0]),
-            Felt::from_u64(value[1]),
-            Felt::from_u64(value[2]),
-            Felt::from_u64(value[3]),
+            Felt::new(value[0]),
+            Felt::new(value[1]),
+            Felt::new(value[2]),
+            Felt::new(value[3]),
         ]))
     }
 }
@@ -455,10 +455,10 @@ impl TryFrom<[u8; DIGEST_BYTES]> for RpoDigest {
         }
 
         Ok(RpoDigest([
-            Felt::from_u64(a),
-            Felt::from_u64(b),
-            Felt::from_u64(c),
-            Felt::from_u64(d),
+            Felt::new(a),
+            Felt::new(b),
+            Felt::new(c),
+            Felt::new(d),
         ]))
     }
 }
@@ -521,7 +521,7 @@ impl Deserializable for RpoDigest {
                     "Value not in the appropriate range",
                 )));
             }
-            *inner = Felt::from_u64(e);
+            *inner = Felt::new(e);
         }
 
         Ok(Self(inner))
@@ -554,10 +554,10 @@ mod tests {
 
     #[test]
     fn digest_serialization() {
-        let e1 = Felt::from_u64(rand_value());
-        let e2 = Felt::from_u64(rand_value());
-        let e3 = Felt::from_u64(rand_value());
-        let e4 = Felt::from_u64(rand_value());
+        let e1 = Felt::new(rand_value());
+        let e2 = Felt::new(rand_value());
+        let e3 = Felt::new(rand_value());
+        let e4 = Felt::new(rand_value());
 
         let d1 = RpoDigest([e1, e2, e3, e4]);
 
@@ -575,10 +575,10 @@ mod tests {
     #[test]
     fn digest_encoding() {
         let digest = RpoDigest([
-            Felt::from_u64(rand_value()),
-            Felt::from_u64(rand_value()),
-            Felt::from_u64(rand_value()),
-            Felt::from_u64(rand_value()),
+            Felt::new(rand_value()),
+            Felt::new(rand_value()),
+            Felt::new(rand_value()),
+            Felt::new(rand_value()),
         ]);
 
         let string: String = digest.into();
@@ -590,10 +590,10 @@ mod tests {
     #[test]
     fn test_conversions() {
         let digest = RpoDigest([
-            Felt::from_u64(rand_value()),
-            Felt::from_u64(rand_value()),
-            Felt::from_u64(rand_value()),
-            Felt::from_u64(rand_value()),
+            Felt::new(rand_value()),
+            Felt::new(rand_value()),
+            Felt::new(rand_value()),
+            Felt::new(rand_value()),
         ]);
 
         // BY VALUE

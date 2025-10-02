@@ -460,7 +460,7 @@ mod tests {
     #[test]
     fn test_serialization() {
         let nodes = (0u64..128u64)
-            .map(|value| Word::new([ZERO, ZERO, ZERO, Felt::from_u64(value)]))
+            .map(|value| Word::new([ZERO, ZERO, ZERO, Felt::new(value)]))
             .collect::<Vec<_>>();
 
         let mmr = Mmr::from(nodes);

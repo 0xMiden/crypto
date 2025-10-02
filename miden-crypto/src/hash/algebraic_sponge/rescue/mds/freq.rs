@@ -185,7 +185,7 @@ mod tests {
             let mut v2;
 
             for i in 0..STATE_WIDTH {
-                v1[i] = Felt::from_u64(a[i]);
+                v1[i] = Felt::new(a[i]);
             }
             v2 = v1;
 

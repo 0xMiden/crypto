@@ -473,7 +473,7 @@ mod tests {
         let entries: Vec<(Word, Word)> = (0..pair_count)
             .map(|n| {
                 let leaf_index = ((n as f64 / pair_count as f64) * 255.0) as u64;
-                let key = Word::new([ONE, ONE, Felt::from_u64(n), Felt::from_u64(leaf_index)]);
+                let key = Word::new([ONE, ONE, Felt::new(n), Felt::new(leaf_index)]);
                 let value = Word::new([ONE, ONE, ONE, ONE]);
                 (key, value)
             })
@@ -645,10 +645,10 @@ mod tests {
             prop::collection::vec(any::<u64>(), 4)
                 .prop_map(|vals| {
                     Word::new([
-                        Felt::from_u64(vals[0]),
-                        Felt::from_u64(vals[1]),
-                        Felt::from_u64(vals[2]),
-                        Felt::from_u64(vals[3]),
+                        Felt::new(vals[0]),
+                        Felt::new(vals[1]),
+                        Felt::new(vals[2]),
+                        Felt::new(vals[3]),
                     ])
                 })
                 .no_shrink()
@@ -978,10 +978,10 @@ mod tests {
                                     // Ensure we use valid leaf indices for the SMT depth
                                     let valid_leaf_index = leaf_index % (1u64 << 60); // Use large but valid range
                                     let key = Word::new([
-                                        Felt::from_u64(n as u64),         // element 0
-                                        Felt::from_u64(n as u64 + 1),     // element 1
-                                        Felt::from_u64(n as u64 + 2),     // element 2
-                                        Felt::from_u64(valid_leaf_index), // element 3 (leaf index)
+                                        Felt::new(n as u64),         // element 0
+                                        Felt::new(n as u64 + 1),     // element 1
+                                        Felt::new(n as u64 + 2),     // element 2
+                                        Felt::new(valid_leaf_index), // element 3 (leaf index)
                                     ]);
                                     (key, value)
                                 })

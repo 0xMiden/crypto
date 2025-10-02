@@ -29,13 +29,13 @@ impl FuzzInput {
 
         for chunk in data.chunks_exact(40).take(num_entries) {
             let key = Word::new([
-                Felt::from_u64(u64::from_le_bytes(chunk[0..8].try_into().unwrap())),
-                Felt::from_u64(u64::from_le_bytes(chunk[8..16].try_into().unwrap())),
-                Felt::from_u64(u64::from_le_bytes(chunk[16..24].try_into().unwrap())),
-                Felt::from_u64(u64::from_le_bytes(chunk[24..32].try_into().unwrap())),
+                Felt::new(u64::from_le_bytes(chunk[0..8].try_into().unwrap())),
+                Felt::new(u64::from_le_bytes(chunk[8..16].try_into().unwrap())),
+                Felt::new(u64::from_le_bytes(chunk[16..24].try_into().unwrap())),
+                Felt::new(u64::from_le_bytes(chunk[24..32].try_into().unwrap())),
             ]);
             let value =
-                [ONE, ONE, ONE, Felt::from_u64(u64::from_le_bytes(chunk[32..40].try_into().unwrap()))];
+                [ONE, ONE, ONE, Felt::new(u64::from_le_bytes(chunk[32..40].try_into().unwrap()))];
             entries.push((key, value));
         }
 

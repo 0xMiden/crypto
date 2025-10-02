@@ -340,8 +340,7 @@ impl Deserializable for SecretKey {
 
         let f = Polynomial::new(f.iter().map(|&c| FalconFelt::new(c.into())).collect());
         let g = Polynomial::new(g.iter().map(|&c| FalconFelt::new(c.into())).collect());
-        let big_f =
-            Polynomial::new(big_f.iter().map(|&c| FalconFelt::new(c.into())).collect());
+        let big_f = Polynomial::new(big_f.iter().map(|&c| FalconFelt::new(c.into())).collect());
 
         // big_g * f - g * big_f = p (mod X^n + 1)
         let big_g = g.fft().hadamard_div(&f.fft()).hadamard_mul(&big_f.fft()).ifft();

@@ -8,6 +8,7 @@
 //! \[1\] <https://eprint.iacr.org/2023/1668>
 
 use alloc::{string::ToString, vec::Vec};
+use p3_field::PrimeField64;
 use core::ops::Range;
 
 use num::Integer;
@@ -351,10 +352,10 @@ impl Distribution<SecretKey> for StandardUniform {
     fn sample<R: rand::Rng + ?Sized>(&self, rng: &mut R) -> SecretKey {
         let mut res = [ZERO; SECRET_KEY_SIZE];
         let uni_dist =
-            Uniform::new(0, Felt::MODULUS).expect("should not fail given the size of the field");
+            Uniform::new(0, Felt::ORDER_U64).expect("should not fail given the size of the field");
         for r in res.iter_mut() {
             let sampled_integer = uni_dist.sample(rng);
-            *r = Felt::from_u64(sampled_integer);
+            *r = Felt::new(sampled_integer);
         }
         SecretKey(res)
     }
@@ -453,10 +454,10 @@ impl Distribution<Nonce> for StandardUniform {
     fn sample<R: rand::Rng + ?Sized>(&self, rng: &mut R) -> Nonce {
         let mut res = [ZERO; NONCE_SIZE];
         let uni_dist =
-            Uniform::new(0, Felt::MODULUS).expect("should not fail given the size of the field");
+            Uniform::new(0, Felt::ORDER_U64).expect("should not fail given the size of the field");
         for r in res.iter_mut() {
             let sampled_integer = uni_dist.sample(rng);
-            *r = Felt::from_u64(sampled_integer);
+            *r = Felt::new(sampled_integer);
         }
         Nonce(res)
     }
@@ -470,9 +471,9 @@ impl Serializable for EncryptedData {
         // we serialize field elements in their canonical form
         target.write_u8(self.data_type as u8);
         target.write_usize(self.ciphertext.len());
-        target.write_many(self.ciphertext.iter().map(Felt::as_int));
-        target.write_many(self.nonce.0.iter().map(Felt::as_int));
-        target.write_many(self.auth_tag.0.iter().map(Felt::as_int));
+        target.write_many(self.ciphertext.iter().map(Felt::as_canonical_u64));
+        target.write_many(self.nonce.0.iter().map(Felt::as_canonical_u64));
+        target.write_many(self.auth_tag.0.iter().map(Felt::as_canonical_u64));
     }
 }
 

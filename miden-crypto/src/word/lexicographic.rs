@@ -1,5 +1,7 @@
 use core::cmp::Ordering;
 
+use p3_field::PrimeField64;
+
 use super::{ByteReader, ByteWriter, Deserializable, DeserializationError, Serializable};
 use crate::{Felt, WORD_SIZE, Word};
 
@@ -72,8 +74,8 @@ impl<T: Into<Word> + Copy> Ord for LexicographicWord<T> {
         for (felt0, felt1) in self_word
             .iter()
             .rev()
-            .map(Felt::as_int)
-            .zip(other_word.iter().rev().map(Felt::as_int))
+            .map(Felt::as_canonical_u64)
+            .zip(other_word.iter().rev().map(Felt::as_canonical_u64))
         {
             let ordering = felt0.cmp(&felt1);
             if let Ordering::Less | Ordering::Greater = ordering {
@@ -155,7 +157,7 @@ mod tests {
 
     #[test]
     fn lexicographic_serialization() {
-        let word = Word::from([1u64, 2, 3, 4].map(Felt::from_u64));
+        let word = Word::from([1u64, 2, 3, 4].map(Felt::new));
         let key = LexicographicWord::new(word);
         let bytes = key.to_bytes();
         let deserialized_key = LexicographicWord::<Word>::read_from_bytes(&bytes).unwrap();

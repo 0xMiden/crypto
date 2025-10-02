@@ -63,7 +63,7 @@ fn test_ethereum_test_vectors() {
 fn compute_expected_element_hash(elements: &[Felt]) -> [u8; DIGEST_BYTES] {
     let mut bytes = Vec::new();
     for element in elements.iter() {
-        bytes.extend_from_slice(&element.as_int().to_le_bytes());
+        bytes.extend_from_slice(&element.as_canonical_u64().to_le_bytes());
     }
     let mut hasher = sha3::Keccak256::new();
     hasher.update(&bytes);
