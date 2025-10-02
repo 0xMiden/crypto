@@ -3,13 +3,10 @@
 //! This module benchmarks the creation and operations of Merkle trees,
 //! including tree construction, path computation, updates, and verification.
 
-<<<<<<< HEAD
 use criterion::{BatchSize, Criterion, criterion_group, criterion_main};
 use miden_crypto::{Felt, ONE, PrimeCharacteristicRing, Word, merkle::MerkleTree};
 use rand_utils::prng_array;
-=======
 use std::hint;
->>>>>>> origin/next
 
 use criterion::{BatchSize, Bencher, Criterion, criterion_group, criterion_main};
 use miden_crypto::{
@@ -48,14 +45,9 @@ benchmark_multi!(
     |b: &mut Bencher<'_>, num_leaves: &usize| {
         b.iter_batched(
             || {
-<<<<<<< HEAD
                 let entries: Vec<Word> =
                     (0..256).map(|i| [Felt::from_u64(i), ONE, ONE, Felt::from_u64(i)]).collect();
                 assert_eq!(entries.len(), 256);
-=======
-                let entries = generate_words_merkle_std(*num_leaves);
-                assert_eq!(entries.len(), *num_leaves);
->>>>>>> origin/next
                 entries
             },
             |leaves| {
@@ -104,7 +96,6 @@ benchmark_with_setup_data!(
     },
 );
 
-<<<<<<< HEAD
 fn generate_word(seed: &mut [u8; 32]) -> Word {
     mem::swap(seed, &mut prng_array(*seed));
     let nums: [u64; 4] = prng_array(*seed);
@@ -115,7 +106,6 @@ fn generate_word(seed: &mut [u8; 32]) -> Word {
         Felt::from_u64(nums[3]),
     ]
 }
-=======
 benchmark_batch!(
     merkle_tree_batch_update,
     &[1, 16, 32, 64, 128],
@@ -204,4 +194,3 @@ criterion_group!(
 );
 
 criterion_main!(merkle_benches);
->>>>>>> origin/next
