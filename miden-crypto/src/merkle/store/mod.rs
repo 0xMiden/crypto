@@ -36,8 +36,8 @@ pub struct StoreNode {
 /// # use miden_crypto::merkle::{NodeIndex, MerkleStore, MerkleTree};
 /// # use miden_crypto::hash::rpo::Rpo256;
 /// # use miden_crypto::PrimeCharacteristicRing;
-/// # fn int_to_node(value: u64) -> Word {
-/// #     [Felt::new(value), ZERO, ZERO, ZERO]
+/// # const fn int_to_node(value: u64) -> Word {
+/// #     Word::new([Felt::new(value), ZERO, ZERO, ZERO])
 /// # }
 /// # let A = int_to_node(1);
 /// # let B = int_to_node(2);

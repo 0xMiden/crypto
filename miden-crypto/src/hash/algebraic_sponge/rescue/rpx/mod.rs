@@ -3,8 +3,8 @@ use alloc::vec::Vec;
 use winter_crypto::Hasher;
 
 use super::{
-    ARK1, ARK2, CAPACITY_RANGE, CubeExtension, DIGEST_RANGE, Felt, MDS, NUM_ROUNDS, RATE_RANGE,
-    Range, STATE_WIDTH, Word, add_constants, add_constants_and_apply_inv_sbox,
+    ARK1, ARK2, CAPACITY_RANGE, DIGEST_RANGE, Felt, MDS, NUM_ROUNDS, RATE_RANGE, Range,
+    STATE_WIDTH, Word, add_constants, add_constants_and_apply_inv_sbox,
     add_constants_and_apply_sbox, apply_inv_sbox, apply_mds, apply_sbox,
 };
 use crate::{
@@ -136,12 +136,6 @@ impl Rpx256 {
         <Self as Hasher>::merge(values)
     }
 
-    // /// Returns a hash of the provided field elements.
-    // #[inline(always)]
-    // pub fn hash_elements<E: FieldElement<BaseField = Felt>>(elements: &[E]) -> Word {
-    //     <Self as ElementHasher>::hash_elements(elements)
-    // }
-
     /// Returns a hash of two digests and a domain identifier.
     #[inline(always)]
     pub fn merge_in_domain(values: &[Word; 2], domain: Felt) -> Word {
@@ -227,7 +221,7 @@ impl Rpx256 {
 
     /// Computes an exponentiation to the power 7 in cubic extension field.
     #[inline(always)]
-    pub fn exp7(x: CubeExtension) -> CubeExtension {
+    pub fn exp7(x: CubicExtElement) -> CubicExtElement {
         let x2 = x * x;
         let x4 = x2 * x2;
 
@@ -257,13 +251,3 @@ impl Hasher for Rpx256 {
         <Self as AlgebraicSponge>::merge_with_int(seed, value)
     }
 }
-
-// impl ElementHasher for Rpx256 {
-//     type BaseField = Felt;
-
-//     fn hash_elements<E: FieldElement<BaseField = Self::BaseField>>(
-//         elements: &[E],
-//     ) -> <Self as Hasher>::Digest {
-//         <Self as AlgebraicSponge>::hash_elements(elements)
-//     }
-// }

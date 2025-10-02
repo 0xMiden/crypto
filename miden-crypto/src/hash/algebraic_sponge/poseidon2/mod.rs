@@ -6,7 +6,6 @@ use crate::PrimeCharacteristicRing;
 mod constants;
 use constants::*;
 use winter_crypto::Hasher;
-// use winter_crypto::{ElementHasher, Hasher};
 
 #[cfg(test)]
 mod test;
@@ -156,12 +155,6 @@ impl Poseidon2 {
     pub fn merge(values: &[Word; 2]) -> Word {
         <Self as Hasher>::merge(values)
     }
-
-    // /// Returns a hash of the provided field elements.
-    // #[inline(always)]
-    // pub fn hash_elements<E: FieldElement<BaseField = Felt>>(elements: &[E]) -> Word {
-    //     <Self as ElementHasher>::hash_elements(elements)
-    // }
 
     /// Returns a hash of two digests and a domain identifier.
     #[inline(always)]

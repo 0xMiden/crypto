@@ -1,6 +1,6 @@
 use alloc::{collections::BTreeSet, vec::Vec};
 
-use p3_field::{PrimeCharacteristicRing, PrimeField64};
+use p3_field::PrimeField64;
 use proptest::prelude::*;
 use rand_utils::rand_value;
 

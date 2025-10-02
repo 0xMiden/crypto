@@ -197,42 +197,7 @@ impl Hasher for Blake3_192 {
         Blake3Digest(*shrink_bytes(&hasher.finalize().into()))
     }
 }
-/*
-impl ElementHasher for Blake3_192 {
-    type BaseField = Felt;
 
-    fn hash_elements<E>(elements: &[E]) -> Self::Digest
-    where
-        E: FieldElement<BaseField = Self::BaseField>,
-    {
-        Blake3Digest(hash_elements(elements))
-    }
-}
-
-impl Blake3_192 {
-    /// Returns a hash of the provided sequence of bytes.
-    #[inline(always)]
-    pub fn hash(bytes: &[u8]) -> Blake3Digest<DIGEST24_BYTES> {
-        <Self as Hasher>::hash(bytes)
-    }
-
-    /// Returns a hash of two digests. This method is intended for use in construction of
-    /// Merkle trees and verification of Merkle paths.
-    #[inline(always)]
-    pub fn merge(values: &[Blake3Digest<DIGEST24_BYTES>; 2]) -> Blake3Digest<DIGEST24_BYTES> {
-        <Self as Hasher>::merge(values)
-    }
-
-    /// Returns a hash of the provided field elements.
-    #[inline(always)]
-    pub fn hash_elements<E>(elements: &[E]) -> Blake3Digest<DIGEST24_BYTES>
-    where
-        E: FieldElement<BaseField = Felt>,
-    {
-        <Self as ElementHasher>::hash_elements(elements)
-    }
-}
-*/
 // BLAKE3 160-BIT OUTPUT
 // ================================================================================================
 
@@ -266,42 +231,7 @@ impl Hasher for Blake3_160 {
         Blake3Digest(*shrink_bytes(&hasher.finalize().into()))
     }
 }
-/*
-impl ElementHasher for Blake3_160 {
-    type BaseField = Felt;
 
-    fn hash_elements<E>(elements: &[E]) -> Self::Digest
-    where
-        E: FieldElement<BaseField = Self::BaseField>,
-    {
-        Blake3Digest(hash_elements(elements))
-    }
-}
-
-impl Blake3_160 {
-    /// Returns a hash of the provided sequence of bytes.
-    #[inline(always)]
-    pub fn hash(bytes: &[u8]) -> Blake3Digest<DIGEST20_BYTES> {
-        <Self as Hasher>::hash(bytes)
-    }
-
-    /// Returns a hash of two digests. This method is intended for use in construction of
-    /// Merkle trees and verification of Merkle paths.
-    #[inline(always)]
-    pub fn merge(values: &[Blake3Digest<DIGEST20_BYTES>; 2]) -> Blake3Digest<DIGEST20_BYTES> {
-        <Self as Hasher>::merge(values)
-    }
-
-    /// Returns a hash of the provided field elements.
-    #[inline(always)]
-    pub fn hash_elements<E>(elements: &[E]) -> Blake3Digest<DIGEST20_BYTES>
-    where
-        E: FieldElement<BaseField = Felt>,
-    {
-        <Self as ElementHasher>::hash_elements(elements)
-    }
-}
-*/
 // HELPER FUNCTIONS
 // ================================================================================================
 

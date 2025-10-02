@@ -288,7 +288,7 @@ benchmark_batch! {
         let entries = generate_simple_smt_entries(256);
         let mut smt = SimpleSmt::<32>::with_leaves(entries).unwrap();
         let new_index = LeafIndex::<32>::new(999).unwrap();
-        let new_value = Word::new([Felt::from_u64(1000), Felt::new(1001), Felt::new(1002), Felt::new(1003)]);
+        let new_value = Word::new([Felt::new(1000), Felt::new(1001), Felt::new(1002), Felt::new(1003)]);
 
         b.iter(|| {
             for _ in 0..insert_count {

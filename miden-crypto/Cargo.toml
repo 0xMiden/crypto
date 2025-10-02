@@ -65,7 +65,6 @@ hashmaps = ["dep:hashbrown"]
 internal = []
 rocksdb = ["concurrent", "dep:rocksdb"]
 serde = ["dep:serde", "serde?/alloc", ]
-# serde = ["dep:serde", "serde?/alloc", "winter-math/serde"]
 std = [
   "blake3/std",
   "dep:cc",

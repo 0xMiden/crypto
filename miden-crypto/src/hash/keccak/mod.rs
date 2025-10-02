@@ -139,17 +139,6 @@ impl Hasher for Keccak256 {
     }
 }
 
-// impl ElementHasher for Keccak256 {
-//     type BaseField = Felt;
-
-//     fn hash_elements<E>(elements: &[E]) -> <Self as Hasher>::Digest
-//     where
-//         E: BasedVectorSpace<Felt>,
-//     {
-//         Keccak256Digest(hash_elements(elements))
-//     }
-// }
-
 impl Keccak256 {
     /// Returns a hash of the provided sequence of bytes.
     #[inline(always)]

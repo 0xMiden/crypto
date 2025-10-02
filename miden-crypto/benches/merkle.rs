@@ -93,16 +93,6 @@ benchmark_with_setup_data!(
     },
 );
 
-// fn generate_word(seed: &mut [u8; 32]) -> Word {
-//     mem::swap(seed, &mut prng_array(*seed));
-//     let nums: [u64; 4] = prng_array(*seed);
-//     [
-//         Felt::new(nums[0]),
-//         Felt::new(nums[1]),
-//         Felt::new(nums[2]),
-//         Felt::new(nums[3]),
-//     ]
-// }
 benchmark_batch!(
     merkle_tree_batch_update,
     &[1, 16, 32, 64, 128],

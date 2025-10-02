@@ -5,6 +5,8 @@ use super::{ALPHA, INV_ALPHA};
 use super::{
     AlgebraicSponge, CAPACITY_RANGE, DIGEST_RANGE, Felt, RATE_RANGE, Range, STATE_WIDTH, Word, ZERO,
 };
+use p3_field::Field;
+
 mod arch;
 pub use arch::optimized::{add_constants_and_apply_inv_sbox, add_constants_and_apply_sbox};
 
@@ -12,7 +14,6 @@ mod mds;
 use mds::{MDS, apply_mds};
 
 mod rpo;
-use p3_field::{Field, extension::BinomialExtensionField};
 pub use rpo::Rpo256;
 
 mod rpx;
@@ -20,8 +21,6 @@ pub use rpx::Rpx256;
 
 #[cfg(test)]
 mod tests;
-
-type CubeExtension = BinomialExtensionField<Felt, 5>;
 
 // CONSTANTS
 // ================================================================================================
