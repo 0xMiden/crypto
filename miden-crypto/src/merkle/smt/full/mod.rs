@@ -498,11 +498,6 @@ impl Serializable for Smt {
         let entries_count = self.entries().count();
 
         // Each entry is the size of a digest plus a word.
-
-        ark_std::println!("entry cnt: {}", entries_count.get_size_hint());
-        ark_std::println!("word size: {}", EMPTY_WORD.get_size_hint());
-        ark_std::println!("RpoDigest: {}", RpoDigest::SERIALIZED_SIZE);
-
         entries_count.get_size_hint()
             + entries_count * (RpoDigest::SERIALIZED_SIZE + EMPTY_WORD.get_size_hint())
     }
@@ -592,6 +587,5 @@ fn test_smt_serialization_deserialization() {
 
     let bytes = smt.to_bytes();
     assert_eq!(smt, Smt::read_from_bytes(&bytes).unwrap());
-    ark_std::println!("bytes: {:?}", bytes);
     assert_eq!(bytes.len(), smt.get_size_hint());
 }

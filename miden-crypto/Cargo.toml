@@ -84,13 +84,12 @@ winter-utils = { version = "0.12", default-features = false }
 # p3-challenger = { version = "0.3.0" }
 
 # FIXME: Remove
-ark-std = "0.5.0"
-p3-field = { path = "../../Plonky3/field", default-features =  false }
-p3-goldilocks = { path = "../../Plonky3/goldilocks", default-features =  false }
-p3-symmetric = { path = "../../Plonky3/symmetric", default-features =  false }
-p3-merkle-tree = { path = "../../Plonky3/merkle-tree", default-features =  false }
-p3-air = { path = "../../Plonky3/air", default-features =  false }
-p3-challenger = { path = "../../Plonky3/challenger", default-features =  false }
+p3-field = { git = "https://github.com/pqstrate/Plonky3/", default-features =  false, branch = "plonky3-migration" }
+p3-goldilocks = { git = "https://github.com/pqstrate/Plonky3/", default-features =  false, branch = "plonky3-migration" }
+p3-symmetric = { git = "https://github.com/pqstrate/Plonky3/", default-features =  false, branch = "plonky3-migration" }
+p3-merkle-tree = { git = "https://github.com/pqstrate/Plonky3/", default-features =  false, branch = "plonky3-migration" }
+p3-air = { git = "https://github.com/pqstrate/Plonky3/", default-features =  false, branch = "plonky3-migration" }
+p3-challenger = { git = "https://github.com/pqstrate/Plonky3/", default-features =  false, branch = "plonky3-migration" }
 
 
 lazy_static = "1.4"
