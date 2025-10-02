@@ -112,7 +112,9 @@ impl Hasher for Poseidon2 {
 impl ElementHasher for Poseidon2 {
     type BaseField = Felt;
 
-    fn hash_elements<E: FieldElement<BaseField = Self::BaseField>>(elements: &[E]) -> Self::Digest {
+    fn hash_elements<E: FieldElement<BaseField = Self::BaseField>>(
+        elements: &[E],
+    ) -> <Self as Hasher>::Digest {
         <Self as AlgebraicSponge>::hash_elements(elements)
     }
 }

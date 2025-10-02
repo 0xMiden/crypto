@@ -193,7 +193,9 @@ impl Hasher for Rpo256 {
 impl ElementHasher for Rpo256 {
     type BaseField = Felt;
 
-    fn hash_elements<E: FieldElement<BaseField = Self::BaseField>>(elements: &[E]) -> Self::Digest {
+    fn hash_elements<E: FieldElement<BaseField = Self::BaseField>>(
+        elements: &[E],
+    ) -> <Self as Hasher>::Digest {
         <Self as AlgebraicSponge>::hash_elements(elements)
     }
 }

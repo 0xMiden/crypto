@@ -43,9 +43,8 @@ benchmark_multi!(
     |b: &mut Bencher<'_>, num_leaves: &usize| {
         b.iter_batched(
             || {
-                let entries: Vec<Word> =
-                    (0..256).map(|i| [Felt::from_u64(i), ONE, ONE, Felt::from_u64(i)]).collect();
-                assert_eq!(entries.len(), 256);
+                let entries = generate_words_merkle_std(*num_leaves);
+                assert_eq!(entries.len(), *num_leaves);
                 entries
             },
             |leaves| {
@@ -94,16 +93,16 @@ benchmark_with_setup_data!(
     },
 );
 
-fn generate_word(seed: &mut [u8; 32]) -> Word {
-    mem::swap(seed, &mut prng_array(*seed));
-    let nums: [u64; 4] = prng_array(*seed);
-    [
-        Felt::from_u64(nums[0]),
-        Felt::from_u64(nums[1]),
-        Felt::from_u64(nums[2]),
-        Felt::from_u64(nums[3]),
-    ]
-}
+// fn generate_word(seed: &mut [u8; 32]) -> Word {
+//     mem::swap(seed, &mut prng_array(*seed));
+//     let nums: [u64; 4] = prng_array(*seed);
+//     [
+//         Felt::from_u64(nums[0]),
+//         Felt::from_u64(nums[1]),
+//         Felt::from_u64(nums[2]),
+//         Felt::from_u64(nums[3]),
+//     ]
+// }
 benchmark_batch!(
     merkle_tree_batch_update,
     &[1, 16, 32, 64, 128],

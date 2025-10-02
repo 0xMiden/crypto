@@ -1,11 +1,13 @@
+use alloc::vec::Vec;
+use p3_field::extension::BinomialExtensionField;
+
 use super::{
     ARK1, ARK2, CAPACITY_RANGE, CubeExtension, DIGEST_RANGE, ElementHasher, Felt, FieldElement,
     Hasher, MDS, NUM_ROUNDS, RATE_RANGE, Range, STATE_WIDTH, Word, add_constants,
     add_constants_and_apply_inv_sbox, add_constants_and_apply_sbox, apply_inv_sbox, apply_mds,
     apply_sbox,
 };
-#[cfg(test)]
-use super::{StarkField, ZERO};
+use crate::ZERO;
 use crate::hash::algebraic_sponge::AlgebraicSponge;
 
 #[cfg(test)]
@@ -257,7 +259,7 @@ impl Hasher for Rpx256 {
 impl ElementHasher for Rpx256 {
     type BaseField = Felt;
 
-    fn hash_elements<E: FieldElement<BaseField = Self::BaseField>>(elements: &[E]) -> Self::Digest {
+    fn hash_elements<E: FieldElement<BaseField = Self::BaseField>>(elements: &[E]) -> <Self as Hasher>::Digest {
         <Self as AlgebraicSponge>::hash_elements(elements)
     }
 }

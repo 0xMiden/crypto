@@ -138,7 +138,7 @@ impl Hasher for Keccak256 {
 impl ElementHasher for Keccak256 {
     type BaseField = Felt;
 
-    fn hash_elements<E>(elements: &[E]) -> Self::Digest
+    fn hash_elements<E>(elements: &[E]) -> <Self as Hasher>::Digest
     where
         E: FieldElement<BaseField = Self::BaseField>,
     {

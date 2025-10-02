@@ -1,4 +1,5 @@
 use alloc::string::String;
+use alloc::vec::Vec;
 use core::{
     mem::{size_of, transmute, transmute_copy},
     ops::Deref,

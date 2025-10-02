@@ -68,7 +68,7 @@ fn test_root_not_in_store() -> Result<(), MerkleError> {
 
 #[test]
 fn test_merkle_tree() -> Result<(), MerkleError> {
-    let mtree = MerkleTree::new(digests_to_words(&values4()))?;
+    let mtree = MerkleTree::new(&values4())?;
     let store = MerkleStore::from(&mtree);
 
     // STORE LEAVES ARE CORRECT -------------------------------------------------------------------

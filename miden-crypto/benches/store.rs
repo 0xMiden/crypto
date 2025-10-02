@@ -11,32 +11,37 @@ use miden_crypto::{
 };
 use rand::{RngCore, SeedableRng};
 use rand_chacha::ChaCha20Rng;
-use rand_utils::rand_value;
+use rand_utils::{rand_array, rand_value};
 
 /// Since MerkleTree can only be created when a power-of-two number of elements is used, the sample
 /// sizes are limited to that.
 static BATCH_SIZES: [usize; 3] = [2usize.pow(4), 2usize.pow(7), 2usize.pow(10)];
 
-/// Generates a random `RpoDigest`.
-fn random_rpo_digest<R: RngCore>(rng: &mut R) -> RpoDigest {
-    [
-        Felt::from_u64(rng.next_u64()),
-        Felt::from_u64(rng.next_u64()),
-        Felt::from_u64(rng.next_u64()),
-        Felt::from_u64(rng.next_u64()),
-    ]
-    .into()
-}
+// /// Generates a random `RpoDigest`.
+// fn random_rpo_digest<R: RngCore>(rng: &mut R) -> RpoDigest {
+//     [
+//         Felt::from_u64(rng.next_u64()),
+//         Felt::from_u64(rng.next_u64()),
+//         Felt::from_u64(rng.next_u64()),
+//         Felt::from_u64(rng.next_u64()),
+//     ]
+//     .into()
+// }
 
 /// Generates a random `Word`.
-fn random_word<R: RngCore>(rng: &mut R) -> Word {
-    [
-        Felt::from_u64(rng.next_u64()),
-        Felt::from_u64(rng.next_u64()),
-        Felt::from_u64(rng.next_u64()),
-        Felt::from_u64(rng.next_u64()),
-    ]
+fn random_word() -> Word {
+    rand_array::<Felt, 4>().into()
 }
+
+// fn random_word<R: RngCore>(rng: &mut R) -> Word {
+//     rand_array::<Felt, 4>().into()
+//     // [
+//     //     Felt::from_u64(rng.next_u64()),
+//     //     Felt::from_u64(rng.next_u64()),
+//     //     Felt::from_u64(rng.next_u64()),
+//     //     Felt::from_u64(rng.next_u64()),
+//     // ]
+// }
 
 /// Generates an index at the specified depth in `0..range`.
 fn random_index(range: u64, depth: u8) -> NodeIndex {
@@ -82,8 +87,7 @@ fn get_leaf_merkletree(c: &mut Criterion) {
     let mut rng = ChaCha20Rng::from_seed(seed);
 
     let random_data_size = BATCH_SIZES.into_iter().max().unwrap();
-    let random_data: Vec<RpoDigest> =
-        (0..random_data_size).map(|_| random_rpo_digest(&mut rng)).collect();
+    let random_data: Vec<RpoDigest> = (0..random_data_size).map(|_| random_word()).collect();
 
     for size in BATCH_SIZES {
         let leaves = &random_data[..size];
@@ -119,8 +123,7 @@ fn get_leaf_simplesmt(c: &mut Criterion) {
     let seed = [0u8; 32];
     let mut rng = ChaCha20Rng::from_seed(seed);
     let random_data_size = BATCH_SIZES.into_iter().max().unwrap();
-    let random_data: Vec<RpoDigest> =
-        (0..random_data_size).map(|_| random_rpo_digest(&mut rng)).collect();
+    let random_data: Vec<RpoDigest> = (0..random_data_size).map(|_| random_word()).collect();
 
     for size in BATCH_SIZES {
         let leaves = &random_data[..size];
@@ -193,8 +196,7 @@ fn get_node_merkletree(c: &mut Criterion) {
     let seed = [0u8; 32];
     let mut rng = ChaCha20Rng::from_seed(seed);
     let random_data_size = BATCH_SIZES.into_iter().max().unwrap();
-    let random_data: Vec<RpoDigest> =
-        (0..random_data_size).map(|_| random_rpo_digest(&mut rng)).collect();
+    let random_data: Vec<RpoDigest> = (0..random_data_size).map(|_| random_word()).collect();
 
     for size in BATCH_SIZES {
         let leaves = &random_data[..size];
@@ -231,8 +233,7 @@ fn get_node_simplesmt(c: &mut Criterion) {
     let seed = [0u8; 32];
     let mut rng = ChaCha20Rng::from_seed(seed);
     let random_data_size = BATCH_SIZES.into_iter().max().unwrap();
-    let random_data: Vec<RpoDigest> =
-        (0..random_data_size).map(|_| random_rpo_digest(&mut rng)).collect();
+    let random_data: Vec<RpoDigest> = (0..random_data_size).map(|_| random_word()).collect();
 
     for size in BATCH_SIZES {
         let leaves = &random_data[..size];
@@ -273,8 +274,7 @@ fn get_leaf_path_merkletree(c: &mut Criterion) {
     let seed = [0u8; 32];
     let mut rng = ChaCha20Rng::from_seed(seed);
     let random_data_size = BATCH_SIZES.into_iter().max().unwrap();
-    let random_data: Vec<RpoDigest> =
-        (0..random_data_size).map(|_| random_rpo_digest(&mut rng)).collect();
+    let random_data: Vec<RpoDigest> = (0..random_data_size).map(|_| random_word()).collect();
 
     for size in BATCH_SIZES {
         let leaves = &random_data[..size];
@@ -310,8 +310,7 @@ fn get_leaf_path_simplesmt(c: &mut Criterion) {
     let seed = [0u8; 32];
     let mut rng = ChaCha20Rng::from_seed(seed);
     let random_data_size = BATCH_SIZES.into_iter().max().unwrap();
-    let random_data: Vec<RpoDigest> =
-        (0..random_data_size).map(|_| random_rpo_digest(&mut rng)).collect();
+    let random_data: Vec<RpoDigest> = (0..random_data_size).map(|_| random_word()).collect();
 
     for size in BATCH_SIZES {
         let leaves = &random_data[..size];
@@ -353,8 +352,7 @@ fn new(c: &mut Criterion) {
     let seed = [0u8; 32];
     let mut rng = ChaCha20Rng::from_seed(seed);
     let random_data_size = BATCH_SIZES.into_iter().max().unwrap();
-    let random_data: Vec<RpoDigest> =
-        (0..random_data_size).map(|_| random_rpo_digest(&mut rng)).collect();
+    let random_data: Vec<RpoDigest> = (0..random_data_size).map(|_| random_word()).collect();
 
     for size in BATCH_SIZES {
         let leaves = &random_data[..size];
@@ -418,8 +416,7 @@ fn update_leaf_merkletree(c: &mut Criterion) {
     let seed = [0u8; 32];
     let mut rng = ChaCha20Rng::from_seed(seed);
     let random_data_size = BATCH_SIZES.into_iter().max().unwrap();
-    let random_data: Vec<RpoDigest> =
-        (0..random_data_size).map(|_| random_rpo_digest(&mut rng)).collect();
+    let random_data: Vec<RpoDigest> = (0..random_data_size).map(|_| random_word()).collect();
 
     for size in BATCH_SIZES {
         let leaves = &random_data[..size];
@@ -462,8 +459,7 @@ fn update_leaf_simplesmt(c: &mut Criterion) {
     let seed = [0u8; 32];
     let mut rng = ChaCha20Rng::from_seed(seed);
     let random_data_size = BATCH_SIZES.into_iter().max().unwrap();
-    let random_data: Vec<RpoDigest> =
-        (0..random_data_size).map(|_| random_rpo_digest(&mut rng)).collect();
+    let random_data: Vec<RpoDigest> = (0..random_data_size).map(|_| random_word()).collect();
 
     for size in BATCH_SIZES {
         let leaves = &random_data[..size];

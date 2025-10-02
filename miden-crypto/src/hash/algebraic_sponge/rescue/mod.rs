@@ -4,6 +4,8 @@ use super::{
     AlgebraicSponge, CAPACITY_RANGE, CubeExtension, DIGEST_RANGE, ElementHasher, Felt,
     FieldElement, Hasher, RATE_RANGE, Range, STATE_WIDTH, StarkField, Word, ZERO,
 };
+use lazy_static::lazy_static;
+
 mod arch;
 pub use arch::optimized::{add_constants_and_apply_inv_sbox, add_constants_and_apply_sbox};
 
@@ -11,6 +13,7 @@ mod mds;
 use mds::apply_mds;
 
 mod rpo;
+use p3_field::{Field, extension::BinomialExtensionField};
 pub use rpo::Rpo256;
 
 mod rpx;

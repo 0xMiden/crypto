@@ -64,14 +64,15 @@ executable = ["dep:clap", "dep:rand-utils", "std"]
 hashmaps = ["dep:hashbrown"]
 internal = []
 rocksdb = ["concurrent", "dep:rocksdb"]
-serde = ["dep:serde", "serde?/alloc", "winter-math/serde"]
+serde = ["dep:serde", "serde?/alloc", ]
+# serde = ["dep:serde", "serde?/alloc", "winter-math/serde"]
 std = [
   "blake3/std",
   "dep:cc",
   "rand/std",
   "rand/thread_rng",
-  "winter-crypto/std",
-  "winter-math/std",
+  # "winter-crypto/std",
+  # "winter-math/std",
   "winter-utils/std",
 ]
 
@@ -97,8 +98,8 @@ rocksdb          = { default-features = false, features = ["lz4"], optional = tr
 serde            = { default-features = false, features = ["derive"], optional = true, version = "1.0" }
 sha3             = { default-features = false, version = "0.10" }
 thiserror        = { default-features = false, version = "2.0" }
-winter-crypto    = { default-features = false, version = "0.13" }
-winter-math      = { default-features = false, version = "0.13" }
+# winter-crypto    = { default-features = false, version = "0.13" }
+# winter-math      = { default-features = false, version = "0.13" }
 winter-utils     = { default-features = false, version = "0.13" }
 x25519-dalek     = { default-features = false, features = ["static_secrets"], version = "2.0" }
 zeroize          = { default-features = false, version = "1.8" }
