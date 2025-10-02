@@ -55,13 +55,7 @@ pub struct Smt {
     inner_nodes: InnerNodes,
 }
 lazy_static! {
-    static ref ROOTS: [RpoDigest; 256] = {
-        let mut array = [RpoDigest::default(); 256];
-        for i in 0..256 {
-            array[i] = RpoDigest::default();
-        }
-        array
-    };
+    static ref ROOTS: [RpoDigest; 256] = [RpoDigest::default(); 256];
 }
 impl Smt {
     // CONSTANTS

@@ -26,6 +26,16 @@ pub fn hash_to_point_rpo256(message: Word, nonce: &Nonce) -> Polynomial<FalconFe
     }
 
     // squeeze the coefficients of the polynomial
+    //
+    // Note that `FalconFelt::new((a.as_canonical_u64() % MODULUS as u64) as i16)` will create a
+    // bias as we are mapping $2^64 - 2^31 + 1$ elements to $12289$ elements and it must not be
+    // uniform. A statistical analysis can be applied here to show that this is still fine: the
+    // output distribution is computational IND from uniform.
+    //
+    // TODO: A potential optimization is to parse a goldilocks elements to 2 or 4 limbs, and map
+    // each limb to FalconFelt field. Then, apply a similar analysis to obtain
+    // indistinguishability from uniform.
+    //
     let mut i = 0;
     let mut res = [FalconFelt::zero(); N];
     for _ in 0..64 {

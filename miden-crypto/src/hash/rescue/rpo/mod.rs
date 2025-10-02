@@ -302,9 +302,6 @@ impl Rpo256 {
     /// Merkle trees and verification of Merkle paths.
     #[inline(always)]
     pub fn merge(values: &[RpoDigest; 2]) -> RpoDigest {
-        //let compressor = RpoCompression::new(RpoPermutation256);
-        //compressor.compress([values[0].into(), values[1].into()]).into()
-
         // initialize the state by copying the digest elements into the rate portion of the state
         // (8 total elements), and set the capacity elements to 0.
         let mut state = [ZERO; STATE_WIDTH];
@@ -327,10 +324,6 @@ impl Rpo256 {
     /// Returns a hash of the provided field elements.
     #[inline(always)]
     pub fn hash_elements<E: ExtensionField<Felt>>(elements: &[E]) -> RpoDigest {
-        //let hasher = RpoHasher::new(RpoPermutation256);
-        //let it = elements.into_iter().flat_map(|elem|
-        // E::as_basis_coefficients_slice(&elem).to_owned()); hasher.hash_iter(it ).into()
-
         // convert the elements into a list of base field elements
         let elements: Vec<Felt> = elements
             .into_iter()

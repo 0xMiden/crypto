@@ -73,9 +73,6 @@ pub(crate) trait SparseMerkleTree<const DEPTH: u8> {
     /// The default value used to compute the hash of empty leaves
     const EMPTY_VALUE: Self::Value;
 
-    /// The root of the empty tree with provided DEPTH
-    //const EMPTY_ROOT: RpoDigest;
-
     // PROVIDED METHODS
     // ---------------------------------------------------------------------------------------------
 

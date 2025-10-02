@@ -133,7 +133,7 @@ criterion_main!(smt_subtree_group);
 // --------------------------------------------------------------------------------------------
 
 fn generate_index<R: RngCore>(rng: &mut R) -> u8 {
-    (rng.next_u32() % (u8::MAX as u32)).try_into().unwrap()
+    rng.next_u32() as u8
 }
 
 fn generate_value<R: RngCore>(rng: &mut R) -> Felt {

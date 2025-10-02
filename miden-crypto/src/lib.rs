@@ -15,10 +15,6 @@ pub mod utils;
 // RE-EXPORTS
 // ================================================================================================
 
-//pub use winter_math::{
-//    FieldElement, StarkField,
-//   fields::{CubeExtension, QuadExtension, f64::BaseElement as Felt},
-// };
 pub use p3_air::*;
 pub use p3_field::{
     BasedVectorSpace, ExtensionField, Field, PrimeCharacteristicRing, PrimeField64,

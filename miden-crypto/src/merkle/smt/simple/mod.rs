@@ -346,7 +346,7 @@ impl<const DEPTH: u8> SparseMerkleTree<DEPTH> for SimpleSmt<DEPTH> {
     type Opening = ValuePath;
 
     const EMPTY_VALUE: Self::Value = EMPTY_WORD;
-    //const EMPTY_ROOT: RpoDigest = ROOTS[DEPTH];
+
     fn from_raw_parts(
         inner_nodes: InnerNodes,
         leaves: Leaves,

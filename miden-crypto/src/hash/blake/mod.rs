@@ -4,7 +4,6 @@ use core::{
     ops::Deref,
     slice::{self, from_raw_parts},
 };
-use std::borrow::ToOwned;
 
 use p3_field::{BasedVectorSpace, PrimeField64};
 use p3_goldilocks::Goldilocks as Felt;
@@ -17,9 +16,6 @@ use crate::utils::{
 
 #[cfg(test)]
 mod tests;
-
-// CONSTANTS
-// ================================================================================================
 
 // BLAKE3 N-BIT OUTPUT
 // ================================================================================================
@@ -157,56 +153,17 @@ impl Blake3_256 {
     /// Returns a hash of the provided field elements.
     #[inline(always)]
     pub fn hash_elements<E: BasedVectorSpace<Felt>>(elements: &[E]) -> Blake3Digest<32> {
-        //let hasher = RpoHasher::new(RpoPermutation256);
-        //let it = elements.into_iter().flat_map(|elem|
-        // E::as_basis_coefficients_slice(&elem).to_owned()); hasher.hash_iter(it ).into()
-
         // convert the elements into a list of base field elements
         let elements: Vec<Felt> = elements
             .into_iter()
-            .flat_map(|elem| E::as_basis_coefficients_slice(&elem).to_owned())
+            .flat_map(|elem| E::as_basis_coefficients_slice(&elem))
+            .copied()
             .collect();
 
         Blake3Digest(hash_elements(&elements))
     }
 }
 
-/*
-impl ElementHasher for Blake3_256 {
-    type BaseField = Felt;
-
-    fn hash_elements<E>(elements: &[E]) -> Self::Digest
-    where
-        E: FieldElement<BaseField = Self::BaseField>,
-    {
-        Blake3Digest(hash_elements(elements))
-    }
-}
-
-impl Blake3_256 {
-    /// Returns a hash of the provided sequence of bytes.
-    #[inline(always)]
-    pub fn hash(bytes: &[u8]) -> Blake3Digest<DIGEST32_BYTES> {
-        <Self as Hasher>::hash(bytes)
-    }
-
-    /// Returns a hash of two digests. This method is intended for use in construction of
-    /// Merkle trees and verification of Merkle paths.
-    #[inline(always)]
-    pub fn merge(values: &[Blake3Digest<DIGEST32_BYTES>; 2]) -> Blake3Digest<DIGEST32_BYTES> {
-        <Self as Hasher>::merge(values)
-    }
-
-    /// Returns a hash of the provided field elements.
-    #[inline(always)]
-    pub fn hash_elements<E>(elements: &[E]) -> Blake3Digest<DIGEST32_BYTES>
-    where
-        E: FieldElement<BaseField = Felt>,
-    {
-        <Self as ElementHasher>::hash_elements(elements)
-    }
-}
-*/
 // BLAKE3 192-BIT OUTPUT
 // ================================================================================================
 
@@ -372,7 +329,8 @@ where
         let mut buf = [0_u8; 64];
         let elements_base = elements
             .into_iter()
-            .flat_map(|elem| E::as_basis_coefficients_slice(&elem).to_owned())
+            .flat_map(|elem| E::as_basis_coefficients_slice(&elem))
+            .copied()
             .collect::<Vec<Felt>>();
         let mut chunks_iter = elements_base.chunks_exact(8);
         for chunk in chunks_iter.by_ref() {

@@ -71,18 +71,18 @@ const INV_ALPHA: u64 = 10540996611094048183;
 
 #[inline(always)]
 fn apply_sbox(state: &mut [Felt; STATE_WIDTH]) {
-    state[0] = state[0].exp_u64(7);
-    state[1] = state[1].exp_u64(7);
-    state[2] = state[2].exp_u64(7);
-    state[3] = state[3].exp_u64(7);
-    state[4] = state[4].exp_u64(7);
-    state[5] = state[5].exp_u64(7);
-    state[6] = state[6].exp_u64(7);
-    state[7] = state[7].exp_u64(7);
-    state[8] = state[8].exp_u64(7);
-    state[9] = state[9].exp_u64(7);
-    state[10] = state[10].exp_u64(7);
-    state[11] = state[11].exp_u64(7);
+    state[0] = state[0].exp_const_u64::<7>();
+    state[1] = state[1].exp_const_u64::<7>();
+    state[2] = state[2].exp_const_u64::<7>();
+    state[3] = state[3].exp_const_u64::<7>();
+    state[4] = state[4].exp_const_u64::<7>();
+    state[5] = state[5].exp_const_u64::<7>();
+    state[6] = state[6].exp_const_u64::<7>();
+    state[7] = state[7].exp_const_u64::<7>();
+    state[8] = state[8].exp_const_u64::<7>();
+    state[9] = state[9].exp_const_u64::<7>();
+    state[10] = state[10].exp_const_u64::<7>();
+    state[11] = state[11].exp_const_u64::<7>();
 }
 
 // INVERSE SBOX FUNCTION

@@ -3,9 +3,10 @@ use alloc::vec::Vec;
 use p3_field::PrimeField64;
 use p3_goldilocks::Goldilocks as Felt;
 use proptest::prelude::*;
+use rand_utils::rand_vector;
 
 use super::*;
-/*
+
 #[test]
 fn blake3_hash_elements() {
     // test multiple of 8
@@ -20,7 +21,7 @@ fn blake3_hash_elements() {
     let actual: [u8; 32] = hash_elements(&elements);
     assert_eq!(&expected, &actual);
 }
- */
+
 proptest! {
     #[test]
     fn blake160_wont_panic_with_arbitrary_input(ref vec in any::<Vec<u8>>()) {

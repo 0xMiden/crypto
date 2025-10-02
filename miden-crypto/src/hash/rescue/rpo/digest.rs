@@ -102,17 +102,16 @@ impl Ord for RpoDigest {
         // the endianness is irrelevant here because since, this being a cryptographically secure
         // hash computation, the digest shouldn't have any ordered property of its input.
         //
-        // finally, we use `Felt::inner` instead of `Felt::as_int` so we avoid performing a
-        // montgomery reduction for every limb. that is safe because every inner element of the
-        // digest is guaranteed to be in its canonical form (that is, `x in [0,p)`).
+        // ideally, we want to use `Felt::vale` directly, instead of `Felt::as_canonical_u64` since
+        // every inner element of the digest is guaranteed to be in its canonical form (that
+        // is, `x in [0,p)`).
+        //
+        // At the moment Plonky3 does not allow for direct access to value so we will think about
+        // fixing this later.
         self.0
             .iter()
-            .map(|a| Felt::as_canonical_u64(a))
-            .zip(other.0.iter().map(|a| Felt::as_canonical_u64(a)))
-            .fold(Ordering::Equal, |ord, (a, b)| match ord {
-                Ordering::Equal => a.cmp(&b),
-                _ => ord,
-            })
+            .map(Felt::as_canonical_u64)
+            .cmp(other.0.iter().map(Felt::as_canonical_u64))
     }
 }
 

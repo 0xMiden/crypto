@@ -567,23 +567,31 @@ fn test_mutations_revert() {
 
     assert_eq!(smt, original, "SMT with applied revert mutations did not match original SMT");
 }
-/*
+
 #[test]
 fn test_mutation_set_serialization() {
     let mut smt = Smt::default();
 
     let key_1: RpoDigest = RpoDigest::from([ONE, ONE, ONE, Felt::from_u64(1)]);
-    let key_2: RpoDigest =
-        RpoDigest::from([Felt::from_u64(2), Felt::from_u64(2), Felt::from_u64(2), Felt::from_u64(2)]);
-    let key_3: RpoDigest =
-        RpoDigest::from([Felt::from_u32(0_u32), Felt::from_u32(0_u32), Felt::from_u32(0_u32), Felt::from_u64(3)]);
+    let key_2: RpoDigest = RpoDigest::from([
+        Felt::from_u64(2),
+        Felt::from_u64(2),
+        Felt::from_u64(2),
+        Felt::from_u64(2),
+    ]);
+    let key_3: RpoDigest = RpoDigest::from([
+        Felt::from_u32(0_u32),
+        Felt::from_u32(0_u32),
+        Felt::from_u32(0_u32),
+        Felt::from_u64(3),
+    ]);
 
     let value_1 = [ONE; WORD_SIZE];
     let value_2 = [Felt::from_u64(2); WORD_SIZE];
     let value_3 = [Felt::from_u32(3_u32); WORD_SIZE];
 
-    smt.insert(key_1, value_1);
-    smt.insert(key_2, value_2);
+    let _ = smt.insert(key_1, value_1);
+    let _ = smt.insert(key_2, value_2);
 
     let mutations =
         smt.compute_mutations(vec![(key_1, EMPTY_WORD), (key_2, value_1), (key_3, value_3)]);
@@ -602,7 +610,7 @@ fn test_mutation_set_serialization() {
 
     assert_eq!(deserialized, revert, "deserialized mutations did not match original");
 }
-*/
+
 /// Tests that 2 key-value pairs stored in the same leaf have the same path
 #[test]
 fn test_smt_path_to_keys_in_same_leaf_are_equal() {
@@ -675,17 +683,7 @@ fn test_smt_entries() {
 
     assert_eq!(actual, expected);
 }
-/*
-/// Tests that `EMPTY_ROOT` constant generated in the `Smt` equals to the root of the empty tree of
-/// depth 64
-#[test]
-fn test_smt_check_empty_root_constant() {
-    // get the root of the empty tree of depth 64
-    let empty_root_64_depth = EmptySubtreeRoots::empty_hashes(64)[0];
 
-    assert_eq!(empty_root_64_depth, Smt::EMPTY_ROOT);
-}
- */
 // SMT LEAF
 // --------------------------------------------------------------------------------------------
 
@@ -756,6 +754,14 @@ fn test_multiple_smt_leaf_serialization_success() {
 // HELPERS
 // --------------------------------------------------------------------------------------------
 
+fn build_empty_or_single_leaf_node(key: RpoDigest, value: Word) -> RpoDigest {
+    if value == EMPTY_WORD {
+        SmtLeaf::new_empty(key.into()).hash()
+    } else {
+        SmtLeaf::Single((key, value)).hash()
+    }
+}
+
 fn build_multiple_leaf_node(kv_pairs: &[(RpoDigest, Word)]) -> RpoDigest {
     let elements: Vec<Felt> = kv_pairs
         .iter()
@@ -784,12 +790,4 @@ fn apply_mutations(
     assert_eq!(&smt2, smt);
 
     reversion
-}
-
-fn build_empty_or_single_leaf_node(key: RpoDigest, value: Word) -> RpoDigest {
-    if value == EMPTY_WORD {
-        SmtLeaf::new_empty(key.into()).hash()
-    } else {
-        SmtLeaf::Single((key, value)).hash()
-    }
 }
