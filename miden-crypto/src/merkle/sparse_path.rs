@@ -459,7 +459,6 @@ mod tests {
     use core::num::NonZero;
 
     use assert_matches::assert_matches;
-    use winter_math::FieldElement;
 
     use super::SparseMerklePath;
     use crate::{

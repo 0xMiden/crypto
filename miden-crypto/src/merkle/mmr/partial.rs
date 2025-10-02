@@ -630,7 +630,7 @@ mod tests {
         merkle::{MerkleStore, Mmr, NodeIndex, int_to_node, mmr::forest::Forest},
     };
 
-    fn leaves() -> [RpoDigest; 7] {
+    fn leaves() -> [Word; 7] {
         [
             int_to_node(0),
             int_to_node(1),

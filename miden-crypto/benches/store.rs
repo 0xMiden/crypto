@@ -429,7 +429,7 @@ fn update_leaf_merkletree(c: &mut Criterion) {
 
         group.bench_function(BenchmarkId::new("MerkleTree", size), |b| {
             b.iter_batched(
-                || (rand_value::<u64>() % size_u64, random_word(&mut rng)),
+                || (rand_value::<u64>() % size_u64, random_word()),
                 |(index, value)| black_box(mtree.update_leaf(index, value)),
                 BatchSize::SmallInput,
             )
@@ -438,7 +438,7 @@ fn update_leaf_merkletree(c: &mut Criterion) {
         let mut store_root = root;
         group.bench_function(BenchmarkId::new("MerkleStore", size), |b| {
             b.iter_batched(
-                || (random_index(size_u64, depth), random_word(&mut rng)),
+                || (random_index(size_u64, depth), random_word()),
                 |(index, value)| {
                     // The MerkleTree automatically updates its internal root, the Store maintains
                     // the old root and adds the new one. Here we update the root to have a fair
@@ -476,7 +476,7 @@ fn update_leaf_simplesmt(c: &mut Criterion) {
 
         group.bench_function(BenchmarkId::new("SimpleSMT", size), |b| {
             b.iter_batched(
-                || (rand_value::<u64>() % size_u64, random_word(&mut rng)),
+                || (rand_value::<u64>() % size_u64, random_word()),
                 |(index, value)| {
                     black_box(smt.insert(LeafIndex::<SMT_MAX_DEPTH>::new(index).unwrap(), value))
                 },
@@ -487,7 +487,7 @@ fn update_leaf_simplesmt(c: &mut Criterion) {
         let mut store_root = root;
         group.bench_function(BenchmarkId::new("MerkleStore", size), |b| {
             b.iter_batched(
-                || (random_index(size_u64, SMT_MAX_DEPTH), random_word(&mut rng)),
+                || (random_index(size_u64, SMT_MAX_DEPTH), random_word()),
                 |(index, value)| {
                     // The MerkleTree automatically updates its internal root, the Store maintains
                     // the old root and adds the new one. Here we update the root to have a fair

@@ -1,11 +1,11 @@
+use lazy_static::lazy_static;
+
 #[cfg(test)]
 use super::{ALPHA, INV_ALPHA};
 use super::{
-    AlgebraicSponge, CAPACITY_RANGE, CubeExtension, DIGEST_RANGE, ElementHasher, Felt,
-    FieldElement, Hasher, RATE_RANGE, Range, STATE_WIDTH, StarkField, Word, ZERO,
+    AlgebraicSponge, CAPACITY_RANGE, DIGEST_RANGE, Felt, RATE_RANGE, Range, STATE_WIDTH, Word, ZERO,
 };
-use lazy_static::lazy_static;
-
+use p3_field::PrimeCharacteristicRing;
 mod arch;
 pub use arch::optimized::{add_constants_and_apply_inv_sbox, add_constants_and_apply_sbox};
 

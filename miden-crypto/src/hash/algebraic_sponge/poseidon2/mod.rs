@@ -1,10 +1,11 @@
 use super::{
-    AlgebraicSponge, CAPACITY_RANGE, DIGEST_RANGE, ElementHasher, Felt, FieldElement, Hasher,
+    AlgebraicSponge, CAPACITY_RANGE, DIGEST_RANGE,  Felt, 
     RATE_RANGE, Range, STATE_WIDTH, Word, ZERO,
 };
 
 mod constants;
 use constants::*;
+use winter_crypto::{ElementHasher, Hasher};
 
 #[cfg(test)]
 mod test;
@@ -106,16 +107,6 @@ impl Hasher for Poseidon2 {
 
     fn merge_with_int(seed: Self::Digest, value: u64) -> Self::Digest {
         <Self as AlgebraicSponge>::merge_with_int(seed, value)
-    }
-}
-
-impl ElementHasher for Poseidon2 {
-    type BaseField = Felt;
-
-    fn hash_elements<E: FieldElement<BaseField = Self::BaseField>>(
-        elements: &[E],
-    ) -> <Self as Hasher>::Digest {
-        <Self as AlgebraicSponge>::hash_elements(elements)
     }
 }
 

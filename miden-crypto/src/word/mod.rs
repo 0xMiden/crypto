@@ -10,6 +10,7 @@ use core::{
 };
 
 use thiserror::Error;
+use winter_crypto::Digest;
 
 const WORD_SIZE_FELT: usize = 4;
 const WORD_SIZE_BYTES: usize = 32;

@@ -1,5 +1,4 @@
-use alloc::string::String;
-use alloc::vec::Vec;
+use alloc::{string::String, vec::Vec};
 use core::{
     mem::{size_of, transmute, transmute_copy},
     ops::Deref,
@@ -8,8 +7,8 @@ use core::{
 
 use p3_field::{BasedVectorSpace, PrimeField64};
 use p3_goldilocks::Goldilocks as Felt;
+use winter_crypto::{Digest, Hasher};
 
-use super::{Digest, Hasher};
 use crate::utils::{
     ByteReader, ByteWriter, Deserializable, DeserializationError, HexParseError, Serializable,
     bytes_to_hex_string, hex_to_bytes,

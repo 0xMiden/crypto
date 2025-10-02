@@ -364,16 +364,15 @@ mod tests {
     use alloc::collections::{BTreeMap, BTreeSet};
 
     use assert_matches::assert_matches;
-    use p3_goldilocks::Goldilocks;
+    use p3_goldilocks::Goldilocks as Felt;
     use rand::{RngCore, distr::StandardUniform};
     use rand_chacha::ChaCha20Rng;
     use rand_utils::{rand_array, rand_value};
-    use winter_math::fields::f64::BaseElement as Felt;
 
     use super::*;
     use crate::{EMPTY_WORD, ONE, ZERO, merkle::EmptySubtreeRoots};
 
-    fn random_array<T: RngCore>(rng: &mut T) -> [Goldilocks; 4] {
+    fn random_array<T: RngCore>(rng: &mut T) -> [Felt; 4] {
         rng.sample(StandardUniform)
     }
     /// Tests that a basic PartialSmt can be built from a full one and that inserting or removing

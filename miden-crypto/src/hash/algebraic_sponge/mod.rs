@@ -14,9 +14,11 @@
 
 use core::ops::Range;
 
-use super::{CubeExtension, ElementHasher, Felt, FieldElement, Hasher, StarkField, Word, ZERO};
+use p3_field::BasedVectorSpace;
 
-pub(crate) mod poseidon2;
+use super::{Felt, Word, ZERO};
+
+// pub(crate) mod poseidon2;
 pub(crate) mod rescue;
 
 // CONSTANTS
@@ -63,7 +65,7 @@ pub(crate) trait AlgebraicSponge {
     /// Returns a hash of the provided field elements.
     fn hash_elements<E>(elements: &[E]) -> Word
     where
-        E: FieldElement<BaseField = Felt>,
+        E: BasedVectorSpace<Felt>,
     {
         // convert the elements into a list of base field elements
         let elements = E::slice_as_base_elements(elements);

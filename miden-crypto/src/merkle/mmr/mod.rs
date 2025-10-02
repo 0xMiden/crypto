@@ -21,7 +21,7 @@ pub use partial::PartialMmr;
 pub use peaks::MmrPeaks;
 pub use proof::MmrProof;
 
-use super::{Rpo256, RpoDigest, Word};
+use super::{Rpo256, Word};
 
 // UTILITIES
 // ===============================================================================================

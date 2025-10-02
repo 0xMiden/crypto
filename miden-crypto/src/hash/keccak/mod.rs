@@ -5,12 +5,16 @@ use core::{
     slice::{self, from_raw_parts},
 };
 
+use p3_field::BasedVectorSpace;
 use sha3::Digest as Sha3Digest;
+use winter_crypto::{Digest, ElementHasher, Hasher};
 
-use super::{Digest, ElementHasher, Felt, FieldElement, Hasher};
-use crate::utils::{
-    ByteReader, ByteWriter, Deserializable, DeserializationError, HexParseError, Serializable,
-    bytes_to_hex_string, hex_to_bytes,
+use crate::{
+    Felt,
+    utils::{
+        ByteReader, ByteWriter, Deserializable, DeserializationError, HexParseError, Serializable,
+        bytes_to_hex_string, hex_to_bytes,
+    },
 };
 
 #[cfg(test)]
@@ -135,16 +139,16 @@ impl Hasher for Keccak256 {
     }
 }
 
-impl ElementHasher for Keccak256 {
-    type BaseField = Felt;
+// impl ElementHasher for Keccak256 {
+//     type BaseField = Felt;
 
-    fn hash_elements<E>(elements: &[E]) -> <Self as Hasher>::Digest
-    where
-        E: FieldElement<BaseField = Self::BaseField>,
-    {
-        Keccak256Digest(hash_elements(elements))
-    }
-}
+//     fn hash_elements<E>(elements: &[E]) -> <Self as Hasher>::Digest
+//     where
+//         E: BasedVectorSpace<Felt>,
+//     {
+//         Keccak256Digest(hash_elements(elements))
+//     }
+// }
 
 impl Keccak256 {
     /// Returns a hash of the provided sequence of bytes.
@@ -164,7 +168,7 @@ impl Keccak256 {
     #[inline(always)]
     pub fn hash_elements<E>(elements: &[E]) -> Keccak256Digest
     where
-        E: FieldElement<BaseField = Felt>,
+        E: BasedVectorSpace<Felt>,
     {
         <Self as ElementHasher>::hash_elements(elements)
     }
@@ -176,7 +180,7 @@ impl Keccak256 {
 /// Hash the elements into bytes and shrink the output.
 fn hash_elements<E>(elements: &[E]) -> [u8; DIGEST_BYTES]
 where
-    E: FieldElement<BaseField = Felt>,
+    E: BasedVectorSpace<Felt>,
 {
     // don't leak assumptions from felt and check its actual implementation.
     // this is a compile-time branch so it is for free
