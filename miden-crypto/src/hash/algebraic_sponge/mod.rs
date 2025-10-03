@@ -69,8 +69,8 @@ pub trait AlgebraicSponge {
     {
         // convert the elements into a list of base field elements
         let elements = elements
-            .into_iter()
-            .flat_map(|elem| E::as_basis_coefficients_slice(&elem))
+            .iter()
+            .flat_map(|elem| E::as_basis_coefficients_slice(elem))
             .copied()
             .collect::<Vec<Felt>>();
 

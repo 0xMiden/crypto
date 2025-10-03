@@ -288,7 +288,7 @@ mod tests {
 
     #[test]
     fn build_merkle_tree() {
-        let tree = super::MerkleTree::new(&LEAVES4).unwrap();
+        let tree = super::MerkleTree::new(LEAVES4).unwrap();
         assert_eq!(8, tree.nodes.len());
 
         // leaves were copied correctly
@@ -307,7 +307,7 @@ mod tests {
 
     #[test]
     fn get_leaf() {
-        let tree = super::MerkleTree::new(&LEAVES4).unwrap();
+        let tree = super::MerkleTree::new(LEAVES4).unwrap();
 
         // check depth 2
         assert_eq!(LEAVES4[0], tree.get_node(NodeIndex::make(2, 0)).unwrap());
@@ -324,7 +324,7 @@ mod tests {
 
     #[test]
     fn get_path() {
-        let tree = super::MerkleTree::new(&LEAVES4).unwrap();
+        let tree = super::MerkleTree::new(LEAVES4).unwrap();
 
         let (_, node2, node3) = compute_internal_nodes();
 
@@ -365,7 +365,7 @@ mod tests {
 
     #[test]
     fn nodes() -> Result<(), MerkleError> {
-        let tree = super::MerkleTree::new(&LEAVES4).unwrap();
+        let tree = super::MerkleTree::new(LEAVES4).unwrap();
         let root = tree.root();
         let l1n0 = tree.get_node(NodeIndex::make(1, 0))?;
         let l1n1 = tree.get_node(NodeIndex::make(1, 1))?;

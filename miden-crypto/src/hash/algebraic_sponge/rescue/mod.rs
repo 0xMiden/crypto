@@ -109,7 +109,6 @@ fn add_constants(state: &mut [Felt; STATE_WIDTH], ark: &[Felt; STATE_WIDTH]) {
 ///
 /// The constants are broken up into two arrays ARK1 and ARK2; ARK1 contains the constants for the
 /// first half of RPO round, and ARK2 contains constants for the second half of RPO round.
-
 const ARK1: [[Felt; STATE_WIDTH]; NUM_ROUNDS] = [
     [
         Felt::new(5789762306288267392),

@@ -1,5 +1,4 @@
-use alloc::string::ToString;
-use alloc::vec::Vec;
+use alloc::{string::ToString, vec::Vec};
 
 use p3_field::PrimeField64;
 use rand_core::impls;

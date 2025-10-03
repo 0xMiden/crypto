@@ -153,7 +153,7 @@ impl Blake3_256 {
     /// Returns a hash of the provided field elements.
     #[inline(always)]
     pub fn hash_elements<E: BasedVectorSpace<Felt>>(elements: &[E]) -> Blake3Digest<32> {
-        Blake3Digest(hash_elements(&elements))
+        Blake3Digest(hash_elements(elements))
     }
 }
 
@@ -195,7 +195,7 @@ impl Blake3_192 {
     /// Returns a hash of the provided field elements.
     #[inline(always)]
     pub fn hash_elements<E: BasedVectorSpace<Felt>>(elements: &[E]) -> Blake3Digest<32> {
-        Blake3Digest(hash_elements(&elements))
+        Blake3Digest(hash_elements(elements))
     }
 }
 
@@ -237,7 +237,7 @@ impl Blake3_160 {
     /// Returns a hash of the provided field elements.
     #[inline(always)]
     pub fn hash_elements<E: BasedVectorSpace<Felt>>(elements: &[E]) -> Blake3Digest<32> {
-        Blake3Digest(hash_elements(&elements))
+        Blake3Digest(hash_elements(elements))
     }
 }
 
@@ -267,8 +267,8 @@ where
         // a chance to process multiple element-to-byte conversions in parallel
         let mut buf = [0_u8; 64];
         let elements_base = elements
-            .into_iter()
-            .flat_map(|elem| E::as_basis_coefficients_slice(&elem))
+            .iter()
+            .flat_map(|elem| E::as_basis_coefficients_slice(elem))
             .copied()
             .collect::<Vec<Felt>>();
         let mut chunks_iter = elements_base.chunks_exact(8);

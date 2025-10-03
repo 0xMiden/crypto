@@ -206,7 +206,7 @@ impl Rpx256 {
         let arr_ext = [ext0, ext1, ext2, ext3];
         *state = arr_ext
             .into_iter()
-            .flat_map(|arr| (&CubicExtElement::as_basis_coefficients_slice(&arr)[..3]).to_owned())
+            .flat_map(|arr| CubicExtElement::as_basis_coefficients_slice(&arr)[..3].to_owned())
             .collect::<Vec<_>>()
             .try_into()
             .expect("shouldn't fail");

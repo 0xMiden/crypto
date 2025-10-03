@@ -8,7 +8,6 @@ use miden_crypto::{
     hash::rpo::Rpo256,
     merkle::{LargeSmt, LargeSmtError, MemoryStorage, SmtStorage},
 };
-use p3_field::PrimeCharacteristicRing;
 use rand::{Rng, prelude::IteratorRandom, rng};
 use rand_utils::rand_value;
 

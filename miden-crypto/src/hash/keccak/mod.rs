@@ -184,8 +184,8 @@ where
         let mut buf = [0_u8; 136];
 
         let elements_base = elements
-            .into_iter()
-            .flat_map(|elem| E::as_basis_coefficients_slice(&elem))
+            .iter()
+            .flat_map(|elem| E::as_basis_coefficients_slice(elem))
             .copied()
             .collect::<Vec<Felt>>();
 
