@@ -7,10 +7,9 @@ use std::hint;
 
 use criterion::{BatchSize, Bencher, Criterion, criterion_group, criterion_main};
 use miden_crypto::{
-    Felt, ONE, PrimeCharacteristicRing, Word,
+    Word,
     merkle::{MerklePath, MerkleTree, NodeIndex},
 };
-use rand_utils::prng_array;
 
 mod common;
 use common::{

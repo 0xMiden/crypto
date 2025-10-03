@@ -153,13 +153,6 @@ impl Blake3_256 {
     /// Returns a hash of the provided field elements.
     #[inline(always)]
     pub fn hash_elements<E: BasedVectorSpace<Felt>>(elements: &[E]) -> Blake3Digest<32> {
-        // convert the elements into a list of base field elements
-        let elements: Vec<Felt> = elements
-            .into_iter()
-            .flat_map(|elem| E::as_basis_coefficients_slice(&elem))
-            .copied()
-            .collect();
-
         Blake3Digest(hash_elements(&elements))
     }
 }
@@ -198,6 +191,14 @@ impl Hasher for Blake3_192 {
     }
 }
 
+impl Blake3_192 {
+    /// Returns a hash of the provided field elements.
+    #[inline(always)]
+    pub fn hash_elements<E: BasedVectorSpace<Felt>>(elements: &[E]) -> Blake3Digest<32> {
+        Blake3Digest(hash_elements(&elements))
+    }
+}
+
 // BLAKE3 160-BIT OUTPUT
 // ================================================================================================
 
@@ -229,6 +230,14 @@ impl Hasher for Blake3_160 {
         hasher.update(&seed.0);
         hasher.update(&value.to_le_bytes());
         Blake3Digest(*shrink_bytes(&hasher.finalize().into()))
+    }
+}
+
+impl Blake3_160 {
+    /// Returns a hash of the provided field elements.
+    #[inline(always)]
+    pub fn hash_elements<E: BasedVectorSpace<Felt>>(elements: &[E]) -> Blake3Digest<32> {
+        Blake3Digest(hash_elements(&elements))
     }
 }
 

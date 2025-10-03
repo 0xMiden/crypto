@@ -5,8 +5,9 @@ pub use winter_crypto::{DefaultRandomCoin as WinterRandomCoin, RandomCoin, Rando
 pub use winter_utils::Randomizable;
 
 mod rpo;
-mod rpx;
 pub use rpo::RpoRandomCoin;
+
+mod rpx;
 pub use rpx::RpxRandomCoin;
 
 use crate::{Felt, Word};
