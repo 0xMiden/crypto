@@ -64,7 +64,7 @@ executable = ["dep:clap", "dep:rand-utils", "std"]
 hashmaps = ["dep:hashbrown"]
 internal = []
 rocksdb = ["concurrent", "dep:rocksdb"]
-serde = ["dep:serde", "serde?/alloc", ]
+serde = ["dep:serde", "serde?/alloc"]
 std = [
   "blake3/std",
   "dep:cc",
@@ -111,12 +111,11 @@ zeroize          = { default-features = false, version = "1.8" }
 # p3-challenger = { version = "0.3.0" }
 
 # FIXME: switch to main branch once zz/migrate-plonky3 is merged
-p3-field = { git = "https://github.com/0xMiden/Plonky3/", default-features =  false, branch = "zz/migrate-plonky3" }
-p3-goldilocks = { git = "https://github.com/0xMiden/Plonky3/", default-features =  false, branch = "zz/migrate-plonky3" }
-p3-symmetric = { git = "https://github.com/0xMiden/Plonky3/", default-features =  false, branch = "zz/migrate-plonky3" }
-p3-merkle-tree = { git = "https://github.com/0xMiden/Plonky3/", default-features =  false, branch = "zz/migrate-plonky3" }
-p3-air = { git = "https://github.com/0xMiden/Plonky3/", default-features =  false, branch = "zz/migrate-plonky3" }
-p3-challenger = { git = "https://github.com/0xMiden/Plonky3/", default-features =  false, branch = "zz/migrate-plonky3" }
+p3-air        = { branch = "zz/migrate-plonky3", default-features = false, git = "https://github.com/0xMiden/Plonky3/" }
+p3-challenger = { branch = "zz/migrate-plonky3", default-features = false, git = "https://github.com/0xMiden/Plonky3/" }
+p3-field      = { branch = "zz/migrate-plonky3", default-features = false, git = "https://github.com/0xMiden/Plonky3/" }
+p3-goldilocks = { branch = "zz/migrate-plonky3", default-features = false, git = "https://github.com/0xMiden/Plonky3/" }
+p3-symmetric  = { branch = "zz/migrate-plonky3", default-features = false, git = "https://github.com/0xMiden/Plonky3/" }
 
 [dev-dependencies]
 assert_matches = { default-features = false, version = "1.5" }
