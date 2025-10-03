@@ -71,7 +71,6 @@ std = [
   "rand/std",
   "rand/thread_rng",
   "winter-crypto/std",
-  # "winter-math/std",
   "winter-utils/std",
 ]
 
