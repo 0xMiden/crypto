@@ -58,6 +58,7 @@ When the `rocksdb` feature is enabled, `LargeSmt` can persist the lower subtrees
 [DSA module](./miden-crypto/src/dsa) provides a set of digital signature schemes supported by default in the Miden VM. Currently, these schemes are:
 
 - `ECDSA k256`: Elliptic Curve Digital Signature Algorithm using the `k256` curve (also known as `secp256k1`) using `Keccak` to hash messages. This is a widely adopted signature scheme known for its compact key and signature sizes, making it efficient for storage and transmission.
+- `Ed25519`: Elliptic Curve Digital Signature Algorithm using the `Curve25519` elliptic curve with `SHA-512` to hash messages. This is a state-of-the-art signature scheme known for its exceptional performance, strong security guarantees, and resistance to implementation vulnerabilities, making it the preferred choice for modern cryptographic applications.
 - `RPO Falcon512`: a variant of the [Falcon](https://falcon-sign.info/) signature scheme. This variant differs from the standard in that instead of using SHAKE256 hash function in the _hash-to-point_ algorithm we use RPO256. This makes the signature more efficient to verify in Miden VM. Another point of difference is with respect to the signing process, which is deterministic in our case.
 
 For the above signatures, key generation, signing, and signature verification are available for both `std` and `no_std` contexts (see [crate features](#crate-features) below). However, in `no_std` context, the user is responsible for supplying the key generation and signing procedures with a random number generator.
@@ -67,7 +68,8 @@ For the above signatures, key generation, signing, and signature verification ar
 [ECDH module](./miden-crypto/src/ecdh) provides elliptic curve key exchange algorithms for secure key agreement. Implementations in this module make use of ephemeral keys for a "sealed box" approach where the sender generates an ephemeral secret key, derives a shared secret with the receiver's static public key, and includes the ephemeral public key alongside the encrypted message. This design enables secure communication without requiring prior interaction between parties.
 Currently, the module includes the following implementations:
 
-- `ECDH k256`: Elliptic Curve Diffie-Hellman key exchange using the `k256` curve (also known as `secp256k1`). 
+- `ECDH k256`: Elliptic Curve Diffie-Hellman key exchange using the `k256` curve (also known as `secp256k1`). This is a widely adopted key agreement scheme known for its broad ecosystem support and compatibility.
+- `X25519`: Elliptic Curve Diffie-Hellman key exchange using the `Curve25519` elliptic curve. This is a state-of-the-art key agreement scheme known for its high performance, strong security properties, and resistance to timing attacks, making it the modern standard for secure key exchange protocols.
 
 ## Pseudo-Random Element Generator
 

@@ -39,7 +39,7 @@ macro_rules! benchmark_hash_core {
             for size_ref in $sizes {
                 let size_val = *size_ref;
                 group.bench_with_input(
-                    BenchmarkId::new($operation, size_val),
+                    criterion::BenchmarkId::new($operation, size_val),
                     &size_val,
                     |b: &mut criterion::Bencher, &size_param: &usize| $closure(b, size_param),
                 );
@@ -166,7 +166,7 @@ macro_rules! benchmark_hash_merge {
             for size_ref in $sizes {
                 let size = *size_ref;
                 group.bench_with_input(
-                    BenchmarkId::new("merge", size),
+                    criterion::BenchmarkId::new("merge", size),
                     &size,
                     |b: &mut criterion::Bencher, &size_param: &usize| $closure(b, size_param),
                 );
@@ -202,7 +202,7 @@ macro_rules! benchmark_hash_felt {
             for count_ref in $counts {
                 let count = *count_ref;
                 group.bench_with_input(
-                    BenchmarkId::new("hash_elements", count),
+                    criterion::BenchmarkId::new("hash_elements", count),
                     &count,
                     |b: &mut criterion::Bencher, &count_param: &usize| $closure(b, count_param),
                 );
@@ -236,7 +236,7 @@ macro_rules! benchmark_hash_merge_domain {
                 for domain_ref in $domains {
                     let domain = *domain_ref;
                     group.bench_with_input(
-                        BenchmarkId::new("merge_in_domain", format!("{}_{}", size, domain)),
+                        criterion::BenchmarkId::new("merge_in_domain", format!("{size}_{domain}")),
                         &(size, domain),
                         |b: &mut criterion::Bencher, param_ref: &(usize, u64)| {
                             let (size_param, domain_param) = *param_ref;
@@ -264,7 +264,7 @@ macro_rules! benchmark_hash_merge_with_int {
                 for int_size_ref in $int_sizes {
                     let int_size = *int_size_ref;
                     group.bench_with_input(
-                        BenchmarkId::new("merge_with_int", format!("{}_{}", size, int_size)),
+                        criterion::BenchmarkId::new("merge_with_int", format!("{size}_{int_size}")),
                         &(size, int_size),
                         |b: &mut criterion::Bencher, param_ref: &(usize, usize)| {
                             let (size_param, int_size_param) = *param_ref;
@@ -290,7 +290,7 @@ macro_rules! benchmark_hash_merge_many {
             for digest_count_ref in $digest_counts {
                 let digest_count = *digest_count_ref;
                 group.bench_with_input(
-                    BenchmarkId::new("merge_many", digest_count),
+                    criterion::BenchmarkId::new("merge_many", digest_count),
                     &digest_count,
                     |b: &mut criterion::Bencher, &digest_count_param: &usize| {
                         $closure(b, digest_count_param)
@@ -341,7 +341,7 @@ macro_rules! benchmark_rand_core {
             for count_ref in $sizes {
                 let count = *count_ref;
                 group.bench_with_input(
-                    BenchmarkId::new($operation, count),
+                    criterion::BenchmarkId::new($operation, count),
                     &count,
                     |b: &mut criterion::Bencher, &count_param: &usize| {
                         b.iter(|| $closure(&mut coin, count_param))
@@ -429,10 +429,10 @@ macro_rules! benchmark_multi {
         fn $func_name(c: &mut Criterion) {
             let mut group = c.benchmark_group(concat!("bench-", $operation));
 
-            for &$test_case in $test_cases {
+            for &test_case in $test_cases {
                 group.bench_with_input(
-                    BenchmarkId::new($operation, stringify!($test_case)),
-                    &$test_case,
+                    criterion::BenchmarkId::new($operation, test_case),
+                    &test_case,
                     |b, test_case| $closure(b, test_case),
                 );
             }
@@ -697,7 +697,7 @@ macro_rules! benchmark_rand_reseed {
             group.sample_size($crate::common::config::DEFAULT_SAMPLE_SIZE);
 
             let mut coin = <$coin_type>::new($seed);
-            let new_seeds: Vec<miden_crypto::Word> = (0..10)
+            let new_seeds: Vec<miden_crypto::Word> = (0u64..10)
                 .map(|i| miden_crypto::Word::new([miden_crypto::Felt::new((i + 1) as u64); 4]))
                 .collect();
 
@@ -738,9 +738,9 @@ macro_rules! benchmark_rand_draw_integers {
                     // Ensure num_values < domain_size to avoid assertion error
                     if num_values < domain_size {
                         group.bench_with_input(
-                            BenchmarkId::new(
+                            criterion::BenchmarkId::new(
                                 "draw_integers",
-                                format!("{}_{}", num_values, domain_size),
+                                format!("{num_values}_{domain_size}"),
                             ),
                             &(num_values, domain_size),
                             |b, &(num_values, domain_size)| {
@@ -779,7 +779,7 @@ macro_rules! benchmark_rand_check_leading_zeros {
             group.sample_size($crate::common::config::DEFAULT_SAMPLE_SIZE);
 
             let coin = <$coin_type>::new($seed);
-            let test_values: Vec<u64> = (0..100).map(|i| i as u64).collect();
+            let test_values: Vec<u64> = (0u64..100).collect();
 
             group.bench_function("check_leading_zeros", |b| {
                 b.iter(|| {
@@ -816,12 +816,16 @@ macro_rules! benchmark_rand_fill_bytes {
             let mut coin = <$coin_type>::new($seed);
 
             for &size in $sizes {
-                group.bench_with_input(BenchmarkId::new("fill_bytes", size), &size, |b, &size| {
-                    let mut buffer = vec![0u8; size];
-                    b.iter(|| {
-                        coin.fill_bytes(black_box(&mut buffer));
-                    })
-                });
+                group.bench_with_input(
+                    criterion::BenchmarkId::new("fill_bytes", size),
+                    &size,
+                    |b, &size| {
+                        let mut buffer = vec![0u8; size];
+                        b.iter(|| {
+                            coin.fill_bytes(black_box(&mut buffer));
+                        })
+                    },
+                );
             }
 
             group.finish();
