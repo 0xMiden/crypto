@@ -27,3 +27,4 @@ pub mod algebraic_sponge;
 
 // RE-EXPORTS
 // ================================================================================================
+pub use winter_crypto::{Digest, ElementHasher, Hasher};
