@@ -2,6 +2,7 @@
 
 - [BREAKING] Incremented MSRV to 1.89.
 - [BREAKING] Adds DSA (EdDSA25519) and ECDH (X25519) using Curve25519 ([#537](https://github.com/0xMiden/crypto/pull/537)).
+- Add implementation of sealed box primitive ([#514](https://github.com/0xMiden/crypto/pull/514)).
 
 ## 0.17.0 (2025-09-12)
 
