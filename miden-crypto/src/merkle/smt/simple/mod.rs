@@ -145,7 +145,6 @@ impl<const DEPTH: u8> SimpleSmt<DEPTH> {
     pub fn num_leaves(&self) -> usize {
         self.leaves.len()
     }
-
     /// Returns the leaf at the specified index.
     pub fn get_leaf(&self, key: &LeafIndex<DEPTH>) -> Word {
         <Self as SparseMerkleTree<DEPTH>>::get_leaf(self, key)
