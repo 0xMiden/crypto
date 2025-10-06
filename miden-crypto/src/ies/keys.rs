@@ -18,6 +18,8 @@ use crate::{
 type K256XChaCha20Poly1305 = CryptoBox<K256, XChaCha>;
 /// Instantiation of sealed box using X25519 + XChaCha20Poly1305
 type X25519XChaCha20Poly1305 = CryptoBox<X25519, XChaCha>;
+/// Instantiation of sealed box using K256 + AeadRPO
+type K256AeadRpo = CryptoBox<K256, AeadRpo>;
 /// Instantiation of sealed box using X25519 + AeadRPO
 type X25519AeadRpo = CryptoBox<X25519, AeadRpo>;
 
@@ -180,6 +182,7 @@ macro_rules! impl_unseal_elements_with_associated_data {
 pub enum SealingKey {
     K256XChaCha20Poly1305(crate::dsa::ecdsa_k256_keccak::PublicKey),
     X25519XChaCha20Poly1305(crate::dsa::eddsa_25519::PublicKey),
+    K256AeadRpo(crate::dsa::ecdsa_k256_keccak::PublicKey),
     X25519AeadRpo(crate::dsa::eddsa_25519::PublicKey),
 }
 
@@ -196,6 +199,7 @@ impl SealingKey {
     impl_seal_with_associated_data! {
         SealingKey::K256XChaCha20Poly1305 => K256XChaCha20Poly1305, K256, EphemeralPublicKey::K256XChaCha20Poly1305;
         SealingKey::X25519XChaCha20Poly1305 => X25519XChaCha20Poly1305, X25519, EphemeralPublicKey::X25519XChaCha20Poly1305;
+        SealingKey::K256AeadRpo => K256AeadRpo, K256, EphemeralPublicKey::K256AeadRpo;
         SealingKey::X25519AeadRpo => X25519AeadRpo, X25519, EphemeralPublicKey::X25519AeadRpo;
     }
 
@@ -211,6 +215,7 @@ impl SealingKey {
     impl_seal_elements_with_associated_data! {
         SealingKey::K256XChaCha20Poly1305 => K256XChaCha20Poly1305, K256, EphemeralPublicKey::K256XChaCha20Poly1305;
         SealingKey::X25519XChaCha20Poly1305 => X25519XChaCha20Poly1305, X25519, EphemeralPublicKey::X25519XChaCha20Poly1305;
+        SealingKey::K256AeadRpo => K256AeadRpo, K256, EphemeralPublicKey::K256AeadRpo;
         SealingKey::X25519AeadRpo => X25519AeadRpo, X25519, EphemeralPublicKey::X25519AeadRpo;
     }
 }
@@ -219,6 +224,7 @@ impl SealingKey {
 pub enum UnsealingKey {
     K256XChaCha20Poly1305(crate::dsa::ecdsa_k256_keccak::SecretKey),
     X25519XChaCha20Poly1305(crate::dsa::eddsa_25519::SecretKey),
+    K256AeadRpo(crate::dsa::ecdsa_k256_keccak::SecretKey),
     X25519AeadRpo(crate::dsa::eddsa_25519::SecretKey),
 }
 
@@ -234,6 +240,7 @@ impl UnsealingKey {
     impl_unseal_with_associated_data! {
         UnsealingKey::K256XChaCha20Poly1305 => K256XChaCha20Poly1305;
         UnsealingKey::X25519XChaCha20Poly1305 => X25519XChaCha20Poly1305;
+        UnsealingKey::K256AeadRpo => K256AeadRpo;
         UnsealingKey::X25519AeadRpo => X25519AeadRpo;
     }
 
@@ -242,6 +249,7 @@ impl UnsealingKey {
         match self {
             UnsealingKey::K256XChaCha20Poly1305(_) => IesAlgorithm::K256XChaCha20Poly1305,
             UnsealingKey::X25519XChaCha20Poly1305(_) => IesAlgorithm::X25519XChaCha20Poly1305,
+            UnsealingKey::K256AeadRpo(_) => IesAlgorithm::K256AeadRpo,
             UnsealingKey::X25519AeadRpo(_) => IesAlgorithm::X25519AeadRpo,
         }
     }
@@ -262,6 +270,7 @@ impl UnsealingKey {
     impl_unseal_elements_with_associated_data! {
         UnsealingKey::K256XChaCha20Poly1305 => K256XChaCha20Poly1305;
         UnsealingKey::X25519XChaCha20Poly1305 => X25519XChaCha20Poly1305;
+        UnsealingKey::K256AeadRpo => K256AeadRpo;
         UnsealingKey::X25519AeadRpo => X25519AeadRpo;
     }
 }
@@ -271,6 +280,7 @@ impl UnsealingKey {
 pub(crate) enum EphemeralPublicKey {
     K256XChaCha20Poly1305(crate::ecdh::k256::EphemeralPublicKey),
     X25519XChaCha20Poly1305(crate::ecdh::x25519::EphemeralPublicKey),
+    K256AeadRpo(crate::ecdh::k256::EphemeralPublicKey),
     X25519AeadRpo(crate::ecdh::x25519::EphemeralPublicKey),
 }
 
@@ -280,6 +290,7 @@ impl EphemeralPublicKey {
         match self {
             EphemeralPublicKey::K256XChaCha20Poly1305(_) => IesAlgorithm::K256XChaCha20Poly1305,
             EphemeralPublicKey::X25519XChaCha20Poly1305(_) => IesAlgorithm::X25519XChaCha20Poly1305,
+            EphemeralPublicKey::K256AeadRpo(_) => IesAlgorithm::K256AeadRpo,
             EphemeralPublicKey::X25519AeadRpo(_) => IesAlgorithm::X25519AeadRpo,
         }
     }
@@ -289,6 +300,7 @@ impl EphemeralPublicKey {
         match self {
             EphemeralPublicKey::K256XChaCha20Poly1305(key) => key.to_bytes(),
             EphemeralPublicKey::X25519XChaCha20Poly1305(key) => key.to_bytes(),
+            EphemeralPublicKey::K256AeadRpo(key) => key.to_bytes(),
             EphemeralPublicKey::X25519AeadRpo(key) => key.to_bytes(),
         }
     }
@@ -299,28 +311,20 @@ impl EphemeralPublicKey {
         bytes: &[u8],
     ) -> Result<Self, IntegratedEncryptionSchemeError> {
         match algorithm {
-            IesAlgorithm::K256XChaCha20Poly1305 => {
+            IesAlgorithm::K256XChaCha20Poly1305 | IesAlgorithm::K256AeadRpo => {
                 let key = <K256 as KeyAgreementScheme>::EphemeralPublicKey::read_from_bytes(bytes)
                     .map_err(|_| {
                         IntegratedEncryptionSchemeError::EphemeralPublicKeyDeserializationFailed
                     })?;
                 Ok(EphemeralPublicKey::K256XChaCha20Poly1305(key))
             },
-            IesAlgorithm::X25519XChaCha20Poly1305 => {
+            IesAlgorithm::X25519XChaCha20Poly1305 | IesAlgorithm::X25519AeadRpo => {
                 let key =
                     <X25519 as KeyAgreementScheme>::EphemeralPublicKey::read_from_bytes(bytes)
                         .map_err(|_| {
                             IntegratedEncryptionSchemeError::EphemeralPublicKeyDeserializationFailed
                         })?;
                 Ok(EphemeralPublicKey::X25519XChaCha20Poly1305(key))
-            },
-            IesAlgorithm::X25519AeadRpo => {
-                let key =
-                    <X25519 as KeyAgreementScheme>::EphemeralPublicKey::read_from_bytes(bytes)
-                        .map_err(|_| {
-                            IntegratedEncryptionSchemeError::EphemeralPublicKeyDeserializationFailed
-                        })?;
-                Ok(EphemeralPublicKey::X25519AeadRpo(key))
             },
         }
     }

@@ -10,7 +10,8 @@ use crate::utils::{ByteReader, ByteWriter, Deserializable, DeserializationError,
 pub(crate) enum IesAlgorithm {
     K256XChaCha20Poly1305 = 0,
     X25519XChaCha20Poly1305 = 1,
-    X25519AeadRpo = 2,
+    K256AeadRpo = 2,
+    X25519AeadRpo = 3,
 }
 
 impl TryFrom<u8> for IesAlgorithm {
@@ -19,7 +20,8 @@ impl TryFrom<u8> for IesAlgorithm {
         match value {
             0 => Ok(IesAlgorithm::K256XChaCha20Poly1305),
             1 => Ok(IesAlgorithm::X25519XChaCha20Poly1305),
-            2 => Ok(IesAlgorithm::X25519AeadRpo),
+            2 => Ok(IesAlgorithm::K256AeadRpo),
+            3 => Ok(IesAlgorithm::X25519AeadRpo),
             _ => Err(IntegratedEncryptionSchemeError::UnsupportedAlgorithm),
         }
     }
@@ -42,6 +44,7 @@ impl IesAlgorithm {
         match self {
             IesAlgorithm::K256XChaCha20Poly1305 => "K256+XChaCha20-Poly1305",
             IesAlgorithm::X25519XChaCha20Poly1305 => "X25519+XChaCha20-Poly1305",
+            IesAlgorithm::K256AeadRpo => "K256+AeadRpo",
             IesAlgorithm::X25519AeadRpo => "X25519+AeadRpo",
         }
     }
