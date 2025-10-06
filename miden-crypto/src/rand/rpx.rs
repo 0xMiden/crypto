@@ -1,6 +1,6 @@
 use alloc::{string::ToString, vec::Vec};
 
-use p3_field::PrimeField64;
+use p3_field::{ExtensionField, PrimeField64};
 use rand_core::impls;
 use winter_crypto::RandomCoinError;
 
@@ -72,7 +72,7 @@ impl RpxRandomCoin {
         <Self as RngCore>::fill_bytes(self, dest)
     }
 
-    fn draw_basefield(&mut self) -> Felt {
+    pub fn draw_basefield(&mut self) -> Felt {
         if self.current == RATE_END {
             Rpx256::apply_permutation(&mut self.state);
             self.current = RATE_START;
@@ -80,6 +80,18 @@ impl RpxRandomCoin {
 
         self.current += 1;
         self.state[self.current - 1]
+    }
+
+    pub fn draw_ext_field<E: ExtensionField<Felt>>(&mut self) -> Result<E, RandomCoinError> {
+        let ext_degree = E::DIMENSION;
+        let mut result = vec![ZERO; ext_degree];
+        for r in result.iter_mut().take(ext_degree) {
+            *r = self.draw_basefield();
+        }
+        match E::from_basis_coefficients_slice(&result) {
+            Some(p) => Ok(p),
+            None => Err(RandomCoinError::FailedToDrawFieldElement(ext_degree)),
+        }
     }
 
     pub fn reseed(&mut self, data: Word) {
