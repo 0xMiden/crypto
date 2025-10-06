@@ -10,14 +10,14 @@
 //! - [`message`] - Sealed message format and algorithm identifiers
 //! - [`error`] - Error types for IES operations
 
-pub mod crypto_box;
-pub mod error;
-pub mod keys;
-pub mod message;
+mod crypto_box;
+mod error;
+mod keys;
+mod message;
 
 #[cfg(test)]
 mod tests;
 
-pub use error::*;
+pub use error::IntegratedEncryptionSchemeError;
 pub use keys::{SealingKey, UnsealingKey};
 pub use message::SealedMessage;
