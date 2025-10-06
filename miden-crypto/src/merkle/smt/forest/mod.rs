@@ -1,11 +1,13 @@
 use alloc::{
-    collections::{BTreeMap, BTreeSet},
+    collections::{BTreeMap, BTreeSet, VecDeque},
     vec::Vec,
-    collections::VecDeque,
 };
 
 use super::{EmptySubtreeRoots, MerkleError, NodeIndex, SmtLeaf, SmtProof, Word};
-use crate::merkle::{smt::{forest::store::SmtStore, SMT_DEPTH}, LeafIndex, SmtLeafError, SmtProofError};
+use crate::merkle::{
+    LeafIndex, SmtLeafError, SmtProofError,
+    smt::{SMT_DEPTH, forest::store::SmtStore},
+};
 
 mod store;
 
@@ -82,13 +84,11 @@ impl SmtForest {
 
     /// Creates an empty `SmtForest` instance.
     pub fn new() -> SmtForest {
-        let empty_tree_root = *EmptySubtreeRoots::entry(SMT_DEPTH, 0);
-
         let mut roots = BTreeSet::new();
-        roots.insert(empty_tree_root);
+        //roots.insert(empty_tree_root);
 
         let mut root_history = VecDeque::new();
-        root_history.push_back(empty_tree_root);
+        //root_history.push_back(empty_tree_root);
 
         let store = SmtStore::new();
         let leaves = BTreeMap::new();
@@ -105,7 +105,10 @@ impl SmtForest {
     /// not have sufficient data to provide an opening for the specified key.
     pub fn open(&self, root: Word, key: Word) -> Result<SmtProof, MerkleError> {
         if !self.roots.contains(&root) {
-            return Err(MerkleError::RootNotInStore(root));
+            let empty_tree_root = *EmptySubtreeRoots::entry(SMT_DEPTH, 0);
+            if root != empty_tree_root {
+                return Err(MerkleError::RootNotInStore(root));
+            }
         }
 
         let leaf_index = NodeIndex::new(SMT_DEPTH, key[3].as_int())?;
@@ -149,7 +152,10 @@ impl SmtForest {
         entries: impl Iterator<Item = (Word, Word)> + Clone,
     ) -> Result<Word, MerkleError> {
         if !self.roots.contains(&root) {
-            return Err(MerkleError::RootNotInStore(root));
+            let empty_tree_root = *EmptySubtreeRoots::entry(SMT_DEPTH, 0);
+            if root != empty_tree_root {
+                return Err(MerkleError::RootNotInStore(root));
+            }
         }
 
         // Find all affected leaf indices
@@ -189,6 +195,16 @@ impl SmtForest {
         self.root_history.push_back(new_root);
 
         Ok(new_root)
+    }
+
+    pub fn pop_roots(&mut self, count: usize) {
+        let roots = self.root_history.drain(..count).collect::<Vec<_>>();
+        for root in &roots {
+            self.roots.remove(root);
+        }
+        for leaf in self.store.remove_roots(roots.into_iter()) {
+            self.leaves.remove(&leaf);
+        }
     }
 }
 

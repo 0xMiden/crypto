@@ -1,6 +1,10 @@
 use alloc::{collections::VecDeque, vec::Vec};
 
-use crate::{hash::rpo::Rpo256, merkle::{EmptySubtreeRoots, MerkleError, MerklePath, MerkleProof, NodeIndex, SMT_DEPTH}, Map, Word};
+use crate::{
+    Map, Word,
+    hash::rpo::Rpo256,
+    merkle::{EmptySubtreeRoots, MerkleError, MerklePath, MerkleProof, NodeIndex, SMT_DEPTH},
+};
 
 #[derive(Debug, Default, Copy, Clone, Eq, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
@@ -191,7 +195,14 @@ impl SmtStore {
                 .ok_or(MerkleError::NodeIndexNotFoundInTree(right_index))?;
 
             let new_value = Rpo256::merge(&[left_value, right_value]);
-            new_nodes.insert(new_value, SmtNode { left: left_value, right: right_value, rc: 0 });
+            new_nodes.insert(
+                new_value,
+                SmtNode {
+                    left: left_value,
+                    right: right_value,
+                    rc: 0,
+                },
+            );
             nodes_by_index.insert(index, new_value);
         }
 
@@ -210,6 +221,7 @@ impl SmtStore {
             } else {
                 let mut smt_node = new_nodes.get_mut(&node).unwrap().clone();
                 smt_node.rc = 1;
+                std::println!("inserting node: {:?} {:?}", node, smt_node);
                 self.nodes.insert(node, smt_node);
                 if smt_node.left != Word::empty() {
                     queue.push_back(smt_node.left);
@@ -221,6 +233,41 @@ impl SmtStore {
         }
 
         Ok(new_root)
+    }
+
+    fn remove_node(&mut self, node: Word, nest: usize) -> Vec<Word> {
+        let indent = " ".repeat(nest);
+        let Some(smt_node) = self.nodes.get_mut(&node) else {
+            std::println!("{} node not found: {:?}", indent, node);
+            return vec![];
+        };
+        smt_node.rc -= 1;
+        if smt_node.rc > 0 {
+            return vec![];
+        }
+
+        std::println!("{} removing node: {:?}", indent, node);
+
+        let left = smt_node.left;
+        let right = smt_node.right;
+
+        if left == Word::empty() && right == Word::empty() {
+            // this was a leaf node, so we return it
+            return vec![node];
+        } else {
+            let mut result = Vec::new();
+            result.extend(self.remove_node(left, nest + 1));
+            result.extend(self.remove_node(right, nest + 1));
+            return result;
+        }
+    }
+
+    pub fn remove_roots(&mut self, roots: impl IntoIterator<Item = Word>) -> Vec<Word> {
+        let mut removed_leaves = Vec::new();
+        for root in roots {
+            removed_leaves.extend(self.remove_node(root, 0));
+        }
+        removed_leaves
     }
 }
 
