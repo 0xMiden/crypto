@@ -44,18 +44,22 @@ impl<K: KeyAgreementScheme, A: AeadScheme> CryptoBox<K, A> {
     ) -> Result<RawSealedMessage, IntegratedEncryptionSchemeError> {
         let (ephemeral_private, ephemeral_public) = K::generate_ephemeral_keypair(rng);
 
-        let shared_secret = Zeroizing::new(K::exchange_ephemeral_static(ephemeral_private, recipient_public_key)
-            .map_err(|_| IntegratedEncryptionSchemeError::KeyAgreementFailed)?);
-
-        let encryption_key_bytes = Zeroizing::new(
-            K::extract_key_material(&*shared_secret, <A as AeadScheme>::KEY_SIZE)
-                .map_err(|_| IntegratedEncryptionSchemeError::FailedExtractKeyMaterial)?
+        let shared_secret = Zeroizing::new(
+            K::exchange_ephemeral_static(ephemeral_private, recipient_public_key)
+                .map_err(|_| IntegratedEncryptionSchemeError::KeyAgreementFailed)?,
         );
 
-        let encryption_key = Zeroizing::new(A::key_from_bytes(&*encryption_key_bytes)
-            .map_err(|_| IntegratedEncryptionSchemeError::EncryptionKeyCreationFailed)?);
+        let encryption_key_bytes = Zeroizing::new(
+            K::extract_key_material(&shared_secret, <A as AeadScheme>::KEY_SIZE)
+                .map_err(|_| IntegratedEncryptionSchemeError::FailedExtractKeyMaterial)?,
+        );
 
-        let ciphertext = A::encrypt_bytes(&*encryption_key, rng, plaintext, associated_data)
+        let encryption_key = Zeroizing::new(
+            A::key_from_bytes(&encryption_key_bytes)
+                .map_err(|_| IntegratedEncryptionSchemeError::EncryptionKeyCreationFailed)?,
+        );
+
+        let ciphertext = A::encrypt_bytes(&encryption_key, rng, plaintext, associated_data)
             .map_err(|_| IntegratedEncryptionSchemeError::EncryptionFailed)?;
 
         Ok(RawSealedMessage {
@@ -74,19 +78,23 @@ impl<K: KeyAgreementScheme, A: AeadScheme> CryptoBox<K, A> {
         )
         .map_err(|_| IntegratedEncryptionSchemeError::EphemeralPublicKeyDeserializationFailed)?;
 
-        let shared_secret = Zeroizing::new(K::exchange_static_ephemeral(recipient_private_key, &ephemeral_public)
-            .map_err(|_| IntegratedEncryptionSchemeError::KeyAgreementFailed)?);
-
-        let decryption_key_bytes = Zeroizing::new(
-            K::extract_key_material(&*shared_secret, <A as AeadScheme>::KEY_SIZE)
-                .map_err(|_| IntegratedEncryptionSchemeError::FailedExtractKeyMaterial)?
+        let shared_secret = Zeroizing::new(
+            K::exchange_static_ephemeral(recipient_private_key, &ephemeral_public)
+                .map_err(|_| IntegratedEncryptionSchemeError::KeyAgreementFailed)?,
         );
 
-        let decryption_key = Zeroizing::new(A::key_from_bytes(&*decryption_key_bytes)
-            .map_err(|_| IntegratedEncryptionSchemeError::EncryptionKeyCreationFailed)?);
+        let decryption_key_bytes = Zeroizing::new(
+            K::extract_key_material(&shared_secret, <A as AeadScheme>::KEY_SIZE)
+                .map_err(|_| IntegratedEncryptionSchemeError::FailedExtractKeyMaterial)?,
+        );
+
+        let decryption_key = Zeroizing::new(
+            A::key_from_bytes(&decryption_key_bytes)
+                .map_err(|_| IntegratedEncryptionSchemeError::EncryptionKeyCreationFailed)?,
+        );
 
         let result = A::decrypt_bytes_with_associated_data(
-            &*decryption_key,
+            &decryption_key,
             &sealed_message.ciphertext,
             associated_data,
         )
@@ -107,18 +115,22 @@ impl<K: KeyAgreementScheme, A: AeadScheme> CryptoBox<K, A> {
     ) -> Result<RawSealedMessage, IntegratedEncryptionSchemeError> {
         let (ephemeral_private, ephemeral_public) = K::generate_ephemeral_keypair(rng);
 
-        let shared_secret = Zeroizing::new(K::exchange_ephemeral_static(ephemeral_private, recipient_public_key)
-            .map_err(|_| IntegratedEncryptionSchemeError::KeyAgreementFailed)?);
-
-        let encryption_key_bytes = Zeroizing::new(
-            K::extract_key_material(&*shared_secret, <A as AeadScheme>::KEY_SIZE)
-                .map_err(|_| IntegratedEncryptionSchemeError::FailedExtractKeyMaterial)?
+        let shared_secret = Zeroizing::new(
+            K::exchange_ephemeral_static(ephemeral_private, recipient_public_key)
+                .map_err(|_| IntegratedEncryptionSchemeError::KeyAgreementFailed)?,
         );
 
-        let encryption_key = Zeroizing::new(A::key_from_bytes(&*encryption_key_bytes)
-            .map_err(|_| IntegratedEncryptionSchemeError::EncryptionKeyCreationFailed)?);
+        let encryption_key_bytes = Zeroizing::new(
+            K::extract_key_material(&shared_secret, <A as AeadScheme>::KEY_SIZE)
+                .map_err(|_| IntegratedEncryptionSchemeError::FailedExtractKeyMaterial)?,
+        );
 
-        let ciphertext = A::encrypt_elements(&*encryption_key, rng, plaintext, associated_data)
+        let encryption_key = Zeroizing::new(
+            A::key_from_bytes(&encryption_key_bytes)
+                .map_err(|_| IntegratedEncryptionSchemeError::EncryptionKeyCreationFailed)?,
+        );
+
+        let ciphertext = A::encrypt_elements(&encryption_key, rng, plaintext, associated_data)
             .map_err(|_| IntegratedEncryptionSchemeError::EncryptionFailed)?;
 
         Ok(RawSealedMessage {
@@ -138,19 +150,23 @@ impl<K: KeyAgreementScheme, A: AeadScheme> CryptoBox<K, A> {
         )
         .map_err(|_| IntegratedEncryptionSchemeError::EphemeralPublicKeyDeserializationFailed)?;
 
-        let shared_secret = Zeroizing::new(K::exchange_static_ephemeral(recipient_private_key, &ephemeral_public)
-            .map_err(|_| IntegratedEncryptionSchemeError::KeyAgreementFailed)?);
-
-        let decryption_key_bytes = Zeroizing::new(
-            K::extract_key_material(&*shared_secret, <A as AeadScheme>::KEY_SIZE)
-                .map_err(|_| IntegratedEncryptionSchemeError::FailedExtractKeyMaterial)?
+        let shared_secret = Zeroizing::new(
+            K::exchange_static_ephemeral(recipient_private_key, &ephemeral_public)
+                .map_err(|_| IntegratedEncryptionSchemeError::KeyAgreementFailed)?,
         );
 
-        let decryption_key = Zeroizing::new(A::key_from_bytes(&*decryption_key_bytes)
-            .map_err(|_| IntegratedEncryptionSchemeError::EncryptionKeyCreationFailed)?);
+        let decryption_key_bytes = Zeroizing::new(
+            K::extract_key_material(&shared_secret, <A as AeadScheme>::KEY_SIZE)
+                .map_err(|_| IntegratedEncryptionSchemeError::FailedExtractKeyMaterial)?,
+        );
+
+        let decryption_key = Zeroizing::new(
+            A::key_from_bytes(&decryption_key_bytes)
+                .map_err(|_| IntegratedEncryptionSchemeError::EncryptionKeyCreationFailed)?,
+        );
 
         let result = A::decrypt_elements_with_associated_data(
-            &*decryption_key,
+            &decryption_key,
             &sealed_message.ciphertext,
             associated_data,
         )

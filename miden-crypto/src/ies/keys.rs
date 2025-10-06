@@ -21,6 +21,160 @@ type X25519XChaCha20Poly1305 = CryptoBox<X25519, XChaCha>;
 /// Instantiation of sealed box using X25519 + AeadRPO
 type X25519AeadRpo = CryptoBox<X25519, AeadRpo>;
 
+// HELPER MACROS
+// ================================================================================================
+
+/// Generates seal_with_associated_data method implementation
+macro_rules! impl_seal_with_associated_data {
+    ($($variant:path => $crypto_box:ty, $key_agreement:ty, $ephemeral_variant:path;)*) => {
+        /// Seal (encrypt and authenticate) data for this recipient given some associated data
+        pub fn seal_with_associated_data<R: CryptoRng + RngCore>(
+            &self,
+            rng: &mut R,
+            plaintext: &[u8],
+            associated_data: &[u8],
+        ) -> Result<SealedMessage, IntegratedEncryptionSchemeError> {
+            match self {
+                $(
+                    $variant(key) => {
+                        let raw = <$crypto_box>::seal_with_associated_data(
+                            rng,
+                            key,
+                            plaintext,
+                            associated_data,
+                        )?;
+
+                        let ephemeral = <$key_agreement as KeyAgreementScheme>::EphemeralPublicKey::read_from_bytes(
+                            &raw.ephemeral_public_key,
+                        )
+                        .map_err(|_| {
+                            IntegratedEncryptionSchemeError::EphemeralPublicKeyDeserializationFailed
+                        })?;
+
+                        Ok(SealedMessage {
+                            ephemeral_key: $ephemeral_variant(ephemeral),
+                            ciphertext: raw.ciphertext,
+                        })
+                    }
+                )*
+            }
+        }
+    };
+}
+
+/// Generates seal_elements_with_associated_data method implementation
+macro_rules! impl_seal_elements_with_associated_data {
+    ($($variant:path => $crypto_box:ty, $key_agreement:ty, $ephemeral_variant:path;)*) => {
+        /// Seal field elements with associated data for this recipient
+        pub fn seal_elements_with_associated_data<R: CryptoRng + RngCore>(
+            &self,
+            rng: &mut R,
+            plaintext: &[Felt],
+            associated_data: &[Felt],
+        ) -> Result<SealedMessage, IntegratedEncryptionSchemeError> {
+            match self {
+                $(
+                    $variant(key) => {
+                        let raw = <$crypto_box>::seal_elements_with_associated_data(
+                            rng,
+                            key,
+                            plaintext,
+                            associated_data,
+                        )?;
+
+                        let ephemeral = <$key_agreement as KeyAgreementScheme>::EphemeralPublicKey::read_from_bytes(
+                            &raw.ephemeral_public_key,
+                        )
+                        .map_err(|_| {
+                            IntegratedEncryptionSchemeError::EphemeralPublicKeyDeserializationFailed
+                        })?;
+
+                        Ok(SealedMessage {
+                            ephemeral_key: $ephemeral_variant(ephemeral),
+                            ciphertext: raw.ciphertext,
+                        })
+                    }
+                )*
+            }
+        }
+    };
+}
+
+/// Generates unseal_with_associated_data method implementation
+macro_rules! impl_unseal_with_associated_data {
+    ($($variant:path => $crypto_box:ty;)*) => {
+        /// Unseal a sealed message given its associated data
+        pub fn unseal_with_associated_data(
+            &self,
+            sealed_message: SealedMessage,
+            associated_data: &[u8],
+        ) -> Result<Vec<u8>, IntegratedEncryptionSchemeError> {
+            // Check algorithm compatibility using constant-time comparison
+            let self_algo = self.algorithm() as u8;
+            let msg_algo = sealed_message.ephemeral_key.algorithm() as u8;
+
+            let compatible = self_algo == msg_algo;
+            if !compatible {
+                return Err(IntegratedEncryptionSchemeError::AlgorithmMismatch);
+            }
+
+            // Destructure and serialize the ephemeral key
+            let SealedMessage { ephemeral_key, ciphertext } = sealed_message;
+            let raw_sealed = RawSealedMessage {
+                ephemeral_public_key: ephemeral_key.to_bytes(),
+                ciphertext,
+            };
+
+            match self {
+                $(
+                    $variant(key) => {
+                        <$crypto_box>::unseal_with_associated_data(key, &raw_sealed, associated_data)
+                    }
+                )*
+            }
+        }
+    };
+}
+
+/// Generates unseal_elements_with_associated_data method implementation
+macro_rules! impl_unseal_elements_with_associated_data {
+    ($($variant:path => $crypto_box:ty;)*) => {
+        /// Unseal field elements from a sealed message with associated data
+        pub fn unseal_elements_with_associated_data(
+            &self,
+            sealed_message: SealedMessage,
+            associated_data: &[Felt],
+        ) -> Result<Vec<Felt>, IntegratedEncryptionSchemeError> {
+            match self {
+                $(
+                    $variant(key) => {
+                        // Check algorithm compatibility
+                        let self_algo = self.algorithm() as u8;
+                        let msg_algo = sealed_message.ephemeral_key.algorithm() as u8;
+
+                        let compatible = self_algo == msg_algo;
+                        if !compatible {
+                            return Err(IntegratedEncryptionSchemeError::AlgorithmMismatch);
+                        }
+
+                        // Destructure and serialize the ephemeral key
+                        let SealedMessage { ephemeral_key, ciphertext } = sealed_message;
+                        let raw_sealed = RawSealedMessage {
+                            ephemeral_public_key: ephemeral_key.to_bytes(),
+                            ciphertext,
+                        };
+
+                        <$crypto_box>::unseal_elements_with_associated_data(key, &raw_sealed, associated_data)
+                    }
+                )*
+            }
+        }
+    };
+}
+
+// STRUCTS AND IMPLEMENTATIONS
+// ================================================================================================
+
 /// Public key for sealing messages to a recipient.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum SealingKey {
@@ -39,68 +193,10 @@ impl SealingKey {
         self.seal_with_associated_data(rng, plaintext, &[])
     }
 
-    /// Seal (encrypt and authenticate) data for this recipient given some associated data
-    pub fn seal_with_associated_data<R: CryptoRng + RngCore>(
-        &self,
-        rng: &mut R,
-        plaintext: &[u8],
-        associated_data: &[u8],
-    ) -> Result<SealedMessage, IntegratedEncryptionSchemeError> {
-        match self {
-            SealingKey::K256XChaCha20Poly1305(key) => {
-                let raw = K256XChaCha20Poly1305::seal_with_associated_data(
-                    rng,
-                    key,
-                    plaintext,
-                    associated_data,
-                )?;
-
-                let ephemeral = <K256 as KeyAgreementScheme>::EphemeralPublicKey::read_from_bytes(
-                    &raw.ephemeral_public_key,
-                )
-                .map_err(|_| {
-                    IntegratedEncryptionSchemeError::EphemeralPublicKeyDeserializationFailed
-                })?;
-                Ok(SealedMessage {
-                    ephemeral_key: EphemeralPublicKey::K256XChaCha20Poly1305(ephemeral),
-                    ciphertext: raw.ciphertext,
-                })
-            },
-            SealingKey::X25519XChaCha20Poly1305(key) => {
-                let raw = X25519XChaCha20Poly1305::seal_with_associated_data(
-                    rng,
-                    key,
-                    plaintext,
-                    associated_data,
-                )?;
-                let ephemeral =
-                    <X25519 as KeyAgreementScheme>::EphemeralPublicKey::read_from_bytes(
-                        &raw.ephemeral_public_key,
-                    )
-                    .map_err(|_| {
-                        IntegratedEncryptionSchemeError::EphemeralPublicKeyDeserializationFailed
-                    })?;
-                Ok(SealedMessage {
-                    ephemeral_key: EphemeralPublicKey::X25519XChaCha20Poly1305(ephemeral),
-                    ciphertext: raw.ciphertext,
-                })
-            },
-            SealingKey::X25519AeadRpo(key) => {
-                let raw =
-                    X25519AeadRpo::seal_with_associated_data(rng, key, plaintext, associated_data)?;
-                let ephemeral =
-                    <X25519 as KeyAgreementScheme>::EphemeralPublicKey::read_from_bytes(
-                        &raw.ephemeral_public_key,
-                    )
-                    .map_err(|_| {
-                        IntegratedEncryptionSchemeError::EphemeralPublicKeyDeserializationFailed
-                    })?;
-                Ok(SealedMessage {
-                    ephemeral_key: EphemeralPublicKey::X25519Rpo256(ephemeral),
-                    ciphertext: raw.ciphertext,
-                })
-            },
-        }
+    impl_seal_with_associated_data! {
+        SealingKey::K256XChaCha20Poly1305 => K256XChaCha20Poly1305, K256, EphemeralPublicKey::K256XChaCha20Poly1305;
+        SealingKey::X25519XChaCha20Poly1305 => X25519XChaCha20Poly1305, X25519, EphemeralPublicKey::X25519XChaCha20Poly1305;
+        SealingKey::X25519AeadRpo => X25519AeadRpo, X25519, EphemeralPublicKey::X25519AeadRpo;
     }
 
     /// Seal field elements for this recipient (only available for X25519Rpo256)
@@ -112,36 +208,10 @@ impl SealingKey {
         self.seal_elements_with_associated_data(rng, plaintext, &[])
     }
 
-    /// Seal field elements with associated data for this recipient (only available for
-    /// X25519Rpo256)
-    pub fn seal_elements_with_associated_data<R: CryptoRng + RngCore>(
-        &self,
-        rng: &mut R,
-        plaintext: &[Felt],
-        associated_data: &[Felt],
-    ) -> Result<SealedMessage, IntegratedEncryptionSchemeError> {
-        match self {
-            SealingKey::X25519AeadRpo(key) => {
-                let raw = X25519AeadRpo::seal_elements_with_associated_data(
-                    rng,
-                    key,
-                    plaintext,
-                    associated_data,
-                )?;
-                let ephemeral =
-                    <X25519 as KeyAgreementScheme>::EphemeralPublicKey::read_from_bytes(
-                        &raw.ephemeral_public_key,
-                    )
-                    .map_err(|_| {
-                        IntegratedEncryptionSchemeError::EphemeralPublicKeyDeserializationFailed
-                    })?;
-                Ok(SealedMessage {
-                    ephemeral_key: EphemeralPublicKey::X25519Rpo256(ephemeral),
-                    ciphertext: raw.ciphertext,
-                })
-            },
-            _ => Err(IntegratedEncryptionSchemeError::UnsupportedAlgorithm),
-        }
+    impl_seal_elements_with_associated_data! {
+        SealingKey::K256XChaCha20Poly1305 => K256XChaCha20Poly1305, K256, EphemeralPublicKey::K256XChaCha20Poly1305;
+        SealingKey::X25519XChaCha20Poly1305 => X25519XChaCha20Poly1305, X25519, EphemeralPublicKey::X25519XChaCha20Poly1305;
+        SealingKey::X25519AeadRpo => X25519AeadRpo, X25519, EphemeralPublicKey::X25519AeadRpo;
     }
 }
 
@@ -161,47 +231,10 @@ impl UnsealingKey {
         self.unseal_with_associated_data(sealed_message, &[])
     }
 
-    /// Unseal a sealed message given its associated data
-    pub fn unseal_with_associated_data(
-        &self,
-        sealed_message: SealedMessage,
-        associated_data: &[u8],
-    ) -> Result<Vec<u8>, IntegratedEncryptionSchemeError> {
-        // Check algorithm compatibility using constant-time comparison
-        let self_algo = self.algorithm() as u8;
-        let msg_algo = sealed_message.ephemeral_key.algorithm() as u8;
-
-        let compatible = self_algo == msg_algo;
-        if !compatible {
-            return Err(IntegratedEncryptionSchemeError::AlgorithmMismatch);
-        }
-
-        // Destructure and serialize the ephemeral key
-        let SealedMessage { ephemeral_key, ciphertext } = sealed_message;
-        let raw_sealed = RawSealedMessage {
-            ephemeral_public_key: ephemeral_key.to_bytes(),
-            ciphertext,
-        };
-
-        match self {
-            UnsealingKey::K256XChaCha20Poly1305(key) => {
-                K256XChaCha20Poly1305::unseal_with_associated_data(
-                    key,
-                    &raw_sealed,
-                    associated_data,
-                )
-            },
-            UnsealingKey::X25519XChaCha20Poly1305(key) => {
-                X25519XChaCha20Poly1305::unseal_with_associated_data(
-                    key,
-                    &raw_sealed,
-                    associated_data,
-                )
-            },
-            UnsealingKey::X25519AeadRpo(key) => {
-                X25519AeadRpo::unseal_with_associated_data(key, &raw_sealed, associated_data)
-            },
-        }
+    impl_unseal_with_associated_data! {
+        UnsealingKey::K256XChaCha20Poly1305 => K256XChaCha20Poly1305;
+        UnsealingKey::X25519XChaCha20Poly1305 => X25519XChaCha20Poly1305;
+        UnsealingKey::X25519AeadRpo => X25519AeadRpo;
     }
 
     /// Get algorithm identifier for this secret key
@@ -226,39 +259,10 @@ impl UnsealingKey {
         self.unseal_elements_with_associated_data(sealed_message, &[])
     }
 
-    /// Unseal field elements from a sealed message with associated data (only available for
-    /// X25519Rpo256)
-    pub fn unseal_elements_with_associated_data(
-        &self,
-        sealed_message: SealedMessage,
-        associated_data: &[Felt],
-    ) -> Result<Vec<Felt>, IntegratedEncryptionSchemeError> {
-        match self {
-            UnsealingKey::X25519AeadRpo(key) => {
-                // Check algorithm compatibility
-                let self_algo = self.algorithm() as u8;
-                let msg_algo = sealed_message.ephemeral_key.algorithm() as u8;
-
-                let compatible = self_algo == msg_algo;
-                if !compatible {
-                    return Err(IntegratedEncryptionSchemeError::AlgorithmMismatch);
-                }
-
-                // Destructure and serialize the ephemeral key
-                let SealedMessage { ephemeral_key, ciphertext } = sealed_message;
-                let raw_sealed = RawSealedMessage {
-                    ephemeral_public_key: ephemeral_key.to_bytes(),
-                    ciphertext,
-                };
-
-                X25519AeadRpo::unseal_elements_with_associated_data(
-                    key,
-                    &raw_sealed,
-                    associated_data,
-                )
-            },
-            _ => Err(IntegratedEncryptionSchemeError::UnsupportedAlgorithm),
-        }
+    impl_unseal_elements_with_associated_data! {
+        UnsealingKey::K256XChaCha20Poly1305 => K256XChaCha20Poly1305;
+        UnsealingKey::X25519XChaCha20Poly1305 => X25519XChaCha20Poly1305;
+        UnsealingKey::X25519AeadRpo => X25519AeadRpo;
     }
 }
 
@@ -267,7 +271,7 @@ impl UnsealingKey {
 pub(crate) enum EphemeralPublicKey {
     K256XChaCha20Poly1305(crate::ecdh::k256::EphemeralPublicKey),
     X25519XChaCha20Poly1305(crate::ecdh::x25519::EphemeralPublicKey),
-    X25519Rpo256(crate::ecdh::x25519::EphemeralPublicKey),
+    X25519AeadRpo(crate::ecdh::x25519::EphemeralPublicKey),
 }
 
 impl EphemeralPublicKey {
@@ -276,7 +280,7 @@ impl EphemeralPublicKey {
         match self {
             EphemeralPublicKey::K256XChaCha20Poly1305(_) => IesAlgorithm::K256XChaCha20Poly1305,
             EphemeralPublicKey::X25519XChaCha20Poly1305(_) => IesAlgorithm::X25519XChaCha20Poly1305,
-            EphemeralPublicKey::X25519Rpo256(_) => IesAlgorithm::X25519AeadRpo,
+            EphemeralPublicKey::X25519AeadRpo(_) => IesAlgorithm::X25519AeadRpo,
         }
     }
 
@@ -285,7 +289,7 @@ impl EphemeralPublicKey {
         match self {
             EphemeralPublicKey::K256XChaCha20Poly1305(key) => key.to_bytes(),
             EphemeralPublicKey::X25519XChaCha20Poly1305(key) => key.to_bytes(),
-            EphemeralPublicKey::X25519Rpo256(key) => key.to_bytes(),
+            EphemeralPublicKey::X25519AeadRpo(key) => key.to_bytes(),
         }
     }
 
@@ -316,431 +320,8 @@ impl EphemeralPublicKey {
                         .map_err(|_| {
                             IntegratedEncryptionSchemeError::EphemeralPublicKeyDeserializationFailed
                         })?;
-                Ok(EphemeralPublicKey::X25519Rpo256(key))
+                Ok(EphemeralPublicKey::X25519AeadRpo(key))
             },
-        }
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::dsa::{ecdsa_k256_keccak::SecretKey, eddsa_25519::SecretKey as SecretKey25519};
-
-    #[test]
-    fn test_sealing_and_unsealing_roundtrip() {
-        let mut rng = rand::rng();
-        let plaintext = b"roundtrip";
-        let ad = b"ctx";
-
-        let secret_key = SecretKey::with_rng(&mut rng);
-        let public_key = secret_key.public_key();
-
-        let sealing_key = SealingKey::K256XChaCha20Poly1305(public_key);
-        let sealed = sealing_key.seal_with_associated_data(&mut rng, plaintext, ad).unwrap();
-
-        let unsealing_key = UnsealingKey::K256XChaCha20Poly1305(secret_key);
-        let decrypted = unsealing_key.unseal_with_associated_data(sealed, ad).unwrap();
-
-        assert_eq!(decrypted, plaintext);
-    }
-
-    #[test]
-    fn test_invalid_associated_data() {
-        let mut rng = rand::rng();
-        let plaintext = b"with ad";
-        let ad = b"good";
-        let bad_ad = b"bad";
-
-        let secret_key = SecretKey::with_rng(&mut rng);
-        let public_key = secret_key.public_key();
-
-        let sealing_key = SealingKey::K256XChaCha20Poly1305(public_key);
-        let sealed = sealing_key.seal_with_associated_data(&mut rng, plaintext, ad).unwrap();
-
-        let unsealing_key = UnsealingKey::K256XChaCha20Poly1305(secret_key);
-        let result = unsealing_key.unseal_with_associated_data(sealed, bad_ad);
-
-        assert!(result.is_err());
-    }
-
-    #[test]
-    fn test_sealing_and_unsealing_roundtrip_x25519() {
-        let mut rng = rand::rng();
-        let plaintext = b"roundtrip-x25519";
-        let ad = b"ctx-x25519";
-
-        let secret_key = SecretKey25519::with_rng(&mut rng);
-        let public_key = secret_key.public_key();
-
-        let sealing_key = SealingKey::X25519XChaCha20Poly1305(public_key);
-        let sealed = sealing_key.seal_with_associated_data(&mut rng, plaintext, ad).unwrap();
-
-        let unsealing_key = UnsealingKey::X25519XChaCha20Poly1305(secret_key);
-        let decrypted = unsealing_key.unseal_with_associated_data(sealed, ad).unwrap();
-
-        assert_eq!(decrypted, plaintext);
-    }
-
-    #[test]
-    fn test_invalid_associated_data_x25519() {
-        let mut rng = rand::rng();
-        let plaintext = b"with ad x25519";
-        let ad = b"good-x25519";
-        let bad_ad = b"bad-x25519";
-
-        let secret_key = SecretKey25519::with_rng(&mut rng);
-        let public_key = secret_key.public_key();
-
-        let sealing_key = SealingKey::X25519XChaCha20Poly1305(public_key);
-        let sealed = sealing_key.seal_with_associated_data(&mut rng, plaintext, ad).unwrap();
-
-        let unsealing_key = UnsealingKey::X25519XChaCha20Poly1305(secret_key);
-        let result = unsealing_key.unseal_with_associated_data(sealed, bad_ad);
-
-        assert!(result.is_err());
-    }
-
-    #[test]
-    fn test_ephemeral_public_key_serialization_roundtrip_k256() {
-        let mut rng = rand::rng();
-        let secret_key = SecretKey::with_rng(&mut rng);
-        let public_key = secret_key.public_key();
-        let sealing_key = SealingKey::K256XChaCha20Poly1305(public_key);
-        let sealed = sealing_key.seal_with_associated_data(&mut rng, b"msg", b"ad").unwrap();
-
-        let original = sealed.ephemeral_key.clone();
-        let bytes = original.to_bytes();
-        let restored = EphemeralPublicKey::from_bytes(original.algorithm(), &bytes).unwrap();
-
-        assert_eq!(original, restored);
-    }
-
-    #[test]
-    fn test_ephemeral_public_key_serialization_roundtrip_x25519() {
-        let mut rng = rand::rng();
-        let secret_key = SecretKey25519::with_rng(&mut rng);
-        let public_key = secret_key.public_key();
-        let sealing_key = SealingKey::X25519XChaCha20Poly1305(public_key);
-        let sealed = sealing_key.seal_with_associated_data(&mut rng, b"msg", b"ad").unwrap();
-
-        let original = sealed.ephemeral_key.clone();
-        let bytes = original.to_bytes();
-        let restored = EphemeralPublicKey::from_bytes(original.algorithm(), &bytes).unwrap();
-
-        assert_eq!(original, restored);
-    }
-
-    #[test]
-    fn test_field_element_sealing_and_unsealing_roundtrip() {
-        let mut rng = rand::rng();
-        let plaintext = vec![crate::Felt::new(1), crate::Felt::new(2), crate::Felt::new(3)];
-        let associated_data = vec![crate::Felt::new(100), crate::Felt::new(200)];
-
-        let secret_key = SecretKey25519::with_rng(&mut rng);
-        let public_key = secret_key.public_key();
-
-        let sealing_key = SealingKey::X25519AeadRpo(public_key);
-        let sealed = sealing_key
-            .seal_elements_with_associated_data(&mut rng, &plaintext, &associated_data)
-            .unwrap();
-
-        let unsealing_key = UnsealingKey::X25519AeadRpo(secret_key);
-        let decrypted = unsealing_key
-            .unseal_elements_with_associated_data(sealed, &associated_data)
-            .unwrap();
-
-        assert_eq!(plaintext, decrypted);
-    }
-
-    #[test]
-    fn test_field_element_sealing_without_associated_data() {
-        let mut rng = rand::rng();
-        let plaintext = vec![crate::Felt::new(42), crate::Felt::new(84), crate::Felt::new(126)];
-
-        let secret_key = SecretKey25519::with_rng(&mut rng);
-        let public_key = secret_key.public_key();
-
-        let sealing_key = SealingKey::X25519AeadRpo(public_key);
-        let sealed = sealing_key.seal_elements(&mut rng, &plaintext).unwrap();
-
-        let unsealing_key = UnsealingKey::X25519AeadRpo(secret_key);
-        let decrypted = unsealing_key.unseal_elements(sealed).unwrap();
-
-        assert_eq!(plaintext, decrypted);
-    }
-
-    #[test]
-    fn test_x25519_rpo256_bytes_compatibility() {
-        let mut rng = rand::rng();
-        let byte_data = b"Hello, field elements!";
-
-        let secret_key = SecretKey25519::with_rng(&mut rng);
-        let public_key = secret_key.public_key();
-
-        let sealing_key = SealingKey::X25519AeadRpo(public_key);
-        let sealed = sealing_key.seal(&mut rng, byte_data).unwrap();
-
-        let unsealing_key = UnsealingKey::X25519AeadRpo(secret_key);
-        let decrypted = unsealing_key.unseal(sealed).unwrap();
-
-        assert_eq!(byte_data, decrypted.as_slice());
-    }
-
-    #[test]
-    fn test_k256_seal_unseal_without_associated_data() {
-        let mut rng = rand::rng();
-        let plaintext = b"test message k256";
-
-        let secret_key = SecretKey::with_rng(&mut rng);
-        let public_key = secret_key.public_key();
-
-        let sealing_key = SealingKey::K256XChaCha20Poly1305(public_key);
-        let sealed = sealing_key.seal(&mut rng, plaintext).unwrap();
-
-        let unsealing_key = UnsealingKey::K256XChaCha20Poly1305(secret_key);
-        let decrypted = unsealing_key.unseal(sealed).unwrap();
-
-        assert_eq!(plaintext, decrypted.as_slice());
-    }
-
-    #[test]
-    fn test_x25519_xchacha_seal_unseal_without_associated_data() {
-        let mut rng = rand::rng();
-        let plaintext = b"test message x25519 xchacha";
-
-        let secret_key = SecretKey25519::with_rng(&mut rng);
-        let public_key = secret_key.public_key();
-
-        let sealing_key = SealingKey::X25519XChaCha20Poly1305(public_key);
-        let sealed = sealing_key.seal(&mut rng, plaintext).unwrap();
-
-        let unsealing_key = UnsealingKey::X25519XChaCha20Poly1305(secret_key);
-        let decrypted = unsealing_key.unseal(sealed).unwrap();
-
-        assert_eq!(plaintext, decrypted.as_slice());
-    }
-
-    #[test]
-    fn test_x25519_rpo_seal_unseal_without_associated_data() {
-        let mut rng = rand::rng();
-        let plaintext = b"test message x25519 rpo";
-
-        let secret_key = SecretKey25519::with_rng(&mut rng);
-        let public_key = secret_key.public_key();
-
-        let sealing_key = SealingKey::X25519AeadRpo(public_key);
-        let sealed = sealing_key.seal(&mut rng, plaintext).unwrap();
-
-        let unsealing_key = UnsealingKey::X25519AeadRpo(secret_key);
-        let decrypted = unsealing_key.unseal(sealed).unwrap();
-
-        assert_eq!(plaintext, decrypted.as_slice());
-    }
-
-    // PROPERTY-BASED TESTS
-    // ================================================================================================
-
-    use proptest::prelude::*;
-    use rand::{RngCore, SeedableRng};
-    use rand_chacha::ChaCha20Rng;
-
-    /// Generates arbitrary byte vectors using the same pattern as existing AEAD tests
-    fn arbitrary_bytes() -> impl Strategy<Value = Vec<u8>> {
-        prop::collection::vec(any::<u8>(), 0..500)
-    }
-
-    /// Generates arbitrary field element vectors using the same pattern as AEAD tests
-    fn arbitrary_field_elements() -> impl Strategy<Value = Vec<crate::Felt>> {
-        (1usize..100, any::<u64>()).prop_map(|(len, seed)| {
-            let mut rng = ChaCha20Rng::seed_from_u64(seed);
-            (0..len).map(|_| crate::Felt::new(rng.next_u64())).collect()
-        })
-    }
-
-    /// Helper macro for basic IES roundtrip testing
-    macro_rules! test_roundtrip {
-        (
-            $sealing_key:expr,
-            $unsealing_key:expr,
-            $plaintext:expr,
-            $seal_method:ident,
-            $unseal_method:ident
-        ) => {
-            let mut rng = rand::rng();
-            let sealed = $sealing_key.$seal_method(&mut rng, $plaintext).unwrap();
-            let decrypted = $unsealing_key.$unseal_method(sealed).unwrap();
-            prop_assert_eq!($plaintext.clone(), decrypted);
-        };
-        (
-            $sealing_key:expr,
-            $unsealing_key:expr,
-            $plaintext:expr,
-            $associated_data:expr,
-            $seal_method:ident,
-            $unseal_method:ident
-        ) => {
-            let mut rng = rand::rng();
-            let sealed = $sealing_key.$seal_method(&mut rng, $plaintext, $associated_data).unwrap();
-            let decrypted = $unsealing_key.$unseal_method(sealed, $associated_data).unwrap();
-            prop_assert_eq!($plaintext.clone(), decrypted);
-        };
-    }
-
-    proptest! {
-        #[test]
-        fn prop_k256_bytes_roundtrip(
-            plaintext in arbitrary_bytes(),
-            associated_data in arbitrary_bytes()
-        ) {
-            let mut rng = rand::rng();
-            let secret_key = SecretKey::with_rng(&mut rng);
-            let public_key = secret_key.public_key();
-            let sealing_key = SealingKey::K256XChaCha20Poly1305(public_key);
-            let unsealing_key = UnsealingKey::K256XChaCha20Poly1305(secret_key);
-
-            test_roundtrip!(sealing_key, unsealing_key, &plaintext, &associated_data, seal_with_associated_data, unseal_with_associated_data);
-        }
-
-        #[test]
-        fn prop_x25519_xchacha_bytes_roundtrip(
-            plaintext in arbitrary_bytes(),
-            associated_data in arbitrary_bytes()
-        ) {
-            let mut rng = rand::rng();
-            let secret_key = SecretKey25519::with_rng(&mut rng);
-            let public_key = secret_key.public_key();
-            let sealing_key = SealingKey::X25519XChaCha20Poly1305(public_key);
-            let unsealing_key = UnsealingKey::X25519XChaCha20Poly1305(secret_key);
-
-            test_roundtrip!(sealing_key, unsealing_key, &plaintext, &associated_data, seal_with_associated_data, unseal_with_associated_data);
-        }
-
-        #[test]
-        fn prop_x25519_rpo_bytes_roundtrip(
-            plaintext in arbitrary_bytes(),
-            associated_data in arbitrary_bytes()
-        ) {
-            let mut rng = rand::rng();
-            let secret_key = SecretKey25519::with_rng(&mut rng);
-            let public_key = secret_key.public_key();
-            let sealing_key = SealingKey::X25519AeadRpo(public_key);
-            let unsealing_key = UnsealingKey::X25519AeadRpo(secret_key);
-
-            test_roundtrip!(sealing_key, unsealing_key, &plaintext, &associated_data, seal_with_associated_data, unseal_with_associated_data);
-        }
-
-        #[test]
-        fn prop_x25519_rpo_elements_roundtrip(
-            plaintext in arbitrary_field_elements(),
-            associated_data in arbitrary_field_elements()
-        ) {
-            let mut rng = rand::rng();
-            let secret_key = SecretKey25519::with_rng(&mut rng);
-            let public_key = secret_key.public_key();
-            let sealing_key = SealingKey::X25519AeadRpo(public_key);
-            let unsealing_key = UnsealingKey::X25519AeadRpo(secret_key);
-
-            test_roundtrip!(sealing_key, unsealing_key, &plaintext, &associated_data, seal_elements_with_associated_data, unseal_elements_with_associated_data);
-        }
-
-        #[test]
-        fn prop_algorithm_mismatch_detection(
-            plaintext in arbitrary_bytes()
-        ) {
-            let mut rng = rand::rng();
-
-            // Create keys for different algorithms
-            let secret_k256 = SecretKey::with_rng(&mut rng);
-            let public_k256 = secret_k256.public_key();
-            let secret_x25519 = SecretKey25519::with_rng(&mut rng);
-
-            // Seal with K256
-            let sealing_key = SealingKey::K256XChaCha20Poly1305(public_k256);
-            let sealed = sealing_key.seal(&mut rng, &plaintext).unwrap();
-
-            // Try to unseal with X25519 - should fail
-            let unsealing_key = UnsealingKey::X25519XChaCha20Poly1305(secret_x25519);
-            let result = unsealing_key.unseal(sealed);
-
-            prop_assert!(result.is_err());
-        }
-
-        #[test]
-        fn prop_wrong_associated_data_detection(
-            plaintext in arbitrary_bytes(),
-            correct_ad in arbitrary_bytes(),
-            wrong_ad in arbitrary_bytes()
-        ) {
-            // Skip test if associated data is the same
-            prop_assume!(correct_ad != wrong_ad);
-
-            let mut rng = rand::rng();
-
-            let secret_key = SecretKey25519::with_rng(&mut rng);
-            let public_key = secret_key.public_key();
-
-            let sealing_key = SealingKey::X25519AeadRpo(public_key);
-            let sealed = sealing_key.seal_with_associated_data(&mut rng, &plaintext, &correct_ad).unwrap();
-
-            let unsealing_key = UnsealingKey::X25519AeadRpo(secret_key);
-            let result = unsealing_key.unseal_with_associated_data(sealed, &wrong_ad);
-
-            prop_assert!(result.is_err());
-        }
-
-        #[test]
-        fn prop_different_keys_different_ciphertexts(
-            plaintext in arbitrary_bytes()
-        ) {
-            prop_assume!(!plaintext.is_empty()); // Skip empty plaintexts
-
-            let mut rng = rand::rng();
-
-            // Generate two different key pairs
-            let secret1 = SecretKey25519::with_rng(&mut rng);
-            let public1 = secret1.public_key();
-            let secret2 = SecretKey25519::with_rng(&mut rng);
-            let public2 = secret2.public_key();
-
-            let sealing_key1 = SealingKey::X25519AeadRpo(public1);
-            let sealing_key2 = SealingKey::X25519AeadRpo(public2);
-
-            let sealed1 = sealing_key1.seal(&mut rng, &plaintext).unwrap();
-            let sealed2 = sealing_key2.seal(&mut rng, &plaintext).unwrap();
-
-            // Different keys should produce different ciphertexts
-            prop_assert_ne!(sealed1.ciphertext, sealed2.ciphertext);
-        }
-
-        #[test]
-        fn prop_seal_without_ad_consistency(
-            plaintext in arbitrary_bytes()
-        ) {
-            let mut rng = rand::rng();
-            let secret_key = SecretKey25519::with_rng(&mut rng);
-            let public_key = secret_key.public_key();
-            let sealing_key = SealingKey::X25519AeadRpo(public_key);
-            let unsealing_key = UnsealingKey::X25519AeadRpo(secret_key);
-
-            // Test both seal methods work for the same plaintext
-            test_roundtrip!(sealing_key, unsealing_key, &plaintext, seal, unseal);
-            test_roundtrip!(sealing_key, unsealing_key, &plaintext, &Vec::<u8>::new(), seal_with_associated_data, unseal_with_associated_data);
-        }
-
-        #[test]
-        fn prop_field_elements_consistency(
-            plaintext in arbitrary_field_elements()
-        ) {
-            let mut rng = rand::rng();
-            let secret_key = SecretKey25519::with_rng(&mut rng);
-            let public_key = secret_key.public_key();
-            let sealing_key = SealingKey::X25519AeadRpo(public_key);
-            let unsealing_key = UnsealingKey::X25519AeadRpo(secret_key);
-
-            // Test both seal methods work for the same field elements
-            test_roundtrip!(sealing_key, unsealing_key, &plaintext, seal_elements, unseal_elements);
-            test_roundtrip!(sealing_key, unsealing_key, &plaintext, &Vec::<crate::Felt>::new(), seal_elements_with_associated_data, unseal_elements_with_associated_data);
         }
     }
 }

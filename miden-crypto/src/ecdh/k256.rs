@@ -62,10 +62,11 @@ impl Zeroize for SharedSecret {
     /// This implementation follows the same security methodology as the `zeroize` crate to ensure
     /// that sensitive cryptographic material is reliably cleared from memory:
     ///
-    /// - **Volatile writes**: Uses `ptr::write_volatile` to prevent dead store elimination and other
-    ///   compiler optimizations that might remove the zeroing operation.
-    /// - **Memory ordering**: Includes a sequentially consistent compiler fence (`SeqCst`) to prevent
-    ///   instruction reordering that could expose the secret data after this function returns.
+    /// - **Volatile writes**: Uses `ptr::write_volatile` to prevent dead store elimination and
+    ///   other compiler optimizations that might remove the zeroing operation.
+    /// - **Memory ordering**: Includes a sequentially consistent compiler fence (`SeqCst`) to
+    ///   prevent instruction reordering that could expose the secret data after this function
+    ///   returns.
     fn zeroize(&mut self) {
         let bytes = self.inner.raw_secret_bytes();
         for byte in

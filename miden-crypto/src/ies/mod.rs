@@ -15,6 +15,9 @@ pub mod error;
 pub mod keys;
 pub mod message;
 
+#[cfg(test)]
+mod tests;
+
 pub use error::*;
 pub use keys::{SealingKey, UnsealingKey};
 pub use message::SealedMessage;
