@@ -1,10 +1,13 @@
 use alloc::{
     collections::{BTreeMap, BTreeSet},
     vec::Vec,
+    collections::VecDeque,
 };
 
 use super::{EmptySubtreeRoots, MerkleError, NodeIndex, SmtLeaf, SmtProof, Word};
-use crate::merkle::{LeafIndex, MerkleStore, SmtLeafError, SmtProofError, smt::SMT_DEPTH};
+use crate::merkle::{smt::{forest::store::SmtStore, SMT_DEPTH}, LeafIndex, SmtLeafError, SmtProofError};
+
+mod store;
 
 #[cfg(test)]
 mod tests;
@@ -57,8 +60,11 @@ pub struct SmtForest {
     /// root to this set.
     roots: BTreeSet<Word>,
 
+    /// Chronological history of SMT roots in this forest used for pruning.
+    root_history: VecDeque<Word>,
+
     /// Stores Merkle paths for all SMTs in this forest.
-    store: MerkleStore,
+    store: SmtStore,
 
     /// Leaves of all SMTs stored in this forest
     leaves: BTreeMap<Word, SmtLeaf>,
@@ -81,10 +87,13 @@ impl SmtForest {
         let mut roots = BTreeSet::new();
         roots.insert(empty_tree_root);
 
-        let store = MerkleStore::new();
+        let mut root_history = VecDeque::new();
+        root_history.push_back(empty_tree_root);
+
+        let store = SmtStore::new();
         let leaves = BTreeMap::new();
 
-        SmtForest { roots, store, leaves }
+        SmtForest { roots, root_history, store, leaves }
     }
 
     // DATA EXTRACTORS
@@ -177,6 +186,7 @@ impl SmtForest {
             self.leaves.insert(leaf.hash(), leaf);
         }
         self.roots.insert(new_root);
+        self.root_history.push_back(new_root);
 
         Ok(new_root)
     }
