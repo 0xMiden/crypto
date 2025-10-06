@@ -17,7 +17,7 @@ use chacha20poly1305::{
     aead::{Aead, AeadCore, KeyInit},
 };
 use rand::{CryptoRng, RngCore};
-use zeroize::Zeroize;
+use zeroize::{Zeroize, ZeroizeOnDrop};
 
 use crate::{
     Felt,
@@ -314,6 +314,8 @@ impl Zeroize for SecretKey {
         self.0.zeroize();
     }
 }
+
+impl ZeroizeOnDrop for SecretKey {}
 
 // IES IMPLEMENTATION
 // ================================================================================================

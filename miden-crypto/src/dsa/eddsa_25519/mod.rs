@@ -54,6 +54,11 @@ impl SecretKey {
         rand::RngCore::fill_bytes(rng, &mut seed);
 
         let inner = ed25519_dalek::SigningKey::from_bytes(&seed);
+
+        // SECURITY: Zeroize sensitive seed material
+        use zeroize::Zeroize;
+        seed.zeroize();
+
         Self { inner }
     }
 

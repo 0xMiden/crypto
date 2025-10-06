@@ -67,6 +67,11 @@ impl SecretKey {
         let mut rng = rand_hc::Hc128Rng::from_seed(seed);
 
         let signing_key = SigningKey::random(&mut rng);
+        
+        // SECURITY: Zeroize sensitive seed material
+        use zeroize::Zeroize;
+        seed.zeroize();
+        
         Self { inner: signing_key }
     }
 

@@ -3,7 +3,7 @@
 use alloc::vec::Vec;
 use core::fmt;
 
-use zeroize::Zeroize;
+use zeroize::{Zeroize, ZeroizeOnDrop};
 
 use crate::{Felt, utils::Deserializable};
 
@@ -37,7 +37,7 @@ impl TryFrom<u8> for DataType {
 pub(crate) trait AeadScheme {
     const KEY_SIZE: usize;
 
-    type Key: Deserializable + Zeroize;
+    type Key: Deserializable + Zeroize + ZeroizeOnDrop;
 
     fn key_from_bytes(bytes: &[u8]) -> Result<Self::Key, EncryptionError>;
 

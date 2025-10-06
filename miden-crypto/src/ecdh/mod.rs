@@ -5,7 +5,7 @@ use core::fmt;
 
 use rand::{CryptoRng, RngCore};
 use winter_utils::{Deserializable, Serializable};
-use zeroize::ZeroizeOnDrop;
+use zeroize::{Zeroize, ZeroizeOnDrop};
 
 pub mod k256;
 pub mod x25519;
@@ -20,7 +20,7 @@ pub trait KeyAgreementScheme {
     type SecretKey;
     type PublicKey: Clone;
 
-    type SharedSecret: AsRef<[u8]> + ZeroizeOnDrop;
+    type SharedSecret: AsRef<[u8]> + Zeroize + ZeroizeOnDrop;
 
     fn generate_ephemeral_keypair<R: CryptoRng + RngCore>(
         rng: &mut R,

@@ -17,7 +17,7 @@ use alloc::vec::Vec;
 use hkdf::{Hkdf, hmac::SimpleHmac};
 use k256::sha2::Sha256;
 use rand::{CryptoRng, RngCore};
-use zeroize::ZeroizeOnDrop;
+use zeroize::{Zeroize, ZeroizeOnDrop};
 
 use crate::{
     dsa::eddsa_25519::{PublicKey, SecretKey},
@@ -43,7 +43,30 @@ impl SharedSecret {
     }
 }
 
-// Safe to derive ZeroizeOnDrop because the inner field already implements it.
+impl Zeroize for SharedSecret {
+    /// Securely clears the shared secret from memory.
+    ///
+    /// # Security
+    ///
+    /// This implementation follows the same security methodology as the `zeroize` crate to ensure
+    /// that sensitive cryptographic material is reliably cleared from memory:
+    ///
+    /// - **Volatile writes**: Uses `ptr::write_volatile` to prevent dead store elimination and other
+    ///   compiler optimizations that might remove the zeroing operation.
+    /// - **Memory ordering**: Includes a sequentially consistent compiler fence (`SeqCst`) to prevent
+    ///   instruction reordering that could expose the secret data after this function returns.
+    fn zeroize(&mut self) {
+        let bytes = self.inner.as_bytes();
+        for byte in unsafe { core::slice::from_raw_parts_mut(bytes.as_ptr() as *mut u8, bytes.len()) } {
+            unsafe {
+                core::ptr::write_volatile(byte, 0u8);
+            }
+        }
+        core::sync::atomic::compiler_fence(core::sync::atomic::Ordering::SeqCst);
+    }
+}
+
+// Safe to derive ZeroizeOnDrop because we implement Zeroize above
 impl ZeroizeOnDrop for SharedSecret {}
 
 impl AsRef<[u8]> for SharedSecret {

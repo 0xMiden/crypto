@@ -15,7 +15,7 @@ use rand::{
     Rng,
     distr::{Distribution, StandardUniform, Uniform},
 };
-use zeroize::Zeroize;
+use zeroize::{Zeroize, ZeroizeOnDrop};
 
 use crate::{
     Felt, FieldElement, ONE, StarkField, Word, ZERO,
@@ -375,12 +375,17 @@ impl Drop for SecretKey {
 }
 
 impl Zeroize for SecretKey {
-    /// Securely zeros the secret key using volatile writes and memory barriers.
+    /// Securely clears the shared secret from memory.
     ///
-    /// This implementation follows the same methodology as the `zeroize` crate:
-    /// - Uses `write_volatile` to prevent compiler optimizations from eliminating the zeroing
-    /// - Includes a compiler fence to prevent instruction reordering
-    /// - Ensures cryptographic key material is reliably cleared from memory
+    /// # Security
+    ///
+    /// This implementation follows the same security methodology as the `zeroize` crate to ensure
+    /// that sensitive cryptographic material is reliably cleared from memory:
+    ///
+    /// - **Volatile writes**: Uses `ptr::write_volatile` to prevent dead store elimination and other
+    ///   compiler optimizations that might remove the zeroing operation.
+    /// - **Memory ordering**: Includes a sequentially consistent compiler fence (`SeqCst`) to prevent
+    ///   instruction reordering that could expose the secret data after this function returns.
     fn zeroize(&mut self) {
         for element in self.0.iter_mut() {
             unsafe {
@@ -390,6 +395,8 @@ impl Zeroize for SecretKey {
         core::sync::atomic::compiler_fence(core::sync::atomic::Ordering::SeqCst);
     }
 }
+
+impl ZeroizeOnDrop for SecretKey {}
 
 // SPONGE STATE
 // ================================================================================================
