@@ -129,6 +129,7 @@ use crate::merkle::smt::{
         MutatedSubtreeLeaves, PairComputations, SUBTREE_DEPTH, SubtreeLeaf, SubtreeLeavesIter,
         build_subtree, fetch_sibling_pair, process_sorted_pairs_to_leaves,
     },
+    word_to_leaf_index,
 };
 
 mod error;
@@ -342,6 +343,11 @@ impl<S: SmtStorage> LargeSmt<S> {
     /// Returns the leaf to which `key` maps
     pub fn get_leaf(&self, key: &Word) -> SmtLeaf {
         <Self as SparseMerkleTree<SMT_DEPTH>>::get_leaf(self, key)
+    }
+
+    /// Returns the leaf at the given leaf index
+    pub fn get_leaf_by_index(&self, leaf_index: &LeafIndex<SMT_DEPTH>) -> SmtLeaf {
+        <Self as SparseMerkleTree<SMT_DEPTH>>::get_leaf_by_index(self, leaf_index)
     }
 
     /// Returns the value associated with `key`
@@ -1125,10 +1131,14 @@ impl<S: SmtStorage> SparseMerkleTree<SMT_DEPTH> for LargeSmt<S> {
     }
 
     fn get_leaf(&self, key: &Word) -> Self::Leaf {
-        let leaf_pos = LeafIndex::<SMT_DEPTH>::from(*key).value();
-        match self.storage.get_leaf(leaf_pos) {
+        let leaf_pos = LeafIndex::<SMT_DEPTH>::from(*key);
+        self.get_leaf_by_index(&leaf_pos)
+    }
+
+    fn get_leaf_by_index(&self, leaf_index: &LeafIndex<SMT_DEPTH>) -> Self::Leaf {
+        match self.storage.get_leaf(leaf_index.value()) {
             Ok(Some(leaf)) => leaf,
-            Ok(None) => SmtLeaf::new_empty((*key).into()),
+            Ok(None) => SmtLeaf::new_empty(leaf_index.clone()),
             Err(_) => {
                 panic!("Storage error during get_leaf in get_leaf");
             },
@@ -1211,8 +1221,7 @@ impl<S: SmtStorage> SparseMerkleTree<SMT_DEPTH> for LargeSmt<S> {
     }
 
     fn key_to_leaf_index(key: &Word) -> LeafIndex<SMT_DEPTH> {
-        let most_significant_felt = key[3];
-        LeafIndex::new_max_depth(most_significant_felt.as_int())
+        word_to_leaf_index(key)
     }
 
     fn path_and_leaf_to_opening(path: SparseMerklePath, leaf: SmtLeaf) -> SmtProof {

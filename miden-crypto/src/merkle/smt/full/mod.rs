@@ -4,6 +4,7 @@ use super::{
     EMPTY_WORD, EmptySubtreeRoots, Felt, InnerNode, InnerNodeInfo, InnerNodes, LeafIndex,
     MerkleError, MutationSet, NodeIndex, Rpo256, SparseMerklePath, SparseMerkleTree, Word,
 };
+use crate::merkle::smt::word_to_leaf_index;
 
 mod error;
 pub use error::{SmtLeafError, SmtProofError};
@@ -252,6 +253,11 @@ impl Smt {
     /// contain more than one key-value pair.
     pub fn num_entries(&self) -> usize {
         self.num_entries
+    }
+
+    /// Returns an iterator over the leaves of this [`Smt`] in arbitrary order.
+    pub fn get_leaf_by_index(&self, leaf_index: &LeafIndex<SMT_DEPTH>) -> SmtLeaf {
+        <Self as SparseMerkleTree<SMT_DEPTH>>::get_leaf_by_index(self, leaf_index)
     }
 
     /// Returns the leaf to which `key` maps
@@ -517,12 +523,15 @@ impl SparseMerkleTree<SMT_DEPTH> for Smt {
         }
     }
 
-    fn get_leaf(&self, key: &Word) -> Self::Leaf {
-        let leaf_pos = LeafIndex::<SMT_DEPTH>::from(*key).value();
+    fn get_leaf(&self, key: &Self::Key) -> Self::Leaf {
+        let leaf_pos = LeafIndex::<SMT_DEPTH>::from(*key);
+        self.get_leaf_by_index(&leaf_pos)
+    }
 
-        match self.leaves.get(&leaf_pos) {
+    fn get_leaf_by_index(&self, leaf_index: &LeafIndex<SMT_DEPTH>) -> Self::Leaf {
+        match self.leaves.get(&leaf_index.value()) {
             Some(leaf) => leaf.clone(),
-            None => SmtLeaf::new_empty((*key).into()),
+            None => SmtLeaf::new_empty(leaf_index.clone()),
         }
     }
 
@@ -553,8 +562,7 @@ impl SparseMerkleTree<SMT_DEPTH> for Smt {
     }
 
     fn key_to_leaf_index(key: &Word) -> LeafIndex<SMT_DEPTH> {
-        let most_significant_felt = key[3];
-        LeafIndex::new_max_depth(most_significant_felt.as_int())
+        word_to_leaf_index(key)
     }
 
     fn path_and_leaf_to_opening(path: SparseMerklePath, leaf: SmtLeaf) -> SmtProof {

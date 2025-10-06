@@ -145,7 +145,6 @@ impl<const DEPTH: u8> SimpleSmt<DEPTH> {
     pub fn num_leaves(&self) -> usize {
         self.leaves.len()
     }
-
     /// Returns the leaf at the specified index.
     pub fn get_leaf(&self, key: &LeafIndex<DEPTH>) -> Word {
         <Self as SparseMerkleTree<DEPTH>>::get_leaf(self, key)
@@ -418,6 +417,10 @@ impl<const DEPTH: u8> SparseMerkleTree<DEPTH> for SimpleSmt<DEPTH> {
             Some(word) => *word,
             None => Self::EMPTY_VALUE,
         }
+    }
+
+    fn get_leaf_by_index(&self, leaf_index: &LeafIndex<DEPTH>) -> Self::Leaf {
+        self.get_leaf(leaf_index)
     }
 
     fn hash_leaf(leaf: &Word) -> Word {
