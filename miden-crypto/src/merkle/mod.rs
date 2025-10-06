@@ -44,6 +44,10 @@ pub use mmr::{Forest, InOrderIndex, Mmr, MmrDelta, MmrError, MmrPeaks, MmrProof,
 mod store;
 pub use store::{MerkleStore, StoreNode};
 
+// Type aliases for backward compatibility
+pub type DefaultMerkleStore = MerkleStore;
+pub type RecordingMerkleStore = MerkleStore;
+
 mod node;
 pub use node::InnerNodeInfo;
 

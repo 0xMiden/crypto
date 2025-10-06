@@ -122,8 +122,8 @@ impl HistoricalReversion {
             let Some(pre_apply) = old_key_values.get(0).map(|tup| tup.clone()) else {
                 continue;
             };
-            // Already the latest state with the original forward mutation set applied. The reversion set
-            // does UNDO that.
+            // Already the latest state with the original forward mutation set applied. The
+            // reversion set does UNDO that.
             let current_leaf = inner.latest.get_leaf(&pre_apply.0);
 
             // Reconstruct what the leaf looked like before the mutation

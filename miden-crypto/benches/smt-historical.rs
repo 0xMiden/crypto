@@ -24,7 +24,7 @@ fn generate_word(seed: &mut [u8; 32]) -> Word {
 #[cfg(feature = "std")]
 fn setup_smt_with_history(num_keys: usize, num_reversions: usize) -> (SmtWithHistory, Vec<Word>) {
     let mut seed = [0u8; 32];
-    let mut smt_with_history = SmtWithHistory::new(Smt::default());
+    let smt_with_history = SmtWithHistory::new(Smt::default());
     let mut keys_used = Vec::new();
 
     // Apply mutations to create history

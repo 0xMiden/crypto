@@ -13,6 +13,14 @@ pub use winter_utils::{
 
 use crate::{Felt, FieldElement, StarkField, Word};
 
+// Re-export collections for backward compatibility
+pub mod collections {
+    pub use alloc::collections::*;
+
+    // Type alias for backward compatibility
+    pub type KvMap<K, V> = BTreeMap<K, V>;
+}
+
 // CONSTANTS
 // ================================================================================================
 
