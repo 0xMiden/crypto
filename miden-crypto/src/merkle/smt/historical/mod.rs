@@ -68,6 +68,10 @@ pub enum HistoricalOffset {
     Latest,
     TooAncient,
 }
+
+/// A wrapper for a `MutationSet` that goes backwards one step
+///
+/// Comes with additional caching.
 #[derive(Debug, Clone)]
 struct HistoricalReversion {
     /// The root at this historical point
@@ -78,6 +82,7 @@ struct HistoricalReversion {
     /// Calculating leaves is expense, so we keep a cache, based on the leaf digest.
     precomputed_leaves: HashMap<LeafIndex<SMT_DEPTH>, SmtLeaf>,
 }
+
 impl HistoricalReversion {
     /// Note: Called after `latest` was updated with the latest mutations. The mutations passed in
     /// to the function is the inverted set.
@@ -115,10 +120,11 @@ impl HistoricalReversion {
         }
 
         // For each affected leaf, construct the full SmtLeaf
-        // FIXME this is horribly complicated
+        // FIXME this is too complicated
         for (leaf_index, old_key_values) in keys_by_leaf {
             // Get the current leaf state (after forward mutation was applied)
             // We need to get any key that maps to this leaf index to fetch the current leaf
+            // TODO double check
             let Some(pre_apply) = old_key_values.get(0).map(|tup| tup.clone()) else {
                 continue;
             };
