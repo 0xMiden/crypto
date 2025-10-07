@@ -120,102 +120,58 @@ impl HistoricalReversion {
         }
 
         // For each affected leaf, construct the full SmtLeaf
-        // FIXME this is too complicated
         for (leaf_index, old_key_values) in keys_by_leaf {
-            // Get the current leaf state (after forward mutation was applied)
-            // We need to get any key that maps to this leaf index to fetch the current leaf
-            // TODO double check
-            let Some(pre_apply) = old_key_values.get(0).map(|tup| tup.clone()) else {
-                continue;
-            };
-            // Already the latest state with the original forward mutation set applied. The
-            // reversion set does UNDO that.
-            let current_leaf = inner.latest.get_leaf(&pre_apply.0);
+            // Get the current leaf (after the forward mutation was applied)
+            let current_leaf = inner.latest.get_leaf_by_index(&leaf_index);
 
-            // Reconstruct what the leaf looked like before the mutation
-            // Start with the current leaf and replace the modified values with their old values
-            let historical_leaf = match current_leaf {
-                SmtLeaf::Empty(_) => {
-                    // If currently empty, check if we had values before
-                    if old_key_values.iter().all(|(_, v)| *v == EMPTY_WORD) {
-                        // All old values were empty, so the leaf was empty before
-                        SmtLeaf::Empty(leaf_index)
-                    } else if old_key_values.len() == 1 {
-                        // Single old key-value pair
-                        let (key, value) = pre_apply;
-                        if value != EMPTY_WORD {
-                            // The key had a non-empty value before, so it was a single entry
-                            SmtLeaf::Single((key, value))
-                        } else {
-                            // The key had an empty value before, so the leaf was empty
-                            SmtLeaf::Empty(leaf_index)
-                        }
-                    } else {
-                        // Multiple old values - filter out any with EMPTY_WORD values
-                        let entries = Vec::<(Word, Word)>::from_iter(
-                            old_key_values.into_iter().filter(|(_, v)| *v != EMPTY_WORD),
-                        );
-                        SmtLeaf::new(entries, leaf_index)
-                            .expect("consistency is given by construction")
-                    }
-                },
-                SmtLeaf::Single((current_key, current_value)) => {
-                    // Current leaf has a single entry
-                    // Check if this entry was modified
-                    let mut leaf_entries = vec![(current_key, current_value)];
-
-                    // Replace with old values
-                    for (old_key, old_value) in &old_key_values {
-                        if *old_key == current_key {
-                            // Replace the current value with the old value
-                            leaf_entries[0].1 = *old_value;
-                        } else if *old_value != EMPTY_WORD {
-                            // This key was removed in the mutation, add it back
-                            leaf_entries.push((*old_key, *old_value));
-                        }
-                    }
-
-                    // Filter out empty values and construct the appropriate leaf type
-                    let entries = Vec::<(Word, Word)>::from_iter(
-                        leaf_entries.into_iter().filter(|(_, v)| *v != EMPTY_WORD),
-                    );
-
-                    SmtLeaf::new(entries, leaf_index).expect("consistency is always given")
-                },
-                SmtLeaf::Multiple(current_entries) => {
-                    // Current leaf has multiple entries
-                    let mut leaf_entries = current_entries.clone();
-
-                    // Apply the old values
-                    for (old_key, old_value) in &old_key_values {
-                        // Find if this key exists in current entries
-                        if let Some(pos) = leaf_entries.iter().position(|(k, _)| k == old_key) {
-                            if *old_value != EMPTY_WORD {
-                                // Update the value
-                                leaf_entries[pos] = (*old_key, *old_value);
-                            } else {
-                                // Remove this entry (it didn't exist before)
-                                leaf_entries.remove(pos);
-                            }
-                        } else if *old_value != EMPTY_WORD {
-                            // This key was removed in the mutation, add it back
-                            leaf_entries.push((*old_key, *old_value));
-                        }
-                    }
-
-                    // Filter out empty values and construct the appropriate leaf type
-                    let entries = Vec::<(Word, Word)>::from_iter(
-                        leaf_entries.into_iter().filter(|(_, v)| *v != EMPTY_WORD),
-                    );
-                    SmtLeaf::new(entries, leaf_index).expect("consistency is always given")
-                },
-            };
+            // Build the historical leaf by merging old values from reversion
+            // with any remaining values from the current state
+            let historical_leaf = build_historical_leaf(leaf_index, current_leaf, old_key_values);
 
             cache.insert(leaf_index, historical_leaf);
         }
 
         cache
     }
+}
+
+/// Helper function to build a historical leaf by combining old values from the reversion
+/// with any remaining current values that weren't affected by the mutation.
+fn build_historical_leaf(
+    leaf_index: LeafIndex<SMT_DEPTH>,
+    current_leaf: SmtLeaf,
+    old_key_values: Vec<(Word, Word)>,
+) -> SmtLeaf {
+    // Create a map of old keys for quick lookup
+    let old_keys: HashMap<Word, Word> = old_key_values.iter().cloned().collect();
+
+    // Collect all entries for the historical leaf
+    let mut historical_entries = Vec::new();
+
+    // Add the old values from the reversion (excluding empty values)
+    for (key, value) in &old_key_values {
+        // Skip entries with empty values - they represent deletions
+        if *value != EMPTY_WORD {
+            historical_entries.push((*key, *value));
+        }
+    }
+
+    // Add any current entries that weren't changed (weren't in the reversion)
+    let current_entries = match &current_leaf {
+        SmtLeaf::Empty(_) => vec![],
+        SmtLeaf::Single(entry) => vec![*entry],
+        SmtLeaf::Multiple(entries) => entries.clone(),
+    };
+
+    for entry in current_entries {
+        if !old_keys.contains_key(&entry.0) {
+            historical_entries.push(entry);
+        }
+    }
+
+    // Create the appropriate SmtLeaf variant using SmtLeaf::new
+    SmtLeaf::new(historical_entries, leaf_index)
+        .expect("Building historical leaf with valid entries should not fail")
 }
 
 /// Internal state that is protected by RwLock for interior mutability
