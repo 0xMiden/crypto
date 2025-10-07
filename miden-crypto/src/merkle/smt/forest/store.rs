@@ -6,6 +6,9 @@ use crate::{
     merkle::{EmptySubtreeRoots, MerkleError, MerklePath, MerkleProof, NodeIndex, SMT_DEPTH},
 };
 
+// SMT FOREST STORE
+// ================================================================================================
+
 #[derive(Debug, Default, Copy, Clone, Eq, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 pub struct SmtNode {
@@ -19,12 +22,24 @@ pub(super) struct SmtStore {
     nodes: Map<Word, SmtNode>,
 }
 
+/// An in-memory data store for SmtForest data.
+///
+/// This is an internal memory data store for SmtForest data. Similarly to the `MerkleStore`, it
+/// allows all the nodes of multiple trees to live as long as necessary and without duplication,
+/// this allows the implementation of space efficient persistent data structures.
+///
+/// Unlike `MerkleStore`, unused nodes can be easily removed from the store by leveraing
+/// reference counting.
 impl SmtStore {
+    /// Creates a new, empty in-memory store for SmtForest data.
     pub fn new() -> Self {
         // pre-populate the store with the empty hashes
         let nodes = empty_hashes().collect();
         Self { nodes }
     }
+
+    // PUBLIC ACCESSORS
+    // --------------------------------------------------------------------------------------------
 
     /// Returns the node at `index` rooted on the tree `root`.
     ///
@@ -112,6 +127,9 @@ impl SmtStore {
         Ok((hash, path))
     }
 
+    // STATE MUTATORS
+    // --------------------------------------------------------------------------------------------
+
     /// Sets multiple node values at once with a single root transition.
     ///
     /// # Errors
@@ -126,7 +144,7 @@ impl SmtStore {
     ) -> Result<Word, MerkleError> {
         self.nodes.get(&root).ok_or(MerkleError::RootNotInStore(root))?;
 
-        // Keep track of affected ancestors to avoid recomputing same nodes multiple times
+        // Keep track of affected ancestors to avoid recomputing nodes multiple times
         let mut ancestors: Vec<NodeIndex> = Vec::new();
         // Start with a guard value, all ancestors have depth < SMT_DEPTH
         let mut last_ancestor = NodeIndex::new_unchecked(SMT_DEPTH, 0);
@@ -137,38 +155,21 @@ impl SmtStore {
         // Collect opening nodes and updated leaves
         let mut nodes_by_index = Map::<NodeIndex, Word>::new();
         for (index, leaf_hash) in entries {
-            std::println!("setting node: {:?} {:?}", index, leaf_hash);
             // Record all sibling nodes along the path from root to this index
             let (old_value, path_nodes) = self.get_indexed_path(root, index)?;
             if old_value == leaf_hash {
                 continue;
             }
-
             nodes_by_index.extend(path_nodes);
 
             // Record the updated leaf value at this index
             nodes_by_index.insert(index, leaf_hash);
-
-            // Ensure leaf hash exists in the store (as a leaf with no children)
-            // new_nodes.insert(
-            //     leaf_hash,
-            //     SmtNode {
-            //         left: Word::empty(),
-            //         right: Word::empty(),
-            //         rc: 0,
-            //     },
-            // );
 
             if last_ancestor != index.parent() {
                 last_ancestor = index.parent();
                 ancestors.push(last_ancestor);
             }
         }
-
-        std::println!("sibling: {:?}", self.get_node(root, NodeIndex::new_unchecked(6, 1)));
-        std::println!("nodes_by_index: {:?}", nodes_by_index);
-        std::println!("ancestors: {:?}", ancestors);
-        std::println!("new_nodes: {:?}", new_nodes);
 
         if nodes_by_index.is_empty() {
             return Ok(root);
@@ -218,6 +219,7 @@ impl SmtStore {
             .ok_or(MerkleError::NodeIndexNotFoundInStore(root, NodeIndex::root()))?;
 
         // The update was computed successfully, update ref counts and insert into the store
+        // TODO: a DFS traversal would be more efficient
         let mut queue = VecDeque::new();
         queue.push_back(new_root);
         while let Some(node) = queue.pop_front() {
@@ -227,15 +229,12 @@ impl SmtStore {
             } else if let Some(smt_node) = new_nodes.get(&node) {
                 let mut smt_node = smt_node.clone();
                 smt_node.rc = 1;
-                std::println!("insert {:?} {:?}", node, smt_node);
                 self.nodes.insert(node, smt_node);
                 if smt_node.left != Word::empty() {
                     queue.push_back(smt_node.left);
                 }
                 if smt_node.right != Word::empty() {
                     queue.push_back(smt_node.right);
-                } else {
-                    std::println!("insert leaf: {:?}", node);
                 }
             }
         }
@@ -243,13 +242,15 @@ impl SmtStore {
         Ok(new_root)
     }
 
-    fn remove_node(&mut self, node: Word, nest: usize) -> Vec<Word> {
+    /// Decreases the reference count of the specified node and releases memory if the count
+    /// reached zero.
+    ///
+    /// Returns the terminal nodes (leaves) that were removed.
+    fn remove_node(&mut self, node: Word) -> Vec<Word> {
         if node == Word::empty() {
             return vec![];
         }
-        let indent = " ".repeat(nest);
         let Some(smt_node) = self.nodes.get_mut(&node) else {
-            std::println!("{} remove leaf: {:?}", indent, node);
             return vec![node];
         };
         smt_node.rc -= 1;
@@ -257,26 +258,23 @@ impl SmtStore {
             return vec![];
         }
 
-        std::println!("{} remove: {:?}", indent, node);
-
         let left = smt_node.left;
         let right = smt_node.right;
 
-        if left == Word::empty() && right == Word::empty() {
-            // this was a leaf node, so we return it
-            return vec![node];
-        } else {
-            let mut result = Vec::new();
-            result.extend(self.remove_node(left, nest + 1));
-            result.extend(self.remove_node(right, nest + 1));
-            return result;
-        }
+        let mut result = Vec::new();
+        result.extend(self.remove_node(left));
+        result.extend(self.remove_node(right));
+        return result;
     }
 
+    /// Removes the specified roots from the store and releases memory used by now
+    /// unreachable nodes.
+    ///
+    /// Returns the terminal nodes (leaves) that were removed.
     pub fn remove_roots(&mut self, roots: impl IntoIterator<Item = Word>) -> Vec<Word> {
         let mut removed_leaves = Vec::new();
         for root in roots {
-            removed_leaves.extend(self.remove_node(root, 0));
+            removed_leaves.extend(self.remove_node(root));
         }
         removed_leaves
     }
