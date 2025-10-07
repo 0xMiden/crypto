@@ -63,7 +63,6 @@ mod tests;
 /// forest.pop_roots(10);
 /// ```
 #[derive(Debug, Clone, Eq, PartialEq)]
-#[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 pub struct SmtForest {
     /// Roots of all SMTs in this forest. Any time an SMT in this forest is updated, we add a new
     /// root to this set.

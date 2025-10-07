@@ -10,7 +10,6 @@ use crate::{
 // ================================================================================================
 
 #[derive(Debug, Default, Copy, Clone, Eq, PartialEq)]
-#[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 pub struct SmtNode {
     left: Word,
     right: Word,
