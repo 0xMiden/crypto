@@ -59,20 +59,13 @@ name    = "rand"
 
 [features]
 concurrent = ["dep:rayon", "hashbrown?/rayon"]
-default = ["concurrent", "std"]
+default    = ["concurrent", "std"]
 executable = ["dep:clap", "dep:rand-utils", "std"]
-hashmaps = ["dep:hashbrown"]
-internal = []
-rocksdb = ["concurrent", "dep:rocksdb"]
-serde = ["dep:serde", "serde?/alloc"]
-std = [
-  "blake3/std",
-  "dep:cc",
-  "rand/std",
-  "rand/thread_rng",
-  "winter-crypto/std",
-  "winter-utils/std",
-]
+hashmaps   = ["dep:hashbrown"]
+internal   = []
+rocksdb    = ["concurrent", "dep:rocksdb"]
+serde      = ["dep:serde", "serde?/alloc"]
+std        = ["blake3/std", "dep:cc", "rand/std", "rand/thread_rng", "winter-crypto/std", "winter-utils/std"]
 
 [dependencies]
 blake3           = { default-features = false, version = "1.8" }
