@@ -30,12 +30,8 @@ mod tests;
 ///
 /// ```rust
 /// use miden_crypto::{
-///     Felt, Map, ONE, WORD_SIZE, ZERO,
-///     merkle::{
-///         forest::{EmptySubtreeRoots, SmtForest, Word},
-///         int_to_node,
-///         smt::{MAX_LEAF_ENTRIES, SMT_DEPTH},
-///     },
+///     Felt, ONE, WORD_SIZE, Word, ZERO,
+///     merkle::{EmptySubtreeRoots, MAX_LEAF_ENTRIES, SMT_DEPTH, SmtForest},
 /// };
 ///
 /// // Create a new SMT forest
@@ -48,19 +44,19 @@ mod tests;
 /// let new_root = forest.insert(empty_tree_root, key, value).unwrap();
 ///
 /// // Insert multiple key-value pairs
-/// let mut entries = Map::new();
+/// let mut entries = Vec::new();
 /// for i in 0..MAX_LEAF_ENTRIES {
 ///     let key = Word::new([Felt::new(i as u64); WORD_SIZE]);
 ///     let value = Word::new([Felt::new((i + 1) as u64); WORD_SIZE]);
-///     entries.insert(key, value);
+///     entries.push((key, value));
 /// }
-/// let new_root = forest.batch_insert(new_root, &entries).unwrap();
+/// let new_root = forest.batch_insert(new_root, entries.into_iter()).unwrap();
 ///
 /// // Open a proof for the inserted key
 /// let proof = forest.open(new_root, key).unwrap();
 ///
 /// // Prune older roots to release memory used by old SMT instances
-/// forest.pop_roots(10);
+/// forest.pop_roots(2);
 /// ```
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct SmtForest {
