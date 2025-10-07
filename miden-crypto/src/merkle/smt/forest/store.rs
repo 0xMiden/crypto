@@ -15,7 +15,7 @@ pub struct SmtNode {
 }
 
 #[derive(Debug, Default, Clone, Eq, PartialEq)]
-pub struct SmtStore {
+pub(super) struct SmtStore {
     nodes: Map<Word, SmtNode>,
 }
 

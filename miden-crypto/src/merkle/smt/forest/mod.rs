@@ -1,12 +1,15 @@
 use alloc::{
-    collections::{BTreeMap, BTreeSet, VecDeque},
+    collections::{BTreeSet, VecDeque},
     vec::Vec,
 };
 
 use super::{EmptySubtreeRoots, MerkleError, NodeIndex, SmtLeaf, SmtProof, Word};
-use crate::merkle::{
-    LeafIndex, SmtLeafError, SmtProofError,
-    smt::{SMT_DEPTH, forest::store::SmtStore},
+use crate::{
+    Map,
+    merkle::{
+        LeafIndex, SmtLeafError, SmtProofError,
+        smt::{SMT_DEPTH, forest::store::SmtStore},
+    },
 };
 
 mod store;
@@ -34,7 +37,8 @@ mod tests;
 ///         smt::{MAX_LEAF_ENTRIES, SMT_DEPTH},
 ///     },
 /// };
-/// // // Create a new SMT forest
+///
+/// // Create a new SMT forest
 /// let mut forest = SmtForest::new();
 ///
 /// // Insert a key-value pair into an SMT with an empty root
@@ -54,6 +58,9 @@ mod tests;
 ///
 /// // Open a proof for the inserted key
 /// let proof = forest.open(new_root, key).unwrap();
+///
+/// // Prune older roots to release memory used by old SMT instances
+/// forest.pop_roots(10);
 /// ```
 #[derive(Debug, Clone, Eq, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
@@ -62,14 +69,14 @@ pub struct SmtForest {
     /// root to this set.
     roots: BTreeSet<Word>,
 
-    /// Chronological history of SMT roots in this forest used for pruning.
+    /// Chronological history of SMT roots used for pruning.
     root_history: VecDeque<Word>,
 
     /// Stores Merkle paths for all SMTs in this forest.
     store: SmtStore,
 
     /// Leaves of all SMTs stored in this forest
-    leaves: BTreeMap<Word, SmtLeaf>,
+    leaves: Map<Word, SmtLeaf>,
 }
 
 impl Default for SmtForest {
@@ -84,14 +91,10 @@ impl SmtForest {
 
     /// Creates an empty `SmtForest` instance.
     pub fn new() -> SmtForest {
-        let mut roots = BTreeSet::new();
-        //roots.insert(empty_tree_root);
-
-        let mut root_history = VecDeque::new();
-        //root_history.push_back(empty_tree_root);
-
+        let roots = BTreeSet::new();
+        let root_history = VecDeque::new();
         let store = SmtStore::new();
-        let leaves = BTreeMap::new();
+        let leaves = Map::new();
 
         SmtForest { roots, root_history, store, leaves }
     }
@@ -104,22 +107,18 @@ impl SmtForest {
     /// Returns an error if an SMT with this root is not in the forest, or if the forest does
     /// not have sufficient data to provide an opening for the specified key.
     pub fn open(&self, root: Word, key: Word) -> Result<SmtProof, MerkleError> {
-        if !self.roots.contains(&root) {
-            let empty_tree_root = *EmptySubtreeRoots::entry(SMT_DEPTH, 0);
-            if root != empty_tree_root {
-                return Err(MerkleError::RootNotInStore(root));
-            }
+        if !self.contains_root(root) {
+            return Err(MerkleError::RootNotInStore(root));
         }
 
-        let leaf_index = NodeIndex::new(SMT_DEPTH, key[3].as_int())?;
+        let leaf_index = NodeIndex::new_unchecked(SMT_DEPTH, key[3].as_int());
 
         let proof = self.store.get_path(root, leaf_index)?;
         let path = proof.path.try_into()?;
         let leaf = proof.value;
 
-        let leaf = match self.leaves.get(&leaf) {
-            Some(leaf) => leaf.clone(),
-            None => return Err(MerkleError::UntrackedKey(key)),
+        let Some(leaf) = self.leaves.get(&leaf).cloned() else {
+            return Err(MerkleError::UntrackedKey(key));
         };
 
         SmtProof::new(path, leaf).map_err(|error| match error {
@@ -151,45 +150,55 @@ impl SmtForest {
         root: Word,
         entries: impl Iterator<Item = (Word, Word)> + Clone,
     ) -> Result<Word, MerkleError> {
-        if !self.roots.contains(&root) {
-            let empty_tree_root = *EmptySubtreeRoots::entry(SMT_DEPTH, 0);
-            if root != empty_tree_root {
-                return Err(MerkleError::RootNotInStore(root));
-            }
+        if !self.contains_root(root) {
+            return Err(MerkleError::RootNotInStore(root));
         }
 
         // Find all affected leaf indices
         let indices = entries.clone().map(|(key, _)| key[3].as_int()).collect::<BTreeSet<_>>();
 
         // Create new SmtLeaf objects for updated key-value pairs
-        let mut new_leaves = BTreeMap::new();
+        let mut new_leaves = Map::new();
         for index in indices {
             let node_index = NodeIndex::new_unchecked(SMT_DEPTH, index);
-            let leaf_hash = self.store.get_node(root, node_index)?;
+            let current_hash = self.store.get_node(root, node_index)?;
 
-            let leaf = self.leaves.get(&leaf_hash).cloned().unwrap_or_else(|| {
+            let current_leaf = self.leaves.get(&current_hash).cloned().unwrap_or_else(|| {
                 let leaf_index = LeafIndex::new_max_depth(index);
                 SmtLeaf::new_empty(leaf_index)
             });
 
-            new_leaves.insert(index, leaf);
+            new_leaves.insert(index, (current_hash, current_leaf));
         }
         for (key, value) in entries {
             let index = key[3].as_int();
-            let leaf = new_leaves.get_mut(&index).unwrap();
+            let (_old_hash, leaf) = new_leaves.get_mut(&index).unwrap();
             leaf.insert(key, value).map_err(to_merkle_error)?;
         }
+
+        // Calculate new leaf hashes, skip processing unchanged leaves
+        new_leaves = new_leaves
+            .into_iter()
+            .filter_map(|(key, (old_hash, leaf))| {
+                let new_hash = leaf.hash();
+                if new_hash == old_hash {
+                    None
+                } else {
+                    Some((key, (new_hash, leaf)))
+                }
+            })
+            .collect();
 
         // Update MerkleStore with new leaf hashes
         let new_leaf_entries = new_leaves
             .iter()
-            .map(|(index, leaf)| (NodeIndex::new_unchecked(SMT_DEPTH, *index), leaf.hash()))
+            .map(|(index, leaf)| (NodeIndex::new_unchecked(SMT_DEPTH, *index), leaf.0))
             .collect::<Vec<_>>();
         let new_root = self.store.set_nodes(root, new_leaf_entries)?;
 
         // Update successful, insert new leaves into the forest
-        for leaf in new_leaves.into_values() {
-            self.leaves.insert(leaf.hash(), leaf);
+        for (leaf_hash, leaf) in new_leaves.into_values() {
+            self.leaves.insert(leaf_hash, leaf);
         }
         self.roots.insert(new_root);
         self.root_history.push_back(new_root);
@@ -197,6 +206,8 @@ impl SmtForest {
         Ok(new_root)
     }
 
+    /// Removes the specified number of oldest roots from the forest.
+    /// Releases memory used by nodes and leaves that are no longer reachable.
     pub fn pop_roots(&mut self, count: usize) {
         let roots = self.root_history.drain(..count).collect::<Vec<_>>();
         for root in &roots {
@@ -205,6 +216,15 @@ impl SmtForest {
         for leaf in self.store.remove_roots(roots.into_iter()) {
             self.leaves.remove(&leaf);
         }
+    }
+
+    // HELPER METHODS
+    // --------------------------------------------------------------------------------------------
+
+    /// Checks if the forest contains the specified root.
+    fn contains_root(&self, root: Word) -> bool {
+        self.roots.contains(&root)
+            || (self.roots.is_empty() && *EmptySubtreeRoots::entry(SMT_DEPTH, 0) == root)
     }
 }
 

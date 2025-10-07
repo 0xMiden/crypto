@@ -222,7 +222,7 @@ fn test_pop_roots() -> Result<(), MerkleError> {
     let empty_tree_root = *EmptySubtreeRoots::entry(SMT_DEPTH, 0);
     let key = Word::new([ZERO; WORD_SIZE]);
     let value = Word::new([ONE; WORD_SIZE]);
-    let root = forest.insert(empty_tree_root, key, value)?;
+    let _root = forest.insert(empty_tree_root, key, value)?;
 
     assert_eq!(forest.roots.len(), 1);
     assert_eq!(forest.leaves.len(), 1);
