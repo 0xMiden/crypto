@@ -189,10 +189,15 @@ impl SmtForest {
             .collect();
 
         // Update MerkleStore with new leaf hashes
-        let new_leaf_entries = new_leaves
+        #[allow(unused_mut)]
+        let mut new_leaf_entries = new_leaves
             .iter()
             .map(|(index, leaf)| (NodeIndex::new_unchecked(SMT_DEPTH, *index), leaf.0))
             .collect::<Vec<_>>();
+
+        #[cfg(feature = "hashmaps")]
+        new_leaf_entries.sort_by_key(|(idx, _)| *idx);
+
         let new_root = self.store.set_nodes(root, new_leaf_entries)?;
 
         // Update successful, insert new leaves into the forest

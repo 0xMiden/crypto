@@ -77,8 +77,7 @@ impl SmtStore {
     ///   store.
     pub fn get_path(&self, root: Word, index: NodeIndex) -> Result<MerkleProof, MerkleError> {
         let (value, path) = self.get_indexed_path(root, index)?;
-        let mut path = path.into_values().collect::<Vec<_>>();
-        path.reverse();
+        let path = path.into_iter().rev().map(|(_, value)| value).collect::<Vec<_>>();
 
         Ok(MerkleProof::new(value, MerklePath::new(path)))
     }
@@ -97,9 +96,9 @@ impl SmtStore {
         &self,
         root: Word,
         index: NodeIndex,
-    ) -> Result<(Word, Map<NodeIndex, Word>), MerkleError> {
+    ) -> Result<(Word, Vec<(NodeIndex, Word)>), MerkleError> {
         let mut hash = root;
-        let mut path = Map::<NodeIndex, Word>::new();
+        let mut path = Vec::with_capacity(index.depth().into());
 
         // corner case: check the root is in the store when called with index `NodeIndex::root()`
         self.nodes.get(&hash).ok_or(MerkleError::RootNotInStore(hash))?;
@@ -114,11 +113,11 @@ impl SmtStore {
             let bit = (index.value() >> i) & 1;
             let depth = index.depth() - i;
             hash = if bit == 0 {
-                path.insert(NodeIndex::new(depth, pos * 2 + 1)?, node.right);
+                path.push((NodeIndex::new(depth, pos * 2 + 1)?, node.right));
                 pos = pos * 2;
                 node.left
             } else {
-                path.insert(NodeIndex::new(depth, pos * 2)?, node.left);
+                path.push((NodeIndex::new(depth, pos * 2)?, node.left));
                 pos = pos * 2 + 1;
                 node.right
             }
