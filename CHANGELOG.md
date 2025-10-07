@@ -2,7 +2,7 @@
 
 - [BREAKING] Incremented MSRV to 1.89.
 - [BREAKING] Adds DSA (EdDSA25519) and ECDH (X25519) using Curve25519 ([#537](https://github.com/0xMiden/crypto/pull/537)).
-- Added `SmtForest` structure ([#537](https://github.com/0xMiden/crypto/pull/540)).
+- Added `SmtForest` structure ([#537](https://github.com/0xMiden/crypto/pull/563)).
 
 ## 0.17.0 (2025-09-12)
 
