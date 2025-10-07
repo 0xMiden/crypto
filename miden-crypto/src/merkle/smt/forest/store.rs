@@ -137,6 +137,7 @@ impl SmtStore {
         // Collect opening nodes and updated leaves
         let mut nodes_by_index = Map::<NodeIndex, Word>::new();
         for (index, leaf_hash) in entries {
+            std::println!("setting node: {:?} {:?}", index, leaf_hash);
             // Record all sibling nodes along the path from root to this index
             let (old_value, path_nodes) = self.get_indexed_path(root, index)?;
             if old_value == leaf_hash {
@@ -149,20 +150,25 @@ impl SmtStore {
             nodes_by_index.insert(index, leaf_hash);
 
             // Ensure leaf hash exists in the store (as a leaf with no children)
-            new_nodes.insert(
-                leaf_hash,
-                SmtNode {
-                    left: Word::empty(),
-                    right: Word::empty(),
-                    rc: 0,
-                },
-            );
+            // new_nodes.insert(
+            //     leaf_hash,
+            //     SmtNode {
+            //         left: Word::empty(),
+            //         right: Word::empty(),
+            //         rc: 0,
+            //     },
+            // );
 
             if last_ancestor != index.parent() {
                 last_ancestor = index.parent();
                 ancestors.push(last_ancestor);
             }
         }
+
+        std::println!("sibling: {:?}", self.get_node(root, NodeIndex::new_unchecked(6, 1)));
+        std::println!("nodes_by_index: {:?}", nodes_by_index);
+        std::println!("ancestors: {:?}", ancestors);
+        std::println!("new_nodes: {:?}", new_nodes);
 
         if nodes_by_index.is_empty() {
             return Ok(root);
@@ -218,16 +224,18 @@ impl SmtStore {
             if let Some(node) = self.nodes.get_mut(&node) {
                 // we already know this node, no need to process its children
                 node.rc += 1;
-            } else {
-                let mut smt_node = new_nodes.get_mut(&node).unwrap().clone();
+            } else if let Some(smt_node) = new_nodes.get(&node) {
+                let mut smt_node = smt_node.clone();
                 smt_node.rc = 1;
-                std::println!("inserting node: {:?} {:?}", node, smt_node);
+                std::println!("insert {:?} {:?}", node, smt_node);
                 self.nodes.insert(node, smt_node);
                 if smt_node.left != Word::empty() {
                     queue.push_back(smt_node.left);
                 }
                 if smt_node.right != Word::empty() {
                     queue.push_back(smt_node.right);
+                } else {
+                    std::println!("insert leaf: {:?}", node);
                 }
             }
         }
@@ -236,17 +244,20 @@ impl SmtStore {
     }
 
     fn remove_node(&mut self, node: Word, nest: usize) -> Vec<Word> {
+        if node == Word::empty() {
+            return vec![];
+        }
         let indent = " ".repeat(nest);
         let Some(smt_node) = self.nodes.get_mut(&node) else {
-            std::println!("{} node not found: {:?}", indent, node);
-            return vec![];
+            std::println!("{} remove leaf: {:?}", indent, node);
+            return vec![node];
         };
         smt_node.rc -= 1;
         if smt_node.rc > 0 {
             return vec![];
         }
 
-        std::println!("{} removing node: {:?}", indent, node);
+        std::println!("{} remove: {:?}", indent, node);
 
         let left = smt_node.left;
         let right = smt_node.right;
@@ -276,7 +287,7 @@ impl SmtStore {
 
 /// Creates empty hashes for all the subtrees of a tree with a max depth of 255.
 fn empty_hashes() -> impl Iterator<Item = (Word, SmtNode)> {
-    let subtrees = EmptySubtreeRoots::empty_hashes(64);
+    let subtrees = EmptySubtreeRoots::empty_hashes(SMT_DEPTH);
     subtrees
         .iter()
         .rev()
