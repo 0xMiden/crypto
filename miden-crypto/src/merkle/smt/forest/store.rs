@@ -1,4 +1,4 @@
-use alloc::{collections::VecDeque, vec::Vec};
+use alloc::vec::Vec;
 
 use crate::{
     Map, Word,
@@ -219,25 +219,22 @@ impl SmtStore {
             .ok_or(MerkleError::NodeIndexNotFoundInStore(root, NodeIndex::root()))?;
 
         // The update was computed successfully, update ref counts and insert into the store
-        // TODO: a DFS traversal would be more efficient
-        let mut queue = VecDeque::new();
-        queue.push_back(new_root);
-        while let Some(node) = queue.pop_front() {
-            if let Some(node) = self.nodes.get_mut(&node) {
-                // we already know this node, no need to process its children
+        fn dfs(node: Word, store: &mut Map<Word, SmtNode>, new_nodes: &mut Map<Word, SmtNode>) {
+            if node == Word::empty() {
+                return;
+            }
+            if let Some(node) = store.get_mut(&node) {
+                // this node already exists in the store, increase its reference count
                 node.rc += 1;
-            } else if let Some(smt_node) = new_nodes.get(&node) {
-                let mut smt_node = smt_node.clone();
+            } else if let Some(mut smt_node) = new_nodes.remove(&node) {
+                // this is a non-leaf node, insert it into the store and process its children
                 smt_node.rc = 1;
-                self.nodes.insert(node, smt_node);
-                if smt_node.left != Word::empty() {
-                    queue.push_back(smt_node.left);
-                }
-                if smt_node.right != Word::empty() {
-                    queue.push_back(smt_node.right);
-                }
+                store.insert(node, smt_node);
+                dfs(smt_node.left, store, new_nodes);
+                dfs(smt_node.right, store, new_nodes);
             }
         }
+        dfs(new_root, &mut self.nodes, &mut new_nodes);
 
         Ok(new_root)
     }
