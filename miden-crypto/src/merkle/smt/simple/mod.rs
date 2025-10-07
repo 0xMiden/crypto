@@ -420,6 +420,10 @@ impl<const DEPTH: u8> SparseMerkleTree<DEPTH> for SimpleSmt<DEPTH> {
         }
     }
 
+    fn get_leaf_by_index(&self, leaf_index: &LeafIndex<DEPTH>) -> Self::Leaf {
+        self.get_leaf(leaf_index)
+    }
+
     fn hash_leaf(leaf: &Word) -> Word {
         // `SimpleSmt` takes the leaf value itself as the hash
         *leaf

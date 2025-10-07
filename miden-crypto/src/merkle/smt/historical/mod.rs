@@ -497,7 +497,9 @@ impl<'a> HistoricalView<'a> {
         let leaf_idx = leaf.index();
 
         let path = SparseMerklePath::from_sized_iter(
-            leaf_idx.index.proof_indices().map(|proof_idx| self.get_node_hash(proof_idx)),
+            Into::<NodeIndex>::into(leaf_idx)
+                .proof_indices()
+                .map(|proof_idx| self.get_node_hash(proof_idx)),
         )
         .expect("By definition, we only construct SMT_DEPTH depths trees");
 

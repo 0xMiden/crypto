@@ -41,6 +41,12 @@ pub const SMT_MAX_DEPTH: u8 = 64;
 // SPARSE MERKLE TREE
 // ================================================================================================
 
+/// Derive a leaf index from the key of the key-value-pair stored
+pub fn word_to_leaf_index(key: &Word) -> LeafIndex<SMT_DEPTH> {
+    let most_significant_felt = key[3];
+    LeafIndex::new_max_depth(most_significant_felt.as_int())
+}
+
 type InnerNodes = Map<NodeIndex, InnerNode>;
 type Leaves<T> = Map<u64, T>;
 type NodeMutations = Map<NodeIndex, NodeMutation>;
@@ -459,8 +465,11 @@ pub(crate) trait SparseMerkleTree<const DEPTH: u8> {
     /// updated is associated with [`Self::EMPTY_VALUE`].
     fn get_value(&self, key: &Self::Key) -> Self::Value;
 
-    /// Returns the leaf at the specified index.
+    /// Returns the leaf at the specified index derived from _any one_ key that maps to the leaf.
     fn get_leaf(&self, key: &Self::Key) -> Self::Leaf;
+
+    /// Access a leaf by leaf index.
+    fn get_leaf_by_index(&self, leaf_index: &LeafIndex<DEPTH>) -> Self::Leaf;
 
     /// Returns the hash of a leaf
     fn hash_leaf(leaf: &Self::Leaf) -> Word;

@@ -230,8 +230,8 @@ fn opening_works_post_1_mutations() {
     let leaf = htv.get_leaf(&test_key);
     let xxx = {
         let leaf_idx = leaf.index();
-        leaf_idx
-            .index
+
+        Into::<NodeIndex>::into(leaf_idx)
             .proof_indices()
             .map(|haxx0r_idx| (haxx0r_idx, htv.get_node_hash(haxx0r_idx)))
     };

@@ -27,7 +27,7 @@ pub use smt::historical;
 pub use smt::{
     InnerNode, LeafIndex, MAX_LEAF_ENTRIES, MutationSet, NodeMutation, PartialSmt, SMT_DEPTH,
     SMT_MAX_DEPTH, SMT_MIN_DEPTH, SimpleSmt, SimpleSmtProof, Smt, SmtLeaf, SmtLeafError, SmtProof,
-    SmtProofError,
+    SmtProofError, word_to_leaf_index,
 };
 #[cfg(feature = "concurrent")]
 pub use smt::{
