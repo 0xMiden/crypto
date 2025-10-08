@@ -7,7 +7,7 @@ use core::{
 
 use sha3::Digest as Sha3Digest;
 
-use super::{Digest, ElementHasher, Felt, FieldElement, Hasher};
+use super::{Digest, ElementHasher, Felt, FieldElement, Hasher, HasherExt};
 use crate::utils::{
     ByteReader, ByteWriter, Deserializable, DeserializationError, HexParseError, Serializable,
     bytes_to_hex_string, hex_to_bytes,
@@ -100,6 +100,16 @@ impl Digest for Keccak256Digest {
 /// Keccak256 hash function
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub struct Keccak256;
+
+impl HasherExt for Keccak256 {
+    fn hash_iter<'a>(&self, slices: impl Iterator<Item = &'a [u8]>) -> Self::Digest {
+        let mut hasher = sha3::Keccak256::new();
+        for slice in slices {
+            hasher.update(slice);
+        }
+        Keccak256Digest(hasher.finalize().into())
+    }
+}
 
 impl Hasher for Keccak256 {
     /// Keccak256 collision resistance is 128-bits for 32-bytes output.

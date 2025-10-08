@@ -186,6 +186,16 @@ impl Blake3_256 {
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub struct Blake3_192;
 
+impl HasherExt for Blake3_192 {
+    fn hash_iter<'a>(&self, slices: impl Iterator<Item = &'a [u8]>) -> Self::Digest {
+        let mut hasher = blake3::Hasher::new();
+        for slice in slices {
+            hasher.update(slice);
+        }
+        Blake3Digest(*shrink_bytes(&hasher.finalize().into()))
+    }
+}
+
 impl Hasher for Blake3_192 {
     /// Blake3 collision resistance is 96-bits for 24-bytes output.
     const COLLISION_RESISTANCE: u32 = 96;
@@ -254,6 +264,16 @@ impl Blake3_192 {
 /// 160-bit output blake3 hasher.
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub struct Blake3_160;
+
+impl HasherExt for Blake3_160 {
+    fn hash_iter<'a>(&self, slices: impl Iterator<Item = &'a [u8]>) -> Self::Digest {
+        let mut hasher = blake3::Hasher::new();
+        for slice in slices {
+            hasher.update(slice);
+        }
+        Blake3Digest(*shrink_bytes(&hasher.finalize().into()))
+    }
+}
 
 impl Hasher for Blake3_160 {
     /// Blake3 collision resistance is 80-bits for 20-bytes output.
