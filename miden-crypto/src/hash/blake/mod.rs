@@ -5,7 +5,7 @@ use core::{
     slice::{self, from_raw_parts},
 };
 
-use super::{Digest, ElementHasher, Felt, FieldElement, Hasher};
+use super::{Digest, ElementHasher, Felt, FieldElement, Hasher, HasherExt};
 use crate::utils::{
     ByteReader, ByteWriter, Deserializable, DeserializationError, HexParseError, Serializable,
     bytes_to_hex_string, hex_to_bytes,
@@ -142,6 +142,16 @@ impl ElementHasher for Blake3_256 {
         E: FieldElement<BaseField = Self::BaseField>,
     {
         Blake3Digest(hash_elements(elements))
+    }
+}
+
+impl HasherExt for Blake3_256 {
+    fn hash_iter<'a>(&self, slices: impl Iterator<Item = &'a [u8]>) -> Self::Digest {
+        let mut hasher = blake3::Hasher::new();
+        for slice in slices {
+            hasher.update(slice);
+        }
+        Blake3Digest(hasher.finalize().into())
     }
 }
 
