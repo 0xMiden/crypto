@@ -64,6 +64,7 @@ pub enum HistoricalError {
 /// The offset enum representing the offset relative to the `latest` `Smt`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum HistoricalOffset {
+    Future,
     ReversionsIdx(usize),
     Latest,
     TooAncient,
@@ -74,6 +75,8 @@ pub enum HistoricalOffset {
 /// Comes with additional caching.
 #[derive(Debug, Clone)]
 struct HistoricalReversion {
+    /// Block number of this historical reversion.
+    block_number: u64,
     /// The root at this historical point
     root: Word,
     /// The mutations that were applied to reach this state (Arc'd for sharing)
@@ -81,58 +84,6 @@ struct HistoricalReversion {
     mutations: Arc<MutationSet<SMT_DEPTH, Word, Word>>,
     /// Calculating leaves is expense, so we keep a cache, based on the leaf digest.
     precomputed_leaves: HashMap<LeafIndex<SMT_DEPTH>, SmtLeaf>,
-}
-
-impl HistoricalReversion {
-    /// Note: Called after `latest` was updated with the latest mutations. The mutations passed in
-    /// to the function is the inverted set.
-    fn from_reversion_mutation_set(
-        inner: &mut InnerState,
-        mutations: MutationSet<SMT_DEPTH, Word, Word>,
-    ) -> Self {
-        let precomputed_leaves = Self::compute_leaves_for_reversion(inner, &mutations);
-        Self {
-            root: mutations.root(), // The root after applying this reversion
-            mutations: Arc::new(mutations),
-            precomputed_leaves,
-        }
-    }
-
-    /// Pre-compute leaves that are being reverted (i.e., their state before the forward mutation).
-    /// These cached leaves will be used when accessing historical views.
-    ///
-    /// The approach: for each affected leaf position, compute the full SmtLeaf
-    /// based on the current state (after mutation) but with the old values from the reversion.
-    fn compute_leaves_for_reversion(
-        inner: &mut InnerState,
-        reversion: &MutationSet<SMT_DEPTH, Word, Word>,
-    ) -> HashMap<LeafIndex<SMT_DEPTH>, SmtLeaf> {
-        let mut cache = HashMap::new();
-
-        // Group all keys by their leaf index to handle multiple keys mapping to the same leaf
-        let mut keys_by_leaf: HashMap<LeafIndex<SMT_DEPTH>, Vec<(Word, Word)>> = HashMap::new();
-
-        // The reversion contains the old values in its new_pairs
-        // These represent what the values were BEFORE the mutation was applied
-        for (key, value) in reversion.new_pairs() {
-            let leaf_index = SmtWithHistory::key_to_leaf_index(key);
-            keys_by_leaf.entry(leaf_index).or_insert_with(Vec::new).push((*key, *value));
-        }
-
-        // For each affected leaf, construct the full SmtLeaf
-        for (leaf_index, old_key_values) in keys_by_leaf {
-            // Get the current leaf (after the forward mutation was applied)
-            let current_leaf = inner.latest.get_leaf_by_index(&leaf_index);
-
-            // Build the historical leaf by merging old values from reversion
-            // with any remaining values from the current state
-            let historical_leaf = build_historical_leaf(leaf_index, current_leaf, old_key_values);
-
-            cache.insert(leaf_index, historical_leaf);
-        }
-
-        cache
-    }
 }
 
 /// Helper function to build a historical leaf by combining old values from the reversion
@@ -177,12 +128,82 @@ fn build_historical_leaf(
 /// Internal state that is protected by RwLock for interior mutability
 #[derive(Debug)]
 struct InnerState {
+    /// Block number of `latest`.
+    block_number: u64,
     /// The latest state being tracked.
     latest: Smt,
     /// Stored in order from latest to oldest. New ones are pushed via `push_front`
     /// and dropped via `pop_back`.
     /// Each state contains the mutations needed to revert from current to that historical state
     history: VecDeque<Arc<HistoricalReversion>>,
+}
+
+impl InnerState {
+    // obtain the index on the in-memory reversions based on the _desired_ block num given the
+    // latest block number.
+    pub fn historical_offset(&self, desired_block_number: u64) -> HistoricalOffset {
+        let Some(past_offset) = self.block_number.checked_sub(desired_block_number) else {
+            return HistoricalOffset::Future;
+        };
+        let past_offset = past_offset as usize;
+        match past_offset {
+            0 => HistoricalOffset::Latest,
+            1..SmtWithHistory::MAX_HISTORY => HistoricalOffset::ReversionsIdx(past_offset - 1),
+            _ => HistoricalOffset::TooAncient,
+        }
+    }
+
+    /// Note: Called after `latest` was updated with the latest mutations. The mutations passed in
+    /// to the function is the inverted set.
+    fn from_reversion_mutation_set(
+        &mut self,
+        block_number: u64,
+        mutations: MutationSet<SMT_DEPTH, Word, Word>,
+    ) -> HistoricalReversion {
+        let precomputed_leaves = self.compute_leaves_for_reversion(&mutations);
+        HistoricalReversion {
+            block_number,
+            root: mutations.root(), // The root after applying this reversion
+            mutations: Arc::new(mutations),
+            precomputed_leaves,
+        }
+    }
+
+    /// Pre-compute leaves that are being reverted (i.e., their state before the forward mutation).
+    /// These cached leaves will be used when accessing historical views.
+    ///
+    /// The approach: for each affected leaf position, compute the full SmtLeaf
+    /// based on the current state (after mutation) but with the old values from the reversion.
+    fn compute_leaves_for_reversion(
+        &mut self,
+        reversion: &MutationSet<SMT_DEPTH, Word, Word>,
+    ) -> HashMap<LeafIndex<SMT_DEPTH>, SmtLeaf> {
+        let mut cache = HashMap::new();
+
+        // Group all keys by their leaf index to handle multiple keys mapping to the same leaf
+        let mut keys_by_leaf: HashMap<LeafIndex<SMT_DEPTH>, Vec<(Word, Word)>> = HashMap::new();
+
+        // The reversion contains the old values in its new_pairs
+        // These represent what the values were BEFORE the mutation was applied
+        for (key, value) in reversion.new_pairs() {
+            let leaf_index = SmtWithHistory::key_to_leaf_index(key);
+            keys_by_leaf.entry(leaf_index).or_insert_with(Vec::new).push((*key, *value));
+        }
+
+        // For each affected leaf, construct the full SmtLeaf
+        for (leaf_index, old_key_values) in keys_by_leaf {
+            // Get the current leaf (after the forward mutation was applied)
+            let current_leaf = self.latest.get_leaf_by_index(&leaf_index);
+
+            // Build the historical leaf by merging old values from reversion
+            // with any remaining values from the current state
+            let historical_leaf = build_historical_leaf(leaf_index, current_leaf, old_key_values);
+
+            cache.insert(leaf_index, historical_leaf);
+        }
+
+        cache
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -193,9 +214,13 @@ pub struct SmtWithHistory {
 impl SmtWithHistory {
     pub const MAX_HISTORY: usize = 33;
 
-    pub fn new(latest: Smt) -> Self {
+    pub fn new(latest: Smt, block_number: u64) -> Self {
         Self {
-            inner: Arc::new(RwLock::new(InnerState { latest, history: VecDeque::new() })),
+            inner: Arc::new(RwLock::new(InnerState {
+                block_number,
+                latest,
+                history: VecDeque::new(),
+            })),
         }
     }
 
@@ -203,6 +228,10 @@ impl SmtWithHistory {
         while history.len() > Self::MAX_HISTORY {
             history.pop_back();
         }
+    }
+
+    pub fn num_leaves(&self) -> usize {
+        self.inner.read().unwrap().latest.num_leaves()
     }
 
     pub fn history_len(&self) -> usize {
@@ -222,29 +251,24 @@ impl SmtWithHistory {
         self.inner.read().unwrap().history.len()
     }
 
-    // obtain the index on the in-memory reversions based on the _desired_ block num given the
-    // latest block number.
-    pub fn historical_offset(past_offset: usize) -> HistoricalOffset {
-        match past_offset {
-            0 => HistoricalOffset::Latest,
-            1..Self::MAX_HISTORY => HistoricalOffset::ReversionsIdx(past_offset - 1),
-            _ => HistoricalOffset::TooAncient,
-        }
-    }
-
     /// Construct a new historical view on the account tree, if the relevant reversions are still
     /// available. This returns a view that holds a read guard to ensure memory safety.
-    pub fn historical_view(&self, past_offset: usize) -> Option<HistoricalView<'_>> {
+    pub fn historical_view(&self, block_number: u64) -> Option<HistoricalView<'_>> {
         let guard = self.inner.read().unwrap();
 
-        match Self::historical_offset(past_offset) {
+        match guard.historical_offset(block_number) {
+            HistoricalOffset::Future => None,
             HistoricalOffset::Latest => Some(HistoricalView { inner: guard, reversions: vec![] }),
             HistoricalOffset::ReversionsIdx(idx) => {
                 // Collect the Arc'd historical states needed for this view
                 if idx < guard.history.len() {
-                    let reversions: Vec<Arc<HistoricalReversion>> =
-                        guard.history.iter().take(idx + 1).cloned().collect();
-
+                    let reversions = Vec::<Arc<HistoricalReversion>>::from_iter(
+                        guard.history.iter().take(idx + 1).cloned(),
+                    );
+                    assert_eq!(
+                        reversions.first().map(|r| r.block_number).unwrap_or(guard.block_number),
+                        block_number
+                    );
                     Some(HistoricalView { inner: guard, reversions })
                 } else {
                     None
@@ -285,8 +309,10 @@ impl SmtWithHistory {
             .map_err(HistoricalError::MerkleError)?;
 
         // Track the historical state with Arc for efficient sharing
-        let state = HistoricalReversion::from_reversion_mutation_set(&mut inner, reversion);
+        let next = inner.block_number + 1;
+        let state = inner.from_reversion_mutation_set(next, reversion);
         inner.history.push_front(Arc::new(state));
+        inner.block_number = next;
         Self::cleanup(&mut inner.history);
 
         Ok(())
