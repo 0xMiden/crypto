@@ -182,8 +182,7 @@ unsafe fn add_small(
         let res_wrapped_s = map3!(_mm256_add_epi64, x_s, y);
         let mask = map3!(_mm256_cmpgt_epi32, x_s, res_wrapped_s);
         let wrapback_amt = map3!(_mm256_srli_epi64::<32>, mask); // EPSILON if overflowed else 0.
-        let res_s = map3!(_mm256_add_epi64, res_wrapped_s, wrapback_amt);
-        res_s
+        map3!(_mm256_add_epi64, res_wrapped_s, wrapback_amt)
     }
 }
 
@@ -217,8 +216,7 @@ unsafe fn sub_tiny(
     unsafe {
         let res_wrapped_s = map3!(_mm256_sub_epi64, x_s, y);
         let mask = map3!(_mm256_cmpgt_epi32, res_wrapped_s, x_s);
-        let res_s = map3!(maybe_adj_sub, res_wrapped_s, mask);
-        res_s
+        map3!(maybe_adj_sub, res_wrapped_s, mask)
     }
 }
 
@@ -234,8 +232,7 @@ unsafe fn reduce3(
         let lo1_s = sub_tiny(lo0_s, hi_hi0);
         let t1 = map3!(_mm256_mul_epu32, hi0, rep epsilon);
         let lo2_s = add_small(lo1_s, t1);
-        let lo2 = map3!(_mm256_xor_si256, lo2_s, rep sign_bit);
-        lo2
+        map3!(_mm256_xor_si256, lo2_s, rep sign_bit)
     }
 }
 
@@ -276,8 +273,7 @@ unsafe fn do_apply_sbox(state: (__m256i, __m256i, __m256i)) -> (__m256i, __m256i
         let state4 = reduce3(state4_unreduced);
         let state3 = reduce3(state3_unreduced);
         let state7_unreduced = mul3(state3, state4);
-        let state7 = reduce3(state7_unreduced);
-        state7
+        reduce3(state7_unreduced)
     }
 }
 
@@ -319,9 +315,9 @@ unsafe fn do_apply_inv_sbox(state: (__m256i, __m256i, __m256i)) -> (__m256i, __m
 unsafe fn avx2_load(state: &[u64; 12]) -> (__m256i, __m256i, __m256i) {
     unsafe {
         (
-            _mm256_loadu_si256((&state[0..4]).as_ptr().cast::<__m256i>()),
-            _mm256_loadu_si256((&state[4..8]).as_ptr().cast::<__m256i>()),
-            _mm256_loadu_si256((&state[8..12]).as_ptr().cast::<__m256i>()),
+            _mm256_loadu_si256((state[0..4]).as_ptr().cast::<__m256i>()),
+            _mm256_loadu_si256((state[4..8]).as_ptr().cast::<__m256i>()),
+            _mm256_loadu_si256((state[8..12]).as_ptr().cast::<__m256i>()),
         )
     }
 }
@@ -329,16 +325,16 @@ unsafe fn avx2_load(state: &[u64; 12]) -> (__m256i, __m256i, __m256i) {
 #[inline(always)]
 unsafe fn avx2_store(buf: &mut [u64; 12], state: (__m256i, __m256i, __m256i)) {
     unsafe {
-        _mm256_storeu_si256((&mut buf[0..4]).as_mut_ptr().cast::<__m256i>(), state.0);
-        _mm256_storeu_si256((&mut buf[4..8]).as_mut_ptr().cast::<__m256i>(), state.1);
-        _mm256_storeu_si256((&mut buf[8..12]).as_mut_ptr().cast::<__m256i>(), state.2);
+        _mm256_storeu_si256((buf[0..4]).as_mut_ptr().cast::<__m256i>(), state.0);
+        _mm256_storeu_si256((buf[4..8]).as_mut_ptr().cast::<__m256i>(), state.1);
+        _mm256_storeu_si256((buf[8..12]).as_mut_ptr().cast::<__m256i>(), state.2);
     }
 }
 
 #[inline(always)]
 pub unsafe fn apply_sbox(buffer: &mut [u64; 12]) {
     unsafe {
-        let mut state = avx2_load(&buffer);
+        let mut state = avx2_load(buffer);
         state = do_apply_sbox(state);
         avx2_store(buffer, state);
     }
@@ -347,7 +343,7 @@ pub unsafe fn apply_sbox(buffer: &mut [u64; 12]) {
 #[inline(always)]
 pub unsafe fn apply_inv_sbox(buffer: &mut [u64; 12]) {
     unsafe {
-        let mut state = avx2_load(&buffer);
+        let mut state = avx2_load(buffer);
         state = do_apply_inv_sbox(state);
         avx2_store(buffer, state);
     }

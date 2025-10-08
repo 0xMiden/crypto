@@ -78,6 +78,13 @@ unsafe fn reduce128(x: (__m512i, __m512i)) -> __m512i {
 
         let lo_s = _mm512_xor_si512(lo, sign);
         let hi_hi = _mm512_srli_epi64::<32>(hi);
+
+        // NOTE: On some Zen4+ CPUs, mask-based conditional operations
+        // (like the masked subtract below) can be slightly slower than the
+        // scalar fixup approach used in the AVX2 path. This all-vector
+        // implementation keeps the code branch-free and still yields the
+        // expected speedup on Zen5, but future maintainers may want to revisit
+        // this if they notice performance regressions on other architectures.
         let lo1_s = {
             let diff = _mm512_sub_epi64(lo_s, hi_hi);
             let mask: __mmask8 = _mm512_cmpgt_epi64_mask(diff, lo_s);

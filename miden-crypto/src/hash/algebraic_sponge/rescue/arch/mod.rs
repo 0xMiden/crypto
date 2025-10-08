@@ -7,7 +7,7 @@ pub mod optimized {
 
     mod ffi {
         #[link(name = "rpo_sve", kind = "static")]
-        extern "C" {
+        unsafe extern "C" {
             pub fn add_constants_and_apply_sbox(
                 state: *mut std::ffi::c_ulong,
                 constants: *const std::ffi::c_ulong,
@@ -44,6 +44,14 @@ pub mod optimized {
             )
         }
     }
+
+    #[inline(always)]
+    pub fn add_constants_and_apply_ext_round(
+        _state: &mut [Felt; STATE_WIDTH],
+        _ark: &[Felt; STATE_WIDTH],
+    ) -> bool {
+        false
+    }
 }
 
 // AVX2 OPTIMIZATIONS
@@ -73,7 +81,7 @@ pub mod optimized {
     ) -> bool {
         add_constants(state, ark);
         unsafe {
-            apply_sbox(core::mem::transmute(state));
+            apply_sbox(core::mem::transmute::<&mut [BaseElement; 12], &mut [u64; 12]>(state));
         }
         true
     }
@@ -85,7 +93,7 @@ pub mod optimized {
     ) -> bool {
         add_constants(state, ark);
         unsafe {
-            apply_inv_sbox(core::mem::transmute(state));
+            apply_inv_sbox(core::mem::transmute::<&mut [BaseElement; 12], &mut [u64; 12]>(state));
         }
         true
     }
@@ -97,7 +105,7 @@ pub mod optimized {
     ) -> bool {
         add_constants(state, ark);
         unsafe {
-            apply_ext_round(core::mem::transmute(state));
+            apply_ext_round(core::mem::transmute::<&mut [BaseElement; 12], &mut [u64; 12]>(state));
         }
         true
     }
@@ -124,7 +132,7 @@ pub mod optimized {
     ) -> bool {
         add_constants(state, ark);
         unsafe {
-            apply_sbox(core::mem::transmute(state));
+            apply_sbox(core::mem::transmute::<&mut [BaseElement; 12], &mut [u64; 12]>(state));
         }
         true
     }
@@ -136,7 +144,7 @@ pub mod optimized {
     ) -> bool {
         add_constants(state, ark);
         unsafe {
-            apply_inv_sbox(core::mem::transmute(state));
+            apply_inv_sbox(core::mem::transmute::<&mut [BaseElement; 12], &mut [u64; 12]>(state));
         }
         true
     }
@@ -148,7 +156,7 @@ pub mod optimized {
     ) -> bool {
         add_constants(state, ark);
         unsafe {
-            apply_ext_round(core::mem::transmute(state));
+            apply_ext_round(core::mem::transmute::<&mut [BaseElement; 12], &mut [u64; 12]>(state));
         }
         true
     }

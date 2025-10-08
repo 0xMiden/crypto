@@ -137,7 +137,7 @@ make build-sve
 
 ### Fastest performance
 
-For users who want the fastest possible performance on their own machine (not portable builds), you can let the compiler automatically enable all CPU features supported by your processor (AVX2, AVX-512, etc.) by building with:
+For the fastest build on your current machine, let the compiler automatically enable all CPU features supported by your processor (AVX2, AVX-512, SVE, etc.):
 
 ```shell
 RUSTFLAGS="-C target-cpu=native" cargo build --release
@@ -149,6 +149,12 @@ You can also make this permanent by adding it to your Cargo configuration file (
 [build]
 rustflags = ["-C", "target-cpu=native"]
 ```
+
+**Notes**
+- Using `-C target-cpu=native` lets `rustc` auto-detect features on the **build host**; there are **no target-feature warnings**, but the binary won’t be portable to CPUs lacking those features.  
+- Forcing features with `-C target-feature=+avx2`, `+avx512*`, or `+sve` on an incompatible target will print a warning and fall back to portable code paths.
+- Example: forcing `-C target-feature=+avx2` when building on macOS with Apple Silicon (`aarch64-apple-darwin`) will emit  
+  "`'+avx2' is not a recognized feature for this target (ignoring feature)`" and automatically fall back to scalar implementations
 
 ## Testing
 
