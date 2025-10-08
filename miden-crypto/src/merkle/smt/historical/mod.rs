@@ -19,7 +19,7 @@
 //! We start with a bootstrap state `Smt`. For sake of brevity, `rev` is short for a `Reversion`
 //! instance.
 //!
-//! I.e. for the follwing call sequence
+//! I.e. for the following call sequence
 //! ```text
 //! # [rev[n] .. rev[1] rev[0]] Smt
 //!
@@ -238,6 +238,10 @@ impl SmtWithHistory {
         self.inner.read().unwrap().history.len()
     }
 
+    pub fn block_number(&self) -> u64 {
+        self.inner.read().unwrap().block_number
+    }
+
     pub fn root(&self) -> Word {
         self.inner.read().unwrap().latest.root()
     }
@@ -265,8 +269,10 @@ impl SmtWithHistory {
                     let reversions = Vec::<Arc<HistoricalReversion>>::from_iter(
                         guard.history.iter().take(idx + 1).cloned(),
                     );
+                    // The reversions are ordered from newest to oldest, so the last one
+                    // should match the requested block_number
                     assert_eq!(
-                        reversions.first().map(|r| r.block_number).unwrap_or(guard.block_number),
+                        reversions.last().map(|r| r.block_number).unwrap_or(guard.block_number),
                         block_number
                     );
                     Some(HistoricalView { inner: guard, reversions })
@@ -302,6 +308,9 @@ impl SmtWithHistory {
     ) -> Result<(), HistoricalError> {
         let mut inner = self.inner.write().unwrap();
 
+        // The reversion represents the state BEFORE this mutation (current block_number)
+        let reversion_block_number = inner.block_number;
+
         // Apply forward mutations directly to the Smt (we only have one in memory)
         let reversion = inner
             .latest
@@ -309,10 +318,11 @@ impl SmtWithHistory {
             .map_err(HistoricalError::MerkleError)?;
 
         // Track the historical state with Arc for efficient sharing
-        let next = inner.block_number + 1;
-        let state = inner.from_reversion_mutation_set(next, reversion);
+        let state = inner.from_reversion_mutation_set(reversion_block_number, reversion);
         inner.history.push_front(Arc::new(state));
-        inner.block_number = next;
+
+        // Now increment the block number
+        inner.block_number += 1;
         Self::cleanup(&mut inner.history);
 
         Ok(())

@@ -124,7 +124,7 @@ fn test_reversion_mutation_sets() {
     smt_after.apply_mutations(mutations1.clone()).unwrap();
 
     // The reversion mutation set should be able to restore the original state
-    let smt_with_history = SmtWithHistory::new(smt.clone());
+    let smt_with_history = SmtWithHistory::new(smt.clone(), 0);
     smt_with_history.apply_mutations(mutations1.clone()).unwrap();
 
     // Check that we have one reversion stored
@@ -156,16 +156,15 @@ fn test_historical_view_cache() {
     assert_ne!(root0, final_smt.root());
 
     // Create historical SMT with overlays
-    let smt_with_history = SmtWithHistory::new(base_smt.clone());
+    let smt_with_history = SmtWithHistory::new(base_smt.clone(), 0);
 
     // but we need to add them in the block order
     smt_with_history.apply_mutations(mutations1).unwrap();
     smt_with_history.apply_mutations(mutations2).unwrap();
 
     assert_eq!(smt_with_history.root(), final_smt.root());
-
-    // Get historical view at 2 overlays back (base state)
-    let historical_view = smt_with_history.historical_view(2).unwrap();
+    // Get historical view at block 0 (base state)
+    let historical_view = smt_with_history.historical_view(0).unwrap();
 
     // Test that cache is being used by checking same node multiple times
     let test_key = TestKV::new(1).key;
@@ -178,7 +177,7 @@ fn test_historical_view_cache() {
     assert_eq!(hash1, hash2);
 
     // Note: There is no cache for this overlay/block_num since compared to the latest
-    // there was no "poisioning" for the particluar node_index aka no change
+    // there was no "poisoning" for the particular node_index aka no change
     // and hence we can re-use the entry from the `latest` `Smt`.
 
     let base_root = base_smt.root();
@@ -198,7 +197,7 @@ fn opening_works_no_mutations() {
     let mut smt_after_1 = base_smt.clone();
     smt_after_1.apply_mutations(mutations1.clone()).unwrap();
 
-    let smt_with_history = SmtWithHistory::new(base_smt.clone());
+    let smt_with_history = SmtWithHistory::new(base_smt.clone(), 0);
 
     let test_key = TestKV::new(1).key;
     let base_proof = base_smt.open(&test_key);
@@ -217,13 +216,13 @@ fn opening_works_post_1_mutations() {
     let mut smt_after_1 = base_smt.clone();
     smt_after_1.apply_mutations(mutations1.clone()).unwrap();
 
-    let smt_with_history = SmtWithHistory::new(base_smt.clone());
+    let smt_with_history = SmtWithHistory::new(base_smt.clone(), 0);
     smt_with_history.apply_mutations(mutations1.clone()).unwrap();
 
     let test_key = TestKV::new(3).key; // doesn't exist in base, so empty key
     let base_proof = base_smt.open(&test_key);
 
-    let htv = smt_with_history.historical_view(1).unwrap();
+    let htv = smt_with_history.historical_view(0).unwrap();
     let historic_proof = htv.open(&test_key);
 
     // historic
@@ -270,13 +269,13 @@ fn opening_works_post_2_mutations() {
     let mut smt_after_2 = smt_after_1.clone();
     smt_after_2.apply_mutations(mutations2.clone()).unwrap();
 
-    let smt_with_history = SmtWithHistory::new(base_smt.clone());
+    let smt_with_history = SmtWithHistory::new(base_smt.clone(), 0);
     smt_with_history.apply_mutations(mutations1.clone()).unwrap();
     smt_with_history.apply_mutations(mutations2.clone()).unwrap();
 
     let test_key = TestKV::new(3).key; // key 3 exists in base
     let base_proof = base_smt.open(&test_key);
-    let htv = smt_with_history.historical_view(2).unwrap();
+    let htv = smt_with_history.historical_view(0).unwrap();
     let historic_proof = htv.open(&test_key);
     assert_eq!(base_smt.root(), htv.root());
     assert_eq!(base_proof, historic_proof);
@@ -297,14 +296,14 @@ fn opening_works_post_3_mutations() {
     let mut smt_after_3 = smt_after_2.clone();
     smt_after_3.apply_mutations(mutations3.clone()).unwrap();
 
-    let smt_with_history = SmtWithHistory::new(base_smt.clone());
+    let smt_with_history = SmtWithHistory::new(base_smt.clone(), 0);
     smt_with_history.apply_mutations(mutations1.clone()).unwrap();
     smt_with_history.apply_mutations(mutations2.clone()).unwrap();
     smt_with_history.apply_mutations(mutations3.clone()).unwrap();
 
     let test_key = TestKV::new(3).key; // key 3 exists in base
     let base_proof = base_smt.open(&test_key);
-    let htv = smt_with_history.historical_view(3).unwrap();
+    let htv = smt_with_history.historical_view(0).unwrap();
     let historic_proof = htv.open(&test_key);
     assert_eq!(base_smt.root(), htv.root());
     assert_eq!(base_proof, historic_proof);
@@ -323,7 +322,7 @@ fn test_opening_comparison_with_vanilla_smt() {
     smt_after_2.apply_mutations(mutations2.clone()).unwrap();
 
     // Create historical SMT
-    let smt_with_history = SmtWithHistory::new(base_smt.clone());
+    let smt_with_history = SmtWithHistory::new(base_smt.clone(), 0);
 
     smt_with_history.apply_mutations(mutations1).unwrap();
     smt_with_history.apply_mutations(mutations2).unwrap();
@@ -334,7 +333,7 @@ fn test_opening_comparison_with_vanilla_smt() {
 
     for key in test_keys {
         // Compare at current state (0 overlays back)
-        let current_view = smt_with_history.historical_view(0).unwrap();
+        let current_view = smt_with_history.historical_view(2).unwrap();
         let current_proof = current_view.open(&key);
         let vanilla_proof = smt_after_2.open(&key);
 
@@ -350,7 +349,7 @@ fn test_opening_comparison_with_vanilla_smt() {
         assert_eq!(historical_proof_1.path(), vanilla_proof_1.path());
 
         // Compare at 2 overlays back (base state)
-        let historical_view_2 = smt_with_history.historical_view(2).unwrap();
+        let historical_view_2 = smt_with_history.historical_view(0).unwrap();
         let historical_proof_2 = historical_view_2.open(&key);
         let vanilla_proof_2 = base_smt.open(&key);
 
@@ -375,7 +374,7 @@ fn test_get_value_across_overlays() {
     final_smt.apply_mutations(mutations3.clone()).unwrap();
 
     // Setup historical SMT
-    let smt_with_history = SmtWithHistory::new(base_smt.clone());
+    let smt_with_history = SmtWithHistory::new(base_smt.clone(), 0);
 
     smt_with_history.apply_mutations(mutations1).unwrap();
     smt_with_history.apply_mutations(mutations2).unwrap();
@@ -385,7 +384,7 @@ fn test_get_value_across_overlays() {
     let key2 = TestKV::new(2).key;
 
     // At current state (0 overlays back), key2 should have updated value from mutations1
-    let view_current = smt_with_history.historical_view(0).unwrap();
+    let view_current = smt_with_history.historical_view(3).unwrap();
     let value_current = view_current.get_value(&key2);
     assert_eq!(
         value_current,
@@ -394,7 +393,7 @@ fn test_get_value_across_overlays() {
     );
 
     // At 3 overlays back (base state), key2 should have original value
-    let view_base = smt_with_history.historical_view(3).unwrap();
+    let view_base = smt_with_history.historical_view(0).unwrap();
     let value_base = view_base.get_value(&key2);
     assert_eq!(
         value_base,
@@ -413,7 +412,7 @@ fn test_get_value_across_overlays() {
 #[test]
 fn test_reversion_cleanup() {
     let smt = create_mock_smt();
-    let smt_with_history = SmtWithHistory::new(smt.clone());
+    let smt_with_history = SmtWithHistory::new(smt.clone(), 0);
 
     // Add more than MAX_OVERLAYS reversions by applying mutations
     for i in 0..SmtWithHistory::MAX_HISTORY * 2 {
@@ -428,45 +427,11 @@ fn test_reversion_cleanup() {
 }
 
 #[test]
-fn test_historical_offset_latest() {
-    // When offset is 0, should return Latest
-    assert_eq!(SmtWithHistory::historical_offset(0), HistoricalOffset::Latest);
-}
-
-#[test]
-fn test_historical_offset_recent() {
-    // When offset is 1-32, should return ReversionsIdx
-    assert_eq!(SmtWithHistory::historical_offset(1), HistoricalOffset::ReversionsIdx(0));
-    assert_eq!(SmtWithHistory::historical_offset(2), HistoricalOffset::ReversionsIdx(1));
-    assert_eq!(SmtWithHistory::historical_offset(32), HistoricalOffset::ReversionsIdx(31));
-}
-
-#[test]
-fn test_historical_offset_too_ancient() {
-    // When offset is > 32, should return TooAncient
-    assert_eq!(SmtWithHistory::historical_offset(33), HistoricalOffset::TooAncient);
-    assert_eq!(SmtWithHistory::historical_offset(100), HistoricalOffset::TooAncient);
-}
-
-#[test]
-fn test_historical_offset_edge_cases() {
-    // Edge case: exactly 32 blocks ago
-    assert_eq!(SmtWithHistory::historical_offset(32), HistoricalOffset::ReversionsIdx(31));
-
-    // Edge case: exactly 33 blocks ago (too ancient)
-    assert_eq!(SmtWithHistory::historical_offset(33), HistoricalOffset::TooAncient);
-
-    // Edge case: small numbers
-    assert_eq!(SmtWithHistory::historical_offset(1), HistoricalOffset::ReversionsIdx(0));
-    assert_eq!(SmtWithHistory::historical_offset(2), HistoricalOffset::ReversionsIdx(1));
-}
-
-#[test]
 fn test_rwlock_guard_ensures_single_smt() {
     use std::{sync::Arc, thread};
 
     let base_smt = create_mock_smt();
-    let smt_with_history = Arc::new(SmtWithHistory::new(base_smt.clone()));
+    let smt_with_history = Arc::new(SmtWithHistory::new(base_smt.clone(), 0));
 
     // Create mutations to apply
     let (mutations1, mutations2, mutations3) = create_mutation_sets(&base_smt);
@@ -519,7 +484,7 @@ fn test_rwlock_guard_ensures_single_smt() {
 #[test]
 fn test_historical_view_lifetime_management() {
     let base_smt = create_mock_smt();
-    let smt_with_history = SmtWithHistory::new(base_smt.clone());
+    let smt_with_history = SmtWithHistory::new(base_smt.clone(), 0);
 
     // Apply some mutations
     let (mutations1, ..) = create_mutation_sets(&base_smt);
@@ -527,7 +492,7 @@ fn test_historical_view_lifetime_management() {
 
     // Create a historical view
     {
-        let view = smt_with_history.historical_view(0).unwrap();
+        let view = smt_with_history.historical_view(1).unwrap();
         let test_key = TestKV::new(1).key;
         let _value = view.get_value(&test_key);
         // view is dropped here, releasing the read guard
@@ -548,7 +513,7 @@ fn test_memory_efficiency_single_smt_instance() {
     let base_smt = create_mock_smt();
     let smt_size = mem::size_of_val(&base_smt);
 
-    let smt_with_history = SmtWithHistory::new(base_smt.clone());
+    let smt_with_history = SmtWithHistory::new(base_smt.clone(), 0);
 
     // Apply many mutations
     for i in 0..10 {
@@ -596,7 +561,7 @@ fn test_concurrent_reads_with_single_smt() {
     };
 
     let base_smt = create_mock_smt();
-    let smt_with_history = Arc::new(SmtWithHistory::new(base_smt.clone()));
+    let smt_with_history = Arc::new(SmtWithHistory::new(base_smt.clone(), 0));
 
     // Apply mutations to create history
     let (mutations1, mutations2, _) = create_mutation_sets(&base_smt);
@@ -649,7 +614,7 @@ fn test_concurrent_reads_with_single_smt() {
 fn test_historical_view_of_latest_matches_current() {
     // Test requirement 1: HistoricalView of latest (offset=0) matches the current latest
     let base_smt = create_mock_smt();
-    let smt_with_history = SmtWithHistory::new(base_smt.clone());
+    let smt_with_history = SmtWithHistory::new(base_smt.clone(), 0);
 
     // Apply some mutations to create history
     let (mutations1, mutations2, _) = create_mutation_sets(&base_smt);
@@ -660,7 +625,7 @@ fn test_historical_view_of_latest_matches_current() {
     let current_root = smt_with_history.root();
 
     // Get historical view at offset 0 (latest)
-    let latest_view = smt_with_history.historical_view(0).unwrap();
+    let latest_view = smt_with_history.historical_view(2).unwrap();
     let latest_view_root = latest_view.root();
 
     // Roots should match
@@ -705,33 +670,29 @@ fn test_two_steps_back_works() {
     let mut smt_after_2 = smt_after_1.clone();
     smt_after_2.apply_mutations(mutations2.clone()).unwrap();
 
-    // Create historical SMT and apply mutations
-    let smt_with_history = SmtWithHistory::new(base_smt.clone());
-    smt_with_history.apply_mutations(mutations1).unwrap();
-    smt_with_history.apply_mutations(mutations2).unwrap();
+    // Create historical SMT starting at block 0 and apply mutations
+    let smt_with_history = SmtWithHistory::new(base_smt.clone(), 0);
+    smt_with_history.apply_mutations(mutations1).unwrap(); // Now at block 1
+    smt_with_history.apply_mutations(mutations2).unwrap(); // Now at block 2
 
-    // Test two steps back (offset=2) - should match base_smt
-    let two_steps_back = smt_with_history.historical_view(2).unwrap();
-    assert_eq!(
-        two_steps_back.root(),
-        base_smt.root(),
-        "Root at 2 steps back should match base SMT"
-    );
+    // Test accessing block 0 (2 steps back from block 2) - should match base_smt
+    let two_steps_back = smt_with_history.historical_view(0).unwrap();
+    assert_eq!(two_steps_back.root(), base_smt.root(), "Root at block 0 should match base SMT");
 
-    // Test one step back (offset=1) - should match smt_after_1
+    // Test accessing block 1 (1 step back from block 2) - should match smt_after_1
     let one_step_back = smt_with_history.historical_view(1).unwrap();
     assert_eq!(
         one_step_back.root(),
         smt_after_1.root(),
-        "Root at 1 step back should match SMT after first mutation"
+        "Root at block 1 should match SMT after first mutation"
     );
 
-    // Test current (offset=0) - should match smt_after_2
-    let current = smt_with_history.historical_view(0).unwrap();
+    // Test accessing block 2 (current) - should match smt_after_2
+    let current = smt_with_history.historical_view(2).unwrap();
     assert_eq!(
         current.root(),
         smt_after_2.root(),
-        "Root at offset 0 should match SMT after second mutation"
+        "Root at block 2 should match SMT after second mutation"
     );
 
     // Verify values and proofs at different historical points
@@ -744,28 +705,28 @@ fn test_two_steps_back_works() {
     ];
 
     for key in test_keys {
-        // Two steps back should match base
+        // Two steps back (block 0) should match base
         let historical_value_2 = two_steps_back.get_value(&key);
         let base_value = base_smt.get_value(&key);
-        assert_eq!(historical_value_2, base_value, "Value at 2 steps back should match base SMT");
+        assert_eq!(historical_value_2, base_value, "Value at block 0 should match base SMT");
 
         let historical_proof_2 = two_steps_back.open(&key);
         let base_proof = base_smt.open(&key);
-        assert_eq!(historical_proof_2, base_proof, "Proof at 2 steps back should match base SMT");
+        assert_eq!(historical_proof_2, base_proof, "Proof at block 0 should match base SMT");
 
-        // One step back should match smt_after_1
+        // One step back (block 1) should match smt_after_1
         let historical_value_1 = one_step_back.get_value(&key);
         let after1_value = smt_after_1.get_value(&key);
         assert_eq!(
             historical_value_1, after1_value,
-            "Value at 1 step back should match SMT after first mutation"
+            "Value at block 1 should match SMT after first mutation"
         );
 
         let historical_proof_1 = one_step_back.open(&key);
         let after1_proof = smt_after_1.open(&key);
         assert_eq!(
             historical_proof_1, after1_proof,
-            "Proof at 1 step back should match SMT after first mutation"
+            "Proof at block 1 should match SMT after first mutation"
         );
     }
 }
@@ -790,7 +751,7 @@ fn test_compute_leaves_for_reversion() {
     // For testing, we'll use keys that we know will collide based on the hash function
 
     // Create an SMT with history
-    let smt_with_history = SmtWithHistory::new(base_smt.clone());
+    let smt_with_history = SmtWithHistory::new(base_smt.clone(), 0);
 
     // Prepare mutations that will test different scenarios:
     // 1. Update existing single value
@@ -831,7 +792,7 @@ fn test_compute_leaves_for_reversion() {
     assert_eq!(reversion.root(), old_root, "Reversion root should match the old SMT root");
 
     // Access the precomputed leaves through the historical view
-    let historical_view = smt_with_history.historical_view(1).unwrap();
+    let historical_view = smt_with_history.historical_view(0).unwrap();
 
     // Test case 1: Updated value should show old value
     let leaf1 = historical_view.get_leaf(&kv1.key);
@@ -908,7 +869,7 @@ fn test_compute_leaves_for_reversion_multiple_entries() {
             base_smt.insert(kv.key, kv.value).unwrap();
         }
 
-        let smt_with_history = SmtWithHistory::new(base_smt.clone());
+        let smt_with_history = SmtWithHistory::new(base_smt.clone(), 0);
 
         // Create mutations that affect the multiple-entry leaf
         let mut mutations_list = Vec::new();
@@ -983,7 +944,7 @@ fn test_compute_leaves_for_reversion_multiple_entries() {
 fn test_compute_leaves_for_reversion_empty_smt_with_additions() {
     // Edge case 1: Empty SMT with additions
     let empty_smt = Smt::new();
-    let smt_with_history = SmtWithHistory::new(empty_smt.clone());
+    let smt_with_history = SmtWithHistory::new(empty_smt.clone(), 0);
 
     let kv1 = TestKV::new(10);
     let kv2 = TestKV::new(11);
@@ -994,7 +955,7 @@ fn test_compute_leaves_for_reversion_empty_smt_with_additions() {
     smt_with_history.apply_mutations(mutations).unwrap();
 
     // Historical view should show empty state
-    let historical_view = smt_with_history.historical_view(1).unwrap();
+    let historical_view = smt_with_history.historical_view(0).unwrap();
     assert_eq!(historical_view.root(), old_root, "Historical root should match empty SMT");
     assert_eq!(historical_view.get_value(&kv1.key), EMPTY_WORD);
     assert_eq!(historical_view.get_value(&kv2.key), EMPTY_WORD);
@@ -1009,7 +970,7 @@ fn test_compute_leaves_for_reversion_all_values_deleted() {
     base_smt.insert(kv3.key, kv3.value).unwrap();
     base_smt.insert(kv4.key, kv4.value).unwrap();
 
-    let smt_with_history = SmtWithHistory::new(base_smt.clone());
+    let smt_with_history = SmtWithHistory::new(base_smt.clone(), 0);
 
     // Delete all values
     let mutations = smt_with_history
@@ -1019,7 +980,7 @@ fn test_compute_leaves_for_reversion_all_values_deleted() {
     smt_with_history.apply_mutations(mutations).unwrap();
 
     // Historical view should show original values
-    let historical_view = smt_with_history.historical_view(1).unwrap();
+    let historical_view = smt_with_history.historical_view(0).unwrap();
     assert_eq!(historical_view.get_value(&kv3.key), kv3.value);
     assert_eq!(historical_view.get_value(&kv4.key), kv4.value);
 }
@@ -1031,7 +992,7 @@ fn test_compute_leaves_for_reversion_replace_and_readd_pattern() {
     let kv5 = TestKV::new(30);
     base_smt.insert(kv5.key, kv5.value).unwrap();
 
-    let smt_with_history = SmtWithHistory::new(base_smt.clone());
+    let smt_with_history = SmtWithHistory::new(base_smt.clone(), 0);
 
     // First delete it
     let delete_mutation = smt_with_history.compute_mutations(vec![kv5.empty().tup()]).unwrap();
@@ -1044,7 +1005,7 @@ fn test_compute_leaves_for_reversion_replace_and_readd_pattern() {
 
     // Check history at different points
     let view_after_delete = smt_with_history.historical_view(1).unwrap();
-    let view_original = smt_with_history.historical_view(2).unwrap();
+    let view_original = smt_with_history.historical_view(0).unwrap();
 
     assert_eq!(
         view_after_delete.get_value(&kv5.key),
@@ -1058,7 +1019,7 @@ fn test_compute_leaves_for_reversion_replace_and_readd_pattern() {
     );
 
     // Current state should have new value
-    let current_view = smt_with_history.historical_view(0).unwrap();
+    let current_view = smt_with_history.historical_view(2).unwrap();
     assert_eq!(current_view.get_value(&kv5.key), kv5_new.value);
 }
 
@@ -1067,7 +1028,7 @@ fn test_guards_prevent_mutations_during_reads() {
     use std::{sync::Arc, thread, time::Duration};
 
     let base_smt = create_mock_smt();
-    let smt_with_history = Arc::new(SmtWithHistory::new(base_smt.clone()));
+    let smt_with_history = Arc::new(SmtWithHistory::new(base_smt.clone(), 0));
 
     // Apply initial mutation
     let (mutations1, ..) = create_mutation_sets(&base_smt);
@@ -1076,7 +1037,7 @@ fn test_guards_prevent_mutations_during_reads() {
     // Create a long-lived historical view in a thread
     let smt_clone = Arc::clone(&smt_with_history);
     let read_handle = thread::spawn(move || {
-        let view = smt_clone.historical_view(0).unwrap();
+        let view = smt_clone.historical_view(1).unwrap();
 
         // Hold the view for a bit to simulate long-running read operation
         thread::sleep(Duration::from_millis(50));

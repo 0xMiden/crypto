@@ -24,7 +24,7 @@ fn generate_word(seed: &mut [u8; 32]) -> Word {
 #[cfg(feature = "std")]
 fn setup_smt_with_history(num_keys: usize, num_reversions: usize) -> (SmtWithHistory, Vec<Word>) {
     let mut seed = [0u8; 32];
-    let smt_with_history = SmtWithHistory::new(Smt::default());
+    let smt_with_history = SmtWithHistory::new(Smt::default(), 0u64);
     let mut keys_used = Vec::new();
 
     // Apply mutations to create history
@@ -103,7 +103,7 @@ fn bench_historical_access(c: &mut Criterion) {
 
                 b.iter(|| {
                     smt_hist
-                        .historical_view(black_box(reversion_depth))
+                        .historical_view(black_box(reversion_depth as u64))
                         .unwrap()
                         .open(black_box(&test_key));
                 });
@@ -141,7 +141,7 @@ fn bench_insertion_with_history(c: &mut Criterion) {
         group.bench_function(BenchmarkId::new("with_history", num_keys), |b| {
             b.iter_batched(
                 || {
-                    let smt = SmtWithHistory::new(Smt::default());
+                    let smt = SmtWithHistory::new(Smt::default(), 0);
                     let mut seed = [0u8; 32];
                     let mutations = Vec::from_iter((0..num_keys).map(|_| {
                         let key = generate_word(&mut seed);
@@ -150,7 +150,7 @@ fn bench_insertion_with_history(c: &mut Criterion) {
                     }));
                     (smt, mutations)
                 },
-                |(mut smt, mutations)| {
+                |(smt, mutations)| {
                     let mutation_set = smt.compute_mutations(mutations).unwrap();
                     smt.apply_mutations(black_box(mutation_set.clone())).unwrap();
                 },
@@ -208,7 +208,9 @@ fn bench_proof_generation(c: &mut Criterion) {
             group.bench_function(bench_id, move |b| {
                 let test_key = keys.get(0).copied().unwrap_or(EMPTY_WORD);
 
-                b.iter(|| smt.historical_view(black_box(history_depth)).unwrap().open(&test_key));
+                b.iter(|| {
+                    smt.historical_view(black_box(history_depth as u64)).unwrap().open(&test_key)
+                });
             });
         }
     }
