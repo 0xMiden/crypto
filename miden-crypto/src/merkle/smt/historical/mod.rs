@@ -250,6 +250,16 @@ impl SmtWithHistory {
         self.inner.read().unwrap().latest.open(key)
     }
 
+    /// Returns the value stored under the specified key in the latest state.
+    pub fn get_value(&self, key: &Word) -> Word {
+        self.inner.read().unwrap().latest.get_value(key)
+    }
+
+    /// Returns the leaf at the specified key in the latest state.
+    pub fn get_leaf(&self, key: &Word) -> SmtLeaf {
+        self.inner.read().unwrap().latest.get_leaf(key)
+    }
+
     /// Delta offset into the past
     pub fn oldest(&self) -> usize {
         self.inner.read().unwrap().history.len()
