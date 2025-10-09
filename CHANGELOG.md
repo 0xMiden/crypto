@@ -3,6 +3,7 @@
 - [BREAKING] Incremented MSRV to 1.89.
 - Added `AVX512` acceleration for RPO and RPX hash functions, including parallelized E-rounds for RPX ([#551](https://github.com/0xMiden/crypto/pull/551)).
 - [BREAKING] Adds DSA (EdDSA25519) and ECDH (X25519) using Curve25519 ([#537](https://github.com/0xMiden/crypto/pull/537)).
+- Add convenience LargeSmt API to compute and apply mutations in one call ([#568](https://github.com/0xMiden/crypto/pull/568)).
 
 ## 0.17.0 (2025-09-12)
 
