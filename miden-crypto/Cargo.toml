@@ -37,7 +37,8 @@ name    = "smt-historical"
 
 [[bench]]
 harness           = false
-name              = "smt"
+name              = "smt-internal"
+path              = "benches/smt.rs"
 required-features = ["internal"]
 
 [[bench]]
