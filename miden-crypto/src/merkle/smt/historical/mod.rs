@@ -234,6 +234,13 @@ impl SmtWithHistory {
         self.inner.read().unwrap().latest.num_leaves()
     }
 
+    /// Returns an iterator over the leaves in the latest state.
+    pub fn leaves(&self) -> impl Iterator<Item = (LeafIndex<SMT_DEPTH>, SmtLeaf)> {
+        let inner = self.inner.read().unwrap();
+        let leaves: Vec<_> = inner.latest.leaves().map(|(idx, leaf)| (idx, leaf.clone())).collect();
+        leaves.into_iter()
+    }
+
     pub fn history_len(&self) -> usize {
         self.inner.read().unwrap().history.len()
     }
