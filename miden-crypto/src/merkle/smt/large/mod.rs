@@ -423,6 +423,60 @@ impl<S: SmtStorage> LargeSmt<S> {
         <Self as SparseMerkleTree<SMT_DEPTH>>::insert(self, key, value)
     }
 
+    /// Computes and immediately applies the mutations necessary to insert the given key-value pairs
+    /// into this Sparse Merkle Tree (SMT).
+    ///
+    /// This is a convenience method that combines the functionality of
+    /// [`Smt::compute_mutations()`] and [`Smt::apply_mutations()`]. It first computes all required
+    /// node and leaf updates for inserting or removing the provided key-value pairs, then applies
+    /// those mutations to the tree atomically.
+    ///
+    /// This ensures that all changes are validated and consistent with the current tree root before
+    /// any modifications are written to storage.
+    ///
+    /// # Behavior
+    ///
+    /// - If a key maps to [`Smt::EMPTY_VALUE`], it is treated as a deletion.
+    /// - If a key already exists, its value is updated.
+    /// - If a key is new, a new leaf is inserted.
+    /// - The operation is atomic — either all mutations are applied or none are, depending on
+    ///   whether any error occurs during computation or application.
+    ///
+    /// # Errors
+    ///
+    /// Returns a [`LargeSmtError`] if:
+    /// - The computation of mutations fails (e.g., due to storage or hashing errors).
+    /// - The mutations cannot be applied because the current tree root has diverged from the one
+    ///   used during mutation computation (see [`MerkleError::ConflictingRoots`]).
+    /// - Any storage backend operation fails during update.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use miden_crypto::{Felt, Word};
+    /// # use miden_crypto::merkle::{Smt, EmptySubtreeRoots, SMT_DEPTH};
+    /// let mut smt = Smt::new();
+    /// let kv_pairs = vec![(Word::default(), Word::default())];
+    ///
+    /// // Compute and apply mutations in a single step
+    /// smt.compute_and_apply_mutations(kv_pairs)
+    ///     .expect("Mutation computation and application succeeded");
+    ///
+    /// // Verify the new root was updated as expected
+    /// assert_eq!(smt.root(), *EmptySubtreeRoots::entry(SMT_DEPTH, 0));
+    /// ```
+    ///
+    /// # See Also
+    /// - [`Smt::compute_mutations()`] for computing changes without applying them.
+    /// - [`Smt::apply_mutations()`] for applying precomputed mutations.
+    pub fn compute_and_apply_mutations(
+        &mut self,
+        kv_pairs: impl IntoIterator<Item = (Word, Word)>,
+    ) -> Result<(), LargeSmtError> {
+        let mutations = self.compute_mutations(kv_pairs)?;
+        self.apply_mutations(mutations)
+    }
+
     /// Computes what changes are necessary to insert the specified key-value pairs into this Merkle
     /// tree, allowing for validation before applying those changes.
     ///
