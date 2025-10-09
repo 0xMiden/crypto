@@ -178,6 +178,12 @@ impl Keccak256 {
     {
         <Self as ElementHasher>::hash_elements(elements)
     }
+
+    /// Hashes an iterator of byte slices.
+    #[inline(always)]
+    pub fn hash_iter<'a>(&self, slices: impl Iterator<Item = &'a [u8]>) -> Keccak256Digest {
+        <Self as HasherExt>::hash_iter(self, slices)
+    }
 }
 
 // HELPER FUNCTIONS

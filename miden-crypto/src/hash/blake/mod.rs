@@ -177,6 +177,15 @@ impl Blake3_256 {
     {
         <Self as ElementHasher>::hash_elements(elements)
     }
+
+    /// Hashes an iterator of byte slices.
+    #[inline(always)]
+    pub fn hash_iter<'a>(
+        &self,
+        slices: impl Iterator<Item = &'a [u8]>,
+    ) -> Blake3Digest<DIGEST32_BYTES> {
+        <Self as HasherExt>::hash_iter(self, slices)
+    }
 }
 
 // BLAKE3 192-BIT OUTPUT
@@ -256,6 +265,15 @@ impl Blake3_192 {
     {
         <Self as ElementHasher>::hash_elements(elements)
     }
+
+    /// Hashes an iterator of byte slices.
+    #[inline(always)]
+    pub fn hash_iter<'a>(
+        &self,
+        slices: impl Iterator<Item = &'a [u8]>,
+    ) -> Blake3Digest<DIGEST24_BYTES> {
+        <Self as HasherExt>::hash_iter(self, slices)
+    }
 }
 
 // BLAKE3 160-BIT OUTPUT
@@ -334,6 +352,15 @@ impl Blake3_160 {
         E: FieldElement<BaseField = Felt>,
     {
         <Self as ElementHasher>::hash_elements(elements)
+    }
+
+    /// Hashes an iterator of byte slices.
+    #[inline(always)]
+    pub fn hash_iter<'a>(
+        &self,
+        slices: impl Iterator<Item = &'a [u8]>,
+    ) -> Blake3Digest<DIGEST20_BYTES> {
+        <Self as HasherExt>::hash_iter(self, slices)
     }
 }
 
