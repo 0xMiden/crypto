@@ -1,4 +1,4 @@
-//! Yields an `Smt` that can be accessed concurrently with historical views.
+//! Yields an `Smt` or `LargeSmt` that can be accessed concurrently with historical views.
 //!
 //! ## Constraints
 //!
@@ -16,7 +16,7 @@
 //! ## Implementation
 //!
 //! On every call to `apply_mutations` we create new `Reversion` and track that internally.
-//! We start with a bootstrap state `Smt`. For sake of brevity, `rev` is short for a `Reversion`
+//! We start with a bootstrap state. For sake of brevity, `rev` is short for a `Reversion`
 //! instance.
 //!
 //! I.e. for the following call sequence
@@ -51,17 +51,187 @@ use crate::{
     },
 };
 
+// TRAITS
+// ================================================================================================
+
+/// Trait providing the minimum API surface needed for `SmtWithHistory` to work with both
+/// `Smt` and `LargeSmt`.
+///
+/// This trait abstracts over the key differences between the two implementations:
+/// - `Smt` returns values directly
+/// - `LargeSmt` returns `Result<T, E>` for some operations and is generic over storage
+pub trait HistoricalSmtApi {
+    /// The error type returned by fallible operations
+    type Error: From<MerkleError> + std::fmt::Debug;
+
+    /// Returns the root of the tree
+    fn root(&self) -> Result<Word, Self::Error>;
+
+    /// Returns the number of leaves in the tree
+    fn num_leaves(&self) -> Result<usize, Self::Error>;
+
+    /// Returns the leaf at the specified key
+    fn get_leaf(&self, key: &Word) -> SmtLeaf;
+
+    /// Returns the leaf at the specified leaf index
+    fn get_leaf_by_index(&self, leaf_index: &LeafIndex<SMT_DEPTH>) -> SmtLeaf;
+
+    /// Returns the value at the specified key
+    fn get_value(&self, key: &Word) -> Word;
+
+    /// Opens a proof for the specified key
+    fn open(&self, key: &Word) -> SmtProof;
+
+    /// Returns an iterator over the leaves
+    fn leaves(&self) -> Result<Vec<(LeafIndex<SMT_DEPTH>, SmtLeaf)>, Self::Error>;
+
+    /// Gets an inner node at the specified index
+    fn get_inner_node(&self, index: NodeIndex) -> InnerNode;
+
+    /// Computes mutations for a set of key-value pairs
+    fn compute_mutations(
+        &self,
+        kv_pairs: impl IntoIterator<Item = (Word, Word)>,
+    ) -> Result<MutationSet<SMT_DEPTH, Word, Word>, Self::Error>;
+
+    /// Applies mutations with reversion support
+    fn apply_mutations_with_reversion(
+        &mut self,
+        mutation_set: MutationSet<SMT_DEPTH, Word, Word>,
+    ) -> Result<MutationSet<SMT_DEPTH, Word, Word>, Self::Error>;
+
+    /// Converts a key to a leaf index
+    fn key_to_leaf_index(key: &Word) -> LeafIndex<SMT_DEPTH>;
+}
+
+/// Implementation of `HistoricalSmtApi` for `Smt`
+impl HistoricalSmtApi for Smt {
+    type Error = MerkleError;
+
+    fn root(&self) -> Result<Word, Self::Error> {
+        Ok(self.root())
+    }
+
+    fn num_leaves(&self) -> Result<usize, Self::Error> {
+        Ok(self.num_leaves())
+    }
+
+    fn get_leaf(&self, key: &Word) -> SmtLeaf {
+        self.get_leaf(key)
+    }
+
+    fn get_leaf_by_index(&self, leaf_index: &LeafIndex<SMT_DEPTH>) -> SmtLeaf {
+        self.get_leaf_by_index(leaf_index)
+    }
+
+    fn get_value(&self, key: &Word) -> Word {
+        self.get_value(key)
+    }
+
+    fn open(&self, key: &Word) -> SmtProof {
+        self.open(key)
+    }
+
+    fn leaves(&self) -> Result<Vec<(LeafIndex<SMT_DEPTH>, SmtLeaf)>, Self::Error> {
+        Ok(self.leaves().map(|(idx, leaf)| (idx, leaf.clone())).collect())
+    }
+
+    fn get_inner_node(&self, index: NodeIndex) -> InnerNode {
+        <Self as SparseMerkleTree<SMT_DEPTH>>::get_inner_node(self, index)
+    }
+
+    fn compute_mutations(
+        &self,
+        kv_pairs: impl IntoIterator<Item = (Word, Word)>,
+    ) -> Result<MutationSet<SMT_DEPTH, Word, Word>, Self::Error> {
+        self.compute_mutations(kv_pairs)
+    }
+
+    fn apply_mutations_with_reversion(
+        &mut self,
+        mutation_set: MutationSet<SMT_DEPTH, Word, Word>,
+    ) -> Result<MutationSet<SMT_DEPTH, Word, Word>, Self::Error> {
+        self.apply_mutations_with_reversion(mutation_set)
+    }
+
+    fn key_to_leaf_index(key: &Word) -> LeafIndex<SMT_DEPTH> {
+        <Self as SparseMerkleTree<SMT_DEPTH>>::key_to_leaf_index(key)
+    }
+}
+
+/// Implementation of `HistoricalSmtApi` for `LargeSmt`
+#[cfg(feature = "concurrent")]
+impl<S: SmtStorage> HistoricalSmtApi for LargeSmt<S> {
+    type Error = LargeSmtError;
+
+    fn root(&self) -> Result<Word, Self::Error> {
+        self.root()
+    }
+
+    fn num_leaves(&self) -> Result<usize, Self::Error> {
+        self.num_leaves()
+    }
+
+    fn get_leaf(&self, key: &Word) -> SmtLeaf {
+        self.get_leaf(key)
+    }
+
+    fn get_leaf_by_index(&self, leaf_index: &LeafIndex<SMT_DEPTH>) -> SmtLeaf {
+        self.get_leaf_by_index(leaf_index)
+    }
+
+    fn get_value(&self, key: &Word) -> Word {
+        self.get_value(key)
+    }
+
+    fn open(&self, key: &Word) -> SmtProof {
+        self.open(key)
+    }
+
+    fn leaves(&self) -> Result<Vec<(LeafIndex<SMT_DEPTH>, SmtLeaf)>, Self::Error> {
+        Ok(self.leaves()?.collect())
+    }
+
+    fn get_inner_node(&self, index: NodeIndex) -> InnerNode {
+        <Self as SparseMerkleTree<SMT_DEPTH>>::get_inner_node(self, index)
+    }
+
+    fn compute_mutations(
+        &self,
+        kv_pairs: impl IntoIterator<Item = (Word, Word)>,
+    ) -> Result<MutationSet<SMT_DEPTH, Word, Word>, Self::Error> {
+        self.compute_mutations(kv_pairs)
+    }
+
+    fn apply_mutations_with_reversion(
+        &mut self,
+        mutation_set: MutationSet<SMT_DEPTH, Word, Word>,
+    ) -> Result<MutationSet<SMT_DEPTH, Word, Word>, Self::Error> {
+        self.apply_mutations_with_reversion(mutation_set)
+    }
+
+    fn key_to_leaf_index(key: &Word) -> LeafIndex<SMT_DEPTH> {
+        <Self as SparseMerkleTree<SMT_DEPTH>>::key_to_leaf_index(key)
+    }
+}
+
 #[cfg(test)]
 mod tests;
 
 #[allow(missing_docs)]
 #[derive(thiserror::Error, Debug)]
-pub enum HistoricalError {
+pub enum HistoricalError<E: From<MerkleError> + std::fmt::Debug> {
     #[error(transparent)]
-    MerkleError(#[from] MerkleError),
+    SmtError(E),
 }
 
-/// The offset enum representing the offset relative to the `latest` `Smt`.
+impl<E: From<MerkleError> + std::fmt::Debug> From<E> for HistoricalError<E> {
+    fn from(err: E) -> Self {
+        Self::SmtError(err)
+    }
+}
+
+/// The offset enum representing the offset relative to the `latest` state.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum HistoricalOffset {
     Future,
@@ -82,7 +252,7 @@ struct HistoricalReversion {
     /// The mutations that were applied to reach this state (Arc'd for sharing)
     /// This is a vector to support potential batching of mutations at a single historical point
     mutations: Arc<MutationSet<SMT_DEPTH, Word, Word>>,
-    /// Calculating leaves is expense, so we keep a cache, based on the leaf digest.
+    /// Calculating leaves is expensive, so we keep a cache, based on the leaf digest.
     precomputed_leaves: HashMap<LeafIndex<SMT_DEPTH>, SmtLeaf>,
 }
 
@@ -127,18 +297,18 @@ fn build_historical_leaf(
 
 /// Internal state that is protected by RwLock for interior mutability
 #[derive(Debug)]
-struct InnerState {
+struct InnerState<S: HistoricalSmtApi> {
     /// Block number of `latest`.
     block_number: u64,
     /// The latest state being tracked.
-    latest: Smt,
+    latest: S,
     /// Stored in order from latest to oldest. New ones are pushed via `push_front`
     /// and dropped via `pop_back`.
     /// Each state contains the mutations needed to revert from current to that historical state
     history: VecDeque<Arc<HistoricalReversion>>,
 }
 
-impl InnerState {
+impl<S: HistoricalSmtApi> InnerState<S> {
     // obtain the index on the in-memory reversions based on the _desired_ block num given the
     // latest block number.
     pub fn historical_offset(&self, desired_block_number: u64) -> HistoricalOffset {
@@ -148,7 +318,7 @@ impl InnerState {
         let past_offset = past_offset as usize;
         match past_offset {
             0 => HistoricalOffset::Latest,
-            1..SmtWithHistory::MAX_HISTORY => HistoricalOffset::ReversionsIdx(past_offset - 1),
+            1..SmtWithHistory::<S>::MAX_HISTORY => HistoricalOffset::ReversionsIdx(past_offset - 1),
             _ => HistoricalOffset::TooAncient,
         }
     }
@@ -186,7 +356,7 @@ impl InnerState {
         // The reversion contains the old values in its new_pairs
         // These represent what the values were BEFORE the mutation was applied
         for (key, value) in reversion.new_pairs() {
-            let leaf_index = SmtWithHistory::key_to_leaf_index(key);
+            let leaf_index = S::key_to_leaf_index(key);
             keys_by_leaf.entry(leaf_index).or_insert_with(Vec::new).push((*key, *value));
         }
 
@@ -207,14 +377,14 @@ impl InnerState {
 }
 
 #[derive(Debug, Clone)]
-pub struct SmtWithHistory {
-    inner: Arc<RwLock<InnerState>>,
+pub struct SmtWithHistory<S: HistoricalSmtApi> {
+    inner: Arc<RwLock<InnerState<S>>>,
 }
 
-impl SmtWithHistory {
+impl<S: HistoricalSmtApi> SmtWithHistory<S> {
     pub const MAX_HISTORY: usize = 33;
 
-    pub fn new(latest: Smt, block_number: u64) -> Self {
+    pub fn new(latest: S, block_number: u64) -> Self {
         Self {
             inner: Arc::new(RwLock::new(InnerState {
                 block_number,
@@ -230,15 +400,14 @@ impl SmtWithHistory {
         }
     }
 
-    pub fn num_leaves(&self) -> usize {
+    pub fn num_leaves(&self) -> Result<usize, S::Error> {
         self.inner.read().unwrap().latest.num_leaves()
     }
 
     /// Returns an iterator over the leaves in the latest state.
-    pub fn leaves(&self) -> impl Iterator<Item = (LeafIndex<SMT_DEPTH>, SmtLeaf)> {
+    pub fn leaves(&self) -> Result<Vec<(LeafIndex<SMT_DEPTH>, SmtLeaf)>, S::Error> {
         let inner = self.inner.read().unwrap();
-        let leaves: Vec<_> = inner.latest.leaves().map(|(idx, leaf)| (idx, leaf.clone())).collect();
-        leaves.into_iter()
+        inner.latest.leaves()
     }
 
     pub fn history_len(&self) -> usize {
@@ -249,7 +418,7 @@ impl SmtWithHistory {
         self.inner.read().unwrap().block_number
     }
 
-    pub fn root(&self) -> Word {
+    pub fn root(&self) -> Result<Word, S::Error> {
         self.inner.read().unwrap().latest.root()
     }
 
@@ -272,9 +441,9 @@ impl SmtWithHistory {
         self.inner.read().unwrap().history.len()
     }
 
-    /// Construct a new historical view on the account tree, if the relevant reversions are still
+    /// Construct a new historical view, if the relevant reversions are still
     /// available. This returns a view that holds a read guard to ensure memory safety.
-    pub fn historical_view(&self, block_number: u64) -> Option<HistoricalView<'_>> {
+    pub fn historical_view(&self, block_number: u64) -> Option<HistoricalView<'_, S>> {
         let guard = self.inner.read().unwrap();
 
         match guard.historical_offset(block_number) {
@@ -302,37 +471,34 @@ impl SmtWithHistory {
     }
 
     pub(crate) fn key_to_leaf_index(key: &Word) -> LeafIndex<SMT_DEPTH> {
-        <Smt as SparseMerkleTree<SMT_DEPTH>>::key_to_leaf_index(key)
+        S::key_to_leaf_index(key)
     }
 
     pub fn compute_mutations(
         &self,
         kv_pairs: impl IntoIterator<Item = (Word, Word)>,
-    ) -> Result<MutationSet<SMT_DEPTH, Word, Word>, HistoricalError> {
+    ) -> Result<MutationSet<SMT_DEPTH, Word, Word>, HistoricalError<S::Error>> {
         let inner = self.inner.read().unwrap();
         Ok(inner.latest.compute_mutations(kv_pairs)?)
     }
 
-    /// Apply the given forward mutation set to the interior [`Smt`].
+    /// Apply the given forward mutation set to the interior SMT.
     /// This method uses interior mutability with RwLock, ensuring only one thread can write at a
     /// time.
     ///
-    /// Creates a reversion `MutationSet` to be able to reconstruct the previous state of the `Smt`
-    /// on-demand and applies the forward mutations as expected using [`Smt::apply_mutations`].
+    /// Creates a reversion `MutationSet` to be able to reconstruct the previous state
+    /// on-demand and applies the forward mutations as expected.
     pub fn apply_mutations(
         &self,
         mutation_set: MutationSet<SMT_DEPTH, Word, Word>,
-    ) -> Result<(), HistoricalError> {
+    ) -> Result<(), HistoricalError<S::Error>> {
         let mut inner = self.inner.write().unwrap();
 
         // The reversion represents the state BEFORE this mutation (current block_number)
         let reversion_block_number = inner.block_number;
 
-        // Apply forward mutations directly to the Smt (we only have one in memory)
-        let reversion = inner
-            .latest
-            .apply_mutations_with_reversion(mutation_set)
-            .map_err(HistoricalError::MerkleError)?;
+        // Apply forward mutations directly (we only have one in memory)
+        let reversion = inner.latest.apply_mutations_with_reversion(mutation_set)?;
 
         // Track the historical state with Arc for efficient sharing
         let state = inner.from_reversion_mutation_set(reversion_block_number, reversion);
@@ -352,13 +518,13 @@ impl SmtWithHistory {
     }
 }
 
-/// A historical view of the `Smt`
+/// A historical view of the SMT
 ///
-/// Attention: Holds a `RwLockReadGuard` to ensure the underlying `Smt` from being modified while
+/// Attention: Holds a `RwLockReadGuard` to ensure the underlying SMT from being modified while
 /// the view exists.
-pub struct HistoricalView<'a> {
-    /// Hold onto the `latest: Smt` to ensure it doesn't change while we use the overlay.
-    inner: RwLockReadGuard<'a, InnerState>,
+pub struct HistoricalView<'a, S: HistoricalSmtApi> {
+    /// Hold onto the `latest` to ensure it doesn't change while we use the overlay.
+    inner: RwLockReadGuard<'a, InnerState<S>>,
     /// The reversions needed to reach this historical state from `latest`.
     ///
     /// `latest + [0, 1, 2, 3, 4, 5... MAX_HISTORY] -> state at[n-1] steps into the past`
@@ -366,7 +532,7 @@ pub struct HistoricalView<'a> {
     reversions: Vec<Arc<HistoricalReversion>>,
 }
 
-impl<'a> HistoricalView<'a> {
+impl<'a, S: HistoricalSmtApi> HistoricalView<'a, S> {
     /// An iterator for the reversion stack
     ///
     /// Flattens all mutations from all historical states, to be applied in order.
@@ -378,17 +544,17 @@ impl<'a> HistoricalView<'a> {
     }
 
     /// Root of the historical view
-    pub fn root(&self) -> Word {
+    pub fn root(&self) -> Result<Word, S::Error> {
         // If we have reversions, the last one contains the historical root we want
         self.reversions
             .last()
-            .map(|state| state.root)
+            .map(|state| Ok(state.root))
             .unwrap_or_else(|| self.inner.latest.root())
     }
 
     /// Wrapper.
     pub(crate) fn key_to_leaf_index(key: &Word) -> LeafIndex<SMT_DEPTH> {
-        <Smt as SparseMerkleTree<SMT_DEPTH>>::key_to_leaf_index(key)
+        S::key_to_leaf_index(key)
     }
 
     /// Lookup an inner node directly from the reversions
@@ -427,7 +593,7 @@ impl<'a> HistoricalView<'a> {
     /// Get the hash of a node at an arbitrary index, including the root or leaf hashes.
     fn get_node_hash(&self, index: NodeIndex) -> Word {
         if index.is_root() {
-            return self.root();
+            return self.root().expect("Root should always be available");
         }
 
         let mut found_mutation = None;

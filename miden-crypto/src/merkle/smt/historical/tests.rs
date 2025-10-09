@@ -1066,3 +1066,130 @@ fn test_guards_prevent_mutations_during_reads() {
     // The write should have succeeded after the read completed
     assert_eq!(history_len, 2);
 }
+
+// Add these tests at the END of tests.rs after all other tests
+
+#[test]
+fn test_smt_with_history_using_smt() {
+    // Test using the regular in-memory Smt as the interior storage
+    let mut smt = Smt::new();
+
+    // Insert some initial values
+    for i in 1..=3 {
+        let TestKV { key, value } = TestKV::new(i);
+        smt.insert(key, value).unwrap();
+    }
+
+    let initial_root = smt.root();
+
+    // Create SmtWithHistory with Smt as the interior type
+    let smt_with_history = SmtWithHistory::new(smt.clone(), 0);
+
+    // Apply some mutations
+    let kv4 = TestKV::new(4);
+    let kv5 = TestKV::new(5);
+    let mutations1 = smt_with_history.compute_mutations(vec![kv4.tup(), kv5.tup()]).unwrap();
+    smt_with_history.apply_mutations(mutations1).unwrap();
+
+    // Apply more mutations
+    let kv6 = TestKV::new(6);
+    let mutations2 = smt_with_history.compute_mutations(vec![kv6.tup()]).unwrap();
+    smt_with_history.apply_mutations(mutations2).unwrap();
+
+    // Verify we can access historical states
+    let historical_view_block0 = smt_with_history.historical_view(0).unwrap();
+    assert_eq!(
+        historical_view_block0.root().unwrap(),
+        initial_root,
+        "Historical view at block 0 should match initial root"
+    );
+
+    // Verify value access in historical views
+    let key1 = TestKV::new(1).key;
+    let historical_value = historical_view_block0.get_value(&key1);
+    let original_value = smt.get_value(&key1);
+    assert_eq!(historical_value, original_value, "Historical value should match original");
+
+    // Keys added later should not exist in historical view
+    let key4 = TestKV::new(4).key;
+    assert_eq!(
+        historical_view_block0.get_value(&key4),
+        EMPTY_WORD,
+        "Key added later should not exist in historical view"
+    );
+
+    // But should exist in current state
+    assert_ne!(
+        smt_with_history.get_value(&key4),
+        EMPTY_WORD,
+        "Key should exist in current state"
+    );
+
+    println!("✓ SmtWithHistory<Smt> test passed");
+}
+
+#[test]
+#[cfg(feature = "concurrent")]
+fn test_smt_with_history_using_large_smt() {
+    use crate::merkle::MemoryStorage;
+
+    // Test using LargeSmt with MemoryStorage as the interior storage
+    let storage = MemoryStorage::default();
+    let mut large_smt = LargeSmt::new(storage).unwrap();
+
+    // Insert some initial values
+    let kv1 = TestKV::new(1);
+    let kv2 = TestKV::new(2);
+    let kv3 = TestKV::new(3);
+
+    let initial_entries = vec![kv1.tup(), kv2.tup(), kv3.tup()];
+    let init_mutations = large_smt.compute_mutations(initial_entries).unwrap();
+    large_smt.apply_mutations(init_mutations).unwrap();
+
+    let initial_root = large_smt.root().unwrap();
+
+    // Create SmtWithHistory with LargeSmt as the interior type
+    let smt_with_history = SmtWithHistory::new(large_smt, 0);
+
+    // Apply some mutations
+    let kv4 = TestKV::new(4);
+    let kv5 = TestKV::new(5);
+    let mutations1 = smt_with_history.compute_mutations(vec![kv4.tup(), kv5.tup()]).unwrap();
+    smt_with_history.apply_mutations(mutations1).unwrap();
+
+    // Apply more mutations
+    let kv6 = TestKV::new(6);
+    let mutations2 = smt_with_history.compute_mutations(vec![kv6.tup()]).unwrap();
+    smt_with_history.apply_mutations(mutations2).unwrap();
+
+    // Verify we can access historical states
+    let historical_view_block0 = smt_with_history.historical_view(0).unwrap();
+    assert_eq!(
+        historical_view_block0.root().unwrap(),
+        initial_root,
+        "Historical view at block 0 should match initial root"
+    );
+
+    // Verify value access in historical views
+    let key1 = TestKV::new(1).key;
+    let historical_value = historical_view_block0.get_value(&key1);
+    let original_value = kv1.value;
+    assert_eq!(historical_value, original_value, "Historical value should match original");
+
+    // Keys added later should not exist in historical view
+    let key4 = TestKV::new(4).key;
+    assert_eq!(
+        historical_view_block0.get_value(&key4),
+        EMPTY_WORD,
+        "Key added later should not exist in historical view"
+    );
+
+    // But should exist in current state
+    assert_ne!(
+        smt_with_history.get_value(&key4),
+        EMPTY_WORD,
+        "Key should exist in current state"
+    );
+
+    println!("✓ SmtWithHistory<LargeSmt<MemoryStorage>> test passed");
+}
