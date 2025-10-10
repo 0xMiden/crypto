@@ -622,6 +622,28 @@ mod tests {
         assert_matches!(err, MerkleError::ConflictingRoots { .. });
     }
 
+    /// Tests that from_proofs fails when the proofs roots do not match.
+    #[test]
+    fn partial_smt_from_proofs_fails_on_root_mismatch() {
+        let key0 = Word::new(rand_array());
+        let key1 = Word::new(rand_array());
+
+        let value0 = Word::new(rand_array());
+        let value1 = Word::new(rand_array());
+
+        let mut full = Smt::with_entries([(key0, value0)]).unwrap();
+
+        // This proof will become stale after the tree is modified.
+        let stale_proof = full.open(&key0);
+
+        // Insert a value so the root changes.
+        full.insert(key1, value1).unwrap();
+
+        // Construct a partial SMT against the latest root.
+        let err = PartialSmt::from_proofs([full.open(&key1), stale_proof]).unwrap_err();
+        assert_matches!(err, MerkleError::ConflictingRoots { .. });
+    }
+
     /// Tests that a basic PartialSmt's iterator APIs return the expected values.
     #[test]
     fn partial_smt_iterator_apis() {
@@ -774,5 +796,9 @@ mod tests {
         // Add the single-entry leaf
         partial.add_proof(full.open(&key2)).unwrap();
         assert_eq!(partial.num_entries(), 3);
+
+        // Setting a value to the empty word removes decreases the number of entries.
+        partial.insert(key0, Word::empty()).unwrap();
+        assert_eq!(partial.num_entries(), 2);
     }
 }
