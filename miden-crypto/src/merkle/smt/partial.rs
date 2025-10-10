@@ -263,8 +263,9 @@ impl PartialSmt {
 
     /// Returns a boolean value indicating whether the [`PartialSmt`] is empty.
     ///
-    /// A partial SMT is considered empty if it does not track any leaves. Note that its root is not
-    /// necessarily equal to [`Smt::EMPTY_ROOT`];
+    /// A partial SMT is considered empty if it does not track any leaves, but it's root is not
+    /// necessarily equal to the empty SMT root, since it could have been constructed from a
+    /// different root.
     pub fn is_empty(&self) -> bool {
         self.0.leaves.is_empty()
     }
