@@ -76,7 +76,7 @@ impl SmtStore {
     /// - `NodeNotInStore` if a node needed to traverse from `root` to `index` is not present in the
     ///   store.
     pub fn get_path(&self, root: Word, index: NodeIndex) -> Result<MerkleProof, MerkleError> {
-        let (value, path) = self.get_indexed_path(root, index)?;
+        let IndexedPath { value, path } = self.get_indexed_path(root, index)?;
         let path = path.into_iter().rev().map(|(_, value)| value).collect::<Vec<_>>();
 
         Ok(MerkleProof::new(value, MerklePath::new(path)))
@@ -92,11 +92,7 @@ impl SmtStore {
     /// - `RootNotInStore` if the `root` is not present in the store.
     /// - `NodeNotInStore` if a node needed to traverse from `root` to `index` is not present in the
     ///   store.
-    fn get_indexed_path(
-        &self,
-        root: Word,
-        index: NodeIndex,
-    ) -> Result<(Word, Vec<(NodeIndex, Word)>), MerkleError> {
+    fn get_indexed_path(&self, root: Word, index: NodeIndex) -> Result<IndexedPath, MerkleError> {
         let mut hash = root;
         let mut path = Vec::with_capacity(index.depth().into());
 
@@ -123,7 +119,7 @@ impl SmtStore {
             }
         }
 
-        Ok((hash, path))
+        Ok(IndexedPath { value: hash, path })
     }
 
     // STATE MUTATORS
@@ -155,11 +151,11 @@ impl SmtStore {
         let mut nodes_by_index = Map::<NodeIndex, Word>::new();
         for (index, leaf_hash) in entries {
             // Record all sibling nodes along the path from root to this index
-            let (old_value, path_nodes) = self.get_indexed_path(root, index)?;
-            if old_value == leaf_hash {
+            let indexed_path = self.get_indexed_path(root, index)?;
+            if indexed_path.value == leaf_hash {
                 continue;
             }
-            nodes_by_index.extend(path_nodes);
+            nodes_by_index.extend(indexed_path.path);
 
             // Record the updated leaf value at this index
             nodes_by_index.insert(index, leaf_hash);
@@ -288,4 +284,9 @@ fn empty_hashes() -> impl Iterator<Item = (Word, SmtNode)> {
         .copied()
         .zip(subtrees.iter().rev().skip(1).copied())
         .map(|(child, parent)| (parent, SmtNode { left: child, right: child, rc: 1 }))
+}
+
+struct IndexedPath {
+    value: Word,
+    path: Vec<(NodeIndex, Word)>,
 }
