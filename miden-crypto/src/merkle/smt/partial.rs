@@ -40,6 +40,8 @@ impl PartialSmt {
     /// Instantiates a new [`PartialSmt`] by calling [`PartialSmt::add_path`] for all [`SmtProof`]s
     /// in the provided iterator.
     ///
+    /// If the provided iterator is empty, an empty [`PartialSmt`] is returned.
+    ///
     /// # Errors
     ///
     /// Returns an error if:
@@ -49,10 +51,21 @@ impl PartialSmt {
     where
         I: IntoIterator<Item = SmtProof>,
     {
-        let mut partial_smt = Self::new();
+        let mut proofs = proofs.into_iter();
 
-        for (proof, leaf) in proofs.into_iter().map(SmtProof::into_parts) {
-            partial_smt.add_path(leaf, proof)?;
+        let Some(first_proof) = proofs.next() else {
+            return Ok(Self::new());
+        };
+
+        // Add the first path without checking that the existing root matches the new one.
+        // This effectively sets the expected root and all subsequently added proofs must match it.
+        let mut partial_smt = Self::new();
+        let (path, leaf) = first_proof.into_parts();
+        let new_root = partial_smt.add_path_unchecked(leaf, path);
+        partial_smt.0.set_root(new_root);
+
+        for (path, leaf) in proofs.map(SmtProof::into_parts) {
+            partial_smt.add_path(leaf, path)?;
         }
 
         Ok(partial_smt)
@@ -166,62 +179,11 @@ impl PartialSmt {
     ///   (except when the first leaf is added). If an error is returned, the tree is left in an
     ///   inconsistent state.
     pub fn add_path(&mut self, leaf: SmtLeaf, path: SparseMerklePath) -> Result<(), MerkleError> {
-        let mut current_index = leaf.index().index;
-
-        let mut node_hash_at_current_index = leaf.hash();
-
-        // We insert directly into the leaves for two reasons:
-        // - We can directly insert the leaf as it is without having to loop over its entries to
-        //   call Smt::perform_insert.
-        // - If the leaf is SmtLeaf::Empty, we will also insert it, which means this leaf is
-        //   considered tracked by the partial SMT as it is part of the leaves map. When calling
-        //   PartialSmt::insert, this will not error for such empty leaves whose merkle path was
-        //   added, but will error for otherwise non-existent leaves whose paths were not added,
-        //   which is what we want.
-        let prev_entries = self
-            .0
-            .leaves
-            .get(&current_index.value())
-            .map(|leaf| leaf.num_entries())
-            .unwrap_or(0);
-        let current_entries = leaf.num_entries();
-        self.0.leaves.insert(current_index.value(), leaf);
-
-        // Guaranteed not to over/underflow. All variables are <= MAX_LEAF_ENTRIES and result > 0.
-        self.0.num_entries = self.0.num_entries + current_entries - prev_entries;
-
-        for sibling_hash in path {
-            // Find the index of the sibling node and compute whether it is a left or right child.
-            let is_sibling_right = current_index.sibling().is_value_odd();
-
-            // Move the index up so it points to the parent of the current index and the sibling.
-            current_index.move_up();
-
-            // Construct the new parent node from the child that was updated and the sibling from
-            // the merkle path.
-            let new_parent_node = if is_sibling_right {
-                InnerNode {
-                    left: node_hash_at_current_index,
-                    right: sibling_hash,
-                }
-            } else {
-                InnerNode {
-                    left: sibling_hash,
-                    right: node_hash_at_current_index,
-                }
-            };
-
-            self.0.insert_inner_node(current_index, new_parent_node);
-
-            node_hash_at_current_index = self.0.get_inner_node(current_index).hash();
-        }
+        let node_hash_at_current_index = self.add_path_unchecked(leaf, path);
 
         // Check the newly added merkle path is consistent with the existing tree. If not, the
-        // merkle path was invalid or computed from another tree.
-        //
-        // We skip this check if we have just inserted the first leaf since we assume that leaf's
-        // root is correct and all subsequent leaves that will be added must have the same root.
-        if self.0.num_leaves() != 1 && self.root() != node_hash_at_current_index {
+        // merkle path was invalid or computed against another tree.
+        if self.root() != node_hash_at_current_index {
             return Err(MerkleError::ConflictingRoots {
                 expected_root: self.root(),
                 actual_root: node_hash_at_current_index,
@@ -231,14 +193,6 @@ impl PartialSmt {
         self.0.set_root(node_hash_at_current_index);
 
         Ok(())
-    }
-
-    /// Returns true if the key's merkle path was previously added to this partial SMT and can be
-    /// sensibly updated to a new value.
-    /// In particular, this returns true for keys whose value was empty **but** their merkle paths
-    /// were added, while it returns false if the merkle paths were **not** added.
-    fn is_leaf_tracked(&self, key: &Word) -> bool {
-        self.0.leaves.contains_key(&Smt::key_to_leaf_index(key).value())
     }
 
     /// Returns an iterator over the inner nodes of the [`PartialSmt`].
@@ -295,6 +249,75 @@ impl PartialSmt {
     /// Returns a boolean value indicating whether the [`PartialSmt`] is empty.
     pub fn is_empty(&self) -> bool {
         self.0.is_empty()
+    }
+
+    // PRIVATE HELPERS
+    // --------------------------------------------------------------------------------------------
+
+    /// Adds a leaf and its sparse merkle path to this [`PartialSmt`] and returns the tree root of
+    /// the inserted path.
+    ///
+    /// This does not check that the computed root matches the existing root of the tree.
+    fn add_path_unchecked(&mut self, leaf: SmtLeaf, path: SparseMerklePath) -> Word {
+        let mut current_index = leaf.index().index;
+
+        let mut node_hash_at_current_index = leaf.hash();
+
+        // We insert directly into the leaves for two reasons:
+        // - We can directly insert the leaf as it is without having to loop over its entries to
+        //   call Smt::perform_insert.
+        // - If the leaf is SmtLeaf::Empty, we will also insert it, which means this leaf is
+        //   considered tracked by the partial SMT as it is part of the leaves map. When calling
+        //   PartialSmt::insert, this will not error for such empty leaves whose merkle path was
+        //   added, but will error for otherwise non-existent leaves whose paths were not added,
+        //   which is what we want.
+        let prev_entries = self
+            .0
+            .leaves
+            .get(&current_index.value())
+            .map(|leaf| leaf.num_entries())
+            .unwrap_or(0);
+        let current_entries = leaf.num_entries();
+        self.0.leaves.insert(current_index.value(), leaf);
+
+        // Guaranteed not to over/underflow. All variables are <= MAX_LEAF_ENTRIES and result > 0.
+        self.0.num_entries = self.0.num_entries + current_entries - prev_entries;
+
+        for sibling_hash in path {
+            // Find the index of the sibling node and compute whether it is a left or right child.
+            let is_sibling_right = current_index.sibling().is_value_odd();
+
+            // Move the index up so it points to the parent of the current index and the sibling.
+            current_index.move_up();
+
+            // Construct the new parent node from the child that was updated and the sibling from
+            // the merkle path.
+            let new_parent_node = if is_sibling_right {
+                InnerNode {
+                    left: node_hash_at_current_index,
+                    right: sibling_hash,
+                }
+            } else {
+                InnerNode {
+                    left: sibling_hash,
+                    right: node_hash_at_current_index,
+                }
+            };
+
+            self.0.insert_inner_node(current_index, new_parent_node);
+
+            node_hash_at_current_index = self.0.get_inner_node(current_index).hash();
+        }
+
+        node_hash_at_current_index
+    }
+
+    /// Returns true if the key's merkle path was previously added to this partial SMT and can be
+    /// sensibly updated to a new value.
+    /// In particular, this returns true for keys whose value was empty **but** their merkle paths
+    /// were added, while it returns false if the merkle paths were **not** added.
+    fn is_leaf_tracked(&self, key: &Word) -> bool {
+        self.0.leaves.contains_key(&Smt::key_to_leaf_index(key).value())
     }
 }
 
