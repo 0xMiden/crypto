@@ -187,13 +187,12 @@ benchmark_multi! {
     |b: &mut criterion::Bencher, num_entries: &usize| {
         b.iter_batched(
             || {
-                let entries = if *num_entries <= 4096 {
+                if *num_entries <= 4096 {
                     generate_smt_entries(*num_entries)
                 } else {
                     // Use mixed pattern for larger datasets to be more realistic
                     generate_smt_entries_mixed(*num_entries)
-                };
-                entries
+                }
             },
             |entries| {
                 Smt::with_entries(hint::black_box(entries)).unwrap()
@@ -453,7 +452,7 @@ benchmark_multi! {
                         let key = Word::new([
                             generate_value(&mut seed),
                             ONE,
-                            Felt::new(n as u64),
+                            Felt::new(n),
                             Felt::new(leaf_index),
                         ]);
                         let value = generate_word(&mut seed);
@@ -500,7 +499,7 @@ benchmark_multi! {
                 let entries: Vec<(Word, Word)> = (0..pair_count)
                     .map(|i| {
                         let leaf_index: u8 = generate_value(&mut seed);
-                        let key = Word::new([ONE, ONE, Felt::new(i as u64), Felt::new(leaf_index as u64)]);
+                        let key = Word::new([ONE, ONE, Felt::new(i), Felt::new(leaf_index as u64)]);
                         let value = generate_word(&mut seed);
                         (key, value)
                     })
