@@ -3,7 +3,12 @@
 - [BREAKING] Incremented MSRV to 1.89.
 - Added `AVX512` acceleration for RPO and RPX hash functions, including parallelized E-rounds for RPX ([#551](https://github.com/0xMiden/crypto/pull/551)).
 - [BREAKING] Adds DSA (EdDSA25519) and ECDH (X25519) using Curve25519 ([#537](https://github.com/0xMiden/crypto/pull/537)).
+- Adds `HasherExt` trait to provide ability to hash using an iterator of slices. ([#565](https://github.com/0xMiden/crypto/pull/565)).
 - [BREAKING] Refactor `PartialSmt` to be constructible from a root ([#569](https://github.com/0xMiden/crypto/pull/569)).
+
+## 0.17.1 (2025-10-10)
+
+- Support ECDSA signing/verifying with prehashed messages ([#573](https://github.com/0xMiden/crypto/pull/573)).
 
 ## 0.17.0 (2025-09-12)
 

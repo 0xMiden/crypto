@@ -79,7 +79,11 @@ impl SecretKey {
     /// Signs a message (represented as a Word) with this secret key.
     pub fn sign(&mut self, message: Word) -> Signature {
         let message_digest = hash_message(message);
+        self.sign_prehash(message_digest)
+    }
 
+    /// Signs a pre-hashed message with this secret key.
+    pub fn sign_prehash(&mut self, message_digest: [u8; 32]) -> Signature {
         let (signature_inner, recovery_id) = self
             .inner
             .sign_prehash_recoverable(&message_digest)
@@ -121,6 +125,11 @@ impl PublicKey {
     /// Verifies a signature against this public key and message.
     pub fn verify(&self, message: Word, signature: &Signature) -> bool {
         let message_digest = hash_message(message);
+        self.verify_prehash(message_digest, signature)
+    }
+
+    /// Verifies a signature against this public key and pre-hashed message.
+    pub fn verify_prehash(&self, message_digest: [u8; 32], signature: &Signature) -> bool {
         let signature_inner = k256::ecdsa::Signature::from_scalars(*signature.r(), *signature.s());
 
         match signature_inner {
