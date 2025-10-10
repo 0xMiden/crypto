@@ -22,6 +22,9 @@ use crate::{
 /// An important caveat is that only pairs whose merkle paths were added can be updated. Attempting
 /// to update an untracked value will result in an error. See [`PartialSmt::insert`] for more
 /// details.
+///
+/// Once a partial SMT has been constructed, its root is set in stone. All subsequently added proofs
+/// or merkle paths must match that root, otherwise an error is returned.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 pub struct PartialSmt(Smt);
@@ -30,14 +33,25 @@ impl PartialSmt {
     // CONSTRUCTORS
     // --------------------------------------------------------------------------------------------
 
-    /// Returns a new [`PartialSmt`].
+    /// Returns a new, empty [`PartialSmt`].
     ///
     /// All leaves in the returned tree are set to [`Smt::EMPTY_VALUE`].
-    pub fn new() -> Self {
+    pub fn new_empty() -> Self {
         Self(Smt::new())
     }
 
-    /// Instantiates a new [`PartialSmt`] by calling [`PartialSmt::add_path`] for all [`SmtProof`]s
+    /// Constructs a [`PartialSmt`] from a root.
+    ///
+    /// All subsequently added proofs or paths must have the same root.
+    pub fn new(root: Word) -> Self {
+        let mut partial_smt = Self(Smt::default());
+
+        partial_smt.0.set_root(root);
+
+        partial_smt
+    }
+
+    /// Instantiates a new [`PartialSmt`] by calling [`PartialSmt::add_proof`] for all [`SmtProof`]s
     /// in the provided iterator.
     ///
     /// If the provided iterator is empty, an empty [`PartialSmt`] is returned.
@@ -54,18 +68,19 @@ impl PartialSmt {
         let mut proofs = proofs.into_iter();
 
         let Some(first_proof) = proofs.next() else {
-            return Ok(Self::new());
+            return Ok(Self::new_empty());
         };
 
-        // Add the first path without checking that the existing root matches the new one.
-        // This effectively sets the expected root and all subsequently added proofs must match it.
-        let mut partial_smt = Self::new();
+        // Add the first path to an empty partial SMT without checking that the existing root
+        // matches the new one. This sets the expected root to the root of the first proof and all
+        // subsequently added proofs must match it.
+        let mut partial_smt = Self::new_empty();
         let (path, leaf) = first_proof.into_parts();
         let new_root = partial_smt.add_path_unchecked(leaf, path);
         partial_smt.0.set_root(new_root);
 
-        for (path, leaf) in proofs.map(SmtProof::into_parts) {
-            partial_smt.add_path(leaf, path)?;
+        for proof in proofs {
+            partial_smt.add_proof(proof)?;
         }
 
         Ok(partial_smt)
@@ -247,8 +262,11 @@ impl PartialSmt {
     }
 
     /// Returns a boolean value indicating whether the [`PartialSmt`] is empty.
+    ///
+    /// A partial SMT is considered empty if it does not track any leaves. Note that its root is not
+    /// necessarily equal to [`Smt::EMPTY_ROOT`];
     pub fn is_empty(&self) -> bool {
-        self.0.is_empty()
+        self.0.leaves.is_empty()
     }
 
     // PRIVATE HELPERS
@@ -322,8 +340,11 @@ impl PartialSmt {
 }
 
 impl Default for PartialSmt {
+    /// Returns a new, empty [`PartialSmt`].
+    ///
+    /// All leaves in the returned tree are set to [`Smt::EMPTY_VALUE`].
     fn default() -> Self {
-        Self::new()
+        Self::new_empty()
     }
 }
 
@@ -392,6 +413,24 @@ mod tests {
 
     use super::*;
     use crate::{EMPTY_WORD, ONE, ZERO, merkle::EmptySubtreeRoots};
+
+    /// Tests that a partial SMT constructed from a root is well behaved and returns expected
+    /// values.
+    #[test]
+    fn partial_smt_new_with_no_entries() {
+        let key0 = Word::from(rand_array::<Felt, 4>());
+        let value0 = Word::from(rand_array::<Felt, 4>());
+        let full = Smt::with_entries([(key0, value0)]).unwrap();
+
+        let partial_smt = PartialSmt::new(full.root());
+
+        assert!(partial_smt.is_empty());
+        assert_eq!(partial_smt.num_entries(), 0);
+        assert_eq!(partial_smt.num_leaves(), 0);
+        assert_eq!(partial_smt.entries().count(), 0);
+        assert_eq!(partial_smt.tracked_leaves().count(), 0);
+        assert_eq!(partial_smt.root(), full.root());
+    }
 
     /// Tests that a basic PartialSmt can be built from a full one and that inserting or removing
     /// values whose merkle path were added to the partial SMT results in the same root as the
@@ -535,19 +574,19 @@ mod tests {
         let kv_pairs = vec![(key0, value0)];
 
         let mut full = Smt::with_entries(kv_pairs).unwrap();
-        // This proof will be stale after we insert another value.
-        let stale_proof0 = full.open(&key0);
+
+        // This proof will become stale after the tree is modified.
+        let stale_proof = full.open(&key2);
 
         // Insert a non-empty value so the root actually changes.
         full.insert(key1, value1).unwrap();
         full.insert(key2, value2).unwrap();
 
-        let proof2 = full.open(&key2);
+        // Construct a partial SMT against the latest root.
+        let mut partial = PartialSmt::new(full.root());
 
-        let mut partial = PartialSmt::new();
-
-        partial.add_proof(stale_proof0).unwrap();
-        let err = partial.add_proof(proof2).unwrap_err();
+        // Adding the stale proof should fail as its root is different.
+        let err = partial.add_proof(stale_proof).unwrap_err();
         assert_matches!(err, MerkleError::ConflictingRoots { .. });
     }
 
@@ -568,17 +607,18 @@ mod tests {
         let kv_pairs = vec![(key0, value0), (key1, value1)];
 
         let mut full = Smt::with_entries(kv_pairs).unwrap();
-        // This proof will be stale after we insert another value.
-        let stale_proof0 = full.open(&key0);
 
+        // This proof will become stale after the tree is modified.
+        let stale_proof = full.open(&key0);
+
+        // Insert a value so the root changes.
         full.insert(key2, value2).unwrap();
 
-        let proof2 = full.open(&key2);
+        // Construct a partial SMT against the latest root.
+        let mut partial = PartialSmt::new(full.root());
 
-        let mut partial = PartialSmt::new();
-
-        partial.add_proof(stale_proof0).unwrap();
-        let err = partial.add_proof(proof2).unwrap_err();
+        // Adding the stale proof should fail as its root is different.
+        let err = partial.add_proof(stale_proof).unwrap_err();
         assert_matches!(err, MerkleError::ConflictingRoots { .. });
     }
 
@@ -682,7 +722,7 @@ mod tests {
     /// Test that an empty partial SMT's is_empty method returns `true`.
     #[test]
     fn partial_smt_is_empty() {
-        assert!(PartialSmt::new().is_empty());
+        assert!(PartialSmt::new_empty().is_empty());
     }
 
     /// `PartialSmt` serde round-trip. Also tests conversion from SMT.
@@ -711,28 +751,28 @@ mod tests {
         assert_eq!(partial_smt, decoded);
     }
 
-    /// Tests that add_path correctly updates num_entries for both increasing and decreasing entry
-    /// counts.
+    /// Tests that add_path correctly updates num_entries for increasing entry counts.
+    ///
+    /// Note that decreasing counts are not possible with the current API.
     #[test]
-    fn partial_smt_add_path_num_entries() {
+    fn partial_smt_add_proof_num_entries() {
         // key0 and key1 have the same felt at index 3 so they will be placed in the same leaf.
         let key0 = Word::from([ZERO, ZERO, ZERO, ONE]);
         let key1 = Word::from([ONE, ONE, ONE, ONE]);
+        let key2 = Word::from([ONE, ONE, ONE, Felt::new(5)]);
         let value0 = Word::from(rand_array::<Felt, 4>());
         let value1 = Word::from(rand_array::<Felt, 4>());
+        let value2 = Word::from(rand_array::<Felt, 4>());
 
-        let full = Smt::with_entries([(key0, value0), (key1, value1)]).unwrap();
-        let mut partial = PartialSmt::new();
+        let full = Smt::with_entries([(key0, value0), (key1, value1), (key2, value2)]).unwrap();
+        let mut partial = PartialSmt::new(full.root());
 
-        // Add the multi-entry leaf via add_path
-        let proof0 = full.open(&key0);
-        let (path0, leaf0) = proof0.into_parts();
-        partial.add_path(leaf0.clone(), path0.clone()).unwrap();
+        // Add the multi-entry leaf
+        partial.add_proof(full.open(&key0)).unwrap();
         assert_eq!(partial.num_entries(), 2);
 
-        // Now, replace the multi-entry leaf with a single-entry leaf (simulate removing one entry)
-        let single_leaf = SmtLeaf::new_single(key0, value0);
-        partial.add_path(single_leaf.clone(), path0.clone()).unwrap();
-        assert_eq!(partial.num_entries(), 1);
+        // Add the single-entry leaf
+        partial.add_proof(full.open(&key2)).unwrap();
+        assert_eq!(partial.num_entries(), 3);
     }
 }
