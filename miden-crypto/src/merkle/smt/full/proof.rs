@@ -1,7 +1,10 @@
 use alloc::string::ToString;
 
 use super::{SMT_DEPTH, SmtLeaf, SmtProofError, SparseMerklePath, Word};
-use crate::utils::{ByteReader, ByteWriter, Deserializable, DeserializationError, Serializable};
+use crate::{
+    merkle::InnerNodeInfo,
+    utils::{ByteReader, ByteWriter, Deserializable, DeserializationError, Serializable},
+};
 
 /// A proof which can be used to assert membership (or non-membership) of key-value pairs
 /// in a [`super::Smt`] (Sparse Merkle Tree).
@@ -93,6 +96,13 @@ impl SmtProof {
     /// Returns the leaf associated with the proof.
     pub fn leaf(&self) -> &SmtLeaf {
         &self.leaf
+    }
+
+    /// Returns an iterator over every inner node of this proof's merkle path.
+    pub fn authenticated_nodes(&self) -> impl Iterator<Item = InnerNodeInfo> + '_ {
+        self.path
+            .authenticated_nodes(self.leaf.index().value(), self.leaf.hash())
+            .expect("leaf index is u64 and should be less than 2^SMT_DEPTH")
     }
 
     /// Consume the proof and returns its parts.
