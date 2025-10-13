@@ -194,18 +194,16 @@ impl PartialSmt {
     ///   (except when the first leaf is added). If an error is returned, the tree is left in an
     ///   inconsistent state.
     pub fn add_path(&mut self, leaf: SmtLeaf, path: SparseMerklePath) -> Result<(), MerkleError> {
-        let node_hash_at_current_index = self.add_path_unchecked(leaf, path);
+        let new_root = self.add_path_unchecked(leaf, path);
 
-        // Check the newly added merkle path is consistent with the existing tree. If not, the
+        // Check if the newly added merkle path is consistent with the existing tree. If not, the
         // merkle path was invalid or computed against another tree.
-        if self.root() != node_hash_at_current_index {
+        if self.root() != new_root {
             return Err(MerkleError::ConflictingRoots {
                 expected_root: self.root(),
-                actual_root: node_hash_at_current_index,
+                actual_root: new_root,
             });
         }
-
-        self.0.set_root(node_hash_at_current_index);
 
         Ok(())
     }
