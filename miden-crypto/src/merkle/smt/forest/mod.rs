@@ -1,7 +1,4 @@
-use alloc::{
-    collections::{BTreeSet, VecDeque},
-    vec::Vec,
-};
+use alloc::{collections::BTreeSet, vec::Vec};
 
 use super::{EmptySubtreeRoots, MerkleError, NodeIndex, SmtLeaf, SmtProof, Word};
 use crate::{
@@ -55,17 +52,14 @@ mod tests;
 /// // Open a proof for the inserted key
 /// let proof = forest.open(new_root, key).unwrap();
 ///
-/// // Prune older roots to release memory used by old SMT instances
-/// forest.pop_roots(2);
+/// // Prune SMTs to release memory used by their nodes and leaves
+/// forest.pop_smts(vec![new_root]);
 /// ```
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct SmtForest {
     /// Roots of all SMTs in this forest. Any time an SMT in this forest is updated, we add a new
     /// root to this set.
     roots: BTreeSet<Word>,
-
-    /// Chronological history of SMT roots used for pruning.
-    root_history: VecDeque<Word>,
 
     /// Stores Merkle paths for all SMTs in this forest.
     store: SmtStore,
@@ -87,11 +81,10 @@ impl SmtForest {
     /// Creates an empty `SmtForest` instance.
     pub fn new() -> SmtForest {
         let roots = BTreeSet::new();
-        let root_history = VecDeque::new();
         let store = SmtStore::new();
         let leaves = Map::new();
 
-        SmtForest { roots, root_history, store, leaves }
+        SmtForest { roots, store, leaves }
     }
 
     // DATA EXTRACTORS
@@ -202,19 +195,17 @@ impl SmtForest {
             self.leaves.insert(leaf_hash, leaf);
         }
         self.roots.insert(new_root);
-        self.root_history.push_back(new_root);
 
         Ok(new_root)
     }
 
-    /// Removes the specified number of oldest roots from the forest.
+    /// Removes the specified SMTs (identified by their roots) from the forest.
     /// Releases memory used by nodes and leaves that are no longer reachable.
-    pub fn pop_roots(&mut self, count: usize) {
-        let roots = self.root_history.drain(..count).collect::<Vec<_>>();
-        for root in &roots {
-            self.roots.remove(root);
+    pub fn pop_smts(&mut self, roots: impl IntoIterator<Item = Word> + Clone) {
+        for root in roots.clone() {
+            self.roots.remove(&root);
         }
-        for leaf in self.store.remove_roots(roots.into_iter()) {
+        for leaf in self.store.remove_roots(roots) {
             self.leaves.remove(&leaf);
         }
     }
