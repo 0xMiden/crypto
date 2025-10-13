@@ -1,4 +1,4 @@
-use alloc::{collections::BTreeSet, vec::Vec};
+use alloc::collections::BTreeSet;
 
 use super::{EmptySubtreeRoots, MerkleError, NodeIndex, SmtLeaf, SmtProof, Word};
 use crate::{
@@ -136,14 +136,18 @@ impl SmtForest {
     pub fn batch_insert(
         &mut self,
         root: Word,
-        entries: impl Iterator<Item = (Word, Word)> + Clone,
+        entries: impl IntoIterator<Item = (Word, Word)> + Clone,
     ) -> Result<Word, MerkleError> {
         if !self.contains_root(root) {
             return Err(MerkleError::RootNotInStore(root));
         }
 
         // Find all affected leaf indices
-        let indices = entries.clone().map(|(key, _)| LeafIndex::from(key)).collect::<BTreeSet<_>>();
+        let indices = entries
+            .clone()
+            .into_iter()
+            .map(|(key, _)| LeafIndex::from(key))
+            .collect::<BTreeSet<_>>();
 
         // Create new SmtLeaf objects for updated key-value pairs
         let mut new_leaves = Map::new();
@@ -180,13 +184,15 @@ impl SmtForest {
 
         // Update MerkleStore with new leaf hashes
         #[allow(unused_mut)]
-        let mut new_leaf_entries = new_leaves
-            .iter()
-            .map(|(index, leaf)| (NodeIndex::from(*index), leaf.0))
-            .collect::<Vec<_>>();
+        let mut new_leaf_entries =
+            new_leaves.iter().map(|(index, leaf)| (NodeIndex::from(*index), leaf.0));
 
         #[cfg(feature = "hashmaps")]
-        new_leaf_entries.sort_by_key(|(idx, _)| *idx);
+        let mut new_leaf_entries = {
+            let mut new_leaf_entries = new_leaf_entries.collect::<Vec<_>>();
+            new_leaf_entries.sort_by_key(|(idx, _)| *idx);
+            new_leaf_entries
+        };
 
         let new_root = self.store.set_nodes(root, new_leaf_entries)?;
 

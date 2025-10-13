@@ -150,7 +150,7 @@ impl NodeIndex {
     pub const fn is_nth_bit_odd(&self, n: u8) -> bool {
         (self.value >> n) & 1 == 1
     }
-    
+
     /// Returns `true` if the depth is `0`.
     pub const fn is_root(&self) -> bool {
         self.depth == 0

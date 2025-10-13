@@ -77,9 +77,9 @@ impl SmtStore {
     ///   store.
     pub fn get_path(&self, root: Word, index: NodeIndex) -> Result<MerkleProof, MerkleError> {
         let IndexedPath { value, path } = self.get_indexed_path(root, index)?;
-        let path = path.into_iter().rev().map(|(_, value)| value).collect::<Vec<_>>();
+        let path_iter = path.into_iter().rev().map(|(_, value)| value);
 
-        Ok(MerkleProof::new(value, MerklePath::new(path)))
+        Ok(MerkleProof::new(value, MerklePath::from_iter(path_iter)))
     }
 
     /// Returns the node at the specified `index` and its opening to the `root`.
