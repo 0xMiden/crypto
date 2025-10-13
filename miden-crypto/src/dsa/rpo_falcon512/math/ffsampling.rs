@@ -76,18 +76,21 @@ impl Zeroize for LdlTree {
         match self {
             LdlTree::Branch(poly, left, right) => {
                 // Zeroize polynomial coefficients using write_volatile to prevent compiler
-                // optimizations
+                // optimizations (dead store elimination)
                 for coeff in poly.coefficients.iter_mut() {
                     unsafe {
                         core::ptr::write_volatile(coeff, Complex64::new(0.0, 0.0));
                     }
                 }
-                // Ensure the write operations are not reordered
-                core::sync::atomic::compiler_fence(core::sync::atomic::Ordering::SeqCst);
 
                 // Recursively zeroize child nodes
                 left.zeroize();
                 right.zeroize();
+
+                // Compiler fence AFTER all zeroing operations to prevent reordering.
+                // This ensures all writes (both at this level and in recursive calls) are
+                // completed before any subsequent code can observe them.
+                core::sync::atomic::compiler_fence(core::sync::atomic::Ordering::SeqCst);
             },
             LdlTree::Leaf(arr) => {
                 // Zeroize leaf array using write_volatile
@@ -96,7 +99,8 @@ impl Zeroize for LdlTree {
                         core::ptr::write_volatile(val, Complex64::new(0.0, 0.0));
                     }
                 }
-                // Ensure the write operations are not reordered
+
+                // Compiler fence after all writes to prevent reordering with subsequent code
                 core::sync::atomic::compiler_fence(core::sync::atomic::Ordering::SeqCst);
             },
         }
