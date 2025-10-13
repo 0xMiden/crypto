@@ -6,6 +6,16 @@ use rand_utils::rand_value;
 use super::{Felt, Hasher, Rpx256, StarkField, ZERO};
 use crate::{ONE, Word};
 
+// The number of iterations to run the `ext_round_matches_reference_many` test.
+#[cfg(all(
+    target_arch = "x86_64",
+    any(
+        target_feature = "avx2",
+        all(target_feature = "avx512f", target_feature = "avx512dq")
+    )
+))]
+const EXT_ROUND_TEST_ITERS: usize = 5_000_000;
+
 #[test]
 fn hash_elements_vs_merge() {
     let elements = [Felt::new(rand_value()); 8];
@@ -176,6 +186,38 @@ fn sponge_zeroes_collision() {
         // panic if a collision was found
         assert!(set.insert(hash));
     });
+}
+
+/// Verifies that the optimized RPX (E) round (SIMD path) matches the
+/// scalar reference implementation across many random states.
+///
+/// Compiles and runs only when we build an x86_64 target with AVX2 or AVX-512 enabled.
+/// At runtime, if the host CPU lacks the compiled feature, the test returns early.
+#[cfg(all(
+    target_arch = "x86_64",
+    any(
+        target_feature = "avx2",
+        all(target_feature = "avx512f", target_feature = "avx512dq")
+    )
+))]
+#[test]
+fn ext_round_matches_reference_many() {
+    for i in 0..EXT_ROUND_TEST_ITERS {
+        let mut state = core::array::from_fn(|_| Felt::new(rand_value()));
+
+        for round in 0..7 {
+            let mut got = state;
+            let mut want = state;
+
+            // Optimized path (AVX2 or AVX-512 depending on build).
+            Rpx256::apply_ext_round(&mut got, round);
+            // Scalar reference path.
+            Rpx256::apply_ext_round_ref(&mut want, round);
+
+            assert_eq!(got, want, "mismatch at round {round} (iteration {i})");
+            state = got; // advance to catch chaining issues
+        }
+    }
 }
 
 proptest! {

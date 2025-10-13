@@ -1,8 +1,8 @@
 use super::{
     ARK1, ARK2, CAPACITY_RANGE, CubeExtension, DIGEST_RANGE, ElementHasher, Felt, FieldElement,
     Hasher, MDS, NUM_ROUNDS, RATE_RANGE, Range, STATE_WIDTH, Word, add_constants,
-    add_constants_and_apply_inv_sbox, add_constants_and_apply_sbox, apply_inv_sbox, apply_mds,
-    apply_sbox,
+    add_constants_and_apply_ext_round, add_constants_and_apply_inv_sbox,
+    add_constants_and_apply_sbox, apply_inv_sbox, apply_mds, apply_sbox,
 };
 #[cfg(test)]
 use super::{StarkField, ZERO};
@@ -179,8 +179,23 @@ impl Rpx256 {
     }
 
     /// (E) round function.
+    ///
+    /// It first attempts to run the optimized (SIMD-accelerated) implementation.
+    /// If SIMD acceleration is not available for the current target it falls
+    /// back to the scalar reference implementation (`apply_ext_round_ref`).
     #[inline(always)]
     pub fn apply_ext_round(state: &mut [Felt; STATE_WIDTH], round: usize) {
+        if !add_constants_and_apply_ext_round(state, &ARK1[round]) {
+            Self::apply_ext_round_ref(state, round);
+        }
+    }
+
+    /// Scalar (reference) implementation of the (E) round function.
+    ///
+    /// This version performs the round without SIMD acceleration and is used
+    /// as a fallback when optimized implementations are not available.
+    #[inline(always)]
+    fn apply_ext_round_ref(state: &mut [Felt; STATE_WIDTH], round: usize) {
         // add constants
         add_constants(state, &ARK1[round]);
 

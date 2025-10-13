@@ -54,13 +54,13 @@ benchmark_with_setup_data! {
     DEFAULT_SAMPLE_SIZE,
     "new_from_elements",
     || {
-        let test_elements: Vec<[Felt; 4]> = (0..100)
+        let test_elements: Vec<[Felt; 4]> = (0u64..100)
             .map(|i| {
                 [
-                    Felt::new(i as u64),
-                    Felt::new((i + 1) as u64),
-                    Felt::new((i + 2) as u64),
-                    Felt::new((i + 3) as u64),
+                    Felt::new(i),
+                    Felt::new(i + 1),
+                    Felt::new(i + 2),
+                    Felt::new(i + 3),
                 ]
             })
             .collect();

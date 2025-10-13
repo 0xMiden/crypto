@@ -113,6 +113,20 @@ On platforms with [AVX2](https://en.wikipedia.org/wiki/Advanced_Vector_Extension
 make build-avx2
 ```
 
+### AVX512 acceleration
+
+On platforms with [AVX-512](https://en.wikipedia.org/wiki/AVX-512) support, RPO and RPX hash functions can be accelerated by using the vector processing unit. To enable AVX-512 acceleration, the code needs to be compiled with the appropriate target features enabled.  
+
+The minimal set of required features is:
+
+- `avx512f` (AVX-512 foundation)  
+- `avx512dq` (doubleword and quadword operations, required for 64-bit multiplies and comparisons)
+
+For example:
+```shell
+make build-avx512
+```
+
 ### SVE acceleration
 
 On platforms with [SVE](<https://en.wikipedia.org/wiki/AArch64#Scalable_Vector_Extension_(SVE)>) support, RPO and RPX hash function can be accelerated by using the vector processing unit. To enable SVE acceleration, the code needs to be compiled with the `sve` target feature enabled. For example:
@@ -120,6 +134,27 @@ On platforms with [SVE](<https://en.wikipedia.org/wiki/AArch64#Scalable_Vector_E
 ```shell
 make build-sve
 ```
+
+### Fastest performance
+
+For the fastest build on your current machine, let the compiler automatically enable all CPU features supported by your processor (AVX2, AVX-512, SVE, etc.):
+
+```shell
+RUSTFLAGS="-C target-cpu=native" cargo build --release
+```
+
+You can also make this permanent by adding it to your Cargo configuration file (`~/.cargo/config.toml`):
+
+```toml
+[build]
+rustflags = ["-C", "target-cpu=native"]
+```
+
+**Notes**
+- Using `-C target-cpu=native` lets `rustc` auto-detect features on the **build host**; there are **no target-feature warnings**, but the binary won’t be portable to CPUs lacking those features.  
+- Forcing features with `-C target-feature=+avx2`, `+avx512*`, or `+sve` on an incompatible target will print a warning and fall back to portable code paths.
+- Example: forcing `-C target-feature=+avx2` when building on macOS with Apple Silicon (`aarch64-apple-darwin`) will emit  
+  "`'+avx2' is not a recognized feature for this target (ignoring feature)`" and automatically fall back to scalar implementations
 
 ## Testing
 

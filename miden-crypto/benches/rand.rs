@@ -24,7 +24,7 @@
 
 use std::hint::black_box;
 
-use criterion::{BenchmarkId, Criterion, criterion_group, criterion_main};
+use criterion::{Criterion, criterion_group, criterion_main};
 // Import random generation modules
 use miden_crypto::{
     Felt, Word,
