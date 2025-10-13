@@ -6,7 +6,7 @@ use alloc::{string::ToString, vec::Vec};
 use ed25519_dalek::{Signer, Verifier};
 use rand::{CryptoRng, RngCore};
 use thiserror::Error;
-use zeroize::Zeroize;
+use zeroize::{Zeroize, ZeroizeOnDrop};
 
 use crate::{
     Felt, SequentialCommit, Word,
@@ -55,6 +55,10 @@ impl SecretKey {
         rand::RngCore::fill_bytes(rng, &mut seed);
 
         let inner = ed25519_dalek::SigningKey::from_bytes(&seed);
+
+        // Zeroize the seed to prevent leaking secret material
+        seed.zeroize();
+
         Self { inner }
     }
 
@@ -81,13 +85,22 @@ impl SecretKey {
     ///
     /// This conversion allows using the same underlying scalar from the Ed25519 secret key
     /// for X25519 Diffie-Hellman key exchange. The returned `StaticSecret` can then be used
-    /// in key agreement protocols to establish a shared secret with another party’s
+    /// in key agreement protocols to establish a shared secret with another party's
     /// X25519 public key.
     fn to_x25519(&self) -> x25519_dalek::StaticSecret {
-        let scalar_bytes = self.inner.to_scalar_bytes();
-        x25519_dalek::StaticSecret::from(scalar_bytes)
+        let mut scalar_bytes = self.inner.to_scalar_bytes();
+        let static_secret = x25519_dalek::StaticSecret::from(scalar_bytes);
+
+        // Zeroize the temporary scalar bytes
+        scalar_bytes.zeroize();
+
+        static_secret
     }
 }
+
+// SAFETY: The inner `ed25519_dalek::SigningKey` already implements `ZeroizeOnDrop`,
+// which ensures that the secret key material is securely zeroized when dropped.
+impl ZeroizeOnDrop for SecretKey {}
 
 // PUBLIC KEY
 // ================================================================================================

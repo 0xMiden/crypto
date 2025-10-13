@@ -8,6 +8,7 @@ use core::{
 };
 
 use num::{One, Zero};
+use zeroize::{Zeroize, ZeroizeOnDrop};
 
 use super::{Inverse, field::FalconFelt};
 use crate::{
@@ -631,6 +632,21 @@ impl Polynomial<i16> {
         self.coefficients.iter().map(|c| FalconFelt::new(*c).balanced_value()).collect()
     }
 }
+
+// ZEROIZE IMPLEMENTATIONS
+// ================================================================================================
+
+impl<F: Zeroize> Zeroize for Polynomial<F> {
+    fn zeroize(&mut self) {
+        // Delegate to Vec's zeroize implementation, which for primitive types (like i16)
+        // uses write_volatile and compiler_fence to prevent compiler optimizations.
+        // For types like Complex64 that don't implement Zeroize, we handle them explicitly
+        // in LdlTree's implementation.
+        self.coefficients.zeroize();
+    }
+}
+
+impl<F: Zeroize> ZeroizeOnDrop for Polynomial<F> {}
 
 // TESTS
 // ================================================================================================

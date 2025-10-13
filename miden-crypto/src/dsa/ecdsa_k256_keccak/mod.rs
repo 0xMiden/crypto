@@ -9,7 +9,7 @@ use k256::{
 };
 use rand::{CryptoRng, RngCore};
 use thiserror::Error;
-use zeroize::Zeroize;
+use zeroize::{Zeroize, ZeroizeOnDrop};
 
 use crate::{
     Felt, SequentialCommit, Word,
@@ -68,6 +68,10 @@ impl SecretKey {
         let mut rng = rand_hc::Hc128Rng::from_seed(seed);
 
         let signing_key = SigningKey::random(&mut rng);
+
+        // Zeroize the seed to prevent leaking secret material
+        seed.zeroize();
+
         Self { inner: signing_key }
     }
 
@@ -107,6 +111,10 @@ impl SecretKey {
         SharedSecret::new(shared_secret_inner)
     }
 }
+
+// SAFETY: The inner `k256::ecdsa::SigningKey` already implements `ZeroizeOnDrop`,
+// which ensures that the secret key material is securely zeroized when dropped.
+impl ZeroizeOnDrop for SecretKey {}
 
 // PUBLIC KEY
 // ================================================================================================

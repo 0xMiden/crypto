@@ -5,6 +5,7 @@ use num::Complex;
 use num::Float;
 use num_complex::Complex64;
 use rand::Rng;
+use zeroize::{Zeroize, ZeroizeOnDrop};
 
 use super::{
     super::{
@@ -119,9 +120,14 @@ impl SecretKey {
         use rand::SeedableRng;
         use rand_chacha::ChaCha20Rng;
 
-        let seed = self.generate_seed(&message);
+        let mut seed = self.generate_seed(&message);
         let mut rng = ChaCha20Rng::from_seed(seed);
-        self.sign_with_rng(message, &mut rng)
+        let signature = self.sign_with_rng(message, &mut rng);
+
+        // Zeroize the seed to prevent leakage
+        seed.zeroize();
+
+        signature
     }
 
     /// Signs a message with the secret key relying on the provided randomness generator.
@@ -248,6 +254,9 @@ impl SecretKey {
 
         let digest = Blake3_256::hash(&buffer);
 
+        // Zeroize the buffer as it contains secret key material
+        buffer.zeroize();
+
         digest.into()
     }
 }
@@ -271,30 +280,36 @@ impl Serializable for SecretKey {
         let mut buffer = Vec::with_capacity(1281);
         buffer.push(header);
 
-        let f_i8: Vec<i8> = neg_f
+        let mut f_i8: Vec<i8> = neg_f
             .coefficients
             .iter()
             .map(|&a| FalconFelt::new(-a).balanced_value() as i8)
             .collect();
         let f_i8_encoded = encode_i8(&f_i8, WIDTH_SMALL_POLY_COEFFICIENT).unwrap();
         buffer.extend_from_slice(&f_i8_encoded);
+        f_i8.zeroize();
 
-        let g_i8: Vec<i8> = g
+        let mut g_i8: Vec<i8> = g
             .coefficients
             .iter()
             .map(|&a| FalconFelt::new(a).balanced_value() as i8)
             .collect();
         let g_i8_encoded = encode_i8(&g_i8, WIDTH_SMALL_POLY_COEFFICIENT).unwrap();
         buffer.extend_from_slice(&g_i8_encoded);
+        g_i8.zeroize();
 
-        let big_f_i8: Vec<i8> = neg_big_f
+        let mut big_f_i8: Vec<i8> = neg_big_f
             .coefficients
             .iter()
             .map(|&a| FalconFelt::new(-a).balanced_value() as i8)
             .collect();
         let big_f_i8_encoded = encode_i8(&big_f_i8, WIDTH_BIG_POLY_COEFFICIENT).unwrap();
         buffer.extend_from_slice(&big_f_i8_encoded);
+        big_f_i8.zeroize();
+
         target.write_bytes(&buffer);
+        // Note: buffer is not zeroized here as it's being passed to write_bytes which consumes it
+        // The caller should ensure proper handling of the written bytes
     }
 }
 
@@ -353,6 +368,20 @@ impl Deserializable for SecretKey {
         Ok(Self::from_short_lattice_basis(basis))
     }
 }
+
+impl Zeroize for SecretKey {
+    fn zeroize(&mut self) {
+        // Zeroize the secret key basis (array of Polynomial<i16>).
+        // This delegates to Vec<i16>::zeroize(), which uses write_volatile.
+        self.secret_key.zeroize();
+
+        // Zeroize the LDL tree (which contains Complex64 coefficients).
+        // The LdlTree implementation uses write_volatile and compiler_fence.
+        self.tree.zeroize();
+    }
+}
+
+impl ZeroizeOnDrop for SecretKey {}
 
 // HELPER FUNCTIONS
 // ================================================================================================

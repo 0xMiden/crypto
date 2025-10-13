@@ -5,6 +5,7 @@ use num::Float;
 use num::{One, Zero};
 use num_complex::{Complex, Complex64};
 use rand::Rng;
+use zeroize::{Zeroize, ZeroizeOnDrop};
 
 use super::{fft::FastFft, polynomial::Polynomial, samplerz::sampler_z};
 
@@ -69,6 +70,39 @@ impl PartialEq for LdlTree {
 }
 
 impl Eq for LdlTree {}
+
+impl Zeroize for LdlTree {
+    fn zeroize(&mut self) {
+        match self {
+            LdlTree::Branch(poly, left, right) => {
+                // Zeroize polynomial coefficients using write_volatile to prevent compiler
+                // optimizations
+                for coeff in poly.coefficients.iter_mut() {
+                    unsafe {
+                        core::ptr::write_volatile(coeff, Complex64::new(0.0, 0.0));
+                    }
+                }
+                // Ensure the write operations are not reordered
+                core::sync::atomic::compiler_fence(core::sync::atomic::Ordering::SeqCst);
+
+                // Recursively zeroize child nodes
+                left.zeroize();
+                right.zeroize();
+            },
+            LdlTree::Leaf(arr) => {
+                // Zeroize leaf array using write_volatile
+                for val in arr.iter_mut() {
+                    unsafe {
+                        core::ptr::write_volatile(val, Complex64::new(0.0, 0.0));
+                    }
+                }
+                core::sync::atomic::compiler_fence(core::sync::atomic::Ordering::SeqCst);
+            },
+        }
+    }
+}
+
+impl ZeroizeOnDrop for LdlTree {}
 
 /// Computes the LDL Tree of G. Corresponds to Algorithm 9 of the specification [1, p.37].
 /// The argument is a 2x2 matrix of polynomials, given in FFT form.
