@@ -53,6 +53,23 @@ pub enum LdlTree {
     Leaf([Complex64; 2]),
 }
 
+impl PartialEq for LdlTree {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (
+                LdlTree::Branch(lhs_poly, lhs_left, lhs_right),
+                LdlTree::Branch(rhs_poly, rhs_left, rhs_right),
+            ) => lhs_poly == rhs_poly && lhs_left == rhs_left && lhs_right == rhs_right,
+            (LdlTree::Leaf(lhs), LdlTree::Leaf(rhs)) => {
+                lhs.iter().zip(rhs.iter()).all(|(a, b)| a == b)
+            },
+            _ => false,
+        }
+    }
+}
+
+impl Eq for LdlTree {}
+
 /// Computes the LDL Tree of G. Corresponds to Algorithm 9 of the specification [1, p.37].
 /// The argument is a 2x2 matrix of polynomials, given in FFT form.
 /// [1]: https://falcon-sign.info/falcon.pdf

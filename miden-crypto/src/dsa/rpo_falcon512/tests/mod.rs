@@ -8,9 +8,12 @@ use rand::{RngCore, SeedableRng};
 use rand_chacha::ChaCha20Rng;
 
 use super::{Serializable, math::Polynomial};
-use crate::dsa::rpo_falcon512::{
-    PREVERSIONED_NONCE, PREVERSIONED_NONCE_LEN, SIG_NONCE_LEN, SIG_POLY_BYTE_LEN, SecretKey,
-    tests::data::DETERMINISTIC_SIGNATURE,
+use crate::{
+    Word, ZERO,
+    dsa::rpo_falcon512::{
+        PREVERSIONED_NONCE, PREVERSIONED_NONCE_LEN, SIG_NONCE_LEN, SIG_POLY_BYTE_LEN, SecretKey,
+        tests::data::DETERMINISTIC_SIGNATURE,
+    },
 };
 
 mod data;
@@ -84,6 +87,28 @@ fn test_signature_gen_reference_impl() {
             &sig_bytes[2..2 + SIG_POLY_BYTE_LEN]
         );
     }
+}
+
+#[test]
+fn derived_trait_consistency() {
+    let seed = [1_u8; 32];
+    let mut rng = ChaCha20Rng::from_seed(seed);
+
+    let sk = SecretKey::with_rng(&mut rng);
+    let sk_clone = sk.clone();
+    assert_eq!(sk, sk_clone);
+    assert_eq!(format!("{sk:?}"), format!("{sk_clone:?}"));
+
+    let pk = sk.public_key();
+    let pk_clone = pk.clone();
+    assert_eq!(pk, pk_clone);
+    assert_eq!(format!("{pk:?}"), format!("{pk_clone:?}"));
+
+    let message = Word::from([ZERO; 4]);
+    let signature = sk.sign(message);
+    let signature_clone = signature.clone();
+    assert_eq!(signature, signature_clone);
+    assert_eq!(format!("{signature:?}"), format!("{signature_clone:?}"));
 }
 
 #[test]

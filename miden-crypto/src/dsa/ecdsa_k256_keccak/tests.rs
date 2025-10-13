@@ -97,3 +97,24 @@ fn test_signature_serialization() {
     let recovered_sig = Signature::from_sec1_bytes_and_recovery_id(sig_bytes, recovery_id).unwrap();
     assert_ne!(signature, recovered_sig);
 }
+
+#[test]
+fn test_derived_traits_consistency() {
+    let mut rng = rng();
+
+    let mut secret_key = SecretKey::with_rng(&mut rng);
+    let secret_key_clone = secret_key.clone();
+    assert_eq!(secret_key, secret_key_clone);
+    assert_eq!(format!("{secret_key:?}"), format!("{secret_key_clone:?}"));
+
+    let public_key = secret_key.public_key();
+    let public_key_clone = public_key.clone();
+    assert_eq!(public_key, public_key_clone);
+    assert_eq!(format!("{public_key:?}"), format!("{public_key_clone:?}"));
+
+    let message = [Felt::new(9), Felt::new(8), Felt::new(7), Felt::new(6)].into();
+    let signature = secret_key.sign(message);
+    let signature_clone = signature.clone();
+    assert_eq!(signature, signature_clone);
+    assert_eq!(format!("{signature:?}"), format!("{signature_clone:?}"));
+}

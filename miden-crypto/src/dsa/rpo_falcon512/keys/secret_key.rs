@@ -54,7 +54,7 @@ pub(crate) const WIDTH_SMALL_POLY_COEFFICIENT: usize = 6;
 /// using Fast Fourier sampling during signature generation (ffSampling algorithm 11 in [1]).
 ///
 /// [1]: https://falcon-sign.info/falcon.pdf
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SecretKey {
     secret_key: ShortLatticeBasis,
     tree: LdlTree,

@@ -34,6 +34,7 @@ const SIGNATURE_BYTES: usize = 64;
 // ================================================================================================
 
 /// Secret key for EdDSA (Ed25519) signature verification over Curve25519.
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SecretKey {
     inner: ed25519_dalek::SigningKey,
 }

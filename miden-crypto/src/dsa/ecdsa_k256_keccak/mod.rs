@@ -41,6 +41,7 @@ const SCALARS_SIZE_BYTES: usize = 32;
 // ================================================================================================
 
 /// Secret key for ECDSA signature verification over secp256k1 curve.
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SecretKey {
     inner: SigningKey,
 }
