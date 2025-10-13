@@ -53,14 +53,14 @@ impl SmtStore {
         // corner case: check the root is in the store when called with index `NodeIndex::root()`
         self.nodes.get(&hash).ok_or(MerkleError::RootNotInStore(hash))?;
 
+        // traverse from root to index
         for i in (0..index.depth()).rev() {
             let node = self
                 .nodes
                 .get(&hash)
                 .ok_or(MerkleError::NodeIndexNotFoundInStore(hash, index))?;
 
-            let bit = (index.value() >> i) & 1;
-            hash = if bit == 0 { node.left } else { node.right }
+            hash = if index.is_nth_bit_odd(i) { node.right } else { node.left }
         }
 
         Ok(hash)
@@ -99,23 +99,22 @@ impl SmtStore {
         // corner case: check the root is in the store when called with index `NodeIndex::root()`
         self.nodes.get(&hash).ok_or(MerkleError::RootNotInStore(hash))?;
 
-        let mut pos = 0; // Root position at level 0
+        // Build sibling node index at each level as we traverse from root to leaf
+        let mut current_index = NodeIndex::root();
         for i in (0..index.depth()).rev() {
             let node = self
                 .nodes
                 .get(&hash)
                 .ok_or(MerkleError::NodeIndexNotFoundInStore(hash, index))?;
 
-            let bit = (index.value() >> i) & 1;
-            let depth = index.depth() - i;
-            hash = if bit == 0 {
-                path.push((NodeIndex::new(depth, pos * 2 + 1)?, node.right));
-                pos = pos * 2;
-                node.left
-            } else {
-                path.push((NodeIndex::new(depth, pos * 2)?, node.left));
-                pos = pos * 2 + 1;
+            hash = if index.is_nth_bit_odd(i) {
+                path.push((current_index.left_child(), node.left));
+                current_index = current_index.right_child();
                 node.right
+            } else {
+                path.push((current_index.right_child(), node.right));
+                current_index = current_index.left_child();
+                node.left
             }
         }
 
