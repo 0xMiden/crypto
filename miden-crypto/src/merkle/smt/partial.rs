@@ -252,13 +252,13 @@ impl PartialSmt {
         self.0.num_entries()
     }
 
-    /// Returns a boolean value indicating whether the [`PartialSmt`] is empty.
+    /// Returns a boolean value indicating whether the [`PartialSmt`] tracks any leaves.
     ///
-    /// A partial SMT is considered empty if it does not track any leaves, but it's root is not
-    /// necessarily equal to the empty SMT root, since it could have been constructed from a
-    /// different root.
-    pub fn is_empty(&self) -> bool {
-        self.0.leaves.is_empty()
+    /// Note that if a partial SMT does not track leaves, its root is not necessarily the empty SMT
+    /// root, since it could have been constructed from a different root but without tracking any
+    /// leaves.
+    pub fn tracks_leaves(&self) -> bool {
+        !self.0.leaves.is_empty()
     }
 
     // PRIVATE HELPERS
@@ -416,7 +416,7 @@ mod tests {
 
         let partial_smt = PartialSmt::new(full.root());
 
-        assert!(partial_smt.is_empty());
+        assert!(!partial_smt.tracks_leaves());
         assert_eq!(partial_smt.num_entries(), 0);
         assert_eq!(partial_smt.num_leaves(), 0);
         assert_eq!(partial_smt.entries().count(), 0);
@@ -673,7 +673,7 @@ mod tests {
         let proofs = [proof0, proof2, proof_empty];
         let partial = PartialSmt::from_proofs(proofs.clone()).unwrap();
 
-        assert!(!partial.is_empty());
+        assert!(partial.tracks_leaves());
         assert_eq!(full.root(), partial.root());
         // There should be 2 non-empty entries.
         assert_eq!(partial.num_entries(), 2);
@@ -733,10 +733,10 @@ mod tests {
         }
     }
 
-    /// Test that an empty partial SMT's is_empty method returns `true`.
+    /// Test that the default partial SMT's tracks_leaves method returns `false`.
     #[test]
-    fn partial_smt_is_empty() {
-        assert!(PartialSmt::default().is_empty());
+    fn partial_smt_tracks_leaves() {
+        assert!(!PartialSmt::default().tracks_leaves());
     }
 
     /// `PartialSmt` serde round-trip. Also tests conversion from SMT.
