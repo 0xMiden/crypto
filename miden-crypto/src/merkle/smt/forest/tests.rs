@@ -234,3 +234,73 @@ fn test_pop_roots() -> Result<(), MerkleError> {
 
     Ok(())
 }
+
+#[test]
+fn test_multiple_independent_trees() -> Result<(), MerkleError> {
+    let mut forest = SmtForest::new();
+
+    let empty_tree_root = *EmptySubtreeRoots::entry(SMT_DEPTH, 0);
+
+    // Create first tree with some key-value pairs
+    let key1 = Word::new([ZERO, ZERO, ZERO, ZERO]);
+    let value1 = Word::new([ONE, ZERO, ZERO, ZERO]);
+    let tree1_root = forest.insert(empty_tree_root, key1, value1)?;
+
+    let key2 = Word::new([ZERO, ZERO, ZERO, ONE]);
+    let value2 = Word::new([ONE, ONE, ZERO, ZERO]);
+    let tree1_root = forest.insert(tree1_root, key2, value2)?;
+
+    // Create second independent tree starting from empty root
+    let key3 = Word::new([ZERO, ZERO, ONE, ZERO]);
+    let value3 = Word::new([Felt::new(3), ZERO, ZERO, ZERO]);
+    let tree2_root = forest.insert(empty_tree_root, key3, value3)?;
+
+    let key4 = Word::new([ZERO, ZERO, ONE, ONE]);
+    let value4 = Word::new([Felt::new(4), ZERO, ZERO, ZERO]);
+    let tree2_root = forest.insert(tree2_root, key4, value4)?;
+
+    // Verify all three roots are different
+    assert_ne!(tree1_root, tree2_root, "Tree 1 and Tree 2 should have different roots");
+
+    // Verify we can open and verify proofs from tree1
+    let proof1 = forest.open(tree1_root, key1)?;
+    assert!(
+        proof1.verify_membership(&key1, &value1, &tree1_root),
+        "Tree 1 should verify key1"
+    );
+
+    let proof2 = forest.open(tree1_root, key2)?;
+    assert!(
+        proof2.verify_membership(&key2, &value2, &tree1_root),
+        "Tree 1 should verify key2"
+    );
+
+    // Verify tree1 does NOT contain keys from tree2
+    let proof_key3_in_tree1 = forest.open(tree1_root, key3)?;
+    assert!(
+        !proof_key3_in_tree1.verify_membership(&key3, &value3, &tree1_root),
+        "Tree 1 should not verify key3 with value3"
+    );
+
+    // Verify we can open and verify proofs from tree2
+    let proof3 = forest.open(tree2_root, key3)?;
+    assert!(
+        proof3.verify_membership(&key3, &value3, &tree2_root),
+        "Tree 2 should verify key3"
+    );
+
+    let proof4 = forest.open(tree2_root, key4)?;
+    assert!(
+        proof4.verify_membership(&key4, &value4, &tree2_root),
+        "Tree 2 should verify key4"
+    );
+
+    // Verify tree2 does NOT contain keys from tree1
+    let proof_key1_in_tree2 = forest.open(tree2_root, key1)?;
+    assert!(
+        !proof_key1_in_tree2.verify_membership(&key1, &value1, &tree2_root),
+        "Tree 2 should not verify key1 with value1"
+    );
+
+    Ok(())
+}

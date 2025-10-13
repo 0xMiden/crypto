@@ -142,6 +142,8 @@ impl SmtForest {
             return Err(MerkleError::RootNotInStore(root));
         }
 
+        std::println!("batch_inserting");
+
         // Find all affected leaf indices
         let indices = entries
             .clone()
@@ -221,8 +223,7 @@ impl SmtForest {
 
     /// Checks if the forest contains the specified root.
     fn contains_root(&self, root: Word) -> bool {
-        self.roots.contains(&root)
-            || (self.roots.is_empty() && *EmptySubtreeRoots::entry(SMT_DEPTH, 0) == root)
+        self.roots.contains(&root) || *EmptySubtreeRoots::entry(SMT_DEPTH, 0) == root
     }
 }
 
