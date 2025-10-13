@@ -29,3 +29,13 @@ mod algebraic_sponge;
 // ================================================================================================
 
 pub use winter_crypto::{Digest, ElementHasher, Hasher};
+
+/// Extension trait for Hasher to provide iterator-based hashing.
+pub trait HasherExt: Hasher {
+    /// Hashes an iterator of byte slices.
+    ///
+    /// This method allows for more efficient hashing by avoiding the need to
+    /// allocate a contiguous buffer when the input data is already available
+    /// as discrete slices.
+    fn hash_iter<'a>(&self, slices: impl Iterator<Item = &'a [u8]>) -> Self::Digest;
+}

@@ -6,7 +6,10 @@ use super::{
 };
 
 mod arch;
-pub use arch::optimized::{add_constants_and_apply_inv_sbox, add_constants_and_apply_sbox};
+pub use arch::optimized::{
+    add_constants_and_apply_ext_round, add_constants_and_apply_inv_sbox,
+    add_constants_and_apply_sbox,
+};
 
 mod mds;
 use mds::{MDS, apply_mds};
