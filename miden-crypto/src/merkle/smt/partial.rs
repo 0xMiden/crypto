@@ -52,8 +52,7 @@ impl PartialSmt {
     /// # Errors
     ///
     /// Returns an error if:
-    /// - the new root after the insertion of a (leaf, path) tuple does not match the existing root
-    ///   (except if the tree was previously empty).
+    /// - the roots of the provided proofs are not the same.
     pub fn from_proofs<I>(proofs: I) -> Result<Self, MerkleError>
     where
         I: IntoIterator<Item = SmtProof>,
@@ -69,8 +68,8 @@ impl PartialSmt {
         // subsequently added proofs must match it.
         let mut partial_smt = Self::default();
         let (path, leaf) = first_proof.into_parts();
-        let new_root = partial_smt.add_path_unchecked(leaf, path);
-        partial_smt.0.set_root(new_root);
+        let path_root = partial_smt.add_path_unchecked(leaf, path);
+        partial_smt.0.set_root(path_root);
 
         for proof in proofs {
             partial_smt.add_proof(proof)?;
@@ -183,18 +182,17 @@ impl PartialSmt {
     /// # Errors
     ///
     /// Returns an error if:
-    /// - the new root after the insertion of the leaf and the path does not match the existing root
-    ///   (except when the first leaf is added). If an error is returned, the tree is left in an
-    ///   inconsistent state.
+    /// - the new root after the insertion of the leaf and the path does not match the existing
+    ///   root. If an error is returned, the tree is left in an inconsistent state.
     pub fn add_path(&mut self, leaf: SmtLeaf, path: SparseMerklePath) -> Result<(), MerkleError> {
-        let new_root = self.add_path_unchecked(leaf, path);
+        let path_root = self.add_path_unchecked(leaf, path);
 
         // Check if the newly added merkle path is consistent with the existing tree. If not, the
         // merkle path was invalid or computed against another tree.
-        if self.root() != new_root {
+        if self.root() != path_root {
             return Err(MerkleError::ConflictingRoots {
                 expected_root: self.root(),
-                actual_root: new_root,
+                actual_root: path_root,
             });
         }
 
@@ -264,10 +262,12 @@ impl PartialSmt {
     // PRIVATE HELPERS
     // --------------------------------------------------------------------------------------------
 
-    /// Adds a leaf and its sparse merkle path to this [`PartialSmt`] and returns the tree root of
-    /// the inserted path.
+    /// Adds a leaf and its sparse merkle path to this [`PartialSmt`] and returns the root of the
+    /// inserted path.
     ///
-    /// This does not check that the computed root matches the existing root of the tree.
+    /// This does not check that the path root matches the existing root of the tree and if so, the
+    /// tree is left in an inconsistent state. This state can be made consistent again by setting
+    /// the root of the SMT to the path root.
     fn add_path_unchecked(&mut self, leaf: SmtLeaf, path: SparseMerklePath) -> Word {
         let mut current_index = leaf.index().index;
 
