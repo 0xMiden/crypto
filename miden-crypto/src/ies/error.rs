@@ -1,47 +1,26 @@
-use core::fmt;
+use thiserror::Error;
 
 /// Error type for the Integrated Encryption Scheme (IES)
-#[derive(Debug)]
-pub enum IntegratedEncryptionSchemeError {
+#[derive(Debug, Error)]
+pub enum IesError {
+    #[error("key agreement failed")]
     KeyAgreementFailed,
+    #[error("encryption failed")]
     EncryptionFailed,
+    #[error("decryption failed")]
     DecryptionFailed,
+    #[error("invalid key size")]
     InvalidKeySize,
+    #[error("invalid nonce")]
     InvalidNonce,
+    #[error("ephemeral public key deserialization failed")]
     EphemeralPublicKeyDeserializationFailed,
-    AlgorithmMismatch,
-    UnsupportedAlgorithm,
+    #[error("scheme mismatch")]
+    SchemeMismatch,
+    #[error("unsupported scheme")]
+    UnsupportedScheme,
+    #[error("failed to extract key material for encryption/decryption")]
     FailedExtractKeyMaterial,
+    #[error("failed to construct the encryption/decryption key from the provided bytes")]
     EncryptionKeyCreationFailed,
-}
-
-#[cfg(feature = "std")]
-impl std::error::Error for IntegratedEncryptionSchemeError {}
-
-impl fmt::Display for IntegratedEncryptionSchemeError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            IntegratedEncryptionSchemeError::KeyAgreementFailed => {
-                write!(f, "key agreement failed")
-            },
-            IntegratedEncryptionSchemeError::EncryptionFailed => write!(f, "encryption failed"),
-            IntegratedEncryptionSchemeError::DecryptionFailed => write!(f, "decryption failed"),
-            IntegratedEncryptionSchemeError::InvalidKeySize => write!(f, "invalid key size"),
-            IntegratedEncryptionSchemeError::InvalidNonce => write!(f, "invalid nonce"),
-            IntegratedEncryptionSchemeError::EphemeralPublicKeyDeserializationFailed => {
-                write!(f, "ephemeral public key deserialization failed")
-            },
-            IntegratedEncryptionSchemeError::AlgorithmMismatch => write!(f, "algorithm mismatch"),
-            IntegratedEncryptionSchemeError::UnsupportedAlgorithm => {
-                write!(f, "unsupported algorithm")
-            },
-            IntegratedEncryptionSchemeError::FailedExtractKeyMaterial => {
-                write!(f, "failed to extract key material for encryption/decryption")
-            },
-            IntegratedEncryptionSchemeError::EncryptionKeyCreationFailed => write!(
-                f,
-                "failed to construct the encryption/decryption key from the provided bytes"
-            ),
-        }
-    }
 }

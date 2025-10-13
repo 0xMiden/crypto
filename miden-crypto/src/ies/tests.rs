@@ -83,7 +83,7 @@ macro_rules! test_basic_roundtrip {
     };
 }
 
-// IES ALGORITHM VARIANT REGISTRY
+// IES SCHEME VARIANT REGISTRY
 // ================================================================================================
 // Each IES variant gets its own dedicated test module with comprehensive coverage
 // To add a new variant, create a new module following the pattern below
@@ -620,18 +620,18 @@ mod x25519_aead_rpo_tests {
     }
 }
 
-// CROSS-ALGORITHM COMPATIBILITY TESTS
+// CROSS-SCHEME COMPATIBILITY TESTS
 // ================================================================================================
-// These tests verify algorithm mismatch detection and security properties
+// These tests verify scheme mismatch detection and security properties
 
-/// Tests algorithm mismatch detection between different IES variants
-mod algorithm_compatibility_tests {
+/// Tests scheme mismatch detection between different IES variants
+mod scheme_compatibility_tests {
     use super::*;
 
     #[test]
-    fn test_algorithm_mismatch_k256_xchacha_vs_aead_rpo() {
+    fn test_scheme_mismatch_k256_xchacha_vs_aead_rpo() {
         let mut rng = rand::rng();
-        let plaintext = b"test algorithm mismatch";
+        let plaintext = b"test scheme mismatch";
 
         // Seal with K256XChaCha20Poly1305
         let secret_key = SecretKey::with_rng(&mut rng);
@@ -647,9 +647,9 @@ mod algorithm_compatibility_tests {
     }
 
     #[test]
-    fn test_algorithm_mismatch_x25519_xchacha_vs_aead_rpo() {
+    fn test_scheme_mismatch_x25519_xchacha_vs_aead_rpo() {
         let mut rng = rand::rng();
-        let plaintext = b"test algorithm mismatch";
+        let plaintext = b"test scheme mismatch";
 
         // Seal with X25519XChaCha20Poly1305
         let secret_key = SecretKey25519::with_rng(&mut rng);
@@ -684,11 +684,11 @@ mod algorithm_compatibility_tests {
 
     proptest! {
         #[test]
-        fn prop_general_algorithm_mismatch_detection(
+        fn prop_general_scheme_mismatch_detection(
             plaintext in arbitrary_bytes()
         ) {
             let mut rng = rand::rng();
-            // Create keys for different algorithms
+            // Create keys for different schemes
             let secret_k256 = SecretKey::with_rng(&mut rng);
             let public_k256 = secret_k256.public_key();
             let secret_x25519 = SecretKey25519::with_rng(&mut rng);
@@ -723,10 +723,10 @@ mod protocol_tests {
 
         // Extract ephemeral key from sealed message
         let ephemeral_bytes = sealed.ephemeral_key.to_bytes();
-        let algorithm = sealed.ephemeral_key.algorithm();
+        let scheme = sealed.ephemeral_key.scheme();
 
         // Deserialize and compare
-        let reconstructed = EphemeralPublicKey::from_bytes(algorithm, &ephemeral_bytes).unwrap();
+        let reconstructed = EphemeralPublicKey::from_bytes(scheme, &ephemeral_bytes).unwrap();
         assert_eq!(sealed.ephemeral_key, reconstructed);
     }
 
@@ -740,10 +740,10 @@ mod protocol_tests {
 
         // Extract ephemeral key from sealed message
         let ephemeral_bytes = sealed.ephemeral_key.to_bytes();
-        let algorithm = sealed.ephemeral_key.algorithm();
+        let scheme = sealed.ephemeral_key.scheme();
 
         // Deserialize and compare
-        let reconstructed = EphemeralPublicKey::from_bytes(algorithm, &ephemeral_bytes).unwrap();
+        let reconstructed = EphemeralPublicKey::from_bytes(scheme, &ephemeral_bytes).unwrap();
         assert_eq!(sealed.ephemeral_key, reconstructed);
     }
 
@@ -758,13 +758,13 @@ mod protocol_tests {
             let sealing_key = SealingKey::K256XChaCha20Poly1305(public_key);
             let sealed = sealing_key.seal(&mut rng, &plaintext).unwrap();
 
-            // Verify algorithm consistency
-            let algorithm_from_key = sealed.ephemeral_key.algorithm();
-            let algorithm_from_message = sealed.algorithm();
-            prop_assert_eq!(algorithm_from_key, algorithm_from_message);
+            // Verify scheme consistency
+            let scheme_from_key = sealed.ephemeral_key.scheme();
+            let scheme_from_message = sealed.scheme();
+            prop_assert_eq!(scheme_from_key, scheme_from_message);
 
-            // Verify algorithm name consistency
-            prop_assert_eq!(algorithm_from_key.name(), sealed.algorithm_name());
+            // Verify scheme name consistency
+            prop_assert_eq!(scheme_from_key.name(), sealed.scheme_name());
         }
     }
 }

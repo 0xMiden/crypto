@@ -12,93 +12,71 @@ use alloc::vec::Vec;
 use rand::{CryptoRng, RngCore};
 use zeroize::Zeroizing;
 
-use super::error::IntegratedEncryptionSchemeError;
-use crate::{
-    Felt,
-    aead::AeadScheme,
-    ecdh::KeyAgreementScheme,
-    utils::{Deserializable, Serializable},
-};
+use super::error::IesError;
+use crate::{Felt, aead::AeadScheme, ecdh::KeyAgreementScheme};
 
 /// A generic CryptoBox primitive parameterized by key agreement and AEAD schemes
 pub(crate) struct CryptoBox<K: KeyAgreementScheme, A: AeadScheme> {
     _phantom: core::marker::PhantomData<(K, A)>,
 }
 
-/// Internal raw sealed message representation
-#[derive(Debug)]
-pub(crate) struct RawSealedMessage {
-    pub ephemeral_public_key: Vec<u8>,
-    pub ciphertext: Vec<u8>,
-}
-
 impl<K: KeyAgreementScheme, A: AeadScheme> CryptoBox<K, A> {
     // BYTE-SPECIFIC METHODS
     // ================================================================================================
 
-    pub(crate) fn seal_with_associated_data<R: CryptoRng + RngCore>(
+    pub(crate) fn seal_bytes_with_associated_data<R: CryptoRng + RngCore>(
         rng: &mut R,
         recipient_public_key: &K::PublicKey,
         plaintext: &[u8],
         associated_data: &[u8],
-    ) -> Result<RawSealedMessage, IntegratedEncryptionSchemeError> {
+    ) -> Result<(Vec<u8>, K::EphemeralPublicKey), IesError> {
         let (ephemeral_private, ephemeral_public) = K::generate_ephemeral_keypair(rng);
 
         let shared_secret = Zeroizing::new(
             K::exchange_ephemeral_static(ephemeral_private, recipient_public_key)
-                .map_err(|_| IntegratedEncryptionSchemeError::KeyAgreementFailed)?,
+                .map_err(|_| IesError::KeyAgreementFailed)?,
         );
 
         let encryption_key_bytes = Zeroizing::new(
             K::extract_key_material(&shared_secret, <A as AeadScheme>::KEY_SIZE)
-                .map_err(|_| IntegratedEncryptionSchemeError::FailedExtractKeyMaterial)?,
+                .map_err(|_| IesError::FailedExtractKeyMaterial)?,
         );
 
         let encryption_key = Zeroizing::new(
             A::key_from_bytes(&encryption_key_bytes)
-                .map_err(|_| IntegratedEncryptionSchemeError::EncryptionKeyCreationFailed)?,
+                .map_err(|_| IesError::EncryptionKeyCreationFailed)?,
         );
 
         let ciphertext = A::encrypt_bytes(&encryption_key, rng, plaintext, associated_data)
-            .map_err(|_| IntegratedEncryptionSchemeError::EncryptionFailed)?;
+            .map_err(|_| IesError::EncryptionFailed)?;
 
-        Ok(RawSealedMessage {
-            ciphertext,
-            ephemeral_public_key: ephemeral_public.to_bytes(),
-        })
+        Ok((ciphertext, ephemeral_public))
     }
 
-    pub(crate) fn unseal_with_associated_data(
+    pub(crate) fn unseal_bytes_with_associated_data(
         recipient_private_key: &K::SecretKey,
-        sealed_message: &RawSealedMessage,
+        ephemeral_public_key: &K::EphemeralPublicKey,
+        ciphertext: &[u8],
         associated_data: &[u8],
-    ) -> Result<Vec<u8>, IntegratedEncryptionSchemeError> {
-        let ephemeral_public = K::EphemeralPublicKey::read_from_bytes(
-            &sealed_message.ephemeral_public_key,
-        )
-        .map_err(|_| IntegratedEncryptionSchemeError::EphemeralPublicKeyDeserializationFailed)?;
-
+    ) -> Result<Vec<u8>, IesError> {
         let shared_secret = Zeroizing::new(
-            K::exchange_static_ephemeral(recipient_private_key, &ephemeral_public)
-                .map_err(|_| IntegratedEncryptionSchemeError::KeyAgreementFailed)?,
+            K::exchange_static_ephemeral(recipient_private_key, ephemeral_public_key)
+                .map_err(|_| IesError::KeyAgreementFailed)?,
         );
 
         let decryption_key_bytes = Zeroizing::new(
             K::extract_key_material(&shared_secret, <A as AeadScheme>::KEY_SIZE)
-                .map_err(|_| IntegratedEncryptionSchemeError::FailedExtractKeyMaterial)?,
+                .map_err(|_| IesError::FailedExtractKeyMaterial)?,
         );
 
         let decryption_key = Zeroizing::new(
             A::key_from_bytes(&decryption_key_bytes)
-                .map_err(|_| IntegratedEncryptionSchemeError::EncryptionKeyCreationFailed)?,
+                .map_err(|_| IesError::EncryptionKeyCreationFailed)?,
         );
 
-        let result = A::decrypt_bytes_with_associated_data(
-            &decryption_key,
-            &sealed_message.ciphertext,
-            associated_data,
-        )
-        .map_err(|_| IntegratedEncryptionSchemeError::DecryptionFailed)?;
+        let result =
+            A::decrypt_bytes_with_associated_data(&decryption_key, ciphertext, associated_data)
+                .map_err(|_| IesError::DecryptionFailed)?;
 
         Ok(result)
     }
@@ -112,65 +90,55 @@ impl<K: KeyAgreementScheme, A: AeadScheme> CryptoBox<K, A> {
         recipient_public_key: &K::PublicKey,
         plaintext: &[Felt],
         associated_data: &[Felt],
-    ) -> Result<RawSealedMessage, IntegratedEncryptionSchemeError> {
+    ) -> Result<(Vec<u8>, K::EphemeralPublicKey), IesError> {
         let (ephemeral_private, ephemeral_public) = K::generate_ephemeral_keypair(rng);
 
         let shared_secret = Zeroizing::new(
             K::exchange_ephemeral_static(ephemeral_private, recipient_public_key)
-                .map_err(|_| IntegratedEncryptionSchemeError::KeyAgreementFailed)?,
+                .map_err(|_| IesError::KeyAgreementFailed)?,
         );
 
         let encryption_key_bytes = Zeroizing::new(
             K::extract_key_material(&shared_secret, <A as AeadScheme>::KEY_SIZE)
-                .map_err(|_| IntegratedEncryptionSchemeError::FailedExtractKeyMaterial)?,
+                .map_err(|_| IesError::FailedExtractKeyMaterial)?,
         );
 
         let encryption_key = Zeroizing::new(
             A::key_from_bytes(&encryption_key_bytes)
-                .map_err(|_| IntegratedEncryptionSchemeError::EncryptionKeyCreationFailed)?,
+                .map_err(|_| IesError::EncryptionKeyCreationFailed)?,
         );
 
         let ciphertext = A::encrypt_elements(&encryption_key, rng, plaintext, associated_data)
-            .map_err(|_| IntegratedEncryptionSchemeError::EncryptionFailed)?;
+            .map_err(|_| IesError::EncryptionFailed)?;
 
-        Ok(RawSealedMessage {
-            ciphertext,
-            ephemeral_public_key: ephemeral_public.to_bytes(),
-        })
+        Ok((ciphertext, ephemeral_public))
     }
 
     /// Unseals field elements from a sealed message with associated data.
     pub(crate) fn unseal_elements_with_associated_data(
         recipient_private_key: &K::SecretKey,
-        sealed_message: &RawSealedMessage,
+        ephemeral_public_key: &K::EphemeralPublicKey,
+        ciphertext: &[u8],
         associated_data: &[Felt],
-    ) -> Result<Vec<Felt>, IntegratedEncryptionSchemeError> {
-        let ephemeral_public = K::EphemeralPublicKey::read_from_bytes(
-            &sealed_message.ephemeral_public_key,
-        )
-        .map_err(|_| IntegratedEncryptionSchemeError::EphemeralPublicKeyDeserializationFailed)?;
-
+    ) -> Result<Vec<Felt>, IesError> {
         let shared_secret = Zeroizing::new(
-            K::exchange_static_ephemeral(recipient_private_key, &ephemeral_public)
-                .map_err(|_| IntegratedEncryptionSchemeError::KeyAgreementFailed)?,
+            K::exchange_static_ephemeral(recipient_private_key, ephemeral_public_key)
+                .map_err(|_| IesError::KeyAgreementFailed)?,
         );
 
         let decryption_key_bytes = Zeroizing::new(
             K::extract_key_material(&shared_secret, <A as AeadScheme>::KEY_SIZE)
-                .map_err(|_| IntegratedEncryptionSchemeError::FailedExtractKeyMaterial)?,
+                .map_err(|_| IesError::FailedExtractKeyMaterial)?,
         );
 
         let decryption_key = Zeroizing::new(
             A::key_from_bytes(&decryption_key_bytes)
-                .map_err(|_| IntegratedEncryptionSchemeError::EncryptionKeyCreationFailed)?,
+                .map_err(|_| IesError::EncryptionKeyCreationFailed)?,
         );
 
-        let result = A::decrypt_elements_with_associated_data(
-            &decryption_key,
-            &sealed_message.ciphertext,
-            associated_data,
-        )
-        .map_err(|_| IntegratedEncryptionSchemeError::DecryptionFailed)?;
+        let result =
+            A::decrypt_elements_with_associated_data(&decryption_key, ciphertext, associated_data)
+                .map_err(|_| IesError::DecryptionFailed)?;
 
         Ok(result)
     }

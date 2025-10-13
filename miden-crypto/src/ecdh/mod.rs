@@ -1,9 +1,9 @@
 //! ECDH (Elliptic Curve Diffie-Hellman) key agreement implementations.
 
 use alloc::vec::Vec;
-use core::fmt;
 
 use rand::{CryptoRng, RngCore};
+use thiserror::Error;
 use winter_utils::{Deserializable, Serializable};
 use zeroize::{Zeroize, ZeroizeOnDrop};
 
@@ -49,27 +49,12 @@ pub trait KeyAgreementScheme {
 // ================================================================================================
 
 /// Errors that can occur during encryption/decryption operations
-#[derive(Debug)]
+#[derive(Debug, Error)]
 pub enum KeyAgreementError {
+    #[error("key agreement failed")]
     FailedKeyAgreement,
+    #[error("deserialization of public key failed")]
     PublicKeyDeserializationFailed,
+    #[error("hkdf expansion failed")]
     HkdfExpansionFailed,
 }
-
-impl fmt::Display for KeyAgreementError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            KeyAgreementError::FailedKeyAgreement => {
-                write!(f, "key agreement failed")
-            },
-            KeyAgreementError::PublicKeyDeserializationFailed => {
-                write!(f, "deserialization of public key failed")
-            },
-            KeyAgreementError::HkdfExpansionFailed => {
-                write!(f, "hkdf expansion failed")
-            },
-        }
-    }
-}
-
-impl core::error::Error for KeyAgreementError {}
