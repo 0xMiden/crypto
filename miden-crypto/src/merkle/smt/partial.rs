@@ -33,13 +33,6 @@ impl PartialSmt {
     // CONSTRUCTORS
     // --------------------------------------------------------------------------------------------
 
-    /// Returns a new, empty [`PartialSmt`].
-    ///
-    /// All leaves in the returned tree are set to [`Smt::EMPTY_VALUE`].
-    pub fn new_empty() -> Self {
-        Self(Smt::new())
-    }
-
     /// Constructs a [`PartialSmt`] from a root.
     ///
     /// All subsequently added proofs or paths must have the same root.
@@ -68,13 +61,13 @@ impl PartialSmt {
         let mut proofs = proofs.into_iter();
 
         let Some(first_proof) = proofs.next() else {
-            return Ok(Self::new_empty());
+            return Ok(Self::default());
         };
 
         // Add the first path to an empty partial SMT without checking that the existing root
         // matches the new one. This sets the expected root to the root of the first proof and all
         // subsequently added proofs must match it.
-        let mut partial_smt = Self::new_empty();
+        let mut partial_smt = Self::default();
         let (path, leaf) = first_proof.into_parts();
         let new_root = partial_smt.add_path_unchecked(leaf, path);
         partial_smt.0.set_root(new_root);
@@ -343,7 +336,7 @@ impl Default for PartialSmt {
     ///
     /// All leaves in the returned tree are set to [`Smt::EMPTY_VALUE`].
     fn default() -> Self {
-        Self::new_empty()
+        Self::new(Smt::EMPTY_ROOT)
     }
 }
 
@@ -743,7 +736,7 @@ mod tests {
     /// Test that an empty partial SMT's is_empty method returns `true`.
     #[test]
     fn partial_smt_is_empty() {
-        assert!(PartialSmt::new_empty().is_empty());
+        assert!(PartialSmt::default().is_empty());
     }
 
     /// `PartialSmt` serde round-trip. Also tests conversion from SMT.
