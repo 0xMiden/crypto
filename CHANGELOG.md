@@ -5,6 +5,7 @@
 - [BREAKING] Adds DSA (EdDSA25519) and ECDH (X25519) using Curve25519 ([#537](https://github.com/0xMiden/crypto/pull/537)).
 - Adds `HasherExt` trait to provide ability to hash using an iterator of slices. ([#565](https://github.com/0xMiden/crypto/pull/565)).
 - Add `Debug`, `Clone`, `Eq` and `PartialEq` derives to secret key structs for DSA-s ([#587](https://github.com/0xMiden/crypto/pull/587)).
+- Add zeroization of secret key structs for DSA-s ([#590](https://github.com/0xMiden/crypto/pull/590)).
 
 ## 0.17.1 (2025-10-10)
 
