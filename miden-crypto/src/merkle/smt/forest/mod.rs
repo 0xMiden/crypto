@@ -106,7 +106,7 @@ impl SmtForest {
             return Err(MerkleError::RootNotInStore(root));
         }
 
-        let leaf_index = NodeIndex::new_unchecked(SMT_DEPTH, key[3].as_int());
+        let leaf_index = NodeIndex::from(LeafIndex::from(key));
 
         let proof = self.store.get_path(root, leaf_index)?;
         let path = proof.path.try_into()?;
@@ -124,7 +124,7 @@ impl SmtForest {
     // STATE MUTATORS
     // --------------------------------------------------------------------------------------------
 
-    /// Inserts the specified key-value pair into an SMT with the specified root. This would also
+    /// Inserts the specified key-value pair into an SMT with the specified root. This will also
     /// add a new root to the forest.
     ///
     /// Returns an error if an SMT with the specified root is not in the forest, these is not
@@ -134,8 +134,8 @@ impl SmtForest {
         self.batch_insert(root, vec![(key, value)].into_iter())
     }
 
-    /// Inserts the specified key-value pairs into an SMT with the specified root. This would also
-    /// add a new root to the forest.
+    /// Inserts the specified key-value pairs into an SMT with the specified root. This will also
+    /// add a single new root to the forest for the entire batch of inserts.
     ///
     /// Returns an error if an SMT with the specified root is not in the forest, these is not
     /// enough data in the forest to perform the insert, or if the insert would create a leaf
@@ -150,23 +150,24 @@ impl SmtForest {
         }
 
         // Find all affected leaf indices
-        let indices = entries.clone().map(|(key, _)| key[3].as_int()).collect::<BTreeSet<_>>();
+        let indices = entries.clone().map(|(key, _)| LeafIndex::from(key)).collect::<BTreeSet<_>>();
 
         // Create new SmtLeaf objects for updated key-value pairs
         let mut new_leaves = Map::new();
         for index in indices {
-            let node_index = NodeIndex::new_unchecked(SMT_DEPTH, index);
+            let node_index = NodeIndex::from(index);
             let current_hash = self.store.get_node(root, node_index)?;
 
-            let current_leaf = self.leaves.get(&current_hash).cloned().unwrap_or_else(|| {
-                let leaf_index = LeafIndex::new_max_depth(index);
-                SmtLeaf::new_empty(leaf_index)
-            });
+            let current_leaf = self
+                .leaves
+                .get(&current_hash)
+                .cloned()
+                .unwrap_or_else(|| SmtLeaf::new_empty(index));
 
             new_leaves.insert(index, (current_hash, current_leaf));
         }
         for (key, value) in entries {
-            let index = key[3].as_int();
+            let index = LeafIndex::from(key);
             let (_old_hash, leaf) = new_leaves.get_mut(&index).unwrap();
             leaf.insert(key, value).map_err(to_merkle_error)?;
         }
@@ -188,7 +189,7 @@ impl SmtForest {
         #[allow(unused_mut)]
         let mut new_leaf_entries = new_leaves
             .iter()
-            .map(|(index, leaf)| (NodeIndex::new_unchecked(SMT_DEPTH, *index), leaf.0))
+            .map(|(index, leaf)| (NodeIndex::from(*index), leaf.0))
             .collect::<Vec<_>>();
 
         #[cfg(feature = "hashmaps")]
