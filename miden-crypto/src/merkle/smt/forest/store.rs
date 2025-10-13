@@ -10,15 +10,21 @@ use crate::{
 // ================================================================================================
 
 #[derive(Debug, Default, Copy, Clone, Eq, PartialEq)]
-pub struct SmtNode {
+struct ForestInnerNode {
     left: Word,
     right: Word,
     rc: usize,
 }
 
+impl ForestInnerNode {
+    pub fn hash(&self) -> Word {
+        Rpo256::merge(&[self.left, self.right])
+    }
+}
+
 #[derive(Debug, Default, Clone, Eq, PartialEq)]
 pub(super) struct SmtStore {
-    nodes: Map<Word, SmtNode>,
+    nodes: Map<Word, ForestInnerNode>,
 }
 
 /// An in-memory data store for SmtForest data.
@@ -144,7 +150,7 @@ impl SmtStore {
         let mut last_ancestor = NodeIndex::new_unchecked(SMT_DEPTH, 0);
 
         // Stash all new nodes until we know there are no errors
-        let mut new_nodes: Map<Word, SmtNode> = Map::new();
+        let mut new_nodes: Map<Word, ForestInnerNode> = Map::new();
 
         // Collect opening nodes and updated leaves
         let mut nodes_by_index = Map::<NodeIndex, Word>::new();
@@ -195,16 +201,14 @@ impl SmtStore {
                 .get(&right_index)
                 .ok_or(MerkleError::NodeIndexNotFoundInTree(right_index))?;
 
-            let new_value = Rpo256::merge(&[left_value, right_value]);
-            new_nodes.insert(
-                new_value,
-                SmtNode {
-                    left: left_value,
-                    right: right_value,
-                    rc: 0,
-                },
-            );
-            nodes_by_index.insert(index, new_value);
+            let node = ForestInnerNode {
+                left: left_value,
+                right: right_value,
+                rc: 0,
+            };
+            let new_key = node.hash();
+            new_nodes.insert(new_key, node);
+            nodes_by_index.insert(index, new_key);
         }
 
         let new_root = nodes_by_index
@@ -213,7 +217,11 @@ impl SmtStore {
             .ok_or(MerkleError::NodeIndexNotFoundInStore(root, NodeIndex::root()))?;
 
         // The update was computed successfully, update ref counts and insert into the store
-        fn dfs(node: Word, store: &mut Map<Word, SmtNode>, new_nodes: &mut Map<Word, SmtNode>) {
+        fn dfs(
+            node: Word,
+            store: &mut Map<Word, ForestInnerNode>,
+            new_nodes: &mut Map<Word, ForestInnerNode>,
+        ) {
             if node == Word::empty() {
                 return;
             }
@@ -275,14 +283,14 @@ impl SmtStore {
 // ================================================================================================
 
 /// Creates empty hashes for all the subtrees of a tree with a max depth of 255.
-fn empty_hashes() -> impl Iterator<Item = (Word, SmtNode)> {
+fn empty_hashes() -> impl Iterator<Item = (Word, ForestInnerNode)> {
     let subtrees = EmptySubtreeRoots::empty_hashes(SMT_DEPTH);
     subtrees
         .iter()
         .rev()
         .copied()
         .zip(subtrees.iter().rev().skip(1).copied())
-        .map(|(child, parent)| (parent, SmtNode { left: child, right: child, rc: 1 }))
+        .map(|(child, parent)| (parent, ForestInnerNode { left: child, right: child, rc: 1 }))
 }
 
 struct IndexedPath {
