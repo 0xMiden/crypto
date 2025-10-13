@@ -371,12 +371,7 @@ impl Deserializable for SecretKey {
 
 impl Zeroize for SecretKey {
     fn zeroize(&mut self) {
-        // Zeroize the secret key basis (array of Polynomial<i16>).
-        // This delegates to Vec<i16>::zeroize(), which uses write_volatile.
         self.secret_key.zeroize();
-
-        // Zeroize the LDL tree (which contains Complex64 coefficients).
-        // The LdlTree implementation uses write_volatile and compiler_fence.
         self.tree.zeroize();
     }
 }

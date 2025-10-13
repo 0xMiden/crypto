@@ -96,6 +96,7 @@ impl Zeroize for LdlTree {
                         core::ptr::write_volatile(val, Complex64::new(0.0, 0.0));
                     }
                 }
+                // Ensure the write operations are not reordered
                 core::sync::atomic::compiler_fence(core::sync::atomic::Ordering::SeqCst);
             },
         }
