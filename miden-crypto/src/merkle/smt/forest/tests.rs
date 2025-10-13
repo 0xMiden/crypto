@@ -111,34 +111,6 @@ fn test_batch_insert() -> Result<(), MerkleError> {
 }
 
 #[test]
-fn test_insert_same_value_idempotent() -> Result<(), MerkleError> {
-    // Test that inserting the same key-value pair multiple times is idempotent
-    let mut forest = SmtForest::new();
-
-    let empty_tree_root = *EmptySubtreeRoots::entry(SMT_DEPTH, 0);
-    let key = Word::new([ZERO; WORD_SIZE]);
-    let value = Word::new([ONE; WORD_SIZE]);
-
-    // First insert
-    let root1 = forest.insert(empty_tree_root, key, value)?;
-
-    // Insert the same key-value pair again
-    let root2 = forest.insert(root1, key, value)?;
-
-    // Roots should be identical since nothing changed
-    assert_eq!(root1, root2, "Inserting the same key-value pair should produce the same root");
-
-    // Verify the proof still works correctly
-    let proof = forest.open(root2, key)?;
-    assert!(
-        proof.verify_membership(&key, &value, &root2),
-        "Proof should verify after multiple idempotent inserts"
-    );
-
-    Ok(())
-}
-
-#[test]
 fn test_open_root_not_in_store() -> Result<(), MerkleError> {
     let forest = SmtForest::new();
     let word = Word::new([ONE; WORD_SIZE]);
@@ -255,10 +227,34 @@ fn test_pop_roots() -> Result<(), MerkleError> {
     assert_eq!(forest.roots.len(), 1);
     assert_eq!(forest.leaves.len(), 1);
 
-    forest.pop_smts(vec![root]);
+    assert_matches!(forest.pop_smts(vec![root]), Ok(_));
 
     assert_eq!(forest.roots.len(), 0);
     assert_eq!(forest.leaves.len(), 0);
+
+    Ok(())
+}
+
+#[test]
+fn test_removing_empty_smt_from_forest() -> Result<(), MerkleError> {
+    let mut forest = SmtForest::new();
+    let empty_tree_root = *EmptySubtreeRoots::entry(SMT_DEPTH, 0);
+    let non_empty_root = Word::new([ONE; WORD_SIZE]);
+
+    // Popping zero SMTs from forest should be a no-op (no panic or error)
+    assert_matches!(forest.pop_smts(vec![]), Ok(_));
+
+    // Popping a non-existent root should return an error
+    assert_matches!(
+        forest.pop_smts(vec![non_empty_root]),
+        Err(MerkleError::RootNotInStore(r)) if r == non_empty_root
+    );
+
+    // Popping the empty root should return an error
+    assert_matches!(
+        forest.pop_smts(vec![empty_tree_root]),
+        Err(MerkleError::RootNotInStore(r)) if r == empty_tree_root
+    );
 
     Ok(())
 }

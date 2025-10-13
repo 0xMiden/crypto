@@ -1,4 +1,4 @@
-use alloc::collections::BTreeSet;
+use alloc::{collections::BTreeSet, vec::Vec};
 
 use super::{EmptySubtreeRoots, MerkleError, NodeIndex, SmtLeaf, SmtProof, Word};
 use crate::{
@@ -142,8 +142,6 @@ impl SmtForest {
             return Err(MerkleError::RootNotInStore(root));
         }
 
-        std::println!("batch_inserting");
-
         // Find all affected leaf indices
         let indices = entries
             .clone()
@@ -209,13 +207,25 @@ impl SmtForest {
 
     /// Removes the specified SMTs (identified by their roots) from the forest.
     /// Releases memory used by nodes and leaves that are no longer reachable.
-    pub fn pop_smts(&mut self, roots: impl IntoIterator<Item = Word> + Clone) {
-        for root in roots.clone() {
-            self.roots.remove(&root);
+    pub fn pop_smts(
+        &mut self,
+        roots: impl IntoIterator<Item = Word> + Clone,
+    ) -> Result<(), MerkleError> {
+        let roots = roots.into_iter().collect::<Vec<_>>();
+        for root in &roots {
+            // don't use self.contains_root here because we don't allow removing empty trees
+            if !self.roots.contains(root) {
+                return Err(MerkleError::RootNotInStore(*root));
+            }
+        }
+        for root in &roots {
+            self.roots.remove(root);
         }
         for leaf in self.store.remove_roots(roots) {
             self.leaves.remove(&leaf);
         }
+
+        Ok(())
     }
 
     // HELPER METHODS
