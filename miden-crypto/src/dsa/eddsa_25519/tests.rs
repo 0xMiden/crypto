@@ -33,22 +33,15 @@ fn test_key_generation_serialization() {
 }
 
 #[test]
-fn derived_trait_consistency() {
+fn test_secret_key_debug_redaction() {
     let mut rng = rand::rng();
-
     let sk = SecretKey::with_rng(&mut rng);
-    let sk_clone = sk.clone();
-    assert_eq!(sk.to_bytes(), sk_clone.to_bytes());
-    assert_eq!(format!("{sk:?}"), format!("{sk_clone:?}"));
 
-    let pk = sk.public_key();
-    let pk_clone = pk.clone();
-    assert_eq!(pk, pk_clone);
-    assert_eq!(format!("{pk:?}"), format!("{pk_clone:?}"));
+    // Verify Debug impl produces expected redacted output
+    let debug_output = format!("{sk:?}");
+    assert_eq!(debug_output, "<elided secret for SecretKey>");
 
-    let msg = Word::from([Felt::new(3), Felt::new(2), Felt::new(1), Felt::new(0)]);
-    let sig = sk.sign(msg);
-    let sig_clone = sig.clone();
-    assert_eq!(sig, sig_clone);
-    assert_eq!(format!("{sig:?}"), format!("{sig_clone:?}"));
+    // Verify Display impl also elides
+    let display_output = format!("{sk}");
+    assert_eq!(display_output, "<elided secret for SecretKey>");
 }

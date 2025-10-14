@@ -2,12 +2,12 @@
 //! curve using Keccak to hash the messages when signing.
 
 use alloc::{string::ToString, vec::Vec};
-use core::fmt;
 
 use k256::{
     ecdh::diffie_hellman,
     ecdsa::{RecoveryId, SigningKey, VerifyingKey, signature::hazmat::PrehashVerifier},
 };
+use miden_crypto_derive::{SilentDebug, SilentDisplay};
 use rand::{CryptoRng, RngCore};
 use thiserror::Error;
 use zeroize::Zeroize;
@@ -42,7 +42,7 @@ const SCALARS_SIZE_BYTES: usize = 32;
 // ================================================================================================
 
 /// Secret key for ECDSA signature verification over secp256k1 curve.
-#[derive(Clone)]
+#[derive(Clone, SilentDebug, SilentDisplay)]
 pub struct SecretKey {
     inner: SigningKey,
 }
@@ -109,11 +109,14 @@ impl SecretKey {
     }
 }
 
-impl fmt::Debug for SecretKey {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("SecretKey").finish_non_exhaustive()
+impl PartialEq for SecretKey {
+    fn eq(&self, other: &Self) -> bool {
+        use subtle::ConstantTimeEq;
+        self.to_bytes().ct_eq(&other.to_bytes()).into()
     }
 }
+
+impl Eq for SecretKey {}
 
 // PUBLIC KEY
 // ================================================================================================

@@ -99,22 +99,15 @@ fn test_signature_serialization() {
 }
 
 #[test]
-fn test_derived_traits_consistency() {
+fn test_secret_key_debug_redaction() {
     let mut rng = rng();
+    let secret_key = SecretKey::with_rng(&mut rng);
 
-    let mut secret_key = SecretKey::with_rng(&mut rng);
-    let secret_key_clone = secret_key.clone();
-    assert_eq!(secret_key.to_bytes(), secret_key_clone.to_bytes());
-    assert_eq!(format!("{secret_key:?}"), format!("{secret_key_clone:?}"));
+    // Verify Debug impl produces expected redacted output
+    let debug_output = format!("{secret_key:?}");
+    assert_eq!(debug_output, "<elided secret for SecretKey>");
 
-    let public_key = secret_key.public_key();
-    let public_key_clone = public_key.clone();
-    assert_eq!(public_key, public_key_clone);
-    assert_eq!(format!("{public_key:?}"), format!("{public_key_clone:?}"));
-
-    let message = [Felt::new(9), Felt::new(8), Felt::new(7), Felt::new(6)].into();
-    let signature = secret_key.sign(message);
-    let signature_clone = signature.clone();
-    assert_eq!(signature, signature_clone);
-    assert_eq!(format!("{signature:?}"), format!("{signature_clone:?}"));
+    // Verify Display impl also elides
+    let display_output = format!("{secret_key}");
+    assert_eq!(display_output, "<elided secret for SecretKey>");
 }

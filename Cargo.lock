@@ -956,6 +956,7 @@ dependencies = [
  "hkdf",
  "itertools 0.14.0",
  "k256",
+ "miden-crypto-derive",
  "num",
  "num-complex",
  "proptest",
@@ -969,6 +970,7 @@ dependencies = [
  "seq-macro",
  "serde",
  "sha3",
+ "subtle",
  "tempfile",
  "thiserror",
  "winter-crypto",
@@ -977,6 +979,14 @@ dependencies = [
  "winter-utils",
  "x25519-dalek",
  "zeroize",
+]
+
+[[package]]
+name = "miden-crypto-derive"
+version = "0.1.0"
+dependencies = [
+ "quote",
+ "syn",
 ]
 
 [[package]]
