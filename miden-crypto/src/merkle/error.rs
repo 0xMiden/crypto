@@ -32,8 +32,6 @@ pub enum MerkleError {
     NumLeavesNotPowerOfTwo(usize),
     #[error("root {0:?} is not in the store")]
     RootNotInStore(Word),
-    #[error(
-        "partial smt does not track the merkle path for key {0} so updating it would produce a different root compared to the same update in the full tree"
-    )]
+    #[error("partial smt does not track the merkle path for key {0}")]
     UntrackedKey(Word),
 }
