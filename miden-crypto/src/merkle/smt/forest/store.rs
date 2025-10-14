@@ -130,17 +130,17 @@ impl SmtStore {
     // STATE MUTATORS
     // --------------------------------------------------------------------------------------------
 
-    /// Sets multiple node values at once with a single root transition.
+    /// Sets multiple leaf values at once with a single root transition.
     ///
     /// # Errors
     /// This method can return the following errors:
     /// - `RootNotInStore` if the `root` is not present in the store.
     /// - `NodeNotInStore` if a node needed to traverse from `root` to `index` is not present in the
     ///   store.
-    pub fn set_nodes(
+    pub fn set_leaves(
         &mut self,
         root: Word,
-        entries: impl IntoIterator<Item = (NodeIndex, Word)>,
+        leaves: impl IntoIterator<Item = (NodeIndex, Word)>,
     ) -> Result<Word, MerkleError> {
         self.nodes.get(&root).ok_or(MerkleError::RootNotInStore(root))?;
 
@@ -154,9 +154,11 @@ impl SmtStore {
 
         // Collect opening nodes and updated leaves
         let mut nodes_by_index = Map::<NodeIndex, Word>::new();
-        for (index, leaf_hash) in entries {
+        for (index, leaf_hash) in leaves {
             // Record all sibling nodes along the path from root to this index
             let indexed_path = self.get_indexed_path(root, index)?;
+
+            // See if we are actually updating the leaf value. If not, we can skip processing it.
             if indexed_path.value == leaf_hash {
                 continue;
             }
@@ -165,6 +167,8 @@ impl SmtStore {
             // Record the updated leaf value at this index
             nodes_by_index.insert(index, leaf_hash);
 
+            // Check if we already processed the sibling of this leaf. If so, the parent is already
+            // added to the ancestors list. This works as long as leaves are sorted by index.
             if last_ancestor != index.parent() {
                 last_ancestor = index.parent();
                 ancestors.push(last_ancestor);
@@ -176,12 +180,15 @@ impl SmtStore {
         }
 
         // Gather all ancestors up to the root (deduplicated)
+        // `ancestors` behaves as both a BFS queue (starting at all updated leaves' parents) and
+        // provides a way of checking if we are not processing the same ancestor multiple times.
         let mut index = 0;
         while index < ancestors.len() {
             let node = ancestors[index];
             if node.is_root() {
                 break;
             }
+            // if we haven't processed node's sibling yet, it will be a new parent
             let parent = node.parent();
             if parent != last_ancestor {
                 last_ancestor = parent;

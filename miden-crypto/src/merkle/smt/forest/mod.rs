@@ -196,7 +196,7 @@ impl SmtForest {
             new_leaf_entries
         };
 
-        let new_root = self.store.set_nodes(root, new_leaf_entries)?;
+        let new_root = self.store.set_leaves(root, new_leaf_entries)?;
 
         // Update successful, insert new leaves into the forest
         for (leaf_hash, leaf) in new_leaves.into_values() {
