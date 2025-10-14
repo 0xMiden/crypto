@@ -124,7 +124,7 @@ impl SmtForest {
     /// enough data in the forest to perform the insert, or if the insert would create a leaf
     /// with too many entries.
     pub fn insert(&mut self, root: Word, key: Word, value: Word) -> Result<Word, MerkleError> {
-        self.batch_insert(root, vec![(key, value)].into_iter())
+        self.batch_insert(root, vec![(key, value)])
     }
 
     /// Inserts the specified key-value pairs into an SMT with the specified root. This will also

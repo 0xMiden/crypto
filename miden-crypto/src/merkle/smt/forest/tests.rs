@@ -146,14 +146,11 @@ fn test_open_root_in_store() -> Result<(), MerkleError> {
 
     let proof =
         forest.open(root, Word::new([Felt::new(0), Felt::new(0), Felt::new(0), Felt::new(2)]))?;
-    assert_eq!(
-        proof.verify_membership(
-            &Word::new([Felt::new(0), Felt::new(0), Felt::new(0), Felt::new(2)]),
-            &int_to_node(3),
-            &root
-        ),
-        true
-    );
+    assert!(proof.verify_membership(
+        &Word::new([Felt::new(0), Felt::new(0), Felt::new(0), Felt::new(2)]),
+        &int_to_node(3),
+        &root
+    ));
 
     Ok(())
 }

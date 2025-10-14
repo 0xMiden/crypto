@@ -270,7 +270,7 @@ impl SmtStore {
         let mut result = Vec::new();
         result.extend(self.remove_node(left));
         result.extend(self.remove_node(right));
-        return result;
+        result
     }
 
     /// Removes the specified roots from the store and releases memory used by now
