@@ -38,7 +38,7 @@ fn derived_trait_consistency() {
 
     let sk = SecretKey::with_rng(&mut rng);
     let sk_clone = sk.clone();
-    assert_eq!(sk, sk_clone);
+    assert_eq!(sk.to_bytes(), sk_clone.to_bytes());
     assert_eq!(format!("{sk:?}"), format!("{sk_clone:?}"));
 
     let pk = sk.public_key();

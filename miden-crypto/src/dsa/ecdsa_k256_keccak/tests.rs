@@ -104,7 +104,7 @@ fn test_derived_traits_consistency() {
 
     let mut secret_key = SecretKey::with_rng(&mut rng);
     let secret_key_clone = secret_key.clone();
-    assert_eq!(secret_key, secret_key_clone);
+    assert_eq!(secret_key.to_bytes(), secret_key_clone.to_bytes());
     assert_eq!(format!("{secret_key:?}"), format!("{secret_key_clone:?}"));
 
     let public_key = secret_key.public_key();

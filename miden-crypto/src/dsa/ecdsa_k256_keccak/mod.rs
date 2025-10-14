@@ -2,6 +2,7 @@
 //! curve using Keccak to hash the messages when signing.
 
 use alloc::{string::ToString, vec::Vec};
+use core::fmt;
 
 use k256::{
     ecdh::diffie_hellman,
@@ -41,7 +42,7 @@ const SCALARS_SIZE_BYTES: usize = 32;
 // ================================================================================================
 
 /// Secret key for ECDSA signature verification over secp256k1 curve.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Clone)]
 pub struct SecretKey {
     inner: SigningKey,
 }
@@ -105,6 +106,12 @@ impl SecretKey {
         let shared_secret_inner = diffie_hellman(self.inner.as_nonzero_scalar(), pk_e.as_affine());
 
         SharedSecret::new(shared_secret_inner)
+    }
+}
+
+impl fmt::Debug for SecretKey {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("SecretKey").finish_non_exhaustive()
     }
 }
 

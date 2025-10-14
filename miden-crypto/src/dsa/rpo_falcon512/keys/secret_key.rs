@@ -1,4 +1,5 @@
 use alloc::{string::ToString, vec::Vec};
+use core::fmt;
 
 use num::Complex;
 #[cfg(not(feature = "std"))]
@@ -54,7 +55,7 @@ pub(crate) const WIDTH_SMALL_POLY_COEFFICIENT: usize = 6;
 /// using Fast Fourier sampling during signature generation (ffSampling algorithm 11 in [1]).
 ///
 /// [1]: https://falcon-sign.info/falcon.pdf
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Clone)]
 pub struct SecretKey {
     secret_key: ShortLatticeBasis,
     tree: LdlTree,
@@ -249,6 +250,12 @@ impl SecretKey {
         let digest = Blake3_256::hash(&buffer);
 
         digest.into()
+    }
+}
+
+impl fmt::Debug for SecretKey {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("SecretKey").finish_non_exhaustive()
     }
 }
 

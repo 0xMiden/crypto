@@ -2,6 +2,7 @@
 //! the messages when signing.
 
 use alloc::{string::ToString, vec::Vec};
+use core::fmt;
 
 use ed25519_dalek::{Signer, Verifier};
 use rand::{CryptoRng, RngCore};
@@ -34,7 +35,7 @@ const SIGNATURE_BYTES: usize = 64;
 // ================================================================================================
 
 /// Secret key for EdDSA (Ed25519) signature verification over Curve25519.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Clone)]
 pub struct SecretKey {
     inner: ed25519_dalek::SigningKey,
 }
@@ -86,6 +87,12 @@ impl SecretKey {
     fn to_x25519(&self) -> x25519_dalek::StaticSecret {
         let scalar_bytes = self.inner.to_scalar_bytes();
         x25519_dalek::StaticSecret::from(scalar_bytes)
+    }
+}
+
+impl fmt::Debug for SecretKey {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("SecretKey").finish_non_exhaustive()
     }
 }
 
