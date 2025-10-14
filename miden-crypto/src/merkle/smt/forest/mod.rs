@@ -182,12 +182,14 @@ impl SmtForest {
             })
             .collect();
 
-        // Update MerkleStore with new leaf hashes
+        // Update SmtStore with new leaf hashes
         let new_leaf_entries =
             new_leaves.iter().map(|(index, leaf)| (NodeIndex::from(*index), leaf.0));
 
         #[cfg(feature = "hashmaps")]
         let new_leaf_entries = {
+            // Required because hashbrown::HashMap doesn't maintain key ordering.
+            // The default implementation uses BTreeMap which behaves differently.
             use alloc::vec::Vec;
             let mut new_leaf_entries = new_leaf_entries.collect::<Vec<_>>();
             new_leaf_entries.sort_by_key(|(idx, _)| *idx);

@@ -22,11 +22,6 @@ impl ForestInnerNode {
     }
 }
 
-#[derive(Debug, Default, Clone, Eq, PartialEq)]
-pub(super) struct SmtStore {
-    nodes: Map<Word, ForestInnerNode>,
-}
-
 /// An in-memory data store for SmtForest data.
 ///
 /// This is an internal memory data store for SmtForest data. Similarly to the `MerkleStore`, it
@@ -35,6 +30,11 @@ pub(super) struct SmtStore {
 ///
 /// Unlike `MerkleStore`, unused nodes can be easily removed from the store by leveraing
 /// reference counting.
+#[derive(Debug, Default, Clone, Eq, PartialEq)]
+pub(super) struct SmtStore {
+    nodes: Map<Word, ForestInnerNode>,
+}
+
 impl SmtStore {
     /// Creates a new, empty in-memory store for SmtForest data.
     pub fn new() -> Self {
