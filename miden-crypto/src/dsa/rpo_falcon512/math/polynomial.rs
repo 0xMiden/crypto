@@ -638,10 +638,6 @@ impl Polynomial<i16> {
 
 impl<F: Zeroize> Zeroize for Polynomial<F> {
     fn zeroize(&mut self) {
-        // Delegate to Vec's zeroize implementation, which for primitive types (like i16)
-        // uses write_volatile and compiler_fence to prevent compiler optimizations.
-        // For types like Complex64 that don't implement Zeroize, we handle them explicitly
-        // in LdlTree's implementation.
         self.coefficients.zeroize();
     }
 }
