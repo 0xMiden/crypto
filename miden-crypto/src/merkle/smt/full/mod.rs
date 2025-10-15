@@ -257,6 +257,23 @@ impl Smt {
         self.inner_nodes.iter().map(|(idx, inner)| (*idx, inner.clone()))
     }
 
+    /// Returns the hash of an inner node at the specified index.
+    ///
+    /// If the node doesn't exist in the tree (i.e., it's part of an empty subtree), this returns
+    /// the corresponding empty subtree root hash for that depth.
+    ///
+    /// This method provides O(1) access to inner node values without needing to iterate through
+    /// all nodes or open specific paths.
+    ///
+    /// # Arguments
+    /// * `node_index` - The index of the inner node to retrieve
+    ///
+    /// # Returns
+    /// The hash value of the inner node, or the empty subtree root if the node doesn't exist.
+    pub fn get_inner_node_hash(&self, node_index: NodeIndex) -> Word {
+        <Self as SparseMerkleTree<SMT_DEPTH>>::get_inner_node(self, node_index).hash()
+    }
+
     // STATE MUTATORS
     // --------------------------------------------------------------------------------------------
 
