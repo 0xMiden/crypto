@@ -1,5 +1,6 @@
 use alloc::{string::ToString, vec::Vec};
 
+use miden_crypto_derive::{SilentDebug, SilentDisplay};
 use num::Complex;
 #[cfg(not(feature = "std"))]
 use num::Float;
@@ -55,7 +56,7 @@ pub(crate) const WIDTH_SMALL_POLY_COEFFICIENT: usize = 6;
 /// using Fast Fourier sampling during signature generation (ffSampling algorithm 11 in [1]).
 ///
 /// [1]: https://falcon-sign.info/falcon.pdf
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Clone, SilentDebug, SilentDisplay)]
 pub struct SecretKey {
     secret_key: ShortLatticeBasis,
     tree: LdlTree,
@@ -261,6 +262,24 @@ impl SecretKey {
     }
 }
 
+impl Zeroize for SecretKey {
+    fn zeroize(&mut self) {
+        self.secret_key.zeroize();
+        self.tree.zeroize();
+    }
+}
+
+impl ZeroizeOnDrop for SecretKey {}
+
+impl PartialEq for SecretKey {
+    fn eq(&self, other: &Self) -> bool {
+        use subtle::ConstantTimeEq;
+        self.to_bytes().ct_eq(&other.to_bytes()).into()
+    }
+}
+
+impl Eq for SecretKey {}
+
 // SERIALIZATION / DESERIALIZATION
 // ================================================================================================
 
@@ -368,15 +387,6 @@ impl Deserializable for SecretKey {
         Ok(Self::from_short_lattice_basis(basis))
     }
 }
-
-impl Zeroize for SecretKey {
-    fn zeroize(&mut self) {
-        self.secret_key.zeroize();
-        self.tree.zeroize();
-    }
-}
-
-impl ZeroizeOnDrop for SecretKey {}
 
 // HELPER FUNCTIONS
 // ================================================================================================

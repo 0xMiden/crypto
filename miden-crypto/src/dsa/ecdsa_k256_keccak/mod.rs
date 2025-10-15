@@ -7,6 +7,7 @@ use k256::{
     ecdh::diffie_hellman,
     ecdsa::{RecoveryId, SigningKey, VerifyingKey, signature::hazmat::PrehashVerifier},
 };
+use miden_crypto_derive::{SilentDebug, SilentDisplay};
 use rand::{CryptoRng, RngCore};
 use thiserror::Error;
 use zeroize::{Zeroize, ZeroizeOnDrop};
@@ -41,7 +42,7 @@ const SCALARS_SIZE_BYTES: usize = 32;
 // ================================================================================================
 
 /// Secret key for ECDSA signature verification over secp256k1 curve.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Clone, SilentDebug, SilentDisplay)]
 pub struct SecretKey {
     inner: SigningKey,
 }
@@ -115,6 +116,15 @@ impl SecretKey {
 // SAFETY: The inner `k256::ecdsa::SigningKey` already implements `ZeroizeOnDrop`,
 // which ensures that the secret key material is securely zeroized when dropped.
 impl ZeroizeOnDrop for SecretKey {}
+
+impl PartialEq for SecretKey {
+    fn eq(&self, other: &Self) -> bool {
+        use subtle::ConstantTimeEq;
+        self.to_bytes().ct_eq(&other.to_bytes()).into()
+    }
+}
+
+impl Eq for SecretKey {}
 
 // PUBLIC KEY
 // ================================================================================================

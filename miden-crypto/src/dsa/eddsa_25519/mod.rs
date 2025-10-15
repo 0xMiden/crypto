@@ -4,6 +4,7 @@
 use alloc::{string::ToString, vec::Vec};
 
 use ed25519_dalek::{Signer, Verifier};
+use miden_crypto_derive::{SilentDebug, SilentDisplay};
 use rand::{CryptoRng, RngCore};
 use thiserror::Error;
 use zeroize::{Zeroize, ZeroizeOnDrop};
@@ -34,7 +35,7 @@ const SIGNATURE_BYTES: usize = 64;
 // ================================================================================================
 
 /// Secret key for EdDSA (Ed25519) signature verification over Curve25519.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Clone, SilentDebug, SilentDisplay)]
 pub struct SecretKey {
     inner: ed25519_dalek::SigningKey,
 }
@@ -101,6 +102,15 @@ impl SecretKey {
 // SAFETY: The inner `ed25519_dalek::SigningKey` already implements `ZeroizeOnDrop`,
 // which ensures that the secret key material is securely zeroized when dropped.
 impl ZeroizeOnDrop for SecretKey {}
+
+impl PartialEq for SecretKey {
+    fn eq(&self, other: &Self) -> bool {
+        use subtle::ConstantTimeEq;
+        self.inner.to_bytes().ct_eq(&other.inner.to_bytes()).into()
+    }
+}
+
+impl Eq for SecretKey {}
 
 // PUBLIC KEY
 // ================================================================================================
