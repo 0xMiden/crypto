@@ -4,6 +4,7 @@
 use alloc::{string::ToString, vec::Vec};
 
 use ed25519_dalek::{Signer, Verifier};
+use miden_crypto_derive::{SilentDebug, SilentDisplay};
 use rand::{CryptoRng, RngCore};
 use thiserror::Error;
 use zeroize::Zeroize;
@@ -34,6 +35,7 @@ const SIGNATURE_BYTES: usize = 64;
 // ================================================================================================
 
 /// Secret key for EdDSA (Ed25519) signature verification over Curve25519.
+#[derive(Clone, SilentDebug, SilentDisplay)]
 pub struct SecretKey {
     inner: ed25519_dalek::SigningKey,
 }
@@ -80,13 +82,22 @@ impl SecretKey {
     ///
     /// This conversion allows using the same underlying scalar from the Ed25519 secret key
     /// for X25519 Diffie-Hellman key exchange. The returned `StaticSecret` can then be used
-    /// in key agreement protocols to establish a shared secret with another party’s
+    /// in key agreement protocols to establish a shared secret with another party's
     /// X25519 public key.
     fn to_x25519(&self) -> x25519_dalek::StaticSecret {
         let scalar_bytes = self.inner.to_scalar_bytes();
         x25519_dalek::StaticSecret::from(scalar_bytes)
     }
 }
+
+impl PartialEq for SecretKey {
+    fn eq(&self, other: &Self) -> bool {
+        use subtle::ConstantTimeEq;
+        self.inner.to_bytes().ct_eq(&other.inner.to_bytes()).into()
+    }
+}
+
+impl Eq for SecretKey {}
 
 // PUBLIC KEY
 // ================================================================================================

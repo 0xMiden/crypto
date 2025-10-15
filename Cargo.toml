@@ -1,7 +1,7 @@
 [workspace]
 exclude  = ["miden-crypto-fuzz"]
-members  = ["miden-crypto"]
-resolver = "3"                   # Use the edition 2024 dependency resolver
+members  = ["miden-crypto", "miden-crypto-derive"]
+resolver = "3"                                     # Use the edition 2024 dependency resolver
 
 [workspace.package]
 authors      = ["miden contributors"]
@@ -11,6 +11,9 @@ keywords     = ["crypto", "hash", "merkle", "miden"]
 license      = "MIT OR Apache-2.0"
 repository   = "https://github.com/0xMiden/crypto"
 rust-version = "1.89"
+
+[workspace.dependencies]
+miden-crypto-derive = { path = "miden-crypto-derive" }
 
 [workspace.lints.rust]
 # Suppress warnings about `cfg(fuzzing)`, which is automatically set when using `cargo-fuzz`.
