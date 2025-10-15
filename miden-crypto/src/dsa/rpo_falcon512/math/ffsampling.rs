@@ -54,23 +54,6 @@ pub enum LdlTree {
     Leaf([Complex64; 2]),
 }
 
-impl PartialEq for LdlTree {
-    fn eq(&self, other: &Self) -> bool {
-        match (self, other) {
-            (
-                LdlTree::Branch(lhs_poly, lhs_left, lhs_right),
-                LdlTree::Branch(rhs_poly, rhs_left, rhs_right),
-            ) => lhs_poly == rhs_poly && lhs_left == rhs_left && lhs_right == rhs_right,
-            (LdlTree::Leaf(lhs), LdlTree::Leaf(rhs)) => {
-                lhs.iter().zip(rhs.iter()).all(|(a, b)| a == b)
-            },
-            _ => false,
-        }
-    }
-}
-
-impl Eq for LdlTree {}
-
 impl Zeroize for LdlTree {
     fn zeroize(&mut self) {
         match self {
@@ -104,6 +87,15 @@ impl Zeroize for LdlTree {
                 core::sync::atomic::compiler_fence(core::sync::atomic::Ordering::SeqCst);
             },
         }
+    }
+}
+
+// Manual Drop implementation to ensure zeroization on drop.
+// Cannot use #[derive(ZeroizeOnDrop)] because Complex64 doesn't implement Zeroize,
+// so we manually implement Drop to call our Zeroize impl.
+impl Drop for LdlTree {
+    fn drop(&mut self) {
+        self.zeroize();
     }
 }
 
