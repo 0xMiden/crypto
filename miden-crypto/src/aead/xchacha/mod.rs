@@ -17,7 +17,6 @@ use chacha20poly1305::{
     aead::{Aead, AeadCore, KeyInit},
 };
 use rand::{CryptoRng, RngCore};
-use zeroize::Zeroize;
 
 use crate::{
     Felt,
@@ -26,6 +25,7 @@ use crate::{
         ByteReader, ByteWriter, Deserializable, DeserializationError, Serializable,
         bytes_to_elements_exact, elements_to_bytes,
     },
+    zeroize::Zeroize,
 };
 
 #[cfg(test)]

@@ -5,9 +5,9 @@ use num::Float;
 use num::{One, Zero};
 use num_complex::{Complex, Complex64};
 use rand::Rng;
-use zeroize::{Zeroize, ZeroizeOnDrop};
 
 use super::{fft::FastFft, polynomial::Polynomial, samplerz::sampler_z};
+use crate::zeroize::{Zeroize, ZeroizeOnDrop};
 
 const SIGMIN: f64 = 1.2778336969128337;
 

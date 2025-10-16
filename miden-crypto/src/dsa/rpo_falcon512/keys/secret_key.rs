@@ -6,7 +6,6 @@ use num::Complex;
 use num::Float;
 use num_complex::Complex64;
 use rand::Rng;
-use zeroize::{Zeroize, ZeroizeOnDrop};
 
 use super::{
     super::{
@@ -21,6 +20,7 @@ use crate::{
     Word,
     dsa::rpo_falcon512::{LOG_N, SK_LEN, hash_to_point::hash_to_point_rpo256, math::ntru_gen},
     hash::blake::Blake3_256,
+    zeroize::{Zeroize, ZeroizeOnDrop},
 };
 
 // CONSTANTS
@@ -56,11 +56,28 @@ pub(crate) const WIDTH_SMALL_POLY_COEFFICIENT: usize = 6;
 /// using Fast Fourier sampling during signature generation (ffSampling algorithm 11 in [1]).
 ///
 /// [1]: https://falcon-sign.info/falcon.pdf
-#[derive(Clone, SilentDebug, SilentDisplay, ZeroizeOnDrop)]
+#[derive(Clone, SilentDebug, SilentDisplay)]
 pub struct SecretKey {
     secret_key: ShortLatticeBasis,
     tree: LdlTree,
 }
+
+impl Zeroize for SecretKey {
+    fn zeroize(&mut self) {
+        self.secret_key.zeroize();
+        self.tree.zeroize();
+    }
+}
+
+// Manual Drop implementation to ensure zeroization on drop.
+// Cannot use #[derive(ZeroizeOnDrop)] because it's not available when sourcing zeroize from k256.
+impl Drop for SecretKey {
+    fn drop(&mut self) {
+        self.zeroize();
+    }
+}
+
+impl ZeroizeOnDrop for SecretKey {}
 
 #[allow(clippy::new_without_default)]
 impl SecretKey {
@@ -259,13 +276,6 @@ impl SecretKey {
         buffer.zeroize();
 
         digest.into()
-    }
-}
-
-impl Zeroize for SecretKey {
-    fn zeroize(&mut self) {
-        self.secret_key.zeroize();
-        self.tree.zeroize();
     }
 }
 

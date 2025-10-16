@@ -8,12 +8,12 @@ use core::{
 };
 
 use num::{One, Zero};
-use zeroize::{Zeroize, ZeroizeOnDrop};
 
 use super::{Inverse, field::FalconFelt};
 use crate::{
     Felt,
     dsa::rpo_falcon512::{MODULUS, N},
+    zeroize::{Zeroize, ZeroizeOnDrop},
 };
 
 /// Represents a polynomial with coefficients of type F.

@@ -10,7 +10,6 @@ use k256::{
 use miden_crypto_derive::{SilentDebug, SilentDisplay};
 use rand::{CryptoRng, RngCore};
 use thiserror::Error;
-use zeroize::{Zeroize, ZeroizeOnDrop};
 
 use crate::{
     Felt, SequentialCommit, Word,
@@ -19,6 +18,7 @@ use crate::{
         ByteReader, ByteWriter, Deserializable, DeserializationError, Serializable,
         bytes_to_elements_with_padding,
     },
+    zeroize::{Zeroize, ZeroizeOnDrop},
 };
 
 #[cfg(test)]
