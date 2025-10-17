@@ -7,6 +7,7 @@ use num_complex::{Complex, Complex64};
 use rand::Rng;
 
 use super::{fft::FastFft, polynomial::Polynomial, samplerz::sampler_z};
+use crate::zeroize::{Zeroize, ZeroizeOnDrop};
 
 const SIGMIN: f64 = 1.2778336969128337;
 
@@ -52,6 +53,53 @@ pub enum LdlTree {
     Branch(Polynomial<Complex64>, Box<LdlTree>, Box<LdlTree>),
     Leaf([Complex64; 2]),
 }
+
+impl Zeroize for LdlTree {
+    fn zeroize(&mut self) {
+        match self {
+            LdlTree::Branch(poly, left, right) => {
+                // Zeroize polynomial coefficients using write_volatile to prevent compiler
+                // optimizations (dead store elimination)
+                for coeff in poly.coefficients.iter_mut() {
+                    unsafe {
+                        core::ptr::write_volatile(coeff, Complex64::new(0.0, 0.0));
+                    }
+                }
+
+                // Recursively zeroize child nodes
+                left.zeroize();
+                right.zeroize();
+
+                // Compiler fence AFTER all zeroing operations to prevent reordering.
+                // This ensures all writes (both at this level and in recursive calls) are
+                // completed before any subsequent code can observe them.
+                core::sync::atomic::compiler_fence(core::sync::atomic::Ordering::SeqCst);
+            },
+            LdlTree::Leaf(arr) => {
+                // Zeroize leaf array using write_volatile
+                for val in arr.iter_mut() {
+                    unsafe {
+                        core::ptr::write_volatile(val, Complex64::new(0.0, 0.0));
+                    }
+                }
+
+                // Compiler fence after all writes to prevent reordering with subsequent code
+                core::sync::atomic::compiler_fence(core::sync::atomic::Ordering::SeqCst);
+            },
+        }
+    }
+}
+
+// Manual Drop implementation to ensure zeroization on drop.
+// Cannot use #[derive(ZeroizeOnDrop)] because Complex64 doesn't implement Zeroize,
+// so we manually implement Drop to call our Zeroize impl.
+impl Drop for LdlTree {
+    fn drop(&mut self) {
+        self.zeroize();
+    }
+}
+
+impl ZeroizeOnDrop for LdlTree {}
 
 /// Computes the LDL Tree of G. Corresponds to Algorithm 9 of the specification [1, p.37].
 /// The argument is a 2x2 matrix of polynomials, given in FFT form.
