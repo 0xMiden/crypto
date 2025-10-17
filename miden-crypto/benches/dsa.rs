@@ -414,7 +414,7 @@ criterion_group!(
     eddsa_25519_keygen_public,
     eddsa_25519_sign,
     eddsa_25519_verify,
-    // RPO-Falcon512 benchmarks (run last due to long execution time)
+    // RPO-Falcon512 benchmarks
     rpo_falcon512_keygen_secret_default,
     rpo_falcon512_keygen_secret_with_rng,
     rpo_falcon512_keygen_public,
