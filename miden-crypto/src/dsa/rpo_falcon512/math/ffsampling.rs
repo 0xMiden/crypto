@@ -35,8 +35,8 @@ pub fn gram(b: [Polynomial<Complex64>; 4]) -> [Polynomial<Complex64>; 4] {
 pub fn ldl(
     g: [Polynomial<Complex64>; 4],
 ) -> ([Polynomial<Complex64>; 4], [Polynomial<Complex64>; 4]) {
-    let zero = Polynomial::<Complex64>::one();
-    let one = Polynomial::<Complex64>::zero();
+    let zero = Polynomial::<Complex64>::zero();
+    let one = Polynomial::<Complex64>::one();
 
     let l10 = g[2].hadamard_div(&g[0]);
     let bc = l10.map(|c| c * c.conj());
@@ -168,5 +168,83 @@ pub fn ffsampling<R: Rng>(
                 Polynomial::new(vec![Complex64::new(z1 as f64, 0.0)]),
             )
         },
+    }
+}
+
+#[cfg(all(test, feature = "std"))]
+mod tests {
+    use num_complex::Complex64;
+    use rand::{Rng, SeedableRng, rngs::StdRng};
+
+    use super::{gram, ldl};
+    use crate::dsa::rpo_falcon512::math::polynomial::Polynomial;
+
+    fn approx_eq(a: Complex64, b: Complex64, tol: f64) -> bool {
+        (a - b).norm_sqr() <= tol * tol
+    }
+
+    #[test]
+    fn ldl_reconstructs_gram_for_random_fft_polys() {
+        let mut rng = StdRng::seed_from_u64(0xfaLC0N);
+        // test several sizes and trials
+        for &n in &[2usize, 4, 8, 16] {
+            for _ in 0..8 {
+                let mut rand_poly = || -> Polynomial<Complex64> {
+                    let coeffs: Vec<Complex64> = (0..n)
+                        .map(|_| {
+                            let re = rng.random::<f64>() - 0.5;
+                            let im = rng.random::<f64>() - 0.5;
+                            Complex64::new(re, im)
+                        })
+                        .collect();
+                    Polynomial::new(coeffs)
+                };
+
+                // B is 2x2 matrix in row-major: [b00, b01, b10, b11]
+                let b = [rand_poly(), rand_poly(), rand_poly(), rand_poly()];
+
+                // Compute Gram matrix in FFT domain
+                let g = gram(b);
+
+                // LDL decomposition
+                let (l, d) = ldl(g.clone());
+
+                // Reconstruct G' = L D L* with Hadamard ops (per-frequency semantics)
+                let one = Polynomial::<Complex64>::one();
+                let zero = Polynomial::<Complex64>::zero();
+
+                // L structure is [[1,0],[l10,1]]
+                debug_assert!(l[0] == one && l[1] == zero && l[3] == one);
+
+                let l10 = &l[2];
+                let d00 = &d[0];
+                let d11 = &d[3];
+
+                // M = L * D
+                let m00 = d00.clone();
+                let m01 = zero.clone();
+                let m10 = l10.hadamard_mul(d00);
+                let m11 = d11.clone();
+
+                // L* = [[1, conj(l10)],[0,1]]
+                let l10_conj = l10.map(|c| c.conj());
+
+                let gp00 = m00.clone();
+                let gp01 = m00.hadamard_mul(&l10_conj);
+                let gp10 = m10.clone();
+                let gp11 = m10.hadamard_mul(&l10_conj).clone() + m11;
+
+                // Compare coefficients
+                let tol = 1e-9;
+                for i in 0..n {
+                    assert!(approx_eq(g[0].coefficients[i], gp00.coefficients[i], tol));
+                    assert!(approx_eq(g[1].coefficients[i], gp01.coefficients[i], tol));
+                    assert!(approx_eq(g[2].coefficients[i], gp10.coefficients[i], tol));
+                    assert!(approx_eq(g[3].coefficients[i], gp11.coefficients[i], tol));
+                    // Hermitian check: g01 == conj(g10)
+                    assert!(approx_eq(g[1].coefficients[i], g[2].coefficients[i].conj(), tol));
+                }
+            }
+        }
     }
 }
