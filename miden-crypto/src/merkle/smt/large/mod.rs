@@ -1029,6 +1029,14 @@ impl<S: SmtStorage> LargeSmt<S> {
             }
         }
     }
+
+    // TEST HELPERS
+    // --------------------------------------------------------------------------------------------
+
+    #[cfg(test)]
+    pub(crate) fn in_memory_nodes(&self) -> &Vec<Word> {
+        &self.in_memory_nodes
+    }
 }
 
 impl<S: SmtStorage> SparseMerkleTree<SMT_DEPTH> for LargeSmt<S> {
@@ -1085,8 +1093,7 @@ impl<S: SmtStorage> SparseMerkleTree<SMT_DEPTH> for LargeSmt<S> {
             self.in_memory_nodes[i * 2 + 1] = inner_node.right;
 
             // Check if the old node was empty
-            let empty_hash = *EmptySubtreeRoots::entry(SMT_DEPTH, index.depth() + 1);
-            if old_left == empty_hash && old_right == empty_hash {
+            if is_empty_parent(old_left, old_right, index.depth() + 1) {
                 return None;
             }
 
@@ -1105,12 +1112,13 @@ impl<S: SmtStorage> SparseMerkleTree<SMT_DEPTH> for LargeSmt<S> {
             let old_right = self.in_memory_nodes[memory_index * 2 + 1];
 
             // Replace with empty hashes
-            let empty_hash = *EmptySubtreeRoots::entry(SMT_DEPTH, index.depth() + 1);
+            let child_depth = index.depth() + 1;
+            let empty_hash = *EmptySubtreeRoots::entry(SMT_DEPTH, child_depth);
             self.in_memory_nodes[memory_index * 2] = empty_hash;
             self.in_memory_nodes[memory_index * 2 + 1] = empty_hash;
 
             // Return the old node if it wasn't already empty
-            if old_left == empty_hash && old_right == empty_hash {
+            if is_empty_parent(old_left, old_right, child_depth) {
                 return None;
             }
 
@@ -1292,6 +1300,13 @@ fn to_memory_index(index: &NodeIndex) -> usize {
     (1usize << index.depth()) + index.value() as usize
 }
 
+/// Checks if a node with the given children is empty.
+/// A node is considered empty if both children equal the empty hash for that depth.
+fn is_empty_parent(left: Word, right: Word, child_depth: u8) -> bool {
+    let empty_hash = *EmptySubtreeRoots::entry(SMT_DEPTH, child_depth);
+    left == empty_hash && right == empty_hash
+}
+
 // ITERATORS
 // ================================================================================================
 
@@ -1356,11 +1371,10 @@ impl<S: SmtStorage> Iterator for LargeSmtInnerNodeIterator<'_, S> {
                         let right = large_smt_in_memory_nodes[node_idx * 2 + 1];
 
                         // Skip empty nodes
-                        // The depth can be computed from the node index
                         let depth = node_idx.ilog2() as u8;
-                        let empty_hash = *EmptySubtreeRoots::entry(SMT_DEPTH, depth + 1);
+                        let child_depth = depth + 1;
 
-                        if left != empty_hash || right != empty_hash {
+                        if !is_empty_parent(left, right, child_depth) {
                             return Some(InnerNodeInfo {
                                 value: Rpo256::merge(&[left, right]),
                                 left,
