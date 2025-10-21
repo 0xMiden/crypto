@@ -47,6 +47,37 @@ Notes:
 - On Graviton 3 and 4, RPO256 and RPX256 are run with SVE acceleration enabled.
 - On AMD EPYC 9R14, RPO256 and RPX256 are run with AVX2 acceleration enabled.
 
+### Digital Signature Algorithms (DSA)
+
+We benchmark the performance of digital signature algorithms used in the Miden VM. These include:
+
+* **RPO-Falcon512** - Falcon512 signature scheme using RPO256 for message hashing
+* **ECDSA over secp256k1** - Elliptic Curve Digital Signature Algorithm using Keccak256 for message hashing
+* **EdDSA over Ed25519** - Edwards-curve Digital Signature Algorithm using SHA-512 for message hashing
+
+For each algorithm, we benchmark three core operations:
+1. **Key Generation** - Creating a new secret key
+2. **Signing** - Generating a signature for a message
+3. **Verification** - Verifying a signature against a message and public key
+
+#### RPO-Falcon512
+
+| Hardware            | Key Generation | Signing | Verification |
+| ------------------- | :------------: | :-----: | :----------: |
+| Apple M4            | 240 ms         | 6.9 ms  | 2.07 ms      |
+
+#### ECDSA over secp256k1 (Keccak256)
+
+| Hardware            | Key Generation | Signing | Verification |
+| ------------------- | :------------: | :-----: | :----------: |
+| Apple M4            | 24.4 µs        | 258 µs  | 390 µs       |
+
+#### EdDSA over Ed25519
+
+| Hardware            | Key Generation | Signing | Verification |
+| ------------------- | :------------: | :-----: | :----------: |
+| Apple M4            | 8.2 µs         | 86.6 µs | 185.6 µs     |
+
 ### Sparse Merkle Tree
 
 We build cryptographic data structures incorporating these hash functions. What follows are benchmarks of operations on sparse Merkle trees (SMTs) which use the above `RPO_256` hash function. We perform a batched modification of 1,000 values in a tree with 1,000,000 leaves (with the `hashmaps` feature to use the `hashbrown` crate).
@@ -85,17 +116,31 @@ Notes:
 
 ### Instructions
 
-Before you can run the benchmarks, you'll need to make sure you have Rust [installed](https://www.rust-lang.org/tools/install). After that, to run the benchmarks for RPO, Poseidon2, BLAKE3 and Keccak256, clone the current repository, and from the root directory of the repo run the following:
+Before you can run the benchmarks, you'll need to make sure you have Rust [installed](https://www.rust-lang.org/tools/install).
+
+#### Hash Function Benchmarks
+
+To run the benchmarks for RPO, Poseidon2, BLAKE3 and Keccak256, clone the current repository, and from the root directory of the repo run:
 
  ```
  cargo bench hash
  ```
 
-To run the benchmarks for SHA3, clone the following [repository](https://github.com/Dominik1999/winterfell.git) as above, then checkout the `hash-functions-benches` branch, and from the root directory of the repo run the following:
+To run the benchmarks for SHA3, clone the following [repository](https://github.com/Dominik1999/winterfell.git) as above, then checkout the `hash-functions-benches` branch, and from the root directory run:
 
 ```
 cargo bench hash
 ```
+
+#### Digital Signature Algorithm (DSA) Benchmarks
+
+To run the benchmarks for all DSA implementations (RPO-Falcon512, ECDSA k256, and EdDSA), from the root directory run:
+
+```
+cargo bench dsa
+```
+
+#### Sparse Merkle Tree Benchmarks
 
 To run the benchmarks for SMT operations, run the binary target with the `executable` feature:
 

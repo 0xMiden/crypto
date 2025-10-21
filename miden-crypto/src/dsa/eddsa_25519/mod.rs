@@ -7,7 +7,6 @@ use ed25519_dalek::{Signer, Verifier};
 use miden_crypto_derive::{SilentDebug, SilentDisplay};
 use rand::{CryptoRng, RngCore};
 use thiserror::Error;
-use zeroize::Zeroize;
 
 use crate::{
     Felt, SequentialCommit, Word,
@@ -16,6 +15,7 @@ use crate::{
         ByteReader, ByteWriter, Deserializable, DeserializationError, Serializable,
         bytes_to_elements_with_padding,
     },
+    zeroize::{Zeroize, ZeroizeOnDrop},
 };
 
 #[cfg(test)]
@@ -56,6 +56,10 @@ impl SecretKey {
         rand::RngCore::fill_bytes(rng, &mut seed);
 
         let inner = ed25519_dalek::SigningKey::from_bytes(&seed);
+
+        // Zeroize the seed to prevent leaking secret material
+        seed.zeroize();
+
         Self { inner }
     }
 
@@ -85,10 +89,19 @@ impl SecretKey {
     /// in key agreement protocols to establish a shared secret with another party's
     /// X25519 public key.
     fn to_x25519(&self) -> x25519_dalek::StaticSecret {
-        let scalar_bytes = self.inner.to_scalar_bytes();
-        x25519_dalek::StaticSecret::from(scalar_bytes)
+        let mut scalar_bytes = self.inner.to_scalar_bytes();
+        let static_secret = x25519_dalek::StaticSecret::from(scalar_bytes);
+
+        // Zeroize the temporary scalar bytes
+        scalar_bytes.zeroize();
+
+        static_secret
     }
 }
+
+// SAFETY: The inner `ed25519_dalek::SigningKey` already implements `ZeroizeOnDrop`,
+// which ensures that the secret key material is securely zeroized when dropped.
+impl ZeroizeOnDrop for SecretKey {}
 
 impl PartialEq for SecretKey {
     fn eq(&self, other: &Self) -> bool {
