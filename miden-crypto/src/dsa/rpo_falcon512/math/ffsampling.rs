@@ -2,7 +2,7 @@ use alloc::boxed::Box;
 
 #[cfg(not(feature = "std"))]
 use num::Float;
-use num::{One, Zero};
+use num::Zero;
 use num_complex::{Complex, Complex64};
 use rand::Rng;
 
@@ -32,20 +32,20 @@ pub fn gram(b: [Polynomial<Complex64>; 4]) -> [Polynomial<Complex64>; 4] {
 /// Computes the LDL decomposition of a 2x2 matrix G such that
 ///     L D L* = G
 /// where D is diagonal, and L is lower-triangular. The elements of the matrices are in FFT domain.
+///
+/// Returns only the non-trivial elements: (l10, d00, d11) where:
+/// - l10: the lower-left element of L (L[1,0])
+/// - d00: the top-left diagonal element of D (D[0,0])
+/// - d11: the bottom-right diagonal element of D (D[1,1])
 pub fn ldl(
     g: [Polynomial<Complex64>; 4],
-) -> ([Polynomial<Complex64>; 4], [Polynomial<Complex64>; 4]) {
-    let zero = Polynomial::<Complex64>::one();
-    let one = Polynomial::<Complex64>::zero();
-
+) -> (Polynomial<Complex64>, Polynomial<Complex64>, Polynomial<Complex64>) {
     let l10 = g[2].hadamard_div(&g[0]);
     let bc = l10.map(|c| c * c.conj());
     let abc = g[0].hadamard_mul(&bc);
     let d11 = g[3].clone() - abc;
 
-    let l = [one.clone(), zero.clone(), l10.clone(), one];
-    let d = [g[0].clone(), zero.clone(), zero, d11];
-    (l, d)
+    (l10, g[0].clone(), d11)
 }
 
 #[derive(Debug, Clone)]
@@ -106,19 +106,19 @@ impl ZeroizeOnDrop for LdlTree {}
 /// [1]: https://falcon-sign.info/falcon.pdf
 pub fn ffldl(gram_matrix: [Polynomial<Complex64>; 4]) -> LdlTree {
     let n = gram_matrix[0].coefficients.len();
-    let (l, d) = ldl(gram_matrix);
+    let (l10, d00, d11) = ldl(gram_matrix);
 
     if n > 2 {
-        let (d00, d01) = d[0].split_fft();
-        let (d10, d11) = d[3].split_fft();
-        let g0 = [d00.clone(), d01.clone(), d01.map(|c| c.conj()), d00];
-        let g1 = [d10.clone(), d11.clone(), d11.map(|c| c.conj()), d10];
-        LdlTree::Branch(l[2].clone(), Box::new(ffldl(g0)), Box::new(ffldl(g1)))
+        let (d00_left, d00_right) = d00.split_fft();
+        let (d11_left, d11_right) = d11.split_fft();
+        let g0 = [d00_left.clone(), d00_right.clone(), d00_right.map(|c| c.conj()), d00_left];
+        let g1 = [d11_left.clone(), d11_right.clone(), d11_right.map(|c| c.conj()), d11_left];
+        LdlTree::Branch(l10, Box::new(ffldl(g0)), Box::new(ffldl(g1)))
     } else {
         LdlTree::Branch(
-            l[2].clone(),
-            Box::new(LdlTree::Leaf(d[0].clone().coefficients.try_into().unwrap())),
-            Box::new(LdlTree::Leaf(d[3].clone().coefficients.try_into().unwrap())),
+            l10,
+            Box::new(LdlTree::Leaf(d00.coefficients.try_into().unwrap())),
+            Box::new(LdlTree::Leaf(d11.coefficients.try_into().unwrap())),
         )
     }
 }
