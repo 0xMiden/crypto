@@ -301,7 +301,10 @@ impl<S: SmtStorage> LargeSmt<S> {
         let entries: Vec<(Word, Word)> = entries.into_iter().collect();
 
         if storage.has_leaves()? {
-            panic!("Cannot create SMT with non-empty storage");
+            return Err(StorageError::Unsupported(
+                "Cannot create SMT with non-empty storage".into(),
+            )
+            .into());
         }
         let mut tree = LargeSmt::new(storage)?;
         if entries.is_empty() {

@@ -18,6 +18,7 @@ pub mod word;
 // RE-EXPORTS
 // ================================================================================================
 
+pub use k256::elliptic_curve::zeroize;
 pub use winter_math::{
     FieldElement, StarkField,
     fields::{CubeExtension, QuadExtension, f64::BaseElement as Felt},

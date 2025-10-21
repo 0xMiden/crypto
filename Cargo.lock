@@ -978,7 +978,6 @@ dependencies = [
  "winter-rand-utils",
  "winter-utils",
  "x25519-dalek",
- "zeroize",
 ]
 
 [[package]]

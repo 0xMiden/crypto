@@ -103,7 +103,6 @@ winter-crypto                 = { default-features = false, version = "0.13" }
 winter-math                   = { default-features = false, version = "0.13" }
 winter-utils                  = { default-features = false, version = "0.13" }
 x25519-dalek                  = { default-features = false, features = ["static_secrets"], version = "2.0" }
-zeroize                       = { default-features = false, version = "1.8" }
 
 [dev-dependencies]
 assert_matches = { default-features = false, version = "1.5" }
