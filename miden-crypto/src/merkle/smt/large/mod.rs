@@ -229,14 +229,10 @@ impl<S: SmtStorage> LargeSmt<S> {
         let mut in_memory_nodes: Vec<Word> = vec![EMPTY_WORD; NUM_IN_MEMORY_NODES];
 
         for depth in 0..IN_MEMORY_DEPTH {
-            let start_idx = 1 << depth;
-            let end_idx = 1 << (depth + 1);
             let child_empty_hash = *EmptySubtreeRoots::entry(SMT_DEPTH, depth + 1);
-
-            for node_idx in start_idx..end_idx {
-                in_memory_nodes[node_idx * 2] = child_empty_hash;
-                in_memory_nodes[node_idx * 2 + 1] = child_empty_hash;
-            }
+            let start = 2 * (1 << depth);
+            let end = 2 * (1 << (depth + 1));
+            in_memory_nodes[start..end].fill(child_empty_hash);
         }
 
         // No leaves, return empty tree
