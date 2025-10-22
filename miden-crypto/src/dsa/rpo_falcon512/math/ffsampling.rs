@@ -48,17 +48,14 @@ pub fn gram(b: [Polynomial<Complex64>; 4]) -> [Polynomial<Complex64>; 4] {
 /// ```
 ///
 /// More specifically:
-/// 
+///
 /// From the equation L·D·L* = G, we can derive:
-/// 1. From position (0,0): 1·d00·1 = g[0]
-///    → **d00 = g[0]**
+/// 1. From position (0,0): 1·d00·1 = g[0] → **d00 = g[0]**
 ///
-/// 2. From position (1,0): l10·d00·1 = g[2]
-///    → **l10 = g[2] / g[0]**
+/// 2. From position (1,0): l10·d00·1 = g[2] → **l10 = g[2] / g[0]**
 ///
-/// 3. From position (1,1): l10·d00·conj(l10) + 1·d11·1 = g[3]
-///    → d11 = g[3] - l10·d00·conj(l10)
-///    → **d11 = g[3] - |l10|²·g[0]**
+/// 3. From position (1,1): l10·d00·conj(l10) + 1·d11·1 = g[3] → d11 = g[3] - l10·d00·conj(l10) →
+///    **d11 = g[3] - |l10|²·g[0]**
 pub fn ldl(
     g: [Polynomial<Complex64>; 4],
 ) -> (Polynomial<Complex64>, Polynomial<Complex64>, Polynomial<Complex64>) {
@@ -202,10 +199,11 @@ pub fn ffsampling<R: Rng>(
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use num_complex::Complex64;
     use rand::{Rng, SeedableRng};
     use rand_chacha::ChaCha20Rng;
+
+    use super::*;
 
     /// Helper to reconstruct G from L and D matrices by computing L·D·L*
     ///
@@ -272,13 +270,18 @@ mod tests {
     }
 
     /// Helper to check if two polynomials are approximately equal
-    fn polynomials_approx_eq(a: &Polynomial<Complex64>, b: &Polynomial<Complex64>, eps: f64) -> bool {
+    fn polynomials_approx_eq(
+        a: &Polynomial<Complex64>,
+        b: &Polynomial<Complex64>,
+        eps: f64,
+    ) -> bool {
         if a.coefficients.len() != b.coefficients.len() {
             return false;
         }
-        a.coefficients.iter().zip(b.coefficients.iter()).all(|(x, y)| {
-            (x.re - y.re).abs() < eps && (x.im - y.im).abs() < eps
-        })
+        a.coefficients
+            .iter()
+            .zip(b.coefficients.iter())
+            .all(|(x, y)| (x.re - y.re).abs() < eps && (x.im - y.im).abs() < eps)
     }
 
     /// Test that LDL decomposition satisfies L·D·L* = G for random polynomials in FFT domain.
