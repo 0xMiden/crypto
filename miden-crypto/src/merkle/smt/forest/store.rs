@@ -51,8 +51,8 @@ impl SmtStore {
     /// # Errors
     /// This method can return the following errors:
     /// - `RootNotInStore` if the `root` is not present in the store.
-    /// - `NodeNotInStore` if a node needed to traverse from `root` to `index` is not present in the
-    ///   store.
+    /// - `NodeIndexNotFoundInStore` if a node needed to traverse from `root` to `index` is not
+    ///   present in the store.
     pub fn get_node(&self, root: Word, index: NodeIndex) -> Result<Word, MerkleError> {
         let mut hash = root;
 
@@ -79,8 +79,8 @@ impl SmtStore {
     /// # Errors
     /// This method can return the following errors:
     /// - `RootNotInStore` if the `root` is not present in the store.
-    /// - `NodeNotInStore` if a node needed to traverse from `root` to `index` is not present in the
-    ///   store.
+    /// - `NodeIndexNotFoundInStore` if a node needed to traverse from `root` to `index` is not
+    ///   present in the store.
     pub fn get_path(&self, root: Word, index: NodeIndex) -> Result<MerkleProof, MerkleError> {
         let IndexedPath { value, path } = self.get_indexed_path(root, index)?;
         let path_iter = path.into_iter().rev().map(|(_, value)| value);
@@ -96,8 +96,8 @@ impl SmtStore {
     /// # Errors
     /// This method can return the following errors:
     /// - `RootNotInStore` if the `root` is not present in the store.
-    /// - `NodeNotInStore` if a node needed to traverse from `root` to `index` is not present in the
-    ///   store.
+    /// - `NodeIndexNotFoundInStore` if a node needed to traverse from `root` to `index` is not
+    ///   present in the store.
     fn get_indexed_path(&self, root: Word, index: NodeIndex) -> Result<IndexedPath, MerkleError> {
         let mut hash = root;
         let mut path = Vec::with_capacity(index.depth().into());
@@ -135,8 +135,8 @@ impl SmtStore {
     /// # Errors
     /// This method can return the following errors:
     /// - `RootNotInStore` if the `root` is not present in the store.
-    /// - `NodeNotInStore` if a node needed to traverse from `root` to `index` is not present in the
-    ///   store.
+    /// - `NodeIndexNotFoundInStore` if a node needed to traverse from `root` to `index` is not
+    ///   present in the store.
     pub fn set_leaves(
         &mut self,
         root: Word,

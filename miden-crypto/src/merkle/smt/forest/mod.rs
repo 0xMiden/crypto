@@ -118,7 +118,7 @@ impl SmtForest {
     // --------------------------------------------------------------------------------------------
 
     /// Inserts the specified key-value pair into an SMT with the specified root. This will also
-    /// add a new root to the forest.
+    /// add a new root to the forest. Returns the new root.
     ///
     /// Returns an error if an SMT with the specified root is not in the forest, these is not
     /// enough data in the forest to perform the insert, or if the insert would create a leaf
@@ -128,7 +128,7 @@ impl SmtForest {
     }
 
     /// Inserts the specified key-value pairs into an SMT with the specified root. This will also
-    /// add a single new root to the forest for the entire batch of inserts.
+    /// add a single new root to the forest for the entire batch of inserts. Returns the new root.
     ///
     /// Returns an error if an SMT with the specified root is not in the forest, these is not
     /// enough data in the forest to perform the insert, or if the insert would create a leaf
@@ -190,7 +190,6 @@ impl SmtForest {
         let new_leaf_entries = {
             // Required because hashbrown::HashMap doesn't maintain key ordering.
             // The default implementation uses BTreeMap which behaves differently.
-            use alloc::vec::Vec;
             let mut new_leaf_entries = new_leaf_entries.collect::<Vec<_>>();
             new_leaf_entries.sort_by_key(|(idx, _)| *idx);
             new_leaf_entries
