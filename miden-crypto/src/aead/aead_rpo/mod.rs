@@ -15,7 +15,6 @@ use rand::{
     Rng,
     distr::{Distribution, StandardUniform, Uniform},
 };
-use zeroize::{Zeroize, ZeroizeOnDrop};
 
 use crate::{
     Felt, FieldElement, ONE, StarkField, Word, ZERO,
@@ -26,6 +25,7 @@ use crate::{
         bytes_to_elements_exact, bytes_to_elements_with_padding, elements_to_bytes,
         padded_elements_to_bytes,
     },
+    zeroize::{Zeroize, ZeroizeOnDrop},
 };
 
 #[cfg(test)]

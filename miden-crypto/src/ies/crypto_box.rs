@@ -10,10 +10,9 @@
 use alloc::vec::Vec;
 
 use rand::{CryptoRng, RngCore};
-use zeroize::Zeroizing;
 
 use super::error::IesError;
-use crate::{Felt, aead::AeadScheme, ecdh::KeyAgreementScheme};
+use crate::{Felt, aead::AeadScheme, ecdh::KeyAgreementScheme, zeroize::Zeroizing};
 
 /// A generic CryptoBox primitive parameterized by key agreement and AEAD schemes
 pub(crate) struct CryptoBox<K: KeyAgreementScheme, A: AeadScheme> {

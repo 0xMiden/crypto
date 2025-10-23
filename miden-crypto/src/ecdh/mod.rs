@@ -5,7 +5,8 @@ use alloc::vec::Vec;
 use rand::{CryptoRng, RngCore};
 use thiserror::Error;
 use winter_utils::{Deserializable, Serializable};
-use zeroize::{Zeroize, ZeroizeOnDrop};
+
+use crate::zeroize::{Zeroize, ZeroizeOnDrop};
 
 pub mod k256;
 pub mod x25519;

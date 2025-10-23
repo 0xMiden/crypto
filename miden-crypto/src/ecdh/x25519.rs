@@ -22,7 +22,7 @@ use crate::{
     dsa::eddsa_25519::{PublicKey, SecretKey},
     ecdh::KeyAgreementScheme,
     utils::{ByteReader, ByteWriter, Deserializable, DeserializationError, Serializable},
-    zeroize::ZeroizeOnDrop,
+    zeroize::{Zeroize, ZeroizeOnDrop},
 };
 
 /// A shared secret computed using the X25519 (Elliptic Curve Diffie-Hellman) key agreement.

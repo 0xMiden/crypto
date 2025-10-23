@@ -3,9 +3,11 @@
 use alloc::vec::Vec;
 use core::fmt;
 
-use zeroize::{Zeroize, ZeroizeOnDrop};
-
-use crate::{Felt, utils::Deserializable};
+use crate::{
+    Felt,
+    utils::Deserializable,
+    zeroize::{Zeroize, ZeroizeOnDrop},
+};
 
 pub mod aead_rpo;
 pub mod xchacha;

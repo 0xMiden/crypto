@@ -17,12 +17,12 @@ use alloc::{string::ToString, vec::Vec};
 use hkdf::{Hkdf, hmac::SimpleHmac};
 use k256::{AffinePoint, elliptic_curve::sec1::ToEncodedPoint, sha2::Sha256};
 use rand::{CryptoRng, RngCore};
-use zeroize::{Zeroize, ZeroizeOnDrop};
 
 use crate::{
     dsa::ecdsa_k256_keccak::{PUBLIC_KEY_BYTES, PublicKey, SecretKey},
     ecdh::KeyAgreementScheme,
     utils::{ByteReader, ByteWriter, Deserializable, DeserializationError, Serializable},
+    zeroize::{Zeroize, ZeroizeOnDrop},
 };
 
 /// A shared secret computed using the ECDH (Elliptic Curve Diffie-Hellman) key agreement.
