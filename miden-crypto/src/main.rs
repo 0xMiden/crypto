@@ -276,6 +276,7 @@ pub fn proof_generation(tree: &mut LargeSmt<Storage>) -> Result<(), LargeSmtErro
     Ok(())
 }
 
+#[allow(unused_variables)]
 fn get_storage(database_path: Option<PathBuf>, open: bool, kind: StorageKind) -> Storage {
     match kind {
         StorageKind::Memory => Box::new(MemoryStorage::new()),

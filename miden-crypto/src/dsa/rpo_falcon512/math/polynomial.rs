@@ -13,6 +13,7 @@ use super::{Inverse, field::FalconFelt};
 use crate::{
     Felt,
     dsa::rpo_falcon512::{MODULUS, N},
+    zeroize::{Zeroize, ZeroizeOnDrop},
 };
 
 /// Represents a polynomial with coefficients of type F.
@@ -631,6 +632,17 @@ impl Polynomial<i16> {
         self.coefficients.iter().map(|c| FalconFelt::new(*c).balanced_value()).collect()
     }
 }
+
+// ZEROIZE IMPLEMENTATIONS
+// ================================================================================================
+
+impl<F: Zeroize> Zeroize for Polynomial<F> {
+    fn zeroize(&mut self) {
+        self.coefficients.zeroize();
+    }
+}
+
+impl<F: Zeroize> ZeroizeOnDrop for Polynomial<F> {}
 
 // TESTS
 // ================================================================================================

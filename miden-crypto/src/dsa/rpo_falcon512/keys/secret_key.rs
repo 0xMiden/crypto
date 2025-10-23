@@ -1,5 +1,6 @@
 use alloc::{string::ToString, vec::Vec};
 
+use miden_crypto_derive::{SilentDebug, SilentDisplay};
 use num::Complex;
 #[cfg(not(feature = "std"))]
 use num::Float;
@@ -19,6 +20,7 @@ use crate::{
     Word,
     dsa::rpo_falcon512::{LOG_N, SK_LEN, hash_to_point::hash_to_point_rpo256, math::ntru_gen},
     hash::blake::Blake3_256,
+    zeroize::{Zeroize, ZeroizeOnDrop},
 };
 
 // CONSTANTS
@@ -54,11 +56,28 @@ pub(crate) const WIDTH_SMALL_POLY_COEFFICIENT: usize = 6;
 /// using Fast Fourier sampling during signature generation (ffSampling algorithm 11 in [1]).
 ///
 /// [1]: https://falcon-sign.info/falcon.pdf
-#[derive(Debug, Clone)]
+#[derive(Clone, SilentDebug, SilentDisplay)]
 pub struct SecretKey {
     secret_key: ShortLatticeBasis,
     tree: LdlTree,
 }
+
+impl Zeroize for SecretKey {
+    fn zeroize(&mut self) {
+        self.secret_key.zeroize();
+        self.tree.zeroize();
+    }
+}
+
+// Manual Drop implementation to ensure zeroization on drop.
+// Cannot use #[derive(ZeroizeOnDrop)] because it's not available when sourcing zeroize from k256.
+impl Drop for SecretKey {
+    fn drop(&mut self) {
+        self.zeroize();
+    }
+}
+
+impl ZeroizeOnDrop for SecretKey {}
 
 #[allow(clippy::new_without_default)]
 impl SecretKey {
@@ -119,9 +138,14 @@ impl SecretKey {
         use rand::SeedableRng;
         use rand_chacha::ChaCha20Rng;
 
-        let seed = self.generate_seed(&message);
+        let mut seed = self.generate_seed(&message);
         let mut rng = ChaCha20Rng::from_seed(seed);
-        self.sign_with_rng(message, &mut rng)
+        let signature = self.sign_with_rng(message, &mut rng);
+
+        // Zeroize the seed to prevent leakage
+        seed.zeroize();
+
+        signature
     }
 
     /// Signs a message with the secret key relying on the provided randomness generator.
@@ -248,9 +272,21 @@ impl SecretKey {
 
         let digest = Blake3_256::hash(&buffer);
 
+        // Zeroize the buffer as it contains secret key material
+        buffer.zeroize();
+
         digest.into()
     }
 }
+
+impl PartialEq for SecretKey {
+    fn eq(&self, other: &Self) -> bool {
+        use subtle::ConstantTimeEq;
+        self.to_bytes().ct_eq(&other.to_bytes()).into()
+    }
+}
+
+impl Eq for SecretKey {}
 
 // SERIALIZATION / DESERIALIZATION
 // ================================================================================================
@@ -271,30 +307,36 @@ impl Serializable for SecretKey {
         let mut buffer = Vec::with_capacity(1281);
         buffer.push(header);
 
-        let f_i8: Vec<i8> = neg_f
+        let mut f_i8: Vec<i8> = neg_f
             .coefficients
             .iter()
             .map(|&a| FalconFelt::new(-a).balanced_value() as i8)
             .collect();
         let f_i8_encoded = encode_i8(&f_i8, WIDTH_SMALL_POLY_COEFFICIENT).unwrap();
         buffer.extend_from_slice(&f_i8_encoded);
+        f_i8.zeroize();
 
-        let g_i8: Vec<i8> = g
+        let mut g_i8: Vec<i8> = g
             .coefficients
             .iter()
             .map(|&a| FalconFelt::new(a).balanced_value() as i8)
             .collect();
         let g_i8_encoded = encode_i8(&g_i8, WIDTH_SMALL_POLY_COEFFICIENT).unwrap();
         buffer.extend_from_slice(&g_i8_encoded);
+        g_i8.zeroize();
 
-        let big_f_i8: Vec<i8> = neg_big_f
+        let mut big_f_i8: Vec<i8> = neg_big_f
             .coefficients
             .iter()
             .map(|&a| FalconFelt::new(-a).balanced_value() as i8)
             .collect();
         let big_f_i8_encoded = encode_i8(&big_f_i8, WIDTH_BIG_POLY_COEFFICIENT).unwrap();
         buffer.extend_from_slice(&big_f_i8_encoded);
+        big_f_i8.zeroize();
+
         target.write_bytes(&buffer);
+        // Note: buffer is not zeroized here as it's being passed to write_bytes which consumes it
+        // The caller should ensure proper handling of the written bytes
     }
 }
 

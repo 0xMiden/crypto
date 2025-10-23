@@ -17,12 +17,12 @@ use alloc::vec::Vec;
 use hkdf::{Hkdf, hmac::SimpleHmac};
 use k256::sha2::Sha256;
 use rand::{CryptoRng, RngCore};
-use zeroize::{Zeroize, ZeroizeOnDrop};
 
 use crate::{
     dsa::eddsa_25519::{PublicKey, SecretKey},
     ecdh::KeyAgreementScheme,
     utils::{ByteReader, ByteWriter, Deserializable, DeserializationError, Serializable},
+    zeroize::ZeroizeOnDrop,
 };
 
 /// A shared secret computed using the X25519 (Elliptic Curve Diffie-Hellman) key agreement.

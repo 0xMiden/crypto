@@ -7,9 +7,9 @@ use k256::{
     ecdh::diffie_hellman,
     ecdsa::{RecoveryId, SigningKey, VerifyingKey, signature::hazmat::PrehashVerifier},
 };
+use miden_crypto_derive::{SilentDebug, SilentDisplay};
 use rand::{CryptoRng, RngCore};
 use thiserror::Error;
-use zeroize::Zeroize;
 
 use crate::{
     Felt, SequentialCommit, Word,
@@ -18,6 +18,7 @@ use crate::{
         ByteReader, ByteWriter, Deserializable, DeserializationError, Serializable,
         bytes_to_elements_with_padding,
     },
+    zeroize::{Zeroize, ZeroizeOnDrop},
 };
 
 #[cfg(test)]
@@ -41,6 +42,7 @@ const SCALARS_SIZE_BYTES: usize = 32;
 // ================================================================================================
 
 /// Secret key for ECDSA signature verification over secp256k1 curve.
+#[derive(Clone, SilentDebug, SilentDisplay)]
 pub struct SecretKey {
     inner: SigningKey,
 }
@@ -68,8 +70,7 @@ impl SecretKey {
 
         let signing_key = SigningKey::random(&mut rng);
 
-        // SECURITY: Zeroize sensitive seed material
-        use zeroize::Zeroize;
+        // Zeroize the seed to prevent leaking secret material
         seed.zeroize();
 
         Self { inner: signing_key }
@@ -111,6 +112,19 @@ impl SecretKey {
         SharedSecret::new(shared_secret_inner)
     }
 }
+
+// SAFETY: The inner `k256::ecdsa::SigningKey` already implements `ZeroizeOnDrop`,
+// which ensures that the secret key material is securely zeroized when dropped.
+impl ZeroizeOnDrop for SecretKey {}
+
+impl PartialEq for SecretKey {
+    fn eq(&self, other: &Self) -> bool {
+        use subtle::ConstantTimeEq;
+        self.to_bytes().ct_eq(&other.to_bytes()).into()
+    }
+}
+
+impl Eq for SecretKey {}
 
 // PUBLIC KEY
 // ================================================================================================
