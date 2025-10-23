@@ -180,6 +180,17 @@ type LoadedLeaves = (Vec<u64>, Map<u64, Option<SmtLeaf>>);
 /// - `isize`: Entry count delta
 type MutatedLeaves = (MutatedSubtreeLeaves, Map<u64, SmtLeaf>, Map<Word, Word>, isize, isize);
 
+/// Represents a storage update for a subtree after processing mutations.
+#[derive(Debug)]
+enum SubtreeUpdate {
+    /// No storage update needed (in-memory or unchanged).
+    None,
+    /// Store the modified subtree at the given index.
+    Store { index: NodeIndex, subtree: Subtree },
+    /// Delete the subtree at the given index (became empty).
+    Delete { index: NodeIndex },
+}
+
 // LargeSmt
 // ================================================================================================
 
@@ -514,81 +525,33 @@ impl<S: SmtStorage> LargeSmt<S> {
             (0..=SMT_DEPTH - SUBTREE_DEPTH).step_by(SUBTREE_DEPTH as usize).rev()
         {
             // Build mutations and apply them to loaded subtrees
+            let subtree_count = leaves.len();
+            let is_in_memory = subtree_root_depth < IN_MEMORY_DEPTH;
+            let mutations_capacity = if is_in_memory {
+                subtree_count * SUBTREE_DEPTH as usize
+            } else {
+                0
+            };
+            let updates_capacity = if is_in_memory { 0 } else { subtree_count };
+
             let (in_memory_mutations, mut subtree_roots, modified_subtrees) = leaves
                 .into_par_iter()
                 .map(|subtree_leaves| {
-                    let subtree_root_index = NodeIndex::new_unchecked(
-                        subtree_root_depth,
-                        subtree_leaves[0].col >> SUBTREE_DEPTH,
-                    );
-
-                    let mut subtree_opt = if subtree_root_depth < IN_MEMORY_DEPTH {
-                        // Use in-memory nodes
-                        None
-                    } else {
-                        // Load subtree from storage
-                        self.storage
-                            .get_subtree(subtree_root_index)
-                            .expect("Storage error getting subtree in insert_batch")
-                            .or_else(|| Some(Subtree::new(subtree_root_index)))
-                    };
-
-                    debug_assert!(subtree_leaves.is_sorted() && !subtree_leaves.is_empty());
-
-                    // Build mutations for the subtree
-                    let (mutations, root) = self.build_subtree_mutations(
-                        subtree_leaves,
-                        SMT_DEPTH,
-                        subtree_root_depth,
-                        subtree_opt.as_ref(),
-                    );
-
-                    let (in_memory_mutations, subtree_modified) =
-                        if subtree_root_depth < IN_MEMORY_DEPTH {
-                            // Return the mutations and indicate that the subtree was not modified
-                            (mutations, false)
-                        } else {
-                            // Apply mutations to the subtree
-                            let modified = !mutations.is_empty();
-                            if let Some(subtree) = subtree_opt.as_mut() {
-                                for (index, mutation) in mutations {
-                                    match mutation {
-                                        NodeMutation::Removal => {
-                                            subtree.remove_inner_node(index);
-                                        },
-                                        NodeMutation::Addition(node) => {
-                                            subtree.insert_inner_node(index, node);
-                                        },
-                                    }
-                                }
-                            }
-                            (NodeMutations::default(), modified)
-                        };
-
-                    // Check if subtree became empty
-                    if let Some(ref subtree) = subtree_opt
-                        && subtree.is_empty()
-                    {
-                        subtree_opt = None;
-                    }
-
-                    // Only include subtree in updates if it was modified
-                    // If modified and became empty, we need to mark it for deletion (None)
-                    let subtree_update = if subtree_modified {
-                        Some((subtree_root_index, subtree_opt))
-                    } else {
-                        None
-                    };
-
-                    (in_memory_mutations, root, subtree_update)
+                    self.process_subtree_for_depth(subtree_leaves, subtree_root_depth)
                 })
                 .fold(
-                    || (Vec::new(), Vec::new(), Vec::new()),
-                    |(mut muts, mut roots, mut subtrees), (mem_muts, root, subtree_opt)| {
+                    || {
+                        (
+                            Vec::with_capacity(mutations_capacity),
+                            Vec::with_capacity(subtree_count),
+                            Vec::with_capacity(updates_capacity),
+                        )
+                    },
+                    |(mut muts, mut roots, mut subtrees), (mem_muts, root, subtree_update)| {
                         muts.extend(mem_muts);
                         roots.push(root);
-                        if let Some(pair) = subtree_opt {
-                            subtrees.push(pair);
+                        if !matches!(subtree_update, SubtreeUpdate::None) {
+                            subtrees.push(subtree_update);
                         }
                         (muts, roots, subtrees)
                     },
@@ -611,9 +574,17 @@ impl<S: SmtStorage> LargeSmt<S> {
                 };
             }
 
-            // Store modified subtrees
-            for (idx, subtree_opt) in modified_subtrees {
-                loaded_subtrees.insert(idx, subtree_opt);
+            // Convert SubtreeUpdate to storage format
+            for update in modified_subtrees {
+                match update {
+                    SubtreeUpdate::None => {},
+                    SubtreeUpdate::Store { index, subtree } => {
+                        loaded_subtrees.insert(index, Some(subtree));
+                    },
+                    SubtreeUpdate::Delete { index } => {
+                        loaded_subtrees.insert(index, None);
+                    },
+                }
             }
 
             // Prepare leaves for the next depth level
@@ -1084,6 +1055,78 @@ impl<S: SmtStorage> LargeSmt<S> {
 
     // MUTATIONS
     // --------------------------------------------------------------------------------------------
+
+    /// Processes one set of `subtree_leaves` at a given `subtree_root_depth` and returns:
+    /// - node mutations to apply to in-memory nodes (empty if handled in subtree),
+    /// - the computed subtree root leaf, and
+    /// - a storage update instruction for the subtree.
+    fn process_subtree_for_depth(
+        &self,
+        subtree_leaves: Vec<SubtreeLeaf>,
+        subtree_root_depth: u8,
+    ) -> (NodeMutations, SubtreeLeaf, SubtreeUpdate)
+    where
+        Self: Sized,
+    {
+        debug_assert!(subtree_leaves.is_sorted() && !subtree_leaves.is_empty());
+
+        let subtree_root_index =
+            NodeIndex::new_unchecked(subtree_root_depth, subtree_leaves[0].col >> SUBTREE_DEPTH);
+
+        // Load subtree from storage if below in-memory horizon; otherwise use in-memory nodes
+        let mut subtree_opt = if subtree_root_depth < IN_MEMORY_DEPTH {
+            None
+        } else {
+            Some(
+                self.storage
+                    .get_subtree(subtree_root_index)
+                    .expect("Storage error getting subtree in insert_batch")
+                    .unwrap_or_else(|| Subtree::new(subtree_root_index)),
+            )
+        };
+
+        // Build mutations for the subtree
+        let (mutations, root) = self.build_subtree_mutations(
+            subtree_leaves,
+            SMT_DEPTH,
+            subtree_root_depth,
+            subtree_opt.as_ref(),
+        );
+
+        let (in_memory_mutations, subtree_update) = if subtree_root_depth < IN_MEMORY_DEPTH {
+            // In-memory nodes: return mutations for direct application
+            (mutations, SubtreeUpdate::None)
+        } else {
+            // Storage nodes: apply mutations to loaded subtree and determine storage action
+            let modified = !mutations.is_empty();
+            if let Some(subtree) = subtree_opt.as_mut() {
+                for (index, mutation) in mutations {
+                    match mutation {
+                        NodeMutation::Removal => {
+                            subtree.remove_inner_node(index);
+                        },
+                        NodeMutation::Addition(node) => {
+                            subtree.insert_inner_node(index, node);
+                        },
+                    }
+                }
+            }
+
+            let update = if !modified {
+                SubtreeUpdate::None
+            } else if let Some(subtree) = subtree_opt
+                && !subtree.is_empty()
+            {
+                SubtreeUpdate::Store { index: subtree_root_index, subtree }
+            } else {
+                SubtreeUpdate::Delete { index: subtree_root_index }
+            };
+
+            (NodeMutations::default(), update)
+        };
+
+        (in_memory_mutations, root, subtree_update)
+    }
 
     /// Helper function to load leaves from storage for a set of key-value pairs.
     /// Returns the deduplicated leaf indices and a map of loaded leaves.
