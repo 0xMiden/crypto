@@ -97,15 +97,13 @@ impl Deserializable for SealedMessage {
             },
         };
 
-        let eph_key_len = source.read_usize()?;
-        let eph_key_bytes = source.read_vec(eph_key_len)?;
+        let eph_key_bytes = Vec::<u8>::read_from(source)?;
         let ephemeral_key =
             EphemeralPublicKey::from_bytes(scheme, &eph_key_bytes).map_err(|e| {
                 DeserializationError::InvalidValue(format!("Invalid ephemeral key: {e}"))
             })?;
 
-        let ciphertext_len = source.read_usize()?;
-        let ciphertext = source.read_vec(ciphertext_len)?;
+        let ciphertext = Vec::<u8>::read_from(source)?;
 
         Ok(Self { ephemeral_key, ciphertext })
     }

@@ -404,8 +404,7 @@ impl Deserializable for EncryptedData {
             DeserializationError::InvalidValue("invalid data type value".to_string())
         })?;
 
-        let ciphertext_len = source.read_usize()?;
-        let ciphertext = source.read_vec(ciphertext_len)?;
+        let ciphertext = Vec::<u8>::read_from(source)?;
 
         let inner: [u8; NONCE_SIZE_BYTES] = source.read_array()?;
 

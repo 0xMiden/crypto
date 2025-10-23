@@ -541,11 +541,11 @@ impl Deserializable for Nonce {
         match bytes_to_elements_exact(&bytes) {
             Some(inner) => {
                 let inner: [Felt; 4] = inner.try_into().map_err(|_| {
-                    DeserializationError::InvalidValue("malformed secret key".to_string())
+                    DeserializationError::InvalidValue("malformed nonce".to_string())
                 })?;
                 Ok(Self(inner))
             },
-            None => Err(DeserializationError::InvalidValue("malformed secret key".to_string())),
+            None => Err(DeserializationError::InvalidValue("malformed nonce".to_string())),
         }
     }
 }
@@ -668,21 +668,7 @@ impl AeadScheme for AeadRpo {
     type Key = SecretKey;
 
     fn key_from_bytes(bytes: &[u8]) -> Result<Self::Key, EncryptionError> {
-        if bytes.len() != SK_SIZE_BYTES {
-            return Err(EncryptionError::FailedOperation);
-        }
-
-        let bytes_array: [u8; SK_SIZE_BYTES] =
-            bytes.try_into().map_err(|_| EncryptionError::FailedOperation)?;
-
-        match bytes_to_elements_exact(&bytes_array) {
-            Some(elements) => {
-                let elements_array: [Felt; SECRET_KEY_SIZE] =
-                    elements.try_into().map_err(|_| EncryptionError::FailedOperation)?;
-                Ok(SecretKey(elements_array))
-            },
-            None => Err(EncryptionError::FailedOperation),
-        }
+        SecretKey::read_from_bytes(bytes).map_err(|_| EncryptionError::FailedOperation)
     }
 
     fn encrypt_bytes<R: rand::CryptoRng + rand::RngCore>(
