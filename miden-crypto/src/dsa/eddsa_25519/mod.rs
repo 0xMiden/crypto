@@ -132,6 +132,153 @@ impl PublicKey {
         self.inner.verify(&message_bytes, &signature.inner).is_ok()
     }
 
+    /// Computes the Ed25519 challenge scalar `k` from a message and signature.
+    ///
+    /// This method computes `k = SHA-512(R || A || message)` where:
+    /// - `R` is the signature's R component (first 32 bytes)
+    /// - `A` is the public key
+    /// - `message` is the message bytes
+    ///
+    /// The resulting 64-byte hash is reduced modulo the curve order L to produce
+    /// a 32-byte scalar that can be used with `verify_with_k()`.
+    ///
+    /// # Use Case
+    ///
+    /// This method is useful when you want to separate the hashing phase from the
+    /// elliptic curve verification phase. You can:
+    /// 1. Compute `k` using this method (hashing phase)
+    /// 2. Verify using `verify_with_k(k, signature)` (EC phase)
+    ///
+    /// This is equivalent to calling `verify()` directly, but allows the two phases
+    /// to be executed separately or in different environments.
+    ///
+    /// # Arguments
+    /// * `message` - The message that was signed
+    /// * `signature` - The signature to compute k from
+    ///
+    /// # Returns
+    /// A 32-byte challenge scalar `k`
+    ///
+    /// # Example
+    /// ```ignore
+    /// let k = public_key.compute_challenge_k(message, &signature);
+    /// let is_valid = public_key.verify_with_k(k, &signature);
+    /// // is_valid should equal public_key.verify(message, &signature)
+    /// ```
+    pub fn compute_challenge_k(&self, message: Word, signature: &Signature) -> [u8; 32] {
+        use curve25519_dalek::scalar::Scalar;
+        use sha2::Digest;
+
+        let message_bytes: [u8; 32] = message.into();
+        let sig_bytes = signature.inner.to_bytes();
+        let r_bytes = &sig_bytes[0..32];
+
+        // Compute k = SHA-512(R || A || message)
+        let mut hasher = sha2::Sha512::new();
+        hasher.update(r_bytes);
+        hasher.update(self.inner.to_bytes());
+        hasher.update(message_bytes);
+        let k_hash = hasher.finalize();
+
+        // Reduce the 64-byte hash modulo L to get a 32-byte scalar
+        let k_hash_64: [u8; 64] = k_hash.into();
+        let k_scalar = Scalar::from_bytes_mod_order_wide(&k_hash_64);
+        k_scalar.to_bytes()
+    }
+
+    /// Verifies a signature using a pre-computed challenge scalar `k`.
+    ///
+    /// # ⚠️ CRITICAL SECURITY WARNING ⚠️
+    ///
+    /// **THIS METHOD IS EXTREMELY DANGEROUS AND EASY TO MISUSE.**
+    ///
+    /// This method bypasses the standard Ed25519 verification process by accepting a pre-computed
+    /// challenge scalar `k` instead of computing it from the message. This breaks Ed25519's
+    /// security properties in the following ways:
+    ///
+    /// ## Security Risks:
+    ///
+    /// 1. **Signature Forgery**: An attacker who can control the `k` value can forge signatures for
+    ///    arbitrary messages without knowing the private key.
+    ///
+    /// 2. **Breaks Message Binding**: Standard Ed25519 cryptographically binds the signature to the
+    ///    message via `k = H(R || A || message)`. Accepting arbitrary `k` breaks this binding.
+    ///
+    /// 3. **Bypasses Standard Protocol**: If `k` is not computed correctly as `SHA-512(R || A ||
+    ///    message)` reduced modulo L, this method bypasses standard Ed25519 verification and the
+    ///    signature will not be compatible with Ed25519 semantics.
+    ///
+    /// ## When This Might Be Used:
+    ///
+    /// This method is only appropriate in very specific scenarios where:
+    /// - You have a trusted computation environment that computes `k` correctly as `SHA-512(R || A
+    ///   || message)` reduced modulo L (see `compute_challenge_k()`)
+    /// - You need to separate the hashing phase from the EC verification phase (e.g., for different
+    ///   execution environments or performance optimization)
+    /// - You fully understand the security implications and have a threat model that accounts for
+    ///   them
+    ///
+    /// When `k` is computed correctly, this method implements standard Ed25519 verification.
+    ///
+    /// ## Standard Usage:
+    ///
+    /// For normal Ed25519 verification, use `verify()` instead.
+    ///
+    /// # Arguments
+    /// * `k` - A 32-byte challenge scalar (typically computed as `SHA-512(R || A ||
+    ///   message)[..32]`)
+    /// * `signature` - The signature to verify
+    ///
+    /// # Returns
+    /// `true` if the verification equation `[s]B = R + [k]A` holds, `false` otherwise
+    ///
+    /// # Warning
+    /// Do NOT use this method unless you fully understand Ed25519's cryptographic properties
+    /// and have a specific need for this low-level operation.
+    pub fn verify_with_k(&self, k: [u8; 32], signature: &Signature) -> bool {
+        use curve25519_dalek::{
+            edwards::{CompressedEdwardsY, EdwardsPoint},
+            scalar::Scalar,
+            traits::IsIdentity,
+        };
+
+        // Extract signature components: R (first 32 bytes) and s (second 32 bytes)
+        let sig_bytes = signature.inner.to_bytes();
+        let r_compressed = CompressedEdwardsY(
+            sig_bytes[..32].try_into().expect("signature R component is exactly 32 bytes"),
+        );
+        let s_bytes: [u8; 32] =
+            sig_bytes[32..].try_into().expect("signature s component is exactly 32 bytes");
+
+        // Decompress R point
+        let r_point = match r_compressed.decompress() {
+            Some(point) => point,
+            None => return false, // Invalid R point
+        };
+
+        // Convert s bytes to Scalar
+        let s = Scalar::from_bytes_mod_order(s_bytes);
+
+        // Convert k bytes to Scalar
+        let k_scalar = Scalar::from_bytes_mod_order(k);
+
+        // Get public key as EdwardsPoint
+        let a_compressed = CompressedEdwardsY(self.inner.to_bytes());
+        let a_point = match a_compressed.decompress() {
+            Some(point) => point,
+            None => return false, // Invalid public key
+        };
+
+        // Compute the verification equation: [s]B = R + [k]A
+        // Rearranged as: [s]B - [k]A - R = 0
+        let sb = EdwardsPoint::mul_base(&s);
+        let ka = a_point * k_scalar;
+        let lhs = sb - ka - r_point;
+
+        // Check if the result is the identity point (zero)
+        lhs.is_identity()
+    }
+
     /// Convert to a X25519 public key which can be used in a DH key exchange protocol.
     ///
     /// # ⚠️ Security Warning
