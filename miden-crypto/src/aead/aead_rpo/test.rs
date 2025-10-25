@@ -111,9 +111,9 @@ proptest! {
 
         let key1 = SecretKey::with_rng(&mut rng1);
         let key2 = SecretKey::with_rng(&mut rng2);
-        let nonce_word = [ONE; 4];
-        let nonce1 = Nonce::from_word(nonce_word.into());
-        let nonce2 = Nonce::from_word(nonce_word.into());
+        let nonce_word: Word = [ONE; 4].into();
+        let nonce1 = Nonce::from(nonce_word);
+        let nonce2 = Nonce::from(nonce_word);
 
         let associated_data: Vec<Felt> = associated_data.into_iter()
             .map(Felt::new)
@@ -138,8 +138,8 @@ proptest! {
     ) {
         let mut rng = ChaCha20Rng::seed_from_u64(seed);
         let key = SecretKey::with_rng(&mut rng);
-        let nonce1 = Nonce::from_word([ZERO; 4].into());
-        let nonce2 = Nonce::from_word([ONE; 4].into());
+        let nonce1 = Nonce::from([ZERO; 4]);
+        let nonce2 = Nonce::from([ONE; 4]);
 
         let associated_data: Vec<Felt> = associated_data.into_iter()
             .map(Felt::new)
@@ -360,6 +360,18 @@ mod security_tests {
     use super::*;
 
     #[test]
+    fn test_key_serialization() {
+        let seed = [0_u8; 32];
+        let mut rng = ChaCha20Rng::from_seed(seed);
+        let key = SecretKey::with_rng(&mut rng);
+
+        let key_serialized = key.to_bytes();
+        let key_deserialized = SecretKey::read_from_bytes(&key_serialized).unwrap();
+
+        assert_eq!(key, key_deserialized)
+    }
+
+    #[test]
     fn test_key_uniqueness() {
         let seed = [0_u8; 32];
         let mut rng = ChaCha20Rng::from_seed(seed);
@@ -414,5 +426,61 @@ mod security_tests {
                 );
             }
         }
+    }
+
+    #[test]
+    fn test_secret_key_from_to_elements() {
+        let seed = [0_u8; 32];
+        let mut rng = ChaCha20Rng::from_seed(seed);
+
+        // Generate a random key
+        let key1 = SecretKey::with_rng(&mut rng);
+
+        // Extract elements and reconstruct
+        let elements = key1.to_elements();
+        let key2 = SecretKey::from_elements(elements);
+
+        // Should be equal
+        assert_eq!(key1, key2);
+
+        // Should produce same ciphertext
+        let plaintext = vec![Felt::new(42), Felt::new(100)];
+        let nonce = Nonce::with_rng(&mut rng);
+
+        let encrypted1 = key1.encrypt_elements_with_nonce(&plaintext, &[], nonce.clone()).unwrap();
+        let encrypted2 = key2.encrypt_elements_with_nonce(&plaintext, &[], nonce).unwrap();
+
+        assert_eq!(encrypted1, encrypted2);
+    }
+
+    #[test]
+    fn test_secret_key_debug_redaction() {
+        let seed = [0_u8; 32];
+        let mut rng = ChaCha20Rng::from_seed(seed);
+        let key = SecretKey::with_rng(&mut rng);
+
+        // Verify Debug impl produces expected redacted output
+        let debug_output = format!("{key:?}");
+        assert_eq!(debug_output, "<elided secret for SecretKey>");
+
+        // Verify Display impl also elides
+        let display_output = format!("{key}");
+        assert_eq!(display_output, "<elided secret for SecretKey>");
+    }
+
+    #[test]
+    fn test_secret_key_constant_time_equality() {
+        let seed = [0_u8; 32];
+        let mut rng = ChaCha20Rng::from_seed(seed);
+
+        let key1 = SecretKey::with_rng(&mut rng);
+        let key2 = SecretKey::with_rng(&mut rng);
+        let key1_clone = key1.clone();
+
+        // Same key should be equal
+        assert_eq!(key1, key1_clone);
+
+        // Different keys should not be equal
+        assert_ne!(key1, key2);
     }
 }
