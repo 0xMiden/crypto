@@ -25,6 +25,9 @@ use crate::{
     zeroize::{Zeroize, ZeroizeOnDrop},
 };
 
+// SHARED SECRETE
+// ================================================================================================
+
 /// A shared secret computed using the X25519 (Elliptic Curve Diffie-Hellman) key agreement.
 ///
 /// This type implements `ZeroizeOnDrop` because the inner `x25519_dalek::SharedSecret`
@@ -78,6 +81,9 @@ impl AsRef<[u8]> for SharedSecret {
     }
 }
 
+// EPHEMERAL SECRET KEY
+// ================================================================================================
+
 /// Ephemeral secret key for X25519 key agreement.
 ///
 /// This type implements `ZeroizeOnDrop` because the inner `x25519_dalek::EphemeralSecret`
@@ -129,6 +135,9 @@ impl EphemeralSecretKey {
     }
 }
 
+// EPHEMERAL PUBLIC KEY
+// ================================================================================================
+
 /// Ephemeral public key for X25519 agreement.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct EphemeralPublicKey {
@@ -149,6 +158,9 @@ impl Deserializable for EphemeralPublicKey {
         })
     }
 }
+
+// KEY AGREEMENT TRAIT IMPLEMENTATION
+// ================================================================================================
 
 pub struct X25519;
 

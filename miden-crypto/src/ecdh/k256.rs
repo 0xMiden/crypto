@@ -25,6 +25,9 @@ use crate::{
     zeroize::{Zeroize, ZeroizeOnDrop},
 };
 
+// SHARED SECRET
+// ================================================================================================
+
 /// A shared secret computed using the ECDH (Elliptic Curve Diffie-Hellman) key agreement.
 ///
 /// This type implements `ZeroizeOnDrop` because the inner `k256::ecdh::SharedSecret`
@@ -83,6 +86,9 @@ impl Zeroize for SharedSecret {
 // Safe to derive ZeroizeOnDrop because we implement Zeroize above
 impl ZeroizeOnDrop for SharedSecret {}
 
+// EPHEMERAL SECRET KEY
+// ================================================================================================
+
 /// Ephemeral secret key for ECDH key agreement over secp256k1 curve.
 ///
 /// This type implements `ZeroizeOnDrop` because the inner `k256::ecdh::EphemeralSecret`
@@ -133,6 +139,9 @@ impl EphemeralSecretKey {
 
 impl ZeroizeOnDrop for EphemeralSecretKey {}
 
+// EPHEMERAL PUBLIC KEY
+// ================================================================================================
+
 /// Ephemeral public key for ECDH key agreement over secp256k1 curve.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct EphemeralPublicKey {
@@ -166,6 +175,9 @@ impl Deserializable for EphemeralPublicKey {
         Ok(Self { inner })
     }
 }
+
+// KEY AGREEMENT TRAIT IMPLEMENTATION
+// ================================================================================================
 
 pub struct K256;
 

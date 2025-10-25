@@ -2,17 +2,16 @@ use alloc::vec::Vec;
 
 use rand::{CryptoRng, RngCore};
 
-use super::{
-    crypto_box::CryptoBox,
-    error::IesError,
-    message::{IesScheme, SealedMessage},
-};
+use super::{IesError, IesScheme, crypto_box::CryptoBox, message::SealedMessage};
 use crate::{
     Felt,
     aead::{aead_rpo::AeadRpo, xchacha::XChaCha},
     ecdh::{KeyAgreementScheme, k256::K256, x25519::X25519},
     utils::{Deserializable, Serializable},
 };
+
+// TYPE ALIASES
+// ================================================================================================
 
 /// Instantiation of sealed box using K256 + XChaCha20Poly1305
 type K256XChaCha20Poly1305 = CryptoBox<K256, XChaCha>;
@@ -152,7 +151,7 @@ macro_rules! impl_unseal_elements_with_associated_data {
     };
 }
 
-// STRUCTS AND IMPLEMENTATIONS
+// SEALING KEY
 // ================================================================================================
 
 /// Public key for sealing messages to a recipient.
@@ -165,7 +164,10 @@ pub enum SealingKey {
 }
 
 impl SealingKey {
-    /// Seal (encrypt and authenticate) data for this recipient
+    /// Seals the provided plaintext (represented as bytes) with this sealing key.
+    ///
+    /// The returned message can be unsealed with the [UnsealingKey] associated with this sealing
+    /// key.
     pub fn seal<R: CryptoRng + RngCore>(
         &self,
         rng: &mut R,
@@ -181,7 +183,13 @@ impl SealingKey {
         SealingKey::X25519AeadRpo => X25519AeadRpo, EphemeralPublicKey::X25519AeadRpo;
     }
 
-    /// Seal field elements for this recipient (only available for X25519Rpo256)
+    /// Seals the provided plaintext (represented as filed elements) with this sealing key.
+    ///
+    /// The returned message can be unsealed with the [UnsealingKey] associated with this sealing
+    /// key.
+    ///
+    /// This method is available only for `K256AeadRpo` and `X25519AeadRpo` schemes, and an error
+    /// will be returned if used with other schemes.
     pub fn seal_elements<R: CryptoRng + RngCore>(
         &self,
         rng: &mut R,
@@ -198,7 +206,10 @@ impl SealingKey {
     }
 }
 
-/// Secret key for unsealing messages
+// UNSEALING KEY
+// ================================================================================================
+
+/// Secret key for unsealing messages.
 pub enum UnsealingKey {
     K256XChaCha20Poly1305(crate::dsa::ecdsa_k256_keccak::SecretKey),
     X25519XChaCha20Poly1305(crate::dsa::eddsa_25519::SecretKey),
@@ -207,7 +218,22 @@ pub enum UnsealingKey {
 }
 
 impl UnsealingKey {
-    /// Unseal a sealed message
+    /// Returns scheme identifier for this secret key.
+    fn scheme(&self) -> IesScheme {
+        match self {
+            UnsealingKey::K256XChaCha20Poly1305(_) => IesScheme::K256XChaCha20Poly1305,
+            UnsealingKey::X25519XChaCha20Poly1305(_) => IesScheme::X25519XChaCha20Poly1305,
+            UnsealingKey::K256AeadRpo(_) => IesScheme::K256AeadRpo,
+            UnsealingKey::X25519AeadRpo(_) => IesScheme::X25519AeadRpo,
+        }
+    }
+
+    /// Returns scheme name for this secret key
+    pub fn scheme_name(&self) -> &'static str {
+        self.scheme().name()
+    }
+
+    /// Unseals a sealed message.
     pub fn unseal(&self, sealed_message: SealedMessage) -> Result<Vec<u8>, IesError> {
         self.unseal_with_associated_data(sealed_message, &[])
     }
@@ -219,22 +245,7 @@ impl UnsealingKey {
         UnsealingKey::X25519AeadRpo => X25519AeadRpo, EphemeralPublicKey::X25519AeadRpo;
     }
 
-    /// Get scheme identifier for this secret key
-    fn scheme(&self) -> IesScheme {
-        match self {
-            UnsealingKey::K256XChaCha20Poly1305(_) => IesScheme::K256XChaCha20Poly1305,
-            UnsealingKey::X25519XChaCha20Poly1305(_) => IesScheme::X25519XChaCha20Poly1305,
-            UnsealingKey::K256AeadRpo(_) => IesScheme::K256AeadRpo,
-            UnsealingKey::X25519AeadRpo(_) => IesScheme::X25519AeadRpo,
-        }
-    }
-
-    /// Get scheme name for this secret key
-    pub fn scheme_name(&self) -> &'static str {
-        self.scheme().name()
-    }
-
-    /// Unseal field elements from a sealed message (only available for X25519Rpo256)
+    /// Unseals the provided message as field elements.
     pub fn unseal_elements(&self, sealed_message: SealedMessage) -> Result<Vec<Felt>, IesError> {
         self.unseal_elements_with_associated_data(sealed_message, &[])
     }
@@ -247,9 +258,12 @@ impl UnsealingKey {
     }
 }
 
+// EPHEMERAL PUBLIC KEY
+// ================================================================================================
+
 /// Ephemeral public key, part of sealed messages
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) enum EphemeralPublicKey {
+pub(super) enum EphemeralPublicKey {
     K256XChaCha20Poly1305(crate::ecdh::k256::EphemeralPublicKey),
     X25519XChaCha20Poly1305(crate::ecdh::x25519::EphemeralPublicKey),
     K256AeadRpo(crate::ecdh::k256::EphemeralPublicKey),

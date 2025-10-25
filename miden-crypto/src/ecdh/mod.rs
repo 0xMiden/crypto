@@ -14,7 +14,7 @@ pub mod x25519;
 // KEY AGREEMENT TRAIT
 // ================================================================================================
 
-pub trait KeyAgreementScheme {
+pub(crate) trait KeyAgreementScheme {
     type EphemeralSecretKey: ZeroizeOnDrop;
     type EphemeralPublicKey: Serializable + Deserializable;
 
@@ -23,23 +23,24 @@ pub trait KeyAgreementScheme {
 
     type SharedSecret: AsRef<[u8]> + Zeroize + ZeroizeOnDrop;
 
+    /// Returns an ephemeral key pair generated from the provided RNG.
     fn generate_ephemeral_keypair<R: CryptoRng + RngCore>(
         rng: &mut R,
     ) -> (Self::EphemeralSecretKey, Self::EphemeralPublicKey);
 
-    /// Perform key exchange between ephemeral secret and static public key
+    /// Performs key exchange between ephemeral secret and static public key.
     fn exchange_ephemeral_static(
         ephemeral_sk: Self::EphemeralSecretKey,
         static_pk: &Self::PublicKey,
     ) -> Result<Self::SharedSecret, KeyAgreementError>;
 
-    /// Perform key exchange between static secret and ephemeral public key
+    /// Performs key exchange between static secret and ephemeral public key.
     fn exchange_static_ephemeral(
         static_sk: &Self::SecretKey,
         ephemeral_pk: &Self::EphemeralPublicKey,
     ) -> Result<Self::SharedSecret, KeyAgreementError>;
 
-    /// Extract key material from shared secret
+    /// Extracts key material from shared secret.
     fn extract_key_material(
         shared_secret: &Self::SharedSecret,
         length: usize,
@@ -51,11 +52,7 @@ pub trait KeyAgreementScheme {
 
 /// Errors that can occur during encryption/decryption operations
 #[derive(Debug, Error)]
-pub enum KeyAgreementError {
-    #[error("key agreement failed")]
-    FailedKeyAgreement,
-    #[error("deserialization of public key failed")]
-    PublicKeyDeserializationFailed,
+pub(crate) enum KeyAgreementError {
     #[error("hkdf expansion failed")]
     HkdfExpansionFailed,
 }

@@ -3,27 +3,27 @@
 //! This module defines the generic `CryptoBox` abstraction that combines a key agreement scheme
 //! (e.g. K256 ECDH) with an AEAD scheme (e.g. XChaCha20-Poly1305) to provide authenticated
 //! encryption.
-//!
-//! It also defines the `RawSealedMessage` which carries ephemeral keys, nonce, and ciphertext
-//! in raw form.
 
 use alloc::vec::Vec;
 
 use rand::{CryptoRng, RngCore};
 
-use super::error::IesError;
+use super::IesError;
 use crate::{Felt, aead::AeadScheme, ecdh::KeyAgreementScheme, zeroize::Zeroizing};
 
-/// A generic CryptoBox primitive parameterized by key agreement and AEAD schemes
-pub(crate) struct CryptoBox<K: KeyAgreementScheme, A: AeadScheme> {
+// CRYPTO BOX
+// ================================================================================================
+
+/// A generic CryptoBox primitive parameterized by key agreement and AEAD schemes.
+pub(super) struct CryptoBox<K: KeyAgreementScheme, A: AeadScheme> {
     _phantom: core::marker::PhantomData<(K, A)>,
 }
 
 impl<K: KeyAgreementScheme, A: AeadScheme> CryptoBox<K, A> {
     // BYTE-SPECIFIC METHODS
-    // ================================================================================================
+    // --------------------------------------------------------------------------------------------
 
-    pub(crate) fn seal_bytes_with_associated_data<R: CryptoRng + RngCore>(
+    pub fn seal_bytes_with_associated_data<R: CryptoRng + RngCore>(
         rng: &mut R,
         recipient_public_key: &K::PublicKey,
         plaintext: &[u8],
@@ -52,7 +52,7 @@ impl<K: KeyAgreementScheme, A: AeadScheme> CryptoBox<K, A> {
         Ok((ciphertext, ephemeral_public))
     }
 
-    pub(crate) fn unseal_bytes_with_associated_data(
+    pub fn unseal_bytes_with_associated_data(
         recipient_private_key: &K::SecretKey,
         ephemeral_public_key: &K::EphemeralPublicKey,
         ciphertext: &[u8],
@@ -73,18 +73,14 @@ impl<K: KeyAgreementScheme, A: AeadScheme> CryptoBox<K, A> {
                 .map_err(|_| IesError::EncryptionKeyCreationFailed)?,
         );
 
-        let result =
-            A::decrypt_bytes_with_associated_data(&decryption_key, ciphertext, associated_data)
-                .map_err(|_| IesError::DecryptionFailed)?;
-
-        Ok(result)
+        A::decrypt_bytes_with_associated_data(&decryption_key, ciphertext, associated_data)
+            .map_err(|_| IesError::DecryptionFailed)
     }
 
-    // FELT-SPECIFIC METHODS
-    // ================================================================================================
+    // ELEMENT-SPECIFIC METHODS
+    // --------------------------------------------------------------------------------------------
 
-    /// Seals field elements with associated data using authenticated encryption.
-    pub(crate) fn seal_elements_with_associated_data<R: CryptoRng + RngCore>(
+    pub fn seal_elements_with_associated_data<R: CryptoRng + RngCore>(
         rng: &mut R,
         recipient_public_key: &K::PublicKey,
         plaintext: &[Felt],
@@ -113,8 +109,7 @@ impl<K: KeyAgreementScheme, A: AeadScheme> CryptoBox<K, A> {
         Ok((ciphertext, ephemeral_public))
     }
 
-    /// Unseals field elements from a sealed message with associated data.
-    pub(crate) fn unseal_elements_with_associated_data(
+    pub fn unseal_elements_with_associated_data(
         recipient_private_key: &K::SecretKey,
         ephemeral_public_key: &K::EphemeralPublicKey,
         ciphertext: &[u8],
@@ -135,10 +130,7 @@ impl<K: KeyAgreementScheme, A: AeadScheme> CryptoBox<K, A> {
                 .map_err(|_| IesError::EncryptionKeyCreationFailed)?,
         );
 
-        let result =
-            A::decrypt_elements_with_associated_data(&decryption_key, ciphertext, associated_data)
-                .map_err(|_| IesError::DecryptionFailed)?;
-
-        Ok(result)
+        A::decrypt_elements_with_associated_data(&decryption_key, ciphertext, associated_data)
+            .map_err(|_| IesError::DecryptionFailed)
     }
 }
