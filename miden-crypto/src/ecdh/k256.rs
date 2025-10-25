@@ -12,18 +12,26 @@
 //! The public key associated with the ephemeral secret key will be sent alongside the encrypted
 //! message.
 
-use alloc::string::ToString;
+use alloc::{string::ToString, vec::Vec};
 
 use hkdf::{Hkdf, hmac::SimpleHmac};
 use k256::{AffinePoint, elliptic_curve::sec1::ToEncodedPoint, sha2::Sha256};
 use rand::{CryptoRng, RngCore};
 
 use crate::{
-    dsa::ecdsa_k256_keccak::{PUBLIC_KEY_BYTES, PublicKey},
+    dsa::ecdsa_k256_keccak::{PUBLIC_KEY_BYTES, PublicKey, SecretKey},
+    ecdh::KeyAgreementScheme,
     utils::{ByteReader, ByteWriter, Deserializable, DeserializationError, Serializable},
+    zeroize::{Zeroize, ZeroizeOnDrop},
 };
 
+// SHARED SECRET
+// ================================================================================================
+
 /// A shared secret computed using the ECDH (Elliptic Curve Diffie-Hellman) key agreement.
+///
+/// This type implements `ZeroizeOnDrop` because the inner `k256::ecdh::SharedSecret`
+/// implements it, ensuring the shared secret is securely wiped from memory when dropped.
 pub struct SharedSecret {
     pub(crate) inner: k256::ecdh::SharedSecret,
 }
@@ -38,12 +46,53 @@ impl SharedSecret {
     ///
     /// This basically converts a shared secret into uniformly random values that are appropriate
     /// for use as key material.
-    pub fn extract<D>(&self, salt: Option<&[u8]>) -> Hkdf<Sha256, SimpleHmac<Sha256>> {
+    pub fn extract(&self, salt: Option<&[u8]>) -> Hkdf<Sha256, SimpleHmac<Sha256>> {
         self.inner.extract(salt)
     }
 }
 
+impl AsRef<[u8]> for SharedSecret {
+    fn as_ref(&self) -> &[u8] {
+        self.inner.raw_secret_bytes()
+    }
+}
+
+impl Zeroize for SharedSecret {
+    /// Securely clears the shared secret from memory.
+    ///
+    /// # Security
+    ///
+    /// This implementation follows the same security methodology as the `zeroize` crate to ensure
+    /// that sensitive cryptographic material is reliably cleared from memory:
+    ///
+    /// - **Volatile writes**: Uses `ptr::write_volatile` to prevent dead store elimination and
+    ///   other compiler optimizations that might remove the zeroing operation.
+    /// - **Memory ordering**: Includes a sequentially consistent compiler fence (`SeqCst`) to
+    ///   prevent instruction reordering that could expose the secret data after this function
+    ///   returns.
+    fn zeroize(&mut self) {
+        let bytes = self.inner.raw_secret_bytes();
+        for byte in
+            unsafe { core::slice::from_raw_parts_mut(bytes.as_ptr() as *mut u8, bytes.len()) }
+        {
+            unsafe {
+                core::ptr::write_volatile(byte, 0u8);
+            }
+        }
+        core::sync::atomic::compiler_fence(core::sync::atomic::Ordering::SeqCst);
+    }
+}
+
+// Safe to derive ZeroizeOnDrop because we implement Zeroize above
+impl ZeroizeOnDrop for SharedSecret {}
+
+// EPHEMERAL SECRET KEY
+// ================================================================================================
+
 /// Ephemeral secret key for ECDH key agreement over secp256k1 curve.
+///
+/// This type implements `ZeroizeOnDrop` because the inner `k256::ecdh::EphemeralSecret`
+/// implements it, ensuring the secret key material is securely wiped from memory when dropped.
 pub struct EphemeralSecretKey {
     inner: k256::ecdh::EphemeralSecret,
 }
@@ -88,6 +137,11 @@ impl EphemeralSecretKey {
     }
 }
 
+impl ZeroizeOnDrop for EphemeralSecretKey {}
+
+// EPHEMERAL PUBLIC KEY
+// ================================================================================================
+
 /// Ephemeral public key for ECDH key agreement over secp256k1 curve.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct EphemeralPublicKey {
@@ -122,11 +176,61 @@ impl Deserializable for EphemeralPublicKey {
     }
 }
 
+// KEY AGREEMENT TRAIT IMPLEMENTATION
+// ================================================================================================
+
+pub struct K256;
+
+impl KeyAgreementScheme for K256 {
+    type EphemeralSecretKey = EphemeralSecretKey;
+    type EphemeralPublicKey = EphemeralPublicKey;
+
+    type SecretKey = SecretKey;
+    type PublicKey = PublicKey;
+
+    type SharedSecret = SharedSecret;
+
+    fn generate_ephemeral_keypair<R: CryptoRng + RngCore>(
+        rng: &mut R,
+    ) -> (Self::EphemeralSecretKey, Self::EphemeralPublicKey) {
+        let sk = EphemeralSecretKey::with_rng(rng);
+        let pk = sk.public_key();
+
+        (sk, pk)
+    }
+
+    fn exchange_ephemeral_static(
+        ephemeral_sk: Self::EphemeralSecretKey,
+        static_pk: &Self::PublicKey,
+    ) -> Result<Self::SharedSecret, super::KeyAgreementError> {
+        Ok(ephemeral_sk.diffie_hellman(static_pk.clone()))
+    }
+
+    fn exchange_static_ephemeral(
+        static_sk: &Self::SecretKey,
+        ephemeral_pk: &Self::EphemeralPublicKey,
+    ) -> Result<Self::SharedSecret, super::KeyAgreementError> {
+        Ok(static_sk.get_shared_secret(ephemeral_pk.clone()))
+    }
+
+    fn extract_key_material(
+        shared_secret: &Self::SharedSecret,
+        length: usize,
+    ) -> Result<Vec<u8>, super::KeyAgreementError> {
+        let hkdf = shared_secret.extract(None);
+        let mut buf = vec![0_u8; length];
+        hkdf.expand(&[], &mut buf)
+            .map_err(|_| super::KeyAgreementError::HkdfExpansionFailed)?;
+        Ok(buf)
+    }
+}
+
 // TESTS
 // ================================================================================================
 
 #[cfg(test)]
 mod test {
+
     use rand::rng;
     use winter_utils::{Deserializable, Serializable};
 

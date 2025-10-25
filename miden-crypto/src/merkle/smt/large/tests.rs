@@ -4,35 +4,32 @@ use rand::{Rng, prelude::IteratorRandom, rng};
 
 use super::MemoryStorage;
 use crate::{
-    EMPTY_WORD, Felt, ONE, WORD_SIZE,
+    EMPTY_WORD, Felt, ONE, WORD_SIZE, Word,
     merkle::{
         InnerNodeInfo, LargeSmt, LeafIndex, SMT_DEPTH, SmtLeaf,
         smt::full::{Smt, concurrent::COLS_PER_SUBTREE},
     },
 };
 
-fn generate_entries(pair_count: u64) -> Vec<(crate::Word, crate::Word)> {
+fn generate_entries(pair_count: u64) -> Vec<(Word, Word)> {
     (0..pair_count)
         .map(|i| {
             let leaf_index = ((i as f64 / pair_count as f64) * (pair_count as f64)) as u64;
-            let key = crate::Word::new([ONE, ONE, Felt::new(i), Felt::new(leaf_index)]);
-            let value = crate::Word::new([ONE, ONE, ONE, Felt::new(i)]);
+            let key = Word::new([ONE, ONE, Felt::new(i), Felt::new(leaf_index)]);
+            let value = Word::new([ONE, ONE, ONE, Felt::new(i)]);
             (key, value)
         })
         .collect()
 }
 
-fn generate_updates(
-    entries: Vec<(crate::Word, crate::Word)>,
-    updates: usize,
-) -> Vec<(crate::Word, crate::Word)> {
+fn generate_updates(entries: Vec<(Word, Word)>, updates: usize) -> Vec<(Word, Word)> {
     const REMOVAL_PROBABILITY: f64 = 0.2;
     let mut rng = rng();
     assert!(
         entries.iter().map(|(key, _)| key).collect::<BTreeSet<_>>().len() == entries.len(),
         "Input entries contain duplicate keys!"
     );
-    let mut sorted_entries: Vec<(crate::Word, crate::Word)> = entries
+    let mut sorted_entries: Vec<(Word, Word)> = entries
         .into_iter()
         .choose_multiple(&mut rng, updates)
         .into_iter()
@@ -40,7 +37,7 @@ fn generate_updates(
             let value = if rng.random_bool(REMOVAL_PROBABILITY) {
                 EMPTY_WORD
             } else {
-                crate::Word::new([ONE, ONE, ONE, Felt::new(rng.random())])
+                Word::new([ONE, ONE, ONE, Felt::new(rng.random())])
             };
             (key, value)
         })
@@ -51,7 +48,7 @@ fn generate_updates(
 
 fn create_equivalent_smts_for_testing<S: super::SmtStorage>(
     storage: S,
-    entries: Vec<(crate::Word, crate::Word)>,
+    entries: Vec<(Word, Word)>,
 ) -> (Smt, LargeSmt<S>) {
     let control_smt = Smt::with_entries(entries.clone()).unwrap();
     let large_smt = LargeSmt::<S>::with_entries(storage, entries).unwrap();
@@ -61,11 +58,11 @@ fn create_equivalent_smts_for_testing<S: super::SmtStorage>(
 #[test]
 fn test_smt_get_value() {
     let storage = MemoryStorage::new();
-    let key_1: crate::Word = crate::Word::from([ONE, ONE, ONE, ONE]);
-    let key_2: crate::Word = crate::Word::from([2_u32, 2_u32, 2_u32, 2_u32]);
+    let key_1: Word = Word::from([ONE, ONE, ONE, ONE]);
+    let key_2: Word = Word::from([2_u32, 2_u32, 2_u32, 2_u32]);
 
-    let value_1 = crate::Word::new([ONE; WORD_SIZE]);
-    let value_2 = crate::Word::new([2_u32.into(); WORD_SIZE]);
+    let value_1 = Word::new([ONE; WORD_SIZE]);
+    let value_2 = Word::new([2_u32.into(); WORD_SIZE]);
     let smt = LargeSmt::<_>::with_entries(storage, [(key_1, value_1), (key_2, value_2)]).unwrap();
 
     let returned_value_1 = smt.get_value(&key_1);
@@ -74,7 +71,7 @@ fn test_smt_get_value() {
     assert_eq!(value_1, returned_value_1);
     assert_eq!(value_2, returned_value_2);
 
-    let key_no_value = crate::Word::from([42_u32, 42_u32, 42_u32, 42_u32]);
+    let key_no_value = Word::from([42_u32, 42_u32, 42_u32, 42_u32]);
     assert_eq!(EMPTY_WORD, smt.get_value(&key_no_value));
 }
 
@@ -103,10 +100,8 @@ fn test_equivalent_entry_sets() {
     let entries = generate_entries(1000);
     let (control_smt, large_smt) = create_equivalent_smts_for_testing(storage, entries);
 
-    let mut entries_control_smt_owned: Vec<(crate::Word, crate::Word)> =
-        control_smt.entries().copied().collect();
-    let mut entries_large_smt: Vec<(crate::Word, crate::Word)> =
-        large_smt.entries().unwrap().collect();
+    let mut entries_control_smt_owned: Vec<(Word, Word)> = control_smt.entries().copied().collect();
+    let mut entries_large_smt: Vec<(Word, Word)> = large_smt.entries().unwrap().collect();
 
     entries_control_smt_owned.sort_by_key(|k| k.0);
     entries_large_smt.sort_by_key(|k| k.0);
@@ -178,7 +173,7 @@ fn test_empty_smt() {
     let empty_control_smt = Smt::new();
     assert_eq!(large_smt.root().unwrap(), empty_control_smt.root(), "Empty SMT root mismatch");
 
-    let random_key = crate::Word::from([ONE, 2_u32.into(), 3_u32.into(), 4_u32.into()]);
+    let random_key = Word::from([ONE, 2_u32.into(), 3_u32.into(), 4_u32.into()]);
     assert_eq!(
         large_smt.get_value(&random_key),
         EMPTY_WORD,
@@ -197,8 +192,8 @@ fn test_empty_smt() {
 #[test]
 fn test_single_entry_smt() {
     let storage = MemoryStorage::new();
-    let key = crate::Word::new([ONE, ONE, ONE, ONE]);
-    let value = crate::Word::new([ONE; WORD_SIZE]);
+    let key = Word::new([ONE, ONE, ONE, ONE]);
+    let value = Word::new([ONE; WORD_SIZE]);
 
     let mut smt = LargeSmt::<_>::with_entries(storage, [(key, value)]).unwrap();
 
@@ -207,14 +202,14 @@ fn test_single_entry_smt() {
 
     assert_eq!(smt.get_value(&key), value, "get_value for existing key failed");
 
-    let other_key = crate::Word::from([2_u32, 2_u32, 2_u32, 2_u32]);
+    let other_key = Word::from([2_u32, 2_u32, 2_u32, 2_u32]);
     assert_eq!(smt.get_value(&other_key), EMPTY_WORD, "get_value for non-existing key failed");
 
     let entries: Vec<_> = smt.entries().unwrap().collect();
     assert_eq!(entries.len(), 1, "Single entry SMT should have one entry");
     assert_eq!(entries[0], (key, value), "Single entry SMT entry mismatch");
 
-    let new_value = crate::Word::new([2_u32.into(); WORD_SIZE]);
+    let new_value = Word::new([2_u32.into(); WORD_SIZE]);
     let mutations = smt.compute_mutations(vec![(key, new_value)]).unwrap();
 
     assert_eq!(
@@ -251,9 +246,9 @@ fn test_single_entry_smt() {
 #[test]
 fn test_duplicate_key_insertion() {
     let storage = MemoryStorage::new();
-    let key = crate::Word::from([ONE, ONE, ONE, ONE]);
-    let value1 = crate::Word::new([ONE; WORD_SIZE]);
-    let value2 = crate::Word::new([2_u32.into(); WORD_SIZE]);
+    let key = Word::from([ONE, ONE, ONE, ONE]);
+    let value1 = Word::new([ONE; WORD_SIZE]);
+    let value2 = Word::new([2_u32.into(); WORD_SIZE]);
 
     let entries = vec![(key, value1), (key, value2)];
 
@@ -264,12 +259,12 @@ fn test_duplicate_key_insertion() {
 #[test]
 fn test_delete_entry() {
     let storage = MemoryStorage::new();
-    let key1 = crate::Word::new([ONE, ONE, ONE, ONE]);
-    let value1 = crate::Word::new([ONE; WORD_SIZE]);
-    let key2 = crate::Word::from([2_u32, 2_u32, 2_u32, 2_u32]);
-    let value2 = crate::Word::new([2_u32.into(); WORD_SIZE]);
-    let key3 = crate::Word::from([3_u32, 3_u32, 3_u32, 3_u32]);
-    let value3 = crate::Word::new([3_u32.into(); WORD_SIZE]);
+    let key1 = Word::new([ONE, ONE, ONE, ONE]);
+    let value1 = Word::new([ONE; WORD_SIZE]);
+    let key2 = Word::from([2_u32, 2_u32, 2_u32, 2_u32]);
+    let value2 = Word::new([2_u32.into(); WORD_SIZE]);
+    let key3 = Word::from([3_u32, 3_u32, 3_u32, 3_u32]);
+    let value3 = Word::new([3_u32.into(); WORD_SIZE]);
 
     let initial_entries = vec![(key1, value1), (key2, value2), (key3, value3)];
 
@@ -322,8 +317,8 @@ fn test_insert_entry() {
         "Number of leaves mismatch"
     );
 
-    let new_key = crate::Word::from([100_u32, 100_u32, 100_u32, 100_u32]);
-    let new_value = crate::Word::new([100_u32.into(); WORD_SIZE]);
+    let new_key = Word::from([100_u32, 100_u32, 100_u32, 100_u32]);
+    let new_value = Word::new([100_u32.into(); WORD_SIZE]);
 
     let old_value = large_smt.insert(new_key, new_value).unwrap();
     let control_old_value = control_smt.insert(new_key, new_value).unwrap();
@@ -362,15 +357,13 @@ fn test_mutations_revert() {
     let storage = MemoryStorage::new();
     let mut smt = LargeSmt::<_>::new(storage).unwrap();
 
-    let key_1: crate::Word = crate::Word::new([ONE, ONE, ONE, Felt::new(1)]);
-    let key_2: crate::Word =
-        crate::Word::new([2_u32.into(), 2_u32.into(), 2_u32.into(), Felt::new(2)]);
-    let key_3: crate::Word =
-        crate::Word::new([0_u32.into(), 0_u32.into(), 0_u32.into(), Felt::new(3)]);
+    let key_1: Word = Word::new([ONE, ONE, ONE, Felt::new(1)]);
+    let key_2: Word = Word::new([2_u32.into(), 2_u32.into(), 2_u32.into(), Felt::new(2)]);
+    let key_3: Word = Word::new([0_u32.into(), 0_u32.into(), 0_u32.into(), Felt::new(3)]);
 
-    let value_1 = crate::Word::new([ONE; WORD_SIZE]);
-    let value_2 = crate::Word::new([2_u32.into(); WORD_SIZE]);
-    let value_3 = crate::Word::new([3_u32.into(); WORD_SIZE]);
+    let value_1 = Word::new([ONE; WORD_SIZE]);
+    let value_2 = Word::new([2_u32.into(); WORD_SIZE]);
+    let value_3 = Word::new([3_u32.into(); WORD_SIZE]);
 
     smt.insert(key_1, value_1).unwrap();
     smt.insert(key_2, value_2).unwrap();
@@ -391,4 +384,135 @@ fn test_mutations_revert() {
         original_root,
         "SMT with applied revert mutations did not match original SMT"
     );
+}
+
+// IN-MEMORY LAYOUT TESTS
+// ================================================================================================
+
+#[test]
+fn test_flat_layout_index_zero_unused_in_instance() {
+    use crate::merkle::Rpo256;
+
+    let storage = MemoryStorage::new();
+    let mut smt = LargeSmt::<_>::new(storage).unwrap();
+
+    let in_memory_nodes = smt.in_memory_nodes();
+
+    // Index 0 should always be EMPTY_WORD (unused)
+    assert_eq!(in_memory_nodes[0], EMPTY_WORD, "Index 0 should be EMPTY_WORD (unused)");
+
+    let key = Word::new([ONE, ONE, ONE, Felt::new(1)]);
+    let value = Word::new([Felt::new(42), Felt::new(43), Felt::new(44), Felt::new(45)]);
+    smt.insert(key, value).unwrap();
+
+    let in_memory_nodes = smt.in_memory_nodes();
+    assert_eq!(in_memory_nodes[0], EMPTY_WORD, "Index 0 should be EMPTY_WORD (unused)");
+
+    // The root hash is computed from children at indices 2 and 3
+    let computed_root = Rpo256::merge(&[in_memory_nodes[2], in_memory_nodes[3]]);
+    assert_eq!(
+        computed_root,
+        smt.root().unwrap(),
+        "Root should equal hash(children[2], children[3])"
+    );
+}
+
+#[test]
+fn test_flat_layout_after_insertion() {
+    use crate::merkle::{EmptySubtreeRoots, Rpo256};
+
+    // Insert a value and verify the flat layout is updated correctly
+    let storage = MemoryStorage::new();
+    let mut smt = LargeSmt::<_>::new(storage).unwrap();
+
+    let key = Word::new([ONE, ONE, ONE, Felt::new(1)]);
+    let value = Word::new([Felt::new(42), Felt::new(43), Felt::new(44), Felt::new(45)]);
+
+    smt.insert(key, value).unwrap();
+
+    let in_memory_nodes = smt.in_memory_nodes();
+
+    // Index 0 should still be unused
+    assert_eq!(in_memory_nodes[0], EMPTY_WORD, "Index 0 should remain EMPTY_WORD");
+
+    let depth_1_empty = *EmptySubtreeRoots::entry(SMT_DEPTH, 1);
+    let changed = in_memory_nodes[2] != depth_1_empty || in_memory_nodes[3] != depth_1_empty;
+    assert!(changed, "At least one of root's children should have changed after insertion");
+
+    // Verify root can be computed from children at indices 2 and 3
+    let computed_root = Rpo256::merge(&[in_memory_nodes[2], in_memory_nodes[3]]);
+    assert_eq!(
+        computed_root,
+        smt.root().unwrap(),
+        "Root should equal hash of children at indices 2 and 3"
+    );
+}
+
+#[test]
+fn test_flat_layout_children_relationship() {
+    use crate::merkle::{EmptySubtreeRoots, NodeIndex, Rpo256};
+
+    // Insert multiple values and verify parent-child relationships in the flat layout
+    let storage = MemoryStorage::new();
+    let mut smt = LargeSmt::<_>::new(storage).unwrap();
+
+    // Generate random leaf indices
+    let mut rng = rng();
+    let num_samples = 50;
+    let leaf_indices: Vec<u64> =
+        (0..num_samples).map(|_| rng.random::<u64>() % (1 << 20)).collect();
+
+    for leaf_value in &leaf_indices {
+        let key = Word::new([ONE, ONE, ONE, Felt::new(*leaf_value)]);
+        let value = Word::new([Felt::new(*leaf_value * 10); 4]);
+        smt.insert(key, value).unwrap();
+    }
+
+    let in_memory_nodes = smt.in_memory_nodes();
+
+    // Verify root separately (depth 0, value 0, memory_idx 1)
+    let root_left = in_memory_nodes[2];
+    let root_right = in_memory_nodes[3];
+    let root_hash = Rpo256::merge(&[root_left, root_right]);
+    assert_eq!(
+        root_hash,
+        smt.root().unwrap(),
+        "Root hash should match computed hash from children"
+    );
+
+    for &leaf_value in &leaf_indices {
+        // Trace path from depth 1 down to in-memory depth
+        for depth in 1..super::IN_MEMORY_DEPTH {
+            let node_value = leaf_value >> (SMT_DEPTH - depth);
+            let node_idx = NodeIndex::new(depth, node_value).unwrap();
+            let memory_idx = super::to_memory_index(&node_idx);
+
+            // Get children from flat layout
+            let left_child = in_memory_nodes[memory_idx * 2];
+            let right_child = in_memory_nodes[memory_idx * 2 + 1];
+
+            // Calculate expected empty hash for children at this depth
+            let child_depth = depth + 1;
+            let empty_hash = *EmptySubtreeRoots::entry(SMT_DEPTH, child_depth);
+
+            // Determine which child is on the path to our leaf
+            let is_right_child = ((leaf_value >> (SMT_DEPTH - depth - 1)) & 1) == 1;
+
+            // Select the child on the path and verify it's non-empty
+            let child_on_path = if is_right_child { right_child } else { left_child };
+            assert_ne!(
+                child_on_path, empty_hash,
+                "Child on path should be non-empty at depth {}, value {} (on path to leaf {})",
+                depth, node_value, leaf_value
+            );
+
+            // Verify the parent-child hash relationship
+            let node_hash = Rpo256::merge(&[left_child, right_child]);
+            assert_eq!(
+                in_memory_nodes[memory_idx], node_hash,
+                "Stored hash at memory_idx {} should match computed hash from children at depth {}, value {}",
+                memory_idx, depth, node_value
+            );
+        }
+    }
 }

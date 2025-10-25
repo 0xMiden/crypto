@@ -146,6 +146,11 @@ impl NodeIndex {
         (self.value & 1) == 1
     }
 
+    /// Returns `true` if the n-th node on the path points to a right child.
+    pub const fn is_nth_bit_odd(&self, n: u8) -> bool {
+        (self.value >> n) & 1 == 1
+    }
+
     /// Returns `true` if the depth is `0`.
     pub const fn is_root(&self) -> bool {
         self.depth == 0

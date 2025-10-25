@@ -151,8 +151,8 @@ pub use storage::{RocksDbConfig, RocksDbStorage};
 /// Number of levels of the tree that are stored in memory
 const IN_MEMORY_DEPTH: u8 = 24;
 
-/// Number of nodes that are stored in memory
-const NUM_IN_MEMORY_LEAVES: usize = (1 << IN_MEMORY_DEPTH) - 1;
+/// Number of nodes that are stored in memory (including the unused index 0)
+const NUM_IN_MEMORY_NODES: usize = 1 << (IN_MEMORY_DEPTH + 1);
 
 /// Number of subtree levels below in-memory depth (24-64 in steps of 8)
 const NUM_SUBTREE_LEVELS: usize = 5;
@@ -194,7 +194,10 @@ type Leaves = super::Leaves<SmtLeaf>;
 #[derive(Debug)]
 pub struct LargeSmt<S: SmtStorage> {
     storage: S,
-    in_memory_nodes: Vec<Option<Box<InnerNode>>>,
+    /// Flat vector representation of in-memory nodes.
+    /// Index 0 is unused; index 1 is root.
+    /// For node at index i: left child at 2*i, right child at 2*i+1.
+    in_memory_nodes: Vec<Word>,
 }
 
 impl<S: SmtStorage> LargeSmt<S> {
@@ -222,8 +225,15 @@ impl<S: SmtStorage> LargeSmt<S> {
 
         let is_empty = !storage.has_leaves()?;
 
-        // Initialize in-memory cache structure
-        let mut in_memory_nodes: Vec<Option<Box<InnerNode>>> = vec![None; NUM_IN_MEMORY_LEAVES];
+        // Initialize in-memory nodes
+        let mut in_memory_nodes: Vec<Word> = vec![EMPTY_WORD; NUM_IN_MEMORY_NODES];
+
+        for depth in 0..IN_MEMORY_DEPTH {
+            let child_empty_hash = *EmptySubtreeRoots::entry(SMT_DEPTH, depth + 1);
+            let start = 2 * (1 << depth);
+            let end = 2 * (1 << (depth + 1));
+            in_memory_nodes[start..end].fill(child_empty_hash);
+        }
 
         // No leaves, return empty tree
         if is_empty {
@@ -260,17 +270,17 @@ impl<S: SmtStorage> LargeSmt<S> {
             for subtree_nodes in nodes {
                 for (index, node) in subtree_nodes {
                     let memory_index = to_memory_index(&index);
-                    in_memory_nodes[memory_index] = Some(Box::new(node));
+                    // Store left and right children in flat layout
+                    in_memory_nodes[memory_index * 2] = node.left;
+                    in_memory_nodes[memory_index * 2 + 1] = node.right;
                 }
             }
         }
 
         // Check that the calculated root matches the root in storage
-        assert_eq!(
-            in_memory_nodes[0].as_ref().unwrap().hash(),
-            root,
-            "Tree reconstruction failed - root mismatch"
-        );
+        // Root is at index 1, with children at indices 2 and 3
+        let calculated_root = Rpo256::merge(&[in_memory_nodes[2], in_memory_nodes[3]]);
+        assert_eq!(calculated_root, root, "Tree reconstruction failed - root mismatch");
 
         Ok(Self { storage, in_memory_nodes })
     }
@@ -1011,9 +1021,19 @@ impl<S: SmtStorage> LargeSmt<S> {
         for (index, node) in nodes {
             if index.depth() < IN_MEMORY_DEPTH {
                 let memory_index = to_memory_index(&index);
-                self.in_memory_nodes[memory_index] = Some(Box::new(node));
+                // Store in flat layout: left at 2*i, right at 2*i+1
+                self.in_memory_nodes[memory_index * 2] = node.left;
+                self.in_memory_nodes[memory_index * 2 + 1] = node.right;
             }
         }
+    }
+
+    // TEST HELPERS
+    // --------------------------------------------------------------------------------------------
+
+    #[cfg(test)]
+    pub(crate) fn in_memory_nodes(&self) -> &Vec<Word> {
+        &self.in_memory_nodes
     }
 }
 
@@ -1046,9 +1066,10 @@ impl<S: SmtStorage> SparseMerkleTree<SMT_DEPTH> for LargeSmt<S> {
     fn get_inner_node(&self, index: NodeIndex) -> InnerNode {
         if index.depth() < IN_MEMORY_DEPTH {
             let memory_index = to_memory_index(&index);
-            return match &self.in_memory_nodes[memory_index] {
-                Some(boxed_node) => (**boxed_node).clone(),
-                None => EmptySubtreeRoots::get_inner_node(SMT_DEPTH, index.depth()),
+            // Reconstruct InnerNode from flat layout: left at 2*i, right at 2*i+1
+            return InnerNode {
+                left: self.in_memory_nodes[memory_index * 2],
+                right: self.in_memory_nodes[memory_index * 2 + 1],
             };
         }
 
@@ -1061,8 +1082,20 @@ impl<S: SmtStorage> SparseMerkleTree<SMT_DEPTH> for LargeSmt<S> {
     fn insert_inner_node(&mut self, index: NodeIndex, inner_node: InnerNode) -> Option<InnerNode> {
         if index.depth() < IN_MEMORY_DEPTH {
             let i = to_memory_index(&index);
-            let old_option_box = self.in_memory_nodes[i].replace(Box::new(inner_node));
-            return old_option_box.map(|boxed_node| *boxed_node);
+            // Get the old node before replacing
+            let old_left = self.in_memory_nodes[i * 2];
+            let old_right = self.in_memory_nodes[i * 2 + 1];
+
+            // Store new node in flat layout
+            self.in_memory_nodes[i * 2] = inner_node.left;
+            self.in_memory_nodes[i * 2 + 1] = inner_node.right;
+
+            // Check if the old node was empty
+            if is_empty_parent(old_left, old_right, index.depth() + 1) {
+                return None;
+            }
+
+            return Some(InnerNode { left: old_left, right: old_right });
         }
         self.storage
             .set_inner_node(index, inner_node)
@@ -1072,8 +1105,22 @@ impl<S: SmtStorage> SparseMerkleTree<SMT_DEPTH> for LargeSmt<S> {
     fn remove_inner_node(&mut self, index: NodeIndex) -> Option<InnerNode> {
         if index.depth() < IN_MEMORY_DEPTH {
             let memory_index = to_memory_index(&index);
-            let old_option_box = self.in_memory_nodes[memory_index].take();
-            return old_option_box.map(|boxed_node| *boxed_node);
+            // Get the old node before replacing with empty hashes
+            let old_left = self.in_memory_nodes[memory_index * 2];
+            let old_right = self.in_memory_nodes[memory_index * 2 + 1];
+
+            // Replace with empty hashes
+            let child_depth = index.depth() + 1;
+            let empty_hash = *EmptySubtreeRoots::entry(SMT_DEPTH, child_depth);
+            self.in_memory_nodes[memory_index * 2] = empty_hash;
+            self.in_memory_nodes[memory_index * 2 + 1] = empty_hash;
+
+            // Return the old node if it wasn't already empty
+            if is_empty_parent(old_left, old_right, child_depth) {
+                return None;
+            }
+
+            return Some(InnerNode { left: old_left, right: old_right });
         }
         self.storage.remove_inner_node(index).expect("Failed to remove inner node")
     }
@@ -1242,10 +1289,20 @@ impl<S: SmtStorage> Eq for LargeSmt<S> {}
 // 2. This doesn't actually clone the underlying disk data, which is misleading
 // 3. Users should be explicit about sharing LargeSmt instances via Arc if needed
 
+/// Converts a NodeIndex to a flat vector index using 1-indexed layout.
+/// Index 0 is unused, index 1 is root.
+/// For a node at index i: left child at 2*i, right child at 2*i+1.
 fn to_memory_index(index: &NodeIndex) -> usize {
     debug_assert!(index.depth() < IN_MEMORY_DEPTH);
     debug_assert!(index.value() < (1 << index.depth()));
-    ((1usize << index.depth()) - 1) + index.value() as usize
+    (1usize << index.depth()) + index.value() as usize
+}
+
+/// Checks if a node with the given children is empty.
+/// A node is considered empty if both children equal the empty hash for that depth.
+fn is_empty_parent(left: Word, right: Word, child_depth: u8) -> bool {
+    let empty_hash = *EmptySubtreeRoots::entry(SMT_DEPTH, child_depth);
+    left == empty_hash && right == empty_hash
 }
 
 // ITERATORS
@@ -1254,7 +1311,7 @@ fn to_memory_index(index: &NodeIndex) -> usize {
 enum InnerNodeIteratorState<'a> {
     InMemory {
         current_index: usize,
-        large_smt_in_memory_nodes: &'a Vec<Option<Box<InnerNode>>>,
+        large_smt_in_memory_nodes: &'a Vec<Word>,
     },
     Subtree {
         subtree_iter: Box<dyn Iterator<Item = Subtree> + 'a>,
@@ -1293,17 +1350,33 @@ impl<S: SmtStorage> Iterator for LargeSmtInnerNodeIterator<'_, S> {
     fn next(&mut self) -> Option<Self::Item> {
         loop {
             match &mut self.state {
-                // Phase 1: Process in-memory nodes (depths 0-24)
+                // Phase 1: Process in-memory nodes (depths 0-23)
                 InnerNodeIteratorState::InMemory { current_index, large_smt_in_memory_nodes } => {
-                    while *current_index < large_smt_in_memory_nodes.len() {
-                        let flat_idx = *current_index;
+                    // Iterate through nodes at depths 0 to IN_MEMORY_DEPTH-1
+                    // Start at index 1 (root), max node index is (1 << IN_MEMORY_DEPTH) - 1
+                    if *current_index == 0 {
+                        *current_index = 1;
+                    }
+
+                    let max_node_idx = (1 << IN_MEMORY_DEPTH) - 1;
+
+                    while *current_index <= max_node_idx {
+                        let node_idx = *current_index;
                         *current_index += 1;
 
-                        if let Some(node) = &large_smt_in_memory_nodes[flat_idx] {
+                        // Get children from flat layout: left at 2*i, right at 2*i+1
+                        let left = large_smt_in_memory_nodes[node_idx * 2];
+                        let right = large_smt_in_memory_nodes[node_idx * 2 + 1];
+
+                        // Skip empty nodes
+                        let depth = node_idx.ilog2() as u8;
+                        let child_depth = depth + 1;
+
+                        if !is_empty_parent(left, right, child_depth) {
                             return Some(InnerNodeInfo {
-                                value: Rpo256::merge(&[node.left, node.right]),
-                                left: node.left,
-                                right: node.right,
+                                value: Rpo256::merge(&[left, right]),
+                                left,
+                                right,
                             });
                         }
                     }

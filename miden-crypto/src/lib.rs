@@ -10,6 +10,7 @@ pub mod aead;
 pub mod dsa;
 pub mod ecdh;
 pub mod hash;
+pub mod ies;
 pub mod merkle;
 pub mod rand;
 pub mod utils;
