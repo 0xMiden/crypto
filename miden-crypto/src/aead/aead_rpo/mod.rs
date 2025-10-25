@@ -596,7 +596,7 @@ impl Serializable for Nonce {
 
 impl Deserializable for Nonce {
     fn read_from<R: ByteReader>(source: &mut R) -> Result<Self, DeserializationError> {
-        let bytes: [u8; SK_SIZE_BYTES] = source.read_array()?;
+        let bytes: [u8; NONCE_SIZE_BYTES] = source.read_array()?;
 
         match bytes_to_elements_exact(&bytes) {
             Some(inner) => {
