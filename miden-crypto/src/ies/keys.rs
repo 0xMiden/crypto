@@ -98,10 +98,14 @@ macro_rules! impl_seal_elements_with_associated_data {
 /// Generates unseal_bytes_with_associated_data method implementation
 macro_rules! impl_unseal_bytes_with_associated_data {
     ($($variant:path => $crypto_box:ty, $ephemeral_variant:path;)*) => {
-        /// Unseals the provided message using this unsealing key.
+        /// Unseals the provided message using this unsealing key and returns the plaintext as bytes.
         ///
-        /// The message must have been sealed as bytes (i.e., using `seal_bytes()` or
-        /// `seal_bytes_with_associated_data()` method), otherwise an error will be returned.
+        /// # Errors
+        /// Returns an error if:
+        /// - The message was not sealed as bytes (i.e., if it was sealed using `seal_elements()`
+        ///   or `seal_elements_with_associated_data()`)
+        /// - The scheme used to seal the message does not match this unsealing key's scheme
+        /// - Decryption or authentication fails
         pub fn unseal_bytes_with_associated_data(
             &self,
             sealed_message: SealedMessage,
@@ -133,10 +137,14 @@ macro_rules! impl_unseal_bytes_with_associated_data {
 /// Generates unseal_elements_with_associated_data method implementation
 macro_rules! impl_unseal_elements_with_associated_data {
     ($($variant:path => $crypto_box:ty, $ephemeral_variant:path;)*) => {
-        /// Unseals the provided message using this unsealing key.
+        /// Unseals the provided message using this unsealing key and returns the plaintext as field elements.
         ///
-        /// The message must have been sealed as elements (i.e., using `seal_elements()` or
-        /// `seal_elements_with_associated_data()` method), otherwise an error will be returned.
+        /// # Errors
+        /// Returns an error if:
+        /// - The message was not sealed as elements (i.e., if it was sealed using `seal_bytes()`
+        ///   or `seal_bytes_with_associated_data()`)
+        /// - The scheme used to seal the message does not match this unsealing key's scheme
+        /// - Decryption or authentication fails
         pub fn unseal_elements_with_associated_data(
             &self,
             sealed_message: SealedMessage,

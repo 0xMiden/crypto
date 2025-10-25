@@ -71,6 +71,49 @@ Currently, the module includes the following implementations:
 - `ECDH k256`: Elliptic Curve Diffie-Hellman key exchange using the `k256` curve (also known as `secp256k1`). This is a widely adopted key agreement scheme known for its broad ecosystem support and compatibility.
 - `X25519`: Elliptic Curve Diffie-Hellman key exchange using the `Curve25519` elliptic curve. This is a state-of-the-art key agreement scheme known for its high performance, strong security properties, and resistance to timing attacks, making it the modern standard for secure key exchange protocols.
 
+## Sealed Box (IES)
+
+[IES module](./miden-crypto/src/ies) provides an Integrated Encryption Scheme (IES) implementation that combines key agreement with authenticated encryption to enable secure public-key encryption. The sealed box construction allows encrypting messages to a recipient using only their public key, without requiring prior key exchange or shared secrets.
+
+### How it works
+
+1. **Sealing**: The sender uses the recipient's public key to seal (encrypt) a message:
+   - Generates an ephemeral key pair
+   - Derives a shared secret using ECDH between the ephemeral private key and recipient's public key
+   - Encrypts the message using the shared secret with an AEAD scheme
+   - Returns the ciphertext along with the ephemeral public key
+
+2. **Unsealing**: The recipient uses their private key to unseal (decrypt) the message:
+   - Derives the same shared secret using ECDH between their private key and the ephemeral public key
+   - Decrypts and authenticates the message using the shared secret
+
+### Available schemes
+
+The implementation supports multiple combinations of key exchange and encryption algorithms:
+
+**Key Exchange**:
+- `K256` (secp256k1)
+- `X25519` (Curve25519)
+
+**AEAD Encryption**:
+- `XChaCha20Poly1305`
+- `AEAD-RPO`
+
+This gives four scheme combinations:
+- `K256XChaCha20Poly1305`: Best for general-purpose applications requiring secp256k1 compatibility
+- `X25519XChaCha20Poly1305`: Best for general-purpose applications **not** requiring secp256k1 compatibility
+- `K256AeadRpo`: Best for STARK proof systems requiring secp256k1 compatibility
+- `X25519AeadRpo`: Best for STARK proof systems **not** requiring secp256k1 compatibility
+
+### Data type support
+
+The sealed box API supports two types of data:
+
+- **Bytes** (`seal_bytes`/`unseal_bytes`): For arbitrary byte data (strings, binary files, etc.)
+- **Field Elements** (`seal_elements`/`unseal_elements`): For native field elements, optimized for use within Miden VM
+
+Messages sealed as one type must be unsealed using the corresponding method, otherwise an error is returned.
+
 ## Pseudo-Random Element Generator
 
 [Pseudo random element generator module](./miden-crypto/src/rand/) provides a set of traits and data structures that facilitate generating pseudo-random elements in the context of Miden protocol. The module currently includes:
