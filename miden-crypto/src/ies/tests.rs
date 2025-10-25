@@ -100,7 +100,7 @@ mod k256_xchacha_tests {
         let public_key = secret_key.public_key();
         let sealing_key = SealingKey::K256XChaCha20Poly1305(public_key);
         let unsealing_key = UnsealingKey::K256XChaCha20Poly1305(secret_key);
-        test_basic_roundtrip!(sealing_key, unsealing_key, plaintext, seal, unseal);
+        test_basic_roundtrip!(sealing_key, unsealing_key, plaintext, seal_bytes, unseal_bytes);
     }
 
     #[test]
@@ -117,8 +117,8 @@ mod k256_xchacha_tests {
             unsealing_key,
             plaintext,
             associated_data,
-            seal_with_associated_data,
-            unseal_with_associated_data
+            seal_bytes_with_associated_data,
+            unseal_bytes_with_associated_data
         );
     }
 
@@ -167,10 +167,11 @@ mod k256_xchacha_tests {
         let secret_key = SecretKey::with_rng(&mut rng);
         let public_key = secret_key.public_key();
         let sealing_key = SealingKey::K256XChaCha20Poly1305(public_key);
-        let sealed =
-            sealing_key.seal_with_associated_data(&mut rng, plaintext, correct_ad).unwrap();
+        let sealed = sealing_key
+            .seal_bytes_with_associated_data(&mut rng, plaintext, correct_ad)
+            .unwrap();
         let unsealing_key = UnsealingKey::K256XChaCha20Poly1305(secret_key);
-        let result = unsealing_key.unseal_with_associated_data(sealed, incorrect_ad);
+        let result = unsealing_key.unseal_bytes_with_associated_data(sealed, incorrect_ad);
         assert!(result.is_err());
     }
 
@@ -185,7 +186,7 @@ mod k256_xchacha_tests {
             let public_key = secret_key.public_key();
             let sealing_key = SealingKey::K256XChaCha20Poly1305(public_key);
             let unsealing_key = UnsealingKey::K256XChaCha20Poly1305(secret_key);
-            test_roundtrip!(sealing_key, unsealing_key, &plaintext, &associated_data, seal_with_associated_data, unseal_with_associated_data);
+            test_roundtrip!(sealing_key, unsealing_key, &plaintext, &associated_data, seal_bytes_with_associated_data, unseal_bytes_with_associated_data);
         }
 
         #[test]
@@ -211,9 +212,9 @@ mod k256_xchacha_tests {
             let public1 = secret1.public_key();
             let secret2 = SecretKey::with_rng(&mut rng);
             let sealing_key = SealingKey::K256XChaCha20Poly1305(public1);
-            let sealed = sealing_key.seal(&mut rng, &plaintext).unwrap();
+            let sealed = sealing_key.seal_bytes(&mut rng, &plaintext).unwrap();
             let unsealing_key = UnsealingKey::K256XChaCha20Poly1305(secret2);
-            let result = unsealing_key.unseal(sealed);
+            let result = unsealing_key.unseal_bytes(sealed);
             prop_assert!(result.is_err());
         }
     }
@@ -231,7 +232,7 @@ mod x25519_xchacha_tests {
         let public_key = secret_key.public_key();
         let sealing_key = SealingKey::X25519XChaCha20Poly1305(public_key);
         let unsealing_key = UnsealingKey::X25519XChaCha20Poly1305(secret_key);
-        test_basic_roundtrip!(sealing_key, unsealing_key, plaintext, seal, unseal);
+        test_basic_roundtrip!(sealing_key, unsealing_key, plaintext, seal_bytes, unseal_bytes);
     }
 
     #[test]
@@ -248,8 +249,8 @@ mod x25519_xchacha_tests {
             unsealing_key,
             plaintext,
             associated_data,
-            seal_with_associated_data,
-            unseal_with_associated_data
+            seal_bytes_with_associated_data,
+            unseal_bytes_with_associated_data
         );
     }
 
@@ -298,10 +299,11 @@ mod x25519_xchacha_tests {
         let secret_key = SecretKey25519::with_rng(&mut rng);
         let public_key = secret_key.public_key();
         let sealing_key = SealingKey::X25519XChaCha20Poly1305(public_key);
-        let sealed =
-            sealing_key.seal_with_associated_data(&mut rng, plaintext, correct_ad).unwrap();
+        let sealed = sealing_key
+            .seal_bytes_with_associated_data(&mut rng, plaintext, correct_ad)
+            .unwrap();
         let unsealing_key = UnsealingKey::X25519XChaCha20Poly1305(secret_key);
-        let result = unsealing_key.unseal_with_associated_data(sealed, incorrect_ad);
+        let result = unsealing_key.unseal_bytes_with_associated_data(sealed, incorrect_ad);
         assert!(result.is_err());
     }
 
@@ -316,7 +318,7 @@ mod x25519_xchacha_tests {
             let public_key = secret_key.public_key();
             let sealing_key = SealingKey::X25519XChaCha20Poly1305(public_key);
             let unsealing_key = UnsealingKey::X25519XChaCha20Poly1305(secret_key);
-            test_roundtrip!(sealing_key, unsealing_key, &plaintext, &associated_data, seal_with_associated_data, unseal_with_associated_data);
+            test_roundtrip!(sealing_key, unsealing_key, &plaintext, &associated_data, seal_bytes_with_associated_data, unseal_bytes_with_associated_data);
         }
 
         #[test]
@@ -342,9 +344,9 @@ mod x25519_xchacha_tests {
             let public1 = secret1.public_key();
             let secret2 = SecretKey25519::with_rng(&mut rng);
             let sealing_key = SealingKey::X25519XChaCha20Poly1305(public1);
-            let sealed = sealing_key.seal(&mut rng, &plaintext).unwrap();
+            let sealed = sealing_key.seal_bytes(&mut rng, &plaintext).unwrap();
             let unsealing_key = UnsealingKey::X25519XChaCha20Poly1305(secret2);
-            let result = unsealing_key.unseal(sealed);
+            let result = unsealing_key.unseal_bytes(sealed);
             prop_assert!(result.is_err());
         }
     }
@@ -363,7 +365,7 @@ mod k256_aead_rpo_tests {
         let public_key = secret_key.public_key();
         let sealing_key = SealingKey::K256AeadRpo(public_key);
         let unsealing_key = UnsealingKey::K256AeadRpo(secret_key);
-        test_basic_roundtrip!(sealing_key, unsealing_key, plaintext, seal, unseal);
+        test_basic_roundtrip!(sealing_key, unsealing_key, plaintext, seal_bytes, unseal_bytes);
     }
 
     #[test]
@@ -380,8 +382,8 @@ mod k256_aead_rpo_tests {
             unsealing_key,
             plaintext,
             associated_data,
-            seal_with_associated_data,
-            unseal_with_associated_data
+            seal_bytes_with_associated_data,
+            unseal_bytes_with_associated_data
         );
     }
 
@@ -394,10 +396,11 @@ mod k256_aead_rpo_tests {
         let secret_key = SecretKey::with_rng(&mut rng);
         let public_key = secret_key.public_key();
         let sealing_key = SealingKey::K256AeadRpo(public_key);
-        let sealed =
-            sealing_key.seal_with_associated_data(&mut rng, plaintext, correct_ad).unwrap();
+        let sealed = sealing_key
+            .seal_bytes_with_associated_data(&mut rng, plaintext, correct_ad)
+            .unwrap();
         let unsealing_key = UnsealingKey::K256AeadRpo(secret_key);
-        let result = unsealing_key.unseal_with_associated_data(sealed, incorrect_ad);
+        let result = unsealing_key.unseal_bytes_with_associated_data(sealed, incorrect_ad);
         assert!(result.is_err());
     }
 
@@ -451,7 +454,7 @@ mod k256_aead_rpo_tests {
             let public_key = secret_key.public_key();
             let sealing_key = SealingKey::K256AeadRpo(public_key);
             let unsealing_key = UnsealingKey::K256AeadRpo(secret_key);
-            test_roundtrip!(sealing_key, unsealing_key, &plaintext, &associated_data, seal_with_associated_data, unseal_with_associated_data);
+            test_roundtrip!(sealing_key, unsealing_key, &plaintext, &associated_data, seal_bytes_with_associated_data, unseal_bytes_with_associated_data);
         }
 
         #[test]
@@ -477,9 +480,9 @@ mod k256_aead_rpo_tests {
             let public1 = secret1.public_key();
             let secret2 = SecretKey::with_rng(&mut rng);
             let sealing_key = SealingKey::K256AeadRpo(public1);
-            let sealed = sealing_key.seal(&mut rng, &plaintext).unwrap();
+            let sealed = sealing_key.seal_bytes(&mut rng, &plaintext).unwrap();
             let unsealing_key = UnsealingKey::K256AeadRpo(secret2);
-            let result = unsealing_key.unseal(sealed);
+            let result = unsealing_key.unseal_bytes(sealed);
             prop_assert!(result.is_err());
         }
     }
@@ -498,7 +501,7 @@ mod x25519_aead_rpo_tests {
         let public_key = secret_key.public_key();
         let sealing_key = SealingKey::X25519AeadRpo(public_key);
         let unsealing_key = UnsealingKey::X25519AeadRpo(secret_key);
-        test_basic_roundtrip!(sealing_key, unsealing_key, plaintext, seal, unseal);
+        test_basic_roundtrip!(sealing_key, unsealing_key, plaintext, seal_bytes, unseal_bytes);
     }
 
     #[test]
@@ -515,8 +518,8 @@ mod x25519_aead_rpo_tests {
             unsealing_key,
             plaintext,
             associated_data,
-            seal_with_associated_data,
-            unseal_with_associated_data
+            seal_bytes_with_associated_data,
+            unseal_bytes_with_associated_data
         );
     }
 
@@ -529,10 +532,11 @@ mod x25519_aead_rpo_tests {
         let secret_key = SecretKey25519::with_rng(&mut rng);
         let public_key = secret_key.public_key();
         let sealing_key = SealingKey::X25519AeadRpo(public_key);
-        let sealed =
-            sealing_key.seal_with_associated_data(&mut rng, plaintext, correct_ad).unwrap();
+        let sealed = sealing_key
+            .seal_bytes_with_associated_data(&mut rng, plaintext, correct_ad)
+            .unwrap();
         let unsealing_key = UnsealingKey::X25519AeadRpo(secret_key);
-        let result = unsealing_key.unseal_with_associated_data(sealed, incorrect_ad);
+        let result = unsealing_key.unseal_bytes_with_associated_data(sealed, incorrect_ad);
         assert!(result.is_err());
     }
 
@@ -586,7 +590,7 @@ mod x25519_aead_rpo_tests {
             let public_key = secret_key.public_key();
             let sealing_key = SealingKey::X25519AeadRpo(public_key);
             let unsealing_key = UnsealingKey::X25519AeadRpo(secret_key);
-            test_roundtrip!(sealing_key, unsealing_key, &plaintext, &associated_data, seal_with_associated_data, unseal_with_associated_data);
+            test_roundtrip!(sealing_key, unsealing_key, &plaintext, &associated_data, seal_bytes_with_associated_data, unseal_bytes_with_associated_data);
         }
 
         #[test]
@@ -612,9 +616,9 @@ mod x25519_aead_rpo_tests {
             let public1 = secret1.public_key();
             let secret2 = SecretKey25519::with_rng(&mut rng);
             let sealing_key = SealingKey::X25519AeadRpo(public1);
-            let sealed = sealing_key.seal(&mut rng, &plaintext).unwrap();
+            let sealed = sealing_key.seal_bytes(&mut rng, &plaintext).unwrap();
             let unsealing_key = UnsealingKey::X25519AeadRpo(secret2);
-            let result = unsealing_key.unseal(sealed);
+            let result = unsealing_key.unseal_bytes(sealed);
             prop_assert!(result.is_err());
         }
     }
@@ -637,12 +641,12 @@ mod scheme_compatibility_tests {
         let secret_key = SecretKey::with_rng(&mut rng);
         let public_key = secret_key.public_key();
         let sealing_key = SealingKey::K256XChaCha20Poly1305(public_key);
-        let sealed = sealing_key.seal(&mut rng, plaintext).unwrap();
+        let sealed = sealing_key.seal_bytes(&mut rng, plaintext).unwrap();
 
         // Try to unseal with K256AeadRpo (should fail)
         let secret_key2 = SecretKey::with_rng(&mut rng);
         let unsealing_key = UnsealingKey::K256AeadRpo(secret_key2);
-        let result = unsealing_key.unseal(sealed);
+        let result = unsealing_key.unseal_bytes(sealed);
         assert!(result.is_err());
     }
 
@@ -655,12 +659,12 @@ mod scheme_compatibility_tests {
         let secret_key = SecretKey25519::with_rng(&mut rng);
         let public_key = secret_key.public_key();
         let sealing_key = SealingKey::X25519XChaCha20Poly1305(public_key);
-        let sealed = sealing_key.seal(&mut rng, plaintext).unwrap();
+        let sealed = sealing_key.seal_bytes(&mut rng, plaintext).unwrap();
 
         // Try to unseal with X25519AeadRpo (should fail)
         let secret_key2 = SecretKey25519::with_rng(&mut rng);
         let unsealing_key = UnsealingKey::X25519AeadRpo(secret_key2);
-        let result = unsealing_key.unseal(sealed);
+        let result = unsealing_key.unseal_bytes(sealed);
         assert!(result.is_err());
     }
 
@@ -673,12 +677,12 @@ mod scheme_compatibility_tests {
         let secret_k256 = SecretKey::with_rng(&mut rng);
         let public_k256 = secret_k256.public_key();
         let sealing_key = SealingKey::K256XChaCha20Poly1305(public_k256);
-        let sealed = sealing_key.seal(&mut rng, plaintext).unwrap();
+        let sealed = sealing_key.seal_bytes(&mut rng, plaintext).unwrap();
 
         // Try to unseal with X25519XChaCha20Poly1305 (should fail)
         let secret_x25519 = SecretKey25519::with_rng(&mut rng);
         let unsealing_key = UnsealingKey::X25519XChaCha20Poly1305(secret_x25519);
-        let result = unsealing_key.unseal(sealed);
+        let result = unsealing_key.unseal_bytes(sealed);
         assert!(result.is_err());
     }
 
@@ -695,11 +699,11 @@ mod scheme_compatibility_tests {
 
             // Seal with K256XChaCha20Poly1305
             let sealing_key = SealingKey::K256XChaCha20Poly1305(public_k256);
-            let sealed = sealing_key.seal(&mut rng, &plaintext).unwrap();
+            let sealed = sealing_key.seal_bytes(&mut rng, &plaintext).unwrap();
 
             // Try to unseal with X25519XChaCha20Poly1305 - should fail
             let unsealing_key = UnsealingKey::X25519XChaCha20Poly1305(secret_x25519);
-            let result = unsealing_key.unseal(sealed);
+            let result = unsealing_key.unseal_bytes(sealed);
             prop_assert!(result.is_err());
         }
     }
@@ -719,7 +723,7 @@ mod protocol_tests {
         let secret_key = SecretKey::with_rng(&mut rng);
         let public_key = secret_key.public_key();
         let sealing_key = SealingKey::K256XChaCha20Poly1305(public_key);
-        let sealed = sealing_key.seal(&mut rng, b"test").unwrap();
+        let sealed = sealing_key.seal_bytes(&mut rng, b"test").unwrap();
 
         // Extract ephemeral key from sealed message
         let ephemeral_bytes = sealed.ephemeral_key.to_bytes();
@@ -736,7 +740,7 @@ mod protocol_tests {
         let secret_key = SecretKey25519::with_rng(&mut rng);
         let public_key = secret_key.public_key();
         let sealing_key = SealingKey::X25519XChaCha20Poly1305(public_key);
-        let sealed = sealing_key.seal(&mut rng, b"test").unwrap();
+        let sealed = sealing_key.seal_bytes(&mut rng, b"test").unwrap();
 
         // Extract ephemeral key from sealed message
         let ephemeral_bytes = sealed.ephemeral_key.to_bytes();
@@ -756,7 +760,7 @@ mod protocol_tests {
             let secret_key = SecretKey::with_rng(&mut rng);
             let public_key = secret_key.public_key();
             let sealing_key = SealingKey::K256XChaCha20Poly1305(public_key);
-            let sealed = sealing_key.seal(&mut rng, &plaintext).unwrap();
+            let sealed = sealing_key.seal_bytes(&mut rng, &plaintext).unwrap();
 
             // Verify scheme consistency
             let scheme_from_key = sealed.ephemeral_key.scheme();
@@ -818,8 +822,8 @@ mod integration_tests {
             let sealing_key1 = SealingKey::K256AeadRpo(public1);
             let sealing_key2 = SealingKey::K256AeadRpo(public2);
 
-            let sealed1 = sealing_key1.seal(&mut rng, &plaintext).unwrap();
-            let sealed2 = sealing_key2.seal(&mut rng, &plaintext).unwrap();
+            let sealed1 = sealing_key1.seal_bytes(&mut rng, &plaintext).unwrap();
+            let sealed2 = sealing_key2.seal_bytes(&mut rng, &plaintext).unwrap();
 
             // Different keys should produce different ciphertexts
             prop_assert_ne!(sealed1.ciphertext, sealed2.ciphertext);

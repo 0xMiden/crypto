@@ -21,8 +21,8 @@
 //! let sealing_key = SealingKey::X25519XChaCha20Poly1305(public_key);
 //! let unsealing_key = UnsealingKey::X25519XChaCha20Poly1305(secret_key);
 //!
-//! let sealed = sealing_key.seal(&mut rng, b"hello world").unwrap();
-//! let opened = unsealing_key.unseal(sealed).unwrap();
+//! let sealed = sealing_key.seal_bytes(&mut rng, b"hello world").unwrap();
+//! let opened = unsealing_key.unseal_bytes(sealed).unwrap();
 //!
 //! assert_eq!(opened.as_slice(), b"hello world");
 //! ```

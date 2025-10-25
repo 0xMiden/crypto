@@ -25,11 +25,15 @@ type X25519AeadRpo = CryptoBox<X25519, AeadRpo>;
 // HELPER MACROS
 // ================================================================================================
 
-/// Generates seal_with_associated_data method implementation
-macro_rules! impl_seal_with_associated_data {
+/// Generates seal_bytes_with_associated_data method implementation
+macro_rules! impl_seal_bytes_with_associated_data {
     ($($variant:path => $crypto_box:ty, $ephemeral_variant:path;)*) => {
-        /// Seal (encrypt and authenticate) data for this recipient given some associated data
-        pub fn seal_with_associated_data<R: CryptoRng + RngCore>(
+        /// Seals the provided plaintext (represented as bytes) and associated data with this
+        /// sealing key.
+        ///
+        /// The returned message can be unsealed with the [UnsealingKey] associated with this
+        /// sealing key.
+        pub fn seal_bytes_with_associated_data<R: CryptoRng + RngCore>(
             &self,
             rng: &mut R,
             plaintext: &[u8],
@@ -59,7 +63,11 @@ macro_rules! impl_seal_with_associated_data {
 /// Generates seal_elements_with_associated_data method implementation
 macro_rules! impl_seal_elements_with_associated_data {
     ($($variant:path => $crypto_box:ty, $ephemeral_variant:path;)*) => {
-        /// Seal field elements with associated data for this recipient
+        /// Seals the provided plaintext (represented as filed elements) and associated data with
+        /// this sealing key.
+        ///
+        /// The returned message can be unsealed with the [UnsealingKey] associated with this
+        /// sealing key.
         pub fn seal_elements_with_associated_data<R: CryptoRng + RngCore>(
             &self,
             rng: &mut R,
@@ -87,11 +95,14 @@ macro_rules! impl_seal_elements_with_associated_data {
     };
 }
 
-/// Generates unseal_with_associated_data method implementation
-macro_rules! impl_unseal_with_associated_data {
+/// Generates unseal_bytes_with_associated_data method implementation
+macro_rules! impl_unseal_bytes_with_associated_data {
     ($($variant:path => $crypto_box:ty, $ephemeral_variant:path;)*) => {
-        /// Unseal a sealed message given its associated data
-        pub fn unseal_with_associated_data(
+        /// Unseals the provided message using this unsealing key.
+        ///
+        /// The message must have been sealed as bytes (i.e., using `seal_bytes()` or
+        /// `seal_bytes_with_associated_data()` method), otherwise an error will be returned.
+        pub fn unseal_bytes_with_associated_data(
             &self,
             sealed_message: SealedMessage,
             associated_data: &[u8],
@@ -122,7 +133,10 @@ macro_rules! impl_unseal_with_associated_data {
 /// Generates unseal_elements_with_associated_data method implementation
 macro_rules! impl_unseal_elements_with_associated_data {
     ($($variant:path => $crypto_box:ty, $ephemeral_variant:path;)*) => {
-        /// Unseal field elements from a sealed message with associated data
+        /// Unseals the provided message using this unsealing key.
+        ///
+        /// The message must have been sealed as elements (i.e., using `seal_elements()` or
+        /// `seal_elements_with_associated_data()` method), otherwise an error will be returned.
         pub fn unseal_elements_with_associated_data(
             &self,
             sealed_message: SealedMessage,
@@ -168,15 +182,15 @@ impl SealingKey {
     ///
     /// The returned message can be unsealed with the [UnsealingKey] associated with this sealing
     /// key.
-    pub fn seal<R: CryptoRng + RngCore>(
+    pub fn seal_bytes<R: CryptoRng + RngCore>(
         &self,
         rng: &mut R,
         plaintext: &[u8],
     ) -> Result<SealedMessage, IesError> {
-        self.seal_with_associated_data(rng, plaintext, &[])
+        self.seal_bytes_with_associated_data(rng, plaintext, &[])
     }
 
-    impl_seal_with_associated_data! {
+    impl_seal_bytes_with_associated_data! {
         SealingKey::K256XChaCha20Poly1305 => K256XChaCha20Poly1305, EphemeralPublicKey::K256XChaCha20Poly1305;
         SealingKey::X25519XChaCha20Poly1305 => X25519XChaCha20Poly1305, EphemeralPublicKey::X25519XChaCha20Poly1305;
         SealingKey::K256AeadRpo => K256AeadRpo, EphemeralPublicKey::K256AeadRpo;
@@ -187,9 +201,6 @@ impl SealingKey {
     ///
     /// The returned message can be unsealed with the [UnsealingKey] associated with this sealing
     /// key.
-    ///
-    /// This method is available only for `K256AeadRpo` and `X25519AeadRpo` schemes, and an error
-    /// will be returned if used with other schemes.
     pub fn seal_elements<R: CryptoRng + RngCore>(
         &self,
         rng: &mut R,
@@ -218,7 +229,7 @@ pub enum UnsealingKey {
 }
 
 impl UnsealingKey {
-    /// Returns scheme identifier for this secret key.
+    /// Returns scheme identifier for this unsealing key.
     fn scheme(&self) -> IesScheme {
         match self {
             UnsealingKey::K256XChaCha20Poly1305(_) => IesScheme::K256XChaCha20Poly1305,
@@ -228,24 +239,30 @@ impl UnsealingKey {
         }
     }
 
-    /// Returns scheme name for this secret key
+    /// Returns scheme name for this unsealing key.
     pub fn scheme_name(&self) -> &'static str {
         self.scheme().name()
     }
 
-    /// Unseals a sealed message.
-    pub fn unseal(&self, sealed_message: SealedMessage) -> Result<Vec<u8>, IesError> {
-        self.unseal_with_associated_data(sealed_message, &[])
+    /// Unseals the provided message using this unsealing key.
+    ///
+    /// The message must have been sealed as bytes (i.e., using `seal_bytes()` or
+    /// `seal_bytes_with_associated_data()` method), otherwise an error will be returned.
+    pub fn unseal_bytes(&self, sealed_message: SealedMessage) -> Result<Vec<u8>, IesError> {
+        self.unseal_bytes_with_associated_data(sealed_message, &[])
     }
 
-    impl_unseal_with_associated_data! {
+    impl_unseal_bytes_with_associated_data! {
         UnsealingKey::K256XChaCha20Poly1305 => K256XChaCha20Poly1305, EphemeralPublicKey::K256XChaCha20Poly1305;
         UnsealingKey::X25519XChaCha20Poly1305 => X25519XChaCha20Poly1305, EphemeralPublicKey::X25519XChaCha20Poly1305;
         UnsealingKey::K256AeadRpo => K256AeadRpo, EphemeralPublicKey::K256AeadRpo;
         UnsealingKey::X25519AeadRpo => X25519AeadRpo, EphemeralPublicKey::X25519AeadRpo;
     }
 
-    /// Unseals the provided message as field elements.
+    /// Unseals the provided message using this unsealing key.
+    ///
+    /// The message must have been sealed as elements (i.e., using `seal_elements()` or
+    /// `seal_elements_with_associated_data()` method), otherwise an error will be returned.
     pub fn unseal_elements(&self, sealed_message: SealedMessage) -> Result<Vec<Felt>, IesError> {
         self.unseal_elements_with_associated_data(sealed_message, &[])
     }
