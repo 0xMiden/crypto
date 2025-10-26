@@ -99,7 +99,8 @@ fn test_batch_insert() -> Result<(), MerkleError> {
 
     values.into_iter().permutations(3).for_each(|values| {
         let mut forest = forest.clone();
-        let new_root = forest.batch_insert(empty_tree_root, values).unwrap();
+        let new_root = forest.batch_insert(empty_tree_root, values.clone()).unwrap();
+
         assert_eq!(
             new_root,
             Word::new([
@@ -109,6 +110,11 @@ fn test_batch_insert() -> Result<(), MerkleError> {
                 Felt::new(1147037274136690014)
             ])
         );
+
+        for (key, value) in values {
+            let proof = forest.open(new_root, key).unwrap();
+            assert!(proof.verify_membership(&key, &value, &new_root));
+        }
     });
 
     Ok(())
