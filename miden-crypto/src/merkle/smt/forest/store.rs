@@ -131,6 +131,7 @@ impl SmtStore {
     // --------------------------------------------------------------------------------------------
 
     /// Sets multiple leaf values at once with a single root transition.
+    /// Leaves must be sorted by NodeIndex to avoid recomputing ancestor nodes multiple times.
     ///
     /// # Errors
     /// This method can return the following errors:

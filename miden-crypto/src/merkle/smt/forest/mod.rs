@@ -186,6 +186,16 @@ impl SmtForest {
         let new_leaf_entries =
             new_leaves.iter().map(|(index, leaf)| (NodeIndex::from(*index), leaf.0));
 
+        #[cfg(feature = "hashmaps")]
+        let new_leaf_entries = {
+            // Required because hashbrown::HashMap doesn't maintain key ordering, and set_leaves
+            // requires leaves to be sorted by NodeIndex. The default implementation
+            // uses BTreeMap which maintians key ordering.
+            let mut new_leaf_entries = new_leaf_entries.collect::<Vec<_>>();
+            new_leaf_entries.sort_by_key(|(idx, _)| *idx);
+            new_leaf_entries
+        };
+
         let new_root = self.store.set_leaves(root, new_leaf_entries)?;
 
         // Update successful, insert new leaves into the forest
