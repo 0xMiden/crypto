@@ -190,7 +190,7 @@ impl SmtForest {
         let new_leaf_entries = {
             // Required because hashbrown::HashMap doesn't maintain key ordering, and set_leaves
             // requires leaves to be sorted by NodeIndex. The default implementation
-            // uses BTreeMap which maintians key ordering.
+            // uses BTreeMap which maintains key ordering.
             let mut new_leaf_entries = new_leaf_entries.collect::<Vec<_>>();
             new_leaf_entries.sort_by_key(|(idx, _)| *idx);
             new_leaf_entries
