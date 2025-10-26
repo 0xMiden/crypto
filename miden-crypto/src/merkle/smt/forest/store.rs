@@ -233,10 +233,11 @@ impl SmtStore {
                 return;
             }
             if let Some(node) = store.get_mut(&node) {
-                // this node already exists in the store, increase its reference count
+                // This node already exists in the store, increase its reference count.
+                // Stops the dfs descent here to leave children ref counts unchanged.
                 node.rc += 1;
             } else if let Some(mut smt_node) = new_nodes.remove(&node) {
-                // this is a non-leaf node, insert it into the store and process its children
+                // This is a non-leaf node, insert it into the store and process its children.
                 smt_node.rc = 1;
                 store.insert(node, smt_node);
                 dfs(smt_node.left, store, new_nodes);
@@ -289,7 +290,7 @@ impl SmtStore {
 // HELPER FUNCTIONS
 // ================================================================================================
 
-/// Creates empty hashes for all the subtrees of a tree with a max depth of 255.
+/// Creates empty hashes for all the subtrees of a tree with a max depth of [`SMT_DEPTH`].
 fn empty_hashes() -> impl Iterator<Item = (Word, ForestInnerNode)> {
     let subtrees = EmptySubtreeRoots::empty_hashes(SMT_DEPTH);
     subtrees
@@ -300,6 +301,9 @@ fn empty_hashes() -> impl Iterator<Item = (Word, ForestInnerNode)> {
         .map(|(child, parent)| (parent, ForestInnerNode { left: child, right: child, rc: 1 }))
 }
 
+/// A Merkle opening that starts below the root and ends at the sibling of the target leaf.
+/// Indexed by the NodeIndex at each level to efficiently query all the hashes needed for a batch
+/// update.
 struct IndexedPath {
     value: Word,
     path: Vec<(NodeIndex, Word)>,

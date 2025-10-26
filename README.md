@@ -39,6 +39,7 @@ For performance benchmarks of these hash functions and their comparison to other
 - `SimpleSmt`: a Sparse Merkle Tree (with no compaction), mapping 64-bit keys to 4-element values.
 - `Smt`: a Sparse Merkle tree (with compaction at depth 64), mapping 4-element keys to 4-element values.
 - `LargeSmt`: a large-scale Sparse Merkle tree backed by pluggable storage (e.g., [RocksDB](https://github.com/facebook/rocksdb)), optimized for datasets that exceed available memory.
+- `SmtForest`: a collection of Sparse Merkle Trees with depth 64. Designed to efficiently store trees with common subtrees (smilar to `MerkleStore`) with a method to prune old unused trees.
 
 The module also contains additional supporting components such as `NodeIndex`, `MerklePath`, `SparseMerklePath`, and `MerkleError` to assist with tree indexation, opening proofs, and reporting inconsistent arguments/state. `SparseMerklePath` provides a memory-efficient representation for Merkle paths with nodes representing empty subtrees.
 

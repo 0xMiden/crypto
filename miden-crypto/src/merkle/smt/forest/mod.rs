@@ -186,15 +186,6 @@ impl SmtForest {
         let new_leaf_entries =
             new_leaves.iter().map(|(index, leaf)| (NodeIndex::from(*index), leaf.0));
 
-        #[cfg(feature = "hashmaps")]
-        let new_leaf_entries = {
-            // Required because hashbrown::HashMap doesn't maintain key ordering.
-            // The default implementation uses BTreeMap which behaves differently.
-            let mut new_leaf_entries = new_leaf_entries.collect::<Vec<_>>();
-            new_leaf_entries.sort_by_key(|(idx, _)| *idx);
-            new_leaf_entries
-        };
-
         let new_root = self.store.set_leaves(root, new_leaf_entries)?;
 
         // Update successful, insert new leaves into the forest
@@ -208,25 +199,22 @@ impl SmtForest {
 
     /// Removes the specified SMTs (identified by their roots) from the forest.
     /// Releases memory used by nodes and leaves that are no longer reachable.
-    pub fn pop_smts(
-        &mut self,
-        roots: impl IntoIterator<Item = Word> + Clone,
-    ) -> Result<(), MerkleError> {
-        let roots = roots.into_iter().collect::<Vec<_>>();
-        for root in &roots {
+    /// Roots not in the forest and empty trees are ignored.
+    pub fn pop_smts(&mut self, roots: impl IntoIterator<Item = Word>) {
+        let roots = roots
+            .into_iter()
+            .filter(|root|
             // don't use self.contains_root here because we don't allow removing empty trees
-            if !self.roots.contains(root) {
-                return Err(MerkleError::RootNotInStore(*root));
-            }
-        }
+            self.roots.contains(root))
+            .collect::<Vec<_>>();
+
         for root in &roots {
             self.roots.remove(root);
         }
+
         for leaf in self.store.remove_roots(roots) {
             self.leaves.remove(&leaf);
         }
-
-        Ok(())
     }
 
     // HELPER METHODS

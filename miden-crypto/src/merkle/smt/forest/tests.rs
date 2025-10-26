@@ -91,8 +91,8 @@ fn test_batch_insert() -> Result<(), MerkleError> {
     let empty_tree_root = *EmptySubtreeRoots::entry(SMT_DEPTH, 0);
 
     let values = vec![
-        (Word::new([ZERO; WORD_SIZE]), Word::new([ONE; WORD_SIZE])),
         (Word::new([ZERO, ONE, ZERO, ZERO]), Word::new([ONE; WORD_SIZE])),
+        (Word::new([ZERO; WORD_SIZE]), Word::new([ONE; WORD_SIZE])),
         (Word::new([ZERO, ONE, ZERO, ONE]), Word::new([ONE; WORD_SIZE])),
     ];
 
@@ -224,7 +224,7 @@ fn test_pop_roots() -> Result<(), MerkleError> {
     assert_eq!(forest.roots.len(), 1);
     assert_eq!(forest.leaves.len(), 1);
 
-    assert_matches!(forest.pop_smts(vec![root]), Ok(_));
+    forest.pop_smts(vec![root]);
 
     assert_eq!(forest.roots.len(), 0);
     assert_eq!(forest.leaves.len(), 0);
@@ -233,25 +233,17 @@ fn test_pop_roots() -> Result<(), MerkleError> {
 }
 
 #[test]
-fn test_removing_empty_smt_from_forest() -> Result<(), MerkleError> {
+fn test_removing_empty_smt_from_forest() {
     let mut forest = SmtForest::new();
     let empty_tree_root = *EmptySubtreeRoots::entry(SMT_DEPTH, 0);
     let non_empty_root = Word::new([ONE; WORD_SIZE]);
 
     // Popping zero SMTs from forest should be a no-op (no panic or error)
-    assert_matches!(forest.pop_smts(vec![]), Ok(_));
+    forest.pop_smts(vec![]);
 
-    // Popping a non-existent root should return an error
-    assert_matches!(
-        forest.pop_smts(vec![non_empty_root]),
-        Err(MerkleError::RootNotInStore(r)) if r == non_empty_root
-    );
+    // Popping a non-existent root should be a no-op (no panic or error)
+    forest.pop_smts(vec![non_empty_root]);
 
-    // Popping the empty root should return an error
-    assert_matches!(
-        forest.pop_smts(vec![empty_tree_root]),
-        Err(MerkleError::RootNotInStore(r)) if r == empty_tree_root
-    );
-
-    Ok(())
+    // Popping the empty root should be a no-op (no panic or error)
+    forest.pop_smts(vec![empty_tree_root]);
 }
