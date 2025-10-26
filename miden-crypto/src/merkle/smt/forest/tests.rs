@@ -99,7 +99,7 @@ fn test_batch_insert() -> Result<(), MerkleError> {
 
     values.into_iter().permutations(3).for_each(|values| {
         let mut forest = forest.clone();
-        let new_root = forest.batch_insert(empty_tree_root, values.into_iter()).unwrap();
+        let new_root = forest.batch_insert(empty_tree_root, values).unwrap();
         assert_eq!(
             new_root,
             Word::new([
