@@ -1,4 +1,5 @@
 use assert_matches::assert_matches;
+use itertools::Itertools;
 
 use super::{EmptySubtreeRoots, MerkleError, SmtForest, Word};
 use crate::{
@@ -86,26 +87,29 @@ fn test_insert_multiple_values() -> Result<(), MerkleError> {
 
 #[test]
 fn test_batch_insert() -> Result<(), MerkleError> {
-    let mut forest = SmtForest::new();
+    let forest = SmtForest::new();
 
     let empty_tree_root = *EmptySubtreeRoots::entry(SMT_DEPTH, 0);
 
     let values = vec![
-        (Word::new([ZERO, ONE, ZERO, ZERO]), Word::new([ONE; WORD_SIZE])),
         (Word::new([ZERO; WORD_SIZE]), Word::new([ONE; WORD_SIZE])),
         (Word::new([ZERO, ONE, ZERO, ONE]), Word::new([ONE; WORD_SIZE])),
+        (Word::new([ZERO, ONE, ZERO, ZERO]), Word::new([ONE; WORD_SIZE])),
     ];
 
-    let new_root = forest.batch_insert(empty_tree_root, values.into_iter())?;
-    assert_eq!(
-        new_root,
-        Word::new([
-            Felt::new(6703167280526557258),
-            Felt::new(18389096225374738330),
-            Felt::new(5605267564941856750),
-            Felt::new(14623616106397295145)
-        ])
-    );
+    values.into_iter().permutations(3).for_each(|values| {
+        let mut forest = forest.clone();
+        let new_root = forest.batch_insert(empty_tree_root, values.into_iter()).unwrap();
+        assert_eq!(
+            new_root,
+            Word::new([
+                Felt::new(7086678883692273722),
+                Felt::new(12292668811816691012),
+                Felt::new(10126815404170194367),
+                Felt::new(1147037274136690014)
+            ])
+        );
+    });
 
     Ok(())
 }

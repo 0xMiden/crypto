@@ -131,7 +131,6 @@ impl SmtStore {
     // --------------------------------------------------------------------------------------------
 
     /// Sets multiple leaf values at once with a single root transition.
-    /// Leaves must be sorted by NodeIndex to avoid recomputing ancestor nodes multiple times.
     ///
     /// # Errors
     /// This method can return the following errors:
@@ -145,16 +144,9 @@ impl SmtStore {
     ) -> Result<Word, MerkleError> {
         self.nodes.get(&root).ok_or(MerkleError::RootNotInStore(root))?;
 
-        // Keep track of affected ancestors to avoid recomputing nodes multiple times
-        let mut ancestors: Vec<NodeIndex> = Vec::new();
-        // Start with a guard value, all ancestors have depth < SMT_DEPTH
-        let mut last_ancestor = NodeIndex::new_unchecked(SMT_DEPTH, 0);
-
-        // Stash all new nodes until we know there are no errors
-        let mut new_nodes: Map<Word, ForestInnerNode> = Map::new();
-
         // Collect opening nodes and updated leaves
         let mut nodes_by_index = Map::<NodeIndex, Word>::new();
+        let mut leaves_by_index = Map::<NodeIndex, Word>::new();
         for (index, leaf_hash) in leaves {
             // Record all sibling nodes along the path from root to this index
             let indexed_path = self.get_indexed_path(root, index)?;
@@ -166,18 +158,35 @@ impl SmtStore {
             nodes_by_index.extend(indexed_path.path);
 
             // Record the updated leaf value at this index
-            nodes_by_index.insert(index, leaf_hash);
-
-            // Check if we already processed the sibling of this leaf. If so, the parent is already
-            // added to the ancestors list. This works as long as leaves are sorted by index.
-            if last_ancestor != index.parent() {
-                last_ancestor = index.parent();
-                ancestors.push(last_ancestor);
-            }
+            leaves_by_index.insert(index, leaf_hash);
         }
 
-        if nodes_by_index.is_empty() {
-            return Ok(root);
+        #[allow(unused_mut)]
+        let mut sorted_leaf_indices = leaves_by_index.keys().cloned().collect::<Vec<_>>();
+
+        #[cfg(feature = "hashmaps")]
+        // Sort leaves by NodeIndex to easily detect when leaves share a parent (only neighboring
+        // leaves can share a parent). Hashbrown::HashMap doesn't maintain key ordering, so
+        // we need to sort the indices.
+        sorted_leaf_indices.sort();
+
+        // Ensure new leaf values override current opening values.
+        nodes_by_index.extend(leaves_by_index);
+
+        // Keep track of affected ancestors to avoid recomputing nodes multiple times
+        let mut ancestors: Vec<NodeIndex> = Vec::new();
+        // Start with a guard value, all ancestors have depth < SMT_DEPTH
+        let mut last_ancestor = NodeIndex::new_unchecked(SMT_DEPTH, 0);
+
+        for leaf_index in sorted_leaf_indices {
+            let parent = leaf_index.parent();
+
+            // Check if we already processed the sibling of this leaf. If so, the parent is already
+            // added to the ancestors list. This works because leaves are sorted by index.
+            if parent != last_ancestor {
+                last_ancestor = parent;
+                ancestors.push(last_ancestor);
+            }
         }
 
         // Gather all ancestors up to the root (deduplicated)
@@ -198,6 +207,9 @@ impl SmtStore {
             index += 1;
         }
 
+        // Stash all new nodes until we know there are no errors
+        let mut new_nodes: Map<Word, ForestInnerNode> = Map::new();
+
         for index in ancestors {
             let left_index = index.left_child();
             let right_index = index.right_child();
@@ -217,6 +229,10 @@ impl SmtStore {
             let new_key = node.hash();
             new_nodes.insert(new_key, node);
             nodes_by_index.insert(index, new_key);
+        }
+
+        if nodes_by_index.is_empty() {
+            return Ok(root);
         }
 
         let new_root = nodes_by_index
