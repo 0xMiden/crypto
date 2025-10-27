@@ -1,17 +1,20 @@
+use alloc::{borrow::ToOwned, vec::Vec};
+
+use p3_field::{BasedVectorSpace, extension::BinomialExtensionField};
+use winter_crypto::Hasher;
+
 use super::{
-    ARK1, ARK2, CAPACITY_RANGE, CubeExtension, DIGEST_RANGE, ElementHasher, Felt, FieldElement,
-    Hasher, MDS, NUM_ROUNDS, RATE_RANGE, Range, STATE_WIDTH, Word, add_constants,
-    add_constants_and_apply_ext_round, add_constants_and_apply_inv_sbox,
-    add_constants_and_apply_sbox, apply_inv_sbox, apply_mds, apply_sbox,
+    ARK1, ARK2, CAPACITY_RANGE, DIGEST_RANGE, Felt, MDS, NUM_ROUNDS, RATE_RANGE, Range,
+    STATE_WIDTH, Word, add_constants, add_constants_and_apply_ext_round,
+    add_constants_and_apply_inv_sbox, add_constants_and_apply_sbox, apply_inv_sbox, apply_mds,
+    apply_sbox,
 };
-#[cfg(test)]
-use super::{StarkField, ZERO};
-use crate::hash::algebraic_sponge::AlgebraicSponge;
+use crate::{AlgebraicSponge, ZERO};
 
 #[cfg(test)]
 mod tests;
 
-pub type CubicExtElement = CubeExtension<Felt>;
+pub type CubicExtElement = BinomialExtensionField<Felt, 5>;
 
 // HASHER IMPLEMENTATION
 // ================================================================================================
@@ -132,12 +135,6 @@ impl Rpx256 {
         <Self as Hasher>::merge(values)
     }
 
-    /// Returns a hash of the provided field elements.
-    #[inline(always)]
-    pub fn hash_elements<E: FieldElement<BaseField = Felt>>(elements: &[E]) -> Word {
-        <Self as ElementHasher>::hash_elements(elements)
-    }
-
     /// Returns a hash of two digests and a domain identifier.
     #[inline(always)]
     pub fn merge_in_domain(values: &[Word; 2], domain: Felt) -> Word {
@@ -202,14 +199,29 @@ impl Rpx256 {
         // decompose the state into 4 elements in the cubic extension field and apply the power 7
         // map to each of the elements
         let [s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11] = *state;
-        let ext0 = Self::exp7(CubicExtElement::new(s0, s1, s2));
-        let ext1 = Self::exp7(CubicExtElement::new(s3, s4, s5));
-        let ext2 = Self::exp7(CubicExtElement::new(s6, s7, s8));
-        let ext3 = Self::exp7(CubicExtElement::new(s9, s10, s11));
+        let ext0 = Self::exp7(
+            CubicExtElement::from_basis_coefficients_iter([s0, s1, s2, ZERO, ZERO].into_iter())
+                .unwrap(),
+        );
+        let ext1 = Self::exp7(
+            CubicExtElement::from_basis_coefficients_iter([s3, s4, s5, ZERO, ZERO].into_iter())
+                .unwrap(),
+        );
+        let ext2 = Self::exp7(
+            CubicExtElement::from_basis_coefficients_iter([s6, s7, s8, ZERO, ZERO].into_iter())
+                .unwrap(),
+        );
+        let ext3 = Self::exp7(
+            CubicExtElement::from_basis_coefficients_iter([s9, s10, s11, ZERO, ZERO].into_iter())
+                .unwrap(),
+        );
 
         // decompose the state back into 12 base field elements
         let arr_ext = [ext0, ext1, ext2, ext3];
-        *state = CubicExtElement::slice_as_base_elements(&arr_ext)
+        *state = arr_ext
+            .into_iter()
+            .flat_map(|arr| CubicExtElement::as_basis_coefficients_slice(&arr)[..3].to_owned())
+            .collect::<Vec<_>>()
             .try_into()
             .expect("shouldn't fail");
     }
@@ -223,9 +235,9 @@ impl Rpx256 {
 
     /// Computes an exponentiation to the power 7 in cubic extension field.
     #[inline(always)]
-    pub fn exp7(x: CubeExtension<Felt>) -> CubeExtension<Felt> {
-        let x2 = x.square();
-        let x4 = x2.square();
+    pub fn exp7(x: CubicExtElement) -> CubicExtElement {
+        let x2 = x * x;
+        let x4 = x2 * x2;
 
         let x3 = x2 * x;
         x3 * x4
@@ -251,13 +263,5 @@ impl Hasher for Rpx256 {
 
     fn merge_with_int(seed: Self::Digest, value: u64) -> Self::Digest {
         <Self as AlgebraicSponge>::merge_with_int(seed, value)
-    }
-}
-
-impl ElementHasher for Rpx256 {
-    type BaseField = Felt;
-
-    fn hash_elements<E: FieldElement<BaseField = Self::BaseField>>(elements: &[E]) -> Self::Digest {
-        <Self as AlgebraicSponge>::hash_elements(elements)
     }
 }

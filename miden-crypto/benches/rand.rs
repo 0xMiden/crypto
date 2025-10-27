@@ -28,7 +28,7 @@ use criterion::{Criterion, criterion_group, criterion_main};
 // Import random generation modules
 use miden_crypto::{
     Felt, Word,
-    rand::{FeltRng, RandomCoin, RpoRandomCoin, RpxRandomCoin},
+    rand::{FeltRng, RpoRandomCoin, RpxRandomCoin},
 };
 
 // Import common utilities

@@ -5,6 +5,7 @@ use assert_matches::assert_matches;
 use super::{EMPTY_WORD, Felt, LeafIndex, NodeIndex, Rpo256, SMT_DEPTH, Smt, SmtLeaf, Word};
 use crate::{
     ONE, WORD_SIZE,
+    hash::algebraic_sponge::AlgebraicSponge,
     merkle::{
         EmptySubtreeRoots, MerkleStore, MutationSet, SmtLeafError,
         smt::{Map, NodeMutation, SparseMerkleTree, full::MAX_LEAF_ENTRIES},

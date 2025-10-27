@@ -32,7 +32,7 @@ impl EmptySubtreeRoots {
     /// `node_depth` is the depth of the **parent** to have empty children. That is, `node_depth`
     /// and the depth of the returned [`InnerNode`] are the same, and thus the empty hashes are for
     /// subtrees of depth `node_depth + 1`.
-    pub(crate) const fn get_inner_node(tree_depth: u8, node_depth: u8) -> InnerNode {
+    pub(crate) fn get_inner_node(tree_depth: u8, node_depth: u8) -> InnerNode {
         let &child = Self::entry(tree_depth, node_depth + 1);
         InnerNode { left: child, right: child }
     }

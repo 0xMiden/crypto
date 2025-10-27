@@ -1,5 +1,7 @@
 use alloc::vec::Vec;
 
+use p3_field::PrimeField64;
+use p3_goldilocks::Goldilocks as Felt;
 use proptest::prelude::*;
 use rand_utils::rand_vector;
 
@@ -127,10 +129,11 @@ proptest! {
 // HELPER FUNCTIONS
 // ================================================================================================
 
+#[allow(dead_code)]
 fn compute_expected_element_hash(elements: &[Felt]) -> blake3::Hash {
     let mut bytes = Vec::new();
     for element in elements.iter() {
-        bytes.extend_from_slice(&element.as_int().to_le_bytes());
+        bytes.extend_from_slice(&((*element).as_canonical_u64()).to_le_bytes());
     }
     blake3::hash(&bytes)
 }

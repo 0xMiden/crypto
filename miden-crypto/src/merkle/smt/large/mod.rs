@@ -123,11 +123,14 @@ use super::{
     MutationSet, NodeIndex, Rpo256, SMT_DEPTH, Smt, SmtLeaf, SmtLeafError, SmtProof,
     SparseMerklePath, SparseMerkleTree, Word,
 };
-use crate::merkle::smt::{
-    Map, NodeMutation, NodeMutations,
-    full::concurrent::{
-        MutatedSubtreeLeaves, PairComputations, SUBTREE_DEPTH, SubtreeLeaf, SubtreeLeavesIter,
-        build_subtree, fetch_sibling_pair, process_sorted_pairs_to_leaves,
+use crate::{
+    PrimeField64,
+    merkle::smt::{
+        Map, NodeMutation, NodeMutations,
+        full::concurrent::{
+            MutatedSubtreeLeaves, PairComputations, SUBTREE_DEPTH, SubtreeLeaf, SubtreeLeavesIter,
+            build_subtree, fetch_sibling_pair, process_sorted_pairs_to_leaves,
+        },
     },
 };
 
@@ -1261,7 +1264,7 @@ impl<S: SmtStorage> SparseMerkleTree<SMT_DEPTH> for LargeSmt<S> {
 
     fn key_to_leaf_index(key: &Word) -> LeafIndex<SMT_DEPTH> {
         let most_significant_felt = key[3];
-        LeafIndex::new_max_depth(most_significant_felt.as_int())
+        LeafIndex::new_max_depth(most_significant_felt.as_canonical_u64())
     }
 
     fn path_and_leaf_to_opening(path: SparseMerklePath, leaf: SmtLeaf) -> SmtProof {

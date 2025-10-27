@@ -1,9 +1,11 @@
+use winter_crypto::Hasher;
+
 use super::{
-    ARK1, ARK2, AlgebraicSponge, CAPACITY_RANGE, DIGEST_RANGE, ElementHasher, Felt, FieldElement,
-    Hasher, MDS, NUM_ROUNDS, RATE_RANGE, Range, STATE_WIDTH, Word, add_constants,
-    add_constants_and_apply_inv_sbox, add_constants_and_apply_sbox, apply_inv_sbox, apply_mds,
-    apply_sbox,
+    ARK1, ARK2, AlgebraicSponge, CAPACITY_RANGE, DIGEST_RANGE, Felt, NUM_ROUNDS, RATE_RANGE, Range,
+    STATE_WIDTH, Word, add_constants, add_constants_and_apply_inv_sbox,
+    add_constants_and_apply_sbox, apply_inv_sbox, apply_mds, apply_sbox,
 };
+use crate::hash::algebraic_sponge::rescue::mds::MDS;
 
 #[cfg(test)]
 mod tests;
@@ -126,12 +128,6 @@ impl Rpo256 {
         <Self as Hasher>::merge(values)
     }
 
-    /// Returns a hash of the provided field elements.
-    #[inline(always)]
-    pub fn hash_elements<E: FieldElement<BaseField = Felt>>(elements: &[E]) -> Word {
-        <Self as ElementHasher>::hash_elements(elements)
-    }
-
     /// Returns a hash of two digests and a domain identifier.
     #[inline(always)]
     pub fn merge_in_domain(values: &[Word; 2], domain: Felt) -> Word {
@@ -187,13 +183,5 @@ impl Hasher for Rpo256 {
 
     fn merge_with_int(seed: Self::Digest, value: u64) -> Self::Digest {
         <Self as AlgebraicSponge>::merge_with_int(seed, value)
-    }
-}
-
-impl ElementHasher for Rpo256 {
-    type BaseField = Felt;
-
-    fn hash_elements<E: FieldElement<BaseField = Self::BaseField>>(elements: &[E]) -> Self::Digest {
-        <Self as AlgebraicSponge>::hash_elements(elements)
     }
 }

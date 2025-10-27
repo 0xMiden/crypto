@@ -4,7 +4,7 @@ use rand::{Rng, prelude::IteratorRandom, rng};
 
 use super::MemoryStorage;
 use crate::{
-    EMPTY_WORD, Felt, ONE, WORD_SIZE, Word,
+    EMPTY_WORD, Felt, ONE, PrimeField64, WORD_SIZE, Word,
     merkle::{
         InnerNodeInfo, LargeSmt, LeafIndex, SMT_DEPTH, SmtLeaf,
         smt::full::{Smt, concurrent::COLS_PER_SUBTREE},
@@ -42,7 +42,7 @@ fn generate_updates(entries: Vec<(Word, Word)>, updates: usize) -> Vec<(Word, Wo
             (key, value)
         })
         .collect();
-    sorted_entries.sort_by_key(|(key, _)| key[3].as_int());
+    sorted_entries.sort_by_key(|(key, _)| key[3].as_canonical_u64());
     sorted_entries
 }
 

@@ -4,12 +4,13 @@ use rand::RngCore;
 pub use winter_crypto::{DefaultRandomCoin as WinterRandomCoin, RandomCoin, RandomCoinError};
 pub use winter_utils::Randomizable;
 
-use crate::{Felt, FieldElement, Word, ZERO};
-
 mod rpo;
-mod rpx;
 pub use rpo::RpoRandomCoin;
+
+mod rpx;
 pub use rpx::RpxRandomCoin;
+
+use crate::{Felt, Word};
 
 /// Pseudo-random element generator.
 ///

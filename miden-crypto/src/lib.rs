@@ -20,11 +20,19 @@ pub mod word;
 // ================================================================================================
 
 pub use k256::elliptic_curve::zeroize;
+pub use p3_air::*;
+pub use p3_field::{
+    BasedVectorSpace, ExtensionField, Field, PrimeCharacteristicRing, PrimeField64,
+    batch_multiplicative_inverse, extension::BinomialExtensionField,
+};
+pub use p3_goldilocks::{Goldilocks as Felt, Poseidon2Goldilocks};
 pub use winter_math::{
     FieldElement, StarkField,
-    fields::{CubeExtension, QuadExtension, f64::BaseElement as Felt},
+    fields::{CubeExtension, QuadExtension},
 };
 pub use word::{Word, WordError};
+
+pub use crate::hash::algebraic_sponge::AlgebraicSponge;
 
 // TYPE ALIASES
 // ================================================================================================
@@ -84,7 +92,7 @@ pub trait SequentialCommit {
 #[test]
 #[should_panic]
 fn debug_assert_is_checked() {
-    // enforce the release checks to always have `RUSTFLAGS="-C debug-assertions".
+    // enforce the release checks to always have `RUSTFLAGS="-C debug-assertions"`.
     //
     // some upstream tests are performed with `debug_assert`, and we want to assert its correctness
     // downstream.
@@ -105,4 +113,31 @@ fn overflow_panics_for_test() {
     let a = 1_u64;
     let b = 64;
     assert_ne!(a << b, 0);
+}
+
+/// A simple single-threaded implementation of Montgomery's trick. Since not all
+/// `PrimeCharacteristicRing`s support inversion, this takes a custom inversion function.
+pub fn batch_multiplicative_inverse_general<F, Inv>(x: &[F], result: &mut [F], inv: Inv)
+where
+    F: PrimeCharacteristicRing + Copy,
+    Inv: Fn(F) -> F,
+{
+    let n = x.len();
+    assert_eq!(result.len(), n);
+    if n == 0 {
+        return;
+    }
+
+    result[0] = F::ONE;
+    for i in 1..n {
+        result[i] = result[i - 1] * x[i - 1];
+    }
+
+    let product = result[n - 1] * x[n - 1];
+    let mut inv = inv(product);
+
+    for i in (0..n).rev() {
+        result[i] *= inv;
+        inv *= x[i];
+    }
 }

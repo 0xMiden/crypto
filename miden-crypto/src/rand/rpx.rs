@@ -1,10 +1,12 @@
 use alloc::{string::ToString, vec::Vec};
 
+use p3_field::{ExtensionField, PrimeField64};
 use rand_core::impls;
+use winter_crypto::RandomCoinError;
 
-use super::{Felt, FeltRng, FieldElement, RandomCoin, RandomCoinError, RngCore, ZERO};
+use super::{Felt, FeltRng, RngCore, Word};
 use crate::{
-    Word,
+    ZERO,
     hash::rpx::Rpx256,
     utils::{ByteReader, ByteWriter, Deserializable, DeserializationError, Serializable},
 };
@@ -70,7 +72,7 @@ impl RpxRandomCoin {
         <Self as RngCore>::fill_bytes(self, dest)
     }
 
-    fn draw_basefield(&mut self) -> Felt {
+    pub fn draw_basefield(&mut self) -> Felt {
         if self.current == RATE_END {
             Rpx256::apply_permutation(&mut self.state);
             self.current = RATE_START;
@@ -79,21 +81,20 @@ impl RpxRandomCoin {
         self.current += 1;
         self.state[self.current - 1]
     }
-}
 
-// RANDOM COIN IMPLEMENTATION
-// ------------------------------------------------------------------------------------------------
-
-impl RandomCoin for RpxRandomCoin {
-    type BaseField = Felt;
-    type Hasher = Rpx256;
-
-    fn new(seed: &[Self::BaseField]) -> Self {
-        let word: Word = (*Rpx256::hash_elements(seed)).into();
-        Self::new(word)
+    pub fn draw_ext_field<E: ExtensionField<Felt>>(&mut self) -> Result<E, RandomCoinError> {
+        let ext_degree = E::DIMENSION;
+        let mut result = vec![ZERO; ext_degree];
+        for r in result.iter_mut().take(ext_degree) {
+            *r = self.draw_basefield();
+        }
+        match E::from_basis_coefficients_slice(&result) {
+            Some(p) => Ok(p),
+            None => Err(RandomCoinError::FailedToDrawFieldElement(ext_degree)),
+        }
     }
 
-    fn reseed(&mut self, data: Word) {
+    pub fn reseed(&mut self, data: Word) {
         // Reset buffer
         self.current = RATE_START;
 
@@ -109,7 +110,7 @@ impl RandomCoin for RpxRandomCoin {
         Rpx256::apply_permutation(&mut self.state);
     }
 
-    fn check_leading_zeros(&self, value: u64) -> u32 {
+    pub fn check_leading_zeros(&self, value: u64) -> u32 {
         let value = Felt::new(value);
         let mut state_tmp = self.state;
 
@@ -117,22 +118,11 @@ impl RandomCoin for RpxRandomCoin {
 
         Rpx256::apply_permutation(&mut state_tmp);
 
-        let first_rate_element = state_tmp[RATE_START].as_int();
+        let first_rate_element = state_tmp[RATE_START].as_canonical_u64();
         first_rate_element.trailing_zeros()
     }
 
-    fn draw<E: FieldElement<BaseField = Felt>>(&mut self) -> Result<E, RandomCoinError> {
-        let ext_degree = E::EXTENSION_DEGREE;
-        let mut result = vec![ZERO; ext_degree];
-        for r in result.iter_mut().take(ext_degree) {
-            *r = self.draw_basefield();
-        }
-
-        let result = E::slice_from_base_elements(&result);
-        Ok(result[0])
-    }
-
-    fn draw_integers(
+    pub fn draw_integers(
         &mut self,
         num_values: usize,
         domain_size: usize,
@@ -156,7 +146,7 @@ impl RandomCoin for RpxRandomCoin {
         let mut values = Vec::new();
         for _ in 0..1000 {
             // get the next pseudo-random field element
-            let value = self.draw_basefield().as_int();
+            let value = self.draw_basefield().as_canonical_u64();
 
             // use the mask to get a value within the range
             let value = (value & v_mask) as usize;
@@ -197,7 +187,7 @@ impl FeltRng for RpxRandomCoin {
 
 impl RngCore for RpxRandomCoin {
     fn next_u32(&mut self) -> u32 {
-        self.draw_basefield().as_int() as u32
+        self.draw_basefield().as_canonical_u64() as u32
     }
 
     fn next_u64(&mut self) -> u64 {

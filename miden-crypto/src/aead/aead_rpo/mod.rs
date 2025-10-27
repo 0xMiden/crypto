@@ -12,6 +12,7 @@ use core::ops::Range;
 
 use miden_crypto_derive::{SilentDebug, SilentDisplay};
 use num::Integer;
+use p3_field::{PrimeField64, RawDataSerializable};
 use rand::{
     Rng,
     distr::{Distribution, StandardUniform, Uniform},
@@ -19,7 +20,7 @@ use rand::{
 use subtle::ConstantTimeEq;
 
 use crate::{
-    Felt, FieldElement, ONE, StarkField, Word, ZERO,
+    Felt, ONE, Word, ZERO,
     aead::{AeadScheme, DataType, EncryptionError},
     hash::rpo::Rpo256,
     utils::{
@@ -40,13 +41,13 @@ mod test;
 pub const SECRET_KEY_SIZE: usize = 4;
 
 /// Size of a secret key in bytes
-pub const SK_SIZE_BYTES: usize = SECRET_KEY_SIZE * Felt::ELEMENT_BYTES;
+pub const SK_SIZE_BYTES: usize = SECRET_KEY_SIZE * Felt::NUM_BYTES;
 
 /// Size of a nonce in field elements
 pub const NONCE_SIZE: usize = 4;
 
 /// Size of a nonce in bytes
-pub const NONCE_SIZE_BYTES: usize = NONCE_SIZE * Felt::ELEMENT_BYTES;
+pub const NONCE_SIZE_BYTES: usize = NONCE_SIZE * Felt::NUM_BYTES;
 
 /// Size of an authentication tag in field elements
 pub const AUTH_TAG_SIZE: usize = 4;
@@ -384,7 +385,7 @@ impl Distribution<SecretKey> for StandardUniform {
     fn sample<R: rand::Rng + ?Sized>(&self, rng: &mut R) -> SecretKey {
         let mut res = [ZERO; SECRET_KEY_SIZE];
         let uni_dist =
-            Uniform::new(0, Felt::MODULUS).expect("should not fail given the size of the field");
+            Uniform::new(0, Felt::ORDER_U64).expect("should not fail given the size of the field");
         for r in res.iter_mut() {
             let sampled_integer = uni_dist.sample(rng);
             *r = Felt::new(sampled_integer);
@@ -552,7 +553,7 @@ impl Distribution<Nonce> for StandardUniform {
     fn sample<R: rand::Rng + ?Sized>(&self, rng: &mut R) -> Nonce {
         let mut res = [ZERO; NONCE_SIZE];
         let uni_dist =
-            Uniform::new(0, Felt::MODULUS).expect("should not fail given the size of the field");
+            Uniform::new(0, Felt::ORDER_U64).expect("should not fail given the size of the field");
         for r in res.iter_mut() {
             let sampled_integer = uni_dist.sample(rng);
             *r = Felt::new(sampled_integer);
@@ -615,9 +616,9 @@ impl Serializable for EncryptedData {
         // we serialize field elements in their canonical form
         target.write_u8(self.data_type as u8);
         target.write_usize(self.ciphertext.len());
-        target.write_many(self.ciphertext.iter().map(Felt::as_int));
-        target.write_many(self.nonce.0.iter().map(Felt::as_int));
-        target.write_many(self.auth_tag.0.iter().map(Felt::as_int));
+        target.write_many(self.ciphertext.iter().map(Felt::as_canonical_u64));
+        target.write_many(self.nonce.0.iter().map(Felt::as_canonical_u64));
+        target.write_many(self.auth_tag.0.iter().map(Felt::as_canonical_u64));
     }
 }
 
