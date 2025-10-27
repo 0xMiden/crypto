@@ -1,5 +1,4 @@
-use alloc::vec::Vec;
-use std::borrow::ToOwned;
+use alloc::{borrow::ToOwned, vec::Vec};
 
 use p3_field::{BasedVectorSpace, extension::BinomialExtensionField};
 use winter_crypto::Hasher;

@@ -92,7 +92,7 @@ pub trait SequentialCommit {
 #[test]
 #[should_panic]
 fn debug_assert_is_checked() {
-    // enforce the release checks to always have `RUSTFLAGS="-C debug-assertions".
+    // enforce the release checks to always have `RUSTFLAGS="-C debug-assertions"`.
     //
     // some upstream tests are performed with `debug_assert`, and we want to assert its correctness
     // downstream.
