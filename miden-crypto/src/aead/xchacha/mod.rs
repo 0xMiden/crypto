@@ -374,7 +374,7 @@ impl Deserializable for SecretKey {
 
 impl Serializable for Nonce {
     fn write_into<W: ByteWriter>(&self, target: &mut W) {
-        target.write_bytes(self.inner.as_slice());
+        target.write_bytes(&self.inner);
     }
 }
 
@@ -382,9 +382,7 @@ impl Deserializable for Nonce {
     fn read_from<R: ByteReader>(source: &mut R) -> Result<Self, DeserializationError> {
         let inner: [u8; NONCE_SIZE_BYTES] = source.read_array()?;
 
-        Ok(Nonce {
-            inner: chacha20poly1305::XNonce::clone_from_slice(&inner),
-        })
+        Ok(Nonce { inner: inner.into() })
     }
 }
 
