@@ -31,3 +31,17 @@ fn test_key_generation_serialization() {
     let serialized_pk = PublicKey::read_from_bytes(&pk_bytes).unwrap();
     assert_eq!(pk, serialized_pk);
 }
+
+#[test]
+fn test_secret_key_debug_redaction() {
+    let mut rng = rand::rng();
+    let sk = SecretKey::with_rng(&mut rng);
+
+    // Verify Debug impl produces expected redacted output
+    let debug_output = format!("{sk:?}");
+    assert_eq!(debug_output, "<elided secret for SecretKey>");
+
+    // Verify Display impl also elides
+    let display_output = format!("{sk}");
+    assert_eq!(display_output, "<elided secret for SecretKey>");
+}

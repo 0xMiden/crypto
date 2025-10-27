@@ -14,7 +14,7 @@ WARNINGS=RUSTDOCFLAGS="-D warnings"
 
 .PHONY: clippy
 clippy: ## Run Clippy with configs
-	$(WARNINGS) cargo clippy --workspace --all-targets --all-features
+	cargo clippy --workspace --all-targets --all-features -- -D warnings
 
 
 .PHONY: fix
@@ -109,6 +109,10 @@ build-no-std: ## Build without the standard library
 build-avx2: ## Build with avx2 support
 	RUSTFLAGS="-C target-feature=+avx2" cargo build --release
 
+.PHONY: build-avx512
+build-avx512: ## Build with avx512 support
+	RUSTFLAGS="-C target-feature=+avx512f,+avx512dq" cargo build --release
+
 .PHONY: build-sve
 build-sve: ## Build with sve support
 	RUSTFLAGS="-C target-feature=+sve" cargo build --release
@@ -133,7 +137,7 @@ bench-large-smt-rocksdb: ## Run large SMT benchmarks with rocksdb storage
 
 .PHONY: bench-large-smt-rocksdb-open
 bench-large-smt-rocksdb-open: ## Run large SMT benchmarks with rocksdb storage and open existing database
-	cargo run --release --features concurrent,hashmaps,rocksdb,executable -- --open
+	cargo run --release --features concurrent,hashmaps,rocksdb,executable -- --storage rocksdb --open
 
 # --- fuzzing --------------------------------------------------------------------------------
 

@@ -10,6 +10,7 @@ pub mod aead;
 pub mod dsa;
 pub mod ecdh;
 pub mod hash;
+pub mod ies;
 pub mod merkle;
 pub mod rand;
 pub mod utils;
@@ -18,12 +19,17 @@ pub mod word;
 // RE-EXPORTS
 // ================================================================================================
 
+pub use k256::elliptic_curve::zeroize;
 pub use p3_air::*;
 pub use p3_field::{
     BasedVectorSpace, ExtensionField, Field, PrimeCharacteristicRing, PrimeField64,
     batch_multiplicative_inverse, extension::BinomialExtensionField,
 };
 pub use p3_goldilocks::{Goldilocks as Felt, Poseidon2Goldilocks};
+pub use winter_math::{
+    FieldElement, StarkField,
+    fields::{CubeExtension, QuadExtension},
+};
 pub use word::{Word, WordError};
 
 pub use crate::hash::algebraic_sponge::AlgebraicSponge;

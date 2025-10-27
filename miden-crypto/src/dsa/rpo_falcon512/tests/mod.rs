@@ -87,6 +87,21 @@ fn test_signature_gen_reference_impl() {
 }
 
 #[test]
+fn test_secret_key_debug_redaction() {
+    let seed = [1_u8; 32];
+    let mut rng = ChaCha20Rng::from_seed(seed);
+    let sk = SecretKey::with_rng(&mut rng);
+
+    // Verify Debug impl produces expected redacted output
+    let debug_output = format!("{sk:?}");
+    assert_eq!(debug_output, "<elided secret for SecretKey>");
+
+    // Verify Display impl also elides
+    let display_output = format!("{sk}");
+    assert_eq!(display_output, "<elided secret for SecretKey>");
+}
+
+#[test]
 fn test_signature_determinism() {
     let seed = [0_u8; 32];
     let mut rng = ChaCha20Rng::from_seed(seed);

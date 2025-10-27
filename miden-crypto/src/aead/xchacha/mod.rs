@@ -17,15 +17,15 @@ use chacha20poly1305::{
     aead::{Aead, AeadCore, KeyInit},
 };
 use rand::{CryptoRng, RngCore};
-use zeroize::Zeroize;
 
 use crate::{
     Felt,
-    aead::{DataType, EncryptionError},
+    aead::{AeadScheme, DataType, EncryptionError},
     utils::{
         ByteReader, ByteWriter, Deserializable, DeserializationError, Serializable,
         bytes_to_elements_exact, elements_to_bytes,
     },
+    zeroize::{Zeroize, ZeroizeOnDrop},
 };
 
 #[cfg(test)]
@@ -315,6 +315,46 @@ impl Zeroize for SecretKey {
     }
 }
 
+impl ZeroizeOnDrop for SecretKey {}
+
+// IES IMPLEMENTATION
+// ================================================================================================
+
+pub struct XChaCha;
+
+impl AeadScheme for XChaCha {
+    const KEY_SIZE: usize = SK_SIZE_BYTES;
+
+    type Key = SecretKey;
+
+    fn key_from_bytes(bytes: &[u8]) -> Result<Self::Key, EncryptionError> {
+        SecretKey::read_from_bytes(bytes).map_err(|_| EncryptionError::FailedOperation)
+    }
+
+    fn encrypt_bytes<R: rand::CryptoRng + rand::RngCore>(
+        key: &Self::Key,
+        rng: &mut R,
+        plaintext: &[u8],
+        associated_data: &[u8],
+    ) -> Result<Vec<u8>, EncryptionError> {
+        let nonce = Nonce::with_rng(rng);
+        let encrypted_data = key
+            .encrypt_bytes_with_nonce(plaintext, associated_data, nonce)
+            .map_err(|_| EncryptionError::FailedOperation)?;
+        Ok(encrypted_data.to_bytes())
+    }
+
+    fn decrypt_bytes_with_associated_data(
+        key: &Self::Key,
+        ciphertext: &[u8],
+        associated_data: &[u8],
+    ) -> Result<Vec<u8>, EncryptionError> {
+        let encrypted_data = &EncryptedData::read_from_bytes(ciphertext).unwrap();
+        key.decrypt_bytes_with_associated_data(encrypted_data, associated_data)
+            .map_err(|_| EncryptionError::FailedOperation)
+    }
+}
+
 // SERIALIZATION / DESERIALIZATION
 // ================================================================================================
 
@@ -334,7 +374,7 @@ impl Deserializable for SecretKey {
 
 impl Serializable for Nonce {
     fn write_into<W: ByteWriter>(&self, target: &mut W) {
-        target.write_bytes(self.inner.as_slice());
+        target.write_bytes(&self.inner);
     }
 }
 
@@ -342,9 +382,7 @@ impl Deserializable for Nonce {
     fn read_from<R: ByteReader>(source: &mut R) -> Result<Self, DeserializationError> {
         let inner: [u8; NONCE_SIZE_BYTES] = source.read_array()?;
 
-        Ok(Nonce {
-            inner: chacha20poly1305::XNonce::clone_from_slice(&inner),
-        })
+        Ok(Nonce { inner: inner.into() })
     }
 }
 
@@ -364,8 +402,7 @@ impl Deserializable for EncryptedData {
             DeserializationError::InvalidValue("invalid data type value".to_string())
         })?;
 
-        let ciphertext_len = source.read_usize()?;
-        let ciphertext = source.read_vec(ciphertext_len)?;
+        let ciphertext = Vec::<u8>::read_from(source)?;
 
         let inner: [u8; NONCE_SIZE_BYTES] = source.read_array()?;
 

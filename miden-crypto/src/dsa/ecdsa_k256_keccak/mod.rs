@@ -7,9 +7,9 @@ use k256::{
     ecdh::diffie_hellman,
     ecdsa::{RecoveryId, SigningKey, VerifyingKey, signature::hazmat::PrehashVerifier},
 };
+use miden_crypto_derive::{SilentDebug, SilentDisplay};
 use rand::{CryptoRng, RngCore};
 use thiserror::Error;
-use zeroize::Zeroize;
 
 use crate::{
     Felt, SequentialCommit, Word,
@@ -18,6 +18,7 @@ use crate::{
         ByteReader, ByteWriter, Deserializable, DeserializationError, Serializable,
         bytes_to_elements_with_padding,
     },
+    zeroize::{Zeroize, ZeroizeOnDrop},
 };
 
 #[cfg(test)]
@@ -41,6 +42,7 @@ const SCALARS_SIZE_BYTES: usize = 32;
 // ================================================================================================
 
 /// Secret key for ECDSA signature verification over secp256k1 curve.
+#[derive(Clone, SilentDebug, SilentDisplay)]
 pub struct SecretKey {
     inner: SigningKey,
 }
@@ -67,6 +69,10 @@ impl SecretKey {
         let mut rng = rand_hc::Hc128Rng::from_seed(seed);
 
         let signing_key = SigningKey::random(&mut rng);
+
+        // Zeroize the seed to prevent leaking secret material
+        seed.zeroize();
+
         Self { inner: signing_key }
     }
 
@@ -79,7 +85,11 @@ impl SecretKey {
     /// Signs a message (represented as a Word) with this secret key.
     pub fn sign(&mut self, message: Word) -> Signature {
         let message_digest = hash_message(message);
+        self.sign_prehash(message_digest)
+    }
 
+    /// Signs a pre-hashed message with this secret key.
+    pub fn sign_prehash(&mut self, message_digest: [u8; 32]) -> Signature {
         let (signature_inner, recovery_id) = self
             .inner
             .sign_prehash_recoverable(&message_digest)
@@ -103,6 +113,19 @@ impl SecretKey {
     }
 }
 
+// SAFETY: The inner `k256::ecdsa::SigningKey` already implements `ZeroizeOnDrop`,
+// which ensures that the secret key material is securely zeroized when dropped.
+impl ZeroizeOnDrop for SecretKey {}
+
+impl PartialEq for SecretKey {
+    fn eq(&self, other: &Self) -> bool {
+        use subtle::ConstantTimeEq;
+        self.to_bytes().ct_eq(&other.to_bytes()).into()
+    }
+}
+
+impl Eq for SecretKey {}
+
 // PUBLIC KEY
 // ================================================================================================
 
@@ -121,6 +144,11 @@ impl PublicKey {
     /// Verifies a signature against this public key and message.
     pub fn verify(&self, message: Word, signature: &Signature) -> bool {
         let message_digest = hash_message(message);
+        self.verify_prehash(message_digest, signature)
+    }
+
+    /// Verifies a signature against this public key and pre-hashed message.
+    pub fn verify_prehash(&self, message_digest: [u8; 32], signature: &Signature) -> bool {
         let signature_inner = k256::ecdsa::Signature::from_scalars(*signature.r(), *signature.s());
 
         match signature_inner {
