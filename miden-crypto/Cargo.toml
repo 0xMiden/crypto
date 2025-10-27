@@ -82,8 +82,7 @@ clap                          = { features = ["derive"], optional = true, versio
 curve25519-dalek              = { default-features = false, version = "4" }
 ed25519-dalek                 = { features = ["zeroize"], version = "2" }
 flume                         = { version = "0.11" }
-getrandom                     = { features = ["js"], version = "0.2" }
-hashbrown                     = { features = ["serde"], optional = true, version = "0.15" }
+hashbrown                     = { features = ["serde"], optional = true, version = "0.16" }
 hkdf                          = { default-features = false, version = "0.12" }
 k256                          = { features = ["ecdh", "ecdsa"], version = "0.13" }
 miden-crypto-derive.workspace = true
@@ -95,7 +94,7 @@ rand_chacha                   = { default-features = false, version = "0.9" }
 rand_core                     = { default-features = false, version = "0.9" }
 rand_hc                       = { version = "0.3" }
 rayon                         = { optional = true, version = "1.10" }
-rocksdb                       = { default-features = false, features = ["lz4"], optional = true, version = "0.23" }
+rocksdb                       = { default-features = false, features = ["lz4"], optional = true, version = "0.24" }
 serde                         = { default-features = false, features = ["derive"], optional = true, version = "1.0" }
 sha2                          = { default-features = false, version = "0.10" }
 sha3                          = { default-features = false, version = "0.10" }

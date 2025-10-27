@@ -27,6 +27,9 @@ pub use simple::{SimpleSmt, SimpleSmtProof};
 mod partial;
 pub use partial::PartialSmt;
 
+mod forest;
+pub use forest::SmtForest;
+
 // CONSTANTS
 // ================================================================================================
 

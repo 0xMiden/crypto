@@ -24,8 +24,8 @@ pub use sparse_path::SparseMerklePath;
 mod smt;
 pub use smt::{
     InnerNode, LeafIndex, MAX_LEAF_ENTRIES, MutationSet, NodeMutation, PartialSmt, SMT_DEPTH,
-    SMT_MAX_DEPTH, SMT_MIN_DEPTH, SimpleSmt, SimpleSmtProof, Smt, SmtLeaf, SmtLeafError, SmtProof,
-    SmtProofError,
+    SMT_MAX_DEPTH, SMT_MIN_DEPTH, SimpleSmt, SimpleSmtProof, Smt, SmtForest, SmtLeaf, SmtLeafError,
+    SmtProof, SmtProofError,
 };
 #[cfg(feature = "concurrent")]
 pub use smt::{

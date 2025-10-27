@@ -1,7 +1,7 @@
 [workspace]
 exclude  = ["miden-crypto-fuzz"]
 members  = ["miden-crypto", "miden-crypto-derive"]
-resolver = "3"                                     # Use the edition 2024 dependency resolver
+resolver = "3"
 
 [workspace.package]
 authors      = ["miden contributors"]
@@ -10,7 +10,7 @@ edition      = "2024"
 keywords     = ["crypto", "hash", "merkle", "miden"]
 license      = "MIT OR Apache-2.0"
 repository   = "https://github.com/0xMiden/crypto"
-rust-version = "1.89"
+rust-version = "1.90"
 
 [workspace.dependencies]
 miden-crypto-derive = { path = "miden-crypto-derive" }

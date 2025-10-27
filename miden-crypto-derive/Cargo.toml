@@ -6,6 +6,7 @@ edition.workspace      = true
 keywords.workspace     = true
 license.workspace      = true
 name                   = "miden-crypto-derive"
+readme                 = ""
 repository.workspace   = true
 rust-version.workspace = true
 version                = "0.1.0"

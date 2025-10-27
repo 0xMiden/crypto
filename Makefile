@@ -137,7 +137,7 @@ bench-large-smt-rocksdb: ## Run large SMT benchmarks with rocksdb storage
 
 .PHONY: bench-large-smt-rocksdb-open
 bench-large-smt-rocksdb-open: ## Run large SMT benchmarks with rocksdb storage and open existing database
-	cargo run --release --features concurrent,hashmaps,rocksdb,executable -- --open
+	cargo run --release --features concurrent,hashmaps,rocksdb,executable -- --storage rocksdb --open
 
 # --- fuzzing --------------------------------------------------------------------------------
 
