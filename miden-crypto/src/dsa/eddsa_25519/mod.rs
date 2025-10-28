@@ -139,7 +139,7 @@ impl PublicKey {
     /// - `A` is the public key
     /// - `message` is the message bytes
     ///
-    /// The resulting 64-byte hash can be passed to `verify_with_k()` which will
+    /// The resulting 64-byte hash can be passed to `verify_with_unchecked_k()` which will
     /// reduce it modulo the curve order L to produce the challenge scalar.
     ///
     /// # Use Case
@@ -147,7 +147,7 @@ impl PublicKey {
     /// This method is useful when you want to separate the hashing phase from the
     /// elliptic curve verification phase. You can:
     /// 1. Compute the hash using this method (hashing phase)
-    /// 2. Verify using `verify_with_k(hash, signature)` (EC phase)
+    /// 2. Verify using `verify_with_unchecked_k(hash, signature)` (EC phase)
     ///
     /// This is equivalent to calling `verify()` directly, but allows the two phases
     /// to be executed separately or in different environments.
@@ -157,14 +157,21 @@ impl PublicKey {
     /// * `signature` - The signature to compute the challenge hash from
     ///
     /// # Returns
-    /// A 64-byte hash that will be reduced modulo L in `verify_with_k()`
+    /// A 64-byte hash that will be reduced modulo L in `verify_with_unchecked_k()`
     ///
     /// # Example
     /// ```ignore
     /// let k_hash = public_key.compute_challenge_k(message, &signature);
-    /// let is_valid = public_key.verify_with_k(k_hash, &signature);
+    /// let is_valid = public_key.verify_with_unchecked_k(k_hash, &signature);
     /// // is_valid should equal public_key.verify(message, &signature)
     /// ```
+    ///
+    /// # Not Ed25519ph / RFC 8032 Prehash
+    ///
+    /// This helper reproduces the *standard* Ed25519 challenge `H(R || A || M)` used when verifying
+    /// signatures. It does **not** implement the RFC 8032 Ed25519ph variant, which prepends a
+    /// domain separation string and optional context before hashing. Callers that require the
+    /// Ed25519ph flavour must implement the additional domain separation logic themselves.
     pub fn compute_challenge_k(&self, message: Word, signature: &Signature) -> [u8; 64] {
         use sha2::Digest;
 
@@ -221,6 +228,11 @@ impl PublicKey {
     ///
     /// For normal Ed25519 verification, use `verify()` instead.
     ///
+    /// ## Performance
+    ///
+    /// This helper decompresses both the signature's `R` component and the public key before
+    /// performing group arithmetic. Expect it to be slower than calling `verify()` directly.
+    ///
     /// # Arguments
     /// * `k_hash` - A 64-byte hash (typically computed as `SHA-512(R || A || message)`)
     /// * `signature` - The signature to verify
@@ -229,13 +241,13 @@ impl PublicKey {
     /// `true` if the verification equation `[s]B = R + [k]A` holds, `false` otherwise
     ///
     /// # Warning
-    /// Do NOT use this method unless you fully understand Ed25519's cryptographic properties
-    /// and have a specific need for this low-level operation.
-    pub fn verify_with_k(&self, k_hash: [u8; 64], signature: &Signature) -> bool {
+    /// Do NOT use this method unless you fully understand Ed25519's cryptographic properties,
+    /// have a specific need for this low-level operation, and are feeding it the exact
+    /// `SHA-512(R || A || message)` output (without the Ed25519ph domain separation string).
+    pub fn verify_with_unchecked_k(&self, k_hash: [u8; 64], signature: &Signature) -> bool {
         use curve25519_dalek::{
             edwards::{CompressedEdwardsY, EdwardsPoint},
             scalar::Scalar,
-            traits::IsIdentity,
         };
 
         // Reduce the 64-byte hash modulo L to get the challenge scalar
@@ -243,36 +255,43 @@ impl PublicKey {
 
         // Extract signature components: R (first 32 bytes) and s (second 32 bytes)
         let sig_bytes = signature.inner.to_bytes();
-        let r_compressed = CompressedEdwardsY(
-            sig_bytes[..32].try_into().expect("signature R component is exactly 32 bytes"),
-        );
+        let r_bytes: [u8; 32] =
+            sig_bytes[..32].try_into().expect("signature R component is exactly 32 bytes");
         let s_bytes: [u8; 32] =
             sig_bytes[32..].try_into().expect("signature s component is exactly 32 bytes");
 
-        // Decompress R point
-        let r_point = match r_compressed.decompress() {
-            Some(point) => point,
-            None => return false, // Invalid R point
+        // RFC 8032 requires s to be canonical; reject non-canonical scalars to avoid malleability.
+        let s_candidate = Scalar::from_canonical_bytes(s_bytes);
+        if s_candidate.is_none().into() {
+            return false;
+        }
+        let s_scalar = s_candidate.unwrap();
+
+        let r_compressed = CompressedEdwardsY(r_bytes);
+        let Some(r_point) = r_compressed.decompress() else {
+            return false;
         };
 
-        // Convert s bytes to Scalar
-        let s = Scalar::from_bytes_mod_order(s_bytes);
-
-        // Get public key as EdwardsPoint
         let a_compressed = CompressedEdwardsY(self.inner.to_bytes());
-        let a_point = match a_compressed.decompress() {
-            Some(point) => point,
-            None => return false, // Invalid public key
-        };
+        let a_point = a_compressed
+            .decompress()
+            .expect("ed25519_dalek::VerifyingKey always decompresses to a valid Edwards point");
 
-        // Compute the verification equation: [s]B = R + [k]A
-        // Rearranged as: [s]B - [k]A - R = 0
-        let sb = EdwardsPoint::mul_base(&s);
-        let ka = a_point * k_scalar;
-        let lhs = sb - ka - r_point;
+        // Match the stricter ed25519-dalek semantics by rejecting small-order inputs instead of
+        // multiplying the whole equation by the cofactor. dalek leaves this check opt-in via
+        // `verify_strict()`; we enforce it here to guard this hazmat API against torsion exploits.
+        if r_point.is_small_order() || a_point.is_small_order() {
+            return false;
+        }
 
-        // Check if the result is the identity point (zero)
-        lhs.is_identity()
+        // Compute the verification equation: -[k]A + [s]B == R, mirroring dalek's raw_verify.
+        // Small-order points are rejected above and hence no need for multiplication by co-factor
+        let minus_a = -a_point;
+        let expected_r =
+            EdwardsPoint::vartime_double_scalar_mul_basepoint(&k_scalar, &minus_a, &s_scalar)
+                .compress();
+
+        expected_r == r_compressed
     }
 
     /// Convert to a X25519 public key which can be used in a DH key exchange protocol.
