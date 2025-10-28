@@ -135,7 +135,8 @@ impl SecretKey {
         data: &[u8],
         associated_data: &[u8],
     ) -> Result<EncryptedData, EncryptionError> {
-        let mut rng = rand::rng();
+        use rand::{SeedableRng, rngs::StdRng};
+        let mut rng = StdRng::from_os_rng();
         let nonce = Nonce::with_rng(&mut rng);
 
         self.encrypt_bytes_with_nonce(data, associated_data, nonce)
