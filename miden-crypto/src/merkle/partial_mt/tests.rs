@@ -4,6 +4,7 @@ use super::{
     super::{MerkleStore, MerkleTree, NodeIndex, PartialMerkleTree, int_to_node},
     Deserializable, InnerNodeInfo, MerkleProof, Serializable, Word,
 };
+use crate::merkle::MerkleError;
 
 // TEST DATA
 // ================================================================================================
