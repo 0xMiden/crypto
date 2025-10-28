@@ -162,7 +162,7 @@ impl PublicKey {
     /// # Example
     /// ```ignore
     /// let k_hash = public_key.compute_challenge_k(message, &signature);
-    /// let is_valid = public_key.verify_with_unchecked_k(k_hash, &signature);
+    /// let is_valid = public_key.verify_with_unchecked_k(k_hash, &signature).is_ok();
     /// // is_valid should equal public_key.verify(message, &signature)
     /// ```
     ///
@@ -238,13 +238,18 @@ impl PublicKey {
     /// * `signature` - The signature to verify
     ///
     /// # Returns
-    /// `true` if the verification equation `[s]B = R + [k]A` holds, `false` otherwise
+    /// `Ok(())` if the verification equation `[s]B = R + [k]A` holds, or an error describing why
+    /// the verification failed.
     ///
     /// # Warning
     /// Do NOT use this method unless you fully understand Ed25519's cryptographic properties,
     /// have a specific need for this low-level operation, and are feeding it the exact
     /// `SHA-512(R || A || message)` output (without the Ed25519ph domain separation string).
-    pub fn verify_with_unchecked_k(&self, k_hash: [u8; 64], signature: &Signature) -> bool {
+    pub fn verify_with_unchecked_k(
+        &self,
+        k_hash: [u8; 64],
+        signature: &Signature,
+    ) -> Result<(), UncheckedVerificationError> {
         use curve25519_dalek::{
             edwards::{CompressedEdwardsY, EdwardsPoint},
             scalar::Scalar,
@@ -263,25 +268,29 @@ impl PublicKey {
         // RFC 8032 requires s to be canonical; reject non-canonical scalars to avoid malleability.
         let s_candidate = Scalar::from_canonical_bytes(s_bytes);
         if s_candidate.is_none().into() {
-            return false;
+            return Err(UncheckedVerificationError::NonCanonicalScalar);
         }
         let s_scalar = s_candidate.unwrap();
 
         let r_compressed = CompressedEdwardsY(r_bytes);
         let Some(r_point) = r_compressed.decompress() else {
-            return false;
+            return Err(UncheckedVerificationError::InvalidSignaturePoint);
         };
 
         let a_compressed = CompressedEdwardsY(self.inner.to_bytes());
-        let a_point = a_compressed
-            .decompress()
-            .expect("ed25519_dalek::VerifyingKey always decompresses to a valid Edwards point");
+        let Some(a_point) = a_compressed.decompress() else {
+            return Err(UncheckedVerificationError::InvalidPublicKey);
+        };
 
         // Match the stricter ed25519-dalek semantics by rejecting small-order inputs instead of
         // multiplying the whole equation by the cofactor. dalek leaves this check opt-in via
         // `verify_strict()`; we enforce it here to guard this hazmat API against torsion exploits.
         if r_point.is_small_order() || a_point.is_small_order() {
-            return false;
+            if r_point.is_small_order() {
+                return Err(UncheckedVerificationError::SmallOrderSignature);
+            } else {
+                return Err(UncheckedVerificationError::SmallOrderPublicKey);
+            }
         }
 
         // Compute the verification equation: -[k]A + [s]B == R, mirroring dalek's raw_verify.
@@ -291,7 +300,11 @@ impl PublicKey {
             EdwardsPoint::vartime_double_scalar_mul_basepoint(&k_scalar, &minus_a, &s_scalar)
                 .compress();
 
-        expected_r == r_compressed
+        if expected_r == r_compressed {
+            Ok(())
+        } else {
+            Err(UncheckedVerificationError::EquationMismatch)
+        }
     }
 
     /// Convert to a X25519 public key which can be used in a DH key exchange protocol.
@@ -321,6 +334,23 @@ impl SequentialCommit for PublicKey {
 pub enum PublicKeyError {
     #[error("Could not verify with given public key and signature")]
     VerificationFailed,
+}
+
+/// Errors that can arise when invoking [`PublicKey::verify_with_unchecked_k`].
+#[derive(Debug, Error)]
+pub enum UncheckedVerificationError {
+    #[error("challenge scalar is not canonical")]
+    NonCanonicalScalar,
+    #[error("signature R component failed to decompress")]
+    InvalidSignaturePoint,
+    #[error("public key failed to decompress")]
+    InvalidPublicKey,
+    #[error("small-order component detected in signature R")]
+    SmallOrderSignature,
+    #[error("small-order component detected in public key")]
+    SmallOrderPublicKey,
+    #[error("verification equation was not satisfied")]
+    EquationMismatch,
 }
 
 // SIGNATURE

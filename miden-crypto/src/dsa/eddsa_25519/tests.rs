@@ -68,7 +68,7 @@ fn test_compute_challenge_k_equivalence() {
         let k_hash = pk.compute_challenge_k(message, &signature);
 
         // Verify using verify_with_unchecked_k should give the same result as verify()
-        let result_with_k = pk.verify_with_unchecked_k(k_hash, &signature);
+        let result_with_k = pk.verify_with_unchecked_k(k_hash, &signature).is_ok();
         let result_standard = pk.verify(message, &signature);
 
         assert_eq!(
@@ -82,10 +82,10 @@ fn test_compute_challenge_k_equivalence() {
             Word::from([Felt::new(999), Felt::new(888), Felt::new(777), Felt::new(666)]);
         let wrong_k_hash = pk.compute_challenge_k(wrong_message, &signature);
 
-        assert!(
-            !pk.verify_with_unchecked_k(wrong_k_hash, &signature),
-            "verify_with_unchecked_k with wrong hash should fail"
-        );
+        assert!(matches!(
+            pk.verify_with_unchecked_k(wrong_k_hash, &signature),
+            Err(UncheckedVerificationError::EquationMismatch)
+        ));
         assert!(!pk.verify(wrong_message, &signature), "verify with wrong message should fail");
     }
 }
