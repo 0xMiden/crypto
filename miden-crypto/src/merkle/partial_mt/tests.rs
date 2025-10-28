@@ -461,3 +461,45 @@ fn err_update_leaf() {
 
     assert!(pmt.update_leaf(8, int_to_node(38)).is_err());
 }
+
+/// Checks that `with_leaves()` accepts exactly-capacity number of entries at max_depth and
+/// produces the expected root.
+#[test]
+fn with_leaves_capacity_respected() {
+    // Tree of depth 3 has capacity 2^3 = 8.
+    let mt = MerkleTree::new(VALUES8).unwrap();
+    let expected_root = mt.root();
+
+    // Build entries consisting of all 8 leaves at depth 3 (indices 0..7)
+    let leaf_nodes_vec: Vec<(NodeIndex, Word)> = (0u64..8)
+        .map(|i| {
+            let idx = NodeIndex::new(3, i).unwrap();
+            // map leaves 0..7 to VALUES8 0..7
+            (idx, VALUES8[i as usize])
+        })
+        .collect();
+
+    let leaf_nodes: BTreeMap<NodeIndex, Word> = leaf_nodes_vec.into_iter().collect();
+
+    let pmt = PartialMerkleTree::with_leaves(leaf_nodes).unwrap();
+
+    assert_eq!(expected_root, pmt.root());
+}
+
+/// Checks that `with_leaves()` returns TooManyEntries when provided entries exceed capacity
+/// implied by the deepest layer.
+#[test]
+fn err_with_leaves_exceeds_capacity() {
+    // depth 3 => capacity 8; provide 9 entries
+    let mut entries: BTreeMap<NodeIndex, Word> = (0u64..8)
+        .map(|i| (NodeIndex::new(3, i).unwrap(), VALUES8[i as usize]))
+        .collect();
+
+    // Add one extra node at a shallower depth (still implies max_depth = 3)
+    entries.insert(NodeIndex::new(2, 0).unwrap(), int_to_node(999));
+
+    match PartialMerkleTree::with_leaves(entries) {
+        Err(MerkleError::TooManyEntries(max)) => assert_eq!(max, 8),
+        other => panic!("expected TooManyEntries(8), got {other:?}"),
+    }
+}
