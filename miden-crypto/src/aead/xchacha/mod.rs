@@ -10,7 +10,7 @@
 //! - [`Nonce`]: A 192-bit nonce that should be sampled randomly per encryption operation
 //! - [`EncryptedData`]: Encrypted data
 
-use alloc::{string::ToString, vec::Vec};
+use alloc::vec::Vec;
 
 use chacha20poly1305::{
     XChaCha20Poly1305,
