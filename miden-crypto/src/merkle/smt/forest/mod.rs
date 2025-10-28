@@ -22,6 +22,7 @@ mod tests;
 /// Each SMT in the forest is identified by its root hash. The forest stores all leaves of all SMTs
 /// in the forest, as well as all Merkle paths required to prove membership of any leaf in any SMT.
 ///
+/// An empty tree root is always present in the forest.
 ///
 /// Example usage:
 ///
@@ -185,16 +186,6 @@ impl SmtForest {
         // Update SmtStore with new leaf hashes
         let new_leaf_entries =
             new_leaves.iter().map(|(index, leaf)| (NodeIndex::from(*index), leaf.0));
-
-        #[cfg(feature = "hashmaps")]
-        let new_leaf_entries = {
-            // Required because hashbrown::HashMap doesn't maintain key ordering.
-            // The default implementation uses BTreeMap which behaves differently.
-            let mut new_leaf_entries = new_leaf_entries.collect::<Vec<_>>();
-            new_leaf_entries.sort_by_key(|(idx, _)| *idx);
-            new_leaf_entries
-        };
-
         let new_root = self.store.set_leaves(root, new_leaf_entries)?;
 
         // Update successful, insert new leaves into the forest
@@ -208,31 +199,30 @@ impl SmtForest {
 
     /// Removes the specified SMTs (identified by their roots) from the forest.
     /// Releases memory used by nodes and leaves that are no longer reachable.
-    pub fn pop_smts(
-        &mut self,
-        roots: impl IntoIterator<Item = Word> + Clone,
-    ) -> Result<(), MerkleError> {
-        let roots = roots.into_iter().collect::<Vec<_>>();
-        for root in &roots {
-            // don't use self.contains_root here because we don't allow removing empty trees
-            if !self.roots.contains(root) {
-                return Err(MerkleError::RootNotInStore(*root));
-            }
-        }
+    /// Roots not in the forest and empty trees are ignored.
+    pub fn pop_smts(&mut self, roots: impl IntoIterator<Item = Word>) {
+        let roots = roots
+            .into_iter()
+            .filter(|root| {
+                // don't use self.contains_root here because we don't remove empty trees
+                self.roots.contains(root)
+            })
+            .collect::<Vec<_>>();
+
         for root in &roots {
             self.roots.remove(root);
         }
+
         for leaf in self.store.remove_roots(roots) {
             self.leaves.remove(&leaf);
         }
-
-        Ok(())
     }
 
     // HELPER METHODS
     // --------------------------------------------------------------------------------------------
 
-    /// Checks if the forest contains the specified root.
+    /// Checks if the forest contains the specified root or if it is the empty tree root
+    /// (always present in the forest).
     fn contains_root(&self, root: Word) -> bool {
         self.roots.contains(&root) || *EmptySubtreeRoots::entry(SMT_DEPTH, 0) == root
     }

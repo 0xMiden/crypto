@@ -1,4 +1,5 @@
 use assert_matches::assert_matches;
+use itertools::Itertools;
 
 use super::{EmptySubtreeRoots, MerkleError, SmtForest, Word};
 use crate::{
@@ -69,6 +70,10 @@ fn test_insert_multiple_values() -> Result<(), MerkleError> {
         ]),
     );
 
+    // Inserting the same key-value pair again should return the same root
+    let root_duplicate = forest.insert(new_root, key, value)?;
+    assert_eq!(new_root, root_duplicate);
+
     let key2 = Word::new([ZERO, ONE, ZERO, ONE]);
     let new_root = forest.insert(new_root, key2, value)?;
     assert_eq!(
@@ -86,26 +91,35 @@ fn test_insert_multiple_values() -> Result<(), MerkleError> {
 
 #[test]
 fn test_batch_insert() -> Result<(), MerkleError> {
-    let mut forest = SmtForest::new();
+    let forest = SmtForest::new();
 
     let empty_tree_root = *EmptySubtreeRoots::entry(SMT_DEPTH, 0);
 
     let values = vec![
         (Word::new([ZERO; WORD_SIZE]), Word::new([ONE; WORD_SIZE])),
-        (Word::new([ZERO, ONE, ZERO, ZERO]), Word::new([ONE; WORD_SIZE])),
         (Word::new([ZERO, ONE, ZERO, ONE]), Word::new([ONE; WORD_SIZE])),
+        (Word::new([ZERO, ONE, ZERO, ZERO]), Word::new([ONE; WORD_SIZE])),
     ];
 
-    let new_root = forest.batch_insert(empty_tree_root, values.into_iter())?;
-    assert_eq!(
-        new_root,
-        Word::new([
-            Felt::new(6703167280526557258),
-            Felt::new(18389096225374738330),
-            Felt::new(5605267564941856750),
-            Felt::new(14623616106397295145)
-        ])
-    );
+    values.into_iter().permutations(3).for_each(|values| {
+        let mut forest = forest.clone();
+        let new_root = forest.batch_insert(empty_tree_root, values.clone()).unwrap();
+
+        assert_eq!(
+            new_root,
+            Word::new([
+                Felt::new(7086678883692273722),
+                Felt::new(12292668811816691012),
+                Felt::new(10126815404170194367),
+                Felt::new(1147037274136690014)
+            ])
+        );
+
+        for (key, value) in values {
+            let proof = forest.open(new_root, key).unwrap();
+            assert!(proof.verify_membership(&key, &value, &new_root));
+        }
+    });
 
     Ok(())
 }
@@ -224,7 +238,7 @@ fn test_pop_roots() -> Result<(), MerkleError> {
     assert_eq!(forest.roots.len(), 1);
     assert_eq!(forest.leaves.len(), 1);
 
-    assert_matches!(forest.pop_smts(vec![root]), Ok(_));
+    forest.pop_smts(vec![root]);
 
     assert_eq!(forest.roots.len(), 0);
     assert_eq!(forest.leaves.len(), 0);
@@ -233,25 +247,17 @@ fn test_pop_roots() -> Result<(), MerkleError> {
 }
 
 #[test]
-fn test_removing_empty_smt_from_forest() -> Result<(), MerkleError> {
+fn test_removing_empty_smt_from_forest() {
     let mut forest = SmtForest::new();
     let empty_tree_root = *EmptySubtreeRoots::entry(SMT_DEPTH, 0);
     let non_empty_root = Word::new([ONE; WORD_SIZE]);
 
     // Popping zero SMTs from forest should be a no-op (no panic or error)
-    assert_matches!(forest.pop_smts(vec![]), Ok(_));
+    forest.pop_smts(vec![]);
 
-    // Popping a non-existent root should return an error
-    assert_matches!(
-        forest.pop_smts(vec![non_empty_root]),
-        Err(MerkleError::RootNotInStore(r)) if r == non_empty_root
-    );
+    // Popping a non-existent root should be a no-op (no panic or error)
+    forest.pop_smts(vec![non_empty_root]);
 
-    // Popping the empty root should return an error
-    assert_matches!(
-        forest.pop_smts(vec![empty_tree_root]),
-        Err(MerkleError::RootNotInStore(r)) if r == empty_tree_root
-    );
-
-    Ok(())
+    // Popping the empty root should be a no-op (no panic or error)
+    forest.pop_smts(vec![empty_tree_root]);
 }
