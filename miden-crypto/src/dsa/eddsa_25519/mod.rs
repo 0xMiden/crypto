@@ -230,9 +230,9 @@ impl PublicKey {
     ///
     /// ## Performance
     ///
-    /// This helper decompresses the signature's `R` component before performing group arithmetic and
-    /// reuses the cached Edwards form of the public key. Expect it to be slower than calling
-    /// `verify()` directly.
+    /// This helper decompresses the signature's `R` component before performing group arithmetic
+    /// and reuses the cached Edwards form of the public key. Expect it to be slower than
+    /// calling `verify()` directly.
     ///
     /// # Arguments
     /// * `k_hash` - A 64-byte hash (typically computed as `SHA-512(R || A || message)`)
