@@ -230,8 +230,9 @@ impl PublicKey {
     ///
     /// ## Performance
     ///
-    /// This helper decompresses both the signature's `R` component and the public key before
-    /// performing group arithmetic. Expect it to be slower than calling `verify()` directly.
+    /// This helper decompresses the signature's `R` component before performing group arithmetic and
+    /// reuses the cached Edwards form of the public key. Expect it to be slower than calling
+    /// `verify()` directly.
     ///
     /// # Arguments
     /// * `k_hash` - A 64-byte hash (typically computed as `SHA-512(R || A || message)`)
@@ -277,20 +278,17 @@ impl PublicKey {
             return Err(UncheckedVerificationError::InvalidSignaturePoint);
         };
 
-        let a_compressed = CompressedEdwardsY(self.inner.to_bytes());
-        let Some(a_point) = a_compressed.decompress() else {
-            return Err(UncheckedVerificationError::InvalidPublicKey);
-        };
+        let a_point = self.inner.to_edwards();
 
         // Match the stricter ed25519-dalek semantics by rejecting small-order inputs instead of
         // multiplying the whole equation by the cofactor. dalek leaves this check opt-in via
         // `verify_strict()`; we enforce it here to guard this hazmat API against torsion exploits.
         if r_point.is_small_order() || a_point.is_small_order() {
-            if r_point.is_small_order() {
-                return Err(UncheckedVerificationError::SmallOrderSignature);
+            return if r_point.is_small_order() {
+                Err(UncheckedVerificationError::SmallOrderSignature)
             } else {
-                return Err(UncheckedVerificationError::SmallOrderPublicKey);
-            }
+                Err(UncheckedVerificationError::SmallOrderPublicKey)
+            };
         }
 
         // Compute the verification equation: -[k]A + [s]B == R, mirroring dalek's raw_verify.
@@ -343,8 +341,6 @@ pub enum UncheckedVerificationError {
     NonCanonicalScalar,
     #[error("signature R component failed to decompress")]
     InvalidSignaturePoint,
-    #[error("public key failed to decompress")]
-    InvalidPublicKey,
     #[error("small-order component detected in signature R")]
     SmallOrderSignature,
     #[error("small-order component detected in public key")]
