@@ -1,5 +1,7 @@
 ## 0.19.0 (TBD)
 
+- Refactored `LargeSmt::apply_mutations_with_reversion` to use batched storage operations ([#613](https://github.com/0xMiden/crypto/pull/613)).
+
 ## 0.18.0 (2025-10-27)
 
 - [BREAKING] Incremented MSRV to 1.90.
