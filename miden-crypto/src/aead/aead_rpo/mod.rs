@@ -105,12 +105,7 @@ impl EncryptedData {
         auth_tag: AuthTag,
         nonce: Nonce,
     ) -> Self {
-        Self {
-            data_type,
-            ciphertext,
-            auth_tag,
-            nonce,
-        }
+        Self { data_type, ciphertext, auth_tag, nonce }
     }
 
     /// Returns the data type of the encrypted data
