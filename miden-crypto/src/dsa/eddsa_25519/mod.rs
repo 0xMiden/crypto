@@ -283,12 +283,11 @@ impl PublicKey {
         // Match the stricter ed25519-dalek semantics by rejecting small-order inputs instead of
         // multiplying the whole equation by the cofactor. dalek leaves this check opt-in via
         // `verify_strict()`; we enforce it here to guard this hazmat API against torsion exploits.
-        if r_point.is_small_order() || a_point.is_small_order() {
-            return if r_point.is_small_order() {
-                Err(UncheckedVerificationError::SmallOrderSignature)
-            } else {
-                Err(UncheckedVerificationError::SmallOrderPublicKey)
-            };
+        if r_point.is_small_order() {
+            return Err(UncheckedVerificationError::SmallOrderSignature);
+        }
+        if a_point.is_small_order() {
+            return Err(UncheckedVerificationError::SmallOrderPublicKey);
         }
 
         // Compute the verification equation: -[k]A + [s]B == R, mirroring dalek's raw_verify.
