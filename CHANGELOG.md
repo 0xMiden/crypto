@@ -1,5 +1,7 @@
 ## 0.19.0 (TBD)
 
+- Added `LargeSmt::insert_batch()` for optimized bulk operations ([#597](https://github.com/0xMiden/crypto/issues/597)).
+
 ## 0.18.0 (2025-10-27)
 
 - [BREAKING] Incremented MSRV to 1.90.
