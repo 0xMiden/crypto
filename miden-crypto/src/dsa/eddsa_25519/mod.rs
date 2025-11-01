@@ -132,6 +132,178 @@ impl PublicKey {
         self.inner.verify(&message_bytes, &signature.inner).is_ok()
     }
 
+    /// Computes the Ed25519 challenge hash from a message and signature.
+    ///
+    /// This method computes the 64-byte hash `SHA-512(R || A || message)` where:
+    /// - `R` is the signature's R component (first 32 bytes)
+    /// - `A` is the public key
+    /// - `message` is the message bytes
+    ///
+    /// The resulting 64-byte hash can be passed to `verify_with_unchecked_k()` which will
+    /// reduce it modulo the curve order L to produce the challenge scalar.
+    ///
+    /// # Use Case
+    ///
+    /// This method is useful when you want to separate the hashing phase from the
+    /// elliptic curve verification phase. You can:
+    /// 1. Compute the hash using this method (hashing phase)
+    /// 2. Verify using `verify_with_unchecked_k(hash, signature)` (EC phase)
+    ///
+    /// This is equivalent to calling `verify()` directly, but allows the two phases
+    /// to be executed separately or in different environments.
+    ///
+    /// # Arguments
+    /// * `message` - The message that was signed
+    /// * `signature` - The signature to compute the challenge hash from
+    ///
+    /// # Returns
+    /// A 64-byte hash that will be reduced modulo L in `verify_with_unchecked_k()`
+    ///
+    /// # Example
+    /// ```ignore
+    /// let k_hash = public_key.compute_challenge_k(message, &signature);
+    /// let is_valid = public_key.verify_with_unchecked_k(k_hash, &signature).is_ok();
+    /// // is_valid should equal public_key.verify(message, &signature)
+    /// ```
+    ///
+    /// # Not Ed25519ph / RFC 8032 Prehash
+    ///
+    /// This helper reproduces the *standard* Ed25519 challenge `H(R || A || M)` used when verifying
+    /// signatures. It does **not** implement the RFC 8032 Ed25519ph variant, which prepends a
+    /// domain separation string and optional context before hashing. Callers that require the
+    /// Ed25519ph flavour must implement the additional domain separation logic themselves.
+    pub fn compute_challenge_k(&self, message: Word, signature: &Signature) -> [u8; 64] {
+        use sha2::Digest;
+
+        let message_bytes: [u8; 32] = message.into();
+        let sig_bytes = signature.inner.to_bytes();
+        let r_bytes = &sig_bytes[0..32];
+
+        // Compute SHA-512(R || A || message)
+        let mut hasher = sha2::Sha512::new();
+        hasher.update(r_bytes);
+        hasher.update(self.inner.to_bytes());
+        hasher.update(message_bytes);
+        let k_hash = hasher.finalize();
+
+        k_hash.into()
+    }
+
+    /// Verifies a signature using a pre-computed challenge hash.
+    ///
+    /// # ⚠️ CRITICAL SECURITY WARNING ⚠️
+    ///
+    /// **THIS METHOD IS EXTREMELY DANGEROUS AND EASY TO MISUSE.**
+    ///
+    /// This method bypasses the standard Ed25519 verification process by accepting a pre-computed
+    /// challenge hash instead of computing it from the message. This breaks Ed25519's
+    /// security properties in the following ways:
+    ///
+    /// ## Security Risks:
+    ///
+    /// 1. **Signature Forgery**: An attacker who can control the hash value can forge signatures
+    ///    for arbitrary messages without knowing the private key.
+    ///
+    /// 2. **Breaks Message Binding**: Standard Ed25519 cryptographically binds the signature to the
+    ///    message via the hash `H(R || A || message)`. Accepting arbitrary hashes breaks this
+    ///    binding.
+    ///
+    /// 3. **Bypasses Standard Protocol**: If the hash is not computed correctly as `SHA-512(R || A
+    ///    || message)`, this method bypasses standard Ed25519 verification and the signature will
+    ///    not be compatible with Ed25519 semantics.
+    ///
+    /// ## When This Might Be Used:
+    ///
+    /// This method is only appropriate in very specific scenarios where:
+    /// - You have a trusted computation environment that computes the hash correctly as `SHA-512(R
+    ///   || A || message)` (see `compute_challenge_k()`)
+    /// - You need to separate the hashing phase from the EC verification phase (e.g., for different
+    ///   execution environments or performance optimization)
+    /// - You fully understand the security implications and have a threat model that accounts for
+    ///   them
+    ///
+    /// When the hash is computed correctly, this method implements standard Ed25519 verification.
+    ///
+    /// ## Standard Usage:
+    ///
+    /// For normal Ed25519 verification, use `verify()` instead.
+    ///
+    /// ## Performance
+    ///
+    /// This helper decompresses the signature's `R` component before performing group arithmetic
+    /// and reuses the cached Edwards form of the public key. Expect it to be slower than
+    /// calling `verify()` directly.
+    ///
+    /// # Arguments
+    /// * `k_hash` - A 64-byte hash (typically computed as `SHA-512(R || A || message)`)
+    /// * `signature` - The signature to verify
+    ///
+    /// # Returns
+    /// `Ok(())` if the verification equation `[s]B = R + [k]A` holds, or an error describing why
+    /// the verification failed.
+    ///
+    /// # Warning
+    /// Do NOT use this method unless you fully understand Ed25519's cryptographic properties,
+    /// have a specific need for this low-level operation, and are feeding it the exact
+    /// `SHA-512(R || A || message)` output (without the Ed25519ph domain separation string).
+    pub fn verify_with_unchecked_k(
+        &self,
+        k_hash: [u8; 64],
+        signature: &Signature,
+    ) -> Result<(), UncheckedVerificationError> {
+        use curve25519_dalek::{
+            edwards::{CompressedEdwardsY, EdwardsPoint},
+            scalar::Scalar,
+        };
+
+        // Reduce the 64-byte hash modulo L to get the challenge scalar
+        let k_scalar = Scalar::from_bytes_mod_order_wide(&k_hash);
+
+        // Extract signature components: R (first 32 bytes) and s (second 32 bytes)
+        let sig_bytes = signature.inner.to_bytes();
+        let r_bytes: [u8; 32] =
+            sig_bytes[..32].try_into().expect("signature R component is exactly 32 bytes");
+        let s_bytes: [u8; 32] =
+            sig_bytes[32..].try_into().expect("signature s component is exactly 32 bytes");
+
+        // RFC 8032 requires s to be canonical; reject non-canonical scalars to avoid malleability.
+        let s_candidate = Scalar::from_canonical_bytes(s_bytes);
+        if s_candidate.is_none().into() {
+            return Err(UncheckedVerificationError::NonCanonicalScalar);
+        }
+        let s_scalar = s_candidate.unwrap();
+
+        let r_compressed = CompressedEdwardsY(r_bytes);
+        let Some(r_point) = r_compressed.decompress() else {
+            return Err(UncheckedVerificationError::InvalidSignaturePoint);
+        };
+
+        let a_point = self.inner.to_edwards();
+
+        // Match the stricter ed25519-dalek semantics by rejecting small-order inputs instead of
+        // multiplying the whole equation by the cofactor. dalek leaves this check opt-in via
+        // `verify_strict()`; we enforce it here to guard this hazmat API against torsion exploits.
+        if r_point.is_small_order() {
+            return Err(UncheckedVerificationError::SmallOrderSignature);
+        }
+        if a_point.is_small_order() {
+            return Err(UncheckedVerificationError::SmallOrderPublicKey);
+        }
+
+        // Compute the verification equation: -[k]A + [s]B == R, mirroring dalek's raw_verify.
+        // Small-order points are rejected above and hence no need for multiplication by co-factor
+        let minus_a = -a_point;
+        let expected_r =
+            EdwardsPoint::vartime_double_scalar_mul_basepoint(&k_scalar, &minus_a, &s_scalar)
+                .compress();
+
+        if expected_r == r_compressed {
+            Ok(())
+        } else {
+            Err(UncheckedVerificationError::EquationMismatch)
+        }
+    }
+
     /// Convert to a X25519 public key which can be used in a DH key exchange protocol.
     ///
     /// # ⚠️ Security Warning
@@ -159,6 +331,21 @@ impl SequentialCommit for PublicKey {
 pub enum PublicKeyError {
     #[error("Could not verify with given public key and signature")]
     VerificationFailed,
+}
+
+/// Errors that can arise when invoking [`PublicKey::verify_with_unchecked_k`].
+#[derive(Debug, Error)]
+pub enum UncheckedVerificationError {
+    #[error("challenge scalar is not canonical")]
+    NonCanonicalScalar,
+    #[error("signature R component failed to decompress")]
+    InvalidSignaturePoint,
+    #[error("small-order component detected in signature R")]
+    SmallOrderSignature,
+    #[error("small-order component detected in public key")]
+    SmallOrderPublicKey,
+    #[error("verification equation was not satisfied")]
+    EquationMismatch,
 }
 
 // SIGNATURE

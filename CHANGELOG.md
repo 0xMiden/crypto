@@ -1,3 +1,7 @@
+## 0.19.0 (TBD)
+
+- Fixed IES sealed box deserialization ([#616](https://github.com/0xMiden/crypto/pull/616)).
+
 ## 0.18.0 (2025-10-27)
 
 - [BREAKING] Incremented MSRV to 1.90.
@@ -10,8 +14,9 @@
 - Added `Debug`, `Clone`, `Eq` and `PartialEq` derives to secret key structs for DSA-s ([#589](https://github.com/0xMiden/crypto/pull/589)).
 - Added zeroization of secret key structs for DSA-s ([#590](https://github.com/0xMiden/crypto/pull/590)).
 - Added `SmtProof::authenticated_nodes()` delegating to `SparseMerklePath::authenticated_nodes` ([#585](https://github.com/0xMiden/crypto/pull/585)).
+- Add benchmarks for ECDSA-k256 and EdDSA-25519 ([#598](https://github.com/0xMiden/crypto/pull/598)).
+- Added `compute_challenge_k()` and `verify_with_unchecked_k()` methods to separate hashing and EC logic in EdDSA over Ed25519 ([#602](https://github.com/0xMiden/crypto/pull/602)).
 - Refactored `LargeSmt` to use flat `Vec<Word>` layout for in-memory nodes ([#591](https://github.com/0xMiden/crypto/pull/594)).
-- Added benchmarks for ECDSA-k256 and EdDSA-25519 ([#598](https://github.com/0xMiden/crypto/pull/598)).
 
 ## 0.17.1 (2025-10-10)
 

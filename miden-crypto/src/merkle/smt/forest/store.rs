@@ -161,6 +161,11 @@ impl SmtStore {
             leaves_by_index.insert(index, leaf_hash);
         }
 
+        if leaves_by_index.is_empty() {
+            // No leaves were updated, return the original root
+            return Ok(root);
+        }
+
         #[allow(unused_mut)]
         let mut sorted_leaf_indices = leaves_by_index.keys().cloned().collect::<Vec<_>>();
 
@@ -229,10 +234,6 @@ impl SmtStore {
             let new_key = node.hash();
             new_nodes.insert(new_key, node);
             nodes_by_index.insert(index, new_key);
-        }
-
-        if nodes_by_index.is_empty() {
-            return Ok(root);
         }
 
         let new_root = nodes_by_index
