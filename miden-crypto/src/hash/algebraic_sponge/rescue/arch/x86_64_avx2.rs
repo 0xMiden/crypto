@@ -180,7 +180,7 @@ unsafe fn add_small(
 ) -> (__m256i, __m256i, __m256i) {
     unsafe {
         let res_wrapped_s = map3!(_mm256_add_epi64, x_s, y);
-        let mask = map3!(_mm256_cmpgt_epi32, x_s, res_wrapped_s);
+        let mask = map3!(_mm256_cmpgt_epi64, x_s, res_wrapped_s);
         let wrapback_amt = map3!(_mm256_srli_epi64::<32>, mask); // EPSILON if overflowed else 0.
         map3!(_mm256_add_epi64, res_wrapped_s, wrapback_amt)
     }
@@ -189,9 +189,8 @@ unsafe fn add_small(
 #[inline(always)]
 unsafe fn maybe_adj_sub(res_wrapped_s: __m256i, mask: __m256i) -> __m256i {
     // The subtraction is very unlikely to overflow so we're best off branching.
-    // The even u32s in `mask` are meaningless, so we want to ignore them. `_mm256_testz_pd`
-    // branches depending on the sign bit of double-precision (64-bit) floats. Bit cast `mask` to
-    // floating-point (this is free).
+    // `_mm256_testz_pd` branches depending on the sign bit of double-precision (64-bit) floats.
+    // Bit cast `mask` to floating-point (this is free).
     unsafe {
         let mask_pd = _mm256_castsi256_pd(mask);
         // `_mm256_testz_pd(mask_pd, mask_pd) == 1` iff all sign bits are 0, meaning that underflow
@@ -215,7 +214,7 @@ unsafe fn sub_tiny(
 ) -> (__m256i, __m256i, __m256i) {
     unsafe {
         let res_wrapped_s = map3!(_mm256_sub_epi64, x_s, y);
-        let mask = map3!(_mm256_cmpgt_epi32, res_wrapped_s, x_s);
+        let mask = map3!(_mm256_cmpgt_epi64, res_wrapped_s, x_s);
         map3!(maybe_adj_sub, res_wrapped_s, mask)
     }
 }
