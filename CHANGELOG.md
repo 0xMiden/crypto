@@ -1,6 +1,6 @@
 ## 0.18.1 (2025-11-05)
 
-- [BREAKING] removed un-needed mutability from ECDSA `sign()` function ().
+- [BREAKING] removed un-needed mutability from ECDSA `sign()` function ([#628](https://github.com/0xMiden/crypto/pull/628)).
 
 ## 0.18.0 (2025-10-27)
 
