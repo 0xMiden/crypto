@@ -1223,6 +1223,7 @@ impl<S: SmtStorage> LargeSmt<S> {
                     },
                     (SmtLeaf::Empty(_), None) => {
                         // Was empty, still empty (shouldn't happen with leaf_changed=true)
+                        unreachable!("Leaf was empty, but leaf_changed=true");
                     },
                     (_, None) => {
                         // New leaf created
