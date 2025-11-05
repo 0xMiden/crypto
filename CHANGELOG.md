@@ -1,4 +1,5 @@
 ## 0.19.0 (TBD)
+- Add serialization of sealing and unsealing keys in IES ([#637](https://github.com/0xMiden/crypto/pull/637)).
 
 ## 0.18.0 (2025-10-27)
 
