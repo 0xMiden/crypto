@@ -189,8 +189,9 @@ unsafe fn add_small(
 #[inline(always)]
 unsafe fn maybe_adj_sub(res_wrapped_s: __m256i, mask: __m256i) -> __m256i {
     // The subtraction is very unlikely to overflow so we're best off branching.
-    // `_mm256_testz_pd` branches depending on the sign bit of double-precision (64-bit) floats.
-    // Bit cast `mask` to floating-point (this is free).
+    // The even u32s in `mask` are meaningless, so we want to ignore them. `_mm256_testz_pd`
+    // branches depending on the sign bit of double-precision (64-bit) floats. Bit cast `mask` to
+    // floating-point (this is free).
     unsafe {
         let mask_pd = _mm256_castsi256_pd(mask);
         // `_mm256_testz_pd(mask_pd, mask_pd) == 1` iff all sign bits are 0, meaning that underflow
