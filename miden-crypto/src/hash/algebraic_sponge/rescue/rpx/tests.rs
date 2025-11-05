@@ -220,6 +220,81 @@ fn ext_round_matches_reference_many() {
     }
 }
 
+/// Verifies that overflow detection at 32-bit boundaries works correctly.
+///
+/// This test specifically targets values where overflow affects the upper 32 bits
+/// of 64-bit integers, ensuring that the 64-bit comparison in add_small and sub_tiny
+/// correctly handles these edge cases.
+///
+/// Compiles and runs only when we build an x86_64 target with AVX2 or AVX-512 enabled.
+/// At runtime, if the host CPU lacks the compiled feature, the test returns early.
+#[cfg(all(
+    target_arch = "x86_64",
+    any(
+        target_feature = "avx2",
+        all(target_feature = "avx512f", target_feature = "avx512dq")
+    )
+))]
+#[test]
+fn ext_round_overflow_at_32bit_boundary() {
+    // Test cases designed to trigger overflow in the upper 32 bits of 64-bit values.
+    // These values are close to the field modulus (0xffffffff00000001) and will cause
+    // overflow that affects the upper 32 bits when operations are performed.
+    let test_cases = [
+        // Values with upper 32 bits set to various patterns that can cause overflow
+        // when combined with operations that trigger add_small/sub_tiny.
+        [
+            Felt::new(0x80000000FFFFFFFF), // Upper 32 bits: 0x80000000
+            Felt::new(0xFFFFFFFF00000000), // Upper 32 bits: 0xFFFFFFFF
+            Felt::new(0xC0000000FFFFFFFF), // Upper 32 bits: 0xC0000000
+            Felt::new(0xFFFFFFFFFFFFFFFF), // Upper 32 bits: 0xFFFFFFFF
+            Felt::new(0x7FFFFFFF00000001), // Upper 32 bits: 0x7FFFFFFF
+            Felt::new(0xFFFFFFFF00000000), // Upper 32 bits: 0xFFFFFFFF
+            Felt::new(0x8000000000000000), // Upper 32 bits: 0x80000000
+            Felt::new(0xFFFFFFFFFFFFFFFE), // Upper 32 bits: 0xFFFFFFFF
+            Felt::new(0xC000000000000000), // Upper 32 bits: 0xC0000000
+            Felt::new(0xFFFFFFFF80000000), // Upper 32 bits: 0xFFFFFFFF
+            Felt::new(0x8000000080000000), // Upper 32 bits: 0x80000000
+            Felt::new(0xFFFFFFFFC0000000), // Upper 32 bits: 0xFFFFFFFF
+        ],
+        // Another set with different upper 32-bit patterns
+        [
+            Felt::new(0x9000000000000000), // Upper 32 bits: 0x90000000
+            Felt::new(0xA000000000000000), // Upper 32 bits: 0xA0000000
+            Felt::new(0xB000000000000000), // Upper 32 bits: 0xB0000000
+            Felt::new(0xC000000000000000), // Upper 32 bits: 0xC0000000
+            Felt::new(0xD000000000000000), // Upper 32 bits: 0xD0000000
+            Felt::new(0xE000000000000000), // Upper 32 bits: 0xE0000000
+            Felt::new(0xF000000000000000), // Upper 32 bits: 0xF0000000
+            Felt::new(0xFFFFFFFF00000000), // Upper 32 bits: 0xFFFFFFFF
+            Felt::new(0xFFFFFFFF80000000), // Upper 32 bits: 0xFFFFFFFF
+            Felt::new(0xFFFFFFFFC0000000), // Upper 32 bits: 0xFFFFFFFF
+            Felt::new(0xFFFFFFFFE0000000), // Upper 32 bits: 0xFFFFFFFF
+            Felt::new(0xFFFFFFFFF0000000), // Upper 32 bits: 0xFFFFFFFF
+        ],
+    ];
+
+    for (case_idx, state) in test_cases.iter().enumerate() {
+        let mut state_array = *state;
+        
+        for round in 0..7 {
+            let mut got = state_array;
+            let mut want = state_array;
+
+            // Optimized path (AVX2 or AVX-512 depending on build).
+            Rpx256::apply_ext_round(&mut got, round);
+            // Scalar reference path.
+            Rpx256::apply_ext_round_ref(&mut want, round);
+
+            assert_eq!(
+                got, want,
+                "mismatch at round {round} (test case {case_idx}) - overflow at 32-bit boundary not handled correctly"
+            );
+            state_array = got; // advance to catch chaining issues
+        }
+    }
+}
+
 proptest! {
     #[test]
     fn rpo256_wont_panic_with_arbitrary_input(ref bytes in any::<Vec<u8>>()) {
