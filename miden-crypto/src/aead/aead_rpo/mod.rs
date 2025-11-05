@@ -97,9 +97,53 @@ pub struct EncryptedData {
     nonce: Nonce,
 }
 
+impl EncryptedData {
+    /// Constructs an EncryptedData from its component parts.
+    pub fn from_parts(
+        data_type: DataType,
+        ciphertext: Vec<Felt>,
+        auth_tag: AuthTag,
+        nonce: Nonce,
+    ) -> Self {
+        Self { data_type, ciphertext, auth_tag, nonce }
+    }
+
+    /// Returns the data type of the encrypted data
+    pub fn data_type(&self) -> DataType {
+        self.data_type
+    }
+
+    /// Returns a reference to the ciphertext
+    pub fn ciphertext(&self) -> &[Felt] {
+        &self.ciphertext
+    }
+
+    /// Returns a reference to the authentication tag
+    pub fn auth_tag(&self) -> &AuthTag {
+        &self.auth_tag
+    }
+
+    /// Returns a reference to the nonce
+    pub fn nonce(&self) -> &Nonce {
+        &self.nonce
+    }
+}
+
 /// An authentication tag represented as 4 field elements
 #[derive(Debug, Default, Clone, PartialEq, Eq)]
 pub struct AuthTag([Felt; AUTH_TAG_SIZE]);
+
+impl AuthTag {
+    /// Constructs an AuthTag from an array of field elements.
+    pub fn new(elements: [Felt; AUTH_TAG_SIZE]) -> Self {
+        Self(elements)
+    }
+
+    /// Returns the authentication tag as an array of field elements
+    pub fn to_elements(&self) -> [Felt; AUTH_TAG_SIZE] {
+        self.0
+    }
+}
 
 /// A 256-bit secret key represented as 4 field elements
 #[derive(Clone, SilentDebug, SilentDisplay)]
