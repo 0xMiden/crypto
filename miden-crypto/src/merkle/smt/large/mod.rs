@@ -112,6 +112,37 @@
 //! # Ok(())
 //! # }
 //! ```
+//!
+//! ## Performance and Memory Considerations
+//!
+//! The `apply_mutations()` and `apply_mutations_with_reversion()` methods use batched
+//! operations: they preload all affected subtrees and leaves before applying changes
+//! atomically. This approach reduces I/O at the cost of higher temporary memory usage.
+//!
+//! ### Memory Usage
+//!
+//! Peak memory is proportional to:
+//! - The number of mutated leaves
+//! - The number of distinct storage subtrees touched by those mutations
+//!
+//! This memory is temporary and released immediately after the batch commits.
+//!
+//! ### Locality Matters
+//!
+//! Memory usage scales with how dispersed updates are, not just their count:
+//! - **Localized updates**: Keys with shared high-order bits fall into the same storage subtrees
+//! - **Scattered updates**: Keys spread across many storage subtrees require loading more distinct
+//!   subtrees
+//!
+//! ### Guidelines
+//!
+//! For typical batches (up to ~10,000 updates) with reasonable locality, the working set
+//! is modest. Very large or highly scattered batches will use more
+//! memory proportionally.
+//!
+//! To optimize memory and I/O: group updates by key locality so that keys sharing
+//! high-order bits are processed together.
+
 use alloc::{boxed::Box, vec::Vec};
 use core::mem;
 
