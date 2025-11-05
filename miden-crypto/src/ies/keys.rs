@@ -7,7 +7,7 @@ use crate::{
     Felt,
     aead::{aead_rpo::AeadRpo, xchacha::XChaCha},
     ecdh::{KeyAgreementScheme, k256::K256, x25519::X25519},
-    utils::{Deserializable, Serializable},
+    utils::{ByteReader, ByteWriter, Deserializable, DeserializationError, Serializable},
 };
 
 // TYPE ALIASES
@@ -186,6 +186,21 @@ pub enum SealingKey {
 }
 
 impl SealingKey {
+    /// Returns scheme identifier for this sealing key.
+    pub fn scheme(&self) -> IesScheme {
+        match self {
+            SealingKey::K256XChaCha20Poly1305(_) => IesScheme::K256XChaCha20Poly1305,
+            SealingKey::X25519XChaCha20Poly1305(_) => IesScheme::X25519XChaCha20Poly1305,
+            SealingKey::K256AeadRpo(_) => IesScheme::K256AeadRpo,
+            SealingKey::X25519AeadRpo(_) => IesScheme::X25519AeadRpo,
+        }
+    }
+
+    /// Returns the scheme name for this sealing key.
+    pub fn scheme_name(&self) -> &'static str {
+        self.scheme().name()
+    }
+
     /// Seals the provided plaintext (represented as bytes) with this sealing key.
     ///
     /// The returned message can be unsealed with the [UnsealingKey] associated with this sealing
@@ -225,6 +240,45 @@ impl SealingKey {
     }
 }
 
+impl Serializable for SealingKey {
+    fn write_into<W: ByteWriter>(&self, target: &mut W) {
+        target.write_u8(self.scheme().into());
+
+        match self {
+            SealingKey::K256XChaCha20Poly1305(key) => key.write_into(target),
+            SealingKey::X25519XChaCha20Poly1305(key) => key.write_into(target),
+            SealingKey::K256AeadRpo(key) => key.write_into(target),
+            SealingKey::X25519AeadRpo(key) => key.write_into(target),
+        }
+    }
+}
+
+impl Deserializable for SealingKey {
+    fn read_from<R: ByteReader>(source: &mut R) -> Result<Self, DeserializationError> {
+        let scheme = IesScheme::try_from(source.read_u8()?)
+            .map_err(|_| DeserializationError::InvalidValue("Unsupported IES scheme".into()))?;
+
+        match scheme {
+            IesScheme::K256XChaCha20Poly1305 => {
+                let key = crate::dsa::ecdsa_k256_keccak::PublicKey::read_from(source)?;
+                Ok(SealingKey::K256XChaCha20Poly1305(key))
+            },
+            IesScheme::X25519XChaCha20Poly1305 => {
+                let key = crate::dsa::eddsa_25519::PublicKey::read_from(source)?;
+                Ok(SealingKey::X25519XChaCha20Poly1305(key))
+            },
+            IesScheme::K256AeadRpo => {
+                let key = crate::dsa::ecdsa_k256_keccak::PublicKey::read_from(source)?;
+                Ok(SealingKey::K256AeadRpo(key))
+            },
+            IesScheme::X25519AeadRpo => {
+                let key = crate::dsa::eddsa_25519::PublicKey::read_from(source)?;
+                Ok(SealingKey::X25519AeadRpo(key))
+            },
+        }
+    }
+}
+
 // UNSEALING KEY
 // ================================================================================================
 
@@ -238,7 +292,7 @@ pub enum UnsealingKey {
 
 impl UnsealingKey {
     /// Returns scheme identifier for this unsealing key.
-    fn scheme(&self) -> IesScheme {
+    pub fn scheme(&self) -> IesScheme {
         match self {
             UnsealingKey::K256XChaCha20Poly1305(_) => IesScheme::K256XChaCha20Poly1305,
             UnsealingKey::X25519XChaCha20Poly1305(_) => IesScheme::X25519XChaCha20Poly1305,
@@ -280,6 +334,45 @@ impl UnsealingKey {
         UnsealingKey::X25519XChaCha20Poly1305 => X25519XChaCha20Poly1305, EphemeralPublicKey::X25519XChaCha20Poly1305;
         UnsealingKey::K256AeadRpo => K256AeadRpo, EphemeralPublicKey::K256AeadRpo;
         UnsealingKey::X25519AeadRpo => X25519AeadRpo, EphemeralPublicKey::X25519AeadRpo;
+    }
+}
+
+impl Serializable for UnsealingKey {
+    fn write_into<W: ByteWriter>(&self, target: &mut W) {
+        target.write_u8(self.scheme().into());
+
+        match self {
+            UnsealingKey::K256XChaCha20Poly1305(key) => key.write_into(target),
+            UnsealingKey::X25519XChaCha20Poly1305(key) => key.write_into(target),
+            UnsealingKey::K256AeadRpo(key) => key.write_into(target),
+            UnsealingKey::X25519AeadRpo(key) => key.write_into(target),
+        }
+    }
+}
+
+impl Deserializable for UnsealingKey {
+    fn read_from<R: ByteReader>(source: &mut R) -> Result<Self, DeserializationError> {
+        let scheme = IesScheme::try_from(source.read_u8()?)
+            .map_err(|_| DeserializationError::InvalidValue("Unsupported IES scheme".into()))?;
+
+        match scheme {
+            IesScheme::K256XChaCha20Poly1305 => {
+                let key = crate::dsa::ecdsa_k256_keccak::SecretKey::read_from(source)?;
+                Ok(UnsealingKey::K256XChaCha20Poly1305(key))
+            },
+            IesScheme::X25519XChaCha20Poly1305 => {
+                let key = crate::dsa::eddsa_25519::SecretKey::read_from(source)?;
+                Ok(UnsealingKey::X25519XChaCha20Poly1305(key))
+            },
+            IesScheme::K256AeadRpo => {
+                let key = crate::dsa::ecdsa_k256_keccak::SecretKey::read_from(source)?;
+                Ok(UnsealingKey::K256AeadRpo(key))
+            },
+            IesScheme::X25519AeadRpo => {
+                let key = crate::dsa::eddsa_25519::SecretKey::read_from(source)?;
+                Ok(UnsealingKey::X25519AeadRpo(key))
+            },
+        }
     }
 }
 
