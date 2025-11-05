@@ -83,13 +83,13 @@ impl SecretKey {
     }
 
     /// Signs a message (represented as a Word) with this secret key.
-    pub fn sign(&mut self, message: Word) -> Signature {
+    pub fn sign(&self, message: Word) -> Signature {
         let message_digest = hash_message(message);
         self.sign_prehash(message_digest)
     }
 
     /// Signs a pre-hashed message with this secret key.
-    pub fn sign_prehash(&mut self, message_digest: [u8; 32]) -> Signature {
+    pub fn sign_prehash(&self, message_digest: [u8; 32]) -> Signature {
         let (signature_inner, recovery_id) = self
             .inner
             .sign_prehash_recoverable(&message_digest)

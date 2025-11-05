@@ -771,6 +771,89 @@ mod protocol_tests {
             prop_assert_eq!(scheme_from_key.name(), sealed.scheme_name());
         }
     }
+
+    // SEALED MESSAGE SERIALIZATION ROUND-TRIP TESTS (BYTES)
+    // --------------------------------------------------------------------------------------------
+
+    #[test]
+    fn test_sealed_message_serialization_roundtrip_k256_xchacha() {
+        let mut rng = rand::rng();
+        let sk = crate::dsa::ecdsa_k256_keccak::SecretKey::with_rng(&mut rng);
+        let pk = sk.public_key();
+        let sealing_key = SealingKey::K256XChaCha20Poly1305(pk);
+        let unsealing_key = UnsealingKey::K256XChaCha20Poly1305(sk);
+
+        let plaintext = b"serialization roundtrip";
+        let sealed = sealing_key.seal_bytes(&mut rng, plaintext).unwrap();
+        let before = sealed.scheme_name();
+        let bytes = sealed.to_bytes();
+        let sealed2 =
+            <SealedMessage as crate::utils::Deserializable>::read_from_bytes(&bytes).unwrap();
+        let after = sealed2.scheme_name();
+        assert_eq!(before, after);
+        let opened = unsealing_key.unseal_bytes(sealed2).unwrap();
+        assert_eq!(opened.as_slice(), plaintext);
+    }
+
+    #[test]
+    fn test_sealed_message_serialization_roundtrip_x25519_xchacha() {
+        let mut rng = rand::rng();
+        let sk = crate::dsa::eddsa_25519::SecretKey::with_rng(&mut rng);
+        let pk = sk.public_key();
+        let sealing_key = SealingKey::X25519XChaCha20Poly1305(pk);
+        let unsealing_key = UnsealingKey::X25519XChaCha20Poly1305(sk);
+
+        let plaintext = b"serialization roundtrip";
+        let sealed = sealing_key.seal_bytes(&mut rng, plaintext).unwrap();
+        let before = sealed.scheme_name();
+        let bytes = sealed.to_bytes();
+        let sealed2 =
+            <SealedMessage as crate::utils::Deserializable>::read_from_bytes(&bytes).unwrap();
+        let after = sealed2.scheme_name();
+        assert_eq!(before, after);
+        let opened = unsealing_key.unseal_bytes(sealed2).unwrap();
+        assert_eq!(opened.as_slice(), plaintext);
+    }
+
+    #[test]
+    fn test_sealed_message_serialization_roundtrip_k256_aeadrpo() {
+        let mut rng = rand::rng();
+        let sk = crate::dsa::ecdsa_k256_keccak::SecretKey::with_rng(&mut rng);
+        let pk = sk.public_key();
+        let sealing_key = SealingKey::K256AeadRpo(pk);
+        let unsealing_key = UnsealingKey::K256AeadRpo(sk);
+
+        let plaintext = b"serialization roundtrip";
+        let sealed = sealing_key.seal_bytes(&mut rng, plaintext).unwrap();
+        let before = sealed.scheme_name();
+        let bytes = sealed.to_bytes();
+        let sealed2 =
+            <SealedMessage as crate::utils::Deserializable>::read_from_bytes(&bytes).unwrap();
+        let after = sealed2.scheme_name();
+        assert_eq!(before, after);
+        let opened = unsealing_key.unseal_bytes(sealed2).unwrap();
+        assert_eq!(opened.as_slice(), plaintext);
+    }
+
+    #[test]
+    fn test_sealed_message_serialization_roundtrip_x25519_aeadrpo() {
+        let mut rng = rand::rng();
+        let sk = crate::dsa::eddsa_25519::SecretKey::with_rng(&mut rng);
+        let pk = sk.public_key();
+        let sealing_key = SealingKey::X25519AeadRpo(pk);
+        let unsealing_key = UnsealingKey::X25519AeadRpo(sk);
+
+        let plaintext = b"serialization roundtrip";
+        let sealed = sealing_key.seal_bytes(&mut rng, plaintext).unwrap();
+        let before = sealed.scheme_name();
+        let bytes = sealed.to_bytes();
+        let sealed2 =
+            <SealedMessage as crate::utils::Deserializable>::read_from_bytes(&bytes).unwrap();
+        let after = sealed2.scheme_name();
+        assert_eq!(before, after);
+        let opened = unsealing_key.unseal_bytes(sealed2).unwrap();
+        assert_eq!(opened.as_slice(), plaintext);
+    }
 }
 
 // INTEGRATION AND REGRESSION TESTS
