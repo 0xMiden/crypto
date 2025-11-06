@@ -131,16 +131,16 @@ impl SmtStorage for MemoryStorage {
     fn remove_value(&self, index: u64, key: Word) -> Result<Option<Word>, StorageError> {
         let mut leaves_guard = self.leaves.write()?;
 
-        match leaves_guard.get_mut(&index) {
-            Some(leaf) => {
-                let old_value = leaf.get_value(&key);
-                leaf.remove(key);
-                Ok(old_value)
-            },
-            None => {
-                // Leaf at index does not exist, so no value could be removed.
-                Ok(None)
-            },
+        // Take ownership of the leaf to perform mutation safely, then reinsert if not empty.
+        if let Some(mut leaf) = leaves_guard.remove(&index) {
+            let (old_value, is_empty) = leaf.remove(key);
+            if !is_empty {
+                leaves_guard.insert(index, leaf);
+            }
+            Ok(old_value)
+        } else {
+            // Leaf at index does not exist, so no value could be removed.
+            Ok(None)
         }
     }
 
