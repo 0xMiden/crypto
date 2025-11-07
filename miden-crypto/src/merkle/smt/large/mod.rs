@@ -110,6 +110,37 @@
 //! # Ok(())
 //! # }
 //! ```
+//!
+//! ## Performance and Memory Considerations
+//!
+//! The `apply_mutations()` and `apply_mutations_with_reversion()` methods use batched
+//! operations: they preload all affected subtrees and leaves before applying changes
+//! atomically. This approach reduces I/O at the cost of higher temporary memory usage.
+//!
+//! ### Memory Usage
+//!
+//! Peak memory is proportional to:
+//! - The number of mutated leaves
+//! - The number of distinct storage subtrees touched by those mutations
+//!
+//! This memory is temporary and released immediately after the batch commits.
+//!
+//! ### Locality Matters
+//!
+//! Memory usage scales with how dispersed updates are, not just their count:
+//! - **Localized updates**: Keys with shared high-order bits fall into the same storage subtrees
+//! - **Scattered updates**: Keys spread across many storage subtrees require loading more distinct
+//!   subtrees
+//!
+//! ### Guidelines
+//!
+//! For typical batches (up to ~10,000 updates) with reasonable locality, the working set
+//! is modest. Very large or highly scattered batches will use more
+//! memory proportionally.
+//!
+//! To optimize memory and I/O: group updates by key locality so that keys sharing
+//! high-order bits are processed together.
+
 use alloc::{boxed::Box, vec::Vec};
 use core::mem;
 
@@ -189,6 +220,16 @@ enum SubtreeUpdate {
     Store { index: NodeIndex, subtree: Subtree },
     /// Delete the subtree at the given index (became empty).
     Delete { index: NodeIndex },
+}
+
+/// Prepared mutations loaded from storage, ready to be applied.
+struct PreparedMutations {
+    old_root: Word,
+    new_root: Word,
+    sorted_node_mutations: Vec<(NodeIndex, NodeMutation)>,
+    loaded_subtrees: Map<NodeIndex, Option<Subtree>>,
+    new_pairs: Map<Word, Word>,
+    leaf_map: Map<u64, Option<SmtLeaf>>,
 }
 
 // LargeSmt
@@ -749,7 +790,116 @@ impl<S: SmtStorage> LargeSmt<S> {
         &mut self,
         mutations: MutationSet<SMT_DEPTH, Word, Word>,
     ) -> Result<(), LargeSmtError> {
+        let prepared = self.prepare_mutations(mutations)?;
+        self.apply_prepared_mutations(prepared)?;
+        Ok(())
+    }
+
+    /// Applies the prospective mutations computed with [`Smt::compute_mutations()`] to this tree
+    /// and returns the reverse mutation set.
+    ///
+    /// Applying the reverse mutation sets to the updated tree will revert the changes.
+    ///
+    /// # Errors
+    /// If `mutations` was computed on a tree with a different root than this one, returns
+    /// [`MerkleError::ConflictingRoots`] with a two-item [`Vec`]. The first item is the root hash
+    /// the `mutations` were computed against, and the second item is the actual current root of
+    /// this tree.
+    pub fn apply_mutations_with_reversion(
+        &mut self,
+        mutations: MutationSet<SMT_DEPTH, Word, Word>,
+    ) -> Result<MutationSet<SMT_DEPTH, Word, Word>, LargeSmtError>
+    where
+        Self: Sized,
+    {
         use NodeMutation::*;
+
+        let prepared = self.prepare_mutations(mutations)?;
+        let (old_root, new_root) = (prepared.old_root, prepared.new_root);
+
+        // Collect reverse mutations: for each mutation, capture the old node state
+        let reverse_mutations: NodeMutations = prepared
+            .sorted_node_mutations
+            .iter()
+            .filter_map(|(index, mutation)| {
+                let old_node = if index.depth() < IN_MEMORY_DEPTH {
+                    self.get_non_empty_inner_node(*index)
+                } else {
+                    let subtree_root = Subtree::find_subtree_root(*index);
+                    prepared
+                        .loaded_subtrees
+                        .get(&subtree_root)
+                        .and_then(|opt| opt.as_ref())
+                        .and_then(|subtree| subtree.get_inner_node(*index))
+                };
+
+                // Map (index, mutation, old_node) to the reverse mutation
+                match (mutation, old_node) {
+                    (Removal, Some(node)) => Some((*index, Addition(node))),
+                    (Addition(_), Some(node)) => Some((*index, Addition(node))),
+                    (Addition(_), None) => Some((*index, Removal)),
+                    (Removal, None) => None,
+                }
+            })
+            .collect();
+
+        // Collect reverse pairs: for each key, capture the old value
+        let reverse_pairs: Map<Word, Word> = prepared
+            .new_pairs
+            .keys()
+            .map(|key| {
+                let leaf_idx = Self::key_to_leaf_index(key).value();
+                let old_value = prepared
+                    .leaf_map
+                    .get(&leaf_idx)
+                    .and_then(|opt| opt.as_ref())
+                    .and_then(|leaf| leaf.get_value(key))
+                    .unwrap_or(Self::EMPTY_VALUE);
+                (*key, old_value)
+            })
+            .collect();
+
+        // Apply the mutations
+        self.apply_prepared_mutations(prepared)?;
+
+        Ok(MutationSet {
+            old_root: new_root,
+            node_mutations: reverse_mutations,
+            new_pairs: reverse_pairs,
+            new_root: old_root,
+        })
+    }
+
+    // HELPERS
+    // --------------------------------------------------------------------------------------------
+
+    /// Helper to get an in-memory node if not empty.
+    ///
+    /// # Panics
+    /// With debug assertions on, panics if `index.depth() >= IN_MEMORY_DEPTH`.
+    fn get_non_empty_inner_node(&self, index: NodeIndex) -> Option<InnerNode> {
+        debug_assert!(index.depth() < IN_MEMORY_DEPTH, "Only for in-memory nodes");
+
+        let memory_index = to_memory_index(&index);
+
+        let left = self.in_memory_nodes[memory_index * 2];
+        let right = self.in_memory_nodes[memory_index * 2 + 1];
+
+        // Check if both children are empty
+        let child_depth = index.depth() + 1;
+        if is_empty_parent(left, right, child_depth) {
+            None
+        } else {
+            Some(InnerNode { left, right })
+        }
+    }
+
+    /// Prepares mutations for applying by loading all necessary data from storage.
+    /// Returns a PreparedMutations struct with sorted mutations and loaded data.
+    fn prepare_mutations(
+        &self,
+        mutations: MutationSet<SMT_DEPTH, Word, Word>,
+    ) -> Result<PreparedMutations, LargeSmtError> {
         use rayon::prelude::*;
         let MutationSet {
             old_root,
@@ -789,42 +939,13 @@ impl<S: SmtStorage> LargeSmt<S> {
         let subtrees_from_storage = self.storage.get_subtrees(&subtree_roots_indices)?;
 
         // Map the subtrees
-        let mut loaded_subtrees: Map<NodeIndex, Option<Subtree>> = subtree_roots_indices
+        let loaded_subtrees: Map<NodeIndex, Option<Subtree>> = subtree_roots_indices
             .into_iter()
             .zip(subtrees_from_storage)
             .map(|(root_index, subtree_opt)| {
                 (root_index, Some(subtree_opt.unwrap_or_else(|| Subtree::new(root_index))))
             })
             .collect();
-
-        // Process mutations
-        for (index, mutation) in sorted_mutations {
-            if index.depth() < IN_MEMORY_DEPTH {
-                match mutation {
-                    Removal => self.remove_inner_node(index),
-                    Addition(node) => self.insert_inner_node(index, node),
-                };
-            } else {
-                let subtree_root_index = Subtree::find_subtree_root(index);
-                let subtree = loaded_subtrees
-                    .get_mut(&subtree_root_index)
-                    .expect("Subtree map entry must exist")
-                    .as_mut()
-                    .expect("Subtree must exist as it was either fetched or created");
-
-                match mutation {
-                    Removal => subtree.remove_inner_node(index),
-                    Addition(node) => subtree.insert_inner_node(index, node),
-                };
-            }
-        }
-
-        // Go through subtrees, see if any are empty, and if so remove them
-        for (_index, subtree) in loaded_subtrees.iter_mut() {
-            if subtree.as_ref().is_some_and(|s| s.is_empty()) {
-                *subtree = None;
-            }
-        }
 
         // Collect and sort key-value pairs by their corresponding leaf index
         let mut sorted_kv_pairs: Vec<_> = new_pairs.iter().map(|(k, v)| (*k, *v)).collect();
@@ -842,18 +963,80 @@ impl<S: SmtStorage> LargeSmt<S> {
         let leaves = self.storage.get_leaves(&leaf_indices)?;
 
         // Map leaf indices to their corresponding leaves
-        let mut leaf_map: Map<u64, Option<SmtLeaf>> =
-            leaf_indices.into_iter().zip(leaves).collect();
+        let leaf_map: Map<u64, Option<SmtLeaf>> = leaf_indices.into_iter().zip(leaves).collect();
 
+        Ok(PreparedMutations {
+            old_root,
+            new_root,
+            sorted_node_mutations: sorted_mutations,
+            loaded_subtrees,
+            new_pairs,
+            leaf_map,
+        })
+    }
+
+    /// Applies prepared mutations to the tree, updating storage.
+    fn apply_prepared_mutations(
+        &mut self,
+        prepared: PreparedMutations,
+    ) -> Result<(), LargeSmtError> {
+        use NodeMutation::*;
+
+        let PreparedMutations {
+            old_root: _,
+            new_root,
+            sorted_node_mutations,
+            mut loaded_subtrees,
+            new_pairs,
+            mut leaf_map,
+        } = prepared;
+
+        // Process node mutations
+        for (index, mutation) in sorted_node_mutations {
+            if index.depth() < IN_MEMORY_DEPTH {
+                match mutation {
+                    Removal => {
+                        self.remove_inner_node(index);
+                    },
+                    Addition(node) => {
+                        self.insert_inner_node(index, node);
+                    },
+                };
+            } else {
+                let subtree_root_index = Subtree::find_subtree_root(index);
+                let subtree = loaded_subtrees
+                    .get_mut(&subtree_root_index)
+                    .expect("Subtree map entry must exist")
+                    .as_mut()
+                    .expect("Subtree must exist as it was either fetched or created");
+
+                match mutation {
+                    Removal => {
+                        subtree.remove_inner_node(index);
+                    },
+                    Addition(node) => {
+                        subtree.insert_inner_node(index, node);
+                    },
+                };
+            }
+        }
+
+        // Go through subtrees, see if any are empty, and if so remove them
+        for (_index, subtree) in loaded_subtrees.iter_mut() {
+            if subtree.as_ref().is_some_and(|s| s.is_empty()) {
+                *subtree = None;
+            }
+        }
+
+        // Process leaf mutations
         let mut leaf_count_delta = 0isize;
         let mut entry_count_delta = 0isize;
 
         for (key, value) in new_pairs {
             let idx = Self::key_to_leaf_index(&key).value();
-            // Get leaf
             let entry = leaf_map.entry(idx).or_insert(None);
 
-            // New values is empty, handle deletion
+            // New value is empty, handle deletion
             if value == Self::EMPTY_VALUE {
                 if let Some(leaf) = entry {
                     // Leaf exists, handle deletion
@@ -898,71 +1081,6 @@ impl<S: SmtStorage> LargeSmt<S> {
         self.storage.apply(updates)?;
         Ok(())
     }
-
-    /// Applies the prospective mutations computed with [`Smt::compute_mutations()`] to this tree
-    /// and returns the reverse mutation set.
-    ///
-    /// Applying the reverse mutation sets to the updated tree will revert the changes.
-    ///
-    /// # Errors
-    /// If `mutations` was computed on a tree with a different root than this one, returns
-    /// [`MerkleError::ConflictingRoots`] with a two-item [`Vec`]. The first item is the root hash
-    /// the `mutations` were computed against, and the second item is the actual current root of
-    /// this tree.
-    pub fn apply_mutations_with_reversion(
-        &mut self,
-        mutations: MutationSet<SMT_DEPTH, Word, Word>,
-    ) -> Result<MutationSet<SMT_DEPTH, Word, Word>, LargeSmtError>
-    where
-        Self: Sized,
-    {
-        use NodeMutation::*;
-        let MutationSet {
-            old_root,
-            node_mutations,
-            new_pairs,
-            new_root,
-        } = mutations;
-
-        let mut reverse_mutations = NodeMutations::new();
-        for (index, mutation) in node_mutations {
-            match mutation {
-                Removal => {
-                    if let Some(node) = self.remove_inner_node(index) {
-                        reverse_mutations.insert(index, Addition(node));
-                    }
-                },
-                Addition(node) => {
-                    if let Some(old_node) = self.insert_inner_node(index, node) {
-                        reverse_mutations.insert(index, Addition(old_node));
-                    } else {
-                        reverse_mutations.insert(index, Removal);
-                    }
-                },
-            }
-        }
-
-        let mut reverse_pairs = Map::new();
-        for (key, value) in new_pairs {
-            if let Some(old_value) = self.insert_value(key, value)? {
-                reverse_pairs.insert(key, old_value);
-            } else {
-                reverse_pairs.insert(key, Self::EMPTY_VALUE);
-            }
-        }
-
-        self.set_root(new_root);
-
-        Ok(MutationSet {
-            old_root: new_root,
-            node_mutations: reverse_mutations,
-            new_pairs: reverse_pairs,
-            new_root: old_root,
-        })
-    }
-
-    // HELPERS
-    // --------------------------------------------------------------------------------------------
 
     fn build_subtrees(&mut self, mut entries: Vec<(Word, Word)>) -> Result<(), MerkleError> {
         entries.par_sort_unstable_by_key(|item| {

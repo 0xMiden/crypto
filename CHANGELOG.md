@@ -2,6 +2,7 @@
 
 - Added `LargeSmt::insert_batch()` for optimized bulk operations ([#597](https://github.com/0xMiden/crypto/issues/597)).
 - Added `compute_challenge_k()` and `verify_with_unchecked_k()` methods to separate hashing and EC logic in EdDSA over Ed25519 ([#602](https://github.com/0xMiden/crypto/pull/602)).
+- Refactored `LargeSmt::apply_mutations_with_reversion` to use batched storage operations ([#613](https://github.com/0xMiden/crypto/pull/613)).
 - Fixed IES sealed box deserialization ([#616](https://github.com/0xMiden/crypto/pull/616)).
 
 ## 0.18.1 (2025-11-05)
