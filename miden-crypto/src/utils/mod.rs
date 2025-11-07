@@ -246,10 +246,12 @@ pub fn bytes_to_elements_exact(bytes: &[u8]) -> Option<Vec<Felt>> {
 /// A vector of field elements, each containing 4 bytes packed in little-endian order.
 ///
 /// # Examples
-/// ```ignore
+/// ```rust
+/// # use miden_crypto::{Felt, utils::bytes_to_packed_u32_elements};
+///
 /// let bytes = vec![0x01, 0x02, 0x03, 0x04, 0x05];
-/// let felts = bytes_to_felts(&bytes);
-/// // Returns: [Felt(0x04030201), Felt(0x00000005)]
+/// let felts = bytes_to_packed_u32_elements(&bytes);
+/// assert_eq!(felts, vec![Felt::new(0x04030201), Felt::new(0x00000005)]);
 /// ```
 pub fn bytes_to_packed_u32_elements(bytes: &[u8]) -> Vec<Felt> {
     const BYTES_PER_U32: usize = core::mem::size_of::<u32>();
