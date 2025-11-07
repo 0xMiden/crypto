@@ -13,7 +13,7 @@ use crate::{
     ecdh::x25519::{EphemeralPublicKey, SharedSecret},
     utils::{
         ByteReader, ByteWriter, Deserializable, DeserializationError, Serializable,
-        bytes_to_elements_with_padding,
+        bytes_to_packed_u32_elements,
     },
     zeroize::{Zeroize, ZeroizeOnDrop},
 };
@@ -122,6 +122,9 @@ pub struct PublicKey {
 
 impl PublicKey {
     /// Returns a commitment to the public key using the RPO256 hash function.
+    ///
+    /// The commitment is computed by first converting the public key to field elements (4 bytes
+    /// per element), and then computing a sequential hash of the elements.
     pub fn to_commitment(&self) -> Word {
         <Self as SequentialCommit>::to_commitment(self)
     }
@@ -151,7 +154,7 @@ impl SequentialCommit for PublicKey {
     type Commitment = Word;
 
     fn to_elements(&self) -> Vec<Felt> {
-        bytes_to_elements_with_padding(&self.to_bytes())
+        bytes_to_packed_u32_elements(&self.to_bytes())
     }
 }
 
