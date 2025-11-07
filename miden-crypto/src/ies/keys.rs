@@ -1,4 +1,5 @@
 use alloc::vec::Vec;
+use core::fmt;
 
 use rand::{CryptoRng, RngCore};
 
@@ -196,11 +197,6 @@ impl SealingKey {
         }
     }
 
-    /// Returns the scheme name for this sealing key.
-    pub fn scheme_name(&self) -> &'static str {
-        self.scheme().name()
-    }
-
     /// Seals the provided plaintext (represented as bytes) with this sealing key.
     ///
     /// The returned message can be unsealed with the [UnsealingKey] associated with this sealing
@@ -237,6 +233,12 @@ impl SealingKey {
         SealingKey::X25519XChaCha20Poly1305 => X25519XChaCha20Poly1305, EphemeralPublicKey::X25519XChaCha20Poly1305;
         SealingKey::K256AeadRpo => K256AeadRpo, EphemeralPublicKey::K256AeadRpo;
         SealingKey::X25519AeadRpo => X25519AeadRpo, EphemeralPublicKey::X25519AeadRpo;
+    }
+}
+
+impl fmt::Display for SealingKey {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{} sealing key", self.scheme())
     }
 }
 
@@ -334,6 +336,12 @@ impl UnsealingKey {
         UnsealingKey::X25519XChaCha20Poly1305 => X25519XChaCha20Poly1305, EphemeralPublicKey::X25519XChaCha20Poly1305;
         UnsealingKey::K256AeadRpo => K256AeadRpo, EphemeralPublicKey::K256AeadRpo;
         UnsealingKey::X25519AeadRpo => X25519AeadRpo, EphemeralPublicKey::X25519AeadRpo;
+    }
+}
+
+impl fmt::Display for UnsealingKey {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{} unsealing key", self.scheme())
     }
 }
 

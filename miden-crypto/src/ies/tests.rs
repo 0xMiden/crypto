@@ -883,60 +883,38 @@ mod keys_serialization_tests {
         assert!(!reader.has_more_bytes());
     }
 
-    #[test]
-    fn k256_xchacha_roundtrip() {
+    fn sample_sealing_keys() -> Vec<SealingKey> {
         let mut rng = rand::rng();
-        let public_key = SecretKey::with_rng(&mut rng).public_key();
-        assert_roundtrip(SealingKey::K256XChaCha20Poly1305(public_key));
+        vec![
+            SealingKey::K256XChaCha20Poly1305(SecretKey::with_rng(&mut rng).public_key()),
+            SealingKey::X25519XChaCha20Poly1305(SecretKey25519::with_rng(&mut rng).public_key()),
+            SealingKey::K256AeadRpo(SecretKey::with_rng(&mut rng).public_key()),
+            SealingKey::X25519AeadRpo(SecretKey25519::with_rng(&mut rng).public_key()),
+        ]
+    }
+
+    fn sample_unsealing_keys() -> Vec<UnsealingKey> {
+        let mut rng = rand::rng();
+        vec![
+            UnsealingKey::K256XChaCha20Poly1305(SecretKey::with_rng(&mut rng)),
+            UnsealingKey::X25519XChaCha20Poly1305(SecretKey25519::with_rng(&mut rng)),
+            UnsealingKey::K256AeadRpo(SecretKey::with_rng(&mut rng)),
+            UnsealingKey::X25519AeadRpo(SecretKey25519::with_rng(&mut rng)),
+        ]
     }
 
     #[test]
-    fn x25519_xchacha_roundtrip() {
-        let mut rng = rand::rng();
-        let public_key = SecretKey25519::with_rng(&mut rng).public_key();
-        assert_roundtrip(SealingKey::X25519XChaCha20Poly1305(public_key));
+    fn sealing_keys_roundtrip() {
+        for key in sample_sealing_keys() {
+            assert_roundtrip(key);
+        }
     }
 
     #[test]
-    fn k256_aead_rpo_roundtrip() {
-        let mut rng = rand::rng();
-        let public_key = SecretKey::with_rng(&mut rng).public_key();
-        assert_roundtrip(SealingKey::K256AeadRpo(public_key));
-    }
-
-    #[test]
-    fn x25519_aead_rpo_roundtrip() {
-        let mut rng = rand::rng();
-        let public_key = SecretKey25519::with_rng(&mut rng).public_key();
-        assert_roundtrip(SealingKey::X25519AeadRpo(public_key));
-    }
-
-    #[test]
-    fn unsealing_k256_xchacha_roundtrip() {
-        let mut rng = rand::rng();
-        let secret_key = SecretKey::with_rng(&mut rng);
-        assert_unsealing_roundtrip(UnsealingKey::K256XChaCha20Poly1305(secret_key));
-    }
-
-    #[test]
-    fn unsealing_x25519_xchacha_roundtrip() {
-        let mut rng = rand::rng();
-        let secret_key = SecretKey25519::with_rng(&mut rng);
-        assert_unsealing_roundtrip(UnsealingKey::X25519XChaCha20Poly1305(secret_key));
-    }
-
-    #[test]
-    fn unsealing_k256_aead_rpo_roundtrip() {
-        let mut rng = rand::rng();
-        let secret_key = SecretKey::with_rng(&mut rng);
-        assert_unsealing_roundtrip(UnsealingKey::K256AeadRpo(secret_key));
-    }
-
-    #[test]
-    fn unsealing_x25519_aead_rpo_roundtrip() {
-        let mut rng = rand::rng();
-        let secret_key = SecretKey25519::with_rng(&mut rng);
-        assert_unsealing_roundtrip(UnsealingKey::X25519AeadRpo(secret_key));
+    fn unsealing_keys_roundtrip() {
+        for key in sample_unsealing_keys() {
+            assert_unsealing_roundtrip(key);
+        }
     }
 
     #[test]
