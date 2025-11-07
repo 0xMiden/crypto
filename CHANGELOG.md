@@ -1,3 +1,7 @@
+## 0.18.2 (2025-11-08)
+
+- Changed the methodology for computing ECDSA and EdDSA public key commitments ([#643](https://github.com/0xMiden/crypto/pull/643)).
+
 ## 0.18.1 (2025-11-05)
 
 - [BREAKING] removed un-needed mutability from ECDSA `sign()` function ([#628](https://github.com/0xMiden/crypto/pull/628)).

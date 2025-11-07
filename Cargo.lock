@@ -939,7 +939,7 @@ checksum = "f52b00d39961fc5b2736ea853c9cc86238e165017a493d1d5c8eac6bdc4cc273"
 
 [[package]]
 name = "miden-crypto"
-version = "0.18.1"
+version = "0.18.2"
 dependencies = [
  "assert_matches",
  "blake3",
@@ -981,7 +981,7 @@ dependencies = [
 
 [[package]]
 name = "miden-crypto-derive"
-version = "0.18.1"
+version = "0.18.2"
 dependencies = [
  "quote",
  "syn",

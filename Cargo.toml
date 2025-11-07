@@ -11,7 +11,7 @@ keywords     = ["crypto", "hash", "merkle", "miden"]
 license      = "MIT OR Apache-2.0"
 repository   = "https://github.com/0xMiden/crypto"
 rust-version = "1.90"
-version      = "0.18.1"
+version      = "0.18.2"
 
 [workspace.dependencies]
 miden-crypto-derive = { path = "miden-crypto-derive", version = "0.18" }
