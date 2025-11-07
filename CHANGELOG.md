@@ -2,6 +2,7 @@
 
 - Added `compute_challenge_k()` and `verify_with_unchecked_k()` methods to separate hashing and EC logic in EdDSA over Ed25519 ([#602](https://github.com/0xMiden/crypto/pull/602)).
 - Fixed IES sealed box deserialization ([#616](https://github.com/0xMiden/crypto/pull/616)).
+- Fixed AVX2 overflow detection to use 64-bit comparison instead of 32-bit for correct handling of 64-bit values ([#623](https://github.com/0xMiden/crypto/pull/623)).
 
 ## 0.18.0 (2025-10-27)
 
