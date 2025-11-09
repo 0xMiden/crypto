@@ -20,8 +20,8 @@ pub enum MerkleError {
     InvalidPathLength(usize),
     #[error("merkle subtree depth {subtree_depth} exceeds merkle tree depth {tree_depth}")]
     SubtreeDepthExceedsDepth { subtree_depth: u8, tree_depth: u8 },
-    #[error("number of entries in the merkle tree exceeds the maximum of {0}")]
-    TooManyEntries(usize),
+    #[error("number of entries in the merkle tree exceeds the maximum of 2^{0}")]
+    TooManyEntries(u8),
     #[error("number of entries in a leaf ({actual}) exceeds the maximum of ({MAX_LEAF_ENTRIES})")]
     TooManyLeafEntries { actual: usize },
     #[error("node index `{0}` not found in the tree")]
