@@ -1,5 +1,10 @@
+#[cfg(not(feature = "hashmaps"))]
+use alloc::collections::btree_map::Entry as MapEntry;
 use alloc::{boxed::Box, string::String, vec::Vec};
 use std::sync::{PoisonError, RwLock};
+
+#[cfg(feature = "hashmaps")]
+use hashbrown::hash_map::Entry as MapEntry;
 
 use super::{SmtStorage, StorageError, StorageUpdateParts, StorageUpdates};
 use crate::{
@@ -131,17 +136,17 @@ impl SmtStorage for MemoryStorage {
     fn remove_value(&self, index: u64, key: Word) -> Result<Option<Word>, StorageError> {
         let mut leaves_guard = self.leaves.write()?;
 
-        // Take ownership of the leaf to perform mutation safely, then reinsert if not empty.
-        if let Some(mut leaf) = leaves_guard.remove(&index) {
-            let (old_value, is_empty) = leaf.remove(key);
-            if !is_empty {
-                leaves_guard.insert(index, leaf);
-            }
-            Ok(old_value)
-        } else {
-            // Leaf at index does not exist, so no value could be removed.
-            Ok(None)
-        }
+        let old_value = match leaves_guard.entry(index) {
+            MapEntry::Occupied(mut entry) => {
+                let (old_value, is_empty) = entry.get_mut().remove(key);
+                if is_empty {
+                    entry.remove();
+                }
+                old_value
+            },
+            MapEntry::Vacant(_) => None,
+        };
+        Ok(old_value)
     }
 
     /// Retrieves a single leaf node.
