@@ -181,9 +181,9 @@ macro_rules! impl_unseal_elements_with_associated_data {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum SealingKey {
     K256XChaCha20Poly1305(crate::dsa::ecdsa_k256_keccak::PublicKey),
-    X25519XChaCha20Poly1305(crate::dsa::eddsa_25519::PublicKey),
+    X25519XChaCha20Poly1305(crate::dsa::eddsa_25519_sha512::PublicKey),
     K256AeadRpo(crate::dsa::ecdsa_k256_keccak::PublicKey),
-    X25519AeadRpo(crate::dsa::eddsa_25519::PublicKey),
+    X25519AeadRpo(crate::dsa::eddsa_25519_sha512::PublicKey),
 }
 
 impl SealingKey {
@@ -266,7 +266,7 @@ impl Deserializable for SealingKey {
                 Ok(SealingKey::K256XChaCha20Poly1305(key))
             },
             IesScheme::X25519XChaCha20Poly1305 => {
-                let key = crate::dsa::eddsa_25519::PublicKey::read_from(source)?;
+                let key = crate::dsa::eddsa_25519_sha512::PublicKey::read_from(source)?;
                 Ok(SealingKey::X25519XChaCha20Poly1305(key))
             },
             IesScheme::K256AeadRpo => {
@@ -274,7 +274,7 @@ impl Deserializable for SealingKey {
                 Ok(SealingKey::K256AeadRpo(key))
             },
             IesScheme::X25519AeadRpo => {
-                let key = crate::dsa::eddsa_25519::PublicKey::read_from(source)?;
+                let key = crate::dsa::eddsa_25519_sha512::PublicKey::read_from(source)?;
                 Ok(SealingKey::X25519AeadRpo(key))
             },
         }
@@ -287,9 +287,9 @@ impl Deserializable for SealingKey {
 /// Secret key for unsealing messages.
 pub enum UnsealingKey {
     K256XChaCha20Poly1305(crate::dsa::ecdsa_k256_keccak::SecretKey),
-    X25519XChaCha20Poly1305(crate::dsa::eddsa_25519::SecretKey),
+    X25519XChaCha20Poly1305(crate::dsa::eddsa_25519_sha512::SecretKey),
     K256AeadRpo(crate::dsa::ecdsa_k256_keccak::SecretKey),
-    X25519AeadRpo(crate::dsa::eddsa_25519::SecretKey),
+    X25519AeadRpo(crate::dsa::eddsa_25519_sha512::SecretKey),
 }
 
 impl UnsealingKey {
@@ -369,7 +369,7 @@ impl Deserializable for UnsealingKey {
                 Ok(UnsealingKey::K256XChaCha20Poly1305(key))
             },
             IesScheme::X25519XChaCha20Poly1305 => {
-                let key = crate::dsa::eddsa_25519::SecretKey::read_from(source)?;
+                let key = crate::dsa::eddsa_25519_sha512::SecretKey::read_from(source)?;
                 Ok(UnsealingKey::X25519XChaCha20Poly1305(key))
             },
             IesScheme::K256AeadRpo => {
@@ -377,7 +377,7 @@ impl Deserializable for UnsealingKey {
                 Ok(UnsealingKey::K256AeadRpo(key))
             },
             IesScheme::X25519AeadRpo => {
-                let key = crate::dsa::eddsa_25519::SecretKey::read_from(source)?;
+                let key = crate::dsa::eddsa_25519_sha512::SecretKey::read_from(source)?;
                 Ok(UnsealingKey::X25519AeadRpo(key))
             },
         }
