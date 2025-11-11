@@ -4,7 +4,10 @@ use itertools::Itertools;
 use super::{EmptySubtreeRoots, MerkleError, SmtForest, Word};
 use crate::{
     Felt, ONE, WORD_SIZE, ZERO,
-    merkle::{int_to_node, smt::SMT_DEPTH},
+    merkle::{
+        int_to_node,
+        smt::{SMT_DEPTH, Smt},
+    },
 };
 
 // TESTS
@@ -85,6 +88,28 @@ fn test_insert_multiple_values() -> Result<(), MerkleError> {
             Felt::new(9187865964280213047)
         ])
     );
+
+    Ok(())
+}
+
+#[test]
+fn test_insert_path() -> Result<(), MerkleError> {
+    let mut smt = Smt::new();
+    let key = Word::new([ZERO, ZERO, ZERO, ONE]);
+    let value = Word::new([ONE; WORD_SIZE]);
+    smt.insert(key, value)?;
+    let proof = smt.open(&key);
+
+    let mut forest = SmtForest::new();
+    let root = forest.insert_path(proof);
+    assert_eq!(root, smt.root());
+
+    let stored_proof = forest.open(root, key)?;
+    assert!(stored_proof.verify_membership(&key, &value, &root));
+
+    forest.pop_smts(vec![root]);
+    assert!(forest.roots.is_empty());
+    assert!(forest.leaves.is_empty());
 
     Ok(())
 }
