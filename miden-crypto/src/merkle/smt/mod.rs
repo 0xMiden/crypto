@@ -30,6 +30,12 @@ pub use partial::PartialSmt;
 mod forest;
 pub use forest::SmtForest;
 
+#[cfg(all(feature = "rocksdb", feature = "std"))]
+mod persisted_forest;
+#[cfg(all(feature = "rocksdb", feature = "std"))]
+#[allow(unused_imports)]
+pub use persisted_forest::{PersistedSmtForest, RocksDbForestConfig};
+
 // CONSTANTS
 // ================================================================================================
 
