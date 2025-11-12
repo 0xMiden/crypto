@@ -1,7 +1,7 @@
 use alloc::{boxed::Box, string::String, vec::Vec};
 use std::sync::{PoisonError, RwLock};
 
-use super::{SmtStorage, StorageError, StorageUpdateParts, StorageUpdates};
+use super::{SmtStorage, StorageError, StorageUpdateParts, StorageUpdates, SubtreeUpdate};
 use crate::{
     EMPTY_WORD, Map, MapEntry, Word,
     merkle::{
@@ -342,11 +342,14 @@ impl SmtStorage for MemoryStorage {
                 leaves_guard.remove(&index);
             }
         }
-        for (index, subtree_opt) in subtree_updates {
-            if let Some(subtree) = subtree_opt {
-                subtrees_guard.insert(index, subtree);
-            } else {
-                subtrees_guard.remove(&index);
+        for update in subtree_updates {
+            match update {
+                SubtreeUpdate::Store { index, subtree } => {
+                    subtrees_guard.insert(index, subtree);
+                },
+                SubtreeUpdate::Delete { index } => {
+                    subtrees_guard.remove(&index);
+                },
             }
         }
         *root_guard = new_root;
