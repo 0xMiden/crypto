@@ -7,6 +7,7 @@
 - Add serialization of sealing and unsealing keys in IES ([#637](https://github.com/0xMiden/crypto/pull/637)).
 - Fixed undefined `BaseElement` in rescue arch optimizations ([#644](https://github.com/0xMiden/crypto/pull/644)).
 - Added `MerkleStore::has_path()` ([#649](https://github.com/0xMiden/crypto/pull/649)).
+- Refactored `LargeSmt` into smaller focused modules ([#658](https://github.com/0xMiden/crypto/pull/658)).
 
 ## 0.18.2 (2025-11-08)
 
