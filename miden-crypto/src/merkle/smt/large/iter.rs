@@ -1,6 +1,6 @@
 use alloc::{boxed::Box, vec::Vec};
 
-use super::{IN_MEMORY_DEPTH, LargeSmt, SmtStorage, utils::is_empty_parent};
+use super::{IN_MEMORY_DEPTH, LargeSmt, SmtStorage, is_empty_parent};
 use crate::{
     Word,
     merkle::{InnerNodeInfo, Rpo256, smt::large::subtree::Subtree},

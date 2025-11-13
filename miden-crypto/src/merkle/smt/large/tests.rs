@@ -621,7 +621,7 @@ fn test_flat_layout_children_relationship() {
         for depth in 1..super::IN_MEMORY_DEPTH {
             let node_value = leaf_value >> (SMT_DEPTH - depth);
             let node_idx = NodeIndex::new(depth, node_value).unwrap();
-            let memory_idx = super::utils::to_memory_index(&node_idx);
+            let memory_idx = super::to_memory_index(&node_idx);
 
             // Get children from flat layout
             let left_child = in_memory_nodes[memory_idx * 2];

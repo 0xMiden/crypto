@@ -26,22 +26,18 @@ use crate::{
 // ================================================================================================
 
 /// Prepared mutations loaded from storage, ready to be applied.
-pub(super) struct PreparedMutations {
-    pub(super) old_root: Word,
-    pub(super) new_root: Word,
-    pub(super) sorted_node_mutations: Vec<(NodeIndex, NodeMutation)>,
-    pub(super) loaded_subtrees: Map<NodeIndex, Option<Subtree>>,
-    pub(super) new_pairs: Map<Word, Word>,
-    pub(super) leaf_map: Map<u64, Option<SmtLeaf>>,
+struct PreparedMutations {
+    old_root: Word,
+    new_root: Word,
+    sorted_node_mutations: Vec<(NodeIndex, NodeMutation)>,
+    loaded_subtrees: Map<NodeIndex, Option<Subtree>>,
+    new_pairs: Map<Word, Word>,
+    leaf_map: Map<u64, Option<SmtLeaf>>,
 }
 
 // BATCH OPERATIONS
 // ================================================================================================
 
-/// Additional implementation block for batch mutation operations on `LargeSmt`.
-///
-/// This module groups batch operations (`insert_batch`, `compute_mutations`, `apply_mutations`)
-/// separately from single-item operations (like `insert` in `mod.rs`).
 impl<S: SmtStorage> LargeSmt<S> {
     /// Processes one set of `subtree_leaves` at a given `subtree_root_depth` and returns:
     /// - node mutations to apply to in-memory nodes (empty if handled in subtree),

@@ -142,22 +142,12 @@
 //! high-order bits are processed together.
 
 use alloc::vec::Vec;
-use core::mem;
-
-use rayon::prelude::*;
 
 use super::{
-    EMPTY_WORD, EmptySubtreeRoots, InnerNode, InnerNodeInfo, InnerNodes, LeafIndex, MerkleError,
-    NodeIndex, Rpo256, SMT_DEPTH, Smt, SmtLeaf, SmtLeafError, SmtProof, SparseMerklePath,
-    SparseMerkleTree, Word,
+    EmptySubtreeRoots, InnerNode, InnerNodeInfo, InnerNodes, LeafIndex, MerkleError, NodeIndex,
+    SMT_DEPTH, SmtLeaf, SmtProof, SparseMerkleTree, Word,
 };
-use crate::merkle::smt::{
-    Map,
-    full::concurrent::{
-        MutatedSubtreeLeaves, PairComputations, SUBTREE_DEPTH, SubtreeLeaf, SubtreeLeavesIter,
-        build_subtree,
-    },
-};
+use crate::merkle::smt::{Map, full::concurrent::MutatedSubtreeLeaves};
 
 mod error;
 pub use error::LargeSmtError;
@@ -176,10 +166,9 @@ pub use storage::{RocksDbConfig, RocksDbStorage};
 mod iter;
 pub use iter::LargeSmtInnerNodeIterator;
 
-mod utils;
-use utils::{is_empty_parent, to_memory_index};
-
 mod batch_ops;
+mod construction;
+mod smt_trait;
 
 // CONSTANTS
 // ================================================================================================
@@ -267,111 +256,6 @@ impl<S: SmtStorage> LargeSmt<S> {
 
     /// Subtree depths for the subtrees stored in storage.
     pub const SUBTREE_DEPTHS: [u8; 5] = [56, 48, 40, 32, 24];
-
-    // CONSTRUCTORS
-    // --------------------------------------------------------------------------------------------
-
-    /// Returns a new [LargeSmt] backed by the provided storage.
-    ///
-    /// The SMT's root is fetched from the storage backend. If the storage is empty the SMT is
-    /// initialized with the root of an empty tree. Otherwise, materializes in-memory nodes from
-    /// the top subtrees.
-    ///
-    /// # Errors
-    /// Returns an error if fetching the root or initial in-memory nodes from the storage fails.
-    pub fn new(storage: S) -> Result<Self, LargeSmtError> {
-        let root = storage.get_root()?.unwrap_or(*EmptySubtreeRoots::entry(SMT_DEPTH, 0));
-
-        let is_empty = !storage.has_leaves()?;
-
-        // Initialize in-memory nodes
-        let mut in_memory_nodes: Vec<Word> = vec![EMPTY_WORD; NUM_IN_MEMORY_NODES];
-
-        for depth in 0..IN_MEMORY_DEPTH {
-            let child_empty_hash = *EmptySubtreeRoots::entry(SMT_DEPTH, depth + 1);
-            let start = 2 * (1 << depth);
-            let end = 2 * (1 << (depth + 1));
-            in_memory_nodes[start..end].fill(child_empty_hash);
-        }
-
-        // No leaves, return empty tree
-        if is_empty {
-            return Ok(Self { storage, in_memory_nodes });
-        }
-
-        let subtree_roots = storage.get_depth24()?;
-
-        // convert subtree roots to SubtreeLeaf
-        let mut leaf_subtrees: Vec<SubtreeLeaf> = subtree_roots
-            .into_iter()
-            .map(|(index, hash)| SubtreeLeaf { col: index, hash })
-            .collect();
-        leaf_subtrees.sort_by_key(|leaf| leaf.col);
-
-        let mut subtree_leaves: Vec<Vec<SubtreeLeaf>> =
-            SubtreeLeavesIter::from_leaves(&mut leaf_subtrees).collect();
-
-        // build in-memory top of the tree
-        for current_depth in (SUBTREE_DEPTH..=IN_MEMORY_DEPTH).step_by(SUBTREE_DEPTH as usize).rev()
-        {
-            let (nodes, mut subtree_roots): (Vec<Map<_, _>>, Vec<SubtreeLeaf>) = subtree_leaves
-                .into_par_iter()
-                .map(|subtree| {
-                    debug_assert!(subtree.is_sorted());
-                    debug_assert!(!subtree.is_empty());
-                    let (nodes, subtree_root) = build_subtree(subtree, SMT_DEPTH, current_depth);
-                    (nodes, subtree_root)
-                })
-                .unzip();
-            subtree_leaves = SubtreeLeavesIter::from_leaves(&mut subtree_roots).collect();
-            debug_assert!(!subtree_leaves.is_empty());
-
-            for subtree_nodes in nodes {
-                for (index, node) in subtree_nodes {
-                    let memory_index = to_memory_index(&index);
-                    // Store left and right children in flat layout
-                    in_memory_nodes[memory_index * 2] = node.left;
-                    in_memory_nodes[memory_index * 2 + 1] = node.right;
-                }
-            }
-        }
-
-        // Check that the calculated root matches the root in storage
-        // Root is at index 1, with children at indices 2 and 3
-        let calculated_root = Rpo256::merge(&[in_memory_nodes[2], in_memory_nodes[3]]);
-        assert_eq!(calculated_root, root, "Tree reconstruction failed - root mismatch");
-
-        Ok(Self { storage, in_memory_nodes })
-    }
-
-    /// Returns a new [Smt] instantiated with leaves set as specified by the provided entries.
-    ///
-    /// If the `concurrent` feature is enabled, this function uses a parallel implementation to
-    /// process the entries efficiently, otherwise it defaults to the sequential implementation.
-    ///
-    /// All leaves omitted from the entries list are set to [Self::EMPTY_VALUE].
-    ///
-    /// # Errors
-    /// Returns an error if the provided entries contain multiple values for the same key.
-    pub fn with_entries(
-        storage: S,
-        entries: impl IntoIterator<Item = (Word, Word)>,
-    ) -> Result<Self, LargeSmtError> {
-        let entries: Vec<(Word, Word)> = entries.into_iter().collect();
-
-        if storage.has_leaves()? {
-            return Err(StorageError::Unsupported(
-                "Cannot create SMT with non-empty storage".into(),
-            )
-            .into());
-        }
-        let mut tree = LargeSmt::new(storage)?;
-        if entries.is_empty() {
-            return Ok(tree);
-        }
-        tree.build_subtrees(entries)?;
-        Ok(tree)
-    }
 
     // PUBLIC ACCESSORS
     // --------------------------------------------------------------------------------------------
@@ -519,123 +403,6 @@ impl<S: SmtStorage> LargeSmt<S> {
         }
     }
 
-    fn build_subtrees(&mut self, mut entries: Vec<(Word, Word)>) -> Result<(), MerkleError> {
-        entries.par_sort_unstable_by_key(|item| {
-            let index = Self::key_to_leaf_index(&item.0);
-            index.value()
-        });
-        self.build_subtrees_from_sorted_entries(entries)?;
-        Ok(())
-    }
-
-    fn build_subtrees_from_sorted_entries(
-        &mut self,
-        entries: Vec<(Word, Word)>,
-    ) -> Result<(), MerkleError> {
-        let PairComputations {
-            leaves: mut leaf_subtrees,
-            nodes: initial_leaves,
-        } = Smt::sorted_pairs_to_leaves(entries)?;
-
-        if initial_leaves.is_empty() {
-            return Ok(());
-        }
-
-        // Store the initial leaves
-        self.storage.set_leaves(initial_leaves).expect("Failed to store initial leaves");
-
-        // build deep (disk-backed) subtrees
-        leaf_subtrees = std::thread::scope(|scope| {
-            let (sender, receiver) = flume::bounded(CONSTRUCTION_SUBTREE_BATCH_SIZE);
-            let storage: &S = &self.storage;
-
-            scope.spawn(move || -> Result<(), MerkleError> {
-                let mut subtrees: Vec<Subtree> =
-                    Vec::with_capacity(CONSTRUCTION_SUBTREE_BATCH_SIZE);
-                for subtree in receiver.iter() {
-                    subtrees.push(subtree);
-                    if subtrees.len() == CONSTRUCTION_SUBTREE_BATCH_SIZE {
-                        let subtrees_clone = mem::take(&mut subtrees);
-                        storage
-                            .set_subtrees(subtrees_clone)
-                            .expect("Writer thread failed to set subtrees");
-                    }
-                }
-                storage.set_subtrees(subtrees).expect("Writer thread failed to set subtrees");
-                Ok(())
-            });
-
-            for bottom_depth in (IN_MEMORY_DEPTH + SUBTREE_DEPTH..=SMT_DEPTH)
-                .step_by(SUBTREE_DEPTH as usize)
-                .rev()
-            {
-                let mut subtree_roots: Vec<SubtreeLeaf> = leaf_subtrees
-                    .into_par_iter()
-                    .map(|subtree_leaves| {
-                        debug_assert!(subtree_leaves.is_sorted());
-                        debug_assert!(!subtree_leaves.is_empty());
-                        let (nodes, subtree_root) =
-                            build_subtree(subtree_leaves, SMT_DEPTH, bottom_depth);
-
-                        let subtree_root_index =
-                            NodeIndex::new(bottom_depth - SUBTREE_DEPTH, subtree_root.col).unwrap();
-                        let mut subtree = Subtree::new(subtree_root_index);
-                        for (index, node) in nodes {
-                            subtree.insert_inner_node(index, node);
-                        }
-                        sender.send(subtree).expect("Flume channel disconnected unexpectedly");
-                        subtree_root
-                    })
-                    .collect();
-                leaf_subtrees = SubtreeLeavesIter::from_leaves(&mut subtree_roots).collect();
-                debug_assert!(!leaf_subtrees.is_empty());
-            }
-
-            drop(sender);
-            leaf_subtrees
-        });
-
-        // build top of the tree (in-memory only, normal insert)
-        for bottom_depth in (SUBTREE_DEPTH..=IN_MEMORY_DEPTH).step_by(SUBTREE_DEPTH as usize).rev()
-        {
-            let (nodes, mut subtree_roots): (Vec<Map<_, _>>, Vec<SubtreeLeaf>) = leaf_subtrees
-                .into_par_iter()
-                .map(|subtree| {
-                    debug_assert!(subtree.is_sorted());
-                    debug_assert!(!subtree.is_empty());
-                    let (nodes, subtree_root) = build_subtree(subtree, SMT_DEPTH, bottom_depth);
-                    (nodes, subtree_root)
-                })
-                .unzip();
-            leaf_subtrees = SubtreeLeavesIter::from_leaves(&mut subtree_roots).collect();
-            debug_assert!(!leaf_subtrees.is_empty());
-
-            for subtree_nodes in nodes {
-                self.insert_inner_nodes_batch(subtree_nodes.into_iter());
-            }
-        }
-        self.set_root(self.get_inner_node(NodeIndex::root()).hash());
-        Ok(())
-    }
-
-    // STORAGE
-    // --------------------------------------------------------------------------------------------
-
-    // Inserts batch of upper inner nodes
-    fn insert_inner_nodes_batch(
-        &mut self,
-        nodes: impl IntoIterator<Item = (NodeIndex, InnerNode)>,
-    ) {
-        for (index, node) in nodes {
-            if index.depth() < IN_MEMORY_DEPTH {
-                let memory_index = to_memory_index(&index);
-                // Store in flat layout: left at 2*i, right at 2*i+1
-                self.in_memory_nodes[memory_index * 2] = node.left;
-                self.in_memory_nodes[memory_index * 2 + 1] = node.right;
-            }
-        }
-    }
-
     // TEST HELPERS
     // --------------------------------------------------------------------------------------------
 
@@ -645,236 +412,23 @@ impl<S: SmtStorage> LargeSmt<S> {
     }
 }
 
-impl<S: SmtStorage> SparseMerkleTree<SMT_DEPTH> for LargeSmt<S> {
-    type Key = Word;
-    type Value = Word;
-    type Leaf = SmtLeaf;
-    type Opening = SmtProof;
+// HELPERS
+// ================================================================================================
 
-    const EMPTY_VALUE: Self::Value = EMPTY_WORD;
-    const EMPTY_ROOT: Word = *EmptySubtreeRoots::entry(SMT_DEPTH, 0);
+/// Checks if a node with the given children is empty.
+/// A node is considered empty if both children equal the empty hash for that depth.
+pub(super) fn is_empty_parent(left: Word, right: Word, child_depth: u8) -> bool {
+    let empty_hash = *EmptySubtreeRoots::entry(SMT_DEPTH, child_depth);
+    left == empty_hash && right == empty_hash
+}
 
-    fn from_raw_parts(
-        _inner_nodes: InnerNodes,
-        _leaves: Leaves,
-        _root: Word,
-    ) -> Result<Self, MerkleError> {
-        // This method is not supported
-        panic!("LargeSmt::from_raw_parts is not supported");
-    }
-
-    fn root(&self) -> Word {
-        self.storage.get_root().ok().flatten().unwrap_or(Self::EMPTY_ROOT)
-    }
-
-    fn set_root(&mut self, root: Word) {
-        self.storage.set_root(root).expect("Failed to set root");
-    }
-
-    fn get_inner_node(&self, index: NodeIndex) -> InnerNode {
-        if index.depth() < IN_MEMORY_DEPTH {
-            let memory_index = to_memory_index(&index);
-            // Reconstruct InnerNode from flat layout: left at 2*i, right at 2*i+1
-            return InnerNode {
-                left: self.in_memory_nodes[memory_index * 2],
-                right: self.in_memory_nodes[memory_index * 2 + 1],
-            };
-        }
-
-        self.storage
-            .get_inner_node(index)
-            .expect("Failed to get inner node")
-            .unwrap_or_else(|| EmptySubtreeRoots::get_inner_node(SMT_DEPTH, index.depth()))
-    }
-
-    fn insert_inner_node(&mut self, index: NodeIndex, inner_node: InnerNode) -> Option<InnerNode> {
-        if index.depth() < IN_MEMORY_DEPTH {
-            let i = to_memory_index(&index);
-            // Get the old node before replacing
-            let old_left = self.in_memory_nodes[i * 2];
-            let old_right = self.in_memory_nodes[i * 2 + 1];
-
-            // Store new node in flat layout
-            self.in_memory_nodes[i * 2] = inner_node.left;
-            self.in_memory_nodes[i * 2 + 1] = inner_node.right;
-
-            // Check if the old node was empty
-            if is_empty_parent(old_left, old_right, index.depth() + 1) {
-                return None;
-            }
-
-            return Some(InnerNode { left: old_left, right: old_right });
-        }
-        self.storage
-            .set_inner_node(index, inner_node)
-            .expect("Failed to store inner node")
-    }
-
-    fn remove_inner_node(&mut self, index: NodeIndex) -> Option<InnerNode> {
-        if index.depth() < IN_MEMORY_DEPTH {
-            let memory_index = to_memory_index(&index);
-            // Get the old node before replacing with empty hashes
-            let old_left = self.in_memory_nodes[memory_index * 2];
-            let old_right = self.in_memory_nodes[memory_index * 2 + 1];
-
-            // Replace with empty hashes
-            let child_depth = index.depth() + 1;
-            let empty_hash = *EmptySubtreeRoots::entry(SMT_DEPTH, child_depth);
-            self.in_memory_nodes[memory_index * 2] = empty_hash;
-            self.in_memory_nodes[memory_index * 2 + 1] = empty_hash;
-
-            // Return the old node if it wasn't already empty
-            if is_empty_parent(old_left, old_right, child_depth) {
-                return None;
-            }
-
-            return Some(InnerNode { left: old_left, right: old_right });
-        }
-        self.storage.remove_inner_node(index).expect("Failed to remove inner node")
-    }
-
-    fn insert(&mut self, key: Self::Key, value: Self::Value) -> Result<Self::Value, MerkleError> {
-        let old_value = self.get_value(&key);
-        // if the old value and new value are the same, there is nothing to update
-        if value == old_value {
-            return Ok(value);
-        }
-
-        let mutations = self
-            .compute_mutations([(key, value)])
-            .expect("Failed to compute mutations in insert");
-        self.apply_mutations(mutations).expect("Failed to apply mutations in insert");
-
-        Ok(old_value)
-    }
-
-    fn insert_value(
-        &mut self,
-        key: Self::Key,
-        value: Self::Value,
-    ) -> Result<Option<Self::Value>, MerkleError> {
-        // inserting an `EMPTY_VALUE` is equivalent to removing any value associated with `key`
-        let index = Self::key_to_leaf_index(&key).value();
-        if value != Self::EMPTY_VALUE {
-            match self.storage.insert_value(index, key, value) {
-                Ok(prev) => Ok(prev),
-                Err(StorageError::Leaf(SmtLeafError::TooManyLeafEntries { actual })) => {
-                    Err(MerkleError::TooManyLeafEntries { actual })
-                },
-                Err(_) => {
-                    panic!("Storage error during insert_value");
-                },
-            }
-        } else {
-            Ok(self.storage.remove_value(index, key).expect("Failed to remove value"))
-        }
-    }
-
-    fn get_value(&self, key: &Self::Key) -> Self::Value {
-        let leaf_pos = LeafIndex::<SMT_DEPTH>::from(*key);
-        match self.storage.get_leaf(leaf_pos.value()) {
-            Ok(Some(leaf)) => leaf.get_value(key).unwrap_or_default(),
-            Ok(None) => EMPTY_WORD,
-            Err(_) => {
-                panic!("Storage error during get_leaf in get_value");
-            },
-        }
-    }
-
-    fn get_leaf(&self, key: &Word) -> Self::Leaf {
-        let leaf_pos = LeafIndex::<SMT_DEPTH>::from(*key).value();
-        match self.storage.get_leaf(leaf_pos) {
-            Ok(Some(leaf)) => leaf,
-            Ok(None) => SmtLeaf::new_empty((*key).into()),
-            Err(_) => {
-                panic!("Storage error during get_leaf in get_leaf");
-            },
-        }
-    }
-
-    fn hash_leaf(leaf: &Self::Leaf) -> Word {
-        leaf.hash()
-    }
-
-    fn construct_prospective_leaf(
-        &self,
-        mut existing_leaf: SmtLeaf,
-        key: &Word,
-        value: &Word,
-    ) -> Result<SmtLeaf, SmtLeafError> {
-        debug_assert_eq!(existing_leaf.index(), Self::key_to_leaf_index(key));
-
-        match existing_leaf {
-            SmtLeaf::Empty(_) => Ok(SmtLeaf::new_single(*key, *value)),
-            _ => {
-                if *value != EMPTY_WORD {
-                    existing_leaf.insert(*key, *value)?;
-                } else {
-                    existing_leaf.remove(*key);
-                }
-
-                Ok(existing_leaf)
-            },
-        }
-    }
-
-    fn open(&self, key: &Self::Key) -> Self::Opening {
-        let leaf = self.get_leaf(key);
-
-        let mut idx: NodeIndex = LeafIndex::from(*key).into();
-
-        let subtree_roots: Vec<NodeIndex> = (0..NUM_SUBTREE_LEVELS)
-            .scan(idx.parent(), |cursor, _| {
-                let subtree_root = Subtree::find_subtree_root(*cursor);
-                *cursor = subtree_root.parent();
-                Some(subtree_root)
-            })
-            .collect();
-        // cache subtrees in memory
-        let mut cache = Map::<NodeIndex, Subtree>::new();
-        for &root in &subtree_roots {
-            let subtree =
-                match self.storage.get_subtree(root).expect("storage error fetching subtree") {
-                    Some(st) => st,
-                    None => Subtree::new(root),
-                };
-            cache.insert(root, subtree);
-        }
-        let mut path = Vec::with_capacity(idx.depth() as usize);
-        while idx.depth() > 0 {
-            let is_right = idx.is_value_odd();
-            idx = idx.parent();
-
-            let sibling_hash = if idx.depth() < IN_MEMORY_DEPTH {
-                // top levels in memory
-                let InnerNode { left, right } = self.get_inner_node(idx);
-                if is_right { left } else { right }
-            } else {
-                // deep levels come from our 5 preloaded subtrees
-                let root = Subtree::find_subtree_root(idx);
-                let subtree = &cache[&root];
-                let InnerNode { left, right } = subtree
-                    .get_inner_node(idx)
-                    .unwrap_or_else(|| EmptySubtreeRoots::get_inner_node(SMT_DEPTH, idx.depth()));
-                if is_right { left } else { right }
-            };
-
-            path.push(sibling_hash);
-        }
-
-        let merkle_path =
-            SparseMerklePath::from_sized_iter(path).expect("failed to convert to SparseMerklePath");
-        Self::path_and_leaf_to_opening(merkle_path, leaf)
-    }
-
-    fn key_to_leaf_index(key: &Word) -> LeafIndex<SMT_DEPTH> {
-        let most_significant_felt = key[3];
-        LeafIndex::new_max_depth(most_significant_felt.as_int())
-    }
-
-    fn path_and_leaf_to_opening(path: SparseMerklePath, leaf: SmtLeaf) -> SmtProof {
-        SmtProof::new_unchecked(path, leaf)
-    }
+/// Converts a NodeIndex to a flat vector index using 1-indexed layout.
+/// Index 0 is unused, index 1 is root.
+/// For a node at index i: left child at 2*i, right child at 2*i+1.
+pub(super) fn to_memory_index(index: &NodeIndex) -> usize {
+    debug_assert!(index.depth() < IN_MEMORY_DEPTH);
+    debug_assert!(index.value() < (1 << index.depth()));
+    (1usize << index.depth()) + index.value() as usize
 }
 
 impl<S: SmtStorage> PartialEq for LargeSmt<S> {
