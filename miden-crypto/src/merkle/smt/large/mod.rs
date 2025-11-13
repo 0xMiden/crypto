@@ -324,7 +324,7 @@ impl<S: SmtStorage> LargeSmt<S> {
     // ITERATORS
     // --------------------------------------------------------------------------------------------
 
-    /// Returns an iterator over the leaves of this [Smt].
+    /// Returns an iterator over the leaves of this [`LargeSmt`].
     /// Note: This iterator returns owned SmtLeaf values.
     ///
     /// # Errors
@@ -336,7 +336,7 @@ impl<S: SmtStorage> LargeSmt<S> {
         Ok(iter.map(|(idx, leaf)| (LeafIndex::new_max_depth(idx), leaf)))
     }
 
-    /// Returns an iterator over the key-value pairs of this [Smt].
+    /// Returns an iterator over the key-value pairs of this [`LargeSmt`].
     /// Note: This iterator returns owned (Word, Word) tuples.
     ///
     /// # Errors
@@ -352,7 +352,7 @@ impl<S: SmtStorage> LargeSmt<S> {
         }))
     }
 
-    /// Returns an iterator over the inner nodes of this [Smt].
+    /// Returns an iterator over the inner nodes of this [`LargeSmt`].
     ///
     /// # Errors
     /// Returns an error if the storage backend fails during iteration setup.

@@ -302,7 +302,8 @@ impl<S: SmtStorage> LargeSmt<S> {
     ///
     /// # Errors
     /// Returns an error if:
-    /// - Any leaf would exceed [`MAX_LEAF_ENTRIES`](super::MAX_LEAF_ENTRIES) (1024 entries)
+    /// - Any leaf would exceed [`MAX_LEAF_ENTRIES`](crate::merkle::smt::MAX_LEAF_ENTRIES) (1024
+    ///   entries)
     /// - Storage operations fail
     ///
     /// # Example
@@ -652,7 +653,7 @@ impl<S: SmtStorage> LargeSmt<S> {
     /// This method returns a [`MutationSet`], which contains all the information for inserting
     /// `kv_pairs` into this Merkle tree already calculated, including the new root hash, which can
     /// be queried with [`MutationSet::root()`]. Once a mutation set is returned,
-    /// [`Smt::apply_mutations()`] can be called in order to commit these changes to the Merkle
+    /// [`LargeSmt::apply_mutations()`] can be called in order to commit these changes to the Merkle
     /// tree, or [`drop()`] to discard them.
     ///
     /// # Example
@@ -755,7 +756,8 @@ impl<S: SmtStorage> LargeSmt<S> {
         Ok(mutation_set)
     }
 
-    /// Applies the prospective mutations computed with [`Smt::compute_mutations()`] to this tree.
+    /// Applies the prospective mutations computed with [`LargeSmt::compute_mutations()`] to this
+    /// tree.
     ///
     /// # Errors
     /// If `mutations` was computed on a tree with a different root than this one, returns
@@ -771,8 +773,8 @@ impl<S: SmtStorage> LargeSmt<S> {
         Ok(())
     }
 
-    /// Applies the prospective mutations computed with [`Smt::compute_mutations()`] to this tree
-    /// and returns the reverse mutation set.
+    /// Applies the prospective mutations computed with [`LargeSmt::compute_mutations()`] to this
+    /// tree and returns the reverse mutation set.
     ///
     /// Applying the reverse mutation sets to the updated tree will revert the changes.
     ///
