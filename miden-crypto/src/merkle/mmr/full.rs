@@ -167,7 +167,7 @@ impl Mmr {
             .collect();
 
         // Safety: the invariant is maintained by the [Mmr]
-        let peaks = MmrPeaks::new(forest, peaks).unwrap();
+        let peaks = MmrPeaks::new(forest, peaks)?;
 
         Ok(peaks)
     }

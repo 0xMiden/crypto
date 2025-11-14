@@ -1,3 +1,5 @@
+use alloc::string::{String, ToString};
+
 use thiserror::Error;
 
 use super::{MAX_LEAF_ENTRIES, NodeIndex, Word};
@@ -34,4 +36,16 @@ pub enum MerkleError {
     RootNotInStore(Word),
     #[error("partial smt does not track the merkle path for key {0}")]
     UntrackedKey(Word),
+    #[error("internal error: {0}")]
+    InternalError(String),
+}
+
+#[cfg(feature = "concurrent")]
+impl From<crate::merkle::LargeSmtError> for MerkleError {
+    fn from(err: crate::merkle::LargeSmtError) -> Self {
+        match err {
+            crate::merkle::LargeSmtError::Merkle(me) => me,
+            crate::merkle::LargeSmtError::Storage(se) => MerkleError::InternalError(se.to_string()),
+        }
+    }
 }
