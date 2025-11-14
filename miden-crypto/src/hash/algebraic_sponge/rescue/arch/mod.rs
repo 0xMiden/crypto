@@ -81,7 +81,7 @@ pub mod optimized {
     ) -> bool {
         add_constants(state, ark);
         unsafe {
-            apply_sbox(core::mem::transmute::<&mut [BaseElement; 12], &mut [u64; 12]>(state));
+            apply_sbox(core::mem::transmute::<&mut [Felt; 12], &mut [u64; 12]>(state));
         }
         true
     }
@@ -93,7 +93,7 @@ pub mod optimized {
     ) -> bool {
         add_constants(state, ark);
         unsafe {
-            apply_inv_sbox(core::mem::transmute::<&mut [BaseElement; 12], &mut [u64; 12]>(state));
+            apply_inv_sbox(core::mem::transmute::<&mut [Felt; 12], &mut [u64; 12]>(state));
         }
         true
     }
@@ -105,7 +105,7 @@ pub mod optimized {
     ) -> bool {
         add_constants(state, ark);
         unsafe {
-            apply_ext_round(core::mem::transmute::<&mut [BaseElement; 12], &mut [u64; 12]>(state));
+            apply_ext_round(core::mem::transmute::<&mut [Felt; 12], &mut [u64; 12]>(state));
         }
         true
     }
@@ -132,7 +132,7 @@ pub mod optimized {
     ) -> bool {
         add_constants(state, ark);
         unsafe {
-            apply_sbox(core::mem::transmute::<&mut [BaseElement; 12], &mut [u64; 12]>(state));
+            apply_sbox(core::mem::transmute::<&mut [Felt; 12], &mut [u64; 12]>(state));
         }
         true
     }
@@ -144,7 +144,7 @@ pub mod optimized {
     ) -> bool {
         add_constants(state, ark);
         unsafe {
-            apply_inv_sbox(core::mem::transmute::<&mut [BaseElement; 12], &mut [u64; 12]>(state));
+            apply_inv_sbox(core::mem::transmute::<&mut [Felt; 12], &mut [u64; 12]>(state));
         }
         true
     }
@@ -156,7 +156,7 @@ pub mod optimized {
     ) -> bool {
         add_constants(state, ark);
         unsafe {
-            apply_ext_round(core::mem::transmute::<&mut [BaseElement; 12], &mut [u64; 12]>(state));
+            apply_ext_round(core::mem::transmute::<&mut [Felt; 12], &mut [u64; 12]>(state));
         }
         true
     }

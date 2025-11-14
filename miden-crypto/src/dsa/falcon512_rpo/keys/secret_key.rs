@@ -18,7 +18,7 @@ use super::{
 };
 use crate::{
     Word,
-    dsa::rpo_falcon512::{LOG_N, SK_LEN, hash_to_point::hash_to_point_rpo256, math::ntru_gen},
+    dsa::falcon512_rpo::{LOG_N, SK_LEN, hash_to_point::hash_to_point_rpo256, math::ntru_gen},
     hash::blake::Blake3_256,
     zeroize::{Zeroize, ZeroizeOnDrop},
 };
@@ -87,9 +87,7 @@ impl SecretKey {
     /// Generates a secret key from OS-provided randomness.
     #[cfg(feature = "std")]
     pub fn new() -> Self {
-        use rand::{SeedableRng, rngs::StdRng};
-
-        let mut rng = StdRng::from_os_rng();
+        let mut rng = rand::rng();
         Self::with_rng(&mut rng)
     }
 
@@ -173,7 +171,7 @@ impl SecretKey {
     /// These changes make the signature algorithm compliant with the reference implementation.
     #[cfg(all(test, feature = "std"))]
     pub fn sign_with_rng_testing<R: Rng>(&self, message: &[u8], rng: &mut R) -> Signature {
-        use crate::dsa::rpo_falcon512::{hash_to_point::hash_to_point_shake256, tests::ChaCha};
+        use crate::dsa::falcon512_rpo::{hash_to_point::hash_to_point_shake256, tests::ChaCha};
 
         let nonce = Nonce::random(rng);
 

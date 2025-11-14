@@ -386,6 +386,142 @@ fn test_mutations_revert() {
     );
 }
 
+#[test]
+fn test_insert_batch_matches_compute_apply() {
+    let storage1 = MemoryStorage::new();
+    let storage2 = MemoryStorage::new();
+
+    const PAIR_COUNT: u64 = COLS_PER_SUBTREE * 64;
+    let entries = generate_entries(PAIR_COUNT);
+
+    // Create two identical trees
+    let mut tree1 = LargeSmt::with_entries(storage1, entries.clone()).unwrap();
+    let mut tree2 = LargeSmt::with_entries(storage2, entries.clone()).unwrap();
+
+    // Generate updates
+    let updates = generate_updates(entries, 1000);
+
+    // Compute_mutations + apply_mutations
+    let mutations = tree1.compute_mutations(updates.clone()).unwrap();
+    let root1_before = tree1.root().unwrap();
+    tree1.apply_mutations(mutations).unwrap();
+    let root1_after = tree1.root().unwrap();
+
+    // Insert_batch
+    let root2_before = tree2.root().unwrap();
+    let root2_after = tree2.insert_batch(updates.clone()).unwrap();
+
+    // Roots match at each step
+    assert_eq!(root1_before, root2_before, "Initial roots should match");
+    assert_eq!(root1_after, root2_after, "Final roots should match");
+
+    // All values match
+    for (key, _) in updates {
+        let val1 = tree1.get_value(&key);
+        let val2 = tree2.get_value(&key);
+        assert_eq!(val1, val2, "Values should match for key {key:?}");
+    }
+
+    // Verify metadata
+    assert_eq!(tree1.num_leaves().unwrap(), tree2.num_leaves().unwrap());
+    assert_eq!(tree1.num_entries().unwrap(), tree2.num_entries().unwrap());
+}
+
+#[test]
+fn test_insert_batch_empty_tree() {
+    let storage = MemoryStorage::new();
+    let mut smt = LargeSmt::new(storage).unwrap();
+
+    let entries = vec![
+        (
+            crate::Word::new([Felt::new(1), Felt::new(0), Felt::new(0), Felt::new(0)]),
+            crate::Word::new([Felt::new(10), Felt::new(20), Felt::new(30), Felt::new(40)]),
+        ),
+        (
+            crate::Word::new([Felt::new(2), Felt::new(0), Felt::new(0), Felt::new(0)]),
+            crate::Word::new([Felt::new(11), Felt::new(22), Felt::new(33), Felt::new(44)]),
+        ),
+    ];
+
+    let new_root = smt.insert_batch(entries.clone()).unwrap();
+    use crate::merkle::EmptySubtreeRoots;
+    assert_ne!(new_root, *EmptySubtreeRoots::entry(SMT_DEPTH, 0));
+
+    // Verify values were inserted
+    for (key, value) in entries {
+        assert_eq!(smt.get_value(&key), value);
+    }
+}
+
+#[test]
+fn test_insert_batch_with_deletions() {
+    let storage = MemoryStorage::new();
+    let mut smt = LargeSmt::new(storage).unwrap();
+
+    // Initial data
+    let key_1 = crate::Word::new([ONE, ONE, ONE, Felt::new(1)]);
+    let key_2 = crate::Word::new([2_u32.into(), 2_u32.into(), 2_u32.into(), Felt::new(2)]);
+    let key_3 = crate::Word::new([0_u32.into(), 0_u32.into(), 0_u32.into(), Felt::new(3)]);
+
+    let value_1 = crate::Word::new([ONE; WORD_SIZE]);
+    let value_2 = crate::Word::new([2_u32.into(); WORD_SIZE]);
+    let value_3 = crate::Word::new([3_u32.into(); WORD_SIZE]);
+
+    smt.insert(key_1, value_1).unwrap();
+    smt.insert(key_2, value_2).unwrap();
+
+    let initial_root = smt.root().unwrap();
+
+    // Batch update with insertions and deletions
+    let updates = vec![(key_1, EMPTY_WORD), (key_2, value_1), (key_3, value_3)];
+
+    let new_root = smt.insert_batch(updates).unwrap();
+    assert_ne!(new_root, initial_root);
+
+    // Verify the state
+    assert_eq!(smt.get_value(&key_1), EMPTY_WORD);
+    assert_eq!(smt.get_value(&key_2), value_1);
+    assert_eq!(smt.get_value(&key_3), value_3);
+}
+
+#[test]
+fn test_insert_batch_no_mutations() {
+    let storage = MemoryStorage::new();
+    let mut smt = LargeSmt::new(storage).unwrap();
+
+    let key_1 = crate::Word::new([ONE, ONE, ONE, Felt::new(1)]);
+    let value_1 = crate::Word::new([ONE; WORD_SIZE]);
+
+    smt.insert(key_1, value_1).unwrap();
+    let root_before = smt.root().unwrap();
+
+    // Insert the same value again (no change)
+    let root_after = smt.insert_batch(vec![(key_1, value_1)]).unwrap();
+
+    assert_eq!(root_before, root_after);
+}
+
+#[test]
+fn test_insert_batch_large_dataset() {
+    // Test insert_batch with a large dataset
+    let storage = MemoryStorage::new();
+    let mut smt = LargeSmt::new(storage).unwrap();
+
+    const LARGE_COUNT: u64 = COLS_PER_SUBTREE * 128;
+    let entries = generate_entries(LARGE_COUNT);
+
+    let new_root = smt.insert_batch(entries.clone()).unwrap();
+    use crate::merkle::EmptySubtreeRoots;
+    assert_ne!(new_root, *EmptySubtreeRoots::entry(SMT_DEPTH, 0));
+
+    // Spot check some values
+    for (key, value) in entries.iter().step_by(100) {
+        assert_eq!(smt.get_value(key), *value);
+    }
+
+    assert_eq!(smt.num_entries().unwrap(), LARGE_COUNT as usize);
+}
+
 // IN-MEMORY LAYOUT TESTS
 // ================================================================================================
 
