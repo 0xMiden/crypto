@@ -136,10 +136,7 @@ pub struct PublicKey {
 }
 
 impl PublicKey {
-    /// Returns a commitment to the public key using the RPO256 hash function.
-    ///
-    /// The commitment is computed by first converting the public key to field elements (4 bytes
-    /// per element), and then computing a sequential hash of the elements.
+    /// Returns a commitment to the public key
     pub fn to_commitment(&self) -> Word {
         <Self as SequentialCommit>::to_commitment(self)
     }
@@ -183,6 +180,35 @@ impl SequentialCommit for PublicKey {
 
     fn to_elements(&self) -> Vec<Felt> {
         bytes_to_packed_u32_elements(&self.to_bytes())
+    }
+
+    fn to_commitment(&self) -> Self::Commitment {
+        // convert point to bytes [tag, x-cord, y-cord]
+        let point_bytes = self.inner.to_encoded_point(false).to_bytes();
+        // create the uncompressed public key [x,y]
+        let point_bytes: [u8; 64] = point_bytes[1..].try_into().unwrap();
+        // compute the keccak
+        use sha3::{Digest, Keccak256};
+        let mut hasher = Keccak256::new();
+        hasher.update(point_bytes);
+        let hash: [u8; 32] = hasher.finalize().into();
+        // take the last 20 bytes
+        let address_bytes: [u8; 20] = hash[12..].try_into().unwrap();
+        // encode 20 bytes into a word as 5 per bytes
+        let mut word = [0u64; 4];
+        for i in 0..4 {
+            word[i] = u64::from_le_bytes([
+                0,
+                0,
+                0,
+                address_bytes[5 * i],
+                address_bytes[5 * i + 1],
+                address_bytes[5 * i + 2],
+                address_bytes[5 * i + 3],
+                address_bytes[5 * i + 4],
+            ])
+        }
+        word.try_into().unwrap()
     }
 }
 

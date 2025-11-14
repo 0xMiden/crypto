@@ -1,3 +1,6 @@
+use core::str::FromStr;
+
+use k256::{SecretKey as K256SecretKey, elliptic_curve::ScalarPrimitive};
 use rand::rng;
 
 use super::*;
@@ -110,4 +113,29 @@ fn test_secret_key_debug_redaction() {
     // Verify Display impl also elides
     let display_output = format!("{secret_key}");
     assert_eq!(display_output, "<elided secret for SecretKey>");
+}
+
+#[test]
+fn test_publick_key_commitment() {
+    let sk = K256SecretKey::new(
+        ScalarPrimitive::from_str(
+            "0101010101010101010101010101010101010101010101010101010101010101",
+        )
+        .unwrap(),
+    );
+    let sk = SecretKey { inner: SigningKey::from(sk) };
+
+    let pk_comm = sk.public_key().to_commitment().to_hex();
+    let pk_comm_should_be = "0x1a642f0e3c3af545e7acbd38b07251b3990914f1";
+
+    // remove zeroes from pk commitment
+    let formated_pk = format!(
+        "0x{}{}{}{}",
+        pk_comm[0..18].strip_prefix("0x000000").unwrap(),
+        pk_comm[18..34].strip_prefix("000000").unwrap(),
+        pk_comm[34..50].strip_prefix("000000").unwrap(),
+        pk_comm[50..66].strip_prefix("000000").unwrap()
+    );
+
+    assert_eq!(formated_pk, pk_comm_should_be)
 }
