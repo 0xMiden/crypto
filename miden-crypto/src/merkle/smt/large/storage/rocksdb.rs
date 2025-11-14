@@ -12,9 +12,9 @@ use super::{SmtStorage, StorageError, StorageUpdateParts, StorageUpdates};
 use crate::{
     EMPTY_WORD, Word,
     merkle::{
-        InnerNode, NodeIndex, SmtLeaf,
+        NodeIndex,
         smt::{
-            Map,
+            InnerNode, Map, SmtLeaf,
             large::{IN_MEMORY_DEPTH, LargeSmt, subtree::Subtree},
         },
     },
@@ -1157,7 +1157,7 @@ impl RocksDbConfig {
     ///
     /// # Examples
     /// ```
-    /// use miden_crypto::merkle::RocksDbConfig;
+    /// use miden_crypto::merkle::smt::RocksDbConfig;
     ///
     /// let config = RocksDbConfig::new("/path/to/database");
     /// ```
@@ -1180,7 +1180,7 @@ impl RocksDbConfig {
     ///
     /// # Examples
     /// ```
-    /// use miden_crypto::merkle::RocksDbConfig;
+    /// use miden_crypto::merkle::smt::RocksDbConfig;
     ///
     /// let config = RocksDbConfig::new("/path/to/database")
     ///     .with_cache_size(2 * 1024 * 1024 * 1024); // 2GB cache
@@ -1201,7 +1201,7 @@ impl RocksDbConfig {
     ///
     /// # Examples
     /// ```
-    /// use miden_crypto::merkle::RocksDbConfig;
+    /// use miden_crypto::merkle::smt::RocksDbConfig;
     ///
     /// let config = RocksDbConfig::new("/path/to/database")
     ///     .with_max_open_files(1024); // Allow up to 1024 open files

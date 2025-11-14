@@ -6,8 +6,11 @@ use super::{EMPTY_WORD, Felt, LeafIndex, NodeIndex, Rpo256, SMT_DEPTH, Smt, SmtL
 use crate::{
     ONE, WORD_SIZE,
     merkle::{
-        EmptySubtreeRoots, MerkleStore, MutationSet, SmtLeafError,
-        smt::{Map, NodeMutation, SparseMerkleTree, full::MAX_LEAF_ENTRIES},
+        EmptySubtreeRoots,
+        smt::{
+            Map, MutationSet, NodeMutation, SmtLeafError, SparseMerkleTree, full::MAX_LEAF_ENTRIES,
+        },
+        store::MerkleStore,
     },
     utils::{Deserializable, Serializable},
 };

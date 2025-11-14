@@ -4,8 +4,8 @@ use super::{LeafIndex, SMT_DEPTH};
 use crate::{
     EMPTY_WORD, Word,
     merkle::{
-        InnerNode, InnerNodeInfo, MerkleError, NodeIndex, Smt, SmtLeaf, SmtProof, SparseMerklePath,
-        smt::{InnerNodes, Leaves, SparseMerkleTree},
+        InnerNodeInfo, MerkleError, NodeIndex, SparseMerklePath,
+        smt::{InnerNode, InnerNodes, Leaves, Smt, SmtLeaf, SmtProof, SparseMerkleTree},
     },
 };
 

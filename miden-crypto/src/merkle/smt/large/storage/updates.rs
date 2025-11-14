@@ -1,8 +1,8 @@
 use crate::{
     Word,
     merkle::{
-        NodeIndex, SmtLeaf,
-        smt::{Map, large::subtree::Subtree},
+        NodeIndex,
+        smt::{Map, SmtLeaf, large::subtree::Subtree},
     },
 };
 

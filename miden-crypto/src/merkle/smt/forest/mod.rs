@@ -3,10 +3,7 @@ use alloc::{collections::BTreeSet, vec::Vec};
 use super::{EmptySubtreeRoots, MerkleError, NodeIndex, SmtLeaf, SmtProof, Word};
 use crate::{
     Map,
-    merkle::{
-        LeafIndex, SmtLeafError, SmtProofError,
-        smt::{SMT_DEPTH, forest::store::SmtStore},
-    },
+    merkle::smt::{LeafIndex, SMT_DEPTH, SmtLeafError, SmtProofError, forest::store::SmtStore},
 };
 
 mod store;
@@ -29,7 +26,10 @@ mod tests;
 /// ```rust
 /// use miden_crypto::{
 ///     Felt, ONE, WORD_SIZE, Word, ZERO,
-///     merkle::{EmptySubtreeRoots, MAX_LEAF_ENTRIES, SMT_DEPTH, SmtForest},
+///     merkle::{
+///         EmptySubtreeRoots,
+///         smt::{MAX_LEAF_ENTRIES, SMT_DEPTH, SmtForest},
+///     },
 /// };
 ///
 /// // Create a new SMT forest

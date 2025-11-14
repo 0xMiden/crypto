@@ -32,7 +32,7 @@ use std::hint;
 use criterion::{Criterion, criterion_group, criterion_main};
 use miden_crypto::{
     Felt, ONE, Word,
-    merkle::{LeafIndex, SimpleSmt, Smt, SmtLeaf, SubtreeLeaf, build_subtree_for_bench},
+    merkle::smt::{LeafIndex, SimpleSmt, Smt, SmtLeaf, SubtreeLeaf, build_subtree_for_bench},
 };
 
 mod common;

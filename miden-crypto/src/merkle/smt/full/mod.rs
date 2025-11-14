@@ -334,7 +334,7 @@ impl Smt {
     /// # Example
     /// ```
     /// # use miden_crypto::{Felt, Word};
-    /// # use miden_crypto::merkle::{Smt, EmptySubtreeRoots, SMT_DEPTH};
+    /// # use miden_crypto::merkle::{EmptySubtreeRoots, smt::{Smt, SMT_DEPTH}};
     /// let mut smt = Smt::new();
     /// let pair = (Word::default(), Word::default());
     /// let mutations = smt.compute_mutations(vec![pair]).unwrap();
