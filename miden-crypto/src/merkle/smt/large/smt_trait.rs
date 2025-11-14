@@ -6,8 +6,8 @@ use super::{
 use crate::{
     EMPTY_WORD, Word,
     merkle::{
-        EmptySubtreeRoots, InnerNode, LeafIndex, MerkleError, NodeIndex, SmtLeaf, SmtLeafError,
-        SmtProof, SparseMerklePath,
+        EmptySubtreeRoots, InnerNode, LargeSmtError, LeafIndex, MerkleError, NodeIndex, SmtLeaf,
+        SmtLeafError, SmtProof, SparseMerklePath,
         smt::{
             Map, SparseMerkleTree,
             large::{is_empty_parent, to_memory_index},
@@ -110,9 +110,7 @@ impl<S: SmtStorage> SparseMerkleTree<SMT_DEPTH> for LargeSmt<S> {
             return Ok(value);
         }
 
-        let mutations = self
-            .compute_mutations([(key, value)])
-            .expect("Failed to compute mutations in insert");
+        let mutations = self.compute_mutations([(key, value)])?;
         self.apply_mutations(mutations).expect("Failed to apply mutations in insert");
 
         Ok(old_value)
@@ -136,7 +134,7 @@ impl<S: SmtStorage> SparseMerkleTree<SMT_DEPTH> for LargeSmt<S> {
                 },
             }
         } else {
-            Ok(self.storage.remove_value(index, key).expect("Failed to remove value"))
+            Ok(self.storage.remove_value(index, key).map_err(LargeSmtError::from)?)
         }
     }
 
