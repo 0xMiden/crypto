@@ -1,3 +1,7 @@
+## 0.18.3 (TODO)
+
+- Fixed serialization of `PartialSmt` panicking in debug mode when it was constructed from only a root ([#662](https://github.com/0xMiden/crypto/pull/662)).
+
 ## 0.18.2 (2025-11-08)
 
 - Changed the methodology for computing ECDSA and EdDSA public key commitments ([#643](https://github.com/0xMiden/crypto/pull/643)).
