@@ -1564,14 +1564,11 @@ impl<S: SmtStorage> SparseMerkleTree<SMT_DEPTH> for LargeSmt<S> {
             return Ok(value);
         }
 
-        let mutations = self
-            .compute_mutations([(key, value)])
-            .expect("Failed to compute mutations in insert");
+        let mutations = self.compute_mutations([(key, value)])?;
         self.apply_mutations(mutations).expect("Failed to apply mutations in insert");
 
         Ok(old_value)
     }
-
     fn insert_value(
         &mut self,
         key: Self::Key,
@@ -1590,7 +1587,7 @@ impl<S: SmtStorage> SparseMerkleTree<SMT_DEPTH> for LargeSmt<S> {
                 },
             }
         } else {
-            Ok(self.storage.remove_value(index, key).expect("Failed to remove value"))
+            Ok(self.storage.remove_value(index, key).map_err(LargeSmtError::from)?)
         }
     }
 
