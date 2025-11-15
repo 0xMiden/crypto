@@ -1,17 +1,18 @@
 /// The representation of a single Merkle path.
 use super::super::MerklePath;
 use super::forest::Forest;
+use crate::Word;
 
 // MMR PROOF
 // ================================================================================================
 
 #[derive(Debug, Clone, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
-pub struct MmrProof {
-    /// The state of the MMR when the MmrProof was created.
+pub struct MmrPath {
+    /// The state of the MMR when the MMR path was created.
     pub forest: Forest,
 
-    /// The position of the leaf value on this MmrProof.
+    /// The position of the leaf value within the MMR.
     pub position: usize,
 
     /// The Merkle opening, starting from the value's sibling up to and excluding the root of the
@@ -19,9 +20,9 @@ pub struct MmrProof {
     pub merkle_path: MerklePath,
 }
 
-impl MmrProof {
+impl MmrPath {
     /// Converts the leaf global position into a local position that can be used to verify the
-    /// merkle_path.
+    /// Merkle path.
     pub fn relative_pos(&self) -> usize {
         self.forest
             .leaf_relative_position(self.position)
@@ -34,13 +35,36 @@ impl MmrProof {
     }
 }
 
+#[derive(Debug, Clone, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
+pub struct MmrProof {
+    /// The Merkle path data describing how to authenticate the leaf.
+    pub path: MmrPath,
+
+    /// The leaf value that was opened.
+    pub leaf: Word,
+}
+
+impl MmrProof {
+    /// Converts the leaf global position into a local position that can be used to verify the
+    /// merkle_path.
+    pub fn relative_pos(&self) -> usize {
+        self.path.relative_pos()
+    }
+
+    /// Returns index of the MMR peak against which the Merkle path in this proof can be verified.
+    pub fn peak_index(&self) -> usize {
+        self.path.peak_index()
+    }
+}
+
 // TESTS
 // ================================================================================================
 
 #[cfg(test)]
 mod tests {
-    use super::{MerklePath, MmrProof};
-    use crate::merkle::mmr::forest::Forest;
+    use super::{MerklePath, MmrPath, MmrProof};
+    use crate::{Word, merkle::mmr::forest::Forest};
 
     #[test]
     fn test_peak_index() {
@@ -93,10 +117,12 @@ mod tests {
     }
 
     fn make_dummy_proof(forest: Forest, position: usize) -> MmrProof {
-        MmrProof {
+        let path = MmrPath {
             forest,
             position,
             merkle_path: MerklePath::default(),
-        }
+        };
+
+        MmrProof { path, leaf: Word::empty() }
     }
 }

@@ -19,4 +19,4 @@ pub use full::Mmr;
 pub use inorder::InOrderIndex;
 pub use partial::PartialMmr;
 pub use peaks::MmrPeaks;
-pub use proof::MmrProof;
+pub use proof::{MmrPath, MmrProof};
