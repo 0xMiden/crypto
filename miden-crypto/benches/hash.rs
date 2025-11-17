@@ -26,6 +26,7 @@ use miden_crypto::{
     hash::{
         blake::{Blake3_160, Blake3_192, Blake3_256},
         keccak::Keccak256,
+        poseidon2::Poseidon2,
         rpo::Rpo256,
         rpx::Rpx256,
     },
@@ -213,6 +214,75 @@ benchmark_hash_merge_many!(
     }
 );
 
+// === Poseidon2 Hash Benchmarks ===
+
+// Single hash operation with parameterized input sizes
+benchmark_hash!(
+    hash_poseidon2_single,
+    "poseidon2",
+    "single",
+    HASH_INPUT_SIZES,
+    |b: &mut criterion::Bencher, size| {
+        let data = generate_byte_array_sequential(size);
+        b.iter(|| Poseidon2::hash(black_box(&data)))
+    },
+    size,
+    |size| Some(criterion::Throughput::Bytes(size as u64))
+);
+
+// 2-to-1 hash merge with parameterized inputs
+benchmark_hash_merge!(
+    hash_poseidon2_merge,
+    "poseidon2",
+    &[32, 64, 256],
+    |b: &mut criterion::Bencher, size| {
+        let input1 = Poseidon2::hash(&generate_byte_array_random(size));
+        let input2 = Poseidon2::hash(&generate_byte_array_random(size));
+        b.iter(|| Poseidon2::merge(black_box(&[input1, input2])))
+    }
+);
+
+// Sequential hashing of Felt elements with parameterized counts
+benchmark_hash_felt!(
+    hash_poseidon2_sequential_felt,
+    "poseidon2",
+    HASH_ELEMENT_COUNTS,
+    |b: &mut criterion::Bencher, count| {
+        let elements = generate_felt_array_sequential(count);
+        b.iter(|| Poseidon2::hash_elements(black_box(&elements)))
+    },
+    |count| Some(criterion::Throughput::Elements(count as u64))
+);
+
+// Domain-separated merging with parameterized inputs
+benchmark_hash_merge_domain!(
+    hash_poseidon2_merge_in_domain,
+    "poseidon2",
+    MERGE_INPUT_SIZES,
+    &[0u64, 1, u64::MAX],
+    |b: &mut criterion::Bencher, (size, domain)| {
+        let data = generate_byte_array_sequential(size);
+        let digest = Poseidon2::hash(&data);
+        let domain_felt = Felt::new(domain);
+        b.iter(|| Poseidon2::merge_in_domain(black_box(&[digest, digest]), domain_felt))
+    }
+);
+
+// Multi-digest merging with parameterized digest counts
+benchmark_hash_merge_many!(
+    hash_poseidon2_merge_many,
+    "poseidon2",
+    &[1, 2],
+    |b: &mut criterion::Bencher, digest_count| {
+        let mut digests = Vec::new();
+        for _ in 0..digest_count {
+            let data = generate_byte_array_sequential(64);
+            digests.push(Poseidon2::hash(&data));
+        }
+        b.iter(|| Poseidon2::merge_many(black_box(&digests)))
+    }
+);
+
 // === Blake3 Hash Benchmarks ===
 
 // Single hash operation with parameterized input sizes
@@ -366,34 +436,40 @@ benchmark_hash_felt!(
 criterion_group!(
     hash_benchmark_group,
     // RPO256 benchmarks
-    hash_rpo256_single,
+    //hash_rpo256_single,
     hash_rpo256_merge,
-    hash_rpo256_sequential_felt,
-    hash_rpo256_merge_in_domain,
-    hash_rpo256_merge_with_int,
-    hash_rpo256_merge_many,
-    // RPX256 benchmarks
-    hash_rpx256_single,
-    hash_rpx256_merge,
-    hash_rpx256_sequential_felt,
-    hash_rpx256_merge_in_domain,
-    hash_rpx256_merge_with_int,
-    hash_rpx256_merge_many,
-    // Blake3 benchmarks
-    hash_blake3_single,
-    hash_blake3_merge,
-    hash_blake3_sequential_felt,
-    // Blake3_192 benchmarks
-    hash_blake3_192_single,
-    hash_blake3_192_merge,
-    hash_blake3_192_sequential_felt,
-    // Blake3_160 benchmarks
-    hash_blake3_160_single,
-    hash_blake3_160_merge,
-    hash_blake3_160_sequential_felt,
-    // Keccak256 benchmarks
-    hash_keccak_256_merge,
-    hash_keccak_256_sequential_felt,
+    //hash_rpo256_sequential_felt,
+    //hash_rpo256_merge_in_domain,
+    //hash_rpo256_merge_with_int,
+    //hash_rpo256_merge_many,
+    //// RPX256 benchmarks
+    //hash_rpx256_single,
+    //hash_rpx256_merge,
+    //hash_rpx256_sequential_felt,
+    //hash_rpx256_merge_in_domain,
+    //hash_rpx256_merge_with_int,
+    //hash_rpx256_merge_many,
+    // Poseidon2 benchmarks
+    //hash_poseidon2_single,
+    hash_poseidon2_merge,
+    //hash_poseidon2_sequential_felt,
+    //hash_poseidon2_merge_in_domain,
+    //hash_poseidon2_merge_many,
+    //// Blake3 benchmarks
+    //hash_blake3_single,
+    //hash_blake3_merge,
+    //hash_blake3_sequential_felt,
+    //// Blake3_192 benchmarks
+    //hash_blake3_192_single,
+    //hash_blake3_192_merge,
+    //hash_blake3_192_sequential_felt,
+    //// Blake3_160 benchmarks
+    //hash_blake3_160_single,
+    //hash_blake3_160_merge,
+    //hash_blake3_160_sequential_felt,
+    //// Keccak256 benchmarks
+    //hash_keccak_256_merge,
+    //hash_keccak_256_sequential_felt,
 );
 
 criterion_main!(hash_benchmark_group);

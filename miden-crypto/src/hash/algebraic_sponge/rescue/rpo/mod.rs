@@ -75,8 +75,12 @@ impl AlgebraicSponge for Rpo256 {
     /// Applies RPO permutation to the provided state.
     #[inline(always)]
     fn apply_permutation(state: &mut [Felt; STATE_WIDTH]) {
-        for i in 0..NUM_ROUNDS {
+        const CUTOFF: usize = 1;
+        for i in 0..CUTOFF {
             Self::apply_round(state, i);
+        }
+        for i in CUTOFF..NUM_ROUNDS {
+            Self::apply_round_partial(state, i);
         }
     }
 }
@@ -144,8 +148,12 @@ impl Rpo256 {
     /// Applies RPO permutation to the provided state.
     #[inline(always)]
     pub fn apply_permutation(state: &mut [Felt; STATE_WIDTH]) {
-        for i in 0..NUM_ROUNDS {
+        const CUTOFF: usize = 1;
+        for i in 0..CUTOFF {
             Self::apply_round(state, i);
+        }
+        for i in CUTOFF..NUM_ROUNDS {
+            Self::apply_round_partial(state, i);
         }
     }
 
@@ -164,6 +172,24 @@ impl Rpo256 {
         if !add_constants_and_apply_inv_sbox(state, &ARK2[round]) {
             add_constants(state, &ARK2[round]);
             apply_inv_sbox(state);
+        }
+    }
+
+    /// RPO round function.
+    #[inline(always)]
+    pub fn apply_round_partial(state: &mut [Felt; STATE_WIDTH], round: usize) {
+        // apply first half of RPO round
+        apply_mds(state);
+        if !add_constants_and_apply_sbox(state, &ARK1[round]) {
+            add_constants(state, &ARK1[round]);
+            apply_sbox(state);
+        }
+
+        // apply second half of RPO round
+        apply_mds(state);
+        if !add_constants_and_apply_inv_sbox(state, &ARK2[round]) {
+            add_constants(state, &ARK2[round]);
+            //apply_inv_sbox(state);
         }
     }
 }
