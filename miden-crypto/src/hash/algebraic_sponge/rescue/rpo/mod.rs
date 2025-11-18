@@ -79,6 +79,7 @@ impl AlgebraicSponge for Rpo256 {
         for i in 0..CUTOFF {
             Self::apply_round(state, i);
         }
+        let cnt = 0;
         for i in CUTOFF..NUM_ROUNDS {
             Self::apply_round_partial(state, i);
         }
