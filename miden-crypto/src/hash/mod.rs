@@ -37,5 +37,5 @@ pub trait HasherExt: Hasher {
     /// This method allows for more efficient hashing by avoiding the need to
     /// allocate a contiguous buffer when the input data is already available
     /// as discrete slices.
-    fn hash_iter<'a>(&self, slices: impl Iterator<Item = &'a [u8]>) -> Self::Digest;
+    fn hash_iter<'a>(slices: impl Iterator<Item = &'a [u8]>) -> Self::Digest;
 }

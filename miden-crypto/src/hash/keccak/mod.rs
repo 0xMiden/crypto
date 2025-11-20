@@ -102,7 +102,7 @@ impl Digest for Keccak256Digest {
 pub struct Keccak256;
 
 impl HasherExt for Keccak256 {
-    fn hash_iter<'a>(&self, slices: impl Iterator<Item = &'a [u8]>) -> Self::Digest {
+    fn hash_iter<'a>(slices: impl Iterator<Item = &'a [u8]>) -> Self::Digest {
         let mut hasher = sha3::Keccak256::new();
         for slice in slices {
             hasher.update(slice);
@@ -181,8 +181,8 @@ impl Keccak256 {
 
     /// Hashes an iterator of byte slices.
     #[inline(always)]
-    pub fn hash_iter<'a>(&self, slices: impl Iterator<Item = &'a [u8]>) -> Keccak256Digest {
-        <Self as HasherExt>::hash_iter(self, slices)
+    pub fn hash_iter<'a>(slices: impl Iterator<Item = &'a [u8]>) -> Keccak256Digest {
+        <Self as HasherExt>::hash_iter(slices)
     }
 }
 

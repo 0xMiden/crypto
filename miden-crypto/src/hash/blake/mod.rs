@@ -146,7 +146,7 @@ impl ElementHasher for Blake3_256 {
 }
 
 impl HasherExt for Blake3_256 {
-    fn hash_iter<'a>(&self, slices: impl Iterator<Item = &'a [u8]>) -> Self::Digest {
+    fn hash_iter<'a>(slices: impl Iterator<Item = &'a [u8]>) -> Self::Digest {
         let mut hasher = blake3::Hasher::new();
         for slice in slices {
             hasher.update(slice);
@@ -180,11 +180,8 @@ impl Blake3_256 {
 
     /// Hashes an iterator of byte slices.
     #[inline(always)]
-    pub fn hash_iter<'a>(
-        &self,
-        slices: impl Iterator<Item = &'a [u8]>,
-    ) -> Blake3Digest<DIGEST32_BYTES> {
-        <Self as HasherExt>::hash_iter(self, slices)
+    pub fn hash_iter<'a>(slices: impl Iterator<Item = &'a [u8]>) -> Blake3Digest<DIGEST32_BYTES> {
+        <Self as HasherExt>::hash_iter(slices)
     }
 }
 
@@ -196,7 +193,7 @@ impl Blake3_256 {
 pub struct Blake3_192;
 
 impl HasherExt for Blake3_192 {
-    fn hash_iter<'a>(&self, slices: impl Iterator<Item = &'a [u8]>) -> Self::Digest {
+    fn hash_iter<'a>(slices: impl Iterator<Item = &'a [u8]>) -> Self::Digest {
         let mut hasher = blake3::Hasher::new();
         for slice in slices {
             hasher.update(slice);
@@ -268,11 +265,8 @@ impl Blake3_192 {
 
     /// Hashes an iterator of byte slices.
     #[inline(always)]
-    pub fn hash_iter<'a>(
-        &self,
-        slices: impl Iterator<Item = &'a [u8]>,
-    ) -> Blake3Digest<DIGEST24_BYTES> {
-        <Self as HasherExt>::hash_iter(self, slices)
+    pub fn hash_iter<'a>(slices: impl Iterator<Item = &'a [u8]>) -> Blake3Digest<DIGEST24_BYTES> {
+        <Self as HasherExt>::hash_iter(slices)
     }
 }
 
@@ -284,7 +278,7 @@ impl Blake3_192 {
 pub struct Blake3_160;
 
 impl HasherExt for Blake3_160 {
-    fn hash_iter<'a>(&self, slices: impl Iterator<Item = &'a [u8]>) -> Self::Digest {
+    fn hash_iter<'a>(slices: impl Iterator<Item = &'a [u8]>) -> Self::Digest {
         let mut hasher = blake3::Hasher::new();
         for slice in slices {
             hasher.update(slice);
@@ -356,11 +350,8 @@ impl Blake3_160 {
 
     /// Hashes an iterator of byte slices.
     #[inline(always)]
-    pub fn hash_iter<'a>(
-        &self,
-        slices: impl Iterator<Item = &'a [u8]>,
-    ) -> Blake3Digest<DIGEST20_BYTES> {
-        <Self as HasherExt>::hash_iter(self, slices)
+    pub fn hash_iter<'a>(slices: impl Iterator<Item = &'a [u8]>) -> Blake3Digest<DIGEST20_BYTES> {
+        <Self as HasherExt>::hash_iter(slices)
     }
 }
 

@@ -29,7 +29,6 @@ proptest! {
     #[test]
     fn keccak256_hash_iter_matches_hash(ref slices in any::<Vec<Vec<u8>>>()) {
         // Test that hash_iter produces the same result as concatenating all slices
-        let hasher = Keccak256;
 
         // Concatenate all slices to create the expected result using the original hash method
         let mut concatenated = Vec::new();
@@ -39,17 +38,17 @@ proptest! {
         let expected = Keccak256::hash(&concatenated);
 
         // Test with the original iterator of slices
-        let actual = hasher.hash_iter(slices.iter().map(|v| v.as_slice()));
+        let actual = Keccak256::hash_iter(slices.iter().map(|v| v.as_slice()));
         assert_eq!(expected, actual);
 
         // Test with empty slices list (should produce hash of empty string)
-        let empty_actual = hasher.hash_iter(core::iter::empty());
+        let empty_actual = Keccak256::hash_iter(core::iter::empty());
         let empty_expected = Keccak256::hash(b"");
         assert_eq!(empty_expected, empty_actual);
 
         // Test with single slice (should be identical to hash)
         if let Some(single_slice) = slices.first() {
-            let single_actual = hasher.hash_iter(core::iter::once(single_slice.as_slice()));
+            let single_actual = Keccak256::hash_iter(core::iter::once(single_slice.as_slice()));
             let single_expected = Keccak256::hash(single_slice);
             assert_eq!(single_expected, single_actual);
         }
