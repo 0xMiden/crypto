@@ -16,7 +16,7 @@ use winter_utils::{ByteReader, ByteWriter, Deserializable, DeserializationError,
 
 use super::{
     super::{InnerNodeInfo, MerklePath},
-    MmrDelta, MmrError, MmrPeaks, MmrProof,
+    MmrDelta, MmrError, MmrPath, MmrPeaks, MmrProof,
     forest::{Forest, TreeSizeIterator},
 };
 use crate::{Word, merkle::Rpo256};
@@ -100,13 +100,15 @@ impl Mmr {
         if forest > self.forest {
             return Err(MmrError::ForestOutOfBounds(forest.num_leaves(), self.forest.num_leaves()));
         }
-        let (_, path) = self.collect_merkle_path_and_value(pos, forest)?;
+        let (leaf, path) = self.collect_merkle_path_and_value(pos, forest)?;
 
-        Ok(MmrProof {
+        let path = MmrPath {
             forest,
             position: pos,
             merkle_path: MerklePath::new(path),
-        })
+        };
+
+        Ok(MmrProof { path, leaf })
     }
 
     /// Returns the leaf value at position `pos`.
