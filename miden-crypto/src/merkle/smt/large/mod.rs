@@ -164,6 +164,8 @@ mod error;
 pub use error::LargeSmtError;
 
 #[cfg(test)]
+mod property_tests;
+#[cfg(test)]
 mod tests;
 
 mod subtree;

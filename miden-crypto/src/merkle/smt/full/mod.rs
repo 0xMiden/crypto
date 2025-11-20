@@ -635,6 +635,7 @@ impl Smt {
         kv_pairs: impl IntoIterator<Item = (Word, Word)>,
     ) -> MutationSet<SMT_DEPTH, Word, Word> {
         <Self as SparseMerkleTree<SMT_DEPTH>>::compute_mutations(self, kv_pairs)
+            .expect("Failed to compute mutations in fuzzing")
     }
 }
 
