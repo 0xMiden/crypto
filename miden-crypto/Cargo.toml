@@ -61,6 +61,7 @@ name    = "rand"
 concurrent = ["dep:rayon", "hashbrown?/rayon"]
 default = ["concurrent", "std"]
 executable = ["dep:clap", "dep:rand-utils", "std"]
+fuzzing = []
 hashmaps = ["dep:hashbrown"]
 internal = []
 rocksdb = ["concurrent", "dep:rocksdb"]

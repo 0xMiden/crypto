@@ -1,7 +1,7 @@
 #![no_main]
 
 use libfuzzer_sys::fuzz_target;
-use miden_crypto::{Felt, ONE, Word, hash::rpo::Word, merkle::Smt};
+use miden_crypto::{Felt, ONE, Word, merkle::Smt};
 use rand::Rng; // Needed for randomizing the split percentage
 
 struct FuzzInput {
@@ -39,6 +39,10 @@ impl FuzzInput {
                     .into();
             entries.push((key, value));
         }
+
+        // Sort entries by key to ensure deterministic processing order between
+        // sequential and concurrent implementations.
+        entries.sort_by_key(|(key, _)| *key);
 
         entries
     }
