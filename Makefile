@@ -139,6 +139,11 @@ bench-large-smt-rocksdb: ## Run large SMT benchmarks with rocksdb storage
 bench-large-smt-rocksdb-open: ## Run large SMT benchmarks with rocksdb storage and open existing database
 	cargo run --release --features concurrent,hashmaps,rocksdb,executable -- --storage rocksdb --open
 
+.PHONY: bench-persisted-smt-forest
+bench-persisted-smt-forest: ## Run large SMT benchmarks with rocksdb storage
+	cargo run --release --features concurrent,hashmaps,rocksdb,executable -- --storage rocksdb --size 100000 --tree persisted-forest
+
+
 # --- fuzzing --------------------------------------------------------------------------------
 
 .PHONY: fuzz-smt

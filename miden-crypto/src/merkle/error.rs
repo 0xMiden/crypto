@@ -1,3 +1,5 @@
+use alloc::string::String;
+
 use thiserror::Error;
 
 use super::{MAX_LEAF_ENTRIES, NodeIndex, Word};
@@ -34,4 +36,6 @@ pub enum MerkleError {
     RootNotInStore(Word),
     #[error("partial smt does not track the merkle path for key {0}")]
     UntrackedKey(Word),
+    #[error("storage error: {0}")]
+    Storage(String),
 }

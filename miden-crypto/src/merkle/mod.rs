@@ -32,7 +32,7 @@ pub use smt::{
     LargeSmt, LargeSmtError, MemoryStorage, SmtStorage, StorageUpdateParts, StorageUpdates, Subtree,
 };
 #[cfg(feature = "rocksdb")]
-pub use smt::{RocksDbConfig, RocksDbStorage};
+pub use smt::{PersistedSmtForest, RocksDbConfig, RocksDbForestConfig, RocksDbStorage};
 #[cfg(feature = "internal")]
 pub use smt::{SubtreeLeaf, build_subtree_for_bench};
 
