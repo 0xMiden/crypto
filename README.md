@@ -206,7 +206,12 @@ On Linux this is traditionally provided by the package manager, while on macOS i
 `clang` must be available as `cc`, and `libclang` must be available in the path for the runtime dynamic linker.
 
 If the default search paths do not include your install, you may need to add the corresponding `bin` directory to your `$PATH`.
-You may additionally need to add the associated `lib` and `include` directories to
+You may additionally need to add the associated `lib` and `include` directories to your `$LDFLAGS` and `$CXXFLAGS` environment variables respectively.
+
+```sh
+export LDFLAGS="-L$LLVM_INSTALL_PATH/lib"
+export CPPFLAGS="-I$LLVM_INSTALL_PATH/include"
+```
 
 ## Testing
 
