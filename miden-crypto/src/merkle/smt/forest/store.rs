@@ -3,7 +3,10 @@ use alloc::vec::Vec;
 use crate::{
     Map, Word,
     hash::rpo::Rpo256,
-    merkle::{EmptySubtreeRoots, MerkleError, MerklePath, MerkleProof, NodeIndex, SMT_DEPTH},
+    merkle::{
+        EmptySubtreeRoots, InnerNodeInfo, MerkleError, MerklePath, MerkleProof, NodeIndex,
+        SMT_DEPTH,
+    },
 };
 
 // SMT FOREST STORE
@@ -242,29 +245,24 @@ impl SmtStore {
             .ok_or(MerkleError::NodeIndexNotFoundInStore(root, NodeIndex::root()))?;
 
         // The update was computed successfully, update ref counts and insert into the store
-        fn dfs(
-            node: Word,
-            store: &mut Map<Word, ForestInnerNode>,
-            new_nodes: &mut Map<Word, ForestInnerNode>,
-        ) {
-            if node == Word::empty() {
-                return;
-            }
-            if let Some(node) = store.get_mut(&node) {
-                // This node already exists in the store, increase its reference count.
-                // Stops the dfs descent here to leave children ref counts unchanged.
-                node.rc += 1;
-            } else if let Some(mut smt_node) = new_nodes.remove(&node) {
-                // This is a non-leaf node, insert it into the store and process its children.
-                smt_node.rc = 1;
-                store.insert(node, smt_node);
-                dfs(smt_node.left, store, new_nodes);
-                dfs(smt_node.right, store, new_nodes);
-            }
-        }
-        dfs(new_root, &mut self.nodes, &mut new_nodes);
+        self.insert_node_recursive(new_root, &mut new_nodes);
 
         Ok(new_root)
+    }
+
+    /// Inserts the nodes described by `path_nodes` into the store, updating reference counts and
+    /// ensuring that shared subtrees remain tracked only once.
+    pub(super) fn insert_nodes_from_path(
+        &mut self,
+        root: Word,
+        path_nodes: impl IntoIterator<Item = InnerNodeInfo>,
+    ) {
+        let mut new_nodes: Map<Word, ForestInnerNode> = Map::new();
+        for InnerNodeInfo { value, left, right } in path_nodes {
+            new_nodes.insert(value, ForestInnerNode { left, right, rc: 0 });
+        }
+
+        self.insert_node_recursive(root, &mut new_nodes);
     }
 
     /// Decreases the reference count of the specified node and releases memory if the count
@@ -302,6 +300,22 @@ impl SmtStore {
             removed_leaves.extend(self.remove_node(root));
         }
         removed_leaves
+    }
+
+    /// Inserts nodes from `new_nodes` into the store, increasing reference counts for existing
+    /// nodes and recursively adding unseen nodes together with their subtrees.
+    fn insert_node_recursive(&mut self, node: Word, new_nodes: &mut Map<Word, ForestInnerNode>) {
+        if node == Word::empty() {
+            return;
+        }
+        if let Some(existing) = self.nodes.get_mut(&node) {
+            existing.rc += 1;
+        } else if let Some(mut smt_node) = new_nodes.remove(&node) {
+            smt_node.rc = 1;
+            self.nodes.insert(node, smt_node);
+            self.insert_node_recursive(smt_node.left, new_nodes);
+            self.insert_node_recursive(smt_node.right, new_nodes);
+        }
     }
 }
 

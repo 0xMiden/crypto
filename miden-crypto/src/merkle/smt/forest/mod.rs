@@ -118,6 +118,26 @@ impl SmtForest {
     // STATE MUTATORS
     // --------------------------------------------------------------------------------------------
 
+    /// Inserts all nodes present in the provided [`SmtProof`] into the forest and returns
+    /// the root computed from the proof.
+    ///
+    /// If the computed root already exists, returns without modifying the forest.
+    pub fn insert_path(&mut self, proof: SmtProof) -> Word {
+        let root = proof.compute_root();
+        let path_nodes: Vec<_> = proof.authenticated_nodes().collect();
+        let (_path, leaf) = proof.into_parts();
+
+        if !self.roots.insert(root) {
+            return root;
+        }
+
+        let leaf_hash = leaf.hash();
+        self.leaves.insert(leaf_hash, leaf);
+        self.store.insert_nodes_from_path(root, path_nodes);
+
+        root
+    }
+
     /// Inserts the specified key-value pair into an SMT with the specified root. This will also
     /// add a new root to the forest. Returns the new root.
     ///
