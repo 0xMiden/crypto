@@ -3,7 +3,7 @@ use std::hint;
 use criterion::{Criterion, criterion_group, criterion_main};
 use miden_crypto::{
     Word,
-    merkle::{LargeSmt, RocksDbConfig, RocksDbStorage},
+    merkle::smt::{LargeSmt, RocksDbConfig, RocksDbStorage},
 };
 
 mod common;

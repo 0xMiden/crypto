@@ -3,7 +3,11 @@ use std::hint::black_box;
 use criterion::{BatchSize, BenchmarkId, Criterion, criterion_group, criterion_main};
 use miden_crypto::{
     Felt, Word,
-    merkle::{LeafIndex, MerkleStore, MerkleTree, NodeIndex, SMT_MAX_DEPTH, SimpleSmt},
+    merkle::{
+        MerkleTree, NodeIndex,
+        smt::{LeafIndex, SMT_MAX_DEPTH, SimpleSmt},
+        store::MerkleStore,
+    },
 };
 use rand_utils::{rand_array, rand_value};
 

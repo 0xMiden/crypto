@@ -4,7 +4,7 @@ use super::{
     EMPTY_WORD, EmptySubtreeRoots, InnerNode, InnerNodeInfo, InnerNodes, LeafIndex, MerkleError,
     MutationSet, NodeIndex, SMT_MAX_DEPTH, SMT_MIN_DEPTH, SparseMerkleTree, Word,
 };
-use crate::merkle::{SmtLeafError, SparseMerklePath};
+use crate::merkle::{SparseMerklePath, smt::SmtLeafError};
 
 mod proof;
 pub use proof::SimpleSmtProof;
@@ -234,7 +234,7 @@ impl<const DEPTH: u8> SimpleSmt<DEPTH> {
     /// # Example
     /// ```
     /// # use miden_crypto::{Felt, Word};
-    /// # use miden_crypto::merkle::{LeafIndex, SimpleSmt, EmptySubtreeRoots, SMT_DEPTH};
+    /// # use miden_crypto::merkle::{smt::{LeafIndex, SimpleSmt, SMT_DEPTH}, EmptySubtreeRoots};
     /// let mut smt: SimpleSmt<3> = SimpleSmt::new().unwrap();
     /// let pair = (LeafIndex::default(), Word::default());
     /// let mutations = smt.compute_mutations(vec![pair]);

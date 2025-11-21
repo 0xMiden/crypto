@@ -8,10 +8,7 @@ use super::{
     EmptySubtreeRoots, InnerNode, InnerNodes, Leaves, MerkleError, MutationSet, NodeIndex,
     SMT_DEPTH, Smt, SmtLeaf, SparseMerkleTree, Word, leaf,
 };
-use crate::merkle::{
-    SmtLeafError,
-    smt::{Map, NodeMutation, NodeMutations},
-};
+use crate::merkle::smt::{Map, NodeMutation, NodeMutations, SmtLeafError};
 
 #[cfg(test)]
 mod tests;

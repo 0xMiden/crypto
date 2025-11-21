@@ -1,6 +1,6 @@
 use thiserror::Error;
 
-use super::{MAX_LEAF_ENTRIES, NodeIndex, Word};
+use super::{NodeIndex, Word, smt::MAX_LEAF_ENTRIES};
 
 #[derive(Debug, Error)]
 pub enum MerkleError {
