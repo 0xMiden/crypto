@@ -6,7 +6,7 @@ use rayon::prelude::*;
 
 use super::{
     EmptySubtreeRoots, InnerNode, InnerNodes, Leaves, MerkleError, MutationSet, NodeIndex,
-    SMT_DEPTH, Smt, SmtLeaf, SparseMerkleTree, Word, leaf,
+    SMT_DEPTH, Smt, SmtLeaf, SparseMerkleTree, Word,
 };
 use crate::merkle::{
     SmtLeafError,
@@ -277,14 +277,16 @@ impl Smt {
         assert!(!pairs.is_empty());
 
         if pairs.len() > 1 {
-            pairs.sort_by(|(key_1, _), (key_2, _)| leaf::cmp_keys(*key_1, *key_2));
-            // Check for duplicates in a sorted list by comparing adjacent pairs
-            if let Some(window) = pairs.windows(2).find(|window| window[0].0 == window[1].0) {
-                // If we find a duplicate, return an error
-                let col = Self::key_to_leaf_index(&window[0].0).index.value();
-                return Err(MerkleError::DuplicateValuesForIndex(col));
-            }
-            Ok(Some(SmtLeaf::new_multiple(pairs).unwrap()))
+            SmtLeaf::new_multiple(pairs).map(Some).map_err(|e| match e {
+                SmtLeafError::DuplicateKeysInMultipleLeaf { key } => {
+                    let col = Self::key_to_leaf_index(&key).index.value();
+                    MerkleError::DuplicateValuesForIndex(col)
+                },
+                SmtLeafError::TooManyLeafEntries { actual } => {
+                    MerkleError::TooManyLeafEntries { actual }
+                },
+                other => panic!("unexpected error in pairs_to_leaf: {:?}", other),
+            })
         } else {
             let (key, value) = pairs.pop().unwrap();
             if value == Self::EMPTY_VALUE {
