@@ -97,9 +97,53 @@ pub struct EncryptedData {
     nonce: Nonce,
 }
 
+impl EncryptedData {
+    /// Constructs an EncryptedData from its component parts.
+    pub fn from_parts(
+        data_type: DataType,
+        ciphertext: Vec<Felt>,
+        auth_tag: AuthTag,
+        nonce: Nonce,
+    ) -> Self {
+        Self { data_type, ciphertext, auth_tag, nonce }
+    }
+
+    /// Returns the data type of the encrypted data
+    pub fn data_type(&self) -> DataType {
+        self.data_type
+    }
+
+    /// Returns a reference to the ciphertext
+    pub fn ciphertext(&self) -> &[Felt] {
+        &self.ciphertext
+    }
+
+    /// Returns a reference to the authentication tag
+    pub fn auth_tag(&self) -> &AuthTag {
+        &self.auth_tag
+    }
+
+    /// Returns a reference to the nonce
+    pub fn nonce(&self) -> &Nonce {
+        &self.nonce
+    }
+}
+
 /// An authentication tag represented as 4 field elements
 #[derive(Debug, Default, Clone, PartialEq, Eq)]
 pub struct AuthTag([Felt; AUTH_TAG_SIZE]);
+
+impl AuthTag {
+    /// Constructs an AuthTag from an array of field elements.
+    pub fn new(elements: [Felt; AUTH_TAG_SIZE]) -> Self {
+        Self(elements)
+    }
+
+    /// Returns the authentication tag as an array of field elements
+    pub fn to_elements(&self) -> [Felt; AUTH_TAG_SIZE] {
+        self.0
+    }
+}
 
 /// A 256-bit secret key represented as 4 field elements
 #[derive(Clone, SilentDebug, SilentDisplay)]
@@ -113,9 +157,7 @@ impl SecretKey {
     #[cfg(feature = "std")]
     #[allow(clippy::new_without_default)]
     pub fn new() -> Self {
-        use rand::{SeedableRng, rngs::StdRng};
-        let mut rng = StdRng::from_os_rng();
-
+        let mut rng = rand::rng();
         Self::with_rng(&mut rng)
     }
 
@@ -165,8 +207,7 @@ impl SecretKey {
         data: &[Felt],
         associated_data: &[Felt],
     ) -> Result<EncryptedData, EncryptionError> {
-        use rand::{SeedableRng, rngs::StdRng};
-        let mut rng = StdRng::from_os_rng();
+        let mut rng = rand::rng();
         let nonce = Nonce::with_rng(&mut rng);
 
         self.encrypt_elements_with_nonce(data, associated_data, nonce)
@@ -234,8 +275,7 @@ impl SecretKey {
         data: &[u8],
         associated_data: &[u8],
     ) -> Result<EncryptedData, EncryptionError> {
-        use rand::{SeedableRng, rngs::StdRng};
-        let mut rng = StdRng::from_os_rng();
+        let mut rng = rand::rng();
         let nonce = Nonce::with_rng(&mut rng);
 
         self.encrypt_bytes_with_nonce(data, associated_data, nonce)
@@ -637,7 +677,9 @@ impl Deserializable for EncryptedData {
         let nonce: [Felt; NONCE_SIZE] = felts_from_u64(nonce)
             .map_err(DeserializationError::InvalidValue)?
             .try_into()
-            .expect("deserialization reads exactly NONCE_SIZE elements");
+            .map_err(|_| {
+                DeserializationError::InvalidValue("nonce conversion failed".to_string())
+            })?;
 
         let tag = source.read_many(AUTH_TAG_SIZE)?;
         let tag: [Felt; AUTH_TAG_SIZE] = felts_from_u64(tag)
@@ -698,7 +740,8 @@ fn unpad(mut plaintext: Vec<Felt>) -> Result<Vec<Felt>, EncryptionError> {
     let (num_blocks, remainder) = plaintext.len().div_rem(&RATE_WIDTH);
     assert_eq!(remainder, 0);
 
-    let final_block: &[Felt; RATE_WIDTH] = plaintext.last_chunk().expect("plaintext is empty");
+    let final_block: &[Felt; RATE_WIDTH] =
+        plaintext.last_chunk().ok_or(EncryptionError::MalformedPadding)?;
 
     let pos = match final_block.iter().rposition(|entry| *entry == ONE) {
         Some(pos) => pos,

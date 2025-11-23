@@ -284,6 +284,7 @@ checksum = "0b023947811758c97c59bf9d1c188fd619ad4718dcaa767947df1cadb14f39f4"
 dependencies = [
  "glob",
  "libc",
+ "libloading",
 ]
 
 [[package]]
@@ -871,6 +872,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2874a2af47a2325c2001a6e6fad9b16a53b802102b528163885171cf92b15976"
 
 [[package]]
+name = "libloading"
+version = "0.8.9"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d7c4b02199fee7c5d21a5ae7d8cfa79a6ef5bb2fc834d6e9058e89c825efdc55"
+dependencies = [
+ "cfg-if",
+ "windows-link",
+]
+
+[[package]]
 name = "libm"
 version = "0.2.15"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -934,7 +945,7 @@ checksum = "f52b00d39961fc5b2736ea853c9cc86238e165017a493d1d5c8eac6bdc4cc273"
 
 [[package]]
 name = "miden-crypto"
-version = "0.18.4"
+version = "0.19.0"
 dependencies = [
  "assert_matches",
  "blake3",
@@ -942,6 +953,7 @@ dependencies = [
  "chacha20poly1305",
  "clap",
  "criterion",
+ "curve25519-dalek",
  "ed25519-dalek",
  "flume",
  "glob",
@@ -963,6 +975,7 @@ dependencies = [
  "rstest",
  "seq-macro",
  "serde",
+ "sha2",
  "sha3",
  "subtle",
  "tempfile",
@@ -976,7 +989,7 @@ dependencies = [
 
 [[package]]
 name = "miden-crypto-derive"
-version = "0.18.4"
+version = "0.19.0"
 dependencies = [
  "quote",
  "syn",

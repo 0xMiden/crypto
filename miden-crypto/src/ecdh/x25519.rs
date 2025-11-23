@@ -19,7 +19,7 @@ use k256::sha2::Sha256;
 use rand::{CryptoRng, RngCore};
 
 use crate::{
-    dsa::eddsa_25519::{PublicKey, SecretKey},
+    dsa::eddsa_25519_sha512::{PublicKey, SecretKey},
     ecdh::KeyAgreementScheme,
     utils::{ByteReader, ByteWriter, Deserializable, DeserializationError, Serializable},
     zeroize::{Zeroize, ZeroizeOnDrop},
@@ -216,7 +216,7 @@ mod tests {
     use rand::rng;
 
     use super::*;
-    use crate::dsa::eddsa_25519::SecretKey;
+    use crate::dsa::eddsa_25519_sha512::SecretKey;
 
     #[test]
     fn key_agreement() {

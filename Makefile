@@ -95,6 +95,10 @@ test: test-default test-hashmaps test-no-std test-docs test-large-smt ## Run all
 check: ## Check all targets and features for errors without code generation
 	cargo check --all-targets --all-features
 
+.PHONY: check-fuzz
+check-fuzz: ## Check miden-crypto-fuzz compilation
+	cd miden-crypto-fuzz && cargo check
+
 # --- building ------------------------------------------------------------------------------------
 
 .PHONY: build

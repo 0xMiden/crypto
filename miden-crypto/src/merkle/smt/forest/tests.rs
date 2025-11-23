@@ -70,6 +70,10 @@ fn test_insert_multiple_values() -> Result<(), MerkleError> {
         ]),
     );
 
+    // Inserting the same key-value pair again should return the same root
+    let root_duplicate = forest.insert(new_root, key, value)?;
+    assert_eq!(new_root, root_duplicate);
+
     let key2 = Word::new([ZERO, ONE, ZERO, ONE]);
     let new_root = forest.insert(new_root, key2, value)?;
     assert_eq!(

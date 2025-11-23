@@ -8,7 +8,7 @@ use rand::{RngCore, SeedableRng};
 use rand_chacha::ChaCha20Rng;
 
 use super::{Serializable, math::Polynomial};
-use crate::dsa::rpo_falcon512::{
+use crate::dsa::falcon512_rpo::{
     PREVERSIONED_NONCE, PREVERSIONED_NONCE_LEN, SIG_NONCE_LEN, SIG_POLY_BYTE_LEN, SecretKey,
     tests::data::DETERMINISTIC_SIGNATURE,
 };
@@ -125,7 +125,7 @@ fn check_preversioned_fixed_nonce() {
 ///
 /// [1]: https://github.com/algorand/falcon/blob/main/falcon-det.pdf
 fn build_preversioned_fixed_nonce() -> [u8; PREVERSIONED_NONCE_LEN] {
-    use crate::dsa::rpo_falcon512::LOG_N;
+    use crate::dsa::falcon512_rpo::LOG_N;
 
     let mut result = [0_u8; 39];
     result[0] = LOG_N;

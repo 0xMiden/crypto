@@ -10,7 +10,7 @@ use super::{
     ByteReader, ByteWriter, Deserializable, DeserializationError, FalconFelt, Felt, Polynomial,
     Serializable, Signature,
 };
-use crate::{SequentialCommit, Word, dsa::rpo_falcon512::FALCON_ENCODING_BITS};
+use crate::{SequentialCommit, Word, dsa::falcon512_rpo::FALCON_ENCODING_BITS};
 
 // PUBLIC KEY
 // ================================================================================================

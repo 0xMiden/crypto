@@ -61,6 +61,7 @@ name    = "rand"
 concurrent = ["dep:rayon", "hashbrown?/rayon"]
 default = ["concurrent", "std"]
 executable = ["dep:clap", "dep:rand-utils", "std"]
+fuzzing = []
 hashmaps = ["dep:hashbrown"]
 internal = []
 rocksdb = ["concurrent", "dep:rocksdb"]
@@ -79,6 +80,7 @@ std = [
 blake3                        = { default-features = false, version = "1.8" }
 chacha20poly1305              = { features = ["alloc", "stream"], version = "0.10" }
 clap                          = { features = ["derive"], optional = true, version = "4.5" }
+curve25519-dalek              = { default-features = false, version = "4" }
 ed25519-dalek                 = { features = ["zeroize"], version = "2" }
 flume                         = { version = "0.11" }
 hashbrown                     = { features = ["serde"], optional = true, version = "0.16" }
@@ -93,8 +95,9 @@ rand_chacha                   = { default-features = false, version = "0.9" }
 rand_core                     = { default-features = false, version = "0.9" }
 rand_hc                       = { version = "0.3" }
 rayon                         = { optional = true, version = "1.10" }
-rocksdb                       = { default-features = false, features = ["lz4"], optional = true, version = "0.24" }
+rocksdb                       = { default-features = false, features = ["bindgen-runtime", "lz4"], optional = true, version = "0.24" }
 serde                         = { default-features = false, features = ["derive"], optional = true, version = "1.0" }
+sha2                          = { default-features = false, version = "0.10" }
 sha3                          = { default-features = false, version = "0.10" }
 subtle                        = { default-features = false, version = "2.6" }
 thiserror                     = { default-features = false, version = "2.0" }
