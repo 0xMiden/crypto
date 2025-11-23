@@ -1,6 +1,10 @@
-## 0.18.3 (TODO)
+## 0.18.4 (TODO)
 
 - Fixed serialization of `PartialSmt` panicking in debug mode when it was constructed from only a root ([#662](https://github.com/0xMiden/crypto/pull/662)).
+
+## 0.18.3 (2025-11-22)
+
+- [BREAKING] removed unused 'self' parameter in HasherExt and all its implementations ([#666](https://github.com/0xMiden/crypto/pull/666))
 
 ## 0.18.2 (2025-11-08)
 
