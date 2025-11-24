@@ -106,7 +106,7 @@ impl SmtStorage for MemoryStorage {
         let mut leaves_guard = self.leaves.write()?;
 
         match leaves_guard.get_mut(&index) {
-            Some(leaf) => Ok(leaf.insert(key, value).expect("Failed to insert value")),
+            Some(leaf) => Ok(leaf.insert(key, value)?),
             None => {
                 leaves_guard.insert(index, SmtLeaf::Single((key, value)));
                 Ok(None)

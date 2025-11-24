@@ -9,7 +9,7 @@
 //!
 //! ```
 //! use miden_crypto::{
-//!     dsa::eddsa_25519::SecretKey,
+//!     dsa::eddsa_25519_sha512::SecretKey,
 //!     ies::{SealingKey, UnsealingKey},
 //! };
 //! use rand::rng;

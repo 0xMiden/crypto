@@ -6,8 +6,19 @@
 - Fixed IES sealed box deserialization ([#616](https://github.com/0xMiden/crypto/pull/616)).
 - Add serialization of sealing and unsealing keys in IES ([#637](https://github.com/0xMiden/crypto/pull/637)).
 - Fixed undefined `BaseElement` in rescue arch optimizations ([#644](https://github.com/0xMiden/crypto/pull/644)).
+- Fixed bugs in Merkle tree capacity checks for `SimpleSmt` and `PartialMerkleTree` ([#648](https://github.com/0xMiden/crypto/pull/648)).
 - Added `MerkleStore::has_path()` ([#649](https://github.com/0xMiden/crypto/pull/649)).
 - Refactored `StorageUpdates` to use explicit `SubtreeUpdate` enum for storage operations ([#654](https://github.com/0xMiden/crypto/issues/654)).
+- Refactored `LargeSmt` into smaller focused modules ([#658](https://github.com/0xMiden/crypto/pull/658)).
+- Added property-based testing for `LargeSmt` verifying `insert_batch` equivalence with `compute_mutations`+`apply_mutations`. ([#667](https://github.com/0xMiden/crypto/pull/667)).
+
+## 0.18.4 (2025-11-22)
+
+- Fixed serialization of `PartialSmt` panicking in debug mode when it was constructed from only a root ([#662](https://github.com/0xMiden/crypto/pull/662)).
+
+## 0.18.3 (2025-11-22)
+
+- [BREAKING] removed unused 'self' parameter in HasherExt and all its implementations ([#666](https://github.com/0xMiden/crypto/pull/666))
 
 ## 0.18.2 (2025-11-08)
 

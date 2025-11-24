@@ -386,7 +386,20 @@ impl Deserializable for PartialSmt {
             nodes.insert(idx, node);
         }
 
-        let smt = Smt::from_raw_parts(nodes, leaves, root);
+        // If the leaves are empty, the set root may not match the root of the inner nodes, which
+        // causes from_raw_parts to panic. In this case, we bypass this check by constructing the
+        // SMT with the expected root and overwriting it afterward.
+        let smt = if leaves.is_empty() {
+            let inner_node_root =
+                nodes.get(&NodeIndex::root()).map(InnerNode::hash).unwrap_or(Smt::EMPTY_ROOT);
+            let mut smt = Smt::from_raw_parts(nodes, leaves, inner_node_root);
+            smt.set_root(root);
+            smt
+        } else {
+            // If the leaves are not empty, the root should match.
+            Smt::from_raw_parts(nodes, leaves, root)
+        };
+
         Ok(PartialSmt(smt))
     }
 }
@@ -737,6 +750,13 @@ mod tests {
     #[test]
     fn partial_smt_tracks_leaves() {
         assert!(!PartialSmt::default().tracks_leaves());
+    }
+
+    /// `PartialSmt` serde round-trip when constructed from just a root.
+    #[test]
+    fn partial_smt_with_empty_leaves_serialization_roundtrip() {
+        let partial_smt = PartialSmt::new(rand_value());
+        assert_eq!(partial_smt, PartialSmt::read_from_bytes(&partial_smt.to_bytes()).unwrap());
     }
 
     /// `PartialSmt` serde round-trip. Also tests conversion from SMT.

@@ -1,7 +1,7 @@
 #![no_main]
 
 use libfuzzer_sys::fuzz_target;
-use miden_crypto::{Felt, ONE, Word, hash::rpo::Word, merkle::Smt};
+use miden_crypto::{Felt, ONE, Word, merkle::Smt};
 use rand::Rng; // Needed for randomizing the split percentage
 
 struct FuzzInput {
@@ -35,9 +35,14 @@ impl FuzzInput {
                 Felt::new(u64::from_le_bytes(chunk[24..32].try_into().unwrap())),
             ]);
             let value =
-                [ONE, ONE, ONE, Felt::new(u64::from_le_bytes(chunk[32..40].try_into().unwrap()))];
+                [ONE, ONE, ONE, Felt::new(u64::from_le_bytes(chunk[32..40].try_into().unwrap()))]
+                    .into();
             entries.push((key, value));
         }
+
+        // Sort entries by key to ensure deterministic processing order between
+        // sequential and concurrent implementations.
+        entries.sort_by_key(|(key, _)| *key);
 
         entries
     }
@@ -58,7 +63,9 @@ fn run_fuzz_smt(fuzz_input: FuzzInput) {
 
             let sequential_mutations =
                 sequential_smt.fuzz_compute_mutations_sequential(fuzz_input.updates.clone());
-            let parallel_mutations = parallel_smt.compute_mutations(fuzz_input.updates);
+            let parallel_mutations = parallel_smt
+                .compute_mutations(fuzz_input.updates)
+                .expect("Failed to compute mutations for parallel");
 
             assert_eq!(
                 sequential_mutations.root(),
