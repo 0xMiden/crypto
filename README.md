@@ -140,7 +140,6 @@ This crate can be compiled with the following features:
 - `no_std` does not rely on the Rust standard library and enables compilation to WebAssembly.
 - `hashmaps` - uses hashbrown hashmaps in SMT and Merkle Store implementation which significantly improves performance of updates. Keys ordering in iterators is not guaranteed when this feature is enabled.
 - `rocksdb` - enables the RocksDB-backed storage for `LargeSmt` and related utilities. Implies `concurrent`.
-
 All of these features imply the use of [alloc](https://doc.rust-lang.org/alloc/) to support heap-allocated collections.
 
 To compile with `no_std`, disable default features via `--no-default-features` flag or using the following command:
@@ -159,11 +158,11 @@ make build-avx2
 
 ### AVX512 acceleration
 
-On platforms with [AVX-512](https://en.wikipedia.org/wiki/AVX-512) support, RPO and RPX hash functions can be accelerated by using the vector processing unit. To enable AVX-512 acceleration, the code needs to be compiled with the appropriate target features enabled.  
+On platforms with [AVX-512](https://en.wikipedia.org/wiki/AVX-512) support, RPO and RPX hash functions can be accelerated by using the vector processing unit. To enable AVX-512 acceleration, the code needs to be compiled with the appropriate target features enabled.
 
 The minimal set of required features is:
 
-- `avx512f` (AVX-512 foundation)  
+- `avx512f` (AVX-512 foundation)
 - `avx512dq` (doubleword and quadword operations, required for 64-bit multiplies and comparisons)
 
 For example:
@@ -195,10 +194,24 @@ rustflags = ["-C", "target-cpu=native"]
 ```
 
 **Notes**
-- Using `-C target-cpu=native` lets `rustc` auto-detect features on the **build host**; there are **no target-feature warnings**, but the binary won’t be portable to CPUs lacking those features.  
+- Using `-C target-cpu=native` lets `rustc` auto-detect features on the **build host**; there are **no target-feature warnings**, but the binary won’t be portable to CPUs lacking those features.
 - Forcing features with `-C target-feature=+avx2`, `+avx512*`, or `+sve` on an incompatible target will print a warning and fall back to portable code paths.
-- Example: forcing `-C target-feature=+avx2` when building on macOS with Apple Silicon (`aarch64-apple-darwin`) will emit  
+- Example: forcing `-C target-feature=+avx2` when building on macOS with Apple Silicon (`aarch64-apple-darwin`) will emit
   "`'+avx2' is not a recognized feature for this target (ignoring feature)`" and automatically fall back to scalar implementations
+
+### Building with `rocksdb`
+
+Building the library with this feature enabled requires an install of `clang` that is accessible to the rust toolchain.
+On Linux this is traditionally provided by the package manager, while on macOS it will function with either `llvm` from Homebrew or XCode's clang install.
+`clang` must be available as `cc`, and `libclang` must be available in the path for the runtime dynamic linker.
+
+If the default search paths do not include your install, you may need to add the corresponding `bin` directory to your `$PATH`.
+You may additionally need to add the associated `lib` and `include` directories to your `$LDFLAGS` and `$CXXFLAGS` environment variables respectively.
+
+```sh
+export LDFLAGS="-L$LLVM_INSTALL_PATH/lib"
+export CPPFLAGS="-I$LLVM_INSTALL_PATH/include"
+```
 
 ## Testing
 

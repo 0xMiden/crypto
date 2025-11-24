@@ -5,7 +5,7 @@ use rand::{RngCore, SeedableRng};
 use rand_chacha::ChaCha20Rng;
 
 use crate::{
-    dsa::{ecdsa_k256_keccak::SecretKey, eddsa_25519::SecretKey as SecretKey25519},
+    dsa::{ecdsa_k256_keccak::SecretKey, eddsa_25519_sha512::SecretKey as SecretKey25519},
     ies::{keys::EphemeralPublicKey, *},
     utils::{Deserializable, DeserializationError, Serializable, SliceReader},
 };
@@ -799,7 +799,7 @@ mod protocol_tests {
     #[test]
     fn test_sealed_message_serialization_roundtrip_x25519_xchacha() {
         let mut rng = rand::rng();
-        let sk = crate::dsa::eddsa_25519::SecretKey::with_rng(&mut rng);
+        let sk = crate::dsa::eddsa_25519_sha512::SecretKey::with_rng(&mut rng);
         let pk = sk.public_key();
         let sealing_key = SealingKey::X25519XChaCha20Poly1305(pk);
         let unsealing_key = UnsealingKey::X25519XChaCha20Poly1305(sk);
@@ -839,7 +839,7 @@ mod protocol_tests {
     #[test]
     fn test_sealed_message_serialization_roundtrip_x25519_aeadrpo() {
         let mut rng = rand::rng();
-        let sk = crate::dsa::eddsa_25519::SecretKey::with_rng(&mut rng);
+        let sk = crate::dsa::eddsa_25519_sha512::SecretKey::with_rng(&mut rng);
         let pk = sk.public_key();
         let sealing_key = SealingKey::X25519AeadRpo(pk);
         let unsealing_key = UnsealingKey::X25519AeadRpo(sk);

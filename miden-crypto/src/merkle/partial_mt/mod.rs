@@ -111,11 +111,12 @@ impl PartialMerkleTree {
                 .or_insert(vec![node_index.value()]);
         }
 
-        // check if the number of leaves can be accommodated by the tree's depth; we use a min
-        // depth of 63 because we consider passing in a vector of size 2^64 infeasible.
-        let max = 2usize.pow(63);
-        if layers.len() > max {
-            return Err(MerkleError::TooManyEntries(max));
+        // make sure the depth of the last layer is 64 or smaller
+        if let Some(last_layer) = layers.last_entry() {
+            let last_layer_depth = *last_layer.key();
+            if last_layer_depth > 64 {
+                return Err(MerkleError::TooManyEntries(last_layer_depth));
+            }
         }
 
         // Get maximum depth

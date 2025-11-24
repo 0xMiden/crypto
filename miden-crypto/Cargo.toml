@@ -61,6 +61,7 @@ name    = "rand"
 concurrent = ["dep:rayon", "hashbrown?/rayon"]
 default = ["concurrent", "std"]
 executable = ["dep:clap", "dep:rand-utils", "std"]
+fuzzing = []
 hashmaps = ["dep:hashbrown"]
 internal = []
 rocksdb = ["concurrent", "dep:rocksdb"]
@@ -94,7 +95,7 @@ rand_chacha                   = { default-features = false, version = "0.9" }
 rand_core                     = { default-features = false, version = "0.9" }
 rand_hc                       = { version = "0.3" }
 rayon                         = { optional = true, version = "1.10" }
-rocksdb                       = { default-features = false, features = ["lz4"], optional = true, version = "0.24" }
+rocksdb                       = { default-features = false, features = ["bindgen-runtime", "lz4"], optional = true, version = "0.24" }
 serde                         = { default-features = false, features = ["derive"], optional = true, version = "1.0" }
 sha2                          = { default-features = false, version = "0.10" }
 sha3                          = { default-features = false, version = "0.10" }

@@ -1,4 +1,4 @@
-use crate::dsa::rpo_falcon512::SIG_SERIALIZED_LEN;
+use crate::dsa::falcon512_rpo::SIG_SERIALIZED_LEN;
 
 pub(crate) const NUM_TEST_VECTORS: usize = 12;
 

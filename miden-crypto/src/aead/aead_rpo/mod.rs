@@ -677,7 +677,9 @@ impl Deserializable for EncryptedData {
         let nonce: [Felt; NONCE_SIZE] = felts_from_u64(nonce)
             .map_err(DeserializationError::InvalidValue)?
             .try_into()
-            .expect("deserialization reads exactly NONCE_SIZE elements");
+            .map_err(|_| {
+                DeserializationError::InvalidValue("nonce conversion failed".to_string())
+            })?;
 
         let tag = source.read_many(AUTH_TAG_SIZE)?;
         let tag: [Felt; AUTH_TAG_SIZE] = felts_from_u64(tag)
@@ -738,7 +740,8 @@ fn unpad(mut plaintext: Vec<Felt>) -> Result<Vec<Felt>, EncryptionError> {
     let (num_blocks, remainder) = plaintext.len().div_rem(&RATE_WIDTH);
     assert_eq!(remainder, 0);
 
-    let final_block: &[Felt; RATE_WIDTH] = plaintext.last_chunk().expect("plaintext is empty");
+    let final_block: &[Felt; RATE_WIDTH] =
+        plaintext.last_chunk().ok_or(EncryptionError::MalformedPadding)?;
 
     let pos = match final_block.iter().rposition(|entry| *entry == ONE) {
         Some(pos) => pos,
