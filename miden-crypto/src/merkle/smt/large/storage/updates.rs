@@ -104,14 +104,14 @@ impl StorageUpdates {
     /// a batch of mutations.
     pub fn from_parts(
         leaf_updates: Map<u64, Option<SmtLeaf>>,
-        subtree_updates: Vec<SubtreeUpdate>,
+        subtree_updates: impl IntoIterator<Item = SubtreeUpdate>,
         new_root: Word,
         leaf_count_delta: isize,
         entry_count_delta: isize,
     ) -> Self {
         Self {
             leaf_updates,
-            subtree_updates,
+            subtree_updates: subtree_updates.into_iter().collect(),
             new_root,
             leaf_count_delta,
             entry_count_delta,

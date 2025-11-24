@@ -627,18 +627,12 @@ impl<S: SmtStorage> LargeSmt<S> {
             }
         }
 
-        // Convert map to vector of SubtreeUpdates
-        let subtree_updates: Vec<SubtreeUpdate> = loaded_subtrees
-            .into_iter()
-            .map(|(index, subtree_opt)| match subtree_opt {
-                Some(subtree) => SubtreeUpdate::Store { index, subtree },
-                None => SubtreeUpdate::Delete { index },
-            })
-            .collect();
-
         let updates = StorageUpdates::from_parts(
             leaf_map,
-            subtree_updates,
+            loaded_subtrees.into_iter().map(|(index, subtree_opt)| match subtree_opt {
+                Some(subtree) => SubtreeUpdate::Store { index, subtree },
+                None => SubtreeUpdate::Delete { index },
+            }),
             new_root,
             leaf_count_delta,
             entry_count_delta,
