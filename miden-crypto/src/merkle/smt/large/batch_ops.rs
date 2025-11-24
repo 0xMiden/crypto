@@ -354,7 +354,7 @@ impl<S: SmtStorage> LargeSmt<S> {
             self.sorted_pairs_to_mutated_leaves_with_preloaded_leaves(sorted_kv_pairs, &leaf_map);
 
         // Early return if no mutations
-        let old_root = self.root()?;
+        let old_root = self.root();
         if leaves.is_empty() {
             return Ok(old_root);
         }
@@ -457,6 +457,7 @@ impl<S: SmtStorage> LargeSmt<S> {
             entry_count_delta,
         );
         self.storage.apply(updates)?;
+        self.in_memory_nodes[1] = new_root;
 
         Ok(new_root)
     }
@@ -644,6 +645,7 @@ impl<S: SmtStorage> LargeSmt<S> {
             entry_count_delta,
         );
         self.storage.apply(updates)?;
+        self.in_memory_nodes[1] = new_root;
         Ok(())
     }
 

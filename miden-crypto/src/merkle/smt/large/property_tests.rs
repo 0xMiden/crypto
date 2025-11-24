@@ -106,13 +106,13 @@ fn run_insert_batch_matches_compute_apply(
     // Create two identical trees
     let mut tree1 = LargeSmt::with_entries(storage1, initial_entries.clone()).unwrap();
     let mut tree2 = LargeSmt::with_entries(storage2, initial_entries.clone()).unwrap();
-    let root1 = tree1.root().unwrap();
-    let root2 = tree2.root().unwrap();
+    let root1 = tree1.root();
+    let root2 = tree2.root();
 
     // Compute mutations -> apply mutations
     let mutations = tree1.compute_mutations(updates.clone()).unwrap();
     tree1.apply_mutations(mutations).unwrap();
-    let new_root1 = tree1.root().unwrap();
+    let new_root1 = tree1.root();
 
     // Insert_batch
     let new_root2 = tree2.insert_batch(updates.clone()).unwrap();

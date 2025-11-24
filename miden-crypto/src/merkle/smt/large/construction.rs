@@ -34,13 +34,12 @@ impl<S: SmtStorage> LargeSmt<S> {
     /// # Errors
     /// Returns an error if fetching the root or initial in-memory nodes from the storage fails.
     pub fn new(storage: S) -> Result<Self, LargeSmtError> {
-        let root = storage.get_root()?.unwrap_or(*EmptySubtreeRoots::entry(SMT_DEPTH, 0));
-
-        let is_empty = !storage.has_leaves()?;
-
         // Initialize in-memory nodes
         let mut in_memory_nodes: Vec<Word> = vec![EMPTY_WORD; NUM_IN_MEMORY_NODES];
 
+        // Root
+        in_memory_nodes[1] = *EmptySubtreeRoots::entry(SMT_DEPTH, 0);
+        // Inner nodes
         for depth in 0..IN_MEMORY_DEPTH {
             let child_empty_hash = *EmptySubtreeRoots::entry(SMT_DEPTH, depth + 1);
             let start = 2 * (1 << depth);
@@ -48,20 +47,23 @@ impl<S: SmtStorage> LargeSmt<S> {
             in_memory_nodes[start..end].fill(child_empty_hash);
         }
 
-        // No leaves, return empty tree
+        let is_empty = !storage.has_leaves()?;
+        // If the tree is empty, return it
         if is_empty {
             return Ok(Self { storage, in_memory_nodes });
         }
 
-        let subtree_roots = storage.get_depth24()?;
+        // Get the root from storage
+        let storage_root = storage.get_root()?;
+        // Get the in-memory top of tree leaves from storage
+        let in_memory_tree_leaves = storage.get_depth24()?;
 
-        // convert subtree roots to SubtreeLeaf
-        let mut leaf_subtrees: Vec<SubtreeLeaf> = subtree_roots
+        // Convert in-memory top of tree leaves to SubtreeLeaf
+        let mut leaf_subtrees: Vec<SubtreeLeaf> = in_memory_tree_leaves
             .into_iter()
             .map(|(index, hash)| SubtreeLeaf { col: index, hash })
             .collect();
         leaf_subtrees.sort_by_key(|leaf| leaf.col);
-
         let mut subtree_leaves: Vec<Vec<SubtreeLeaf>> =
             SubtreeLeavesIter::from_leaves(&mut leaf_subtrees).collect();
 
@@ -93,7 +95,14 @@ impl<S: SmtStorage> LargeSmt<S> {
         // Check that the calculated root matches the root in storage
         // Root is at index 1, with children at indices 2 and 3
         let calculated_root = Rpo256::merge(&[in_memory_nodes[2], in_memory_nodes[3]]);
-        assert_eq!(calculated_root, root, "Tree reconstruction failed - root mismatch");
+        assert_eq!(
+            calculated_root,
+            storage_root.unwrap(),
+            "Tree reconstruction failed - root mismatch"
+        );
+
+        // Set the root node
+        in_memory_nodes[1] = calculated_root;
 
         Ok(Self { storage, in_memory_nodes })
     }

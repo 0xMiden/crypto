@@ -15,7 +15,7 @@
 //! # fn main() -> Result<(), Box<dyn std::error::Error>> {
 //! let storage = RocksDbStorage::open(RocksDbConfig::new("/path/to/db"))?;
 //! let smt = LargeSmt::new(storage)?; // reconstructs in-memory top if data exists
-//! let _root = smt.root()?;
+//! let _root = smt.root();
 //! # Ok(())
 //! # }
 //! ```
@@ -241,6 +241,11 @@ enum SubtreeUpdate {
 /// The tree structure:
 /// - Depths 0-23: Stored in memory as a flat array for fast access
 /// - Depths 24-64: Stored in external storage organized as subtrees for efficient batch operations
+///
+/// `LargeSmt` does **not** implement [`Clone`]. Copying an instance would only duplicate the
+/// in-memory nodes while continuing to share the storage backend, which is misleading. If you need
+/// to share an instance between threads or components, wrap it in an
+/// [`Arc`](alloc::sync::Arc) explicitly so the ownership semantics are clear.
 #[derive(Debug)]
 pub struct LargeSmt<S: SmtStorage> {
     storage: S,
@@ -268,8 +273,8 @@ impl<S: SmtStorage> LargeSmt<S> {
     }
 
     /// Returns the root of the tree
-    pub fn root(&self) -> Result<Word, LargeSmtError> {
-        Ok(self.storage.get_root()?.unwrap_or(Self::EMPTY_ROOT))
+    pub fn root(&self) -> Word {
+        self.in_memory_nodes[1]
     }
 
     /// Returns the number of non-empty leaves in this tree.
@@ -440,7 +445,7 @@ impl<S: SmtStorage> PartialEq for LargeSmt<S> {
     /// storage contents. Two SMTs with the same root should be cryptographically
     /// equivalent, but this doesn't verify the storage backends are identical.
     fn eq(&self, other: &Self) -> bool {
-        self.root().unwrap() == other.root().unwrap()
+        self.root() == other.root()
             && self.num_leaves().unwrap() == other.num_leaves().unwrap()
             && self.num_entries().unwrap() == other.num_entries().unwrap()
     }
