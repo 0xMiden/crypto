@@ -452,8 +452,3 @@ impl<S: SmtStorage> PartialEq for LargeSmt<S> {
 }
 
 impl<S: SmtStorage> Eq for LargeSmt<S> {}
-
-// Note: Clone is intentionally not implemented for LargeSmt because:
-// 1. Cloning would only clone the in-memory portion and share storage via Arc
-// 2. This doesn't actually clone the underlying disk data, which is misleading
-// 3. Users should be explicit about sharing LargeSmt instances via Arc if needed
