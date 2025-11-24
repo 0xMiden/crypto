@@ -657,13 +657,13 @@ impl<S: SmtStorage> LargeSmt<S> {
     /// # Example
     /// ```
     /// # use miden_crypto::{Felt, Word};
-    /// # use miden_crypto::merkle::{EmptySubtreeRoots, smt::{Smt, SMT_DEPTH}};
-    /// let mut smt = Smt::new();
+    /// # use miden_crypto::merkle::{EmptySubtreeRoots, smt::{LargeSmt, MemoryStorage, SMT_DEPTH}};
+    /// let mut smt = LargeSmt::new(MemoryStorage::new()).unwrap();
     /// let pair = (Word::default(), Word::default());
     /// let mutations = smt.compute_mutations(vec![pair]).expect("compute_mutations ok");
     /// assert_eq!(mutations.root(), *EmptySubtreeRoots::entry(SMT_DEPTH, 0));
     /// smt.apply_mutations(mutations);
-    /// assert_eq!(smt.root(), *EmptySubtreeRoots::entry(SMT_DEPTH, 0));
+    /// assert_eq!(smt.root().unwrap(), *EmptySubtreeRoots::entry(SMT_DEPTH, 0));
     /// ```
     pub fn compute_mutations(
         &self,
