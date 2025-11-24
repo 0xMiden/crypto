@@ -1,5 +1,4 @@
 //! Data structures related to Merkle trees based on RPO256 hash function.
-use core::fmt::{self, Display};
 
 use super::{EMPTY_WORD, Felt, Word, ZERO, hash::rpo::Rpo256};
 
@@ -15,13 +14,10 @@ mod partial_mt;
 mod path;
 mod sparse_path;
 
-/// Merkle Mountain Range (MMR) data structures.
 pub mod mmr;
 
-/// Sparse Merkle Tree (SMT) data structures.
 pub mod smt;
 
-/// Merkle store for efficiently storing multiple Merkle trees with common subtrees.
 pub mod store;
 
 // REEXPORTS - MERKLE TREE
@@ -39,12 +35,6 @@ pub use partial_mt::PartialMerkleTree;
 // ================================================================================================
 pub use path::{MerklePath, MerkleProof, RootPath};
 pub use sparse_path::SparseMerklePath;
-
-impl<const DEPTH: u8> Display for smt::LeafIndex<DEPTH> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "DEPTH={}, value={}", DEPTH, self.value())
-    }
-}
 
 // HELPER FUNCTIONS
 // ================================================================================================

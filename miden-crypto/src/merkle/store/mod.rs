@@ -1,3 +1,5 @@
+//! Merkle store for efficiently storing multiple Merkle trees with common subtrees.
+
 use alloc::vec::Vec;
 use core::borrow::Borrow;
 
