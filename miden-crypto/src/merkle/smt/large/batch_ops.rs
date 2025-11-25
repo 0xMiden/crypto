@@ -554,6 +554,9 @@ impl<S: SmtStorage> LargeSmt<S> {
             mut leaf_map,
         } = prepared;
 
+        // Update the root in memory
+        self.in_memory_nodes[ROOT_MEMORY_INDEX] = new_root;
+
         // Process node mutations
         for (index, mutation) in sorted_node_mutations {
             if index.depth() < IN_MEMORY_DEPTH {
@@ -663,7 +666,7 @@ impl<S: SmtStorage> LargeSmt<S> {
     /// let mutations = smt.compute_mutations(vec![pair]).expect("compute_mutations ok");
     /// assert_eq!(mutations.root(), *EmptySubtreeRoots::entry(SMT_DEPTH, 0));
     /// smt.apply_mutations(mutations);
-    /// assert_eq!(smt.root().unwrap(), *EmptySubtreeRoots::entry(SMT_DEPTH, 0));
+    /// assert_eq!(smt.root(), *EmptySubtreeRoots::entry(SMT_DEPTH, 0));
     /// ```
     pub fn compute_mutations(
         &self,
