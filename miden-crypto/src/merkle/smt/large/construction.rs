@@ -9,15 +9,12 @@ use super::{
 };
 use crate::{
     EMPTY_WORD, Word,
-    merkle::{
-        EmptySubtreeRoots, InnerNode, MerkleError, NodeIndex, Rpo256,
-        smt::{
-            Map, Smt, SparseMerkleTree,
-            full::concurrent::{
-                PairComputations, SUBTREE_DEPTH, SubtreeLeaf, SubtreeLeavesIter, build_subtree,
-            },
-            large::to_memory_index,
+    merkle::smt::{
+        EmptySubtreeRoots, InnerNode, Map, MerkleError, NodeIndex, Rpo256, Smt, SparseMerkleTree,
+        full::concurrent::{
+            PairComputations, SUBTREE_DEPTH, SubtreeLeaf, SubtreeLeavesIter, build_subtree,
         },
+        large::to_memory_index,
     },
 };
 

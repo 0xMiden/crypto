@@ -2,7 +2,7 @@ use thiserror::Error;
 
 use crate::{
     Word,
-    merkle::{LeafIndex, MAX_LEAF_ENTRIES, SMT_DEPTH},
+    merkle::smt::{LeafIndex, MAX_LEAF_ENTRIES, SMT_DEPTH},
 };
 
 // SMT LEAF ERROR

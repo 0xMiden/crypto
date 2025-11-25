@@ -2,7 +2,7 @@ use alloc::string::{String, ToString};
 
 use thiserror::Error;
 
-use super::{MAX_LEAF_ENTRIES, NodeIndex, Word};
+use super::{NodeIndex, Word, smt::MAX_LEAF_ENTRIES};
 
 #[derive(Debug, Error)]
 pub enum MerkleError {
@@ -41,11 +41,13 @@ pub enum MerkleError {
 }
 
 #[cfg(feature = "concurrent")]
-impl From<crate::merkle::LargeSmtError> for MerkleError {
-    fn from(err: crate::merkle::LargeSmtError) -> Self {
+impl From<crate::merkle::smt::LargeSmtError> for MerkleError {
+    fn from(err: crate::merkle::smt::LargeSmtError) -> Self {
         match err {
-            crate::merkle::LargeSmtError::Merkle(me) => me,
-            crate::merkle::LargeSmtError::Storage(se) => MerkleError::InternalError(se.to_string()),
+            crate::merkle::smt::LargeSmtError::Merkle(me) => me,
+            crate::merkle::smt::LargeSmtError::Storage(se) => {
+                MerkleError::InternalError(se.to_string())
+            },
         }
     }
 }

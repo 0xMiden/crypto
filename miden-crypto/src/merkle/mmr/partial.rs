@@ -9,7 +9,8 @@ use super::{MmrDelta, MmrProof};
 use crate::{
     Word,
     merkle::{
-        InOrderIndex, InnerNodeInfo, MerklePath, MmrError, MmrPeaks, Rpo256, mmr::forest::Forest,
+        InnerNodeInfo, MerklePath, Rpo256,
+        mmr::{InOrderIndex, MmrError, MmrPeaks, forest::Forest},
     },
 };
 
@@ -627,7 +628,11 @@ mod tests {
     use super::{MmrPeaks, PartialMmr};
     use crate::{
         Word,
-        merkle::{MerkleStore, Mmr, NodeIndex, int_to_node, mmr::forest::Forest},
+        merkle::{
+            NodeIndex, int_to_node,
+            mmr::{Mmr, forest::Forest},
+            store::MerkleStore,
+        },
     };
 
     const LEAVES: [Word; 7] = [

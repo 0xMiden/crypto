@@ -9,6 +9,7 @@
 - Fixed bugs in Merkle tree capacity checks for `SimpleSmt` and `PartialMerkleTree` ([#648](https://github.com/0xMiden/crypto/pull/648)).
 - Added `MerkleStore::has_path()` ([#649](https://github.com/0xMiden/crypto/pull/649)).
 - Refactored `LargeSmt` into smaller focused modules ([#658](https://github.com/0xMiden/crypto/pull/658)).
+- [BREAKING] Organized `merkle` module into public submodules (`mmr`, `smt`, `store`) ([#660](https://github.com/0xMiden/crypto/pull/660)).
 - Added property-based testing for `LargeSmt` verifying `insert_batch` equivalence with `compute_mutations`+`apply_mutations` ([#667](https://github.com/0xMiden/crypto/pull/667)).
 - [BREAKING] Made `LargeSmt::root()` infallible - returns `Word` from the in-memory root and removes storage reads ([#671](https://github.com/0xMiden/crypto/pull/671)).
 

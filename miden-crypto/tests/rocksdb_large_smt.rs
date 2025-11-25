@@ -1,6 +1,9 @@
 use miden_crypto::{
     EMPTY_WORD, Felt, ONE, WORD_SIZE, Word,
-    merkle::{InnerNodeInfo, LargeSmt, RocksDbConfig, RocksDbStorage},
+    merkle::{
+        InnerNodeInfo,
+        smt::{LargeSmt, RocksDbConfig, RocksDbStorage},
+    },
 };
 use tempfile::TempDir;
 

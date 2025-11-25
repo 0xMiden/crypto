@@ -1,5 +1,10 @@
+//! Sparse Merkle Tree (SMT) data structures.
+
 use alloc::vec::Vec;
-use core::hash::Hash;
+use core::{
+    fmt::{self, Display},
+    hash::Hash,
+};
 
 use winter_utils::{ByteReader, ByteWriter, Deserializable, DeserializationError, Serializable};
 
@@ -585,6 +590,12 @@ impl<const DEPTH: u8> Serializable for LeafIndex<DEPTH> {
 impl<const DEPTH: u8> Deserializable for LeafIndex<DEPTH> {
     fn read_from<R: ByteReader>(source: &mut R) -> Result<Self, DeserializationError> {
         Ok(Self { index: source.read()? })
+    }
+}
+
+impl<const DEPTH: u8> Display for LeafIndex<DEPTH> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "DEPTH={}, value={}", DEPTH, self.value())
     }
 }
 

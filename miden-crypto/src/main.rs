@@ -2,11 +2,11 @@ use std::{path::PathBuf, time::Instant};
 
 use clap::{Parser, ValueEnum};
 #[cfg(feature = "rocksdb")]
-use miden_crypto::merkle::{RocksDbConfig, RocksDbStorage};
+use miden_crypto::merkle::smt::{RocksDbConfig, RocksDbStorage};
 use miden_crypto::{
     EMPTY_WORD, Felt, ONE, Word,
     hash::rpo::Rpo256,
-    merkle::{LargeSmt, LargeSmtError, MemoryStorage, SmtStorage},
+    merkle::smt::{LargeSmt, LargeSmtError, MemoryStorage, SmtStorage},
 };
 use rand::{Rng, prelude::IteratorRandom, rng};
 use rand_utils::rand_value;

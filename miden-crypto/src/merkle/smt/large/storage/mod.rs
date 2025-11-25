@@ -4,8 +4,8 @@ use core::{fmt, ops::Deref};
 use crate::{
     Word,
     merkle::{
-        NodeIndex, SmtLeaf,
-        smt::{InnerNode, Map, large::subtree::Subtree},
+        NodeIndex,
+        smt::{InnerNode, Map, SmtLeaf, large::subtree::Subtree},
     },
 };
 

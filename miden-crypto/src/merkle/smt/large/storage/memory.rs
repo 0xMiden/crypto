@@ -5,8 +5,11 @@ use super::{SmtStorage, StorageError, StorageUpdateParts, StorageUpdates};
 use crate::{
     EMPTY_WORD, Map, MapEntry, Word,
     merkle::{
-        EmptySubtreeRoots, InnerNode, NodeIndex, SmtLeaf,
-        smt::large::{IN_MEMORY_DEPTH, SMT_DEPTH, subtree::Subtree},
+        EmptySubtreeRoots, NodeIndex,
+        smt::{
+            InnerNode, SmtLeaf,
+            large::{IN_MEMORY_DEPTH, SMT_DEPTH, subtree::Subtree},
+        },
     },
 };
 

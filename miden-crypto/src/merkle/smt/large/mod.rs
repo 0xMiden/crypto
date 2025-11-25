@@ -10,7 +10,7 @@
 //!
 //! Open an existing RocksDB-backed tree:
 //! ```no_run
-//! use miden_crypto::merkle::{LargeSmt, RocksDbConfig, RocksDbStorage};
+//! use miden_crypto::merkle::smt::{LargeSmt, RocksDbConfig, RocksDbStorage};
 //!
 //! # fn main() -> Result<(), Box<dyn std::error::Error>> {
 //! let storage = RocksDbStorage::open(RocksDbConfig::new("/path/to/db"))?;
@@ -24,7 +24,7 @@
 //! ```no_run
 //! use miden_crypto::{
 //!     Felt, Word,
-//!     merkle::{LargeSmt, RocksDbConfig, RocksDbStorage},
+//!     merkle::smt::{LargeSmt, RocksDbConfig, RocksDbStorage},
 //! };
 //!
 //! # fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -59,7 +59,7 @@
 //! ```no_run
 //! use miden_crypto::{
 //!     EMPTY_WORD, Felt, Word,
-//!     merkle::{LargeSmt, RocksDbConfig, RocksDbStorage},
+//!     merkle::smt::{LargeSmt, RocksDbConfig, RocksDbStorage},
 //! };
 //!
 //! # fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -83,7 +83,7 @@
 //! ```no_run
 //! use miden_crypto::{
 //!     Felt, Word,
-//!     merkle::{LargeSmt, RocksDbConfig, RocksDbStorage},
+//!     merkle::smt::{LargeSmt, RocksDbConfig, RocksDbStorage},
 //! };
 //!
 //! # fn main() -> Result<(), Box<dyn std::error::Error>> {

@@ -1,9 +1,13 @@
+//! Merkle store for efficiently storing multiple Merkle trees with common subtrees.
+
 use alloc::vec::Vec;
 use core::borrow::Borrow;
 
 use super::{
     EmptySubtreeRoots, InnerNodeInfo, MerkleError, MerklePath, MerkleProof, MerkleTree, NodeIndex,
-    PartialMerkleTree, RootPath, Rpo256, SimpleSmt, Smt, Word, mmr::Mmr,
+    PartialMerkleTree, RootPath, Rpo256, Word,
+    mmr::Mmr,
+    smt::{SimpleSmt, Smt},
 };
 use crate::{
     Map,
@@ -33,7 +37,7 @@ pub struct StoreNode {
 ///
 /// ```rust
 /// # use miden_crypto::{ZERO, Felt, Word};
-/// # use miden_crypto::merkle::{NodeIndex, MerkleStore, MerkleTree};
+/// # use miden_crypto::merkle::{NodeIndex, MerkleTree, store::MerkleStore};
 /// # use miden_crypto::hash::rpo::Rpo256;
 /// # const fn int_to_node(value: u64) -> Word {
 /// #     Word::new([Felt::new(value), ZERO, ZERO, ZERO])

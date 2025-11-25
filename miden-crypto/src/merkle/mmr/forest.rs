@@ -195,7 +195,7 @@ impl Forest {
     /// resulting in `0b0101_0100`.
     ///
     /// ```
-    /// # use miden_crypto::merkle::Forest;
+    /// # use miden_crypto::merkle::mmr::Forest;
     /// let range = Forest::new(0b0101_0110);
     /// assert_eq!(range.trees_larger_than(1), Forest::new(0b0101_0100));
     /// ```

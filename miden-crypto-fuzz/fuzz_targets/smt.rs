@@ -1,7 +1,7 @@
 #![no_main]
 
 use libfuzzer_sys::fuzz_target;
-use miden_crypto::{Felt, ONE, Word, merkle::Smt};
+use miden_crypto::{Felt, ONE, Word, merkle::smt::Smt};
 use rand::Rng; // Needed for randomizing the split percentage
 
 struct FuzzInput {

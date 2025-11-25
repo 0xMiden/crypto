@@ -7,7 +7,7 @@ use core::{
 use winter_utils::{Deserializable, DeserializationError, Serializable};
 
 use super::{
-    EmptySubtreeRoots, InnerNodeInfo, MerkleError, MerklePath, NodeIndex, SMT_MAX_DEPTH, Word,
+    EmptySubtreeRoots, InnerNodeInfo, MerkleError, MerklePath, NodeIndex, Word, smt::SMT_MAX_DEPTH,
 };
 use crate::hash::rpo::Rpo256;
 
@@ -465,8 +465,9 @@ mod tests {
     use crate::{
         Felt, ONE, Word,
         merkle::{
-            EmptySubtreeRoots, LeafIndex, MerkleError, MerklePath, MerkleTree, NodeIndex,
-            SMT_MAX_DEPTH, SimpleSmt, Smt, smt::SparseMerkleTree, sparse_path::path_depth_iter,
+            EmptySubtreeRoots, MerkleError, MerklePath, MerkleTree, NodeIndex,
+            smt::{LeafIndex, SMT_MAX_DEPTH, SimpleSmt, Smt, SparseMerkleTree},
+            sparse_path::path_depth_iter,
         },
     };
 

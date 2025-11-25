@@ -8,7 +8,7 @@ use proptest::prelude::*;
 use super::MemoryStorage;
 use crate::{
     EMPTY_WORD, Felt, ONE, Word, ZERO,
-    merkle::{LargeSmt, LeafIndex, SMT_DEPTH},
+    merkle::smt::{LargeSmt, LeafIndex, SMT_DEPTH},
 };
 
 // GENERATORS

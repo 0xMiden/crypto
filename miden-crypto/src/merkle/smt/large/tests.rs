@@ -6,8 +6,11 @@ use super::MemoryStorage;
 use crate::{
     EMPTY_WORD, Felt, ONE, WORD_SIZE, Word,
     merkle::{
-        InnerNodeInfo, LargeSmt, LeafIndex, SMT_DEPTH, SmtLeaf,
-        smt::full::{Smt, concurrent::COLS_PER_SUBTREE},
+        InnerNodeInfo,
+        smt::{
+            LargeSmt, LeafIndex, SMT_DEPTH, SmtLeaf,
+            full::{Smt, concurrent::COLS_PER_SUBTREE},
+        },
     },
 };
 

@@ -6,13 +6,10 @@ use super::{
 };
 use crate::{
     EMPTY_WORD, Word,
-    merkle::{
-        EmptySubtreeRoots, InnerNode, LargeSmtError, LeafIndex, MerkleError, NodeIndex, SmtLeaf,
-        SmtLeafError, SmtProof, SparseMerklePath,
-        smt::{
-            Map, SparseMerkleTree,
-            large::{is_empty_parent, to_memory_index},
-        },
+    merkle::smt::{
+        EmptySubtreeRoots, InnerNode, LargeSmtError, LeafIndex, Map, MerkleError, NodeIndex,
+        SmtLeaf, SmtLeafError, SmtProof, SparseMerklePath, SparseMerkleTree,
+        large::{is_empty_parent, to_memory_index},
     },
 };
 

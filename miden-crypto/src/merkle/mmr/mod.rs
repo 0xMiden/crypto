@@ -1,3 +1,5 @@
+//! Merkle Mountain Range (MMR) data structures.
+
 mod delta;
 mod error;
 mod forest;
