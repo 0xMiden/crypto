@@ -5,8 +5,8 @@ use num::Integer;
 use rayon::prelude::*;
 
 use super::{
-    IN_MEMORY_DEPTH, LargeSmt, LargeSmtError, LoadedLeaves, MutatedLeaves, SMT_DEPTH, SmtStorage,
-    StorageUpdates, Subtree, SubtreeUpdate,
+    IN_MEMORY_DEPTH, LargeSmt, LargeSmtError, LoadedLeaves, MutatedLeaves, ROOT_MEMORY_INDEX,
+    SMT_DEPTH, SmtStorage, StorageUpdates, Subtree, SubtreeUpdate,
 };
 use crate::{
     Word,
@@ -354,9 +354,8 @@ impl<S: SmtStorage> LargeSmt<S> {
             self.sorted_pairs_to_mutated_leaves_with_preloaded_leaves(sorted_kv_pairs, &leaf_map);
 
         // Early return if no mutations
-        let old_root = self.root();
         if leaves.is_empty() {
-            return Ok(old_root);
+            return Ok(self.root());
         }
 
         let mut loaded_subtrees: Map<NodeIndex, Option<Subtree>> = Map::new();
@@ -435,6 +434,7 @@ impl<S: SmtStorage> LargeSmt<S> {
         }
 
         let new_root = leaves[0][0].hash;
+        self.in_memory_nodes[ROOT_MEMORY_INDEX] = new_root;
 
         // Build leaf updates for storage (convert Empty to None for deletion)
         let mut leaf_update_map = leaf_map;
@@ -457,7 +457,6 @@ impl<S: SmtStorage> LargeSmt<S> {
             entry_count_delta,
         );
         self.storage.apply(updates)?;
-        self.in_memory_nodes[1] = new_root;
 
         Ok(new_root)
     }
@@ -645,7 +644,6 @@ impl<S: SmtStorage> LargeSmt<S> {
             entry_count_delta,
         );
         self.storage.apply(updates)?;
-        self.in_memory_nodes[1] = new_root;
         Ok(())
     }
 

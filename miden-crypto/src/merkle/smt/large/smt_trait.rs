@@ -1,7 +1,8 @@
 use alloc::vec::Vec;
 
 use super::{
-    IN_MEMORY_DEPTH, LargeSmt, NUM_SUBTREE_LEVELS, SMT_DEPTH, SmtStorage, StorageError, Subtree,
+    IN_MEMORY_DEPTH, LargeSmt, NUM_SUBTREE_LEVELS, ROOT_MEMORY_INDEX, SMT_DEPTH, SmtStorage,
+    StorageError, Subtree,
 };
 use crate::{
     EMPTY_WORD, Word,
@@ -34,12 +35,12 @@ impl<S: SmtStorage> SparseMerkleTree<SMT_DEPTH> for LargeSmt<S> {
     }
 
     fn root(&self) -> Word {
-        self.in_memory_nodes[1]
+        self.in_memory_nodes[ROOT_MEMORY_INDEX]
     }
 
     fn set_root(&mut self, root: Word) {
         self.storage.set_root(root).expect("Failed to set root");
-        self.in_memory_nodes[1] = root;
+        self.in_memory_nodes[ROOT_MEMORY_INDEX] = root;
     }
 
     fn get_inner_node(&self, index: NodeIndex) -> InnerNode {

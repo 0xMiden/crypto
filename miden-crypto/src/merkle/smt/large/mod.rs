@@ -181,6 +181,9 @@ const IN_MEMORY_DEPTH: u8 = 24;
 /// Number of nodes that are stored in memory (including the unused index 0)
 const NUM_IN_MEMORY_NODES: usize = 1 << (IN_MEMORY_DEPTH + 1);
 
+/// Index of the root node inside `in_memory_nodes`.
+pub(super) const ROOT_MEMORY_INDEX: usize = 1;
+
 /// Number of subtree levels below in-memory depth (24-64 in steps of 8)
 const NUM_SUBTREE_LEVELS: usize = 5;
 
@@ -274,7 +277,7 @@ impl<S: SmtStorage> LargeSmt<S> {
 
     /// Returns the root of the tree
     pub fn root(&self) -> Word {
-        self.in_memory_nodes[1]
+        self.in_memory_nodes[ROOT_MEMORY_INDEX]
     }
 
     /// Returns the number of non-empty leaves in this tree.
