@@ -39,7 +39,7 @@ use core::fmt::Debug;
 use error::{HistoryError, Result};
 
 use crate::{
-    Map, Set, Word,
+    Map, Word,
     merkle::{
         NodeIndex,
         smt::{LeafIndex, SMT_DEPTH},
@@ -136,13 +136,15 @@ impl History {
 
     /// Returns all the roots that the history knows about.
     ///
+    /// The iteration order of the roots is guaranteed to move backward in time, with earlier items
+    /// being roots from versions closer to the present.
+    ///
     /// # Complexity
     ///
-    /// Calling this method requires a traversal of all the versions and is hence linear in the
-    /// number of history versions.
-    #[must_use]
-    pub fn roots(&self) -> Set<Word> {
-        self.deltas.iter().map(|d| d.root).collect()
+    /// Calling this method provides an iterator whose consumption requires a traversal of all the
+    /// versions. The method's complexity is thus `O(n)` in the number of versions.
+    pub fn roots(&self) -> impl Iterator<Item = Word> {
+        self.deltas.iter().rev().map(|d| d.root)
     }
 
     /// Returns `true` if `root` is in the history and `false` otherwise.
