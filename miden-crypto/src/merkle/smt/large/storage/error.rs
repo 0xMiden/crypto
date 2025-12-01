@@ -11,7 +11,7 @@ use alloc::{boxed::Box, string::String};
 pub enum StorageError {
     /// Backend I/O or database error (e.g., RocksDB).
     #[error("backend error: {0}")]
-    Backend(#[from] Box<dyn core::error::Error + Send + 'static>),
+    Backend(#[from] Box<dyn core::error::Error + Send + Sync + 'static>),
     /// Key bytes had the wrong length (e.g., leaf index key, subtree root key).
     #[error("invalid key length: expected {expected} bytes, found {found}")]
     BadKeyLen { expected: usize, found: usize },
