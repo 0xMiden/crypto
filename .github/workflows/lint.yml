@@ -42,6 +42,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - name: Cleanup large tools for build space
+        uses: ./.github/actions/cleanup-runner
       # Added: LLVM/Clang for RocksDB/bindgen
       - name: Install LLVM/Clang
         uses: KyleMayes/install-llvm-action@v2
@@ -83,6 +85,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - name: Cleanup large tools for build space
+        uses: ./.github/actions/cleanup-runner
       # Added: LLVM/Clang for RocksDB/bindgen
       - name: Install LLVM/Clang
         uses: ./.github/actions/install-llvm
