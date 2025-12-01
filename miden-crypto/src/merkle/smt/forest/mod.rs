@@ -126,7 +126,7 @@ impl SmtForest {
     /// Inserts the specified key-value pair into an SMT with the specified root. This will also
     /// add a new root to the forest. Returns the new root.
     ///
-    /// Returns an error if an SMT with the specified root is not in the forest, these is not
+    /// Returns an error if an SMT with the specified root is not in the forest, there is not
     /// enough data in the forest to perform the insert, or if the insert would create a leaf
     /// with too many entries.
     pub fn insert(&mut self, root: Word, key: Word, value: Word) -> Result<Word, MerkleError> {
@@ -136,7 +136,7 @@ impl SmtForest {
     /// Inserts the specified key-value pairs into an SMT with the specified root. This will also
     /// add a single new root to the forest for the entire batch of inserts. Returns the new root.
     ///
-    /// Returns an error if an SMT with the specified root is not in the forest, these is not
+    /// Returns an error if an SMT with the specified root is not in the forest, there is not
     /// enough data in the forest to perform the insert, or if the insert would create a leaf
     /// with too many entries.
     pub fn batch_insert(

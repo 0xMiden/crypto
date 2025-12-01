@@ -175,9 +175,9 @@ impl Subtree {
                 let left_hash = if has_left {
                     let hash_bytes = hash_chunks
                         .next()
-                        .ok_or(SubtreeError::MissingLeft { index: local_index })?;
+                        .ok_or(SubtreeError::MissingLeft { index: local_index.into() })?;
                     Word::try_from(hash_bytes)
-                        .map_err(|_| SubtreeError::BadLeft { index: local_index })?
+                        .map_err(|_| SubtreeError::BadLeft { index: local_index.into() })?
                 } else {
                     empty_hash
                 };
@@ -186,9 +186,9 @@ impl Subtree {
                 let right_hash = if has_right {
                     let hash_bytes = hash_chunks
                         .next()
-                        .ok_or(SubtreeError::MissingRight { index: local_index })?;
+                        .ok_or(SubtreeError::MissingRight { index: local_index.into() })?;
                     Word::try_from(hash_bytes)
-                        .map_err(|_| SubtreeError::BadRight { index: local_index })?
+                        .map_err(|_| SubtreeError::BadRight { index: local_index.into() })?
                 } else {
                     empty_hash
                 };

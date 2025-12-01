@@ -28,8 +28,8 @@ pub use large::{
 #[cfg(feature = "rocksdb")]
 pub use large::{RocksDbConfig, RocksDbStorage};
 
-mod large_forest;
-pub use large_forest::{History, HistoryError, HistoryView, LargeSmtForestError};
+pub mod large_forest;
+pub use large_forest::{LargeSmtForest, LargeSmtForestError};
 
 mod simple;
 pub use simple::{SimpleSmt, SimpleSmtProof};
