@@ -1,0 +1,49 @@
+# cargo-deny configuration for Miden VM workspace
+
+# Graph configuration
+[graph]
+targets = ["aarch64-apple-darwin", "x86_64-apple-darwin", "x86_64-pc-windows-msvc", "x86_64-unknown-linux-gnu"]
+
+# Advisory database configuration
+[advisories]
+db-path = "~/.cargo/advisory-db"
+db-urls = ["https://github.com/rustsec/advisory-db"]
+ignore  = []
+yanked  = "warn"
+
+# License configuration
+[licenses]
+allow = [
+  "Apache-2.0 WITH LLVM-exception",
+  "Apache-2.0",
+  "BSD-2-Clause",
+  "BSD-3-Clause",
+  "CC0-1.0",
+  "MIT",
+  "Unicode-3.0",
+  "Zlib",
+]
+exceptions = []
+
+# Bans configuration
+[bans]
+allow = []
+deny = []
+highlight = "all"
+multiple-versions = "deny"
+skip = []
+skip-tree = [
+  # Allow getrandom v0.2.x for now - legacy dependency
+  { name = "getrandom", version = "=0.2.16" },
+  # Allow rand_core v0.6.x for now - legacy dependency
+  { name = "rand_core", version = "=0.6.4" },
+]
+wildcards = "allow"
+
+# Sources configuration
+[sources]
+allow-registry   = ["https://github.com/rust-lang/crates.io-index"]
+unknown-git      = "deny"
+unknown-registry = "deny"
+# Only allow Git dependencies from known sources
+allow-git = []

@@ -51,8 +51,12 @@ typos-check: ## Runs spellchecker
 workspace-check: ## Runs a check that all packages have `lints.workspace = true`
 	cargo workspace-lints
 
+.PHONY: cargo-deny
+cargo-deny: ## Run cargo-deny to check dependencies for security vulnerabilities and license compliance
+	cargo deny check
+
 .PHONY: lint
-lint: format fix clippy toml typos-check machete ## Run all linting tasks at once (Clippy, fixing, formatting, machete)
+lint: format fix clippy toml typos-check machete cargo-deny ## Run all linting tasks at once (Clippy, fixing, formatting, machete, cargo-deny)
 
 # --- docs ----------------------------------------------------------------------------------------
 
@@ -158,12 +162,14 @@ check-tools: ## Checks if development tools are installed
 	@command -v cargo nextest >/dev/null 2>&1 && echo "[OK] nextest is installed" || echo "[MISSING] nextest is not installed (run: make install-tools)"
 	@command -v taplo >/dev/null 2>&1 && echo "[OK] taplo is installed" || echo "[MISSING] taplo is not installed (run: make install-tools)"
 	@command -v cargo machete >/dev/null 2>&1 && echo "[OK] machete is installed" || echo "[MISSING] machete is not installed (run: make install-tools)"
+	@command -v cargo deny >/dev/null 2>&1 && echo "[OK] cargo-deny is installed" || echo "[MISSING] cargo-deny is not installed (run: make install-tools)"
 
 .PHONY: install-tools
-install-tools: ## Installs development tools required by the Makefile (typos, nextest, taplo, machete)
+install-tools: ## Installs development tools required by the Makefile (typos, nextest, taplo, machete, cargo-deny)
 	@echo "Installing development tools..."
 	cargo install typos-cli --locked
 	cargo install cargo-nextest --locked
 	cargo install taplo-cli --locked
 	cargo install cargo-machete --locked
+	cargo install cargo-deny --locked
 	@echo "Development tools installation complete!"
