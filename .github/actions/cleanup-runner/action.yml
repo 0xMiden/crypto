@@ -20,7 +20,7 @@ runs:
         sudo docker system prune -af --volumes || true
 
         echo "Removing large packages..."
-        sudo apt-get remove -y '^llvm-.*' '^ghc-.*' '^php.*' '^mongodb.*' '^mysql.*' '^postgresql.*' || true
+        sudo apt-get remove -y '^ghc-.*' '^php.*' '^mongodb.*' '^mysql.*' '^postgresql.*' || true
         sudo apt-get autoremove -y
         sudo apt-get clean
 
