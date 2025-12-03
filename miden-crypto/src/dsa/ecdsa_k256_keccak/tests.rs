@@ -98,6 +98,20 @@ fn test_signature_serialization() {
     assert_ne!(signature, recovered_sig);
 }
 
+#[test]
+fn test_secret_key_debug_redaction() {
+    let mut rng = rng();
+    let secret_key = SecretKey::with_rng(&mut rng);
+
+    // Verify Debug impl produces expected redacted output
+    let debug_output = format!("{secret_key:?}");
+    assert_eq!(debug_output, "<elided secret for SecretKey>");
+
+    // Verify Display impl also elides
+    let display_output = format!("{secret_key}");
+    assert_eq!(display_output, "<elided secret for SecretKey>");
+}
+
 #[cfg(feature = "std")]
 #[test]
 fn test_signature_serde() {
