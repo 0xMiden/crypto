@@ -10,6 +10,7 @@ use k256::{
 use miden_crypto_derive::{SilentDebug, SilentDisplay};
 use rand::{CryptoRng, RngCore};
 use thiserror::Error;
+use winter_utils::SliceReader;
 
 use crate::{
     Felt, SequentialCommit, Word,
@@ -330,6 +331,8 @@ impl Deserializable for Signature {
         let r: [u8; SCALARS_SIZE_BYTES] = source.read_array()?;
         let s: [u8; SCALARS_SIZE_BYTES] = source.read_array()?;
         let v: u8 = source.read_u8()?;
+        // Read an additional byte to compensate for the extra byte written during serialization.
+        let _: u8 = source.read_u8()?;
 
         Ok(Signature { r, s, v })
     }
@@ -345,4 +348,16 @@ fn hash_message(message: Word) -> [u8; 32] {
     let message_bytes: [u8; 32] = message.into();
     hasher.update(message_bytes);
     hasher.finalize().into()
+}
+
+#[test]
+fn signature_serde() {
+    let sig0 = SecretKey::new().sign(Word::from([5, 0, 0, 0u32]));
+
+    let sig_bytes = sig0.to_bytes();
+    let mut slice_reader = SliceReader::new(&sig_bytes);
+    let sig0_deserialized = Signature::read_from(&mut slice_reader).unwrap();
+    assert!(!slice_reader.has_more_bytes());
+
+    assert_eq!(sig0, sig0_deserialized);
 }

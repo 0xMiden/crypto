@@ -1,3 +1,7 @@
+## 0.19.1 (2025-12-04)
+
+- Fixed `Signature` deserialization missing one byte from serialization ([#687](https://github.com/0xMiden/crypto/pull/687)).
+
 ## 0.19.0 (2025-11-30)
 
 - Added `LargeSmt::insert_batch()` for optimized bulk operations ([#597](https://github.com/0xMiden/crypto/issues/597)).
