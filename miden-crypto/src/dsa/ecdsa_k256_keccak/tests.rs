@@ -111,3 +111,16 @@ fn test_secret_key_debug_redaction() {
     let display_output = format!("{secret_key}");
     assert_eq!(display_output, "<elided secret for SecretKey>");
 }
+
+#[cfg(feature = "std")]
+#[test]
+fn test_signature_serde() {
+    use winter_utils::SliceReader;
+    let sig0 = SecretKey::new().sign(Word::from([5, 0, 0, 0u32]));
+    let sig_bytes = sig0.to_bytes();
+    let mut slice_reader = SliceReader::new(&sig_bytes);
+    let sig0_deserialized = Signature::read_from(&mut slice_reader).unwrap();
+
+    assert!(!slice_reader.has_more_bytes());
+    assert_eq!(sig0, sig0_deserialized);
+}

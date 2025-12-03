@@ -1,3 +1,7 @@
+## 0.18.5 (2025-12-05)
+
+- Fixed `Signature` deserialization missing one byte from serialization ([#687](https://github.com/0xMiden/crypto/pull/687)).
+
 ## 0.18.4 (2025-11-22)
 
 - Fixed serialization of `PartialSmt` panicking in debug mode when it was constructed from only a root ([#662](https://github.com/0xMiden/crypto/pull/662)).

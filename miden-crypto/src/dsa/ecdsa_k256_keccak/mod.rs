@@ -330,6 +330,8 @@ impl Deserializable for Signature {
         let r: [u8; SCALARS_SIZE_BYTES] = source.read_array()?;
         let s: [u8; SCALARS_SIZE_BYTES] = source.read_array()?;
         let v: u8 = source.read_u8()?;
+        // Read an additional byte to compensate for the extra byte written during serialization.
+        let _: u8 = source.read_u8()?;
 
         Ok(Signature { r, s, v })
     }
