@@ -28,7 +28,7 @@ pub use large::{RocksDbConfig, RocksDbStorage};
 #[cfg(feature = "concurrent")]
 mod large_forest;
 #[cfg(feature = "concurrent")]
-pub use large_forest::{HistoryError, LargeSmtForestError};
+pub use large_forest::LargeSmtForestError;
 
 mod simple;
 pub use simple::{SimpleSmt, SimpleSmtProof};
@@ -37,8 +37,9 @@ mod partial;
 pub use partial::PartialSmt;
 
 mod forest;
-
+mod history;
 pub use forest::SmtForest;
+pub use history::{Delta, History, HistoryView, error::HistoryError};
 
 // CONSTANTS
 // ================================================================================================
