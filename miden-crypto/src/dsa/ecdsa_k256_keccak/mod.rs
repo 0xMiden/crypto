@@ -317,7 +317,7 @@ impl Deserializable for PublicKey {
 
 impl Serializable for Signature {
     fn write_into<W: ByteWriter>(&self, target: &mut W) {
-        let mut bytes = [0u8; SIGNATURE_BYTES];
+        let mut bytes = [0u8; SIGNATURE_BYTES - 1];
         bytes[0..SCALARS_SIZE_BYTES].copy_from_slice(self.r());
         bytes[SCALARS_SIZE_BYTES..2 * SCALARS_SIZE_BYTES].copy_from_slice(self.s());
         bytes[2 * SCALARS_SIZE_BYTES] = self.v();
