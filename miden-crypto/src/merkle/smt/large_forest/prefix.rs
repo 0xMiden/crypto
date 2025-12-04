@@ -22,7 +22,7 @@ use crate::{
 
 /// An in-memory tree prefix that stores all nodes for the first `n` levels of the tree in
 /// fully-materialised form.
-#[allow(dead_code)] // Temporarily
+#[allow(dead_code)] // Temporary
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct InMemoryPrefix {
     /// The number of levels that are stored in the prefix, including the root level.
@@ -38,7 +38,7 @@ pub struct InMemoryPrefix {
     pub nodes: Vec<Word>,
 }
 
-#[allow(dead_code)] // Temporarily
+#[allow(dead_code)] // Temporary
 impl InMemoryPrefix {
     // CONSTRUCTORS
     // --------------------------------------------------------------------------------------------

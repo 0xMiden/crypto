@@ -5,9 +5,12 @@ pub mod subtree;
 
 use thiserror::Error;
 
-use crate::merkle::{
-    MerkleError,
-    smt::large_forest::{error::prefix::PrefixError, history::error::HistoryError, storage},
+use crate::{
+    Word,
+    merkle::{
+        MerkleError,
+        smt::large_forest::{error::prefix::PrefixError, history::error::HistoryError, storage},
+    },
 };
 
 // LARGE SMT FOREST ERROR
@@ -31,6 +34,10 @@ pub enum LargeSmtForestError {
     /// Errors with the in-memory tree prefixes in the forest.
     #[error(transparent)]
     PrefixError(#[from] PrefixError),
+
+    /// Raised when an attempt is made to modify a frozen tree.
+    #[error("Attempted to modify frozen tree with root {0}")]
+    InvalidModification(Word),
 }
 
 /// The result type for use within the large SMT forest portion of the library.

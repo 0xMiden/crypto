@@ -29,7 +29,6 @@ pub use large::{
 pub use large::{RocksDbConfig, RocksDbStorage};
 
 pub mod large_forest;
-
 pub use large_forest::{
     LargeSmtForest, LargeSmtForestError, Storage as ForestStorage, StorageError, StoredTreeHandle,
     SubtreeLevels,
