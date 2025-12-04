@@ -37,9 +37,56 @@
 
 mod error;
 pub mod history;
+mod prefix;
 pub mod storage;
 pub mod utils;
 
-pub use error::LargeSmtForestError;
+pub use error::{LargeSmtForestError, Result};
 pub use storage::{Storage, StorageError, StoredTreeHandle};
 pub use utils::SubtreeLevels;
+
+use crate::{Map, Word, merkle::smt::large_forest::prefix::InMemoryPrefix};
+
+// SPARSE MERKLE TREE FOREST
+// ================================================================================================
+
+/// A high-performance forest of sparse merkle trees with pluggable storage.
+///
+/// # Performance
+///
+/// The performance characteristics of this forest
+#[allow(dead_code)] // Temporary, while the tree gets built.
+#[derive(Debug)]
+pub struct LargeSmtForest<S: Storage> {
+    /// The underlying data storage for the portion of the tree that is not guaranteed to be in
+    /// memory. It **must not be exposed** to any client of this struct's API to ensure
+    /// correctness.
+    storage: S,
+
+    /// The number of levels of each tree that are kept in memory by the forest.
+    in_memory_depth: SubtreeLevels,
+
+    /// The container for the in-memory prefixes of each tree stored in the forest, identified by
+    /// their current root.
+    prefixes: Map<Word, InMemoryPrefix>,
+}
+
+impl<S: Storage> LargeSmtForest<S> {
+    // CONSTRUCTORS
+    // --------------------------------------------------------------------------------------------
+
+    /// Constructs a new forest backed by the provided `storage`.
+    ///
+    /// The constructor will treat whatever state is contained within the provided `storage` as the
+    /// starting state for the forest. This means that if you pass a newly-initialized storage the
+    /// forest will start in an empty state, while if you pass a `storage` that already contains
+    /// some data (e.g. loaded from disk), then the forest will start in _that_ form instead.
+    ///
+    /// # Errors
+    ///
+    /// - [`LargeSmtForestError::StorageError`] if the forest cannot be started up correctly from
+    ///   storage.
+    pub fn new(_storage: S) -> Result<Self> {
+        todo!()
+    }
+}

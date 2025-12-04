@@ -6,10 +6,26 @@
 
 use core::fmt::{Display, Formatter};
 
+use crate::merkle::NodeIndex;
+
 /// The maximum number of levels that can be stored in a given subtree for a tree with depth 64.
 ///
 /// Simply put, it must never include the leaves level, and hence is one less than that depth.
 pub const MAX_NUM_SUBTREE_LEVELS: u8 = 63;
+
+// TYPE ALIASES
+// ================================================================================================
+
+/// The type of linear indexes in the in-memory tree prefix.
+///
+/// It is assumed to be indexing into a linear container of nodes which contains `2.pow(depth + 1)`
+/// entries laid out as follows:
+///
+/// - Index 0 is unused, containing a sentinel value.
+/// - Index 1 contains the root of the tree.
+/// - For a node at index `i`, the left child is found at index `2 * i` and the right child at index
+///   `2 * i + 1`.
+pub type LinearIndex = u64;
 
 // SUBTREE LEVELS
 // ================================================================================================
@@ -80,5 +96,42 @@ impl From<SubtreeLevels> for u64 {
 impl Display for SubtreeLevels {
     fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
         write!(f, "{}", self.value)
+    }
+}
+
+// UTILITY FUNCTIONS
+// ================================================================================================
+
+/// Converts the provided `ix` into a linear index for use in the prefix, based on the addressing
+/// scheme set out in the [`LinearIndex`] documentation.
+#[must_use]
+pub fn node_index_to_linear(ix: NodeIndex) -> LinearIndex {
+    // The NodeIndex is a pair of (depth, index_from_left) where the root is (0, 0).
+    (1 << ix.depth() as u64) + ix.value()
+}
+
+// TESTS
+// ================================================================================================
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn node_index_to_lin() {
+        // Check the edge-cases to start with, being both the minimum and maximum supported number
+        // of levels.
+        assert_eq!(node_index_to_linear(NodeIndex::new_unchecked(0, 0)), 1);
+        assert_eq!(
+            node_index_to_linear(NodeIndex::new_unchecked(62, 2u64.pow(62) - 1)),
+            2u64.pow(63) - 1
+        );
+
+        // Then we can try some random ones.
+        assert_eq!(node_index_to_linear(NodeIndex::new_unchecked(7, 3)), 2u64.pow(7) + 3);
+        assert_eq!(
+            node_index_to_linear(NodeIndex::new_unchecked(21, 2u64.pow(12))),
+            2u64.pow(21) + 2u64.pow(12)
+        );
     }
 }
