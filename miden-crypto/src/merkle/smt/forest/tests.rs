@@ -4,11 +4,17 @@ use itertools::Itertools;
 use super::{EmptySubtreeRoots, MerkleError, SmtForest, Word};
 use crate::{
     Felt, ONE, WORD_SIZE, ZERO,
-    merkle::{int_to_node, smt::SMT_DEPTH},
+    merkle::{
+        int_to_node,
+        smt::{SMT_DEPTH, Smt},
+    },
 };
 
 // TESTS
 // ================================================================================================
+
+// Number of nodes in an empty forest.
+const EMPTY_NODE_COUNT: usize = SMT_DEPTH as usize;
 
 #[test]
 fn test_insert_root_not_in_store() -> Result<(), MerkleError> {
@@ -85,6 +91,43 @@ fn test_insert_multiple_values() -> Result<(), MerkleError> {
             Felt::new(9187865964280213047)
         ])
     );
+
+    Ok(())
+}
+
+#[test]
+fn test_insert_proof() -> Result<(), MerkleError> {
+    // Create an SMT with multiple entries to test partial forest view
+    let key1 = Word::new([ZERO, ZERO, ZERO, ONE]);
+    let value1 = Word::new([ONE; WORD_SIZE]);
+
+    let key2 = Word::new([ZERO, ZERO, ONE, ZERO]);
+    let value2 = Word::new([ONE; WORD_SIZE]);
+
+    let key3 = Word::new([ZERO, ONE, ZERO, Felt::new(2)]);
+    let value3 = Word::new([ONE; WORD_SIZE]);
+
+    let smt = Smt::with_entries(vec![(key1, value1), (key2, value2), (key3, value3)])?;
+    let proof = smt.open(&key1);
+
+    let mut forest = SmtForest::new();
+    assert_eq!(forest.store.num_nodes(), EMPTY_NODE_COUNT);
+    let root = forest.insert_proof(proof);
+    assert_eq!(root, smt.root());
+
+    // key1 should be accessible as we inserted its proof
+    let stored_proof = forest.open(root, key1)?;
+    assert!(stored_proof.verify_membership(&key1, &value1, &root));
+
+    // key2 path is available, but the key is not tracked in the forest.
+    assert_matches!(forest.open(root, key2), Err(MerkleError::UntrackedKey(_)));
+    // key3 path is not available in the forest.
+    assert_matches!(forest.open(root, key3), Err(MerkleError::NodeIndexNotFoundInStore(_, _)));
+
+    forest.pop_smts(vec![root]);
+    assert_eq!(forest.store.num_nodes(), EMPTY_NODE_COUNT);
+    assert!(forest.roots.is_empty());
+    assert!(forest.leaves.is_empty());
 
     Ok(())
 }
