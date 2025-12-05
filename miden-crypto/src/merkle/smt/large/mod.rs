@@ -144,19 +144,8 @@
 use alloc::vec::Vec;
 
 use super::{
-    EMPTY_WORD, EmptySubtreeRoots, InnerNode, InnerNodeInfo, InnerNodes, LeafIndex, MerkleError,
-    MutationSet, NodeIndex, Rpo256, SMT_DEPTH, Smt, SmtLeaf, SmtLeafError, SmtProof,
-    SparseMerklePath, SparseMerkleTree, Word,
-};
-use crate::{
-    PrimeField64,
-    merkle::smt::{
-        Map, NodeMutation, NodeMutations,
-        full::concurrent::{
-            MutatedSubtreeLeaves, PairComputations, SUBTREE_DEPTH, SubtreeLeaf, SubtreeLeavesIter,
-            build_subtree, fetch_sibling_pair, process_sorted_pairs_to_leaves,
-        },
-    },
+    EmptySubtreeRoots, InnerNode, InnerNodeInfo, InnerNodes, LeafIndex, MerkleError, NodeIndex,
+    SMT_DEPTH, SmtLeaf, SmtProof, SparseMerkleTree, Word,
 };
 use crate::merkle::smt::{Map, full::concurrent::MutatedSubtreeLeaves};
 

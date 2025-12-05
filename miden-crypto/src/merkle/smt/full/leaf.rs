@@ -5,7 +5,7 @@ use super::{EMPTY_WORD, Felt, LeafIndex, Rpo256, SMT_DEPTH, SmtLeafError, Word};
 use crate::{
     PrimeField64,
     hash::algebraic_sponge::AlgebraicSponge,
-    merkle::MAX_LEAF_ENTRIES,
+    merkle::smt::MAX_LEAF_ENTRIES,
     utils::{ByteReader, ByteWriter, Deserializable, DeserializationError, Serializable},
 };
 
