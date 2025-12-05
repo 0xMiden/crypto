@@ -10,6 +10,8 @@
 //!
 //! Open an existing RocksDB-backed tree:
 //! ```no_run
+//! # #[cfg(feature = "rocksdb")]
+//! # {
 //! use miden_crypto::merkle::smt::{LargeSmt, RocksDbConfig, RocksDbStorage};
 //!
 //! # fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -18,10 +20,13 @@
 //! let _root = smt.root();
 //! # Ok(())
 //! # }
+//! # }
 //! ```
 //!
 //! Initialize an empty RocksDB-backed tree and bulk-load entries:
 //! ```no_run
+//! # #[cfg(feature = "rocksdb")]
+//! # {
 //! use miden_crypto::{
 //!     Felt, Word,
 //!     merkle::smt::{LargeSmt, RocksDbConfig, RocksDbStorage},
@@ -53,10 +58,13 @@
 //! smt.insert_batch(entries)?;
 //! # Ok(())
 //! # }
+//! # }
 //! ```
 //!
 //! Apply batch updates (insertions and deletions):
 //! ```no_run
+//! # #[cfg(feature = "rocksdb")]
+//! # {
 //! use miden_crypto::{
 //!     EMPTY_WORD, Felt, Word,
 //!     merkle::smt::{LargeSmt, RocksDbConfig, RocksDbStorage},
@@ -77,10 +85,13 @@
 //! smt.insert_batch(updates)?;
 //! # Ok(())
 //! # }
+//! # }
 //! ```
 //!
 //! Quick initialization with `with_entries` (best for modest datasets/tests):
 //! ```no_run
+//! # #[cfg(feature = "rocksdb")]
+//! # {
 //! use miden_crypto::{
 //!     Felt, Word,
 //!     merkle::smt::{LargeSmt, RocksDbConfig, RocksDbStorage},
@@ -108,6 +119,7 @@
 //! ];
 //! let _smt = LargeSmt::with_entries(storage, entries)?;
 //! # Ok(())
+//! # }
 //! # }
 //! ```
 //!

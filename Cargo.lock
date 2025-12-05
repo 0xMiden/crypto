@@ -944,6 +944,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f52b00d39961fc5b2736ea853c9cc86238e165017a493d1d5c8eac6bdc4cc273"
 
 [[package]]
+name = "miden-air"
+version = "0.3.0"
+source = "git+https://github.com/0xMiden/Plonky3/?branch=zz%2Fmigrate-plonky3#c240fc0366f1fb547fda44c726f55d6e44b11ed2"
+dependencies = [
+ "p3-air",
+ "p3-field",
+ "p3-matrix",
+]
+
+[[package]]
 name = "miden-crypto"
 version = "0.20.0"
 dependencies = [
@@ -962,14 +972,14 @@ dependencies = [
  "hkdf",
  "itertools 0.14.0",
  "k256",
+ "miden-air",
  "miden-crypto-derive",
+ "miden-prover",
  "num",
  "num-complex",
  "p3-air",
- "p3-challenger",
  "p3-field",
  "p3-goldilocks",
- "p3-symmetric",
  "proptest",
  "rand",
  "rand_chacha",
@@ -998,6 +1008,27 @@ version = "0.20.0"
 dependencies = [
  "quote",
  "syn",
+]
+
+[[package]]
+name = "miden-prover"
+version = "0.3.0"
+source = "git+https://github.com/0xMiden/Plonky3/?branch=zz%2Fmigrate-plonky3#c240fc0366f1fb547fda44c726f55d6e44b11ed2"
+dependencies = [
+ "itertools 0.14.0",
+ "miden-air",
+ "p3-air",
+ "p3-challenger",
+ "p3-commit",
+ "p3-dft",
+ "p3-field",
+ "p3-interpolation",
+ "p3-matrix",
+ "p3-maybe-rayon",
+ "p3-uni-stark",
+ "p3-util",
+ "serde",
+ "tracing",
 ]
 
 [[package]]
@@ -1145,6 +1176,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "p3-commit"
+version = "0.3.0"
+source = "git+https://github.com/0xMiden/Plonky3/?branch=zz%2Fmigrate-plonky3#c240fc0366f1fb547fda44c726f55d6e44b11ed2"
+dependencies = [
+ "itertools 0.14.0",
+ "p3-challenger",
+ "p3-dft",
+ "p3-field",
+ "p3-matrix",
+ "p3-util",
+ "serde",
+]
+
+[[package]]
 name = "p3-dft"
 version = "0.3.0"
 source = "git+https://github.com/0xMiden/Plonky3/?branch=zz%2Fmigrate-plonky3#c240fc0366f1fb547fda44c726f55d6e44b11ed2"
@@ -1189,6 +1234,17 @@ dependencies = [
  "rand",
  "serde",
  "winter-utils",
+]
+
+[[package]]
+name = "p3-interpolation"
+version = "0.3.0"
+source = "git+https://github.com/0xMiden/Plonky3/?branch=zz%2Fmigrate-plonky3#c240fc0366f1fb547fda44c726f55d6e44b11ed2"
+dependencies = [
+ "p3-field",
+ "p3-matrix",
+ "p3-maybe-rayon",
+ "p3-util",
 ]
 
 [[package]]
@@ -1243,6 +1299,24 @@ dependencies = [
  "itertools 0.14.0",
  "p3-field",
  "serde",
+]
+
+[[package]]
+name = "p3-uni-stark"
+version = "0.3.0"
+source = "git+https://github.com/0xMiden/Plonky3/?branch=zz%2Fmigrate-plonky3#c240fc0366f1fb547fda44c726f55d6e44b11ed2"
+dependencies = [
+ "itertools 0.14.0",
+ "p3-air",
+ "p3-challenger",
+ "p3-commit",
+ "p3-dft",
+ "p3-field",
+ "p3-matrix",
+ "p3-maybe-rayon",
+ "p3-util",
+ "serde",
+ "tracing",
 ]
 
 [[package]]

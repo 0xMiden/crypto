@@ -20,6 +20,8 @@ pub mod word;
 // ================================================================================================
 
 pub use k256::elliptic_curve::zeroize;
+pub use miden_air::*;
+pub use miden_prover::*;
 pub use p3_air::*;
 pub use p3_field::{
     BasedVectorSpace, ExtensionField, Field, PrimeCharacteristicRing, PrimeField64,
