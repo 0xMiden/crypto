@@ -36,7 +36,7 @@ use core::fmt::Debug;
 use error::{HistoryError, Result};
 
 use crate::{
-    Map, Word,
+    Map, Set, Word,
     merkle::{
         NodeIndex,
         smt::{LeafIndex, SMT_DEPTH},
@@ -128,8 +128,30 @@ impl History {
     /// Returns `true` if a new entry can be added without removing the oldest, and `false`
     /// otherwise.
     #[must_use]
-    fn can_add_version_without_removal(&self) -> bool {
+    pub fn can_add_version_without_removal(&self) -> bool {
         self.num_versions() < self.max_versions()
+    }
+
+    /// Returns all the roots that the history knows about.
+    ///
+    /// # Complexity
+    ///
+    /// Calling this method requires a traversal of all the versions and is hence linear in the
+    /// number of history versions.
+    #[must_use]
+    pub fn roots(&self) -> Set<Word> {
+        self.deltas.iter().map(|d| d.root()).collect()
+    }
+
+    /// Returns `true` if `root` is in the history and `false` otherwise.
+    ///
+    /// # Complexity
+    ///
+    /// Calling this method requires a traversal of all the versions and is hence linear in the
+    /// number of history versions.
+    #[must_use]
+    pub fn knows_root(&self, root: Word) -> bool {
+        self.deltas.iter().any(|r| r.root == root)
     }
 
     /// Adds a version to the history with the provided `root` and represented by the changes from
@@ -537,6 +559,47 @@ mod tests {
         assert_eq!(history.num_versions(), 0);
         assert_eq!(history.max_versions(), 5);
         assert!(history.can_add_version_without_removal());
+    }
+
+    #[test]
+    fn roots() -> Result<()> {
+        // Set up our test state
+        let nodes = NodeChanges::default();
+        let leaves = LeafChanges::default();
+        let mut history = History::empty(2);
+        let root_1: Word = rand_value();
+        let root_2: Word = rand_value();
+        history.add_version(root_1, 0, nodes.clone(), leaves.clone())?;
+        history.add_version(root_2, 1, nodes.clone(), leaves.clone())?;
+
+        // We should be able to get all the roots.
+        let roots = history.roots();
+        assert_eq!(roots.len(), 2);
+        assert!(roots.contains(&root_1));
+        assert!(roots.contains(&root_2));
+
+        Ok(())
+    }
+
+    #[test]
+    fn knows_root() -> Result<()> {
+        // Set up our test state
+        let nodes = NodeChanges::default();
+        let leaves = LeafChanges::default();
+        let mut history = History::empty(2);
+        let root_1: Word = rand_value();
+        let root_2: Word = rand_value();
+        history.add_version(root_1, 0, nodes.clone(), leaves.clone())?;
+        history.add_version(root_2, 1, nodes.clone(), leaves.clone())?;
+
+        // We should be able to query for existing roots.
+        assert!(history.knows_root(root_1));
+        assert!(history.knows_root(root_2));
+
+        // But not for nonexistent ones.
+        assert!(!history.knows_root(rand_value()));
+
+        Ok(())
     }
 
     #[test]
