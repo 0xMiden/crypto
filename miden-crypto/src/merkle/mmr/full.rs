@@ -167,7 +167,7 @@ impl Mmr {
             .collect();
 
         // Safety: the invariant is maintained by the [Mmr]
-        let peaks = MmrPeaks::new(forest, peaks).unwrap();
+        let peaks = MmrPeaks::new(forest, peaks)?;
 
         Ok(peaks)
     }
@@ -455,7 +455,7 @@ mod tests {
 
     use winter_utils::{Deserializable, Serializable};
 
-    use crate::{Felt, Word, ZERO, merkle::Mmr};
+    use crate::{Felt, Word, ZERO, merkle::mmr::Mmr};
 
     #[test]
     fn test_serialization() {

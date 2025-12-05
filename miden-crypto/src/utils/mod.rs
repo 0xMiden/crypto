@@ -88,6 +88,9 @@ pub fn hex_to_bytes<const N: usize>(value: &str) -> Result<[u8; N], HexParseErro
     Ok(decoded)
 }
 
+// CONVERSIONS BETWEEN BYTES AND ELEMENTS
+// ================================================================================================
+
 /// Converts a sequence of bytes into vector field elements with padding. This guarantees that no
 /// two sequences or bytes map to the same sequence of field elements.
 ///
@@ -230,4 +233,37 @@ pub fn bytes_to_elements_exact(bytes: &[u8]) -> Option<Vec<Felt>> {
     }
 
     Some(result)
+}
+
+/// Converts bytes to field elements using u32 packing in little-endian format.
+///
+/// Each field element contains a u32 value representing up to 4 bytes. If the byte length
+/// is not a multiple of 4, the final field element is zero-padded.
+///
+/// # Arguments
+/// - `bytes`: The byte slice to convert
+///
+/// # Returns
+/// A vector of field elements, each containing 4 bytes packed in little-endian order.
+///
+/// # Examples
+/// ```rust
+/// # use miden_crypto::{Felt, utils::bytes_to_packed_u32_elements};
+///
+/// let bytes = vec![0x01, 0x02, 0x03, 0x04, 0x05];
+/// let felts = bytes_to_packed_u32_elements(&bytes);
+/// assert_eq!(felts, vec![Felt::new(0x04030201), Felt::new(0x00000005)]);
+/// ```
+pub fn bytes_to_packed_u32_elements(bytes: &[u8]) -> Vec<Felt> {
+    const BYTES_PER_U32: usize = core::mem::size_of::<u32>();
+
+    bytes
+        .chunks(BYTES_PER_U32)
+        .map(|chunk| {
+            // Pack up to 4 bytes into a u32 in little-endian format
+            let mut packed = [0u8; BYTES_PER_U32];
+            packed[..chunk.len()].copy_from_slice(chunk);
+            Felt::from(u32::from_le_bytes(packed))
+        })
+        .collect()
 }

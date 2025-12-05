@@ -7,8 +7,11 @@ use crate::{
     ONE, WORD_SIZE,
     hash::algebraic_sponge::AlgebraicSponge,
     merkle::{
-        EmptySubtreeRoots, MerkleStore, MutationSet, SmtLeafError,
-        smt::{Map, NodeMutation, SparseMerkleTree, full::MAX_LEAF_ENTRIES},
+        EmptySubtreeRoots,
+        smt::{
+            Map, MutationSet, NodeMutation, SmtLeafError, SparseMerkleTree, full::MAX_LEAF_ENTRIES,
+        },
+        store::MerkleStore,
     },
     utils::{Deserializable, Serializable},
 };

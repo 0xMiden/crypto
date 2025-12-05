@@ -1,6 +1,8 @@
+use alloc::string::{String, ToString};
+
 use thiserror::Error;
 
-use super::{MAX_LEAF_ENTRIES, NodeIndex, Word};
+use super::{NodeIndex, Word, smt::MAX_LEAF_ENTRIES};
 
 #[derive(Debug, Error)]
 pub enum MerkleError {
@@ -20,8 +22,8 @@ pub enum MerkleError {
     InvalidPathLength(usize),
     #[error("merkle subtree depth {subtree_depth} exceeds merkle tree depth {tree_depth}")]
     SubtreeDepthExceedsDepth { subtree_depth: u8, tree_depth: u8 },
-    #[error("number of entries in the merkle tree exceeds the maximum of {0}")]
-    TooManyEntries(usize),
+    #[error("number of entries in the merkle tree exceeds the maximum of 2^{0}")]
+    TooManyEntries(u8),
     #[error("number of entries in a leaf ({actual}) exceeds the maximum of ({MAX_LEAF_ENTRIES})")]
     TooManyLeafEntries { actual: usize },
     #[error("node index `{0}` not found in the tree")]
@@ -34,4 +36,18 @@ pub enum MerkleError {
     RootNotInStore(Word),
     #[error("partial smt does not track the merkle path for key {0}")]
     UntrackedKey(Word),
+    #[error("internal error: {0}")]
+    InternalError(String),
+}
+
+#[cfg(feature = "concurrent")]
+impl From<crate::merkle::smt::LargeSmtError> for MerkleError {
+    fn from(err: crate::merkle::smt::LargeSmtError) -> Self {
+        match err {
+            crate::merkle::smt::LargeSmtError::Merkle(me) => me,
+            crate::merkle::smt::LargeSmtError::Storage(se) => {
+                MerkleError::InternalError(se.to_string())
+            },
+        }
+    }
 }

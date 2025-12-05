@@ -185,7 +185,7 @@ impl Smt {
     /// Returns an error if:
     /// - the provided entries contain multiple values for the same key.
     /// - inserting a key-value pair would exceed [`MAX_LEAF_ENTRIES`] (1024 entries) in a leaf.
-    #[cfg(any(not(feature = "concurrent"), fuzzing, test))]
+    #[cfg(any(not(feature = "concurrent"), fuzzing, feature = "fuzzing", test))]
     fn with_entries_sequential(
         entries: impl IntoIterator<Item = (Word, Word)>,
     ) -> Result<Self, MerkleError> {
@@ -336,7 +336,7 @@ impl Smt {
     /// # Example
     /// ```
     /// # use miden_crypto::{Felt, Word};
-    /// # use miden_crypto::merkle::{Smt, EmptySubtreeRoots, SMT_DEPTH};
+    /// # use miden_crypto::merkle::{EmptySubtreeRoots, smt::{Smt, SMT_DEPTH}};
     /// let mut smt = Smt::new();
     /// let pair = (Word::default(), Word::default());
     /// let mutations = smt.compute_mutations(vec![pair]).unwrap();
@@ -624,7 +624,7 @@ impl Deserializable for Smt {
 // FUZZING
 // ================================================================================================
 
-#[cfg(fuzzing)]
+#[cfg(any(fuzzing, feature = "fuzzing"))]
 impl Smt {
     pub fn fuzz_with_entries_sequential(
         entries: impl IntoIterator<Item = (Word, Word)>,
@@ -637,6 +637,7 @@ impl Smt {
         kv_pairs: impl IntoIterator<Item = (Word, Word)>,
     ) -> MutationSet<SMT_DEPTH, Word, Word> {
         <Self as SparseMerkleTree<SMT_DEPTH>>::compute_mutations(self, kv_pairs)
+            .expect("Failed to compute mutations in fuzzing")
     }
 }
 

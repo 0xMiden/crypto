@@ -5,8 +5,9 @@ use rand::{RngCore, SeedableRng};
 use rand_chacha::ChaCha20Rng;
 
 use crate::{
-    dsa::{ecdsa_k256_keccak::SecretKey, eddsa_25519::SecretKey as SecretKey25519},
+    dsa::{ecdsa_k256_keccak::SecretKey, eddsa_25519_sha512::SecretKey as SecretKey25519},
     ies::{keys::EphemeralPublicKey, *},
+    utils::{Deserializable, DeserializationError, Serializable, SliceReader},
 };
 
 // CORE TEST INFRASTRUCTURE
@@ -771,6 +772,89 @@ mod protocol_tests {
             prop_assert_eq!(scheme_from_key.name(), sealed.scheme_name());
         }
     }
+
+    // SEALED MESSAGE SERIALIZATION ROUND-TRIP TESTS (BYTES)
+    // --------------------------------------------------------------------------------------------
+
+    #[test]
+    fn test_sealed_message_serialization_roundtrip_k256_xchacha() {
+        let mut rng = rand::rng();
+        let sk = crate::dsa::ecdsa_k256_keccak::SecretKey::with_rng(&mut rng);
+        let pk = sk.public_key();
+        let sealing_key = SealingKey::K256XChaCha20Poly1305(pk);
+        let unsealing_key = UnsealingKey::K256XChaCha20Poly1305(sk);
+
+        let plaintext = b"serialization roundtrip";
+        let sealed = sealing_key.seal_bytes(&mut rng, plaintext).unwrap();
+        let before = sealed.scheme_name();
+        let bytes = sealed.to_bytes();
+        let sealed2 =
+            <SealedMessage as crate::utils::Deserializable>::read_from_bytes(&bytes).unwrap();
+        let after = sealed2.scheme_name();
+        assert_eq!(before, after);
+        let opened = unsealing_key.unseal_bytes(sealed2).unwrap();
+        assert_eq!(opened.as_slice(), plaintext);
+    }
+
+    #[test]
+    fn test_sealed_message_serialization_roundtrip_x25519_xchacha() {
+        let mut rng = rand::rng();
+        let sk = crate::dsa::eddsa_25519_sha512::SecretKey::with_rng(&mut rng);
+        let pk = sk.public_key();
+        let sealing_key = SealingKey::X25519XChaCha20Poly1305(pk);
+        let unsealing_key = UnsealingKey::X25519XChaCha20Poly1305(sk);
+
+        let plaintext = b"serialization roundtrip";
+        let sealed = sealing_key.seal_bytes(&mut rng, plaintext).unwrap();
+        let before = sealed.scheme_name();
+        let bytes = sealed.to_bytes();
+        let sealed2 =
+            <SealedMessage as crate::utils::Deserializable>::read_from_bytes(&bytes).unwrap();
+        let after = sealed2.scheme_name();
+        assert_eq!(before, after);
+        let opened = unsealing_key.unseal_bytes(sealed2).unwrap();
+        assert_eq!(opened.as_slice(), plaintext);
+    }
+
+    #[test]
+    fn test_sealed_message_serialization_roundtrip_k256_aeadrpo() {
+        let mut rng = rand::rng();
+        let sk = crate::dsa::ecdsa_k256_keccak::SecretKey::with_rng(&mut rng);
+        let pk = sk.public_key();
+        let sealing_key = SealingKey::K256AeadRpo(pk);
+        let unsealing_key = UnsealingKey::K256AeadRpo(sk);
+
+        let plaintext = b"serialization roundtrip";
+        let sealed = sealing_key.seal_bytes(&mut rng, plaintext).unwrap();
+        let before = sealed.scheme_name();
+        let bytes = sealed.to_bytes();
+        let sealed2 =
+            <SealedMessage as crate::utils::Deserializable>::read_from_bytes(&bytes).unwrap();
+        let after = sealed2.scheme_name();
+        assert_eq!(before, after);
+        let opened = unsealing_key.unseal_bytes(sealed2).unwrap();
+        assert_eq!(opened.as_slice(), plaintext);
+    }
+
+    #[test]
+    fn test_sealed_message_serialization_roundtrip_x25519_aeadrpo() {
+        let mut rng = rand::rng();
+        let sk = crate::dsa::eddsa_25519_sha512::SecretKey::with_rng(&mut rng);
+        let pk = sk.public_key();
+        let sealing_key = SealingKey::X25519AeadRpo(pk);
+        let unsealing_key = UnsealingKey::X25519AeadRpo(sk);
+
+        let plaintext = b"serialization roundtrip";
+        let sealed = sealing_key.seal_bytes(&mut rng, plaintext).unwrap();
+        let before = sealed.scheme_name();
+        let bytes = sealed.to_bytes();
+        let sealed2 =
+            <SealedMessage as crate::utils::Deserializable>::read_from_bytes(&bytes).unwrap();
+        let after = sealed2.scheme_name();
+        assert_eq!(before, after);
+        let opened = unsealing_key.unseal_bytes(sealed2).unwrap();
+        assert_eq!(opened.as_slice(), plaintext);
+    }
 }
 
 // INTEGRATION AND REGRESSION TESTS
@@ -827,6 +911,118 @@ mod integration_tests {
 
             // Different keys should produce different ciphertexts
             prop_assert_ne!(sealed1.ciphertext, sealed2.ciphertext);
+        }
+    }
+}
+
+// SEALING/UNSEALING KEY (DE)SERIALIZATION TESTS
+// ================================================================================================
+
+mod keys_serialization_tests {
+    use winter_utils::ByteReader;
+
+    use super::*;
+
+    fn assert_roundtrip(sealing_key: SealingKey) {
+        let expected_scheme = sealing_key.scheme();
+        let expected_tag = expected_scheme as u8;
+
+        let bytes = sealing_key.to_bytes();
+        assert!(!bytes.is_empty());
+        assert_eq!(bytes[0], expected_tag);
+
+        let decoded = <SealingKey as Deserializable>::read_from_bytes(&bytes)
+            .expect("failed to deserialize sealing key");
+        assert_eq!(decoded, sealing_key);
+        assert_eq!(decoded.scheme(), expected_scheme);
+
+        // also confirm direct reader usage consumes all data
+        let mut reader = SliceReader::new(&bytes);
+        let decoded_via_reader =
+            SealingKey::read_from(&mut reader).expect("failed to deserialize sealing key");
+        assert_eq!(decoded_via_reader, sealing_key);
+        assert_eq!(decoded_via_reader.scheme(), expected_scheme);
+        assert!(!reader.has_more_bytes());
+    }
+
+    fn assert_unsealing_roundtrip(unsealing_key: UnsealingKey) {
+        let expected_scheme = unsealing_key.scheme();
+        let expected_tag = expected_scheme as u8;
+
+        let bytes = unsealing_key.to_bytes();
+        assert!(!bytes.is_empty());
+        assert_eq!(bytes[0], expected_tag);
+
+        let decoded = <UnsealingKey as Deserializable>::read_from_bytes(&bytes)
+            .expect("failed to deserialize unsealing key");
+        assert_eq!(decoded.to_bytes(), bytes);
+        assert_eq!(decoded.scheme(), expected_scheme);
+
+        let mut reader = SliceReader::new(&bytes);
+        let decoded_via_reader =
+            UnsealingKey::read_from(&mut reader).expect("failed to deserialize unsealing key");
+        assert_eq!(decoded_via_reader.to_bytes(), bytes);
+        assert_eq!(decoded_via_reader.scheme(), expected_scheme);
+        assert!(!reader.has_more_bytes());
+    }
+
+    fn sample_sealing_keys() -> Vec<SealingKey> {
+        let mut rng = rand::rng();
+        vec![
+            SealingKey::K256XChaCha20Poly1305(SecretKey::with_rng(&mut rng).public_key()),
+            SealingKey::X25519XChaCha20Poly1305(SecretKey25519::with_rng(&mut rng).public_key()),
+            SealingKey::K256AeadRpo(SecretKey::with_rng(&mut rng).public_key()),
+            SealingKey::X25519AeadRpo(SecretKey25519::with_rng(&mut rng).public_key()),
+        ]
+    }
+
+    fn sample_unsealing_keys() -> Vec<UnsealingKey> {
+        let mut rng = rand::rng();
+        vec![
+            UnsealingKey::K256XChaCha20Poly1305(SecretKey::with_rng(&mut rng)),
+            UnsealingKey::X25519XChaCha20Poly1305(SecretKey25519::with_rng(&mut rng)),
+            UnsealingKey::K256AeadRpo(SecretKey::with_rng(&mut rng)),
+            UnsealingKey::X25519AeadRpo(SecretKey25519::with_rng(&mut rng)),
+        ]
+    }
+
+    #[test]
+    fn sealing_keys_roundtrip() {
+        for key in sample_sealing_keys() {
+            assert_roundtrip(key);
+        }
+    }
+
+    #[test]
+    fn unsealing_keys_roundtrip() {
+        for key in sample_unsealing_keys() {
+            assert_unsealing_roundtrip(key);
+        }
+    }
+
+    #[test]
+    fn sealing_from_bytes_rejects_unknown_scheme() {
+        let bytes = vec![0xff];
+
+        match <SealingKey as Deserializable>::read_from_bytes(&bytes) {
+            Err(DeserializationError::InvalidValue(msg)) => {
+                assert!(msg.contains("Unsupported IES scheme"), "unexpected error message: {msg}");
+            },
+            Err(err) => panic!("unexpected error: {err:?}"),
+            Ok(_) => panic!("expected unsupported scheme error"),
+        }
+    }
+
+    #[test]
+    fn unsealing_from_bytes_rejects_unknown_scheme() {
+        let bytes = vec![0xff];
+
+        match <UnsealingKey as Deserializable>::read_from_bytes(&bytes) {
+            Err(DeserializationError::InvalidValue(msg)) => {
+                assert!(msg.contains("Unsupported IES scheme"), "unexpected error message: {msg}");
+            },
+            Err(err) => panic!("unexpected error: {err:?}"),
+            Ok(_) => panic!("expected unsupported scheme error"),
         }
     }
 }

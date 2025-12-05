@@ -4,8 +4,8 @@ use core::{fmt, ops::Deref};
 use crate::{
     Word,
     merkle::{
-        NodeIndex, SmtLeaf,
-        smt::{InnerNode, Map, large::subtree::Subtree},
+        NodeIndex,
+        smt::{InnerNode, Map, SmtLeaf, large::subtree::Subtree},
     },
 };
 
@@ -21,7 +21,7 @@ mod memory;
 pub use memory::MemoryStorage;
 
 mod updates;
-pub use updates::{StorageUpdateParts, StorageUpdates};
+pub use updates::{StorageUpdateParts, StorageUpdates, SubtreeUpdate};
 
 /// Sparse Merkle Tree storage backend.
 ///

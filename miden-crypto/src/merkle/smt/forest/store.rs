@@ -3,7 +3,7 @@ use alloc::vec::Vec;
 use crate::{
     Map, Word,
     hash::rpo::Rpo256,
-    merkle::{EmptySubtreeRoots, MerkleError, MerklePath, MerkleProof, NodeIndex, SMT_DEPTH},
+    merkle::{EmptySubtreeRoots, MerkleError, MerklePath, MerkleProof, NodeIndex, smt::SMT_DEPTH},
 };
 
 // SMT FOREST STORE

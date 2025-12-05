@@ -8,8 +8,11 @@ use crate::{
     Felt,
     hash::algebraic_sponge::AlgebraicSponge,
     merkle::{
-        InOrderIndex, MerklePath, MerkleTree, MmrProof, NodeIndex, int_to_node,
-        mmr::forest::{Forest, TreeSizeIterator, high_bitmask},
+        MerklePath, MerkleTree, NodeIndex, int_to_node,
+        mmr::{
+            InOrderIndex, MmrProof,
+            forest::{Forest, TreeSizeIterator, high_bitmask},
+        },
     },
 };
 

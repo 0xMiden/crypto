@@ -1,10 +1,31 @@
+use alloc::vec::Vec;
+
 use crate::{
     Word,
     merkle::{
-        NodeIndex, SmtLeaf,
-        smt::{Map, large::subtree::Subtree},
+        NodeIndex,
+        smt::{Map, SmtLeaf, large::subtree::Subtree},
     },
 };
+
+/// Represents a storage update operation for a subtree.
+///
+/// Each variant explicitly indicates whether to store or delete a subtree at a given index.
+#[derive(Debug, Clone)]
+pub enum SubtreeUpdate {
+    /// Store or update a subtree at the specified index.
+    Store {
+        /// The index where the subtree should be stored.
+        index: NodeIndex,
+        /// The subtree data to store.
+        subtree: Subtree,
+    },
+    /// Delete the subtree at the specified index.
+    Delete {
+        /// The index of the subtree to delete.
+        index: NodeIndex,
+    },
+}
 
 /// Owned decomposition of a [`StorageUpdates`] batch into its constituent parts.
 ///
@@ -17,10 +38,8 @@ pub struct StorageUpdateParts {
     /// `Some(leaf)` indicates an insertion or update, while `None` indicates deletion.
     pub leaf_updates: Map<u64, Option<SmtLeaf>>,
 
-    /// Subtree updates indexed by their root node position.
-    ///
-    /// `Some(subtree)` indicates an insertion or update, while `None` indicates deletion.
-    pub subtree_updates: Map<NodeIndex, Option<Subtree>>,
+    /// Vector of subtree storage operations (Store or Delete) to be applied atomically.
+    pub subtree_updates: Vec<SubtreeUpdate>,
 
     /// Root hash of the tree after applying all updates.
     pub new_root: Word,
@@ -52,11 +71,8 @@ pub struct StorageUpdates {
     /// - `None` indicates a deletion of the leaf at that index.
     leaf_updates: Map<u64, Option<SmtLeaf>>,
 
-    /// A map of updates to SMT subtrees.
-    /// The key is the `NodeIndex` of the subtree's root.
-    /// - `Some(Subtree)` indicates an insertion or update of the subtree.
-    /// - `None` indicates a deletion of the subtree.
-    subtree_updates: Map<NodeIndex, Option<Subtree>>,
+    /// Vector of subtree storage operations (Store or Delete) to be applied atomically.
+    subtree_updates: Vec<SubtreeUpdate>,
 
     /// The new root hash of the SMT that should be persisted after applying
     /// all `leaf_updates` and `subtree_updates`.
@@ -88,14 +104,14 @@ impl StorageUpdates {
     /// a batch of mutations.
     pub fn from_parts(
         leaf_updates: Map<u64, Option<SmtLeaf>>,
-        subtree_updates: Map<NodeIndex, Option<Subtree>>,
+        subtree_updates: impl IntoIterator<Item = SubtreeUpdate>,
         new_root: Word,
         leaf_count_delta: isize,
         entry_count_delta: isize,
     ) -> Self {
         Self {
             leaf_updates,
-            subtree_updates,
+            subtree_updates: subtree_updates.into_iter().collect(),
             new_root,
             leaf_count_delta,
             entry_count_delta,
@@ -103,24 +119,36 @@ impl StorageUpdates {
     }
 
     /// Adds a leaf insertion/update to the batch.
+    ///
+    /// If a leaf at the same index was previously added to this batch, it will be replaced.
     pub fn insert_leaf(&mut self, index: u64, leaf: SmtLeaf) {
         self.leaf_updates.insert(index, Some(leaf));
     }
 
     /// Adds a leaf removal to the batch.
+    ///
+    /// If a leaf at the same index was previously added to this batch, it will be replaced.
     pub fn remove_leaf(&mut self, index: u64) {
         self.leaf_updates.insert(index, None);
     }
 
     /// Adds a subtree insertion/update to the batch.
+    ///
+    /// **Note:** This method does not deduplicate. If you call this multiple times with the
+    /// same subtree index, multiple update operations will be added to the batch. The storage
+    /// implementation will apply them in order, with the last one taking effect.
     pub fn insert_subtree(&mut self, subtree: Subtree) {
         let index = subtree.root_index();
-        self.subtree_updates.insert(index, Some(subtree));
+        self.subtree_updates.push(SubtreeUpdate::Store { index, subtree });
     }
 
     /// Adds a subtree removal to the batch.
+    ///
+    /// **Note:** This method does not deduplicate. If you call this multiple times with the
+    /// same subtree index, multiple delete operations will be added to the batch. The storage
+    /// implementation will apply them in order, with the last one taking effect.
     pub fn remove_subtree(&mut self, index: NodeIndex) {
-        self.subtree_updates.insert(index, None);
+        self.subtree_updates.push(SubtreeUpdate::Delete { index });
     }
 
     /// Returns true if this update batch contains no changes.
@@ -143,8 +171,8 @@ impl StorageUpdates {
         &self.leaf_updates
     }
 
-    /// Returns a reference to the subtree updates map.
-    pub fn subtree_updates(&self) -> &Map<NodeIndex, Option<Subtree>> {
+    /// Returns a reference to the subtree updates vector.
+    pub fn subtree_updates(&self) -> &[SubtreeUpdate] {
         &self.subtree_updates
     }
 
@@ -188,8 +216,8 @@ impl StorageUpdates {
         self.leaf_updates
     }
 
-    /// Consumes this StorageUpdates and returns the subtree updates map.
-    pub fn into_subtree_updates(self) -> Map<NodeIndex, Option<Subtree>> {
+    /// Consumes this StorageUpdates and returns the subtree updates vector.
+    pub fn into_subtree_updates(self) -> Vec<SubtreeUpdate> {
         self.subtree_updates
     }
 

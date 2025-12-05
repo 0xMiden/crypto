@@ -1,6 +1,9 @@
 use miden_crypto::{
     EMPTY_WORD, Felt, ONE, WORD_SIZE, Word,
-    merkle::{InnerNodeInfo, LargeSmt, RocksDbConfig, RocksDbStorage},
+    merkle::{
+        InnerNodeInfo,
+        smt::{LargeSmt, RocksDbConfig, RocksDbStorage},
+    },
 };
 use tempfile::TempDir;
 
@@ -48,7 +51,7 @@ fn rocksdb_persistence_reopen() {
     let db_path = temp_dir_guard.path().to_path_buf();
 
     let smt = LargeSmt::<RocksDbStorage>::with_entries(initial_storage, entries).unwrap();
-    let root = smt.root().unwrap();
+    let root = smt.root();
 
     let mut inner_nodes: Vec<InnerNodeInfo> = smt.inner_nodes().unwrap().collect();
     inner_nodes.sort_by_key(|info| info.value);
@@ -62,7 +65,7 @@ fn rocksdb_persistence_reopen() {
 
     assert_eq!(inner_nodes.len(), inner_nodes_2.len());
     assert_eq!(inner_nodes, inner_nodes_2);
-    assert_eq!(smt.root().unwrap(), root);
+    assert_eq!(smt.root(), root);
 }
 
 #[test]
@@ -76,7 +79,7 @@ fn rocksdb_persistence_after_insertion() {
     let key = Word::new([ONE, ONE, ONE, ONE]);
     let new_value = Word::new([Felt::new(2), Felt::new(2), Felt::new(2), Felt::new(2)]);
     smt.insert(key, new_value).unwrap();
-    let root = smt.root().unwrap();
+    let root = smt.root();
 
     let mut inner_nodes: Vec<InnerNodeInfo> = smt.inner_nodes().unwrap().collect();
     inner_nodes.sort_by_key(|info| info.value);
@@ -90,5 +93,55 @@ fn rocksdb_persistence_after_insertion() {
 
     assert_eq!(inner_nodes.len(), inner_nodes_2.len());
     assert_eq!(inner_nodes, inner_nodes_2);
-    assert_eq!(smt.root().unwrap(), root);
+    assert_eq!(smt.root(), root);
+}
+
+#[test]
+fn rocksdb_persistence_after_insert_batch_with_deletions() {
+    // Create a tree with initial entries
+    let entries = generate_entries(10_000);
+
+    let (initial_storage, temp_dir_guard) = setup_storage();
+    let db_path = temp_dir_guard.path().to_path_buf();
+
+    let mut smt = LargeSmt::<RocksDbStorage>::with_entries(initial_storage, entries).unwrap();
+
+    // Create a batch that includes both insertions and deletions
+    let mut batch_entries: Vec<(Word, Word)> = Vec::new();
+
+    // Add new entries
+    for i in 20_000..25_000 {
+        let key = Word::new([ONE, ONE, Felt::new(i as u64), Felt::new(i as u64 % 1000)]);
+        let value = Word::new([ONE, ONE, ONE, Felt::new(i as u64)]);
+        batch_entries.push((key, value));
+    }
+
+    // Delete some existing entries
+    for i in 0..1000 {
+        let key = Word::new([ONE, ONE, Felt::new(i as u64), Felt::new(i as u64 % 1000)]);
+        batch_entries.push((key, EMPTY_WORD));
+    }
+
+    smt.insert_batch(batch_entries).unwrap();
+    let root = smt.root();
+
+    let mut inner_nodes: Vec<InnerNodeInfo> = smt.inner_nodes().unwrap().collect();
+    inner_nodes.sort_by_key(|info| info.value);
+    let num_leaves = smt.num_leaves().unwrap();
+    let num_entries = smt.num_entries().unwrap();
+    drop(smt);
+
+    let reopened_storage = RocksDbStorage::open(RocksDbConfig::new(db_path)).unwrap();
+    let smt = LargeSmt::<RocksDbStorage>::new(reopened_storage).unwrap();
+
+    let mut inner_nodes_2: Vec<InnerNodeInfo> = smt.inner_nodes().unwrap().collect();
+    inner_nodes_2.sort_by_key(|info| info.value);
+    let num_leaves_2 = smt.num_leaves().unwrap();
+    let num_entries_2 = smt.num_entries().unwrap();
+
+    assert_eq!(inner_nodes.len(), inner_nodes_2.len());
+    assert_eq!(inner_nodes, inner_nodes_2);
+    assert_eq!(num_leaves, num_leaves_2);
+    assert_eq!(num_entries, num_entries_2);
+    assert_eq!(smt.root(), root, "Tree reconstruction failed - root mismatch after deletions");
 }

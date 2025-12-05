@@ -19,7 +19,7 @@ mod tests {
     use rand_chacha::ChaCha20Rng;
     use winter_utils::{Deserializable, Serializable};
 
-    use crate::{ONE, PrimeCharacteristicRing, Word, dsa::rpo_falcon512::SecretKey};
+    use crate::{ONE, PrimeCharacteristicRing, Word, dsa::falcon512_rpo::SecretKey};
 
     #[test]
     fn test_falcon_verification() {

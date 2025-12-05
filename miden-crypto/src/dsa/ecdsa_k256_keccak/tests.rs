@@ -24,7 +24,7 @@ fn test_key_generation() {
 fn test_public_key_recovery() {
     let mut rng = rng();
 
-    let mut secret_key = SecretKey::with_rng(&mut rng);
+    let secret_key = SecretKey::with_rng(&mut rng);
     let public_key = secret_key.public_key();
 
     // Generate a signature using the secret key
@@ -45,7 +45,7 @@ fn test_public_key_recovery() {
 fn test_sign_and_verify() {
     let mut rng = rng();
 
-    let mut secret_key = SecretKey::with_rng(&mut rng);
+    let secret_key = SecretKey::with_rng(&mut rng);
     let public_key = secret_key.public_key();
 
     let message = [Felt::new(1), Felt::new(2), Felt::new(3), Felt::new(4)].into();
@@ -66,7 +66,7 @@ fn test_sign_and_verify() {
 fn test_signature_serialization_default() {
     let mut rng = rng();
 
-    let mut secret_key = SecretKey::with_rng(&mut rng);
+    let secret_key = SecretKey::with_rng(&mut rng);
     let message = [Felt::new(1), Felt::new(2), Felt::new(3), Felt::new(4)].into();
     let signature = secret_key.sign(message);
 
@@ -80,7 +80,7 @@ fn test_signature_serialization_default() {
 fn test_signature_serialization() {
     let mut rng = rng();
 
-    let mut secret_key = SecretKey::with_rng(&mut rng);
+    let secret_key = SecretKey::with_rng(&mut rng);
     let message = [Felt::new(1), Felt::new(2), Felt::new(3), Felt::new(4)].into();
     let signature = secret_key.sign(message);
     let recovery_id = signature.v();
@@ -110,4 +110,17 @@ fn test_secret_key_debug_redaction() {
     // Verify Display impl also elides
     let display_output = format!("{secret_key}");
     assert_eq!(display_output, "<elided secret for SecretKey>");
+}
+
+#[cfg(feature = "std")]
+#[test]
+fn test_signature_serde() {
+    use winter_utils::SliceReader;
+    let sig0 = SecretKey::new().sign(Word::from([5, 0, 0, 0u32]));
+    let sig_bytes = sig0.to_bytes();
+    let mut slice_reader = SliceReader::new(&sig_bytes);
+    let sig0_deserialized = Signature::read_from(&mut slice_reader).unwrap();
+
+    assert!(!slice_reader.has_more_bytes());
+    assert_eq!(sig0, sig0_deserialized);
 }

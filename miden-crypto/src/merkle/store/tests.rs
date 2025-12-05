@@ -14,7 +14,10 @@ use super::{
 };
 use crate::{
     Felt, ONE, WORD_SIZE, ZERO,
-    merkle::{LeafIndex, MerkleTree, SMT_MAX_DEPTH, SimpleSmt, int_to_leaf, int_to_node},
+    merkle::{
+        MerkleTree, int_to_leaf, int_to_node,
+        smt::{LeafIndex, SMT_MAX_DEPTH, SimpleSmt},
+    },
 };
 
 // TEST DATA
@@ -50,6 +53,10 @@ fn test_root_not_in_store() -> Result<(), MerkleError> {
     assert_matches!(
         store.get_path(VALUES4[0], NodeIndex::make(mtree.depth(), 0)),
         Err(MerkleError::RootNotInStore(root)) if root == VALUES4[0],
+        "Leaf 0 is not a root"
+    );
+    assert!(
+        !store.has_path(VALUES4[0], NodeIndex::make(mtree.depth(), 0)),
         "Leaf 0 is not a root"
     );
 
@@ -119,6 +126,10 @@ fn test_merkle_tree() -> Result<(), MerkleError> {
         result.path,
         "merkle path for index 0 must be the same for the MerkleTree and MerkleStore"
     );
+    assert!(
+        store.has_path(mtree.root(), NodeIndex::make(mtree.depth(), 0)),
+        "path for index 0 must exist"
+    );
 
     let result = store.get_path(mtree.root(), NodeIndex::make(mtree.depth(), 1)).unwrap();
     assert_eq!(
@@ -129,6 +140,10 @@ fn test_merkle_tree() -> Result<(), MerkleError> {
         mtree.get_path(NodeIndex::make(mtree.depth(), 1)).unwrap(),
         result.path,
         "merkle path for index 1 must be the same for the MerkleTree and MerkleStore"
+    );
+    assert!(
+        store.has_path(mtree.root(), NodeIndex::make(mtree.depth(), 1)),
+        "path for index 1 must exist"
     );
 
     let result = store.get_path(mtree.root(), NodeIndex::make(mtree.depth(), 2)).unwrap();
@@ -141,6 +156,10 @@ fn test_merkle_tree() -> Result<(), MerkleError> {
         result.path,
         "merkle path for index 0 must be the same for the MerkleTree and MerkleStore"
     );
+    assert!(
+        store.has_path(mtree.root(), NodeIndex::make(mtree.depth(), 2)),
+        "path for index 2 must exist"
+    );
 
     let result = store.get_path(mtree.root(), NodeIndex::make(mtree.depth(), 3)).unwrap();
     assert_eq!(
@@ -151,6 +170,10 @@ fn test_merkle_tree() -> Result<(), MerkleError> {
         mtree.get_path(NodeIndex::make(mtree.depth(), 3)).unwrap(),
         result.path,
         "merkle path for index 0 must be the same for the MerkleTree and MerkleStore"
+    );
+    assert!(
+        store.has_path(mtree.root(), NodeIndex::make(mtree.depth(), 3)),
+        "path for index 3 must exist"
     );
 
     Ok(())
@@ -197,6 +220,7 @@ fn test_leaf_paths_for_empty_trees() -> Result<(), MerkleError> {
             smt.root(),
             "computed root from the path must match the empty tree root"
         );
+        assert!(store.has_path(smt.root(), index), "path for index 0 at depth {} must exist", DEPTH);
 
     });
 
@@ -303,6 +327,10 @@ fn test_sparse_merkle_tree() -> Result<(), MerkleError> {
         result.path,
         "merkle path for index 0 must be the same for the MerkleTree and MerkleStore"
     );
+    assert!(
+        store.has_path(smt.root(), NodeIndex::make(SMT_MAX_DEPTH, 0)),
+        "path for index 0 must exist"
+    );
 
     let result = store.get_path(smt.root(), NodeIndex::make(SMT_MAX_DEPTH, 1)).unwrap();
     assert_eq!(
@@ -313,6 +341,10 @@ fn test_sparse_merkle_tree() -> Result<(), MerkleError> {
         smt.open(&LeafIndex::<SMT_MAX_DEPTH>::new(1).unwrap()).path,
         result.path,
         "merkle path for index 1 must be the same for the MerkleTree and MerkleStore"
+    );
+    assert!(
+        store.has_path(smt.root(), NodeIndex::make(SMT_MAX_DEPTH, 1)),
+        "path for index 1 must exist"
     );
 
     let result = store.get_path(smt.root(), NodeIndex::make(SMT_MAX_DEPTH, 2)).unwrap();
@@ -325,6 +357,10 @@ fn test_sparse_merkle_tree() -> Result<(), MerkleError> {
         result.path,
         "merkle path for index 2 must be the same for the MerkleTree and MerkleStore"
     );
+    assert!(
+        store.has_path(smt.root(), NodeIndex::make(SMT_MAX_DEPTH, 2)),
+        "path for index 2 must exist"
+    );
 
     let result = store.get_path(smt.root(), NodeIndex::make(SMT_MAX_DEPTH, 3)).unwrap();
     assert_eq!(
@@ -335,6 +371,10 @@ fn test_sparse_merkle_tree() -> Result<(), MerkleError> {
         smt.open(&LeafIndex::<SMT_MAX_DEPTH>::new(3).unwrap()).path,
         result.path,
         "merkle path for index 3 must be the same for the MerkleTree and MerkleStore"
+    );
+    assert!(
+        store.has_path(smt.root(), NodeIndex::make(SMT_MAX_DEPTH, 3)),
+        "path for index 3 must exist"
     );
 
     let result = store.get_path(smt.root(), NodeIndex::make(SMT_MAX_DEPTH, 4)).unwrap();
@@ -347,6 +387,10 @@ fn test_sparse_merkle_tree() -> Result<(), MerkleError> {
         smt.open(&LeafIndex::<SMT_MAX_DEPTH>::new(4).unwrap()).path,
         result.path,
         "merkle path for index 4 must be the same for the MerkleTree and MerkleStore"
+    );
+    assert!(
+        store.has_path(smt.root(), NodeIndex::make(SMT_MAX_DEPTH, 4)),
+        "path for index 4 must exist"
     );
 
     Ok(())
@@ -438,6 +482,10 @@ fn test_add_merkle_paths() -> Result<(), MerkleError> {
         result.path,
         "merkle path for index 0 must be the same for the MerkleTree and MerkleStore"
     );
+    assert!(
+        store.has_path(pmt.root(), NodeIndex::make(pmt.max_depth(), 0)),
+        "path for index 0 must exist"
+    );
 
     let result = store.get_path(pmt.root(), NodeIndex::make(pmt.max_depth(), 1)).unwrap();
     assert_eq!(
@@ -448,6 +496,10 @@ fn test_add_merkle_paths() -> Result<(), MerkleError> {
         pmt.get_path(NodeIndex::make(pmt.max_depth(), 1)).unwrap(),
         result.path,
         "merkle path for index 1 must be the same for the MerkleTree and MerkleStore"
+    );
+    assert!(
+        store.has_path(pmt.root(), NodeIndex::make(pmt.max_depth(), 1)),
+        "path for index 1 must exist"
     );
 
     let result = store.get_path(pmt.root(), NodeIndex::make(pmt.max_depth(), 2)).unwrap();
@@ -460,6 +512,10 @@ fn test_add_merkle_paths() -> Result<(), MerkleError> {
         result.path,
         "merkle path for index 0 must be the same for the MerkleTree and MerkleStore"
     );
+    assert!(
+        store.has_path(pmt.root(), NodeIndex::make(pmt.max_depth(), 2)),
+        "path for index 2 must exist"
+    );
 
     let result = store.get_path(pmt.root(), NodeIndex::make(pmt.max_depth(), 3)).unwrap();
     assert_eq!(
@@ -470,6 +526,10 @@ fn test_add_merkle_paths() -> Result<(), MerkleError> {
         pmt.get_path(NodeIndex::make(pmt.max_depth(), 3)).unwrap(),
         result.path,
         "merkle path for index 0 must be the same for the MerkleTree and MerkleStore"
+    );
+    assert!(
+        store.has_path(pmt.root(), NodeIndex::make(pmt.max_depth(), 3)),
+        "path for index 3 must exist"
     );
 
     Ok(())
@@ -551,6 +611,12 @@ fn test_constructors() -> Result<(), MerkleError> {
         let index = NodeIndex::make(depth, index);
         let value_path = store.get_path(mtree.root(), index)?;
         assert_eq!(mtree.get_path(index)?, value_path.path);
+        assert!(
+            store.has_path(mtree.root(), index),
+            "path for index {} at depth {} must exist",
+            index.value(),
+            depth
+        );
     }
 
     const DEPTH: u8 = 32;
@@ -561,6 +627,12 @@ fn test_constructors() -> Result<(), MerkleError> {
         let index = NodeIndex::make(DEPTH, key);
         let value_path = store.get_path(smt.root(), index)?;
         assert_eq!(smt.open(&LeafIndex::<DEPTH>::new(key).unwrap()).path, value_path.path);
+        assert!(
+            store.has_path(smt.root(), index),
+            "path for key {} at depth {} must exist",
+            key,
+            DEPTH
+        );
     }
 
     let d = 2;
@@ -589,6 +661,18 @@ fn test_constructors() -> Result<(), MerkleError> {
 
         let index = NodeIndex::make(d, key);
         assert_eq!(pmt.get_path(index)?, value_path1.path);
+        assert!(
+            store1.has_path(pmt.root(), index),
+            "path for key {} at depth {} must exist in store1",
+            key,
+            d
+        );
+        assert!(
+            store2.has_path(pmt.root(), index),
+            "path for key {} at depth {} must exist in store2",
+            key,
+            d
+        );
     }
 
     Ok(())
@@ -611,6 +695,7 @@ fn node_path_should_be_truncated_by_midtier_insert() {
     assert_eq!(node, result);
     assert_eq!(path.depth(), depth);
     assert!(path.verify(index.value(), result, &root).is_ok());
+    assert!(store.has_path(root, index), "path for first inserted node must exist");
 
     // flip the first bit of the key and insert the second node on a different depth
     let key = key ^ (1 << 63);
@@ -624,6 +709,7 @@ fn node_path_should_be_truncated_by_midtier_insert() {
     assert_eq!(node, result);
     assert_eq!(path.depth(), depth);
     assert!(path.verify(index.value(), result, &root).is_ok());
+    assert!(store.has_path(root, index), "path for second inserted node must exist");
 
     // attempt to fetch a path of the second node to depth 64
     // should fail because the previously inserted node will remove its sub-tree from the set
@@ -857,6 +943,7 @@ fn check_mstore_subtree(store: &MerkleStore, subtree: &MerkleTree) {
 
         let path2 = subtree.get_path(index).unwrap();
         assert_eq!(path1.path, path2);
+        assert!(store.has_path(subtree.root(), index), "path for leaf {} must exist", i);
     }
 }
 

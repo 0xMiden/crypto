@@ -181,8 +181,7 @@ impl SecretKey {
         data: &[Felt],
         associated_data: &[Felt],
     ) -> Result<EncryptedData, EncryptionError> {
-        use rand::{SeedableRng, rngs::StdRng};
-        let mut rng = StdRng::from_os_rng();
+        let mut rng = rand::rng();
         let nonce = Nonce::with_rng(&mut rng);
 
         self.encrypt_elements_with_nonce(data, associated_data, nonce)

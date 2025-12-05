@@ -29,6 +29,8 @@ jobs:
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@main
+      - name: Cleanup large tools for build space
+        uses: ./.github/actions/cleanup-runner
       - uses: taiki-e/install-action@nextest
       - name: Install LLVM/Clang
         if: ${{ matrix.args == 'large-smt' }}
@@ -52,6 +54,8 @@ jobs:
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@main
+      - name: Cleanup large tools for build space
+        uses: ./.github/actions/cleanup-runner
       - uses: taiki-e/install-action@nextest
       - name: Perform concurrent SMT tests
         run: |
@@ -67,6 +71,8 @@ jobs:
       fail-fast: false
     steps:
       - uses: actions/checkout@main
+      - name: Cleanup large tools for build space
+        uses: ./.github/actions/cleanup-runner
       - uses: Swatinem/rust-cache@v2
       - name: Install LLVM/Clang
         uses: ./.github/actions/install-llvm

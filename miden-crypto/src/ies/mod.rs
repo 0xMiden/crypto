@@ -9,7 +9,7 @@
 //!
 //! ```
 //! use miden_crypto::{
-//!     dsa::eddsa_25519::SecretKey,
+//!     dsa::eddsa_25519_sha512::SecretKey,
 //!     ies::{SealingKey, UnsealingKey},
 //! };
 //! use rand::rng;
@@ -44,7 +44,7 @@ use thiserror::Error;
 /// Supported schemes for IES
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(u8)]
-enum IesScheme {
+pub enum IesScheme {
     K256XChaCha20Poly1305 = 0,
     X25519XChaCha20Poly1305 = 1,
     K256AeadRpo = 2,

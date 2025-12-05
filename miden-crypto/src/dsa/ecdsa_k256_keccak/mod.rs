@@ -16,7 +16,7 @@ use crate::{
     ecdh::k256::{EphemeralPublicKey, SharedSecret},
     utils::{
         ByteReader, ByteWriter, Deserializable, DeserializationError, Serializable,
-        bytes_to_elements_with_padding,
+        bytes_to_packed_u32_elements,
     },
     zeroize::{Zeroize, ZeroizeOnDrop},
 };
@@ -32,7 +32,7 @@ const SECRET_KEY_BYTES: usize = 32;
 /// Length of public key in bytes when using compressed format encoding
 pub(crate) const PUBLIC_KEY_BYTES: usize = 33;
 /// Length of signature in bytes using our custom serialization
-const SIGNATURE_BYTES: usize = 66;
+const SIGNATURE_BYTES: usize = 65;
 /// Length of signature in bytes using standard serialization i.e., `SEC1`
 const SIGNATURE_STANDARD_BYTES: usize = 64;
 /// Length of scalars for the `secp256k1` curve
@@ -83,13 +83,13 @@ impl SecretKey {
     }
 
     /// Signs a message (represented as a Word) with this secret key.
-    pub fn sign(&mut self, message: Word) -> Signature {
+    pub fn sign(&self, message: Word) -> Signature {
         let message_digest = hash_message(message);
         self.sign_prehash(message_digest)
     }
 
     /// Signs a pre-hashed message with this secret key.
-    pub fn sign_prehash(&mut self, message_digest: [u8; 32]) -> Signature {
+    pub fn sign_prehash(&self, message_digest: [u8; 32]) -> Signature {
         let (signature_inner, recovery_id) = self
             .inner
             .sign_prehash_recoverable(&message_digest)
@@ -137,6 +137,9 @@ pub struct PublicKey {
 
 impl PublicKey {
     /// Returns a commitment to the public key using the RPO256 hash function.
+    ///
+    /// The commitment is computed by first converting the public key to field elements (4 bytes
+    /// per element), and then computing a sequential hash of the elements.
     pub fn to_commitment(&self) -> Word {
         <Self as SequentialCommit>::to_commitment(self)
     }
@@ -179,7 +182,7 @@ impl SequentialCommit for PublicKey {
     type Commitment = Word;
 
     fn to_elements(&self) -> Vec<Felt> {
-        bytes_to_elements_with_padding(&self.to_bytes())
+        bytes_to_packed_u32_elements(&self.to_bytes())
     }
 }
 

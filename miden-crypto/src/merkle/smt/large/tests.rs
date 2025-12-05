@@ -6,8 +6,11 @@ use super::MemoryStorage;
 use crate::{
     EMPTY_WORD, Felt, ONE, PrimeField64, WORD_SIZE, Word,
     merkle::{
-        InnerNodeInfo, LargeSmt, LeafIndex, SMT_DEPTH, SmtLeaf,
-        smt::full::{Smt, concurrent::COLS_PER_SUBTREE},
+        InnerNodeInfo,
+        smt::{
+            LargeSmt, LeafIndex, SMT_DEPTH, SmtLeaf,
+            full::{Smt, concurrent::COLS_PER_SUBTREE},
+        },
     },
 };
 
@@ -80,7 +83,7 @@ fn test_equivalent_roots() {
     let storage = MemoryStorage::new();
     let entries = generate_entries(1000);
     let (control_smt, large_smt) = create_equivalent_smts_for_testing(storage, entries);
-    assert_eq!(control_smt.root(), large_smt.root().unwrap());
+    assert_eq!(control_smt.root(), large_smt.root());
 }
 
 #[test]
@@ -171,7 +174,7 @@ fn test_empty_smt() {
     let large_smt = LargeSmt::<_>::new(storage).expect("Failed to create empty SMT");
 
     let empty_control_smt = Smt::new();
-    assert_eq!(large_smt.root().unwrap(), empty_control_smt.root(), "Empty SMT root mismatch");
+    assert_eq!(large_smt.root(), empty_control_smt.root(), "Empty SMT root mismatch");
 
     let random_key = Word::from([ONE, 2_u32.into(), 3_u32.into(), 4_u32.into()]);
     assert_eq!(
@@ -198,7 +201,7 @@ fn test_single_entry_smt() {
     let mut smt = LargeSmt::<_>::with_entries(storage, [(key, value)]).unwrap();
 
     let control_smt_single = Smt::with_entries([(key, value)]).unwrap();
-    assert_eq!(smt.root().unwrap(), control_smt_single.root(), "Single entry SMT root mismatch");
+    assert_eq!(smt.root(), control_smt_single.root(), "Single entry SMT root mismatch");
 
     assert_eq!(smt.get_value(&key), value, "get_value for existing key failed");
 
@@ -221,7 +224,7 @@ fn test_single_entry_smt() {
     smt.apply_mutations(mutations).unwrap();
 
     let control_smt_updated = Smt::with_entries([(key, new_value)]).unwrap();
-    assert_eq!(smt.root().unwrap(), control_smt_updated.root(), "Updated SMT root mismatch");
+    assert_eq!(smt.root(), control_smt_updated.root(), "Updated SMT root mismatch");
     assert_eq!(smt.get_value(&key), new_value, "get_value after update failed");
 
     assert_eq!(
@@ -234,11 +237,7 @@ fn test_single_entry_smt() {
     smt.apply_mutations(mutations_delete).unwrap();
 
     let empty_control_smt = Smt::new();
-    assert_eq!(
-        smt.root().unwrap(),
-        empty_control_smt.root(),
-        "SMT root after deletion mismatch"
-    );
+    assert_eq!(smt.root(), empty_control_smt.root(), "SMT root after deletion mismatch");
     assert_eq!(smt.get_value(&key), EMPTY_WORD, "get_value after deletion failed");
     assert_eq!(smt.entries().unwrap().count(), 0, "SMT should have no entries after deletion");
 }
@@ -291,11 +290,7 @@ fn test_delete_entry() {
 
     let remaining_entries = vec![(key1, value1), (key3, value3)];
     let control_smt_after_delete = Smt::with_entries(remaining_entries).unwrap();
-    assert_eq!(
-        smt.root().unwrap(),
-        control_smt_after_delete.root(),
-        "SMT root mismatch after deletion"
-    );
+    assert_eq!(smt.root(), control_smt_after_delete.root(), "SMT root mismatch after deletion");
 }
 
 #[test]
@@ -339,7 +334,7 @@ fn test_insert_entry() {
     assert_eq!(large_smt.get_value(&new_key), new_value, "Value mismatch");
     assert_eq!(control_smt.get_value(&new_key), new_value, "Value mismatch");
 
-    assert_eq!(large_smt.root().unwrap(), control_smt.root(), "Roots don't match after insert");
+    assert_eq!(large_smt.root(), control_smt.root(), "Roots don't match after insert");
 
     let large_proof = large_smt.open(&new_key);
     let control_proof = control_smt.open(&new_key);
@@ -372,18 +367,154 @@ fn test_mutations_revert() {
         .compute_mutations(vec![(key_1, EMPTY_WORD), (key_2, value_1), (key_3, value_3)])
         .unwrap();
 
-    let original_root = smt.root().unwrap();
+    let original_root = smt.root();
     let revert = smt.apply_mutations_with_reversion(mutations).unwrap();
-    assert_eq!(revert.old_root, smt.root().unwrap(), "reverse mutations old root did not match");
+    assert_eq!(revert.old_root, smt.root(), "reverse mutations old root did not match");
     assert_eq!(revert.root(), original_root, "reverse mutations new root did not match");
 
     smt.apply_mutations(revert).unwrap();
 
     assert_eq!(
-        smt.root().unwrap(),
+        smt.root(),
         original_root,
         "SMT with applied revert mutations did not match original SMT"
     );
+}
+
+#[test]
+fn test_insert_batch_matches_compute_apply() {
+    let storage1 = MemoryStorage::new();
+    let storage2 = MemoryStorage::new();
+
+    const PAIR_COUNT: u64 = COLS_PER_SUBTREE * 64;
+    let entries = generate_entries(PAIR_COUNT);
+
+    // Create two identical trees
+    let mut tree1 = LargeSmt::with_entries(storage1, entries.clone()).unwrap();
+    let mut tree2 = LargeSmt::with_entries(storage2, entries.clone()).unwrap();
+
+    // Generate updates
+    let updates = generate_updates(entries, 1000);
+
+    // Compute_mutations + apply_mutations
+    let mutations = tree1.compute_mutations(updates.clone()).unwrap();
+    let root1_before = tree1.root();
+    tree1.apply_mutations(mutations).unwrap();
+    let root1_after = tree1.root();
+
+    // Insert_batch
+    let root2_before = tree2.root();
+    let root2_after = tree2.insert_batch(updates.clone()).unwrap();
+
+    // Roots match at each step
+    assert_eq!(root1_before, root2_before, "Initial roots should match");
+    assert_eq!(root1_after, root2_after, "Final roots should match");
+
+    // All values match
+    for (key, _) in updates {
+        let val1 = tree1.get_value(&key);
+        let val2 = tree2.get_value(&key);
+        assert_eq!(val1, val2, "Values should match for key {key:?}");
+    }
+
+    // Verify metadata
+    assert_eq!(tree1.num_leaves().unwrap(), tree2.num_leaves().unwrap());
+    assert_eq!(tree1.num_entries().unwrap(), tree2.num_entries().unwrap());
+}
+
+#[test]
+fn test_insert_batch_empty_tree() {
+    let storage = MemoryStorage::new();
+    let mut smt = LargeSmt::new(storage).unwrap();
+
+    let entries = vec![
+        (
+            crate::Word::new([Felt::new(1), Felt::new(0), Felt::new(0), Felt::new(0)]),
+            crate::Word::new([Felt::new(10), Felt::new(20), Felt::new(30), Felt::new(40)]),
+        ),
+        (
+            crate::Word::new([Felt::new(2), Felt::new(0), Felt::new(0), Felt::new(0)]),
+            crate::Word::new([Felt::new(11), Felt::new(22), Felt::new(33), Felt::new(44)]),
+        ),
+    ];
+
+    let new_root = smt.insert_batch(entries.clone()).unwrap();
+    use crate::merkle::EmptySubtreeRoots;
+    assert_ne!(new_root, *EmptySubtreeRoots::entry(SMT_DEPTH, 0));
+
+    // Verify values were inserted
+    for (key, value) in entries {
+        assert_eq!(smt.get_value(&key), value);
+    }
+}
+
+#[test]
+fn test_insert_batch_with_deletions() {
+    let storage = MemoryStorage::new();
+    let mut smt = LargeSmt::new(storage).unwrap();
+
+    // Initial data
+    let key_1 = crate::Word::new([ONE, ONE, ONE, Felt::new(1)]);
+    let key_2 = crate::Word::new([2_u32.into(), 2_u32.into(), 2_u32.into(), Felt::new(2)]);
+    let key_3 = crate::Word::new([0_u32.into(), 0_u32.into(), 0_u32.into(), Felt::new(3)]);
+
+    let value_1 = crate::Word::new([ONE; WORD_SIZE]);
+    let value_2 = crate::Word::new([2_u32.into(); WORD_SIZE]);
+    let value_3 = crate::Word::new([3_u32.into(); WORD_SIZE]);
+
+    smt.insert(key_1, value_1).unwrap();
+    smt.insert(key_2, value_2).unwrap();
+
+    let initial_root = smt.root();
+
+    // Batch update with insertions and deletions
+    let updates = vec![(key_1, EMPTY_WORD), (key_2, value_1), (key_3, value_3)];
+
+    let new_root = smt.insert_batch(updates).unwrap();
+    assert_ne!(new_root, initial_root);
+
+    // Verify the state
+    assert_eq!(smt.get_value(&key_1), EMPTY_WORD);
+    assert_eq!(smt.get_value(&key_2), value_1);
+    assert_eq!(smt.get_value(&key_3), value_3);
+}
+
+#[test]
+fn test_insert_batch_no_mutations() {
+    let storage = MemoryStorage::new();
+    let mut smt = LargeSmt::new(storage).unwrap();
+
+    let key_1 = crate::Word::new([ONE, ONE, ONE, Felt::new(1)]);
+    let value_1 = crate::Word::new([ONE; WORD_SIZE]);
+
+    smt.insert(key_1, value_1).unwrap();
+    let root_before = smt.root();
+
+    // Insert the same value again (no change)
+    let root_after = smt.insert_batch(vec![(key_1, value_1)]).unwrap();
+
+    assert_eq!(root_before, root_after);
+}
+
+#[test]
+fn test_insert_batch_large_dataset() {
+    // Test insert_batch with a large dataset
+    let storage = MemoryStorage::new();
+    let mut smt = LargeSmt::new(storage).unwrap();
+
+    const LARGE_COUNT: u64 = COLS_PER_SUBTREE * 128;
+    let entries = generate_entries(LARGE_COUNT);
+
+    let new_root = smt.insert_batch(entries.clone()).unwrap();
+    use crate::merkle::EmptySubtreeRoots;
+    assert_ne!(new_root, *EmptySubtreeRoots::entry(SMT_DEPTH, 0));
+
+    // Spot check some values
+    for (key, value) in entries.iter().step_by(100) {
+        assert_eq!(smt.get_value(key), *value);
+    }
+
+    assert_eq!(smt.num_entries().unwrap(), LARGE_COUNT as usize);
 }
 
 // IN-MEMORY LAYOUT TESTS
@@ -410,11 +541,7 @@ fn test_flat_layout_index_zero_unused_in_instance() {
 
     // The root hash is computed from children at indices 2 and 3
     let computed_root = Rpo256::merge(&[in_memory_nodes[2], in_memory_nodes[3]]);
-    assert_eq!(
-        computed_root,
-        smt.root().unwrap(),
-        "Root should equal hash(children[2], children[3])"
-    );
+    assert_eq!(computed_root, smt.root(), "Root should equal hash(children[2], children[3])");
 }
 
 #[test]
@@ -443,7 +570,7 @@ fn test_flat_layout_after_insertion() {
     let computed_root = Rpo256::merge(&[in_memory_nodes[2], in_memory_nodes[3]]);
     assert_eq!(
         computed_root,
-        smt.root().unwrap(),
+        smt.root(),
         "Root should equal hash of children at indices 2 and 3"
     );
 }
@@ -474,11 +601,7 @@ fn test_flat_layout_children_relationship() {
     let root_left = in_memory_nodes[2];
     let root_right = in_memory_nodes[3];
     let root_hash = Rpo256::merge(&[root_left, root_right]);
-    assert_eq!(
-        root_hash,
-        smt.root().unwrap(),
-        "Root hash should match computed hash from children"
-    );
+    assert_eq!(root_hash, smt.root(), "Root hash should match computed hash from children");
 
     for &leaf_value in &leaf_indices {
         // Trace path from depth 1 down to in-memory depth

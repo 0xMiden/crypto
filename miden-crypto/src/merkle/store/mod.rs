@@ -1,9 +1,13 @@
+//! Merkle store for efficiently storing multiple Merkle trees with common subtrees.
+
 use alloc::vec::Vec;
 use core::borrow::Borrow;
 
 use super::{
     EmptySubtreeRoots, InnerNodeInfo, MerkleError, MerklePath, MerkleProof, MerkleTree, NodeIndex,
-    PartialMerkleTree, RootPath, Rpo256, SimpleSmt, Smt, Word, mmr::Mmr,
+    PartialMerkleTree, RootPath, Rpo256, Word,
+    mmr::Mmr,
+    smt::{SimpleSmt, Smt},
 };
 use crate::{
     Map,
@@ -33,7 +37,7 @@ pub struct StoreNode {
 ///
 /// ```rust
 /// # use miden_crypto::{ZERO, Felt, Word};
-/// # use miden_crypto::merkle::{NodeIndex, MerkleStore, MerkleTree};
+/// # use miden_crypto::merkle::{NodeIndex, MerkleTree, store::MerkleStore};
 /// # use miden_crypto::hash::rpo::Rpo256;
 /// # use miden_crypto::PrimeCharacteristicRing;
 /// # const fn int_to_node(value: u64) -> Word {
@@ -136,8 +140,8 @@ impl MerkleStore {
                 .get(&hash)
                 .ok_or(MerkleError::NodeIndexNotFoundInStore(hash, index))?;
 
-            let bit = (index.value() >> i) & 1;
-            hash = if bit == 0 { node.left } else { node.right }
+            let is_right = index.is_nth_bit_odd(i);
+            hash = if is_right { node.right } else { node.left };
         }
 
         Ok(hash)
@@ -165,13 +169,13 @@ impl MerkleStore {
                 .get(&hash)
                 .ok_or(MerkleError::NodeIndexNotFoundInStore(hash, index))?;
 
-            let bit = (index.value() >> i) & 1;
-            hash = if bit == 0 {
-                path.push(node.right);
-                node.left
-            } else {
+            let is_right = index.is_nth_bit_odd(i);
+            hash = if is_right {
                 path.push(node.left);
                 node.right
+            } else {
+                path.push(node.right);
+                node.left
             }
         }
 
@@ -179,6 +183,33 @@ impl MerkleStore {
         path.reverse();
 
         Ok(MerkleProof::new(hash, MerklePath::new(path)))
+    }
+
+    /// Returns `true` if a valid path exists from `root` to the specified `index`, `false`
+    /// otherwise.
+    ///
+    /// This method checks if all nodes needed to traverse from `root` to `index` are present in the
+    /// store, without building the actual path. It is more efficient than `get_path` when only
+    /// existence verification is needed.
+    pub fn has_path(&self, root: Word, index: NodeIndex) -> bool {
+        // check if the root exists
+        if self.nodes.get(&root).is_none() {
+            return false;
+        }
+
+        // traverse from root to index
+        let mut hash = root;
+        for i in (0..index.depth()).rev() {
+            let node = match self.nodes.get(&hash) {
+                Some(node) => node,
+                None => return false,
+            };
+
+            let is_right = index.is_nth_bit_odd(i);
+            hash = if is_right { node.right } else { node.left };
+        }
+
+        true
     }
 
     // LEAF TRAVERSAL

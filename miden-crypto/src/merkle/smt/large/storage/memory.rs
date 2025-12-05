@@ -1,13 +1,13 @@
 use alloc::{boxed::Box, string::String, vec::Vec};
 use std::sync::{PoisonError, RwLock};
 
-use super::{SmtStorage, StorageError, StorageUpdateParts, StorageUpdates};
+use super::{SmtStorage, StorageError, StorageUpdateParts, StorageUpdates, SubtreeUpdate};
 use crate::{
-    EMPTY_WORD, Word,
+    EMPTY_WORD, Map, MapEntry, Word,
     merkle::{
-        EmptySubtreeRoots, InnerNode, NodeIndex, SmtLeaf,
+        EmptySubtreeRoots, NodeIndex,
         smt::{
-            Map,
+            InnerNode, SmtLeaf,
             large::{IN_MEMORY_DEPTH, SMT_DEPTH, subtree::Subtree},
         },
     },
@@ -109,7 +109,7 @@ impl SmtStorage for MemoryStorage {
         let mut leaves_guard = self.leaves.write()?;
 
         match leaves_guard.get_mut(&index) {
-            Some(leaf) => Ok(leaf.insert(key, value).expect("Failed to insert value")),
+            Some(leaf) => Ok(leaf.insert(key, value)?),
             None => {
                 leaves_guard.insert(index, SmtLeaf::Single((key, value)));
                 Ok(None)
@@ -131,17 +131,18 @@ impl SmtStorage for MemoryStorage {
     fn remove_value(&self, index: u64, key: Word) -> Result<Option<Word>, StorageError> {
         let mut leaves_guard = self.leaves.write()?;
 
-        match leaves_guard.get_mut(&index) {
-            Some(leaf) => {
-                let old_value = leaf.get_value(&key);
-                leaf.remove(key);
-                Ok(old_value)
+        let old_value = match leaves_guard.entry(index) {
+            MapEntry::Occupied(mut entry) => {
+                let (old_value, is_empty) = entry.get_mut().remove(key);
+                if is_empty {
+                    entry.remove();
+                }
+                old_value
             },
-            None => {
-                // Leaf at index does not exist, so no value could be removed.
-                Ok(None)
-            },
-        }
+            // Leaf at index does not exist, so no value could be removed.
+            MapEntry::Vacant(_) => None,
+        };
+        Ok(old_value)
     }
 
     /// Retrieves a single leaf node.
@@ -344,11 +345,14 @@ impl SmtStorage for MemoryStorage {
                 leaves_guard.remove(&index);
             }
         }
-        for (index, subtree_opt) in subtree_updates {
-            if let Some(subtree) = subtree_opt {
-                subtrees_guard.insert(index, subtree);
-            } else {
-                subtrees_guard.remove(&index);
+        for update in subtree_updates {
+            match update {
+                SubtreeUpdate::Store { index, subtree } => {
+                    subtrees_guard.insert(index, subtree);
+                },
+                SubtreeUpdate::Delete { index } => {
+                    subtrees_guard.remove(&index);
+                },
             }
         }
         *root_guard = new_root;

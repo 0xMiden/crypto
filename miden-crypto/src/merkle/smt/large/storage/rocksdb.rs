@@ -8,13 +8,13 @@ use rocksdb::{
 };
 use winter_utils::{Deserializable, Serializable};
 
-use super::{SmtStorage, StorageError, StorageUpdateParts, StorageUpdates};
+use super::{SmtStorage, StorageError, StorageUpdateParts, StorageUpdates, SubtreeUpdate};
 use crate::{
     EMPTY_WORD, Word,
     merkle::{
-        InnerNode, NodeIndex, SmtLeaf,
+        NodeIndex,
         smt::{
-            Map,
+            InnerNode, Map, SmtLeaf,
             large::{IN_MEMORY_DEPTH, LargeSmt, subtree::Subtree},
         },
     },
@@ -872,12 +872,9 @@ impl SmtStorage for RocksDbStorage {
         // Parallel preparation of subtree operations
         let subtree_ops: Result<Vec<_>, StorageError> = subtree_updates
             .into_par_iter()
-            .map(|(index, maybe_subtree)| -> Result<_, StorageError> {
-                let key = Self::subtree_db_key(index);
-                let subtrees_cf = self.subtree_cf(index);
-
-                let (maybe_bytes, depth24_op) = match maybe_subtree {
-                    Some(subtree) => {
+            .map(|update| -> Result<_, StorageError> {
+                let (index, maybe_bytes, depth24_op) = match update {
+                    SubtreeUpdate::Store { index, subtree } => {
                         let bytes = subtree.to_vec();
                         let depth24_op = is_depth_24(index)
                             .then(|| subtree.get_inner_node(index))
@@ -886,16 +883,19 @@ impl SmtStorage for RocksDbStorage {
                                 let hash_key = Self::index_db_key(index.value());
                                 (hash_key, Some(root_node.hash().to_bytes()))
                             });
-                        (Some(bytes), depth24_op)
+                        (index, Some(bytes), depth24_op)
                     },
-                    None => {
+                    SubtreeUpdate::Delete { index } => {
                         let depth24_op = is_depth_24(index).then(|| {
                             let hash_key = Self::index_db_key(index.value());
                             (hash_key, None)
                         });
-                        (None, depth24_op)
+                        (index, None, depth24_op)
                     },
                 };
+
+                let key = Self::subtree_db_key(index);
+                let subtrees_cf = self.subtree_cf(index);
 
                 Ok((subtrees_cf, key, maybe_bytes, depth24_op))
             })
@@ -1157,7 +1157,7 @@ impl RocksDbConfig {
     ///
     /// # Examples
     /// ```
-    /// use miden_crypto::merkle::RocksDbConfig;
+    /// use miden_crypto::merkle::smt::RocksDbConfig;
     ///
     /// let config = RocksDbConfig::new("/path/to/database");
     /// ```
@@ -1180,7 +1180,7 @@ impl RocksDbConfig {
     ///
     /// # Examples
     /// ```
-    /// use miden_crypto::merkle::RocksDbConfig;
+    /// use miden_crypto::merkle::smt::RocksDbConfig;
     ///
     /// let config = RocksDbConfig::new("/path/to/database")
     ///     .with_cache_size(2 * 1024 * 1024 * 1024); // 2GB cache
@@ -1201,7 +1201,7 @@ impl RocksDbConfig {
     ///
     /// # Examples
     /// ```
-    /// use miden_crypto::merkle::RocksDbConfig;
+    /// use miden_crypto::merkle::smt::RocksDbConfig;
     ///
     /// let config = RocksDbConfig::new("/path/to/database")
     ///     .with_max_open_files(1024); // Allow up to 1024 open files

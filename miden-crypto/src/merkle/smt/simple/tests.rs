@@ -10,8 +10,8 @@ use crate::{
     EMPTY_WORD,
     hash::rpo::Rpo256,
     merkle::{
-        EmptySubtreeRoots, InnerNodeInfo, LeafIndex, MerklePath, MerkleTree, int_to_leaf,
-        int_to_node, smt::SparseMerkleTree,
+        EmptySubtreeRoots, InnerNodeInfo, MerklePath, MerkleTree, int_to_leaf, int_to_node,
+        smt::{LeafIndex, SparseMerkleTree},
     },
 };
 
