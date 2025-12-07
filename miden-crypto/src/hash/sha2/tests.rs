@@ -172,7 +172,7 @@ struct TestVector {
 // ================================================================================================
 
 // NIST test vectors for SHA-256
-// https://csrc.nist.gov/projects/cryptographic-standards-and-guidelines/example-values
+// https://csrc.nist.gov/CSRC/media/Projects/Cryptographic-Standards-and-Guidelines/documents/examples/SHA256.pdf
 const SHA256_TEST_VECTORS: &[TestVector] = &[
     TestVector {
         input: b"",
@@ -192,7 +192,7 @@ const SHA256_TEST_VECTORS: &[TestVector] = &[
 ];
 
 // NIST test vectors for SHA-512
-// https://csrc.nist.gov/projects/cryptographic-standards-and-guidelines/example-values
+// https://csrc.nist.gov/CSRC/media/Projects/Cryptographic-Standards-and-Guidelines/documents/examples/SHA512.pdf
 const SHA512_TEST_VECTORS: &[TestVector] = &[
     TestVector {
         input: b"",
