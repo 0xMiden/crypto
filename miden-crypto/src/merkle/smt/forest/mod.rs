@@ -112,6 +112,11 @@ impl SmtForest {
 
         SmtProof::new(path, leaf).map_err(|error| match error {
             SmtProofError::InvalidMerklePathLength(depth) => MerkleError::InvalidPathLength(depth),
+            // These variants are only returned by verification methods, not by SmtProof::new()
+            SmtProofError::InvalidKeyForProof
+            | SmtProofError::ValueMismatch { .. }
+            | SmtProofError::ConflictingRoots { .. }
+            | SmtProofError::ValuePresent { .. } => unreachable!(),
         })
     }
 

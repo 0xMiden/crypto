@@ -4,7 +4,10 @@ use itertools::Itertools;
 use super::{EmptySubtreeRoots, MerkleError, SmtForest, Word};
 use crate::{
     Felt, ONE, WORD_SIZE, ZERO,
-    merkle::{int_to_node, smt::SMT_DEPTH},
+    merkle::{
+        int_to_node,
+        smt::{SMT_DEPTH, SmtProofError},
+    },
 };
 
 // TESTS
@@ -117,7 +120,7 @@ fn test_batch_insert() -> Result<(), MerkleError> {
 
         for (key, value) in values {
             let proof = forest.open(new_root, key).unwrap();
-            assert!(proof.verify_membership(&key, &value, &new_root));
+            proof.verify_presence(&key, &value, &new_root).unwrap();
         }
     });
 
@@ -160,11 +163,13 @@ fn test_open_root_in_store() -> Result<(), MerkleError> {
 
     let proof =
         forest.open(root, Word::new([Felt::new(0), Felt::new(0), Felt::new(0), Felt::new(2)]))?;
-    assert!(proof.verify_membership(
-        &Word::new([Felt::new(0), Felt::new(0), Felt::new(0), Felt::new(2)]),
-        &int_to_node(3),
-        &root
-    ));
+    proof
+        .verify_presence(
+            &Word::new([Felt::new(0), Felt::new(0), Felt::new(0), Felt::new(2)]),
+            &int_to_node(3),
+            &root,
+        )
+        .expect("proof should verify membership");
 
     Ok(())
 }
@@ -195,31 +200,30 @@ fn test_multiple_versions_of_same_key() -> Result<(), MerkleError> {
 
     // Open proofs for each historical root and verify them
     let proof1 = forest.open(root1, key)?;
-    assert!(
-        proof1.verify_membership(&key, &value1, &root1),
-        "Proof for root1 should verify with value1"
-    );
+    proof1
+        .verify_presence(&key, &value1, &root1)
+        .expect("Proof for root1 should verify with value1");
 
     let proof2 = forest.open(root2, key)?;
-    assert!(
-        proof2.verify_membership(&key, &value2, &root2),
-        "Proof for root2 should verify with value2"
-    );
+    proof2
+        .verify_presence(&key, &value2, &root2)
+        .expect("Proof for root2 should verify with value2");
 
     let proof3 = forest.open(root3, key)?;
-    assert!(
-        proof3.verify_membership(&key, &value3, &root3),
-        "Proof for root3 should verify with value3"
-    );
+    proof3
+        .verify_presence(&key, &value3, &root3)
+        .expect("Proof for root3 should verify with value3");
 
-    // Wrong values cannot be verified
-    assert!(
-        !proof1.verify_membership(&key, &value2, &root1),
+    // Wrong values cannot be verified - should return ValueMismatch
+    assert_matches!(
+        proof1.verify_presence(&key, &value2, &root1),
+        Err(SmtProofError::ValueMismatch { .. }),
         "Proof for root1 should not verify with value2"
     );
 
-    assert!(
-        !proof3.verify_membership(&key, &value1, &root3),
+    assert_matches!(
+        proof3.verify_presence(&key, &value1, &root3),
+        Err(SmtProofError::ValueMismatch { .. }),
         "Proof for root3 should not verify with value1"
     );
 
