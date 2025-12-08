@@ -125,7 +125,8 @@ impl MmrPeaks {
     pub fn verify(&self, value: Word, opening: MmrProof) -> Result<(), MmrError> {
         let root = self.get_peak(opening.peak_index())?;
         opening
-            .merkle_path
+            .path()
+            .merkle_path()
             .verify(opening.relative_pos() as u64, value, root)
             .map_err(MmrError::InvalidMerklePath)
     }
