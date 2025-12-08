@@ -1,8 +1,10 @@
 use alloc::vec::Vec;
 
+use assert_matches::assert_matches;
+
 use super::{
     super::{InnerNodeInfo, Rpo256, Word},
-    Mmr, MmrPeaks, PartialMmr,
+    Mmr, MmrError, MmrPeaks, PartialMmr,
 };
 use crate::{
     Felt,
@@ -1104,14 +1106,18 @@ fn test_mmr_add_invalid_odd_leaf() {
 /// Here we manipulate the proof to return a peak index of 1 while the MMR only has 1 peak (with
 /// index 0).
 #[test]
-#[should_panic]
 fn test_mmr_proof_num_peaks_exceeds_current_num_peaks() {
     let mmr: Mmr = LEAVES[0..4].iter().cloned().into();
     let original_proof = mmr.open(3).unwrap();
     // Create an invalid proof with wrong forest and position
     let invalid_path = MmrPath::new(Forest::new(5), 4, original_proof.path().merkle_path().clone());
     let invalid_proof = MmrProof::new(invalid_path, original_proof.leaf());
-    mmr.peaks().verify(LEAVES[3], invalid_proof).unwrap();
+    let err = mmr.peaks().verify(LEAVES[3], invalid_proof).unwrap_err();
+    assert_matches!(
+        err,
+        MmrError::PeakOutOfBounds { peak_idx, peaks_len }
+            if peak_idx == 1 && peaks_len == mmr.peaks().num_peaks()
+    );
 }
 
 /// Tests that a proof whose peak count exceeds the peak count of the MMR returns an error.
@@ -1120,7 +1126,6 @@ fn test_mmr_proof_num_peaks_exceeds_current_num_peaks() {
 /// Then we add another leaf which results in an Mmr with just one peak due to trees
 /// being merged. If we try to use the old proof against the new Mmr, we should get an error.
 #[test]
-#[should_panic]
 fn test_mmr_old_proof_num_peaks_exceeds_current_num_peaks() {
     let leaves_len = 3;
     let mut mmr = Mmr::from(LEAVES[0..leaves_len].iter().cloned());
@@ -1130,7 +1135,12 @@ fn test_mmr_old_proof_num_peaks_exceeds_current_num_peaks() {
     assert!(mmr.peaks().verify(LEAVES[leaf_idx], proof.clone()).is_ok());
 
     mmr.add(LEAVES[leaves_len]);
-    mmr.peaks().verify(LEAVES[leaf_idx], proof).unwrap();
+    let err = mmr.peaks().verify(LEAVES[leaf_idx], proof).unwrap_err();
+    assert_matches!(
+        err,
+        MmrError::PeakOutOfBounds { peak_idx, peaks_len }
+            if peak_idx == 1 && peaks_len == mmr.peaks().num_peaks()
+    );
 }
 
 mod property_tests {
