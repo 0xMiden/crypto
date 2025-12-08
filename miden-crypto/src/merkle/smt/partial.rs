@@ -86,6 +86,88 @@ impl PartialSmt {
         self.0.root()
     }
 
+    /// Decomposes this [`PartialSmt`] into its constituent parts: root, leaves, and inner nodes.
+    ///
+    /// The parts are returned as:
+    /// - `root`: The root digest of the tree
+    /// - `leaves`: A vector of (leaf_index, leaf) tuples sorted by leaf index
+    /// - `inner_nodes`: A vector of (scalar_index, inner_node) tuples sorted by scalar index
+    ///
+    /// The scalar index uniquely identifies a node's position as `2^depth + value`.
+    /// This compact representation saves space compared to storing depth and value separately.
+    ///
+    /// The returned parts can be used to reconstruct the tree using [`PartialSmt::from_parts`].
+    pub fn into_parts(
+        self,
+    ) -> (Word, alloc::vec::Vec<(u64, SmtLeaf)>, alloc::vec::Vec<(u64, InnerNode)>) {
+        let root = self.0.root();
+
+        // Extract leaves and sort by index for deterministic ordering
+        let mut leaves: alloc::vec::Vec<_> = self.0.leaves.into_iter().collect();
+        leaves.sort_by_key(|(index, _)| *index);
+
+        // Extract inner nodes, convert to scalar index, and sort for deterministic ordering
+        let mut inner_nodes: alloc::vec::Vec<_> = self
+            .0
+            .inner_nodes
+            .into_iter()
+            .map(|(node_index, inner_node)| {
+                // Convert NodeIndex to scalar index: 2^depth + value
+                let scalar_index = node_index.to_scalar_index();
+                (scalar_index, inner_node)
+            })
+            .collect();
+
+        // Sort by scalar index (which naturally orders by depth then value)
+        inner_nodes.sort_by_key(|(scalar_index, _)| *scalar_index);
+
+        (root, leaves, inner_nodes)
+    }
+
+    /// Reconstructs a [`PartialSmt`] from its constituent parts.
+    ///
+    /// # Arguments
+    ///
+    /// * `root` - The root digest of the tree
+    /// * `leaves` - A vector of (leaf_index, leaf) tuples
+    /// * `inner_nodes` - A vector of (scalar_index, inner_node) tuples
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - The provided parts are inconsistent (e.g., computed root doesn't match provided root)
+    /// - The inner nodes don't form a valid tree structure
+    /// - A scalar index is invalid (e.g., 0)
+    pub fn from_parts(
+        root: Word,
+        leaves: alloc::vec::Vec<(u64, SmtLeaf)>,
+        inner_nodes: alloc::vec::Vec<(u64, InnerNode)>,
+    ) -> Result<Self, MerkleError> {
+        // Create the maps from the vectors
+        let leaves_map: Leaves<SmtLeaf> = leaves.into_iter().collect();
+
+        // Convert scalar indices back to NodeIndex
+        let inner_nodes_map: InnerNodes = inner_nodes
+            .into_iter()
+            .map(|(scalar_index, inner_node)| {
+                // Decode scalar index back to depth and value
+                // scalar_index = 2^depth + value
+                // depth = position of MSB - 1
+                if scalar_index == 0 {
+                    return Err(MerkleError::InvalidNodeIndex { depth: 0, value: 0 });
+                }
+                let depth = 63 - scalar_index.leading_zeros() as u8;
+                let value = scalar_index - (1u64 << depth);
+                let node_index = NodeIndex::new(depth, value)?;
+                Ok((node_index, inner_node))
+            })
+            .collect::<Result<_, MerkleError>>()?;
+
+        let smt = Smt::from_raw_parts(inner_nodes_map, leaves_map, root);
+
+        Ok(Self(smt))
+    }
+
     /// Returns an opening of the leaf associated with `key`. Conceptually, an opening is a Merkle
     /// path to the leaf, as well as the leaf itself.
     ///
@@ -812,5 +894,84 @@ mod tests {
         // Setting a value to the empty word removes decreases the number of entries.
         partial.insert(key0, Word::empty()).unwrap();
         assert_eq!(partial.num_entries(), 2);
+    }
+
+    /// Tests that `into_parts` and `from_parts` correctly round-trip a PartialSmt.
+    #[test]
+    fn partial_smt_into_parts_from_parts_roundtrip() {
+        let key0 = Word::from(rand_array::<Felt, 4>());
+        let key1 = Word::from(rand_array::<Felt, 4>());
+        let key2 = Word::from(rand_array::<Felt, 4>());
+
+        let value0 = Word::from(rand_array::<Felt, 4>());
+        let value1 = Word::from(rand_array::<Felt, 4>());
+        let value2 = Word::from(rand_array::<Felt, 4>());
+
+        let kv_pairs = vec![(key0, value0), (key1, value1), (key2, value2)];
+        let full = Smt::with_entries(kv_pairs).unwrap();
+
+        // Build a partial SMT with some proofs
+        let proof0 = full.open(&key0);
+        let proof1 = full.open(&key1);
+        let proof2 = full.open(&key2);
+
+        let partial = PartialSmt::from_proofs([proof0, proof1, proof2]).unwrap();
+        let original_root = partial.root();
+
+        // Get the original openings
+        let original_opening0 = partial.open(&key0).unwrap();
+        let original_opening1 = partial.open(&key1).unwrap();
+        let original_opening2 = partial.open(&key2).unwrap();
+
+        // Decompose into parts
+        let (root, leaves, inner_nodes) = partial.clone().into_parts();
+
+        // Verify root matches
+        assert_eq!(root, original_root);
+
+        // Verify leaves are sorted by index
+        for i in 1..leaves.len() {
+            assert!(leaves[i - 1].0 < leaves[i].0, "leaves should be sorted by index");
+        }
+
+        // Verify inner nodes are sorted by scalar index
+        for i in 1..inner_nodes.len() {
+            assert!(
+                inner_nodes[i - 1].0 < inner_nodes[i].0,
+                "inner nodes should be sorted by scalar index"
+            );
+        }
+
+        // Reconstruct from parts
+        let reconstructed = PartialSmt::from_parts(root, leaves, inner_nodes).unwrap();
+
+        // Verify the reconstructed tree has the same root
+        assert_eq!(reconstructed.root(), original_root);
+
+        // Verify all tracked keys can be accessed
+        assert_eq!(reconstructed.get_value(&key0).unwrap(), value0);
+        assert_eq!(reconstructed.get_value(&key1).unwrap(), value1);
+        assert_eq!(reconstructed.get_value(&key2).unwrap(), value2);
+
+        // Verify the reconstructed tree equals the original
+        assert_eq!(reconstructed, partial);
+
+        // Verify that openings for all tracked keys remain identical after roundtrip
+        let reconstructed_opening0 = reconstructed.open(&key0).unwrap();
+        let reconstructed_opening1 = reconstructed.open(&key1).unwrap();
+        let reconstructed_opening2 = reconstructed.open(&key2).unwrap();
+
+        assert_eq!(
+            original_opening0, reconstructed_opening0,
+            "opening for key0 should be identical after roundtrip"
+        );
+        assert_eq!(
+            original_opening1, reconstructed_opening1,
+            "opening for key1 should be identical after roundtrip"
+        );
+        assert_eq!(
+            original_opening2, reconstructed_opening2,
+            "opening for key2 should be identical after roundtrip"
+        );
     }
 }
