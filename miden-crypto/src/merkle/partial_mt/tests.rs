@@ -1,7 +1,9 @@
 use alloc::{collections::BTreeMap, vec::Vec};
 
 use super::{
-    super::{MerkleTree, NodeIndex, PartialMerkleTree, int_to_node, store::MerkleStore},
+    super::{
+        MerkleError, MerkleTree, NodeIndex, PartialMerkleTree, int_to_node, store::MerkleStore,
+    },
     Deserializable, InnerNodeInfo, MerkleProof, Serializable, Word,
 };
 
@@ -85,6 +87,28 @@ fn err_with_leaves() {
     let leaf_nodes: BTreeMap<NodeIndex, Word> = leaf_nodes_vec.into_iter().collect();
 
     assert!(PartialMerkleTree::with_leaves(leaf_nodes).is_err());
+}
+
+/// Tests that `with_leaves()` returns `EntryIsNotLeaf` error when an entry
+/// is an ancestor of another entry.
+#[test]
+fn err_with_leaves_entry_is_not_leaf() {
+    // Provide all 8 leaves at depth 3
+    let mut entries: BTreeMap<NodeIndex, Word> = (0u64..8)
+        .map(|i| (NodeIndex::new(3, i).unwrap(), VALUES8[i as usize]))
+        .collect();
+
+    // Add an entry at depth 1 - this is an ancestor of some depth-3 entries
+    entries.insert(NodeIndex::new(1, 0).unwrap(), int_to_node(999));
+
+    // Verify we get EntryIsNotLeaf error
+    match PartialMerkleTree::with_leaves(entries) {
+        Err(MerkleError::EntryIsNotLeaf { node }) => {
+            assert_eq!(node.depth(), 1);
+            assert_eq!(node.value(), 0);
+        },
+        other => panic!("Expected EntryIsNotLeaf error, got {:?}", other),
+    }
 }
 
 /// Checks that root returned by `root()` function is equal to the expected one.

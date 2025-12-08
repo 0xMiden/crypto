@@ -14,6 +14,8 @@ pub enum MerkleError {
     DepthTooBig(u64),
     #[error("multiple values provided for merkle tree index {0}")]
     DuplicateValuesForIndex(u64),
+    #[error("entry {node} is not a leaf")]
+    EntryIsNotLeaf { node: NodeIndex },
     #[error("node index value {value} is not valid for depth {depth}")]
     InvalidNodeIndex { depth: u8, value: u64 },
     #[error("provided node index depth {provided} does not match expected depth {expected}")]
