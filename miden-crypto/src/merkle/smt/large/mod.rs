@@ -331,13 +331,13 @@ impl<S: SmtStorage> LargeSmt<S> {
     }
 
     /// Returns a boolean value indicating whether the SMT is empty.
-    ///
-    /// # Errors
-    /// Returns an error if there is a storage error when retrieving the leaf count.
-    pub fn is_empty(&self) -> Result<bool, LargeSmtError> {
+    pub fn is_empty(&self) -> bool {
         let root = self.root();
-        debug_assert_eq!(self.num_leaves()? == 0, root == Self::EMPTY_ROOT);
-        Ok(root == Self::EMPTY_ROOT)
+        debug_assert_eq!(
+            self.num_leaves().expect("failed to get leaf count") == 0,
+            root == Self::EMPTY_ROOT
+        );
+        root == Self::EMPTY_ROOT
     }
 
     // ITERATORS
