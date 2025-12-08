@@ -30,6 +30,9 @@
 
 pub mod error;
 
+#[cfg(test)]
+mod tests;
+
 use alloc::collections::VecDeque;
 use core::fmt::Debug;
 
@@ -52,10 +55,13 @@ pub type CompactLeaf = Map<Word, Word>;
 
 /// A collection of changes to arbitrary non-leaf nodes in a merkle tree.
 ///
-/// Note that if in the version of the tree represented by these `NodeChanges` had the default value
-/// at the node, this default value _must_ be made concrete in the map. Failure to do so will retain
-/// a newer, non-default value for that node, and thus result in incorrect query results at this
-/// point in the history.
+/// All changes to nodes between versions `v` and `v + 1` must be explicitly "undone" in the
+/// `NodeChanges` representing version `v`. This includes nodes that were defaulted in version `v`
+/// that were given an explicit value in version `v + 1`, where the `NodeChanges` must explicitly
+/// set those nodes back to the default.
+///
+/// Failure to do so will result in incorrect values when those nodes are queried at a point in the
+/// history corresponding to version `v`.
 pub type NodeChanges = Map<NodeIndex, Word>;
 
 /// A collection of changes to arbitrary leaf nodes in a merkle tree.
@@ -109,7 +115,10 @@ impl History {
     /// a tree.
     #[must_use]
     pub fn empty(max_count: usize) -> Self {
-        let deltas = VecDeque::with_capacity(max_count);
+        // We allocate one more than we actually need to store to allow us to insert and THEN
+        // remove, rather than the other way around. This leads to negligible increases in memory
+        // usage while allowing for cleaner code.
+        let deltas = VecDeque::with_capacity(max_count + 1);
         Self { max_count, deltas }
     }
 
@@ -125,13 +134,6 @@ impl History {
         self.deltas.len()
     }
 
-    /// Returns `true` if a new entry can be added without removing the oldest, and `false`
-    /// otherwise.
-    #[must_use]
-    pub fn can_add_version_without_removal(&self) -> bool {
-        self.num_versions() < self.max_versions()
-    }
-
     /// Returns all the roots that the history knows about.
     ///
     /// # Complexity
@@ -140,7 +142,7 @@ impl History {
     /// number of history versions.
     #[must_use]
     pub fn roots(&self) -> Set<Word> {
-        self.deltas.iter().map(|d| d.root()).collect()
+        self.deltas.iter().map(|d| d.root).collect()
     }
 
     /// Returns `true` if `root` is in the history and `false` otherwise.
@@ -150,7 +152,7 @@ impl History {
     /// Calling this method requires a traversal of all the versions and is hence linear in the
     /// number of history versions.
     #[must_use]
-    pub fn knows_root(&self, root: Word) -> bool {
+    pub fn is_known_root(&self, root: Word) -> bool {
         self.deltas.iter().any(|r| r.root == root)
     }
 
@@ -182,124 +184,84 @@ impl History {
         version_id: VersionId,
         nodes: NodeChanges,
         leaves: LeafChanges,
-    ) -> Result<Option<Delta>> {
+    ) -> Result<()> {
         if let Some(v) = self.deltas.iter().last() {
             if v.version_id < version_id {
-                let ret_val = if !self.can_add_version_without_removal() {
-                    self.deltas.pop_front()
-                } else {
-                    None
-                };
-
                 self.deltas.push_back(Delta::new(root, version_id, nodes, leaves));
+                if self.num_versions() > self.max_versions() {
+                    self.deltas.pop_front();
+                }
 
-                Ok(ret_val)
+                Ok(())
             } else {
                 Err(HistoryError::NonMonotonicVersions(version_id, v.version_id))
             }
         } else {
             self.deltas.push_back(Delta::new(root, version_id, nodes, leaves));
 
-            Ok(None)
+            Ok(())
         }
     }
 
-    /// Gets the first version corresponding to the oldest tree version `v` for which the provided
-    /// `f` returns `true`.
+    /// Returns the index in the sequence of deltas of the version that corresponds to the provided
+    /// `version_id`.
     ///
-    /// This version represents the transition from version `v` to version `v + 1`, and is a simple
-    /// delta that **does not account for any cumulative state changes**. It should not be used
-    /// alone as an overlay for the current tree. See [`History::view_at`] and friends for querying
-    /// the overlay state correctly.
-    ///
-    /// # Complexity
-    ///
-    /// The computational complexity of this method is linear in the number of versions stored in
-    /// the history.
-    pub fn get_version_by(&self, f: impl FnMut(&&Delta) -> bool) -> Result<&Delta> {
-        self.deltas.iter().find(f).ok_or(HistoryError::NoSuchVersion)
-    }
-
-    /// Gets the version corresponding to the tree version `v` with the provided `root` that
-    /// represents the changes in the transition from version `v` to version `v + 1`.
-    ///
-    /// In particular, the return value is the simple delta and does **not account for any
-    /// cumulative state changes**. It should not be used alone as an overlay for the current tree.
-    /// See [`History::view_at_root`] for querying the overlay state correctly.
+    /// To "correspond" means that it either has the provided `version_id`, or is the newest version
+    /// with a `version_id` less than the provided id. In either case, it is the correct version to
+    /// be used to query the tree state in the provided `version_id`.
     ///
     /// # Complexity
     ///
-    /// The computational complexity of this method is linear in the number of versions stored in
-    /// the history.
+    /// Finding the latest corresponding version in the history requires a linear traversal of the
+    /// history entries, and hence has complexity `O(n)` in the number of versions.
     ///
     /// # Errors
     ///
-    /// - [`HistoryError::NoSuchRoot`] if there is no state in the history that corresponds to the
-    ///   provided root.
-    pub fn get_version_by_root(&self, root: Word) -> Result<&Delta> {
-        self.get_version_by(|d| d.root == root)
-            .map_err(|_| HistoryError::NoSuchRoot(root))
-    }
+    /// - [`HistoryError::VersionTooOld`] if the history does not contain the data to provide a
+    ///   coherent overlay for the provided `version_id` due to `version_id` being older than the
+    ///   oldest version stored.
+    fn find_latest_corresponding_version(&self, version_id: VersionId) -> Result<usize> {
+        // If the version is older than the oldest, we error.
+        if let Some(oldest_version) = self.deltas.front() {
+            if oldest_version.version_id > version_id {
+                return Err(HistoryError::VersionTooOld);
+            }
+        } else {
+            return Err(HistoryError::VersionTooOld);
+        }
 
-    /// Gets the version corresponding to the tree version `v` with the provided `version_id` that
-    /// represents the changes made in the transition from version `v` to version `v + 1`.
-    ///
-    /// In particular, the return value is the simple delta and does **not account for any
-    /// cumulative state changes**. It should not be used alone as an overlay for the current tree.
-    /// See [`History::view_at_id`] for querying the overlay state correctly.
-    ///
-    /// # Complexity
-    ///
-    /// The computational complexity of this method is linear in the number of versions stored in
-    /// the history.
-    ///
-    /// # Errors
-    ///
-    /// - [`HistoryError::NoSuchId`] if there is no state in the history that corresponds to the
-    ///   provided id.
-    pub fn get_version_by_id(&self, version_id: VersionId) -> Result<&Delta> {
-        self.get_version_by(|d| d.version_id == version_id)
-            .map_err(|_| HistoryError::NoSuchId(version_id))
-    }
+        // We look for the newest delta with a version less than or equal to the target version, but
+        // if that doesn't exist we just return the index of the latest delta.
+        //
+        // It is always safe to subtract due to:
+        //
+        // - In the single version case, this will yield `self.num_versions()`.
+        // - The no-version case has already been ruled out.
+        // - In the 2+ version case, there is either a greater version index than 0 or
+        //   `self.num_versions()` is returned.
+        //
+        // If we somehow ever subtract with it NOT being safe, it makes more sense to crash than to
+        // saturate.
+        let ix = self
+            .deltas
+            .iter()
+            .position(|d| d.version_id > version_id)
+            .unwrap_or_else(|| self.num_versions())
+            - 1;
 
-    /// Returns a view of the history that allows querying as a single unified overlay on the
-    /// current state of the merkle tree as if the overlay reverts the tree to the state given by
-    /// the oldest version for which `f` returns true.
-    ///
-    /// # Complexity
-    ///
-    /// The computational complexity of this method is linear in the number of versions stored in
-    /// the history.
-    ///
-    /// # Errors
-    ///
-    /// - [`HistoryError::NoSuchVersion`] if `f` does not return `true` for any versions in the
-    ///   history.
-    pub fn view_at(&self, f: impl FnMut(&Delta) -> bool) -> Result<HistoryView<'_>> {
-        HistoryView::new_of(f, self)
-    }
-
-    /// Returns a view of the history that allows querying as a single unified overlay on the
-    /// current state of the merkle tree as if the overlay was reverting the tree to the state in
-    /// the specified `root`.
-    ///
-    /// # Complexity
-    ///
-    /// The computational complexity of this method is linear in the number of versions stored in
-    /// the history.
-    ///
-    /// # Errors
-    ///
-    /// - [`HistoryError::NoSuchRoot`] if there is no state in the history that corresponds to the
-    ///   provided root.
-    pub fn view_at_root(&self, root: Word) -> Result<HistoryView<'_>> {
-        self.view_at(|d| d.root == root).map_err(|_| HistoryError::NoSuchRoot(root))
+        Ok(ix)
     }
 
     /// Returns a view of the history that allows querying as a single unified overlay on the
     /// current state of the merkle tree as if the overlay was reverting the tree to the state
     /// corresponding to the specified `version_id`.
     ///
+    /// Note that the history may not contain a version that directly corresponds to `version_id`.
+    /// In such a case, the view will instead use the newest version coherent with the provided
+    /// `version_id`, as this is the correct version for the provided id. Note that this will be
+    /// incorrect if the versions stored in the history do not represent contiguous changes from the
+    /// current tree.
+    ///
     /// # Complexity
     ///
     /// The computational complexity of this method is linear in the number of versions stored in
@@ -307,79 +269,34 @@ impl History {
     ///
     /// # Errors
     ///
-    /// - [`HistoryError::NoSuchId`] if there is no state in the history that corresponds to the
-    ///   provided version id.
-    pub fn view_at_id(&self, version_id: VersionId) -> Result<HistoryView<'_>> {
-        self.view_at(|d| d.version_id == version_id)
-            .map_err(|_| HistoryError::NoSuchId(version_id))
-    }
-
-    /// Removes all versions of the history that are older than the oldest version for which `f`
-    /// returns `true`.
-    ///
-    /// # Complexity
-    ///
-    /// The computational complexity of this method is linear in the number of versions stored in
-    /// the history prior to any removals.
-    ///
-    /// # Errors
-    ///
-    /// - [`HistoryError::NoSuchVersion`] if there is no version for which `f` returns `true`.
-    pub fn remove_versions_until(&mut self, f: impl FnMut(&Delta) -> bool) -> Result<()> {
-        if let Some(ix) = self.deltas.iter().position(f) {
-            for _ in 0..ix {
-                self.deltas.pop_front();
-            }
-            Ok(())
-        } else {
-            Err(HistoryError::NoSuchVersion)
-        }
-    }
-
-    /// Removes all versions in the history that are older than the version denoted by the provided
-    /// `root`.
-    ///
-    /// # Complexity
-    ///
-    /// The computational complexity of this method is linear in the number of versions stored in
-    /// the history prior to any removals.
-    ///
-    /// # Errors
-    ///
-    /// - [`HistoryError::NoSuchRoot`] if there is no state in the history that corresponds to the
-    ///   provided `root`.
-    pub fn remove_versions_until_root(&mut self, root: Word) -> Result<()> {
-        self.remove_versions_until(|d| d.root == root)
-            .map_err(|_| HistoryError::NoSuchRoot(root))
+    /// - [`HistoryError::VersionTooOld`] if the history does not contain the data to provide a
+    ///   coherent overlay for the provided `version_id` due to `version_id` being older than the
+    ///   oldest version stored.
+    pub fn get_view_at(&self, version_id: VersionId) -> Result<HistoryView<'_>> {
+        let version_index = self.find_latest_corresponding_version(version_id)?;
+        Ok(HistoryView::new_of(version_index, self))
     }
 
     /// Removes all versions in the history that are older than the version denoted by the provided
     /// `version_id`.
     ///
+    /// If `version_id` is not a version known by the history, it will keep the newest version that
+    /// is capable of serving as that version in queries.
+    ///
     /// # Complexity
     ///
     /// The computational complexity of this method is linear in the number of versions stored in
     /// the history prior to any removals.
-    ///
-    /// # Errors
-    ///
-    /// - [`HistoryError::NoSuchId`] if there is no state in the history that corresponds to the
-    ///   provided `version_id`.
-    pub fn remove_versions_until_id(&mut self, version_id: VersionId) -> Result<()> {
-        self.remove_versions_until(|d| d.version_id == version_id)
-            .map_err(|_| HistoryError::NoSuchId(version_id))
-    }
+    pub fn truncate(&mut self, version_id: VersionId) -> usize {
+        // We start by getting the index to truncate to, though it is not an error to remove
+        // something too old.
+        let truncate_ix = self.find_latest_corresponding_version(version_id).unwrap_or(0);
 
-    /// Removes up to `count` of the oldest versions from the history.
-    ///
-    /// # Complexity
-    ///
-    /// The computational complexity of this method is linear in the number of versions to be
-    /// removed.
-    pub fn remove_oldest_versions(&mut self, count: usize) {
-        for _ in 0..count {
+        for _ in 0..truncate_ix {
             self.deltas.pop_front();
         }
+
+        truncate_ix
     }
 
     /// Removes all versions from the history.
@@ -409,17 +326,8 @@ impl<'history> HistoryView<'history> {
     ///
     /// The computational complexity of this method is linear in the number of versions stored in
     /// the history.
-    ///
-    /// # Errors
-    ///
-    /// - [`HistoryError::NoSuchVersion`] if no version is found in the history for which `f`
-    ///   returns true.
-    pub fn new_of(f: impl FnMut(&Delta) -> bool, history: &'history History) -> Result<Self> {
-        if let Some(version_ix) = history.deltas.iter().position(f) {
-            Ok(Self { version_ix, history })
-        } else {
-            Err(HistoryError::NoSuchVersion)
-        }
+    fn new_of(version_ix: usize, history: &'history History) -> Self {
+        Self { version_ix, history }
     }
 
     /// Gets the value of the node in the history at the provided `index`, or returns `None` if the
@@ -494,21 +402,21 @@ impl<'history> HistoryView<'history> {
 /// While the [`Delta`] type is visible in the interface of the history, it is only intended to be
 /// constructed by the history. Users should not be allowed to construct it directly.
 #[derive(Clone, Debug, PartialEq)]
-pub struct Delta {
+struct Delta {
     /// The root of the tree in the `version` corresponding to this delta.
-    root: Word,
+    pub root: Word,
 
     /// The version of the tree represented by the delta.
-    version_id: VersionId,
+    pub version_id: VersionId,
 
     /// Any changes to the non-leaf nodes in the tree for this delta.
-    nodes: NodeChanges,
+    pub nodes: NodeChanges,
 
     /// Any changes to the leaf nodes in the tree for this delta.
     ///
     /// Note that the leaf state is **not represented compactly**, and describes the entire state
     /// of the leaf in the corresponding version.
-    leaves: LeafChanges,
+    pub leaves: LeafChanges,
 }
 
 impl Delta {
@@ -517,407 +425,5 @@ impl Delta {
     #[must_use]
     fn new(root: Word, version_id: VersionId, nodes: NodeChanges, leaves: LeafChanges) -> Self {
         Self { root, version_id, nodes, leaves }
-    }
-
-    /// Gets the root of the tree created by applying the delta.
-    #[must_use]
-    pub fn root(&self) -> Word {
-        self.root
-    }
-
-    /// Gets the version id associated with the delta.
-    #[must_use]
-    pub fn id(&self) -> VersionId {
-        self.version_id
-    }
-
-    /// Gets the nodes that need to be altered in applying the delta.
-    #[must_use]
-    pub fn nodes(&self) -> &NodeChanges {
-        &self.nodes
-    }
-
-    /// Gets the leaves that need to be altered in applying the delta.
-    #[must_use]
-    pub fn leaves(&self) -> &LeafChanges {
-        &self.leaves
-    }
-}
-
-// TESTS
-// ================================================================================================
-
-#[cfg(test)]
-mod tests {
-    use rand_utils::rand_value;
-
-    use super::*;
-
-    #[test]
-    fn empty() {
-        let history = History::empty(5);
-        assert_eq!(history.num_versions(), 0);
-        assert_eq!(history.max_versions(), 5);
-        assert!(history.can_add_version_without_removal());
-    }
-
-    #[test]
-    fn roots() -> Result<()> {
-        // Set up our test state
-        let nodes = NodeChanges::default();
-        let leaves = LeafChanges::default();
-        let mut history = History::empty(2);
-        let root_1: Word = rand_value();
-        let root_2: Word = rand_value();
-        history.add_version(root_1, 0, nodes.clone(), leaves.clone())?;
-        history.add_version(root_2, 1, nodes.clone(), leaves.clone())?;
-
-        // We should be able to get all the roots.
-        let roots = history.roots();
-        assert_eq!(roots.len(), 2);
-        assert!(roots.contains(&root_1));
-        assert!(roots.contains(&root_2));
-
-        Ok(())
-    }
-
-    #[test]
-    fn knows_root() -> Result<()> {
-        // Set up our test state
-        let nodes = NodeChanges::default();
-        let leaves = LeafChanges::default();
-        let mut history = History::empty(2);
-        let root_1: Word = rand_value();
-        let root_2: Word = rand_value();
-        history.add_version(root_1, 0, nodes.clone(), leaves.clone())?;
-        history.add_version(root_2, 1, nodes.clone(), leaves.clone())?;
-
-        // We should be able to query for existing roots.
-        assert!(history.knows_root(root_1));
-        assert!(history.knows_root(root_2));
-
-        // But not for nonexistent ones.
-        assert!(!history.knows_root(rand_value()));
-
-        Ok(())
-    }
-
-    #[test]
-    fn add_version() -> Result<()> {
-        let nodes = NodeChanges::default();
-        let leaves = LeafChanges::default();
-
-        // We start with an empty state, and we should be able to add deltas up until the limit we
-        // set.
-        let mut history = History::empty(2);
-        assert_eq!(history.num_versions(), 0);
-        assert_eq!(history.max_versions(), 2);
-        assert!(history.can_add_version_without_removal());
-
-        let root_1: Word = rand_value();
-        let id_1 = 0;
-        history.add_version(root_1, id_1, nodes.clone(), leaves.clone())?;
-        assert_eq!(history.num_versions(), 1);
-        assert!(history.can_add_version_without_removal());
-
-        let root_2: Word = rand_value();
-        let id_2 = 1;
-        history.add_version(root_2, id_2, nodes.clone(), leaves.clone())?;
-        assert_eq!(history.num_versions(), 2);
-        assert!(!history.can_add_version_without_removal());
-
-        // At this point, adding any version should remove the oldest and return it.
-        let root_3: Word = rand_value();
-        let id_3 = 2;
-        let removed_version = history.add_version(root_3, id_3, nodes.clone(), leaves.clone())?;
-        assert!(removed_version.is_some());
-        let removed_version = removed_version.unwrap();
-        assert_eq!(removed_version.root(), root_1);
-        assert_eq!(removed_version.id(), id_1);
-
-        // If we then query for that first version it won't be there anymore, but the other two
-        // should.
-        assert!(history.get_version_by_root(root_1).is_err());
-        assert!(history.get_version_by_root(root_2).is_ok());
-        assert!(history.get_version_by_root(root_3).is_ok());
-
-        // If we try and add a version with a non-monotonic version number, we should see an error.
-        assert!(history.add_version(root_3, id_1, nodes, leaves).is_err());
-
-        Ok(())
-    }
-
-    #[test]
-    fn get_version() -> Result<()> {
-        // We start by setting up some basic test data.
-        let mut history = History::empty(2);
-
-        let nodes = NodeChanges::default();
-        let leaves = LeafChanges::default();
-
-        let root_1: Word = rand_value();
-        let id_1 = 0;
-        history.add_version(root_1, id_1, nodes.clone(), leaves.clone())?;
-
-        let root_2: Word = rand_value();
-        let id_2 = 1;
-        history.add_version(root_2, id_2, nodes.clone(), leaves.clone())?;
-
-        // We can query based on an arbitrary property, finding the OLDEST version that satisfies
-        // the property. In this case, we query for something that _both_ versions would satisfy,
-        // and we get the older one.
-        assert_eq!(history.get_version_by(|v| v.nodes().is_empty())?.root(), root_1);
-
-        // We can also query based on two utilities for common queries.
-        assert_eq!(history.get_version_by_root(root_2)?.id(), id_2);
-        assert_eq!(history.get_version_by_id(id_2)?.root(), root_2);
-
-        Ok(())
-    }
-
-    #[test]
-    fn remove_versions() -> Result<()> {
-        // Start by setting up the test data
-        let mut history = History::empty(4);
-
-        let nodes = NodeChanges::default();
-        let leaves = LeafChanges::default();
-
-        let root_1: Word = rand_value();
-        let id_1 = 0;
-        history.add_version(root_1, id_1, nodes.clone(), leaves.clone())?;
-
-        let root_2: Word = rand_value();
-        let id_2 = 1;
-        history.add_version(root_2, id_2, nodes.clone(), leaves.clone())?;
-
-        let root_3: Word = rand_value();
-        let id_3 = 2;
-        history.add_version(root_3, id_3, nodes.clone(), leaves.clone())?;
-
-        let root_4: Word = rand_value();
-        let id_4 = 3;
-        history.add_version(root_4, id_4, nodes.clone(), leaves.clone())?;
-
-        assert_eq!(history.num_versions(), 4);
-
-        // We can remove all versions older than the oldest one satisfying a property. If none
-        // satisfy the property then things are unchanged, but an error is raised as this is likely
-        // a mistake.
-        assert!(history.remove_versions_until(|v| v.id() == 7).is_err());
-        assert_eq!(history.num_versions(), 4);
-
-        history.remove_versions_until(|v| v.id() == 1)?;
-        assert_eq!(history.num_versions(), 3);
-
-        // We also have some useful methods for common ways to remove.
-        history.remove_versions_until_id(2)?;
-        assert_eq!(history.num_versions(), 2);
-
-        history.remove_versions_until_root(root_4)?;
-        assert_eq!(history.num_versions(), 1);
-
-        Ok(())
-    }
-
-    #[test]
-    fn remove_oldest_versions() -> Result<()> {
-        // Start by setting up the test data
-        let mut history = History::empty(4);
-
-        let nodes = NodeChanges::default();
-        let leaves = LeafChanges::default();
-
-        let root_1: Word = rand_value();
-        let id_1 = 0;
-        history.add_version(root_1, id_1, nodes.clone(), leaves.clone())?;
-
-        let root_2: Word = rand_value();
-        let id_2 = 1;
-        history.add_version(root_2, id_2, nodes.clone(), leaves.clone())?;
-
-        let root_3: Word = rand_value();
-        let id_3 = 2;
-        history.add_version(root_3, id_3, nodes.clone(), leaves.clone())?;
-
-        let root_4: Word = rand_value();
-        let id_4 = 3;
-        history.add_version(root_4, id_4, nodes.clone(), leaves.clone())?;
-
-        assert_eq!(history.num_versions(), 4);
-
-        // We can simply remove the n oldest versions
-        history.remove_oldest_versions(2);
-        assert_eq!(history.num_versions(), 2);
-
-        Ok(())
-    }
-
-    #[test]
-    fn clear() -> Result<()> {
-        // Start by setting up the test data
-        let mut history = History::empty(4);
-
-        let nodes = NodeChanges::default();
-        let leaves = LeafChanges::default();
-
-        let root_1: Word = rand_value();
-        let id_1 = 0;
-        history.add_version(root_1, id_1, nodes.clone(), leaves.clone())?;
-
-        let root_2: Word = rand_value();
-        let id_2 = 1;
-        history.add_version(root_2, id_2, nodes.clone(), leaves.clone())?;
-
-        assert_eq!(history.num_versions(), 2);
-
-        // We can clear the history entirely in one go.
-        history.clear();
-        assert_eq!(history.num_versions(), 0);
-
-        Ok(())
-    }
-
-    #[test]
-    fn view_at() -> Result<()> {
-        // Starting in an empty state we should be able to add deltas up until the limit we set.
-        let mut history = History::empty(3);
-        assert_eq!(history.num_versions(), 0);
-        assert_eq!(history.max_versions(), 3);
-
-        // We can add an initial version with some changes in both nodes and leaves.
-        let root_1 = rand_value::<Word>();
-
-        let mut nodes_1 = NodeChanges::default();
-        let n1_value: Word = rand_value();
-        let n2_value: Word = rand_value();
-        nodes_1.insert(NodeIndex::new(2, 1).unwrap(), n1_value);
-        nodes_1.insert(NodeIndex::new(8, 128).unwrap(), n2_value);
-
-        let mut leaf_1 = CompactLeaf::new();
-        let l1_e1_key: Word = rand_value();
-        let l1_e1_value: Word = rand_value();
-        let leaf_1_ix = LeafIndex::from(l1_e1_key);
-        leaf_1.insert(l1_e1_key, l1_e1_value);
-
-        let mut leaf_2 = CompactLeaf::new();
-        let l2_e1_key: Word = rand_value();
-        let l2_e1_value: Word = rand_value();
-        let leaf_2_ix = LeafIndex::from(l2_e1_key);
-        let mut l2_e2_key: Word = rand_value();
-        l2_e2_key[3] = leaf_2_ix.value().try_into().unwrap();
-        let l2_e2_value: Word = rand_value();
-        leaf_2.insert(l2_e1_key, l2_e1_value);
-        leaf_2.insert(l2_e2_key, l2_e2_value);
-
-        let mut leaves_1 = LeafChanges::default();
-        leaves_1.insert(leaf_1_ix, leaf_1.clone());
-        leaves_1.insert(leaf_2_ix, leaf_2.clone());
-
-        history.add_version(root_1, 0, nodes_1.clone(), leaves_1.clone())?;
-        assert_eq!(history.num_versions(), 1);
-        assert!(history.can_add_version_without_removal());
-
-        // We then add another version that overlaps with the older version.
-        let root_2 = rand_value::<Word>();
-
-        let mut nodes_2 = NodeChanges::default();
-        let n3_value: Word = rand_value();
-        let n4_value: Word = rand_value();
-        nodes_2.insert(NodeIndex::new(2, 1).unwrap(), n3_value);
-        nodes_2.insert(NodeIndex::new(10, 256).unwrap(), n4_value);
-
-        let mut leaf_3 = CompactLeaf::new();
-        let leaf_3_ix = leaf_2_ix;
-        let mut l3_e1_key: Word = rand_value();
-        l3_e1_key[3] = leaf_3_ix.value().try_into().unwrap();
-        let l3_e1_value: Word = rand_value();
-        leaf_3.insert(l3_e1_key, l3_e1_value);
-
-        let mut leaves_2 = LeafChanges::default();
-        leaves_2.insert(leaf_3_ix, leaf_3.clone());
-        history.add_version(root_2, 1, nodes_2.clone(), leaves_2.clone())?;
-        assert_eq!(history.num_versions(), 2);
-        assert!(history.can_add_version_without_removal());
-
-        // And another version for the sake of the test.
-        let root_3 = rand_value::<Word>();
-
-        let mut nodes_3 = NodeChanges::default();
-        let n5_value: Word = rand_value();
-        nodes_3.insert(NodeIndex::new(30, 1).unwrap(), n5_value);
-
-        let mut leaf_4 = CompactLeaf::new();
-        let l4_e1_key: Word = rand_value();
-        let l4_e1_value: Word = rand_value();
-        let leaf_4_ix = LeafIndex::from(l4_e1_key);
-        leaf_4.insert(l4_e1_key, l4_e1_value);
-
-        let mut leaves_3 = LeafChanges::default();
-        leaves_3.insert(leaf_4_ix, leaf_4.clone());
-
-        history.add_version(root_3, 2, nodes_3.clone(), leaves_3.clone())?;
-        assert_eq!(history.num_versions(), 3);
-        assert!(!history.can_add_version_without_removal());
-
-        // At this point, we can now grab a view into the history. This should error for an invalid
-        // version.
-        let invalid_root: Word = rand_value();
-        let invalid_view = history.view_at(|v| v.root() == invalid_root);
-        assert!(invalid_view.is_err());
-        assert_eq!(invalid_view.unwrap_err(), HistoryError::NoSuchVersion);
-
-        // We should also be able to grab a view at a valid point in the history. We grab the oldest
-        // possible version to ensure that the overlay logic functions correctly.
-        let view = history.view_at_root(root_1)?;
-
-        // Getting a node in the targeted version should just return it.
-        assert_eq!(view.node_value(&NodeIndex::new(2, 1).unwrap()), Some(&n1_value));
-        assert_eq!(view.node_value(&NodeIndex::new(8, 128).unwrap()), Some(&n2_value));
-
-        // Getting a node that is _not_ in the targeted delta directly should search through the
-        // versions in between the targeted version at the current tree and return the oldest value
-        // it can find for it.
-        assert_eq!(view.node_value(&NodeIndex::new(10, 256).unwrap()), Some(&n4_value));
-        assert_eq!(view.node_value(&NodeIndex::new(30, 1).unwrap()), Some(&n5_value));
-
-        // Getting a node that doesn't exist in ANY versions should return none.
-        assert!(view.node_value(&NodeIndex::new(45, 100).unwrap()).is_none());
-
-        // Similarly, getting a leaf from the targeted version should just return it.
-        assert_eq!(view.leaf_value(&leaf_1_ix), Some(&leaf_1));
-        assert_eq!(view.leaf_value(&leaf_2_ix), Some(&leaf_2));
-
-        // But getting a leaf that is not in the target delta directly should result in the same
-        // traversal.
-        assert_eq!(view.leaf_value(&leaf_4_ix), Some(&leaf_4));
-
-        // And getting a leaf that does not exist in any of the versions should return one.
-        assert!(view.leaf_value(&LeafIndex::new(1024).unwrap()).is_none());
-
-        // Finally, getting a full value from a compact leaf should yield the value directly from
-        // the target version if the target version overlays it AND contains it.
-        assert_eq!(view.value(&l1_e1_key), Some(Some(&l1_e1_value)));
-        assert_eq!(view.value(&l2_e1_key), Some(Some(&l2_e1_value)));
-        assert_eq!(view.value(&l2_e2_key), Some(Some(&l2_e2_value)));
-
-        // However, if the leaf exists but does not contain the provided word, it should return the
-        // sentinel `Some(None)`.
-        let mut ne_key_in_existing_leaf: Word = rand_value();
-        ne_key_in_existing_leaf[3] = leaf_1_ix.value().try_into().unwrap();
-        assert_eq!(view.value(&ne_key_in_existing_leaf), Some(None));
-
-        // If the leaf is not overlaid, then the lookup should go up the chain just as in the other
-        // cases.
-        assert_eq!(view.value(&l4_e1_key), Some(Some(&l4_e1_value)));
-
-        // But if nothing is found, it should just return None;
-        let ne_key: Word = rand_value();
-        assert!(view.value(&ne_key).is_none());
-
-        // We can also, obviously, query by key instead of root.
-        assert!(history.view_at_id(2).is_ok());
-
-        Ok(())
     }
 }

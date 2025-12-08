@@ -39,7 +39,7 @@ pub use partial::PartialSmt;
 mod forest;
 mod history;
 pub use forest::SmtForest;
-pub use history::{Delta, History, HistoryView, error::HistoryError};
+pub use history::{History, HistoryView, error::HistoryError};
 
 // CONSTANTS
 // ================================================================================================
