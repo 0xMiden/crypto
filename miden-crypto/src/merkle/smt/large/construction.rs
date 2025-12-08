@@ -25,7 +25,7 @@ impl<S: SmtStorage> LargeSmt<S> {
     /// Creates a new empty [LargeSmt] backed by the provided storage.
     ///
     /// This method is intended for creating a fresh tree with empty storage. If the storage
-    /// already contains data, use [`Self::open_with_root()`] or [`Self::open_unchecked()`]
+    /// already contains data, use [`Self::load_with_root()`] or [`Self::load()`]
     /// instead.
     ///
     /// # Errors
@@ -53,7 +53,7 @@ impl<S: SmtStorage> LargeSmt<S> {
     ///
     /// **Note:** This method does not validate the reconstructed root. Use this only when
     /// you explicitly want to skip validation. For normal reopening, prefer
-    /// [`Self::open_with_root()`].
+    /// [`Self::load_with_root()`].
     ///
     /// # Errors
     /// Returns an error if fetching data from storage fails.
@@ -62,9 +62,9 @@ impl<S: SmtStorage> LargeSmt<S> {
     /// ```no_run
     /// # use miden_crypto::merkle::smt::{LargeSmt, RocksDbConfig, RocksDbStorage};
     /// let storage = RocksDbStorage::open(RocksDbConfig::new("/path/to/db")).unwrap();
-    /// let smt = LargeSmt::open_unchecked(storage).expect("Failed to open SMT");
+    /// let smt = LargeSmt::load(storage).expect("Failed to open SMT");
     /// ```
-    pub fn open_unchecked(storage: S) -> Result<Self, LargeSmtError> {
+    pub fn load(storage: S) -> Result<Self, LargeSmtError> {
         Self::initialize_from_storage(storage)
     }
 
@@ -88,11 +88,11 @@ impl<S: SmtStorage> LargeSmt<S> {
     /// let expected_root: Word = todo!();
     ///
     /// let storage = RocksDbStorage::open(RocksDbConfig::new("/path/to/db")).unwrap();
-    /// let smt = LargeSmt::open_with_root(storage, expected_root)
+    /// let smt = LargeSmt::load_with_root(storage, expected_root)
     ///     .expect("Failed to open SMT with expected root");
     /// ```
-    pub fn open_with_root(storage: S, expected_root: Word) -> Result<Self, LargeSmtError> {
-        let smt = Self::open_unchecked(storage)?;
+    pub fn load_with_root(storage: S, expected_root: Word) -> Result<Self, LargeSmtError> {
+        let smt = Self::load(storage)?;
 
         let actual_root = smt.root();
         if actual_root != expected_root {

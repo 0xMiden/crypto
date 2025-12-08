@@ -20,7 +20,7 @@
 //! let expected_root: Word = /* load from your own persistence */ todo!();
 //!
 //! let storage = RocksDbStorage::open(RocksDbConfig::new("/path/to/db"))?;
-//! let smt = LargeSmt::open_with_root(storage, expected_root)?;
+//! let smt = LargeSmt::load_with_root(storage, expected_root)?;
 //! assert_eq!(smt.root(), expected_root);
 //! # Ok(())
 //! # }
@@ -32,7 +32,7 @@
 //!
 //! # fn main() -> Result<(), Box<dyn std::error::Error>> {
 //! let storage = RocksDbStorage::open(RocksDbConfig::new("/path/to/db"))?;
-//! let smt = LargeSmt::open_unchecked(storage)?;
+//! let smt = LargeSmt::load(storage)?;
 //! let _root = smt.root();
 //! # Ok(())
 //! # }
@@ -82,7 +82,7 @@
 //!
 //! # fn main() -> Result<(), Box<dyn std::error::Error>> {
 //! let storage = RocksDbStorage::open(RocksDbConfig::new("/path/to/db"))?;
-//! let mut smt = LargeSmt::open_unchecked(storage)?;
+//! let mut smt = LargeSmt::load(storage)?;
 //!
 //! let k1 = Word::new([Felt::new(101), Felt::new(0), Felt::new(0), Felt::new(0)]);
 //! let v1 = Word::new([Felt::new(1), Felt::new(2), Felt::new(3), Felt::new(4)]);

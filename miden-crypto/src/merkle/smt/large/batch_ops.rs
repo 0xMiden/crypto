@@ -313,7 +313,7 @@ impl<S: SmtStorage> LargeSmt<S> {
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// let storage = RocksDbStorage::open(RocksDbConfig::new("/path/to/db"))?;
-    /// let mut smt = LargeSmt::open_unchecked(storage)?;
+    /// let mut smt = LargeSmt::load(storage)?;
     ///
     /// let entries = vec![
     ///     // Insert new entries
