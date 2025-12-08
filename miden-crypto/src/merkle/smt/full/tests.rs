@@ -8,7 +8,8 @@ use crate::{
     merkle::{
         EmptySubtreeRoots,
         smt::{
-            Map, MutationSet, NodeMutation, SmtLeafError, SparseMerkleTree, full::MAX_LEAF_ENTRIES,
+            Map, MutationSet, NodeMutation, SmtLeafError, SmtProofError, SparseMerkleTree,
+            full::MAX_LEAF_ENTRIES,
         },
         store::MerkleStore,
     },
@@ -759,6 +760,196 @@ fn test_max_leaf_entries_validation() {
         error,
         SmtLeafError::TooManyLeafEntries { .. },
         "should reject more than MAX_LEAF_ENTRIES entries"
+    );
+}
+
+/// Tests that verify_presence returns InvalidKeyForProof when key maps to different leaf index
+#[test]
+fn test_smt_proof_error_invalid_key_for_proof() {
+    let key = Word::from([ONE, ONE, ONE, Felt::new(42)]);
+    let value = Word::new([ONE; WORD_SIZE]);
+
+    let smt = Smt::with_entries([(key, value)]).unwrap();
+    let proof = smt.open(&key);
+    let root = smt.root();
+
+    // Use a key that maps to a different leaf index (different most significant felt)
+    let different_index_key = Word::from([ONE, ONE, ONE, Felt::new(999)]);
+
+    assert_matches!(
+        proof.verify_presence(&different_index_key, &value, &root),
+        Err(SmtProofError::InvalidKeyForProof)
+    );
+}
+
+/// Tests that verify_presence returns ValueMismatch when value doesn't match
+#[test]
+fn test_smt_proof_error_value_mismatch() {
+    let key = Word::from([ONE, ONE, ONE, Felt::new(42)]);
+    let value = Word::new([ONE; WORD_SIZE]);
+
+    let smt = Smt::with_entries([(key, value)]).unwrap();
+    let proof = smt.open(&key);
+    let root = smt.root();
+
+    // Use the correct key but wrong value
+    let wrong_value = Word::new([Felt::new(999); WORD_SIZE]);
+
+    assert_matches!(
+        proof.verify_presence(&key, &wrong_value, &root),
+        Err(SmtProofError::ValueMismatch { expected, actual })
+            if expected == wrong_value && actual == value
+    );
+}
+
+/// Tests that verify_presence returns ConflictingRoots when root doesn't match
+#[test]
+fn test_smt_proof_error_conflicting_roots() {
+    let key = Word::from([ONE, ONE, ONE, Felt::new(42)]);
+    let value = Word::new([ONE; WORD_SIZE]);
+
+    let smt = Smt::with_entries([(key, value)]).unwrap();
+    let proof = smt.open(&key);
+    let actual_root = smt.root();
+
+    // Use a completely wrong root
+    let wrong_root = Word::new([Felt::new(999); WORD_SIZE]);
+
+    assert_matches!(
+        proof.verify_presence(&key, &value, &wrong_root),
+        Err(SmtProofError::ConflictingRoots { expected_root, actual_root: got_root })
+            if expected_root == wrong_root && got_root == actual_root
+    );
+}
+
+/// Tests that verify_unset returns Ok for keys with no value
+#[test]
+fn test_smt_proof_verify_unset_success() {
+    // Use an empty tree where no keys have values
+    let smt = Smt::default();
+    let key = Word::from([ONE, ONE, ONE, Felt::new(42)]);
+    let proof = smt.open(&key);
+    let root = smt.root();
+
+    // This key has no value in the empty tree
+    proof.verify_unset(&key, &root).unwrap();
+}
+
+/// Tests that verify_unset returns ValueMismatch when key has a value
+#[test]
+fn test_smt_proof_verify_unset_fails_when_value_exists() {
+    let key = Word::from([ONE, ONE, ONE, Felt::new(42)]);
+    let value = Word::new([ONE; WORD_SIZE]);
+
+    let smt = Smt::with_entries([(key, value)]).unwrap();
+    let proof = smt.open(&key);
+    let root = smt.root();
+
+    // Key has a value, so non-membership should fail
+    assert_matches!(proof.verify_unset(&key, &root), Err(SmtProofError::ValueMismatch { .. }));
+}
+
+/// Tests that verify_absence returns Ok when the key has a different value
+#[test]
+fn test_smt_proof_verify_absence_success_different_value() {
+    let key = Word::from([ONE, ONE, ONE, Felt::new(42)]);
+    let actual_value = Word::new([ONE; WORD_SIZE]);
+
+    let smt = Smt::with_entries([(key, actual_value)]).unwrap();
+    let proof = smt.open(&key);
+    let root = smt.root();
+
+    // The key has a different value, so this pair is absent
+    let absent_value = Word::new([Felt::new(999); WORD_SIZE]);
+    proof.verify_absence(&key, &absent_value, &root).unwrap();
+}
+
+/// Tests that verify_absence returns Ok when the key is unset
+#[test]
+fn test_smt_proof_verify_absence_success_key_unset() {
+    // Use an empty tree
+    let smt = Smt::default();
+    let key = Word::from([ONE, ONE, ONE, Felt::new(42)]);
+    let proof = smt.open(&key);
+    let root = smt.root();
+
+    // Any non-empty value should be absent since key is unset
+    let value = Word::new([ONE; WORD_SIZE]);
+    proof.verify_absence(&key, &value, &root).unwrap();
+}
+
+/// Tests that verify_absence returns ValuePresent when the key-value pair exists
+#[test]
+fn test_smt_proof_error_value_present() {
+    let key = Word::from([ONE, ONE, ONE, Felt::new(42)]);
+    let value = Word::new([ONE; WORD_SIZE]);
+
+    let smt = Smt::with_entries([(key, value)]).unwrap();
+    let proof = smt.open(&key);
+    let root = smt.root();
+
+    // The exact key-value pair exists, so absence verification fails
+    assert_matches!(
+        proof.verify_absence(&key, &value, &root),
+        Err(SmtProofError::ValuePresent { key: k, value: v }) if k == key && v == value
+    );
+}
+
+/// Tests that verify_absence returns InvalidKeyForProof for wrong leaf index
+#[test]
+fn test_smt_proof_verify_absence_invalid_key() {
+    let key = Word::from([ONE, ONE, ONE, Felt::new(42)]);
+    let value = Word::new([ONE; WORD_SIZE]);
+
+    let smt = Smt::with_entries([(key, value)]).unwrap();
+    let proof = smt.open(&key);
+    let root = smt.root();
+
+    // Use a key that maps to a different leaf index
+    let different_index_key = Word::from([ONE, ONE, ONE, Felt::new(999)]);
+
+    assert_matches!(
+        proof.verify_absence(&different_index_key, &value, &root),
+        Err(SmtProofError::InvalidKeyForProof)
+    );
+}
+
+/// Tests that `get()` returns None for keys that don't map to the proof's leaf index.
+#[test]
+fn test_smt_proof_get_returns_none_for_different_leaf() {
+    let key = Word::from([ONE, ONE, ONE, Felt::new(42)]);
+    let value = Word::new([ONE; WORD_SIZE]);
+
+    let smt = Smt::with_entries([(key, value)]).unwrap();
+    let proof = smt.open(&key);
+
+    // Key that maps to a different leaf index
+    let different_leaf_key = Word::from([ONE, ONE, ONE, Felt::new(999)]);
+
+    assert!(
+        proof.get(&different_leaf_key).is_none(),
+        "get() should return None for key mapping to different leaf"
+    );
+}
+
+/// Tests that `get()` returns EMPTY_WORD for keys that map to the proof's leaf but don't exist.
+#[test]
+fn test_smt_proof_get_returns_empty_for_absent_key_same_leaf() {
+    let key = Word::from([ONE, ONE, ONE, Felt::new(42)]);
+    let value = Word::new([ONE; WORD_SIZE]);
+
+    let smt = Smt::with_entries([(key, value)]).unwrap();
+    let proof = smt.open(&key);
+
+    // Key that maps to the same leaf but doesn't exist (same most significant felt)
+    let absent_key_same_leaf =
+        Word::from([2_u32.into(), 2_u32.into(), 2_u32.into(), Felt::new(42)]);
+
+    let result = proof.get(&absent_key_same_leaf);
+    assert_eq!(
+        result,
+        Some(EMPTY_WORD),
+        "get() should return Some(EMPTY_WORD) for absent key mapping to same leaf"
     );
 }
 

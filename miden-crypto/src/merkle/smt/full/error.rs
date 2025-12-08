@@ -50,9 +50,25 @@ pub enum SmtLeafError {
 // =================================================================================================
 
 /// Errors that can occur when validating SMT proofs.
-#[derive(Debug, Error)]
+#[derive(Debug, Error, PartialEq, Eq)]
 pub enum SmtProofError {
     /// The length of the provided Merkle path is not [`SMT_DEPTH`].
     #[error("merkle path length {0} does not match SMT depth {SMT_DEPTH}")]
     InvalidMerklePathLength(usize),
+
+    /// The key maps to a different leaf index than the proof's leaf.
+    #[error("key maps to a different leaf index than the proof")]
+    InvalidKeyForProof,
+
+    /// The value does not match the value in the leaf for the given key.
+    #[error("value mismatch: expected {expected}, got {actual}")]
+    ValueMismatch { expected: Word, actual: Word },
+
+    /// The computed root does not match the expected root.
+    #[error("expected merkle root {expected_root} found {actual_root}")]
+    ConflictingRoots { expected_root: Word, actual_root: Word },
+
+    /// The key-value pair exists in the tree.
+    #[error("key-value pair exists in the tree: key {key}, value {value}")]
+    ValuePresent { key: Word, value: Word },
 }
