@@ -1,5 +1,6 @@
 use winter_utils::{ByteReader, ByteWriter, Deserializable, DeserializationError, Serializable};
 
+use alloc::vec::Vec;
 use super::{LeafIndex, SMT_DEPTH};
 use crate::{
     EMPTY_WORD, Word,
@@ -84,6 +85,42 @@ impl PartialSmt {
     /// Returns the root of the tree.
     pub fn root(&self) -> Word {
         self.0.root()
+    }
+
+    /// Decomposes this tree into (root, leaves, inner_nodes).
+	#[allow(clippy::type_complexity)]
+    pub fn into_parts(
+        self,
+    ) -> (Word, Vec<SmtLeaf>, Vec<(NodeIndex, InnerNode)>) {
+        let root = self.0.root();
+
+        let leaves =  Vec::from_iter(self.0.leaves.into_iter().map(|(_, leaf)| leaf));
+
+        let inner_nodes = Vec::from_iter(self.0.inner_nodes);
+
+        (root, leaves, inner_nodes)
+    }
+
+    /// Reconstructs a tree from (root, leaves, inner_nodes).
+    ///
+    /// # Errors
+    /// - Inconsistent parts or invalid tree structure
+    pub fn from_parts(
+        root: Word,
+        leaves: Vec<SmtLeaf>,
+        inner_nodes: Vec<(NodeIndex, InnerNode)>,
+    ) -> Result<Self, MerkleError> {
+        // Reconstruct leaf indices from leaves
+        let leaves_map: Leaves<SmtLeaf> = leaves
+            .into_iter()
+            .map(|leaf| (leaf.index().value(), leaf))
+            .collect();
+
+        let inner_nodes_map: InnerNodes = inner_nodes.into_iter().collect();
+
+        let smt = Smt::from_raw_parts(inner_nodes_map, leaves_map, root);
+
+        Ok(Self(smt))
     }
 
     /// Returns an opening of the leaf associated with `key`. Conceptually, an opening is a Merkle
@@ -812,5 +849,84 @@ mod tests {
         // Setting a value to the empty word removes decreases the number of entries.
         partial.insert(key0, Word::empty()).unwrap();
         assert_eq!(partial.num_entries(), 2);
+    }
+
+    /// Tests that `into_parts` and `from_parts` correctly round-trip a PartialSmt.
+    #[test]
+    fn partial_smt_into_parts_from_parts_roundtrip() {
+        let key0 = Word::from(rand_array::<Felt, 4>());
+        let key1 = Word::from(rand_array::<Felt, 4>());
+        let key2 = Word::from(rand_array::<Felt, 4>());
+
+        let value0 = Word::from(rand_array::<Felt, 4>());
+        let value1 = Word::from(rand_array::<Felt, 4>());
+        let value2 = Word::from(rand_array::<Felt, 4>());
+
+        let kv_pairs = vec![(key0, value0), (key1, value1), (key2, value2)];
+        let full = Smt::with_entries(kv_pairs).unwrap();
+
+        // Build a partial SMT with some proofs
+        let proof0 = full.open(&key0);
+        let proof1 = full.open(&key1);
+        let proof2 = full.open(&key2);
+
+        let partial = PartialSmt::from_proofs([proof0, proof1, proof2]).unwrap();
+        let original_root = partial.root();
+
+        // Get the original openings
+        let original_opening0 = partial.open(&key0).unwrap();
+        let original_opening1 = partial.open(&key1).unwrap();
+        let original_opening2 = partial.open(&key2).unwrap();
+
+        // Decompose into parts
+        let (root, leaves, inner_nodes) = partial.clone().into_parts();
+
+        // Verify root matches
+        assert_eq!(root, original_root);
+
+        // Verify leaves are sorted by index
+        for i in 1..leaves.len() {
+            assert!(leaves[i - 1].index() < leaves[i].index(), "leaves should be sorted by index");
+        }
+
+        // Verify inner nodes are sorted
+        for i in 1..inner_nodes.len() {
+            assert!(
+                inner_nodes[i - 1].0 < inner_nodes[i].0,
+                "inner nodes should be sorted"
+            );
+        }
+
+        // Reconstruct from parts
+        let reconstructed = PartialSmt::from_parts(root, leaves, inner_nodes).unwrap();
+
+        // Verify the reconstructed tree has the same root
+        assert_eq!(reconstructed.root(), original_root);
+
+        // Verify all tracked keys can be accessed
+        assert_eq!(reconstructed.get_value(&key0).unwrap(), value0);
+        assert_eq!(reconstructed.get_value(&key1).unwrap(), value1);
+        assert_eq!(reconstructed.get_value(&key2).unwrap(), value2);
+
+        // Verify the reconstructed tree equals the original
+        assert_eq!(reconstructed, partial);
+
+        // Verify that openings for all tracked keys remain identical after roundtrip
+        let reconstructed_opening0 = reconstructed.open(&key0).unwrap();
+        let reconstructed_opening1 = reconstructed.open(&key1).unwrap();
+        let reconstructed_opening2 = reconstructed.open(&key2).unwrap();
+
+        assert_eq!(
+            original_opening0, reconstructed_opening0,
+            "opening for key0 should be identical after roundtrip"
+        );
+        assert_eq!(
+            original_opening1, reconstructed_opening1,
+            "opening for key1 should be identical after roundtrip"
+        );
+        assert_eq!(
+            original_opening2, reconstructed_opening2,
+            "opening for key2 should be identical after roundtrip"
+        );
     }
 }
