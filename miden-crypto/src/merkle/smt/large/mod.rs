@@ -3,12 +3,12 @@
 //! `LargeSmt` stores the top of the tree (depths 0–23) in memory and persists the lower
 //! depths (24–64) in storage as fixed-size subtrees. This hybrid layout scales beyond RAM
 //! while keeping common operations fast. With the `rocksdb` feature enabled, the lower
-//! subtrees and leaves are stored in RocksDB. On reopen, the in-memory top is reconstructed
+//! subtrees and leaves are stored in RocksDB. On reload, the in-memory top is reconstructed
 //! from cached depth-24 subtree roots.
 //!
 //! Examples below require the `rocksdb` feature.
 //!
-//! Open an existing RocksDB-backed tree with root validation:
+//! Load an existing RocksDB-backed tree with root validation:
 //! ```no_run
 //! use miden_crypto::{
 //!     Word,
@@ -26,7 +26,7 @@
 //! # }
 //! ```
 //!
-//! Open an existing tree without root validation (use with caution):
+//! Load an existing tree without root validation (use with caution):
 //! ```no_run
 //! use miden_crypto::merkle::smt::{LargeSmt, RocksDbConfig, RocksDbStorage};
 //!

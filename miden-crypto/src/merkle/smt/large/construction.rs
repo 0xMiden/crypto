@@ -45,14 +45,14 @@ impl<S: SmtStorage> LargeSmt<S> {
         Self::initialize_from_storage(storage)
     }
 
-    /// Opens an existing [LargeSmt] from storage without validating the root.
+    /// Loads an existing [LargeSmt] from storage without validating the root.
     ///
     /// If the storage is empty, the SMT is initialized with the root of an empty tree.
     /// Otherwise, the in-memory top of the tree is reconstructed from the cached depth-24
     /// subtree hashes stored in the backend.
     ///
     /// **Note:** This method does not validate the reconstructed root. Use this only when
-    /// you explicitly want to skip validation. For normal reopening, prefer
+    /// you explicitly want to skip validation. For normal reloading, prefer
     /// [`Self::load_with_root()`].
     ///
     /// # Errors
@@ -62,18 +62,18 @@ impl<S: SmtStorage> LargeSmt<S> {
     /// ```no_run
     /// # use miden_crypto::merkle::smt::{LargeSmt, RocksDbConfig, RocksDbStorage};
     /// let storage = RocksDbStorage::open(RocksDbConfig::new("/path/to/db")).unwrap();
-    /// let smt = LargeSmt::load(storage).expect("Failed to open SMT");
+    /// let smt = LargeSmt::load(storage).expect("Failed to load SMT");
     /// ```
     pub fn load(storage: S) -> Result<Self, LargeSmtError> {
         Self::initialize_from_storage(storage)
     }
 
-    /// Opens an existing [LargeSmt] from storage and validates it against the expected root.
+    /// Loads an existing [LargeSmt] from storage and validates it against the expected root.
     ///
     /// This method reconstructs the in-memory top of the tree from the cached depth-24
     /// subtree hashes, computes the root, and validates it against `expected_root`.
     ///
-    /// Use this method when reopening a tree to ensure the storage contains the expected
+    /// Use this method when reloading a tree to ensure the storage contains the expected
     /// data and hasn't been corrupted or tampered with.
     ///
     /// # Errors
@@ -89,7 +89,7 @@ impl<S: SmtStorage> LargeSmt<S> {
     ///
     /// let storage = RocksDbStorage::open(RocksDbConfig::new("/path/to/db")).unwrap();
     /// let smt = LargeSmt::load_with_root(storage, expected_root)
-    ///     .expect("Failed to open SMT with expected root");
+    ///     .expect("Failed to load SMT with expected root");
     /// ```
     pub fn load_with_root(storage: S, expected_root: Word) -> Result<Self, LargeSmtError> {
         let smt = Self::load(storage)?;
