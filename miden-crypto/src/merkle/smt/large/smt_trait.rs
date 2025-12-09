@@ -36,7 +36,6 @@ impl<S: SmtStorage> SparseMerkleTree<SMT_DEPTH> for LargeSmt<S> {
     }
 
     fn set_root(&mut self, root: Word) {
-        self.storage.set_root(root).expect("Failed to set root");
         self.in_memory_nodes[ROOT_MEMORY_INDEX] = root;
     }
 

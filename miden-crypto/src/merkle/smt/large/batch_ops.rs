@@ -313,7 +313,7 @@ impl<S: SmtStorage> LargeSmt<S> {
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// let storage = RocksDbStorage::open(RocksDbConfig::new("/path/to/db"))?;
-    /// let mut smt = LargeSmt::new(storage)?;
+    /// let mut smt = LargeSmt::load(storage)?;
     ///
     /// let entries = vec![
     ///     // Insert new entries
@@ -441,7 +441,6 @@ impl<S: SmtStorage> LargeSmt<S> {
         let updates = StorageUpdates::from_parts(
             leaf_update_map,
             subtree_updates,
-            new_root,
             leaf_count_delta,
             entry_count_delta,
         );
@@ -634,7 +633,6 @@ impl<S: SmtStorage> LargeSmt<S> {
                 Some(subtree) => SubtreeUpdate::Store { index, subtree },
                 None => SubtreeUpdate::Delete { index },
             }),
-            new_root,
             leaf_count_delta,
             entry_count_delta,
         );

@@ -50,6 +50,15 @@ impl From<crate::merkle::smt::LargeSmtError> for MerkleError {
             crate::merkle::smt::LargeSmtError::Storage(se) => {
                 MerkleError::InternalError(se.to_string())
             },
+            crate::merkle::smt::LargeSmtError::RootMismatch { expected, actual } => {
+                MerkleError::ConflictingRoots {
+                    expected_root: expected,
+                    actual_root: actual,
+                }
+            },
+            crate::merkle::smt::LargeSmtError::StorageNotEmpty => {
+                MerkleError::InternalError("storage is not empty".into())
+            },
         }
     }
 }

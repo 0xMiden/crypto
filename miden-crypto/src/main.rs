@@ -113,7 +113,7 @@ pub fn open_existing(
     println!("Opening an existing database:");
     let now = Instant::now();
     let storage = get_storage(storage_path, true, storage);
-    let tree = LargeSmt::new(storage)?;
+    let tree = LargeSmt::load(storage)?;
     let elapsed = now.elapsed().as_secs_f32();
     println!("Opened an existing database in {elapsed:.1} seconds");
     Ok(tree)

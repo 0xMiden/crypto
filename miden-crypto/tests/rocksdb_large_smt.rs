@@ -2,7 +2,7 @@ use miden_crypto::{
     EMPTY_WORD, Felt, ONE, WORD_SIZE, Word,
     merkle::{
         InnerNodeInfo,
-        smt::{LargeSmt, RocksDbConfig, RocksDbStorage},
+        smt::{LargeSmt, LargeSmtError, RocksDbConfig, RocksDbStorage},
     },
 };
 use tempfile::TempDir;
@@ -58,7 +58,7 @@ fn rocksdb_persistence_reopen() {
     drop(smt);
 
     let reopened_storage = RocksDbStorage::open(RocksDbConfig::new(db_path)).unwrap();
-    let smt = LargeSmt::<RocksDbStorage>::new(reopened_storage).unwrap();
+    let smt = LargeSmt::<RocksDbStorage>::load(reopened_storage).unwrap();
 
     let mut inner_nodes_2: Vec<InnerNodeInfo> = smt.inner_nodes().unwrap().collect();
     inner_nodes_2.sort_by_key(|info| info.value);
@@ -86,7 +86,7 @@ fn rocksdb_persistence_after_insertion() {
     drop(smt);
 
     let reopened_storage = RocksDbStorage::open(RocksDbConfig::new(db_path)).unwrap();
-    let smt = LargeSmt::<RocksDbStorage>::new(reopened_storage).unwrap();
+    let smt = LargeSmt::<RocksDbStorage>::load(reopened_storage).unwrap();
 
     let mut inner_nodes_2: Vec<InnerNodeInfo> = smt.inner_nodes().unwrap().collect();
     inner_nodes_2.sort_by_key(|info| info.value);
@@ -132,7 +132,7 @@ fn rocksdb_persistence_after_insert_batch_with_deletions() {
     drop(smt);
 
     let reopened_storage = RocksDbStorage::open(RocksDbConfig::new(db_path)).unwrap();
-    let smt = LargeSmt::<RocksDbStorage>::new(reopened_storage).unwrap();
+    let smt = LargeSmt::<RocksDbStorage>::load(reopened_storage).unwrap();
 
     let mut inner_nodes_2: Vec<InnerNodeInfo> = smt.inner_nodes().unwrap().collect();
     inner_nodes_2.sort_by_key(|info| info.value);
@@ -144,4 +144,92 @@ fn rocksdb_persistence_after_insert_batch_with_deletions() {
     assert_eq!(num_leaves, num_leaves_2);
     assert_eq!(num_entries, num_entries_2);
     assert_eq!(smt.root(), root, "Tree reconstruction failed - root mismatch after deletions");
+}
+
+#[test]
+fn rocksdb_load_with_root_validates_correctly() {
+    let entries = generate_entries(1000);
+
+    let (initial_storage, temp_dir_guard) = setup_storage();
+    let db_path = temp_dir_guard.path().to_path_buf();
+
+    let smt = LargeSmt::<RocksDbStorage>::with_entries(initial_storage, entries).unwrap();
+    let expected_root = smt.root();
+    drop(smt);
+
+    // Reopen with the correct expected root
+    let reopened_storage = RocksDbStorage::open(RocksDbConfig::new(db_path)).unwrap();
+    let smt = LargeSmt::load_with_root(reopened_storage, expected_root)
+        .expect("Should successfully open with correct root");
+
+    assert_eq!(smt.root(), expected_root);
+}
+
+#[test]
+fn rocksdb_load_with_root_mismatch_returns_error() {
+    let entries = generate_entries(1000);
+
+    let (initial_storage, temp_dir_guard) = setup_storage();
+    let db_path = temp_dir_guard.path().to_path_buf();
+
+    let smt = LargeSmt::<RocksDbStorage>::with_entries(initial_storage, entries).unwrap();
+    let actual_root = smt.root();
+    drop(smt);
+
+    // Try to reopen with a wrong root
+    let wrong_root = Word::new([ONE; 4]);
+    assert_ne!(wrong_root, actual_root, "Test requires different roots");
+
+    let reopened_storage = RocksDbStorage::open(RocksDbConfig::new(db_path)).unwrap();
+    let result = LargeSmt::load_with_root(reopened_storage, wrong_root);
+
+    assert!(result.is_err(), "Should fail with wrong root");
+    match result.unwrap_err() {
+        LargeSmtError::RootMismatch { expected, actual } => {
+            assert_eq!(expected, wrong_root);
+            assert_eq!(actual, actual_root);
+        },
+        other => panic!("Expected RootMismatch error, got {:?}", other),
+    }
+}
+
+#[test]
+fn rocksdb_load_skips_validation() {
+    let entries = generate_entries(1000);
+
+    let (initial_storage, temp_dir_guard) = setup_storage();
+    let db_path = temp_dir_guard.path().to_path_buf();
+
+    let smt = LargeSmt::<RocksDbStorage>::with_entries(initial_storage, entries).unwrap();
+    let expected_root = smt.root();
+    drop(smt);
+
+    // load should succeed
+    let reopened_storage = RocksDbStorage::open(RocksDbConfig::new(db_path)).unwrap();
+    let smt =
+        LargeSmt::load(reopened_storage).expect("Should successfully open without validation");
+
+    assert_eq!(smt.root(), expected_root);
+}
+
+#[test]
+fn rocksdb_new_fails_on_non_empty_storage() {
+    let entries = generate_entries(1000);
+
+    let (initial_storage, temp_dir_guard) = setup_storage();
+    let db_path = temp_dir_guard.path().to_path_buf();
+
+    // Create a tree with data
+    let smt = LargeSmt::<RocksDbStorage>::with_entries(initial_storage, entries).unwrap();
+    drop(smt);
+
+    // Reopen storage and try to use new() - should fail
+    let reopened_storage = RocksDbStorage::open(RocksDbConfig::new(db_path)).unwrap();
+    let result = LargeSmt::new(reopened_storage);
+
+    assert!(result.is_err(), "new() should fail on non-empty storage");
+    match result.unwrap_err() {
+        LargeSmtError::StorageNotEmpty => {},
+        other => panic!("Expected StorageNotEmpty error, got {:?}", other),
+    }
 }
