@@ -1,7 +1,9 @@
 ## 0.20.0 (TBD)
 
+- [BREAKING] Rename `MmrProof` to `MmrPath`, and introduce a new `MmrProof` with the leaf value included ([#656](https://github.com/0xMiden/crypto/pull/656)).
 - Added `+ Sync` bound to `StorageError` and `LargeSmtError` ([#680](https://github.com/0xMiden/crypto/pull/680)).
 - [BREAKING] Refactored `SmtProof` verification API to return `Result<(), SmtProofError>` ([#682](https://github.com/0xMiden/crypto/pull/682)).
+- Added validation to `PartialMerkleTree::with_leaves()` to reject internal nodes ([#684](https://github.com/0xMiden/crypto/pull/684)).
 - [BREAKING] Moved `LargeSmt` root ownership from storage to in-memory layer ([#694](https://github.com/0xMiden/crypto/pull/694)). 
 
 ## 0.19.2 (2025-12-04)

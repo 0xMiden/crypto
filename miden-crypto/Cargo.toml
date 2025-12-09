@@ -37,6 +37,10 @@ harness = false
 name    = "merkle"
 
 [[bench]]
+harness = false
+name    = "partial_mt"
+
+[[bench]]
 harness           = false
 name              = "large-smt"
 required-features = ["rocksdb"]
