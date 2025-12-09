@@ -25,10 +25,9 @@ pub use large::{
 };
 #[cfg(feature = "rocksdb")]
 pub use large::{RocksDbConfig, RocksDbStorage};
-#[cfg(feature = "concurrent")]
+
 mod large_forest;
-#[cfg(feature = "concurrent")]
-pub use large_forest::LargeSmtForestError;
+pub use large_forest::{History, HistoryError, HistoryView, LargeSmtForestError};
 
 mod simple;
 pub use simple::{SimpleSmt, SimpleSmtProof};
@@ -37,9 +36,7 @@ mod partial;
 pub use partial::PartialSmt;
 
 mod forest;
-mod history;
 pub use forest::SmtForest;
-pub use history::{History, HistoryView, error::HistoryError};
 
 // CONSTANTS
 // ================================================================================================

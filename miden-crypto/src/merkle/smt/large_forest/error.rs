@@ -3,7 +3,7 @@
 
 use thiserror::Error;
 
-use crate::merkle::{MerkleError, smt::history::error::HistoryError};
+use crate::merkle::{MerkleError, smt::large_forest::history::error::HistoryError};
 
 /// The errors returned by operations on the large SMT forest.
 ///

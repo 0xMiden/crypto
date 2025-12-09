@@ -160,8 +160,7 @@ impl History {
     /// the current tree given in `nodes` and `leaves`.
     ///
     /// If adding this version would result in exceeding `self.max_count` historical versions, then
-    /// the oldest of the versions is automatically removed and returned. If no version is pruned,
-    /// the method returns [`None`].
+    /// the oldest of the versions is automatically removed.
     ///
     /// # Gotchas
     ///
@@ -217,6 +216,8 @@ impl History {
     ///
     /// # Errors
     ///
+    /// - [`HistoryError::HistoryEmpty`] if the history is empty and hence there is no version to
+    ///   find.
     /// - [`HistoryError::VersionTooOld`] if the history does not contain the data to provide a
     ///   coherent overlay for the provided `version_id` due to `version_id` being older than the
     ///   oldest version stored.
@@ -230,24 +231,16 @@ impl History {
             return Err(HistoryError::VersionTooOld);
         }
 
-        // We look for the newest delta with a version less than or equal to the target version, but
-        // if that doesn't exist we just return the index of the latest delta.
-        //
-        // It is always safe to subtract due to:
-        //
-        // - In the single version case, this will yield `self.num_versions()`.
-        // - The no-version case has already been ruled out.
-        // - In the 2+ version case, there is either a greater version index than 0 or
-        //   `self.num_versions()` is returned.
-        //
-        // If we somehow ever subtract with it NOT being safe, it makes more sense to crash than to
-        // saturate.
         let ix = self
             .deltas
             .iter()
             .position(|d| d.version_id > version_id)
             .unwrap_or_else(|| self.num_versions())
-            - 1;
+            .checked_sub(1)
+            .expect(
+                "Subtraction should not overflow as we have ruled out the no-version \
+                case, and in the other cases the left operand will be >= 1",
+            );
 
         Ok(ix)
     }
@@ -403,7 +396,8 @@ impl<'history> HistoryView<'history> {
 /// constructed by the history. Users should not be allowed to construct it directly.
 #[derive(Clone, Debug, PartialEq)]
 struct Delta {
-    /// The root of the tree in the `version` corresponding to this delta.
+    /// The root of the tree in the `version` corresponding to the application of the reversions in
+    /// this delta to the previous tree state.
     pub root: Word,
 
     /// The version of the tree represented by the delta.
