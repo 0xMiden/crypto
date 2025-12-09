@@ -1,4 +1,11 @@
 //! SHA2 hash function wrappers (SHA-256 and SHA-512).
+//!
+//! # Note on SHA-512 Digest trait implementation
+//!
+//! The [Sha512Digest::as_bytes] method returns only the first 32 bytes of the full 64-byte
+//! SHA-512 digest. This is truncated SHA-512, NOT SHA-512/256 (which uses different
+//! initialization vectors as per FIPS 180-4). The full 64-byte digest is always available
+//! via the [Deref] implementation.
 
 use alloc::string::String;
 use core::{
@@ -31,6 +38,7 @@ const DIGEST512_BYTES: usize = 64;
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd)]
 #[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 #[cfg_attr(feature = "serde", serde(into = "String", try_from = "&str"))]
+#[repr(transparent)]
 pub struct Sha256Digest([u8; DIGEST256_BYTES]);
 
 impl Sha256Digest {
@@ -198,6 +206,7 @@ impl Sha256 {
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd)]
 #[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 #[cfg_attr(feature = "serde", serde(into = "String", try_from = "&str"))]
+#[repr(transparent)]
 pub struct Sha512Digest([u8; DIGEST512_BYTES]);
 
 impl Sha512Digest {
@@ -261,8 +270,14 @@ impl Deserializable for Sha512Digest {
 }
 
 impl Digest for Sha512Digest {
+    /// Returns the first 32 bytes of the 64-byte SHA-512 digest.
+    ///
+    /// # Note
+    ///
+    /// This returns truncated SHA-512, NOT SHA-512/256. SHA-512/256 uses different
+    /// initialization vectors (IVs) as specified in FIPS 180-4 and produces different
+    /// output. For the full 64-byte digest, use the [Deref] implementation.
     fn as_bytes(&self) -> [u8; 32] {
-        // Return first 32 bytes of the 64-byte digest
         let mut result = [0u8; 32];
         result.copy_from_slice(&self.0[..32]);
         result
