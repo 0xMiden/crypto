@@ -3,18 +3,36 @@
 //! `LargeSmt` stores the top of the tree (depths 0–23) in memory and persists the lower
 //! depths (24–64) in storage as fixed-size subtrees. This hybrid layout scales beyond RAM
 //! while keeping common operations fast. With the `rocksdb` feature enabled, the lower
-//! subtrees and leaves are stored in RocksDB. On reopen, the in-memory top is reconstructed
+//! subtrees and leaves are stored in RocksDB. On reload, the in-memory top is reconstructed
 //! from cached depth-24 subtree roots.
 //!
 //! Examples below require the `rocksdb` feature.
 //!
-//! Open an existing RocksDB-backed tree:
+//! Load an existing RocksDB-backed tree with root validation:
+//! ```no_run
+//! use miden_crypto::{
+//!     Word,
+//!     merkle::smt::{LargeSmt, RocksDbConfig, RocksDbStorage},
+//! };
+//!
+//! # fn main() -> Result<(), Box<dyn std::error::Error>> {
+//! // The expected root should be stored/tracked separately by the caller
+//! let expected_root: Word = /* load from your own persistence */ todo!();
+//!
+//! let storage = RocksDbStorage::open(RocksDbConfig::new("/path/to/db"))?;
+//! let smt = LargeSmt::load_with_root(storage, expected_root)?;
+//! assert_eq!(smt.root(), expected_root);
+//! # Ok(())
+//! # }
+//! ```
+//!
+//! Load an existing tree without root validation (use with caution):
 //! ```no_run
 //! use miden_crypto::merkle::smt::{LargeSmt, RocksDbConfig, RocksDbStorage};
 //!
 //! # fn main() -> Result<(), Box<dyn std::error::Error>> {
 //! let storage = RocksDbStorage::open(RocksDbConfig::new("/path/to/db"))?;
-//! let smt = LargeSmt::new(storage)?; // reconstructs in-memory top if data exists
+//! let smt = LargeSmt::load(storage)?;
 //! let _root = smt.root();
 //! # Ok(())
 //! # }
@@ -64,7 +82,7 @@
 //!
 //! # fn main() -> Result<(), Box<dyn std::error::Error>> {
 //! let storage = RocksDbStorage::open(RocksDbConfig::new("/path/to/db"))?;
-//! let mut smt = LargeSmt::new(storage)?;
+//! let mut smt = LargeSmt::load(storage)?;
 //!
 //! let k1 = Word::new([Felt::new(101), Felt::new(0), Felt::new(0), Felt::new(0)]);
 //! let v1 = Word::new([Felt::new(1), Felt::new(2), Felt::new(3), Felt::new(4)]);
@@ -313,13 +331,13 @@ impl<S: SmtStorage> LargeSmt<S> {
     }
 
     /// Returns a boolean value indicating whether the SMT is empty.
-    ///
-    /// # Errors
-    /// Returns an error if there is a storage error when retrieving the root or leaf count.
-    pub fn is_empty(&self) -> Result<bool, LargeSmtError> {
-        let root = self.storage.get_root()?.unwrap_or(Self::EMPTY_ROOT);
-        debug_assert_eq!(self.num_leaves()? == 0, root == Self::EMPTY_ROOT);
-        Ok(root == Self::EMPTY_ROOT)
+    pub fn is_empty(&self) -> bool {
+        let root = self.root();
+        debug_assert_eq!(
+            self.num_leaves().expect("failed to get leaf count") == 0,
+            root == Self::EMPTY_ROOT
+        );
+        root == Self::EMPTY_ROOT
     }
 
     // ITERATORS

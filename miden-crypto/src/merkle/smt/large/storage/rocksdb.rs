@@ -29,13 +29,11 @@ const SUBTREE_40_CF: &str = "st40";
 const SUBTREE_48_CF: &str = "st48";
 const SUBTREE_56_CF: &str = "st56";
 
-/// The name of the RocksDB column family used for storing metadata (e.g., root, counts).
+/// The name of the RocksDB column family used for storing metadata (e.g., counts).
 const METADATA_CF: &str = "metadata";
 /// The name of the RocksDB column family used for storing level 24 hashes for fast tree rebuilding.
 const DEPTH_24_CF: &str = "depth24";
 
-/// The key used in the `METADATA_CF` column family to store the SMT's root hash.
-const ROOT_KEY: &[u8] = b"smt_root";
 /// The key used in the `METADATA_CF` column family to store the total count of non-empty leaves.
 const LEAF_COUNT_KEY: &[u8] = b"leaf_count";
 /// The key used in the `METADATA_CF` column family to store the total count of key-value entries.
@@ -253,35 +251,6 @@ impl RocksDbStorage {
 }
 
 impl SmtStorage for RocksDbStorage {
-    /// Retrieves the SMT root hash from the `METADATA_CF` column family.
-    ///
-    /// # Errors
-    /// - `StorageError::Backend`: If the metadata column family is missing or a RocksDB error
-    ///   occurs.
-    /// - `StorageError::DeserializationError`: If the retrieved root hash bytes cannot be
-    ///   deserialized.
-    fn get_root(&self) -> Result<Option<Word>, StorageError> {
-        let cf = self.cf_handle(METADATA_CF)?;
-        match self.db.get_cf(cf, ROOT_KEY)? {
-            Some(bytes) => {
-                let digest = Word::read_from_bytes(&bytes)?;
-                Ok(Some(digest))
-            },
-            None => Ok(None),
-        }
-    }
-
-    /// Stores the SMT root hash in the `METADATA_CF` column family.
-    ///
-    /// # Errors
-    /// - `StorageError::Backend`: If the metadata column family is missing or a RocksDB error
-    ///   occurs.
-    fn set_root(&self, root: Word) -> Result<(), StorageError> {
-        let cf = self.cf_handle(METADATA_CF)?;
-        self.db.put_cf(cf, ROOT_KEY, root.to_bytes())?;
-        Ok(())
-    }
-
     /// Retrieves the total count of non-empty leaves from the `METADATA_CF` column family.
     /// Returns 0 if the count is not found.
     ///
@@ -834,7 +803,6 @@ impl SmtStorage for RocksDbStorage {
     ///   `SUBTREE_48_CF`, `SUBTREE_56_CF`.
     /// - Updates to leaf and entry counts in `METADATA_CF` based on `leaf_count_delta` and
     ///   `entry_count_delta`.
-    /// - Sets the new SMT root in `METADATA_CF`.
     ///
     /// All operations in the batch are applied atomically by RocksDB.
     ///
@@ -852,7 +820,6 @@ impl SmtStorage for RocksDbStorage {
         let StorageUpdateParts {
             leaf_updates,
             subtree_updates,
-            new_root,
             leaf_count_delta,
             entry_count_delta,
         } = updates.into_parts();
@@ -926,8 +893,6 @@ impl SmtStorage for RocksDbStorage {
             batch.put_cf(metadata_cf, LEAF_COUNT_KEY, new_leaf_count.to_be_bytes());
             batch.put_cf(metadata_cf, ENTRY_COUNT_KEY, new_entry_count.to_be_bytes());
         }
-
-        batch.put_cf(metadata_cf, ROOT_KEY, new_root.to_bytes());
 
         let mut write_opts = rocksdb::WriteOptions::default();
         // Disable immediate WAL sync to disk for better performance

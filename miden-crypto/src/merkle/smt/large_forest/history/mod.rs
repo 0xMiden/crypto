@@ -1,0 +1,423 @@
+//! This module contains the definition of [`History`], a simple container for some number of
+//! historical versions of a given merkle tree.
+//!
+//! This history consists of a series of _deltas_ from the current state of the tree, moving
+//! backward in history away from that current state. These deltas are then used to form a "merged
+//! overlay" that represents the changes to be made on top of the current tree to put it _back_ in
+//! that historical state.
+//!
+//! It provides functionality for adding new states to the history, as well as for querying the
+//! history at a given point in time.
+//!
+//! # Complexity
+//!
+//! Versions in this structure are _cumulative_. To get the entire picture of an arbitrary node or
+//! leaf at version `v` it may be necessary to check for changes in all versions between `v` and the
+//! current tree state. This gives worst-case complexity `O(v)` when querying a node or leaf for the
+//! version `v`.
+//!
+//! This is acceptable overhead as we assert that newer versions are far more likely to be queried
+//! than older versions. Nevertheless, it may be improved in future using a sharing approach, but
+//! that potential improvement is being ignored for now for the sake of simplicity.
+//!
+//! # Performance
+//!
+//! This structure operates entirely in memory, and is hence reasonably quick to query. As of the
+//! current time, no detailed benchmarking has taken place for the history, but based on some basic
+//! profiling the major time taken is in chasing pointers throughout memory due to the use of
+//! [`Map`]s, but this is unavoidable in the current structure and may need to be revisited in
+//! the future.
+
+pub mod error;
+
+#[cfg(test)]
+mod tests;
+
+use alloc::collections::VecDeque;
+use core::fmt::Debug;
+
+use error::{HistoryError, Result};
+
+use crate::{
+    Map, Set, Word,
+    merkle::{
+        NodeIndex,
+        smt::{LeafIndex, SMT_DEPTH},
+    },
+};
+
+// UTILITY TYPE ALIASES
+// ================================================================================================
+
+/// A compact leaf is a mapping from full word-length keys to word-length values, intended to be
+/// stored in the leaves of an otherwise shallower merkle tree.
+pub type CompactLeaf = Map<Word, Word>;
+
+/// A collection of changes to arbitrary non-leaf nodes in a merkle tree.
+///
+/// All changes to nodes between versions `v` and `v + 1` must be explicitly "undone" in the
+/// `NodeChanges` representing version `v`. This includes nodes that were defaulted in version `v`
+/// that were given an explicit value in version `v + 1`, where the `NodeChanges` must explicitly
+/// set those nodes back to the default.
+///
+/// Failure to do so will result in incorrect values when those nodes are queried at a point in the
+/// history corresponding to version `v`.
+pub type NodeChanges = Map<NodeIndex, Word>;
+
+/// A collection of changes to arbitrary leaf nodes in a merkle tree.
+///
+/// This represents the state of the leaf wholesale, rather than as a delta from the newer version.
+/// This massively simplifies querying leaves in the history.
+///
+/// Note that if in the version of the tree represented by these `LeafChanges` had the default value
+/// at the leaf, this default value must be made concrete in the map. Failure to do so will retain a
+/// newer, non-default value for that leaf, and thus result in incorrect query results at this point
+/// in the history.
+pub type LeafChanges = Map<LeafIndex<SMT_DEPTH>, CompactLeaf>;
+
+/// An identifier for a historical tree version overlay, which must be monotonic as new versions are
+/// added.
+pub type VersionId = u64;
+
+// HISTORY
+// ================================================================================================
+
+/// A History contains a sequence of versions atop a given tree.
+///
+/// The versions are _cumulative_, meaning that querying the history must account for changes from
+/// the current tree that take place in versions that are not the queried version or the current
+/// tree.
+#[derive(Clone, Debug)]
+pub struct History {
+    /// The maximum number of historical versions to be stored.
+    max_count: usize,
+
+    /// The deltas that make up the history for this tree.
+    ///
+    /// It will never contain more than `max_count` deltas, and is ordered with the oldest data at
+    /// the lowest index.
+    ///
+    /// # Implementation Note
+    ///
+    /// As we are targeting small numbers of history items (e.g. 30), having a sequence with an
+    /// allocated capacity equal to the small maximum number of items is perfectly sane. This will
+    /// avoid costly reallocations in the fast path.
+    ///
+    /// We use a [`VecDeque`] instead of a [`Vec`] or [`alloc::collections::LinkedList`] as we
+    /// estimate that the vast majority of removals will be the oldest entries as new ones are
+    /// pushed. This means that we can optimize for those removals along with indexing performance,
+    /// rather than optimizing for more rare removals from the middle of the sequence.
+    deltas: VecDeque<Delta>,
+}
+
+impl History {
+    /// Constructs a new history container, containing at most `max_count` historical versions for
+    /// a tree.
+    #[must_use]
+    pub fn empty(max_count: usize) -> Self {
+        // We allocate one more than we actually need to store to allow us to insert and THEN
+        // remove, rather than the other way around. This leads to negligible increases in memory
+        // usage while allowing for cleaner code.
+        let deltas = VecDeque::with_capacity(max_count + 1);
+        Self { max_count, deltas }
+    }
+
+    /// Gets the maximum number of versions that this history can store.
+    #[must_use]
+    pub fn max_versions(&self) -> usize {
+        self.max_count
+    }
+
+    /// Gets the current number of versions in the history.
+    #[must_use]
+    pub fn num_versions(&self) -> usize {
+        self.deltas.len()
+    }
+
+    /// Returns all the roots that the history knows about.
+    ///
+    /// # Complexity
+    ///
+    /// Calling this method requires a traversal of all the versions and is hence linear in the
+    /// number of history versions.
+    #[must_use]
+    pub fn roots(&self) -> Set<Word> {
+        self.deltas.iter().map(|d| d.root).collect()
+    }
+
+    /// Returns `true` if `root` is in the history and `false` otherwise.
+    ///
+    /// # Complexity
+    ///
+    /// Calling this method requires a traversal of all the versions and is hence linear in the
+    /// number of history versions.
+    #[must_use]
+    pub fn is_known_root(&self, root: Word) -> bool {
+        self.deltas.iter().any(|r| r.root == root)
+    }
+
+    /// Adds a version to the history with the provided `root` and represented by the changes from
+    /// the current tree given in `nodes` and `leaves`.
+    ///
+    /// If adding this version would result in exceeding `self.max_count` historical versions, then
+    /// the oldest of the versions is automatically removed.
+    ///
+    /// # Gotchas
+    ///
+    /// When constructing the `nodes` and `leaves`, keep in mind that those collections must contain
+    /// entries for the **default value of a node or leaf** at any position where the tree was
+    /// sparse in the state represented by `root`. If this is not done, incorrect values may be
+    /// returned.
+    ///
+    /// This is necessary because the changes are the _reverse_ from what one might expect. Namely,
+    /// the changes in a given version `v` must "_revert_" the changes made in the transition from
+    /// version `v` to version `v + 1`.
+    ///
+    /// # Errors
+    ///
+    /// - [`HistoryError::NonMonotonicVersions`] if the provided version is not greater than the
+    ///   previously added version.
+    pub fn add_version(
+        &mut self,
+        root: Word,
+        version_id: VersionId,
+        nodes: NodeChanges,
+        leaves: LeafChanges,
+    ) -> Result<()> {
+        if let Some(v) = self.deltas.iter().last() {
+            if v.version_id < version_id {
+                self.deltas.push_back(Delta::new(root, version_id, nodes, leaves));
+                if self.num_versions() > self.max_versions() {
+                    self.deltas.pop_front();
+                }
+
+                Ok(())
+            } else {
+                Err(HistoryError::NonMonotonicVersions(version_id, v.version_id))
+            }
+        } else {
+            self.deltas.push_back(Delta::new(root, version_id, nodes, leaves));
+
+            Ok(())
+        }
+    }
+
+    /// Returns the index in the sequence of deltas of the version that corresponds to the provided
+    /// `version_id`.
+    ///
+    /// To "correspond" means that it either has the provided `version_id`, or is the newest version
+    /// with a `version_id` less than the provided id. In either case, it is the correct version to
+    /// be used to query the tree state in the provided `version_id`.
+    ///
+    /// # Complexity
+    ///
+    /// Finding the latest corresponding version in the history requires a linear traversal of the
+    /// history entries, and hence has complexity `O(n)` in the number of versions.
+    ///
+    /// # Errors
+    ///
+    /// - [`HistoryError::HistoryEmpty`] if the history is empty and hence there is no version to
+    ///   find.
+    /// - [`HistoryError::VersionTooOld`] if the history does not contain the data to provide a
+    ///   coherent overlay for the provided `version_id` due to `version_id` being older than the
+    ///   oldest version stored.
+    fn find_latest_corresponding_version(&self, version_id: VersionId) -> Result<usize> {
+        // If the version is older than the oldest, we error.
+        if let Some(oldest_version) = self.deltas.front() {
+            if oldest_version.version_id > version_id {
+                return Err(HistoryError::VersionTooOld);
+            }
+        } else {
+            return Err(HistoryError::VersionTooOld);
+        }
+
+        let ix = self
+            .deltas
+            .iter()
+            .position(|d| d.version_id > version_id)
+            .unwrap_or_else(|| self.num_versions())
+            .checked_sub(1)
+            .expect(
+                "Subtraction should not overflow as we have ruled out the no-version \
+                case, and in the other cases the left operand will be >= 1",
+            );
+
+        Ok(ix)
+    }
+
+    /// Returns a view of the history that allows querying as a single unified overlay on the
+    /// current state of the merkle tree as if the overlay was reverting the tree to the state
+    /// corresponding to the specified `version_id`.
+    ///
+    /// Note that the history may not contain a version that directly corresponds to `version_id`.
+    /// In such a case, the view will instead use the newest version coherent with the provided
+    /// `version_id`, as this is the correct version for the provided id. Note that this will be
+    /// incorrect if the versions stored in the history do not represent contiguous changes from the
+    /// current tree.
+    ///
+    /// # Complexity
+    ///
+    /// The computational complexity of this method is linear in the number of versions stored in
+    /// the history.
+    ///
+    /// # Errors
+    ///
+    /// - [`HistoryError::VersionTooOld`] if the history does not contain the data to provide a
+    ///   coherent overlay for the provided `version_id` due to `version_id` being older than the
+    ///   oldest version stored.
+    pub fn get_view_at(&self, version_id: VersionId) -> Result<HistoryView<'_>> {
+        let version_index = self.find_latest_corresponding_version(version_id)?;
+        Ok(HistoryView::new_of(version_index, self))
+    }
+
+    /// Removes all versions in the history that are older than the version denoted by the provided
+    /// `version_id`.
+    ///
+    /// If `version_id` is not a version known by the history, it will keep the newest version that
+    /// is capable of serving as that version in queries.
+    ///
+    /// # Complexity
+    ///
+    /// The computational complexity of this method is linear in the number of versions stored in
+    /// the history prior to any removals.
+    pub fn truncate(&mut self, version_id: VersionId) -> usize {
+        // We start by getting the index to truncate to, though it is not an error to remove
+        // something too old.
+        let truncate_ix = self.find_latest_corresponding_version(version_id).unwrap_or(0);
+
+        for _ in 0..truncate_ix {
+            self.deltas.pop_front();
+        }
+
+        truncate_ix
+    }
+
+    /// Removes all versions from the history.
+    pub fn clear(&mut self) {
+        self.deltas.clear();
+    }
+}
+
+// HISTORY VIEW
+// ================================================================================================
+
+/// A read-only view of the history overlay on the tree at a specified place in the history.
+#[derive(Debug)]
+pub struct HistoryView<'history> {
+    /// The index of the target version in the history.
+    version_ix: usize,
+
+    /// The history that actually stores the data that will be queried.
+    history: &'history History,
+}
+
+impl<'history> HistoryView<'history> {
+    /// Constructs a new history view that acts as a single overlay of the state represented by the
+    /// oldest delta for which `f` returns true.
+    ///
+    /// # Complexity
+    ///
+    /// The computational complexity of this method is linear in the number of versions stored in
+    /// the history.
+    fn new_of(version_ix: usize, history: &'history History) -> Self {
+        Self { version_ix, history }
+    }
+
+    /// Gets the value of the node in the history at the provided `index`, or returns `None` if the
+    /// version does not overlay the current tree at that node.
+    ///
+    /// # Complexity
+    ///
+    /// The computational complexity of this method is linear in the number of versions due to the
+    /// need to traverse to find the correct overlay value.
+    #[must_use]
+    pub fn node_value(&self, index: &NodeIndex) -> Option<&Word> {
+        self.history
+            .deltas
+            .iter()
+            .skip(self.version_ix)
+            .find_map(|v| v.nodes.get(index))
+    }
+
+    /// Gets the value of the entire leaf in the history at the specified `index`, or returns `None`
+    /// if the version does not overlay the current tree at that leaf.
+    ///
+    /// # Complexity
+    ///
+    /// The computational complexity of this method is linear in the number of versions due to the
+    /// need to traverse to find the correct overlay value.
+    #[must_use]
+    pub fn leaf_value(&self, index: &LeafIndex<SMT_DEPTH>) -> Option<&CompactLeaf> {
+        self.history
+            .deltas
+            .iter()
+            .skip(self.version_ix)
+            .find_map(|v| v.leaves.get(index))
+    }
+
+    /// Queries the value of a specific key in a leaf in the overlay, returning:
+    ///
+    /// - `None` if the version does not overlay that leaf in the current tree,
+    /// - `Some(None)` if the version does overlay that leaf but the compact leaf does not contain
+    ///   that value,
+    /// - and `Some(Some(v))` if the version does overlay the leaf and the key exists in that leaf.
+    ///
+    /// # Complexity
+    ///
+    /// The computational complexity of this method is linear in the number of versions due to the
+    /// need to traverse to find the correct overlay value.
+    #[must_use]
+    pub fn value(&self, key: &Word) -> Option<Option<&Word>> {
+        self.leaf_value(&LeafIndex::from(*key)).map(|leaf| leaf.get(key))
+    }
+}
+
+// DELTA
+// ================================================================================================
+
+/// A delta for a state `n` represents the changes (to both nodes and leaves) that need to be
+/// applied on top of the state `n + 1` to yield the correct tree for state `n`.
+///
+/// # Cumulative Deltas and Temporal Ordering
+///
+/// In order to best represent the history of a merkle tree, these deltas are constructed to take
+/// advantage of two main properties:
+///
+/// - They are _cumulative_, which reduces their practical memory usage. This does, however, mean
+///   that querying the state of older blocks is more expensive than querying newer ones.
+/// - Deltas are applied in **temporally reversed order** from what one might expect. Most
+///   conventional applications of deltas bring something from the past into the future through
+///   application. In our case, the application of one or more deltas moves the tree into a **past
+///   state**.
+///
+/// # Construction
+///
+/// While the [`Delta`] type is visible in the interface of the history, it is only intended to be
+/// constructed by the history. Users should not be allowed to construct it directly.
+#[derive(Clone, Debug, PartialEq)]
+struct Delta {
+    /// The root of the tree in the `version` corresponding to the application of the reversions in
+    /// this delta to the previous tree state.
+    pub root: Word,
+
+    /// The version of the tree represented by the delta.
+    pub version_id: VersionId,
+
+    /// Any changes to the non-leaf nodes in the tree for this delta.
+    pub nodes: NodeChanges,
+
+    /// Any changes to the leaf nodes in the tree for this delta.
+    ///
+    /// Note that the leaf state is **not represented compactly**, and describes the entire state
+    /// of the leaf in the corresponding version.
+    pub leaves: LeafChanges,
+}
+
+impl Delta {
+    /// Creates a new delta with the provided `root`, and representing the provided
+    /// changes to `nodes` and `leaves` in the merkle tree.
+    #[must_use]
+    fn new(root: Word, version_id: VersionId, nodes: NodeChanges, leaves: LeafChanges) -> Self {
+        Self { root, version_id, nodes, leaves }
+    }
+}

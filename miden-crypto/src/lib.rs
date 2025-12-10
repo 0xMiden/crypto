@@ -2,7 +2,6 @@
 
 #[macro_use]
 extern crate alloc;
-
 #[cfg(feature = "std")]
 extern crate std;
 
@@ -48,6 +47,20 @@ pub type Map<K, V> = alloc::collections::BTreeMap<K, V>;
 
 #[cfg(not(feature = "hashmaps"))]
 pub use alloc::collections::btree_map::Entry as MapEntry;
+
+/// An alias for a simple set.
+///
+/// By default, this is an alias for the [`alloc::collections::BTreeSet`]. However, when the
+/// `hashmaps` feature is enabled, this becomes an alias for hashbrown's HashSet.
+#[cfg(feature = "hashmaps")]
+pub type Set<V> = hashbrown::HashSet<V>;
+
+/// An alias for a simple set.
+///
+/// By default, this is an alias for the [`alloc::collections::BTreeSet`]. However, when the
+/// `hashmaps` feature is enabled, this becomes an alias for hashbrown's HashSet.
+#[cfg(not(feature = "hashmaps"))]
+pub type Set<V> = alloc::collections::BTreeSet<V>;
 
 // CONSTANTS
 // ================================================================================================

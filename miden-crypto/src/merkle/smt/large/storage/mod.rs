@@ -26,26 +26,13 @@ pub use updates::{StorageUpdateParts, StorageUpdates, SubtreeUpdate};
 /// Sparse Merkle Tree storage backend.
 ///
 /// This trait outlines the fundamental operations required to persist and retrieve
-/// the components of an SMT, such as its root hash, leaves, and deeper subtrees.
+/// the components of an SMT: leaves and deeper subtrees.
 /// Implementations of this trait can provide various storage solutions, like in-memory
 /// maps or persistent databases (e.g., RocksDB).
 ///
 /// All methods are expected to handle potential storage errors by returning a
 /// `Result<_, StorageError>`.
 pub trait SmtStorage: 'static + fmt::Debug + Send + Sync {
-    /// Retrieves the current root hash of the Sparse Merkle Tree.
-    /// Returns `Ok(None)` if no root has been set or an empty SMT is represented.
-    ///
-    /// # Errors
-    /// Returns `StorageError` if the storage read operation fails.
-    fn get_root(&self) -> Result<Option<Word>, StorageError>;
-
-    /// Sets or updates the root hash of the Sparse Merkle Tree.
-    ///
-    /// # Errors
-    /// Returns `StorageError` if the storage write operation fails.
-    fn set_root(&self, root: Word) -> Result<(), StorageError>;
-
     /// Retrieves the total number of leaf nodes currently stored.
     ///
     /// # Errors
@@ -228,14 +215,6 @@ where
     P: Deref<Target = T> + fmt::Debug + Send + Sync + 'static,
     T: SmtStorage + ?Sized,
 {
-    #[inline]
-    fn get_root(&self) -> Result<Option<Word>, StorageError> {
-        self.deref().get_root()
-    }
-    #[inline]
-    fn set_root(&self, root: Word) -> Result<(), StorageError> {
-        self.deref().set_root(root)
-    }
     #[inline]
     fn leaf_count(&self) -> Result<usize, StorageError> {
         self.deref().leaf_count()

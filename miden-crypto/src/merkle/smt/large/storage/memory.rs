@@ -5,17 +5,17 @@ use super::{SmtStorage, StorageError, StorageUpdateParts, StorageUpdates, Subtre
 use crate::{
     EMPTY_WORD, Map, MapEntry, Word,
     merkle::{
-        EmptySubtreeRoots, NodeIndex,
+        NodeIndex,
         smt::{
             InnerNode, SmtLeaf,
-            large::{IN_MEMORY_DEPTH, SMT_DEPTH, subtree::Subtree},
+            large::{IN_MEMORY_DEPTH, subtree::Subtree},
         },
     },
 };
 
 /// In-memory storage for a Sparse Merkle Tree (SMT), implementing the `SmtStorage` trait.
 ///
-/// This structure stores the SMT's root hash, leaf nodes, and subtrees directly in memory.
+/// This structure stores the SMT's leaf nodes and subtrees directly in memory.
 /// Access to these components is synchronized using `std::sync::RwLock` for thread safety.
 ///
 /// It is primarily intended for scenarios where data persistence to disk is not a
@@ -26,7 +26,6 @@ use crate::{
 ///   strategy.
 #[derive(Debug)]
 pub struct MemoryStorage {
-    pub root: RwLock<Word>,
     pub leaves: RwLock<Map<u64, SmtLeaf>>,
     pub subtrees: RwLock<Map<NodeIndex, Subtree>>,
 }
@@ -34,12 +33,9 @@ pub struct MemoryStorage {
 impl MemoryStorage {
     /// Creates a new, empty in-memory storage for a Sparse Merkle Tree.
     ///
-    /// Initializes the root to the empty SMT root for the defined SMT_DEPTH,
-    /// and empty maps for leaves and subtrees.
+    /// Initializes empty maps for leaves and subtrees.
     pub fn new() -> Self {
-        let root_val = *EmptySubtreeRoots::entry(SMT_DEPTH, 0);
         Self {
-            root: RwLock::new(root_val),
             leaves: RwLock::new(Map::new()),
             subtrees: RwLock::new(Map::new()),
         }
@@ -55,7 +51,6 @@ impl Default for MemoryStorage {
 impl Clone for MemoryStorage {
     fn clone(&self) -> Self {
         MemoryStorage {
-            root: RwLock::new(*self.root.read().expect("Failed to read lock for root in clone")),
             leaves: RwLock::new(
                 self.leaves.read().expect("Failed to read lock for leaves in clone").clone(),
             ),
@@ -67,17 +62,6 @@ impl Clone for MemoryStorage {
 }
 
 impl SmtStorage for MemoryStorage {
-    /// Retrieves the current root hash of the Sparse Merkle Tree.
-    fn get_root(&self) -> Result<Option<Word>, StorageError> {
-        Ok(Some(*self.root.read()?))
-    }
-
-    /// Sets the root hash of the Sparse Merkle Tree.
-    fn set_root(&self, root: Word) -> Result<(), StorageError> {
-        *self.root.write()? = root;
-        Ok(())
-    }
-
     /// Gets the total number of non-empty leaves currently stored.
     fn leaf_count(&self) -> Result<usize, StorageError> {
         Ok(self.leaves.read()?.len())
@@ -317,23 +301,20 @@ impl SmtStorage for MemoryStorage {
     /// This method handles updates to:
     /// - Leaves: Inserts new or updated leaves, removes specified leaves.
     /// - Subtrees: Inserts new or updated subtrees, removes specified subtrees.
-    /// - Root hash: Sets the new root hash of the SMT.
     ///
-    /// All operations are performed after acquiring write locks on the root, leaves, and subtrees
+    /// All operations are performed after acquiring write locks on the leaves and subtrees
     /// collections, ensuring atomicity of the batch update.
     ///
     /// # Errors
     /// Returns `StorageError::Backend` if any of the necessary write locks
-    /// (for root, leaves, or subtrees) cannot be acquired.
+    /// (for leaves or subtrees) cannot be acquired.
     fn apply(&self, updates: StorageUpdates) -> Result<(), StorageError> {
-        let mut root_guard = self.root.write()?;
         let mut leaves_guard = self.leaves.write()?;
         let mut subtrees_guard = self.subtrees.write()?;
 
         let StorageUpdateParts {
             leaf_updates,
             subtree_updates,
-            new_root,
             leaf_count_delta: _,
             entry_count_delta: _,
         } = updates.into_parts();
@@ -355,7 +336,6 @@ impl SmtStorage for MemoryStorage {
                 },
             }
         }
-        *root_guard = new_root;
         Ok(())
     }
 
