@@ -1,11 +1,11 @@
 use winter_utils::{ByteReader, ByteWriter, Deserializable, DeserializationError, Serializable};
 
-use super::{LeafIndex, SMT_DEPTH};
+use super::{EmptySubtreeRoots, LeafIndex, SMT_DEPTH};
 use crate::{
     EMPTY_WORD, Word,
     merkle::{
         InnerNodeInfo, MerkleError, NodeIndex, SparseMerklePath,
-        smt::{InnerNode, InnerNodes, Leaves, Smt, SmtLeaf, SmtProof, SparseMerkleTree},
+        smt::{InnerNode, InnerNodes, Leaves, SmtLeaf, SmtLeafError, SmtProof},
     },
 };
 
@@ -27,9 +27,23 @@ use crate::{
 /// or merkle paths must match that root, otherwise an error is returned.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
-pub struct PartialSmt(Smt);
+pub struct PartialSmt {
+    root: Word,
+    num_entries: usize,
+    leaves: Leaves<SmtLeaf>,
+    inner_nodes: InnerNodes,
+}
 
 impl PartialSmt {
+    // CONSTANTS
+    // --------------------------------------------------------------------------------------------
+
+    /// The default value used to compute the hash of empty leaves.
+    pub const EMPTY_VALUE: Word = EMPTY_WORD;
+
+    /// The root of an empty tree.
+    pub const EMPTY_ROOT: Word = *EmptySubtreeRoots::entry(SMT_DEPTH, 0);
+
     // CONSTRUCTORS
     // --------------------------------------------------------------------------------------------
 
@@ -37,11 +51,12 @@ impl PartialSmt {
     ///
     /// All subsequently added proofs or paths must have the same root.
     pub fn new(root: Word) -> Self {
-        let mut partial_smt = Self(Smt::default());
-
-        partial_smt.0.set_root(root);
-
-        partial_smt
+        Self {
+            root,
+            num_entries: 0,
+            leaves: Leaves::<SmtLeaf>::default(),
+            inner_nodes: InnerNodes::default(),
+        }
     }
 
     /// Instantiates a new [`PartialSmt`] by calling [`PartialSmt::add_proof`] for all [`SmtProof`]s
@@ -69,7 +84,7 @@ impl PartialSmt {
         let mut partial_smt = Self::default();
         let (path, leaf) = first_proof.into_parts();
         let path_root = partial_smt.add_path_unchecked(leaf, path);
-        partial_smt.0.set_root(path_root);
+        partial_smt.root = path_root;
 
         for proof in proofs {
             partial_smt.add_proof(proof)?;
@@ -83,7 +98,7 @@ impl PartialSmt {
 
     /// Returns the root of the tree.
     pub fn root(&self) -> Word {
-        self.0.root()
+        self.root
     }
 
     /// Returns an opening of the leaf associated with `key`. Conceptually, an opening is a Merkle
@@ -94,11 +109,9 @@ impl PartialSmt {
     /// Returns an error if:
     /// - the key is not tracked by this partial SMT.
     pub fn open(&self, key: &Word) -> Result<SmtProof, MerkleError> {
-        if !self.is_leaf_tracked(key) {
-            return Err(MerkleError::UntrackedKey(*key));
-        }
-
-        Ok(self.0.open(key))
+        let leaf = self.get_leaf(key)?;
+        let merkle_path = self.get_path(key);
+        Ok(SmtProof::new_unchecked(merkle_path, leaf))
     }
 
     /// Returns the leaf to which `key` maps
@@ -108,11 +121,12 @@ impl PartialSmt {
     /// Returns an error if:
     /// - the key is not tracked by this partial SMT.
     pub fn get_leaf(&self, key: &Word) -> Result<SmtLeaf, MerkleError> {
-        if !self.is_leaf_tracked(key) {
-            return Err(MerkleError::UntrackedKey(*key));
-        }
+        let leaf_pos = LeafIndex::<SMT_DEPTH>::from(*key).value();
 
-        Ok(self.0.get_leaf(key))
+        match self.leaves.get(&leaf_pos) {
+            Some(leaf) => Ok(leaf.clone()),
+            None => Err(MerkleError::UntrackedKey(*key)),
+        }
     }
 
     /// Returns the value associated with `key`.
@@ -122,11 +136,12 @@ impl PartialSmt {
     /// Returns an error if:
     /// - the key is not tracked by this partial SMT.
     pub fn get_value(&self, key: &Word) -> Result<Word, MerkleError> {
-        if !self.is_leaf_tracked(key) {
-            return Err(MerkleError::UntrackedKey(*key));
-        }
+        let leaf_pos = LeafIndex::<SMT_DEPTH>::from(*key).value();
 
-        Ok(self.0.get_value(key))
+        match self.leaves.get(&leaf_pos) {
+            Some(leaf) => Ok(leaf.get_value(key).unwrap_or_default()),
+            None => Err(MerkleError::UntrackedKey(*key)),
+        }
     }
 
     // STATE MUTATORS
@@ -134,7 +149,7 @@ impl PartialSmt {
 
     /// Inserts a value at the specified key, returning the previous value associated with that key.
     /// Recall that by definition, any key that hasn't been updated is associated with
-    /// [`Smt::EMPTY_VALUE`].
+    /// [`Self::EMPTY_VALUE`].
     ///
     /// This also recomputes all hashes between the leaf (associated with the key) and the root,
     /// updating the root itself.
@@ -152,15 +167,38 @@ impl PartialSmt {
             return Err(MerkleError::UntrackedKey(key));
         }
 
-        let previous_value = self.0.insert(key, value)?;
+        let leaf_index = Self::key_to_leaf_index(&key);
 
-        // If the value was removed the SmtLeaf was removed as well by the underlying Smt
-        // implementation. However, we still want to consider that leaf tracked so it can be
-        // read and written to, so we reinsert an empty SmtLeaf.
-        if value == EMPTY_WORD {
-            let leaf_index = Smt::key_to_leaf_index(&key);
-            self.0.leaves.insert(leaf_index.value(), SmtLeaf::Empty(leaf_index));
+        // Get the current leaf and compute the previous value
+        let leaf = self.leaves.get_mut(&leaf_index.value()).expect("leaf must exist if tracked");
+        let previous_value = leaf.get_value(&key).unwrap_or(EMPTY_WORD);
+
+        // Update the leaf
+        let prev_entries = leaf.num_entries();
+        if value != EMPTY_WORD {
+            leaf.insert(key, value).map_err(|e| match e {
+                SmtLeafError::TooManyLeafEntries { actual } => {
+                    MerkleError::TooManyLeafEntries { actual }
+                },
+                other => panic!("unexpected SmtLeaf::insert error: {:?}", other),
+            })?;
+        } else {
+            leaf.remove(key);
         }
+        let current_entries = leaf.num_entries();
+
+        // Update num_entries
+        self.num_entries = self.num_entries + current_entries - prev_entries;
+
+        // If the leaf became empty after removal, we still want to track it
+        // so we keep an empty leaf in the map
+        if leaf.is_empty() {
+            *leaf = SmtLeaf::new_empty(leaf_index);
+        }
+
+        // Recompute the path from leaf to root
+        let new_leaf_hash = leaf.hash();
+        self.recompute_nodes_from_leaf_to_root(leaf_index, new_leaf_hash);
 
         Ok(previous_value)
     }
@@ -201,37 +239,39 @@ impl PartialSmt {
 
     /// Returns an iterator over the inner nodes of the [`PartialSmt`].
     pub fn inner_nodes(&self) -> impl Iterator<Item = InnerNodeInfo> + '_ {
-        self.0.inner_nodes()
+        self.inner_nodes.values().map(|e| InnerNodeInfo {
+            value: e.hash(),
+            left: e.left,
+            right: e.right,
+        })
     }
 
     /// Returns an iterator over the [`InnerNode`] and the respective [`NodeIndex`] of the
     /// [`PartialSmt`].
     pub fn inner_node_indices(&self) -> impl Iterator<Item = (NodeIndex, InnerNode)> + '_ {
-        self.0.inner_node_indices()
+        self.inner_nodes.iter().map(|(idx, inner)| (*idx, inner.clone()))
     }
 
     /// Returns an iterator over the tracked, non-empty leaves of the [`PartialSmt`] in arbitrary
     /// order.
     pub fn leaves(&self) -> impl Iterator<Item = (LeafIndex<SMT_DEPTH>, &SmtLeaf)> {
         // The partial SMT also contains empty leaves, so we have to filter them out.
-        self.0.leaves().filter_map(
-            |(leaf_idx, leaf)| {
-                if leaf.is_empty() { None } else { Some((leaf_idx, leaf)) }
-            },
-        )
+        self.tracked_leaves().filter(|(_, leaf)| !leaf.is_empty())
     }
 
     /// Returns an iterator over the tracked leaves of the [`PartialSmt`] in arbitrary order.
     ///
     /// Note that this includes empty leaves.
     pub fn tracked_leaves(&self) -> impl Iterator<Item = (LeafIndex<SMT_DEPTH>, &SmtLeaf)> {
-        self.0.leaves()
+        self.leaves
+            .iter()
+            .map(|(leaf_index, leaf)| (LeafIndex::new_max_depth(*leaf_index), leaf))
     }
 
     /// Returns an iterator over the tracked, non-empty key-value pairs of the [`PartialSmt`] in
     /// arbitrary order.
     pub fn entries(&self) -> impl Iterator<Item = &(Word, Word)> {
-        self.0.entries()
+        self.leaves().flat_map(|(_, leaf)| leaf.entries())
     }
 
     /// Returns the number of tracked leaves in this tree, which includes empty ones.
@@ -239,7 +279,7 @@ impl PartialSmt {
     /// Note that this may return a different value from [Self::num_entries()] as a single leaf may
     /// contain more than one key-value pair.
     pub fn num_leaves(&self) -> usize {
-        self.0.num_leaves()
+        self.leaves.len()
     }
 
     /// Returns the number of tracked, non-empty key-value pairs in this tree.
@@ -247,7 +287,7 @@ impl PartialSmt {
     /// Note that this may return a different value from [Self::num_leaves()] as a single leaf may
     /// contain more than one key-value pair.
     pub fn num_entries(&self) -> usize {
-        self.0.num_entries()
+        self.num_entries
     }
 
     /// Returns a boolean value indicating whether the [`PartialSmt`] tracks any leaves.
@@ -256,7 +296,7 @@ impl PartialSmt {
     /// root, since it could have been constructed from a different root but without tracking any
     /// leaves.
     pub fn tracks_leaves(&self) -> bool {
-        !self.0.leaves.is_empty()
+        !self.leaves.is_empty()
     }
 
     // PRIVATE HELPERS
@@ -282,16 +322,15 @@ impl PartialSmt {
         //   added, but will error for otherwise non-existent leaves whose paths were not added,
         //   which is what we want.
         let prev_entries = self
-            .0
             .leaves
             .get(&current_index.value())
             .map(|leaf| leaf.num_entries())
             .unwrap_or(0);
         let current_entries = leaf.num_entries();
-        self.0.leaves.insert(current_index.value(), leaf);
+        self.leaves.insert(current_index.value(), leaf);
 
         // Guaranteed not to over/underflow. All variables are <= MAX_LEAF_ENTRIES and result > 0.
-        self.0.num_entries = self.0.num_entries + current_entries - prev_entries;
+        self.num_entries = self.num_entries + current_entries - prev_entries;
 
         for sibling_hash in path {
             // Find the index of the sibling node and compute whether it is a left or right child.
@@ -314,9 +353,9 @@ impl PartialSmt {
                 }
             };
 
-            self.0.insert_inner_node(current_index, new_parent_node);
+            self.insert_inner_node(current_index, new_parent_node);
 
-            node_hash_at_current_index = self.0.get_inner_node(current_index).hash();
+            node_hash_at_current_index = self.get_inner_node(current_index).hash();
         }
 
         node_hash_at_current_index
@@ -327,25 +366,109 @@ impl PartialSmt {
     /// In particular, this returns true for keys whose value was empty **but** their merkle paths
     /// were added, while it returns false if the merkle paths were **not** added.
     fn is_leaf_tracked(&self, key: &Word) -> bool {
-        self.0.leaves.contains_key(&Smt::key_to_leaf_index(key).value())
+        self.leaves.contains_key(&Self::key_to_leaf_index(key).value())
+    }
+
+    /// Converts a key to a leaf index.
+    fn key_to_leaf_index(key: &Word) -> LeafIndex<SMT_DEPTH> {
+        let most_significant_felt = key[3];
+        LeafIndex::new_max_depth(most_significant_felt.as_int())
+    }
+
+    /// Returns the inner node at the specified index.
+    fn get_inner_node(&self, index: NodeIndex) -> InnerNode {
+        self.inner_nodes
+            .get(&index)
+            .cloned()
+            .unwrap_or_else(|| EmptySubtreeRoots::get_inner_node(SMT_DEPTH, index.depth()))
+    }
+
+    /// Inserts an inner node at the specified index.
+    fn insert_inner_node(&mut self, index: NodeIndex, inner_node: InnerNode) {
+        if inner_node == EmptySubtreeRoots::get_inner_node(SMT_DEPTH, index.depth()) {
+            self.inner_nodes.remove(&index);
+        } else {
+            self.inner_nodes.insert(index, inner_node);
+        }
+    }
+
+    /// Returns the merkle path for a key by walking up the tree from the leaf.
+    fn get_path(&self, key: &Word) -> SparseMerklePath {
+        let index = NodeIndex::from(Self::key_to_leaf_index(key));
+
+        // Use proof_indices to get sibling indices from leaf to root,
+        // and get each sibling's hash
+        SparseMerklePath::from_sized_iter(index.proof_indices().map(|idx| self.get_node_hash(idx)))
+            .expect("path should be valid since it's from a valid SMT")
+    }
+
+    /// Get the hash of a node at an arbitrary index, including the root or leaf hashes.
+    ///
+    /// The root index simply returns the root. Other hashes are retrieved by looking at
+    /// the parent inner node and returning the respective child hash.
+    fn get_node_hash(&self, index: NodeIndex) -> Word {
+        if index.is_root() {
+            return self.root;
+        }
+
+        let InnerNode { left, right } = self.get_inner_node(index.parent());
+
+        if index.is_value_odd() { right } else { left }
+    }
+
+    /// Recomputes all inner nodes from a leaf up to the root after a leaf value change.
+    fn recompute_nodes_from_leaf_to_root(
+        &mut self,
+        leaf_index: LeafIndex<SMT_DEPTH>,
+        leaf_hash: Word,
+    ) {
+        use crate::hash::rpo::Rpo256;
+
+        let mut index: NodeIndex = leaf_index.into();
+        let mut node_hash = leaf_hash;
+
+        for node_depth in (0..index.depth()).rev() {
+            let is_right = index.is_value_odd();
+            index.move_up();
+            let InnerNode { left, right } = self.get_inner_node(index);
+            let (left, right) = if is_right {
+                (left, node_hash)
+            } else {
+                (node_hash, right)
+            };
+            node_hash = Rpo256::merge(&[left, right]);
+
+            if node_hash == *EmptySubtreeRoots::entry(SMT_DEPTH, node_depth) {
+                // If a subtree is empty, remove the inner node since it's equal to the default
+                self.inner_nodes.remove(&index);
+            } else {
+                self.insert_inner_node(index, InnerNode { left, right });
+            }
+        }
+        self.root = node_hash;
     }
 }
 
 impl Default for PartialSmt {
     /// Returns a new, empty [`PartialSmt`].
     ///
-    /// All leaves in the returned tree are set to [`Smt::EMPTY_VALUE`].
+    /// All leaves in the returned tree are set to [`Self::EMPTY_VALUE`].
     fn default() -> Self {
-        Self::new(Smt::EMPTY_ROOT)
+        Self::new(Self::EMPTY_ROOT)
     }
 }
 
 // CONVERSIONS
 // ================================================================================================
 
-impl From<Smt> for PartialSmt {
-    fn from(smt: Smt) -> Self {
-        PartialSmt(smt)
+impl From<super::Smt> for PartialSmt {
+    fn from(smt: super::Smt) -> Self {
+        Self {
+            root: smt.root(),
+            num_entries: smt.num_entries(),
+            leaves: smt.leaves().map(|(idx, leaf)| (idx.value(), leaf.clone())).collect(),
+            inner_nodes: smt.inner_node_indices().collect(),
+        }
     }
 }
 
@@ -355,13 +478,13 @@ impl From<Smt> for PartialSmt {
 impl Serializable for PartialSmt {
     fn write_into<W: ByteWriter>(&self, target: &mut W) {
         target.write(self.root());
-        target.write_usize(self.0.leaves.len());
-        for (i, leaf) in &self.0.leaves {
+        target.write_usize(self.leaves.len());
+        for (i, leaf) in &self.leaves {
             target.write_u64(*i);
             target.write(leaf);
         }
-        target.write_usize(self.0.inner_nodes.len());
-        for (idx, node) in &self.0.inner_nodes {
+        target.write_usize(self.inner_nodes.len());
+        for (idx, node) in &self.inner_nodes {
             target.write(idx);
             target.write(node);
         }
@@ -372,35 +495,23 @@ impl Deserializable for PartialSmt {
     fn read_from<R: ByteReader>(source: &mut R) -> Result<Self, DeserializationError> {
         let root: Word = source.read()?;
 
-        let mut leaves = Leaves::default();
+        let mut leaves = Leaves::<SmtLeaf>::default();
         for _ in 0..source.read_usize()? {
             let pos: u64 = source.read()?;
             let leaf: SmtLeaf = source.read()?;
             leaves.insert(pos, leaf);
         }
 
-        let mut nodes = InnerNodes::default();
+        let mut inner_nodes = InnerNodes::default();
         for _ in 0..source.read_usize()? {
             let idx: NodeIndex = source.read()?;
             let node: InnerNode = source.read()?;
-            nodes.insert(idx, node);
+            inner_nodes.insert(idx, node);
         }
 
-        // If the leaves are empty, the set root may not match the root of the inner nodes, which
-        // causes from_raw_parts to panic. In this case, we bypass this check by constructing the
-        // SMT with the expected root and overwriting it afterward.
-        let smt = if leaves.is_empty() {
-            let inner_node_root =
-                nodes.get(&NodeIndex::root()).map(InnerNode::hash).unwrap_or(Smt::EMPTY_ROOT);
-            let mut smt = Smt::from_raw_parts(nodes, leaves, inner_node_root);
-            smt.set_root(root);
-            smt
-        } else {
-            // If the leaves are not empty, the root should match.
-            Smt::from_raw_parts(nodes, leaves, root)
-        };
+        let num_entries = leaves.values().map(|leaf| leaf.num_entries()).sum();
 
-        Ok(PartialSmt(smt))
+        Ok(Self { root, num_entries, leaves, inner_nodes })
     }
 }
 
@@ -417,7 +528,10 @@ mod tests {
     use winter_math::fields::f64::BaseElement as Felt;
 
     use super::*;
-    use crate::{EMPTY_WORD, ONE, ZERO, merkle::EmptySubtreeRoots};
+    use crate::{
+        EMPTY_WORD, ONE, ZERO,
+        merkle::{EmptySubtreeRoots, smt::Smt},
+    };
 
     /// Tests that a partial SMT constructed from a root is well behaved and returns expected
     /// values.

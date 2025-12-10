@@ -99,10 +99,9 @@ type Leaves = super::Leaves<SmtLeaf>;
 #[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 pub struct Smt {
     root: Word,
-    // pub(super) for use in PartialSmt.
-    pub(super) num_entries: usize,
-    pub(super) leaves: Leaves,
-    pub(super) inner_nodes: InnerNodes,
+    num_entries: usize,
+    leaves: Leaves,
+    inner_nodes: InnerNodes,
 }
 
 impl Smt {
