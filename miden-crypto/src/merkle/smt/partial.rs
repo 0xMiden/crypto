@@ -16,12 +16,18 @@ use crate::{
 /// tree. This is useful so that not all leaves have to be present and loaded into memory to compute
 /// an update.
 ///
-/// To facilitate this, a partial SMT requires that the merkle paths of every key-value pair are
-/// added to the tree. This means this pair is considered "tracked" and can be updated.
+/// A key is considered "tracked" if either:
+/// 1. Its merkle path was explicitly added to the tree (via [`PartialSmt::add_path`] or
+///    [`PartialSmt::add_proof`]), or
+/// 2. The path from the leaf to the root goes through empty subtrees that are consistent with the
+///    stored inner nodes (provably empty with zero hash computations).
 ///
-/// An important caveat is that only pairs whose merkle paths were added can be updated. Attempting
-/// to update an untracked value will result in an error. See [`PartialSmt::insert`] for more
-/// details.
+/// The second condition allows updating keys in empty subtrees without explicitly adding their
+/// merkle paths. This is verified by walking up from the leaf and checking that any stored
+/// inner node has an empty subtree root as the child on our path.
+///
+/// An important caveat is that only tracked keys can be updated. Attempting to update an
+/// untracked key will result in an error. See [`PartialSmt::insert`] for more details.
 ///
 /// Once a partial SMT has been constructed, its root is set in stone. All subsequently added proofs
 /// or merkle paths must match that root, otherwise an error is returned.
@@ -114,19 +120,14 @@ impl PartialSmt {
         Ok(SmtProof::new_unchecked(merkle_path, leaf))
     }
 
-    /// Returns the leaf to which `key` maps
+    /// Returns the leaf to which `key` maps.
     ///
     /// # Errors
     ///
     /// Returns an error if:
     /// - the key is not tracked by this partial SMT.
     pub fn get_leaf(&self, key: &Word) -> Result<SmtLeaf, MerkleError> {
-        let leaf_pos = LeafIndex::<SMT_DEPTH>::from(*key).value();
-
-        match self.leaves.get(&leaf_pos) {
-            Some(leaf) => Ok(leaf.clone()),
-            None => Err(MerkleError::UntrackedKey(*key)),
-        }
+        self.get_tracked_leaf(key).ok_or(MerkleError::UntrackedKey(*key))
     }
 
     /// Returns the value associated with `key`.
@@ -136,12 +137,9 @@ impl PartialSmt {
     /// Returns an error if:
     /// - the key is not tracked by this partial SMT.
     pub fn get_value(&self, key: &Word) -> Result<Word, MerkleError> {
-        let leaf_pos = LeafIndex::<SMT_DEPTH>::from(*key).value();
-
-        match self.leaves.get(&leaf_pos) {
-            Some(leaf) => Ok(leaf.get_value(key).unwrap_or_default()),
-            None => Err(MerkleError::UntrackedKey(*key)),
-        }
+        self.get_tracked_leaf(key)
+            .map(|leaf| leaf.get_value(key).unwrap_or_default())
+            .ok_or(MerkleError::UntrackedKey(*key))
     }
 
     // STATE MUTATORS
@@ -157,24 +155,21 @@ impl PartialSmt {
     /// # Errors
     ///
     /// Returns an error if:
-    /// - the key and its merkle path were not previously added (using [`PartialSmt::add_path`]) to
-    ///   this [`PartialSmt`], which means it is almost certainly incorrect to update its value. If
-    ///   an error is returned the tree is in the same state as before.
+    /// - the key is not tracked (see the type documentation for the definition of "tracked"). If an
+    ///   error is returned the tree is in the same state as before.
     /// - inserting the key-value pair would exceed [`super::MAX_LEAF_ENTRIES`] (1024 entries) in
     ///   the leaf.
     pub fn insert(&mut self, key: Word, value: Word) -> Result<Word, MerkleError> {
-        if !self.is_leaf_tracked(&key) {
-            return Err(MerkleError::UntrackedKey(key));
-        }
+        let current_leaf = self.get_tracked_leaf(&key).ok_or(MerkleError::UntrackedKey(key))?;
+        let leaf_index = current_leaf.index();
+        let previous_value = current_leaf.get_value(&key).unwrap_or(EMPTY_WORD);
+        let prev_entries = current_leaf.num_entries();
 
-        let leaf_index = Self::key_to_leaf_index(&key);
+        let leaf = self
+            .leaves
+            .entry(leaf_index.value())
+            .or_insert_with(|| SmtLeaf::new_empty(leaf_index));
 
-        // Get the current leaf and compute the previous value
-        let leaf = self.leaves.get_mut(&leaf_index.value()).expect("leaf must exist if tracked");
-        let previous_value = leaf.get_value(&key).unwrap_or(EMPTY_WORD);
-
-        // Update the leaf
-        let prev_entries = leaf.num_entries();
         if value != EMPTY_WORD {
             leaf.insert(key, value).map_err(|e| match e {
                 SmtLeafError::TooManyLeafEntries { actual } => {
@@ -186,15 +181,7 @@ impl PartialSmt {
             leaf.remove(key);
         }
         let current_entries = leaf.num_entries();
-
-        // Update num_entries
         self.num_entries = self.num_entries + current_entries - prev_entries;
-
-        // If the leaf became empty after removal, we still want to track it
-        // so we keep an empty leaf in the map
-        if leaf.is_empty() {
-            *leaf = SmtLeaf::new_empty(leaf_index);
-        }
 
         // Recompute the path from leaf to root
         let new_leaf_hash = leaf.hash();
@@ -313,14 +300,6 @@ impl PartialSmt {
 
         let mut node_hash_at_current_index = leaf.hash();
 
-        // We insert directly into the leaves for two reasons:
-        // - We can directly insert the leaf as it is without having to loop over its entries to
-        //   call Smt::perform_insert.
-        // - If the leaf is SmtLeaf::Empty, we will also insert it, which means this leaf is
-        //   considered tracked by the partial SMT as it is part of the leaves map. When calling
-        //   PartialSmt::insert, this will not error for such empty leaves whose merkle path was
-        //   added, but will error for otherwise non-existent leaves whose paths were not added,
-        //   which is what we want.
         let prev_entries = self
             .leaves
             .get(&current_index.value())
@@ -353,20 +332,51 @@ impl PartialSmt {
                 }
             };
 
-            self.insert_inner_node(current_index, new_parent_node);
+            node_hash_at_current_index = new_parent_node.hash();
 
-            node_hash_at_current_index = self.get_inner_node(current_index).hash();
+            self.insert_inner_node(current_index, new_parent_node);
         }
 
         node_hash_at_current_index
     }
 
-    /// Returns true if the key's merkle path was previously added to this partial SMT and can be
-    /// sensibly updated to a new value.
-    /// In particular, this returns true for keys whose value was empty **but** their merkle paths
-    /// were added, while it returns false if the merkle paths were **not** added.
-    fn is_leaf_tracked(&self, key: &Word) -> bool {
-        self.leaves.contains_key(&Self::key_to_leaf_index(key).value())
+    /// Returns the leaf for a key if it can be tracked.
+    ///
+    /// A key is trackable if:
+    /// 1. It was explicitly added via `add_path`/`add_proof`, OR
+    /// 2. The path to the leaf goes through empty subtrees (provably empty)
+    ///
+    /// Returns `None` if the key cannot be tracked (path goes through non-empty
+    /// subtrees we don't have data for).
+    fn get_tracked_leaf(&self, key: &Word) -> Option<SmtLeaf> {
+        let leaf_index = Self::key_to_leaf_index(key);
+
+        // Explicitly stored leaves are always trackable
+        if let Some(leaf) = self.leaves.get(&leaf_index.value()) {
+            return Some(leaf.clone());
+        }
+
+        // Check if we can reach this leaf through empty subtrees
+        let mut index: NodeIndex = leaf_index.into();
+
+        while index.depth() > 0 {
+            if let Some(parent) = self.get_inner_node(index.parent()) {
+                // Found a stored inner node - child must be empty subtree root
+                let child_hash = if index.is_value_odd() {
+                    parent.right
+                } else {
+                    parent.left
+                };
+                if child_hash == *EmptySubtreeRoots::entry(SMT_DEPTH, index.depth()) {
+                    return Some(SmtLeaf::new_empty(leaf_index));
+                }
+                return None; // Non-empty child we don't have data for
+            }
+            index.move_up();
+        }
+
+        // Reached root through all unstored nodes - implicitly empty
+        Some(SmtLeaf::new_empty(leaf_index))
     }
 
     /// Converts a key to a leaf index.
@@ -375,11 +385,15 @@ impl PartialSmt {
         LeafIndex::new_max_depth(most_significant_felt.as_int())
     }
 
-    /// Returns the inner node at the specified index.
-    fn get_inner_node(&self, index: NodeIndex) -> InnerNode {
-        self.inner_nodes
-            .get(&index)
-            .cloned()
+    /// Returns the inner node at the specified index, or `None` if not stored.
+    fn get_inner_node(&self, index: NodeIndex) -> Option<InnerNode> {
+        self.inner_nodes.get(&index).cloned()
+    }
+
+    /// Returns the inner node at the specified index, falling back to the empty subtree root
+    /// if not stored.
+    fn get_inner_node_or_empty(&self, index: NodeIndex) -> InnerNode {
+        self.get_inner_node(index)
             .unwrap_or_else(|| EmptySubtreeRoots::get_inner_node(SMT_DEPTH, index.depth()))
     }
 
@@ -411,7 +425,7 @@ impl PartialSmt {
             return self.root;
         }
 
-        let InnerNode { left, right } = self.get_inner_node(index.parent());
+        let InnerNode { left, right } = self.get_inner_node_or_empty(index.parent());
 
         if index.is_value_odd() { right } else { left }
     }
@@ -427,10 +441,10 @@ impl PartialSmt {
         let mut index: NodeIndex = leaf_index.into();
         let mut node_hash = leaf_hash;
 
-        for node_depth in (0..index.depth()).rev() {
+        for _ in (0..index.depth()).rev() {
             let is_right = index.is_value_odd();
             index.move_up();
-            let InnerNode { left, right } = self.get_inner_node(index);
+            let InnerNode { left, right } = self.get_inner_node_or_empty(index);
             let (left, right) = if is_right {
                 (left, node_hash)
             } else {
@@ -438,12 +452,8 @@ impl PartialSmt {
             };
             node_hash = Rpo256::merge(&[left, right]);
 
-            if node_hash == *EmptySubtreeRoots::entry(SMT_DEPTH, node_depth) {
-                // If a subtree is empty, remove the inner node since it's equal to the default
-                self.inner_nodes.remove(&index);
-            } else {
-                self.insert_inner_node(index, InnerNode { left, right });
-            }
+            // insert_inner_node handles removing empty subtree roots
+            self.insert_inner_node(index, InnerNode { left, right });
         }
         self.root = node_hash;
     }
@@ -926,5 +936,139 @@ mod tests {
         // Setting a value to the empty word removes decreases the number of entries.
         partial.insert(key0, Word::empty()).unwrap();
         assert_eq!(partial.num_entries(), 2);
+    }
+
+    /// Tests implicit tracking of empty subtrees based on the visualization from PR #375.
+    ///
+    /// ```text
+    ///              g (root)
+    ///            /      \
+    ///          e          f
+    ///         / \        / \
+    ///        a   b      c   d
+    ///       /\ /\      /\  /\
+    ///      0 1 2 3    4 5 6 7
+    /// ```
+    ///
+    /// State:
+    /// - Subtree f is entirely empty.
+    /// - Key 1 has a value and a proof in the partial SMT.
+    /// - Key 3 has a value but is missing from the partial SMT (making node b non-empty).
+    /// - Keys 0, 2, 4, 5, 6, 7 are empty.
+    ///
+    /// Expected:
+    /// - Key 1: CAN update (explicitly tracked via proof)
+    /// - Key 0: CAN update (sibling of key 1, provably empty)
+    /// - Keys 4, 5, 6, 7: CAN update (in empty subtree f, provably empty)
+    /// - Keys 2, 3: CANNOT update (under non-empty node b, only have its hash)
+    #[test]
+    fn partial_smt_tracking_visualization() {
+        // Situation in the diagram mapped to depth-64 SMT.
+        const LEAF_0: u64 = 0;
+        const LEAF_1: u64 = 1 << 61;
+        const LEAF_2: u64 = 1 << 62;
+        const LEAF_3: u64 = (1 << 62) | (1 << 61);
+        const LEAF_4: u64 = 1 << 63;
+        const LEAF_5: u64 = (1 << 63) | (1 << 61);
+        const LEAF_6: u64 = (1 << 63) | (1 << 62);
+        const LEAF_7: u64 = (1 << 63) | (1 << 62) | (1 << 61);
+
+        let key_0 = Word::from([ZERO, ZERO, ZERO, Felt::new(LEAF_0)]);
+        let key_1 = Word::from([ZERO, ZERO, ZERO, Felt::new(LEAF_1)]);
+        let key_2 = Word::from([ZERO, ZERO, ZERO, Felt::new(LEAF_2)]);
+        let key_3 = Word::from([ZERO, ZERO, ZERO, Felt::new(LEAF_3)]);
+        let key_4 = Word::from([ZERO, ZERO, ZERO, Felt::new(LEAF_4)]);
+        let key_5 = Word::from([ZERO, ZERO, ZERO, Felt::new(LEAF_5)]);
+        let key_6 = Word::from([ZERO, ZERO, ZERO, Felt::new(LEAF_6)]);
+        let key_7 = Word::from([ZERO, ZERO, ZERO, Felt::new(LEAF_7)]);
+
+        // Create full SMT with keys 1 and 3 (key_3 makes node b non-empty)
+        let mut full = Smt::with_entries([(key_1, rand_value()), (key_3, rand_value())]).unwrap();
+
+        // Create partial SMT with ONLY the proof for key 1
+        let proof_1 = full.open(&key_1);
+        let mut partial = PartialSmt::from_proofs([proof_1]).unwrap();
+        assert_eq!(full.root(), partial.root());
+
+        // Key 1: CAN update (explicitly tracked via proof)
+        let new_value_1: Word = rand_value();
+        full.insert(key_1, new_value_1).unwrap();
+        partial.insert(key_1, new_value_1).unwrap();
+        assert_eq!(full.root(), partial.root());
+
+        // Key 0: CAN update (sibling of key 1, empty)
+        let value_0: Word = rand_value();
+        full.insert(key_0, value_0).unwrap();
+        partial.insert(key_0, value_0).unwrap();
+        assert_eq!(full.root(), partial.root());
+
+        // Key 4: CAN update (in empty subtree f)
+        let value_4: Word = rand_value();
+        full.insert(key_4, value_4).unwrap();
+        partial.insert(key_4, value_4).unwrap();
+        assert_eq!(full.root(), partial.root());
+
+        // Key 5: CAN update (in empty subtree f)
+        let value_5: Word = rand_value();
+        full.insert(key_5, value_5).unwrap();
+        partial.insert(key_5, value_5).unwrap();
+        assert_eq!(full.root(), partial.root());
+
+        // Key 6: CAN update (in empty subtree f)
+        let value_6: Word = rand_value();
+        full.insert(key_6, value_6).unwrap();
+        partial.insert(key_6, value_6).unwrap();
+        assert_eq!(full.root(), partial.root());
+
+        // Key 7: CAN update (in empty subtree f)
+        let value_7: Word = rand_value();
+        full.insert(key_7, value_7).unwrap();
+        partial.insert(key_7, value_7).unwrap();
+        assert_eq!(full.root(), partial.root());
+
+        // Key 2: CANNOT update (under non-empty node b, only have its hash)
+        let result = partial.insert(key_2, rand_value());
+        assert_matches!(result, Err(MerkleError::UntrackedKey(_)));
+
+        // Key 3: CANNOT update (has data but no proof in partial SMT)
+        let result = partial.insert(key_3, rand_value());
+        assert_matches!(result, Err(MerkleError::UntrackedKey(_)));
+    }
+
+    #[test]
+    fn partial_smt_implicit_empty_tree() {
+        let mut full = Smt::new();
+        let mut partial = PartialSmt::new(full.root());
+
+        let key: Word = rand_value();
+        let value: Word = rand_value();
+
+        full.insert(key, value).unwrap();
+        // Can insert into empty partial SMT (implicitly tracked)
+        partial.insert(key, value).unwrap();
+
+        assert_eq!(full.root(), partial.root());
+        assert_eq!(partial.get_value(&key).unwrap(), value);
+    }
+
+    #[test]
+    fn partial_smt_implicit_insert_and_remove() {
+        let mut full = Smt::new();
+        let mut partial = PartialSmt::new(full.root());
+
+        let key: Word = rand_value();
+        let value: Word = rand_value();
+
+        // Insert into implicitly tracked leaf
+        full.insert(key, value).unwrap();
+        partial.insert(key, value).unwrap();
+        assert_eq!(full.root(), partial.root());
+
+        // Remove the value we just inserted
+        full.insert(key, EMPTY_WORD).unwrap();
+        partial.insert(key, EMPTY_WORD).unwrap();
+        assert_eq!(full.root(), partial.root());
+        assert_eq!(partial.get_value(&key).unwrap(), EMPTY_WORD);
+        assert_eq!(partial.num_entries(), 0);
     }
 }
