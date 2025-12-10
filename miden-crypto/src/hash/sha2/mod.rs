@@ -1,11 +1,14 @@
 //! SHA2 hash function wrappers (SHA-256 and SHA-512).
 //!
-//! # Note on SHA-512 Digest trait implementation
+//! # Note on SHA-512 and the Digest trait
 //!
-//! The [Sha512Digest::as_bytes] method returns only the first 32 bytes of the full 64-byte
-//! SHA-512 digest. This is truncated SHA-512, NOT SHA-512/256 (which uses different
-//! initialization vectors as per FIPS 180-4). The full 64-byte digest is always available
-//! via the [Deref] implementation.
+//! `Sha512Digest` does not implement the `Digest` trait because Winterfell's `Digest` trait
+//! requires a fixed 32-byte output via `as_bytes() -> [u8; 32]`, which is incompatible with
+//! SHA-512's native 64-byte output. Truncating to 32 bytes would create confusion with
+//! SHA-512/256 (which uses different initialization vectors per FIPS 180-4).
+//!
+//! See <https://github.com/facebook/winterfell/issues/406> for a proposal to make the
+//! `Digest` trait generic over output size.
 
 use alloc::string::String;
 use core::{
@@ -269,95 +272,43 @@ impl Deserializable for Sha512Digest {
     }
 }
 
-impl Digest for Sha512Digest {
-    /// Returns the first 32 bytes of the 64-byte SHA-512 digest.
-    ///
-    /// # Note
-    ///
-    /// This returns truncated SHA-512, NOT SHA-512/256. SHA-512/256 uses different
-    /// initialization vectors (IVs) as specified in FIPS 180-4 and produces different
-    /// output. For the full 64-byte digest, use the [Deref] implementation.
-    fn as_bytes(&self) -> [u8; 32] {
-        let mut result = [0u8; 32];
-        result.copy_from_slice(&self.0[..32]);
-        result
-    }
-}
+// NOTE: Sha512 intentionally does not implement the Hasher, HasherExt, ElementHasher,
+// or Digest traits. See the module-level documentation for details.
 
 // SHA512 HASHER
 // ================================================================================================
 
 /// SHA-512 hash function.
+///
+/// Unlike [Sha256], this struct does not implement the [Hasher], [HasherExt], or [ElementHasher]
+/// traits because those traits require [Digest], which mandates a 32-byte output. SHA-512
+/// produces a 64-byte digest, and truncating it would create confusion with SHA-512/256.
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub struct Sha512;
-
-impl HasherExt for Sha512 {
-    fn hash_iter<'a>(slices: impl Iterator<Item = &'a [u8]>) -> Self::Digest {
-        let mut hasher = sha2::Sha512::new();
-        for slice in slices {
-            hasher.update(slice);
-        }
-        Sha512Digest(hasher.finalize().into())
-    }
-}
-
-impl Hasher for Sha512 {
-    /// SHA-512 collision resistance is 256-bits for 64-bytes output.
-    const COLLISION_RESISTANCE: u32 = 256;
-
-    type Digest = Sha512Digest;
-
-    fn hash(bytes: &[u8]) -> Self::Digest {
-        let mut hasher = sha2::Sha512::new();
-        hasher.update(bytes);
-
-        Sha512Digest(hasher.finalize().into())
-    }
-
-    fn merge(values: &[Self::Digest; 2]) -> Self::Digest {
-        Self::hash(prepare_merge(values))
-    }
-
-    fn merge_many(values: &[Self::Digest]) -> Self::Digest {
-        let data = Sha512Digest::digests_as_bytes(values);
-        let mut hasher = sha2::Sha512::new();
-        hasher.update(data);
-
-        Sha512Digest(hasher.finalize().into())
-    }
-
-    fn merge_with_int(seed: Self::Digest, value: u64) -> Self::Digest {
-        let mut hasher = sha2::Sha512::new();
-        hasher.update(seed.0);
-        hasher.update(value.to_le_bytes());
-
-        Sha512Digest(hasher.finalize().into())
-    }
-}
-
-impl ElementHasher for Sha512 {
-    type BaseField = Felt;
-
-    fn hash_elements<E>(elements: &[E]) -> Self::Digest
-    where
-        E: FieldElement<BaseField = Self::BaseField>,
-    {
-        Sha512Digest(hash_elements_512(elements))
-    }
-}
 
 impl Sha512 {
     /// Returns a hash of the provided sequence of bytes.
     #[inline(always)]
     pub fn hash(bytes: &[u8]) -> Sha512Digest {
-        <Self as Hasher>::hash(bytes)
+        let mut hasher = sha2::Sha512::new();
+        hasher.update(bytes);
+        Sha512Digest(hasher.finalize().into())
     }
 
     /// Returns a hash of two digests. This method is intended for use in construction of
     /// Merkle trees and verification of Merkle paths.
     #[inline(always)]
     pub fn merge(values: &[Sha512Digest; 2]) -> Sha512Digest {
-        <Self as Hasher>::merge(values)
+        Self::hash(prepare_merge(values))
+    }
+
+    /// Returns a hash of the provided digests.
+    #[inline(always)]
+    pub fn merge_many(values: &[Sha512Digest]) -> Sha512Digest {
+        let data = Sha512Digest::digests_as_bytes(values);
+        let mut hasher = sha2::Sha512::new();
+        hasher.update(data);
+        Sha512Digest(hasher.finalize().into())
     }
 
     /// Returns a hash of the provided field elements.
@@ -366,13 +317,17 @@ impl Sha512 {
     where
         E: FieldElement<BaseField = Felt>,
     {
-        <Self as ElementHasher>::hash_elements(elements)
+        Sha512Digest(hash_elements_512(elements))
     }
 
     /// Hashes an iterator of byte slices.
     #[inline(always)]
     pub fn hash_iter<'a>(slices: impl Iterator<Item = &'a [u8]>) -> Sha512Digest {
-        <Self as HasherExt>::hash_iter(slices)
+        let mut hasher = sha2::Sha512::new();
+        for slice in slices {
+            hasher.update(slice);
+        }
+        Sha512Digest(hasher.finalize().into())
     }
 }
 

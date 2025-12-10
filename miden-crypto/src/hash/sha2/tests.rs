@@ -217,35 +217,19 @@ const SHA512_TEST_VECTORS: &[TestVector] = &[
 #[test]
 fn test_memory_layout_assumptions() {
     // Verify struct size equals inner array size (required for safe pointer casting)
-    assert_eq!(
-        core::mem::size_of::<Sha256Digest>(),
-        core::mem::size_of::<[u8; 32]>()
-    );
+    assert_eq!(core::mem::size_of::<Sha256Digest>(), core::mem::size_of::<[u8; 32]>());
 
     // Verify alignment
-    assert_eq!(
-        core::mem::align_of::<Sha256Digest>(),
-        core::mem::align_of::<[u8; 32]>()
-    );
+    assert_eq!(core::mem::align_of::<Sha256Digest>(), core::mem::align_of::<[u8; 32]>());
 
     // Same for Sha512Digest
-    assert_eq!(
-        core::mem::size_of::<Sha512Digest>(),
-        core::mem::size_of::<[u8; 64]>()
-    );
-    assert_eq!(
-        core::mem::align_of::<Sha512Digest>(),
-        core::mem::align_of::<[u8; 64]>()
-    );
+    assert_eq!(core::mem::size_of::<Sha512Digest>(), core::mem::size_of::<[u8; 64]>());
+    assert_eq!(core::mem::align_of::<Sha512Digest>(), core::mem::align_of::<[u8; 64]>());
 }
 
 #[test]
 fn test_sha256_digests_as_bytes_correctness() {
-    let digests = vec![
-        Sha256Digest([1u8; 32]),
-        Sha256Digest([2u8; 32]),
-        Sha256Digest([3u8; 32]),
-    ];
+    let digests = vec![Sha256Digest([1u8; 32]), Sha256Digest([2u8; 32]), Sha256Digest([3u8; 32])];
 
     let bytes = Sha256Digest::digests_as_bytes(&digests);
 
@@ -260,11 +244,7 @@ fn test_sha256_digests_as_bytes_correctness() {
 
 #[test]
 fn test_sha512_digests_as_bytes_correctness() {
-    let digests = vec![
-        Sha512Digest([1u8; 64]),
-        Sha512Digest([2u8; 64]),
-        Sha512Digest([3u8; 64]),
-    ];
+    let digests = vec![Sha512Digest([1u8; 64]), Sha512Digest([2u8; 64]), Sha512Digest([3u8; 64])];
 
     let bytes = Sha512Digest::digests_as_bytes(&digests);
 
@@ -275,39 +255,6 @@ fn test_sha512_digests_as_bytes_correctness() {
     assert_eq!(&bytes[0..64], &[1u8; 64]);
     assert_eq!(&bytes[64..128], &[2u8; 64]);
     assert_eq!(&bytes[128..192], &[3u8; 64]);
-}
-
-// SHA-512 TRUNCATION TEST
-// ================================================================================================
-
-/// This test demonstrates that Sha512Digest::as_bytes() returns truncated SHA-512,
-/// NOT SHA-512/256. SHA-512/256 uses different initialization vectors and produces
-/// completely different output.
-#[test]
-fn test_sha512_truncation_not_sha512_256() {
-    // Hash "abc" with SHA-512
-    let sha512_digest = Sha512::hash(b"abc");
-    
-    // Get the first 32 bytes (truncated SHA-512)
-    let truncated: [u8; 32] = sha512_digest.as_bytes();
-    
-    // SHA-512("abc") = ddaf35a193617aba...
-    // First 32 bytes should be: ddaf35a193617abacc417349ae20413112e6fa4e89a97ea20a9eeee64b55d39a
-    let expected_truncated = hex::decode(
-        "ddaf35a193617abacc417349ae20413112e6fa4e89a97ea20a9eeee64b55d39a"
-    ).unwrap();
-    
-    assert_eq!(truncated.to_vec(), expected_truncated,
-        "Truncated SHA-512 should be the first 32 bytes of full SHA-512 digest");
-    
-    // SHA-512/256("abc") would be: 53048e2681941ef99b2e29b76b4c7dabe4c2d0c634fc6d46e0e2f13107e7af23
-    // This is completely different from truncated SHA-512
-    let sha512_256_expected = hex::decode(
-        "53048e2681941ef99b2e29b76b4c7dabe4c2d0c634fc6d46e0e2f13107e7af23"
-    ).unwrap();
-    
-    assert_ne!(truncated.to_vec(), sha512_256_expected,
-        "Truncated SHA-512 should NOT equal SHA-512/256 (different IVs per FIPS 180-4)");
 }
 
 // MERGE_MANY CORRECTNESS TESTS
