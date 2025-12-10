@@ -9,12 +9,12 @@ use crate::{
     },
 };
 
-/// A partial version of an [`Smt`].
+/// A partial version of an [`super::Smt`].
 ///
-/// This type can track a subset of the key-value pairs of a full [`Smt`] and allows for updating
-/// those pairs to compute the new root of the tree, as if the updates had been done on the full
-/// tree. This is useful so that not all leaves have to be present and loaded into memory to compute
-/// an update.
+/// This type can track a subset of the key-value pairs of a full [`super::Smt`] and allows for
+/// updating those pairs to compute the new root of the tree, as if the updates had been done on the
+/// full tree. This is useful so that not all leaves have to be present and loaded into memory to
+/// compute an update.
 ///
 /// A key is considered "tracked" if either:
 /// 1. Its merkle path was explicitly added to the tree (via [`PartialSmt::add_path`] or
