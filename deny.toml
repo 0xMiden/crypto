@@ -8,7 +8,10 @@ targets = ["aarch64-apple-darwin", "x86_64-apple-darwin", "x86_64-pc-windows-msv
 [advisories]
 db-path = "~/.cargo/advisory-db"
 db-urls = ["https://github.com/rustsec/advisory-db"]
-ignore  = []
+ignore  = [
+  # paste crate is unmaintained but still functional; transitively used by Plonky3
+  "RUSTSEC-2024-0436",
+]
 yanked  = "warn"
 
 # License configuration
@@ -31,7 +34,10 @@ allow = []
 deny = []
 highlight = "all"
 multiple-versions = "deny"
-skip = []
+skip = [
+  # Allow duplicate spin versions - transitively pulled by p3-dft and flume
+  { name = "spin" },
+]
 skip-tree = [
   # Allow getrandom v0.2.x for now - legacy dependency
   { name = "getrandom", version = "=0.2.16" },
@@ -46,4 +52,6 @@ allow-registry   = ["https://github.com/rust-lang/crates.io-index"]
 unknown-git      = "deny"
 unknown-registry = "deny"
 # Only allow Git dependencies from known sources
-allow-git = []
+allow-git = [
+  "https://github.com/0xMiden/Plonky3",
+]
