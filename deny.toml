@@ -8,11 +8,11 @@ targets = ["aarch64-apple-darwin", "x86_64-apple-darwin", "x86_64-pc-windows-msv
 [advisories]
 db-path = "~/.cargo/advisory-db"
 db-urls = ["https://github.com/rustsec/advisory-db"]
-ignore  = [
+ignore = [
   # paste crate is unmaintained but still functional; transitively used by Plonky3
   "RUSTSEC-2024-0436",
 ]
-yanked  = "warn"
+yanked = "warn"
 
 # License configuration
 [licenses]
@@ -52,6 +52,4 @@ allow-registry   = ["https://github.com/rust-lang/crates.io-index"]
 unknown-git      = "deny"
 unknown-registry = "deny"
 # Only allow Git dependencies from known sources
-allow-git = [
-  "https://github.com/0xMiden/Plonky3",
-]
+allow-git = ["https://github.com/0xMiden/Plonky3"]
