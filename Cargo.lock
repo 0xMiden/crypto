@@ -995,8 +995,10 @@ dependencies = [
  "subtle",
  "tempfile",
  "thiserror",
+ "winter-air",
  "winter-crypto",
  "winter-math",
+ "winter-prover",
  "winter-rand-utils",
  "winter-utils",
  "x25519-dalek",
@@ -2111,6 +2113,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "winter-air"
+version = "0.13.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ef01227f23c7c331710f43b877a8333f5f8d539631eea763600f1a74bf018c7c"
+dependencies = [
+ "libm",
+ "winter-crypto",
+ "winter-fri",
+ "winter-math",
+ "winter-utils",
+]
+
+[[package]]
 name = "winter-crypto"
 version = "0.13.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2123,12 +2138,48 @@ dependencies = [
 ]
 
 [[package]]
+name = "winter-fri"
+version = "0.13.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "fd592b943f9d65545683868aaf1b601eb66e52bfd67175347362efff09101d3a"
+dependencies = [
+ "winter-crypto",
+ "winter-math",
+ "winter-utils",
+]
+
+[[package]]
 name = "winter-math"
 version = "0.13.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7aecfb48ee6a8b4746392c8ff31e33e62df8528a3b5628c5af27b92b14aef1ea"
 dependencies = [
  "serde",
+ "winter-utils",
+]
+
+[[package]]
+name = "winter-maybe-async"
+version = "0.13.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6d31a19dae58475d019850e25b0170e94b16d382fbf6afee9c0e80fdc935e73e"
+dependencies = [
+ "quote",
+ "syn",
+]
+
+[[package]]
+name = "winter-prover"
+version = "0.13.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "84cc631ed56cd39b78ef932c1ec4060cc6a44d114474291216c32f56655b3048"
+dependencies = [
+ "tracing",
+ "winter-air",
+ "winter-crypto",
+ "winter-fri",
+ "winter-math",
+ "winter-maybe-async",
  "winter-utils",
 ]
 

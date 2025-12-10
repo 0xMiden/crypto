@@ -1,5 +1,19 @@
 #![no_std]
 
+// BACKEND FEATURE VALIDATION
+// ================================================================================================
+
+// Ensure at least one backend is enabled (warn if neither is enabled via --no-default-features)
+#[cfg(not(any(feature = "winterfell", feature = "plonky3")))]
+compile_error!(
+    "At least one backend feature must be enabled: 'winterfell' or 'plonky3'. \
+     The default is 'winterfell'. Use --features plonky3 for Plonky3 backend."
+);
+
+// Note: Both backends CAN be enabled simultaneously, though this is not the intended use case.
+// In production, downstream consumers (like miden-vm) should select exactly one backend.
+// miden-crypto provides cryptographic primitives; the actual STARK proving happens in miden-vm.
+
 #[macro_use]
 extern crate alloc;
 #[cfg(feature = "std")]
@@ -19,9 +33,16 @@ pub mod word;
 // ================================================================================================
 
 pub use k256::elliptic_curve::zeroize;
+
+// Backend-specific proving framework re-exports
+#[cfg(feature = "plonky3")]
 pub use miden_air::*;
+#[cfg(feature = "plonky3")]
 pub use miden_prover::*;
+#[cfg(feature = "plonky3")]
 pub use p3_air::*;
+
+// Field types
 pub use p3_field::{
     BasedVectorSpace, ExtensionField, Field, PrimeCharacteristicRing, PrimeField64,
     batch_multiplicative_inverse, extension::BinomialExtensionField,

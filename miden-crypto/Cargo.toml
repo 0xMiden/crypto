@@ -62,8 +62,14 @@ harness = false
 name    = "rand"
 
 [features]
+# Backend selection (mutually exclusive)
+# During transition period, winterfell is the default stable backend
+# After transition, only plonky3 will remain
+winterfell = ["winter-prover", "winter-air"]
+plonky3 = ["miden-air", "miden-prover", "p3-air"]
+
 concurrent = ["dep:rayon", "hashbrown?/rayon"]
-default = ["concurrent", "std"]
+default = ["winterfell", "concurrent", "std"]
 executable = ["dep:clap", "dep:rand-utils", "std"]
 fuzzing = []
 hashmaps = ["dep:hashbrown"]
@@ -105,15 +111,20 @@ sha2                          = { default-features = false, version = "0.10" }
 sha3                          = { default-features = false, version = "0.10" }
 subtle                        = { default-features = false, version = "2.6" }
 thiserror                     = { default-features = false, version = "2.0" }
+winter-air                    = { default-features = false, optional = true, version = "0.13" }
 winter-crypto                 = { default-features = false, version = "0.13" }
 winter-math                   = { default-features = false, version = "0.13" }
+winter-prover                 = { default-features = false, optional = true, version = "0.13" }
 winter-utils                  = { default-features = false, version = "0.13" }
 x25519-dalek                  = { default-features = false, features = ["static_secrets"], version = "2.0" }
 
 # FIXME: switch to main branch once zz/migrate-plonky3 is merged
-miden-air     = { branch = "zz/migrate-plonky3", default-features = false, git = "https://github.com/0xMiden/Plonky3/" }
-miden-prover  = { branch = "zz/migrate-plonky3", default-features = false, git = "https://github.com/0xMiden/Plonky3/" }
-p3-air        = { branch = "zz/migrate-plonky3", default-features = false, git = "https://github.com/0xMiden/Plonky3/" }
+# Note: p3-field and p3-goldilocks are non-optional because PR 558 migrated core modules to use them
+# During transition: both backends use Goldilocks field, differ only in proving system
+# After transition: only Plonky3 backend remains
+miden-air     = { branch = "zz/migrate-plonky3", default-features = false, optional = true, git = "https://github.com/0xMiden/Plonky3/" }
+miden-prover  = { branch = "zz/migrate-plonky3", default-features = false, optional = true, git = "https://github.com/0xMiden/Plonky3/" }
+p3-air        = { branch = "zz/migrate-plonky3", default-features = false, optional = true, git = "https://github.com/0xMiden/Plonky3/" }
 p3-field      = { branch = "zz/migrate-plonky3", default-features = false, git = "https://github.com/0xMiden/Plonky3/" }
 p3-goldilocks = { branch = "zz/migrate-plonky3", default-features = false, git = "https://github.com/0xMiden/Plonky3/" }
 
