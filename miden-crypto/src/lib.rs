@@ -33,7 +33,6 @@ pub mod word;
 // ================================================================================================
 
 pub use k256::elliptic_curve::zeroize;
-
 // Backend-specific proving framework re-exports
 #[cfg(feature = "plonky3")]
 pub use miden_air::*;
@@ -41,7 +40,6 @@ pub use miden_air::*;
 pub use miden_prover::*;
 #[cfg(feature = "plonky3")]
 pub use p3_air::*;
-
 // Field types
 pub use p3_field::{
     BasedVectorSpace, ExtensionField, Field, PrimeCharacteristicRing, PrimeField64,
