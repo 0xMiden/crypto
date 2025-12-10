@@ -22,15 +22,123 @@ use crate::{
 // ================================================================================================
 
 impl<S: SmtStorage> LargeSmt<S> {
-    /// Returns a new [LargeSmt] backed by the provided storage.
+    /// Creates a new empty [LargeSmt] backed by the provided storage.
     ///
-    /// The SMT's root is fetched from the storage backend. If the storage is empty the SMT is
-    /// initialized with the root of an empty tree. Otherwise, materializes in-memory nodes from
-    /// the top subtrees.
+    /// This method is intended for creating a fresh tree with empty storage. If the storage
+    /// already contains data, use [`Self::load_with_root()`] or [`Self::load()`]
+    /// instead.
     ///
     /// # Errors
-    /// Returns an error if fetching the root or initial in-memory nodes from the storage fails.
+    /// - Returns [`LargeSmtError::StorageNotEmpty`] if the storage already contains data.
+    /// - Returns a storage error if checking the storage state fails.
+    ///
+    /// # Example
+    /// ```
+    /// # use miden_crypto::merkle::smt::{LargeSmt, MemoryStorage};
+    /// let storage = MemoryStorage::new();
+    /// let smt = LargeSmt::new(storage).expect("Failed to create SMT");
+    /// ```
     pub fn new(storage: S) -> Result<Self, LargeSmtError> {
+        if storage.has_leaves()? {
+            return Err(LargeSmtError::StorageNotEmpty);
+        }
+        Self::initialize_from_storage(storage)
+    }
+
+    /// Loads an existing [LargeSmt] from storage without validating the root.
+    ///
+    /// If the storage is empty, the SMT is initialized with the root of an empty tree.
+    /// Otherwise, the in-memory top of the tree is reconstructed from the cached depth-24
+    /// subtree hashes stored in the backend.
+    ///
+    /// **Note:** This method does not validate the reconstructed root. Use this only when
+    /// you explicitly want to skip validation. For normal reloading, prefer
+    /// [`Self::load_with_root()`].
+    ///
+    /// # Errors
+    /// Returns an error if fetching data from storage fails.
+    ///
+    /// # Example
+    /// ```no_run
+    /// # use miden_crypto::merkle::smt::{LargeSmt, RocksDbConfig, RocksDbStorage};
+    /// let storage = RocksDbStorage::open(RocksDbConfig::new("/path/to/db")).unwrap();
+    /// let smt = LargeSmt::load(storage).expect("Failed to load SMT");
+    /// ```
+    pub fn load(storage: S) -> Result<Self, LargeSmtError> {
+        Self::initialize_from_storage(storage)
+    }
+
+    /// Loads an existing [LargeSmt] from storage and validates it against the expected root.
+    ///
+    /// This method reconstructs the in-memory top of the tree from the cached depth-24
+    /// subtree hashes, computes the root, and validates it against `expected_root`.
+    ///
+    /// Use this method when reloading a tree to ensure the storage contains the expected
+    /// data and hasn't been corrupted or tampered with.
+    ///
+    /// # Errors
+    /// - Returns [`LargeSmtError::RootMismatch`] if the reconstructed root does not match
+    ///   `expected_root`.
+    /// - Returns a storage error if fetching data from storage fails.
+    ///
+    /// # Example
+    /// ```no_run
+    /// # use miden_crypto::{Word, merkle::smt::{LargeSmt, RocksDbConfig, RocksDbStorage}};
+    /// // Load the expected root from your own persistence
+    /// let expected_root: Word = todo!();
+    ///
+    /// let storage = RocksDbStorage::open(RocksDbConfig::new("/path/to/db")).unwrap();
+    /// let smt = LargeSmt::load_with_root(storage, expected_root)
+    ///     .expect("Failed to load SMT with expected root");
+    /// ```
+    pub fn load_with_root(storage: S, expected_root: Word) -> Result<Self, LargeSmtError> {
+        let smt = Self::load(storage)?;
+
+        let actual_root = smt.root();
+        if actual_root != expected_root {
+            return Err(LargeSmtError::RootMismatch {
+                expected: expected_root,
+                actual: actual_root,
+            });
+        }
+
+        Ok(smt)
+    }
+
+    /// Returns a new [Smt] instantiated with leaves set as specified by the provided entries.
+    ///
+    /// If the `concurrent` feature is enabled, this function uses a parallel implementation to
+    /// process the entries efficiently, otherwise it defaults to the sequential implementation.
+    ///
+    /// All leaves omitted from the entries list are set to [Self::EMPTY_VALUE].
+    ///
+    /// # Errors
+    /// Returns an error if the provided entries contain multiple values for the same key.
+    pub fn with_entries(
+        storage: S,
+        entries: impl IntoIterator<Item = (Word, Word)>,
+    ) -> Result<Self, LargeSmtError> {
+        let entries: Vec<(Word, Word)> = entries.into_iter().collect();
+
+        if storage.has_leaves()? {
+            return Err(StorageError::Unsupported(
+                "Cannot create SMT with non-empty storage".into(),
+            )
+            .into());
+        }
+        let mut tree = LargeSmt::new(storage)?;
+        if entries.is_empty() {
+            return Ok(tree);
+        }
+        tree.build_subtrees(entries)?;
+        Ok(tree)
+    }
+
+    /// Internal method that initializes the in-memory tree from storage.
+    ///
+    /// For empty storage, returns an empty tree. For non-empty storage,
+    /// rebuilds the in-memory top from cached depth-24 hashes.
+    fn initialize_from_storage(storage: S) -> Result<Self, LargeSmtError> {
         // Initialize in-memory nodes
         let mut in_memory_nodes: Vec<Word> = vec![EMPTY_WORD; NUM_IN_MEMORY_NODES];
 
@@ -87,49 +195,13 @@ impl<S: SmtStorage> LargeSmt<S> {
             }
         }
 
-        // Check that the calculated root matches the root in storage
-        // Root is at index 1, with children at indices 2 and 3
+        // Compute the root from children at indices 2 and 3
         let calculated_root = Rpo256::merge(&[in_memory_nodes[2], in_memory_nodes[3]]);
-        let storage_root = storage.get_root()?;
-        assert_eq!(
-            calculated_root,
-            storage_root.unwrap(),
-            "Tree reconstruction failed - root mismatch"
-        );
 
         // Set the root node
         in_memory_nodes[ROOT_MEMORY_INDEX] = calculated_root;
 
         Ok(Self { storage, in_memory_nodes })
-    }
-
-    /// Returns a new [Smt] instantiated with leaves set as specified by the provided entries.
-    ///
-    /// If the `concurrent` feature is enabled, this function uses a parallel implementation to
-    /// process the entries efficiently, otherwise it defaults to the sequential implementation.
-    ///
-    /// All leaves omitted from the entries list are set to [Self::EMPTY_VALUE].
-    ///
-    /// # Errors
-    /// Returns an error if the provided entries contain multiple values for the same key.
-    pub fn with_entries(
-        storage: S,
-        entries: impl IntoIterator<Item = (Word, Word)>,
-    ) -> Result<Self, LargeSmtError> {
-        let entries: Vec<(Word, Word)> = entries.into_iter().collect();
-
-        if storage.has_leaves()? {
-            return Err(StorageError::Unsupported(
-                "Cannot create SMT with non-empty storage".into(),
-            )
-            .into());
-        }
-        let mut tree = LargeSmt::new(storage)?;
-        if entries.is_empty() {
-            return Ok(tree);
-        }
-        tree.build_subtrees(entries)?;
-        Ok(tree)
     }
 
     fn build_subtrees(&mut self, mut entries: Vec<(Word, Word)>) -> Result<(), MerkleError> {
