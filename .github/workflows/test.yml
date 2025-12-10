@@ -18,7 +18,7 @@ permissions:
 
 jobs:
   test:
-    name: test ${{matrix.toolchain}} on ${{matrix.os}} with ${{matrix.args}}
+    name: test ${{matrix.toolchain}} on ${{matrix.os}} with ${{matrix.args}} (${{matrix.backend}})
     runs-on: ${{matrix.os}}-latest
     strategy:
       fail-fast: false
@@ -26,6 +26,7 @@ jobs:
         toolchain: [stable, nightly]
         os: [ubuntu]
         args: [default, hashmaps, no-std, large-smt]
+        backend: [winterfell, plonky3]
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@main
@@ -41,16 +42,17 @@ jobs:
         run: |
           rustup update --no-self-update ${{matrix.toolchain}}
           rustup default ${{ matrix.toolchain }}
-          make test-${{matrix.args}}
+          make test-${{matrix.args}} BACKEND=${{matrix.backend}}
 
   test-smt-concurrent:
-    name: test-smt-concurrent ${{ matrix.toolchain }}
+    name: test-smt-concurrent ${{ matrix.toolchain }} (${{matrix.backend}})
     runs-on: ubuntu-latest
     if: ${{ github.event_name == 'pull_request' && (github.base_ref == 'main' || github.base_ref == 'next') }}
     strategy:
       fail-fast: false
       matrix:
         toolchain: [stable, nightly]
+        backend: [winterfell, plonky3]
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@main
@@ -61,14 +63,16 @@ jobs:
         run: |
           rustup update --no-self-update ${{matrix.toolchain}}
           rustup default ${{ matrix.toolchain }}
-          make test-smt-concurrent
+          make test-smt-concurrent BACKEND=${{matrix.backend}}
 
   doc-tests:
-    name: doc-tests
+    name: doc-tests (${{matrix.backend}})
     runs-on: ubuntu-latest
     if: ${{ github.event_name == 'pull_request' && (github.base_ref == 'main' || github.base_ref == 'next') }}
     strategy:
       fail-fast: false
+      matrix:
+        backend: [winterfell, plonky3]
     steps:
       - uses: actions/checkout@main
       - name: Cleanup large tools for build space
@@ -82,4 +86,4 @@ jobs:
         run: |
           rustup update --no-self-update
           rustup default ${{ matrix.toolchain }}
-          make test-docs
+          make test-docs BACKEND=${{matrix.backend}}

@@ -38,8 +38,12 @@ jobs:
         run: make format-check
 
   clippy:
-    name: clippy
+    name: clippy (${{matrix.backend}})
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        backend: [winterfell, plonky3]
     steps:
       - uses: actions/checkout@v4
       - name: Cleanup large tools for build space
@@ -57,7 +61,7 @@ jobs:
         with:
           save-if: ${{ github.event_name == 'push' && github.ref == format('refs/heads/{0}', inputs.target_branch) }}
       - name: Clippy
-        run: make clippy
+        run: make clippy BACKEND=${{matrix.backend}}
 
   toml:
     runs-on: ubuntu-latest
@@ -81,8 +85,12 @@ jobs:
           make workspace-check
 
   doc:
-    name: doc
+    name: doc (${{matrix.backend}})
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        backend: [winterfell, plonky3]
     steps:
       - uses: actions/checkout@v4
       - name: Cleanup large tools for build space
@@ -98,7 +106,7 @@ jobs:
         with:
           save-if: ${{ github.event_name == 'push' && github.ref == format('refs/heads/{0}', inputs.target_branch) }}
       - name: Build docs
-        run: make doc
+        run: make doc BACKEND=${{matrix.backend}}
 
   unused_deps:
     name: check for unused dependencies

@@ -10,11 +10,15 @@ ALL_FEATURES_EXCEPT_ROCKSDB="concurrent executable hashmaps internal serde std"
 DEBUG_OVERFLOW_INFO=RUSTFLAGS="-C debug-assertions -C overflow-checks -C debuginfo=2"
 WARNINGS=RUSTDOCFLAGS="-D warnings"
 
+# Backend selection (defaults to winterfell if not specified)
+BACKEND ?= winterfell
+BACKEND_FLAG=--features $(BACKEND)
+
 # -- linting --------------------------------------------------------------------------------------
 
 .PHONY: clippy
 clippy: ## Run Clippy with configs
-	cargo clippy --workspace --all-targets --all-features -- -D warnings
+	cargo clippy --workspace --all-targets --features $(BACKEND) --features concurrent,executable,hashmaps,internal,serde,std,rocksdb -- -D warnings
 
 
 .PHONY: fix
@@ -62,33 +66,33 @@ lint: format fix clippy toml typos-check machete cargo-deny ## Run all linting t
 
 .PHONY: doc
 doc: ## Generate and check documentation
-	$(WARNINGS) cargo doc --all-features --keep-going --release
+	$(WARNINGS) cargo doc --features $(BACKEND) --features concurrent,executable,hashmaps,internal,serde,std,rocksdb --keep-going --release
 
 # --- testing -------------------------------------------------------------------------------------
 
 .PHONY: test-default
 test-default: ## Run tests with default features
-	$(DEBUG_OVERFLOW_INFO) cargo nextest run --profile default --release --features ${ALL_FEATURES_EXCEPT_ROCKSDB}
+	$(DEBUG_OVERFLOW_INFO) cargo nextest run --profile default --release --features $(BACKEND),${ALL_FEATURES_EXCEPT_ROCKSDB}
 
 .PHONY: test-hashmaps
 test-hashmaps: ## Run tests with `hashmaps` feature enabled
-	$(DEBUG_OVERFLOW_INFO) cargo nextest run --profile default --release --features hashmaps
+	$(DEBUG_OVERFLOW_INFO) cargo nextest run --profile default --release --features $(BACKEND),hashmaps
 
 .PHONY: test-no-std
 test-no-std: ## Run tests with `no-default-features` (std)
-	$(DEBUG_OVERFLOW_INFO) cargo nextest run --profile default --release --no-default-features
+	$(DEBUG_OVERFLOW_INFO) cargo nextest run --profile default --release --no-default-features $(BACKEND_FLAG)
 
 .PHONY: test-smt-concurrent
 test-smt-concurrent: ## Run only concurrent SMT tests
-	$(DEBUG_OVERFLOW_INFO) cargo nextest run --profile smt-concurrent --release
+	$(DEBUG_OVERFLOW_INFO) cargo nextest run --profile smt-concurrent --release $(BACKEND_FLAG)
 
 .PHONY: test-docs
 test-docs:
-	$(DEBUG_OVERFLOW_INFO) cargo test --doc --all-features
+	$(DEBUG_OVERFLOW_INFO) cargo test --doc --features $(BACKEND),concurrent,executable,hashmaps,internal,serde,std,rocksdb
 
 .PHONY: test-large-smt
 test-large-smt: ## Run only large SMT tests
-	$(DEBUG_OVERFLOW_INFO) cargo nextest run --success-output immediate  --profile large-smt --release --features hashmaps,rocksdb
+	$(DEBUG_OVERFLOW_INFO) cargo nextest run --success-output immediate  --profile large-smt --release --features $(BACKEND),hashmaps,rocksdb
 
 .PHONY: test
 test: test-default test-hashmaps test-no-std test-docs test-large-smt ## Run all tests except concurrent SMT tests
@@ -111,7 +115,7 @@ build: ## Build with default features enabled
 
 .PHONY: build-no-std
 build-no-std: ## Build without the standard library
-	cargo build --release --no-default-features --target wasm32-unknown-unknown
+	cargo build --release --no-default-features $(BACKEND_FLAG) --target wasm32-unknown-unknown
 
 .PHONY: build-avx2
 build-avx2: ## Build with avx2 support

@@ -18,12 +18,13 @@ permissions:
 
 jobs:
   no-std:
-    name: Build for no-std
+    name: Build for no-std (${{matrix.backend}})
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
         toolchain: [stable, nightly]
+        backend: [winterfell, plonky3]
     steps:
       - uses: actions/checkout@main
       - name: Cleanup large tools for build space
@@ -33,4 +34,4 @@ jobs:
           rustup update --no-self-update ${{ matrix.toolchain }}
           rustup default ${{ matrix.toolchain }}
           rustup target add wasm32-unknown-unknown
-          make build-no-std
+          make build-no-std BACKEND=${{matrix.backend}}
