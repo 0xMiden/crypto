@@ -65,11 +65,11 @@ name    = "rand"
 # Backend selection (mutually exclusive)
 # During transition period, winterfell is the default stable backend
 # After transition, only plonky3 will remain
-winterfell = ["winter-prover", "winter-air"]
-plonky3 = ["miden-air", "miden-prover", "p3-air"]
+plonky3    = ["miden-air", "miden-prover", "p3-air"]
+winterfell = ["winter-air", "winter-prover"]
 
 concurrent = ["dep:rayon", "hashbrown?/rayon"]
-default = ["winterfell", "concurrent", "std"]
+default = ["concurrent", "std", "winterfell"]
 executable = ["dep:clap", "dep:rand-utils", "std"]
 fuzzing = []
 hashmaps = ["dep:hashbrown"]
@@ -122,9 +122,9 @@ x25519-dalek                  = { default-features = false, features = ["static_
 # Note: p3-field and p3-goldilocks are non-optional because PR 558 migrated core modules to use them
 # During transition: both backends use Goldilocks field, differ only in proving system
 # After transition: only Plonky3 backend remains
-miden-air     = { branch = "zz/migrate-plonky3", default-features = false, optional = true, git = "https://github.com/0xMiden/Plonky3/" }
-miden-prover  = { branch = "zz/migrate-plonky3", default-features = false, optional = true, git = "https://github.com/0xMiden/Plonky3/" }
-p3-air        = { branch = "zz/migrate-plonky3", default-features = false, optional = true, git = "https://github.com/0xMiden/Plonky3/" }
+miden-air     = { branch = "zz/migrate-plonky3", default-features = false, git = "https://github.com/0xMiden/Plonky3/", optional = true }
+miden-prover  = { branch = "zz/migrate-plonky3", default-features = false, git = "https://github.com/0xMiden/Plonky3/", optional = true }
+p3-air        = { branch = "zz/migrate-plonky3", default-features = false, git = "https://github.com/0xMiden/Plonky3/", optional = true }
 p3-field      = { branch = "zz/migrate-plonky3", default-features = false, git = "https://github.com/0xMiden/Plonky3/" }
 p3-goldilocks = { branch = "zz/migrate-plonky3", default-features = false, git = "https://github.com/0xMiden/Plonky3/" }
 
