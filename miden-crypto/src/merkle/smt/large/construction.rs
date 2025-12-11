@@ -88,7 +88,10 @@ impl<S: SmtStorage> LargeSmt<S> {
     /// ```no_run
     /// # #[cfg(feature = "rocksdb")]
     /// # {
-    /// use miden_crypto::{Word, merkle::smt::{LargeSmt, RocksDbConfig, RocksDbStorage}};
+    /// use miden_crypto::{
+    ///     Word,
+    ///     merkle::smt::{LargeSmt, RocksDbConfig, RocksDbStorage},
+    /// };
     /// # let expected_root: Word = miden_crypto::EMPTY_WORD;
     /// let storage = RocksDbStorage::open(RocksDbConfig::new("/path/to/db")).unwrap();
     /// let smt = LargeSmt::load_with_root(storage, expected_root)

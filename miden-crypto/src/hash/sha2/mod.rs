@@ -10,16 +10,14 @@
 //! See <https://github.com/facebook/winterfell/issues/406> for a proposal to make the
 //! `Digest` trait generic over output size.
 
-use alloc::string::String;
+use alloc::{string::String, vec::Vec};
 use core::{
     mem::size_of,
     ops::Deref,
     slice::{self, from_raw_parts},
 };
-use p3_field::BasedVectorSpace;
-use p3_field::PrimeField64;
-use std::vec::Vec;
 
+use p3_field::{BasedVectorSpace, PrimeField64};
 use sha2::Digest as Sha2Digest;
 
 use super::{Digest, Felt, Hasher, HasherExt};
@@ -272,7 +270,7 @@ impl Deserializable for Sha512Digest {
 
 /// SHA-512 hash function.
 ///
-/// Unlike [Sha256], this struct does not implement the [Hasher], [HasherExt], or [ElementHasher]
+/// Unlike [Sha256], this struct does not implement the [Hasher], [HasherExt]
 /// traits because those traits require [Digest], which mandates a 32-byte output. SHA-512
 /// produces a 64-byte digest, and truncating it would create confusion with SHA-512/256.
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
