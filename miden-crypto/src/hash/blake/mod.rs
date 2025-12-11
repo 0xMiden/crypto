@@ -397,7 +397,7 @@ where
 ///
 /// Due to compiler optimizations, this function is zero-copy.
 fn shrink_array<const M: usize, const N: usize>(source: [u8; M]) -> [u8; N] {
-    assert!(M >= N, "size of destination should be smaller or equal than source");
+    const { assert!(M >= N, "size of destination should be smaller or equal than source"); }
     core::array::from_fn(|i| source[i])
 }
 
