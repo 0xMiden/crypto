@@ -31,6 +31,7 @@ const DIGEST20_BYTES: usize = 20;
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd)]
 #[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 #[cfg_attr(feature = "serde", serde(into = "String", try_from = "&str"))]
+#[repr(transparent)]
 pub struct Blake3Digest<const N: usize>([u8; N]);
 
 impl<const N: usize> Blake3Digest<N> {
