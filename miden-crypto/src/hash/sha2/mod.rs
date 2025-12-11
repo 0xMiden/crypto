@@ -11,6 +11,7 @@
 //! `Digest` trait generic over output size.
 
 use alloc::string::String;
+use alloc::vec::Vec;
 use core::{
     mem::size_of,
     ops::Deref,
@@ -18,7 +19,6 @@ use core::{
 };
 use p3_field::BasedVectorSpace;
 use p3_field::PrimeField64;
-use std::vec::Vec;
 
 use sha2::Digest as Sha2Digest;
 

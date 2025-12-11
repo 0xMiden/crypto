@@ -1,4 +1,4 @@
-use alloc::string::{String, ToString};
+use alloc::string::String;
 
 use thiserror::Error;
 
@@ -45,6 +45,8 @@ pub enum MerkleError {
 #[cfg(feature = "concurrent")]
 impl From<crate::merkle::smt::LargeSmtError> for MerkleError {
     fn from(err: crate::merkle::smt::LargeSmtError) -> Self {
+        use alloc::string::ToString;
+
         match err {
             crate::merkle::smt::LargeSmtError::Merkle(me) => me,
             crate::merkle::smt::LargeSmtError::Storage(se) => {
