@@ -8,6 +8,9 @@ pub mod blake;
 /// Keccak hash function.
 pub mod keccak;
 
+/// SHA-2 hash functions (SHA-256 and SHA-512).
+pub mod sha2;
+
 /// Poseidon2 hash function.
 pub mod poseidon2 {
     pub use super::algebraic_sponge::poseidon2::Poseidon2;
