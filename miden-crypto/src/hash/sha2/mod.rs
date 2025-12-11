@@ -16,10 +16,13 @@ use core::{
     ops::Deref,
     slice::{self, from_raw_parts},
 };
+use p3_field::BasedVectorSpace;
+use p3_field::PrimeField64;
+use std::vec::Vec;
 
 use sha2::Digest as Sha2Digest;
 
-use super::{Digest, ElementHasher, Felt, FieldElement, Hasher, HasherExt};
+use super::{Digest, Felt, Hasher, HasherExt};
 use crate::utils::{
     ByteReader, ByteWriter, Deserializable, DeserializationError, HexParseError, Serializable,
     bytes_to_hex_string, hex_to_bytes,
@@ -161,17 +164,6 @@ impl Hasher for Sha256 {
     }
 }
 
-impl ElementHasher for Sha256 {
-    type BaseField = Felt;
-
-    fn hash_elements<E>(elements: &[E]) -> Self::Digest
-    where
-        E: FieldElement<BaseField = Self::BaseField>,
-    {
-        Sha256Digest(hash_elements_256(elements))
-    }
-}
-
 impl Sha256 {
     /// Returns a hash of the provided sequence of bytes.
     #[inline(always)]
@@ -190,9 +182,9 @@ impl Sha256 {
     #[inline(always)]
     pub fn hash_elements<E>(elements: &[E]) -> Sha256Digest
     where
-        E: FieldElement<BaseField = Felt>,
+        E: BasedVectorSpace<Felt>,
     {
-        <Self as ElementHasher>::hash_elements(elements)
+        hash_elements_256(elements).into()
     }
 
     /// Hashes an iterator of byte slices.
@@ -315,7 +307,7 @@ impl Sha512 {
     #[inline(always)]
     pub fn hash_elements<E>(elements: &[E]) -> Sha512Digest
     where
-        E: FieldElement<BaseField = Felt>,
+        E: BasedVectorSpace<Felt>,
     {
         Sha512Digest(hash_elements_512(elements))
     }
@@ -337,30 +329,32 @@ impl Sha512 {
 /// Hash the elements into bytes for SHA-256.
 fn hash_elements_256<E>(elements: &[E]) -> [u8; DIGEST256_BYTES]
 where
-    E: FieldElement<BaseField = Felt>,
+    E: BasedVectorSpace<Felt>,
 {
     // don't leak assumptions from felt and check its actual implementation.
     // this is a compile-time branch so it is for free
-    let digest = if Felt::IS_CANONICAL {
-        let mut hasher = sha2::Sha256::new();
-        hasher.update(E::elements_as_bytes(elements));
-        hasher.finalize()
-    } else {
+    let digest = {
         let mut hasher = sha2::Sha256::new();
         // SHA-256 has a block size of 64 bytes, so we can absorb 64 bytes per block.
         // We move the elements into the hasher via the buffer to give the CPU a chance
         // to process multiple element-to-byte conversions in parallel.
         let mut buf = [0_u8; 64];
-        let mut chunk_iter = E::slice_as_base_elements(elements).chunks_exact(8);
+        let elements_base = elements
+            .iter()
+            .flat_map(|elem| E::as_basis_coefficients_slice(elem))
+            .copied()
+            .collect::<Vec<Felt>>();
+
+        let mut chunk_iter = elements_base.chunks_exact(8);
         for chunk in chunk_iter.by_ref() {
             for i in 0..8 {
-                buf[i * 8..(i + 1) * 8].copy_from_slice(&chunk[i].as_int().to_le_bytes());
+                buf[i * 8..(i + 1) * 8].copy_from_slice(&chunk[i].as_canonical_u64().to_le_bytes());
             }
             hasher.update(buf);
         }
 
         for element in chunk_iter.remainder() {
-            hasher.update(element.as_int().to_le_bytes());
+            hasher.update(element.as_canonical_u64().to_le_bytes());
         }
 
         hasher.finalize()
@@ -371,30 +365,32 @@ where
 /// Hash the elements into bytes for SHA-512.
 fn hash_elements_512<E>(elements: &[E]) -> [u8; DIGEST512_BYTES]
 where
-    E: FieldElement<BaseField = Felt>,
+    E: BasedVectorSpace<Felt>,
 {
     // don't leak assumptions from felt and check its actual implementation.
     // this is a compile-time branch so it is for free
-    let digest = if Felt::IS_CANONICAL {
-        let mut hasher = sha2::Sha512::new();
-        hasher.update(E::elements_as_bytes(elements));
-        hasher.finalize()
-    } else {
+    let digest = {
         let mut hasher = sha2::Sha512::new();
         // SHA-512 has a block size of 128 bytes, so we can absorb 128 bytes per block.
         // We move the elements into the hasher via the buffer to give the CPU a chance
         // to process multiple element-to-byte conversions in parallel.
         let mut buf = [0_u8; 128];
-        let mut chunk_iter = E::slice_as_base_elements(elements).chunks_exact(16);
+        let elements_base = elements
+            .iter()
+            .flat_map(|elem| E::as_basis_coefficients_slice(elem))
+            .copied()
+            .collect::<Vec<Felt>>();
+
+        let mut chunk_iter = elements_base.chunks_exact(16);
         for chunk in chunk_iter.by_ref() {
             for i in 0..16 {
-                buf[i * 8..(i + 1) * 8].copy_from_slice(&chunk[i].as_int().to_le_bytes());
+                buf[i * 8..(i + 1) * 8].copy_from_slice(&chunk[i].as_canonical_u64().to_le_bytes());
             }
             hasher.update(buf);
         }
 
         for element in chunk_iter.remainder() {
-            hasher.update(element.as_int().to_le_bytes());
+            hasher.update(element.as_canonical_u64().to_le_bytes());
         }
 
         hasher.finalize()

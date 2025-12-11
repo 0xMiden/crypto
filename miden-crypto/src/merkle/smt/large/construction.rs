@@ -83,7 +83,8 @@ impl<S: SmtStorage> LargeSmt<S> {
     ///
     /// # Example
     /// ```no_run
-    /// # use miden_crypto::{Word, merkle::smt::{LargeSmt, RocksDbConfig, RocksDbStorage}};
+    /// #[cfg(feature = "rocksdb")]
+    /// use miden_crypto::{Word, merkle::smt::{LargeSmt, RocksDbConfig, RocksDbStorage}};
     /// // Load the expected root from your own persistence
     /// let expected_root: Word = todo!();
     ///

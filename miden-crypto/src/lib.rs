@@ -27,10 +27,7 @@ pub use p3_field::{
     batch_multiplicative_inverse, extension::BinomialExtensionField,
 };
 pub use p3_goldilocks::{Goldilocks as Felt, Poseidon2Goldilocks};
-pub use winter_math::{
-    FieldElement, StarkField,
-    fields::{CubeExtension, QuadExtension},
-};
+pub use winter_math::fields::{CubeExtension, QuadExtension};
 pub use word::{Word, WordError};
 
 pub use crate::hash::algebraic_sponge::AlgebraicSponge;
