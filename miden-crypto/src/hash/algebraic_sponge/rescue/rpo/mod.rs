@@ -91,17 +91,18 @@ impl Rpo256 {
     /// The number of rounds is set to 7 to target 128-bit security level.
     pub const NUM_ROUNDS: usize = NUM_ROUNDS;
 
-    /// Sponge state is set to 12 field elements or 768 bytes; 8 elements are reserved for rate and
-    /// the remaining 4 elements are reserved for capacity.
+    /// Sponge state is set to 12 field elements or 768 bytes; 8 elements are reserved for the
+    /// rate and the remaining 4 elements are reserved for the capacity.
     pub const STATE_WIDTH: usize = STATE_WIDTH;
 
-    /// The rate portion of the state is located in elements 4 through 11 (inclusive).
+    /// The rate portion of the state is located in elements 0 through 7 (inclusive).
     pub const RATE_RANGE: Range<usize> = RATE_RANGE;
 
-    /// The capacity portion of the state is located in elements 0, 1, 2, and 3.
+    /// The capacity portion of the state is located in elements 8, 9, 10, and 11.
     pub const CAPACITY_RANGE: Range<usize> = CAPACITY_RANGE;
 
-    /// The output of the hash function can be read from state elements 4, 5, 6, and 7.
+    /// The output of the hash function can be read from state elements 4, 5, 6, and 7 (the second
+    /// word of the rate portion, i.e. the middle word of the sponge state).
     pub const DIGEST_RANGE: Range<usize> = DIGEST_RANGE;
 
     /// MDS matrix used for computing the linear layer in a RPO round.

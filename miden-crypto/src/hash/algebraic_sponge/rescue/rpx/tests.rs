@@ -325,9 +325,11 @@ mod p3_tests {
     }
 
     #[test]
-    #[ignore] // TODO: Re-enable after migrating RPX state layout to match Plonky3
-    // Miden-crypto: capacity=[0-3], rate=[4-11]
-    // Plonky3:      rate=[0-7], capacity=[8-11]
+    #[ignore]
+    // TODO: The state layout now matches Plonky3 (rate=[0-7], capacity=[8-11]), but there's
+    // still a digest position mismatch:
+    // - Miden's Rpx256::hash_elements() reads digest from state[4..8] (DIGEST_RANGE, middle word)
+    // - Plonky3's PaddingFreeSponge reads digest from state[0..OUT] (first 4 elements)
     fn test_rpx_hasher_vs_hash_elements() {
         // Test with empty input
         let expected: [Felt; 4] = Rpx256::hash_elements::<Felt>(&[]).into();
@@ -381,9 +383,9 @@ mod p3_tests {
     }
 
     #[test]
-    #[ignore] // TODO: Re-enable after migrating RPX state layout to match Plonky3
-    // Miden-crypto: capacity=[0-3], rate=[4-11]
-    // Plonky3:      rate=[0-7], capacity=[8-11]
+    #[ignore]
+    // TODO: Same digest position mismatch as test_rpx_hasher_vs_hash_elements above.
+    // Rpx256::merge() reads from state[4..8], TruncatedPermutation reads from state[0..4].
     fn test_rpx_compression_vs_merge() {
         let digest1 = [Felt::new(1), Felt::new(2), Felt::new(3), Felt::new(4)];
         let digest2 = [Felt::new(5), Felt::new(6), Felt::new(7), Felt::new(8)];

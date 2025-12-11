@@ -25,24 +25,24 @@ pub(crate) mod rescue;
 // CONSTANTS
 // ================================================================================================
 
-/// Sponge state is set to 12 field elements or 96 bytes; 8 elements are reserved for rate and
-/// the remaining 4 elements are reserved for capacity.
+/// Sponge state is set to 12 field elements or 96 bytes; 8 elements are reserved for the rate and
+/// the remaining 4 elements are reserved for the capacity.
 pub(crate) const STATE_WIDTH: usize = 12;
 
-/// The rate portion of the state is located in elements 4 through 11.
-pub(crate) const RATE_RANGE: Range<usize> = 4..12;
+/// The rate portion of the state is located in elements 0 through 7.
+pub(crate) const RATE_RANGE: Range<usize> = 0..8;
 pub(crate) const RATE_WIDTH: usize = RATE_RANGE.end - RATE_RANGE.start;
 
-pub(crate) const INPUT1_RANGE: Range<usize> = 4..8;
-pub(crate) const INPUT2_RANGE: Range<usize> = 8..12;
+/// The first and second 4-element words of the rate portion.
+pub(crate) const INPUT1_RANGE: Range<usize> = 0..4;
+pub(crate) const INPUT2_RANGE: Range<usize> = 4..8;
 
-/// The capacity portion of the state is located in elements 0, 1, 2, and 3.
-pub(crate) const CAPACITY_RANGE: Range<usize> = 0..4;
+/// The capacity portion of the state is located in elements 8, 9, 10, and 11.
+pub(crate) const CAPACITY_RANGE: Range<usize> = 8..12;
 
-/// The output of the hash function is a digest which consists of 4 field elements or 32 bytes.
-///
-/// The digest is returned from state elements 4, 5, 6, and 7 (the first four elements of the
-/// rate portion).
+/// The output of the hash function is a digest which consists of 4 field elements or 32 bytes,
+/// taken from the second word of the rate portion of the state (the middle word of the 3-word
+/// sponge state).
 pub(crate) const DIGEST_RANGE: Range<usize> = 4..8;
 
 /// The number of byte chunks defining a field element when hashing a sequence of bytes
@@ -96,7 +96,7 @@ pub(crate) trait AlgebraicSponge {
             Self::apply_permutation(&mut state);
         }
 
-        // return the first 4 elements of the state as hash result
+        // return the digest portion of the state as hash result
         Word::new(state[DIGEST_RANGE].try_into().unwrap())
     }
 
@@ -169,7 +169,7 @@ pub(crate) trait AlgebraicSponge {
             Self::apply_permutation(&mut state);
         }
 
-        // return the first 4 elements of the rate as hash result.
+        // return the digest portion of the rate as hash result.
         Word::new(state[DIGEST_RANGE].try_into().unwrap())
     }
 

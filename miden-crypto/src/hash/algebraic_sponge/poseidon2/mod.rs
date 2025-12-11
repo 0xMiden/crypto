@@ -102,17 +102,18 @@ impl Poseidon2 {
     /// Number of internal rounds.
     pub const NUM_INTERNAL_ROUNDS: usize = NUM_INTERNAL_ROUNDS;
 
-    /// Sponge state is set to 12 field elements or 768 bytes; 8 elements are reserved for rate and
-    /// the remaining 4 elements are reserved for capacity.
+    /// Sponge state is set to 12 field elements or 768 bytes; 8 elements are reserved for the
+    /// rate and the remaining 4 elements are reserved for the capacity.
     pub const STATE_WIDTH: usize = STATE_WIDTH;
 
-    /// The rate portion of the state is located in elements 4 through 11 (inclusive).
+    /// The rate portion of the state is located in elements 0 through 7 (inclusive).
     pub const RATE_RANGE: Range<usize> = RATE_RANGE;
 
-    /// The capacity portion of the state is located in elements 0, 1, 2, and 3.
+    /// The capacity portion of the state is located in elements 8, 9, 10, and 11.
     pub const CAPACITY_RANGE: Range<usize> = CAPACITY_RANGE;
 
-    /// The output of the hash function can be read from state elements 4, 5, 6, and 7.
+    /// The output of the hash function can be read from state elements 4, 5, 6, and 7 (the second
+    /// word of the rate portion, i.e. the middle word of the sponge state).
     pub const DIGEST_RANGE: Range<usize> = DIGEST_RANGE;
 
     /// Matrix used for computing the linear layers of internal rounds.
@@ -474,9 +475,11 @@ mod p3_tests {
     }
 
     #[test]
-    #[ignore] // TODO: Re-enable after migrating Poseidon2 state layout to match Plonky3
-    // Miden-crypto: capacity=[0-3], rate=[4-11]
-    // Plonky3:      rate=[0-7], capacity=[8-11]
+    #[ignore]
+    // TODO: The state layout now matches Plonky3 (rate=[0-7], capacity=[8-11]), but there's
+    // still a digest position mismatch:
+    // - Miden's Poseidon2::hash_elements() reads digest from state[4..8] (DIGEST_RANGE, middle word)
+    // - Plonky3's PaddingFreeSponge reads digest from state[0..OUT] (first 4 elements)
     fn test_poseidon2_hasher_vs_hash_elements() {
         // Test with empty input
         let expected: [Felt; 4] = Poseidon2::hash_elements::<Felt>(&[]).into();
@@ -530,9 +533,9 @@ mod p3_tests {
     }
 
     #[test]
-    #[ignore] // TODO: Re-enable after migrating Poseidon2 state layout to match Plonky3
-    // Miden-crypto: capacity=[0-3], rate=[4-11]
-    // Plonky3:      rate=[0-7], capacity=[8-11]
+    #[ignore]
+    // TODO: Same digest position mismatch as test_poseidon2_hasher_vs_hash_elements above.
+    // Poseidon2::merge() reads from state[4..8], TruncatedPermutation reads from state[0..4].
     fn test_poseidon2_compression_vs_merge() {
         let digest1 = [Felt::new(1), Felt::new(2), Felt::new(3), Felt::new(4)];
         let digest2 = [Felt::new(5), Felt::new(6), Felt::new(7), Felt::new(8)];
