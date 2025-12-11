@@ -9,7 +9,7 @@ use super::{
 };
 use crate::{
     FieldElement, ONE, StarkField, Word, ZERO,
-    hash::algebraic_sponge::{BINARY_CHUNK_SIZE, CAPACITY_RANGE, RATE_WIDTH},
+    hash::algebraic_sponge::{BINARY_CHUNK_SIZE, CAPACITY_RANGE, RATE_RANGE, RATE_WIDTH},
 };
 
 #[test]
@@ -144,7 +144,8 @@ fn hash_padding_no_extra_permutation_call() {
     let mut state = [ZERO; STATE_WIDTH];
     // padding when hashing bytes
     state[CAPACITY_RANGE.start] = Felt::from(RATE_WIDTH as u8);
-    *state.last_mut().unwrap() = Felt::new(u64::from_le_bytes(final_chunk));
+    // place the final padded chunk into the last rate element
+    state[RATE_RANGE.start + RATE_WIDTH - 1] = Felt::new(u64::from_le_bytes(final_chunk));
     Rpo256::apply_permutation(&mut state);
 
     assert_eq!(&r1[0..4], &state[DIGEST_RANGE]);
@@ -226,7 +227,7 @@ fn hash_test_vectors() {
     ];
 
     for i in 0..elements.len() {
-        let expected = Word::new(*EXPECTED[i]);
+        let expected = EXPECTED[i];
         let result = Rpo256::hash_elements(&elements[..(i + 1)]);
         assert_eq!(result, expected);
     }
@@ -271,117 +272,117 @@ proptest! {
 
 const EXPECTED: [Word; 19] = [
     Word::new([
-        Felt::new(18126731724905382595),
-        Felt::new(7388557040857728717),
-        Felt::new(14290750514634285295),
-        Felt::new(7852282086160480146),
+        Felt::new(15469139178109825283),
+        Felt::new(13298322520406718581),
+        Felt::new(17526830383584509711),
+        Felt::new(11090661028409776847),
     ]),
     Word::new([
-        Felt::new(10139303045932500183),
-        Felt::new(2293916558361785533),
-        Felt::new(15496361415980502047),
-        Felt::new(17904948502382283940),
+        Felt::new(11706991355830235601),
+        Felt::new(17934710181964143981),
+        Felt::new(4452402857411820110),
+        Felt::new(11507536382314375479),
     ]),
     Word::new([
-        Felt::new(17457546260239634015),
-        Felt::new(803990662839494686),
-        Felt::new(10386005777401424878),
-        Felt::new(18168807883298448638),
+        Felt::new(2999547141091331606),
+        Felt::new(3815970388294335083),
+        Felt::new(3235818406702695957),
+        Felt::new(6413763952416051197),
     ]),
     Word::new([
-        Felt::new(13072499238647455740),
-        Felt::new(10174350003422057273),
-        Felt::new(9201651627651151113),
-        Felt::new(6872461887313298746),
+        Felt::new(5139836888548140301),
+        Felt::new(3876981810195464724),
+        Felt::new(16089700743443351350),
+        Felt::new(1833434212470092856),
     ]),
     Word::new([
-        Felt::new(2903803350580990546),
-        Felt::new(1838870750730563299),
-        Felt::new(4258619137315479708),
-        Felt::new(17334260395129062936),
+        Felt::new(15554982301745873839),
+        Felt::new(151818417656338362),
+        Felt::new(9548070910841645331),
+        Felt::new(13558459638592248743),
     ]),
     Word::new([
-        Felt::new(8571221005243425262),
-        Felt::new(3016595589318175865),
-        Felt::new(13933674291329928438),
-        Felt::new(678640375034313072),
+        Felt::new(2397011179117920116),
+        Felt::new(8752502466497753750),
+        Felt::new(4652194430176185727),
+        Felt::new(474647832046121463),
     ]),
     Word::new([
-        Felt::new(16314113978986502310),
-        Felt::new(14587622368743051587),
-        Felt::new(2808708361436818462),
-        Felt::new(10660517522478329440),
+        Felt::new(4230974115326455730),
+        Felt::new(1896316786078360494),
+        Felt::new(11147868109563898491),
+        Felt::new(6393232086365640838),
     ]),
     Word::new([
-        Felt::new(2242391899857912644),
-        Felt::new(12689382052053305418),
-        Felt::new(235236990017815546),
-        Felt::new(5046143039268215739),
+        Felt::new(2837471104304140642),
+        Felt::new(5153261125632881780),
+        Felt::new(640241909830199468),
+        Felt::new(16978206582833722982),
     ]),
     Word::new([
-        Felt::new(5218076004221736204),
-        Felt::new(17169400568680971304),
-        Felt::new(8840075572473868990),
-        Felt::new(12382372614369863623),
+        Felt::new(9383518511358660362),
+        Felt::new(9070368828200673888),
+        Felt::new(16333766749737601006),
+        Felt::new(267018218564404219),
     ]),
     Word::new([
-        Felt::new(9783834557155203486),
-        Felt::new(12317263104955018849),
-        Felt::new(3933748931816109604),
-        Felt::new(1843043029836917214),
+        Felt::new(9842084245203653494),
+        Felt::new(3624620050543733613),
+        Felt::new(11549596931368439046),
+        Felt::new(15569501800395392802),
     ]),
     Word::new([
-        Felt::new(14498234468286984551),
-        Felt::new(16837257669834682387),
-        Felt::new(6664141123711355107),
-        Felt::new(4590460158294697186),
+        Felt::new(1982074106153676251),
+        Felt::new(3670811651680553202),
+        Felt::new(13020939175959765999),
+        Felt::new(1631228032466827189),
     ]),
     Word::new([
-        Felt::new(4661800562479916067),
-        Felt::new(11794407552792839953),
-        Felt::new(9037742258721863712),
-        Felt::new(6287820818064278819),
+        Felt::new(12498438494396623236),
+        Felt::new(12522140033657837500),
+        Felt::new(15931812573179338859),
+        Felt::new(4524495014558894935),
     ]),
     Word::new([
-        Felt::new(7752693085194633729),
-        Felt::new(7379857372245835536),
-        Felt::new(9270229380648024178),
-        Felt::new(10638301488452560378),
+        Felt::new(15280875087510385592),
+        Felt::new(1616122979288813833),
+        Felt::new(8971164051716151989),
+        Felt::new(7735253038562305937),
     ]),
     Word::new([
-        Felt::new(11542686762698783357),
-        Felt::new(15570714990728449027),
-        Felt::new(7518801014067819501),
-        Felt::new(12706437751337583515),
+        Felt::new(3109214984643679462),
+        Felt::new(911083193857751305),
+        Felt::new(5901679412876477991),
+        Felt::new(13358708367525191703),
     ]),
     Word::new([
-        Felt::new(9553923701032839042),
-        Felt::new(7281190920209838818),
-        Felt::new(2488477917448393955),
-        Felt::new(5088955350303368837),
+        Felt::new(15186971827737962282),
+        Felt::new(18413440267559781060),
+        Felt::new(10496575362998017360),
+        Felt::new(13081559717536478834),
     ]),
     Word::new([
-        Felt::new(4935426252518736883),
-        Felt::new(12584230452580950419),
-        Felt::new(8762518969632303998),
-        Felt::new(18159875708229758073),
+        Felt::new(5459020364317991813),
+        Felt::new(13522209963728741381),
+        Felt::new(7336753520967971663),
+        Felt::new(6316033838662753634),
     ]),
     Word::new([
-        Felt::new(12795429638314178838),
-        Felt::new(14360248269767567855),
-        Felt::new(3819563852436765058),
-        Felt::new(10859123583999067291),
+        Felt::new(9420108075927647958),
+        Felt::new(6547816111471735269),
+        Felt::new(12220545288446975893),
+        Felt::new(3577117082695137213),
     ]),
     Word::new([
-        Felt::new(2695742617679420093),
-        Felt::new(9151515850666059759),
-        Felt::new(15855828029180595485),
-        Felt::new(17190029785471463210),
+        Felt::new(12908714971205406449),
+        Felt::new(12995350974802899384),
+        Felt::new(5883568711258737532),
+        Felt::new(383173514483963899),
     ]),
     Word::new([
-        Felt::new(13205273108219124830),
-        Felt::new(2524898486192849221),
-        Felt::new(14618764355375283547),
-        Felt::new(10615614265042186874),
+        Felt::new(17503723628055804519),
+        Felt::new(9438267265380355731),
+        Felt::new(8794036951449618344),
+        Felt::new(10910433304110137166),
     ]),
 ];
