@@ -26,6 +26,7 @@ const DIGEST_BYTES: usize = 32;
 
 /// Keccak digest
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd)]
+#[repr(transparent)]
 pub struct Keccak256Digest([u8; DIGEST_BYTES]);
 
 impl Keccak256Digest {
