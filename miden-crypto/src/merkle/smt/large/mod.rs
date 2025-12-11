@@ -10,19 +10,20 @@
 //!
 //! Load an existing RocksDB-backed tree with root validation:
 //! ```no_run
+//! # #[cfg(feature = "rocksdb")]
+//! # {
 //! use miden_crypto::{
 //!     Word,
 //!     merkle::smt::{LargeSmt, RocksDbConfig, RocksDbStorage},
 //! };
 //!
 //! # fn main() -> Result<(), Box<dyn std::error::Error>> {
-//! // The expected root should be stored/tracked separately by the caller
-//! let expected_root: Word = /* load from your own persistence */ todo!();
-//!
+//! # let expected_root: Word = miden_crypto::EMPTY_WORD;
 //! let storage = RocksDbStorage::open(RocksDbConfig::new("/path/to/db"))?;
 //! let smt = LargeSmt::load_with_root(storage, expected_root)?;
 //! assert_eq!(smt.root(), expected_root);
 //! # Ok(())
+//! # }
 //! # }
 //! ```
 //!
