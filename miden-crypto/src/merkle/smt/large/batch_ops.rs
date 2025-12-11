@@ -446,6 +446,10 @@ impl<S: SmtStorage> LargeSmt<S> {
         );
         self.storage.apply(updates)?;
 
+        // Update cached counts
+        self.leaf_count = self.leaf_count.saturating_add_signed(leaf_count_delta);
+        self.entry_count = self.entry_count.saturating_add_signed(entry_count_delta);
+
         Ok(new_root)
     }
 
@@ -596,14 +600,15 @@ impl<S: SmtStorage> LargeSmt<S> {
             if value == LargeSmt::<S>::EMPTY_VALUE {
                 if let Some(leaf) = entry {
                     // Leaf exists, handle deletion
-                    if leaf.remove(key).1 {
+                    let (old_value, is_empty) = leaf.remove(key);
+                    if old_value.is_some() {
                         // Key had previous value, decrement entry count
                         entry_count_delta -= 1;
-                        if leaf.is_empty() {
-                            // Leaf is now empty, remove it and decrement leaf count
-                            *entry = None;
-                            leaf_count_delta -= 1;
-                        }
+                    }
+                    if is_empty {
+                        // Leaf is now empty, remove it and decrement leaf count
+                        *entry = None;
+                        leaf_count_delta -= 1;
                     }
                 }
             } else {
@@ -637,6 +642,11 @@ impl<S: SmtStorage> LargeSmt<S> {
             entry_count_delta,
         );
         self.storage.apply(updates)?;
+
+        // Update cached counts
+        self.leaf_count = self.leaf_count.saturating_add_signed(leaf_count_delta);
+        self.entry_count = self.entry_count.saturating_add_signed(entry_count_delta);
+
         Ok(())
     }
 

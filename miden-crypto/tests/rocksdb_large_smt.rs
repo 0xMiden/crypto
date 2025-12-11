@@ -127,8 +127,8 @@ fn rocksdb_persistence_after_insert_batch_with_deletions() {
 
     let mut inner_nodes: Vec<InnerNodeInfo> = smt.inner_nodes().unwrap().collect();
     inner_nodes.sort_by_key(|info| info.value);
-    let num_leaves = smt.num_leaves().unwrap();
-    let num_entries = smt.num_entries().unwrap();
+    let num_leaves = smt.num_leaves();
+    let num_entries = smt.num_entries();
     drop(smt);
 
     let reopened_storage = RocksDbStorage::open(RocksDbConfig::new(db_path)).unwrap();
@@ -136,8 +136,8 @@ fn rocksdb_persistence_after_insert_batch_with_deletions() {
 
     let mut inner_nodes_2: Vec<InnerNodeInfo> = smt.inner_nodes().unwrap().collect();
     inner_nodes_2.sort_by_key(|info| info.value);
-    let num_leaves_2 = smt.num_leaves().unwrap();
-    let num_entries_2 = smt.num_entries().unwrap();
+    let num_leaves_2 = smt.num_leaves();
+    let num_entries_2 = smt.num_entries();
 
     assert_eq!(inner_nodes.len(), inner_nodes_2.len());
     assert_eq!(inner_nodes, inner_nodes_2);
