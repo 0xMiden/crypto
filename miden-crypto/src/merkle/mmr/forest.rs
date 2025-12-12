@@ -3,10 +3,11 @@ use core::{
     ops::{BitAnd, BitOr, BitXor, BitXorAssign},
 };
 
-use winter_utils::{ByteReader, ByteWriter, Deserializable, DeserializationError, Serializable};
-
 use super::InOrderIndex;
-use crate::{Felt, PrimeField64};
+use crate::{
+    Felt, PrimeField64,
+    utils::{ByteReader, ByteWriter, Deserializable, DeserializationError, Serializable},
+};
 
 /// A compact representation of trees in a forest. Used in the Merkle forest (MMR).
 ///

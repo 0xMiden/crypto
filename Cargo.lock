@@ -978,8 +978,10 @@ dependencies = [
  "num",
  "num-complex",
  "p3-air",
+ "p3-challenger",
  "p3-field",
  "p3-goldilocks",
+ "p3-symmetric",
  "proptest",
  "rand",
  "rand_chacha",
@@ -995,10 +997,6 @@ dependencies = [
  "subtle",
  "tempfile",
  "thiserror",
- "winter-crypto",
- "winter-math",
- "winter-rand-utils",
- "winter-utils",
  "x25519-dalek",
 ]
 
@@ -2108,38 +2106,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5a5364e9d77fcdeeaa6062ced926ee3381faa2ee02d3eb83a5c27a8825540829"
 dependencies = [
  "memchr",
-]
-
-[[package]]
-name = "winter-crypto"
-version = "0.13.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1cdb247bc142438798edb04067ab72a22cf815f57abbd7b78a6fa986fc101db8"
-dependencies = [
- "blake3",
- "sha3",
- "winter-math",
- "winter-utils",
-]
-
-[[package]]
-name = "winter-math"
-version = "0.13.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7aecfb48ee6a8b4746392c8ff31e33e62df8528a3b5628c5af27b92b14aef1ea"
-dependencies = [
- "serde",
- "winter-utils",
-]
-
-[[package]]
-name = "winter-rand-utils"
-version = "0.13.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a4ff3b651754a7bd216f959764d0a5ab6f4b551c9a3a08fb9ccecbed594b614a"
-dependencies = [
- "rand",
- "winter-utils",
 ]
 
 [[package]]

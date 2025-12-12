@@ -28,12 +28,14 @@ pub mod rpx {
 
 pub mod algebraic_sponge;
 
-// RE-EXPORTS
+// TRAITS
 // ================================================================================================
-pub use winter_crypto::{Digest, ElementHasher, Hasher};
 
-/// Extension trait for Hasher to provide iterator-based hashing.
-pub trait HasherExt: Hasher {
+/// Extension trait for hashers to provide iterator-based hashing.
+pub trait HasherExt {
+    /// The digest type produced by this hasher.
+    type Digest;
+
     /// Hashes an iterator of byte slices.
     ///
     /// This method allows for more efficient hashing by avoiding the need to

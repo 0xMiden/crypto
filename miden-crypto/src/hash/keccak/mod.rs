@@ -7,7 +7,6 @@ use core::{
 
 use p3_field::BasedVectorSpace;
 use sha3::Digest as Sha3Digest;
-use winter_crypto::{Digest, Hasher};
 
 use super::{Felt, HasherExt};
 use crate::{
@@ -94,8 +93,9 @@ impl Deserializable for Keccak256Digest {
     }
 }
 
-impl Digest for Keccak256Digest {
-    fn as_bytes(&self) -> [u8; 32] {
+impl Keccak256Digest {
+    /// Returns the digest as a 32-byte array.
+    pub fn as_bytes(&self) -> [u8; 32] {
         self.0
     }
 }
@@ -108,6 +108,8 @@ impl Digest for Keccak256Digest {
 pub struct Keccak256;
 
 impl HasherExt for Keccak256 {
+    type Digest = Keccak256Digest;
+
     fn hash_iter<'a>(slices: impl Iterator<Item = &'a [u8]>) -> Self::Digest {
         let mut hasher = sha3::Keccak256::new();
         for slice in slices {
@@ -117,24 +119,22 @@ impl HasherExt for Keccak256 {
     }
 }
 
-impl Hasher for Keccak256 {
+impl Keccak256 {
     /// Keccak256 collision resistance is 128-bits for 32-bytes output.
-    const COLLISION_RESISTANCE: u32 = 128;
+    pub const COLLISION_RESISTANCE: u32 = 128;
 
-    type Digest = Keccak256Digest;
-
-    fn hash(bytes: &[u8]) -> Self::Digest {
+    pub fn hash(bytes: &[u8]) -> Keccak256Digest {
         let mut hasher = sha3::Keccak256::new();
         hasher.update(bytes);
 
         Keccak256Digest(hasher.finalize().into())
     }
 
-    fn merge(values: &[Self::Digest; 2]) -> Self::Digest {
+    pub fn merge(values: &[Keccak256Digest; 2]) -> Keccak256Digest {
         Self::hash(prepare_merge(values))
     }
 
-    fn merge_many(values: &[Self::Digest]) -> Self::Digest {
+    pub fn merge_many(values: &[Keccak256Digest]) -> Keccak256Digest {
         let data = Keccak256Digest::digests_as_bytes(values);
         let mut hasher = sha3::Keccak256::new();
         hasher.update(data);
@@ -142,27 +142,12 @@ impl Hasher for Keccak256 {
         Keccak256Digest(hasher.finalize().into())
     }
 
-    fn merge_with_int(seed: Self::Digest, value: u64) -> Self::Digest {
+    pub fn merge_with_int(seed: Keccak256Digest, value: u64) -> Keccak256Digest {
         let mut hasher = sha3::Keccak256::new();
         hasher.update(seed.0);
         hasher.update(value.to_le_bytes());
 
         Keccak256Digest(hasher.finalize().into())
-    }
-}
-
-impl Keccak256 {
-    /// Returns a hash of the provided sequence of bytes.
-    #[inline(always)]
-    pub fn hash(bytes: &[u8]) -> Keccak256Digest {
-        <Self as Hasher>::hash(bytes)
-    }
-
-    /// Returns a hash of two digests. This method is intended for use in construction of
-    /// Merkle trees and verification of Merkle paths.
-    #[inline(always)]
-    pub fn merge(values: &[Keccak256Digest; 2]) -> Keccak256Digest {
-        <Self as Hasher>::merge(values)
     }
 
     /// Returns a hash of the provided field elements.

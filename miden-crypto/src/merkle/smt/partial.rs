@@ -1,5 +1,3 @@
-use winter_utils::{ByteReader, ByteWriter, Deserializable, DeserializationError, Serializable};
-
 use super::{LeafIndex, SMT_DEPTH};
 use crate::{
     EMPTY_WORD, Word,
@@ -7,6 +5,7 @@ use crate::{
         InnerNodeInfo, MerkleError, NodeIndex, SparseMerklePath,
         smt::{InnerNode, InnerNodes, Leaves, Smt, SmtLeaf, SmtProof, SparseMerkleTree},
     },
+    utils::{ByteReader, ByteWriter, Deserializable, DeserializationError, Serializable},
 };
 
 /// A partial version of an [`Smt`].
@@ -413,10 +412,13 @@ mod tests {
     use alloc::collections::{BTreeMap, BTreeSet};
 
     use assert_matches::assert_matches;
-    use rand_utils::{rand_array, rand_value};
 
     use super::*;
-    use crate::{EMPTY_WORD, Felt, ONE, ZERO, merkle::EmptySubtreeRoots};
+    use crate::{
+        EMPTY_WORD, Felt, ONE, ZERO,
+        merkle::EmptySubtreeRoots,
+        test_utils::{rand_array, rand_value},
+    };
 
     /// Tests that a partial SMT constructed from a root is well behaved and returns expected
     /// values.

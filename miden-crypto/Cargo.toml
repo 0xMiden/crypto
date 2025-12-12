@@ -64,20 +64,17 @@ name    = "rand"
 [features]
 concurrent = ["dep:rayon", "hashbrown?/rayon"]
 default = ["concurrent", "std"]
-executable = ["dep:clap", "dep:rand-utils", "std"]
+executable = ["dep:clap", "std"]
 fuzzing = []
 hashmaps = ["dep:hashbrown"]
 internal = []
 rocksdb = ["concurrent", "dep:rocksdb"]
-serde = ["dep:serde", "serde?/alloc", "winter-math/serde"]
+serde = ["dep:serde", "serde?/alloc"]
 std = [
   "blake3/std",
   "dep:cc",
   "rand/std",
   "rand/thread_rng",
-  "winter-crypto/std",
-  "winter-math/std",
-  "winter-utils/std",
 ]
 
 [dependencies]
@@ -94,7 +91,6 @@ miden-crypto-derive.workspace = true
 num                           = { default-features = false, features = ["alloc", "libm"], version = "0.4" }
 num-complex                   = { default-features = false, version = "0.4" }
 rand                          = { default-features = false, version = "0.9" }
-rand-utils                    = { optional = true, package = "winter-rand-utils", version = "0.13" }
 rand_chacha                   = { default-features = false, version = "0.9" }
 rand_core                     = { default-features = false, version = "0.9" }
 rand_hc                       = { version = "0.3" }
@@ -105,17 +101,16 @@ sha2                          = { default-features = false, version = "0.10" }
 sha3                          = { default-features = false, version = "0.10" }
 subtle                        = { default-features = false, version = "2.6" }
 thiserror                     = { default-features = false, version = "2.0" }
-winter-crypto                 = { default-features = false, version = "0.13" }
-winter-math                   = { default-features = false, version = "0.13" }
-winter-utils                  = { default-features = false, version = "0.13" }
 x25519-dalek                  = { default-features = false, features = ["static_secrets"], version = "2.0" }
 
 # FIXME: switch to main branch once zz/migrate-plonky3 is merged
 miden-air     = { branch = "zz/migrate-plonky3", default-features = false, git = "https://github.com/0xMiden/Plonky3/" }
 miden-prover  = { branch = "zz/migrate-plonky3", default-features = false, git = "https://github.com/0xMiden/Plonky3/" }
 p3-air        = { branch = "zz/migrate-plonky3", default-features = false, git = "https://github.com/0xMiden/Plonky3/" }
+p3-challenger = { branch = "zz/migrate-plonky3", default-features = false, git = "https://github.com/0xMiden/Plonky3/" }
 p3-field      = { branch = "zz/migrate-plonky3", default-features = false, git = "https://github.com/0xMiden/Plonky3/" }
 p3-goldilocks = { branch = "zz/migrate-plonky3", default-features = false, git = "https://github.com/0xMiden/Plonky3/" }
+p3-symmetric  = { branch = "zz/migrate-plonky3", default-features = false, git = "https://github.com/0xMiden/Plonky3/" }
 
 [dev-dependencies]
 assert_matches = { default-features = false, version = "1.5" }
@@ -123,7 +118,6 @@ criterion      = { features = ["html_reports"], version = "0.7" }
 hex            = { default-features = false, features = ["alloc"], version = "0.4" }
 itertools      = { version = "0.14" }
 proptest       = { default-features = false, features = ["alloc"], version = "1.7" }
-rand-utils     = { package = "winter-rand-utils", version = "0.13" }
 rand_chacha    = { default-features = false, version = "0.9" }
 rstest         = { version = "0.26" }
 seq-macro      = { version = "0.3" }

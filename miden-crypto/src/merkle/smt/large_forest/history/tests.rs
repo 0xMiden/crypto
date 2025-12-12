@@ -1,11 +1,10 @@
 //! The functional tests for the history component.
 
-use rand_utils::rand_value;
-
 use super::{CompactLeaf, History, LeafChanges, NodeChanges, error::Result};
 use crate::{
     Word,
     merkle::{NodeIndex, smt::LeafIndex},
+    test_utils::rand_value,
 };
 
 // TESTS

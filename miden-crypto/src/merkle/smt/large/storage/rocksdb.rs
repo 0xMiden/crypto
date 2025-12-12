@@ -6,7 +6,6 @@ use rocksdb::{
     DBIteratorWithThreadMode, FlushOptions, IteratorMode, Options, ReadOptions, WriteBatch,
     WriteOptions,
 };
-use winter_utils::{Deserializable, Serializable};
 
 use super::{SmtStorage, StorageError, StorageUpdateParts, StorageUpdates, SubtreeUpdate};
 use crate::{
@@ -18,6 +17,7 @@ use crate::{
             large::{IN_MEMORY_DEPTH, LargeSmt, subtree::Subtree},
         },
     },
+    utils::{Deserializable, Serializable},
 };
 
 /// The name of the RocksDB column family used for storing SMT leaves.

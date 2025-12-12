@@ -5,7 +5,6 @@ use crate::PrimeCharacteristicRing;
 
 mod constants;
 use constants::*;
-use winter_crypto::Hasher;
 
 #[cfg(test)]
 mod test;
@@ -88,31 +87,12 @@ impl AlgebraicSponge for Poseidon2 {
     }
 }
 
-impl Hasher for Poseidon2 {
-    const COLLISION_RESISTANCE: u32 = 128;
-
-    type Digest = Word;
-
-    fn hash(bytes: &[u8]) -> Self::Digest {
-        <Self as AlgebraicSponge>::hash(bytes)
-    }
-
-    fn merge(values: &[Self::Digest; 2]) -> Self::Digest {
-        <Self as AlgebraicSponge>::merge(values)
-    }
-
-    fn merge_many(values: &[Self::Digest]) -> Self::Digest {
-        <Self as AlgebraicSponge>::merge_many(values)
-    }
-
-    fn merge_with_int(seed: Self::Digest, value: u64) -> Self::Digest {
-        <Self as AlgebraicSponge>::merge_with_int(seed, value)
-    }
-}
-
 impl Poseidon2 {
     // CONSTANTS
     // --------------------------------------------------------------------------------------------
+
+    /// Target collision resistance level in bits.
+    pub const COLLISION_RESISTANCE: u32 = 128;
 
     /// Number of initial or terminal external rounds.
     pub const NUM_EXTERNAL_ROUNDS_HALF: usize = NUM_EXTERNAL_ROUNDS_HALF;
@@ -140,20 +120,32 @@ impl Poseidon2 {
     pub const ARK_EXT_TERMINAL: [[Felt; STATE_WIDTH]; NUM_EXTERNAL_ROUNDS_HALF] = ARK_EXT_TERMINAL;
     pub const ARK_INT: [Felt; NUM_INTERNAL_ROUNDS] = ARK_INT;
 
-    // TRAIT PASS-THROUGH FUNCTIONS
+    // HASH FUNCTIONS
     // --------------------------------------------------------------------------------------------
 
     /// Returns a hash of the provided sequence of bytes.
     #[inline(always)]
     pub fn hash(bytes: &[u8]) -> Word {
-        <Self as Hasher>::hash(bytes)
+        <Self as AlgebraicSponge>::hash(bytes)
     }
 
     /// Returns a hash of two digests. This method is intended for use in construction of
     /// Merkle trees and verification of Merkle paths.
     #[inline(always)]
     pub fn merge(values: &[Word; 2]) -> Word {
-        <Self as Hasher>::merge(values)
+        <Self as AlgebraicSponge>::merge(values)
+    }
+
+    /// Returns a hash of multiple digests.
+    #[inline(always)]
+    pub fn merge_many(values: &[Word]) -> Word {
+        <Self as AlgebraicSponge>::merge_many(values)
+    }
+
+    /// Returns a hash of a digest and a u64 value.
+    #[inline(always)]
+    pub fn merge_with_int(seed: Word, value: u64) -> Word {
+        <Self as AlgebraicSponge>::merge_with_int(seed, value)
     }
 
     /// Returns a hash of two digests and a domain identifier.
@@ -298,5 +290,253 @@ impl Poseidon2 {
         state[9] = state[9].exp_const_u64::<7>();
         state[10] = state[10].exp_const_u64::<7>();
         state[11] = state[11].exp_const_u64::<7>();
+    }
+}
+
+// PLONKY3 INTEGRATION
+// ================================================================================================
+
+/// Plonky3-compatible Poseidon2 permutation implementation.
+///
+/// This module provides a Plonky3-compatible interface to the Poseidon2 hash function,
+/// implementing the `Permutation` and `CryptographicPermutation` traits from Plonky3.
+///
+/// This allows Poseidon2 to be used with Plonky3's cryptographic infrastructure, including:
+/// - PaddingFreeSponge for hashing
+/// - TruncatedPermutation for compression
+/// - DuplexChallenger for Fiat-Shamir transforms
+use p3_challenger::DuplexChallenger;
+use p3_symmetric::{
+    CryptographicPermutation, PaddingFreeSponge, Permutation, TruncatedPermutation,
+};
+
+// POSEIDON2 PERMUTATION FOR PLONKY3
+// ================================================================================================
+
+/// Plonky3-compatible Poseidon2 permutation.
+///
+/// This struct wraps the Poseidon2 permutation and implements Plonky3's `Permutation` and
+/// `CryptographicPermutation` traits, allowing Poseidon2 to be used within the Plonky3 ecosystem.
+///
+/// The permutation operates on a state of 12 field elements (STATE_WIDTH = 12), with:
+/// - Rate: 8 elements (positions 4-11)
+/// - Capacity: 4 elements (positions 0-3)
+/// - Digest output: 4 elements (positions 4-7)
+#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+pub struct Poseidon2Permutation256;
+
+impl Poseidon2Permutation256 {
+    // CONSTANTS
+    // --------------------------------------------------------------------------------------------
+
+    /// Number of initial or terminal external rounds.
+    pub const NUM_EXTERNAL_ROUNDS_HALF: usize = Poseidon2::NUM_EXTERNAL_ROUNDS_HALF;
+
+    /// Number of internal rounds.
+    pub const NUM_INTERNAL_ROUNDS: usize = Poseidon2::NUM_INTERNAL_ROUNDS;
+
+    /// Sponge state is set to 12 field elements or 768 bytes; 8 elements are reserved for rate and
+    /// the remaining 4 elements are reserved for capacity.
+    pub const STATE_WIDTH: usize = STATE_WIDTH;
+
+    /// The rate portion of the state is located in elements 4 through 11 (inclusive).
+    pub const RATE_RANGE: Range<usize> = Poseidon2::RATE_RANGE;
+
+    /// The capacity portion of the state is located in elements 0, 1, 2, and 3.
+    pub const CAPACITY_RANGE: Range<usize> = Poseidon2::CAPACITY_RANGE;
+
+    /// The output of the hash function can be read from state elements 4, 5, 6, and 7.
+    pub const DIGEST_RANGE: Range<usize> = Poseidon2::DIGEST_RANGE;
+
+    // POSEIDON2 PERMUTATION
+    // --------------------------------------------------------------------------------------------
+
+    /// Applies Poseidon2 permutation to the provided state.
+    ///
+    /// This delegates to the Poseidon2 implementation.
+    #[inline(always)]
+    pub fn apply_permutation(state: &mut [Felt; STATE_WIDTH]) {
+        Poseidon2::apply_permutation(state);
+    }
+}
+
+// PLONKY3 TRAIT IMPLEMENTATIONS
+// ================================================================================================
+
+impl Permutation<[Felt; STATE_WIDTH]> for Poseidon2Permutation256 {
+    fn permute_mut(&self, state: &mut [Felt; STATE_WIDTH]) {
+        Self::apply_permutation(state);
+    }
+}
+
+impl CryptographicPermutation<[Felt; STATE_WIDTH]> for Poseidon2Permutation256 {}
+
+// TYPE ALIASES FOR PLONKY3 INTEGRATION
+// ================================================================================================
+
+/// Poseidon2-based hasher using Plonky3's PaddingFreeSponge.
+///
+/// This provides a sponge-based hash function with:
+/// - WIDTH: 12 field elements (total state size)
+/// - RATE: 8 field elements (input/output rate)
+/// - OUT: 4 field elements (digest size)
+pub type Poseidon2Hasher = PaddingFreeSponge<Poseidon2Permutation256, 12, 8, 4>;
+
+/// Poseidon2-based compression function using Plonky3's TruncatedPermutation.
+///
+/// This provides a 2-to-1 compression function for Merkle tree construction with:
+/// - CHUNK: 2 (number of input chunks - i.e., 2 digests of 4 elements each = 8 elements)
+/// - N: 4 (output size in field elements)
+/// - WIDTH: 12 (total state size)
+///
+/// The compression function takes 8 field elements (2 digests) as input and produces
+/// 4 field elements (1 digest) as output.
+pub type Poseidon2Compression = TruncatedPermutation<Poseidon2Permutation256, 2, 4, 12>;
+
+/// Poseidon2-based challenger using Plonky3's DuplexChallenger.
+///
+/// This provides a Fiat-Shamir transform implementation for interactive proof protocols,
+/// with:
+/// - F: Generic field type (typically the same as Felt)
+/// - WIDTH: 12 field elements (sponge state size)
+/// - RATE: 8 field elements (rate of absorption/squeezing)
+pub type Poseidon2Challenger<F> = DuplexChallenger<F, Poseidon2Permutation256, 12, 8>;
+
+#[cfg(test)]
+mod p3_tests {
+    use p3_symmetric::{CryptographicHasher, PseudoCompressionFunction};
+
+    use super::*;
+
+    #[test]
+    fn test_poseidon2_permutation_basic() {
+        let mut state = [Felt::new(0); STATE_WIDTH];
+
+        // Apply permutation
+        let perm = Poseidon2Permutation256;
+        perm.permute_mut(&mut state);
+
+        // State should be different from all zeros after permutation
+        assert_ne!(state, [Felt::new(0); STATE_WIDTH]);
+    }
+
+    #[test]
+    fn test_poseidon2_permutation_consistency() {
+        let mut state1 = [Felt::new(0); STATE_WIDTH];
+        let mut state2 = [Felt::new(0); STATE_WIDTH];
+
+        // Apply permutation using the trait
+        let perm = Poseidon2Permutation256;
+        perm.permute_mut(&mut state1);
+
+        // Apply permutation directly
+        Poseidon2Permutation256::apply_permutation(&mut state2);
+
+        // Both should produce the same result
+        assert_eq!(state1, state2);
+    }
+
+    #[test]
+    fn test_poseidon2_permutation_deterministic() {
+        let input = [
+            Felt::new(1),
+            Felt::new(2),
+            Felt::new(3),
+            Felt::new(4),
+            Felt::new(5),
+            Felt::new(6),
+            Felt::new(7),
+            Felt::new(8),
+            Felt::new(9),
+            Felt::new(10),
+            Felt::new(11),
+            Felt::new(12),
+        ];
+
+        let mut state1 = input;
+        let mut state2 = input;
+
+        let perm = Poseidon2Permutation256;
+        perm.permute_mut(&mut state1);
+        perm.permute_mut(&mut state2);
+
+        // Same input should produce same output
+        assert_eq!(state1, state2);
+    }
+
+    #[test]
+    #[ignore] // TODO: Re-enable after migrating Poseidon2 state layout to match Plonky3
+    // Miden-crypto: capacity=[0-3], rate=[4-11]
+    // Plonky3:      rate=[0-7], capacity=[8-11]
+    fn test_poseidon2_hasher_vs_hash_elements() {
+        use crate::hash::algebraic_sponge::AlgebraicSponge;
+
+        // Test with empty input
+        let expected: [Felt; 4] = Poseidon2::hash_elements::<Felt>(&[]).into();
+        let hasher = Poseidon2Hasher::new(Poseidon2Permutation256);
+        let result = hasher.hash_iter([]);
+        assert_eq!(result, expected, "Empty input should produce same digest");
+
+        // Test with 4 elements (one digest worth)
+        let input4 = [Felt::new(1), Felt::new(2), Felt::new(3), Felt::new(4)];
+        let expected: [Felt; 4] = Poseidon2::hash_elements(&input4).into();
+        let result = hasher.hash_iter(input4);
+        assert_eq!(result, expected, "4 elements should produce same digest");
+
+        // Test with 8 elements (exactly one rate)
+        let input8 = [
+            Felt::new(1),
+            Felt::new(2),
+            Felt::new(3),
+            Felt::new(4),
+            Felt::new(5),
+            Felt::new(6),
+            Felt::new(7),
+            Felt::new(8),
+        ];
+        let expected: [Felt; 4] = Poseidon2::hash_elements(&input8).into();
+        let result = hasher.hash_iter(input8);
+        assert_eq!(result, expected, "8 elements (one rate) should produce same digest");
+
+        // Test with 16 elements (two rates)
+        let input16 = [
+            Felt::new(1),
+            Felt::new(2),
+            Felt::new(3),
+            Felt::new(4),
+            Felt::new(5),
+            Felt::new(6),
+            Felt::new(7),
+            Felt::new(8),
+            Felt::new(9),
+            Felt::new(10),
+            Felt::new(11),
+            Felt::new(12),
+            Felt::new(13),
+            Felt::new(14),
+            Felt::new(15),
+            Felt::new(16),
+        ];
+        let expected: [Felt; 4] = Poseidon2::hash_elements(&input16).into();
+        let result = hasher.hash_iter(input16);
+        assert_eq!(result, expected, "16 elements (two rates) should produce same digest");
+    }
+
+    #[test]
+    #[ignore] // TODO: Re-enable after migrating Poseidon2 state layout to match Plonky3
+    // Miden-crypto: capacity=[0-3], rate=[4-11]
+    // Plonky3:      rate=[0-7], capacity=[8-11]
+    fn test_poseidon2_compression_vs_merge() {
+        let digest1 = [Felt::new(1), Felt::new(2), Felt::new(3), Felt::new(4)];
+        let digest2 = [Felt::new(5), Felt::new(6), Felt::new(7), Felt::new(8)];
+
+        // Poseidon2::merge expects &[Word; 2]
+        let expected: [Felt; 4] = Poseidon2::merge(&[digest1.into(), digest2.into()]).into();
+
+        // Poseidon2Compression expects [[Felt; 4]; 2]
+        let compress = Poseidon2Compression::new(Poseidon2Permutation256);
+        let result = compress.compress([digest1, digest2]);
+
+        assert_eq!(result, expected, "Poseidon2Compression should match Poseidon2::merge");
     }
 }

@@ -10,7 +10,6 @@ use core::{
 };
 
 use thiserror::Error;
-use winter_crypto::Digest;
 
 const WORD_SIZE_FELT: usize = 4;
 const WORD_SIZE_BYTES: usize = 32;
@@ -187,12 +186,6 @@ impl Word {
 impl Hash for Word {
     fn hash<H: Hasher>(&self, state: &mut H) {
         state.write(&self.as_bytes());
-    }
-}
-
-impl Digest for Word {
-    fn as_bytes(&self) -> [u8; WORD_SIZE_BYTES] {
-        self.as_bytes()
     }
 }
 

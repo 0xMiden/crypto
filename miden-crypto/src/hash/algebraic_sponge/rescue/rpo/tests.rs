@@ -1,15 +1,15 @@
 use alloc::{collections::BTreeSet, vec::Vec};
 
 use proptest::prelude::*;
-use rand_utils::rand_value;
 
 use super::{
     super::{ALPHA, INV_ALPHA, apply_inv_sbox, apply_sbox},
-    Felt, Hasher, Rpo256, STATE_WIDTH,
+    Felt, Rpo256, STATE_WIDTH,
 };
 use crate::{
     ONE, PrimeCharacteristicRing, PrimeField64, Word, ZERO,
     hash::algebraic_sponge::{AlgebraicSponge, BINARY_CHUNK_SIZE, CAPACITY_RANGE, RATE_WIDTH},
+    test_utils::rand_value,
 };
 
 #[test]
@@ -86,7 +86,7 @@ fn hash_elements_vs_merge_with_int() {
 
     // ----- value fits into a field element ------------------------------------------------------
     let val: Felt = Felt::new(rand_value());
-    let m_result = <Rpo256 as Hasher>::merge_with_int(seed, val.as_canonical_u64());
+    let m_result = <Rpo256 as AlgebraicSponge>::merge_with_int(seed, val.as_canonical_u64());
 
     let mut elements = seed.as_elements().to_vec();
     elements.push(val);
@@ -96,7 +96,7 @@ fn hash_elements_vs_merge_with_int() {
 
     // ----- value does not fit into a field element ----------------------------------------------
     let val = Felt::ORDER_U64 + 2;
-    let m_result = <Rpo256 as Hasher>::merge_with_int(seed, val);
+    let m_result = <Rpo256 as AlgebraicSponge>::merge_with_int(seed, val);
 
     let mut elements = seed.as_elements().to_vec();
     elements.push(Felt::new(val));

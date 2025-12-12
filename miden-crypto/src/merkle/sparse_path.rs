@@ -4,12 +4,13 @@ use core::{
     num::NonZero,
 };
 
-use winter_utils::{Deserializable, DeserializationError, Serializable};
-
 use super::{
     EmptySubtreeRoots, InnerNodeInfo, MerkleError, MerklePath, NodeIndex, Word, smt::SMT_MAX_DEPTH,
 };
-use crate::hash::rpo::Rpo256;
+use crate::{
+    hash::rpo::Rpo256,
+    utils::{Deserializable, DeserializationError, Serializable},
+};
 
 /// A different representation of [`MerklePath`] designed for memory efficiency for Merkle paths
 /// with empty nodes.
@@ -248,7 +249,7 @@ impl SparseMerklePath {
 // ================================================================================================
 
 impl Serializable for SparseMerklePath {
-    fn write_into<W: winter_utils::ByteWriter>(&self, target: &mut W) {
+    fn write_into<W: crate::utils::ByteWriter>(&self, target: &mut W) {
         target.write_u8(self.depth());
         target.write_u64(self.empty_nodes_mask);
         target.write_many(&self.nodes);
@@ -256,7 +257,7 @@ impl Serializable for SparseMerklePath {
 }
 
 impl Deserializable for SparseMerklePath {
-    fn read_from<R: winter_utils::ByteReader>(
+    fn read_from<R: crate::utils::ByteReader>(
         source: &mut R,
     ) -> Result<Self, DeserializationError> {
         let depth = source.read_u8()?;

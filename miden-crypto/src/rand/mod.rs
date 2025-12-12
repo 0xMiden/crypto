@@ -1,8 +1,8 @@
 //! Pseudo-random element generation.
 
 use rand::RngCore;
-pub use winter_crypto::{DefaultRandomCoin as WinterRandomCoin, RandomCoin, RandomCoinError};
-pub use winter_utils::Randomizable;
+
+pub use crate::utils::Randomizable;
 
 mod rpo;
 pub use rpo::RpoRandomCoin;
@@ -21,4 +21,27 @@ pub trait FeltRng: RngCore {
 
     /// Draw, uniformly at random, a [Word].
     fn draw_word(&mut self) -> Word;
+}
+
+// RANDOM VALUE GENERATION FOR TESTING
+// ================================================================================================
+
+/// Generates a random field element for testing purposes.
+///
+/// This function is only available with the `std` feature or in test code.
+#[cfg(any(test, feature = "std"))]
+pub fn random_felt() -> Felt {
+    use rand::Rng;
+    let mut rng = rand::rng();
+    // Goldilocks field order is 2^64 - 2^32 + 1
+    // Generate a random u64 and reduce modulo the field order
+    Felt::new(rng.random::<u64>())
+}
+
+/// Generates a random word (4 field elements) for testing purposes.
+///
+/// This function is only available with the `std` feature or in test code.
+#[cfg(any(test, feature = "std"))]
+pub fn random_word() -> Word {
+    Word::new([random_felt(), random_felt(), random_felt(), random_felt()])
 }

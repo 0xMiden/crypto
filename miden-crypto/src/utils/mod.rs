@@ -1,16 +1,26 @@
 //! Utilities used in this crate which can also be generally useful downstream.
 
 use alloc::{string::String, vec::Vec};
-use core::fmt::{self, Write};
+use core::{
+    fmt::{self, Write},
+    mem, slice,
+};
 
 use p3_field::RawDataSerializable;
 use thiserror::Error;
+
+// Serialization module (ported from Winterfell's winter-utils)
+mod errors;
+pub use errors::DeserializationError;
+
+mod serde;
 #[cfg(feature = "std")]
-pub use winter_utils::ReadAdapter;
-pub use winter_utils::{
-    ByteReader, ByteWriter, Deserializable, DeserializationError, Serializable, SliceReader,
-    uninit_vector,
-};
+pub use serde::ReadAdapter;
+pub use serde::{ByteReader, ByteWriter, Deserializable, Serializable, SliceReader};
+
+mod iterators;
+#[cfg(feature = "concurrent")]
+use iterators::*;
 
 use crate::{Felt, PrimeField64, Word};
 
@@ -266,4 +276,195 @@ pub fn bytes_to_packed_u32_elements(bytes: &[u8]) -> Vec<Felt> {
             Felt::from(u32::from_le_bytes(packed))
         })
         .collect()
+}
+
+// VECTOR FUNCTIONS (ported from Winterfell's winter-utils)
+// ================================================================================================
+
+/// Returns a vector of the specified length with un-initialized memory.
+///
+/// This is usually faster than requesting a vector with initialized memory and is useful when we
+/// overwrite all contents of the vector immediately after memory allocation.
+///
+/// # Safety
+/// Using values from the returned vector before initializing them will lead to undefined behavior.
+#[allow(clippy::uninit_vec)]
+pub unsafe fn uninit_vector<T>(length: usize) -> Vec<T> {
+    let mut vector = Vec::with_capacity(length);
+    unsafe {
+        vector.set_len(length);
+    }
+    vector
+}
+
+// GROUPING / UN-GROUPING FUNCTIONS (ported from Winterfell's winter-utils)
+// ================================================================================================
+
+/// Transmutes a slice of `n` elements into a slice of `n` / `N` elements, each of which is
+/// an array of `N` elements.
+///
+/// This function just re-interprets the underlying memory and is thus zero-copy.
+/// # Panics
+/// Panics if `n` is not divisible by `N`.
+pub fn group_slice_elements<T, const N: usize>(source: &[T]) -> &[[T; N]] {
+    assert_eq!(source.len() % N, 0, "source length must be divisible by {N}");
+    let p = source.as_ptr();
+    let len = source.len() / N;
+    unsafe { slice::from_raw_parts(p as *const [T; N], len) }
+}
+
+/// Transmutes a slice of `n` arrays each of length `N`, into a slice of `N` * `n` elements.
+///
+/// This function just re-interprets the underlying memory and is thus zero-copy.
+pub fn flatten_slice_elements<T, const N: usize>(source: &[[T; N]]) -> &[T] {
+    let p = source.as_ptr();
+    let len = source.len() * N;
+    unsafe { slice::from_raw_parts(p as *const T, len) }
+}
+
+/// Transmutes a vector of `n` arrays each of length `N`, into a vector of `N` * `n` elements.
+///
+/// This function just re-interprets the underlying memory and is thus zero-copy.
+pub fn flatten_vector_elements<T, const N: usize>(source: Vec<[T; N]>) -> Vec<T> {
+    let v = mem::ManuallyDrop::new(source);
+    let p = v.as_ptr();
+    let len = v.len() * N;
+    let cap = v.capacity() * N;
+    unsafe { Vec::from_raw_parts(p as *mut T, len, cap) }
+}
+
+// TRANSPOSING (ported from Winterfell's winter-utils)
+// ================================================================================================
+
+/// Transposes a slice of `n` elements into a matrix with `N` columns and `n`/`N` rows.
+///
+/// When `concurrent` feature is enabled, the slice will be transposed using multiple threads.
+///
+/// # Panics
+/// Panics if `n` is not divisible by `N`.
+pub fn transpose_slice<T: Copy + Send + Sync, const N: usize>(source: &[T]) -> Vec<[T; N]> {
+    let row_count = source.len() / N;
+    assert_eq!(
+        row_count * N,
+        source.len(),
+        "source length must be divisible by {}, but was {}",
+        N,
+        source.len()
+    );
+
+    let mut result: Vec<[T; N]> = unsafe { uninit_vector(row_count) };
+    crate::iter_mut!(result, 1024).enumerate().for_each(|(i, element)| {
+        for j in 0..N {
+            element[j] = source[i + j * row_count]
+        }
+    });
+    result
+}
+
+// RANDOMNESS (ported from Winterfell's winter-utils)
+// ================================================================================================
+
+/// Defines how `Self` can be read from a sequence of random bytes.
+pub trait Randomizable: Sized {
+    /// Size of `Self` in bytes.
+    ///
+    /// This is used to determine how many bytes should be passed to the
+    /// [from_random_bytes()](Self::from_random_bytes) function.
+    const VALUE_SIZE: usize;
+
+    /// Returns `Self` if the set of bytes forms a valid value, otherwise returns None.
+    fn from_random_bytes(source: &[u8]) -> Option<Self>;
+}
+
+impl Randomizable for u128 {
+    const VALUE_SIZE: usize = 16;
+
+    fn from_random_bytes(source: &[u8]) -> Option<Self> {
+        if let Ok(bytes) = source[..Self::VALUE_SIZE].try_into() {
+            Some(u128::from_le_bytes(bytes))
+        } else {
+            None
+        }
+    }
+}
+
+impl Randomizable for u64 {
+    const VALUE_SIZE: usize = 8;
+
+    fn from_random_bytes(source: &[u8]) -> Option<Self> {
+        if let Ok(bytes) = source[..Self::VALUE_SIZE].try_into() {
+            Some(u64::from_le_bytes(bytes))
+        } else {
+            None
+        }
+    }
+}
+
+impl Randomizable for u32 {
+    const VALUE_SIZE: usize = 4;
+
+    fn from_random_bytes(source: &[u8]) -> Option<Self> {
+        if let Ok(bytes) = source[..Self::VALUE_SIZE].try_into() {
+            Some(u32::from_le_bytes(bytes))
+        } else {
+            None
+        }
+    }
+}
+
+impl Randomizable for u16 {
+    const VALUE_SIZE: usize = 2;
+
+    fn from_random_bytes(source: &[u8]) -> Option<Self> {
+        if let Ok(bytes) = source[..Self::VALUE_SIZE].try_into() {
+            Some(u16::from_le_bytes(bytes))
+        } else {
+            None
+        }
+    }
+}
+
+impl Randomizable for u8 {
+    const VALUE_SIZE: usize = 1;
+
+    fn from_random_bytes(source: &[u8]) -> Option<Self> {
+        Some(source[0])
+    }
+}
+
+impl Randomizable for Felt {
+    const VALUE_SIZE: usize = 8;
+
+    fn from_random_bytes(source: &[u8]) -> Option<Self> {
+        if let Ok(bytes) = source[..Self::VALUE_SIZE].try_into() {
+            let value = u64::from_le_bytes(bytes);
+            // Ensure the value is within the field modulus
+            if value < Felt::ORDER_U64 {
+                Some(Felt::new(value))
+            } else {
+                None
+            }
+        } else {
+            None
+        }
+    }
+}
+
+// FELT SERIALIZATION
+// ================================================================================================
+
+impl Serializable for Felt {
+    fn write_into<W: ByteWriter>(&self, target: &mut W) {
+        target.write_u64(self.as_canonical_u64());
+    }
+
+    fn get_size_hint(&self) -> usize {
+        core::mem::size_of::<u64>()
+    }
+}
+
+impl Deserializable for Felt {
+    fn read_from<R: ByteReader>(source: &mut R) -> Result<Self, DeserializationError> {
+        Ok(Felt::new(source.read_u64()?))
+    }
 }

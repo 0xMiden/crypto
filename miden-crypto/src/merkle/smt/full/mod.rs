@@ -15,7 +15,8 @@ pub use leaf::SmtLeaf;
 
 mod proof;
 pub use proof::SmtProof;
-use winter_utils::{ByteReader, ByteWriter, Deserializable, DeserializationError, Serializable};
+
+use crate::utils::{ByteReader, ByteWriter, Deserializable, DeserializationError, Serializable};
 
 // Concurrent implementation
 #[cfg(feature = "concurrent")]

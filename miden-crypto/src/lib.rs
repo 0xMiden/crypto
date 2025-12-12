@@ -15,6 +15,10 @@ pub mod rand;
 pub mod utils;
 pub mod word;
 
+// Test utilities for generating random data (used in tests and benchmarks)
+#[cfg(any(test, feature = "std"))]
+pub mod test_utils;
+
 // RE-EXPORTS
 // ================================================================================================
 
@@ -27,7 +31,6 @@ pub use p3_field::{
     batch_multiplicative_inverse, extension::BinomialExtensionField,
 };
 pub use p3_goldilocks::{Goldilocks as Felt, Poseidon2Goldilocks};
-pub use winter_math::fields::{CubeExtension, QuadExtension};
 pub use word::{Word, WordError};
 
 pub use crate::hash::algebraic_sponge::AlgebraicSponge;

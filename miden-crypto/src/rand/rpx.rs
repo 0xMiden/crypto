@@ -2,7 +2,6 @@ use alloc::{string::ToString, vec::Vec};
 
 use p3_field::{ExtensionField, PrimeField64};
 use rand_core::impls;
-use winter_crypto::RandomCoinError;
 
 use super::{Felt, FeltRng, RngCore, Word};
 use crate::{
@@ -82,16 +81,13 @@ impl RpxRandomCoin {
         self.state[self.current - 1]
     }
 
-    pub fn draw_ext_field<E: ExtensionField<Felt>>(&mut self) -> Result<E, RandomCoinError> {
+    pub fn draw_ext_field<E: ExtensionField<Felt>>(&mut self) -> E {
         let ext_degree = E::DIMENSION;
         let mut result = vec![ZERO; ext_degree];
         for r in result.iter_mut().take(ext_degree) {
             *r = self.draw_basefield();
         }
-        match E::from_basis_coefficients_slice(&result) {
-            Some(p) => Ok(p),
-            None => Err(RandomCoinError::FailedToDrawFieldElement(ext_degree)),
-        }
+        E::from_basis_coefficients_slice(&result).expect("failed to draw extension field element")
     }
 
     pub fn reseed(&mut self, data: Word) {
@@ -127,7 +123,7 @@ impl RpxRandomCoin {
         num_values: usize,
         domain_size: usize,
         nonce: u64,
-    ) -> Result<Vec<usize>, RandomCoinError> {
+    ) -> Vec<usize> {
         assert!(domain_size.is_power_of_two(), "domain size must be a power of two");
         assert!(num_values < domain_size, "number of values must be smaller than domain size");
 
@@ -157,11 +153,15 @@ impl RpxRandomCoin {
             }
         }
 
-        if values.len() < num_values {
-            return Err(RandomCoinError::FailedToDrawIntegers(num_values, values.len(), 1000));
-        }
+        assert_eq!(
+            values.len(),
+            num_values,
+            "failed to draw {} integers after 1000 iterations (got {})",
+            num_values,
+            values.len()
+        );
 
-        Ok(values)
+        values
     }
 }
 

@@ -3,9 +3,9 @@ use alloc::vec::Vec;
 use p3_field::PrimeField64;
 use p3_goldilocks::Goldilocks as Felt;
 use proptest::prelude::*;
-use rand_utils::rand_vector;
 
 use super::*;
+use crate::test_utils::rand_vector;
 
 #[test]
 fn blake3_hash_elements() {
