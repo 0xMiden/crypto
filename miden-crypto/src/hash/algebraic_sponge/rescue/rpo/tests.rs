@@ -1,3 +1,4 @@
+#![cfg(feature = "std")]
 use alloc::{collections::BTreeSet, vec::Vec};
 
 use proptest::prelude::*;

@@ -1,8 +1,9 @@
+#![cfg(feature = "std")]
 use super::*;
 
 #[test]
 fn sign_and_verify_roundtrip() {
-    use rand::rng;
+    use rand::thread_rng as rng;
 
     let mut rng = rng();
     let sk = SecretKey::with_rng(&mut rng);
@@ -16,7 +17,7 @@ fn sign_and_verify_roundtrip() {
 
 #[test]
 fn test_key_generation_serialization() {
-    let mut rng = rand::rng();
+    let mut rng = rand::thread_rng();
 
     let sk = SecretKey::with_rng(&mut rng);
     let pk = sk.public_key();
@@ -36,7 +37,7 @@ fn test_key_generation_serialization() {
 
 #[test]
 fn test_secret_key_debug_redaction() {
-    let mut rng = rand::rng();
+    let mut rng = rand::thread_rng();
     let sk = SecretKey::with_rng(&mut rng);
 
     // Verify Debug impl produces expected redacted output
@@ -50,7 +51,7 @@ fn test_secret_key_debug_redaction() {
 
 #[test]
 fn test_compute_challenge_k_equivalence() {
-    let mut rng = rand::rng();
+    let mut rng = rand::thread_rng();
     let sk = SecretKey::with_rng(&mut rng);
     let pk = sk.public_key();
 

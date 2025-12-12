@@ -28,11 +28,11 @@ pub trait FeltRng: RngCore {
 
 /// Generates a random field element for testing purposes.
 ///
-/// This function is only available with the `std` feature or in test code.
-#[cfg(any(test, feature = "std"))]
+/// This function is only available with the `std` feature.
+#[cfg(feature = "std")]
 pub fn random_felt() -> Felt {
     use rand::Rng;
-    let mut rng = rand::rng();
+    let mut rng = rand::thread_rng();
     // Goldilocks field order is 2^64 - 2^32 + 1
     // Generate a random u64 and reduce modulo the field order
     Felt::new(rng.random::<u64>())
@@ -40,8 +40,8 @@ pub fn random_felt() -> Felt {
 
 /// Generates a random word (4 field elements) for testing purposes.
 ///
-/// This function is only available with the `std` feature or in test code.
-#[cfg(any(test, feature = "std"))]
+/// This function is only available with the `std` feature.
+#[cfg(feature = "std")]
 pub fn random_word() -> Word {
     Word::new([random_felt(), random_felt(), random_felt(), random_felt()])
 }

@@ -1,3 +1,5 @@
+#![cfg(feature = "std")]
+
 use alloc::vec::Vec;
 
 use proptest::prelude::*;
@@ -35,7 +37,7 @@ macro_rules! test_roundtrip {
         $seal_method:ident,
         $unseal_method:ident
     ) => {
-        let mut rng = rand::rng();
+        let mut rng = rand::thread_rng();
         let sealed = $sealing_key.$seal_method(&mut rng, $plaintext).unwrap();
         let decrypted = $unsealing_key.$unseal_method(sealed).unwrap();
         prop_assert_eq!($plaintext.clone(), decrypted);
@@ -48,7 +50,7 @@ macro_rules! test_roundtrip {
         $seal_method:ident,
         $unseal_method:ident
     ) => {
-        let mut rng = rand::rng();
+        let mut rng = rand::thread_rng();
         let sealed = $sealing_key.$seal_method(&mut rng, $plaintext, $associated_data).unwrap();
         let decrypted = $unsealing_key.$unseal_method(sealed, $associated_data).unwrap();
         prop_assert_eq!($plaintext.clone(), decrypted);
@@ -64,7 +66,7 @@ macro_rules! test_basic_roundtrip {
         $seal_method:ident,
         $unseal_method:ident
     ) => {
-        let mut rng = rand::rng();
+        let mut rng = rand::thread_rng();
         let sealed = $sealing_key.$seal_method(&mut rng, $plaintext).unwrap();
         let decrypted = $unsealing_key.$unseal_method(sealed).unwrap();
         assert_eq!($plaintext, decrypted.as_slice());
@@ -77,7 +79,7 @@ macro_rules! test_basic_roundtrip {
         $seal_method:ident,
         $unseal_method:ident
     ) => {
-        let mut rng = rand::rng();
+        let mut rng = rand::thread_rng();
         let sealed = $sealing_key.$seal_method(&mut rng, $plaintext, $associated_data).unwrap();
         let decrypted = $unsealing_key.$unseal_method(sealed, $associated_data).unwrap();
         assert_eq!($plaintext, decrypted.as_slice());
@@ -95,7 +97,7 @@ mod k256_xchacha_tests {
 
     #[test]
     fn test_k256_xchacha_bytes_roundtrip() {
-        let mut rng = rand::rng();
+        let mut rng = rand::thread_rng();
         let plaintext = b"test bytes encryption";
         let secret_key = SecretKey::with_rng(&mut rng);
         let public_key = secret_key.public_key();
@@ -106,7 +108,7 @@ mod k256_xchacha_tests {
 
     #[test]
     fn test_k256_xchacha_bytes_with_associated_data() {
-        let mut rng = rand::rng();
+        let mut rng = rand::thread_rng();
         let plaintext = b"test bytes with associated data";
         let associated_data = b"authentication context";
         let secret_key = SecretKey::with_rng(&mut rng);
@@ -125,7 +127,7 @@ mod k256_xchacha_tests {
 
     #[test]
     fn test_k256_xchacha_elements_roundtrip() {
-        let mut rng = rand::rng();
+        let mut rng = rand::thread_rng();
         let plaintext = vec![crate::Felt::new(42), crate::Felt::new(1337), crate::Felt::new(9999)];
         let secret_key = SecretKey::with_rng(&mut rng);
         let public_key = secret_key.public_key();
@@ -142,7 +144,7 @@ mod k256_xchacha_tests {
 
     #[test]
     fn test_k256_xchacha_elements_with_associated_data() {
-        let mut rng = rand::rng();
+        let mut rng = rand::thread_rng();
         let plaintext = vec![crate::Felt::new(100), crate::Felt::new(200), crate::Felt::new(300)];
         let associated_data = vec![crate::Felt::new(999), crate::Felt::new(888)];
         let secret_key = SecretKey::with_rng(&mut rng);
@@ -161,7 +163,7 @@ mod k256_xchacha_tests {
 
     #[test]
     fn test_k256_xchacha_invalid_associated_data() {
-        let mut rng = rand::rng();
+        let mut rng = rand::thread_rng();
         let plaintext = b"test invalid associated data";
         let correct_ad = b"correct context";
         let incorrect_ad = b"wrong context";
@@ -182,7 +184,7 @@ mod k256_xchacha_tests {
             plaintext in arbitrary_bytes(),
             associated_data in arbitrary_bytes()
         ) {
-            let mut rng = rand::rng();
+            let mut rng = rand::thread_rng();
             let secret_key = SecretKey::with_rng(&mut rng);
             let public_key = secret_key.public_key();
             let sealing_key = SealingKey::K256XChaCha20Poly1305(public_key);
@@ -195,7 +197,7 @@ mod k256_xchacha_tests {
             plaintext in arbitrary_field_elements(),
             associated_data in arbitrary_field_elements()
         ) {
-            let mut rng = rand::rng();
+            let mut rng = rand::thread_rng();
             let secret_key = SecretKey::with_rng(&mut rng);
             let public_key = secret_key.public_key();
             let sealing_key = SealingKey::K256XChaCha20Poly1305(public_key);
@@ -208,7 +210,7 @@ mod k256_xchacha_tests {
             plaintext in arbitrary_bytes()
         ) {
             prop_assume!(!plaintext.is_empty());
-            let mut rng = rand::rng();
+            let mut rng = rand::thread_rng();
             let secret1 = SecretKey::with_rng(&mut rng);
             let public1 = secret1.public_key();
             let secret2 = SecretKey::with_rng(&mut rng);
@@ -227,7 +229,7 @@ mod x25519_xchacha_tests {
 
     #[test]
     fn test_x25519_xchacha_bytes_roundtrip() {
-        let mut rng = rand::rng();
+        let mut rng = rand::thread_rng();
         let plaintext = b"test bytes encryption";
         let secret_key = SecretKey25519::with_rng(&mut rng);
         let public_key = secret_key.public_key();
@@ -238,7 +240,7 @@ mod x25519_xchacha_tests {
 
     #[test]
     fn test_x25519_xchacha_bytes_with_associated_data() {
-        let mut rng = rand::rng();
+        let mut rng = rand::thread_rng();
         let plaintext = b"test bytes with associated data";
         let associated_data = b"authentication context";
         let secret_key = SecretKey25519::with_rng(&mut rng);
@@ -257,7 +259,7 @@ mod x25519_xchacha_tests {
 
     #[test]
     fn test_x25519_xchacha_elements_roundtrip() {
-        let mut rng = rand::rng();
+        let mut rng = rand::thread_rng();
         let plaintext = vec![crate::Felt::new(42), crate::Felt::new(1337), crate::Felt::new(9999)];
         let secret_key = SecretKey25519::with_rng(&mut rng);
         let public_key = secret_key.public_key();
@@ -274,7 +276,7 @@ mod x25519_xchacha_tests {
 
     #[test]
     fn test_x25519_xchacha_elements_with_associated_data() {
-        let mut rng = rand::rng();
+        let mut rng = rand::thread_rng();
         let plaintext = vec![crate::Felt::new(100), crate::Felt::new(200), crate::Felt::new(300)];
         let associated_data = vec![crate::Felt::new(999), crate::Felt::new(888)];
         let secret_key = SecretKey25519::with_rng(&mut rng);
@@ -293,7 +295,7 @@ mod x25519_xchacha_tests {
 
     #[test]
     fn test_x25519_xchacha_invalid_associated_data() {
-        let mut rng = rand::rng();
+        let mut rng = rand::thread_rng();
         let plaintext = b"test invalid associated data";
         let correct_ad = b"correct context";
         let incorrect_ad = b"wrong context";
@@ -314,7 +316,7 @@ mod x25519_xchacha_tests {
             plaintext in arbitrary_bytes(),
             associated_data in arbitrary_bytes()
         ) {
-            let mut rng = rand::rng();
+            let mut rng = rand::thread_rng();
             let secret_key = SecretKey25519::with_rng(&mut rng);
             let public_key = secret_key.public_key();
             let sealing_key = SealingKey::X25519XChaCha20Poly1305(public_key);
@@ -327,7 +329,7 @@ mod x25519_xchacha_tests {
             plaintext in arbitrary_field_elements(),
             associated_data in arbitrary_field_elements()
         ) {
-            let mut rng = rand::rng();
+            let mut rng = rand::thread_rng();
             let secret_key = SecretKey25519::with_rng(&mut rng);
             let public_key = secret_key.public_key();
             let sealing_key = SealingKey::X25519XChaCha20Poly1305(public_key);
@@ -340,7 +342,7 @@ mod x25519_xchacha_tests {
             plaintext in arbitrary_bytes()
         ) {
             prop_assume!(!plaintext.is_empty());
-            let mut rng = rand::rng();
+            let mut rng = rand::thread_rng();
             let secret1 = SecretKey25519::with_rng(&mut rng);
             let public1 = secret1.public_key();
             let secret2 = SecretKey25519::with_rng(&mut rng);
@@ -360,7 +362,7 @@ mod k256_aead_rpo_tests {
     // BYTES TESTS
     #[test]
     fn test_k256_aead_rpo_bytes_roundtrip() {
-        let mut rng = rand::rng();
+        let mut rng = rand::thread_rng();
         let plaintext = b"test bytes encryption";
         let secret_key = SecretKey::with_rng(&mut rng);
         let public_key = secret_key.public_key();
@@ -371,7 +373,7 @@ mod k256_aead_rpo_tests {
 
     #[test]
     fn test_k256_aead_rpo_bytes_with_associated_data() {
-        let mut rng = rand::rng();
+        let mut rng = rand::thread_rng();
         let plaintext = b"test bytes with associated data";
         let associated_data = b"authentication context";
         let secret_key = SecretKey::with_rng(&mut rng);
@@ -390,7 +392,7 @@ mod k256_aead_rpo_tests {
 
     #[test]
     fn test_k256_aead_rpo_invalid_associated_data() {
-        let mut rng = rand::rng();
+        let mut rng = rand::thread_rng();
         let plaintext = b"test invalid associated data";
         let correct_ad = b"correct context";
         let incorrect_ad = b"wrong context";
@@ -409,7 +411,7 @@ mod k256_aead_rpo_tests {
     #[test]
     fn test_k256_aead_rpo_field_elements_roundtrip() {
         use crate::Felt;
-        let mut rng = rand::rng();
+        let mut rng = rand::thread_rng();
         let plaintext = vec![Felt::new(1), Felt::new(2), Felt::new(3)];
         let secret_key = SecretKey::with_rng(&mut rng);
         let public_key = secret_key.public_key();
@@ -427,7 +429,7 @@ mod k256_aead_rpo_tests {
     #[test]
     fn test_k256_aead_rpo_field_elements_with_associated_data() {
         use crate::Felt;
-        let mut rng = rand::rng();
+        let mut rng = rand::thread_rng();
         let plaintext = vec![Felt::new(10), Felt::new(20)];
         let associated_data = vec![Felt::new(100), Felt::new(200)];
         let secret_key = SecretKey::with_rng(&mut rng);
@@ -450,7 +452,7 @@ mod k256_aead_rpo_tests {
             plaintext in arbitrary_bytes(),
             associated_data in arbitrary_bytes()
         ) {
-            let mut rng = rand::rng();
+            let mut rng = rand::thread_rng();
             let secret_key = SecretKey::with_rng(&mut rng);
             let public_key = secret_key.public_key();
             let sealing_key = SealingKey::K256AeadRpo(public_key);
@@ -463,7 +465,7 @@ mod k256_aead_rpo_tests {
             plaintext in arbitrary_field_elements(),
             associated_data in arbitrary_field_elements()
         ) {
-            let mut rng = rand::rng();
+            let mut rng = rand::thread_rng();
             let secret_key = SecretKey::with_rng(&mut rng);
             let public_key = secret_key.public_key();
             let sealing_key = SealingKey::K256AeadRpo(public_key);
@@ -476,7 +478,7 @@ mod k256_aead_rpo_tests {
             plaintext in arbitrary_bytes()
         ) {
             prop_assume!(!plaintext.is_empty());
-            let mut rng = rand::rng();
+            let mut rng = rand::thread_rng();
             let secret1 = SecretKey::with_rng(&mut rng);
             let public1 = secret1.public_key();
             let secret2 = SecretKey::with_rng(&mut rng);
@@ -496,7 +498,7 @@ mod x25519_aead_rpo_tests {
     // BYTES TESTS
     #[test]
     fn test_x25519_aead_rpo_bytes_roundtrip() {
-        let mut rng = rand::rng();
+        let mut rng = rand::thread_rng();
         let plaintext = b"test bytes encryption";
         let secret_key = SecretKey25519::with_rng(&mut rng);
         let public_key = secret_key.public_key();
@@ -507,7 +509,7 @@ mod x25519_aead_rpo_tests {
 
     #[test]
     fn test_x25519_aead_rpo_bytes_with_associated_data() {
-        let mut rng = rand::rng();
+        let mut rng = rand::thread_rng();
         let plaintext = b"test bytes with associated data";
         let associated_data = b"authentication context";
         let secret_key = SecretKey25519::with_rng(&mut rng);
@@ -526,7 +528,7 @@ mod x25519_aead_rpo_tests {
 
     #[test]
     fn test_x25519_aead_rpo_invalid_associated_data() {
-        let mut rng = rand::rng();
+        let mut rng = rand::thread_rng();
         let plaintext = b"test invalid associated data";
         let correct_ad = b"correct context";
         let incorrect_ad = b"wrong context";
@@ -545,7 +547,7 @@ mod x25519_aead_rpo_tests {
     #[test]
     fn test_x25519_aead_rpo_field_elements_roundtrip() {
         use crate::Felt;
-        let mut rng = rand::rng();
+        let mut rng = rand::thread_rng();
         let plaintext = vec![Felt::new(1), Felt::new(2), Felt::new(3)];
         let secret_key = SecretKey25519::with_rng(&mut rng);
         let public_key = secret_key.public_key();
@@ -563,7 +565,7 @@ mod x25519_aead_rpo_tests {
     #[test]
     fn test_x25519_aead_rpo_field_elements_with_associated_data() {
         use crate::Felt;
-        let mut rng = rand::rng();
+        let mut rng = rand::thread_rng();
         let plaintext = vec![Felt::new(10), Felt::new(20)];
         let associated_data = vec![Felt::new(100), Felt::new(200)];
         let secret_key = SecretKey25519::with_rng(&mut rng);
@@ -586,7 +588,7 @@ mod x25519_aead_rpo_tests {
             plaintext in arbitrary_bytes(),
             associated_data in arbitrary_bytes()
         ) {
-            let mut rng = rand::rng();
+            let mut rng = rand::thread_rng();
             let secret_key = SecretKey25519::with_rng(&mut rng);
             let public_key = secret_key.public_key();
             let sealing_key = SealingKey::X25519AeadRpo(public_key);
@@ -599,7 +601,7 @@ mod x25519_aead_rpo_tests {
             plaintext in arbitrary_field_elements(),
             associated_data in arbitrary_field_elements()
         ) {
-            let mut rng = rand::rng();
+            let mut rng = rand::thread_rng();
             let secret_key = SecretKey25519::with_rng(&mut rng);
             let public_key = secret_key.public_key();
             let sealing_key = SealingKey::X25519AeadRpo(public_key);
@@ -612,7 +614,7 @@ mod x25519_aead_rpo_tests {
             plaintext in arbitrary_bytes()
         ) {
             prop_assume!(!plaintext.is_empty());
-            let mut rng = rand::rng();
+            let mut rng = rand::thread_rng();
             let secret1 = SecretKey25519::with_rng(&mut rng);
             let public1 = secret1.public_key();
             let secret2 = SecretKey25519::with_rng(&mut rng);
@@ -635,7 +637,7 @@ mod scheme_compatibility_tests {
 
     #[test]
     fn test_scheme_mismatch_k256_xchacha_vs_aead_rpo() {
-        let mut rng = rand::rng();
+        let mut rng = rand::thread_rng();
         let plaintext = b"test scheme mismatch";
 
         // Seal with K256XChaCha20Poly1305
@@ -653,7 +655,7 @@ mod scheme_compatibility_tests {
 
     #[test]
     fn test_scheme_mismatch_x25519_xchacha_vs_aead_rpo() {
-        let mut rng = rand::rng();
+        let mut rng = rand::thread_rng();
         let plaintext = b"test scheme mismatch";
 
         // Seal with X25519XChaCha20Poly1305
@@ -671,7 +673,7 @@ mod scheme_compatibility_tests {
 
     #[test]
     fn test_cross_curve_mismatch_k256_vs_x25519() {
-        let mut rng = rand::rng();
+        let mut rng = rand::thread_rng();
         let plaintext = b"test cross-curve mismatch";
 
         // Seal with K256XChaCha20Poly1305
@@ -692,7 +694,7 @@ mod scheme_compatibility_tests {
         fn prop_general_scheme_mismatch_detection(
             plaintext in arbitrary_bytes()
         ) {
-            let mut rng = rand::rng();
+            let mut rng = rand::thread_rng();
             // Create keys for different schemes
             let secret_k256 = SecretKey::with_rng(&mut rng);
             let public_k256 = secret_k256.public_key();
@@ -720,7 +722,7 @@ mod protocol_tests {
 
     #[test]
     fn test_ephemeral_key_serialization_k256() {
-        let mut rng = rand::rng();
+        let mut rng = rand::thread_rng();
         let secret_key = SecretKey::with_rng(&mut rng);
         let public_key = secret_key.public_key();
         let sealing_key = SealingKey::K256XChaCha20Poly1305(public_key);
@@ -737,7 +739,7 @@ mod protocol_tests {
 
     #[test]
     fn test_ephemeral_key_serialization_x25519() {
-        let mut rng = rand::rng();
+        let mut rng = rand::thread_rng();
         let secret_key = SecretKey25519::with_rng(&mut rng);
         let public_key = secret_key.public_key();
         let sealing_key = SealingKey::X25519XChaCha20Poly1305(public_key);
@@ -757,7 +759,7 @@ mod protocol_tests {
         fn prop_sealed_message_format_consistency(
             plaintext in arbitrary_bytes()
         ) {
-            let mut rng = rand::rng();
+            let mut rng = rand::thread_rng();
             let secret_key = SecretKey::with_rng(&mut rng);
             let public_key = secret_key.public_key();
             let sealing_key = SealingKey::K256XChaCha20Poly1305(public_key);
@@ -778,7 +780,7 @@ mod protocol_tests {
 
     #[test]
     fn test_sealed_message_serialization_roundtrip_k256_xchacha() {
-        let mut rng = rand::rng();
+        let mut rng = rand::thread_rng();
         let sk = crate::dsa::ecdsa_k256_keccak::SecretKey::with_rng(&mut rng);
         let pk = sk.public_key();
         let sealing_key = SealingKey::K256XChaCha20Poly1305(pk);
@@ -798,7 +800,7 @@ mod protocol_tests {
 
     #[test]
     fn test_sealed_message_serialization_roundtrip_x25519_xchacha() {
-        let mut rng = rand::rng();
+        let mut rng = rand::thread_rng();
         let sk = crate::dsa::eddsa_25519_sha512::SecretKey::with_rng(&mut rng);
         let pk = sk.public_key();
         let sealing_key = SealingKey::X25519XChaCha20Poly1305(pk);
@@ -818,7 +820,7 @@ mod protocol_tests {
 
     #[test]
     fn test_sealed_message_serialization_roundtrip_k256_aeadrpo() {
-        let mut rng = rand::rng();
+        let mut rng = rand::thread_rng();
         let sk = crate::dsa::ecdsa_k256_keccak::SecretKey::with_rng(&mut rng);
         let pk = sk.public_key();
         let sealing_key = SealingKey::K256AeadRpo(pk);
@@ -838,7 +840,7 @@ mod protocol_tests {
 
     #[test]
     fn test_sealed_message_serialization_roundtrip_x25519_aeadrpo() {
-        let mut rng = rand::rng();
+        let mut rng = rand::thread_rng();
         let sk = crate::dsa::eddsa_25519_sha512::SecretKey::with_rng(&mut rng);
         let pk = sk.public_key();
         let sealing_key = SealingKey::X25519AeadRpo(pk);
@@ -871,7 +873,7 @@ mod integration_tests {
             field_values in prop::collection::vec(any::<u64>(), 1..10)
         ) {
             use crate::Felt;
-            let mut rng = rand::rng();
+            let mut rng = rand::thread_rng();
             let secret_key = SecretKey25519::with_rng(&mut rng);
             let public_key = secret_key.public_key();
             let sealing_key = SealingKey::X25519AeadRpo(public_key);
@@ -895,7 +897,7 @@ mod integration_tests {
             plaintext in arbitrary_bytes()
         ) {
             prop_assume!(!plaintext.is_empty());
-            let mut rng = rand::rng();
+            let mut rng = rand::thread_rng();
 
             // Create two different key pairs
             let secret1 = SecretKey::with_rng(&mut rng);
@@ -966,7 +968,7 @@ mod keys_serialization_tests {
     }
 
     fn sample_sealing_keys() -> Vec<SealingKey> {
-        let mut rng = rand::rng();
+        let mut rng = rand::thread_rng();
         vec![
             SealingKey::K256XChaCha20Poly1305(SecretKey::with_rng(&mut rng).public_key()),
             SealingKey::X25519XChaCha20Poly1305(SecretKey25519::with_rng(&mut rng).public_key()),
@@ -976,7 +978,7 @@ mod keys_serialization_tests {
     }
 
     fn sample_unsealing_keys() -> Vec<UnsealingKey> {
-        let mut rng = rand::rng();
+        let mut rng = rand::thread_rng();
         vec![
             UnsealingKey::K256XChaCha20Poly1305(SecretKey::with_rng(&mut rng)),
             UnsealingKey::X25519XChaCha20Poly1305(SecretKey25519::with_rng(&mut rng)),

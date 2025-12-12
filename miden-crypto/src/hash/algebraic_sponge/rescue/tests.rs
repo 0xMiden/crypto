@@ -1,3 +1,4 @@
+#![cfg(feature = "std")]
 use p3_field::PrimeCharacteristicRing;
 
 use super::{ALPHA, Felt, INV_ALPHA};

@@ -406,7 +406,7 @@ impl Deserializable for PartialSmt {
 // TESTS
 // ================================================================================================
 
-#[cfg(test)]
+#[cfg(all(test, feature = "std"))]
 mod tests {
 
     use alloc::collections::{BTreeMap, BTreeSet};

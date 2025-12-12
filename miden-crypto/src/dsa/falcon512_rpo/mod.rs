@@ -31,7 +31,7 @@
 //! [1]: https://github.com/algorand/falcon/blob/main/falcon-det.pdf
 //! [2]: https://datatracker.ietf.org/doc/html/rfc6979#section-3.5
 
-#[cfg(test)]
+#[cfg(all(test, feature = "std"))]
 use rand::Rng;
 
 use crate::{
@@ -104,7 +104,7 @@ pub const SK_LEN: usize = 1281;
 const SIG_POLY_BYTE_LEN: usize = 625;
 
 /// Signature size when serialized as a u8 vector.
-#[cfg(test)]
+#[cfg(all(test, feature = "std"))]
 const SIG_SERIALIZED_LEN: usize = 1524;
 
 /// Bound on the squared-norm of the signature.
@@ -148,8 +148,8 @@ impl Nonce {
     ///
     /// This is used only in testing against the test vectors of the reference (non-deterministic)
     /// Falcon DSA implementation.
-    #[cfg(test)]
-    pub fn random<R: Rng>(rng: &mut R) -> Self {
+    #[cfg(all(test, feature = "std"))]
+    pub fn random<R: rand::Rng>(rng: &mut R) -> Self {
         let mut nonce_bytes = [0u8; SIG_NONCE_LEN];
         rng.fill_bytes(&mut nonce_bytes);
         Self::from_bytes(nonce_bytes)

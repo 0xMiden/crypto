@@ -1,3 +1,4 @@
+#![cfg(feature = "std")]
 use alloc::string::String;
 
 use super::{Deserializable, Felt, Serializable, WORD_SIZE_BYTES, WORD_SIZE_FELT, Word};

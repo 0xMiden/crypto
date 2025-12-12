@@ -1,4 +1,5 @@
-use rand::rng;
+#![cfg(feature = "std")]
+use rand::thread_rng as rng;
 
 use super::*;
 use crate::Felt;

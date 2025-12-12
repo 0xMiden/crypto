@@ -1,3 +1,4 @@
+#![cfg(feature = "std")]
 //! The functional tests for the history component.
 
 use super::{CompactLeaf, History, LeafChanges, NodeChanges, error::Result};

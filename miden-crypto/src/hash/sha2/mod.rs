@@ -20,7 +20,7 @@ use core::{
 use p3_field::{BasedVectorSpace, PrimeField64};
 use sha2::Digest as Sha2Digest;
 
-use super::{Digest, Felt, Hasher, HasherExt};
+use super::{Felt, HasherExt};
 use crate::utils::{
     ByteReader, ByteWriter, Deserializable, DeserializationError, HexParseError, Serializable,
     bytes_to_hex_string, hex_to_bytes,
@@ -46,6 +46,10 @@ const DIGEST512_BYTES: usize = 64;
 pub struct Sha256Digest([u8; DIGEST256_BYTES]);
 
 impl Sha256Digest {
+    pub fn as_bytes(&self) -> &[u8; DIGEST256_BYTES] {
+        &self.0
+    }
+
     pub fn digests_as_bytes(digests: &[Sha256Digest]) -> &[u8] {
         let p = digests.as_ptr();
         let len = digests.len() * DIGEST256_BYTES;
@@ -81,7 +85,7 @@ impl From<[u8; DIGEST256_BYTES]> for Sha256Digest {
 
 impl From<Sha256Digest> for String {
     fn from(value: Sha256Digest) -> Self {
-        bytes_to_hex_string(value.as_bytes())
+        bytes_to_hex_string(*value.as_bytes())
     }
 }
 
@@ -105,12 +109,6 @@ impl Deserializable for Sha256Digest {
     }
 }
 
-impl Digest for Sha256Digest {
-    fn as_bytes(&self) -> [u8; 32] {
-        self.0
-    }
-}
-
 // SHA256 HASHER
 // ================================================================================================
 
@@ -119,6 +117,8 @@ impl Digest for Sha256Digest {
 pub struct Sha256;
 
 impl HasherExt for Sha256 {
+    type Digest = Sha256Digest;
+
     fn hash_iter<'a>(slices: impl Iterator<Item = &'a [u8]>) -> Self::Digest {
         let mut hasher = sha2::Sha256::new();
         for slice in slices {
@@ -128,24 +128,22 @@ impl HasherExt for Sha256 {
     }
 }
 
-impl Hasher for Sha256 {
+impl Sha256 {
     /// SHA-256 collision resistance is 128-bits for 32-bytes output.
-    const COLLISION_RESISTANCE: u32 = 128;
+    pub const COLLISION_RESISTANCE: u32 = 128;
 
-    type Digest = Sha256Digest;
-
-    fn hash(bytes: &[u8]) -> Self::Digest {
+    pub fn hash(bytes: &[u8]) -> Sha256Digest {
         let mut hasher = sha2::Sha256::new();
         hasher.update(bytes);
 
         Sha256Digest(hasher.finalize().into())
     }
 
-    fn merge(values: &[Self::Digest; 2]) -> Self::Digest {
+    pub fn merge(values: &[Sha256Digest; 2]) -> Sha256Digest {
         Self::hash(prepare_merge(values))
     }
 
-    fn merge_many(values: &[Self::Digest]) -> Self::Digest {
+    pub fn merge_many(values: &[Sha256Digest]) -> Sha256Digest {
         let data = Sha256Digest::digests_as_bytes(values);
         let mut hasher = sha2::Sha256::new();
         hasher.update(data);
@@ -153,36 +151,18 @@ impl Hasher for Sha256 {
         Sha256Digest(hasher.finalize().into())
     }
 
-    fn merge_with_int(seed: Self::Digest, value: u64) -> Self::Digest {
+    pub fn merge_with_int(seed: Sha256Digest, value: u64) -> Sha256Digest {
         let mut hasher = sha2::Sha256::new();
         hasher.update(seed.0);
         hasher.update(value.to_le_bytes());
 
         Sha256Digest(hasher.finalize().into())
     }
-}
-
-impl Sha256 {
-    /// Returns a hash of the provided sequence of bytes.
-    #[inline(always)]
-    pub fn hash(bytes: &[u8]) -> Sha256Digest {
-        <Self as Hasher>::hash(bytes)
-    }
-
-    /// Returns a hash of two digests. This method is intended for use in construction of
-    /// Merkle trees and verification of Merkle paths.
-    #[inline(always)]
-    pub fn merge(values: &[Sha256Digest; 2]) -> Sha256Digest {
-        <Self as Hasher>::merge(values)
-    }
 
     /// Returns a hash of the provided field elements.
     #[inline(always)]
-    pub fn hash_elements<E>(elements: &[E]) -> Sha256Digest
-    where
-        E: BasedVectorSpace<Felt>,
-    {
-        hash_elements_256(elements).into()
+    pub fn hash_elements<E: BasedVectorSpace<Felt>>(elements: &[E]) -> Sha256Digest {
+        Sha256Digest(hash_elements_256(elements))
     }
 
     /// Hashes an iterator of byte slices.

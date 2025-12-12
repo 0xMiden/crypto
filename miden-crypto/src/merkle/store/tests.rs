@@ -1,3 +1,4 @@
+#![cfg(feature = "std")]
 use assert_matches::assert_matches;
 use p3_field::integers::QuotientMap;
 use seq_macro::seq;

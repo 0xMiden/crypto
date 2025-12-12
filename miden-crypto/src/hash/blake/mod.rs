@@ -184,9 +184,7 @@ impl Blake3_192 {
     /// Blake3 collision resistance is 96-bits for 24-bytes output.
     pub const COLLISION_RESISTANCE: u32 = 96;
 
-    type Digest = Blake3Digest<24>;
-
-    fn hash(bytes: &[u8]) -> Self::Digest {
+    pub fn hash(bytes: &[u8]) -> Blake3Digest<24> {
         Blake3Digest(shrink_array(blake3::hash(bytes).into()))
     }
 
@@ -242,9 +240,7 @@ impl Blake3_160 {
     /// Blake3 collision resistance is 80-bits for 20-bytes output.
     pub const COLLISION_RESISTANCE: u32 = 80;
 
-    type Digest = Blake3Digest<20>;
-
-    fn hash(bytes: &[u8]) -> Self::Digest {
+    pub fn hash(bytes: &[u8]) -> Blake3Digest<20> {
         Blake3Digest(shrink_array(blake3::hash(bytes).into()))
     }
 

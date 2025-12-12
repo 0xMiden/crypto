@@ -13,7 +13,7 @@ pub(crate) use secret_key::{WIDTH_BIG_POLY_COEFFICIENT, WIDTH_SMALL_POLY_COEFFIC
 // TESTS
 // ================================================================================================
 
-#[cfg(test)]
+#[cfg(all(test, feature = "std"))]
 mod tests {
     use rand::SeedableRng;
     use rand_chacha::ChaCha20Rng;

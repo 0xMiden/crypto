@@ -31,7 +31,7 @@ use crate::{
     zeroize::{Zeroize, ZeroizeOnDrop},
 };
 
-#[cfg(test)]
+#[cfg(all(test, feature = "std"))]
 mod test;
 
 // CONSTANTS
@@ -158,7 +158,7 @@ impl SecretKey {
     #[cfg(feature = "std")]
     #[allow(clippy::new_without_default)]
     pub fn new() -> Self {
-        let mut rng = rand::rng();
+        let mut rng = rand::thread_rng();
         Self::with_rng(&mut rng)
     }
 
@@ -208,7 +208,7 @@ impl SecretKey {
         data: &[Felt],
         associated_data: &[Felt],
     ) -> Result<EncryptedData, EncryptionError> {
-        let mut rng = rand::rng();
+        let mut rng = rand::thread_rng();
         let nonce = Nonce::with_rng(&mut rng);
 
         self.encrypt_elements_with_nonce(data, associated_data, nonce)
@@ -276,7 +276,7 @@ impl SecretKey {
         data: &[u8],
         associated_data: &[u8],
     ) -> Result<EncryptedData, EncryptionError> {
-        let mut rng = rand::rng();
+        let mut rng = rand::thread_rng();
         let nonce = Nonce::with_rng(&mut rng);
 
         self.encrypt_bytes_with_nonce(data, associated_data, nonce)

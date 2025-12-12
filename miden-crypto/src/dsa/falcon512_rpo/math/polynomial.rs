@@ -648,7 +648,7 @@ impl<F: Zeroize> ZeroizeOnDrop for Polynomial<F> {}
 // TESTS
 // ================================================================================================
 
-#[cfg(test)]
+#[cfg(all(test, feature = "std"))]
 mod tests {
     use super::{FalconFelt, N, Polynomial};
 
