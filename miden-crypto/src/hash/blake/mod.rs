@@ -1,6 +1,6 @@
 use alloc::string::String;
 use core::{
-    mem::{size_of, transmute, transmute_copy},
+    mem::size_of,
     ops::Deref,
     slice::{self, from_raw_parts},
 };
@@ -31,6 +31,7 @@ const DIGEST20_BYTES: usize = 20;
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd)]
 #[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 #[cfg_attr(feature = "serde", serde(into = "String", try_from = "&str"))]
+#[repr(transparent)]
 pub struct Blake3Digest<const N: usize>([u8; N]);
 
 impl<const N: usize> Blake3Digest<N> {
@@ -198,7 +199,7 @@ impl HasherExt for Blake3_192 {
         for slice in slices {
             hasher.update(slice);
         }
-        Blake3Digest(*shrink_bytes(&hasher.finalize().into()))
+        Blake3Digest(shrink_array(hasher.finalize().into()))
     }
 }
 
@@ -209,12 +210,12 @@ impl Hasher for Blake3_192 {
     type Digest = Blake3Digest<24>;
 
     fn hash(bytes: &[u8]) -> Self::Digest {
-        Blake3Digest(*shrink_bytes(&blake3::hash(bytes).into()))
+        Blake3Digest(shrink_array(blake3::hash(bytes).into()))
     }
 
     fn merge_many(values: &[Self::Digest]) -> Self::Digest {
         let bytes = Blake3Digest::digests_as_bytes(values);
-        Blake3Digest(*shrink_bytes(&blake3::hash(bytes).into()))
+        Blake3Digest(shrink_array(blake3::hash(bytes).into()))
     }
 
     fn merge(values: &[Self::Digest; 2]) -> Self::Digest {
@@ -225,7 +226,7 @@ impl Hasher for Blake3_192 {
         let mut hasher = blake3::Hasher::new();
         hasher.update(&seed.0);
         hasher.update(&value.to_le_bytes());
-        Blake3Digest(*shrink_bytes(&hasher.finalize().into()))
+        Blake3Digest(shrink_array(hasher.finalize().into()))
     }
 }
 
@@ -283,7 +284,7 @@ impl HasherExt for Blake3_160 {
         for slice in slices {
             hasher.update(slice);
         }
-        Blake3Digest(*shrink_bytes(&hasher.finalize().into()))
+        Blake3Digest(shrink_array(hasher.finalize().into()))
     }
 }
 
@@ -294,7 +295,7 @@ impl Hasher for Blake3_160 {
     type Digest = Blake3Digest<20>;
 
     fn hash(bytes: &[u8]) -> Self::Digest {
-        Blake3Digest(*shrink_bytes(&blake3::hash(bytes).into()))
+        Blake3Digest(shrink_array(blake3::hash(bytes).into()))
     }
 
     fn merge(values: &[Self::Digest; 2]) -> Self::Digest {
@@ -303,14 +304,14 @@ impl Hasher for Blake3_160 {
 
     fn merge_many(values: &[Self::Digest]) -> Self::Digest {
         let bytes = Blake3Digest::digests_as_bytes(values);
-        Blake3Digest(*shrink_bytes(&blake3::hash(bytes).into()))
+        Blake3Digest(shrink_array(blake3::hash(bytes).into()))
     }
 
     fn merge_with_int(seed: Self::Digest, value: u64) -> Self::Digest {
         let mut hasher = blake3::Hasher::new();
         hasher.update(&seed.0);
         hasher.update(&value.to_le_bytes());
-        Blake3Digest(*shrink_bytes(&hasher.finalize().into()))
+        Blake3Digest(shrink_array(hasher.finalize().into()))
     }
 }
 
@@ -358,14 +359,6 @@ impl Blake3_160 {
 // HELPER FUNCTIONS
 // ================================================================================================
 
-/// Zero-copy ref shrink to array.
-fn shrink_bytes<const M: usize, const N: usize>(bytes: &[u8; M]) -> &[u8; N] {
-    // compile-time assertion
-    assert!(M >= N, "N should fit in M so it can be safely transmuted into a smaller slice!");
-    // safety: bytes len is asserted
-    unsafe { transmute(bytes) }
-}
-
 /// Hash the elements into bytes and shrink the output.
 fn hash_elements<const N: usize, E>(elements: &[E]) -> [u8; N]
 where
@@ -396,23 +389,27 @@ where
 
         hasher.finalize()
     };
-    *shrink_bytes(&digest.into())
+
+    shrink_array(digest.into())
+}
+
+/// Shrinks an array.
+///
+/// Due to compiler optimizations, this function is zero-copy.
+fn shrink_array<const M: usize, const N: usize>(source: [u8; M]) -> [u8; N] {
+    const {
+        assert!(M >= N, "size of destination should be smaller or equal than source");
+    }
+    core::array::from_fn(|i| source[i])
 }
 
 /// Owned bytes expansion.
 fn expand_bytes<const M: usize, const N: usize>(bytes: &[u8; M]) -> [u8; N] {
     // compile-time assertion
     assert!(M <= N, "M should fit in N so M can be expanded!");
-    // this branch is constant so it will be optimized to be either one of the variants in release
-    // mode
-    if M == N {
-        // safety: the sizes are checked to be the same
-        unsafe { transmute_copy(bytes) }
-    } else {
-        let mut expanded = [0u8; N];
-        expanded[..M].copy_from_slice(bytes);
-        expanded
-    }
+    let mut expanded = [0u8; N];
+    expanded[..M].copy_from_slice(bytes);
+    expanded
 }
 
 // Cast the slice into contiguous bytes.
