@@ -1,4 +1,6 @@
 #![cfg(feature = "std")]
+#![allow(deprecated)]
+
 use super::*;
 
 #[test]

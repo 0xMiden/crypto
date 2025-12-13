@@ -1,4 +1,6 @@
 #![no_std]
+// Allow deprecated rand::thread_rng - we use it for compatibility with no-std builds
+#![allow(deprecated)]
 
 #[macro_use]
 extern crate alloc;

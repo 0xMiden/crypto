@@ -31,9 +31,6 @@
 //! [1]: https://github.com/algorand/falcon/blob/main/falcon-det.pdf
 //! [2]: https://datatracker.ietf.org/doc/html/rfc6979#section-3.5
 
-#[cfg(all(test, feature = "std"))]
-use rand::Rng;
-
 use crate::{
     Felt, ZERO,
     hash::rpo::Rpo256,

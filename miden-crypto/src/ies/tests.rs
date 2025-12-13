@@ -1,4 +1,5 @@
 #![cfg(feature = "std")]
+#![allow(deprecated)]
 
 use alloc::vec::Vec;
 

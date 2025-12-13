@@ -63,19 +63,14 @@ name    = "rand"
 
 [features]
 concurrent = ["dep:rayon", "hashbrown?/rayon"]
-default = ["concurrent", "std"]
+default    = ["concurrent", "std"]
 executable = ["dep:clap", "std"]
-fuzzing = []
-hashmaps = ["dep:hashbrown"]
-internal = []
-rocksdb = ["concurrent", "dep:rocksdb"]
-serde = ["dep:serde", "serde?/alloc"]
-std = [
-  "blake3/std",
-  "dep:cc",
-  "rand/std",
-  "rand/thread_rng",
-]
+fuzzing    = []
+hashmaps   = ["dep:hashbrown"]
+internal   = []
+rocksdb    = ["concurrent", "dep:rocksdb"]
+serde      = ["dep:serde", "serde?/alloc"]
+std        = ["blake3/std", "dep:cc", "rand/std", "rand/thread_rng"]
 
 [dependencies]
 blake3                        = { default-features = false, version = "1.8" }

@@ -2,9 +2,9 @@
 use alloc::vec::Vec;
 
 use proptest::prelude::*;
-use crate::test_utils::rand_vector;
 
 use super::*;
+use crate::test_utils::rand_vector;
 
 // SHA-256 TESTS
 // ================================================================================================

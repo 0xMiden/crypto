@@ -1,4 +1,6 @@
 #![cfg(feature = "std")]
+#![allow(deprecated)]
+
 use alloc::{
     collections::{BTreeMap, BTreeSet},
     vec::Vec,
