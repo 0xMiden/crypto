@@ -204,6 +204,190 @@ impl<T: Deserializable> Deserializable for Option<T> {
     }
 }
 
+// ================================================================================================
+// TUPLE IMPLEMENTATIONS
+// ================================================================================================
+
+// 1-tuple
+impl<T1: Serializable> Serializable for (T1,) {
+    fn write_into<W: ByteWrite + ?Sized>(&self, target: &mut W) -> Result<(), W::Error> {
+        self.0.write_into(target)
+    }
+
+    fn get_size_hint(&self) -> usize {
+        self.0.get_size_hint()
+    }
+}
+
+impl<T1: Deserializable> Deserializable for (T1,) {
+    fn read_from<R: ByteRead>(source: &mut R) -> Result<Self, R::Error> {
+        Ok((T1::read_from(source)?,))
+    }
+}
+
+// 2-tuple
+impl<T1: Serializable, T2: Serializable> Serializable for (T1, T2) {
+    fn write_into<W: ByteWrite + ?Sized>(&self, target: &mut W) -> Result<(), W::Error> {
+        self.0.write_into(target)?;
+        self.1.write_into(target)
+    }
+
+    fn get_size_hint(&self) -> usize {
+        self.0.get_size_hint() + self.1.get_size_hint()
+    }
+}
+
+impl<T1: Deserializable, T2: Deserializable> Deserializable for (T1, T2) {
+    fn read_from<R: ByteRead>(source: &mut R) -> Result<Self, R::Error> {
+        Ok((T1::read_from(source)?, T2::read_from(source)?))
+    }
+}
+
+// 3-tuple
+impl<T1: Serializable, T2: Serializable, T3: Serializable> Serializable for (T1, T2, T3) {
+    fn write_into<W: ByteWrite + ?Sized>(&self, target: &mut W) -> Result<(), W::Error> {
+        self.0.write_into(target)?;
+        self.1.write_into(target)?;
+        self.2.write_into(target)
+    }
+
+    fn get_size_hint(&self) -> usize {
+        self.0.get_size_hint() + self.1.get_size_hint() + self.2.get_size_hint()
+    }
+}
+
+impl<T1: Deserializable, T2: Deserializable, T3: Deserializable> Deserializable for (T1, T2, T3) {
+    fn read_from<R: ByteRead>(source: &mut R) -> Result<Self, R::Error> {
+        Ok((
+            T1::read_from(source)?,
+            T2::read_from(source)?,
+            T3::read_from(source)?,
+        ))
+    }
+}
+
+// 4-tuple
+impl<T1: Serializable, T2: Serializable, T3: Serializable, T4: Serializable> Serializable
+    for (T1, T2, T3, T4)
+{
+    fn write_into<W: ByteWrite + ?Sized>(&self, target: &mut W) -> Result<(), W::Error> {
+        self.0.write_into(target)?;
+        self.1.write_into(target)?;
+        self.2.write_into(target)?;
+        self.3.write_into(target)
+    }
+
+    fn get_size_hint(&self) -> usize {
+        self.0.get_size_hint()
+            + self.1.get_size_hint()
+            + self.2.get_size_hint()
+            + self.3.get_size_hint()
+    }
+}
+
+impl<T1: Deserializable, T2: Deserializable, T3: Deserializable, T4: Deserializable>
+    Deserializable for (T1, T2, T3, T4)
+{
+    fn read_from<R: ByteRead>(source: &mut R) -> Result<Self, R::Error> {
+        Ok((
+            T1::read_from(source)?,
+            T2::read_from(source)?,
+            T3::read_from(source)?,
+            T4::read_from(source)?,
+        ))
+    }
+}
+
+// 5-tuple
+impl<T1: Serializable, T2: Serializable, T3: Serializable, T4: Serializable, T5: Serializable>
+    Serializable for (T1, T2, T3, T4, T5)
+{
+    fn write_into<W: ByteWrite + ?Sized>(&self, target: &mut W) -> Result<(), W::Error> {
+        self.0.write_into(target)?;
+        self.1.write_into(target)?;
+        self.2.write_into(target)?;
+        self.3.write_into(target)?;
+        self.4.write_into(target)
+    }
+
+    fn get_size_hint(&self) -> usize {
+        self.0.get_size_hint()
+            + self.1.get_size_hint()
+            + self.2.get_size_hint()
+            + self.3.get_size_hint()
+            + self.4.get_size_hint()
+    }
+}
+
+impl<
+        T1: Deserializable,
+        T2: Deserializable,
+        T3: Deserializable,
+        T4: Deserializable,
+        T5: Deserializable,
+    > Deserializable for (T1, T2, T3, T4, T5)
+{
+    fn read_from<R: ByteRead>(source: &mut R) -> Result<Self, R::Error> {
+        Ok((
+            T1::read_from(source)?,
+            T2::read_from(source)?,
+            T3::read_from(source)?,
+            T4::read_from(source)?,
+            T5::read_from(source)?,
+        ))
+    }
+}
+
+// 6-tuple
+impl<
+        T1: Serializable,
+        T2: Serializable,
+        T3: Serializable,
+        T4: Serializable,
+        T5: Serializable,
+        T6: Serializable,
+    > Serializable for (T1, T2, T3, T4, T5, T6)
+{
+    fn write_into<W: ByteWrite + ?Sized>(&self, target: &mut W) -> Result<(), W::Error> {
+        self.0.write_into(target)?;
+        self.1.write_into(target)?;
+        self.2.write_into(target)?;
+        self.3.write_into(target)?;
+        self.4.write_into(target)?;
+        self.5.write_into(target)
+    }
+
+    fn get_size_hint(&self) -> usize {
+        self.0.get_size_hint()
+            + self.1.get_size_hint()
+            + self.2.get_size_hint()
+            + self.3.get_size_hint()
+            + self.4.get_size_hint()
+            + self.5.get_size_hint()
+    }
+}
+
+impl<
+        T1: Deserializable,
+        T2: Deserializable,
+        T3: Deserializable,
+        T4: Deserializable,
+        T5: Deserializable,
+        T6: Deserializable,
+    > Deserializable for (T1, T2, T3, T4, T5, T6)
+{
+    fn read_from<R: ByteRead>(source: &mut R) -> Result<Self, R::Error> {
+        Ok((
+            T1::read_from(source)?,
+            T2::read_from(source)?,
+            T3::read_from(source)?,
+            T4::read_from(source)?,
+            T5::read_from(source)?,
+            T6::read_from(source)?,
+        ))
+    }
+}
+
 // Implement for fixed-size arrays
 impl<T: Serializable, const N: usize> Serializable for [T; N] {
     fn write_into<W: ByteWrite + ?Sized>(&self, target: &mut W) -> Result<(), W::Error> {
@@ -572,6 +756,77 @@ mod tests {
         // This just verifies compilation in no_std mode
         let value = 42u32;
         let _ = value.get_size_hint();
+    }
+
+    // =============================================================================================
+    // TUPLE IMPLEMENTATIONS TESTS
+    // =============================================================================================
+
+    #[test]
+    #[cfg(feature = "alloc")]
+    fn test_tuple_roundtrip() {
+        // Test 1-tuple
+        let value1 = (42u8,);
+        let bytes1 = value1.to_bytes();
+        let decoded1 = <(u8,)>::read_from_bytes(&bytes1).unwrap();
+        assert_eq!(value1, decoded1);
+        assert_eq!(bytes1.len(), 1);
+
+        // Test 2-tuple
+        let value2 = (1u8, 2u16);
+        let bytes2 = value2.to_bytes();
+        let decoded2 = <(u8, u16)>::read_from_bytes(&bytes2).unwrap();
+        assert_eq!(value2, decoded2);
+        assert_eq!(bytes2.len(), 3); // 1 + 2
+
+        // Test 3-tuple
+        let value3 = (1u8, 2u16, 3u32);
+        let bytes3 = value3.to_bytes();
+        let decoded3 = <(u8, u16, u32)>::read_from_bytes(&bytes3).unwrap();
+        assert_eq!(value3, decoded3);
+        assert_eq!(bytes3.len(), 7); // 1 + 2 + 4
+
+        // Test 4-tuple
+        let value4 = (1u8, 2u16, 3u32, 4u64);
+        let bytes4 = value4.to_bytes();
+        let decoded4 = <(u8, u16, u32, u64)>::read_from_bytes(&bytes4).unwrap();
+        assert_eq!(value4, decoded4);
+        assert_eq!(bytes4.len(), 15); // 1 + 2 + 4 + 8
+
+        // Test 5-tuple
+        let value5 = (1u8, 2u16, 3u32, 4u64, 5u128);
+        let bytes5 = value5.to_bytes();
+        let decoded5 = <(u8, u16, u32, u64, u128)>::read_from_bytes(&bytes5).unwrap();
+        assert_eq!(value5, decoded5);
+        assert_eq!(bytes5.len(), 31); // 1 + 2 + 4 + 8 + 16
+
+        // Test 6-tuple
+        let value6 = (1u8, 2u16, 3u32, 4u64, 5u128, 6u8);
+        let bytes6 = value6.to_bytes();
+        let decoded6 = <(u8, u16, u32, u64, u128, u8)>::read_from_bytes(&bytes6).unwrap();
+        assert_eq!(value6, decoded6);
+        assert_eq!(bytes6.len(), 32); // 1 + 2 + 4 + 8 + 16 + 1
+    }
+
+    #[test]
+    #[cfg(feature = "alloc")]
+    fn test_tuple_size_hints() {
+        assert_eq!((42u8,).get_size_hint(), 1);
+        assert_eq!((1u8, 2u16).get_size_hint(), 3);
+        assert_eq!((1u8, 2u16, 3u32).get_size_hint(), 7);
+        assert_eq!((1u8, 2u16, 3u32, 4u64).get_size_hint(), 15);
+        assert_eq!((1u8, 2u16, 3u32, 4u64, 5u128).get_size_hint(), 31);
+        assert_eq!((1u8, 2u16, 3u32, 4u64, 5u128, 6u8).get_size_hint(), 32);
+    }
+
+    #[test]
+    #[cfg(feature = "alloc")]
+    fn test_tuple_nested() {
+        // Test nested tuple with options
+        let value = (Some(1u32), None::<u32>, Some(3u32));
+        let bytes = value.to_bytes();
+        let decoded = <(Option<u32>, Option<u32>, Option<u32>)>::read_from_bytes(&bytes).unwrap();
+        assert_eq!(value, decoded);
     }
 
     // =============================================================================================
