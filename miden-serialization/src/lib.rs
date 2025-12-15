@@ -16,7 +16,7 @@ mod error;
 mod byte_read;
 mod byte_write;
 // mod traits;
-// mod slice_reader;
+mod slice_reader;
 // #[cfg(feature = "alloc")]
 // mod vec_writer;
 #[cfg(feature = "winterfell-compat")]
@@ -27,7 +27,7 @@ pub use error::DeserializationError;
 pub use byte_read::ByteRead;
 pub use byte_write::ByteWrite;
 // pub use traits::{Serializable, Deserializable};
-// pub use slice_reader::SliceReader;
+pub use slice_reader::SliceReader;
 
 // #[cfg(feature = "alloc")]
 // pub use vec_writer::VecWriter;
