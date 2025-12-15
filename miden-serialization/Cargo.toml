@@ -1,0 +1,25 @@
+[package]
+name = "miden-serialization"
+version = "0.1.0"
+description = "Serialization traits for Miden crypto primitives"
+authors.workspace = true
+categories.workspace = true
+edition.workspace = true
+keywords.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+
+[features]
+default = []
+std = ["embedded-io/std", "alloc", "embedded-io-adapters?/std"]
+alloc = []
+winterfell-compat = ["winter-utils"]
+
+[dependencies]
+embedded-io = { version = "0.7", default-features = false }
+embedded-io-adapters = { version = "0.7", optional = true, default-features = false }
+winter-utils = { version = "0.13", optional = true, default-features = false }
+
+[lints]
+workspace = true
