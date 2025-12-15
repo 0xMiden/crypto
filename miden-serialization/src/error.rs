@@ -33,7 +33,7 @@ impl fmt::Display for DeserializationError {
     }
 }
 
-// Implement core::error::Error for DeserializationError (available in core since Rust 1.81)
+// Implement core::error::Error for DeserializationError (required by embedded_io::Error)
 impl core::error::Error for DeserializationError {}
 
 // Implement embedded_io::Error for DeserializationError
@@ -43,6 +43,40 @@ impl embedded_io::Error for DeserializationError {
             Self::UnexpectedEOF => embedded_io::ErrorKind::Other,
             Self::InvalidValue(_) => embedded_io::ErrorKind::InvalidData,
             Self::UnknownError(_) => embedded_io::ErrorKind::Other,
+        }
+    }
+}
+
+/// Helper trait to convert errors to DeserializationError
+pub trait IntoDeserError {
+    fn into_deser_error(self) -> DeserializationError;
+}
+
+impl IntoDeserError for DeserializationError {
+    fn into_deser_error(self) -> DeserializationError {
+        self
+    }
+}
+
+// Allow converting from embedded_io ErrorKind
+impl IntoDeserError for embedded_io::ErrorKind {
+    #[cfg(feature = "alloc")]
+    fn into_deser_error(self) -> DeserializationError {
+        match self {
+            embedded_io::ErrorKind::InvalidData => {
+                DeserializationError::InvalidValue("invalid data".into())
+            }
+            _ => DeserializationError::UnknownError("io error".into()),
+        }
+    }
+
+    #[cfg(not(feature = "alloc"))]
+    fn into_deser_error(self) -> DeserializationError {
+        match self {
+            embedded_io::ErrorKind::InvalidData => {
+                DeserializationError::InvalidValue("invalid data")
+            }
+            _ => DeserializationError::UnknownError("io error"),
         }
     }
 }
