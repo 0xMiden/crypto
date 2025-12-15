@@ -17,8 +17,8 @@ mod byte_read;
 mod byte_write;
 // mod traits;
 mod slice_reader;
-// #[cfg(feature = "alloc")]
-// mod vec_writer;
+#[cfg(feature = "alloc")]
+mod vec_writer;
 #[cfg(feature = "winterfell-compat")]
 mod winterfell_bridge;
 
@@ -29,8 +29,8 @@ pub use byte_write::ByteWrite;
 // pub use traits::{Serializable, Deserializable};
 pub use slice_reader::SliceReader;
 
-// #[cfg(feature = "alloc")]
-// pub use vec_writer::VecWriter;
+#[cfg(feature = "alloc")]
+pub use vec_writer::VecWriter;
 
 // #[cfg(feature = "std")]
 // pub use embedded_io_adapters::blocking::{ReadAdapter as StdReadAdapter, WriteAdapter as StdWriteAdapter};
