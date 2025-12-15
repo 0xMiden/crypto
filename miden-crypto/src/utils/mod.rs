@@ -11,6 +11,17 @@ pub use winter_utils::{
     uninit_vector,
 };
 
+// Re-export new serialization traits from miden-serialization
+// These provide a modern embedded-io based alternative to winter-utils serialization
+pub use miden_serialization::{
+    ByteRead,
+    ByteWrite,
+    Deserializable as MidenDeserializable,
+    DeserializationError as MidenDeserializationError,
+    Serializable as MidenSerializable,
+    SliceReader as MidenSliceReader,
+};
+
 use crate::{Felt, FieldElement, StarkField, Word};
 
 // CONSTANTS

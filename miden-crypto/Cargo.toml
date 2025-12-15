@@ -73,6 +73,7 @@ serde = ["dep:serde", "serde?/alloc", "winter-math/serde"]
 std = [
   "blake3/std",
   "dep:cc",
+  "miden-serialization/std",
   "rand/std",
   "rand/thread_rng",
   "winter-crypto/std",
@@ -91,6 +92,7 @@ hashbrown                     = { features = ["serde"], optional = true, version
 hkdf                          = { default-features = false, version = "0.12" }
 k256                          = { features = ["ecdh", "ecdsa"], version = "0.13" }
 miden-crypto-derive.workspace = true
+miden-serialization.workspace = true
 num                           = { default-features = false, features = ["alloc", "libm"], version = "0.4" }
 num-complex                   = { default-features = false, version = "0.4" }
 rand                          = { default-features = false, version = "0.9" }
