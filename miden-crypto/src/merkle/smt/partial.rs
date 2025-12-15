@@ -303,6 +303,9 @@ impl PartialSmt {
             .map(|leaf| leaf.num_entries())
             .unwrap_or(0);
         let current_entries = leaf.num_entries();
+        // We insert even empty leaves into the leaves map. While not strictly necessary for
+        // tracking (empty leaves are implicitly trackable), storing them preserves the merkle
+        // path information and avoids the cost of implicit tracking lookups for these leaves.
         self.leaves.insert(current_index.value(), leaf);
 
         // Guaranteed not to over/underflow. All variables are <= MAX_LEAF_ENTRIES and result > 0.
