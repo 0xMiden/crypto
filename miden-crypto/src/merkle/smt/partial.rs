@@ -457,6 +457,41 @@ impl PartialSmt {
         }
         self.root = node_hash;
     }
+
+    /// Validates the internal structure during deserialization.
+    ///
+    /// Checks that:
+    /// - Each inner node's hash is consistent with its parent.
+    /// - Each leaf's hash is consistent with its parent inner node's left/right child.
+    fn validate(&self) -> Result<(), DeserializationError> {
+        // Validate each inner node is consistent with its parent
+        for (&idx, node) in &self.inner_nodes {
+            let node_hash = node.hash();
+            let expected_hash = self.get_node_hash(idx);
+
+            if node_hash != expected_hash {
+                return Err(DeserializationError::InvalidValue(
+                    "inner node hash is inconsistent with parent".into(),
+                ));
+            }
+        }
+
+        // Validate each leaf's hash is consistent with its parent inner node
+        for (&leaf_pos, leaf) in &self.leaves {
+            let leaf_index = LeafIndex::<SMT_DEPTH>::new_max_depth(leaf_pos);
+            let node_index: NodeIndex = leaf_index.into();
+            let leaf_hash = leaf.hash();
+            let expected_hash = self.get_node_hash(node_index);
+
+            if leaf_hash != expected_hash {
+                return Err(DeserializationError::InvalidValue(
+                    "leaf hash is inconsistent with parent inner node".into(),
+                ));
+            }
+        }
+
+        Ok(())
+    }
 }
 
 impl Default for PartialSmt {
@@ -521,7 +556,10 @@ impl Deserializable for PartialSmt {
 
         let num_entries = leaves.values().map(|leaf| leaf.num_entries()).sum();
 
-        Ok(Self { root, num_entries, leaves, inner_nodes })
+        let partial = Self { root, num_entries, leaves, inner_nodes };
+        partial.validate()?;
+
+        Ok(partial)
     }
 }
 
