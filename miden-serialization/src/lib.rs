@@ -3,7 +3,6 @@
 //! This crate provides serialization and deserialization traits built on top of
 //! the `embedded-io` ecosystem, supporting no_std environments.
 
-#![no_std]
 #![cfg_attr(not(feature = "std"), no_std)]
 
 #[cfg(feature = "alloc")]
@@ -37,4 +36,5 @@ pub use vec_writer::VecWriter;
 pub use embedded_io_adapters::blocking::{ReadAdapter as StdReadAdapter, WriteAdapter as StdWriteAdapter};
 
 // Type aliases for hybrid approach (Option C from design)
+/// Convenience type alias for serialization errors
 pub type SerError = DeserializationError;

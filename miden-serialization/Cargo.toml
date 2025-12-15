@@ -12,7 +12,7 @@ rust-version.workspace = true
 
 [features]
 default = []
-std = ["embedded-io/std", "alloc", "embedded-io-adapters?/std"]
+std = ["embedded-io/std", "alloc", "dep:embedded-io-adapters", "embedded-io-adapters?/std"]
 alloc = []
 winterfell-compat = ["winter-utils"]
 
