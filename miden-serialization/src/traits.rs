@@ -3,7 +3,11 @@
 use crate::{ByteRead, ByteWrite};
 
 #[cfg(feature = "alloc")]
-use alloc::vec::Vec;
+use alloc::{
+    collections::{BTreeMap, BTreeSet},
+    string::String,
+    vec::Vec,
+};
 
 /// Defines how to serialize `Self` into bytes.
 pub trait Serializable {
@@ -229,9 +233,147 @@ impl<T: Deserializable, const N: usize> Deserializable for [T; N] {
     }
 }
 
+// ================================================================================================
+// COLLECTION IMPLEMENTATIONS (requires alloc feature)
+// ================================================================================================
+
+// Implementations for slices (write length prefix)
+#[cfg(feature = "alloc")]
+impl<T: Serializable> Serializable for [T] {
+    fn write_into<W: ByteWrite + ?Sized>(&self, target: &mut W) -> Result<(), W::Error> {
+        target.write_usize(self.len())?;
+        for element in self {
+            element.write_into(target)?;
+        }
+        Ok(())
+    }
+
+    fn get_size_hint(&self) -> usize {
+        let len_size = crate::byte_write::usize_encoded_len(self.len() as u64);
+        let elements_size: usize = self.iter().map(|e| e.get_size_hint()).sum();
+        len_size + elements_size
+    }
+}
+
+#[cfg(feature = "alloc")]
+impl<T: Serializable> Serializable for Vec<T> {
+    fn write_into<W: ByteWrite + ?Sized>(&self, target: &mut W) -> Result<(), W::Error> {
+        target.write_usize(self.len())?;
+        for element in self {
+            element.write_into(target)?;
+        }
+        Ok(())
+    }
+
+    fn get_size_hint(&self) -> usize {
+        let len_size = crate::byte_write::usize_encoded_len(self.len() as u64);
+        let elements_size: usize = self.iter().map(|e| e.get_size_hint()).sum();
+        len_size + elements_size
+    }
+}
+
+#[cfg(feature = "alloc")]
+impl<T: Deserializable> Deserializable for Vec<T> {
+    fn read_from<R: ByteRead>(source: &mut R) -> Result<Self, R::Error> {
+        let len = source.read_usize()?;
+        source.read_many(len)
+    }
+}
+
+#[cfg(feature = "alloc")]
+impl Serializable for String {
+    fn write_into<W: ByteWrite + ?Sized>(&self, target: &mut W) -> Result<(), W::Error> {
+        target.write_usize(self.len())?;
+        ByteWrite::write_all(target, self.as_bytes())
+    }
+
+    fn get_size_hint(&self) -> usize {
+        crate::byte_write::usize_encoded_len(self.len() as u64) + self.len()
+    }
+}
+
+#[cfg(feature = "alloc")]
+impl Deserializable for String {
+    fn read_from<R: ByteRead>(source: &mut R) -> Result<Self, R::Error> {
+        let len = source.read_usize()?;
+        let mut bytes = alloc::vec![0u8; len];
+        for byte in bytes.iter_mut() {
+            *byte = source.read_u8()?;
+        }
+        String::from_utf8(bytes)
+            .map_err(|_| panic!("invalid UTF-8 string"))
+    }
+}
+
+#[cfg(feature = "alloc")]
+impl<K: Serializable, V: Serializable> Serializable for BTreeMap<K, V> {
+    fn write_into<W: ByteWrite + ?Sized>(&self, target: &mut W) -> Result<(), W::Error> {
+        target.write_usize(self.len())?;
+        for (k, v) in self {
+            k.write_into(target)?;
+            v.write_into(target)?;
+        }
+        Ok(())
+    }
+
+    fn get_size_hint(&self) -> usize {
+        let len_size = crate::byte_write::usize_encoded_len(self.len() as u64);
+        let entries_size: usize = self.iter()
+            .map(|(k, v)| k.get_size_hint() + v.get_size_hint())
+            .sum();
+        len_size + entries_size
+    }
+}
+
+#[cfg(feature = "alloc")]
+impl<K: Deserializable + Ord, V: Deserializable> Deserializable for BTreeMap<K, V> {
+    fn read_from<R: ByteRead>(source: &mut R) -> Result<Self, R::Error> {
+        let len = source.read_usize()?;
+        let mut map = BTreeMap::new();
+        for _ in 0..len {
+            let key = K::read_from(source)?;
+            let value = V::read_from(source)?;
+            map.insert(key, value);
+        }
+        Ok(map)
+    }
+}
+
+#[cfg(feature = "alloc")]
+impl<T: Serializable> Serializable for BTreeSet<T> {
+    fn write_into<W: ByteWrite + ?Sized>(&self, target: &mut W) -> Result<(), W::Error> {
+        target.write_usize(self.len())?;
+        for item in self {
+            item.write_into(target)?;
+        }
+        Ok(())
+    }
+
+    fn get_size_hint(&self) -> usize {
+        let len_size = crate::byte_write::usize_encoded_len(self.len() as u64);
+        let items_size: usize = self.iter().map(|item| item.get_size_hint()).sum();
+        len_size + items_size
+    }
+}
+
+#[cfg(feature = "alloc")]
+impl<T: Deserializable + Ord> Deserializable for BTreeSet<T> {
+    fn read_from<R: ByteRead>(source: &mut R) -> Result<Self, R::Error> {
+        let len = source.read_usize()?;
+        let mut set = BTreeSet::new();
+        for _ in 0..len {
+            set.insert(T::read_from(source)?);
+        }
+        Ok(set)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[cfg(feature = "alloc")]
+    use alloc::vec;
 
     #[test]
     fn test_unit_roundtrip() {
@@ -430,5 +572,182 @@ mod tests {
         // This just verifies compilation in no_std mode
         let value = 42u32;
         let _ = value.get_size_hint();
+    }
+
+    // =============================================================================================
+    // COLLECTION IMPLEMENTATIONS TESTS
+    // =============================================================================================
+
+    #[test]
+    #[cfg(feature = "alloc")]
+    fn test_vec_roundtrip() {
+        let value = vec![1u32, 2, 3, 4, 5];
+        let bytes = value.to_bytes();
+        let decoded = Vec::<u32>::read_from_bytes(&bytes).unwrap();
+        assert_eq!(value, decoded);
+    }
+
+    #[test]
+    #[cfg(feature = "alloc")]
+    fn test_vec_empty() {
+        let value: Vec<u32> = vec![];
+        let bytes = value.to_bytes();
+        let decoded = Vec::<u32>::read_from_bytes(&bytes).unwrap();
+        assert_eq!(value, decoded);
+        // Empty vec should only encode the length (1 byte for 0)
+        assert_eq!(bytes.len(), 1);
+    }
+
+    #[test]
+    #[cfg(feature = "alloc")]
+    fn test_vec_nested() {
+        let value = vec![vec![1u8, 2], vec![3, 4, 5], vec![6]];
+        let bytes = value.to_bytes();
+        let decoded = Vec::<Vec<u8>>::read_from_bytes(&bytes).unwrap();
+        assert_eq!(value, decoded);
+    }
+
+    #[test]
+    #[cfg(feature = "alloc")]
+    fn test_string_roundtrip() {
+        let value = String::from("Hello, world!");
+        let bytes = value.to_bytes();
+        let decoded = String::read_from_bytes(&bytes).unwrap();
+        assert_eq!(value, decoded);
+    }
+
+    #[test]
+    #[cfg(feature = "alloc")]
+    fn test_string_empty() {
+        let value = String::from("");
+        let bytes = value.to_bytes();
+        let decoded = String::read_from_bytes(&bytes).unwrap();
+        assert_eq!(value, decoded);
+        // Empty string should only encode length (1 byte for 0)
+        assert_eq!(bytes.len(), 1);
+    }
+
+    #[test]
+    #[cfg(feature = "alloc")]
+    fn test_string_unicode() {
+        let value = String::from("Hello, 世界! 🦀");
+        let bytes = value.to_bytes();
+        let decoded = String::read_from_bytes(&bytes).unwrap();
+        assert_eq!(value, decoded);
+    }
+
+    #[test]
+    #[cfg(feature = "alloc")]
+    fn test_btreemap_roundtrip() {
+        let mut value = BTreeMap::new();
+        value.insert(1u32, String::from("one"));
+        value.insert(2u32, String::from("two"));
+        value.insert(3u32, String::from("three"));
+
+        let bytes = value.to_bytes();
+        let decoded = BTreeMap::<u32, String>::read_from_bytes(&bytes).unwrap();
+        assert_eq!(value, decoded);
+    }
+
+    #[test]
+    #[cfg(feature = "alloc")]
+    fn test_btreemap_empty() {
+        let value: BTreeMap<u32, String> = BTreeMap::new();
+        let bytes = value.to_bytes();
+        let decoded = BTreeMap::<u32, String>::read_from_bytes(&bytes).unwrap();
+        assert_eq!(value, decoded);
+        // Empty map should only encode length (1 byte for 0)
+        assert_eq!(bytes.len(), 1);
+    }
+
+    #[test]
+    #[cfg(feature = "alloc")]
+    fn test_btreemap_nested() {
+        let mut inner1 = BTreeMap::new();
+        inner1.insert(1u8, 10u8);
+        inner1.insert(2u8, 20u8);
+
+        let mut inner2 = BTreeMap::new();
+        inner2.insert(3u8, 30u8);
+
+        let mut value = BTreeMap::new();
+        value.insert(String::from("a"), inner1);
+        value.insert(String::from("b"), inner2);
+
+        let bytes = value.to_bytes();
+        let decoded = BTreeMap::<String, BTreeMap<u8, u8>>::read_from_bytes(&bytes).unwrap();
+        assert_eq!(value, decoded);
+    }
+
+    #[test]
+    #[cfg(feature = "alloc")]
+    fn test_btreeset_roundtrip() {
+        let mut value = BTreeSet::new();
+        value.insert(1u32);
+        value.insert(2u32);
+        value.insert(3u32);
+        value.insert(5u32);
+        value.insert(8u32);
+
+        let bytes = value.to_bytes();
+        let decoded = BTreeSet::<u32>::read_from_bytes(&bytes).unwrap();
+        assert_eq!(value, decoded);
+    }
+
+    #[test]
+    #[cfg(feature = "alloc")]
+    fn test_btreeset_empty() {
+        let value: BTreeSet<u32> = BTreeSet::new();
+        let bytes = value.to_bytes();
+        let decoded = BTreeSet::<u32>::read_from_bytes(&bytes).unwrap();
+        assert_eq!(value, decoded);
+        // Empty set should only encode length (1 byte for 0)
+        assert_eq!(bytes.len(), 1);
+    }
+
+    #[test]
+    #[cfg(feature = "alloc")]
+    fn test_btreeset_strings() {
+        let mut value = BTreeSet::new();
+        value.insert(String::from("apple"));
+        value.insert(String::from("banana"));
+        value.insert(String::from("cherry"));
+
+        let bytes = value.to_bytes();
+        let decoded = BTreeSet::<String>::read_from_bytes(&bytes).unwrap();
+        assert_eq!(value, decoded);
+    }
+
+    #[test]
+    #[cfg(feature = "alloc")]
+    fn test_slice_serialization() {
+        let data = vec![1u32, 2, 3, 4, 5];
+        let slice: &[u32] = &data;
+        let bytes = slice.to_bytes();
+        let decoded = Vec::<u32>::read_from_bytes(&bytes).unwrap();
+        assert_eq!(data, decoded);
+    }
+
+    #[test]
+    #[cfg(feature = "alloc")]
+    fn test_collection_size_hints() {
+        let vec = vec![1u32, 2, 3];
+        // Length (1 byte) + 3 * 4 bytes
+        assert_eq!(vec.get_size_hint(), 1 + 12);
+
+        let string = String::from("hello");
+        // Length (1 byte) + 5 bytes
+        assert_eq!(string.get_size_hint(), 1 + 5);
+
+        let mut map = BTreeMap::new();
+        map.insert(1u32, 2u32);
+        // Length (1 byte) + 1 * (4 + 4) bytes
+        assert_eq!(map.get_size_hint(), 1 + 8);
+
+        let mut set = BTreeSet::new();
+        set.insert(1u32);
+        set.insert(2u32);
+        // Length (1 byte) + 2 * 4 bytes
+        assert_eq!(set.get_size_hint(), 1 + 8);
     }
 }

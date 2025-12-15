@@ -128,19 +128,20 @@ pub trait ByteRead: Read {
         }
     }
 
-    // /// Read many values into a vector (requires alloc feature)
-    // #[cfg(feature = "alloc")]
-    // fn read_many<D>(&mut self, num_elements: usize) -> Result<alloc::vec::Vec<D>, Self::Error>
-    // where
-    //     D: crate::Deserializable,
-    // {
-    //     let mut result = alloc::vec::Vec::with_capacity(num_elements);
-    //     for _ in 0..num_elements {
-    //         let element = D::read_from(self)?;
-    //         result.push(element);
-    //     }
-    //     Ok(result)
-    // }
+    /// Read many values into a vector (requires alloc feature)
+    #[cfg(feature = "alloc")]
+    fn read_many<D>(&mut self, num_elements: usize) -> Result<alloc::vec::Vec<D>, Self::Error>
+    where
+        D: crate::Deserializable,
+        Self: Sized,
+    {
+        let mut result = alloc::vec::Vec::with_capacity(num_elements);
+        for _ in 0..num_elements {
+            let element = D::read_from(self)?;
+            result.push(element);
+        }
+        Ok(result)
+    }
 }
 
 // Blanket implementation for any type that implements embedded_io::Read
