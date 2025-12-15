@@ -80,17 +80,17 @@ pub trait ByteWrite: Write {
         }
     }
 
-    // /// Write multiple items from an iterator
-    // fn write_many<S, T>(&mut self, elements: T) -> Result<(), Self::Error>
-    // where
-    //     T: IntoIterator<Item = S>,
-    //     S: crate::Serializable,
-    // {
-    //     for element in elements {
-    //         element.write_into(self)?;
-    //     }
-    //     Ok(())
-    // }
+    /// Write multiple items from an iterator
+    fn write_many<S, T>(&mut self, elements: T) -> Result<(), Self::Error>
+    where
+        T: IntoIterator<Item = S>,
+        S: crate::Serializable,
+    {
+        for element in elements {
+            element.write_into(self)?;
+        }
+        Ok(())
+    }
 }
 
 // Blanket implementation for any type that implements embedded_io::blocking::Write

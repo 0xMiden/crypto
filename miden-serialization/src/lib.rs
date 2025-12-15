@@ -15,7 +15,7 @@ extern crate std;
 mod error;
 mod byte_read;
 mod byte_write;
-// mod traits;
+mod traits;
 mod slice_reader;
 #[cfg(feature = "alloc")]
 mod vec_writer;
@@ -26,7 +26,7 @@ mod winterfell_bridge;
 pub use error::DeserializationError;
 pub use byte_read::ByteRead;
 pub use byte_write::ByteWrite;
-// pub use traits::{Serializable, Deserializable};
+pub use traits::{Serializable, Deserializable};
 pub use slice_reader::SliceReader;
 
 #[cfg(feature = "alloc")]
