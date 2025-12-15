@@ -987,7 +987,7 @@ mod tests {
     ///
     /// Expected:
     /// - Key 1: CAN update (explicitly tracked via proof)
-    /// - Key 0: CAN update (sibling of key 1, provably empty)
+    /// - Key 0: CAN update (under same parent 'a' as key 1, provably empty)
     /// - Keys 4, 5, 6, 7: CAN update (in empty subtree f, provably empty)
     /// - Keys 2, 3: CANNOT update (under non-empty node b, only have its hash)
     #[test]
@@ -1025,7 +1025,7 @@ mod tests {
         partial.insert(key_1, new_value_1).unwrap();
         assert_eq!(full.root(), partial.root());
 
-        // Key 0: CAN update (sibling of key 1, empty)
+        // Key 0: CAN update (under same parent 'a' as key 1, empty)
         let value_0: Word = rand_value();
         full.insert(key_0, value_0).unwrap();
         partial.insert(key_0, value_0).unwrap();
@@ -1037,19 +1037,22 @@ mod tests {
         partial.insert(key_4, value_4).unwrap();
         assert_eq!(full.root(), partial.root());
 
-        // Key 5: CAN update (in empty subtree f)
+        // Note: After inserting key 4, subtree f is no longer empty, but keys 5, 6, 7
+        // remain trackable through the inner nodes created by previous inserts.
+
+        // Key 5: CAN update
         let value_5: Word = rand_value();
         full.insert(key_5, value_5).unwrap();
         partial.insert(key_5, value_5).unwrap();
         assert_eq!(full.root(), partial.root());
 
-        // Key 6: CAN update (in empty subtree f)
+        // Key 6: CAN update
         let value_6: Word = rand_value();
         full.insert(key_6, value_6).unwrap();
         partial.insert(key_6, value_6).unwrap();
         assert_eq!(full.root(), partial.root());
 
-        // Key 7: CAN update (in empty subtree f)
+        // Key 7: CAN update
         let value_7: Word = rand_value();
         full.insert(key_7, value_7).unwrap();
         partial.insert(key_7, value_7).unwrap();
@@ -1062,6 +1065,9 @@ mod tests {
         // Key 3: CANNOT update (has data but no proof in partial SMT)
         let result = partial.insert(key_3, rand_value());
         assert_matches!(result, Err(MerkleError::UntrackedKey(_)));
+
+        // Verify roots still match (failed inserts should not modify partial SMT)
+        assert_eq!(full.root(), partial.root());
     }
 
     #[test]
