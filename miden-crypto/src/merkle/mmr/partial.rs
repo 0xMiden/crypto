@@ -348,18 +348,29 @@ impl PartialMmr {
 
     /// Removes a leaf of the [PartialMmr] and the unused nodes from the authentication path.
     ///
+    /// Returns a vector of the authentication nodes removed from this [PartialMmr] as a result
+    /// of this operation. This is useful for client-side pruning, where the caller needs to know
+    /// which nodes can be deleted from storage.
+    ///
     /// Note: `leaf_pos` corresponds to the position in the MMR and not on an individual tree.
-    pub fn untrack(&mut self, leaf_pos: usize) {
+    pub fn untrack(&mut self, leaf_pos: usize) -> Vec<(InOrderIndex, Word)> {
         let mut idx = InOrderIndex::from_leaf_pos(leaf_pos);
+        let mut removed = Vec::new();
 
         // `idx` represent the element that can be computed by the authentication path, because
         // these elements can be computed they are not saved for the authentication of the current
         // target. In other words, if the idx is present it was added for the authentication of
         // another element, and no more elements should be removed otherwise it would remove that
         // element's authentication data.
-        while self.nodes.remove(&idx.sibling()).is_some() && !self.nodes.contains_key(&idx) {
+        while let Some(word) = self.nodes.remove(&idx.sibling()) {
+            removed.push((idx.sibling(), word));
+            if self.nodes.contains_key(&idx) {
+                break;
+            }
             idx = idx.parent();
         }
+
+        removed
     }
 
     /// Applies updates to this [PartialMmr] and returns a vector of new authentication nodes
@@ -901,5 +912,76 @@ mod tests {
         assert!(!partial_mmr.is_tracked(1));
         assert!(!partial_mmr.is_tracked(2));
         assert_eq!(partial_mmr.nodes().count(), 0);
+    }
+
+    #[test]
+    fn test_partial_mmr_untrack_returns_removed_nodes() {
+        // build the MMR
+        let mmr: Mmr = LEAVES.into();
+
+        // get path and node for position 1
+        let node1 = mmr.get(1).unwrap();
+        let proof1 = mmr.open(1).unwrap();
+
+        // create partial MMR
+        let mut partial_mmr: PartialMmr = mmr.peaks().into();
+
+        // add authentication path for position 1
+        partial_mmr.track(1, node1, proof1.path().merkle_path()).unwrap();
+
+        // collect nodes before untracking
+        let nodes_before: BTreeSet<_> =
+            partial_mmr.nodes().map(|(&idx, &word)| (idx, word)).collect();
+
+        // untrack and capture removed nodes
+        let removed: BTreeSet<_> = partial_mmr.untrack(1).into_iter().collect();
+
+        // verify that all nodes that were in the partial MMR were returned
+        assert_eq!(removed, nodes_before);
+
+        // verify that partial MMR is now empty
+        assert!(!partial_mmr.is_tracked(1));
+        assert_eq!(partial_mmr.nodes().count(), 0);
+    }
+
+    #[test]
+    fn test_partial_mmr_untrack_shared_nodes() {
+        // build the MMR
+        let mmr: Mmr = LEAVES.into();
+
+        // track two sibling leaves
+        let node0 = mmr.get(0).unwrap();
+        let proof0 = mmr.open(0).unwrap();
+
+        let node1 = mmr.get(1).unwrap();
+        let proof1 = mmr.open(1).unwrap();
+
+        // create partial MMR
+        let mut partial_mmr: PartialMmr = mmr.peaks().into();
+
+        // add authentication paths for position 0 and 1
+        partial_mmr.track(0, node0, proof0.path().merkle_path()).unwrap();
+        partial_mmr.track(1, node1, proof1.path().merkle_path()).unwrap();
+
+        // There are 3 unique authentication nodes stored:
+        // - leaf0's sibling (stored at leaf1's index)
+        // - leaf1's sibling (stored at leaf0's index)
+        // - the parent sibling (shared by both openings)
+        assert_eq!(partial_mmr.nodes().count(), 3);
+
+        // untrack position 0:
+        // removes the node stored at leaf1's index (the sibling of leaf0),
+        // then stops because leaf0's index is still present (needed to authenticate leaf1).
+        let removed0 = partial_mmr.untrack(0);
+        assert_eq!(removed0.len(), 1);
+        assert_eq!(partial_mmr.nodes().count(), 2);
+        assert!(partial_mmr.is_tracked(1));
+
+        // untrack position 1:
+        // removes the node stored at leaf0's index (the sibling of leaf1) and the shared parent sibling.
+        let removed1 = partial_mmr.untrack(1);
+        assert_eq!(removed1.len(), 2);
+        assert_eq!(partial_mmr.nodes().count(), 0);
+        assert!(!partial_mmr.is_tracked(1));
     }
 }
