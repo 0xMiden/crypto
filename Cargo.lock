@@ -1000,6 +1000,7 @@ dependencies = [
 name = "miden-serde-utils"
 version = "0.20.0"
 dependencies = [
+ "winter-math",
  "winter-utils",
 ]
 

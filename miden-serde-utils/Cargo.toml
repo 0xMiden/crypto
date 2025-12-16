@@ -13,12 +13,13 @@ rust-version.workspace = true
 version.workspace      = true
 
 [features]
-default = ["std"]
-std     = ["winter-utils?/std"]
-winter-compat = ["dep:winter-utils"]
+default       = ["std"]
+std           = ["winter-math?/std", "winter-utils?/std"]
+winter-compat = ["dep:winter-math", "dep:winter-utils"]
 
 [dependencies]
-winter-utils = { version = "0.13", default-features = false, optional = true }
+winter-math  = { default-features = false, optional = true, version = "0.13" }
+winter-utils = { default-features = false, optional = true, version = "0.13" }
 
 [lints]
 workspace = true
