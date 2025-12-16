@@ -978,7 +978,8 @@ mod tests {
         assert!(partial_mmr.is_tracked(1));
 
         // untrack position 1:
-        // removes the node stored at leaf0's index (the sibling of leaf1) and the shared parent sibling.
+        // removes the node stored at leaf0's index (the sibling of leaf1) and the shared parent
+        // sibling.
         let removed1 = partial_mmr.untrack(1);
         assert_eq!(removed1.len(), 2);
         assert_eq!(partial_mmr.nodes().count(), 0);
