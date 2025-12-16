@@ -1,0 +1,25 @@
+[package]
+authors.workspace      = true
+categories.workspace   = true
+description            = "Serialization/deserialization utilities for Miden"
+documentation          = "https://docs.rs/miden-serde-utils"
+edition.workspace      = true
+keywords.workspace     = true
+license.workspace      = true
+name                   = "miden-serde-utils"
+readme                 = "README.md"
+repository.workspace   = true
+rust-version.workspace = true
+version.workspace      = true
+
+[features]
+default = ["std"]
+std     = []
+
+[dependencies]
+
+[lints]
+workspace = true
+
+[package.metadata.cargo-machete]
+ignored = ["winter-math", "winter-utils"]
