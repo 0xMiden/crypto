@@ -2,6 +2,13 @@
 //!
 //! This crate provides serialization and deserialization traits built on top of
 //! the `embedded-io` ecosystem, supporting no_std environments.
+//!
+//! ## Winterfell Compatibility Bridge
+//!
+//! When the `winterfell-compat` feature is enabled, this crate provides limited
+//! compatibility with `winter-utils` serialization traits. Note that full automatic
+//! compatibility via blanket impls is not possible due to different error handling
+//! models. The bridge is best used for specific type adaptations during migration.
 
 #![cfg_attr(not(feature = "std"), no_std)]
 
