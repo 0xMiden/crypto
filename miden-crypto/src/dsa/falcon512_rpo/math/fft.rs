@@ -4,8 +4,6 @@ use core::{
     ops::{Add, AddAssign, Mul, MulAssign, Neg, Sub, SubAssign},
 };
 
-#[cfg(not(feature = "std"))]
-use num::Float;
 use num::{One, Zero};
 use num_complex::Complex64;
 
