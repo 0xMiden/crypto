@@ -49,6 +49,9 @@ pub use byte_reader::{ByteReader, SliceReader};
 mod byte_writer;
 pub use byte_writer::ByteWriter;
 
+#[cfg(feature = "winter-compat")]
+mod winter_compat;
+
 // SERIALIZABLE TRAIT
 // ================================================================================================
 

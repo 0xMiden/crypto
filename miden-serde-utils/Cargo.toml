@@ -14,9 +14,11 @@ version.workspace      = true
 
 [features]
 default = ["std"]
-std     = []
+std     = ["winter-utils?/std"]
+winter-compat = ["dep:winter-utils"]
 
 [dependencies]
+winter-utils = { version = "0.13", default-features = false, optional = true }
 
 [lints]
 workspace = true

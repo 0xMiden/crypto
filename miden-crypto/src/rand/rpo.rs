@@ -223,18 +223,18 @@ impl Serializable for RpoRandomCoin {
 impl Deserializable for RpoRandomCoin {
     fn read_from<R: ByteReader>(source: &mut R) -> Result<Self, DeserializationError> {
         let state = [
-            Felt::read_from(source)?,
-            Felt::read_from(source)?,
-            Felt::read_from(source)?,
-            Felt::read_from(source)?,
-            Felt::read_from(source)?,
-            Felt::read_from(source)?,
-            Felt::read_from(source)?,
-            Felt::read_from(source)?,
-            Felt::read_from(source)?,
-            Felt::read_from(source)?,
-            Felt::read_from(source)?,
-            Felt::read_from(source)?,
+            Felt::new(source.read_u64()?),
+            Felt::new(source.read_u64()?),
+            Felt::new(source.read_u64()?),
+            Felt::new(source.read_u64()?),
+            Felt::new(source.read_u64()?),
+            Felt::new(source.read_u64()?),
+            Felt::new(source.read_u64()?),
+            Felt::new(source.read_u64()?),
+            Felt::new(source.read_u64()?),
+            Felt::new(source.read_u64()?),
+            Felt::new(source.read_u64()?),
+            Felt::new(source.read_u64()?),
         ];
         let current = source.read_u8()? as usize;
         if !(RATE_START..RATE_END).contains(&current) {
