@@ -124,3 +124,26 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - run: make check-fuzz
+
+  check-features:
+    name: check all feature combinations
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Cleanup large tools for build space
+        uses: ./.github/actions/cleanup-runner
+      # Added: LLVM/Clang for RocksDB/bindgen (needed for rocksdb feature)
+      - name: Install LLVM/Clang
+        uses: ./.github/actions/install-llvm
+        with:
+          version: "17"
+      - name: Rustup
+        run: rustup update --no-self-update
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-hack
+      - uses: Swatinem/rust-cache@v2
+        with:
+          save-if: ${{ github.event_name == 'push' && github.ref == format('refs/heads/{0}', inputs.target_branch) }}
+      - name: Check all feature combinations
+        run: ./scripts/check-features.sh
