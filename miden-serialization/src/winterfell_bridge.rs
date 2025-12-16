@@ -8,6 +8,7 @@ use winter_utils;
 use crate::DeserializationError;
 
 /// Adapter that wraps a winter_utils::ByteWriter to implement embedded_io::Write
+#[allow(dead_code)]
 struct WinterWriteAdapter<W: winter_utils::ByteWriter>(W);
 
 impl<W: winter_utils::ByteWriter> embedded_io::ErrorType for WinterWriteAdapter<W> {
@@ -26,6 +27,7 @@ impl<W: winter_utils::ByteWriter> embedded_io::Write for WinterWriteAdapter<W> {
 }
 
 /// Adapter that wraps a winter_utils::ByteReader to implement embedded_io::Read
+#[allow(dead_code)]
 struct WinterReadAdapter<'a, R: winter_utils::ByteReader>(&'a mut R);
 
 impl<R: winter_utils::ByteReader> embedded_io::ErrorType for WinterReadAdapter<'_, R> {
@@ -59,7 +61,5 @@ impl<R: winter_utils::ByteReader> embedded_io::Read for WinterReadAdapter<'_, R>
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-
     // Add tests once we have concrete types to test with
 }

@@ -978,6 +978,7 @@ dependencies = [
  "itertools 0.14.0",
  "k256",
  "miden-crypto-derive",
+ "miden-serialization",
  "num",
  "num-complex",
  "proptest",

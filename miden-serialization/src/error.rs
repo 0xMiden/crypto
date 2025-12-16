@@ -47,36 +47,5 @@ impl embedded_io::Error for DeserializationError {
     }
 }
 
-/// Helper trait to convert errors to DeserializationError
-pub trait IntoDeserError {
-    fn into_deser_error(self) -> DeserializationError;
-}
-
-impl IntoDeserError for DeserializationError {
-    fn into_deser_error(self) -> DeserializationError {
-        self
-    }
-}
-
-// Allow converting from embedded_io ErrorKind
-impl IntoDeserError for embedded_io::ErrorKind {
-    #[cfg(feature = "alloc")]
-    fn into_deser_error(self) -> DeserializationError {
-        match self {
-            embedded_io::ErrorKind::InvalidData => {
-                DeserializationError::InvalidValue("invalid data".into())
-            }
-            _ => DeserializationError::UnknownError("io error".into()),
-        }
-    }
-
-    #[cfg(not(feature = "alloc"))]
-    fn into_deser_error(self) -> DeserializationError {
-        match self {
-            embedded_io::ErrorKind::InvalidData => {
-                DeserializationError::InvalidValue("invalid data")
-            }
-            _ => DeserializationError::UnknownError("io error"),
-        }
-    }
-}
+// Note: IntoDeserError trait was removed as it was not being used.
+// Error conversion is handled through the embedded_io::Error trait implementation.
