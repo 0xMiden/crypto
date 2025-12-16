@@ -46,7 +46,7 @@ jobs:
         uses: ./.github/actions/cleanup-runner
       # Added: LLVM/Clang for RocksDB/bindgen
       - name: Install LLVM/Clang
-        uses: KyleMayes/install-llvm-action@v2
+        uses: ./.github/actions/install-llvm
         with:
           version: "17"
       - name: Rustup
