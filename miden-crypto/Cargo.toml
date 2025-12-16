@@ -50,8 +50,9 @@ harness = false
 name    = "store"
 
 [[bench]]
-harness = false
-name    = "dsa"
+harness           = false
+name              = "dsa"
+required-features = ["std"]
 
 [[bench]]
 harness = false
