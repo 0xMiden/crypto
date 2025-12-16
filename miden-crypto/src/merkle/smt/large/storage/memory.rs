@@ -1,5 +1,4 @@
-use alloc::{boxed::Box, string::String, vec::Vec};
-use std::sync::{PoisonError, RwLock};
+use alloc::{boxed::Box, vec::Vec};
 
 use super::{SmtStorage, StorageError, StorageUpdateParts, StorageUpdates, SubtreeUpdate};
 use crate::{
@@ -16,7 +15,6 @@ use crate::{
 /// In-memory storage for a Sparse Merkle Tree (SMT), implementing the `SmtStorage` trait.
 ///
 /// This structure stores the SMT's leaf nodes and subtrees directly in memory.
-/// Access to these components is synchronized using `std::sync::RwLock` for thread safety.
 ///
 /// It is primarily intended for scenarios where data persistence to disk is not a
 /// primary concern. Common use cases include:
@@ -24,10 +22,10 @@ use crate::{
 /// - Managing SMT instances with a limited operational lifecycle.
 /// - Situations where a higher-level application architecture handles its own data persistence
 ///   strategy.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct MemoryStorage {
-    pub leaves: RwLock<Map<u64, SmtLeaf>>,
-    pub subtrees: RwLock<Map<NodeIndex, Subtree>>,
+    pub leaves: Map<u64, SmtLeaf>,
+    pub subtrees: Map<NodeIndex, Subtree>,
 }
 
 impl MemoryStorage {
@@ -35,10 +33,7 @@ impl MemoryStorage {
     ///
     /// Initializes empty maps for leaves and subtrees.
     pub fn new() -> Self {
-        Self {
-            leaves: RwLock::new(Map::new()),
-            subtrees: RwLock::new(Map::new()),
-        }
+        Self { leaves: Map::new(), subtrees: Map::new() }
     }
 }
 
@@ -48,28 +43,15 @@ impl Default for MemoryStorage {
     }
 }
 
-impl Clone for MemoryStorage {
-    fn clone(&self) -> Self {
-        MemoryStorage {
-            leaves: RwLock::new(
-                self.leaves.read().expect("Failed to read lock for leaves in clone").clone(),
-            ),
-            subtrees: RwLock::new(
-                self.subtrees.read().expect("Failed to read lock for subtrees in clone").clone(),
-            ),
-        }
-    }
-}
-
 impl SmtStorage for MemoryStorage {
     /// Gets the total number of non-empty leaves currently stored.
     fn leaf_count(&self) -> Result<usize, StorageError> {
-        Ok(self.leaves.read()?.len())
+        Ok(self.leaves.len())
     }
 
     /// Gets the total number of key-value entries currently stored.
     fn entry_count(&self) -> Result<usize, StorageError> {
-        Ok(self.leaves.read()?.values().map(|leaf| leaf.num_entries()).sum())
+        Ok(self.leaves.values().map(|leaf| leaf.num_entries()).sum())
     }
 
     /// Inserts a key-value pair into the leaf at the given index.
@@ -78,24 +60,20 @@ impl SmtStorage for MemoryStorage {
     /// - If the leaf exists, the key-value pair is inserted into it.
     /// - Returns the previous value associated with the key, if any.
     ///
-    /// # Errors
-    /// Returns `StorageError::Backend` if the write lock cannot be acquired.
-    ///
     /// # Panics
     /// Panics in debug builds if `value` is `EMPTY_WORD`.
     fn insert_value(
-        &self,
+        &mut self,
         index: u64,
         key: Word,
         value: Word,
     ) -> Result<Option<Word>, StorageError> {
         debug_assert_ne!(value, EMPTY_WORD);
-        let mut leaves_guard = self.leaves.write()?;
 
-        match leaves_guard.get_mut(&index) {
+        match self.leaves.get_mut(&index) {
             Some(leaf) => Ok(leaf.insert(key, value)?),
             None => {
-                leaves_guard.insert(index, SmtLeaf::Single((key, value)));
+                self.leaves.insert(index, SmtLeaf::Single((key, value)));
                 Ok(None)
             },
         }
@@ -109,13 +87,8 @@ impl SmtStorage for MemoryStorage {
     ///   returned (as `leaf.get_value(&key)` would be `None`).
     /// - If the leaf at `index` does not exist, `Ok(None)` is returned, as no value could be
     ///   removed.
-    ///
-    /// # Errors
-    /// Returns `StorageError::Backend` if the write lock for leaves cannot be acquired.
-    fn remove_value(&self, index: u64, key: Word) -> Result<Option<Word>, StorageError> {
-        let mut leaves_guard = self.leaves.write()?;
-
-        let old_value = match leaves_guard.entry(index) {
+    fn remove_value(&mut self, index: u64, key: Word) -> Result<Option<Word>, StorageError> {
+        let old_value = match self.leaves.entry(index) {
             MapEntry::Occupied(mut entry) => {
                 let (old_value, is_empty) = entry.get_mut().remove(key);
                 if is_empty {
@@ -131,51 +104,44 @@ impl SmtStorage for MemoryStorage {
 
     /// Retrieves a single leaf node.
     fn get_leaf(&self, index: u64) -> Result<Option<SmtLeaf>, StorageError> {
-        Ok(self.leaves.read()?.get(&index).cloned())
+        Ok(self.leaves.get(&index).cloned())
     }
 
     /// Sets multiple leaf nodes in storage.
     ///
     /// If a leaf at a given index already exists, it is overwritten.
-    ///
-    /// # Errors
-    /// Returns `StorageError::Backend` if the write lock for leaves cannot be acquired.
-    fn set_leaves(&self, leaves_map: Map<u64, SmtLeaf>) -> Result<(), StorageError> {
-        let mut leaves_guard = self.leaves.write()?;
-        leaves_guard.extend(leaves_map);
+    fn set_leaves(&mut self, leaves_map: Map<u64, SmtLeaf>) -> Result<(), StorageError> {
+        self.leaves.extend(leaves_map);
         Ok(())
     }
 
     /// Removes a single leaf node.
-    fn remove_leaf(&self, index: u64) -> Result<Option<SmtLeaf>, StorageError> {
-        Ok(self.leaves.write()?.remove(&index))
+    fn remove_leaf(&mut self, index: u64) -> Result<Option<SmtLeaf>, StorageError> {
+        Ok(self.leaves.remove(&index))
     }
 
     /// Retrieves multiple leaf nodes. Returns Ok(None) for indices not found.
     fn get_leaves(&self, indices: &[u64]) -> Result<Vec<Option<SmtLeaf>>, StorageError> {
-        let leaves_guard = self.leaves.read()?;
-        let leaves = indices.iter().map(|idx| leaves_guard.get(idx).cloned()).collect();
+        let leaves = indices.iter().map(|idx| self.leaves.get(idx).cloned()).collect();
         Ok(leaves)
     }
 
     /// Returns true if the storage has any leaves.
     fn has_leaves(&self) -> Result<bool, StorageError> {
-        let leaves_guard = self.leaves.read()?;
-        Ok(!leaves_guard.is_empty())
+        Ok(!self.leaves.is_empty())
     }
 
     /// Retrieves a single Subtree (representing deep nodes) by its root NodeIndex.
     /// Assumes index.depth() >= IN_MEMORY_DEPTH. Returns Ok(None) if not found.
     fn get_subtree(&self, index: NodeIndex) -> Result<Option<Subtree>, StorageError> {
-        Ok(self.subtrees.read()?.get(&index).cloned())
+        Ok(self.subtrees.get(&index).cloned())
     }
 
     /// Retrieves multiple Subtrees.
     /// Assumes index.depth() >= IN_MEMORY_DEPTH for all indices. Returns Ok(None) for indices not
     /// found.
     fn get_subtrees(&self, indices: &[NodeIndex]) -> Result<Vec<Option<Subtree>>, StorageError> {
-        let subtrees_guard = self.subtrees.read()?;
-        let subtrees: Vec<_> = indices.iter().map(|idx| subtrees_guard.get(idx).cloned()).collect();
+        let subtrees: Vec<_> = indices.iter().map(|idx| self.subtrees.get(idx).cloned()).collect();
         Ok(subtrees)
     }
 
@@ -183,11 +149,8 @@ impl SmtStorage for MemoryStorage {
     ///
     /// If a subtree with the same root NodeIndex already exists, it is overwritten.
     /// Assumes `subtree.root_index().depth() >= IN_MEMORY_DEPTH`.
-    ///
-    /// # Errors
-    /// Returns `StorageError::Backend` if the write lock for subtrees cannot be acquired.
-    fn set_subtree(&self, subtree: &Subtree) -> Result<(), StorageError> {
-        self.subtrees.write()?.insert(subtree.root_index(), subtree.clone());
+    fn set_subtree(&mut self, subtree: &Subtree) -> Result<(), StorageError> {
+        self.subtrees.insert(subtree.root_index(), subtree.clone());
         Ok(())
     }
 
@@ -195,19 +158,15 @@ impl SmtStorage for MemoryStorage {
     ///
     /// If a subtree with a given root NodeIndex already exists, it is overwritten.
     /// Assumes `subtree.root_index().depth() >= IN_MEMORY_DEPTH` for all subtrees in the vector.
-    ///
-    /// # Errors
-    /// Returns `StorageError::Backend` if the write lock for subtrees cannot be acquired.
-    fn set_subtrees(&self, subtrees_vec: Vec<Subtree>) -> Result<(), StorageError> {
-        let mut subtrees_guard = self.subtrees.write()?;
-        subtrees_guard
+    fn set_subtrees(&mut self, subtrees_vec: Vec<Subtree>) -> Result<(), StorageError> {
+        self.subtrees
             .extend(subtrees_vec.into_iter().map(|subtree| (subtree.root_index(), subtree)));
         Ok(())
     }
 
     /// Removes a single Subtree (representing deep nodes) by its root NodeIndex.
-    fn remove_subtree(&self, index: NodeIndex) -> Result<(), StorageError> {
-        self.subtrees.write()?.remove(&index);
+    fn remove_subtree(&mut self, index: NodeIndex) -> Result<(), StorageError> {
+        self.subtrees.remove(&index);
         Ok(())
     }
 
@@ -217,8 +176,7 @@ impl SmtStorage for MemoryStorage {
     /// `index.depth()` must be greater than or equal to `IN_MEMORY_DEPTH`.
     ///
     /// # Errors
-    /// - `StorageError::Backend`: If `index.depth() < IN_MEMORY_DEPTH`.
-    /// - `StorageError::Backend`: If the read lock for subtrees cannot be acquired.
+    /// - `StorageError::Unsupported`: If `index.depth() < IN_MEMORY_DEPTH`.
     ///
     /// Returns `Ok(None)` if the subtree or the specific inner node within it is not found.
     fn get_inner_node(&self, index: NodeIndex) -> Result<Option<InnerNode>, StorageError> {
@@ -228,8 +186,8 @@ impl SmtStorage for MemoryStorage {
             ));
         }
         let subtree_root_index = Subtree::find_subtree_root(index);
-        let subtrees_guard = self.subtrees.read()?;
-        Ok(subtrees_guard
+        Ok(self
+            .subtrees
             .get(&subtree_root_index)
             .and_then(|subtree| subtree.get_inner_node(index)))
     }
@@ -243,10 +201,9 @@ impl SmtStorage for MemoryStorage {
     /// Returns the `InnerNode` that was previously at this `index`, if any.
     ///
     /// # Errors
-    /// - `StorageError::Backend`: If `index.depth() < IN_MEMORY_DEPTH`.
-    /// - `StorageError::Backend`: If the write lock for subtrees cannot be acquired.
+    /// - `StorageError::Unsupported`: If `index.depth() < IN_MEMORY_DEPTH`.
     fn set_inner_node(
-        &self,
+        &mut self,
         index: NodeIndex,
         node: InnerNode,
     ) -> Result<Option<InnerNode>, StorageError> {
@@ -256,12 +213,12 @@ impl SmtStorage for MemoryStorage {
             ));
         }
         let subtree_root_index = Subtree::find_subtree_root(index);
-        let mut subtrees_guard = self.subtrees.write()?;
-        let mut subtree = subtrees_guard
+        let mut subtree = self
+            .subtrees
             .remove(&subtree_root_index)
             .unwrap_or_else(|| Subtree::new(subtree_root_index));
         let old_node = subtree.insert_inner_node(index, node);
-        subtrees_guard.insert(subtree_root_index, subtree);
+        self.subtrees.insert(subtree_root_index, subtree);
         Ok(old_node)
     }
 
@@ -274,22 +231,20 @@ impl SmtStorage for MemoryStorage {
     /// Returns the `InnerNode` that was removed, if any.
     ///
     /// # Errors
-    /// - `StorageError::Backend`: If `index.depth() < IN_MEMORY_DEPTH`.
-    /// - `StorageError::Backend`: If the write lock for subtrees cannot be acquired.
-    fn remove_inner_node(&self, index: NodeIndex) -> Result<Option<InnerNode>, StorageError> {
+    /// - `StorageError::Unsupported`: If `index.depth() < IN_MEMORY_DEPTH`.
+    fn remove_inner_node(&mut self, index: NodeIndex) -> Result<Option<InnerNode>, StorageError> {
         if index.depth() < IN_MEMORY_DEPTH {
             return Err(StorageError::Unsupported(
                 "Cannot remove inner node from upper part of the tree".into(),
             ));
         }
         let subtree_root_index = Subtree::find_subtree_root(index);
-        let mut subtrees_guard = self.subtrees.write()?;
 
         let inner_node: Option<InnerNode> =
-            subtrees_guard.remove(&subtree_root_index).and_then(|mut subtree| {
+            self.subtrees.remove(&subtree_root_index).and_then(|mut subtree| {
                 let old_node = subtree.remove_inner_node(index);
                 if !subtree.is_empty() {
-                    subtrees_guard.insert(subtree_root_index, subtree);
+                    self.subtrees.insert(subtree_root_index, subtree);
                 }
                 old_node
             });
@@ -301,17 +256,7 @@ impl SmtStorage for MemoryStorage {
     /// This method handles updates to:
     /// - Leaves: Inserts new or updated leaves, removes specified leaves.
     /// - Subtrees: Inserts new or updated subtrees, removes specified subtrees.
-    ///
-    /// All operations are performed after acquiring write locks on the leaves and subtrees
-    /// collections, ensuring atomicity of the batch update.
-    ///
-    /// # Errors
-    /// Returns `StorageError::Backend` if any of the necessary write locks
-    /// (for leaves or subtrees) cannot be acquired.
-    fn apply(&self, updates: StorageUpdates) -> Result<(), StorageError> {
-        let mut leaves_guard = self.leaves.write()?;
-        let mut subtrees_guard = self.subtrees.write()?;
-
+    fn apply(&mut self, updates: StorageUpdates) -> Result<(), StorageError> {
         let StorageUpdateParts {
             leaf_updates,
             subtree_updates,
@@ -321,18 +266,18 @@ impl SmtStorage for MemoryStorage {
 
         for (index, leaf_opt) in leaf_updates {
             if let Some(leaf) = leaf_opt {
-                leaves_guard.insert(index, leaf);
+                self.leaves.insert(index, leaf);
             } else {
-                leaves_guard.remove(&index);
+                self.leaves.remove(&index);
             }
         }
         for update in subtree_updates {
             match update {
                 SubtreeUpdate::Store { index, subtree } => {
-                    subtrees_guard.insert(index, subtree);
+                    self.subtrees.insert(index, subtree);
                 },
                 SubtreeUpdate::Delete { index } => {
-                    subtrees_guard.remove(&index);
+                    self.subtrees.remove(&index);
                 },
             }
         }
@@ -342,24 +287,16 @@ impl SmtStorage for MemoryStorage {
     /// Returns an iterator over all (index, SmtLeaf) pairs in the storage.
     ///
     /// The iterator provides access to the current state of the leaves.
-    ///
-    /// # Errors
-    /// Returns `StorageError::Backend` if the read lock for leaves cannot be acquired.
     fn iter_leaves(&self) -> Result<Box<dyn Iterator<Item = (u64, SmtLeaf)> + '_>, StorageError> {
-        let leaves_guard = self.leaves.read()?;
-        let leaves_vec = leaves_guard.iter().map(|(&k, v)| (k, v.clone())).collect::<Vec<_>>();
+        let leaves_vec = self.leaves.iter().map(|(&k, v)| (k, v.clone())).collect::<Vec<_>>();
         Ok(Box::new(leaves_vec.into_iter()))
     }
 
     /// Returns an iterator over all Subtrees in the storage.
     ///
     /// The iterator provides access to the current subtrees from storage.
-    ///
-    /// # Errors
-    /// Returns `StorageError::Backend` if the read lock for subtrees cannot be acquired.
     fn iter_subtrees(&self) -> Result<Box<dyn Iterator<Item = Subtree> + '_>, StorageError> {
-        let subtrees_guard = self.subtrees.read()?;
-        let subtrees_vec = subtrees_guard.values().cloned().collect::<Vec<_>>();
+        let subtrees_vec = self.subtrees.values().cloned().collect::<Vec<_>>();
         Ok(Box::new(subtrees_vec.into_iter()))
     }
 
@@ -369,27 +306,5 @@ impl SmtStorage for MemoryStorage {
     /// and there's no startup performance benefit to caching depth 24 roots.
     fn get_depth24(&self) -> Result<Vec<(u64, Word)>, StorageError> {
         Ok(Vec::new())
-    }
-}
-
-// ERRORS
-// --------------------------------------------------------------------------------------------
-
-impl<T> From<PoisonError<T>> for StorageError {
-    fn from(e: PoisonError<T>) -> Self {
-        // Simple string-based error since we can't box PoisonError<T> directly
-        // (T might not implement Send)
-        #[derive(Debug)]
-        struct LockError(String);
-
-        impl std::fmt::Display for LockError {
-            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                write!(f, "{}", self.0)
-            }
-        }
-
-        impl std::error::Error for LockError {}
-
-        StorageError::Backend(Box::new(LockError(format!("Lock poisoned: {e}"))))
     }
 }
