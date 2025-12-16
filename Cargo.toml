@@ -20,3 +20,9 @@ miden-serde-utils   = { features = ["winter-compat"], path = "miden-serde-utils"
 [workspace.lints.rust]
 # Suppress warnings about `cfg(fuzzing)`, which is automatically set when using `cargo-fuzz`.
 unexpected_cfgs = { check-cfg = ['cfg(fuzzing)'], level = "warn" }
+
+[profile.test-release]
+debug            = 2
+debug-assertions = true
+inherits         = "release"
+overflow-checks  = true
