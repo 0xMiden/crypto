@@ -1,5 +1,6 @@
 ## 0.20.0 (TBD)
 
+- [BREAKING] Changed `SmtStorage` mutator methods from `&self` to `&mut self` ([#709](https://github.com/0xMiden/crypto/pull/709)).
 - Added SHA-256 and SHA-512 hash function wrappers ([#692](https://github.com/0xMiden/crypto/pull/692)).
 - [BREAKING] Rename `MmrProof` to `MmrPath`, and introduce a new `MmrProof` with the leaf value included ([#656](https://github.com/0xMiden/crypto/pull/656)).
 - Added `+ Sync` bound to `StorageError` and `LargeSmtError` ([#680](https://github.com/0xMiden/crypto/pull/680)).

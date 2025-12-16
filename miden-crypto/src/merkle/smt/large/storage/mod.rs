@@ -1,5 +1,8 @@
 use alloc::{boxed::Box, vec::Vec};
-use core::{fmt, ops::Deref};
+use core::{
+    fmt,
+    ops::{Deref, DerefMut},
+};
 
 use crate::{
     Word,
@@ -60,7 +63,7 @@ pub trait SmtStorage: 'static + fmt::Debug + Send + Sync {
     /// Returns `StorageError` if the storage operation fails (e.g., backend database error,
     /// insufficient space, serialization failures).
     fn insert_value(
-        &self,
+        &mut self,
         index: u64,
         key: Word,
         value: Word,
@@ -84,7 +87,7 @@ pub trait SmtStorage: 'static + fmt::Debug + Send + Sync {
     /// # Errors
     /// Returns `StorageError` if the storage operation fails (e.g., backend database error,
     /// write permission issues, serialization failures).
-    fn remove_value(&self, index: u64, key: Word) -> Result<Option<Word>, StorageError>;
+    fn remove_value(&mut self, index: u64, key: Word) -> Result<Option<Word>, StorageError>;
 
     /// Retrieves a single SMT leaf node by its logical `index`.
     /// Returns `Ok(None)` if no leaf exists at the given `index`.
@@ -101,7 +104,7 @@ pub trait SmtStorage: 'static + fmt::Debug + Send + Sync {
     ///
     /// # Errors
     /// Returns `StorageError` if any storage operation fails during the batch update.
-    fn set_leaves(&self, leaves: Map<u64, SmtLeaf>) -> Result<(), StorageError>;
+    fn set_leaves(&mut self, leaves: Map<u64, SmtLeaf>) -> Result<(), StorageError>;
 
     /// Removes a single SMT leaf node entirely from storage by its logical `index`.
     ///
@@ -111,7 +114,7 @@ pub trait SmtStorage: 'static + fmt::Debug + Send + Sync {
     /// Returns the `SmtLeaf` that was removed, or `Ok(None)` if no leaf existed at `index`.
     /// Implementations should ensure that removing a leaf also correctly updates
     /// the overall leaf and entry counts.
-    fn remove_leaf(&self, index: u64) -> Result<Option<SmtLeaf>, StorageError>;
+    fn remove_leaf(&mut self, index: u64) -> Result<Option<SmtLeaf>, StorageError>;
 
     /// Retrieves multiple SMT leaf nodes by their logical `indices`.
     ///
@@ -142,18 +145,18 @@ pub trait SmtStorage: 'static + fmt::Debug + Send + Sync {
     /// Sets or updates a single SMT Subtree in storage, identified by its root `NodeIndex`.
     ///
     /// If a subtree with the same root `NodeIndex` already exists, it is overwritten.
-    fn set_subtree(&self, subtree: &Subtree) -> Result<(), StorageError>;
+    fn set_subtree(&mut self, subtree: &Subtree) -> Result<(), StorageError>;
 
     /// Sets or updates multiple SMT Subtrees in storage.
     ///
     /// For each `Subtree` in the `subtrees` vector, if a subtree with the same root `NodeIndex`
     /// already exists, it is overwritten.
-    fn set_subtrees(&self, subtrees: Vec<Subtree>) -> Result<(), StorageError>;
+    fn set_subtrees(&mut self, subtrees: Vec<Subtree>) -> Result<(), StorageError>;
 
     /// Removes a single SMT Subtree from storage, identified by its root `NodeIndex`.
     ///
     /// Returns `Ok(())` on successful removal or if the subtree did not exist.
-    fn remove_subtree(&self, index: NodeIndex) -> Result<(), StorageError>;
+    fn remove_subtree(&mut self, index: NodeIndex) -> Result<(), StorageError>;
 
     /// Retrieves a single inner node from within a Subtree.
     ///
@@ -166,7 +169,7 @@ pub trait SmtStorage: 'static + fmt::Debug + Send + Sync {
     /// - If the target Subtree does not exist, it might need to be created by the implementation.
     /// - Returns the `InnerNode` that was previously at this `index`, if any.
     fn set_inner_node(
-        &self,
+        &mut self,
         index: NodeIndex,
         node: InnerNode,
     ) -> Result<Option<InnerNode>, StorageError>;
@@ -176,7 +179,7 @@ pub trait SmtStorage: 'static + fmt::Debug + Send + Sync {
     /// - If the Subtree becomes empty after removing the node, the Subtree itself might be removed
     ///   by the storage implementation.
     /// - Returns the `InnerNode` that was removed, if any.
-    fn remove_inner_node(&self, index: NodeIndex) -> Result<Option<InnerNode>, StorageError>;
+    fn remove_inner_node(&mut self, index: NodeIndex) -> Result<Option<InnerNode>, StorageError>;
 
     /// Applies a batch of `StorageUpdates` atomically to the storage backend.
     ///
@@ -185,7 +188,7 @@ pub trait SmtStorage: 'static + fmt::Debug + Send + Sync {
     /// new root hash, and count deltas) are applied as a single, indivisible operation.
     /// If any part of the update fails, the entire transaction should be rolled back, leaving
     /// the storage in its previous state.
-    fn apply(&self, updates: StorageUpdates) -> Result<(), StorageError>;
+    fn apply(&mut self, updates: StorageUpdates) -> Result<(), StorageError>;
 
     /// Returns an iterator over all (logical_index, SmtLeaf) pairs currently in storage.
     ///
@@ -209,16 +212,12 @@ pub trait SmtStorage: 'static + fmt::Debug + Send + Sync {
     fn get_depth24(&self) -> Result<Vec<(u64, Word)>, StorageError>;
 }
 
-// Blanket impl to allow any pointer to a `SmtStorage` to be used as storage.
-impl<P, T> SmtStorage for P
-where
-    P: Deref<Target = T> + fmt::Debug + Send + Sync + 'static,
-    T: SmtStorage + ?Sized,
-{
+impl<T: SmtStorage + ?Sized> SmtStorage for Box<T> {
     #[inline]
     fn leaf_count(&self) -> Result<usize, StorageError> {
         self.deref().leaf_count()
     }
+
     #[inline]
     fn entry_count(&self) -> Result<usize, StorageError> {
         self.deref().entry_count()
@@ -226,35 +225,39 @@ where
 
     #[inline]
     fn insert_value(
-        &self,
+        &mut self,
         index: u64,
         key: Word,
         value: Word,
     ) -> Result<Option<Word>, StorageError> {
-        self.deref().insert_value(index, key, value)
+        self.deref_mut().insert_value(index, key, value)
     }
 
     #[inline]
-    fn remove_value(&self, index: u64, key: Word) -> Result<Option<Word>, StorageError> {
-        self.deref().remove_value(index, key)
+    fn remove_value(&mut self, index: u64, key: Word) -> Result<Option<Word>, StorageError> {
+        self.deref_mut().remove_value(index, key)
     }
 
     #[inline]
     fn get_leaf(&self, index: u64) -> Result<Option<SmtLeaf>, StorageError> {
         self.deref().get_leaf(index)
     }
+
     #[inline]
-    fn set_leaves(&self, leaves: Map<u64, SmtLeaf>) -> Result<(), StorageError> {
-        self.deref().set_leaves(leaves)
+    fn set_leaves(&mut self, leaves: Map<u64, SmtLeaf>) -> Result<(), StorageError> {
+        self.deref_mut().set_leaves(leaves)
     }
+
     #[inline]
-    fn remove_leaf(&self, index: u64) -> Result<Option<SmtLeaf>, StorageError> {
-        self.deref().remove_leaf(index)
+    fn remove_leaf(&mut self, index: u64) -> Result<Option<SmtLeaf>, StorageError> {
+        self.deref_mut().remove_leaf(index)
     }
+
     #[inline]
     fn get_leaves(&self, indices: &[u64]) -> Result<Vec<Option<SmtLeaf>>, StorageError> {
         self.deref().get_leaves(indices)
     }
+
     #[inline]
     fn has_leaves(&self) -> Result<bool, StorageError> {
         self.deref().has_leaves()
@@ -271,16 +274,18 @@ where
     }
 
     #[inline]
-    fn set_subtree(&self, subtree: &Subtree) -> Result<(), StorageError> {
-        self.deref().set_subtree(subtree)
+    fn set_subtree(&mut self, subtree: &Subtree) -> Result<(), StorageError> {
+        self.deref_mut().set_subtree(subtree)
     }
+
     #[inline]
-    fn set_subtrees(&self, subtrees: Vec<Subtree>) -> Result<(), StorageError> {
-        self.deref().set_subtrees(subtrees)
+    fn set_subtrees(&mut self, subtrees: Vec<Subtree>) -> Result<(), StorageError> {
+        self.deref_mut().set_subtrees(subtrees)
     }
+
     #[inline]
-    fn remove_subtree(&self, index: NodeIndex) -> Result<(), StorageError> {
-        self.deref().remove_subtree(index)
+    fn remove_subtree(&mut self, index: NodeIndex) -> Result<(), StorageError> {
+        self.deref_mut().remove_subtree(index)
     }
 
     #[inline]
@@ -290,21 +295,21 @@ where
 
     #[inline]
     fn set_inner_node(
-        &self,
+        &mut self,
         index: NodeIndex,
         node: InnerNode,
     ) -> Result<Option<InnerNode>, StorageError> {
-        self.deref().set_inner_node(index, node)
+        self.deref_mut().set_inner_node(index, node)
     }
 
     #[inline]
-    fn remove_inner_node(&self, index: NodeIndex) -> Result<Option<InnerNode>, StorageError> {
-        self.deref().remove_inner_node(index)
+    fn remove_inner_node(&mut self, index: NodeIndex) -> Result<Option<InnerNode>, StorageError> {
+        self.deref_mut().remove_inner_node(index)
     }
 
     #[inline]
-    fn apply(&self, updates: StorageUpdates) -> Result<(), StorageError> {
-        self.deref().apply(updates)
+    fn apply(&mut self, updates: StorageUpdates) -> Result<(), StorageError> {
+        self.deref_mut().apply(updates)
     }
 
     #[inline]
