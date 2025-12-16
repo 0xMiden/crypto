@@ -1106,4 +1106,55 @@ mod tests {
         assert_eq!(partial.get_value(&key).unwrap(), EMPTY_WORD);
         assert_eq!(partial.num_entries(), 0);
     }
+
+    /// Tests that deserialization fails when an inner node hash is inconsistent with its parent.
+    #[test]
+    fn partial_smt_deserialize_invalid_inner_node() {
+        let key: Word = rand_value();
+        let value: Word = rand_value();
+        let smt = Smt::with_entries([(key, value)]).unwrap();
+
+        let proof = smt.open(&key);
+        let mut partial = PartialSmt::new(smt.root());
+        partial.add_proof(proof).unwrap();
+
+        // Serialize and tamper with inner node data
+        let mut bytes = partial.to_bytes();
+
+        // The inner node data is at the end of the serialization.
+        // Flip a byte in the inner node section to corrupt it.
+        let last_idx = bytes.len() - 1;
+        bytes[last_idx] ^= 0xff;
+
+        let result = PartialSmt::read_from_bytes(&bytes);
+        assert!(result.is_err());
+    }
+
+    /// Tests that deserialization fails when a leaf hash is inconsistent with its parent inner
+    /// node.
+    #[test]
+    fn partial_smt_deserialize_invalid_leaf() {
+        let key: Word = rand_value();
+        let value: Word = rand_value();
+        let smt = Smt::with_entries([(key, value)]).unwrap();
+
+        let proof = smt.open(&key);
+        let mut partial = PartialSmt::new(smt.root());
+        partial.add_proof(proof).unwrap();
+
+        // Serialize the partial SMT
+        let bytes = partial.to_bytes();
+
+        // Find where the leaf data starts (after root and leaves count).
+        // Root is 32 bytes, leaves count is 8 bytes, leaf position is 8 bytes.
+        // Tamper with leaf value data (after position).
+        // Byte position to flip.
+        let leaf_value_offset = 32 + 8 + 8 + 10;
+        let mut tampered_bytes = bytes.clone();
+        // Flip a byte in the leaf value data to corrupt it.
+        tampered_bytes[leaf_value_offset] ^= 0xff;
+
+        let result = PartialSmt::read_from_bytes(&tampered_bytes);
+        assert!(result.is_err());
+    }
 }
