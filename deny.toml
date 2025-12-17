@@ -52,4 +52,7 @@ allow-registry   = ["https://github.com/rust-lang/crates.io-index"]
 unknown-git      = "deny"
 unknown-registry = "deny"
 # Only allow Git dependencies from known sources
-allow-git = ["https://github.com/0xMiden/Plonky3"]
+allow-git = [
+  "https://github.com/Plonky3/Plonky3",
+  "https://github.com/0xMiden/p3-miden",
+]
