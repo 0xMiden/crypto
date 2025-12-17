@@ -98,14 +98,14 @@ subtle                        = { default-features = false, version = "2.6" }
 thiserror                     = { default-features = false, version = "2.0" }
 x25519-dalek                  = { default-features = false, features = ["static_secrets"], version = "2.0" }
 
-# FIXME: switch to main branch once zz/migrate-plonky3 is merged
-miden-air     = { branch = "zz/migrate-plonky3", default-features = false, git = "https://github.com/0xMiden/Plonky3/" }
-miden-prover  = { branch = "zz/migrate-plonky3", default-features = false, git = "https://github.com/0xMiden/Plonky3/" }
-p3-air        = { branch = "zz/migrate-plonky3", default-features = false, git = "https://github.com/0xMiden/Plonky3/" }
-p3-challenger = { branch = "zz/migrate-plonky3", default-features = false, git = "https://github.com/0xMiden/Plonky3/" }
-p3-field      = { branch = "zz/migrate-plonky3", default-features = false, git = "https://github.com/0xMiden/Plonky3/" }
-p3-goldilocks = { branch = "zz/migrate-plonky3", default-features = false, git = "https://github.com/0xMiden/Plonky3/" }
-p3-symmetric  = { branch = "zz/migrate-plonky3", default-features = false, git = "https://github.com/0xMiden/Plonky3/" }
+# Plonky3 dependencies
+p3-miden-air        = { branch = "al-p3-cleanup-and-update", default-features = false, git = "https://github.com/0xMiden/Plonky3/" }
+p3-miden-prover     = { branch = "al-p3-cleanup-and-update", default-features = false, git = "https://github.com/0xMiden/Plonky3/" }
+p3-miden-goldilocks = { branch = "al-p3-cleanup-and-update", default-features = false, git = "https://github.com/0xMiden/Plonky3/" }
+p3-air              = { branch = "al-p3-cleanup-and-update", default-features = false, git = "https://github.com/0xMiden/Plonky3/" }
+p3-challenger       = { branch = "al-p3-cleanup-and-update", default-features = false, git = "https://github.com/0xMiden/Plonky3/" }
+p3-field            = { branch = "al-p3-cleanup-and-update", default-features = false, git = "https://github.com/0xMiden/Plonky3/" }
+p3-symmetric        = { branch = "al-p3-cleanup-and-update", default-features = false, git = "https://github.com/0xMiden/Plonky3/" }
 
 [dev-dependencies]
 assert_matches = { default-features = false, version = "1.5" }

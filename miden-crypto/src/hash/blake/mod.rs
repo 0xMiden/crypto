@@ -6,7 +6,7 @@ use core::{
 };
 
 use p3_field::{BasedVectorSpace, PrimeField64};
-use p3_goldilocks::Goldilocks as Felt;
+use p3_miden_goldilocks::Goldilocks as Felt;
 
 use super::HasherExt;
 use crate::utils::{

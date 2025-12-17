@@ -543,10 +543,10 @@ impl TryFrom<[u64; WORD_SIZE_FELT]> for Word {
 
     fn try_from(value: [u64; WORD_SIZE_FELT]) -> Result<Self, WordError> {
         Ok(Self([
-            value[0].try_into().map_err(WordError::InvalidFieldElement)?,
-            value[1].try_into().map_err(WordError::InvalidFieldElement)?,
-            value[2].try_into().map_err(WordError::InvalidFieldElement)?,
-            value[3].try_into().map_err(WordError::InvalidFieldElement)?,
+            Felt::try_checked(value[0]).map_err(WordError::InvalidFieldElement)?,
+            Felt::try_checked(value[1]).map_err(WordError::InvalidFieldElement)?,
+            Felt::try_checked(value[2]).map_err(WordError::InvalidFieldElement)?,
+            Felt::try_checked(value[3]).map_err(WordError::InvalidFieldElement)?,
         ]))
     }
 }
@@ -582,10 +582,10 @@ impl TryFrom<[u8; WORD_SIZE_BYTES]> for Word {
         let c = u64::from_le_bytes(value[16..24].try_into().unwrap());
         let d = u64::from_le_bytes(value[24..32].try_into().unwrap());
 
-        let a: Felt = a.try_into().map_err(WordError::InvalidFieldElement)?;
-        let b: Felt = b.try_into().map_err(WordError::InvalidFieldElement)?;
-        let c: Felt = c.try_into().map_err(WordError::InvalidFieldElement)?;
-        let d: Felt = d.try_into().map_err(WordError::InvalidFieldElement)?;
+        let a: Felt = Felt::try_checked(a).map_err(WordError::InvalidFieldElement)?;
+        let b: Felt = Felt::try_checked(b).map_err(WordError::InvalidFieldElement)?;
+        let c: Felt = Felt::try_checked(c).map_err(WordError::InvalidFieldElement)?;
+        let d: Felt = Felt::try_checked(d).map_err(WordError::InvalidFieldElement)?;
 
         Ok(Word([a, b, c, d]))
     }
