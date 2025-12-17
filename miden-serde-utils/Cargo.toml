@@ -14,10 +14,12 @@ version.workspace      = true
 
 [features]
 default       = ["std"]
-std           = ["winter-math?/std", "winter-utils?/std"]
-winter-compat = ["dep:winter-math", "dep:winter-utils"]
+std           = ["winter-air?/std", "winter-crypto?/std", "winter-math?/std", "winter-utils?/std"]
+winter-compat = ["dep:winter-air", "dep:winter-crypto", "dep:winter-math", "dep:winter-utils"]
 
 [dependencies]
+winter-air   = { default-features = false, optional = true, version = "0.13" }
+winter-crypto = { default-features = false, optional = true, version = "0.13" }
 winter-math  = { default-features = false, optional = true, version = "0.13" }
 winter-utils = { default-features = false, optional = true, version = "0.13" }
 
@@ -25,4 +27,4 @@ winter-utils = { default-features = false, optional = true, version = "0.13" }
 workspace = true
 
 [package.metadata.cargo-machete]
-ignored = ["winter-math", "winter-utils"]
+ignored = ["winter-air", "winter-crypto", "winter-math", "winter-utils"]
