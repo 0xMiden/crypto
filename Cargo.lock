@@ -963,6 +963,7 @@ dependencies = [
  "itertools 0.14.0",
  "k256",
  "miden-crypto-derive",
+ "miden-serde-utils",
  "num",
  "num-complex",
  "proptest",
@@ -993,6 +994,14 @@ version = "0.20.0"
 dependencies = [
  "quote",
  "syn",
+]
+
+[[package]]
+name = "miden-serde-utils"
+version = "0.20.0"
+dependencies = [
+ "winter-math",
+ "winter-utils",
 ]
 
 [[package]]
