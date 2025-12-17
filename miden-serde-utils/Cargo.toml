@@ -18,10 +18,10 @@ std           = ["winter-air?/std", "winter-crypto?/std", "winter-math?/std", "w
 winter-compat = ["dep:winter-air", "dep:winter-crypto", "dep:winter-math", "dep:winter-utils"]
 
 [dependencies]
-winter-air   = { default-features = false, optional = true, version = "0.13" }
+winter-air    = { default-features = false, optional = true, version = "0.13" }
 winter-crypto = { default-features = false, optional = true, version = "0.13" }
-winter-math  = { default-features = false, optional = true, version = "0.13" }
-winter-utils = { default-features = false, optional = true, version = "0.13" }
+winter-math   = { default-features = false, optional = true, version = "0.13" }
+winter-utils  = { default-features = false, optional = true, version = "0.13" }
 
 [lints]
 workspace = true

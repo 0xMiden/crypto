@@ -3,13 +3,12 @@
 //! Adapters bridge between miden_serde_utils and winter_utils trait systems to ensure
 //! identical binary formats.
 
-use crate::{ByteReader, ByteWriter, Deserializable, DeserializationError, Serializable};
-use alloc::{string::ToString, vec::Vec};
-
 use winter_utils::{
     ByteReader as WinterByteReader, ByteWriter as WinterByteWriter,
     Deserializable as WinterDeserializable, Serializable as WinterSerializable,
 };
+
+use crate::{ByteReader, ByteWriter, Deserializable, DeserializationError, Serializable};
 
 // ADAPTER TYPES
 // ================================================================================================
