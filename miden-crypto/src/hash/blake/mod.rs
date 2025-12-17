@@ -29,8 +29,8 @@ const DIGEST20_BYTES: usize = 20;
 
 /// N-bytes output of a blake3 function.
 ///
-/// Note: `N` can't be greater than `32` because [`Digest::as_bytes`] currently supports only 32
-/// bytes.
+/// Note: `N` can't be greater than `32` because [`Blake3Digest::as_bytes`] currently supports only
+/// 32 bytes.
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd)]
 #[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 #[cfg_attr(feature = "serde", serde(into = "String", try_from = "&str"))]

@@ -250,8 +250,8 @@ impl Deserializable for Sha512Digest {
 
 /// SHA-512 hash function.
 ///
-/// Unlike [Sha256], this struct does not implement the [Hasher], [HasherExt], or [ElementHasher]
-/// traits because those traits require [Digest], which mandates a 32-byte output. SHA-512
+/// Unlike [Sha256], this struct does not implement the `Hasher`, `HasherExt`, or `ElementHasher`
+/// traits because those traits require `Digest`, which mandates a 32-byte output. SHA-512
 /// produces a 64-byte digest, and truncating it would create confusion with SHA-512/256.
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub struct Sha512;
