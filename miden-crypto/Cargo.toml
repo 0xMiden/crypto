@@ -62,11 +62,11 @@ harness = false
 name    = "rand"
 
 [features]
-concurrent = ["dep:rayon", "hashbrown?/rayon"]
+concurrent = ["dep:rayon"]
 default = ["concurrent", "std"]
 executable = ["dep:clap", "dep:rand-utils", "std"]
 fuzzing = []
-hashmaps = ["dep:hashbrown"]
+hashmaps = ["std"]
 internal = []
 rocksdb = ["concurrent", "dep:rocksdb"]
 serde = ["dep:serde", "serde?/alloc", "winter-math/serde"]
@@ -87,7 +87,6 @@ clap                          = { features = ["derive"], optional = true, versio
 curve25519-dalek              = { default-features = false, version = "4" }
 ed25519-dalek                 = { features = ["zeroize"], version = "2" }
 flume                         = { version = "0.11" }
-hashbrown                     = { features = ["serde"], optional = true, version = "0.16" }
 hkdf                          = { default-features = false, version = "0.12" }
 k256                          = { features = ["ecdh", "ecdsa"], version = "0.13" }
 miden-crypto-derive.workspace = true
