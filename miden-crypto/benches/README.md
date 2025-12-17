@@ -80,7 +80,7 @@ For each algorithm, we benchmark three core operations:
 
 ### Sparse Merkle Tree
 
-We build cryptographic data structures incorporating these hash functions. What follows are benchmarks of operations on sparse Merkle trees (SMTs) which use the above `RPO_256` hash function. We perform a batched modification of 1,000 values in a tree with 1,000,000 leaves (with the `hashmaps` feature to use the `hashbrown` crate).
+We build cryptographic data structures incorporating these hash functions. What follows are benchmarks of operations on sparse Merkle trees (SMTs) which use the above `RPO_256` hash function. We perform a batched modification of 1,000 values in a tree with 1,000,000 leaves (with the `hashmaps` feature enabled to leverage the standard library `HashMap`).
 
 ### Scenario 1: SMT Construction (1M pairs)
 
