@@ -250,7 +250,7 @@ impl<S: SmtStorage> LargeSmt<S> {
         // build deep (disk-backed) subtrees
         leaf_subtrees = std::thread::scope(|scope| {
             let (sender, receiver) = flume::bounded(CONSTRUCTION_SUBTREE_BATCH_SIZE);
-            let storage: &S = &self.storage;
+            let storage = &mut self.storage;
 
             scope.spawn(move || -> Result<(), MerkleError> {
                 let mut subtrees: Vec<Subtree> =
