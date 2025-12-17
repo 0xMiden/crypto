@@ -11,8 +11,8 @@ use super::{
 use crate::{
     Word,
     merkle::smt::{
-        EmptySubtreeRoots, LeafIndex, Map, MerkleError, MutationSet, NodeIndex, NodeMutation,
-        NodeMutations, SmtLeaf, SparseMerkleTree,
+        EmptySubtreeRoots, InnerNode, LeafIndex, Map, MerkleError, MutationSet, NodeIndex,
+        NodeMutation, NodeMutations, SmtLeaf, SparseMerkleTree,
         full::concurrent::{
             SUBTREE_DEPTH, SubtreeLeaf, SubtreeLeavesIter, fetch_sibling_pair,
             process_sorted_pairs_to_leaves,
@@ -51,16 +51,15 @@ impl<S: SmtStorage> LargeSmt<S> {
         let subtree_root_index =
             NodeIndex::new_unchecked(subtree_root_depth, subtree_leaves[0].col >> SUBTREE_DEPTH);
 
-        // Load subtree from storage if below in-memory horizon; otherwise use in-memory nodes
-        let mut subtree_opt = if subtree_root_depth < IN_MEMORY_DEPTH {
-            None
+        let is_storage_subtree = subtree_root_depth >= IN_MEMORY_DEPTH;
+
+        // For storage subtrees, load existing subtree to read old nodes during mutation building
+        let existing_subtree = if is_storage_subtree {
+            self.storage
+                .get_subtree(subtree_root_index)
+                .expect("Storage error getting subtree in insert_batch")
         } else {
-            Some(
-                self.storage
-                    .get_subtree(subtree_root_index)
-                    .expect("Storage error getting subtree in insert_batch")
-                    .unwrap_or_else(|| Subtree::new(subtree_root_index)),
-            )
+            None
         };
 
         // Build mutations for the subtree
@@ -68,36 +67,42 @@ impl<S: SmtStorage> LargeSmt<S> {
             subtree_leaves,
             SMT_DEPTH,
             subtree_root_depth,
-            subtree_opt.as_ref(),
+            existing_subtree.as_ref(),
         );
 
-        let (in_memory_mutations, subtree_update) = if subtree_root_depth < IN_MEMORY_DEPTH {
+        let (in_memory_mutations, subtree_update) = if !is_storage_subtree {
             // In-memory nodes: return mutations for direct application
             (mutations, None)
         } else {
-            // Storage nodes: apply mutations to loaded subtree and determine storage action
+            // Storage nodes: merge existing nodes with mutations and build directly
             let modified = !mutations.is_empty();
-            if let Some(subtree) = subtree_opt.as_mut() {
-                for (index, mutation) in mutations {
-                    match mutation {
-                        NodeMutation::Removal => {
-                            subtree.remove_inner_node(index);
-                        },
-                        NodeMutation::Addition(node) => {
-                            subtree.insert_inner_node(index, node);
-                        },
-                    }
-                }
-            }
 
             let update = if !modified {
                 None
-            } else if let Some(subtree) = subtree_opt
-                && !subtree.is_empty()
-            {
-                Some(SubtreeUpdate::Store { index: subtree_root_index, subtree })
             } else {
-                Some(SubtreeUpdate::Delete { index: subtree_root_index })
+                // Start with existing nodes (if any), then apply mutations
+                let mut final_nodes: Map<NodeIndex, InnerNode> = existing_subtree
+                    .map(|s| s.iter_nodes().collect())
+                    .unwrap_or_default();
+
+                // Apply mutations: remove Removals, add/update Additions
+                for (index, mutation) in mutations {
+                    match mutation {
+                        NodeMutation::Removal => {
+                            final_nodes.remove(&index);
+                        },
+                        NodeMutation::Addition(node) => {
+                            final_nodes.insert(index, node);
+                        },
+                    }
+                }
+
+                if final_nodes.is_empty() {
+                    Some(SubtreeUpdate::Delete { index: subtree_root_index })
+                } else {
+                    let subtree = Subtree::from_nodes(subtree_root_index, final_nodes);
+                    Some(SubtreeUpdate::Store { index: subtree_root_index, subtree })
+                }
             };
 
             (NodeMutations::default(), update)
@@ -547,9 +552,15 @@ impl<S: SmtStorage> LargeSmt<S> {
         // Update the root in memory
         self.in_memory_nodes[ROOT_MEMORY_INDEX] = new_root;
 
-        // Process node mutations
+        // Process node mutations - group by subtree for efficient batch application.
+        // Mutations are pre-sorted by subtree root, so consecutive mutations belong
+        // to the same subtree.
+        let mut current_subtree_root: Option<NodeIndex> = None;
+        let mut current_subtree_mutations: Vec<(NodeIndex, NodeMutation)> = Vec::new();
+
         for (index, mutation) in sorted_node_mutations {
             if index.depth() < IN_MEMORY_DEPTH {
+                // In-memory mutations applied directly
                 match mutation {
                     Removal => {
                         SparseMerkleTree::<SMT_DEPTH>::remove_inner_node(self, index);
@@ -560,21 +571,31 @@ impl<S: SmtStorage> LargeSmt<S> {
                 };
             } else {
                 let subtree_root_index = Subtree::find_subtree_root(index);
-                let subtree = loaded_subtrees
-                    .get_mut(&subtree_root_index)
-                    .expect("Subtree map entry must exist")
-                    .as_mut()
-                    .expect("Subtree must exist as it was either fetched or created");
 
-                match mutation {
-                    Removal => {
-                        subtree.remove_inner_node(index);
-                    },
-                    Addition(node) => {
-                        subtree.insert_inner_node(index, node);
-                    },
-                };
+                // Check if we've moved to a new subtree
+                if current_subtree_root != Some(subtree_root_index) {
+                    // Apply accumulated mutations to previous subtree
+                    if let Some(prev_root) = current_subtree_root {
+                        Self::apply_mutations_to_subtree(
+                            &mut loaded_subtrees,
+                            prev_root,
+                            mem::take(&mut current_subtree_mutations),
+                        );
+                    }
+                    current_subtree_root = Some(subtree_root_index);
+                }
+
+                current_subtree_mutations.push((index, mutation));
             }
+        }
+
+        // Apply any remaining mutations to the last subtree
+        if let Some(prev_root) = current_subtree_root {
+            Self::apply_mutations_to_subtree(
+                &mut loaded_subtrees,
+                prev_root,
+                current_subtree_mutations,
+            );
         }
 
         // Go through subtrees, see if any are empty, and if so remove them
@@ -638,6 +659,46 @@ impl<S: SmtStorage> LargeSmt<S> {
         );
         self.storage.apply(updates)?;
         Ok(())
+    }
+
+    /// Applies a batch of mutations to a subtree efficiently.
+    ///
+    /// Instead of using `insert_inner_node`/`remove_inner_node` calls repeatedly,
+    /// this collects existing nodes into a Map, applies all mutations, then rebuilds
+    /// the subtree in one pass using `from_nodes()`.
+    fn apply_mutations_to_subtree(
+        loaded_subtrees: &mut Map<NodeIndex, Option<Subtree>>,
+        subtree_root_index: NodeIndex,
+        mutations: Vec<(NodeIndex, NodeMutation)>,
+    ) {
+        let subtree_entry = loaded_subtrees
+            .get_mut(&subtree_root_index)
+            .expect("Subtree map entry must exist");
+
+        let existing_subtree = subtree_entry
+            .take()
+            .expect("Subtree must exist as it was either fetched or created");
+
+        // Collect existing nodes into a Map
+        let mut final_nodes: Map<NodeIndex, InnerNode> = existing_subtree.iter_nodes().collect();
+
+        // Apply all mutations
+        for (index, mutation) in mutations {
+            match mutation {
+                NodeMutation::Removal => {
+                    final_nodes.remove(&index);
+                },
+                NodeMutation::Addition(node) => {
+                    final_nodes.insert(index, node);
+                },
+            }
+        }
+
+        // Rebuild subtree from final node set (or leave as None if empty)
+        if !final_nodes.is_empty() {
+            *subtree_entry = Some(Subtree::from_nodes(subtree_root_index, final_nodes));
+        }
+        // If final_nodes is empty, subtree_entry is already None from the take()
     }
 
     /// Computes what changes are necessary to insert the specified key-value pairs into this Merkle

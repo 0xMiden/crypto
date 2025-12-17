@@ -264,10 +264,7 @@ impl<S: SmtStorage> LargeSmt<S> {
 
                         let subtree_root_index =
                             NodeIndex::new(bottom_depth - SUBTREE_DEPTH, subtree_root.col).unwrap();
-                        let mut subtree = Subtree::new(subtree_root_index);
-                        for (index, node) in nodes {
-                            subtree.insert_inner_node(index, node);
-                        }
+                        let subtree = Subtree::from_nodes(subtree_root_index, nodes);
                         sender.send(subtree).expect("Flume channel disconnected unexpectedly");
                         subtree_root
                     })

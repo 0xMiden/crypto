@@ -3,7 +3,7 @@ use alloc::vec::Vec;
 use super::{EmptySubtreeRoots, InnerNode, InnerNodeInfo, NodeIndex, SMT_DEPTH};
 use crate::{
     Word,
-    merkle::smt::{Map, full::concurrent::SUBTREE_DEPTH},
+    merkle::smt::full::concurrent::SUBTREE_DEPTH,
 };
 
 mod error;
@@ -15,28 +15,31 @@ mod tests;
 /// Represents a complete 8-depth subtree that is serialized into a single RocksDB entry.
 ///
 /// ### What is stored
-/// - `nodes` tracks only **non-empty inner nodes** of this subtree (i.e., nodes for which at least
-///   one child differs from the canonical empty hash). Each entry stores an `InnerNode` (hash
-///   pair).
+/// - `non_empty_node_bits` is a 256-bit bitmask (4 x u64) where each bit indicates whether the
+///   corresponding node exists (i.e., differs from the canonical empty state).
+/// - `nodes` stores the left and right child hashes for each existing node, packed in order
+///   of set bits. For each set bit at position `i`, two consecutive Words (left, right) are stored.
 ///
 /// ### Local index layout (how indices are computed)
 /// - Indices are **subtree-local** and follow binary-heap (level-order) layout: `root = 0`;
 ///   children of `i` are at `2i+1` and `2i+2`.
 /// - Equivalently, given a `(depth, value)` from the parent tree, the local index is obtained by
-///   taking the node’s depth **relative to the subtree root** and its left-to-right position within
+///   taking the node's depth **relative to the subtree root** and its left-to-right position within
 ///   that level (offset by the total number of nodes in all previous levels).
 ///
 /// ### Serialization (`to_vec` / `from_vec`)
 /// - Uses a **512-bit bitmask** (2 bits per node) to mark non-empty left/right children, followed
 ///   by a packed stream of `Word` hashes for each set bit.
 /// - Children equal to the canonical empty hash are omitted in the byte representation and
-///   reconstructed on load using `EmptySubtreeRoots` and the child’s depth in the parent tree.
+///   reconstructed on load using `EmptySubtreeRoots` and the child's depth in the parent tree.
 #[derive(Debug, Clone)]
 pub struct Subtree {
     /// Index of this subtree's root in the parent SMT.
     root_index: NodeIndex,
-    /// Inner nodes keyed by subtree-local index (binary-heap order).
-    nodes: Map<u8, InnerNode>,
+    /// Bitmask indicating which nodes exist (256 bits for local indices 0-255).
+    non_empty_node_bits: [u64; 4],
+    /// Child hashes for existing nodes, stored as pairs (left, right) in order of set bits.
+    nodes: Vec<Word>,
 }
 
 impl Subtree {
@@ -46,7 +49,41 @@ impl Subtree {
     const BITS_PER_NODE: usize = 2;
 
     pub fn new(root_index: NodeIndex) -> Self {
-        Self { root_index, nodes: Map::new() }
+        Self {
+            root_index,
+            non_empty_node_bits: [0u64; 4],
+            nodes: Vec::new(),
+        }
+    }
+
+    /// Creates a subtree from an iterator of nodes.
+    ///
+    /// This is more efficient than calling `insert_inner_node` repeatedly,
+    /// as it builds the bitmask and node vector in a single pass after sorting.
+    pub fn from_nodes(
+        root_index: NodeIndex,
+        nodes: impl IntoIterator<Item = (NodeIndex, InnerNode)>,
+    ) -> Self {
+        // Convert to local indices and collect
+        let mut local_nodes: Vec<(u8, InnerNode)> = nodes
+            .into_iter()
+            .map(|(index, node)| (Self::global_to_local(index, root_index), node))
+            .collect();
+
+        // Sort by local index for sequential Vec building
+        local_nodes.sort_unstable_by_key(|(local_idx, _)| *local_idx);
+
+        // Build bitmask and nodes Vec in one pass
+        let mut subtree = Self::new(root_index);
+        subtree.nodes.reserve(local_nodes.len() * 2);
+
+        for (local_index, inner_node) in local_nodes {
+            subtree.set_node_bit(local_index, true);
+            subtree.nodes.push(inner_node.left);
+            subtree.nodes.push(inner_node.right);
+        }
+
+        subtree
     }
 
     pub fn root_index(&self) -> NodeIndex {
@@ -54,7 +91,7 @@ impl Subtree {
     }
 
     pub fn len(&self) -> usize {
-        self.nodes.len()
+        self.non_empty_node_bits.iter().map(|&bits| bits.count_ones() as usize).sum()
     }
 
     pub fn insert_inner_node(
@@ -63,17 +100,98 @@ impl Subtree {
         inner_node: InnerNode,
     ) -> Option<InnerNode> {
         let local_index = Self::global_to_local(index, self.root_index);
-        self.nodes.insert(local_index, inner_node)
+        let was_present = self.is_node_present(local_index);
+
+        if was_present {
+            // Node exists - replace in place
+            let position = self.node_position(local_index);
+            let old_left = self.nodes[position * 2];
+            let old_right = self.nodes[position * 2 + 1];
+            self.nodes[position * 2] = inner_node.left;
+            self.nodes[position * 2 + 1] = inner_node.right;
+            Some(InnerNode { left: old_left, right: old_right })
+        } else {
+            // Node doesn't exist - insert at the correct position
+            let position = self.node_position(local_index);
+            self.set_node_bit(local_index, true);
+            self.nodes.insert(position * 2, inner_node.left);
+            self.nodes.insert(position * 2 + 1, inner_node.right);
+            None
+        }
     }
 
     pub fn remove_inner_node(&mut self, index: NodeIndex) -> Option<InnerNode> {
         let local_index = Self::global_to_local(index, self.root_index);
-        self.nodes.remove(&local_index)
+
+        if !self.is_node_present(local_index) {
+            return None;
+        }
+
+        let position = self.node_position(local_index);
+        let old_left = self.nodes[position * 2];
+        let old_right = self.nodes[position * 2 + 1];
+
+        self.set_node_bit(local_index, false);
+        self.nodes.remove(position * 2 + 1);
+        self.nodes.remove(position * 2);
+
+        Some(InnerNode { left: old_left, right: old_right })
     }
 
     pub fn get_inner_node(&self, index: NodeIndex) -> Option<InnerNode> {
         let local_index = Self::global_to_local(index, self.root_index);
-        self.nodes.get(&local_index).cloned()
+
+        if !self.is_node_present(local_index) {
+            return None;
+        }
+
+        let position = self.node_position(local_index);
+        Some(InnerNode {
+            left: self.nodes[position * 2],
+            right: self.nodes[position * 2 + 1],
+        })
+    }
+
+    /// Returns true if a node exists at the given local index.
+    #[inline]
+    fn is_node_present(&self, local_index: u8) -> bool {
+        let word_idx = (local_index / 64) as usize;
+        let bit_idx = local_index % 64;
+        (self.non_empty_node_bits[word_idx] >> bit_idx) & 1 != 0
+    }
+
+    /// Sets or clears the bit for the given local index.
+    #[inline]
+    fn set_node_bit(&mut self, local_index: u8, present: bool) {
+        let word_idx = (local_index / 64) as usize;
+        let bit_idx = local_index % 64;
+        if present {
+            self.non_empty_node_bits[word_idx] |= 1u64 << bit_idx;
+        } else {
+            self.non_empty_node_bits[word_idx] &= !(1u64 << bit_idx);
+        }
+    }
+
+    /// Returns the position in the `nodes` Vec for the given local index.
+    /// This is the count of set bits before this index in the bitmask.
+    #[inline]
+    fn node_position(&self, local_index: u8) -> usize {
+        let mut count = 0usize;
+        let full_words = (local_index / 64) as usize;
+        let remaining_bits = local_index % 64;
+
+        // Count all bits in full words
+        for i in 0..full_words {
+            count += self.non_empty_node_bits[i].count_ones() as usize;
+        }
+
+        // Count bits in the partial word up to (but not including) the target bit
+        if remaining_bits > 0 {
+            let mask = (1u64 << remaining_bits) - 1;
+            count += (self.non_empty_node_bits[full_words] & mask).count_ones() as usize;
+        }
+
+        count
     }
 
     /// Serializes this subtree into a compact byte representation.
@@ -95,20 +213,24 @@ impl Subtree {
         let mut bitmask = [0u8; Self::BITMASK_SIZE];
 
         for local_index in 0..Self::MAX_NODES {
-            if let Some(node) = self.nodes.get(&local_index) {
+            if self.is_node_present(local_index) {
+                let position = self.node_position(local_index);
+                let left = self.nodes[position * 2];
+                let right = self.nodes[position * 2 + 1];
+
                 let bit_offset = (local_index as usize) * Self::BITS_PER_NODE;
                 let node_depth_in_subtree = Self::local_index_to_depth(local_index);
                 let child_depth = self.root_index.depth() + node_depth_in_subtree + 1;
                 let empty_hash = *EmptySubtreeRoots::entry(SMT_DEPTH, child_depth);
 
-                if node.left != empty_hash {
+                if left != empty_hash {
                     Self::set_bit(&mut bitmask, bit_offset);
-                    data.extend_from_slice(&node.left.as_bytes());
+                    data.extend_from_slice(&left.as_bytes());
                 }
 
-                if node.right != empty_hash {
+                if right != empty_hash {
                     Self::set_bit(&mut bitmask, bit_offset + 1);
-                    data.extend_from_slice(&node.right.as_bytes());
+                    data.extend_from_slice(&right.as_bytes());
                 }
             }
         }
@@ -136,7 +258,7 @@ impl Subtree {
     /// a `Word` hash is read sequentially from the data section.
     ///
     /// When a child bit is unset, the corresponding hash is reconstructed from
-    /// `EmptySubtreeRoots` based on the child’s depth in the full tree.
+    /// `EmptySubtreeRoots` based on the child's depth in the full tree.
     ///
     /// Errors are returned if the byte slice is too short, contains an unexpected
     /// number of hashes, or leaves unconsumed data at the end.
@@ -156,7 +278,8 @@ impl Subtree {
             });
         }
 
-        let mut nodes = Map::new();
+        let mut non_empty_node_bits = [0u64; 4];
+        let mut nodes = Vec::new();
         let mut hash_chunks = hash_data.chunks_exact(Self::HASH_SIZE);
 
         // Process each potential node position
@@ -193,8 +316,14 @@ impl Subtree {
                     empty_hash
                 };
 
-                let inner_node = InnerNode { left: left_hash, right: right_hash };
-                nodes.insert(local_index, inner_node);
+                // Set the bit in the bitmask
+                let word_idx = (local_index / 64) as usize;
+                let bit_idx = local_index % 64;
+                non_empty_node_bits[word_idx] |= 1u64 << bit_idx;
+
+                // Store the child hashes
+                nodes.push(left_hash);
+                nodes.push(right_hash);
             }
         }
 
@@ -203,7 +332,7 @@ impl Subtree {
             return Err(SubtreeError::ExtraData);
         }
 
-        Ok(Self { root_index, nodes })
+        Ok(Self { root_index, non_empty_node_bits, nodes })
     }
 
     fn global_to_local(global: NodeIndex, base: NodeIndex) -> u8 {
@@ -245,7 +374,37 @@ impl Subtree {
     }
 
     pub fn is_empty(&self) -> bool {
-        self.len() == 0
+        self.non_empty_node_bits.iter().all(|&bits| bits == 0)
+    }
+
+    /// Returns an iterator over all (NodeIndex, InnerNode) pairs in this subtree.
+    pub fn iter_nodes(&self) -> impl Iterator<Item = (NodeIndex, InnerNode)> + '_ {
+        (0..Self::MAX_NODES)
+            .filter(|&local_index| self.is_node_present(local_index))
+            .map(|local_index| {
+                let position = self.node_position(local_index);
+                let inner_node = InnerNode {
+                    left: self.nodes[position * 2],
+                    right: self.nodes[position * 2 + 1],
+                };
+                let global_index = Self::local_to_global(local_index, self.root_index);
+                (global_index, inner_node)
+            })
+    }
+
+    /// Converts a local subtree index back to a global NodeIndex.
+    fn local_to_global(local_index: u8, root_index: NodeIndex) -> NodeIndex {
+        let local_depth = Self::local_index_to_depth(local_index);
+        let global_depth = root_index.depth() + local_depth;
+
+        // Calculate position within the level
+        let level_start = (1u8 << local_depth) - 1;
+        let position_in_level = local_index - level_start;
+
+        // Global value is root's value shifted left by local_depth, plus position
+        let global_value = (root_index.value() << local_depth) | (position_in_level as u64);
+
+        NodeIndex::new_unchecked(global_depth, global_value)
     }
 
     /// Convert local index to depth within subtree
@@ -256,10 +415,18 @@ impl Subtree {
     }
 
     pub fn iter_inner_node_info(&self) -> impl Iterator<Item = InnerNodeInfo> + '_ {
-        self.nodes.values().map(|inner_node_ref| InnerNodeInfo {
-            value: inner_node_ref.hash(),
-            left: inner_node_ref.left,
-            right: inner_node_ref.right,
-        })
+        (0..Self::MAX_NODES)
+            .filter(|&local_index| self.is_node_present(local_index))
+            .map(|local_index| {
+                let position = self.node_position(local_index);
+                let left = self.nodes[position * 2];
+                let right = self.nodes[position * 2 + 1];
+                let inner_node = InnerNode { left, right };
+                InnerNodeInfo {
+                    value: inner_node.hash(),
+                    left,
+                    right,
+                }
+            })
     }
 }
