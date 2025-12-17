@@ -105,9 +105,9 @@ p3-field            = { branch = "main", default-features = false, git = "https:
 p3-symmetric        = { branch = "main", default-features = false, git = "https://github.com/Plonky3/Plonky3" }
 
 # Miden-specific Plonky3 crates
-p3-miden-air        = { git = "ssh://git@github.com/0xMiden/p3-miden", branch = "main", default-features = false }
-p3-miden-goldilocks = { git = "ssh://git@github.com/0xMiden/p3-miden", branch = "main", default-features = false }
-p3-miden-prover     = { git = "ssh://git@github.com/0xMiden/p3-miden", branch = "main", default-features = false }
+p3-miden-air        = { git = "https://github.com/0xMiden/p3-miden", branch = "main", default-features = false }
+p3-miden-goldilocks = { git = "https://github.com/0xMiden/p3-miden", branch = "main", default-features = false }
+p3-miden-prover     = { git = "https://github.com/0xMiden/p3-miden", branch = "main", default-features = false }
 
 [dev-dependencies]
 assert_matches = { default-features = false, version = "1.5" }
