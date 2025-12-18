@@ -12,6 +12,7 @@ use core::ops::Range;
 
 use miden_crypto_derive::{SilentDebug, SilentDisplay};
 use num::Integer;
+use p3_field::{PrimeField64, RawDataSerializable};
 use rand::{
     Rng,
     distr::{Distribution, StandardUniform, Uniform},
@@ -19,7 +20,7 @@ use rand::{
 use subtle::ConstantTimeEq;
 
 use crate::{
-    Felt, FieldElement, ONE, StarkField, Word, ZERO,
+    Felt, ONE, Word, ZERO,
     aead::{AeadScheme, DataType, EncryptionError},
     hash::rpo::Rpo256,
     utils::{
@@ -30,7 +31,7 @@ use crate::{
     zeroize::{Zeroize, ZeroizeOnDrop},
 };
 
-#[cfg(test)]
+#[cfg(all(test, feature = "std"))]
 mod test;
 
 // CONSTANTS
@@ -40,13 +41,13 @@ mod test;
 pub const SECRET_KEY_SIZE: usize = 4;
 
 /// Size of a secret key in bytes
-pub const SK_SIZE_BYTES: usize = SECRET_KEY_SIZE * Felt::ELEMENT_BYTES;
+pub const SK_SIZE_BYTES: usize = SECRET_KEY_SIZE * Felt::NUM_BYTES;
 
 /// Size of a nonce in field elements
 pub const NONCE_SIZE: usize = 4;
 
 /// Size of a nonce in bytes
-pub const NONCE_SIZE_BYTES: usize = NONCE_SIZE * Felt::ELEMENT_BYTES;
+pub const NONCE_SIZE_BYTES: usize = NONCE_SIZE * Felt::NUM_BYTES;
 
 /// Size of an authentication tag in field elements
 pub const AUTH_TAG_SIZE: usize = 4;
@@ -157,7 +158,7 @@ impl SecretKey {
     #[cfg(feature = "std")]
     #[allow(clippy::new_without_default)]
     pub fn new() -> Self {
-        let mut rng = rand::rng();
+        let mut rng = rand::thread_rng();
         Self::with_rng(&mut rng)
     }
 
@@ -207,7 +208,7 @@ impl SecretKey {
         data: &[Felt],
         associated_data: &[Felt],
     ) -> Result<EncryptedData, EncryptionError> {
-        let mut rng = rand::rng();
+        let mut rng = rand::thread_rng();
         let nonce = Nonce::with_rng(&mut rng);
 
         self.encrypt_elements_with_nonce(data, associated_data, nonce)
@@ -275,7 +276,7 @@ impl SecretKey {
         data: &[u8],
         associated_data: &[u8],
     ) -> Result<EncryptedData, EncryptionError> {
-        let mut rng = rand::rng();
+        let mut rng = rand::thread_rng();
         let nonce = Nonce::with_rng(&mut rng);
 
         self.encrypt_bytes_with_nonce(data, associated_data, nonce)
@@ -424,7 +425,7 @@ impl Distribution<SecretKey> for StandardUniform {
     fn sample<R: rand::Rng + ?Sized>(&self, rng: &mut R) -> SecretKey {
         let mut res = [ZERO; SECRET_KEY_SIZE];
         let uni_dist =
-            Uniform::new(0, Felt::MODULUS).expect("should not fail given the size of the field");
+            Uniform::new(0, Felt::ORDER_U64).expect("should not fail given the size of the field");
         for r in res.iter_mut() {
             let sampled_integer = uni_dist.sample(rng);
             *r = Felt::new(sampled_integer);
@@ -592,7 +593,7 @@ impl Distribution<Nonce> for StandardUniform {
     fn sample<R: rand::Rng + ?Sized>(&self, rng: &mut R) -> Nonce {
         let mut res = [ZERO; NONCE_SIZE];
         let uni_dist =
-            Uniform::new(0, Felt::MODULUS).expect("should not fail given the size of the field");
+            Uniform::new(0, Felt::ORDER_U64).expect("should not fail given the size of the field");
         for r in res.iter_mut() {
             let sampled_integer = uni_dist.sample(rng);
             *r = Felt::new(sampled_integer);
@@ -655,9 +656,9 @@ impl Serializable for EncryptedData {
         // we serialize field elements in their canonical form
         target.write_u8(self.data_type as u8);
         target.write_usize(self.ciphertext.len());
-        target.write_many(self.ciphertext.iter().map(Felt::as_int));
-        target.write_many(self.nonce.0.iter().map(Felt::as_int));
-        target.write_many(self.auth_tag.0.iter().map(Felt::as_int));
+        target.write_many(self.ciphertext.iter().map(Felt::as_canonical_u64));
+        target.write_many(self.nonce.0.iter().map(Felt::as_canonical_u64));
+        target.write_many(self.auth_tag.0.iter().map(Felt::as_canonical_u64));
     }
 }
 
@@ -756,7 +757,7 @@ fn unpad(mut plaintext: Vec<Felt>) -> Result<Vec<Felt>, EncryptionError> {
 /// Converts a vector of u64 values into a vector of field elements, returning an error if any of
 /// the u64 values is not a valid field element.
 fn felts_from_u64(input: Vec<u64>) -> Result<Vec<Felt>, alloc::string::String> {
-    input.into_iter().map(Felt::try_from).collect()
+    input.into_iter().map(Felt::try_checked).collect()
 }
 
 // AEAD SCHEME IMPLEMENTATION

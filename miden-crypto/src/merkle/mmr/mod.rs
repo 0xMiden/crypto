@@ -22,3 +22,5 @@ pub use inorder::InOrderIndex;
 pub use partial::PartialMmr;
 pub use peaks::MmrPeaks;
 pub use proof::{MmrPath, MmrProof};
+
+use super::{Rpo256, Word};

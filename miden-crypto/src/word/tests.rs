@@ -1,9 +1,8 @@
+#![cfg(feature = "std")]
 use alloc::string::String;
 
-use rand_utils::rand_value;
-
 use super::{Deserializable, Felt, Serializable, WORD_SIZE_BYTES, WORD_SIZE_FELT, Word};
-use crate::{utils::SliceReader, word};
+use crate::{test_utils::rand_value, utils::SliceReader, word};
 
 // TESTS
 // ================================================================================================

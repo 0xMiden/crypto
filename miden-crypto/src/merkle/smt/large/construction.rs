@@ -60,9 +60,12 @@ impl<S: SmtStorage> LargeSmt<S> {
     ///
     /// # Example
     /// ```no_run
-    /// # use miden_crypto::merkle::smt::{LargeSmt, RocksDbConfig, RocksDbStorage};
+    /// # #[cfg(feature = "rocksdb")]
+    /// # {
+    /// use miden_crypto::merkle::smt::{LargeSmt, RocksDbConfig, RocksDbStorage};
     /// let storage = RocksDbStorage::open(RocksDbConfig::new("/path/to/db")).unwrap();
     /// let smt = LargeSmt::load(storage).expect("Failed to load SMT");
+    /// # }
     /// ```
     pub fn load(storage: S) -> Result<Self, LargeSmtError> {
         Self::initialize_from_storage(storage)
@@ -83,13 +86,17 @@ impl<S: SmtStorage> LargeSmt<S> {
     ///
     /// # Example
     /// ```no_run
-    /// # use miden_crypto::{Word, merkle::smt::{LargeSmt, RocksDbConfig, RocksDbStorage}};
-    /// // Load the expected root from your own persistence
-    /// let expected_root: Word = todo!();
-    ///
+    /// # #[cfg(feature = "rocksdb")]
+    /// # {
+    /// use miden_crypto::{
+    ///     Word,
+    ///     merkle::smt::{LargeSmt, RocksDbConfig, RocksDbStorage},
+    /// };
+    /// # let expected_root: Word = miden_crypto::EMPTY_WORD;
     /// let storage = RocksDbStorage::open(RocksDbConfig::new("/path/to/db")).unwrap();
     /// let smt = LargeSmt::load_with_root(storage, expected_root)
     ///     .expect("Failed to load SMT with expected root");
+    /// # }
     /// ```
     pub fn load_with_root(storage: S, expected_root: Word) -> Result<Self, LargeSmtError> {
         let smt = Self::load(storage)?;

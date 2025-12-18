@@ -406,17 +406,19 @@ impl Deserializable for PartialSmt {
 // TESTS
 // ================================================================================================
 
-#[cfg(test)]
+#[cfg(all(test, feature = "std"))]
 mod tests {
 
     use alloc::collections::{BTreeMap, BTreeSet};
 
     use assert_matches::assert_matches;
-    use rand_utils::{rand_array, rand_value};
-    use winter_math::fields::f64::BaseElement as Felt;
 
     use super::*;
-    use crate::{EMPTY_WORD, ONE, ZERO, merkle::EmptySubtreeRoots};
+    use crate::{
+        EMPTY_WORD, Felt, ONE, ZERO,
+        merkle::EmptySubtreeRoots,
+        test_utils::{rand_array, rand_value},
+    };
 
     /// Tests that a partial SMT constructed from a root is well behaved and returns expected
     /// values.

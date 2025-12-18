@@ -102,7 +102,7 @@ impl EphemeralSecretKey {
     #[cfg(feature = "std")]
     #[allow(clippy::new_without_default)]
     pub fn new() -> Self {
-        let mut rng = rand::rng();
+        let mut rng = rand::thread_rng();
 
         Self::with_rng(&mut rng)
     }
@@ -228,7 +228,7 @@ impl KeyAgreementScheme for K256 {
 // TESTS
 // ================================================================================================
 
-#[cfg(test)]
+#[cfg(all(test, feature = "std"))]
 mod test {
 
     use rand::rng;
