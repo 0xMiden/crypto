@@ -7,7 +7,6 @@ use core::{
 
 use p3_field::{BasedVectorSpace, PrimeField64};
 use p3_miden_goldilocks::Goldilocks as Felt;
-use winter_crypto::Digest;
 
 use super::HasherExt;
 use crate::utils::{
@@ -39,6 +38,12 @@ const DIGEST20_BYTES: usize = 20;
 pub struct Blake3Digest<const N: usize>([u8; N]);
 
 impl<const N: usize> Blake3Digest<N> {
+    pub fn as_bytes(&self) -> [u8; 32] {
+        // compile-time assertion
+        assert!(N <= 32, "digest currently supports only 32 bytes!");
+        expand_bytes(&self.0)
+    }
+
     pub fn digests_as_bytes(digests: &[Blake3Digest<N>]) -> &[u8] {
         let p = digests.as_ptr();
         let len = digests.len() * N;
@@ -110,14 +115,6 @@ impl<const N: usize> winter_utils::Deserializable for Blake3Digest<N> {
         source: &mut R,
     ) -> Result<Self, winter_utils::DeserializationError> {
         source.read_array().map(Self)
-    }
-}
-
-impl<const N: usize> Digest for Blake3Digest<N> {
-    fn as_bytes(&self) -> [u8; 32] {
-        // compile-time assertion
-        assert!(N <= 32, "digest currently supports only 32 bytes!");
-        expand_bytes(&self.0)
     }
 }
 
