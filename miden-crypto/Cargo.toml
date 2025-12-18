@@ -86,7 +86,6 @@ std = [
   "miden-serde-utils/winter-compat",
   "rand/std",
   "rand/thread_rng",
-  "winter-crypto/std",
   "winter-math/std",
   "winter-utils/std",
 ]
@@ -117,7 +116,6 @@ sha2                          = { default-features = false, version = "0.10" }
 sha3                          = { default-features = false, version = "0.10" }
 subtle                        = { default-features = false, version = "2.6" }
 thiserror                     = { default-features = false, version = "2.0" }
-winter-crypto                 = { default-features = false, version = "0.13" }
 winter-math                   = { default-features = false, version = "0.13" }
 winter-utils                  = { default-features = false, version = "0.13" }
 x25519-dalek                  = { default-features = false, features = ["static_secrets"], version = "2.0" }

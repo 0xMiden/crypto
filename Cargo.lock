@@ -988,7 +988,6 @@ dependencies = [
  "subtle",
  "tempfile",
  "thiserror",
- "winter-crypto",
  "winter-math",
  "winter-rand-utils",
  "winter-utils",
@@ -2165,18 +2164,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5a5364e9d77fcdeeaa6062ced926ee3381faa2ee02d3eb83a5c27a8825540829"
 dependencies = [
  "memchr",
-]
-
-[[package]]
-name = "winter-crypto"
-version = "0.13.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1cdb247bc142438798edb04067ab72a22cf815f57abbd7b78a6fa986fc101db8"
-dependencies = [
- "blake3",
- "sha3",
- "winter-math",
- "winter-utils",
 ]
 
 [[package]]

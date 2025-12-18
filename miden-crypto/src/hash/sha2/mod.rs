@@ -19,7 +19,6 @@ use core::{
 
 use p3_field::{BasedVectorSpace, PrimeField64};
 use sha2::Digest as Sha2Digest;
-use winter_crypto::Digest;
 
 use super::{Felt, HasherExt};
 use crate::utils::{
@@ -122,12 +121,6 @@ impl winter_utils::Deserializable for Sha256Digest {
         source: &mut R,
     ) -> Result<Self, winter_utils::DeserializationError> {
         source.read_array().map(Self)
-    }
-}
-
-impl Digest for Sha256Digest {
-    fn as_bytes(&self) -> [u8; 32] {
-        self.0
     }
 }
 

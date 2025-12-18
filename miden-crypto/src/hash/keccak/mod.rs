@@ -7,7 +7,6 @@ use core::{
 
 use p3_field::BasedVectorSpace;
 use sha3::Digest as Sha3Digest;
-use winter_crypto::Digest;
 
 use super::{Felt, HasherExt};
 use crate::{
@@ -35,6 +34,10 @@ const DIGEST_BYTES: usize = 32;
 pub struct Keccak256Digest([u8; DIGEST_BYTES]);
 
 impl Keccak256Digest {
+    pub fn as_bytes(&self) -> [u8; 32] {
+        self.0
+    }
+
     pub fn digests_as_bytes(digests: &[Keccak256Digest]) -> &[u8] {
         let p = digests.as_ptr();
         let len = digests.len() * DIGEST_BYTES;
@@ -106,12 +109,6 @@ impl winter_utils::Deserializable for Keccak256Digest {
         source: &mut R,
     ) -> Result<Self, winter_utils::DeserializationError> {
         source.read_array().map(Self)
-    }
-}
-
-impl Digest for Keccak256Digest {
-    fn as_bytes(&self) -> [u8; 32] {
-        self.0
     }
 }
 
