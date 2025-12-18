@@ -1,6 +1,6 @@
 use p3_field::{Field, PrimeCharacteristicRing};
 
-#[cfg(test)]
+#[cfg(all(test, feature = "std"))]
 use super::{ALPHA, INV_ALPHA};
 use super::{
     AlgebraicSponge, CAPACITY_RANGE, DIGEST_RANGE, Felt, RATE_RANGE, Range, STATE_WIDTH, Word, ZERO,
