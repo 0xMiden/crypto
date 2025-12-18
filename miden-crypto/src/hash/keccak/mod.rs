@@ -37,7 +37,7 @@ impl Keccak256Digest {
     pub fn as_bytes(&self) -> [u8; 32] {
         self.0
     }
-    
+
     pub fn digests_as_bytes(digests: &[Keccak256Digest]) -> &[u8] {
         let p = digests.as_ptr();
         let len = digests.len() * DIGEST_BYTES;
