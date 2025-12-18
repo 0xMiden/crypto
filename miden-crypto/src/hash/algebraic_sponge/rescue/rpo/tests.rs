@@ -1,15 +1,16 @@
+#![cfg(feature = "std")]
 use alloc::{collections::BTreeSet, vec::Vec};
 
 use proptest::prelude::*;
-use rand_utils::rand_value;
 
 use super::{
     super::{ALPHA, INV_ALPHA, apply_inv_sbox, apply_sbox},
-    Felt, Hasher, Rpo256, STATE_WIDTH,
+    Felt, Rpo256, STATE_WIDTH,
 };
 use crate::{
-    FieldElement, ONE, StarkField, Word, ZERO,
-    hash::algebraic_sponge::{BINARY_CHUNK_SIZE, CAPACITY_RANGE, RATE_WIDTH},
+    ONE, PrimeCharacteristicRing, PrimeField64, Word, ZERO,
+    hash::algebraic_sponge::{AlgebraicSponge, BINARY_CHUNK_SIZE, CAPACITY_RANGE, RATE_WIDTH},
+    test_utils::rand_value,
 };
 
 #[test]
@@ -17,7 +18,7 @@ fn test_sbox() {
     let state = [Felt::new(rand_value()); STATE_WIDTH];
 
     let mut expected = state;
-    expected.iter_mut().for_each(|v| *v = v.exp(ALPHA));
+    expected.iter_mut().for_each(|v| *v = v.exp_const_u64::<ALPHA>());
 
     let mut actual = state;
     apply_sbox(&mut actual);
@@ -30,7 +31,7 @@ fn test_inv_sbox() {
     let state = [Felt::new(rand_value()); STATE_WIDTH];
 
     let mut expected = state;
-    expected.iter_mut().for_each(|v| *v = v.exp(INV_ALPHA));
+    expected.iter_mut().for_each(|v| *v = v.exp_u64(INV_ALPHA));
 
     let mut actual = state;
     apply_inv_sbox(&mut actual);
@@ -86,7 +87,7 @@ fn hash_elements_vs_merge_with_int() {
 
     // ----- value fits into a field element ------------------------------------------------------
     let val: Felt = Felt::new(rand_value());
-    let m_result = Rpo256::merge_with_int(seed, val.as_int());
+    let m_result = <Rpo256 as AlgebraicSponge>::merge_with_int(seed, val.as_canonical_u64());
 
     let mut elements = seed.as_elements().to_vec();
     elements.push(val);
@@ -95,8 +96,8 @@ fn hash_elements_vs_merge_with_int() {
     assert_eq!(m_result, h_result);
 
     // ----- value does not fit into a field element ----------------------------------------------
-    let val = Felt::MODULUS + 2;
-    let m_result = Rpo256::merge_with_int(seed, val);
+    let val = Felt::ORDER_U64 + 2;
+    let m_result = <Rpo256 as AlgebraicSponge>::merge_with_int(seed, val);
 
     let mut elements = seed.as_elements().to_vec();
     elements.push(Felt::new(val));
@@ -246,7 +247,7 @@ fn sponge_bytes_with_remainder_length_wont_panic() {
 #[test]
 fn sponge_collision_for_wrapped_field_element() {
     let a = Rpo256::hash(&[0; 8]);
-    let b = Rpo256::hash(&Felt::MODULUS.to_le_bytes());
+    let b = Rpo256::hash(&Felt::ORDER_U64.to_le_bytes());
     assert_ne!(a, b);
 }
 

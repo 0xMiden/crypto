@@ -1,6 +1,6 @@
 //! Cryptographic hash functions used by the Miden protocol.
 
-use super::{CubeExtension, Felt, FieldElement, StarkField, Word, ZERO};
+use super::{Felt, Word, ZERO};
 
 /// Blake3 hash function.
 pub mod blake;
@@ -26,15 +26,16 @@ pub mod rpx {
     pub use super::algebraic_sponge::rescue::Rpx256;
 }
 
-mod algebraic_sponge;
+pub mod algebraic_sponge;
 
-// RE-EXPORTS
+// TRAITS
 // ================================================================================================
 
-pub use winter_crypto::{Digest, ElementHasher, Hasher};
+/// Extension trait for hashers to provide iterator-based hashing.
+pub trait HasherExt {
+    /// The digest type produced by this hasher.
+    type Digest;
 
-/// Extension trait for Hasher to provide iterator-based hashing.
-pub trait HasherExt: Hasher {
     /// Hashes an iterator of byte slices.
     ///
     /// This method allows for more efficient hashing by avoiding the need to
