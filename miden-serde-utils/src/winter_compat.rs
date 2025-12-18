@@ -111,30 +111,6 @@ impl Deserializable for winter_math::fields::f64::BaseElement {
     }
 }
 
-impl Serializable for winter_math::fields::f128::BaseElement {
-    fn write_into<W: ByteWriter>(&self, target: &mut W) {
-        use winter_math::StarkField;
-        target.write_u128(self.as_int());
-    }
-
-    fn get_size_hint(&self) -> usize {
-        core::mem::size_of::<u128>()
-    }
-}
-
-impl Deserializable for winter_math::fields::f128::BaseElement {
-    fn read_from<R: ByteReader>(source: &mut R) -> Result<Self, DeserializationError> {
-        use winter_math::StarkField;
-        let value = source.read_u128()?;
-        if value >= Self::MODULUS {
-            return Err(DeserializationError::InvalidValue(
-                "field element value exceeds modulus".into(),
-            ));
-        }
-        Ok(Self::new(value))
-    }
-}
-
 // WINTER_AIR PROOF IMPLEMENTATIONS
 // ================================================================================================
 // Adapter-based implementations due to private fields and complex nested structures.
