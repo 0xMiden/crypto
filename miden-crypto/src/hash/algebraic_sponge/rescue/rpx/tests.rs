@@ -1,10 +1,11 @@
+#![cfg(feature = "std")]
 use alloc::{collections::BTreeSet, vec::Vec};
 
+use p3_field::PrimeField64;
 use proptest::prelude::*;
-use rand_utils::rand_value;
 
-use super::{Felt, Hasher, Rpx256, StarkField, ZERO};
-use crate::{ONE, Word};
+use super::{Felt, Rpx256};
+use crate::{ONE, Word, ZERO, hash::algebraic_sponge::AlgebraicSponge, test_utils::rand_value};
 
 // The number of iterations to run the `ext_round_matches_reference_many` test.
 #[cfg(all(
@@ -64,7 +65,7 @@ fn hash_elements_vs_merge_with_int() {
 
     // ----- value fits into a field element ------------------------------------------------------
     let val: Felt = Felt::new(rand_value());
-    let m_result = Rpx256::merge_with_int(seed, val.as_int());
+    let m_result = <Rpx256 as AlgebraicSponge>::merge_with_int(seed, val.as_canonical_u64());
 
     let mut elements = seed.as_elements().to_vec();
     elements.push(val);
@@ -73,8 +74,8 @@ fn hash_elements_vs_merge_with_int() {
     assert_eq!(m_result, h_result);
 
     // ----- value does not fit into a field element ----------------------------------------------
-    let val = Felt::MODULUS + 2;
-    let m_result = Rpx256::merge_with_int(seed, val);
+    let val = Felt::ORDER_U64 + 2;
+    let m_result = <Rpx256 as AlgebraicSponge>::merge_with_int(seed, val);
 
     let mut elements = seed.as_elements().to_vec();
     elements.push(Felt::new(val));
@@ -172,7 +173,7 @@ fn sponge_bytes_with_remainder_length_wont_panic() {
 #[test]
 fn sponge_collision_for_wrapped_field_element() {
     let a = Rpx256::hash(&[0; 8]);
-    let b = Rpx256::hash(&Felt::MODULUS.to_le_bytes());
+    let b = Rpx256::hash(&Felt::ORDER_U64.to_le_bytes());
     assert_ne!(a, b);
 }
 
