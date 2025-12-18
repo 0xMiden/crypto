@@ -1,11 +1,15 @@
-use alloc::string::String;
+use alloc::{string::String, vec::Vec};
 use core::{
     mem::size_of,
     ops::Deref,
     slice::{self, from_raw_parts},
 };
 
-use super::{Digest, ElementHasher, Felt, FieldElement, Hasher, HasherExt};
+use p3_field::{BasedVectorSpace, PrimeField64};
+use p3_miden_goldilocks::Goldilocks as Felt;
+use winter_crypto::Digest;
+
+use super::HasherExt;
 use crate::utils::{
     ByteReader, ByteWriter, Deserializable, DeserializationError, HexParseError, Serializable,
     bytes_to_hex_string, hex_to_bytes,
@@ -26,8 +30,8 @@ const DIGEST20_BYTES: usize = 20;
 
 /// N-bytes output of a blake3 function.
 ///
-/// Note: `N` can't be greater than `32` because [`Digest::as_bytes`] currently supports only 32
-/// bytes.
+/// Note: `N` can't be greater than `32` because [`Blake3Digest::as_bytes`] currently supports only
+/// 32 bytes.
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd)]
 #[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 #[cfg_attr(feature = "serde", serde(into = "String", try_from = "&str"))]
@@ -124,44 +128,9 @@ impl<const N: usize> Digest for Blake3Digest<N> {
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub struct Blake3_256;
 
-impl Hasher for Blake3_256 {
-    /// Blake3 collision resistance is 128-bits for 32-bytes output.
-    const COLLISION_RESISTANCE: u32 = 128;
-
+impl HasherExt for Blake3_256 {
     type Digest = Blake3Digest<32>;
 
-    fn hash(bytes: &[u8]) -> Self::Digest {
-        Blake3Digest(blake3::hash(bytes).into())
-    }
-
-    fn merge(values: &[Self::Digest; 2]) -> Self::Digest {
-        Self::hash(prepare_merge(values))
-    }
-
-    fn merge_many(values: &[Self::Digest]) -> Self::Digest {
-        Blake3Digest(blake3::hash(Blake3Digest::digests_as_bytes(values)).into())
-    }
-
-    fn merge_with_int(seed: Self::Digest, value: u64) -> Self::Digest {
-        let mut hasher = blake3::Hasher::new();
-        hasher.update(&seed.0);
-        hasher.update(&value.to_le_bytes());
-        Blake3Digest(hasher.finalize().into())
-    }
-}
-
-impl ElementHasher for Blake3_256 {
-    type BaseField = Felt;
-
-    fn hash_elements<E>(elements: &[E]) -> Self::Digest
-    where
-        E: FieldElement<BaseField = Self::BaseField>,
-    {
-        Blake3Digest(hash_elements(elements))
-    }
-}
-
-impl HasherExt for Blake3_256 {
     fn hash_iter<'a>(slices: impl Iterator<Item = &'a [u8]>) -> Self::Digest {
         let mut hasher = blake3::Hasher::new();
         for slice in slices {
@@ -172,26 +141,32 @@ impl HasherExt for Blake3_256 {
 }
 
 impl Blake3_256 {
-    /// Returns a hash of the provided sequence of bytes.
-    #[inline(always)]
-    pub fn hash(bytes: &[u8]) -> Blake3Digest<DIGEST32_BYTES> {
-        <Self as Hasher>::hash(bytes)
+    /// Blake3 collision resistance is 128-bits for 32-bytes output.
+    pub const COLLISION_RESISTANCE: u32 = 128;
+
+    pub fn hash(bytes: &[u8]) -> Blake3Digest<32> {
+        Blake3Digest(blake3::hash(bytes).into())
     }
 
-    /// Returns a hash of two digests. This method is intended for use in construction of
-    /// Merkle trees and verification of Merkle paths.
-    #[inline(always)]
-    pub fn merge(values: &[Blake3Digest<DIGEST32_BYTES>; 2]) -> Blake3Digest<DIGEST32_BYTES> {
-        <Self as Hasher>::merge(values)
+    pub fn merge(values: &[Blake3Digest<32>; 2]) -> Blake3Digest<32> {
+        Self::hash(prepare_merge(values))
+    }
+
+    pub fn merge_many(values: &[Blake3Digest<32>]) -> Blake3Digest<32> {
+        Blake3Digest(blake3::hash(Blake3Digest::digests_as_bytes(values)).into())
+    }
+
+    pub fn merge_with_int(seed: Blake3Digest<32>, value: u64) -> Blake3Digest<32> {
+        let mut hasher = blake3::Hasher::new();
+        hasher.update(&seed.0);
+        hasher.update(&value.to_le_bytes());
+        Blake3Digest(hasher.finalize().into())
     }
 
     /// Returns a hash of the provided field elements.
     #[inline(always)]
-    pub fn hash_elements<E>(elements: &[E]) -> Blake3Digest<DIGEST32_BYTES>
-    where
-        E: FieldElement<BaseField = Felt>,
-    {
-        <Self as ElementHasher>::hash_elements(elements)
+    pub fn hash_elements<E: BasedVectorSpace<Felt>>(elements: &[E]) -> Blake3Digest<32> {
+        Blake3Digest(hash_elements(elements))
     }
 
     /// Hashes an iterator of byte slices.
@@ -209,6 +184,8 @@ impl Blake3_256 {
 pub struct Blake3_192;
 
 impl HasherExt for Blake3_192 {
+    type Digest = Blake3Digest<24>;
+
     fn hash_iter<'a>(slices: impl Iterator<Item = &'a [u8]>) -> Self::Digest {
         let mut hasher = blake3::Hasher::new();
         for slice in slices {
@@ -218,65 +195,34 @@ impl HasherExt for Blake3_192 {
     }
 }
 
-impl Hasher for Blake3_192 {
+impl Blake3_192 {
     /// Blake3 collision resistance is 96-bits for 24-bytes output.
-    const COLLISION_RESISTANCE: u32 = 96;
+    pub const COLLISION_RESISTANCE: u32 = 96;
 
-    type Digest = Blake3Digest<24>;
-
-    fn hash(bytes: &[u8]) -> Self::Digest {
+    pub fn hash(bytes: &[u8]) -> Blake3Digest<24> {
         Blake3Digest(shrink_array(blake3::hash(bytes).into()))
     }
 
-    fn merge_many(values: &[Self::Digest]) -> Self::Digest {
+    pub fn merge_many(values: &[Blake3Digest<24>]) -> Blake3Digest<24> {
         let bytes = Blake3Digest::digests_as_bytes(values);
         Blake3Digest(shrink_array(blake3::hash(bytes).into()))
     }
 
-    fn merge(values: &[Self::Digest; 2]) -> Self::Digest {
+    pub fn merge(values: &[Blake3Digest<24>; 2]) -> Blake3Digest<24> {
         Self::hash(prepare_merge(values))
     }
 
-    fn merge_with_int(seed: Self::Digest, value: u64) -> Self::Digest {
+    pub fn merge_with_int(seed: Blake3Digest<24>, value: u64) -> Blake3Digest<24> {
         let mut hasher = blake3::Hasher::new();
         hasher.update(&seed.0);
         hasher.update(&value.to_le_bytes());
         Blake3Digest(shrink_array(hasher.finalize().into()))
     }
-}
-
-impl ElementHasher for Blake3_192 {
-    type BaseField = Felt;
-
-    fn hash_elements<E>(elements: &[E]) -> Self::Digest
-    where
-        E: FieldElement<BaseField = Self::BaseField>,
-    {
-        Blake3Digest(hash_elements(elements))
-    }
-}
-
-impl Blake3_192 {
-    /// Returns a hash of the provided sequence of bytes.
-    #[inline(always)]
-    pub fn hash(bytes: &[u8]) -> Blake3Digest<DIGEST24_BYTES> {
-        <Self as Hasher>::hash(bytes)
-    }
-
-    /// Returns a hash of two digests. This method is intended for use in construction of
-    /// Merkle trees and verification of Merkle paths.
-    #[inline(always)]
-    pub fn merge(values: &[Blake3Digest<DIGEST24_BYTES>; 2]) -> Blake3Digest<DIGEST24_BYTES> {
-        <Self as Hasher>::merge(values)
-    }
 
     /// Returns a hash of the provided field elements.
     #[inline(always)]
-    pub fn hash_elements<E>(elements: &[E]) -> Blake3Digest<DIGEST24_BYTES>
-    where
-        E: FieldElement<BaseField = Felt>,
-    {
-        <Self as ElementHasher>::hash_elements(elements)
+    pub fn hash_elements<E: BasedVectorSpace<Felt>>(elements: &[E]) -> Blake3Digest<32> {
+        Blake3Digest(hash_elements(elements))
     }
 
     /// Hashes an iterator of byte slices.
@@ -294,6 +240,8 @@ impl Blake3_192 {
 pub struct Blake3_160;
 
 impl HasherExt for Blake3_160 {
+    type Digest = Blake3Digest<20>;
+
     fn hash_iter<'a>(slices: impl Iterator<Item = &'a [u8]>) -> Self::Digest {
         let mut hasher = blake3::Hasher::new();
         for slice in slices {
@@ -303,65 +251,34 @@ impl HasherExt for Blake3_160 {
     }
 }
 
-impl Hasher for Blake3_160 {
+impl Blake3_160 {
     /// Blake3 collision resistance is 80-bits for 20-bytes output.
-    const COLLISION_RESISTANCE: u32 = 80;
+    pub const COLLISION_RESISTANCE: u32 = 80;
 
-    type Digest = Blake3Digest<20>;
-
-    fn hash(bytes: &[u8]) -> Self::Digest {
+    pub fn hash(bytes: &[u8]) -> Blake3Digest<20> {
         Blake3Digest(shrink_array(blake3::hash(bytes).into()))
     }
 
-    fn merge(values: &[Self::Digest; 2]) -> Self::Digest {
+    pub fn merge(values: &[Blake3Digest<20>; 2]) -> Blake3Digest<20> {
         Self::hash(prepare_merge(values))
     }
 
-    fn merge_many(values: &[Self::Digest]) -> Self::Digest {
+    pub fn merge_many(values: &[Blake3Digest<20>]) -> Blake3Digest<20> {
         let bytes = Blake3Digest::digests_as_bytes(values);
         Blake3Digest(shrink_array(blake3::hash(bytes).into()))
     }
 
-    fn merge_with_int(seed: Self::Digest, value: u64) -> Self::Digest {
+    pub fn merge_with_int(seed: Blake3Digest<20>, value: u64) -> Blake3Digest<20> {
         let mut hasher = blake3::Hasher::new();
         hasher.update(&seed.0);
         hasher.update(&value.to_le_bytes());
         Blake3Digest(shrink_array(hasher.finalize().into()))
     }
-}
-
-impl ElementHasher for Blake3_160 {
-    type BaseField = Felt;
-
-    fn hash_elements<E>(elements: &[E]) -> Self::Digest
-    where
-        E: FieldElement<BaseField = Self::BaseField>,
-    {
-        Blake3Digest(hash_elements(elements))
-    }
-}
-
-impl Blake3_160 {
-    /// Returns a hash of the provided sequence of bytes.
-    #[inline(always)]
-    pub fn hash(bytes: &[u8]) -> Blake3Digest<DIGEST20_BYTES> {
-        <Self as Hasher>::hash(bytes)
-    }
-
-    /// Returns a hash of two digests. This method is intended for use in construction of
-    /// Merkle trees and verification of Merkle paths.
-    #[inline(always)]
-    pub fn merge(values: &[Blake3Digest<DIGEST20_BYTES>; 2]) -> Blake3Digest<DIGEST20_BYTES> {
-        <Self as Hasher>::merge(values)
-    }
 
     /// Returns a hash of the provided field elements.
     #[inline(always)]
-    pub fn hash_elements<E>(elements: &[E]) -> Blake3Digest<DIGEST20_BYTES>
-    where
-        E: FieldElement<BaseField = Felt>,
-    {
-        <Self as ElementHasher>::hash_elements(elements)
+    pub fn hash_elements<E: BasedVectorSpace<Felt>>(elements: &[E]) -> Blake3Digest<32> {
+        Blake3Digest(hash_elements(elements))
     }
 
     /// Hashes an iterator of byte slices.
@@ -377,29 +294,32 @@ impl Blake3_160 {
 /// Hash the elements into bytes and shrink the output.
 fn hash_elements<const N: usize, E>(elements: &[E]) -> [u8; N]
 where
-    E: FieldElement<BaseField = Felt>,
+    E: BasedVectorSpace<Felt>,
 {
     // don't leak assumptions from felt and check its actual implementation.
     // this is a compile-time branch so it is for free
-    let digest = if Felt::IS_CANONICAL {
-        blake3::hash(E::elements_as_bytes(elements))
-    } else {
+    let digest = {
         let mut hasher = blake3::Hasher::new();
 
         // BLAKE3 rate is 64 bytes - so, we can absorb 64 bytes into the state in a single
         // permutation. we move the elements into the hasher via the buffer to give the CPU
         // a chance to process multiple element-to-byte conversions in parallel
         let mut buf = [0_u8; 64];
-        let mut chunk_iter = E::slice_as_base_elements(elements).chunks_exact(8);
-        for chunk in chunk_iter.by_ref() {
+        let elements_base = elements
+            .iter()
+            .flat_map(|elem| E::as_basis_coefficients_slice(elem))
+            .copied()
+            .collect::<Vec<Felt>>();
+        let mut chunks_iter = elements_base.chunks_exact(8);
+        for chunk in chunks_iter.by_ref() {
             for i in 0..8 {
-                buf[i * 8..(i + 1) * 8].copy_from_slice(&chunk[i].as_int().to_le_bytes());
+                buf[i * 8..(i + 1) * 8].copy_from_slice(&chunk[i].as_canonical_u64().to_le_bytes());
             }
             hasher.update(&buf);
         }
 
-        for element in chunk_iter.remainder() {
-            hasher.update(&element.as_int().to_le_bytes());
+        for element in chunks_iter.remainder() {
+            hasher.update(&element.as_canonical_u64().to_le_bytes());
         }
 
         hasher.finalize()

@@ -1,3 +1,4 @@
+#![cfg(feature = "std")]
 use alloc::vec::Vec;
 
 use assert_matches::assert_matches;
@@ -8,6 +9,7 @@ use super::{
 };
 use crate::{
     Felt,
+    hash::algebraic_sponge::AlgebraicSponge,
     merkle::{
         MerklePath, MerkleTree, NodeIndex, int_to_node,
         mmr::{

@@ -1,5 +1,7 @@
 use alloc::{string::ToString, vec::Vec};
 
+use p3_field::PrimeField64;
+
 use super::{
     EMPTY_WORD, EmptySubtreeRoots, Felt, InnerNode, InnerNodeInfo, InnerNodes, LeafIndex,
     MerkleError, MutationSet, NodeIndex, Rpo256, SparseMerklePath, SparseMerkleTree, Word,
@@ -554,7 +556,7 @@ impl SparseMerkleTree<SMT_DEPTH> for Smt {
 
     fn key_to_leaf_index(key: &Word) -> LeafIndex<SMT_DEPTH> {
         let most_significant_felt = key[3];
-        LeafIndex::new_max_depth(most_significant_felt.as_int())
+        LeafIndex::new_max_depth(most_significant_felt.as_canonical_u64())
     }
 
     fn path_and_leaf_to_opening(path: SparseMerklePath, leaf: SmtLeaf) -> SmtProof {
@@ -574,7 +576,7 @@ impl Default for Smt {
 impl From<Word> for LeafIndex<SMT_DEPTH> {
     fn from(value: Word) -> Self {
         // We use the most significant `Felt` of a `Word` as the leaf index.
-        Self::new_max_depth(value[3].as_int())
+        Self::new_max_depth(value[3].as_canonical_u64())
     }
 }
 

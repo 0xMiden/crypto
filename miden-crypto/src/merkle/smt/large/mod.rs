@@ -10,24 +10,27 @@
 //!
 //! Load an existing RocksDB-backed tree with root validation:
 //! ```no_run
+//! # #[cfg(feature = "rocksdb")]
+//! # {
 //! use miden_crypto::{
 //!     Word,
 //!     merkle::smt::{LargeSmt, RocksDbConfig, RocksDbStorage},
 //! };
 //!
 //! # fn main() -> Result<(), Box<dyn std::error::Error>> {
-//! // The expected root should be stored/tracked separately by the caller
-//! let expected_root: Word = /* load from your own persistence */ todo!();
-//!
+//! # let expected_root: Word = miden_crypto::EMPTY_WORD;
 //! let storage = RocksDbStorage::open(RocksDbConfig::new("/path/to/db"))?;
 //! let smt = LargeSmt::load_with_root(storage, expected_root)?;
 //! assert_eq!(smt.root(), expected_root);
 //! # Ok(())
 //! # }
+//! # }
 //! ```
 //!
 //! Load an existing tree without root validation (use with caution):
 //! ```no_run
+//! # #[cfg(feature = "rocksdb")]
+//! # {
 //! use miden_crypto::merkle::smt::{LargeSmt, RocksDbConfig, RocksDbStorage};
 //!
 //! # fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -36,10 +39,13 @@
 //! let _root = smt.root();
 //! # Ok(())
 //! # }
+//! # }
 //! ```
 //!
 //! Initialize an empty RocksDB-backed tree and bulk-load entries:
 //! ```no_run
+//! # #[cfg(feature = "rocksdb")]
+//! # {
 //! use miden_crypto::{
 //!     Felt, Word,
 //!     merkle::smt::{LargeSmt, RocksDbConfig, RocksDbStorage},
@@ -71,10 +77,13 @@
 //! smt.insert_batch(entries)?;
 //! # Ok(())
 //! # }
+//! # }
 //! ```
 //!
 //! Apply batch updates (insertions and deletions):
 //! ```no_run
+//! # #[cfg(feature = "rocksdb")]
+//! # {
 //! use miden_crypto::{
 //!     EMPTY_WORD, Felt, Word,
 //!     merkle::smt::{LargeSmt, RocksDbConfig, RocksDbStorage},
@@ -95,10 +104,13 @@
 //! smt.insert_batch(updates)?;
 //! # Ok(())
 //! # }
+//! # }
 //! ```
 //!
 //! Quick initialization with `with_entries` (best for modest datasets/tests):
 //! ```no_run
+//! # #[cfg(feature = "rocksdb")]
+//! # {
 //! use miden_crypto::{
 //!     Felt, Word,
 //!     merkle::smt::{LargeSmt, RocksDbConfig, RocksDbStorage},
@@ -126,6 +138,7 @@
 //! ];
 //! let _smt = LargeSmt::with_entries(storage, entries)?;
 //! # Ok(())
+//! # }
 //! # }
 //! ```
 //!

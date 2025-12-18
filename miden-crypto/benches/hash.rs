@@ -22,15 +22,15 @@ use std::hint::black_box;
 
 use criterion::{Criterion, criterion_group, criterion_main};
 use miden_crypto::{
-    Felt,
+    AlgebraicSponge, Felt,
     hash::{
+        HasherExt,
         blake::{Blake3_160, Blake3_192, Blake3_256},
         keccak::Keccak256,
         rpo::Rpo256,
         rpx::Rpx256,
     },
 };
-use winter_crypto::Hasher;
 
 // Import common utilities
 mod common;
@@ -109,7 +109,7 @@ benchmark_hash_merge_with_int!(
         // Use zero as the integer value since we're testing merge operation performance,
         // not the specific integer value being merged.
         let int = 0u64;
-        b.iter(|| Rpo256::merge_with_int(black_box(digest), int))
+        b.iter(|| <Rpo256 as AlgebraicSponge>::merge_with_int(black_box(digest), int))
     }
 );
 
@@ -124,7 +124,7 @@ benchmark_hash_merge_many!(
             let data = generate_byte_array_sequential(64);
             digests.push(Rpo256::hash(&data));
         }
-        b.iter(|| Rpo256::merge_many(black_box(&digests)))
+        b.iter(|| <Rpo256 as AlgebraicSponge>::merge_many(black_box(&digests)))
     }
 );
 
@@ -194,7 +194,7 @@ benchmark_hash_merge_with_int!(
         // Use zero as the integer value since we're testing merge operation performance,
         // not the specific integer value being merged.
         let int = 0u64;
-        b.iter(|| Rpx256::merge_with_int(black_box(digest), int))
+        b.iter(|| <Rpx256 as AlgebraicSponge>::merge_with_int(black_box(digest), int))
     }
 );
 
@@ -209,7 +209,7 @@ benchmark_hash_merge_many!(
             let data = generate_byte_array_sequential(64);
             digests.push(Rpx256::hash(&data));
         }
-        b.iter(|| Rpx256::merge_many(black_box(&digests)))
+        b.iter(|| <Rpx256 as AlgebraicSponge>::merge_many(black_box(&digests)))
     }
 );
 
@@ -237,7 +237,7 @@ benchmark_hash_merge!(
     |b: &mut criterion::Bencher, size| {
         let input1 = Blake3_256::hash(&generate_byte_array_random(size));
         let input2 = Blake3_256::hash(&generate_byte_array_random(size));
-        let digest_inputs: [<Blake3_256 as Hasher>::Digest; 2] = [input1, input2];
+        let digest_inputs: [<Blake3_256 as HasherExt>::Digest; 2] = [input1, input2];
         b.iter(|| Blake3_256::merge(black_box(&digest_inputs)))
     }
 );
@@ -278,7 +278,7 @@ benchmark_hash_merge!(
     |b: &mut criterion::Bencher, size| {
         let input1 = Blake3_192::hash(&generate_byte_array_random(size));
         let input2 = Blake3_192::hash(&generate_byte_array_random(size));
-        let digest_inputs: [<Blake3_192 as Hasher>::Digest; 2] = [input1, input2];
+        let digest_inputs: [<Blake3_192 as HasherExt>::Digest; 2] = [input1, input2];
         b.iter(|| Blake3_192::merge(black_box(&digest_inputs)))
     }
 );
@@ -319,7 +319,7 @@ benchmark_hash_merge!(
     |b: &mut criterion::Bencher, size| {
         let input1 = Blake3_160::hash(&generate_byte_array_random(size));
         let input2 = Blake3_160::hash(&generate_byte_array_random(size));
-        let digest_inputs: [<Blake3_160 as Hasher>::Digest; 2] = [input1, input2];
+        let digest_inputs: [<Blake3_160 as HasherExt>::Digest; 2] = [input1, input2];
         b.iter(|| Blake3_160::merge(black_box(&digest_inputs)))
     }
 );
@@ -346,7 +346,7 @@ benchmark_hash_merge!(
     |b: &mut criterion::Bencher, size| {
         let input1 = Keccak256::hash(&generate_byte_array_random(size));
         let input2 = Keccak256::hash(&generate_byte_array_random(size));
-        let digest_inputs: [<Keccak256 as Hasher>::Digest; 2] = [input1, input2];
+        let digest_inputs: [<Keccak256 as HasherExt>::Digest; 2] = [input1, input2];
         b.iter(|| Keccak256::merge(black_box(&digest_inputs)))
     }
 );

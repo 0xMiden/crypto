@@ -1,5 +1,7 @@
 use core::fmt::Display;
 
+use p3_field::PrimeField64;
+
 use super::{Felt, MerkleError, Word};
 use crate::utils::{ByteReader, ByteWriter, Deserializable, DeserializationError, Serializable};
 
@@ -71,9 +73,9 @@ impl NodeIndex {
     /// - `depth` is greater than 64.
     /// - `value` is greater than or equal to 2^{depth}.
     pub fn from_elements(depth: &Felt, value: &Felt) -> Result<Self, MerkleError> {
-        let depth = depth.as_int();
+        let depth = depth.as_canonical_u64();
         let depth = u8::try_from(depth).map_err(|_| MerkleError::DepthTooBig(depth))?;
-        let value = value.as_int();
+        let value = value.as_canonical_u64();
         Self::new(depth, value)
     }
 

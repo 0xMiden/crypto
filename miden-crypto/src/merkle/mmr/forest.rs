@@ -5,7 +5,7 @@ use core::{
 
 use super::InOrderIndex;
 use crate::{
-    Felt,
+    Felt, PrimeField64,
     utils::{ByteReader, ByteWriter, Deserializable, DeserializationError, Serializable},
 };
 
@@ -401,7 +401,7 @@ impl BitXorAssign<Forest> for Forest {
 
 impl From<Felt> for Forest {
     fn from(value: Felt) -> Self {
-        Self::new(value.as_int() as usize)
+        Self::new(value.as_canonical_u64() as usize)
     }
 }
 

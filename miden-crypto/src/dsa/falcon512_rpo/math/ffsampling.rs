@@ -195,7 +195,7 @@ pub fn ffsampling<R: Rng>(
 // TESTS
 // ================================================================================================
 
-#[cfg(test)]
+#[cfg(all(test, feature = "std"))]
 mod tests {
     use num_complex::Complex64;
     use rand::{Rng, SeedableRng};

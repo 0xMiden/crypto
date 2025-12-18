@@ -640,15 +640,17 @@ mod tests {
         utils::{Deserializable, Serializable},
     };
 
-    const LEAVES: [Word; 7] = [
-        int_to_node(0),
-        int_to_node(1),
-        int_to_node(2),
-        int_to_node(3),
-        int_to_node(4),
-        int_to_node(5),
-        int_to_node(6),
-    ];
+    fn leaves() -> [Word; 7] {
+        [
+            int_to_node(0),
+            int_to_node(1),
+            int_to_node(2),
+            int_to_node(3),
+            int_to_node(4),
+            int_to_node(5),
+            int_to_node(6),
+        ]
+    }
 
     #[test]
     fn test_partial_mmr_apply_delta() {
@@ -728,7 +730,7 @@ mod tests {
     #[test]
     fn test_partial_mmr_inner_nodes_iterator() {
         // build the MMR
-        let mmr: Mmr = LEAVES.into();
+        let mmr: Mmr = leaves().into();
         let first_peak = mmr.peaks().peaks()[0];
 
         // -- test single tree ----------------------------
@@ -887,7 +889,7 @@ mod tests {
     #[test]
     fn test_partial_mmr_untrack() {
         // build the MMR
-        let mmr: Mmr = LEAVES.into();
+        let mmr: Mmr = leaves().into();
 
         // get path and node for position 1
         let node1 = mmr.get(1).unwrap();

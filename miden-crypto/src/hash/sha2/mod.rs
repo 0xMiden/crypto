@@ -10,16 +10,18 @@
 //! See <https://github.com/facebook/winterfell/issues/406> for a proposal to make the
 //! `Digest` trait generic over output size.
 
-use alloc::string::String;
+use alloc::{string::String, vec::Vec};
 use core::{
     mem::size_of,
     ops::Deref,
     slice::{self, from_raw_parts},
 };
 
+use p3_field::{BasedVectorSpace, PrimeField64};
 use sha2::Digest as Sha2Digest;
+use winter_crypto::Digest;
 
-use super::{Digest, ElementHasher, Felt, FieldElement, Hasher, HasherExt};
+use super::{Felt, HasherExt};
 use crate::utils::{
     ByteReader, ByteWriter, Deserializable, DeserializationError, HexParseError, Serializable,
     bytes_to_hex_string, hex_to_bytes,
@@ -45,6 +47,10 @@ const DIGEST512_BYTES: usize = 64;
 pub struct Sha256Digest([u8; DIGEST256_BYTES]);
 
 impl Sha256Digest {
+    pub fn as_bytes(&self) -> &[u8; DIGEST256_BYTES] {
+        &self.0
+    }
+
     pub fn digests_as_bytes(digests: &[Sha256Digest]) -> &[u8] {
         let p = digests.as_ptr();
         let len = digests.len() * DIGEST256_BYTES;
@@ -80,7 +86,7 @@ impl From<[u8; DIGEST256_BYTES]> for Sha256Digest {
 
 impl From<Sha256Digest> for String {
     fn from(value: Sha256Digest) -> Self {
-        bytes_to_hex_string(value.as_bytes())
+        bytes_to_hex_string(*value.as_bytes())
     }
 }
 
@@ -133,6 +139,8 @@ impl Digest for Sha256Digest {
 pub struct Sha256;
 
 impl HasherExt for Sha256 {
+    type Digest = Sha256Digest;
+
     fn hash_iter<'a>(slices: impl Iterator<Item = &'a [u8]>) -> Self::Digest {
         let mut hasher = sha2::Sha256::new();
         for slice in slices {
@@ -142,24 +150,22 @@ impl HasherExt for Sha256 {
     }
 }
 
-impl Hasher for Sha256 {
+impl Sha256 {
     /// SHA-256 collision resistance is 128-bits for 32-bytes output.
-    const COLLISION_RESISTANCE: u32 = 128;
+    pub const COLLISION_RESISTANCE: u32 = 128;
 
-    type Digest = Sha256Digest;
-
-    fn hash(bytes: &[u8]) -> Self::Digest {
+    pub fn hash(bytes: &[u8]) -> Sha256Digest {
         let mut hasher = sha2::Sha256::new();
         hasher.update(bytes);
 
         Sha256Digest(hasher.finalize().into())
     }
 
-    fn merge(values: &[Self::Digest; 2]) -> Self::Digest {
+    pub fn merge(values: &[Sha256Digest; 2]) -> Sha256Digest {
         Self::hash(prepare_merge(values))
     }
 
-    fn merge_many(values: &[Self::Digest]) -> Self::Digest {
+    pub fn merge_many(values: &[Sha256Digest]) -> Sha256Digest {
         let data = Sha256Digest::digests_as_bytes(values);
         let mut hasher = sha2::Sha256::new();
         hasher.update(data);
@@ -167,47 +173,18 @@ impl Hasher for Sha256 {
         Sha256Digest(hasher.finalize().into())
     }
 
-    fn merge_with_int(seed: Self::Digest, value: u64) -> Self::Digest {
+    pub fn merge_with_int(seed: Sha256Digest, value: u64) -> Sha256Digest {
         let mut hasher = sha2::Sha256::new();
         hasher.update(seed.0);
         hasher.update(value.to_le_bytes());
 
         Sha256Digest(hasher.finalize().into())
     }
-}
-
-impl ElementHasher for Sha256 {
-    type BaseField = Felt;
-
-    fn hash_elements<E>(elements: &[E]) -> Self::Digest
-    where
-        E: FieldElement<BaseField = Self::BaseField>,
-    {
-        Sha256Digest(hash_elements_256(elements))
-    }
-}
-
-impl Sha256 {
-    /// Returns a hash of the provided sequence of bytes.
-    #[inline(always)]
-    pub fn hash(bytes: &[u8]) -> Sha256Digest {
-        <Self as Hasher>::hash(bytes)
-    }
-
-    /// Returns a hash of two digests. This method is intended for use in construction of
-    /// Merkle trees and verification of Merkle paths.
-    #[inline(always)]
-    pub fn merge(values: &[Sha256Digest; 2]) -> Sha256Digest {
-        <Self as Hasher>::merge(values)
-    }
 
     /// Returns a hash of the provided field elements.
     #[inline(always)]
-    pub fn hash_elements<E>(elements: &[E]) -> Sha256Digest
-    where
-        E: FieldElement<BaseField = Felt>,
-    {
-        <Self as ElementHasher>::hash_elements(elements)
+    pub fn hash_elements<E: BasedVectorSpace<Felt>>(elements: &[E]) -> Sha256Digest {
+        Sha256Digest(hash_elements_256(elements))
     }
 
     /// Hashes an iterator of byte slices.
@@ -295,8 +272,8 @@ impl Deserializable for Sha512Digest {
 
 /// SHA-512 hash function.
 ///
-/// Unlike [Sha256], this struct does not implement the [Hasher], [HasherExt], or [ElementHasher]
-/// traits because those traits require [Digest], which mandates a 32-byte output. SHA-512
+/// Unlike [Sha256], this struct does not implement the `Hasher`, `HasherExt`, or `ElementHasher`
+/// traits because those traits require `Digest`, which mandates a 32-byte output. SHA-512
 /// produces a 64-byte digest, and truncating it would create confusion with SHA-512/256.
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub struct Sha512;
@@ -330,7 +307,7 @@ impl Sha512 {
     #[inline(always)]
     pub fn hash_elements<E>(elements: &[E]) -> Sha512Digest
     where
-        E: FieldElement<BaseField = Felt>,
+        E: BasedVectorSpace<Felt>,
     {
         Sha512Digest(hash_elements_512(elements))
     }
@@ -352,30 +329,32 @@ impl Sha512 {
 /// Hash the elements into bytes for SHA-256.
 fn hash_elements_256<E>(elements: &[E]) -> [u8; DIGEST256_BYTES]
 where
-    E: FieldElement<BaseField = Felt>,
+    E: BasedVectorSpace<Felt>,
 {
     // don't leak assumptions from felt and check its actual implementation.
     // this is a compile-time branch so it is for free
-    let digest = if Felt::IS_CANONICAL {
-        let mut hasher = sha2::Sha256::new();
-        hasher.update(E::elements_as_bytes(elements));
-        hasher.finalize()
-    } else {
+    let digest = {
         let mut hasher = sha2::Sha256::new();
         // SHA-256 has a block size of 64 bytes, so we can absorb 64 bytes per block.
         // We move the elements into the hasher via the buffer to give the CPU a chance
         // to process multiple element-to-byte conversions in parallel.
         let mut buf = [0_u8; 64];
-        let mut chunk_iter = E::slice_as_base_elements(elements).chunks_exact(8);
+        let elements_base = elements
+            .iter()
+            .flat_map(|elem| E::as_basis_coefficients_slice(elem))
+            .copied()
+            .collect::<Vec<Felt>>();
+
+        let mut chunk_iter = elements_base.chunks_exact(8);
         for chunk in chunk_iter.by_ref() {
             for i in 0..8 {
-                buf[i * 8..(i + 1) * 8].copy_from_slice(&chunk[i].as_int().to_le_bytes());
+                buf[i * 8..(i + 1) * 8].copy_from_slice(&chunk[i].as_canonical_u64().to_le_bytes());
             }
             hasher.update(buf);
         }
 
         for element in chunk_iter.remainder() {
-            hasher.update(element.as_int().to_le_bytes());
+            hasher.update(element.as_canonical_u64().to_le_bytes());
         }
 
         hasher.finalize()
@@ -386,30 +365,32 @@ where
 /// Hash the elements into bytes for SHA-512.
 fn hash_elements_512<E>(elements: &[E]) -> [u8; DIGEST512_BYTES]
 where
-    E: FieldElement<BaseField = Felt>,
+    E: BasedVectorSpace<Felt>,
 {
     // don't leak assumptions from felt and check its actual implementation.
     // this is a compile-time branch so it is for free
-    let digest = if Felt::IS_CANONICAL {
-        let mut hasher = sha2::Sha512::new();
-        hasher.update(E::elements_as_bytes(elements));
-        hasher.finalize()
-    } else {
+    let digest = {
         let mut hasher = sha2::Sha512::new();
         // SHA-512 has a block size of 128 bytes, so we can absorb 128 bytes per block.
         // We move the elements into the hasher via the buffer to give the CPU a chance
         // to process multiple element-to-byte conversions in parallel.
         let mut buf = [0_u8; 128];
-        let mut chunk_iter = E::slice_as_base_elements(elements).chunks_exact(16);
+        let elements_base = elements
+            .iter()
+            .flat_map(|elem| E::as_basis_coefficients_slice(elem))
+            .copied()
+            .collect::<Vec<Felt>>();
+
+        let mut chunk_iter = elements_base.chunks_exact(16);
         for chunk in chunk_iter.by_ref() {
             for i in 0..16 {
-                buf[i * 8..(i + 1) * 8].copy_from_slice(&chunk[i].as_int().to_le_bytes());
+                buf[i * 8..(i + 1) * 8].copy_from_slice(&chunk[i].as_canonical_u64().to_le_bytes());
             }
             hasher.update(buf);
         }
 
         for element in chunk_iter.remainder() {
-            hasher.update(element.as_int().to_le_bytes());
+            hasher.update(element.as_canonical_u64().to_le_bytes());
         }
 
         hasher.finalize()

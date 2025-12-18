@@ -306,6 +306,8 @@ impl<S: SmtStorage> LargeSmt<S> {
     ///
     /// # Example
     /// ```no_run
+    /// # #[cfg(feature = "rocksdb")]
+    /// # {
     /// use miden_crypto::{
     ///     EMPTY_WORD, Felt, Word,
     ///     merkle::smt::{LargeSmt, RocksDbConfig, RocksDbStorage},
@@ -331,6 +333,7 @@ impl<S: SmtStorage> LargeSmt<S> {
     ///
     /// let new_root = smt.insert_batch(entries)?;
     /// # Ok(())
+    /// # }
     /// # }
     /// ```
     pub fn insert_batch(

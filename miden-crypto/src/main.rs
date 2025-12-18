@@ -7,9 +7,9 @@ use miden_crypto::{
     EMPTY_WORD, Felt, ONE, Word,
     hash::rpo::Rpo256,
     merkle::smt::{LargeSmt, LargeSmtError, MemoryStorage, SmtStorage},
+    test_utils::rand_value,
 };
 use rand::{Rng, prelude::IteratorRandom, rng};
-use rand_utils::rand_value;
 
 type Storage = Box<dyn SmtStorage>;
 

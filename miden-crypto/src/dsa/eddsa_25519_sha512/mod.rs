@@ -18,7 +18,7 @@ use crate::{
     zeroize::{Zeroize, ZeroizeOnDrop},
 };
 
-#[cfg(test)]
+#[cfg(all(test, feature = "std"))]
 mod tests;
 
 // CONSTANTS
@@ -45,7 +45,7 @@ impl SecretKey {
     #[cfg(feature = "std")]
     #[allow(clippy::new_without_default)]
     pub fn new() -> Self {
-        let mut rng = rand::rng();
+        let mut rng = rand::thread_rng();
 
         Self::with_rng(&mut rng)
     }
