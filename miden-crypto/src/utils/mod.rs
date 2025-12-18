@@ -6,15 +6,14 @@ use core::{
     mem, slice,
 };
 
-use p3_field::RawDataSerializable;
-use thiserror::Error;
-
 // Re-export serialization traits from miden-serde-utils
 #[cfg(feature = "std")]
 pub use miden_serde_utils::ReadAdapter;
 pub use miden_serde_utils::{
     ByteReader, ByteWriter, Deserializable, DeserializationError, Serializable, SliceReader,
 };
+use p3_field::RawDataSerializable;
+use thiserror::Error;
 
 mod iterators;
 #[cfg(feature = "concurrent")]
