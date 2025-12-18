@@ -20,12 +20,14 @@ path              = "src/main.rs"
 required-features = ["executable"]
 
 [[bench]]
-harness = false
-name    = "encryption"
+harness           = false
+name              = "encryption"
+required-features = ["std"]
 
 [[bench]]
-harness = false
-name    = "hash"
+harness           = false
+name              = "hash"
+required-features = ["std"]
 
 [[bench]]
 harness           = false
@@ -33,12 +35,14 @@ name              = "smt"
 required-features = ["internal"]
 
 [[bench]]
-harness = false
-name    = "merkle"
+harness           = false
+name              = "merkle"
+required-features = ["std"]
 
 [[bench]]
-harness = false
-name    = "partial_mt"
+harness           = false
+name              = "partial_mt"
+required-features = ["std"]
 
 [[bench]]
 harness           = false
@@ -46,8 +50,9 @@ name              = "large-smt"
 required-features = ["rocksdb"]
 
 [[bench]]
-harness = false
-name    = "store"
+harness           = false
+name              = "store"
+required-features = ["std"]
 
 [[bench]]
 harness           = false
@@ -55,12 +60,14 @@ name              = "dsa"
 required-features = ["std"]
 
 [[bench]]
-harness = false
-name    = "word"
+harness           = false
+name              = "word"
+required-features = ["std"]
 
 [[bench]]
-harness = false
-name    = "rand"
+harness           = false
+name              = "rand"
+required-features = ["std"]
 
 [features]
 concurrent = ["dep:rayon", "hashbrown?/rayon", "std"]
