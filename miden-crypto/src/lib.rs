@@ -30,7 +30,7 @@ pub use miden_prover::*;
 pub use p3_air::*;
 pub use p3_field::{
     BasedVectorSpace, ExtensionField, Field, PrimeCharacteristicRing, PrimeField64,
-    batch_multiplicative_inverse, extension::BinomialExtensionField,
+    batch_multiplicative_inverse, extension::BinomialExtensionField, integers::QuotientMap,
 };
 pub use p3_goldilocks::{Goldilocks as Felt, Poseidon2Goldilocks};
 pub use word::{Word, WordError};
