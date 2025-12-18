@@ -1,4 +1,6 @@
 #![no_std]
+// Allow deprecated rand::thread_rng - we use it for compatibility with no-std builds
+#![allow(deprecated)]
 
 #[macro_use]
 extern crate alloc;
@@ -15,15 +17,25 @@ pub mod rand;
 pub mod utils;
 pub mod word;
 
+// Test utilities for generating random data (used in tests and benchmarks)
+#[cfg(any(test, feature = "std"))]
+pub mod test_utils;
+
 // RE-EXPORTS
 // ================================================================================================
 
 pub use k256::elliptic_curve::zeroize;
-pub use winter_math::{
-    FieldElement, StarkField,
-    fields::{CubeExtension, QuadExtension, f64::BaseElement as Felt},
+pub use p3_air::*;
+pub use p3_field::{
+    BasedVectorSpace, ExtensionField, Field, PrimeCharacteristicRing, PrimeField64,
+    batch_multiplicative_inverse, extension::BinomialExtensionField,
 };
+pub use p3_miden_air::*;
+pub use p3_miden_goldilocks::{Goldilocks as Felt, Poseidon2Goldilocks};
+pub use p3_miden_prover::*;
 pub use word::{Word, WordError};
+
+pub use crate::hash::algebraic_sponge::AlgebraicSponge;
 
 // TYPE ALIASES
 // ================================================================================================
@@ -103,7 +115,7 @@ pub trait SequentialCommit {
 #[test]
 #[should_panic]
 fn debug_assert_is_checked() {
-    // enforce the release checks to always have `RUSTFLAGS="-C debug-assertions".
+    // enforce the release checks to always have `RUSTFLAGS="-C debug-assertions"`.
     //
     // some upstream tests are performed with `debug_assert`, and we want to assert its correctness
     // downstream.

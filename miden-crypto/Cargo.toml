@@ -64,16 +64,17 @@ name    = "rand"
 
 [features]
 concurrent = ["dep:rayon", "hashbrown?/rayon", "std"]
-default = ["concurrent", "std"]
+default    = ["concurrent", "std"]
 executable = ["concurrent", "dep:clap", "dep:rand-utils"]
-fuzzing = []
-hashmaps = ["dep:hashbrown"]
-internal = ["concurrent"]
-rocksdb = ["concurrent", "dep:rocksdb"]
-serde = ["dep:serde", "serde?/alloc", "winter-math/serde"]
-std = [
+fuzzing    = []
+hashmaps   = ["dep:hashbrown"]
+internal   = ["concurrent"]
+rocksdb    = ["concurrent", "dep:rocksdb"]
+serde      = ["dep:serde", "serde?/alloc", "winter-math/serde"]
+std        = [
   "blake3/std",
   "dep:cc",
+  "miden-serde-utils/p3-compat",
   "miden-serde-utils/std",
   "miden-serde-utils/winter-compat",
   "rand/std",
@@ -89,7 +90,7 @@ chacha20poly1305              = { features = ["alloc", "stream"], version = "0.1
 clap                          = { features = ["derive"], optional = true, version = "4.5" }
 curve25519-dalek              = { default-features = false, version = "4" }
 ed25519-dalek                 = { features = ["zeroize"], version = "2" }
-flume                         = { version = "0.11" }
+flume                         = { version = "0.11.1" }
 hashbrown                     = { features = ["serde"], optional = true, version = "0.16" }
 hkdf                          = { default-features = false, version = "0.12" }
 k256                          = { features = ["ecdh", "ecdsa"], version = "0.13" }
@@ -113,6 +114,17 @@ winter-crypto                 = { default-features = false, version = "0.13" }
 winter-math                   = { default-features = false, version = "0.13" }
 winter-utils                  = { default-features = false, version = "0.13" }
 x25519-dalek                  = { default-features = false, features = ["static_secrets"], version = "2.0" }
+
+# Upstream Plonky3 dependencies
+p3-air        = { branch = "main", default-features = false, git = "https://github.com/Plonky3/Plonky3" }
+p3-challenger = { branch = "main", default-features = false, git = "https://github.com/Plonky3/Plonky3" }
+p3-field      = { branch = "main", default-features = false, git = "https://github.com/Plonky3/Plonky3" }
+p3-symmetric  = { branch = "main", default-features = false, git = "https://github.com/Plonky3/Plonky3" }
+
+# Miden-specific Plonky3 crates
+p3-miden-air        = { branch = "main", default-features = false, git = "https://github.com/0xMiden/p3-miden" }
+p3-miden-goldilocks = { branch = "main", default-features = false, git = "https://github.com/0xMiden/p3-miden" }
+p3-miden-prover     = { branch = "main", default-features = false, git = "https://github.com/0xMiden/p3-miden" }
 
 [dev-dependencies]
 assert_matches = { default-features = false, version = "1.5" }

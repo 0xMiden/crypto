@@ -52,6 +52,9 @@ pub use byte_writer::ByteWriter;
 #[cfg(feature = "winter-compat")]
 mod winter_compat;
 
+#[cfg(feature = "p3-compat")]
+mod p3_compat;
+
 // SERIALIZABLE TRAIT
 // ================================================================================================
 
