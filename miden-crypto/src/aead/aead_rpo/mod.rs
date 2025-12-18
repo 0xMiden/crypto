@@ -757,7 +757,7 @@ fn unpad(mut plaintext: Vec<Felt>) -> Result<Vec<Felt>, EncryptionError> {
 /// Converts a vector of u64 values into a vector of field elements, returning an error if any of
 /// the u64 values is not a valid field element.
 fn felts_from_u64(input: Vec<u64>) -> Result<Vec<Felt>, alloc::string::String> {
-    input.into_iter().map(Felt::try_from).collect()
+    input.into_iter().map(Felt::try_checked).collect()
 }
 
 // AEAD SCHEME IMPLEMENTATION

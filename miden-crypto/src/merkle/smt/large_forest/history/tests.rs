@@ -245,7 +245,7 @@ fn view_at() -> Result<()> {
     let l2_e1_value: Word = rand_value();
     let leaf_2_ix = LeafIndex::from(l2_e1_key);
     let mut l2_e2_key: Word = rand_value();
-    l2_e2_key[3] = leaf_2_ix.value().try_into().unwrap();
+    l2_e2_key[3] = leaf_2_ix.value().into();
     let l2_e2_value: Word = rand_value();
     leaf_2.insert(l2_e1_key, l2_e1_value);
     leaf_2.insert(l2_e2_key, l2_e2_value);
@@ -270,7 +270,7 @@ fn view_at() -> Result<()> {
     let mut leaf_3 = CompactLeaf::new();
     let leaf_3_ix = leaf_2_ix;
     let mut l3_e1_key: Word = rand_value();
-    l3_e1_key[3] = leaf_3_ix.value().try_into().unwrap();
+    l3_e1_key[3] = leaf_3_ix.value().into();
     let l3_e1_value: Word = rand_value();
     leaf_3.insert(l3_e1_key, l3_e1_value);
 
@@ -340,7 +340,7 @@ fn view_at() -> Result<()> {
     // However, if the leaf exists but does not contain the provided word, it should return the
     // sentinel `Some(None)`.
     let mut ne_key_in_existing_leaf: Word = rand_value();
-    ne_key_in_existing_leaf[3] = leaf_1_ix.value().try_into().unwrap();
+    ne_key_in_existing_leaf[3] = leaf_1_ix.value().into();
     assert_eq!(view.value(&ne_key_in_existing_leaf), Some(None));
 
     // If the leaf is not overlaid, then the lookup should go up the chain just as in the other
