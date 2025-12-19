@@ -1,5 +1,6 @@
 //! Compatibility layer implementing miden-serde-utils traits for Plonky3 types.
 
+use alloc::format;
 use p3_field::PrimeField64;
 
 use crate::{ByteReader, ByteWriter, Deserializable, DeserializationError, Serializable};
