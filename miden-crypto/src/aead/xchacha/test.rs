@@ -1,5 +1,3 @@
-#![cfg(feature = "std")]
-
 use proptest::{
     prelude::{any, prop},
     prop_assert_eq, prop_assert_ne, proptest,

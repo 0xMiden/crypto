@@ -1,5 +1,3 @@
-#![cfg(feature = "std")]
-
 use rand::rng;
 
 use super::*;
