@@ -24,7 +24,6 @@ use crate::{
 // ================================================================================================
 
 const KEYS4: [u64; 4] = [0, 1, 2, 3];
-
 const VALUES4: [Word; 4] = [int_to_node(1), int_to_node(2), int_to_node(3), int_to_node(4)];
 
 const VALUES8: [Word; 8] = [
