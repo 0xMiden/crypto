@@ -3,8 +3,8 @@ use alloc::{string::ToString, vec::Vec};
 use p3_field::PrimeField64;
 
 use super::{
-    EMPTY_WORD, EmptySubtreeRoots, Felt, InnerNode, InnerNodeInfo, InnerNodes, LeafIndex,
-    MerkleError, MutationSet, NodeIndex, Rpo256, SparseMerklePath, SparseMerkleTree, Word,
+    EMPTY_WORD, EmptySubtreeRoots, InnerNode, InnerNodeInfo, InnerNodes, LeafIndex, MerkleError,
+    MutationSet, NodeIndex, SparseMerklePath, SparseMerkleTree, Word,
 };
 
 mod error;
@@ -643,6 +643,9 @@ impl Smt {
 
 // TESTS
 // ================================================================================================
+
+#[cfg(test)]
+use crate::Felt;
 
 #[test]
 fn test_smt_serialization_deserialization() {

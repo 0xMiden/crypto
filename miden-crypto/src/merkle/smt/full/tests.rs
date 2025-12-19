@@ -3,10 +3,10 @@ use alloc::vec::Vec;
 
 use assert_matches::assert_matches;
 
-use super::{EMPTY_WORD, Felt, LeafIndex, NodeIndex, Rpo256, SMT_DEPTH, Smt, SmtLeaf, Word};
+use super::{EMPTY_WORD, LeafIndex, NodeIndex, SMT_DEPTH, Smt, SmtLeaf};
 use crate::{
-    ONE, WORD_SIZE,
-    hash::algebraic_sponge::AlgebraicSponge,
+    Felt, ONE, WORD_SIZE, Word,
+    hash::{algebraic_sponge::AlgebraicSponge, rpo::Rpo256},
     merkle::{
         EmptySubtreeRoots,
         smt::{

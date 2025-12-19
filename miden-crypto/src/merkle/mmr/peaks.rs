@@ -2,8 +2,11 @@ use alloc::vec::Vec;
 
 use p3_miden_goldilocks::Goldilocks as Felt;
 
-use super::{super::ZERO, MmrError, MmrProof, Rpo256, Word};
-use crate::{hash::algebraic_sponge::AlgebraicSponge, merkle::mmr::Forest};
+use crate::{
+    Word, ZERO,
+    hash::{algebraic_sponge::AlgebraicSponge, rpo::Rpo256},
+    merkle::mmr::{Forest, MmrError, MmrProof},
+};
 
 // MMR PEAKS
 // ================================================================================================

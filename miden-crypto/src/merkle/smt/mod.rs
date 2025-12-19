@@ -8,7 +8,7 @@ use core::{
 
 use super::{EmptySubtreeRoots, InnerNodeInfo, MerkleError, NodeIndex, SparseMerklePath};
 use crate::{
-    EMPTY_WORD, Felt, Map, Word,
+    EMPTY_WORD, Map, Word,
     hash::rpo::Rpo256,
     utils::{ByteReader, ByteWriter, Deserializable, DeserializationError, Serializable},
 };
