@@ -1,5 +1,3 @@
-use winter_utils::{ByteReader, ByteWriter, Deserializable, DeserializationError, Serializable};
-
 use super::{LeafIndex, SMT_DEPTH};
 use crate::{
     EMPTY_WORD, Word,
@@ -7,6 +5,7 @@ use crate::{
         InnerNodeInfo, MerkleError, NodeIndex, SparseMerklePath,
         smt::{InnerNode, InnerNodes, Leaves, Smt, SmtLeaf, SmtProof, SparseMerkleTree},
     },
+    utils::{ByteReader, ByteWriter, Deserializable, DeserializationError, Serializable},
 };
 
 /// A partial version of an [`Smt`].

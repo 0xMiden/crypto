@@ -6,7 +6,7 @@
 //! leaves count.
 use core::num::NonZeroUsize;
 
-use winter_utils::{Deserializable, Serializable};
+use crate::utils::{ByteReader, ByteWriter, Deserializable, Serializable};
 
 // IN-ORDER INDEX
 // ================================================================================================
@@ -115,15 +115,15 @@ impl InOrderIndex {
 }
 
 impl Serializable for InOrderIndex {
-    fn write_into<W: winter_utils::ByteWriter>(&self, target: &mut W) {
+    fn write_into<W: ByteWriter>(&self, target: &mut W) {
         target.write_usize(self.idx);
     }
 }
 
 impl Deserializable for InOrderIndex {
-    fn read_from<R: winter_utils::ByteReader>(
+    fn read_from<R: ByteReader>(
         source: &mut R,
-    ) -> Result<Self, winter_utils::DeserializationError> {
+    ) -> Result<Self, crate::utils::DeserializationError> {
         let idx = source.read_usize()?;
         Ok(InOrderIndex { idx })
     }
@@ -144,9 +144,9 @@ impl From<InOrderIndex> for usize {
 #[cfg(test)]
 mod test {
     use proptest::prelude::*;
-    use winter_utils::{Deserializable, Serializable};
 
     use super::InOrderIndex;
+    use crate::utils::{Deserializable, Serializable};
 
     proptest! {
         #[test]

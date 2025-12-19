@@ -3,13 +3,13 @@
 use alloc::{string::String, vec::Vec};
 use core::fmt::{self, Write};
 
-use thiserror::Error;
 #[cfg(feature = "std")]
-pub use winter_utils::ReadAdapter;
-pub use winter_utils::{
+pub use miden_serde_utils::ReadAdapter;
+pub use miden_serde_utils::{
     ByteReader, ByteWriter, Deserializable, DeserializationError, Serializable, SliceReader,
-    uninit_vector,
 };
+use thiserror::Error;
+pub use winter_utils::uninit_vector;
 
 use crate::{Felt, FieldElement, StarkField, Word};
 

@@ -3,8 +3,6 @@ use alloc::{
     vec::Vec,
 };
 
-use winter_utils::{Deserializable, Serializable};
-
 use super::{MmrDelta, MmrPath};
 use crate::{
     Word,
@@ -12,6 +10,7 @@ use crate::{
         InnerNodeInfo, MerklePath, Rpo256,
         mmr::{InOrderIndex, MmrError, MmrPeaks, forest::Forest},
     },
+    utils::{ByteReader, ByteWriter, Deserializable, Serializable},
 };
 
 // TYPE ALIASES
@@ -602,7 +601,7 @@ impl<I: Iterator<Item = (usize, Word)>> Iterator for InnerNodeIterator<'_, I> {
 }
 
 impl Serializable for PartialMmr {
-    fn write_into<W: winter_utils::ByteWriter>(&self, target: &mut W) {
+    fn write_into<W: ByteWriter>(&self, target: &mut W) {
         self.forest.num_leaves().write_into(target);
         self.peaks.write_into(target);
         self.nodes.write_into(target);
@@ -611,9 +610,9 @@ impl Serializable for PartialMmr {
 }
 
 impl Deserializable for PartialMmr {
-    fn read_from<R: winter_utils::ByteReader>(
+    fn read_from<R: ByteReader>(
         source: &mut R,
-    ) -> Result<Self, winter_utils::DeserializationError> {
+    ) -> Result<Self, crate::utils::DeserializationError> {
         let forest = Forest::new(usize::read_from(source)?);
         let peaks = Vec::<Word>::read_from(source)?;
         let nodes = NodeMap::read_from(source)?;
@@ -630,8 +629,6 @@ impl Deserializable for PartialMmr {
 mod tests {
     use alloc::{collections::BTreeSet, vec::Vec};
 
-    use winter_utils::{Deserializable, Serializable};
-
     use super::{MmrPeaks, PartialMmr};
     use crate::{
         Word,
@@ -640,6 +637,7 @@ mod tests {
             mmr::{Mmr, forest::Forest},
             store::MerkleStore,
         },
+        utils::{Deserializable, Serializable},
     };
 
     const LEAVES: [Word; 7] = [
