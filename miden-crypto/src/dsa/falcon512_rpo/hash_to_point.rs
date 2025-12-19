@@ -43,11 +43,6 @@ pub fn hash_to_point_rpo256(message: Word, nonce: &Nonce) -> Polynomial<FalconFe
         // and it must not be uniform. A statistical analysis can be applied here to show
         // that this is still fine: the output distribution is computational IND from
         // uniform.
-        //
-        // TODO: A potential optimization is to parse a goldilocks elements to 2 or 4 limbs, and map
-        // each limb to FalconFelt field. Then, apply a similar analysis to obtain
-        // indistinguishability from uniform.
-        //
         Rpo256::apply_permutation(&mut state);
         state[Rpo256::RATE_RANGE]
             .iter()
