@@ -115,7 +115,7 @@ fn test_secret_key_debug_redaction() {
 #[cfg(feature = "std")]
 #[test]
 fn test_signature_serde() {
-    use winter_utils::SliceReader;
+    use crate::utils::SliceReader;
     let sig0 = SecretKey::new().sign(Word::from([5, 0, 0, 0u32]));
     let sig_bytes = sig0.to_bytes();
     let mut slice_reader = SliceReader::new(&sig_bytes);
