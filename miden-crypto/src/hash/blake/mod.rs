@@ -130,6 +130,9 @@ impl Blake3_256 {
         Blake3Digest(blake3::hash(bytes).into())
     }
 
+    // Note: merge/merge_many/merge_with_int methods were previously trait delegations
+    // (<Self as Hasher>::merge). They're now direct implementations as part of removing
+    // the Winterfell Hasher trait dependency. These are public API used in benchmarks.
     pub fn merge(values: &[Blake3Digest<32>; 2]) -> Blake3Digest<32> {
         Self::hash(prepare_merge(values))
     }
@@ -185,6 +188,7 @@ impl Blake3_192 {
         Blake3Digest(shrink_array(blake3::hash(bytes).into()))
     }
 
+    // Note: Same as Blake3_256 - these methods replaced trait delegations to remove Winterfell.
     pub fn merge_many(values: &[Blake3Digest<24>]) -> Blake3Digest<24> {
         let bytes = Blake3Digest::digests_as_bytes(values);
         Blake3Digest(shrink_array(blake3::hash(bytes).into()))

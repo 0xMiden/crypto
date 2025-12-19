@@ -619,6 +619,7 @@ fn test_constructors() -> Result<(), MerkleError> {
     }
 
     const DEPTH: u8 = 32;
+    // Note: VALUES4 is an array; removed .to_vec() to avoid unnecessary allocation
     let smt = SimpleSmt::<DEPTH>::with_leaves(KEYS4.into_iter().zip(VALUES4)).unwrap();
     let store = MerkleStore::from(&smt);
 
