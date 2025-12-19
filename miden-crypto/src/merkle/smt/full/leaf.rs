@@ -1,11 +1,11 @@
 use alloc::{string::ToString, vec::Vec};
 use core::cmp::Ordering;
 
-use super::{EMPTY_WORD, Felt, LeafIndex, Rpo256, SMT_DEPTH, SmtLeafError, Word};
+use super::EMPTY_WORD;
 use crate::{
-    PrimeField64,
-    hash::algebraic_sponge::AlgebraicSponge,
-    merkle::smt::MAX_LEAF_ENTRIES,
+    Felt, PrimeField64, Word,
+    hash::{algebraic_sponge::AlgebraicSponge, rpo::Rpo256},
+    merkle::smt::{LeafIndex, MAX_LEAF_ENTRIES, SMT_DEPTH, SmtLeafError},
     utils::{ByteReader, ByteWriter, Deserializable, DeserializationError, Serializable},
 };
 

@@ -1,6 +1,6 @@
 //! Cryptographic hash functions used by the Miden protocol.
 
-use super::{Felt, Word, ZERO};
+use crate::{Felt, Word, ZERO};
 
 /// Blake3 hash function.
 pub mod blake;
