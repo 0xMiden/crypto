@@ -232,10 +232,12 @@ impl KeyAgreementScheme for K256 {
 mod test {
 
     use rand::rng;
-    use winter_utils::{Deserializable, Serializable};
 
     use super::{EphemeralPublicKey, EphemeralSecretKey};
-    use crate::dsa::ecdsa_k256_keccak::SecretKey;
+    use crate::{
+        dsa::ecdsa_k256_keccak::SecretKey,
+        utils::{Deserializable, Serializable},
+    };
 
     #[test]
     fn key_agreement() {

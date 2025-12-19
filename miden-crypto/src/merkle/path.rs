@@ -5,7 +5,7 @@ use core::{
 };
 
 use super::{InnerNodeInfo, MerkleError, NodeIndex, Rpo256, Word};
-use crate::utils::{ByteReader, Deserializable, DeserializationError, Serializable};
+use crate::utils::{ByteReader, ByteWriter, Deserializable, DeserializationError, Serializable};
 
 // MERKLE PATH
 // ================================================================================================
@@ -239,7 +239,7 @@ pub struct RootPath {
 // ================================================================================================
 
 impl Serializable for MerklePath {
-    fn write_into<W: winter_utils::ByteWriter>(&self, target: &mut W) {
+    fn write_into<W: ByteWriter>(&self, target: &mut W) {
         assert!(self.nodes.len() <= u8::MAX.into(), "Length enforced in the constructor");
         target.write_u8(self.nodes.len() as u8);
         target.write_many(&self.nodes);
@@ -255,7 +255,7 @@ impl Deserializable for MerklePath {
 }
 
 impl Serializable for MerkleProof {
-    fn write_into<W: winter_utils::ByteWriter>(&self, target: &mut W) {
+    fn write_into<W: ByteWriter>(&self, target: &mut W) {
         self.value.write_into(target);
         self.path.write_into(target);
     }
@@ -270,7 +270,7 @@ impl Deserializable for MerkleProof {
 }
 
 impl Serializable for RootPath {
-    fn write_into<W: winter_utils::ByteWriter>(&self, target: &mut W) {
+    fn write_into<W: ByteWriter>(&self, target: &mut W) {
         self.root.write_into(target);
         self.path.write_into(target);
     }

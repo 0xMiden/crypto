@@ -12,14 +12,16 @@
 //! reestablished.
 use alloc::vec::Vec;
 
-use winter_utils::{ByteReader, ByteWriter, Deserializable, DeserializationError, Serializable};
-
 use super::{
     super::{InnerNodeInfo, MerklePath},
     MmrDelta, MmrError, MmrPath, MmrPeaks, MmrProof,
     forest::{Forest, TreeSizeIterator},
 };
-use crate::{Word, merkle::Rpo256};
+use crate::{
+    Word,
+    merkle::Rpo256,
+    utils::{ByteReader, ByteWriter, Deserializable, DeserializationError, Serializable},
+};
 
 // MMR
 // ===============================================================================================
@@ -451,9 +453,11 @@ impl Iterator for MmrNodes<'_> {
 mod tests {
     use alloc::vec::Vec;
 
-    use winter_utils::{Deserializable, Serializable};
-
-    use crate::{Felt, Word, ZERO, merkle::mmr::Mmr};
+    use crate::{
+        Felt, Word, ZERO,
+        merkle::mmr::Mmr,
+        utils::{Deserializable, Serializable},
+    };
 
     #[test]
     fn test_serialization() {

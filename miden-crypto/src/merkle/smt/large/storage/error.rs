@@ -38,5 +38,5 @@ pub enum StorageError {
     Unsupported(String),
     /// Higher-level type (e.g., `Word`) failed to decode from bytes.
     #[error("failed to decode value bytes")]
-    Value(#[from] winter_utils::DeserializationError),
+    Value(#[from] crate::utils::DeserializationError),
 }

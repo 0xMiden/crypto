@@ -1,5 +1,3 @@
-#[cfg(not(feature = "std"))]
-use num::Float;
 use rand::Rng;
 
 /// Samples an integer from {0, ..., 18} according to the distribution χ, which is close to
