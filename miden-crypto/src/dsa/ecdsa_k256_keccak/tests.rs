@@ -1,7 +1,6 @@
 #![cfg(feature = "std")]
-#![allow(deprecated)]
 
-use rand::thread_rng as rng;
+use rand::rng;
 
 use super::*;
 use crate::Felt;

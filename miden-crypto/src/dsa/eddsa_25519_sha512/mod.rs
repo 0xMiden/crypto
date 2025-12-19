@@ -45,7 +45,7 @@ impl SecretKey {
     #[cfg(feature = "std")]
     #[allow(clippy::new_without_default)]
     pub fn new() -> Self {
-        let mut rng = rand::thread_rng();
+        let mut rng = rand::rng();
 
         Self::with_rng(&mut rng)
     }

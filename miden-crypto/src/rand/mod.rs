@@ -32,7 +32,7 @@ pub trait FeltRng: RngCore {
 #[cfg(feature = "std")]
 pub fn random_felt() -> Felt {
     use rand::Rng;
-    let mut rng = rand::thread_rng();
+    let mut rng = rand::rng();
     // Goldilocks field order is 2^64 - 2^32 + 1
     // Generate a random u64 and reduce modulo the field order
     Felt::new(rng.random::<u64>())
