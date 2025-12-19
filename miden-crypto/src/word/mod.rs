@@ -672,36 +672,6 @@ impl Deserializable for Word {
     }
 }
 
-// winter_utils compatibility - required for winter_crypto::Digest trait
-impl winter_utils::Serializable for Word {
-    fn write_into<W: winter_utils::ByteWriter>(&self, target: &mut W) {
-        target.write_bytes(&self.as_bytes());
-    }
-
-    fn get_size_hint(&self) -> usize {
-        Self::SERIALIZED_SIZE
-    }
-}
-
-impl winter_utils::Deserializable for Word {
-    fn read_from<R: winter_utils::ByteReader>(
-        source: &mut R,
-    ) -> Result<Self, winter_utils::DeserializationError> {
-        let mut inner: [Felt; WORD_SIZE_FELT] = [ZERO; WORD_SIZE_FELT];
-        for inner in inner.iter_mut() {
-            let e = source.read_u64()?;
-            if e >= Felt::ORDER_U64 {
-                return Err(winter_utils::DeserializationError::InvalidValue(String::from(
-                    "value not in the appropriate range",
-                )));
-            }
-            *inner = Felt::new(e);
-        }
-
-        Ok(Self(inner))
-    }
-}
-
 // ITERATORS
 // ================================================================================================
 impl IntoIterator for Word {
