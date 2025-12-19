@@ -12,7 +12,7 @@ pub use miden_serde_utils::ReadAdapter;
 pub use miden_serde_utils::{
     ByteReader, ByteWriter, Deserializable, DeserializationError, Serializable, SliceReader,
 };
-use p3_field::RawDataSerializable;
+use p3_field::{RawDataSerializable, integers::QuotientMap};
 use thiserror::Error;
 
 mod iterators;
@@ -232,11 +232,8 @@ pub fn bytes_to_elements_exact(bytes: &[u8]) -> Option<Vec<Felt>> {
         let value = u64::from_le_bytes(chunk_array);
 
         // Validate that the value represents a valid field element
-        if value >= Felt::ORDER_U64 {
-            return None;
-        }
-
-        result.push(Felt::new(value));
+        let felt = Felt::from_canonical_checked(value)?;
+        result.push(felt);
     }
 
     Some(result)
