@@ -1,4 +1,3 @@
-#![cfg(feature = "std")]
 use alloc::vec::Vec;
 
 use assert_matches::assert_matches;
