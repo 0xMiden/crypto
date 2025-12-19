@@ -54,9 +54,9 @@ const BINARY_CHUNK_SIZE: usize = 7;
 ///
 /// The constants are defined for tests only because the exponentiations in the code are unrolled
 /// for efficiency reasons.
-#[cfg(test)]
+#[cfg(all(test, feature = "std"))]
 pub(crate) const ALPHA: u64 = 7;
-#[cfg(test)]
+#[cfg(all(test, feature = "std"))]
 pub(crate) const INV_ALPHA: u64 = 10540996611094048183;
 
 // ALGEBRAIC SPONGE
