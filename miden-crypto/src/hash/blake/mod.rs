@@ -103,21 +103,6 @@ impl<const N: usize> Deserializable for Blake3Digest<N> {
     }
 }
 
-// winter_utils compatibility - required for winter_crypto::Digest trait
-impl<const N: usize> winter_utils::Serializable for Blake3Digest<N> {
-    fn write_into<W: winter_utils::ByteWriter>(&self, target: &mut W) {
-        target.write_bytes(&self.0);
-    }
-}
-
-impl<const N: usize> winter_utils::Deserializable for Blake3Digest<N> {
-    fn read_from<R: winter_utils::ByteReader>(
-        source: &mut R,
-    ) -> Result<Self, winter_utils::DeserializationError> {
-        source.read_array().map(Self)
-    }
-}
-
 // BLAKE3 256-BIT OUTPUT
 // ================================================================================================
 

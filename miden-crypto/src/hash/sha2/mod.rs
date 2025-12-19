@@ -109,21 +109,6 @@ impl Deserializable for Sha256Digest {
     }
 }
 
-// winter_utils compatibility - required for winter_crypto::Digest trait
-impl winter_utils::Serializable for Sha256Digest {
-    fn write_into<W: winter_utils::ByteWriter>(&self, target: &mut W) {
-        target.write_bytes(&self.0);
-    }
-}
-
-impl winter_utils::Deserializable for Sha256Digest {
-    fn read_from<R: winter_utils::ByteReader>(
-        source: &mut R,
-    ) -> Result<Self, winter_utils::DeserializationError> {
-        source.read_array().map(Self)
-    }
-}
-
 // SHA256 HASHER
 // ================================================================================================
 
