@@ -70,6 +70,10 @@ impl RpoRandomCoin {
         <Self as RngCore>::fill_bytes(self, dest)
     }
 
+    /// Draws a random base field element from the random coin.
+    ///
+    /// This method applies the Rpo256 permutation when the rate portion of the state is exhausted,
+    /// then returns the next element from the rate portion.
     pub fn draw_basefield(&mut self) -> Felt {
         if self.current == RATE_END {
             Rpo256::apply_permutation(&mut self.state);
@@ -87,6 +91,10 @@ impl RpoRandomCoin {
         self.draw_basefield()
     }
 
+    /// Draws a random extension field element.
+    ///
+    /// The extension field element is constructed by drawing `E::DIMENSION` base field elements
+    /// and interpreting them as basis coefficients.
     pub fn draw_ext_field<E: ExtensionField<Felt>>(&mut self) -> E {
         let ext_degree = E::DIMENSION;
         let mut result = vec![ZERO; ext_degree];
@@ -96,6 +104,11 @@ impl RpoRandomCoin {
         E::from_basis_coefficients_slice(&result).expect("failed to draw extension field element")
     }
 
+    /// Reseeds the random coin with additional entropy.
+    ///
+    /// The provided `data` is added to the first half of the rate portion of the state,
+    /// then the Rpo256 permutation is applied. The buffer pointer is reset to the start
+    /// of the rate portion.
     pub fn reseed(&mut self, data: Word) {
         // Reset buffer
         self.current = RATE_START;
@@ -110,6 +123,11 @@ impl RpoRandomCoin {
         Rpo256::apply_permutation(&mut self.state);
     }
 
+    /// Checks how many leading zeros a value would produce when hashed with the current state.
+    ///
+    /// This method creates a temporary copy of the state, adds the provided `value` to the first
+    /// rate element, applies the Rpo256 permutation, and returns the number of trailing zeros
+    /// in the resulting first rate element. This is useful for proof-of-work style computations.
     pub fn check_leading_zeros(&self, value: u64) -> u32 {
         let value = Felt::new(value);
         let mut state_tmp = self.state;
@@ -122,6 +140,18 @@ impl RpoRandomCoin {
         first_rate_element.trailing_zeros()
     }
 
+    /// Draws a specified number of unique random integers from a domain of a given size.
+    ///
+    /// # Arguments
+    /// * `num_values` - The number of unique integers to draw (must be less than `domain_size`)
+    /// * `domain_size` - The size of the domain (must be a power of two)
+    /// * `nonce` - A nonce value that is absorbed into the state before drawing
+    ///
+    /// # Returns
+    /// A vector of `num_values` unique integers in the range `[0, domain_size)`
+    ///
+    /// # Panics
+    /// Panics if `domain_size` is not a power of two or if `num_values >= domain_size`.
     pub fn draw_integers(
         &mut self,
         num_values: usize,
