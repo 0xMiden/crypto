@@ -2,8 +2,6 @@ use alloc::{string::ToString, vec::Vec};
 
 use miden_crypto_derive::{SilentDebug, SilentDisplay};
 use num::Complex;
-#[cfg(not(feature = "std"))]
-use num::Float;
 use num_complex::Complex64;
 use rand::Rng;
 

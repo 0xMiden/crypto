@@ -9,6 +9,7 @@
 - Decoupled `PartialSmt` from `Smt` and expanded tracking to include provably empty leaves, allowing updates in empty subtrees ([#691](https://github.com/0xMiden/crypto/pull/691)).
 - [BREAKING] Moved `LargeSmt` root ownership from storage to in-memory layer ([#694](https://github.com/0xMiden/crypto/pull/694)). 
 - Remove use of `transmute()` in blake3 implementation ([#704](https://github.com/0xMiden/crypto/pull/704)).
+- [BREAKING] Imported miden-serde-utils crate for serialization ([#715](https://github.com/0xMiden/crypto/pull/715)).
 
 ## 0.19.2 (2025-12-04)
 
