@@ -19,7 +19,14 @@ impl Serializable for p3_miden_goldilocks::Goldilocks {
 
 impl Deserializable for p3_miden_goldilocks::Goldilocks {
     fn read_from<R: ByteReader>(source: &mut R) -> Result<Self, DeserializationError> {
+        use p3_field::integers::QuotientMap;
+
         let value = source.read_u64()?;
-        Ok(Self::new(value))
+        Self::from_canonical_checked(value).ok_or_else(|| {
+            DeserializationError::InvalidValue(format!(
+                "value {} is not a valid Goldilocks field element",
+                value
+            ))
+        })
     }
 }
