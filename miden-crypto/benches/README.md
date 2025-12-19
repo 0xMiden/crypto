@@ -80,7 +80,7 @@ For each algorithm, we benchmark three core operations:
 
 ### Sparse Merkle Tree
 
-We build cryptographic data structures incorporating these hash functions. What follows are benchmarks of operations on sparse Merkle trees (SMTs) which use the above `RPO_256` hash function. We perform a batched modification of 1,000 values in a tree with 1,000,000 leaves (with the `hashmaps` feature enabled to leverage the standard library `HashMap`).
+We build cryptographic data structures incorporating these hash functions. What follows are benchmarks of operations on sparse Merkle trees (SMTs) which use the above `RPO_256` hash function. We perform a batched modification of 1,000 values in a tree with 1,000,000 leaves using the default `HashMap` implementation (enabled with the `std` feature).
 
 ### Scenario 1: SMT Construction (1M pairs)
 
@@ -151,7 +151,7 @@ cargo run --features=executable
 The `concurrent` feature enables the concurrent benchmark, and is enabled by default. To run a sequential benchmark, disable the crate's default features:
 
 ```
-cargo run --no-default-features --features=executable,hashmaps
+cargo run --no-default-features --features=executable
 ```
 
 The benchmark parameters may also be customized with the `-s`/`--size`, `-i`/`--insertions`, and `-u`/`--updates` options.

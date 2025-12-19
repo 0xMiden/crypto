@@ -169,10 +169,10 @@ impl SmtStore {
         #[allow(unused_mut)]
         let mut sorted_leaf_indices = leaves_by_index.keys().cloned().collect::<Vec<_>>();
 
-        #[cfg(all(feature = "hashmaps", feature = "std"))]
+        #[cfg(feature = "std")]
         // Sort leaves by NodeIndex to easily detect when leaves share a parent (only neighboring
-        // leaves can share a parent). `std::collections::HashMap` doesn't maintain key ordering, so
-        // we need to sort the indices.
+        // leaves can share a parent). `std::collections::HashMap` doesn't maintain key ordering,
+        // so we need to sort the indices.
         sorted_leaf_indices.sort();
 
         // Ensure new leaf values override current opening values.

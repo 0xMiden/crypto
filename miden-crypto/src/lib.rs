@@ -5,9 +5,6 @@ extern crate alloc;
 #[cfg(feature = "std")]
 extern crate std;
 
-#[cfg(all(feature = "hashmaps", not(feature = "std")))]
-compile_error!("`hashmaps` feature requires `std` to provide HashMap/HashSet support");
-
 pub mod aead;
 pub mod dsa;
 pub mod ecdh;
@@ -33,36 +30,37 @@ pub use word::{Word, WordError};
 
 /// An alias for a key-value map.
 ///
-/// By default, this is an alias for the [`alloc::collections::BTreeMap`], however, when the
-/// `hashmaps` feature is enabled, this is an alias for the `std::collections::HashMap`.
-#[cfg(all(feature = "hashmaps", feature = "std"))]
+/// By default, this is an alias for the [`alloc::collections::BTreeMap`]; when the `std` feature is
+/// enabled, this is an alias for the `std::collections::HashMap` (iteration order is not
+/// deterministic in that case).
+#[cfg(feature = "std")]
 pub type Map<K, V> = std::collections::HashMap<K, V>;
 
-#[cfg(all(feature = "hashmaps", feature = "std"))]
+#[cfg(feature = "std")]
 pub use std::collections::hash_map::Entry as MapEntry;
 
 /// An alias for a key-value map.
 ///
 /// By default, this is an alias for the [`alloc::collections::BTreeMap`], however, when the
-/// `hashmaps` feature is enabled, this is an alias for the `std::collections::HashMap`.
-#[cfg(not(all(feature = "hashmaps", feature = "std")))]
+/// `std` feature is enabled, this is an alias for the `std::collections::HashMap`.
+#[cfg(not(feature = "std"))]
 pub type Map<K, V> = alloc::collections::BTreeMap<K, V>;
 
-#[cfg(not(all(feature = "hashmaps", feature = "std")))]
+#[cfg(not(feature = "std"))]
 pub use alloc::collections::btree_map::Entry as MapEntry;
 
 /// An alias for a simple set.
 ///
 /// By default, this is an alias for the [`alloc::collections::BTreeSet`]. However, when the
-/// `hashmaps` feature is enabled, this becomes an alias for `std::collections::HashSet`.
-#[cfg(all(feature = "hashmaps", feature = "std"))]
+/// `std` feature is enabled, this becomes an alias for `std::collections::HashSet`.
+#[cfg(feature = "std")]
 pub type Set<V> = std::collections::HashSet<V>;
 
 /// An alias for a simple set.
 ///
 /// By default, this is an alias for the [`alloc::collections::BTreeSet`]. However, when the
-/// `hashmaps` feature is enabled, this becomes an alias for `std::collections::HashSet`.
-#[cfg(not(all(feature = "hashmaps", feature = "std")))]
+/// `std` feature is enabled, this becomes an alias for `std::collections::HashSet`.
+#[cfg(not(feature = "std"))]
 pub type Set<V> = alloc::collections::BTreeSet<V>;
 
 // CONSTANTS
