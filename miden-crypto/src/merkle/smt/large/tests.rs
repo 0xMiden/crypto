@@ -1,8 +1,6 @@
-#![allow(deprecated)]
-
 use alloc::{collections::BTreeSet, vec::Vec};
 
-use rand::{Rng, prelude::IteratorRandom, thread_rng as rng};
+use rand::{Rng, prelude::IteratorRandom, rng};
 
 use super::MemoryStorage;
 use crate::{

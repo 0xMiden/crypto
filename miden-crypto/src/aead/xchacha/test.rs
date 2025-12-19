@@ -1,5 +1,4 @@
 #![cfg(feature = "std")]
-#![allow(deprecated)]
 
 use proptest::{
     prelude::{any, prop},
@@ -18,7 +17,7 @@ proptest! {
     fn test_encryption_decryption_roundtrip(
         data_len in 1usize..1000,
     ) {
-        let mut rng = rand::thread_rng();
+        let mut rng = rand::rng();
         let key = SecretKey::with_rng(&mut rng);
         let nonce = Nonce::with_rng(&mut rng);
 
@@ -38,7 +37,7 @@ proptest! {
         associated_data_len in 1usize..1000,
         data_len in 1usize..1000,
     ) {
-        let mut rng = rand::thread_rng();
+        let mut rng = rand::rng();
         let key = SecretKey::with_rng(&mut rng);
         let nonce = Nonce::with_rng(&mut rng);
 
@@ -60,7 +59,7 @@ proptest! {
     fn test_bytes_encryption_decryption_roundtrip(
         data_len in 0usize..1000,
     ) {
-        let mut rng = rand::thread_rng();
+        let mut rng = rand::rng();
         let key = SecretKey::with_rng(&mut rng);
         let nonce = Nonce::with_rng(&mut rng);
 
@@ -79,7 +78,7 @@ proptest! {
         associated_data_len in 0usize..1000,
         data_len in 0usize..1000,
     ) {
-        let mut rng = rand::thread_rng();
+        let mut rng = rand::rng();
         let key = SecretKey::with_rng(&mut rng);
         let nonce = Nonce::with_rng(&mut rng);
 
@@ -103,8 +102,8 @@ proptest! {
         data in prop::collection::vec(any::<u8>(), 1..500),
     ) {
 
-        let mut rng1 = rand::thread_rng();
-        let mut rng2 = rand::thread_rng();
+        let mut rng1 = rand::rng();
+        let mut rng2 = rand::rng();
 
         let key1 = SecretKey::with_rng(&mut rng1);
         let key2 = SecretKey::with_rng(&mut rng2);
@@ -125,7 +124,7 @@ proptest! {
         associated_data in prop::collection::vec(any::<u8>(), 1..500),
         data in prop::collection::vec(any::<u8>(), 1..500),
     ) {
-        let mut rng = rand::thread_rng();
+        let mut rng = rand::rng();
         let key = SecretKey::with_rng(&mut rng);
         let mut nonce_bytes = [0_u8; 24];
         let _ = rng.try_fill_bytes(&mut nonce_bytes);

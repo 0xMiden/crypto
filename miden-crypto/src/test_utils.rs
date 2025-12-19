@@ -21,7 +21,7 @@ use crate::utils::Randomizable;
 /// ```
 #[cfg(feature = "std")]
 pub fn rand_value<T: Randomizable>() -> T {
-    let mut rng = rand::thread_rng();
+    let mut rng = rand::rng();
     let mut bytes = vec![0u8; T::VALUE_SIZE];
     rng.fill(&mut bytes[..]);
     T::from_random_bytes(&bytes).expect("failed to generate random value")

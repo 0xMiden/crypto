@@ -12,7 +12,7 @@
 //!     dsa::eddsa_25519_sha512::SecretKey,
 //!     ies::{SealingKey, UnsealingKey},
 //! };
-//! use rand::thread_rng as rng;
+//! use rand::rng;
 //!
 //! let mut rng = rng();
 //! let secret_key = SecretKey::with_rng(&mut rng);
