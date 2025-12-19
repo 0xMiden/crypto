@@ -282,7 +282,7 @@ pub fn bytes_to_packed_u32_elements(bytes: &[u8]) -> Vec<Felt> {
 ///
 /// # Safety
 /// Using values from the returned vector before initializing them will lead to undefined behavior.
-#[allow(clippy::uninit_vec)]
+#[expect(clippy::uninit_vec)]
 pub unsafe fn uninit_vector<T>(length: usize) -> Vec<T> {
     let mut vector = Vec::with_capacity(length);
     unsafe {
