@@ -81,9 +81,8 @@ impl<S: SmtStorage> LargeSmt<S> {
                 None
             } else {
                 // Start with existing nodes (if any), then apply mutations
-                let mut final_nodes: Map<NodeIndex, InnerNode> = existing_subtree
-                    .map(|s| s.iter_nodes().collect())
-                    .unwrap_or_default();
+                let mut final_nodes: Map<NodeIndex, InnerNode> =
+                    existing_subtree.map(|s| s.iter_nodes().collect()).unwrap_or_default();
 
                 // Apply mutations: remove Removals, add/update Additions
                 for (index, mutation) in mutations {

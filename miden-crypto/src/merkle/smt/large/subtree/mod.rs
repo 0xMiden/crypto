@@ -1,10 +1,7 @@
 use alloc::vec::Vec;
 
 use super::{EmptySubtreeRoots, InnerNode, InnerNodeInfo, NodeIndex, SMT_DEPTH};
-use crate::{
-    Word,
-    merkle::smt::full::concurrent::SUBTREE_DEPTH,
-};
+use crate::{Word, merkle::smt::full::concurrent::SUBTREE_DEPTH};
 
 mod error;
 pub use error::SubtreeError;
@@ -17,8 +14,8 @@ mod tests;
 /// ### What is stored
 /// - `non_empty_node_bits` is a 256-bit bitmask (4 x u64) where each bit indicates whether the
 ///   corresponding node exists (i.e., differs from the canonical empty state).
-/// - `nodes` stores the left and right child hashes for each existing node, packed in order
-///   of set bits. For each set bit at position `i`, two consecutive Words (left, right) are stored.
+/// - `nodes` stores the left and right child hashes for each existing node, packed in order of set
+///   bits. For each set bit at position `i`, two consecutive Words (left, right) are stored.
 ///
 /// ### Local index layout (how indices are computed)
 /// - Indices are **subtree-local** and follow binary-heap (level-order) layout: `root = 0`;
@@ -422,11 +419,7 @@ impl Subtree {
                 let left = self.nodes[position * 2];
                 let right = self.nodes[position * 2 + 1];
                 let inner_node = InnerNode { left, right };
-                InnerNodeInfo {
-                    value: inner_node.hash(),
-                    left,
-                    right,
-                }
+                InnerNodeInfo { value: inner_node.hash(), left, right }
             })
     }
 }
