@@ -18,6 +18,9 @@ use core::ops::Range;
 use super::{Felt, Word, ZERO};
 use crate::{BasedVectorSpace, PrimeField64};
 
+// Note: These modules must remain `pub` (not `pub(crate)`) to avoid dead_code warnings
+// on the P3 integration types (e.g., Poseidon2Permutation256, RpoPermutation256) which
+// are part of the public API for future use but not yet consumed internally.
 pub mod poseidon2;
 pub mod rescue;
 
@@ -61,6 +64,8 @@ pub(crate) const INV_ALPHA: u64 = 10540996611094048183;
 // ALGEBRAIC SPONGE
 // ================================================================================================
 
+// Note: This trait must remain `pub` (not `pub(crate)`) because it's re-exported
+// at the crate root (lib.rs) as part of the public API.
 pub trait AlgebraicSponge {
     fn apply_permutation(state: &mut [Felt; STATE_WIDTH]);
 
