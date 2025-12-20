@@ -12,7 +12,6 @@
 //! and RPX hash functions, both of which belong to the Rescue family of hash functions, and
 //! Poseidon2 hash function.
 
-use alloc::vec::Vec;
 use core::ops::Range;
 
 use super::{Felt, Word, ZERO};
@@ -72,28 +71,29 @@ pub trait AlgebraicSponge {
     where
         E: BasedVectorSpace<Felt>,
     {
-        // convert the elements into a list of base field elements
-        let elements = elements
+        // Count total number of base field elements without collecting
+        let total_len = elements
             .iter()
-            .flat_map(|elem| E::as_basis_coefficients_slice(elem))
-            .copied()
-            .collect::<Vec<Felt>>();
+            .map(|elem| E::as_basis_coefficients_slice(elem).len())
+            .sum::<usize>();
 
         // initialize state to all zeros, except for the first element of the capacity part, which
-        // is set to `elements.len() % RATE_WIDTH`.
+        // is set to `total_len % RATE_WIDTH`.
         let mut state = [ZERO; STATE_WIDTH];
-        state[CAPACITY_RANGE.start] = Felt::from((elements.len() % RATE_WIDTH) as u8);
+        state[CAPACITY_RANGE.start] = Felt::from((total_len % RATE_WIDTH) as u8);
 
         // absorb elements into the state one by one until the rate portion of the state is filled
         // up; then apply the permutation and start absorbing again; repeat until all
         // elements have been absorbed
         let mut i = 0;
-        for &element in elements.iter() {
-            state[RATE_RANGE.start + i] = element;
-            i += 1;
-            if i.is_multiple_of(RATE_WIDTH) {
-                Self::apply_permutation(&mut state);
-                i = 0;
+        for elem in elements.iter() {
+            for &felt in E::as_basis_coefficients_slice(elem) {
+                state[RATE_RANGE.start + i] = felt;
+                i += 1;
+                if i.is_multiple_of(RATE_WIDTH) {
+                    Self::apply_permutation(&mut state);
+                    i = 0;
+                }
             }
         }
 
