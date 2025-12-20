@@ -1,4 +1,4 @@
-use alloc::{string::String, vec::Vec};
+use alloc::string::String;
 use core::{
     mem::size_of,
     ops::Deref,
@@ -172,33 +172,29 @@ where
     E: BasedVectorSpace<Felt>,
 {
     // don't leak assumptions from felt and check its actual implementation.
-    // this is a compile-time branch so it is for free
     let digest = {
+        const FELT_BYTES: usize = size_of::<u64>();
+        const { assert!(FELT_BYTES == 8, "buffer arithmetic assumes 8-byte field elements") };
+
         let mut hasher = sha3::Keccak256::new();
-        // The Keccak-p permutation has a state of size 1600 bits. For Keccak256, the capacity
-        // is set to 512 bits and the rate is thus of size 1088 bits.
-        // This means that we can absorb 136 bytes into the rate portion of the state per invocation
-        // of the permutation function.
-        // we move the elements into the hasher via the buffer to give the CPU a chance to process
-        // multiple element-to-byte conversions in parallel
         let mut buf = [0_u8; 136];
+        let mut buf_offset = 0;
 
-        let elements_base = elements
-            .iter()
-            .flat_map(|elem| E::as_basis_coefficients_slice(elem))
-            .copied()
-            .collect::<Vec<Felt>>();
+        for elem in elements.iter() {
+            for &felt in E::as_basis_coefficients_slice(elem) {
+                buf[buf_offset..buf_offset + FELT_BYTES]
+                    .copy_from_slice(&felt.as_canonical_u64().to_le_bytes());
+                buf_offset += FELT_BYTES;
 
-        let mut chunk_iter = elements_base.chunks_exact(17);
-        for chunk in chunk_iter.by_ref() {
-            for i in 0..17 {
-                buf[i * 8..(i + 1) * 8].copy_from_slice(&chunk[i].as_canonical_u64().to_le_bytes());
+                if buf_offset == 136 {
+                    hasher.update(buf);
+                    buf_offset = 0;
+                }
             }
-            hasher.update(buf);
         }
 
-        for element in chunk_iter.remainder() {
-            hasher.update(element.as_canonical_u64().to_le_bytes());
+        if buf_offset > 0 {
+            hasher.update(&buf[..buf_offset]);
         }
 
         hasher.finalize()
