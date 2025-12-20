@@ -10,7 +10,7 @@
 //! See <https://github.com/facebook/winterfell/issues/406> for a proposal to make the
 //! `Digest` trait generic over output size.
 
-use alloc::{string::String, vec::Vec};
+use alloc::string::String;
 use core::{
     mem::size_of,
     ops::Deref,
@@ -309,30 +309,29 @@ fn hash_elements_256<E>(elements: &[E]) -> [u8; DIGEST256_BYTES]
 where
     E: BasedVectorSpace<Felt>,
 {
-    // don't leak assumptions from felt and check its actual implementation.
-    // this is a compile-time branch so it is for free
     let digest = {
-        let mut hasher = sha2::Sha256::new();
-        // SHA-256 has a block size of 64 bytes, so we can absorb 64 bytes per block.
-        // We move the elements into the hasher via the buffer to give the CPU a chance
-        // to process multiple element-to-byte conversions in parallel.
-        let mut buf = [0_u8; 64];
-        let elements_base = elements
-            .iter()
-            .flat_map(|elem| E::as_basis_coefficients_slice(elem))
-            .copied()
-            .collect::<Vec<Felt>>();
+        const FELT_BYTES: usize = size_of::<u64>();
+        const { assert!(FELT_BYTES == 8, "buffer arithmetic assumes 8-byte field elements") };
 
-        let mut chunk_iter = elements_base.chunks_exact(8);
-        for chunk in chunk_iter.by_ref() {
-            for i in 0..8 {
-                buf[i * 8..(i + 1) * 8].copy_from_slice(&chunk[i].as_canonical_u64().to_le_bytes());
+        let mut hasher = sha2::Sha256::new();
+        let mut buf = [0_u8; 64];
+        let mut buf_offset = 0;
+
+        for elem in elements.iter() {
+            for &felt in E::as_basis_coefficients_slice(elem) {
+                buf[buf_offset..buf_offset + FELT_BYTES]
+                    .copy_from_slice(&felt.as_canonical_u64().to_le_bytes());
+                buf_offset += FELT_BYTES;
+
+                if buf_offset == 64 {
+                    hasher.update(buf);
+                    buf_offset = 0;
+                }
             }
-            hasher.update(buf);
         }
 
-        for element in chunk_iter.remainder() {
-            hasher.update(element.as_canonical_u64().to_le_bytes());
+        if buf_offset > 0 {
+            hasher.update(&buf[..buf_offset]);
         }
 
         hasher.finalize()
