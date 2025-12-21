@@ -129,6 +129,12 @@ impl Poseidon2 {
         <Self as AlgebraicSponge>::hash(bytes)
     }
 
+    /// Returns a hash of the provided field elements.
+    #[inline(always)]
+    pub fn hash_elements<E: crate::BasedVectorSpace<Felt>>(elements: &[E]) -> Word {
+        <Self as AlgebraicSponge>::hash_elements(elements)
+    }
+
     /// Returns a hash of two digests. This method is intended for use in construction of
     /// Merkle trees and verification of Merkle paths.
     #[inline(always)]
@@ -469,8 +475,6 @@ mod p3_tests {
     // Miden-crypto: capacity=[0-3], rate=[4-11]
     // Plonky3:      rate=[0-7], capacity=[8-11]
     fn test_poseidon2_hasher_vs_hash_elements() {
-        use crate::hash::algebraic_sponge::AlgebraicSponge;
-
         // Test with empty input
         let expected: [Felt; 4] = Poseidon2::hash_elements::<Felt>(&[]).into();
         let hasher = Poseidon2Hasher::new(Poseidon2Permutation256);

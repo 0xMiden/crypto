@@ -8,7 +8,6 @@ use super::{
 };
 use crate::{
     Felt,
-    hash::algebraic_sponge::AlgebraicSponge,
     merkle::{
         MerklePath, MerkleTree, NodeIndex, int_to_node,
         mmr::{

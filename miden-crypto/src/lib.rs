@@ -33,10 +33,7 @@ pub use p3_miden_goldilocks::{Goldilocks as Felt, Poseidon2Goldilocks};
 pub use p3_miden_prover::*;
 pub use word::{Word, WordError};
 
-pub use crate::{
-    hash::algebraic_sponge::AlgebraicSponge,
-    rand::{RpoRandomCoin, RpxRandomCoin},
-};
+pub use crate::rand::{RpoRandomCoin, RpxRandomCoin};
 
 // TYPE ALIASES
 // ================================================================================================
