@@ -268,7 +268,6 @@ mod tests {
     use super::*;
     use crate::{
         Felt, WORD_SIZE,
-        hash::algebraic_sponge::AlgebraicSponge,
         merkle::{int_to_leaf, int_to_node},
     };
 

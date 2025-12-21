@@ -22,9 +22,10 @@ use std::hint::black_box;
 
 use criterion::{Criterion, criterion_group, criterion_main};
 use miden_crypto::{
-    AlgebraicSponge, Felt,
+    Felt,
     hash::{
         HasherExt,
+        algebraic_sponge::AlgebraicSponge,
         blake::{Blake3_160, Blake3_192, Blake3_256},
         keccak::Keccak256,
         rpo::Rpo256,

@@ -4,7 +4,7 @@ use p3_miden_goldilocks::Goldilocks as Felt;
 
 use crate::{
     Word, ZERO,
-    hash::{algebraic_sponge::AlgebraicSponge, rpo::Rpo256},
+    hash::rpo::Rpo256,
     merkle::mmr::{Forest, MmrError, MmrProof},
 };
 

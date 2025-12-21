@@ -4,7 +4,7 @@ use core::cmp::Ordering;
 use super::EMPTY_WORD;
 use crate::{
     Felt, PrimeField64, Word,
-    hash::{algebraic_sponge::AlgebraicSponge, rpo::Rpo256},
+    hash::rpo::Rpo256,
     merkle::smt::{LeafIndex, MAX_LEAF_ENTRIES, SMT_DEPTH, SmtLeafError},
     utils::{ByteReader, ByteWriter, Deserializable, DeserializationError, Serializable},
 };
