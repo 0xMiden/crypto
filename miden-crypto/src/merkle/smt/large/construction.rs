@@ -155,8 +155,17 @@ impl<S: SmtStorage> LargeSmt<S> {
         let is_empty = !storage.has_leaves()?;
         // If the tree is empty, return it
         if is_empty {
-            return Ok(Self { storage, in_memory_nodes });
+            return Ok(Self {
+                storage,
+                in_memory_nodes,
+                leaf_count: 0,
+                entry_count: 0,
+            });
         }
+
+        // Initialize counts from storage
+        let leaf_count = storage.leaf_count()?;
+        let entry_count = storage.entry_count()?;
 
         // Get the in-memory top of tree leaves from storage
         let in_memory_tree_leaves = storage.get_depth24()?;
@@ -201,7 +210,12 @@ impl<S: SmtStorage> LargeSmt<S> {
         // Set the root node
         in_memory_nodes[ROOT_MEMORY_INDEX] = calculated_root;
 
-        Ok(Self { storage, in_memory_nodes })
+        Ok(Self {
+            storage,
+            in_memory_nodes,
+            leaf_count,
+            entry_count,
+        })
     }
 
     fn build_subtrees(&mut self, mut entries: Vec<(Word, Word)>) -> Result<(), MerkleError> {
@@ -225,6 +239,10 @@ impl<S: SmtStorage> LargeSmt<S> {
         if initial_leaves.is_empty() {
             return Ok(());
         }
+
+        // Update cached counts before storing leaves
+        self.leaf_count = initial_leaves.len();
+        self.entry_count = initial_leaves.values().map(|leaf| leaf.num_entries()).sum();
 
         // Store the initial leaves
         self.storage.set_leaves(initial_leaves).expect("Failed to store initial leaves");
