@@ -969,7 +969,6 @@ dependencies = [
  "p3-air",
  "p3-challenger",
  "p3-field",
- "p3-miden-air",
  "p3-miden-goldilocks",
  "p3-miden-prover",
  "p3-symmetric",
@@ -1136,7 +1135,7 @@ checksum = "c08d65885ee38876c4f86fa503fb49d7b507c2b62552df7c70b2fce627e06381"
 [[package]]
 name = "p3-air"
 version = "0.4.1"
-source = "git+https://github.com/Plonky3/Plonky3?branch=main#65bdaa3d9996516dfb80eabf26840ab80da137b0"
+source = "git+https://github.com/0xMiden/Plonky3?branch=periodic-air-builder#ba29a3c6ac8e1b7d7046f4c846ff1efe00bfb645"
 dependencies = [
  "p3-field",
  "p3-matrix",
@@ -1145,7 +1144,7 @@ dependencies = [
 [[package]]
 name = "p3-challenger"
 version = "0.4.1"
-source = "git+https://github.com/Plonky3/Plonky3?branch=main#65bdaa3d9996516dfb80eabf26840ab80da137b0"
+source = "git+https://github.com/0xMiden/Plonky3?branch=periodic-air-builder#ba29a3c6ac8e1b7d7046f4c846ff1efe00bfb645"
 dependencies = [
  "p3-field",
  "p3-maybe-rayon",
@@ -1158,7 +1157,7 @@ dependencies = [
 [[package]]
 name = "p3-commit"
 version = "0.4.1"
-source = "git+https://github.com/Plonky3/Plonky3?branch=main#65bdaa3d9996516dfb80eabf26840ab80da137b0"
+source = "git+https://github.com/0xMiden/Plonky3?branch=periodic-air-builder#ba29a3c6ac8e1b7d7046f4c846ff1efe00bfb645"
 dependencies = [
  "itertools 0.14.0",
  "p3-challenger",
@@ -1172,7 +1171,7 @@ dependencies = [
 [[package]]
 name = "p3-dft"
 version = "0.4.1"
-source = "git+https://github.com/Plonky3/Plonky3?branch=main#65bdaa3d9996516dfb80eabf26840ab80da137b0"
+source = "git+https://github.com/0xMiden/Plonky3?branch=periodic-air-builder#ba29a3c6ac8e1b7d7046f4c846ff1efe00bfb645"
 dependencies = [
  "itertools 0.14.0",
  "p3-field",
@@ -1186,7 +1185,7 @@ dependencies = [
 [[package]]
 name = "p3-field"
 version = "0.4.1"
-source = "git+https://github.com/Plonky3/Plonky3?branch=main#65bdaa3d9996516dfb80eabf26840ab80da137b0"
+source = "git+https://github.com/0xMiden/Plonky3?branch=periodic-air-builder#ba29a3c6ac8e1b7d7046f4c846ff1efe00bfb645"
 dependencies = [
  "itertools 0.14.0",
  "num-bigint",
@@ -1201,7 +1200,7 @@ dependencies = [
 [[package]]
 name = "p3-interpolation"
 version = "0.4.1"
-source = "git+https://github.com/Plonky3/Plonky3?branch=main#65bdaa3d9996516dfb80eabf26840ab80da137b0"
+source = "git+https://github.com/0xMiden/Plonky3?branch=periodic-air-builder#ba29a3c6ac8e1b7d7046f4c846ff1efe00bfb645"
 dependencies = [
  "p3-field",
  "p3-matrix",
@@ -1210,9 +1209,25 @@ dependencies = [
 ]
 
 [[package]]
+name = "p3-lookup"
+version = "0.4.1"
+source = "git+https://github.com/0xMiden/Plonky3?branch=periodic-air-builder#ba29a3c6ac8e1b7d7046f4c846ff1efe00bfb645"
+dependencies = [
+ "itertools 0.14.0",
+ "p3-air",
+ "p3-field",
+ "p3-matrix",
+ "p3-uni-stark",
+ "rand",
+ "serde",
+ "thiserror",
+ "tracing",
+]
+
+[[package]]
 name = "p3-matrix"
 version = "0.4.1"
-source = "git+https://github.com/Plonky3/Plonky3?branch=main#65bdaa3d9996516dfb80eabf26840ab80da137b0"
+source = "git+https://github.com/0xMiden/Plonky3?branch=periodic-air-builder#ba29a3c6ac8e1b7d7046f4c846ff1efe00bfb645"
 dependencies = [
  "itertools 0.14.0",
  "p3-field",
@@ -1227,12 +1242,12 @@ dependencies = [
 [[package]]
 name = "p3-maybe-rayon"
 version = "0.4.1"
-source = "git+https://github.com/Plonky3/Plonky3?branch=main#65bdaa3d9996516dfb80eabf26840ab80da137b0"
+source = "git+https://github.com/0xMiden/Plonky3?branch=periodic-air-builder#ba29a3c6ac8e1b7d7046f4c846ff1efe00bfb645"
 
 [[package]]
 name = "p3-mds"
 version = "0.4.1"
-source = "git+https://github.com/Plonky3/Plonky3?branch=main#65bdaa3d9996516dfb80eabf26840ab80da137b0"
+source = "git+https://github.com/0xMiden/Plonky3?branch=periodic-air-builder#ba29a3c6ac8e1b7d7046f4c846ff1efe00bfb645"
 dependencies = [
  "p3-dft",
  "p3-field",
@@ -1242,19 +1257,9 @@ dependencies = [
 ]
 
 [[package]]
-name = "p3-miden-air"
-version = "0.4.0"
-source = "git+https://github.com/0xMiden/p3-miden?branch=main#423093d16a38e4d9bb0e65bb49bb001dd20c2b0d"
-dependencies = [
- "p3-air",
- "p3-field",
- "p3-matrix",
-]
-
-[[package]]
 name = "p3-miden-goldilocks"
 version = "0.4.0"
-source = "git+https://github.com/0xMiden/p3-miden?branch=main#423093d16a38e4d9bb0e65bb49bb001dd20c2b0d"
+source = "git+https://github.com/0xMiden/p3-miden?branch=cleanup-and-simplify#98a81c22d2a5247fad9478082af6b8a7b419b6ab"
 dependencies = [
  "num-bigint",
  "p3-challenger",
@@ -1272,27 +1277,7 @@ dependencies = [
 [[package]]
 name = "p3-miden-prover"
 version = "0.4.0"
-source = "git+https://github.com/0xMiden/p3-miden?branch=main#423093d16a38e4d9bb0e65bb49bb001dd20c2b0d"
-dependencies = [
- "itertools 0.14.0",
- "p3-challenger",
- "p3-commit",
- "p3-dft",
- "p3-field",
- "p3-interpolation",
- "p3-matrix",
- "p3-maybe-rayon",
- "p3-miden-air",
- "p3-miden-uni-stark",
- "p3-util",
- "serde",
- "tracing",
-]
-
-[[package]]
-name = "p3-miden-uni-stark"
-version = "0.4.0"
-source = "git+https://github.com/0xMiden/p3-miden?branch=main#423093d16a38e4d9bb0e65bb49bb001dd20c2b0d"
+source = "git+https://github.com/0xMiden/p3-miden?branch=cleanup-and-simplify#98a81c22d2a5247fad9478082af6b8a7b419b6ab"
 dependencies = [
  "itertools 0.14.0",
  "p3-air",
@@ -1300,19 +1285,20 @@ dependencies = [
  "p3-commit",
  "p3-dft",
  "p3-field",
+ "p3-interpolation",
+ "p3-lookup",
  "p3-matrix",
  "p3-maybe-rayon",
  "p3-uni-stark",
  "p3-util",
  "serde",
- "thiserror",
  "tracing",
 ]
 
 [[package]]
 name = "p3-monty-31"
 version = "0.4.1"
-source = "git+https://github.com/Plonky3/Plonky3?branch=main#65bdaa3d9996516dfb80eabf26840ab80da137b0"
+source = "git+https://github.com/0xMiden/Plonky3?branch=periodic-air-builder#ba29a3c6ac8e1b7d7046f4c846ff1efe00bfb645"
 dependencies = [
  "itertools 0.14.0",
  "num-bigint",
@@ -1335,7 +1321,7 @@ dependencies = [
 [[package]]
 name = "p3-poseidon2"
 version = "0.4.1"
-source = "git+https://github.com/Plonky3/Plonky3?branch=main#65bdaa3d9996516dfb80eabf26840ab80da137b0"
+source = "git+https://github.com/0xMiden/Plonky3?branch=periodic-air-builder#ba29a3c6ac8e1b7d7046f4c846ff1efe00bfb645"
 dependencies = [
  "p3-field",
  "p3-mds",
@@ -1347,7 +1333,7 @@ dependencies = [
 [[package]]
 name = "p3-symmetric"
 version = "0.4.1"
-source = "git+https://github.com/Plonky3/Plonky3?branch=main#65bdaa3d9996516dfb80eabf26840ab80da137b0"
+source = "git+https://github.com/0xMiden/Plonky3?branch=periodic-air-builder#ba29a3c6ac8e1b7d7046f4c846ff1efe00bfb645"
 dependencies = [
  "itertools 0.14.0",
  "p3-field",
@@ -1357,7 +1343,7 @@ dependencies = [
 [[package]]
 name = "p3-uni-stark"
 version = "0.4.1"
-source = "git+https://github.com/Plonky3/Plonky3?branch=main#65bdaa3d9996516dfb80eabf26840ab80da137b0"
+source = "git+https://github.com/0xMiden/Plonky3?branch=periodic-air-builder#ba29a3c6ac8e1b7d7046f4c846ff1efe00bfb645"
 dependencies = [
  "itertools 0.14.0",
  "p3-air",
@@ -1376,7 +1362,7 @@ dependencies = [
 [[package]]
 name = "p3-util"
 version = "0.4.1"
-source = "git+https://github.com/Plonky3/Plonky3?branch=main#65bdaa3d9996516dfb80eabf26840ab80da137b0"
+source = "git+https://github.com/0xMiden/Plonky3?branch=periodic-air-builder#ba29a3c6ac8e1b7d7046f4c846ff1efe00bfb645"
 dependencies = [
  "serde",
 ]
@@ -2230,3 +2216,13 @@ name = "zeroize"
 version = "1.8.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b97154e67e32c85465826e8bcc1c59429aaaf107c1e4a9e53c8d8ccd5eff88d0"
+
+[[patch.unused]]
+name = "p3-keccak"
+version = "0.4.1"
+source = "git+https://github.com/0xMiden/Plonky3?branch=periodic-air-builder#ba29a3c6ac8e1b7d7046f4c846ff1efe00bfb645"
+
+[[patch.unused]]
+name = "p3-merkle-tree"
+version = "0.4.1"
+source = "git+https://github.com/0xMiden/Plonky3?branch=periodic-air-builder#ba29a3c6ac8e1b7d7046f4c846ff1efe00bfb645"

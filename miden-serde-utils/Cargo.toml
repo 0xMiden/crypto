@@ -20,7 +20,7 @@ winter-compat = ["dep:winter-math", "dep:winter-utils"]
 
 [dependencies]
 p3-field            = { branch = "main", default-features = false, git = "https://github.com/Plonky3/Plonky3", optional = true }
-p3-miden-goldilocks = { branch = "main", default-features = false, git = "https://github.com/0xMiden/p3-miden", optional = true }
+p3-miden-goldilocks = { branch = "cleanup-and-simplify", default-features = false, git = "https://github.com/0xMiden/p3-miden", optional = true }
 winter-math         = { default-features = false, optional = true, version = "0.13" }
 winter-utils        = { default-features = false, optional = true, version = "0.13" }
 

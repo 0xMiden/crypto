@@ -26,3 +26,22 @@ debug            = 2
 debug-assertions = true
 inherits         = "release"
 overflow-checks  = true
+
+# Patch Plonky3 to use 0xMiden fork with periodic column support
+[patch."https://github.com/Plonky3/Plonky3"]
+p3-air = { git = "https://github.com/0xMiden/Plonky3", branch = "periodic-air-builder" }
+p3-challenger = { git = "https://github.com/0xMiden/Plonky3", branch = "periodic-air-builder" }
+p3-commit = { git = "https://github.com/0xMiden/Plonky3", branch = "periodic-air-builder" }
+p3-dft = { git = "https://github.com/0xMiden/Plonky3", branch = "periodic-air-builder" }
+p3-field = { git = "https://github.com/0xMiden/Plonky3", branch = "periodic-air-builder" }
+p3-interpolation = { git = "https://github.com/0xMiden/Plonky3", branch = "periodic-air-builder" }
+p3-keccak = { git = "https://github.com/0xMiden/Plonky3", branch = "periodic-air-builder" }
+p3-lookup = { git = "https://github.com/0xMiden/Plonky3", branch = "periodic-air-builder" }
+p3-matrix = { git = "https://github.com/0xMiden/Plonky3", branch = "periodic-air-builder" }
+p3-maybe-rayon = { git = "https://github.com/0xMiden/Plonky3", branch = "periodic-air-builder" }
+p3-mds = { git = "https://github.com/0xMiden/Plonky3", branch = "periodic-air-builder" }
+p3-merkle-tree = { git = "https://github.com/0xMiden/Plonky3", branch = "periodic-air-builder" }
+p3-poseidon2 = { git = "https://github.com/0xMiden/Plonky3", branch = "periodic-air-builder" }
+p3-symmetric = { git = "https://github.com/0xMiden/Plonky3", branch = "periodic-air-builder" }
+p3-uni-stark = { git = "https://github.com/0xMiden/Plonky3", branch = "periodic-air-builder" }
+p3-util = { git = "https://github.com/0xMiden/Plonky3", branch = "periodic-air-builder" }
