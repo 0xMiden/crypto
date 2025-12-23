@@ -215,3 +215,109 @@ fn word_macro_endianness(#[case] input: &str, #[case] expected: crate::Word) {
     let uut = word!(input);
     assert_eq!(uut, expected);
 }
+
+#[test]
+fn word_ord_respects_partialeq() {
+    use core::cmp::Ordering;
+
+    // Test that Word::cmp() respects the PartialEq invariant:
+    // if a == b, then a.cmp(b) must equal Ordering::Equal
+
+    let test_cases = vec![
+        Word::new([Felt::new(2), Felt::new(0), Felt::new(0), Felt::new(0)]),
+        Word::new([Felt::new(0), Felt::new(0), Felt::new(0), Felt::new(0)]),
+        Word::new([Felt::new(1), Felt::new(2), Felt::new(3), Felt::new(4)]),
+        Word::new([Felt::new(100), Felt::new(200), Felt::new(300), Felt::new(400)]),
+    ];
+
+    for word in test_cases {
+        let word_copy = word;
+
+        assert_eq!(word, word_copy, "Word should be equal to itself");
+        assert_eq!(
+            word.cmp(&word_copy),
+            Ordering::Equal,
+            "Word::cmp() should return Ordering::Equal for equal words: {:?}",
+            word
+        );
+    }
+}
+
+#[test]
+fn word_ord_btreemap_usage() {
+    use alloc::collections::BTreeMap;
+
+    // Test that Word works correctly as a BTreeMap key
+    // This will fail if Ord and PartialEq are inconsistent
+
+    let mut map = BTreeMap::new();
+    let key1 = Word::new([Felt::new(2), Felt::new(0), Felt::new(0), Felt::new(0)]);
+    let key2 = Word::new([Felt::new(2), Felt::new(0), Felt::new(0), Felt::new(0)]);
+
+    map.insert(key1, "value1");
+
+    // key2 should be equal to key1
+    assert_eq!(key1, key2);
+
+    // So map should contain key2
+    assert!(map.contains_key(&key2), "BTreeMap should find key2 since it's equal to key1");
+
+    // And getting by key2 should return the same value
+    assert_eq!(map.get(&key2), Some(&"value1"));
+
+    // Inserting with key2 should update the existing entry
+    map.insert(key2, "value2");
+    assert_eq!(map.len(), 1, "Map should still have only one entry");
+    assert_eq!(map.get(&key1), Some(&"value2"));
+}
+
+#[test]
+fn word_ord_consistency_with_partialeq() {
+    use core::cmp::Ordering;
+
+    // Comprehensive test that Ord is consistent with PartialEq
+    // This is required by Rust's trait contract: if a == b, then a.cmp(b) == Ordering::Equal
+
+    let test_pairs = vec![
+        // Same values
+        (
+            Word::new([Felt::new(1), Felt::new(2), Felt::new(3), Felt::new(4)]),
+            Word::new([Felt::new(1), Felt::new(2), Felt::new(3), Felt::new(4)]),
+            Ordering::Equal,
+        ),
+        // Different first element
+        (
+            Word::new([Felt::new(1), Felt::new(2), Felt::new(3), Felt::new(4)]),
+            Word::new([Felt::new(2), Felt::new(2), Felt::new(3), Felt::new(4)]),
+            Ordering::Less,
+        ),
+        // Different last element
+        (
+            Word::new([Felt::new(1), Felt::new(2), Felt::new(3), Felt::new(4)]),
+            Word::new([Felt::new(1), Felt::new(2), Felt::new(3), Felt::new(3)]),
+            Ordering::Greater,
+        ),
+    ];
+
+    for (w1, w2, expected_ordering) in test_pairs {
+        let actual_ordering = w1.cmp(&w2);
+        assert_eq!(
+            actual_ordering, expected_ordering,
+            "Word::cmp mismatch: {:?}.cmp({:?}) returned {:?}, expected {:?}",
+            w1, w2, actual_ordering, expected_ordering
+        );
+
+        // Verify consistency with PartialEq
+        match expected_ordering {
+            Ordering::Equal => {
+                assert_eq!(w1, w2, "Words should be equal when cmp returns Equal");
+            },
+            Ordering::Less => {
+                assert_ne!(w1, w2, "Words should not be equal when cmp returns Less");
+            },
+            Ordering::Greater => {
+                assert_ne!(w1, w2, "Words should not be equal when cmp returns Greater");
+            },
+        }
+    }
+}

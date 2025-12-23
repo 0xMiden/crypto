@@ -232,18 +232,18 @@ impl IndexMut<Range<usize>> for Word {
 
 impl Ord for Word {
     fn cmp(&self, other: &Self) -> Ordering {
-        // Compare the canonical u64 of both elements.
+        // Compare the canonical u64 representation of both elements.
         //
         // It will iterate the elements and will return the first computation different than
         // `Equal`. Otherwise, the ordering is equal.
         //
-        // The Goldilocks field uses a non-Montgomery representation internally, so
-        // `as_canonical_u64()` performs at most one conditional subtraction per element
-        // to ensure the value is in canonical form (i.e., `x in [0, p)`).
+        // We use `as_canonical_u64()` to ensure we're comparing the actual field element values
+        // in their canonical form (that is, `x in [0,p)`). This method works correctly regardless
+        // of whether the underlying field uses Montgomery representation or not.
         //
         // We must iterate over and compare each element individually. A simple bytestring
-        // comparison would be inappropriate because the `Word`s are compared in
-        // lexicographical order of their field elements.
+        // comparison would be inappropriate because the `Word`s are represented in
+        // "lexicographical" order.
         self.0
             .iter()
             .map(Felt::as_canonical_u64)
