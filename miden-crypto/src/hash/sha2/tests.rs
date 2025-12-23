@@ -144,7 +144,7 @@ fn test_sha512_nist_test_vectors() {
 fn compute_expected_sha256_element_hash(elements: &[Felt]) -> [u8; DIGEST256_BYTES] {
     let mut bytes = Vec::new();
     for element in elements.iter() {
-        bytes.extend_from_slice(&element.as_int().to_le_bytes());
+        bytes.extend_from_slice(&element.as_canonical_u64().to_le_bytes());
     }
     let mut hasher = sha2::Sha256::new();
     hasher.update(&bytes);
@@ -155,7 +155,7 @@ fn compute_expected_sha256_element_hash(elements: &[Felt]) -> [u8; DIGEST256_BYT
 fn compute_expected_sha512_element_hash(elements: &[Felt]) -> [u8; DIGEST512_BYTES] {
     let mut bytes = Vec::new();
     for element in elements.iter() {
-        bytes.extend_from_slice(&element.as_int().to_le_bytes());
+        bytes.extend_from_slice(&element.as_canonical_u64().to_le_bytes());
     }
     let mut hasher = sha2::Sha512::new();
     hasher.update(&bytes);

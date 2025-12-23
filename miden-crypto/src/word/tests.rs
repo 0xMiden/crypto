@@ -1,6 +1,8 @@
 #![cfg(feature = "std")]
 use alloc::string::String;
 
+use p3_field::PrimeCharacteristicRing;
+
 use super::{Deserializable, Felt, Serializable, WORD_SIZE_BYTES, WORD_SIZE_FELT, Word};
 use crate::{test_utils::rand_value, utils::SliceReader, word};
 
@@ -122,37 +124,49 @@ fn test_conversions() {
 
 #[test]
 fn test_index() {
-    let word =
-        Word::new([Felt::from(1_u32), Felt::from(2_u32), Felt::from(3_u32), Felt::from(4_u32)]);
-    assert_eq!(word[0], Felt::from(1_u32));
-    assert_eq!(word[1], Felt::from(2_u32));
-    assert_eq!(word[2], Felt::from(3_u32));
-    assert_eq!(word[3], Felt::from(4_u32));
+    let word = Word::new([
+        Felt::from_u32(1_u32),
+        Felt::from_u32(2_u32),
+        Felt::from_u32(3_u32),
+        Felt::from_u32(4_u32),
+    ]);
+    assert_eq!(word[0], Felt::from_u32(1_u32));
+    assert_eq!(word[1], Felt::from_u32(2_u32));
+    assert_eq!(word[2], Felt::from_u32(3_u32));
+    assert_eq!(word[3], Felt::from_u32(4_u32));
 }
 
 #[test]
 fn test_index_mut() {
-    let mut word =
-        Word::new([Felt::from(1_u32), Felt::from(2_u32), Felt::from(3_u32), Felt::from(4_u32)]);
+    let mut word = Word::new([
+        Felt::from_u32(1_u32),
+        Felt::from_u32(2_u32),
+        Felt::from_u32(3_u32),
+        Felt::from_u32(4_u32),
+    ]);
 
-    word[0] = Felt::from(5_u32);
-    word[1] = Felt::from(6_u32);
-    word[2] = Felt::from(7_u32);
-    word[3] = Felt::from(8_u32);
-    assert_eq!(word[0], Felt::from(5_u32));
-    assert_eq!(word[1], Felt::from(6_u32));
-    assert_eq!(word[2], Felt::from(7_u32));
-    assert_eq!(word[3], Felt::from(8_u32));
+    word[0] = Felt::from_u32(5_u32);
+    word[1] = Felt::from_u32(6_u32);
+    word[2] = Felt::from_u32(7_u32);
+    word[3] = Felt::from_u32(8_u32);
+    assert_eq!(word[0], Felt::from_u32(5_u32));
+    assert_eq!(word[1], Felt::from_u32(6_u32));
+    assert_eq!(word[2], Felt::from_u32(7_u32));
+    assert_eq!(word[3], Felt::from_u32(8_u32));
 }
 
 #[test]
 fn test_index_mut_range() {
-    let mut word =
-        Word::new([Felt::from(1_u32), Felt::from(2_u32), Felt::from(3_u32), Felt::from(4_u32)]);
+    let mut word = Word::new([
+        Felt::from_u32(1_u32),
+        Felt::from_u32(2_u32),
+        Felt::from_u32(3_u32),
+        Felt::from_u32(4_u32),
+    ]);
 
-    word[1..3].copy_from_slice(&[Felt::from(6_u32), Felt::from(7_u32)]);
-    assert_eq!(word[1], Felt::from(6_u32));
-    assert_eq!(word[2], Felt::from(7_u32));
+    word[1..3].copy_from_slice(&[Felt::from_u32(6_u32), Felt::from_u32(7_u32)]);
+    assert_eq!(word[1], Felt::from_u32(6_u32));
+    assert_eq!(word[2], Felt::from_u32(7_u32));
 }
 
 #[rstest::rstest]

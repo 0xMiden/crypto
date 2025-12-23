@@ -113,6 +113,8 @@ impl<T: Into<Word> + From<Word>> Deserializable for LexicographicWord<T> {
 
 #[cfg(test)]
 mod tests {
+    use p3_field::PrimeCharacteristicRing;
+
     use super::*;
 
     #[derive(Debug, Clone, Copy)]
@@ -148,8 +150,8 @@ mod tests {
             (Ordering::Less, [1, 1, 0, 0u32], [0, 0, 1, 0u32]),
         ] {
             assert_eq!(
-                LexicographicWord::from(key0.map(Felt::from))
-                    .cmp(&LexicographicWord::from(key1.map(Felt::from))),
+                LexicographicWord::from(key0.map(Felt::from_u32))
+                    .cmp(&LexicographicWord::from(key1.map(Felt::from_u32))),
                 expected
             );
         }

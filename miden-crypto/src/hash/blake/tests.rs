@@ -2,7 +2,7 @@
 use alloc::vec::Vec;
 
 use p3_field::PrimeField64;
-use p3_miden_goldilocks::Goldilocks as Felt;
+use p3_goldilocks::Goldilocks as Felt;
 use proptest::prelude::*;
 
 use super::*;

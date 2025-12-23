@@ -144,7 +144,7 @@ fn hash_padding_no_extra_permutation_call() {
     let final_chunk = [0_u8, 0, 0, 0, 0, 0, 97, 1];
     let mut state = [ZERO; STATE_WIDTH];
     // padding when hashing bytes
-    state[CAPACITY_RANGE.start] = Felt::from(RATE_WIDTH as u8);
+    state[CAPACITY_RANGE.start] = Felt::from_u8(RATE_WIDTH as u8);
     *state.last_mut().unwrap() = Felt::new(u64::from_le_bytes(final_chunk));
     Rpo256::apply_permutation(&mut state);
 

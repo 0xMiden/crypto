@@ -120,12 +120,12 @@ x25519-dalek                  = { default-features = false, features = ["static_
 p3-air        = { branch = "main", default-features = false, git = "https://github.com/Plonky3/Plonky3" }
 p3-challenger = { branch = "main", default-features = false, git = "https://github.com/Plonky3/Plonky3" }
 p3-field      = { branch = "main", default-features = false, git = "https://github.com/Plonky3/Plonky3" }
+p3-goldilocks = { branch = "main", default-features = false, git = "https://github.com/Plonky3/Plonky3" }
 p3-symmetric  = { branch = "main", default-features = false, git = "https://github.com/Plonky3/Plonky3" }
 
 # Miden-specific Plonky3 crates
-p3-miden-air        = { branch = "main", default-features = false, git = "https://github.com/0xMiden/p3-miden" }
-p3-miden-goldilocks = { branch = "main", default-features = false, git = "https://github.com/0xMiden/p3-miden" }
-p3-miden-prover     = { branch = "main", default-features = false, git = "https://github.com/0xMiden/p3-miden" }
+p3-miden-air    = { branch = "main", default-features = false, git = "https://github.com/0xMiden/p3-miden" }
+p3-miden-prover = { branch = "main", default-features = false, git = "https://github.com/0xMiden/p3-miden" }
 
 [dev-dependencies]
 assert_matches = { default-features = false, version = "1.5" }

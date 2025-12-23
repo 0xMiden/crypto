@@ -12,7 +12,7 @@ pub use miden_serde_utils::ReadAdapter;
 pub use miden_serde_utils::{
     ByteReader, ByteWriter, Deserializable, DeserializationError, Serializable, SliceReader,
 };
-use p3_field::{RawDataSerializable, integers::QuotientMap};
+use p3_field::{PrimeCharacteristicRing, RawDataSerializable, integers::QuotientMap};
 use thiserror::Error;
 
 mod iterators;
@@ -267,7 +267,7 @@ pub fn bytes_to_packed_u32_elements(bytes: &[u8]) -> Vec<Felt> {
             // Pack up to 4 bytes into a u32 in little-endian format
             let mut packed = [0u8; BYTES_PER_U32];
             packed[..chunk.len()].copy_from_slice(chunk);
-            Felt::from(u32::from_le_bytes(packed))
+            Felt::from_u32(u32::from_le_bytes(packed))
         })
         .collect()
 }

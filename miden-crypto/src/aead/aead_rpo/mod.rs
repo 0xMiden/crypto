@@ -12,7 +12,7 @@ use core::ops::Range;
 
 use miden_crypto_derive::{SilentDebug, SilentDisplay};
 use num::Integer;
-use p3_field::{PrimeField64, RawDataSerializable};
+use p3_field::{PrimeField64, RawDataSerializable, integers::QuotientMap};
 use rand::{
     Rng,
     distr::{Distribution, StandardUniform, Uniform},
@@ -439,7 +439,7 @@ impl PartialEq for SecretKey {
         // Use constant-time comparison to prevent timing attacks
         let mut result = true;
         for (a, b) in self.0.iter().zip(other.0.iter()) {
-            result &= bool::from(a.as_int().ct_eq(&b.as_int()));
+            result &= bool::from(a.as_canonical_u64().ct_eq(&b.as_canonical_u64()));
         }
         result
     }
@@ -671,12 +671,12 @@ impl Deserializable for EncryptedData {
 
         let ciphertext_len = source.read_usize()?;
         let ciphertext_bytes = source.read_many(ciphertext_len)?;
-        let ciphertext =
-            felts_from_u64(ciphertext_bytes).map_err(DeserializationError::InvalidValue)?;
+        let ciphertext = felts_from_u64(ciphertext_bytes)
+            .ok_or_else(|| DeserializationError::InvalidValue("invalid ciphertext".into()))?;
 
         let nonce = source.read_many(NONCE_SIZE)?;
         let nonce: [Felt; NONCE_SIZE] = felts_from_u64(nonce)
-            .map_err(DeserializationError::InvalidValue)?
+            .ok_or_else(|| DeserializationError::InvalidValue("invalid nonce".into()))?
             .try_into()
             .map_err(|_| {
                 DeserializationError::InvalidValue("nonce conversion failed".to_string())
@@ -684,7 +684,7 @@ impl Deserializable for EncryptedData {
 
         let tag = source.read_many(AUTH_TAG_SIZE)?;
         let tag: [Felt; AUTH_TAG_SIZE] = felts_from_u64(tag)
-            .map_err(DeserializationError::InvalidValue)?
+            .ok_or_else(|| DeserializationError::InvalidValue("invalid tag".into()))?
             .try_into()
             .expect("deserialization reads exactly AUTH_TAG_SIZE elements");
 
@@ -754,10 +754,10 @@ fn unpad(mut plaintext: Vec<Felt>) -> Result<Vec<Felt>, EncryptionError> {
     Ok(plaintext)
 }
 
-/// Converts a vector of u64 values into a vector of field elements, returning an error if any of
+/// Converts a vector of u64 values into a vector of field elements, returning `None` if any of
 /// the u64 values is not a valid field element.
-fn felts_from_u64(input: Vec<u64>) -> Result<Vec<Felt>, alloc::string::String> {
-    input.into_iter().map(Felt::try_checked).collect()
+fn felts_from_u64(input: Vec<u64>) -> Option<Vec<Felt>> {
+    input.into_iter().map(Felt::from_canonical_checked).collect()
 }
 
 // AEAD SCHEME IMPLEMENTATION

@@ -14,6 +14,8 @@ use thiserror::Error;
 const WORD_SIZE_FELT: usize = 4;
 const WORD_SIZE_BYTES: usize = 32;
 
+use p3_field::integers::QuotientMap;
+
 use super::{Felt, ZERO};
 use crate::{
     PrimeCharacteristicRing, PrimeField64,
@@ -130,13 +132,11 @@ impl Word {
     }
 
     /// Returns true if the word consists of four ZERO elements.
-    pub const fn is_empty(&self) -> bool {
-        const ZERO_FELT_INNER: u64 = Felt::ZERO.inner();
-
-        self.0[0].inner() == ZERO_FELT_INNER
-            && self.0[1].inner() == ZERO_FELT_INNER
-            && self.0[2].inner() == ZERO_FELT_INNER
-            && self.0[3].inner() == ZERO_FELT_INNER
+    pub fn is_empty(&self) -> bool {
+        self.0[0] == Felt::ZERO
+            && self.0[1] == Felt::ZERO
+            && self.0[2] == Felt::ZERO
+            && self.0[3] == Felt::ZERO
     }
 
     /// Returns the word as a slice of field elements.
@@ -232,25 +232,26 @@ impl IndexMut<Range<usize>> for Word {
 
 impl Ord for Word {
     fn cmp(&self, other: &Self) -> Ordering {
-        // Compare the inner u64 of both elements.
+        // Compare the canonical u64 of both elements.
         //
         // It will iterate the elements and will return the first computation different than
         // `Equal`. Otherwise, the ordering is equal.
         //
-        // Finally, we use `Felt::inner` instead of `Felt::as_int` so we avoid performing a
-        // montgomery reduction for every limb. That is safe because every inner element of the
-        // word is guaranteed to be in its canonical form (that is, `x in [0,p)`).
+        // The Goldilocks field uses a non-Montgomery representation internally, so
+        // `as_canonical_u64()` performs at most one conditional subtraction per element
+        // to ensure the value is in canonical form (i.e., `x in [0, p)`).
         //
-        // Because we don't perform Montgomery reduction, we must iterate over, and compare,
-        // each element. A simple bytestring comparison would be inappropriate because the `Word`s
-        // are represented in "lexicographical" order.
-        self.0.iter().map(Felt::inner).zip(other.0.iter().map(Felt::inner)).fold(
-            Ordering::Equal,
-            |ord, (a, b)| match ord {
+        // We must iterate over and compare each element individually. A simple bytestring
+        // comparison would be inappropriate because the `Word`s are compared in
+        // lexicographical order of their field elements.
+        self.0
+            .iter()
+            .map(Felt::as_canonical_u64)
+            .zip(other.0.iter().map(Felt::as_canonical_u64))
+            .fold(Ordering::Equal, |ord, (a, b)| match ord {
                 Ordering::Equal => a.cmp(&b),
                 _ => ord,
-            },
-        )
+            })
     }
 }
 
@@ -501,7 +502,12 @@ impl From<&[u8; WORD_SIZE_FELT]> for Word {
 
 impl From<[u8; WORD_SIZE_FELT]> for Word {
     fn from(value: [u8; WORD_SIZE_FELT]) -> Self {
-        Self([value[0].into(), value[1].into(), value[2].into(), value[3].into()])
+        Self([
+            Felt::from_u8(value[0]),
+            Felt::from_u8(value[1]),
+            Felt::from_u8(value[2]),
+            Felt::from_u8(value[3]),
+        ])
     }
 }
 
@@ -513,7 +519,12 @@ impl From<&[u16; WORD_SIZE_FELT]> for Word {
 
 impl From<[u16; WORD_SIZE_FELT]> for Word {
     fn from(value: [u16; WORD_SIZE_FELT]) -> Self {
-        Self([value[0].into(), value[1].into(), value[2].into(), value[3].into()])
+        Self([
+            Felt::from_u16(value[0]),
+            Felt::from_u16(value[1]),
+            Felt::from_u16(value[2]),
+            Felt::from_u16(value[3]),
+        ])
     }
 }
 
@@ -525,7 +536,12 @@ impl From<&[u32; WORD_SIZE_FELT]> for Word {
 
 impl From<[u32; WORD_SIZE_FELT]> for Word {
     fn from(value: [u32; WORD_SIZE_FELT]) -> Self {
-        Self([value[0].into(), value[1].into(), value[2].into(), value[3].into()])
+        Self([
+            Felt::from_u32(value[0]),
+            Felt::from_u32(value[1]),
+            Felt::from_u32(value[2]),
+            Felt::from_u32(value[3]),
+        ])
     }
 }
 
@@ -541,11 +557,12 @@ impl TryFrom<[u64; WORD_SIZE_FELT]> for Word {
     type Error = WordError;
 
     fn try_from(value: [u64; WORD_SIZE_FELT]) -> Result<Self, WordError> {
+        let err = || WordError::InvalidFieldElement("value >= field modulus".into());
         Ok(Self([
-            Felt::try_checked(value[0]).map_err(WordError::InvalidFieldElement)?,
-            Felt::try_checked(value[1]).map_err(WordError::InvalidFieldElement)?,
-            Felt::try_checked(value[2]).map_err(WordError::InvalidFieldElement)?,
-            Felt::try_checked(value[3]).map_err(WordError::InvalidFieldElement)?,
+            Felt::from_canonical_checked(value[0]).ok_or_else(err)?,
+            Felt::from_canonical_checked(value[1]).ok_or_else(err)?,
+            Felt::from_canonical_checked(value[2]).ok_or_else(err)?,
+            Felt::from_canonical_checked(value[3]).ok_or_else(err)?,
         ]))
     }
 }
@@ -581,10 +598,11 @@ impl TryFrom<[u8; WORD_SIZE_BYTES]> for Word {
         let c = u64::from_le_bytes(value[16..24].try_into().unwrap());
         let d = u64::from_le_bytes(value[24..32].try_into().unwrap());
 
-        let a: Felt = Felt::try_checked(a).map_err(WordError::InvalidFieldElement)?;
-        let b: Felt = Felt::try_checked(b).map_err(WordError::InvalidFieldElement)?;
-        let c: Felt = Felt::try_checked(c).map_err(WordError::InvalidFieldElement)?;
-        let d: Felt = Felt::try_checked(d).map_err(WordError::InvalidFieldElement)?;
+        let err = || WordError::InvalidFieldElement("value >= field modulus".into());
+        let a: Felt = Felt::from_canonical_checked(a).ok_or_else(err)?;
+        let b: Felt = Felt::from_canonical_checked(b).ok_or_else(err)?;
+        let c: Felt = Felt::from_canonical_checked(c).ok_or_else(err)?;
+        let d: Felt = Felt::from_canonical_checked(d).ok_or_else(err)?;
 
         Ok(Word([a, b, c, d]))
     }

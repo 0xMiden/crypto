@@ -14,6 +14,8 @@
 
 use core::ops::Range;
 
+use p3_field::PrimeCharacteristicRing;
+
 use super::{Felt, Word, ZERO};
 use crate::{BasedVectorSpace, PrimeField64};
 
@@ -80,7 +82,7 @@ pub trait AlgebraicSponge {
         // initialize state to all zeros, except for the first element of the capacity part, which
         // is set to `total_len % RATE_WIDTH`.
         let mut state = [ZERO; STATE_WIDTH];
-        state[CAPACITY_RANGE.start] = Felt::from((total_len % RATE_WIDTH) as u8);
+        state[CAPACITY_RANGE.start] = Felt::from_u8((total_len % RATE_WIDTH) as u8);
 
         // absorb elements into the state one by one until the rate portion of the state is filled
         // up; then apply the permutation and start absorbing again; repeat until all
@@ -126,7 +128,7 @@ pub trait AlgebraicSponge {
         // 1. Domain separating hashing of `[u8]` from hashing of `[Felt]`.
         // 2. Avoiding collisions at the `[Felt]` representation of the encoded bytes.
         state[CAPACITY_RANGE.start] =
-            Felt::from((RATE_WIDTH + (num_field_elem % RATE_WIDTH)) as u8);
+            Felt::from_u8((RATE_WIDTH + (num_field_elem % RATE_WIDTH)) as u8);
 
         // initialize a buffer to receive the little-endian elements.
         let mut buf = [0_u8; 8];
@@ -219,10 +221,10 @@ pub trait AlgebraicSponge {
         state[INPUT1_RANGE].copy_from_slice(seed.as_elements());
         state[INPUT2_RANGE.start] = Felt::new(value);
         if value < Felt::ORDER_U64 {
-            state[CAPACITY_RANGE.start] = Felt::from(5_u8);
+            state[CAPACITY_RANGE.start] = Felt::from_u8(5_u8);
         } else {
             state[INPUT2_RANGE.start + 1] = Felt::new(value / Felt::ORDER_U64);
-            state[CAPACITY_RANGE.start] = Felt::from(6_u8);
+            state[CAPACITY_RANGE.start] = Felt::from_u8(6_u8);
         }
 
         // apply the permutation and return the digest portion of the rate
