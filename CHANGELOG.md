@@ -8,6 +8,7 @@
 - Added validation to `PartialMerkleTree::with_leaves()` to reject internal nodes ([#684](https://github.com/0xMiden/crypto/pull/684)).
 - [BREAKING] Moved `LargeSmt` root ownership from storage to in-memory layer ([#694](https://github.com/0xMiden/crypto/pull/694)). 
 - Remove use of `transmute()` in blake3 implementation ([#704](https://github.com/0xMiden/crypto/pull/704)).
+- [BREAKING] Made `LargeSmt::num_leaves()` and `LargeSmt::num_entries()` infallible ([#708](https://github.com/0xMiden/crypto/pull/708)).
 - [BREAKING] Imported miden-serde-utils crate for serialization ([#715](https://github.com/0xMiden/crypto/pull/715)).
 
 ## 0.19.2 (2025-12-04)

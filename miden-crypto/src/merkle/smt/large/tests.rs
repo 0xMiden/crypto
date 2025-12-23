@@ -110,8 +110,8 @@ fn test_equivalent_entry_sets() {
     entries_large_smt.sort_by_key(|k| k.0);
 
     assert_eq!(entries_control_smt_owned, entries_large_smt);
-    assert_eq!(control_smt.num_leaves(), large_smt.num_leaves().unwrap());
-    assert_eq!(control_smt.num_entries(), large_smt.num_entries().unwrap());
+    assert_eq!(control_smt.num_leaves(), large_smt.num_leaves());
+    assert_eq!(control_smt.num_entries(), large_smt.num_entries());
 }
 
 #[test]
@@ -130,8 +130,8 @@ fn test_equivalent_leaf_sets() {
 
     assert_eq!(leaves_control_smt.len(), leaves_large_smt.len());
     assert_eq!(leaves_control_smt, leaves_large_smt);
-    assert_eq!(control_smt.num_leaves(), large_smt.num_leaves().unwrap());
-    assert_eq!(control_smt.num_entries(), large_smt.num_entries().unwrap());
+    assert_eq!(control_smt.num_leaves(), large_smt.num_leaves());
+    assert_eq!(control_smt.num_entries(), large_smt.num_entries());
 }
 
 #[test]
@@ -301,16 +301,8 @@ fn test_insert_entry() {
     let mut large_smt = LargeSmt::<_>::with_entries(storage, initial_entries.clone()).unwrap();
     let mut control_smt = Smt::with_entries(initial_entries.clone()).unwrap();
 
-    assert_eq!(
-        large_smt.num_entries().unwrap(),
-        control_smt.num_entries(),
-        "Number of entries mismatch"
-    );
-    assert_eq!(
-        large_smt.num_leaves().unwrap(),
-        control_smt.num_leaves(),
-        "Number of leaves mismatch"
-    );
+    assert_eq!(large_smt.num_entries(), control_smt.num_entries(), "Number of entries mismatch");
+    assert_eq!(large_smt.num_leaves(), control_smt.num_leaves(), "Number of leaves mismatch");
 
     let new_key = Word::from([100_u32, 100_u32, 100_u32, 100_u32]);
     let new_value = Word::new([100_u32.into(); WORD_SIZE]);
@@ -320,16 +312,8 @@ fn test_insert_entry() {
     assert_eq!(old_value, control_old_value, "Old values mismatch");
     assert_eq!(old_value, EMPTY_WORD, "Expected empty value");
 
-    assert_eq!(
-        large_smt.num_entries().unwrap(),
-        control_smt.num_entries(),
-        "Number of entries mismatch"
-    );
-    assert_eq!(
-        large_smt.num_leaves().unwrap(),
-        control_smt.num_leaves(),
-        "Number of leaves mismatch"
-    );
+    assert_eq!(large_smt.num_entries(), control_smt.num_entries(), "Number of entries mismatch");
+    assert_eq!(large_smt.num_leaves(), control_smt.num_leaves(), "Number of leaves mismatch");
 
     assert_eq!(large_smt.get_value(&new_key), new_value, "Value mismatch");
     assert_eq!(control_smt.get_value(&new_key), new_value, "Value mismatch");
@@ -418,8 +402,8 @@ fn test_insert_batch_matches_compute_apply() {
     }
 
     // Verify metadata
-    assert_eq!(tree1.num_leaves().unwrap(), tree2.num_leaves().unwrap());
-    assert_eq!(tree1.num_entries().unwrap(), tree2.num_entries().unwrap());
+    assert_eq!(tree1.num_leaves(), tree2.num_leaves());
+    assert_eq!(tree1.num_entries(), tree2.num_entries());
 }
 
 #[test]
@@ -514,7 +498,7 @@ fn test_insert_batch_large_dataset() {
         assert_eq!(smt.get_value(key), *value);
     }
 
-    assert_eq!(smt.num_entries().unwrap(), LARGE_COUNT as usize);
+    assert_eq!(smt.num_entries(), LARGE_COUNT as usize);
 }
 
 // IN-MEMORY LAYOUT TESTS
