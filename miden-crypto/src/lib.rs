@@ -33,7 +33,7 @@ pub use p3_miden_air::*;
 pub use p3_miden_prover::*;
 pub use word::{Word, WordError};
 
-pub use crate::rand::{RpoRandomCoin, RpxRandomCoin};
+pub use crate::rand::{Randomizable, RpoRandomCoin, RpxRandomCoin};
 
 // TYPE ALIASES
 // ================================================================================================
