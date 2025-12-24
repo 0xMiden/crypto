@@ -1,6 +1,6 @@
 use alloc::vec::Vec;
 
-use p3_goldilocks::Goldilocks as Felt;
+use p3_miden_goldilocks::Goldilocks as Felt;
 
 use crate::{
     Word, ZERO,

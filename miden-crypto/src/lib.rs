@@ -28,8 +28,8 @@ pub use p3_field::{
     BasedVectorSpace, ExtensionField, Field, PrimeCharacteristicRing, PrimeField64,
     batch_multiplicative_inverse, extension::BinomialExtensionField, integers::QuotientMap,
 };
-pub use p3_goldilocks::{Goldilocks as Felt, Poseidon2Goldilocks};
 pub use p3_miden_air::*;
+pub use p3_miden_goldilocks::{Goldilocks as Felt, Poseidon2Goldilocks};
 pub use p3_miden_prover::*;
 pub use word::{Word, WordError};
 

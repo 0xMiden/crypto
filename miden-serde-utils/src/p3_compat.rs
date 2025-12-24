@@ -9,7 +9,7 @@ use crate::{ByteReader, ByteWriter, Deserializable, DeserializationError, Serial
 // P3_MIDEN_GOLDILOCKS FIELD ELEMENT IMPLEMENTATIONS
 // ================================================================================================
 
-impl Serializable for p3_goldilocks::Goldilocks {
+impl Serializable for p3_miden_goldilocks::Goldilocks {
     fn write_into<W: ByteWriter>(&self, target: &mut W) {
         target.write_u64(self.as_canonical_u64());
     }
@@ -19,7 +19,7 @@ impl Serializable for p3_goldilocks::Goldilocks {
     }
 }
 
-impl Deserializable for p3_goldilocks::Goldilocks {
+impl Deserializable for p3_miden_goldilocks::Goldilocks {
     fn read_from<R: ByteReader>(source: &mut R) -> Result<Self, DeserializationError> {
         use p3_field::integers::QuotientMap;
 

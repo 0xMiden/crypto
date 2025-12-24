@@ -14,15 +14,15 @@ version.workspace      = true
 
 [features]
 default       = ["std"]
-p3-compat     = ["dep:p3-field", "dep:p3-goldilocks"]
+p3-compat     = ["dep:p3-field", "dep:p3-miden-goldilocks"]
 std           = ["winter-math?/std", "winter-utils?/std"]
 winter-compat = ["dep:winter-math", "dep:winter-utils"]
 
 [dependencies]
-p3-field      = { branch = "main", default-features = false, git = "https://github.com/Plonky3/Plonky3", optional = true }
-p3-goldilocks = { branch = "main", default-features = false, git = "https://github.com/Plonky3/Plonky3", optional = true }
-winter-math   = { default-features = false, optional = true, version = "0.13" }
-winter-utils  = { default-features = false, optional = true, version = "0.13" }
+p3-field            = { default-features = false, optional = true, version = "0.4" }
+p3-miden-goldilocks = { default-features = false, optional = true, version = "0.4" }
+winter-math         = { default-features = false, optional = true, version = "0.13" }
+winter-utils        = { default-features = false, optional = true, version = "0.13" }
 
 [lints]
 workspace = true
