@@ -15,6 +15,8 @@ pub(crate) use secret_key::{WIDTH_BIG_POLY_COEFFICIENT, WIDTH_SMALL_POLY_COEFFIC
 
 #[cfg(test)]
 mod tests {
+    use alloc::vec::Vec;
+
     use rand::SeedableRng;
     use rand_chacha::ChaCha20Rng;
 
@@ -53,5 +55,51 @@ mod tests {
         // a signature should not verify against a wrong public key
         let sk2 = SecretKey::with_rng(&mut rng);
         assert!(!sk2.public_key().verify(message, &signature))
+    }
+
+    #[test]
+    fn test_flr_vs_legacy_signing_compatibility() {
+        use super::super::Nonce;
+        use super::super::hash_to_point::hash_to_point_rpo256;
+
+        let seed = [0_u8; 32];
+        let mut rng = ChaCha20Rng::from_seed(seed);
+
+        // generate random keys
+        let sk = SecretKey::with_rng(&mut rng);
+        let pk = sk.public_key();
+
+        // prepare message
+        let message = Word::new([ONE; 4]);
+        let nonce = Nonce::deterministic();
+        let c = hash_to_point_rpo256(message, &nonce);
+
+        // Create two RNGs with the same seed for deterministic comparison
+        let mut rng_flr = ChaCha20Rng::from_seed([1u8; 32]);
+        let mut rng_legacy = ChaCha20Rng::from_seed([1u8; 32]);
+
+        // sign with FLR implementation
+        let sig_flr = sk.sign_helper_flr(c.clone(), &mut rng_flr);
+
+        // sign with legacy implementation using same RNG seed
+        let sig_legacy = sk.sign_helper_legacy(c, &mut rng_legacy);
+
+        // Extract coefficients for comparison
+        let sig_flr_coef: Vec<i16> =
+            sig_flr.coefficients.iter().map(|c| c.balanced_value()).collect();
+        let sig_legacy_coef: Vec<i16> =
+            sig_legacy.coefficients.iter().map(|c| c.balanced_value()).collect();
+
+        // The two implementations should produce EXACTLY the same signature
+        // given the same keys and RNG state
+        assert_eq!(
+            sig_flr_coef, sig_legacy_coef,
+            "FLR and legacy implementations should produce identical signatures with same RNG"
+        );
+
+        // Verify the signature is valid
+        let h = sk.public_key();
+        let signature = super::super::Signature::new(nonce, h, sig_flr);
+        assert!(pk.verify(message, &signature), "Signature should verify");
     }
 }

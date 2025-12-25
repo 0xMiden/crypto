@@ -611,6 +611,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "fn-dsa-comm"
+version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "28104bba227c79bff8ffe34dff7c5a5631fd790dfd4d4f0a84b01952ef7c6f46"
+dependencies = [
+ "cpufeatures",
+ "rand_core 0.6.4",
+]
+
+[[package]]
 name = "foldhash"
 version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -956,6 +966,7 @@ dependencies = [
  "curve25519-dalek",
  "ed25519-dalek",
  "flume",
+ "fn-dsa-comm",
  "glob",
  "hashbrown",
  "hex",

@@ -7,6 +7,7 @@ use rand::Rng;
 use super::{fft::FastFft, polynomial::Polynomial, samplerz::sampler_z};
 use crate::utils::zeroize::{Zeroize, ZeroizeOnDrop};
 
+#[allow(dead_code)] // Used by legacy signing implementation in tests
 const SIGMIN: f64 = 1.2778336969128337;
 
 /// Computes the Gram matrix. The argument must be a 2x2 matrix
@@ -161,6 +162,7 @@ pub fn normalize_tree(tree: &mut LdlTree, sigma: f64) {
 /// Samples short polynomials using a Falcon tree. Algorithm 11 from the spec [1, p.40].
 ///
 /// [1]: https://falcon-sign.info/falcon.pdf
+#[allow(dead_code)] // Used by legacy signing implementation in tests
 pub fn ffsampling<R: Rng>(
     t: &(Polynomial<Complex64>, Polynomial<Complex64>),
     tree: &LdlTree,

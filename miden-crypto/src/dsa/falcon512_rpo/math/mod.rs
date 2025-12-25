@@ -24,13 +24,24 @@ mod field;
 pub use field::FalconFelt;
 
 mod ffsampling;
-pub use ffsampling::{LdlTree, ffldl, ffsampling, gram, normalize_tree};
+pub use ffsampling::{LdlTree, ffldl, gram, normalize_tree};
+// Only export ffsampling for tests (used by legacy signing implementation)
+#[cfg(test)]
+pub use ffsampling::ffsampling;
 
 mod samplerz;
 use self::samplerz::sampler_z;
 
 mod polynomial;
 pub use polynomial::Polynomial;
+
+pub(crate) mod flr;
+pub(crate) use flr::FLR;
+
+pub(crate) mod poly_flr;
+pub(crate) mod poly_flr_avx2;
+
+pub(crate) mod sampler_flr;
 
 const MAX_SMALL_POLY_COEFFICIENT_SIZE: i16 = (1 << (WIDTH_SMALL_POLY_COEFFICIENT - 1)) - 1;
 const MAX_BIG_POLY_COEFFICIENT_SIZE: i16 = (1 << (WIDTH_BIG_POLY_COEFFICIENT - 1)) - 1;

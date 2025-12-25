@@ -4,8 +4,8 @@ use core::ops::Deref;
 use num::Zero;
 
 use super::{
-    ByteReader, ByteWriter, Deserializable, DeserializationError, LOG_N, MODULUS, N, Nonce,
-    SIG_L2_BOUND, SIG_POLY_BYTE_LEN, Serializable,
+    ByteReader, ByteWriter, Deserializable, DeserializationError, LOG_N, N, Nonce, SIG_L2_BOUND,
+    SIG_POLY_BYTE_LEN, Serializable,
     hash_to_point::hash_to_point_rpo256,
     keys::PublicKey,
     math::{FalconFelt, FastFft, Polynomial},
@@ -228,52 +228,11 @@ impl Serializable for &SignaturePoly {
         let sig_coeff: Vec<i16> = self.0.coefficients.iter().map(|a| a.balanced_value()).collect();
         let mut sk_bytes = vec![0_u8; SIG_POLY_BYTE_LEN];
 
-        let mut acc = 0;
-        let mut acc_len = 0;
-        let mut v = 0;
-        let mut t;
-        let mut w;
-
-        // For each coefficient of x:
-        // - the sign is encoded on 1 bit
-        // - the 7 lower bits are encoded naively (binary)
-        // - the high bits are encoded in unary encoding
-        //
-        // Algorithm 17 p. 47 of the specification [1].
-        //
-        // [1]: https://falcon-sign.info/falcon.pdf
-        for &c in sig_coeff.iter() {
-            acc <<= 1;
-            t = c;
-
-            if t < 0 {
-                t = -t;
-                acc |= 1;
-            }
-            w = t as u16;
-
-            acc <<= 7;
-            let mask = 127_u32;
-            acc |= (w as u32) & mask;
-            w >>= 7;
-
-            acc_len += 8;
-
-            acc <<= w + 1;
-            acc |= 1;
-            acc_len += w + 1;
-
-            while acc_len >= 8 {
-                acc_len -= 8;
-
-                sk_bytes[v] = (acc >> acc_len) as u8;
-                v += 1;
-            }
+        // Use fn-dsa-comm's compressed encoding
+        if !encode_signature_poly(&sig_coeff, &mut sk_bytes) {
+            panic!("Failed to encode signature polynomial");
         }
 
-        if acc_len > 0 {
-            sk_bytes[v] = (acc << (8 - acc_len)) as u8;
-        }
         target.write_bytes(&sk_bytes);
     }
 }
@@ -282,59 +241,38 @@ impl Deserializable for SignaturePoly {
     fn read_from<R: ByteReader>(source: &mut R) -> Result<Self, DeserializationError> {
         let input = source.read_array::<SIG_POLY_BYTE_LEN>()?;
 
-        let mut input_idx = 0;
-        let mut acc = 0u32;
-        let mut acc_len = 0;
-        let mut coefficients = [FalconFelt::zero(); N];
+        // Use fn-dsa-comm's compressed decoding
+        let coefficients = decode_signature_poly(&input)?;
 
-        // Algorithm 18 p. 48 of the specification [1].
-        //
-        // [1]: https://falcon-sign.info/falcon.pdf
-        for c in coefficients.iter_mut() {
-            acc = (acc << 8) | (input[input_idx] as u32);
-            input_idx += 1;
-            let b = acc >> acc_len;
-            let s = b & 128;
-            let mut m = b & 127;
-
-            loop {
-                if acc_len == 0 {
-                    acc = (acc << 8) | (input[input_idx] as u32);
-                    input_idx += 1;
-                    acc_len = 8;
-                }
-                acc_len -= 1;
-                if ((acc >> acc_len) & 1) != 0 {
-                    break;
-                }
-                m += 128;
-                if m >= 2048 {
-                    return Err(DeserializationError::InvalidValue(format!(
-                        "Failed to decode signature: high bits {m} exceed 2048",
-                    )));
-                }
-            }
-            if s != 0 && m == 0 {
-                return Err(DeserializationError::InvalidValue(
-                    "Failed to decode signature: -0 is forbidden".to_string(),
-                ));
-            }
-
-            let felt = if s != 0 { (MODULUS as u32 - m) as u16 } else { m as u16 };
-            *c = FalconFelt::new(felt as i16);
-        }
-
-        if (acc & ((1 << acc_len) - 1)) != 0 {
-            return Err(DeserializationError::InvalidValue(
-                "Failed to decode signature: Non-zero unused bits in the last byte".to_string(),
-            ));
-        }
         Ok(Polynomial::new(coefficients.to_vec()).into())
     }
 }
 
 // HELPER FUNCTIONS
 // ================================================================================================
+
+/// Encodes signature polynomial coefficients using fn-dsa-comm's compressed encoding.
+fn encode_signature_poly(sig_coeff: &[i16], output: &mut [u8]) -> bool {
+    fn_dsa_comm::codec::comp_encode(sig_coeff, output)
+}
+
+/// Decodes signature polynomial coefficients using fn-dsa-comm's compressed encoding.
+fn decode_signature_poly(input: &[u8]) -> Result<[FalconFelt; N], DeserializationError> {
+    let mut coefficients_i16 = [0i16; N];
+
+    if !fn_dsa_comm::codec::comp_decode(input, &mut coefficients_i16) {
+        return Err(DeserializationError::InvalidValue(
+            "Failed to decode signature polynomial".to_string(),
+        ));
+    }
+
+    let mut coefficients = [FalconFelt::zero(); N];
+    for (i, &coeff) in coefficients_i16.iter().enumerate() {
+        coefficients[i] = FalconFelt::new(coeff);
+    }
+
+    Ok(coefficients)
+}
 
 /// Takes the hash-to-point polynomial `c` of a message, the signature polynomial over
 /// the message `s2` and a public key polynomial and returns `true` is the signature is a valid

@@ -20,6 +20,7 @@ pub trait FastFft: Sized + Clone {
         a
     }
 
+    #[allow(dead_code)] // Utility method for future use
     fn merge_fft(a: &Self, b: &Self) -> Self;
     fn split_fft(&self) -> (Self, Self);
 
@@ -202,6 +203,7 @@ where
         (f0, f1)
     }
 
+    #[allow(dead_code)] // Utility method for future use
     fn merge_fft(f0: &[Self], f1: &[Self], psi_rev: &[Self]) -> Vec<Self> {
         let n_over_2 = f0.len();
         let n = 2 * n_over_2;

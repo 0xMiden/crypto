@@ -94,7 +94,8 @@ chacha20poly1305              = { features = ["alloc", "stream"], version = "0.1
 clap                          = { features = ["derive"], optional = true, version = "4.5" }
 curve25519-dalek              = { default-features = false, version = "4" }
 ed25519-dalek                 = { features = ["zeroize"], version = "2" }
-flume                         = { version = "0.11.1" }
+fn-dsa-comm                   = { default-features = false, version = "0.3" }
+flume                         = { version = "0.11" }
 hashbrown                     = { features = ["serde"], optional = true, version = "0.16" }
 hkdf                          = { default-features = false, version = "0.12" }
 k256                          = { features = ["ecdh", "ecdsa"], version = "0.13" }

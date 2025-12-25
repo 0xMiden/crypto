@@ -9,7 +9,7 @@ use super::{
     super::{
         ByteReader, ByteWriter, Deserializable, DeserializationError, MODULUS, N, Nonce,
         SIG_L2_BOUND, SIGMA, Serializable, ShortLatticeBasis, Signature,
-        math::{FalconFelt, FastFft, LdlTree, Polynomial, ffldl, ffsampling, gram, normalize_tree},
+        math::{FalconFelt, FastFft, LdlTree, Polynomial, ffldl, flr::FLR, gram, normalize_tree},
         signature::SignaturePoly,
     },
     PublicKey,
@@ -26,6 +26,33 @@ use crate::{
 
 pub(crate) const WIDTH_BIG_POLY_COEFFICIENT: usize = 8;
 pub(crate) const WIDTH_SMALL_POLY_COEFFICIENT: usize = 6;
+
+// RNG ADAPTER
+// ================================================================================================
+
+use super::super::math::sampler_flr::SamplerRng;
+
+/// Adapter to make a `Rng` compatible with `SamplerRng` trait.
+struct RngAdapter<R: Rng> {
+    rng: R,
+}
+
+impl<R: Rng> SamplerRng for RngAdapter<R> {
+    fn next_u8(&mut self) -> u8 {
+        // Use fill_bytes to get exactly 1 byte efficiently
+        // (random::<u8>() would call next_u32() and waste 3 bytes)
+        let mut buf = [0u8; 1];
+        self.rng.fill_bytes(&mut buf);
+        buf[0]
+    }
+
+    fn next_u64(&mut self) -> u64 {
+        // Use fill_bytes to get exactly 8 bytes efficiently
+        let mut buf = [0u8; 8];
+        self.rng.fill_bytes(&mut buf);
+        u64::from_le_bytes(buf)
+    }
+}
 
 // SECRET KEY
 // ================================================================================================
@@ -59,12 +86,20 @@ pub(crate) const WIDTH_SMALL_POLY_COEFFICIENT: usize = 6;
 pub struct SecretKey {
     secret_key: ShortLatticeBasis,
     tree: LdlTree,
+    /// Precomputed basis B = [[g, -f], [G, -F]] in FFT format using FLR arithmetic.
+    /// This is used for fast signing with the FLR-based sampler.
+    /// Layout: [b00, b01, b10, b11] where each is N FLR values in FFT domain.
+    basis_fft_flr: [FLR; 4 * N],
 }
 
 impl Zeroize for SecretKey {
     fn zeroize(&mut self) {
         self.secret_key.zeroize();
         self.tree.zeroize();
+        // Manually zeroize FLR array
+        for i in 0..self.basis_fft_flr.len() {
+            self.basis_fft_flr[i] = FLR::ZERO;
+        }
     }
 }
 
@@ -100,7 +135,7 @@ impl SecretKey {
     /// Note: The basis is stored as [g, f, G, F]; negations to form [[g, -f], [G, -F]] are
     /// applied during signing.
     pub(crate) fn from_short_lattice_basis(basis: ShortLatticeBasis) -> SecretKey {
-        // FFT each polynomial of the short basis.
+        // FFT each polynomial of the short basis for Complex64 LDL tree
         let basis_fft = to_complex_fft(&basis);
         // compute the Gram matrix.
         let gram_fft = gram(basis_fft);
@@ -108,7 +143,11 @@ impl SecretKey {
         let mut tree = ffldl(gram_fft);
         // normalize the leaves of the LDL tree.
         normalize_tree(&mut tree, SIGMA);
-        Self { secret_key: basis, tree }
+
+        // Precompute FLR basis in FFT format for fast signing
+        let basis_fft_flr = Self::compute_basis_fft_flr(&basis);
+
+        Self { secret_key: basis, tree, basis_fft_flr }
     }
 
     // PUBLIC ACCESSORS
@@ -199,11 +238,38 @@ impl SecretKey {
         h_fft.ifft().into()
     }
 
-    /// Signs a message polynomial with the secret key.
+    /// Signs a message polynomial with the secret key using FLR-based ffsampling.
+    ///
+    /// This implementation uses Fixed-point Linear Real (FLR) arithmetic ported from
+    /// rust-fn-dsa. It provides deterministic, no_std compatible signing without requiring
+    /// floating-point hardware. The sampler uses a Gram matrix instead of the LDL tree.
     ///
     /// Takes a randomness generator implementing `Rng` and message polynomial representing `c`
     /// the hash-to-point of the message to be signed. It outputs a signature polynomial `s2`.
     fn sign_helper<R: Rng>(&self, c: Polynomial<FalconFelt>, rng: &mut R) -> SignaturePoly {
+        self.sign_helper_flr(c, rng)
+    }
+
+    /// This is a reference implementation that uses Complex64 arithmetic for floating-point
+    /// operations. It computes the signature using the LDL tree-based fast Fourier sampling.
+    ///
+    /// # Algorithm
+    /// 1. Compute target vectors: t0 = -(c/q) * F, t1 = (c/q) * f
+    /// 2. Sample z = (z0, z1) from a discrete Gaussian distribution
+    /// 3. Compute s = (t - z) * B where B is the secret key basis
+    /// 4. Check if ||s|| is within bounds and retry if needed
+    ///
+    /// Note: This method is kept as a reference implementation even though it's not used
+    /// in production code (which uses `sign_helper_flr` instead).
+    #[allow(dead_code)]
+    #[cfg(test)]
+    pub(crate) fn sign_helper_legacy<R: Rng>(
+        &self,
+        c: Polynomial<FalconFelt>,
+        rng: &mut R,
+    ) -> SignaturePoly {
+        use super::super::math::ffsampling;
+
         let one_over_q = 1.0 / (MODULUS as f64);
         let c_over_q_fft = c.map(|cc| Complex::new(one_over_q * cc.value() as f64, 0.0)).fft();
 
@@ -241,6 +307,223 @@ impl SecretKey {
                 .coefficients
                 .iter()
                 .map(|a| a.re.round() as i16)
+                .collect::<Vec<i16>>()
+                .try_into()
+                .expect("The number of coefficients should be equal to N");
+
+            if let Ok(s2) = SignaturePoly::try_from(&s2_coef) {
+                return s2;
+            }
+        }
+    }
+
+    /// Computes the FLR basis B = [[g, -f], [G, -F]] in FFT format.
+    /// Returns an array [b00, b01, b10, b11] where each is N FLR values in FFT domain.
+    /// This follows fn-dsa's compute_basis_inner approach for precomputation during keygen.
+    fn compute_basis_fft_flr(basis: &ShortLatticeBasis) -> [FLR; 4 * N] {
+        use super::super::math::poly_flr::{FFT, poly_set_small};
+        use core::array;
+        const LOGN_U32: u32 = LOG_N as u32;
+
+        // Convert i16 basis to i8 for poly_set_small
+        let basis_i8: [[i8; N]; 4] = [
+            array::from_fn(|i| basis[0].coefficients[i] as i8),
+            array::from_fn(|i| basis[1].coefficients[i] as i8),
+            array::from_fn(|i| basis[2].coefficients[i] as i8),
+            array::from_fn(|i| basis[3].coefficients[i] as i8),
+        ];
+
+        let mut result = [FLR::ZERO; 4 * N];
+
+        // Split result into b00, b01, b10, b11
+        let (b00, rest) = result.split_at_mut(N);
+        let (b01, rest) = rest.split_at_mut(N);
+        let (b10, rest) = rest.split_at_mut(N);
+        let (b11, _) = rest.split_at_mut(N);
+
+        // Load basis: stored as B = [[g, f], [G, F]]
+        poly_set_small(LOGN_U32, b00, &basis_i8[0]); // g
+        poly_set_small(LOGN_U32, b01, &basis_i8[1]); // f
+        poly_set_small(LOGN_U32, b10, &basis_i8[2]); // G
+        poly_set_small(LOGN_U32, b11, &basis_i8[3]); // F
+
+        // Transform to FFT domain
+        FFT(LOGN_U32, b00);
+        FFT(LOGN_U32, b01);
+        FFT(LOGN_U32, b10);
+        FFT(LOGN_U32, b11);
+
+        // Negate f and F in FFT domain to get signing basis B = [[g, -f], [G, -F]]
+        // (matches fn-dsa-sign's compute_basis_inner)
+        for i in 0..N {
+            b01[i] = -b01[i];
+            b11[i] = -b11[i];
+        }
+
+        result
+    }
+
+    /// Signs using FLR-based implementation with precomputed FFT basis.
+    /// This is the optimized signing path that uses precomputed basis_fft_flr.
+    #[allow(clippy::needless_range_loop)] // Index-based loops match fn-dsa implementation style
+    pub(crate) fn sign_helper_flr<R: Rng>(
+        &self,
+        c: Polynomial<FalconFelt>,
+        rng: &mut R,
+    ) -> SignaturePoly {
+        use super::super::math::poly_flr::{
+            FFT, iFFT, poly_add, poly_mul_fft, poly_muladj_fft, poly_mulconst, poly_mulownadj_fft,
+        };
+        use super::super::math::sampler_flr::Sampler;
+        const LOGN_U32: u32 = LOG_N as u32;
+
+        // Use precomputed FFT basis B = [[g, -f], [G, -F]]
+        // Layout: [b00, b01, b10, b11] where b01 and b11 are already negated
+        let b00 = &self.basis_fft_flr[0..N]; // g in FFT
+        let b01 = &self.basis_fft_flr[N..2 * N]; // -f in FFT
+        let b10 = &self.basis_fft_flr[2 * N..3 * N]; // G in FFT
+        let b11 = &self.basis_fft_flr[3 * N..4 * N]; // -F in FFT
+
+        // Compute Gram matrix G = B^H * B from precomputed FFT basis
+        // This is much faster than computing from scratch (6 muls vs 4 FFTs + 6 muls)
+        let mut g00 = [FLR::ZERO; N];
+        let mut g01 = [FLR::ZERO; N];
+        let mut g11 = [FLR::ZERO; N];
+        let mut temp = [FLR::ZERO; N];
+
+        // g00 = b00*adj(b00) + b01*adj(b01)
+        g00.copy_from_slice(b00);
+        poly_mulownadj_fft(LOGN_U32, &mut g00);
+        temp.copy_from_slice(b01);
+        poly_mulownadj_fft(LOGN_U32, &mut temp);
+        poly_add(LOGN_U32, &mut g00, &temp);
+
+        // g01 = b00*adj(b10) + b01*adj(b11)
+        g01.copy_from_slice(b00);
+        poly_muladj_fft(LOGN_U32, &mut g01, b10);
+        temp.copy_from_slice(b01);
+        poly_muladj_fft(LOGN_U32, &mut temp, b11);
+        poly_add(LOGN_U32, &mut g01, &temp);
+
+        // g11 = b10*adj(b10) + b11*adj(b11)
+        g11.copy_from_slice(b10);
+        poly_mulownadj_fft(LOGN_U32, &mut g11);
+        temp.copy_from_slice(b11);
+        poly_mulownadj_fft(LOGN_U32, &mut temp);
+        poly_add(LOGN_U32, &mut g11, &temp);
+
+        // Convert hash-to-point polynomial c to FLR and transform to FFT domain
+        let mut c_fft = [FLR::ZERO; N];
+        for i in 0..N {
+            c_fft[i] = FLR::from_i32(c.coefficients[i].value() as i32);
+        }
+        FFT(LOGN_U32, &mut c_fft);
+
+        // Compute target vectors: t0 = -(c/q) * F, t1 = (c/q) * f
+        // Note: b11 = -F and b01 = -f from precomputed basis
+        let one_over_q = FLR::from_f64(1.0 / (MODULUS as f64));
+        let mut t0 = c_fft;
+        let mut t1 = c_fft;
+
+        // t0 = (c/q) * b11 = (c/q) * (-F) = -(c/q) * F ✓
+        poly_mulconst(LOGN_U32, &mut t0, one_over_q);
+        let mut b11_copy = [FLR::ZERO; N];
+        b11_copy.copy_from_slice(b11);
+        poly_mul_fft(LOGN_U32, &mut t0, &b11_copy);
+
+        // t1 = -(c/q) * b01 = -(c/q) * (-f) = (c/q) * f ✓
+        poly_mulconst(LOGN_U32, &mut t1, one_over_q);
+        let mut b01_copy = [FLR::ZERO; N];
+        b01_copy.copy_from_slice(b01);
+        poly_mul_fft(LOGN_U32, &mut t1, &b01_copy);
+        for i in 0..N {
+            t1[i] = -t1[i];
+        }
+
+        // Create sampler with RNG adapter
+        let rng_adapter = RngAdapter { rng };
+        let mut sampler = Sampler::new(rng_adapter, LOGN_U32);
+        let mut tmp = vec![FLR::ZERO; 4 * N];
+
+        loop {
+            let bold_s = loop {
+                // Clone Gram matrix for this iteration
+                let mut g00_work = g00;
+                let mut g01_work = g01;
+                let mut g11_work = g11;
+
+                // Sample z from discrete Gaussian using Gram matrix
+                let mut t0_work = t0;
+                let mut t1_work = t1;
+                sampler.ffsamp_fft(
+                    &mut t0_work,
+                    &mut t1_work,
+                    &mut g00_work,
+                    &mut g01_work,
+                    &mut g11_work,
+                    &mut tmp,
+                );
+
+                // Compute t - z
+                let mut t0_min_z0 = t0;
+                let mut t1_min_z1 = t1;
+                for i in 0..N {
+                    t0_min_z0[i] -= t0_work[i];
+                    t1_min_z1[i] -= t1_work[i];
+                }
+
+                // Compute s = (t - z) * B where B = [[g, -f], [G, -F]]
+                // s0 = (t0-z0) * g + (t1-z1) * G
+                let mut s0 = t0_min_z0;
+                let mut b00_copy = [FLR::ZERO; N];
+                b00_copy.copy_from_slice(b00);
+                poly_mul_fft(LOGN_U32, &mut s0, &b00_copy);
+                let mut temp = t1_min_z1;
+                let mut b10_copy = [FLR::ZERO; N];
+                b10_copy.copy_from_slice(b10);
+                poly_mul_fft(LOGN_U32, &mut temp, &b10_copy);
+                poly_add(LOGN_U32, &mut s0, &temp);
+
+                // s1 = (t0-z0) * (-f) + (t1-z1) * (-F) = (t0-z0) * b01 + (t1-z1) * b11
+                let mut s1 = t0_min_z0;
+                b01_copy.copy_from_slice(b01);
+                poly_mul_fft(LOGN_U32, &mut s1, &b01_copy);
+                let mut temp = t1_min_z1;
+                b11_copy.copy_from_slice(b11);
+                poly_mul_fft(LOGN_U32, &mut temp, &b11_copy);
+                poly_add(LOGN_U32, &mut s1, &temp);
+
+                // Compute norm ||s||² in FFT domain
+                let mut length_squared = 0.0_f64;
+                for i in 0..(N / 2) {
+                    let s0_re = s0[i].to_f64();
+                    let s0_im = s0[i + N / 2].to_f64();
+                    let s1_re = s1[i].to_f64();
+                    let s1_im = s1[i + N / 2].to_f64();
+                    length_squared += s0_re * s0_re + s0_im * s0_im;
+                    length_squared += s1_re * s1_re + s1_im * s1_im;
+                }
+                length_squared /= N as f64;
+
+                if length_squared > (SIG_L2_BOUND as f64) {
+                    continue;
+                }
+
+                // Negate s0 for output format
+                for i in 0..N {
+                    s0[i] = -s0[i];
+                }
+
+                break [s0, s1];
+            };
+
+            // Transform s1 back to coefficient domain via inverse FFT
+            let mut s2_fft = bold_s[1];
+            iFFT(LOGN_U32, &mut s2_fft);
+
+            let s2_coef: [i16; N] = s2_fft[0..N]
+                .iter()
+                .map(|a| (*a).to_f64().round() as i16)
                 .collect::<Vec<i16>>()
                 .try_into()
                 .expect("The number of coefficients should be equal to N");
@@ -416,7 +699,8 @@ fn to_complex_fft(basis: &[Polynomial<i16>; 4]) -> [Polynomial<Complex<f64>>; 4]
 
 /// Encodes a sequence of signed integers such that each integer x satisfies |x| < 2^(bits-1)
 /// for a given parameter bits. bits can take either the value 6 or 8.
-pub fn encode_i8(x: &[i8], bits: usize) -> Option<Vec<u8>> {
+#[allow(dead_code)]
+pub fn encode_i8_legacy(x: &[i8], bits: usize) -> Option<Vec<u8>> {
     let maxv = (1 << (bits - 1)) - 1_usize;
     let maxv = maxv as i8;
     let minv = -maxv;
@@ -453,7 +737,8 @@ pub fn encode_i8(x: &[i8], bits: usize) -> Option<Vec<u8>> {
 
 /// Decodes a sequence of bytes into a sequence of signed integers such that each integer x
 /// satisfies |x| < 2^(bits-1) for a given parameter bits. bits can take either the value 6 or 8.
-pub fn decode_i8(buf: &[u8], bits: usize) -> Option<Vec<i8>> {
+#[allow(dead_code)]
+pub fn decode_i8_legacy(buf: &[u8], bits: usize) -> Option<Vec<i8>> {
     let mut x = [0_i8; N];
 
     let mut i = 0;
@@ -487,4 +772,19 @@ pub fn decode_i8(buf: &[u8], bits: usize) -> Option<Vec<i8>> {
     } else {
         None
     }
+}
+
+/// Encodes a slice of i8 values using fn-dsa-comm's trim encoding.
+pub fn encode_i8(x: &[i8], bits: usize) -> Option<Vec<u8>> {
+    let out_len = ((x.len() * bits) + 7) >> 3;
+    let mut buf = vec![0_u8; out_len];
+    let written = fn_dsa_comm::codec::trim_i8_encode(x, bits as u32, &mut buf);
+    if written == out_len { Some(buf) } else { None }
+}
+
+/// Decodes a buffer into a slice of i8 values using fn-dsa-comm's trim decoding.
+pub fn decode_i8(buf: &[u8], bits: usize) -> Option<Vec<i8>> {
+    let mut x = vec![0_i8; N];
+    fn_dsa_comm::codec::trim_i8_decode(buf, &mut x, bits as u32)?;
+    Some(x)
 }
