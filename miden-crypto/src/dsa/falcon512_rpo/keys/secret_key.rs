@@ -32,13 +32,14 @@ pub(crate) const WIDTH_SMALL_POLY_COEFFICIENT: usize = 6;
 
 /// Represents the secret key for Falcon DSA.
 ///
-/// The secret key is a quadruple [[g, -f], [G, -F]] of polynomials with integer coefficients. Each
-/// polynomial is of degree at most N = 512 and computations with these polynomials is done modulo
-/// the monic irreducible polynomial ϕ = x^N + 1. The secret key is a basis for a lattice and has
-/// the property of being short with respect to a certain norm and an upper bound appropriate for
-/// a given security parameter. The public key on the other hand is another basis for the same
-/// lattice and can be described by a single polynomial h with integer coefficients modulo ϕ.
-/// The two keys are related by the following relation:
+/// The secret key is stored internally as a quadruple [g, f, G, F] of polynomials with integer
+/// coefficients. During signing, this is transformed to the signing basis [[g, -f], [G, -F]] where
+/// negations are applied. Each polynomial is of degree at most N = 512 and computations with these
+/// polynomials is done modulo the monic irreducible polynomial ϕ = x^N + 1. The secret key is a
+/// basis for a lattice and has the property of being short with respect to a certain norm and an
+/// upper bound appropriate for a given security parameter. The public key on the other hand is
+/// another basis for the same lattice and can be described by a single polynomial h with integer
+/// coefficients modulo ϕ. The two keys are related by the following relation:
 ///
 /// 1. h = g /f [mod ϕ][mod p]
 /// 2. f.G - g.F = p [mod ϕ]
@@ -95,7 +96,9 @@ impl SecretKey {
         Self::from_short_lattice_basis(basis)
     }
 
-    /// Given a short basis [[g, -f], [G, -F]], computes the normalized LDL tree i.e., Falcon tree.
+    /// Given a short basis [g, f, G, F], computes the normalized LDL tree i.e., Falcon tree.
+    /// Note: The basis is stored as [g, f, G, F]; negations to form [[g, -f], [G, -F]] are
+    /// applied during signing.
     pub(crate) fn from_short_lattice_basis(basis: ShortLatticeBasis) -> SecretKey {
         // FFT each polynomial of the short basis.
         let basis_fft = to_complex_fft(&basis);
@@ -296,17 +299,18 @@ impl Serializable for SecretKey {
         let l = n.checked_ilog2().unwrap() as u8;
         let header: u8 = (5 << 4) | l;
 
-        let neg_f = &basis[1];
+        let f = &basis[1];
         let g = &basis[0];
-        let neg_big_f = &basis[3];
+        let big_f = &basis[3];
 
         let mut buffer = Vec::with_capacity(1281);
         buffer.push(header);
 
-        let mut f_i8: Vec<i8> = neg_f
+        // Encode f, g, F directly without negation (matches fn-dsa format)
+        let mut f_i8: Vec<i8> = f
             .coefficients
             .iter()
-            .map(|&a| FalconFelt::new(-a).balanced_value() as i8)
+            .map(|&a| FalconFelt::new(a).balanced_value() as i8)
             .collect();
         let f_i8_encoded = encode_i8(&f_i8, WIDTH_SMALL_POLY_COEFFICIENT).unwrap();
         buffer.extend_from_slice(&f_i8_encoded);
@@ -321,10 +325,10 @@ impl Serializable for SecretKey {
         buffer.extend_from_slice(&g_i8_encoded);
         g_i8.zeroize();
 
-        let mut big_f_i8: Vec<i8> = neg_big_f
+        let mut big_f_i8: Vec<i8> = big_f
             .coefficients
             .iter()
-            .map(|&a| FalconFelt::new(-a).balanced_value() as i8)
+            .map(|&a| FalconFelt::new(a).balanced_value() as i8)
             .collect();
         let big_f_i8_encoded = encode_i8(&big_f_i8, WIDTH_BIG_POLY_COEFFICIENT).unwrap();
         buffer.extend_from_slice(&big_f_i8_encoded);
@@ -384,11 +388,14 @@ impl Deserializable for SecretKey {
 
         // big_g * f - g * big_f = p (mod X^n + 1)
         let big_g = g.fft().hadamard_div(&f.fft()).hadamard_mul(&big_f.fft()).ifft();
+
+        // Store basis as [g, f, G, F] without negations (matches fn-dsa format)
+        // Negations will be applied only during signing when needed
         let basis = [
             g.map(|f| f.balanced_value()),
-            -f.map(|f| f.balanced_value()),
+            f.map(|f| f.balanced_value()),
             big_g.map(|f| f.balanced_value()),
-            -big_f.map(|f| f.balanced_value()),
+            big_f.map(|f| f.balanced_value()),
         ];
         Ok(Self::from_short_lattice_basis(basis))
     }
