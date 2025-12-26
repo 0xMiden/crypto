@@ -364,27 +364,35 @@ impl PartialSmt {
             return Some(leaf.clone());
         }
 
-        // Check if we can reach this leaf through empty subtrees
-        let mut index: NodeIndex = leaf_index.into();
-
-        while index.depth() > 0 {
-            if let Some(parent) = self.get_inner_node(index.parent()) {
-                // Found a stored inner node - child must be empty subtree root
-                let child_hash = if index.is_value_odd() {
-                    parent.right
-                } else {
-                    parent.left
-                };
-                if child_hash == *EmptySubtreeRoots::entry(SMT_DEPTH, index.depth()) {
-                    return Some(SmtLeaf::new_empty(leaf_index));
-                }
-                return None; // Non-empty child we don't have data for
-            }
-            index.move_up();
+        // Empty tree - all leaves implicitly trackable
+        if self.root == Self::EMPTY_ROOT {
+            return Some(SmtLeaf::new_empty(leaf_index));
         }
 
-        // Reached root through all unstored nodes - implicitly empty
-        Some(SmtLeaf::new_empty(leaf_index))
+        // Walk from root down towards the leaf
+        let target: NodeIndex = leaf_index.into();
+        let mut index = NodeIndex::root();
+
+        for i in (0..SMT_DEPTH).rev() {
+            let inner_node = self.get_inner_node(index)?;
+
+            let is_right = target.is_nth_bit_odd(i);
+            let child_hash = if is_right { inner_node.right } else { inner_node.left };
+
+            // If child is empty subtree root, leaf is implicitly trackable
+            if child_hash == *EmptySubtreeRoots::entry(SMT_DEPTH, SMT_DEPTH - i) {
+                return Some(SmtLeaf::new_empty(leaf_index));
+            }
+
+            index = if is_right {
+                index.right_child()
+            } else {
+                index.left_child()
+            };
+        }
+
+        // Reached leaf level without finding empty subtree - can't track
+        None
     }
 
     /// Converts a key to a leaf index.

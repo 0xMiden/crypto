@@ -32,6 +32,30 @@ fn partial_smt_new_with_no_entries() {
     assert_eq!(partial_smt.root(), full.root());
 }
 
+/// Tests that a PartialSmt with a non-empty root but no proofs cannot track or update keys.
+#[test]
+fn partial_smt_non_empty_root_no_proofs() {
+    let key: Word = rand_value();
+    let value: Word = rand_value();
+    let full = Smt::with_entries([(key, value)]).unwrap();
+
+    // Create partial with non-empty root but don't add any proofs
+    let mut partial = PartialSmt::new(full.root());
+
+    // Can't get value for key with value - not trackable without proofs
+    assert!(partial.get_value(&key).is_err());
+
+    // Can't insert for key with value - not trackable
+    assert!(partial.insert(key, value).is_err());
+
+    // Can't get value for empty key either - still not trackable
+    let empty_key: Word = rand_value();
+    assert!(partial.get_value(&empty_key).is_err());
+
+    // Can't insert at empty key - not trackable
+    assert!(partial.insert(empty_key, value).is_err());
+}
+
 /// Tests that a basic PartialSmt can be built from a full one and that inserting or removing
 /// values whose merkle path were added to the partial SMT results in the same root as the
 /// equivalent update in the full tree.
