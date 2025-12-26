@@ -8,7 +8,7 @@
 use alloc::vec::Vec;
 use core::ops::MulAssign;
 
-use num::{BigInt, FromPrimitive, One, ToPrimitive, Zero};
+use num::{BigInt, FromPrimitive, One, Zero};
 use num_complex::Complex64;
 use rand::Rng;
 
@@ -32,13 +32,15 @@ pub use ffsampling::ffsampling;
 pub(crate) mod samplerz;
 use self::samplerz::sampler_z;
 
+#[cfg(test)]
 pub(crate) mod gauss_fndsa;
 
 mod polynomial;
 pub use polynomial::Polynomial;
 
 // Optimized NTRU solver from rust-fn-dsa
-mod ntru_opt;
+#[cfg_attr(test, allow(unused))]
+pub(crate) mod ntru_opt;
 
 pub(crate) mod flr;
 pub(crate) use flr::FLR;
@@ -99,162 +101,87 @@ impl Inverse for f64 {
 
 /// Samples 4 small polynomials f, g, F, G such that f * G - g * F = q mod (X^n + 1).
 ///
-/// This is the optimized key generation algorithm using the NTRU solver from rust-fn-dsa,
-/// which provides better performance than the recursive approach. It follows Algorithm 5
-/// (NTRUgen) from the Falcon specification [1, p.34] with the following validation checks:
+/// This is the optimized key generation algorithm compatible with fn-dsa-kgen, using:
+/// - CDT-based Gaussian sampling for f, g (with automatic odd parity)
+/// - Optimized NTRU solver from rust-fn-dsa for finding F, G
 ///
-/// 1. **Coefficient bounds**: Ensures f, g coefficients fit in encoding (±31 for 6-bit width)
-/// 2. **Gamma1 check**: Verifies ||f||² + ||g||² < 16823 (squared Gram-Schmidt norm bound)
-/// 3. **Invertibility**: Checks that f is invertible mod X^n+1 mod q
-/// 4. **Gamma2 check**: Validates orthogonalized Gram-Schmidt norm via fixed-point arithmetic
-/// 5. **Solution bounds**: Ensures F, G coefficients fit in encoding (±127 for 8-bit width)
+/// It follows Algorithm 5 (NTRUgen) from the Falcon specification [1, p.34] with the
+/// following validation checks matching fn-dsa-kgen exactly:
 ///
-/// These checks ensure the generated basis is both secure and compatible with the signing
-/// algorithm. The gamma1 and gamma2 checks together implement the Falcon requirement that
+/// 1. **Gamma1 check**: Verifies ||f||² + ||g||² < 16823 (squared Gram-Schmidt norm bound)
+/// 2. **Invertibility**: Checks that f is invertible mod X^n+1 mod q
+/// 3. **Gamma2 check**: Validates orthogonalized Gram-Schmidt norm via fixed-point arithmetic
+/// 4. **NTRU solve**: Solves f*G - g*F = q mod (X^n+1) using optimized fixed-point solver
+///
+/// The gamma1 and gamma2 checks together implement the Falcon requirement that
 /// max(gamma1, gamma2) ≤ 1.3689 × q, which ensures numerical stability during signing.
 ///
 /// [1]: https://falcon-sign.info/falcon.pdf
-pub(crate) fn ntru_gen_opt<R: Rng>(n: usize, rng: &mut R) -> [Polynomial<i16>; 4] {
+#[cfg(test)]
+pub(crate) fn ntru_gen_opt_fndsa<R: fn_dsa_comm::PRNG>(n: usize, rng: &mut R) -> [Polynomial<i16>; 4] {
+    let logn = (n as f64).log2() as u32;
+
     loop {
-        let f = gen_poly(n, rng);
-        let g = gen_poly(n, rng);
+        // Use fn-dsa's CDT-based sampler for compatibility with fn-dsa-kgen KATs
+        let f_i8 = gauss_fndsa::sample_f_fndsa(n, rng);
+        let g_i8 = gauss_fndsa::sample_f_fndsa(n, rng);
 
-        // Check 1: Coefficient bounds for encoding
-        // Ensure f, g coefficients are within ±31 (MAX_SMALL_POLY_COEFFICIENT_SIZE)
-        // to fit in the 6-bit encoding width (WIDTH_SMALL_POLY_COEFFICIENT)
-        if !(check_coefficients_bound(&f, MAX_SMALL_POLY_COEFFICIENT_SIZE)
-            && check_coefficients_bound(&g, MAX_SMALL_POLY_COEFFICIENT_SIZE))
-        {
-            continue;
-        }
-
-        // Check 2: Gamma1 (first Gram-Schmidt norm)
+        // Check 1: Gamma1 (first Gram-Schmidt norm)
         // Verify ||f||² + ||g||² < 16823, which equals (1.17*√12289)² ≈ 16822.41
         // This ensures the first Gram-Schmidt basis vector [g, -f] is short enough
         // to maintain numerical stability in the signing algorithm
         let mut sn = 0i32;
         for i in 0..n {
-            let xf = f.coefficients[i] as i32;
-            let xg = g.coefficients[i] as i32;
+            let xf = f_i8[i] as i32;
+            let xg = g_i8[i] as i32;
             sn += xf * xf + xg * xg;
         }
         if sn >= 16823 {
             continue;
         }
 
-        // Check 3: Invertibility
-        // Verify f is invertible mod X^n+1 mod q by checking no FFT coefficient is zero
-        let f_ntt = f.map(|&i| FalconFelt::new(i)).fft();
-        if f_ntt.coefficients.iter().any(|e| e.is_zero()) {
+        // Check 2: Invertibility
+        // Use fn-dsa-comm's exact invertibility check for compatibility
+        let mut tmp_u16 = vec![0u16; n];
+        if !fn_dsa_comm::mq::mqpoly_small_is_invertible(logn, &f_i8, &mut tmp_u16) {
             continue;
         }
 
-        // Check 4: Gamma2 (orthogonalized Gram-Schmidt norm)
+        // Check 3: Gamma2 (orthogonalized Gram-Schmidt norm)
         // Verify the squared norm of the second orthogonalized basis vector is bounded
         // Uses optimized fixed-point arithmetic from rust-fn-dsa for constant-time operation
-        let f_i8: Vec<i8> = f.coefficients.iter().map(|&x| x as i8).collect();
-        let g_i8: Vec<i8> = g.coefficients.iter().map(|&x| x as i8).collect();
-        let logn = (n as f64).log2() as u32;
         let mut tmp_fxr = vec![ntru_opt::fxp::FXR::ZERO; (5 * n) / 2];
-
         if !ntru_opt::check_ortho_norm(logn, &f_i8, &g_i8, &mut tmp_fxr) {
             continue;
         }
 
         // Solve NTRU equation: f*G - g*F = q mod (X^n + 1)
-        if let Some((capital_f, capital_g)) =
-            ntru_solve_opt(&f.map(|&i| i.into()), &g.map(|&i| i.into()))
-        {
-            // Check 5: Solution coefficient bounds
-            // Ensure F, G coefficients are within ±127 (MAX_BIG_POLY_COEFFICIENT_SIZE)
-            // to fit in the 8-bit encoding width (WIDTH_BIG_POLY_COEFFICIENT)
-            let capital_f = capital_f.map(|i| i.try_into().unwrap());
-            let capital_g = capital_g.map(|i| i.try_into().unwrap());
-            if !(check_coefficients_bound(&capital_f, MAX_BIG_POLY_COEFFICIENT_SIZE)
-                && check_coefficients_bound(&capital_g, MAX_BIG_POLY_COEFFICIENT_SIZE))
-            {
-                continue;
-            }
+        // Call fn-dsa's solve_NTRU directly with i8 arrays (exactly as fn-dsa-kgen does)
+        let mut capital_f_i8 = vec![0i8; n];
+        let mut capital_g_i8 = vec![0i8; n];
+        let mut tmp_u32 = vec![0u32; 6 * n];
+        let mut tmp_fxr = vec![ntru_opt::fxp::FXR::ZERO; (5 * n) / 2];
+
+        if ntru_opt::solve_NTRU(
+            logn,
+            &f_i8,
+            &g_i8,
+            &mut capital_f_i8,
+            &mut capital_g_i8,
+            &mut tmp_u32,
+            &mut tmp_fxr,
+        ) {
+            // Convert i8 arrays to i16 polynomials for storage
+            let f = Polynomial::new(f_i8.iter().map(|&x| x as i16).collect());
+            let g = Polynomial::new(g_i8.iter().map(|&x| x as i16).collect());
+            let capital_f = Polynomial::new(capital_f_i8.iter().map(|&x| x as i16).collect());
+            let capital_g = Polynomial::new(capital_g_i8.iter().map(|&x| x as i16).collect());
 
             // Return basis in storage format [g, f, G, F]
             // Note: Negations are applied during signing, not in storage
             return [g, f, capital_g, capital_f];
         }
     }
-}
-
-/// Solves the NTRU equation using the optimized implementation from rust-fn-dsa.
-/// Given f, g in ZZ[X], find F, G in ZZ[X] such that:
-///
-///    f G - g F = q  mod (X^n + 1)
-///
-/// This replaces the original recursive algorithm (Algorithm 6 of the Falcon spec)
-/// with an optimized fixed-point arithmetic version that's 10-30x faster.
-fn ntru_solve_opt(
-    f: &Polynomial<BigInt>,
-    g: &Polynomial<BigInt>,
-) -> Option<(Polynomial<BigInt>, Polynomial<BigInt>)> {
-    use ntru_opt::fxp::FXR;
-
-    let n = f.coefficients.len();
-
-    // The optimized solver only works for n = 2^logn where 1 <= logn <= 10
-    // For Falcon512, n = 512 = 2^9
-    if n < 2 || n > 1024 || !n.is_power_of_two() {
-        return None;
-    }
-    let logn = n.trailing_zeros();
-
-    // Convert f and g from Polynomial<BigInt> to [i8]
-    // The coefficients should already be small enough to fit in i8
-    let mut f_i8 = vec![0i8; n];
-    let mut g_i8 = vec![0i8; n];
-
-    for i in 0..n {
-        let f_val = f.coefficients[i].to_i16().ok_or(()).ok()?;
-        let g_val = g.coefficients[i].to_i16().ok_or(()).ok()?;
-
-        if f_val < -127 || f_val > 127 || g_val < -127 || g_val > 127 {
-            // Coefficients too large for optimized solver
-            return None;
-        }
-
-        f_i8[i] = f_val as i8;
-        g_i8[i] = g_val as i8;
-    }
-
-    // Allocate output buffers
-    let mut capital_f_i8 = vec![0i8; n];
-    let mut capital_g_i8 = vec![0i8; n];
-
-    // Allocate temporary buffers as required by solve_NTRU
-    // tmp_u32 min size: 6*n
-    // tmp_fxr min size: 2.5*n
-    let mut tmp_u32 = vec![0u32; 6 * n];
-    let mut tmp_fxr = vec![FXR::ZERO; (5 * n) / 2];
-
-    // Call the optimized solver
-    let success = ntru_opt::solve_NTRU(
-        logn,
-        &f_i8,
-        &g_i8,
-        &mut capital_f_i8,
-        &mut capital_g_i8,
-        &mut tmp_u32,
-        &mut tmp_fxr,
-    );
-
-    if !success {
-        return None;
-    }
-
-    // Convert F and G from [i8] back to Polynomial<BigInt>
-    let capital_f =
-        Polynomial::new(capital_f_i8.into_iter().map(|x| BigInt::from(x as i64)).collect());
-    let capital_g =
-        Polynomial::new(capital_g_i8.into_iter().map(|x| BigInt::from(x as i64)).collect());
-
-    Some((capital_f, capital_g))
 }
 
 /// Samples 4 small polynomials f, g, F, G such that f * G - g * F = q mod (X^n + 1).

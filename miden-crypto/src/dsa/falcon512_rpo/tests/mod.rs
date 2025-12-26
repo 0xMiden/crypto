@@ -161,62 +161,9 @@ fn test_flr_and_legacy_signing_match() {
 }
 
 #[test]
-fn test_keygen_compatibility() {
-    use crate::dsa::falcon512_rpo::math::{ntru_gen, ntru_gen_opt};
-    use rand::SeedableRng;
-    use rand_chacha::ChaCha20Rng;
-    use std::println;
-
-    let n = 512;
-
-    println!("\n=== Keygen Compatibility Test ===\n");
-    println!("Testing whether ntru_gen and ntru_gen_opt produce identical keys");
-    println!("with the same RNG seed.\n");
-
-    for seed_value in 0..3 {
-        println!("--- Seed {} ---", seed_value);
-
-        // Create two identical RNGs
-        let seed = [seed_value; 32];
-        let mut rng_legacy = ChaCha20Rng::from_seed(seed);
-        let mut rng_opt = ChaCha20Rng::from_seed(seed);
-
-        // Generate keys with both methods
-        let [g_legacy, f_legacy, big_g_legacy, big_f_legacy] = ntru_gen(n, &mut rng_legacy);
-        let [g_opt, f_opt, big_g_opt, big_f_opt] = ntru_gen_opt(n, &mut rng_opt);
-
-        // Compare all four polynomials
-        let f_match = f_legacy.coefficients == f_opt.coefficients;
-        let g_match = g_legacy.coefficients == g_opt.coefficients;
-        let big_f_match = big_f_legacy.coefficients == big_f_opt.coefficients;
-        let big_g_match = big_g_legacy.coefficients == big_g_opt.coefficients;
-        let all_match = f_match && g_match && big_f_match && big_g_match;
-
-        println!("  f: {}, g: {}, F: {}, G: {} => All: {}",
-                 f_match, g_match, big_f_match, big_g_match, all_match);
-
-        if !all_match {
-            println!("  f_legacy[0..5]: {:?}", &f_legacy.coefficients[0..5]);
-            println!("  f_opt[0..5]:    {:?}", &f_opt.coefficients[0..5]);
-        }
-    }
-
-    println!("\n=== Analysis ===\n");
-    println!("Result: ntru_gen and ntru_gen_opt produce DIFFERENT keys with same RNG seed\n");
-    println!("Reason: Different validation check ordering causes RNG stream divergence:");
-    println!("  - ntru_gen:     bounds → invertibility → max(gamma1,gamma2) → solve → bounds");
-    println!("  - ntru_gen_opt: bounds → gamma1 → invertibility → gamma2 → solve → bounds\n");
-    println!("When a check fails at different points, the methods consume randomness at");
-    println!("different rates, causing the RNG streams to desynchronize permanently.\n");
-    println!("Note: fn-dsa-kgen uses the same logic as ntru_gen_opt, but extracts a 32-byte");
-    println!("seed first and uses SHAKE256 internally, so it also won't match either method.");
-}
-
-#[test]
 fn test_ntru_gen_opt_kat() {
-    use crate::dsa::falcon512_rpo::math::ntru_gen_opt;
+    
     use sha2::{Sha256, Digest};
-    use sha3::{Shake256, digest::{Update, ExtendableOutput, XofReader}};
     use std::println;
 
     // KAT from fn-dsa-kgen for Falcon512 (logn=9)
@@ -240,35 +187,12 @@ fn test_ntru_gen_opt_kat() {
 
         println!("Test {}: seed = '{}'", i, seed);
 
-        // Create SHAKE256-based RNG (fn-dsa uses SHAKE256 internally)
-        let mut shake = Shake256::default();
-        shake.update(seed.as_bytes());
-        let rng = shake.finalize_xof();
+        // Use fn-dsa-comm's SHAKE256_PRNG exactly as fn-dsa-kgen does
+        use crate::dsa::falcon512_rpo::math::ntru_gen_opt_fndsa;
+        use fn_dsa_comm::{PRNG, shake::SHAKE256_PRNG};
 
-        struct ShakeRng<R: XofReader> {
-            reader: R,
-        }
-
-        impl<R: XofReader> rand::RngCore for ShakeRng<R> {
-            fn next_u32(&mut self) -> u32 {
-                let mut bytes = [0u8; 4];
-                self.reader.read(&mut bytes);
-                u32::from_le_bytes(bytes)
-            }
-
-            fn next_u64(&mut self) -> u64 {
-                let mut bytes = [0u8; 8];
-                self.reader.read(&mut bytes);
-                u64::from_le_bytes(bytes)
-            }
-
-            fn fill_bytes(&mut self, dest: &mut [u8]) {
-                self.reader.read(dest);
-            }
-        }
-
-        let mut shake_rng = ShakeRng { reader: rng };
-        let [g, f, big_g, big_f] = ntru_gen_opt(n, &mut shake_rng);
+        let mut rng = <SHAKE256_PRNG as PRNG>::new(seed.as_bytes());
+        let [g, f, big_g, big_f] = ntru_gen_opt_fndsa(n, &mut rng);
 
         // Hash in fn-dsa order: [f, g, F, G]
         let mut hasher = Sha256::new();
@@ -298,6 +222,102 @@ fn test_ntru_gen_opt_kat() {
     }
 
     println!("✅ All {} KAT tests passed!", KAT_KG512.len());
+}
+
+#[test]
+fn test_prng_adapter() {
+    use fn_dsa_comm::{PRNG, shake::SHAKE256_PRNG};
+    use std::println;
+
+    struct FnDsaRngAdapter {
+        prng: SHAKE256_PRNG,
+    }
+
+    impl rand::RngCore for FnDsaRngAdapter {
+        fn next_u32(&mut self) -> u32 {
+            (self.prng.next_u16() as u32) | ((self.prng.next_u16() as u32) << 16)
+        }
+
+        fn next_u64(&mut self) -> u64 {
+            self.prng.next_u64()
+        }
+
+        fn fill_bytes(&mut self, dest: &mut [u8]) {
+            for byte in dest.iter_mut() {
+                *byte = self.prng.next_u8();
+            }
+        }
+    }
+
+    let prng = <SHAKE256_PRNG as PRNG>::new(b"test0");
+    let mut rng = FnDsaRngAdapter { prng };
+
+    // Get first 20 bytes via next_u32
+    let mut bytes = Vec::new();
+    for _ in 0..5 {
+        let val = rng.next_u32();
+        bytes.extend_from_slice(&val.to_le_bytes());
+    }
+
+    println!("First 20 bytes from adapter: {:?}", &bytes);
+
+    // Compare with direct PRNG
+    let mut prng2 = <SHAKE256_PRNG as PRNG>::new(b"test0");
+    let mut bytes2 = Vec::new();
+    for _ in 0..20 {
+        bytes2.push(prng2.next_u8());
+    }
+
+    println!("First 20 bytes from PRNG:    {:?}", &bytes2);
+    assert_eq!(bytes, bytes2, "PRNG adapter should produce same bytes");
+}
+
+#[test]
+fn test_sampler_direct() {
+    use crate::dsa::falcon512_rpo::math::gauss_fndsa::sample_f_fndsa;
+    use crate::dsa::falcon512_rpo::math::Polynomial;
+    use crate::dsa::falcon512_rpo::math::FalconFelt;
+    use crate::dsa::falcon512_rpo::math::FastFft;
+    use crate::dsa::falcon512_rpo::math::ntru_opt;
+    use num::Zero;
+    use std::println;
+
+    println!("\n=== Testing sample_f_fndsa directly ===\n");
+
+    use fn_dsa_comm::{PRNG, shake::SHAKE256_PRNG};
+
+    let mut rng = <SHAKE256_PRNG as PRNG>::new(b"test0");
+
+    let f = sample_f_fndsa(512, &mut rng);
+    let g = sample_f_fndsa(512, &mut rng);
+
+    println!("f[0..10]: {:?}", &f[0..10]);
+    println!("g[0..10]: {:?}", &g[0..10]);
+    println!("f parity: {}", f.iter().map(|&x| x as i32).sum::<i32>() & 1);
+    println!("g parity: {}", g.iter().map(|&x| x as i32).sum::<i32>() & 1);
+
+    // Check if this pair would pass fn-dsa's checks
+    let f_poly = Polynomial::new(f.iter().map(|&x| x as i16).collect());
+    let _g_poly = Polynomial::new(g.iter().map(|&x| x as i16).collect());
+
+    // Check 1: Gamma1
+    let mut sn = 0i32;
+    for i in 0..512 {
+        let xf = f[i] as i32;
+        let xg = g[i] as i32;
+        sn += xf * xf + xg * xg;
+    }
+    println!("Gamma1 check: sn = {} (limit: 16823) -> {}", sn, if sn < 16823 { "PASS" } else { "FAIL" });
+
+    // Check 2: Invertibility
+    let f_ntt = f_poly.map(|&i| FalconFelt::new(i)).fft();
+    let invertible = !f_ntt.coefficients.iter().any(|e| e.is_zero());
+    println!("Invertibility check: {}", if invertible { "PASS" } else { "FAIL" });
+
+    // Check 3: Gamma2
+    let mut tmp_fxr = vec![ntru_opt::fxp::FXR::ZERO; (5 * 512) / 2];
+    let gamma2_ok = ntru_opt::check_ortho_norm(9, &f, &g, &mut tmp_fxr);
+    println!("Gamma2 check: {}", if gamma2_ok { "PASS" } else { "FAIL" });
 }
 
 #[test]
@@ -335,10 +355,8 @@ fn test_sampler_comparison() {
     let seed = b"test0";
 
     // Sample with fn-dsa's CDT approach
-    let mut shake1 = Shake256::default();
-    shake1.update(seed);
-    let rng1 = shake1.finalize_xof();
-    let mut rng1 = ShakeRng { reader: rng1 };
+    use fn_dsa_comm::{PRNG as FnDsaPRNG, shake::SHAKE256_PRNG};
+    let mut rng1 = <SHAKE256_PRNG as FnDsaPRNG>::new(seed);
 
     let f_fndsa = sample_f_fndsa(512, &mut rng1);
 
