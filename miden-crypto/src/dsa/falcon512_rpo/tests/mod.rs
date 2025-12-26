@@ -115,52 +115,6 @@ fn test_signature_determinism() {
 }
 
 #[test]
-fn test_flr_and_legacy_signing_match() {
-    use crate::Word;
-    use crate::dsa::falcon512_rpo::{Nonce, hash_to_point::hash_to_point_rpo256};
-    use rand::SeedableRng;
-    use rand_chacha::ChaCha20Rng;
-
-    let message = Word::new([crate::ONE; 4]);
-    let iterations = 10;
-
-    for i in 0..iterations {
-        // Generate a fresh key with unique seed
-        let mut keygen_seed = [0u8; 32];
-        keygen_seed[0] = i;
-        let mut rng = ChaCha20Rng::from_seed(keygen_seed);
-        let sk = SecretKey::with_rng(&mut rng);
-
-        // Hash message to polynomial
-        let nonce = Nonce::deterministic();
-        let c = hash_to_point_rpo256(message, &nonce);
-
-        // Create two RNGs with the same seed for signing
-        let mut signing_seed = [0u8; 32];
-        signing_seed[0] = i;
-        signing_seed[1] = 0xff;
-        let mut rng_flr = ChaCha20Rng::from_seed(signing_seed);
-        let mut rng_legacy = ChaCha20Rng::from_seed(signing_seed);
-
-        // Sign with both methods
-        let sig_flr = sk.sign_helper(c.clone(), &mut rng_flr);
-        let sig_legacy = sk.sign_helper_legacy(c, &mut rng_legacy);
-
-        // Compare signatures
-        let sig_flr_coef: Vec<i16> =
-            sig_flr.coefficients.iter().map(|c| c.balanced_value()).collect();
-        let sig_legacy_coef: Vec<i16> =
-            sig_legacy.coefficients.iter().map(|c| c.balanced_value()).collect();
-
-        assert_eq!(
-            sig_flr_coef, sig_legacy_coef,
-            "Iteration {}: FLR and legacy signatures should match",
-            i
-        );
-    }
-}
-
-#[test]
 fn test_ntru_gen_opt_kat() {
     
     use sha2::{Sha256, Digest};
@@ -188,11 +142,11 @@ fn test_ntru_gen_opt_kat() {
         println!("Test {}: seed = '{}'", i, seed);
 
         // Use fn-dsa-comm's SHAKE256_PRNG exactly as fn-dsa-kgen does
-        use crate::dsa::falcon512_rpo::math::ntru_gen_fndsa;
+        use crate::dsa::falcon512_rpo::math::ntru_gen;
         use fn_dsa_comm::{PRNG, shake::SHAKE256_PRNG};
 
         let mut rng = <SHAKE256_PRNG as PRNG>::new(seed.as_bytes());
-        let [g, f, big_g, big_f] = ntru_gen_fndsa(n, &mut rng);
+        let [g, f, big_g, big_f] = ntru_gen(n, &mut rng);
 
         // Hash in fn-dsa order: [f, g, F, G]
         let mut hasher = Sha256::new();
@@ -222,54 +176,6 @@ fn test_ntru_gen_opt_kat() {
     }
 
     println!("All {} KAT tests passed!", KAT_KG512.len());
-}
-
-#[test]
-fn test_sampler_direct() {
-    use crate::dsa::falcon512_rpo::math::gauss_fndsa::sample_f_fndsa;
-    use crate::dsa::falcon512_rpo::math::Polynomial;
-    use crate::dsa::falcon512_rpo::math::FalconFelt;
-    use crate::dsa::falcon512_rpo::math::FastFft;
-    use crate::dsa::falcon512_rpo::math::ntru_opt;
-    use num::Zero;
-    use std::println;
-
-    println!("\n=== Testing sample_f_fndsa directly ===\n");
-
-    use fn_dsa_comm::{PRNG, shake::SHAKE256_PRNG};
-
-    let mut rng = <SHAKE256_PRNG as PRNG>::new(b"test0");
-
-    let f = sample_f_fndsa(512, &mut rng);
-    let g = sample_f_fndsa(512, &mut rng);
-
-    println!("f[0..10]: {:?}", &f[0..10]);
-    println!("g[0..10]: {:?}", &g[0..10]);
-    println!("f parity: {}", f.iter().map(|&x| x as i32).sum::<i32>() & 1);
-    println!("g parity: {}", g.iter().map(|&x| x as i32).sum::<i32>() & 1);
-
-    // Check if this pair would pass fn-dsa's checks
-    let f_poly = Polynomial::new(f.iter().map(|&x| x as i16).collect());
-    let _g_poly = Polynomial::new(g.iter().map(|&x| x as i16).collect());
-
-    // Check 1: Gamma1
-    let mut sn = 0i32;
-    for i in 0..512 {
-        let xf = f[i] as i32;
-        let xg = g[i] as i32;
-        sn += xf * xf + xg * xg;
-    }
-    println!("Gamma1 check: sn = {} (limit: 16823) -> {}", sn, if sn < 16823 { "PASS" } else { "FAIL" });
-
-    // Check 2: Invertibility
-    let f_ntt = f_poly.map(|&i| FalconFelt::new(i)).fft();
-    let invertible = !f_ntt.coefficients.iter().any(|e| e.is_zero());
-    println!("Invertibility check: {}", if invertible { "PASS" } else { "FAIL" });
-
-    // Check 3: Gamma2
-    let mut tmp_fxr = vec![ntru_opt::fxp::FXR::ZERO; (5 * 512) / 2];
-    let gamma2_ok = ntru_opt::check_ortho_norm(9, &f, &g, &mut tmp_fxr);
-    println!("Gamma2 check: {}", if gamma2_ok { "PASS" } else { "FAIL" });
 }
 
 #[test]

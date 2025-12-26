@@ -8,8 +8,6 @@ pub use public_key::PublicKey;
 
 mod secret_key;
 pub use secret_key::SecretKey;
-#[cfg(test)]
-pub(crate) use secret_key::{WIDTH_BIG_POLY_COEFFICIENT, WIDTH_SMALL_POLY_COEFFICIENT};
 
 // TESTS
 // ================================================================================================

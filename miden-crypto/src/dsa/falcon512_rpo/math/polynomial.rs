@@ -170,17 +170,6 @@ impl<
     }
 }
 
-impl<F: Clone + Into<f64>> Polynomial<F> {
-    #[cfg(test)]
-    pub(crate) fn l2_norm_squared(&self) -> f64 {
-        self.coefficients
-            .iter()
-            .map(|i| Into::<f64>::into(i.clone()))
-            .map(|i| i * i)
-            .sum::<f64>()
-    }
-}
-
 impl<F> PartialEq for Polynomial<F>
 where
     F: Zero + PartialEq + Clone + AddAssign,

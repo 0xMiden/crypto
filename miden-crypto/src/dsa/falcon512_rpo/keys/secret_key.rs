@@ -1,15 +1,13 @@
 use alloc::{string::ToString, vec::Vec};
 
 use miden_crypto_derive::{SilentDebug, SilentDisplay};
-use num::Complex;
-use num_complex::Complex64;
 use rand::Rng;
 
 use super::{
     super::{
         ByteReader, ByteWriter, Deserializable, DeserializationError, MODULUS, N, Nonce,
-        SIG_L2_BOUND, SIGMA, Serializable, ShortLatticeBasis, Signature,
-        math::{FalconFelt, FastFft, LdlTree, Polynomial, ffldl, flr::FLR, gram, normalize_tree},
+        SIG_L2_BOUND, Serializable, ShortLatticeBasis, Signature,
+        math::{FalconFelt, FastFft, Polynomial, flr::FLR},
         signature::SignaturePoly,
     },
     PublicKey,
@@ -30,7 +28,7 @@ pub(crate) const WIDTH_SMALL_POLY_COEFFICIENT: usize = 6;
 // RNG ADAPTER
 // ================================================================================================
 
-use super::super::math::sampler_flr::SamplerRng;
+use super::super::math::flr::sampler::SamplerRng;
 
 /// Adapter to make a `Rng` compatible with `SamplerRng` trait.
 struct RngAdapter<R: Rng> {
@@ -85,7 +83,6 @@ impl<R: Rng> SamplerRng for RngAdapter<R> {
 #[derive(Clone, SilentDebug, SilentDisplay)]
 pub struct SecretKey {
     secret_key: ShortLatticeBasis,
-    tree: LdlTree,
     /// Precomputed basis B = [[g, -f], [G, -F]] in FFT format using FLR arithmetic.
     /// This is used for fast signing with the FLR-based sampler.
     /// Layout: [b00, b01, b10, b11] where each is N FLR values in FFT domain.
@@ -95,7 +92,6 @@ pub struct SecretKey {
 impl Zeroize for SecretKey {
     fn zeroize(&mut self) {
         self.secret_key.zeroize();
-        self.tree.zeroize();
         // Manually zeroize FLR array
         for i in 0..self.basis_fft_flr.len() {
             self.basis_fft_flr[i] = FLR::ZERO;
@@ -127,7 +123,7 @@ impl SecretKey {
 
     /// Generates a secret_key using the provided random number generator `Rng`.
     pub fn with_rng<R: Rng>(rng: &mut R) -> Self {
-        use crate::dsa::falcon512_rpo::math::ntru_gen_fndsa;
+        use crate::dsa::falcon512_rpo::math::ntru_gen;
         use fn_dsa_comm::PRNG;
 
         // we use fn-dsa's SHAKE256_PRNG seeded with `rng`
@@ -137,7 +133,7 @@ impl SecretKey {
         rng.fill_bytes(&mut seed);
         let mut prng = <fn_dsa_comm::shake::SHAKE256_PRNG as PRNG>::new(&seed);
 
-        let basis = ntru_gen_fndsa(N, &mut prng);
+        let basis = ntru_gen(N, &mut prng);
 
         // Zeroize the seed to prevent leaking secret material
         seed.zeroize();
@@ -145,25 +141,14 @@ impl SecretKey {
         Self::from_short_lattice_basis(basis)
     }
 
-    /// Given a short basis [g, f, G, F], computes the normalized LDL tree i.e., Falcon tree.
+    /// Given a short basis [g, f, G, F], precomputes the FLR basis in FFT format.
     /// Note: The basis is stored as [g, f, G, F]; negations to form [[g, -f], [G, -F]] are
-    /// applied in to_complex_fft.
+    /// applied during FLR basis computation.
     pub(crate) fn from_short_lattice_basis(basis: ShortLatticeBasis) -> SecretKey {
-        // FFT each polynomial of the short basis for Complex64 LDL tree
-        // to_complex_fft returns [FFT(g), FFT(-f), FFT(G), FFT(-F)] for signing basis
-        let basis_fft = to_complex_fft(&basis);
-
-        // compute the Gram matrix for the signing basis [[g, -f], [G, -F]]
-        let gram_fft = gram(basis_fft);
-        // construct the LDL tree of the Gram matrix.
-        let mut tree = ffldl(gram_fft);
-        // normalize the leaves of the LDL tree.
-        normalize_tree(&mut tree, SIGMA);
-
         // Precompute FLR basis in FFT format for fast signing
         let basis_fft_flr = Self::compute_basis_fft_flr(&basis);
 
-        Self { secret_key: basis, tree, basis_fft_flr }
+        Self { secret_key: basis, basis_fft_flr }
     }
 
     // PUBLIC ACCESSORS
@@ -177,11 +162,6 @@ impl SecretKey {
     /// Returns the public key corresponding to this secret key.
     pub fn public_key(&self) -> PublicKey {
         self.compute_pub_key_poly()
-    }
-
-    /// Returns the LDL tree associated to this secret key.
-    pub fn tree(&self) -> &LdlTree {
-        &self.tree
     }
 
     // SIGNATURE GENERATION
@@ -262,10 +242,10 @@ impl SecretKey {
     /// Takes a randomness generator implementing `Rng` and message polynomial representing `c`
     /// the hash-to-point of the message to be signed. It outputs a signature polynomial `s2`.
     pub(crate) fn sign_helper<R: Rng>(&self, c: Polynomial<FalconFelt>, rng: &mut R) -> SignaturePoly {
-        use super::super::math::poly_flr::{
+        use super::super::math::flr::poly::{
             FFT, iFFT, poly_add, poly_mul_fft, poly_muladj_fft, poly_mulconst, poly_mulownadj_fft,
         };
-        use super::super::math::sampler_flr::Sampler;
+        use super::super::math::flr::sampler::Sampler;
         const LOGN_U32: u32 = LOG_N as u32;
 
         // Use precomputed FFT basis B = [[g, -f], [G, -F]]
@@ -425,66 +405,11 @@ impl SecretKey {
         }
     }
 
-    #[cfg(test)]
-    pub(crate) fn sign_helper_legacy<R: Rng>(
-        &self,
-        c: Polynomial<FalconFelt>,
-        rng: &mut R,
-    ) -> SignaturePoly {
-        use super::super::math::ffsampling;
-
-        let one_over_q = 1.0 / (MODULUS as f64);
-        let c_over_q_fft = c.map(|cc| Complex::new(one_over_q * cc.value() as f64, 0.0)).fft();
-
-        // B = [[FFT(g), -FFT(f)], [FFT(G), -FFT(F)]]
-        let [g_fft, minus_f_fft, big_g_fft, minus_big_f_fft] = to_complex_fft(&self.secret_key);
-        let t0 = c_over_q_fft.hadamard_mul(&minus_big_f_fft);
-        let t1 = -c_over_q_fft.hadamard_mul(&minus_f_fft);
-
-        loop {
-            let bold_s = loop {
-                let z = ffsampling(&(t0.clone(), t1.clone()), &self.tree, rng);
-                let t0_min_z0 = t0.clone() - z.0;
-                let t1_min_z1 = t1.clone() - z.1;
-
-                // s = (t-z) * B
-                let s0 = t0_min_z0.hadamard_mul(&g_fft) + t1_min_z1.hadamard_mul(&big_g_fft);
-                let s1 =
-                    t0_min_z0.hadamard_mul(&minus_f_fft) + t1_min_z1.hadamard_mul(&minus_big_f_fft);
-
-                // compute the norm of (s0||s1) and note that they are in FFT representation
-                let length_squared: f64 =
-                    (s0.coefficients.iter().map(|a| (a * a.conj()).re).sum::<f64>()
-                        + s1.coefficients.iter().map(|a| (a * a.conj()).re).sum::<f64>())
-                        / (N as f64);
-
-                if length_squared > (SIG_L2_BOUND as f64) {
-                    continue;
-                }
-
-                break [-s0, s1];
-            };
-
-            let s2 = bold_s[1].ifft();
-            let s2_coef: [i16; N] = s2
-                .coefficients
-                .iter()
-                .map(|a| a.re.round() as i16)
-                .collect::<Vec<i16>>()
-                .try_into()
-                .expect("The number of coefficients should be equal to N");
-
-            if let Ok(s2) = SignaturePoly::try_from(&s2_coef) {
-                return s2;
-            }
-        }
-    }
-
     /// Computes the FLR basis B = [[g, -f], [G, -F]] in FFT format.
     /// Returns an array [b00, b01, b10, b11] where each is N FLR values in FFT domain.
     /// This follows fn-dsa's compute_basis_inner approach for precomputation during keygen.
     fn compute_basis_fft_flr(basis: &ShortLatticeBasis) -> [FLR; 4 * N] {
-        use super::super::math::poly_flr::{FFT, poly_set_small};
+        use super::super::math::flr::poly::{FFT, poly_set_small};
         use core::array;
         const LOGN_U32: u32 = LOG_N as u32;
 
@@ -680,17 +605,6 @@ impl Deserializable for SecretKey {
 // ================================================================================================
 
 /// Computes the complex FFT of the secret key polynomials.
-/// Returns [FFT(g), FFT(-f), FFT(G), FFT(-F)] for the signing basis [[g, -f], [G, -F]].
-/// This is used for both the LDL tree computation and legacy signing.
-fn to_complex_fft(basis: &[Polynomial<i16>; 4]) -> [Polynomial<Complex<f64>>; 4] {
-    let [g, f, big_g, big_f] = basis.clone();
-    let g_fft = g.map(|cc| Complex64::new(*cc as f64, 0.0)).fft();
-    let minus_f_fft = f.map(|cc| -Complex64::new(*cc as f64, 0.0)).fft();
-    let big_g_fft = big_g.map(|cc| Complex64::new(*cc as f64, 0.0)).fft();
-    let minus_big_f_fft = big_f.map(|cc| -Complex64::new(*cc as f64, 0.0)).fft();
-    [g_fft, minus_f_fft, big_g_fft, minus_big_f_fft]
-}
-
 /// Encodes a sequence of signed integers such that each integer x satisfies |x| < 2^(bits-1)
 /// for a given parameter bits. bits can take either the value 6 or 8.
 #[allow(dead_code)]

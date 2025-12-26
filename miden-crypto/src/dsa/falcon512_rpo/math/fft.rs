@@ -20,10 +20,6 @@ pub trait FastFft: Sized + Clone {
         a
     }
 
-    #[allow(dead_code)] // Utility method for future use
-    fn merge_fft(a: &Self, b: &Self) -> Self;
-    fn split_fft(&self) -> (Self, Self);
-
     fn ifft_inplace(&mut self);
     fn ifft(&self) -> Self {
         let mut a = self.clone();
@@ -189,32 +185,6 @@ where
         }
     }
 
-    fn split_fft(f: &[Self], psi_inv_rev: &[Self]) -> (Vec<Self>, Vec<Self>) {
-        let n_over_2 = f.len() / 2;
-        let mut f0 = vec![Self::zero(); n_over_2];
-        let mut f1 = vec![Self::zero(); n_over_2];
-        let two_inv = (Self::one() + Self::one()).inverse_or_zero();
-        for i in 0..n_over_2 {
-            let two_i = i * 2;
-            let two_zeta_inv = two_inv * psi_inv_rev[n_over_2 + i];
-            f0[i] = two_inv * (f[two_i] + f[two_i + 1]);
-            f1[i] = two_zeta_inv * (f[two_i] - f[two_i + 1]);
-        }
-        (f0, f1)
-    }
-
-    #[allow(dead_code)] // Utility method for future use
-    fn merge_fft(f0: &[Self], f1: &[Self], psi_rev: &[Self]) -> Vec<Self> {
-        let n_over_2 = f0.len();
-        let n = 2 * n_over_2;
-        let mut f = vec![Self::zero(); n];
-        for i in 0..n_over_2 {
-            let two_i = i * 2;
-            f[two_i] = f0[i] + psi_rev[n_over_2 + i] * f1[i];
-            f[two_i + 1] = f0[i] - psi_rev[n_over_2 + i] * f1[i];
-        }
-        f
-    }
 }
 
 impl CyclotomicFourier for Complex64 {
@@ -272,33 +242,6 @@ impl FastFft for Polynomial<Complex64> {
         let ninv = Complex64::new(1.0 / (n as f64), 0.0);
         Complex64::ifft(&mut self.coefficients, &psi_inv_rev, ninv);
     }
-
-    fn merge_fft(a: &Self, b: &Self) -> Self {
-        let n = a.coefficients.len();
-        debug_assert!(
-            (1..=512).contains(&n),
-            "unsupported: n = {n} not a power of 2 or larger than 512"
-        );
-        Self {
-            coefficients: Self::Field::merge_fft(
-                &a.coefficients,
-                &b.coefficients,
-                &COMPLEX_BITREVERSED_POWERS,
-            ),
-        }
-    }
-
-    fn split_fft(&self) -> (Self, Self) {
-        let n = self.coefficients.len();
-        debug_assert!(
-            (1..=512).contains(&n),
-            "unsupported: n = {n} not a power of 2 or larger than 512"
-        );
-        let psi_inv_rev: Vec<Complex64> =
-            COMPLEX_BITREVERSED_POWERS.iter().map(|c| Complex64::new(c.re, -c.im)).collect();
-        let (a, b) = Self::Field::split_fft(&self.coefficients, &psi_inv_rev);
-        (Self { coefficients: a }, Self { coefficients: b })
-    }
 }
 
 impl FastFft for Polynomial<FalconFelt> {
@@ -333,31 +276,6 @@ impl FastFft for Polynomial<FalconFelt> {
             _ => unreachable!("vector length is not power of 2 or larger than 512"),
         };
         FalconFelt::ifft(&mut self.coefficients, &FELT_BITREVERSED_POWERS_INVERSE, ninv);
-    }
-
-    fn merge_fft(a: &Self, b: &Self) -> Self {
-        let n = a.coefficients.len();
-        debug_assert!(
-            (1..=512).contains(&n),
-            "unsupported: n = {n} not a power of 2 or larger than 512"
-        );
-        Self {
-            coefficients: Self::Field::merge_fft(
-                &a.coefficients,
-                &b.coefficients,
-                &FELT_BITREVERSED_POWERS,
-            ),
-        }
-    }
-
-    fn split_fft(&self) -> (Self, Self) {
-        let n = self.coefficients.len();
-        debug_assert!(
-            (1..=512).contains(&n),
-            "unsupported: n = {n} not a power of 2 or larger than 512"
-        );
-        let (a, b) = Self::Field::split_fft(&self.coefficients, &FELT_BITREVERSED_POWERS_INVERSE);
-        (Self { coefficients: a }, Self { coefficients: b })
     }
 }
 

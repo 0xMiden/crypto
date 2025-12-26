@@ -27,7 +27,7 @@
 use super::FLR;
 
 #[cfg(target_arch = "x86_64")]
-use super::poly_flr_avx2;
+use super::poly_avx2;
 
 // ========================================================================
 // Complex multiplication for FLR
@@ -2103,7 +2103,7 @@ pub(crate) const GM: [FLR; 2048] = [
 #[inline]
 pub(crate) fn FFT_dispatch(logn: u32, f: &mut [FLR]) {
     if is_x86_feature_detected!("avx2") {
-        unsafe { poly_flr_avx2::FFT(logn, f) }
+        unsafe { poly_avx2::FFT(logn, f) }
     } else {
         FFT_impl(logn, f)
     }
@@ -2114,7 +2114,7 @@ pub(crate) fn FFT_dispatch(logn: u32, f: &mut [FLR]) {
 #[inline]
 pub(crate) fn iFFT_dispatch(logn: u32, f: &mut [FLR]) {
     if is_x86_feature_detected!("avx2") {
-        unsafe { poly_flr_avx2::iFFT(logn, f) }
+        unsafe { poly_avx2::iFFT(logn, f) }
     } else {
         iFFT_impl(logn, f)
     }

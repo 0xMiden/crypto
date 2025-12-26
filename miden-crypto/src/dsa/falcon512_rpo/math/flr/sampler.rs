@@ -22,8 +22,8 @@ use sha3::{
 };
 
 use super::{
-    flr::FLR,
-    poly_flr::{
+    FLR,
+    poly::{
         flc_mul, poly_LDL_fft, poly_add, poly_merge_fft, poly_mul_fft, poly_split_fft,
         poly_split_selfadj_fft, poly_sub,
     },
@@ -885,7 +885,7 @@ mod tests {
     /// cargo test --lib gen_ffsamp_vectors_for_miden -- --nocapture --ignored
     #[test]
     fn test_ffsamp_fft_cross_impl() {
-        use crate::dsa::falcon512_rpo::math::poly_flr::{FFT, poly_set_small};
+        use crate::dsa::falcon512_rpo::math::flr::poly::{FFT, poly_set_small};
 
         const LOGN: u32 = 3; // Use small degree for testing (n=8)
         const N: usize = 1 << LOGN;
