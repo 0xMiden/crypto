@@ -1,12 +1,12 @@
 use alloc::collections::{BTreeMap, BTreeSet};
 
 use assert_matches::assert_matches;
-use rand_utils::{rand_array, rand_value};
-use winter_math::fields::f64::BaseElement as Felt;
 
 use super::{PartialSmt, SMT_DEPTH};
+#[cfg(any(test, feature = "std"))]
+use crate::test_utils::{rand_array, rand_value};
 use crate::{
-    EMPTY_WORD, ONE, Word, ZERO,
+    EMPTY_WORD, Felt, ONE, Word, ZERO,
     merkle::{
         EmptySubtreeRoots, MerkleError,
         smt::{Smt, SmtLeaf},

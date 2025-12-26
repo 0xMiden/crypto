@@ -917,7 +917,7 @@ mod tests {
     #[test]
     fn test_partial_mmr_untrack_returns_removed_nodes() {
         // build the MMR
-        let mmr: Mmr = LEAVES.into();
+        let mmr: Mmr = leaves().into();
 
         // get path and node for position 1
         let node1 = mmr.get(1).unwrap();
@@ -947,7 +947,7 @@ mod tests {
     #[test]
     fn test_partial_mmr_untrack_shared_nodes() {
         // build the MMR
-        let mmr: Mmr = LEAVES.into();
+        let mmr: Mmr = leaves().into();
 
         // track two sibling leaves
         let node0 = mmr.get(0).unwrap();
