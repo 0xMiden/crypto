@@ -133,11 +133,13 @@ impl SecretKey {
 
     /// Given a short basis [g, f, G, F], computes the normalized LDL tree i.e., Falcon tree.
     /// Note: The basis is stored as [g, f, G, F]; negations to form [[g, -f], [G, -F]] are
-    /// applied during signing.
+    /// applied in to_complex_fft.
     pub(crate) fn from_short_lattice_basis(basis: ShortLatticeBasis) -> SecretKey {
         // FFT each polynomial of the short basis for Complex64 LDL tree
+        // to_complex_fft returns [FFT(g), FFT(-f), FFT(G), FFT(-F)] for signing basis
         let basis_fft = to_complex_fft(&basis);
-        // compute the Gram matrix.
+
+        // compute the Gram matrix for the signing basis [[g, -f], [G, -F]]
         let gram_fft = gram(basis_fft);
         // construct the LDL tree of the Gram matrix.
         let mut tree = ffldl(gram_fft);
@@ -231,8 +233,7 @@ impl SecretKey {
     fn compute_pub_key_poly(&self) -> PublicKey {
         let g: Polynomial<FalconFelt> = self.secret_key[0].clone().into();
         let g_fft = g.fft();
-        let minus_f: Polynomial<FalconFelt> = self.secret_key[1].clone().into();
-        let f = -minus_f;
+        let f: Polynomial<FalconFelt> = self.secret_key[1].clone().into();
         let f_fft = f.fft();
         let h_fft = g_fft.hadamard_div(&f_fft);
         h_fft.ifft().into()
@@ -250,18 +251,6 @@ impl SecretKey {
         self.sign_helper_flr(c, rng)
     }
 
-    /// This is a reference implementation that uses Complex64 arithmetic for floating-point
-    /// operations. It computes the signature using the LDL tree-based fast Fourier sampling.
-    ///
-    /// # Algorithm
-    /// 1. Compute target vectors: t0 = -(c/q) * F, t1 = (c/q) * f
-    /// 2. Sample z = (z0, z1) from a discrete Gaussian distribution
-    /// 3. Compute s = (t - z) * B where B is the secret key basis
-    /// 4. Check if ||s|| is within bounds and retry if needed
-    ///
-    /// Note: This method is kept as a reference implementation even though it's not used
-    /// in production code (which uses `sign_helper_flr` instead).
-    #[allow(dead_code)]
     #[cfg(test)]
     pub(crate) fn sign_helper_legacy<R: Rng>(
         &self,
@@ -363,9 +352,6 @@ impl SecretKey {
         result
     }
 
-    /// Signs using FLR-based implementation with precomputed FFT basis.
-    /// This is the optimized signing path that uses precomputed basis_fft_flr.
-    #[allow(clippy::needless_range_loop)] // Index-based loops match fn-dsa implementation style
     pub(crate) fn sign_helper_flr<R: Rng>(
         &self,
         c: Polynomial<FalconFelt>,
@@ -688,6 +674,8 @@ impl Deserializable for SecretKey {
 // ================================================================================================
 
 /// Computes the complex FFT of the secret key polynomials.
+/// Returns [FFT(g), FFT(-f), FFT(G), FFT(-F)] for the signing basis [[g, -f], [G, -F]].
+/// This is used for both the LDL tree computation and legacy signing.
 fn to_complex_fft(basis: &[Polynomial<i16>; 4]) -> [Polynomial<Complex<f64>>; 4] {
     let [g, f, big_g, big_f] = basis.clone();
     let g_fft = g.map(|cc| Complex64::new(*cc as f64, 0.0)).fft();

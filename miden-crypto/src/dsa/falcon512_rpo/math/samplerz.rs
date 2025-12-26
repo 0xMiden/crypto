@@ -168,4 +168,129 @@ mod test {
             );
         }
     }
+
+    /// Test that legacy sampler_z matches official Falcon KAT vectors
+    #[test]
+    fn test_legacy_sampler_kat_falcon512() {
+        use super::super::flr::FLR;
+        use super::sampler_z;
+        use alloc::vec::Vec;
+        use rand::RngCore;
+        use rand_core::impls;
+        use std::println;
+        // Same KAT as FLR sampler test - first 10 from official Falcon512 vectors
+        const KAT_RND_HEX: &str = concat!(
+            "C5442FF043D66E910FD1EAC64EA5450A22941ECADC6CDA0F8D8444D1A772F465",
+            "C26F98BBBB4BEE7DB8EFD9B347F6D7FB9B19F25CDB36D6334D477A8BC0BE68B9",
+            "145D41B4F5209665C74DAE00DCA8168A7BB516B319C10CB41DED26CD52AED770",
+            "2CECA7334E0547BCC3C163DDCE0B054166C1012780C63103AE833CEC73F2F41C",
+            "A59B807C9C92158834632F9BC815557E9D68A50A06DBBC7364778DDD14BF0BF2",
+            "2061A9D632BF6818A68F7AB9993C15148633F5BFA5D268486F668E5DDD46958E",
+            "9763043D10587C2BC6C25F5C5EE53F2783C4361FBC7CC91DC7833AE20A443C59",
+            "574C2C3B0745E2E1071E6D133DBE3275D94B0AC116ED60C258E2CB6AAEAB8C48",
+            "23E6DA36E18D7208DA0CC104E21CC7FD1F5D5CA8DBB675266C928448D9059E16",
+            "3BC1E2CBF3E18E687426A1B51D76222A705AD60259523BFAA8A394BF4EF0A5C1",
+            "842366FDE286D6A30F0803BD87E63374CEE6218727FC31104AAB64F136A06948",
+            "5B2EADBC08EA77ED1CE7282332C29BEF5FF255BB36BA7DE8FBAD926A8748EF11",
+            "BD3D5D7EEC0DEC4AB54775669AD5113B6D846510284427BBFAD1B91B1F32C7D6",
+            "685CF27A2DE77F5B02549FB27829B2BD367EE80FCCF30135AEFDF86C0EF4AD07",
+            "6D8F7854042F67F18F2A49BA99EEA6BA65EF008BE154FDCD9DFD32C97F885D20",
+            "EEFEEE41005C53D4AD1BCF824AF04ABB1814BD9CB8B37171705ACECFDC88A5AF",
+        );
+
+        // First 10 (mu, isigma) pairs - using FLR to compute f64 values
+        let kat_params: [(f64, f64); 10] = [
+            (
+                FLR::scaled(-0x16f9e6cb3119a4, -52 + 6).to_f64(),
+                1.0 / FLR::scaled(0x12c8142a489b3c, -52 - 1).to_f64(),
+            ),
+            (
+                FLR::scaled(-0x10a52739d97620, -52 + 3).to_f64(),
+                1.0 / FLR::scaled(0x12c8142a489b3c, -52 - 1).to_f64(),
+            ),
+            (
+                FLR::scaled(-0x1318b5479c9f93, -52 + 4).to_f64(),
+                1.0 / FLR::scaled(0x12c8b0c2363cd8, -52 - 1).to_f64(),
+            ),
+            (
+                FLR::scaled(-0x16abcc6bbdc16d, -52 + 3).to_f64(),
+                1.0 / FLR::scaled(0x12c8b0c2363cd8, -52 - 1).to_f64(),
+            ),
+            (
+                FLR::scaled(0x1fc1339ad7c928, -52 + 2).to_f64(),
+                1.0 / FLR::scaled(0x12d72de0aa39e9, -52 - 1).to_f64(),
+            ),
+            (
+                FLR::scaled(-0x1cfda859ee5568, -52 + 4).to_f64(),
+                1.0 / FLR::scaled(0x12d72de0aa39e9, -52 - 1).to_f64(),
+            ),
+            (
+                FLR::scaled(-0x12247bead535ad, -52 + 3).to_f64(),
+                1.0 / FLR::scaled(0x12d846f69991f7, -52 - 1).to_f64(),
+            ),
+            (
+                FLR::scaled(-0x15f19b18dcaebe, -52 + 5).to_f64(),
+                1.0 / FLR::scaled(0x12d846f69991f7, -52 - 1).to_f64(),
+            ),
+            (
+                FLR::scaled(-0x1d165147c514e3, -52 + 5).to_f64(),
+                1.0 / FLR::scaled(0x12cfb65140b836, -52 - 1).to_f64(),
+            ),
+            (
+                FLR::scaled(-0x15cb17510e2b49, -52 + 5).to_f64(),
+                1.0 / FLR::scaled(0x12cfb65140b836, -52 - 1).to_f64(),
+            ),
+        ];
+
+        // Expected outputs for first 10 samples
+        const KAT_EXPECTED: [i16; 10] = [-92, -8, -20, -12, 8, -30, -10, -41, -61, -46];
+        const SIGMA_MIN: f64 = 1.2778336969128337;
+
+        // Decode RND hex string to bytes
+        let rnd_bytes = hex::decode(KAT_RND_HEX).expect("Failed to decode KAT RND hex");
+
+        // Create RNG that replays the KAT byte stream
+        struct KatRng {
+            bytes: Vec<u8>,
+            pos: usize,
+        }
+
+        impl KatRng {
+            fn new(bytes: Vec<u8>) -> Self {
+                Self { bytes, pos: 0 }
+            }
+        }
+
+        impl RngCore for KatRng {
+            fn next_u32(&mut self) -> u32 {
+                impls::next_u32_via_fill(self)
+            }
+
+            fn next_u64(&mut self) -> u64 {
+                impls::next_u64_via_u32(self)
+            }
+
+            fn fill_bytes(&mut self, dest: &mut [u8]) {
+                for byte in dest.iter_mut() {
+                    *byte = self.bytes[self.pos];
+                    self.pos += 1;
+                }
+            }
+        }
+
+        let mut rng = KatRng::new(rnd_bytes);
+
+        // Test each of the 10 KAT vectors
+        for (i, ((mu, sigma), &expected)) in kat_params.iter().zip(KAT_EXPECTED.iter()).enumerate()
+        {
+            let actual = sampler_z(*mu, *sigma, SIGMA_MIN, &mut rng);
+            assert_eq!(
+                actual, expected,
+                "Legacy KAT mismatch at index {}: expected {}, got {} (mu={}, sigma={})",
+                i, expected, actual, mu, sigma
+            );
+        }
+
+        println!("✅ Legacy sampler passed all 10 Falcon512 KAT vectors!");
+    }
 }
