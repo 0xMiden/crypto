@@ -144,6 +144,65 @@ impl PartialSmt {
             .ok_or(MerkleError::UntrackedKey(*key))
     }
 
+    /// Returns an iterator over the inner nodes of the [`PartialSmt`].
+    pub fn inner_nodes(&self) -> impl Iterator<Item = InnerNodeInfo> + '_ {
+        self.inner_nodes.values().map(|e| InnerNodeInfo {
+            value: e.hash(),
+            left: e.left,
+            right: e.right,
+        })
+    }
+
+    /// Returns an iterator over the [`InnerNode`] and the respective [`NodeIndex`] of the
+    /// [`PartialSmt`].
+    pub fn inner_node_indices(&self) -> impl Iterator<Item = (NodeIndex, InnerNode)> + '_ {
+        self.inner_nodes.iter().map(|(idx, inner)| (*idx, inner.clone()))
+    }
+
+    /// Returns an iterator over the explicitly stored, non-empty leaves of the [`PartialSmt`] in
+    /// arbitrary order.
+    ///
+    /// Note: This only returns leaves that were explicitly added via [`Self::add_path`] or
+    /// [`Self::add_proof`], or created through [`Self::insert`]. It does not include implicitly
+    /// trackable leaves in empty subtrees.
+    pub fn leaves(&self) -> impl Iterator<Item = (LeafIndex<SMT_DEPTH>, &SmtLeaf)> {
+        self.leaves
+            .iter()
+            .filter(|(_, leaf)| !leaf.is_empty())
+            .map(|(leaf_index, leaf)| (LeafIndex::new_max_depth(*leaf_index), leaf))
+    }
+
+    /// Returns an iterator over the tracked, non-empty key-value pairs of the [`PartialSmt`] in
+    /// arbitrary order.
+    pub fn entries(&self) -> impl Iterator<Item = &(Word, Word)> {
+        self.leaves().flat_map(|(_, leaf)| leaf.entries())
+    }
+
+    /// Returns the number of tracked leaves in this tree, which includes empty ones.
+    ///
+    /// Note that this may return a different value from [Self::num_entries()] as a single leaf may
+    /// contain more than one key-value pair.
+    pub fn num_leaves(&self) -> usize {
+        self.leaves.len()
+    }
+
+    /// Returns the number of tracked, non-empty key-value pairs in this tree.
+    ///
+    /// Note that this may return a different value from [Self::num_leaves()] as a single leaf may
+    /// contain more than one key-value pair.
+    pub fn num_entries(&self) -> usize {
+        self.num_entries
+    }
+
+    /// Returns a boolean value indicating whether the [`PartialSmt`] tracks any leaves.
+    ///
+    /// Note that if a partial SMT does not track leaves, its root is not necessarily the empty SMT
+    /// root, since it could have been constructed from a different root but without tracking any
+    /// leaves.
+    pub fn tracks_leaves(&self) -> bool {
+        !self.leaves.is_empty()
+    }
+
     // STATE MUTATORS
     // --------------------------------------------------------------------------------------------
 
@@ -224,65 +283,6 @@ impl PartialSmt {
         }
 
         Ok(())
-    }
-
-    /// Returns an iterator over the inner nodes of the [`PartialSmt`].
-    pub fn inner_nodes(&self) -> impl Iterator<Item = InnerNodeInfo> + '_ {
-        self.inner_nodes.values().map(|e| InnerNodeInfo {
-            value: e.hash(),
-            left: e.left,
-            right: e.right,
-        })
-    }
-
-    /// Returns an iterator over the [`InnerNode`] and the respective [`NodeIndex`] of the
-    /// [`PartialSmt`].
-    pub fn inner_node_indices(&self) -> impl Iterator<Item = (NodeIndex, InnerNode)> + '_ {
-        self.inner_nodes.iter().map(|(idx, inner)| (*idx, inner.clone()))
-    }
-
-    /// Returns an iterator over the explicitly stored, non-empty leaves of the [`PartialSmt`] in
-    /// arbitrary order.
-    ///
-    /// Note: This only returns leaves that were explicitly added via [`Self::add_path`] or
-    /// [`Self::add_proof`], or created through [`Self::insert`]. It does not include implicitly
-    /// trackable leaves in empty subtrees.
-    pub fn leaves(&self) -> impl Iterator<Item = (LeafIndex<SMT_DEPTH>, &SmtLeaf)> {
-        self.leaves
-            .iter()
-            .filter(|(_, leaf)| !leaf.is_empty())
-            .map(|(leaf_index, leaf)| (LeafIndex::new_max_depth(*leaf_index), leaf))
-    }
-
-    /// Returns an iterator over the tracked, non-empty key-value pairs of the [`PartialSmt`] in
-    /// arbitrary order.
-    pub fn entries(&self) -> impl Iterator<Item = &(Word, Word)> {
-        self.leaves().flat_map(|(_, leaf)| leaf.entries())
-    }
-
-    /// Returns the number of tracked leaves in this tree, which includes empty ones.
-    ///
-    /// Note that this may return a different value from [Self::num_entries()] as a single leaf may
-    /// contain more than one key-value pair.
-    pub fn num_leaves(&self) -> usize {
-        self.leaves.len()
-    }
-
-    /// Returns the number of tracked, non-empty key-value pairs in this tree.
-    ///
-    /// Note that this may return a different value from [Self::num_leaves()] as a single leaf may
-    /// contain more than one key-value pair.
-    pub fn num_entries(&self) -> usize {
-        self.num_entries
-    }
-
-    /// Returns a boolean value indicating whether the [`PartialSmt`] tracks any leaves.
-    ///
-    /// Note that if a partial SMT does not track leaves, its root is not necessarily the empty SMT
-    /// root, since it could have been constructed from a different root but without tracking any
-    /// leaves.
-    pub fn tracks_leaves(&self) -> bool {
-        !self.leaves.is_empty()
     }
 
     // PRIVATE HELPERS
@@ -399,7 +399,8 @@ impl PartialSmt {
             .unwrap_or_else(|| EmptySubtreeRoots::get_inner_node(SMT_DEPTH, index.depth()))
     }
 
-    /// Inserts an inner node at the specified index.
+    /// Inserts an inner node at the specified index, or removes it if it equals the empty
+    /// subtree root.
     fn insert_inner_node(&mut self, index: NodeIndex, inner_node: InnerNode) {
         if inner_node == EmptySubtreeRoots::get_inner_node(SMT_DEPTH, index.depth()) {
             self.inner_nodes.remove(&index);
