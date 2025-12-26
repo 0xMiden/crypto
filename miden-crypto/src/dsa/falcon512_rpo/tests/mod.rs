@@ -221,55 +221,7 @@ fn test_ntru_gen_opt_kat() {
         assert_eq!(hash_hex, expected, "KAT {} failed", i);
     }
 
-    println!("✅ All {} KAT tests passed!", KAT_KG512.len());
-}
-
-#[test]
-fn test_prng_adapter() {
-    use fn_dsa_comm::{PRNG, shake::SHAKE256_PRNG};
-    use std::println;
-
-    struct FnDsaRngAdapter {
-        prng: SHAKE256_PRNG,
-    }
-
-    impl rand::RngCore for FnDsaRngAdapter {
-        fn next_u32(&mut self) -> u32 {
-            (self.prng.next_u16() as u32) | ((self.prng.next_u16() as u32) << 16)
-        }
-
-        fn next_u64(&mut self) -> u64 {
-            self.prng.next_u64()
-        }
-
-        fn fill_bytes(&mut self, dest: &mut [u8]) {
-            for byte in dest.iter_mut() {
-                *byte = self.prng.next_u8();
-            }
-        }
-    }
-
-    let prng = <SHAKE256_PRNG as PRNG>::new(b"test0");
-    let mut rng = FnDsaRngAdapter { prng };
-
-    // Get first 20 bytes via next_u32
-    let mut bytes = Vec::new();
-    for _ in 0..5 {
-        let val = rng.next_u32();
-        bytes.extend_from_slice(&val.to_le_bytes());
-    }
-
-    println!("First 20 bytes from adapter: {:?}", &bytes);
-
-    // Compare with direct PRNG
-    let mut prng2 = <SHAKE256_PRNG as PRNG>::new(b"test0");
-    let mut bytes2 = Vec::new();
-    for _ in 0..20 {
-        bytes2.push(prng2.next_u8());
-    }
-
-    println!("First 20 bytes from PRNG:    {:?}", &bytes2);
-    assert_eq!(bytes, bytes2, "PRNG adapter should produce same bytes");
+    println!("All {} KAT tests passed!", KAT_KG512.len());
 }
 
 #[test]
@@ -318,83 +270,6 @@ fn test_sampler_direct() {
     let mut tmp_fxr = vec![ntru_opt::fxp::FXR::ZERO; (5 * 512) / 2];
     let gamma2_ok = ntru_opt::check_ortho_norm(9, &f, &g, &mut tmp_fxr);
     println!("Gamma2 check: {}", if gamma2_ok { "PASS" } else { "FAIL" });
-}
-
-#[test]
-fn test_sampler_comparison() {
-    use crate::dsa::falcon512_rpo::math::gauss_fndsa::sample_f_fndsa;
-    use crate::dsa::falcon512_rpo::math::samplerz::sampler_z;
-    use sha3::{Shake256, digest::{Update, ExtendableOutput, XofReader}};
-    use std::println;
-
-    struct ShakeRng<R: XofReader> {
-        reader: R,
-    }
-
-    impl<R: XofReader> rand::RngCore for ShakeRng<R> {
-        fn next_u32(&mut self) -> u32 {
-            let mut bytes = [0u8; 4];
-            self.reader.read(&mut bytes);
-            u32::from_le_bytes(bytes)
-        }
-
-        fn next_u64(&mut self) -> u64 {
-            let mut bytes = [0u8; 8];
-            self.reader.read(&mut bytes);
-            u64::from_le_bytes(bytes)
-        }
-
-        fn fill_bytes(&mut self, dest: &mut [u8]) {
-            self.reader.read(dest);
-        }
-    }
-
-    println!("\n=== Comparing Gaussian Samplers ===\n");
-
-    // Test with identical RNG streams
-    let seed = b"test0";
-
-    // Sample with fn-dsa's CDT approach
-    use fn_dsa_comm::{PRNG as FnDsaPRNG, shake::SHAKE256_PRNG};
-    let mut rng1 = <SHAKE256_PRNG as FnDsaPRNG>::new(seed);
-
-    let f_fndsa = sample_f_fndsa(512, &mut rng1);
-
-    // Sample with our approach (gen_poly uses sampler_z)
-    let mut shake2 = Shake256::default();
-    shake2.update(seed);
-    let rng2 = shake2.finalize_xof();
-    let mut rng2 = ShakeRng { reader: rng2 };
-
-    const SIGMA_STAR: f64 = 1.43300980528773;
-    const SIGMA_MIN: f64 = SIGMA_STAR - 0.001;
-    let f_ours: Vec<i16> = (0..4096)
-        .map(|_| sampler_z(0.0, SIGMA_STAR, SIGMA_MIN, &mut rng2))
-        .collect::<Vec<i16>>()
-        .chunks(4096 / 512)
-        .map(|ch| ch.iter().sum())
-        .collect();
-
-    println!("fn-dsa sampler (CDT approach):");
-    println!("  First 10 coefficients: {:?}", &f_fndsa[0..10]);
-    println!("  Range: [{}, {}]",
-             f_fndsa.iter().min().unwrap(),
-             f_fndsa.iter().max().unwrap());
-    println!("  Parity: {}", f_fndsa.iter().map(|&x| x as i32).sum::<i32>() & 1);
-
-    println!("\nOur sampler (gen_poly with sampler_z):");
-    println!("  First 10 coefficients: {:?}", &f_ours[0..10]);
-    println!("  Range: [{}, {}]",
-             f_ours.iter().min().unwrap(),
-             f_ours.iter().max().unwrap());
-    println!("  Parity: {}", f_ours.iter().map(|&x| x as i32).sum::<i32>() & 1);
-
-    let coeffs_match = f_fndsa.iter().map(|&x| x as i16).collect::<Vec<_>>() == f_ours;
-    println!("\nCoefficients match: {}", coeffs_match);
-
-    if !coeffs_match {
-        println!("Expected: Different samplers produce different distributions");
-    }
 }
 
 #[test]

@@ -32,7 +32,6 @@ pub use ffsampling::ffsampling;
 pub(crate) mod samplerz;
 use self::samplerz::sampler_z;
 
-#[cfg(test)]
 pub(crate) mod gauss_fndsa;
 
 mod polynomial;
@@ -110,14 +109,10 @@ impl Inverse for f64 {
 ///
 /// 1. **Gamma1 check**: Verifies ||f||² + ||g||² < 16823 (squared Gram-Schmidt norm bound)
 /// 2. **Invertibility**: Checks that f is invertible mod X^n+1 mod q
-/// 3. **Gamma2 check**: Validates orthogonalized Gram-Schmidt norm via fixed-point arithmetic
+/// 3. **Gamma2 check**: Validates orthogonalized Gram-Schmidt norm
 /// 4. **NTRU solve**: Solves f*G - g*F = q mod (X^n+1) using optimized fixed-point solver
 ///
-/// The gamma1 and gamma2 checks together implement the Falcon requirement that
-/// max(gamma1, gamma2) ≤ 1.3689 × q, which ensures numerical stability during signing.
-///
 /// [1]: https://falcon-sign.info/falcon.pdf
-#[cfg(test)]
 pub(crate) fn ntru_gen_opt_fndsa<R: fn_dsa_comm::PRNG>(n: usize, rng: &mut R) -> [Polynomial<i16>; 4] {
     let logn = (n as f64).log2() as u32;
 
@@ -149,7 +144,6 @@ pub(crate) fn ntru_gen_opt_fndsa<R: fn_dsa_comm::PRNG>(n: usize, rng: &mut R) ->
 
         // Check 3: Gamma2 (orthogonalized Gram-Schmidt norm)
         // Verify the squared norm of the second orthogonalized basis vector is bounded
-        // Uses optimized fixed-point arithmetic from rust-fn-dsa for constant-time operation
         let mut tmp_fxr = vec![ntru_opt::fxp::FXR::ZERO; (5 * n) / 2];
         if !ntru_opt::check_ortho_norm(logn, &f_i8, &g_i8, &mut tmp_fxr) {
             continue;

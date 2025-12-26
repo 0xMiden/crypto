@@ -131,6 +131,30 @@ impl SecretKey {
         Self::from_short_lattice_basis(basis)
     }
 
+    /// Generates a secret key using the provided random number generator with fn-dsa-compatible
+    /// key generation.
+    ///
+    /// This method uses the reference fn-dsa-kgen algorithms and has been validated to produce
+    /// identical keys to the reference implementation when given the same seed.
+    pub fn with_rng_fndsa<R: Rng>(rng: &mut R) -> Self {
+        use crate::dsa::falcon512_rpo::math::ntru_gen_opt_fndsa;
+        use fn_dsa_comm::PRNG;
+
+        // we use fn-dsa's SHAKE256_PRNG seeded with `rng`
+        // this is a work around the fact that the version of the `rand` dependency in our crate
+        // is different than the one used in the `fn-dsa` crates
+        let mut seed = [0u8; 32];
+        rng.fill_bytes(&mut seed);
+        let mut prng = <fn_dsa_comm::shake::SHAKE256_PRNG as PRNG>::new(&seed);
+
+        let basis = ntru_gen_opt_fndsa(N, &mut prng);
+
+        // Zeroize the seed to prevent leaking secret material
+        seed.zeroize();
+
+        Self::from_short_lattice_basis(basis)
+    }
+
     /// Given a short basis [g, f, G, F], computes the normalized LDL tree i.e., Falcon tree.
     /// Note: The basis is stored as [g, f, G, F]; negations to form [[g, -f], [G, -F]] are
     /// applied in to_complex_fft.

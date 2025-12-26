@@ -21,8 +21,7 @@ pub(crate) mod poly;
 pub(crate) mod vect;
 pub(crate) mod zint31;
 
-// Re-export key functions (only used in tests)
-#[cfg(test)]
+// Re-export key functions
 pub(crate) use ntru::{check_ortho_norm, solve_NTRU};
 
 // Note: gauss module is not included as we use miden-crypto's own polynomial sampling
