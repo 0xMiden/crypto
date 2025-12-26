@@ -8,17 +8,21 @@
 use alloc::vec::Vec;
 use core::ops::MulAssign;
 
-use num::{BigInt, FromPrimitive, One, Zero};
+#[cfg(test)]
+use num::{BigInt, FromPrimitive};
+use num::{One, Zero};
 use num_complex::Complex64;
+#[cfg(test)]
 use rand::Rng;
 
-use super::{
-    MODULUS,
-    keys::{WIDTH_BIG_POLY_COEFFICIENT, WIDTH_SMALL_POLY_COEFFICIENT},
-};
+use super::MODULUS;
+#[cfg(test)]
+use super::keys::{WIDTH_BIG_POLY_COEFFICIENT, WIDTH_SMALL_POLY_COEFFICIENT};
 
 mod fft;
-pub use fft::{CyclotomicFourier, FastFft};
+pub use fft::FastFft;
+#[cfg(test)]
+pub use fft::CyclotomicFourier;
 
 mod field;
 pub use field::FalconFelt;
@@ -30,6 +34,7 @@ pub use ffsampling::{LdlTree, ffldl, gram, normalize_tree};
 pub use ffsampling::ffsampling;
 
 pub(crate) mod samplerz;
+#[cfg(test)]
 use self::samplerz::sampler_z;
 
 pub(crate) mod gauss_fndsa;
@@ -49,7 +54,9 @@ pub(crate) mod poly_flr_avx2;
 
 pub(crate) mod sampler_flr;
 
+#[cfg(test)]
 const MAX_SMALL_POLY_COEFFICIENT_SIZE: i16 = (1 << (WIDTH_SMALL_POLY_COEFFICIENT - 1)) - 1;
+#[cfg(test)]
 const MAX_BIG_POLY_COEFFICIENT_SIZE: i16 = (1 << (WIDTH_BIG_POLY_COEFFICIENT - 1)) - 1;
 
 pub trait Inverse: Copy + Zero + MulAssign + One {
@@ -113,7 +120,7 @@ impl Inverse for f64 {
 /// 4. **NTRU solve**: Solves f*G - g*F = q mod (X^n+1) using optimized fixed-point solver
 ///
 /// [1]: https://falcon-sign.info/falcon.pdf
-pub(crate) fn ntru_gen_opt_fndsa<R: fn_dsa_comm::PRNG>(n: usize, rng: &mut R) -> [Polynomial<i16>; 4] {
+pub(crate) fn ntru_gen_fndsa<R: fn_dsa_comm::PRNG>(n: usize, rng: &mut R) -> [Polynomial<i16>; 4] {
     let logn = (n as f64).log2() as u32;
 
     loop {
@@ -183,8 +190,9 @@ pub(crate) fn ntru_gen_opt_fndsa<R: fn_dsa_comm::PRNG>(n: usize, rng: &mut R) ->
 ///
 /// [1]: https://falcon-sign.info/falcon.pdf
 ///
-/// This is the original version using recursive NTRU solving.
-pub(crate) fn ntru_gen<R: Rng>(n: usize, rng: &mut R) -> [Polynomial<i16>; 4] {
+/// This is the legacy version using recursive NTRU solving, kept for testing purposes.
+#[cfg(test)]
+pub(crate) fn ntru_gen_legacy<R: Rng>(n: usize, rng: &mut R) -> [Polynomial<i16>; 4] {
     loop {
         let f = gen_poly(n, rng);
         let g = gen_poly(n, rng);
@@ -232,6 +240,7 @@ pub(crate) fn ntru_gen<R: Rng>(n: usize, rng: &mut R) -> [Polynomial<i16>; 4] {
 /// Algorithm 6 of the specification [1, p.35].
 ///
 /// [1]: https://falcon-sign.info/falcon.pdf
+#[cfg(test)]
 fn ntru_solve(
     f: &Polynomial<BigInt>,
     g: &Polynomial<BigInt>,
@@ -268,6 +277,7 @@ fn ntru_solve(
 /// Corresponds to line 9 in algorithm 5 of the spec [1, p.34]
 ///
 /// [1]: https://falcon-sign.info/falcon.pdf
+#[cfg(test)]
 fn gram_schmidt_norm_squared(f: &Polynomial<i16>, g: &Polynomial<i16>) -> f64 {
     let n = f.coefficients.len();
     let norm_f_squared = f.l2_norm_squared();
@@ -302,6 +312,7 @@ fn gram_schmidt_norm_squared(f: &Polynomial<i16>, g: &Polynomial<i16>) -> f64 {
 /// [1]: https://github.com/tprest/falcon.py
 ///
 /// [2]: https://falcon-sign.info/falcon.pdf
+#[cfg(test)]
 fn babai_reduce(
     f: &Polynomial<BigInt>,
     g: &Polynomial<BigInt>,
@@ -388,6 +399,7 @@ fn babai_reduce(
 /// Implementation adapted from Wikipedia [1].
 ///
 /// [1]: https://en.wikipedia.org/wiki/Extended_Euclidean_algorithm#Pseudocode
+#[cfg(test)]
 fn xgcd(a: &BigInt, b: &BigInt) -> (BigInt, BigInt, BigInt) {
     let (mut old_r, mut r) = (a.clone(), b.clone());
     let (mut old_s, mut s) = (BigInt::one(), BigInt::zero());
@@ -405,6 +417,7 @@ fn xgcd(a: &BigInt, b: &BigInt) -> (BigInt, BigInt, BigInt) {
 
 /// Generates a polynomial of degree at most n-1 whose coefficients are distributed according
 /// to a discrete Gaussian with mu = 0 and sigma = 1.17 * sqrt(Q / (2n)).
+#[cfg(test)]
 fn gen_poly<R: Rng>(n: usize, rng: &mut R) -> Polynomial<i16> {
     let mu = 0.0;
     let sigma_star = 1.43300980528773;
@@ -420,6 +433,7 @@ fn gen_poly<R: Rng>(n: usize, rng: &mut R) -> Polynomial<i16> {
 
 /// Asserts that the balanced values of the coefficients of a polynomial are within the interval
 /// [-bound, bound].
+#[cfg(test)]
 fn check_coefficients_bound(polynomial: &Polynomial<i16>, bound: i16) -> bool {
     polynomial.to_balanced_values().iter().all(|c| *c <= bound && *c >= -bound)
 }

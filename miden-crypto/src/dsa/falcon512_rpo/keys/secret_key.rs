@@ -16,7 +16,7 @@ use super::{
 };
 use crate::{
     Word,
-    dsa::falcon512_rpo::{LOG_N, SK_LEN, hash_to_point::hash_to_point_rpo256, math::ntru_gen},
+    dsa::falcon512_rpo::{LOG_N, SK_LEN, hash_to_point::hash_to_point_rpo256},
     hash::blake::Blake3_256,
     utils::zeroize::{Zeroize, ZeroizeOnDrop},
 };
@@ -127,17 +127,7 @@ impl SecretKey {
 
     /// Generates a secret_key using the provided random number generator `Rng`.
     pub fn with_rng<R: Rng>(rng: &mut R) -> Self {
-        let basis = ntru_gen(N, rng);
-        Self::from_short_lattice_basis(basis)
-    }
-
-    /// Generates a secret key using the provided random number generator with fn-dsa-compatible
-    /// key generation.
-    ///
-    /// This method uses the reference fn-dsa-kgen algorithms and has been validated to produce
-    /// identical keys to the reference implementation when given the same seed.
-    pub fn with_rng_fndsa<R: Rng>(rng: &mut R) -> Self {
-        use crate::dsa::falcon512_rpo::math::ntru_gen_opt_fndsa;
+        use crate::dsa::falcon512_rpo::math::ntru_gen_fndsa;
         use fn_dsa_comm::PRNG;
 
         // we use fn-dsa's SHAKE256_PRNG seeded with `rng`
@@ -147,7 +137,7 @@ impl SecretKey {
         rng.fill_bytes(&mut seed);
         let mut prng = <fn_dsa_comm::shake::SHAKE256_PRNG as PRNG>::new(&seed);
 
-        let basis = ntru_gen_opt_fndsa(N, &mut prng);
+        let basis = ntru_gen_fndsa(N, &mut prng);
 
         // Zeroize the seed to prevent leaking secret material
         seed.zeroize();
@@ -271,116 +261,7 @@ impl SecretKey {
     ///
     /// Takes a randomness generator implementing `Rng` and message polynomial representing `c`
     /// the hash-to-point of the message to be signed. It outputs a signature polynomial `s2`.
-    fn sign_helper<R: Rng>(&self, c: Polynomial<FalconFelt>, rng: &mut R) -> SignaturePoly {
-        self.sign_helper_flr(c, rng)
-    }
-
-    #[cfg(test)]
-    pub(crate) fn sign_helper_legacy<R: Rng>(
-        &self,
-        c: Polynomial<FalconFelt>,
-        rng: &mut R,
-    ) -> SignaturePoly {
-        use super::super::math::ffsampling;
-
-        let one_over_q = 1.0 / (MODULUS as f64);
-        let c_over_q_fft = c.map(|cc| Complex::new(one_over_q * cc.value() as f64, 0.0)).fft();
-
-        // B = [[FFT(g), -FFT(f)], [FFT(G), -FFT(F)]]
-        let [g_fft, minus_f_fft, big_g_fft, minus_big_f_fft] = to_complex_fft(&self.secret_key);
-        let t0 = c_over_q_fft.hadamard_mul(&minus_big_f_fft);
-        let t1 = -c_over_q_fft.hadamard_mul(&minus_f_fft);
-
-        loop {
-            let bold_s = loop {
-                let z = ffsampling(&(t0.clone(), t1.clone()), &self.tree, rng);
-                let t0_min_z0 = t0.clone() - z.0;
-                let t1_min_z1 = t1.clone() - z.1;
-
-                // s = (t-z) * B
-                let s0 = t0_min_z0.hadamard_mul(&g_fft) + t1_min_z1.hadamard_mul(&big_g_fft);
-                let s1 =
-                    t0_min_z0.hadamard_mul(&minus_f_fft) + t1_min_z1.hadamard_mul(&minus_big_f_fft);
-
-                // compute the norm of (s0||s1) and note that they are in FFT representation
-                let length_squared: f64 =
-                    (s0.coefficients.iter().map(|a| (a * a.conj()).re).sum::<f64>()
-                        + s1.coefficients.iter().map(|a| (a * a.conj()).re).sum::<f64>())
-                        / (N as f64);
-
-                if length_squared > (SIG_L2_BOUND as f64) {
-                    continue;
-                }
-
-                break [-s0, s1];
-            };
-
-            let s2 = bold_s[1].ifft();
-            let s2_coef: [i16; N] = s2
-                .coefficients
-                .iter()
-                .map(|a| a.re.round() as i16)
-                .collect::<Vec<i16>>()
-                .try_into()
-                .expect("The number of coefficients should be equal to N");
-
-            if let Ok(s2) = SignaturePoly::try_from(&s2_coef) {
-                return s2;
-            }
-        }
-    }
-
-    /// Computes the FLR basis B = [[g, -f], [G, -F]] in FFT format.
-    /// Returns an array [b00, b01, b10, b11] where each is N FLR values in FFT domain.
-    /// This follows fn-dsa's compute_basis_inner approach for precomputation during keygen.
-    fn compute_basis_fft_flr(basis: &ShortLatticeBasis) -> [FLR; 4 * N] {
-        use super::super::math::poly_flr::{FFT, poly_set_small};
-        use core::array;
-        const LOGN_U32: u32 = LOG_N as u32;
-
-        // Convert i16 basis to i8 for poly_set_small
-        let basis_i8: [[i8; N]; 4] = [
-            array::from_fn(|i| basis[0].coefficients[i] as i8),
-            array::from_fn(|i| basis[1].coefficients[i] as i8),
-            array::from_fn(|i| basis[2].coefficients[i] as i8),
-            array::from_fn(|i| basis[3].coefficients[i] as i8),
-        ];
-
-        let mut result = [FLR::ZERO; 4 * N];
-
-        // Split result into b00, b01, b10, b11
-        let (b00, rest) = result.split_at_mut(N);
-        let (b01, rest) = rest.split_at_mut(N);
-        let (b10, rest) = rest.split_at_mut(N);
-        let (b11, _) = rest.split_at_mut(N);
-
-        // Load basis: stored as B = [[g, f], [G, F]]
-        poly_set_small(LOGN_U32, b00, &basis_i8[0]); // g
-        poly_set_small(LOGN_U32, b01, &basis_i8[1]); // f
-        poly_set_small(LOGN_U32, b10, &basis_i8[2]); // G
-        poly_set_small(LOGN_U32, b11, &basis_i8[3]); // F
-
-        // Transform to FFT domain
-        FFT(LOGN_U32, b00);
-        FFT(LOGN_U32, b01);
-        FFT(LOGN_U32, b10);
-        FFT(LOGN_U32, b11);
-
-        // Negate f and F in FFT domain to get signing basis B = [[g, -f], [G, -F]]
-        // (matches fn-dsa-sign's compute_basis_inner)
-        for i in 0..N {
-            b01[i] = -b01[i];
-            b11[i] = -b11[i];
-        }
-
-        result
-    }
-
-    pub(crate) fn sign_helper_flr<R: Rng>(
-        &self,
-        c: Polynomial<FalconFelt>,
-        rng: &mut R,
-    ) -> SignaturePoly {
+    pub(crate) fn sign_helper<R: Rng>(&self, c: Polynomial<FalconFelt>, rng: &mut R) -> SignaturePoly {
         use super::super::math::poly_flr::{
             FFT, iFFT, poly_add, poly_mul_fft, poly_muladj_fft, poly_mulconst, poly_mulownadj_fft,
         };
@@ -542,6 +423,107 @@ impl SecretKey {
                 return s2;
             }
         }
+    }
+
+    #[cfg(test)]
+    pub(crate) fn sign_helper_legacy<R: Rng>(
+        &self,
+        c: Polynomial<FalconFelt>,
+        rng: &mut R,
+    ) -> SignaturePoly {
+        use super::super::math::ffsampling;
+
+        let one_over_q = 1.0 / (MODULUS as f64);
+        let c_over_q_fft = c.map(|cc| Complex::new(one_over_q * cc.value() as f64, 0.0)).fft();
+
+        // B = [[FFT(g), -FFT(f)], [FFT(G), -FFT(F)]]
+        let [g_fft, minus_f_fft, big_g_fft, minus_big_f_fft] = to_complex_fft(&self.secret_key);
+        let t0 = c_over_q_fft.hadamard_mul(&minus_big_f_fft);
+        let t1 = -c_over_q_fft.hadamard_mul(&minus_f_fft);
+
+        loop {
+            let bold_s = loop {
+                let z = ffsampling(&(t0.clone(), t1.clone()), &self.tree, rng);
+                let t0_min_z0 = t0.clone() - z.0;
+                let t1_min_z1 = t1.clone() - z.1;
+
+                // s = (t-z) * B
+                let s0 = t0_min_z0.hadamard_mul(&g_fft) + t1_min_z1.hadamard_mul(&big_g_fft);
+                let s1 =
+                    t0_min_z0.hadamard_mul(&minus_f_fft) + t1_min_z1.hadamard_mul(&minus_big_f_fft);
+
+                // compute the norm of (s0||s1) and note that they are in FFT representation
+                let length_squared: f64 =
+                    (s0.coefficients.iter().map(|a| (a * a.conj()).re).sum::<f64>()
+                        + s1.coefficients.iter().map(|a| (a * a.conj()).re).sum::<f64>())
+                        / (N as f64);
+
+                if length_squared > (SIG_L2_BOUND as f64) {
+                    continue;
+                }
+
+                break [-s0, s1];
+            };
+
+            let s2 = bold_s[1].ifft();
+            let s2_coef: [i16; N] = s2
+                .coefficients
+                .iter()
+                .map(|a| a.re.round() as i16)
+                .collect::<Vec<i16>>()
+                .try_into()
+                .expect("The number of coefficients should be equal to N");
+
+            if let Ok(s2) = SignaturePoly::try_from(&s2_coef) {
+                return s2;
+            }
+        }
+    }
+
+    /// Computes the FLR basis B = [[g, -f], [G, -F]] in FFT format.
+    /// Returns an array [b00, b01, b10, b11] where each is N FLR values in FFT domain.
+    /// This follows fn-dsa's compute_basis_inner approach for precomputation during keygen.
+    fn compute_basis_fft_flr(basis: &ShortLatticeBasis) -> [FLR; 4 * N] {
+        use super::super::math::poly_flr::{FFT, poly_set_small};
+        use core::array;
+        const LOGN_U32: u32 = LOG_N as u32;
+
+        // Convert i16 basis to i8 for poly_set_small
+        let basis_i8: [[i8; N]; 4] = [
+            array::from_fn(|i| basis[0].coefficients[i] as i8),
+            array::from_fn(|i| basis[1].coefficients[i] as i8),
+            array::from_fn(|i| basis[2].coefficients[i] as i8),
+            array::from_fn(|i| basis[3].coefficients[i] as i8),
+        ];
+
+        let mut result = [FLR::ZERO; 4 * N];
+
+        // Split result into b00, b01, b10, b11
+        let (b00, rest) = result.split_at_mut(N);
+        let (b01, rest) = rest.split_at_mut(N);
+        let (b10, rest) = rest.split_at_mut(N);
+        let (b11, _) = rest.split_at_mut(N);
+
+        // Load basis: stored as B = [[g, f], [G, F]]
+        poly_set_small(LOGN_U32, b00, &basis_i8[0]); // g
+        poly_set_small(LOGN_U32, b01, &basis_i8[1]); // f
+        poly_set_small(LOGN_U32, b10, &basis_i8[2]); // G
+        poly_set_small(LOGN_U32, b11, &basis_i8[3]); // F
+
+        // Transform to FFT domain
+        FFT(LOGN_U32, b00);
+        FFT(LOGN_U32, b01);
+        FFT(LOGN_U32, b10);
+        FFT(LOGN_U32, b11);
+
+        // Negate f and F in FFT domain to get signing basis B = [[g, -f], [G, -F]]
+        // (matches fn-dsa-sign's compute_basis_inner)
+        for i in 0..N {
+            b01[i] = -b01[i];
+            b11[i] = -b11[i];
+        }
+
+        result
     }
 
     /// Deterministically generates a seed for seeding the PRNG used in the trapdoor sampling

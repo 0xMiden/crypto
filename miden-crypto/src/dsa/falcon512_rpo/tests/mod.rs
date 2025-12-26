@@ -143,7 +143,7 @@ fn test_flr_and_legacy_signing_match() {
         let mut rng_legacy = ChaCha20Rng::from_seed(signing_seed);
 
         // Sign with both methods
-        let sig_flr = sk.sign_helper_flr(c.clone(), &mut rng_flr);
+        let sig_flr = sk.sign_helper(c.clone(), &mut rng_flr);
         let sig_legacy = sk.sign_helper_legacy(c, &mut rng_legacy);
 
         // Compare signatures
@@ -188,11 +188,11 @@ fn test_ntru_gen_opt_kat() {
         println!("Test {}: seed = '{}'", i, seed);
 
         // Use fn-dsa-comm's SHAKE256_PRNG exactly as fn-dsa-kgen does
-        use crate::dsa::falcon512_rpo::math::ntru_gen_opt_fndsa;
+        use crate::dsa::falcon512_rpo::math::ntru_gen_fndsa;
         use fn_dsa_comm::{PRNG, shake::SHAKE256_PRNG};
 
         let mut rng = <SHAKE256_PRNG as PRNG>::new(seed.as_bytes());
-        let [g, f, big_g, big_f] = ntru_gen_opt_fndsa(n, &mut rng);
+        let [g, f, big_g, big_f] = ntru_gen_fndsa(n, &mut rng);
 
         // Hash in fn-dsa order: [f, g, F, G]
         let mut hasher = Sha256::new();

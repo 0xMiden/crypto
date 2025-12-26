@@ -171,6 +171,7 @@ impl<
 }
 
 impl<F: Clone + Into<f64>> Polynomial<F> {
+    #[cfg(test)]
     pub(crate) fn l2_norm_squared(&self) -> f64 {
         self.coefficients
             .iter()
