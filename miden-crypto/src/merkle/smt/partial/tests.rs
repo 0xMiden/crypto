@@ -285,8 +285,8 @@ fn partial_smt_iterator_apis() {
     assert_eq!(full.root(), partial.root());
     // There should be 2 non-empty entries.
     assert_eq!(partial.num_entries(), 2);
-    // There should be 3 leaves, including the empty one.
-    assert_eq!(partial.num_leaves(), 3);
+    // There should be 2 leaves (empty leaves are not stored).
+    assert_eq!(partial.num_leaves(), 2);
 
     // The leaves API should only return tracked but non-empty leaves.
     // ----------------------------------------------------------------------------------------
@@ -306,11 +306,11 @@ fn partial_smt_iterator_apis() {
     assert_eq!(actual_leaves.len(), expected_leaves.len());
     assert_eq!(actual_leaves, expected_leaves);
 
-    // The num_leaves API should return the count of explicitly stored leaves including empty.
+    // The num_leaves API should return the count of explicitly stored leaves.
     // ----------------------------------------------------------------------------------------
 
-    // We added 3 proofs (key0, key2, key_empty), so num_leaves should be 3.
-    assert_eq!(partial.num_leaves(), 3);
+    // We added 3 proofs but empty leaves are not stored, so num_leaves should be 2.
+    assert_eq!(partial.num_leaves(), 2);
 
     // The entries of the merkle paths from the proofs should exist as children of inner nodes
     // in the partial SMT.
@@ -538,6 +538,8 @@ fn partial_smt_implicit_insert_and_remove() {
     assert_eq!(full.root(), partial.root());
     assert_eq!(partial.get_value(&key).unwrap(), EMPTY_WORD);
     assert_eq!(partial.num_entries(), 0);
+    // Empty leaves are removed from storage
+    assert_eq!(partial.num_leaves(), 0);
 }
 
 /// Tests that deserialization fails when an inner node hash is inconsistent with its parent.
@@ -588,5 +590,74 @@ fn partial_smt_deserialize_invalid_leaf() {
     tampered_bytes[leaf_value_offset] ^= 0xff;
 
     let result = PartialSmt::read_from_bytes(&tampered_bytes);
+    assert!(result.is_err());
+}
+
+/// Tests that deserialization fails when the root is inconsistent with the inner nodes.
+#[test]
+fn partial_smt_deserialize_invalid_root() {
+    let key: Word = rand_value();
+    let value: Word = rand_value();
+    let smt = Smt::with_entries([(key, value)]).unwrap();
+
+    let proof = smt.open(&key);
+    let mut partial = PartialSmt::new(smt.root());
+    partial.add_proof(proof).unwrap();
+
+    // Serialize and tamper with root (first 32 bytes)
+    let mut bytes = partial.to_bytes();
+    bytes[0] ^= 0xff;
+
+    let result = PartialSmt::read_from_bytes(&bytes);
+    assert!(result.is_err());
+}
+
+/// Tests that deserialization fails when leaves count is tampered to be smaller.
+#[test]
+fn partial_smt_deserialize_leaves_count_smaller() {
+    let key: Word = rand_value();
+    let value: Word = rand_value();
+    let smt = Smt::with_entries([(key, value)]).unwrap();
+
+    let proof = smt.open(&key);
+    let mut partial = PartialSmt::new(smt.root());
+    partial.add_proof(proof).unwrap();
+
+    let mut bytes = partial.to_bytes();
+
+    // Tamper the leaves count to be smaller by one
+    let leaves_count_offset = 32;
+    let count =
+        u64::from_le_bytes(bytes[leaves_count_offset..leaves_count_offset + 8].try_into().unwrap());
+    let tampered_count = count.saturating_sub(1);
+    bytes[leaves_count_offset..leaves_count_offset + 8]
+        .copy_from_slice(&tampered_count.to_le_bytes());
+
+    let result = PartialSmt::read_from_bytes(&bytes);
+    assert!(result.is_err());
+}
+
+/// Tests that deserialization fails when leaves count is tampered to be larger.
+#[test]
+fn partial_smt_deserialize_leaves_count_larger() {
+    let key: Word = rand_value();
+    let value: Word = rand_value();
+    let smt = Smt::with_entries([(key, value)]).unwrap();
+
+    let proof = smt.open(&key);
+    let mut partial = PartialSmt::new(smt.root());
+    partial.add_proof(proof).unwrap();
+
+    let mut bytes = partial.to_bytes();
+
+    // Tamper the leaves count to be larger by one
+    let leaves_count_offset = 32;
+    let count =
+        u64::from_le_bytes(bytes[leaves_count_offset..leaves_count_offset + 8].try_into().unwrap());
+    let tampered_count = count + 1;
+    bytes[leaves_count_offset..leaves_count_offset + 8]
+        .copy_from_slice(&tampered_count.to_le_bytes());
+
+    let result = PartialSmt::read_from_bytes(&bytes);
     assert!(result.is_err());
 }

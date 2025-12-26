@@ -159,8 +159,8 @@ impl PartialSmt {
         self.inner_nodes.iter().map(|(idx, inner)| (*idx, inner.clone()))
     }
 
-    /// Returns an iterator over the explicitly stored, non-empty leaves of the [`PartialSmt`] in
-    /// arbitrary order.
+    /// Returns an iterator over the explicitly stored leaves of the [`PartialSmt`] in arbitrary
+    /// order.
     ///
     /// Note: This only returns leaves that were explicitly added via [`Self::add_path`] or
     /// [`Self::add_proof`], or created through [`Self::insert`]. It does not include implicitly
@@ -168,7 +168,6 @@ impl PartialSmt {
     pub fn leaves(&self) -> impl Iterator<Item = (LeafIndex<SMT_DEPTH>, &SmtLeaf)> {
         self.leaves
             .iter()
-            .filter(|(_, leaf)| !leaf.is_empty())
             .map(|(leaf_index, leaf)| (LeafIndex::new_max_depth(*leaf_index), leaf))
     }
 
@@ -178,7 +177,7 @@ impl PartialSmt {
         self.leaves().flat_map(|(_, leaf)| leaf.entries())
     }
 
-    /// Returns the number of tracked leaves in this tree, which includes empty ones.
+    /// Returns the number of non-empty leaves in this tree.
     ///
     /// Note that this may return a different value from [Self::num_entries()] as a single leaf may
     /// contain more than one key-value pair.
@@ -242,10 +241,15 @@ impl PartialSmt {
             leaf.remove(key);
         }
         let current_entries = leaf.num_entries();
+        let new_leaf_hash = leaf.hash();
         self.num_entries = self.num_entries + current_entries - prev_entries;
 
+        // Remove empty leaf
+        if current_entries == 0 {
+            self.leaves.remove(&leaf_index.value());
+        }
+
         // Recompute the path from leaf to root
-        let new_leaf_hash = leaf.hash();
         self.recompute_nodes_from_leaf_to_root(leaf_index, new_leaf_hash);
 
         Ok(previous_value)
@@ -305,10 +309,12 @@ impl PartialSmt {
             .map(|leaf| leaf.num_entries())
             .unwrap_or(0);
         let current_entries = leaf.num_entries();
-        // We insert even empty leaves into the leaves map. While not strictly necessary for
-        // tracking (empty leaves are implicitly trackable), storing them preserves the merkle
-        // path information and avoids the cost of implicit tracking lookups for these leaves.
-        self.leaves.insert(current_index.value(), leaf);
+        // Only store non-empty leaves
+        if current_entries > 0 {
+            self.leaves.insert(current_index.value(), leaf);
+        } else {
+            self.leaves.remove(&current_index.value());
+        }
 
         // Guaranteed not to over/underflow. All variables are <= MAX_LEAF_ENTRIES and result > 0.
         self.num_entries = self.num_entries + current_entries - prev_entries;
