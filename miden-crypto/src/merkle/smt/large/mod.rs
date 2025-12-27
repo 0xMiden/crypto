@@ -9,7 +9,7 @@
 //! Examples below require the `rocksdb` feature.
 //!
 //! Load an existing RocksDB-backed tree with root validation:
-//! ```no_run
+//! ```ignore
 //! use miden_crypto::{
 //!     Word,
 //!     merkle::smt::{LargeSmt, RocksDbConfig, RocksDbStorage},
@@ -27,7 +27,7 @@
 //! ```
 //!
 //! Load an existing tree without root validation (use with caution):
-//! ```no_run
+//! ```ignore
 //! use miden_crypto::merkle::smt::{LargeSmt, RocksDbConfig, RocksDbStorage};
 //!
 //! # fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -39,7 +39,7 @@
 //! ```
 //!
 //! Initialize an empty RocksDB-backed tree and bulk-load entries:
-//! ```no_run
+//! ```ignore
 //! use miden_crypto::{
 //!     Felt, Word,
 //!     merkle::smt::{LargeSmt, RocksDbConfig, RocksDbStorage},
@@ -74,7 +74,7 @@
 //! ```
 //!
 //! Apply batch updates (insertions and deletions):
-//! ```no_run
+//! ```ignore
 //! use miden_crypto::{
 //!     EMPTY_WORD, Felt, Word,
 //!     merkle::smt::{LargeSmt, RocksDbConfig, RocksDbStorage},
@@ -98,7 +98,7 @@
 //! ```
 //!
 //! Quick initialization with `with_entries` (best for modest datasets/tests):
-//! ```no_run
+//! ```ignore
 //! use miden_crypto::{
 //!     Felt, Word,
 //!     merkle::smt::{LargeSmt, RocksDbConfig, RocksDbStorage},

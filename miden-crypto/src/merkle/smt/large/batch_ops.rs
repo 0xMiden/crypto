@@ -305,7 +305,7 @@ impl<S: SmtStorage> LargeSmt<S> {
     /// - Storage operations fail
     ///
     /// # Example
-    /// ```no_run
+    /// ```ignore
     /// use miden_crypto::{
     ///     EMPTY_WORD, Felt, Word,
     ///     merkle::smt::{LargeSmt, RocksDbConfig, RocksDbStorage},

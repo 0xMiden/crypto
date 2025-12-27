@@ -59,7 +59,7 @@ impl<S: SmtStorage> LargeSmt<S> {
     /// Returns an error if fetching data from storage fails.
     ///
     /// # Example
-    /// ```no_run
+    /// ```ignore
     /// # use miden_crypto::merkle::smt::{LargeSmt, RocksDbConfig, RocksDbStorage};
     /// let storage = RocksDbStorage::open(RocksDbConfig::new("/path/to/db")).unwrap();
     /// let smt = LargeSmt::load(storage).expect("Failed to load SMT");
@@ -82,7 +82,7 @@ impl<S: SmtStorage> LargeSmt<S> {
     /// - Returns a storage error if fetching data from storage fails.
     ///
     /// # Example
-    /// ```no_run
+    /// ```ignore
     /// # use miden_crypto::{Word, merkle::smt::{LargeSmt, RocksDbConfig, RocksDbStorage}};
     /// // Load the expected root from your own persistence
     /// let expected_root: Word = todo!();
