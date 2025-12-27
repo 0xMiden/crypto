@@ -69,10 +69,6 @@ doc: ## Generate and check documentation
 test-default: ## Run tests with default features
 	cargo nextest run --profile default --cargo-profile test-release --features ${ALL_FEATURES_EXCEPT_ROCKSDB}
 
-.PHONY: test-hashmaps
-test-hashmaps: ## Run tests with `hashmaps` feature enabled
-	cargo nextest run --profile default --cargo-profile test-release --features hashmaps
-
 .PHONY: test-no-std
 test-no-std: ## Run tests with `no-default-features` (std)
 	cargo nextest run --profile default --cargo-profile test-release --no-default-features
@@ -87,10 +83,10 @@ test-docs:
 
 .PHONY: test-large-smt
 test-large-smt: ## Run only large SMT tests
-	cargo nextest run --success-output immediate --profile large-smt --cargo-profile test-release --features hashmaps,rocksdb
+	cargo nextest run --success-output immediate --profile large-smt --cargo-profile test-release --features rocksdb
 
 .PHONY: test
-test: test-default test-hashmaps test-no-std test-docs test-large-smt ## Run all tests except concurrent SMT tests
+test: test-default test-no-std test-docs test-large-smt ## Run all tests except concurrent SMT tests
 
 # --- checking ------------------------------------------------------------------------------------
 
@@ -136,15 +132,15 @@ bench-smt-concurrent: ## Run SMT benchmarks with concurrent feature
 
 .PHONY: bench-large-smt-memory
 bench-large-smt-memory: ## Run large SMT benchmarks with memory storage
-	cargo run --release --features concurrent,hashmaps,executable -- --size 1000000
+	cargo run --release --features concurrent,executable -- --size 1000000
 
 .PHONY: bench-large-smt-rocksdb
 bench-large-smt-rocksdb: ## Run large SMT benchmarks with rocksdb storage
-	cargo run --release --features concurrent,hashmaps,rocksdb,executable -- --storage rocksdb --size 1000000
+	cargo run --release --features concurrent,rocksdb,executable -- --storage rocksdb --size 1000000
 
 .PHONY: bench-large-smt-rocksdb-open
 bench-large-smt-rocksdb-open: ## Run large SMT benchmarks with rocksdb storage and open existing database
-	cargo run --release --features concurrent,hashmaps,rocksdb,executable -- --storage rocksdb --open
+	cargo run --release --features concurrent,rocksdb,executable -- --storage rocksdb --open
 
 # --- fuzzing --------------------------------------------------------------------------------
 

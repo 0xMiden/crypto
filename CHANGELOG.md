@@ -7,6 +7,7 @@
 - [BREAKING] Refactored `SmtProof` verification API to return `Result<(), SmtProofError>` ([#682](https://github.com/0xMiden/crypto/pull/682)).
 - Added validation to `PartialMerkleTree::with_leaves()` to reject internal nodes ([#684](https://github.com/0xMiden/crypto/pull/684)).
 - Decoupled `PartialSmt` from `Smt` and expanded tracking to include provably empty leaves, allowing updates in empty subtrees ([#691](https://github.com/0xMiden/crypto/pull/691)).
+- [BREAKING] Removed the direct `hashbrown` dependency and now use `std::collections::{HashMap, HashSet}` whenever `std` is enabled (falling back to `BTreeMap`/`BTreeSet` in `no_std`) ([#696](https://github.com/0xMiden/crypto/issues/696)).
 - [BREAKING] Moved `LargeSmt` root ownership from storage to in-memory layer ([#694](https://github.com/0xMiden/crypto/pull/694)). 
 - Remove use of `transmute()` in blake3 implementation ([#704](https://github.com/0xMiden/crypto/pull/704)).
 - [BREAKING] Made `LargeSmt::num_leaves()` and `LargeSmt::num_entries()` infallible ([#708](https://github.com/0xMiden/crypto/pull/708)).

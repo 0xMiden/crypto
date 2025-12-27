@@ -552,7 +552,6 @@ dependencies = [
  "ed25519-dalek",
  "flume",
  "glob",
- "hashbrown",
  "hkdf",
  "k256",
  "miden-crypto-derive",
