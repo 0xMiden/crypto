@@ -1,5 +1,8 @@
 #![allow(non_snake_case)]
 #![allow(non_upper_case_globals)]
+#![allow(clippy::too_many_arguments)]
+#![allow(clippy::needless_range_loop)]
+#![allow(clippy::identity_op)]
 
 use super::{fxp::*, mp31::*, zint31::*};
 
@@ -151,9 +154,9 @@ pub(crate) fn poly_mp_set_small(logn: u32, f: &[i8], p: u32, d: &mut [u32]) {
 // value overwrites the source. The source is assumed to use signed
 // representation.
 pub(crate) fn poly_mp_set(logn: u32, f: &mut [u32], p: u32) {
-    for i in 0..(1usize << logn) {
-        let x = f[i];
-        f[i] = mp_set((x | ((x & 0x40000000) << 1)) as i32, p);
+    for x_mut in f.iter_mut().take(1usize << logn) {
+        let x = *x_mut;
+        *x_mut = mp_set((x | ((x & 0x40000000) << 1)) as i32, p);
     }
 }
 
@@ -161,8 +164,8 @@ pub(crate) fn poly_mp_set(logn: u32, f: &mut [u32], p: u32) {
 // per coefficient. Note: the returned 32-bit values are NOT truncated to
 // 31 bits; they are full-size signed 32-bit values, cast to u32 type.
 pub(crate) fn poly_mp_norm(logn: u32, f: &mut [u32], p: u32) {
-    for i in 0..(1usize << logn) {
-        f[i] = mp_norm(f[i], p) as u32;
+    for f_item in f.iter_mut().take(1usize << logn) {
+        *f_item = mp_norm(*f_item, p) as u32;
     }
 }
 
@@ -226,8 +229,8 @@ pub(crate) fn poly_big_to_fixed(logn: u32, f: &[u32], flen: usize, sc: u32, d: &
     let n = 1usize << logn;
 
     if flen == 0 {
-        for i in 0..n {
-            d[i] = FXR::ZERO;
+        for d_item in d.iter_mut().take(n) {
+            *d_item = FXR::ZERO;
         }
         return;
     }

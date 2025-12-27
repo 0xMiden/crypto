@@ -1,5 +1,7 @@
 #![allow(non_snake_case)]
 #![allow(non_upper_case_globals)]
+#![allow(clippy::needless_range_loop)]
+#![allow(clippy::too_many_arguments)]
 
 // ========================================================================
 // Big integers.

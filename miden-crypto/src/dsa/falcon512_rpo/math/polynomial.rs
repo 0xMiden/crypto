@@ -8,7 +8,6 @@ use core::{
 };
 
 use num::{One, Zero};
-use p3_field::PrimeCharacteristicRing;
 
 use super::{Inverse, field::FalconFelt};
 use crate::{
@@ -514,16 +513,14 @@ fn vector_karatsuba<
 
 impl From<Polynomial<FalconFelt>> for Polynomial<Felt> {
     fn from(item: Polynomial<FalconFelt>) -> Self {
-        let res: Vec<Felt> =
-            item.coefficients.iter().map(|a| Felt::from_u16(a.value() as u16)).collect();
+        let res: Vec<Felt> = item.coefficients.iter().map(|a| Felt::new(a.value() as u64)).collect();
         Polynomial::new(res)
     }
 }
 
 impl From<&Polynomial<FalconFelt>> for Polynomial<Felt> {
     fn from(item: &Polynomial<FalconFelt>) -> Self {
-        let res: Vec<Felt> =
-            item.coefficients.iter().map(|a| Felt::from_u16(a.value() as u16)).collect();
+        let res: Vec<Felt> = item.coefficients.iter().map(|a| Felt::new(a.value() as u64)).collect();
         Polynomial::new(res)
     }
 }
@@ -579,7 +576,7 @@ impl Polynomial<FalconFelt> {
 
     /// Returns the coefficients of this polynomial as field elements.
     pub fn to_elements(&self) -> Vec<Felt> {
-        self.coefficients.iter().map(|&a| Felt::from_u16(a.value() as u16)).collect()
+        self.coefficients.iter().map(|&a| Felt::new(a.value() as u64)).collect()
     }
 
     // POLYNOMIAL OPERATIONS

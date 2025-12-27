@@ -1,5 +1,6 @@
 #![allow(non_snake_case)]
 #![allow(non_upper_case_globals)]
+#![allow(clippy::needless_range_loop)]
 
 use super::fxp::{FXC, FXR, GM_TAB};
 

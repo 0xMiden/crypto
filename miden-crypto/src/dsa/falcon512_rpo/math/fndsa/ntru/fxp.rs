@@ -16,14 +16,9 @@ use crate::zeroize::DefaultIsZeroes;
 // The integral part is 32 bits, while the fractional part is also 32 bits.
 // For an internal 64-bit signed representation x, the represented real
 // number is x/2^32.
-#[derive(Clone, Copy, Debug, Eq)]
+#[derive(Clone, Copy, Debug, Eq, Default)]
+#[allow(clippy::upper_case_acronyms)]
 pub(crate) struct FXR(pub(crate) u64);
-
-impl Default for FXR {
-    fn default() -> Self {
-        Self(0)
-    }
-}
 
 impl DefaultIsZeroes for FXR {}
 
@@ -554,6 +549,7 @@ impl SubAssign<&FXR> for FXR {
 // A wrapper for a complex number, whose real and imaginary parts both use
 // fixed-point (FXR).
 #[derive(Clone, Copy, Debug)]
+#[allow(clippy::upper_case_acronyms)]
 pub(crate) struct FXC {
     pub(crate) re: FXR,
     pub(crate) im: FXR,

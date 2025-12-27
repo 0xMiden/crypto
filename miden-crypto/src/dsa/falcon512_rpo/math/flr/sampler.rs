@@ -667,14 +667,14 @@ mod tests {
         let isigma = FLR::scaled(1, -5); // isigma = 2^(-5) = 1/32, so sigma = 32
 
         // Just verify we can produce samples without hanging
-        let mut samples = vec![0i32; 20];
+        let mut samples = [0i32; 20];
         for i in 0..samples.len() {
-            samples[i] = sampler.next(mu.clone(), isigma.clone());
+            samples[i] = sampler.next(mu, isigma);
         }
 
         // Basic sanity check: values should be integers
         assert!(
-            samples.iter().all(|&x| x >= -1000 && x <= 1000),
+            samples.iter().all(|&x| (-1000..=1000).contains(&x)),
             "Samples should be reasonable integers"
         );
     }
@@ -690,7 +690,7 @@ mod tests {
 
         let mut samples = vec![0i32; 200];
         for i in 0..samples.len() {
-            samples[i] = sampler.next(mu.clone(), isigma.clone());
+            samples[i] = sampler.next(mu, isigma);
         }
 
         // Mean should be close to 10
@@ -775,7 +775,7 @@ mod tests {
         let isigma = FLR::scaled(1, -7); // isigma = 2^(-7) = 1/128
 
         for (i, &expected) in EXPECTED_NEXT.iter().enumerate() {
-            let actual = sampler.next(mu.clone(), isigma.clone());
+            let actual = sampler.next(mu, isigma);
             assert_eq!(
                 actual, expected,
                 "Cross-implementation mismatch for next() sample {}: expected {}, got {} \
@@ -868,7 +868,7 @@ mod tests {
         for (i, ((mu, isigma), &expected)) in
             KAT_MU_INVSIGMA.iter().zip(KAT_EXPECTED.iter()).enumerate()
         {
-            let actual = sampler.next(mu.clone(), isigma.clone());
+            let actual = sampler.next(*mu, *isigma);
             assert_eq!(
                 actual, expected,
                 "KAT mismatch at index {}: expected {}, got {} (mu={:?}, isigma={:?})",
@@ -955,8 +955,8 @@ mod tests {
 
         // Compare outputs - convert FLR to u64 bits for comparison
         for i in 0..N {
-            let t0_bits = u64::from_le_bytes(t0[i].clone().to_f64().to_le_bytes());
-            let t1_bits = u64::from_le_bytes(t1[i].clone().to_f64().to_le_bytes());
+            let t0_bits = u64::from_le_bytes(t0[i].to_f64().to_le_bytes());
+            let t1_bits = u64::from_le_bytes(t1[i].to_f64().to_le_bytes());
 
             assert_eq!(
                 t0_bits, EXPECTED_T0[i],
@@ -1037,9 +1037,9 @@ mod tests {
 
         // Check a prefix against expected values from rust-fn-dsa
         for i in 0..KAT_EXPECTED_PREFIX.len() {
-            let (mu, isigma) = KAT_MU_INVSIGMA[i % KAT_MU_INVSIGMA.len()].clone();
-            let mu_f64 = mu.clone().to_f64();
-            let isigma_f64 = isigma.clone().to_f64();
+            let (mu, isigma) = KAT_MU_INVSIGMA[i % KAT_MU_INVSIGMA.len()];
+            let mu_f64 = mu.to_f64();
+            let isigma_f64 = isigma.to_f64();
             let v = sampler.next(mu, isigma);
             let rng_pos = sampler.rng.pos;
             assert_eq!(

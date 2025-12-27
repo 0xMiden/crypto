@@ -304,8 +304,8 @@ impl SecretKey {
 
         // Convert hash-to-point polynomial c to FLR and transform to FFT domain
         let mut c_fft = [FLR::ZERO; N];
-        for i in 0..N {
-            c_fft[i] = FLR::from_i32(c.coefficients[i].value() as i32);
+        for (i, coeff) in c.coefficients.iter().enumerate().take(N) {
+            c_fft[i] = FLR::from_i32(coeff.value() as i32);
         }
         FFT(LOGN_U32, &mut c_fft);
 
@@ -326,8 +326,8 @@ impl SecretKey {
         let mut b01_copy = [FLR::ZERO; N];
         b01_copy.copy_from_slice(b01);
         poly_mul_fft(LOGN_U32, &mut t1, &b01_copy);
-        for i in 0..N {
-            t1[i] = -t1[i];
+        for t in t1.iter_mut().take(N) {
+            *t = -*t;
         }
 
         // Create sampler with RNG adapter
@@ -400,8 +400,8 @@ impl SecretKey {
                 }
 
                 // Negate s0 for output format
-                for i in 0..N {
-                    s0[i] = -s0[i];
+                for s in s0.iter_mut().take(N) {
+                    *s = -*s;
                 }
 
                 break [s0, s1];

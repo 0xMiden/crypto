@@ -133,7 +133,7 @@ fn test_ntru_gen_opt_kat() {
     let n = 512;
     println!("\n=== Testing ntru_gen_opt against fn-dsa KAT ===\n");
 
-    for i in 0..KAT_KG512.len() {
+    for (i, _) in KAT_KG512.iter().enumerate() {
         let seed = if i < 10 {
             format!("test{}", i)
         } else {
@@ -153,16 +153,16 @@ fn test_ntru_gen_opt_kat() {
         // Hash in fn-dsa order: [f, g, F, G]
         let mut hasher = Sha256::new();
         for &coef in &f.coefficients {
-            Digest::update(&mut hasher, &[coef as u8]);
+            Digest::update(&mut hasher, [coef as u8]);
         }
         for &coef in &g.coefficients {
-            Digest::update(&mut hasher, &[coef as u8]);
+            Digest::update(&mut hasher, [coef as u8]);
         }
         for &coef in &big_f.coefficients {
-            Digest::update(&mut hasher, &[coef as u8]);
+            Digest::update(&mut hasher, [coef as u8]);
         }
         for &coef in &big_g.coefficients {
-            Digest::update(&mut hasher, &[coef as u8]);
+            Digest::update(&mut hasher, [coef as u8]);
         }
         let hash = hasher.finalize();
         let hash_hex = hex::encode(hash);

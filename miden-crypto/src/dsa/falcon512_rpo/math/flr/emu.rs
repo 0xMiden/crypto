@@ -1,6 +1,6 @@
 #![allow(non_snake_case)]
 #![allow(non_upper_case_globals)]
-// Depending on the target architecture, some explicit intrisics could be
+// Depending on the target architecture, some explicit intrinsics could be
 // used instead of the functions defined here.
 #![allow(dead_code)]
 

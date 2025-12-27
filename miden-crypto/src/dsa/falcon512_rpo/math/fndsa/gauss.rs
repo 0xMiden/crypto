@@ -31,13 +31,13 @@ pub fn sample_f_fndsa<R: PRNG>(n: usize, rng: &mut R) -> Vec<i8> {
                 // Generate random 16-bit value (exactly as fn-dsa does)
                 let y = rng.next_u16() as u32;
                 v -= kmax;
-                for k in 0..tab.len() {
-                    v += (((tab[k] as u32).wrapping_sub(y)) >> 31) as i32;
+                for &t in tab {
+                    v += (((t as u32).wrapping_sub(y)) >> 31) as i32;
                 }
             }
 
             // For degree 512, value should always be in [-127, +127]
-            if v < -127 || v > 127 {
+            if !(-127..=127).contains(&v) {
                 continue;
             }
 

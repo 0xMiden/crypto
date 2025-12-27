@@ -3163,7 +3163,7 @@ mod tests {
         // Tolerance is 2^-20 which is a small number (roughly 0.000001)
         let tolerance = FLR::from_i32(1) / FLR::from_i32(1 << 20);
         for i in 0..n {
-            let diff = (&f[i] - &original[i]).abs();
+            let diff = (f[i] - original[i]).abs();
             assert!(
                 diff < tolerance,
                 "FFT->iFFT round-trip failed at index {}: got {:?}, expected {:?}, diff = {:?}",
@@ -3202,7 +3202,7 @@ mod tests {
         // Check round-trip
         let tolerance = FLR::from_i32(1) / FLR::from_i32(1 << 20);
         for i in 0..n {
-            let diff = (&f_merged[i] - &original[i]).abs();
+            let diff = (f_merged[i] - original[i]).abs();
             assert!(
                 diff < tolerance,
                 "split->merge round-trip failed at index {}: got {:?}, expected {:?}",
@@ -3360,7 +3360,7 @@ mod tests {
 
         // Scale by 2
         let two = FLR::from_i32(2);
-        poly_mulconst(logn, &mut d, two.clone());
+        poly_mulconst(logn, &mut d, two);
 
         // Add to itself (should be 4x original)
         let d_copy = d.clone();

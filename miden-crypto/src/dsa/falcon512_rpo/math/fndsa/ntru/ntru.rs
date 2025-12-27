@@ -80,7 +80,7 @@ pub(crate) fn solve_NTRU(
     tmp_u32: &mut [u32],
     tmp_fxr: &mut [FXR],
 ) -> bool {
-    assert!(1 <= logn && logn <= 10);
+    assert!((1..=10).contains(&logn));
     let n = 1usize << logn;
     assert!(f.len() == n && g.len() == n);
     assert!(F.len() == n && G.len() == n);
@@ -99,9 +99,9 @@ pub(crate) fn solve_NTRU(
 
     // Solution is in the first 2*n slots of tmp_u32.
     // We must check that all coefficients are in [-127,+127].
-    for i in 0..(2 * n) {
-        let z = tmp_u32[i] as i32;
-        if z < -127 || z > 127 {
+    for &tmp in tmp_u32.iter().take(2 * n) {
+        let z = tmp as i32;
+        if !(-127..=127).contains(&z) {
             return false;
         }
     }
@@ -111,7 +111,7 @@ pub(crate) fn solve_NTRU(
         F[i] = (tmp_u32[i] as i32) as i8;
         G[i] = (tmp_u32[i + n] as i32) as i8;
     }
-    return true;
+    true
 }
 
 // Solving the NTRU equation, deepest level.
@@ -161,7 +161,7 @@ fn solve_NTRU_deepest(logn: u32, f: &[i8], g: &[i8], tmp: &mut [u32]) -> bool {
         return false;
     }
 
-    return true;
+    true
 }
 
 // Solving the NTRU equation, intermediate level.
@@ -228,10 +228,10 @@ fn solve_NTRU_intermediate(
         let (_, work) = work.split_at_mut(2 * slen * n); // ft and gt
         let (Fd, work) = work.split_at_mut(tlen * hn);
         let (Gd, _) = work.split_at_mut(tlen * hn);
-        for i in 0..llen {
-            let p = PRIMES[i].p;
-            let p0i = PRIMES[i].p0i;
-            let R2 = PRIMES[i].R2;
+        for (i, prime) in PRIMES.iter().enumerate().take(llen) {
+            let p = prime.p;
+            let p0i = prime.p0i;
+            let R2 = prime.R2;
             let Rx = mp_Rx31(tlen as u32, p, p0i, R2);
             let kt = i * n + hn;
             for j in 0..hn {
@@ -298,15 +298,15 @@ fn solve_NTRU_intermediate(
                 // Compute F and G (unreduced) modulo p.
                 let kt = i * n;
                 for j in 0..hn {
-                    let fa = fx[2 * j + 0];
+                    let fa = fx[2 * j];
                     let fb = fx[2 * j + 1];
-                    let ga = gx[2 * j + 0];
+                    let ga = gx[2 * j];
                     let gb = gx[2 * j + 1];
                     let mFp = mp_mmul(Ft[kt + hn + j], R2, p, p0i);
                     let mGp = mp_mmul(Gt[kt + hn + j], R2, p, p0i);
-                    Ft[kt + 2 * j + 0] = mp_mmul(gb, mFp, p, p0i);
+                    Ft[kt + 2 * j] = mp_mmul(gb, mFp, p, p0i);
                     Ft[kt + 2 * j + 1] = mp_mmul(ga, mFp, p, p0i);
-                    Gt[kt + 2 * j + 0] = mp_mmul(fb, mGp, p, p0i);
+                    Gt[kt + 2 * j] = mp_mmul(fb, mGp, p, p0i);
                     Gt[kt + 2 * j + 1] = mp_mmul(fa, mGp, p, p0i);
                 }
                 mp_iNTT(logn, &mut Ft[kt..(kt + n)], igm, p, p0i);
@@ -645,7 +645,7 @@ fn solve_NTRU_intermediate(
         }
     }
 
-    return true;
+    true
 }
 
 // Solving the NTRU equation, top-level.
@@ -697,15 +697,15 @@ fn solve_NTRU_depth0(
 
         // Build the unreduced (F,G) into ft and gt
         for i in 0..hn {
-            let fa = ft[(i << 1) + 0];
+            let fa = ft[i << 1];
             let fb = ft[(i << 1) + 1];
-            let ga = gt[(i << 1) + 0];
+            let ga = gt[i << 1];
             let gb = gt[(i << 1) + 1];
             let mFd = mp_mmul(Fd[i], R2, p, p0i);
             let mGd = mp_mmul(Gd[i], R2, p, p0i);
-            ft[(i << 1) + 0] = mp_mmul(gb, mFd, p, p0i);
+            ft[i << 1] = mp_mmul(gb, mFd, p, p0i);
             ft[(i << 1) + 1] = mp_mmul(ga, mFd, p, p0i);
-            gt[(i << 1) + 0] = mp_mmul(fb, mGd, p, p0i);
+            gt[i << 1] = mp_mmul(fb, mGd, p, p0i);
             gt[(i << 1) + 1] = mp_mmul(fa, mGd, p, p0i);
         }
     }
@@ -847,7 +847,7 @@ fn solve_NTRU_depth0(
         poly_mp_norm(logn, Gp, p);
     }
 
-    return true;
+    true
 }
 
 // Inject (f,g) at the top-level: f and g are converted to NTT and
@@ -892,10 +892,10 @@ fn make_fg_step(logn_top: u32, depth: u32, work: &mut [u32]) {
     {
         let (fs, gs) = fgs.split_at_mut(n * slen);
         let (igm, _) = data.split_at_mut(n);
-        for i in 0..slen {
-            let p = PRIMES[i].p;
-            let p0i = PRIMES[i].p0i;
-            let R2 = PRIMES[i].R2;
+        for (i, prime) in PRIMES.iter().enumerate().take(slen) {
+            let p = prime.p;
+            let p0i = prime.p0i;
+            let R2 = prime.R2;
             let ks = i * n;
             let kd = i * hn;
             for j in 0..hn {
@@ -918,10 +918,10 @@ fn make_fg_step(logn_top: u32, depth: u32, work: &mut [u32]) {
         let (fs, gs) = fgs.split_at_mut(n * slen);
         let (gm, data) = data.split_at_mut(n);
         let (t2, _) = data.split_at_mut(n);
-        for i in slen..tlen {
-            let p = PRIMES[i].p;
-            let p0i = PRIMES[i].p0i;
-            let R2 = PRIMES[i].R2;
+        for (i, prime) in PRIMES.iter().enumerate().take(tlen).skip(slen) {
+            let p = prime.p;
+            let p0i = prime.p0i;
+            let R2 = prime.R2;
             let Rx = mp_Rx31(slen as u32, p, p0i, R2);
             mp_mkgm(logn, PRIMES[i].g, p, p0i, gm);
             let kd = i * hn;
@@ -967,8 +967,8 @@ fn make_fg_deepest(logn: u32, f: &[i8], g: &[i8], mut work: &mut [u32]) -> bool 
     // that all its NTT coefficients are non-zero.
     let n = 1usize << logn;
     let mut b = 0;
-    for i in 0..n {
-        b |= work[i].wrapping_sub(1);
+    for &w in work.iter().take(n) {
+        b |= w.wrapping_sub(1);
     }
     let r = (b >> 31) == 0;
 
