@@ -1,5 +1,5 @@
 use miden_crypto::{
-    EMPTY_WORD, Felt, ONE, WORD_SIZE, Word,
+    EMPTY_WORD, Felt, ONE, WORD_SIZE, Word, ZERO,
     merkle::{
         InnerNodeInfo,
         smt::{LargeSmt, LargeSmtError, RocksDbConfig, RocksDbStorage},
@@ -127,8 +127,8 @@ fn rocksdb_persistence_after_insert_batch_with_deletions() {
 
     let mut inner_nodes: Vec<InnerNodeInfo> = smt.inner_nodes().unwrap().collect();
     inner_nodes.sort_by_key(|info| info.value);
-    let num_leaves = smt.num_leaves().unwrap();
-    let num_entries = smt.num_entries().unwrap();
+    let num_leaves = smt.num_leaves();
+    let num_entries = smt.num_entries();
     drop(smt);
 
     let reopened_storage = RocksDbStorage::open(RocksDbConfig::new(db_path)).unwrap();
@@ -136,8 +136,8 @@ fn rocksdb_persistence_after_insert_batch_with_deletions() {
 
     let mut inner_nodes_2: Vec<InnerNodeInfo> = smt.inner_nodes().unwrap().collect();
     inner_nodes_2.sort_by_key(|info| info.value);
-    let num_leaves_2 = smt.num_leaves().unwrap();
-    let num_entries_2 = smt.num_entries().unwrap();
+    let num_leaves_2 = smt.num_leaves();
+    let num_entries_2 = smt.num_entries();
 
     assert_eq!(inner_nodes.len(), inner_nodes_2.len());
     assert_eq!(inner_nodes, inner_nodes_2);
@@ -232,4 +232,55 @@ fn rocksdb_new_fails_on_non_empty_storage() {
         LargeSmtError::StorageNotEmpty => {},
         other => panic!("Expected StorageNotEmpty error, got {:?}", other),
     }
+}
+
+// Tests entry/leaf counts through the full lifecycle of a leaf:
+// Empty -> Single -> Multiple -> Single -> Empty
+#[test]
+fn rocksdb_entry_count_through_leaf_lifecycle() {
+    let (storage, temp_dir_guard) = setup_storage();
+    let db_path = temp_dir_guard.path().to_path_buf();
+
+    let mut smt = LargeSmt::new(storage).unwrap();
+
+    // Two keys that map to the same leaf
+    let key1 = Word::new([ZERO, ZERO, ZERO, ZERO]);
+    let key2 = Word::new([ONE, ZERO, ZERO, ZERO]);
+    let value = Word::new([ONE, ONE, ONE, ONE]);
+
+    // Initial state: empty
+    assert_eq!(smt.num_entries(), 0);
+    assert_eq!(smt.num_leaves(), 0);
+
+    // Add first key: Empty -> Single
+    let mutations = smt.compute_mutations([(key1, value)]).unwrap();
+    smt.apply_mutations(mutations).unwrap();
+    assert_eq!(smt.num_entries(), 1, "should have 1 entry after first insert");
+    assert_eq!(smt.num_leaves(), 1, "should have 1 leaf after first insert");
+
+    // Add second key to same leaf: Single -> Multiple
+    let mutations = smt.compute_mutations([(key2, value)]).unwrap();
+    smt.apply_mutations(mutations).unwrap();
+    assert_eq!(smt.num_entries(), 2, "should have 2 entries after second insert");
+    assert_eq!(smt.num_leaves(), 1, "should still have 1 leaf (now Multiple)");
+
+    // Remove first key: Multiple -> Single
+    let mutations = smt.compute_mutations([(key1, EMPTY_WORD)]).unwrap();
+    smt.apply_mutations(mutations).unwrap();
+    assert_eq!(smt.num_entries(), 1, "should have 1 entry after removal from Multiple");
+    assert_eq!(smt.num_leaves(), 1, "should still have 1 leaf (now Single)");
+
+    // Remove second key: Single -> Empty
+    let mutations = smt.compute_mutations([(key2, EMPTY_WORD)]).unwrap();
+    smt.apply_mutations(mutations).unwrap();
+    assert_eq!(smt.num_entries(), 0, "should have 0 entries after removing all");
+    assert_eq!(smt.num_leaves(), 0, "should have 0 leaves after removing all");
+
+    // Verify persistence through the lifecycle
+    drop(smt);
+    let storage = RocksDbStorage::open(RocksDbConfig::new(&db_path)).unwrap();
+    let smt = LargeSmt::load(storage).unwrap();
+
+    assert_eq!(smt.num_entries(), 0, "persisted entry count should be 0");
+    assert_eq!(smt.num_leaves(), 0, "persisted leaf count should be 0");
 }
