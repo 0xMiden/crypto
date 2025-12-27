@@ -66,7 +66,7 @@ For each algorithm, we benchmark three core operations:
 
 | Hardware            | Key Generation | Signing | Verification |
 | ------------------- | :------------: | :-----: | :----------: |
-| Apple M4            | 240 ms         | 6.9 ms  | 2.07 ms      |
+| Apple M4            | 4.2 ms         | 520 µs  | 300 µs       |
 
 #### ECDSA over secp256k1 (Keccak256)
 
