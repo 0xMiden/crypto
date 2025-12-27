@@ -63,11 +63,11 @@ harness = false
 name    = "rand"
 
 [features]
-concurrent = ["dep:rayon"]
+concurrent = ["dep:rayon", "std"]
 default = ["concurrent", "std"]
 executable = ["concurrent", "dep:clap", "dep:rand-utils"]
 fuzzing = []
-internal = []
+internal = ["concurrent"]
 rocksdb = ["concurrent", "dep:rocksdb"]
 serde = ["dep:serde", "serde?/alloc", "winter-math/serde"]
 std = [
