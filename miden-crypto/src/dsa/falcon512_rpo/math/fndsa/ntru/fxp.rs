@@ -1,8 +1,10 @@
 #![allow(non_snake_case)]
 #![allow(non_upper_case_globals)]
 
-use core::cmp::Ordering;
-use core::ops::{Add, AddAssign, Div, DivAssign, Mul, MulAssign, Neg, Sub, SubAssign};
+use core::{
+    cmp::Ordering,
+    ops::{Add, AddAssign, Div, DivAssign, Mul, MulAssign, Neg, Sub, SubAssign},
+};
 
 use crate::zeroize::DefaultIsZeroes;
 

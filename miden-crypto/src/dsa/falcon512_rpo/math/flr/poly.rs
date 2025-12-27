@@ -25,7 +25,6 @@
 #![allow(dead_code)]
 
 use super::FLR;
-
 #[cfg(target_arch = "x86_64")]
 use super::poly_avx2;
 
@@ -2098,7 +2097,8 @@ pub(crate) const GM: [FLR; 2048] = [
 // Runtime dispatch wrappers (use AVX2 when available on x86_64)
 // ========================================================================
 
-/// FFT with AVX2 runtime dispatch - public API that automatically uses best available implementation.
+/// FFT with AVX2 runtime dispatch - public API that automatically uses best available
+/// implementation.
 #[cfg(target_arch = "x86_64")]
 #[inline]
 pub(crate) fn FFT_dispatch(logn: u32, f: &mut [FLR]) {
@@ -2109,7 +2109,8 @@ pub(crate) fn FFT_dispatch(logn: u32, f: &mut [FLR]) {
     }
 }
 
-/// iFFT with AVX2 runtime dispatch - public API that automatically uses best available implementation.
+/// iFFT with AVX2 runtime dispatch - public API that automatically uses best available
+/// implementation.
 #[cfg(target_arch = "x86_64")]
 #[inline]
 pub(crate) fn iFFT_dispatch(logn: u32, f: &mut [FLR]) {
@@ -2147,7 +2148,8 @@ pub(crate) use iFFT_dispatch as iFFT;
 /// The first iteration would be a no-op (computing f[j] + i*f[j + n/2]), so we start at iteration
 /// 2.
 ///
-/// This is the SSE2/NEON/scalar implementation. On x86_64, prefer FFT() which dispatches to AVX2 when available.
+/// This is the SSE2/NEON/scalar implementation. On x86_64, prefer FFT() which dispatches to AVX2
+/// when available.
 fn FFT_impl(logn: u32, f: &mut [FLR]) {
     // First iteration of FFT would compute f[j] + i*f[j + n/2] for all j < n/2;
     // since this is exactly our storage format for complex numbers in FFT representation,
@@ -2218,8 +2220,7 @@ fn FFT_impl(logn: u32, f: &mut [FLR]) {
 
     #[cfg(any(target_arch = "aarch64", target_arch = "arm64ec"))]
     unsafe {
-        use core::arch::aarch64::*;
-        use core::mem::transmute;
+        use core::{arch::aarch64::*, mem::transmute};
 
         assert!(logn >= 1);
         let n = 1usize << logn;
@@ -2325,7 +2326,8 @@ fn FFT_impl(logn: u32, f: &mut [FLR]) {
 /// The last iteration is a no-op (like the first iteration in FFT).
 /// Since we skip it, we must divide by n/2 at the end.
 ///
-/// This is the SSE2/NEON/scalar implementation. On x86_64, prefer iFFT() which dispatches to AVX2 when available.
+/// This is the SSE2/NEON/scalar implementation. On x86_64, prefer iFFT() which dispatches to AVX2
+/// when available.
 fn iFFT_impl(logn: u32, f: &mut [FLR]) {
     // This is the reverse of FFT. We use the fact that if w = exp(i*k*pi/N),
     // then 1/w is the conjugate of w; thus, we can get inverses from GM[] by
@@ -2421,8 +2423,7 @@ fn iFFT_impl(logn: u32, f: &mut [FLR]) {
 
     #[cfg(any(target_arch = "aarch64", target_arch = "arm64ec"))]
     unsafe {
-        use core::arch::aarch64::*;
-        use core::mem::transmute;
+        use core::{arch::aarch64::*, mem::transmute};
 
         assert!(logn >= 1);
         let n = 1usize << logn;
@@ -2572,8 +2573,7 @@ pub(crate) fn poly_set_small(logn: u32, d: &mut [FLR], f: &[i8]) {
 
     #[cfg(any(target_arch = "aarch64", target_arch = "arm64ec"))]
     unsafe {
-        use core::arch::aarch64::*;
-        use core::mem::transmute;
+        use core::{arch::aarch64::*, mem::transmute};
 
         assert!(logn >= 2);
         let ff: *const i8 = transmute(f.as_ptr());
@@ -2640,8 +2640,7 @@ pub(crate) fn poly_add(logn: u32, a: &mut [FLR], b: &[FLR]) {
 
     #[cfg(any(target_arch = "aarch64", target_arch = "arm64ec"))]
     unsafe {
-        use core::arch::aarch64::*;
-        use core::mem::transmute;
+        use core::{arch::aarch64::*, mem::transmute};
 
         let aa: *mut f64 = transmute(a.as_mut_ptr());
         let bb: *const f64 = transmute(b.as_ptr());
@@ -2694,8 +2693,7 @@ pub(crate) fn poly_sub(logn: u32, a: &mut [FLR], b: &[FLR]) {
 
     #[cfg(any(target_arch = "aarch64", target_arch = "arm64ec"))]
     unsafe {
-        use core::arch::aarch64::*;
-        use core::mem::transmute;
+        use core::{arch::aarch64::*, mem::transmute};
 
         let aa: *mut f64 = transmute(a.as_mut_ptr());
         let bb: *const f64 = transmute(b.as_ptr());
@@ -2770,8 +2768,7 @@ pub(crate) fn poly_mul_fft(logn: u32, a: &mut [FLR], b: &[FLR]) {
 
     #[cfg(any(target_arch = "aarch64", target_arch = "arm64ec"))]
     unsafe {
-        use core::arch::aarch64::*;
-        use core::mem::transmute;
+        use core::{arch::aarch64::*, mem::transmute};
 
         let aa: *mut f64 = transmute(a.as_mut_ptr());
         let bb: *const f64 = transmute(b.as_ptr());
@@ -2854,8 +2851,7 @@ pub(crate) fn poly_muladj_fft(logn: u32, a: &mut [FLR], b: &[FLR]) {
 
     #[cfg(any(target_arch = "aarch64", target_arch = "arm64ec"))]
     unsafe {
-        use core::arch::aarch64::*;
-        use core::mem::transmute;
+        use core::{arch::aarch64::*, mem::transmute};
 
         let aa: *mut f64 = transmute(a.as_mut_ptr());
         let bb: *const f64 = transmute(b.as_ptr());
@@ -2924,8 +2920,7 @@ pub(crate) fn poly_mulconst(logn: u32, a: &mut [FLR], x: FLR) {
 
     #[cfg(any(target_arch = "aarch64", target_arch = "arm64ec"))]
     unsafe {
-        use core::arch::aarch64::*;
-        use core::mem::transmute;
+        use core::{arch::aarch64::*, mem::transmute};
 
         let aa: *mut f64 = transmute(a.as_mut_ptr());
         let x1: float64x1_t = transmute(x);
@@ -3046,8 +3041,7 @@ pub(crate) fn poly_mulownadj_fft(logn: u32, a: &mut [FLR]) {
 
     #[cfg(any(target_arch = "aarch64", target_arch = "arm64ec"))]
     unsafe {
-        use core::arch::aarch64::*;
-        use core::mem::transmute;
+        use core::{arch::aarch64::*, mem::transmute};
 
         let aa: *mut f64 = transmute(a.as_mut_ptr());
         let xz = vdupq_lane_f64(vcreate_f64(0), 0);

@@ -89,19 +89,17 @@ pub fn hash_to_point_shake256(message: &[u8], nonce: &Nonce) -> Polynomial<Falco
 /// Converts a Miden field element to a field element in the prime field with characteristic
 /// the Falcon prime.
 ///
-/// Note that since `FalconFelt::new` accepts `i16`, we first reduce the canonical value of
-/// the Miden field element modulo the Falcon prime and then cast the resulting value to an `i16`.
-/// Note that this final cast is safe as the Falcon prime is less than `i16::MAX`.
+/// Reduces the canonical value of the Miden field element modulo the Falcon prime and
+/// converts it to a FalconFelt. The cast to u16 is safe as the Falcon prime (12289) fits in u16.
 fn felt_to_falcon_felt(value: Felt) -> FalconFelt {
     FalconFelt::new((value.as_canonical_u64() % MODULUS as u64) as i16)
 }
 
 /// Converts a `u32` to a field element in the prime field with characteristic the Falcon prime.
 ///
-/// Note that since `FalconFelt::new` accepts `i16`, we first reduce the `u32` value modulo
-/// the Falcon prime and then cast the resulting value to an `i16`.
-/// Note that this final cast is safe as the Falcon prime is less than `i16::MAX`.
-#[cfg(test)]
+/// Reduces the `u32` value modulo the Falcon prime and converts it to a FalconFelt.
+/// The cast to u16 is safe as the Falcon prime (12289) fits in u16.
+#[cfg(all(test, feature = "std"))]
 fn u32_to_falcon_felt(value: u32) -> FalconFelt {
-    FalconFelt::new((value % MODULUS as u32) as i16)
+    FalconFelt::new((value % MODULUS as u32) as u16)
 }

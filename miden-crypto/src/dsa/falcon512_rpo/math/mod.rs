@@ -9,7 +9,6 @@ use alloc::vec::Vec;
 use core::ops::MulAssign;
 
 use num::{One, Zero};
-use num_complex::Complex64;
 
 use super::MODULUS;
 
@@ -54,16 +53,6 @@ pub trait Inverse: Copy + Zero + MulAssign + One {
             }
         }
         rp
-    }
-}
-
-impl Inverse for Complex64 {
-    fn inverse_or_zero(self) -> Self {
-        let modulus = self.re * self.re + self.im * self.im;
-        Complex64::new(self.re / modulus, -self.im / modulus)
-    }
-    fn batch_inverse_or_zero(batch: &[Self]) -> Vec<Self> {
-        batch.iter().map(|&c| Complex64::new(1.0, 0.0) / c).collect()
     }
 }
 

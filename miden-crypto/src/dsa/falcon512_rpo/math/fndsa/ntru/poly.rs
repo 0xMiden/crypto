@@ -1,9 +1,7 @@
 #![allow(non_snake_case)]
 #![allow(non_upper_case_globals)]
 
-use super::fxp::*;
-use super::mp31::*;
-use super::zint31::*;
+use super::{fxp::*, mp31::*, zint31::*};
 
 // ========================================================================
 // Operations on polynomials modulo X^n+1
@@ -177,7 +175,7 @@ pub(crate) fn poly_max_bitlength(logn: u32, x: &[u32], xlen: usize) -> u32 {
     let mut tk = 0u32;
     for i in 0..n {
         // Extend sign bit into a 31-bit mask.
-        let m = (x[i + ((xlen - 1) << logn)] >> 30).wrapping_neg() & 0x7FFFFFFF;
+        let m = (x[i + ((xlen - 1) << logn)] >> 30).wrapping_neg() & 0x7fffffff;
 
         // Get top non-zero sign-adjusted word, with index.
         //   c    top non-zero word
@@ -248,9 +246,9 @@ pub(crate) fn poly_big_to_fixed(logn: u32, f: &[u32], flen: usize, sc: u32, d: &
     //    sch-1   1 - scl
     //    sch     32 - scl
     //    sch+1   63 - scl
-    let t0 = sch.wrapping_sub(1) & 0xFFFF;
-    let t1 = sch & 0xFFFF;
-    let t2 = sch.wrapping_add(1) & 0xFFFF;
+    let t0 = sch.wrapping_sub(1) & 0xffff;
+    let t1 = sch & 0xffff;
+    let t2 = sch.wrapping_add(1) & 0xffff;
     for i in 0..n {
         // Get the relevant upper words.
         let mut w0 = 0u32;
@@ -331,10 +329,9 @@ pub(crate) fn poly_sub_scaled(
 
 // Subtract f*k*2^scale_k from F. This is similar to poly_sub_scaled(),
 // except that:
-//   - f is in RNS+NTT, and over flen+1 words (even though the plain
-//     representation was over flen words).
-//   - An extra temporary array is provided, with at least n*(flen+4) free
-//     words.
+//   - f is in RNS+NTT, and over flen+1 words (even though the plain representation was over flen
+//     words).
+//   - An extra temporary array is provided, with at least n*(flen+4) free words.
 // The multiplication f*k is internally computed using the NTT; this is
 // faster at large degree.
 // The value of logn MUST be at least 3.
@@ -563,8 +560,8 @@ pub(crate) fn poly_sub_kfg_scaled_depth1(
     if FGlen == 1 {
         let p = PRIMES[0].p;
         for i in 0..n {
-            F[i] = (mp_norm(F[i], p) as u32) & 0x7FFFFFFF;
-            G[i] = (mp_norm(G[i], p) as u32) & 0x7FFFFFFF;
+            F[i] = (mp_norm(F[i], p) as u32) & 0x7fffffff;
+            G[i] = (mp_norm(G[i], p) as u32) & 0x7fffffff;
         }
     } else {
         let p0 = PRIMES[0].p;
@@ -580,8 +577,8 @@ pub(crate) fn poly_sub_kfg_scaled_depth1(
             let y = mp_mmul(mp_sub(x1, x0m1, p1), s, p1, p1_0i);
             let z = (x0 as u64) + (p0 as u64) * (y as u64);
             let z = z.wrapping_sub(pp & (hpp.wrapping_sub(z) >> 63).wrapping_neg());
-            F[i] = (z as u32) & 0x7FFFFFFF;
-            F[i + n] = ((z >> 31) as u32) & 0x7FFFFFFF;
+            F[i] = (z as u32) & 0x7fffffff;
+            F[i + n] = ((z >> 31) as u32) & 0x7fffffff;
         }
         for i in 0..n {
             let x0 = G[i];
@@ -590,8 +587,8 @@ pub(crate) fn poly_sub_kfg_scaled_depth1(
             let y = mp_mmul(mp_sub(x1, x0m1, p1), s, p1, p1_0i);
             let z = (x0 as u64) + (p0 as u64) * (y as u64);
             let z = z.wrapping_sub(pp & (hpp.wrapping_sub(z) >> 63).wrapping_neg());
-            G[i] = (z as u32) & 0x7FFFFFFF;
-            G[i + n] = ((z >> 31) as u32) & 0x7FFFFFFF;
+            G[i] = (z as u32) & 0x7fffffff;
+            G[i + n] = ((z >> 31) as u32) & 0x7fffffff;
         }
     }
 }

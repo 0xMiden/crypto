@@ -1,11 +1,7 @@
 #![allow(non_snake_case)]
 #![allow(non_upper_case_globals)]
 
-use super::fxp::*;
-use super::mp31::*;
-use super::poly::*;
-use super::vect::*;
-use super::zint31::*;
+use super::{fxp::*, mp31::*, poly::*, vect::*, zint31::*};
 
 // ========================================================================
 // Solving the NTRU equation
@@ -152,7 +148,7 @@ fn solve_NTRU_deepest(logn: u32, f: &[i8], g: &[i8], tmp: &mut [u32]) -> bool {
     let (fp, gp) = fgp.split_at_mut(slen);
 
     // Apply the binary GCD to get (F, G).
-    if zint_bezout(Gp, Fp, fp, gp, t1) != 0xFFFFFFFF {
+    if zint_bezout(Gp, Fp, fp, gp, t1) != 0xffffffff {
         // Resultants are not coprime to each other; we reject that case
         // (note: we also reject the case where the GCD is exactly q = 12289,
         // even though that case could be handled.

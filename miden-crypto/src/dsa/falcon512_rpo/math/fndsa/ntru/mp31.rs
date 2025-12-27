@@ -18,23 +18,21 @@
 // of x*2^32 mod p (hence in the [0, p-1] range, and using the u32 type).
 //
 // Unless otherwise specified:
-//   - When a function uses an integer modulo p as operand, it expects it
-//     to be provided in unsigned representation. Such operands MUST be in
-//     the proper range; overflows are not checked but may lead to incorrect
-//     results.
-//   - When a function outputs an integer modulo p, it returns it in unsigned
-//     representation (and, in particular, in the proper [0, p-1] range).
+//   - When a function uses an integer modulo p as operand, it expects it to be provided in unsigned
+//     representation. Such operands MUST be in the proper range; overflows are not checked but may
+//     lead to incorrect results.
+//   - When a function outputs an integer modulo p, it returns it in unsigned representation (and,
+//     in particular, in the proper [0, p-1] range).
 //
 // Montgomery multiplication, given a and b in unsigned representation,
 // computes and returns (a*b)/2^32 mod p in unsigned representation. The
 // following properties hold:
-//   - If a and b are really the Montgomery representations of x and y,
-//     respectively, then the returned value is the Mongomery representation
-//     of x*y mod p.
-//   - If a is the Montgomery representation of x, then the returned value
-//     is the unsigned representation of x*b mod p.
-//   - If b is the Montgomery representation of b, then the returned value
-//     is the unsigned representation of a*y mod p.
+//   - If a and b are really the Montgomery representations of x and y, respectively, then the
+//     returned value is the Mongomery representation of x*y mod p.
+//   - If a is the Montgomery representation of x, then the returned value is the unsigned
+//     representation of x*b mod p.
+//   - If b is the Montgomery representation of b, then the returned value is the unsigned
+//     representation of a*y mod p.
 //
 // For a given value with unsigned representation x, its Montgomery
 // representation can be obtained with a Montgomery multiplication of
@@ -175,20 +173,18 @@ pub(crate) fn mp_div(x: u32, y: u32, p: u32) -> u32 {
     //        u <- u/2 mod p
     //    We denote len(z) the length (in bits) of the non-negative
     //    integer z. The following properties hold:
-    //      - If a != 0 at the start of an iteration, then len(a)+len(b)
-    //        is reduced by at least 1 by the iteration.
-    //      - If an iteration sets a to 0, then, upon exit of that
-    //        iteration, b contains GCD(y, p).
-    //      - If a = 0 at the start of an iteration, then a, b, u and v
-    //        are unchanged by that iteration (and all subsequent iterations).
+    //      - If a != 0 at the start of an iteration, then len(a)+len(b) is reduced by at least 1 by
+    //        the iteration.
+    //      - If an iteration sets a to 0, then, upon exit of that iteration, b contains GCD(y, p).
+    //      - If a = 0 at the start of an iteration, then a, b, u and v are unchanged by that
+    //        iteration (and all subsequent iterations).
     //      - b is always odd, and therefore never equal to zero.
     //    Values x, y and p fit on 31 bits, hence len(a)+len(b) <= 62
     //    initially. Therefore:
-    //      - If y is invertible modulo p, then after 60 iterations,
-    //        b contains 1, at which point x = v*y mod p; value v is
-    //        then the result value.
-    //      - If y is not invertible modulo p, then after 60 iterations,
-    //        a contains 0 and b contains a value strictly greater than 1.
+    //      - If y is invertible modulo p, then after 60 iterations, b contains 1, at which point x
+    //        = v*y mod p; value v is then the result value.
+    //      - If y is not invertible modulo p, then after 60 iterations, a contains 0 and b contains
+    //        a value strictly greater than 1.
     let mut a = y;
     let mut b = p;
     let mut u = x;

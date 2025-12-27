@@ -178,7 +178,11 @@ impl SamplerRng for Shake256Prng {
             return x;
         }
         // Read 8 bytes directly from buffer
-        let x = u64::from_le_bytes(self.buf[self.ptr..self.ptr + 8].try_into().unwrap());
+        let x = u64::from_le_bytes(
+            self.buf[self.ptr..self.ptr + 8]
+                .try_into()
+                .expect("slice must be exactly 8 bytes as ensured by bounds check"),
+        );
         self.ptr += 8;
         x
     }

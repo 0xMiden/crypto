@@ -43,29 +43,20 @@ pub(crate) fn vect_FFT(logn: u32, f: &mut [FXR]) {
 //
 // Note: in the final outer iteration:
 //
-//  - f[j] and f[j+hn] are set to the half of a complex number. Fixed point
-//    values are held in integers in the [-2^63..+2^63-1] range (in signed
-//    interpretation) and halving is done by adding 1 and then an
-//    arithmetic right shift, thus with an output necessarily in the
-//    [-2^62..+2^62-1] range (addition of 1 to 2^63-1 "wraps around" in that
-//    +2^63 is interpreted as -2^63 instead).
+//  - f[j] and f[j+hn] are set to the half of a complex number. Fixed point values are held in
+//    integers in the [-2^63..+2^63-1] range (in signed interpretation) and halving is done by
+//    adding 1 and then an arithmetic right shift, thus with an output necessarily in the
+//    [-2^62..+2^62-1] range (addition of 1 to 2^63-1 "wraps around" in that +2^63 is interpreted as
+//    -2^63 instead).
 //
-//  - f[j+ht] and f[j+ht+hn] are set to the product of the half of a
-//    complex number, and the complex sqrt(2)-i*sqrt(2). Value sqrt(2)
-//    is represented by the fixed point 3037000500. Following the steps
-//    in fxc_mul():
-//       r1, i1:           -2^62 .. +2^62-1
-//       r2:               +3037000500
-//       i2:               -3037000500
-//       t0:               -3260954456358912000 .. +3260954456358911999
-//       t1:               -3260954456358912000 .. +3260954456358912000
-//       fxr_add(r1, i1):  -2^63 .. +2^63-2
-//       fxr_add(r2, i2):  always zero
-//       t2:               always zero
-//       fxr_sub(t0, t1):  -6521908912717824000 .. +6521908912717823999
-//       fxr_add(t0, t1):  -6521908912717824000 .. +6521908912717823999
-//    Thus, the obtained output values must be in the
-//    [-6521908912717824000..+6521908912717824000] range.
+//  - f[j+ht] and f[j+ht+hn] are set to the product of the half of a complex number, and the complex
+//    sqrt(2)-i*sqrt(2). Value sqrt(2) is represented by the fixed point 3037000500. Following the
+//    steps in fxc_mul(): r1, i1:           -2^62 .. +2^62-1 r2:               +3037000500 i2:
+//    -3037000500 t0:               -3260954456358912000 .. +3260954456358911999 t1:
+//    -3260954456358912000 .. +3260954456358912000 fxr_add(r1, i1):  -2^63 .. +2^63-2 fxr_add(r2,
+//    i2):  always zero t2:               always zero fxr_sub(t0, t1):  -6521908912717824000 ..
+//    +6521908912717823999 fxr_add(t0, t1):  -6521908912717824000 .. +6521908912717823999 Thus, the
+//    obtained output values must be in the [-6521908912717824000..+6521908912717824000] range.
 //
 // If the output of vect_iFFT() is then rounded to integers, then the
 // maximum range for any output value after rounding is

@@ -11,10 +11,9 @@
 //! All functions are marked with `#[target_feature(enable = "avx2")]` and
 //! require runtime CPU detection to use safely.
 
-use super::flr::FLR;
-use super::poly_flr::GM;
-use core::arch::x86_64::*;
-use core::mem::transmute;
+use core::{arch::x86_64::*, mem::transmute};
+
+use super::{flr::FLR, poly_flr::GM};
 
 /// Complex multiplication (scalar fallback for small sizes).
 #[inline(always)]
@@ -188,8 +187,8 @@ pub(crate) unsafe fn poly_set_small(logn: u32, d: &mut [FLR], f: &[i8]) {
         for i in 0..(1usize << (logn - 4)) {
             let x0 = _mm_loadu_si128(fp.wrapping_add(i));
             let x1 = _mm_shuffle_epi32(x0, 0x55);
-            let x2 = _mm_shuffle_epi32(x0, 0xAA);
-            let x3 = _mm_shuffle_epi32(x0, 0xFF);
+            let x2 = _mm_shuffle_epi32(x0, 0xaa);
+            let x3 = _mm_shuffle_epi32(x0, 0xff);
 
             let y0 = _mm256_cvtepi32_pd(_mm_cvtepi8_epi32(x0));
             let y1 = _mm256_cvtepi32_pd(_mm_cvtepi8_epi32(x1));

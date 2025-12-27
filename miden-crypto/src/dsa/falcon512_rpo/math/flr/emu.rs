@@ -18,6 +18,15 @@ use core::ops::{Add, AddAssign, Div, DivAssign, Mul, MulAssign, Neg, Sub, SubAss
 #[derive(Clone, Copy, Debug, PartialEq, PartialOrd)]
 pub(crate) struct FLR(u64);
 
+// Implement Zeroize for FLR to ensure secure memory clearing
+impl crate::zeroize::Zeroize for FLR {
+    fn zeroize(&mut self) {
+        self.0.zeroize();
+    }
+}
+
+impl crate::zeroize::ZeroizeOnDrop for FLR {}
+
 // lzcnt_nz(x) returns the number of leading zeros in the value x, assuming
 // that it is non-zero.
 // On x86 and x86-64, the bsr or lzcnt opcodes will be used (bsr does not

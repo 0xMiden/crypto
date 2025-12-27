@@ -26,6 +26,15 @@
 #[allow(clippy::upper_case_acronyms)] // FLR is the standard name from fn-dsa
 pub(crate) struct FLR(f64);
 
+// Implement Zeroize for FLR to ensure secure memory clearing
+impl crate::zeroize::Zeroize for FLR {
+    fn zeroize(&mut self) {
+        self.0.zeroize();
+    }
+}
+
+impl crate::zeroize::ZeroizeOnDrop for FLR {}
+
 impl FLR {
     pub(crate) const ZERO: Self = Self(0.0);
     pub(crate) const NZERO: Self = Self(-0.0);
@@ -604,7 +613,7 @@ impl FLR {
     #[cfg(feature = "div_emu")]
     fn div_emu(x: u64, y: u64) -> u64 {
         // see FLR::set_div() in flr_emu.rs for details
-        const M52: u64 = 0x000FFFFFFFFFFFFF;
+        const M52: u64 = 0x000fffffffffffff;
         let mut xu = (x & M52) | (1u64 << 52);
         let yu = (y & M52) | (1u64 << 52);
 
@@ -622,8 +631,8 @@ impl FLR {
         let es = ((q >> 55) as u32) & 1;
         q = (q >> es) | (q & 1);
 
-        let ex = ((x >> 52) as i32) & 0x7FF;
-        let ey = ((y >> 52) as i32) & 0x7FF;
+        let ex = ((x >> 52) as i32) & 0x7ff;
+        let ey = ((y >> 52) as i32) & 0x7ff;
         let e = ex - ey - 55 + (es as i32);
 
         let s = (x ^ y) >> 63;
@@ -633,7 +642,7 @@ impl FLR {
         let dm = !((dz as i64) as u64);
         let s = s & dm;
         q &= dm;
-        let cc = (0xC8u64 >> ((q as u32) & 7)) & 1;
+        let cc = (0xc8u64 >> ((q as u32) & 7)) & 1;
         (s << 63) + (((e + 1076) as u64) << 52) + (q >> 2) + cc
     }
 
@@ -654,9 +663,9 @@ impl FLR {
     ))]
     fn sqrt_emu(x: u64) -> u64 {
         // see FLR::sqrt() in flr_emu.rs for details
-        const M52: u64 = 0x000FFFFFFFFFFFFF;
+        const M52: u64 = 0x000fffffffffffff;
         let mut xu = (x & M52) | (1u64 << 52);
-        let ex = ((x >> 52) as u32) & 0x7FF;
+        let ex = ((x >> 52) as u32) & 0x7ff;
         let mut e = (ex as i32) - 1023;
 
         xu += ((-(e & 1) as i64) as u64) & xu;
@@ -682,10 +691,10 @@ impl FLR {
 
         e -= 54;
 
-        q &= (((ex + 0x7FF) >> 11) as u64).wrapping_neg();
+        q &= (((ex + 0x7ff) >> 11) as u64).wrapping_neg();
         let t = ((q >> 54) as u32).wrapping_neg();
         let e = ((e + 1076) as u32) & t;
-        let cc = (0xC8u64 >> ((q as u32) & 7)) & 1;
+        let cc = (0xc8u64 >> ((q as u32) & 7)) & 1;
         ((e as u64) << 52) + (q >> 2) + cc
     }
 
@@ -767,18 +776,18 @@ impl FLR {
     }
 
     const EXPM_COEFFS: [u64; 13] = [
-        0x00000004741183A3,
-        0x00000036548CFC06,
-        0x0000024FDCBF140A,
-        0x0000171D939DE045,
-        0x0000D00CF58F6F84,
-        0x000680681CF796E3,
-        0x002D82D8305B0FEA,
-        0x011111110E066FD0,
-        0x0555555555070F00,
-        0x155555555581FF00,
-        0x400000000002B400,
-        0x7FFFFFFFFFFF4800,
+        0x00000004741183a3,
+        0x00000036548cfc06,
+        0x0000024fdcbf140a,
+        0x0000171d939de045,
+        0x0000d00cf58f6f84,
+        0x000680681cf796e3,
+        0x002d82d8305b0fea,
+        0x011111110e066fd0,
+        0x0555555555070f00,
+        0x155555555581ff00,
+        0x400000000002b400,
+        0x7fffffffffff4800,
         0x8000000000000000,
     ];
 }

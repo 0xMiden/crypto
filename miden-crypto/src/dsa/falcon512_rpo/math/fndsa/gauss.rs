@@ -2,14 +2,13 @@
 // This implements the CDT (Cumulative Distribution Table) approach used by fn-dsa
 
 use alloc::vec::Vec;
+
 use fn_dsa_comm::PRNG;
 
 const GTAB_9: [u16; 34] = [
-        1,     4,    11,    28,    65,   146,   308,   615,
-     1164,  2083,  3535,  5692,  8706, 12669, 17574, 23285,
-    29542, 35993, 42250, 47961, 52866, 56829, 59843, 62000,
-    63452, 64371, 64920, 65227, 65389, 65470, 65507, 65524,
-    65531, 65534,
+    1, 4, 11, 28, 65, 146, 308, 615, 1164, 2083, 3535, 5692, 8706, 12669, 17574, 23285, 29542,
+    35993, 42250, 47961, 52866, 56829, 59843, 62000, 63452, 64371, 64920, 65227, 65389, 65470,
+    65507, 65524, 65531, 65534,
 ];
 
 /// Sample f or g polynomial using fn-dsa's CDT approach.
@@ -18,7 +17,7 @@ pub fn sample_f_fndsa<R: PRNG>(n: usize, rng: &mut R) -> Vec<i8> {
     assert_eq!(n, 512, "Only n=512 (logn=9) is currently supported");
 
     let tab = &GTAB_9[..];
-    let zz = 1;  // For logn=9
+    let zz = 1; // For logn=9
     let kmax = (tab.len() >> 1) as i32;
 
     loop {
@@ -56,8 +55,9 @@ pub fn sample_f_fndsa<R: PRNG>(n: usize, rng: &mut R) -> Vec<i8> {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use fn_dsa_comm::{PRNG, shake::SHAKE256_PRNG};
+
+    use super::*;
 
     #[test]
     fn test_sample_f_fndsa_basic() {

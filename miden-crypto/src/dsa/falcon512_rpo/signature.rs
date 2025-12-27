@@ -10,7 +10,7 @@ use super::{
     keys::PublicKey,
     math::{FalconFelt, FastFft, Polynomial},
 };
-use crate::Word;
+use crate::{Word, zeroize::Zeroize};
 
 // FALCON SIGNATURE
 // ================================================================================================
@@ -225,15 +225,23 @@ impl TryFrom<&[i16; N]> for SignaturePoly {
 
 impl Serializable for &SignaturePoly {
     fn write_into<W: ByteWriter>(&self, target: &mut W) {
-        let sig_coeff: Vec<i16> = self.0.coefficients.iter().map(|a| a.balanced_value()).collect();
+        let mut sig_coeff: Vec<i16> =
+            self.0.coefficients.iter().map(|a| a.balanced_value()).collect();
         let mut sk_bytes = vec![0_u8; SIG_POLY_BYTE_LEN];
 
         // Use fn-dsa-comm's compressed encoding
-        if !encode_signature_poly(&sig_coeff, &mut sk_bytes) {
-            panic!("Failed to encode signature polynomial");
-        }
+        // This should never fail for valid SignaturePoly instances since they are
+        // constructed via TryFrom which validates coefficient bounds
+        encode_signature_poly(&sig_coeff, &mut sk_bytes).then_some(()).expect(
+            "signature polynomial encoding should never fail for valid coefficients; \
+             this indicates a programming error in SignaturePoly validation",
+        );
 
         target.write_bytes(&sk_bytes);
+
+        // Zeroize temporary buffers
+        sig_coeff.zeroize();
+        sk_bytes.zeroize();
     }
 }
 
@@ -268,7 +276,7 @@ fn decode_signature_poly(input: &[u8]) -> Result<[FalconFelt; N], Deserializatio
 
     let mut coefficients = [FalconFelt::zero(); N];
     for (i, &coeff) in coefficients_i16.iter().enumerate() {
-        coefficients[i] = FalconFelt::new(coeff);
+        coefficients[i] = FalconFelt::from(coeff);
     }
 
     Ok(coefficients)

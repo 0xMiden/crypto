@@ -31,7 +31,7 @@ pub(crate) fn zint_mul_small(m: &mut [u32], x: u32) -> u32 {
     let mut cc = 0u32;
     for mw in m.iter_mut() {
         let z = (*mw as u64) * (x as u64) + (cc as u64);
-        *mw = (z as u32) & 0x7FFFFFFF;
+        *mw = (z as u32) & 0x7fffffff;
         cc = (z >> 31) as u32;
     }
     cc
@@ -98,7 +98,7 @@ pub(crate) fn zint_add_mul_small(d: &mut [u32], dstride: usize, a: &[u32], s: u3
     let mut j = 0;
     for i in 0..a.len() {
         let z = (s as u64) * (a[i] as u64) + (d[j] as u64) + (cc as u64);
-        d[j] = (z as u32) & 0x7FFFFFFF;
+        d[j] = (z as u32) & 0x7fffffff;
         j += dstride;
         cc = (z >> 31) as u32;
     }
@@ -145,7 +145,7 @@ pub(crate) fn zint_norm_zero(x: &mut [u32], xstride: usize, m: &[u32]) {
     j = 0;
     for i in 0..m.len() {
         let xw = x[j].wrapping_sub(m[i] & mk).wrapping_sub(cc);
-        x[j] = xw & 0x7FFFFFFF;
+        x[j] = xw & 0x7fffffff;
         j += xstride;
         cc = xw >> 31;
     }
@@ -176,8 +176,8 @@ pub(crate) fn zint_rebuild_CRT(
     for i in 1..xlen {
         // At entry of each iteration:
         //  - the first i words of each integer have been converted
-        //  - the first i words of tmp[] contain the product of the
-        //    first i prime moduli (denoted q in later comments)
+        //  - the first i words of tmp[] contain the product of the first i prime moduli (denoted q
+        //    in later comments)
         let p = PRIMES[i].p;
         let p0i = PRIMES[i].p0i;
         let R2 = PRIMES[i].R2;
@@ -228,7 +228,7 @@ fn zint_negate(a: &mut [u32], ctl: u32) {
     for aw in a.iter_mut() {
         let z = (*aw ^ m).wrapping_sub(cc);
         cc = z >> 31;
-        *aw = z & 0x7FFFFFFF;
+        *aw = z & 0x7fffffff;
     }
 }
 
@@ -263,14 +263,14 @@ fn zint_co_lin_div31_abs(
             .wrapping_add((bw as u64).wrapping_mul(yb as u64))
             .wrapping_add(ccb as u64);
         if i > 0 {
-            a[i - 1] = (za as u32) & 0x7FFFFFFF;
-            b[i - 1] = (zb as u32) & 0x7FFFFFFF;
+            a[i - 1] = (za as u32) & 0x7fffffff;
+            b[i - 1] = (zb as u32) & 0x7fffffff;
         }
         cca = (za as i64) >> 31;
         ccb = (zb as i64) >> 31;
     }
-    a[nlen - 1] = (cca as u32) & 0x7FFFFFFF;
-    b[nlen - 1] = (ccb as u32) & 0x7FFFFFFF;
+    a[nlen - 1] = (cca as u32) & 0x7fffffff;
+    b[nlen - 1] = (ccb as u32) & 0x7fffffff;
 
     let nega = (cca >> 63) as u32;
     let negb = (ccb >> 63) as u32;
@@ -308,7 +308,7 @@ fn zint_finish_mod(a: &mut [u32], m: &[u32], neg: u32) {
     cc = neg & 1;
     for (aw, mw) in a.iter_mut().zip(m) {
         let z = aw.wrapping_sub((*mw ^ xm) & ym).wrapping_sub(cc);
-        *aw = z & 0x7FFFFFFF;
+        *aw = z & 0x7fffffff;
         cc = z >> 31;
     }
 }
@@ -340,12 +340,12 @@ fn zint_co_lin_mod(
         .wrapping_mul(xa as u32)
         .wrapping_add(b[0].wrapping_mul(xb as u32))
         .wrapping_mul(m0i)
-        & 0x7FFFFFFF;
+        & 0x7fffffff;
     let fb = a[0]
         .wrapping_mul(ya as u32)
         .wrapping_add(b[0].wrapping_mul(yb as u32))
         .wrapping_mul(m0i)
-        & 0x7FFFFFFF;
+        & 0x7fffffff;
     let nlen = a.len();
     for i in 0..nlen {
         let aw = a[i] as u64;
@@ -362,8 +362,8 @@ fn zint_co_lin_mod(
             .wrapping_add(mw.wrapping_mul(fb as u64))
             .wrapping_add(ccb as u64);
         if i > 0 {
-            a[i - 1] = (za as u32) & 0x7FFFFFFF;
-            b[i - 1] = (zb as u32) & 0x7FFFFFFF;
+            a[i - 1] = (za as u32) & 0x7fffffff;
+            b[i - 1] = (zb as u32) & 0x7fffffff;
         }
         cca = (za as i64) >> 31;
         ccb = (zb as i64) >> 31;
@@ -399,7 +399,7 @@ fn ninv31(x: u32) -> u32 {
     let y = y.wrapping_mul(2u32.wrapping_sub(x.wrapping_mul(y)));
     let y = y.wrapping_mul(2u32.wrapping_sub(x.wrapping_mul(y)));
     let y = y.wrapping_mul(2u32.wrapping_sub(x.wrapping_mul(y)));
-    y.wrapping_neg() & 0x7FFFFFFF
+    y.wrapping_neg() & 0x7fffffff
 }
 
 // Extended GCD between two positive integers x and y. The two
@@ -486,9 +486,9 @@ pub(crate) fn zint_bezout(
         //   xa = (2^31)*floor(a / 2^(j-32)) + (a mod 2^31)
         //   xb = (2^31)*floor(a / 2^(j-32)) + (b mod 2^31)
         // (if j < 63 then xa = a and xb = b).
-        let mut c0 = 0xFFFFFFFFu32;
-        let mut c1 = 0xFFFFFFFFu32;
-        let mut cp = 0xFFFFFFFFu32;
+        let mut c0 = 0xffffffffu32;
+        let mut c1 = 0xffffffffu32;
+        let mut cp = 0xffffffffu32;
         let mut a0 = 0u32;
         let mut a1 = 0u32;
         let mut b0 = 0u32;
@@ -504,7 +504,7 @@ pub(crate) fn zint_bezout(
             b0 ^= c0 & (b0 ^ bw);
             cp = c0;
             c0 = c1;
-            c1 &= (((aw | bw) + 0x7FFFFFFF) >> 31).wrapping_sub(1);
+            c1 &= (((aw | bw) + 0x7fffffff) >> 31).wrapping_sub(1);
         }
 
         // Possible situations:
@@ -567,12 +567,12 @@ pub(crate) fn zint_bezout(
         }
 
         // Split update factors.
-        fg0 = fg0.wrapping_add(0x7FFFFFFF7FFFFFFF);
-        fg1 = fg1.wrapping_add(0x7FFFFFFF7FFFFFFF);
-        let f0 = ((fg0 & 0xFFFFFFFF) as i64) - 0x7FFFFFFF;
-        let g0 = ((fg0 >> 32) as i64) - 0x7FFFFFFF;
-        let f1 = ((fg1 & 0xFFFFFFFF) as i64) - 0x7FFFFFFF;
-        let g1 = ((fg1 >> 32) as i64) - 0x7FFFFFFF;
+        fg0 = fg0.wrapping_add(0x7fffffff7fffffff);
+        fg1 = fg1.wrapping_add(0x7fffffff7fffffff);
+        let f0 = ((fg0 & 0xffffffff) as i64) - 0x7fffffff;
+        let g0 = ((fg0 >> 32) as i64) - 0x7fffffff;
+        let f1 = ((fg1 & 0xffffffff) as i64) - 0x7fffffff;
+        let g1 = ((fg1 >> 32) as i64) - 0x7fffffff;
 
         // Apply the update factors.
         let (nega, negb) = zint_co_lin_div31_abs(a, b, f0, g0, f1, g1);
@@ -718,10 +718,10 @@ pub(crate) fn zint_add_scaled_mul_small(
     for u in sch..xlen {
         let j = i - ija;
         let wy = if u < (sch + ylen) { y[j] } else { ysign };
-        let wys = ((wy << scl) & 0x7FFFFFFF) | tw;
+        let wys = ((wy << scl) & 0x7fffffff) | tw;
         tw = wy >> (31 - scl);
         let z = (wys as i64) * (k as i64) + (x[i] as i64) + (cc as i64);
-        x[i] = (z as u32) & 0x7FFFFFFF;
+        x[i] = (z as u32) & 0x7fffffff;
         cc = (z >> 31) as i32;
         i += xystride;
     }
@@ -755,10 +755,10 @@ pub(crate) fn zint_sub_scaled(
     for u in sch..xlen {
         let j = i - ija;
         let wy = if u < (sch + ylen) { y[j] } else { ysign };
-        let wys = ((wy << scl) & 0x7FFFFFFF) | tw;
+        let wys = ((wy << scl) & 0x7fffffff) | tw;
         tw = wy >> (31 - scl);
         let z = x[i].wrapping_sub(wys).wrapping_sub(cc);
-        x[i] = z & 0x7FFFFFFF;
+        x[i] = z & 0x7fffffff;
         cc = z >> 31;
         i += xystride;
     }
