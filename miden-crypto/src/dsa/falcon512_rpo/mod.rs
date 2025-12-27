@@ -57,9 +57,6 @@ pub use self::{
 // The Falcon modulus p.
 const MODULUS: i16 = 12289;
 
-// Number of bits needed to encode an element in the Falcon field.
-const FALCON_ENCODING_BITS: u32 = 14;
-
 // The Falcon parameters for Falcon-512. This is the degree of the polynomial `phi := x^N + 1`
 // defining the ring Z_p[x]/(phi).
 const N: usize = 512;

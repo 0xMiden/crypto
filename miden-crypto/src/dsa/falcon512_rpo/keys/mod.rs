@@ -20,8 +20,26 @@ mod tests {
     use crate::{
         ONE, PrimeCharacteristicRing, Word,
         dsa::falcon512_rpo::SecretKey,
+        dsa::falcon512_rpo::PublicKey,
         utils::{Deserializable, Serializable},
     };
+
+    #[test]
+    fn test_public_key_serialization_roundtrip() {
+        let seed = [0_u8; 32];
+        let mut rng = ChaCha20Rng::from_seed(seed);
+
+        // Generate a public key from a secret key
+        let sk = SecretKey::with_rng(&mut rng);
+        let pk = sk.public_key();
+
+        // Serialize and deserialize the public key
+        let serialized = (&pk).to_bytes();
+        let pk_deserialized = PublicKey::read_from_bytes(&serialized).unwrap();
+
+        // Compare the original and deserialized public keys
+        assert_eq!(pk, pk_deserialized);
+    }
 
     #[test]
     fn test_falcon_verification() {

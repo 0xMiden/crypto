@@ -3,14 +3,12 @@
 use alloc::{string::ToString, vec::Vec};
 use core::ops::Deref;
 
-use num::Zero;
-
 use super::{
     super::{LOG_N, N, PK_LEN},
     ByteReader, ByteWriter, Deserializable, DeserializationError, FalconFelt, Felt, Polynomial,
     Serializable, Signature,
 };
-use crate::{SequentialCommit, Word, dsa::falcon512_rpo::FALCON_ENCODING_BITS};
+use crate::{SequentialCommit, Word};
 
 // PUBLIC KEY
 // ================================================================================================
@@ -64,23 +62,18 @@ impl Serializable for &PublicKey {
         let mut buf = [0_u8; PK_LEN];
         buf[0] = LOG_N;
 
-        let mut acc = 0_u32;
-        let mut acc_len: u32 = 0;
+        // Convert FalconFelt coefficients to u16 external representation [0, q-1]
+        let h: Vec<u16> = self.0.coefficients.iter().map(|c| c.value()).collect();
 
-        let mut input_pos = 1;
-        for c in self.0.coefficients.iter() {
-            let c = c.value();
-            acc = (acc << FALCON_ENCODING_BITS) | c as u32;
-            acc_len += FALCON_ENCODING_BITS;
-            while acc_len >= 8 {
-                acc_len -= 8;
-                buf[input_pos] = (acc >> acc_len) as u8;
-                input_pos += 1;
-            }
-        }
-        if acc_len > 0 {
-            buf[input_pos] = (acc >> (8 - acc_len)) as u8;
-        }
+        // Use fn-dsa-comm's modq_encode to encode 512 coefficients at 14 bits each
+        // This encodes 4 coefficients per 7 bytes (512/4 = 128 groups = 896 bytes)
+        let written = fn_dsa_comm::codec::modq_encode(&h, &mut buf[1..]);
+        assert_eq!(
+            written,
+            PK_LEN - 1,
+            "modq_encode should write exactly {} bytes",
+            PK_LEN - 1
+        );
 
         target.write(buf);
     }
@@ -97,35 +90,27 @@ impl Deserializable for PublicKey {
             )));
         }
 
-        let mut acc = 0_u32;
-        let mut acc_len = 0;
+        // Use fn-dsa-comm's modq_decode to decode 512 coefficients
+        let mut h = [0u16; N];
+        let read_bytes =
+            fn_dsa_comm::codec::modq_decode(&buf[1..], &mut h).ok_or_else(|| {
+                DeserializationError::InvalidValue(
+                    "Failed to decode public key: invalid modq encoding".to_string(),
+                )
+            })?;
 
-        let mut output = [FalconFelt::zero(); N];
-        let mut output_idx = 0;
-
-        for &byte in buf.iter().skip(1) {
-            acc = (acc << 8) | (byte as u32);
-            acc_len += 8;
-
-            if acc_len >= FALCON_ENCODING_BITS {
-                acc_len -= FALCON_ENCODING_BITS;
-                let w = (acc >> acc_len) & 0x3fff;
-                let element = w.try_into().map_err(|err| {
-                    DeserializationError::InvalidValue(format!(
-                        "Failed to decode public key: {err}"
-                    ))
-                })?;
-                output[output_idx] = element;
-                output_idx += 1;
-            }
+        // Verify we consumed exactly the expected number of bytes
+        if read_bytes != PK_LEN - 1 {
+            return Err(DeserializationError::InvalidValue(format!(
+                "Failed to decode public key: expected {} bytes, read {}",
+                PK_LEN - 1,
+                read_bytes
+            )));
         }
 
-        if (acc & ((1u32 << acc_len) - 1)) == 0 {
-            Ok(Polynomial::new(output.to_vec()).into())
-        } else {
-            Err(DeserializationError::InvalidValue(
-                "Failed to decode public key: input not fully consumed".to_string(),
-            ))
-        }
+        // Convert u16 values to FalconFelt (modq_decode already validates values are in [0, q-1])
+        let coefficients: Vec<FalconFelt> = h.iter().map(|&v| FalconFelt::new(v)).collect();
+
+        Ok(Polynomial::new(coefficients).into())
     }
 }
