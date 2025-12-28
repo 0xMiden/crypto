@@ -63,9 +63,7 @@ pub(crate) const INV_ALPHA: u64 = 10540996611094048183;
 // ALGEBRAIC SPONGE
 // ================================================================================================
 
-// Note: This trait must remain `pub` (not `pub(crate)`) because it's re-exported
-// at the crate root (lib.rs) as part of the public API.
-pub trait AlgebraicSponge {
+pub(crate) trait AlgebraicSponge {
     fn apply_permutation(state: &mut [Felt; STATE_WIDTH]);
 
     /// Returns a hash of the provided field elements.
