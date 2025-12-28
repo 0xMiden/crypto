@@ -24,14 +24,14 @@ pub mod poseidon2 {
 /// Rescue Prime Optimized (RPO) hash function.
 pub mod rpo {
     pub use super::algebraic_sponge::rescue::rpo::{
-        Rpo256, RpoChallenger, RpoCompression, RpoHasher,
+        Rpo256, RpoChallenger, RpoCompression, RpoHasher, RpoPermutation256,
     };
 }
 
 /// Rescue Prime Extended (RPX) hash function.
 pub mod rpx {
     pub use super::algebraic_sponge::rescue::rpx::{
-        Rpx256, RpxChallenger, RpxCompression, RpxHasher,
+        Rpx256, RpxChallenger, RpxCompression, RpxHasher, RpxPermutation256,
     };
 }
 
