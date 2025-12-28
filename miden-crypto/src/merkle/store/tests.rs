@@ -1,3 +1,4 @@
+#![cfg(feature = "std")]
 use assert_matches::assert_matches;
 use seq_macro::seq;
 #[cfg(feature = "std")]
@@ -618,7 +619,7 @@ fn test_constructors() -> Result<(), MerkleError> {
     }
 
     const DEPTH: u8 = 32;
-    let smt = SimpleSmt::<DEPTH>::with_leaves(KEYS4.into_iter().zip(VALUES4.to_vec())).unwrap();
+    let smt = SimpleSmt::<DEPTH>::with_leaves(KEYS4.into_iter().zip(VALUES4)).unwrap();
     let store = MerkleStore::from(&smt);
 
     for key in KEYS4 {

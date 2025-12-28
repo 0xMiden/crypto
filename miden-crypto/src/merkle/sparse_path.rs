@@ -458,7 +458,7 @@ mod tests {
     use core::num::NonZero;
 
     use assert_matches::assert_matches;
-    use winter_math::FieldElement;
+    use p3_field::PrimeCharacteristicRing;
 
     use super::SparseMerklePath;
     use crate::{

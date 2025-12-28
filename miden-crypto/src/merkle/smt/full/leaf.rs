@@ -1,8 +1,13 @@
 use alloc::{string::ToString, vec::Vec};
 use core::cmp::Ordering;
 
-use super::{EMPTY_WORD, Felt, LeafIndex, MAX_LEAF_ENTRIES, Rpo256, SMT_DEPTH, SmtLeafError, Word};
-use crate::utils::{ByteReader, ByteWriter, Deserializable, DeserializationError, Serializable};
+use super::EMPTY_WORD;
+use crate::{
+    Felt, PrimeField64, Word,
+    hash::rpo::Rpo256,
+    merkle::smt::{LeafIndex, MAX_LEAF_ENTRIES, SMT_DEPTH, SmtLeafError},
+    utils::{ByteReader, ByteWriter, Deserializable, DeserializationError, Serializable},
+};
 
 /// Represents a leaf node in the Sparse Merkle Tree.
 ///
@@ -305,7 +310,7 @@ impl SmtLeaf {
                     Ok(pos) => {
                         let old_value = kv_pairs[pos].1;
 
-                        kv_pairs.remove(pos);
+                        let _ = kv_pairs.remove(pos);
                         debug_assert!(!kv_pairs.is_empty());
 
                         if kv_pairs.len() == 1 {
@@ -382,8 +387,8 @@ pub(crate) fn kv_to_elements((key, value): (Word, Word)) -> impl Iterator<Item =
 /// the most significant element.
 pub(crate) fn cmp_keys(key_1: Word, key_2: Word) -> Ordering {
     for (v1, v2) in key_1.iter().zip(key_2.iter()).rev() {
-        let v1 = v1.as_int();
-        let v2 = v2.as_int();
+        let v1 = (*v1).as_canonical_u64();
+        let v2 = (*v2).as_canonical_u64();
         if v1 != v2 {
             return v1.cmp(&v2);
         }

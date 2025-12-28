@@ -211,7 +211,7 @@ impl KeyAgreementScheme for X25519 {
 // TESTS
 // ================================================================================================
 
-#[cfg(test)]
+#[cfg(all(test, feature = "std"))]
 mod tests {
     use rand::rng;
 

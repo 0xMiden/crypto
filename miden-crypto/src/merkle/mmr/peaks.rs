@@ -1,7 +1,10 @@
 use alloc::vec::Vec;
 
-use super::{super::ZERO, MmrError, MmrProof, forest::Forest};
-use crate::{Felt, Word, merkle::Rpo256};
+use crate::{
+    Felt, Word, ZERO,
+    hash::rpo::Rpo256,
+    merkle::mmr::{Forest, MmrError, MmrProof},
+};
 
 // MMR PEAKS
 // ================================================================================================

@@ -14,10 +14,25 @@
 
 use core::ops::Range;
 
-use super::{CubeExtension, ElementHasher, Felt, FieldElement, Hasher, StarkField, Word, ZERO};
+use p3_field::PrimeCharacteristicRing;
+
+use super::{Felt, Word, ZERO};
+use crate::{BasedVectorSpace, PrimeField64};
 
 pub(crate) mod poseidon2;
 pub(crate) mod rescue;
+
+// Re-export the main hash function types
+pub use poseidon2::Poseidon2;
+// Re-export P3 integration types for public API
+pub use poseidon2::{
+    Poseidon2Challenger, Poseidon2Compression, Poseidon2Hasher, Poseidon2Permutation256,
+};
+pub use rescue::{
+    Rpo256, Rpx256,
+    rpo::{RpoChallenger, RpoCompression, RpoHasher, RpoPermutation256},
+    rpx::{RpxChallenger, RpxCompression, RpxHasher, RpxPermutation256},
+};
 
 // CONSTANTS
 // ================================================================================================
@@ -49,10 +64,10 @@ const BINARY_CHUNK_SIZE: usize = 7;
 ///
 /// The constants are defined for tests only because the exponentiations in the code are unrolled
 /// for efficiency reasons.
-#[cfg(test)]
-const ALPHA: u64 = 7;
-#[cfg(test)]
-const INV_ALPHA: u64 = 10540996611094048183;
+#[cfg(all(test, feature = "std"))]
+pub(crate) const ALPHA: u64 = 7;
+#[cfg(all(test, feature = "std"))]
+pub(crate) const INV_ALPHA: u64 = 10540996611094048183;
 
 // ALGEBRAIC SPONGE
 // ================================================================================================
@@ -63,26 +78,31 @@ pub(crate) trait AlgebraicSponge {
     /// Returns a hash of the provided field elements.
     fn hash_elements<E>(elements: &[E]) -> Word
     where
-        E: FieldElement<BaseField = Felt>,
+        E: BasedVectorSpace<Felt>,
     {
-        // convert the elements into a list of base field elements
-        let elements = E::slice_as_base_elements(elements);
+        // Count total number of base field elements without collecting
+        let total_len = elements
+            .iter()
+            .map(|elem| E::as_basis_coefficients_slice(elem).len())
+            .sum::<usize>();
 
         // initialize state to all zeros, except for the first element of the capacity part, which
-        // is set to `elements.len() % RATE_WIDTH`.
+        // is set to `total_len % RATE_WIDTH`.
         let mut state = [ZERO; STATE_WIDTH];
-        state[CAPACITY_RANGE.start] = Felt::from((elements.len() % RATE_WIDTH) as u8);
+        state[CAPACITY_RANGE.start] = Felt::from_u8((total_len % RATE_WIDTH) as u8);
 
         // absorb elements into the state one by one until the rate portion of the state is filled
         // up; then apply the permutation and start absorbing again; repeat until all
         // elements have been absorbed
         let mut i = 0;
-        for &element in elements.iter() {
-            state[RATE_RANGE.start + i] = element;
-            i += 1;
-            if i.is_multiple_of(RATE_WIDTH) {
-                Self::apply_permutation(&mut state);
-                i = 0;
+        for elem in elements.iter() {
+            for &felt in E::as_basis_coefficients_slice(elem) {
+                state[RATE_RANGE.start + i] = felt;
+                i += 1;
+                if i.is_multiple_of(RATE_WIDTH) {
+                    Self::apply_permutation(&mut state);
+                    i = 0;
+                }
             }
         }
 
@@ -115,7 +135,7 @@ pub(crate) trait AlgebraicSponge {
         // 1. Domain separating hashing of `[u8]` from hashing of `[Felt]`.
         // 2. Avoiding collisions at the `[Felt]` representation of the encoded bytes.
         state[CAPACITY_RANGE.start] =
-            Felt::from((RATE_WIDTH + (num_field_elem % RATE_WIDTH)) as u8);
+            Felt::from_u8((RATE_WIDTH + (num_field_elem % RATE_WIDTH)) as u8);
 
         // initialize a buffer to receive the little-endian elements.
         let mut buf = [0_u8; 8];
@@ -207,11 +227,11 @@ pub(crate) trait AlgebraicSponge {
         let mut state = [ZERO; STATE_WIDTH];
         state[INPUT1_RANGE].copy_from_slice(seed.as_elements());
         state[INPUT2_RANGE.start] = Felt::new(value);
-        if value < Felt::MODULUS {
-            state[CAPACITY_RANGE.start] = Felt::from(5_u8);
+        if value < Felt::ORDER_U64 {
+            state[CAPACITY_RANGE.start] = Felt::from_u8(5_u8);
         } else {
-            state[INPUT2_RANGE.start + 1] = Felt::new(value / Felt::MODULUS);
-            state[CAPACITY_RANGE.start] = Felt::from(6_u8);
+            state[INPUT2_RANGE.start + 1] = Felt::new(value / Felt::ORDER_U64);
+            state[CAPACITY_RANGE.start] = Felt::from_u8(6_u8);
         }
 
         // apply the permutation and return the digest portion of the rate

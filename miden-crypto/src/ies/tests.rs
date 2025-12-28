@@ -1,3 +1,5 @@
+#![cfg(feature = "std")]
+
 use alloc::vec::Vec;
 
 use proptest::prelude::*;

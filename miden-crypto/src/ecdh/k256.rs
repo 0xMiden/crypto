@@ -228,7 +228,7 @@ impl KeyAgreementScheme for K256 {
 // TESTS
 // ================================================================================================
 
-#[cfg(test)]
+#[cfg(all(test, feature = "std"))]
 mod test {
 
     use rand::rng;

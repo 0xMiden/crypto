@@ -745,13 +745,11 @@ macro_rules! benchmark_rand_draw_integers {
                             &(num_values, domain_size),
                             |b, &(num_values, domain_size)| {
                                 b.iter(|| {
-                                    let _result = coin
-                                        .draw_integers(
-                                            black_box(num_values),
-                                            black_box(domain_size),
-                                            black_box(0),
-                                        )
-                                        .unwrap();
+                                    let _result = coin.draw_integers(
+                                        black_box(num_values),
+                                        black_box(domain_size),
+                                        black_box(0),
+                                    );
                                 })
                             },
                         );

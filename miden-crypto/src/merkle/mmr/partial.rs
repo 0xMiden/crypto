@@ -640,15 +640,20 @@ mod tests {
         utils::{Deserializable, Serializable},
     };
 
-    const LEAVES: [Word; 7] = [
-        int_to_node(0),
-        int_to_node(1),
-        int_to_node(2),
-        int_to_node(3),
-        int_to_node(4),
-        int_to_node(5),
-        int_to_node(6),
-    ];
+    // Note: This function works around the fact that P3 constructors are not const.
+    // Once upstream Plonky3 releases our const constructor changes, this should be
+    // reverted to `const LEAVES: [Word; 7] = [...]`. See issue #731.
+    fn leaves() -> [Word; 7] {
+        [
+            int_to_node(0),
+            int_to_node(1),
+            int_to_node(2),
+            int_to_node(3),
+            int_to_node(4),
+            int_to_node(5),
+            int_to_node(6),
+        ]
+    }
 
     #[test]
     fn test_partial_mmr_apply_delta() {
@@ -728,7 +733,7 @@ mod tests {
     #[test]
     fn test_partial_mmr_inner_nodes_iterator() {
         // build the MMR
-        let mmr: Mmr = LEAVES.into();
+        let mmr: Mmr = leaves().into();
         let first_peak = mmr.peaks().peaks()[0];
 
         // -- test single tree ----------------------------
@@ -887,7 +892,7 @@ mod tests {
     #[test]
     fn test_partial_mmr_untrack() {
         // build the MMR
-        let mmr: Mmr = LEAVES.into();
+        let mmr: Mmr = leaves().into();
 
         // get path and node for position 1
         let node1 = mmr.get(1).unwrap();
@@ -915,7 +920,7 @@ mod tests {
     #[test]
     fn test_partial_mmr_untrack_returns_removed_nodes() {
         // build the MMR
-        let mmr: Mmr = LEAVES.into();
+        let mmr: Mmr = leaves().into();
 
         // get path and node for position 1
         let node1 = mmr.get(1).unwrap();
@@ -945,7 +950,7 @@ mod tests {
     #[test]
     fn test_partial_mmr_untrack_shared_nodes() {
         // build the MMR
-        let mmr: Mmr = LEAVES.into();
+        let mmr: Mmr = leaves().into();
 
         // track two sibling leaves
         let node0 = mmr.get(0).unwrap();

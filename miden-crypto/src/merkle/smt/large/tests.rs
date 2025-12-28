@@ -1,10 +1,11 @@
 use alloc::{collections::BTreeSet, vec::Vec};
 
+use p3_field::PrimeCharacteristicRing;
 use rand::{Rng, prelude::IteratorRandom, rng};
 
 use super::MemoryStorage;
 use crate::{
-    EMPTY_WORD, Felt, ONE, WORD_SIZE, Word,
+    EMPTY_WORD, Felt, ONE, PrimeField64, WORD_SIZE, Word,
     merkle::{
         InnerNodeInfo,
         smt::{
@@ -45,7 +46,7 @@ fn generate_updates(entries: Vec<(Word, Word)>, updates: usize) -> Vec<(Word, Wo
             (key, value)
         })
         .collect();
-    sorted_entries.sort_by_key(|(key, _)| key[3].as_int());
+    sorted_entries.sort_by_key(|(key, _)| key[3].as_canonical_u64());
     sorted_entries
 }
 
@@ -65,7 +66,7 @@ fn test_smt_get_value() {
     let key_2: Word = Word::from([2_u32, 2_u32, 2_u32, 2_u32]);
 
     let value_1 = Word::new([ONE; WORD_SIZE]);
-    let value_2 = Word::new([2_u32.into(); WORD_SIZE]);
+    let value_2 = Word::new([Felt::from_u32(2_u32); WORD_SIZE]);
     let smt = LargeSmt::<_>::with_entries(storage, [(key_1, value_1), (key_2, value_2)]).unwrap();
 
     let returned_value_1 = smt.get_value(&key_1);
@@ -176,7 +177,8 @@ fn test_empty_smt() {
     let empty_control_smt = Smt::new();
     assert_eq!(large_smt.root(), empty_control_smt.root(), "Empty SMT root mismatch");
 
-    let random_key = Word::from([ONE, 2_u32.into(), 3_u32.into(), 4_u32.into()]);
+    let random_key =
+        Word::from([ONE, Felt::from_u32(2_u32), Felt::from_u32(3_u32), Felt::from_u32(4_u32)]);
     assert_eq!(
         large_smt.get_value(&random_key),
         EMPTY_WORD,
@@ -212,7 +214,7 @@ fn test_single_entry_smt() {
     assert_eq!(entries.len(), 1, "Single entry SMT should have one entry");
     assert_eq!(entries[0], (key, value), "Single entry SMT entry mismatch");
 
-    let new_value = Word::new([2_u32.into(); WORD_SIZE]);
+    let new_value = Word::new([Felt::from_u32(2_u32); WORD_SIZE]);
     let mutations = smt.compute_mutations(vec![(key, new_value)]).unwrap();
 
     assert_eq!(
@@ -247,7 +249,7 @@ fn test_duplicate_key_insertion() {
     let storage = MemoryStorage::new();
     let key = Word::from([ONE, ONE, ONE, ONE]);
     let value1 = Word::new([ONE; WORD_SIZE]);
-    let value2 = Word::new([2_u32.into(); WORD_SIZE]);
+    let value2 = Word::new([Felt::from_u32(2_u32); WORD_SIZE]);
 
     let entries = vec![(key, value1), (key, value2)];
 
@@ -261,9 +263,9 @@ fn test_delete_entry() {
     let key1 = Word::new([ONE, ONE, ONE, ONE]);
     let value1 = Word::new([ONE; WORD_SIZE]);
     let key2 = Word::from([2_u32, 2_u32, 2_u32, 2_u32]);
-    let value2 = Word::new([2_u32.into(); WORD_SIZE]);
+    let value2 = Word::new([Felt::from_u32(2_u32); WORD_SIZE]);
     let key3 = Word::from([3_u32, 3_u32, 3_u32, 3_u32]);
-    let value3 = Word::new([3_u32.into(); WORD_SIZE]);
+    let value3 = Word::new([Felt::from_u32(3_u32); WORD_SIZE]);
 
     let initial_entries = vec![(key1, value1), (key2, value2), (key3, value3)];
 
@@ -305,7 +307,7 @@ fn test_insert_entry() {
     assert_eq!(large_smt.num_leaves(), control_smt.num_leaves(), "Number of leaves mismatch");
 
     let new_key = Word::from([100_u32, 100_u32, 100_u32, 100_u32]);
-    let new_value = Word::new([100_u32.into(); WORD_SIZE]);
+    let new_value = Word::new([Felt::from_u32(100_u32); WORD_SIZE]);
 
     let old_value = large_smt.insert(new_key, new_value).unwrap();
     let control_old_value = control_smt.insert(new_key, new_value).unwrap();
@@ -337,12 +339,12 @@ fn test_mutations_revert() {
     let mut smt = LargeSmt::<_>::new(storage).unwrap();
 
     let key_1: Word = Word::new([ONE, ONE, ONE, Felt::new(1)]);
-    let key_2: Word = Word::new([2_u32.into(), 2_u32.into(), 2_u32.into(), Felt::new(2)]);
-    let key_3: Word = Word::new([0_u32.into(), 0_u32.into(), 0_u32.into(), Felt::new(3)]);
+    let key_2: Word = Word::new([Felt::new(2), Felt::new(2), Felt::new(2), Felt::new(2)]);
+    let key_3: Word = Word::new([Felt::new(0), Felt::new(0), Felt::new(0), Felt::new(3)]);
 
     let value_1 = Word::new([ONE; WORD_SIZE]);
-    let value_2 = Word::new([2_u32.into(); WORD_SIZE]);
-    let value_3 = Word::new([3_u32.into(); WORD_SIZE]);
+    let value_2 = Word::new([Felt::from_u32(2_u32); WORD_SIZE]);
+    let value_3 = Word::new([Felt::from_u32(3_u32); WORD_SIZE]);
 
     smt.insert(key_1, value_1).unwrap();
     smt.insert(key_2, value_2).unwrap();
@@ -439,12 +441,12 @@ fn test_insert_batch_with_deletions() {
 
     // Initial data
     let key_1 = crate::Word::new([ONE, ONE, ONE, Felt::new(1)]);
-    let key_2 = crate::Word::new([2_u32.into(), 2_u32.into(), 2_u32.into(), Felt::new(2)]);
-    let key_3 = crate::Word::new([0_u32.into(), 0_u32.into(), 0_u32.into(), Felt::new(3)]);
+    let key_2 = crate::Word::new([Felt::new(2), Felt::new(2), Felt::new(2), Felt::new(2)]);
+    let key_3 = crate::Word::new([Felt::new(0), Felt::new(0), Felt::new(0), Felt::new(3)]);
 
     let value_1 = crate::Word::new([ONE; WORD_SIZE]);
-    let value_2 = crate::Word::new([2_u32.into(); WORD_SIZE]);
-    let value_3 = crate::Word::new([3_u32.into(); WORD_SIZE]);
+    let value_2 = crate::Word::new([Felt::new(2); WORD_SIZE]);
+    let value_3 = crate::Word::new([Felt::new(3); WORD_SIZE]);
 
     smt.insert(key_1, value_1).unwrap();
     smt.insert(key_2, value_2).unwrap();

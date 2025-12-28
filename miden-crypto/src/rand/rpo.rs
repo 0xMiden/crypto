@@ -1,10 +1,11 @@
 use alloc::{string::ToString, vec::Vec};
 
+use p3_field::{ExtensionField, PrimeField64};
 use rand_core::impls;
 
-use super::{Felt, FeltRng, FieldElement, RandomCoin, RandomCoinError, RngCore, ZERO};
+use super::{Felt, FeltRng, RngCore};
 use crate::{
-    Word,
+    Word, ZERO,
     hash::rpo::Rpo256,
     utils::{ByteReader, ByteWriter, Deserializable, DeserializationError, Serializable},
 };
@@ -70,7 +71,11 @@ impl RpoRandomCoin {
         <Self as RngCore>::fill_bytes(self, dest)
     }
 
-    fn draw_basefield(&mut self) -> Felt {
+    /// Draws a random base field element from the random coin.
+    ///
+    /// This method applies the Rpo256 permutation when the rate portion of the state is exhausted,
+    /// then returns the next element from the rate portion.
+    pub fn draw_basefield(&mut self) -> Felt {
         if self.current == RATE_END {
             Rpo256::apply_permutation(&mut self.state);
             self.current = RATE_START;
@@ -79,21 +84,33 @@ impl RpoRandomCoin {
         self.current += 1;
         self.state[self.current - 1]
     }
-}
 
-// RANDOM COIN IMPLEMENTATION
-// ------------------------------------------------------------------------------------------------
-
-impl RandomCoin for RpoRandomCoin {
-    type BaseField = Felt;
-    type Hasher = Rpo256;
-
-    fn new(seed: &[Self::BaseField]) -> Self {
-        let digest: Word = Rpo256::hash_elements(seed);
-        Self::new(digest)
+    /// Draws a random field element.
+    ///
+    /// This is an alias for [Self::draw_basefield].
+    pub fn draw(&mut self) -> Felt {
+        self.draw_basefield()
     }
 
-    fn reseed(&mut self, data: Word) {
+    /// Draws a random extension field element.
+    ///
+    /// The extension field element is constructed by drawing `E::DIMENSION` base field elements
+    /// and interpreting them as basis coefficients.
+    pub fn draw_ext_field<E: ExtensionField<Felt>>(&mut self) -> E {
+        let ext_degree = E::DIMENSION;
+        let mut result = vec![ZERO; ext_degree];
+        for r in result.iter_mut().take(ext_degree) {
+            *r = self.draw_basefield();
+        }
+        E::from_basis_coefficients_slice(&result).expect("failed to draw extension field element")
+    }
+
+    /// Reseeds the random coin with additional entropy.
+    ///
+    /// The provided `data` is added to the first half of the rate portion of the state,
+    /// then the Rpo256 permutation is applied. The buffer pointer is reset to the start
+    /// of the rate portion.
+    pub fn reseed(&mut self, data: Word) {
         // Reset buffer
         self.current = RATE_START;
 
@@ -107,7 +124,12 @@ impl RandomCoin for RpoRandomCoin {
         Rpo256::apply_permutation(&mut self.state);
     }
 
-    fn check_leading_zeros(&self, value: u64) -> u32 {
+    /// Checks how many leading zeros a value would produce when hashed with the current state.
+    ///
+    /// This method creates a temporary copy of the state, adds the provided `value` to the first
+    /// rate element, applies the Rpo256 permutation, and returns the number of trailing zeros
+    /// in the resulting first rate element. This is useful for proof-of-work style computations.
+    pub fn check_leading_zeros(&self, value: u64) -> u32 {
         let value = Felt::new(value);
         let mut state_tmp = self.state;
 
@@ -115,27 +137,28 @@ impl RandomCoin for RpoRandomCoin {
 
         Rpo256::apply_permutation(&mut state_tmp);
 
-        let first_rate_element = state_tmp[RATE_START].as_int();
+        let first_rate_element = state_tmp[RATE_START].as_canonical_u64();
         first_rate_element.trailing_zeros()
     }
 
-    fn draw<E: FieldElement<BaseField = Felt>>(&mut self) -> Result<E, RandomCoinError> {
-        let ext_degree = E::EXTENSION_DEGREE;
-        let mut result = vec![ZERO; ext_degree];
-        for r in result.iter_mut().take(ext_degree) {
-            *r = self.draw_basefield();
-        }
-
-        let result = E::slice_from_base_elements(&result);
-        Ok(result[0])
-    }
-
-    fn draw_integers(
+    /// Draws a specified number of unique random integers from a domain of a given size.
+    ///
+    /// # Arguments
+    /// * `num_values` - The number of unique integers to draw (must be less than `domain_size`)
+    /// * `domain_size` - The size of the domain (must be a power of two)
+    /// * `nonce` - A nonce value that is absorbed into the state before drawing
+    ///
+    /// # Returns
+    /// A vector of `num_values` unique integers in the range `[0, domain_size)`
+    ///
+    /// # Panics
+    /// Panics if `domain_size` is not a power of two or if `num_values >= domain_size`.
+    pub fn draw_integers(
         &mut self,
         num_values: usize,
         domain_size: usize,
         nonce: u64,
-    ) -> Result<Vec<usize>, RandomCoinError> {
+    ) -> Vec<usize> {
         assert!(domain_size.is_power_of_two(), "domain size must be a power of two");
         assert!(num_values < domain_size, "number of values must be smaller than domain size");
 
@@ -156,7 +179,7 @@ impl RandomCoin for RpoRandomCoin {
         let mut values = Vec::new();
         for _ in 0..1000 {
             // get the next pseudo-random field element
-            let value = self.draw_basefield().as_int();
+            let value = self.draw_basefield().as_canonical_u64();
 
             // use the mask to get a value within the range
             let value = (value & v_mask) as usize;
@@ -167,11 +190,15 @@ impl RandomCoin for RpoRandomCoin {
             }
         }
 
-        if values.len() < num_values {
-            return Err(RandomCoinError::FailedToDrawIntegers(num_values, values.len(), 1000));
-        }
+        assert_eq!(
+            values.len(),
+            num_values,
+            "failed to draw {} integers after 1000 iterations (got {})",
+            num_values,
+            values.len()
+        );
 
-        Ok(values)
+        values
     }
 }
 
@@ -197,7 +224,7 @@ impl FeltRng for RpoRandomCoin {
 
 impl RngCore for RpoRandomCoin {
     fn next_u32(&mut self) -> u32 {
-        self.draw_basefield().as_int() as u32
+        self.draw_basefield().as_canonical_u64() as u32
     }
 
     fn next_u64(&mut self) -> u64 {

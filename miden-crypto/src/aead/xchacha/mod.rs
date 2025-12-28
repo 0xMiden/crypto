@@ -28,7 +28,7 @@ use crate::{
     zeroize::{Zeroize, ZeroizeOnDrop},
 };
 
-#[cfg(test)]
+#[cfg(all(test, feature = "std"))]
 mod test;
 
 // CONSTANTS

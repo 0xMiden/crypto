@@ -1,5 +1,6 @@
-use super::{Felt, STATE_WIDTH, ZERO};
+use p3_field::PrimeField64;
 
+use super::{Felt, STATE_WIDTH, ZERO};
 mod freq;
 pub use freq::mds_multiply_freq;
 
@@ -18,7 +19,7 @@ pub fn apply_mds(state: &mut [Felt; STATE_WIDTH]) {
     let mut state_h = [0u64; STATE_WIDTH];
 
     for r in 0..STATE_WIDTH {
-        let s = state[r].inner();
+        let s = state[r].as_canonical_u64();
         state_h[r] = s >> 32;
         state_l[r] = (s as u32) as u64;
     }
@@ -33,7 +34,7 @@ pub fn apply_mds(state: &mut [Felt; STATE_WIDTH]) {
         let z = (s_hi << 32) - s_hi;
         let (res, over) = s_lo.overflowing_add(z);
 
-        result[r] = Felt::from_mont(res.wrapping_add(0u32.wrapping_sub(over as u32) as u64));
+        result[r] = Felt::new(res.wrapping_add(0u32.wrapping_sub(over as u32) as u64));
     }
     *state = result;
 }

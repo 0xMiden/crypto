@@ -1,8 +1,9 @@
-#[cfg(test)]
-use super::{ALPHA, INV_ALPHA};
+use p3_field::{Field, PrimeCharacteristicRing};
+
+#[cfg(all(test, feature = "std"))]
+pub(crate) use super::{ALPHA, INV_ALPHA};
 use super::{
-    AlgebraicSponge, CAPACITY_RANGE, CubeExtension, DIGEST_RANGE, ElementHasher, Felt,
-    FieldElement, Hasher, RATE_RANGE, Range, STATE_WIDTH, StarkField, Word, ZERO,
+    AlgebraicSponge, CAPACITY_RANGE, DIGEST_RANGE, Felt, RATE_RANGE, Range, STATE_WIDTH, Word, ZERO,
 };
 
 mod arch;
@@ -14,10 +15,10 @@ pub use arch::optimized::{
 mod mds;
 use mds::{MDS, apply_mds};
 
-mod rpo;
+pub(crate) mod rpo;
 pub use rpo::Rpo256;
 
-mod rpx;
+pub(crate) mod rpx;
 pub use rpx::Rpx256;
 
 #[cfg(test)]
@@ -35,18 +36,18 @@ const NUM_ROUNDS: usize = 7;
 
 #[inline(always)]
 fn apply_sbox(state: &mut [Felt; STATE_WIDTH]) {
-    state[0] = state[0].exp7();
-    state[1] = state[1].exp7();
-    state[2] = state[2].exp7();
-    state[3] = state[3].exp7();
-    state[4] = state[4].exp7();
-    state[5] = state[5].exp7();
-    state[6] = state[6].exp7();
-    state[7] = state[7].exp7();
-    state[8] = state[8].exp7();
-    state[9] = state[9].exp7();
-    state[10] = state[10].exp7();
-    state[11] = state[11].exp7();
+    state[0] = state[0].exp_const_u64::<7>();
+    state[1] = state[1].exp_const_u64::<7>();
+    state[2] = state[2].exp_const_u64::<7>();
+    state[3] = state[3].exp_const_u64::<7>();
+    state[4] = state[4].exp_const_u64::<7>();
+    state[5] = state[5].exp_const_u64::<7>();
+    state[6] = state[6].exp_const_u64::<7>();
+    state[7] = state[7].exp_const_u64::<7>();
+    state[8] = state[8].exp_const_u64::<7>();
+    state[9] = state[9].exp_const_u64::<7>();
+    state[10] = state[10].exp_const_u64::<7>();
+    state[11] = state[11].exp_const_u64::<7>();
 }
 
 // INVERSE SBOX FUNCTION
@@ -88,10 +89,7 @@ fn apply_inv_sbox(state: &mut [Felt; STATE_WIDTH]) {
     }
 
     #[inline(always)]
-    fn exp_acc<B: StarkField, const N: usize, const M: usize>(
-        base: [B; N],
-        tail: [B; N],
-    ) -> [B; N] {
+    fn exp_acc<B: Field, const N: usize, const M: usize>(base: [B; N], tail: [B; N]) -> [B; N] {
         let mut result = base;
         for _ in 0..M {
             result.iter_mut().for_each(|r| *r = r.square());

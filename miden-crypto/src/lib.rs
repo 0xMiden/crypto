@@ -15,15 +15,36 @@ pub mod rand;
 pub mod utils;
 pub mod word;
 
+// Test utilities for generating random data (used in tests and benchmarks)
+#[cfg(any(test, feature = "std"))]
+pub mod test_utils;
+
 // RE-EXPORTS
 // ================================================================================================
 
 pub use k256::elliptic_curve::zeroize;
-pub use winter_math::{
-    FieldElement, StarkField,
-    fields::{CubeExtension, QuadExtension, f64::BaseElement as Felt},
+pub use p3_air::{
+    Air, AirBuilder, AirBuilderWithPublicValues, BaseAir, BaseAirWithPublicValues,
+    ExtensionBuilder, FilteredAirBuilder, PairBuilder, PairCol, PermutationAirBuilder,
+    VirtualPairCol,
+};
+pub use p3_field::{
+    BasedVectorSpace, ExtensionField, Field, PrimeCharacteristicRing, PrimeField64,
+    batch_multiplicative_inverse, extension::BinomialExtensionField, integers::QuotientMap,
+};
+pub use p3_miden_air::{BaseAirWithAuxTrace, FilteredMidenAirBuilder, MidenAir, MidenAirBuilder};
+pub use p3_miden_goldilocks::{Goldilocks as Felt, Poseidon2Goldilocks};
+pub use p3_miden_prover::{
+    Commitments, Domain, Entry, OpenedValues, PackedChallenge, PackedVal, PcsError, Proof,
+    ProverConstraintFolder, StarkConfig, StarkGenericConfig, SymbolicAirBuilder,
+    SymbolicExpression, SymbolicVariable, Val, VerificationError, VerifierConstraintFolder,
+    generate_logup_trace, get_log_quotient_degree, get_max_constraint_degree,
+    get_symbolic_constraints, prove, quotient_values, recompose_quotient_from_chunks, verify,
+    verify_constraints,
 };
 pub use word::{Word, WordError};
+
+pub use crate::rand::{Randomizable, RpoRandomCoin, RpxRandomCoin};
 
 // TYPE ALIASES
 // ================================================================================================
@@ -103,7 +124,7 @@ pub trait SequentialCommit {
 #[test]
 #[should_panic]
 fn debug_assert_is_checked() {
-    // enforce the release checks to always have `RUSTFLAGS="-C debug-assertions".
+    // enforce the release checks to always have `RUSTFLAGS="-C debug-assertions"`.
     //
     // some upstream tests are performed with `debug_assert`, and we want to assert its correctness
     // downstream.

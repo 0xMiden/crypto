@@ -39,6 +39,7 @@ pub struct StoreNode {
 /// # use miden_crypto::{ZERO, Felt, Word};
 /// # use miden_crypto::merkle::{NodeIndex, MerkleTree, store::MerkleStore};
 /// # use miden_crypto::hash::rpo::Rpo256;
+/// # use miden_crypto::PrimeCharacteristicRing;
 /// # const fn int_to_node(value: u64) -> Word {
 /// #     Word::new([Felt::new(value), ZERO, ZERO, ZERO])
 /// # }
@@ -192,7 +193,7 @@ impl MerkleStore {
     /// existence verification is needed.
     pub fn has_path(&self, root: Word, index: NodeIndex) -> bool {
         // check if the root exists
-        if self.nodes.get(&root).is_none() {
+        if !self.nodes.contains_key(&root) {
             return false;
         }
 
