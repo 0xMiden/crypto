@@ -17,7 +17,7 @@ use thiserror::Error;
 
 mod iterators;
 #[cfg(feature = "concurrent")]
-use iterators::*;
+use iterators::{IndexedParallelIterator, IntoParallelRefMutIterator, ParallelIterator};
 
 use crate::{Felt, PrimeField64, Word};
 

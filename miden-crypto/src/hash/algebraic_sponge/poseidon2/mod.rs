@@ -4,7 +4,10 @@ use super::{
 use crate::PrimeCharacteristicRing;
 
 mod constants;
-use constants::*;
+use constants::{
+    ARK_EXT_INITIAL, ARK_EXT_TERMINAL, ARK_INT, MAT_DIAG, NUM_EXTERNAL_ROUNDS_HALF,
+    NUM_INTERNAL_ROUNDS,
+};
 
 #[cfg(test)]
 mod test;

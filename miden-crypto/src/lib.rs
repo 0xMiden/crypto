@@ -23,14 +23,25 @@ pub mod test_utils;
 // ================================================================================================
 
 pub use k256::elliptic_curve::zeroize;
-pub use p3_air::*;
+pub use p3_air::{
+    Air, AirBuilder, AirBuilderWithPublicValues, BaseAir, BaseAirWithPublicValues,
+    ExtensionBuilder, FilteredAirBuilder, PairBuilder, PairCol, PermutationAirBuilder,
+    VirtualPairCol,
+};
 pub use p3_field::{
     BasedVectorSpace, ExtensionField, Field, PrimeCharacteristicRing, PrimeField64,
     batch_multiplicative_inverse, extension::BinomialExtensionField, integers::QuotientMap,
 };
-pub use p3_miden_air::*;
+pub use p3_miden_air::{BaseAirWithAuxTrace, FilteredMidenAirBuilder, MidenAir, MidenAirBuilder};
 pub use p3_miden_goldilocks::{Goldilocks as Felt, Poseidon2Goldilocks};
-pub use p3_miden_prover::*;
+pub use p3_miden_prover::{
+    Commitments, Domain, Entry, OpenedValues, PackedChallenge, PackedVal, PcsError, Proof,
+    ProverConstraintFolder, StarkConfig, StarkGenericConfig, SymbolicAirBuilder,
+    SymbolicExpression, SymbolicVariable, Val, VerificationError, VerifierConstraintFolder,
+    generate_logup_trace, get_log_quotient_degree, get_max_constraint_degree,
+    get_symbolic_constraints, prove, quotient_values, recompose_quotient_from_chunks, verify,
+    verify_constraints,
+};
 pub use word::{Word, WordError};
 
 pub use crate::rand::{Randomizable, RpoRandomCoin, RpxRandomCoin};
