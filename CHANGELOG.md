@@ -12,6 +12,7 @@
 - [BREAKING] Made `LargeSmt::num_leaves()` and `LargeSmt::num_entries()` infallible ([#708](https://github.com/0xMiden/crypto/pull/708)).
 - `PartialMmr::untrack()` now returns the removed authentication nodes ([#714](https://github.com/0xMiden/crypto/pull/714)).
 - [BREAKING] Imported miden-serde-utils crate for serialization ([#715](https://github.com/0xMiden/crypto/pull/715)).
+- Trimmed down hash benchmarks, restored Poseidon2 testing, removed unnecessary size parameterization from merge benchmarks ([#737](https://github.com/0xMiden/crypto/pull/737))
 
 ## 0.19.2 (2025-12-04)
 

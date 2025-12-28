@@ -158,6 +158,13 @@ macro_rules! benchmark_hash_auto {
 // ```
 #[macro_export]
 macro_rules! benchmark_hash_merge {
+    // Simple variant without size parameterization - just benchmarks merge operation
+    ($func_name:ident, $hasher_name:literal, $closure:expr) => {
+        fn $func_name(c: &mut Criterion) {
+            c.bench_function(concat!("hash-", $hasher_name, "-merge"), |b| $closure(b));
+        }
+    };
+    // Parameterized variant with multiple sizes (legacy)
     ($func_name:ident, $hasher_name:literal, $sizes:expr, $closure:expr) => {
         fn $func_name(c: &mut Criterion) {
             let mut group = c.benchmark_group(concat!("hash-", $hasher_name, "-merge"));

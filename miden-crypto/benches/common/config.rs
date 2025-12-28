@@ -33,24 +33,11 @@ pub const HASH_INPUT_SIZES: &[usize] = &[
 ];
 
 /// Element counts for sequential hashing tests
+/// Focused on the key benchmark size (100 elements) with a few representative sizes
 pub const HASH_ELEMENT_COUNTS: &[usize] = &[
-    0,     // Empty array (edge case)
-    1,     // Single element
-    2,     // Two elements
-    4,     // Very small array
-    8,     // Tiny array
-    16,    // Small array
-    32,    // Word size
-    64,    // Double word
-    100,   // Small array
-    128,   // Medium small array
-    256,   // Medium array
-    512,   // Large medium array
-    1000,  // Medium array
-    2000,  // Large array
-    5000,  // Very large array
-    10000, // Large array
-    20000, // Very large array
+    1,    // Single element (minimal case)
+    100,  // Primary benchmark target - typical use case
+    1000, // Larger scale test
 ];
 
 /// Input sizes for merge operations (in bytes)
