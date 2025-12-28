@@ -167,9 +167,9 @@ Configuration constants are defined in `benches/common/config.rs`:
 pub const DEFAULT_MEASUREMENT_TIME: Duration = Duration::from_secs(20);
 pub const DEFAULT_SAMPLE_SIZE: u64 = 100;
 
-// Hash function configuration  
-pub const HASH_INPUT_SIZES: &[usize] = &[1, 2, 4, 8, 16, 32, 64, 128, 256, 512, 1024, 2048, 4096, 8192, 16384];
-pub const HASH_ELEMENT_COUNTS: &[usize] = &[0, 1, 2, 4, 8, 16, 32, 64, 100, 128, 256, 512, 1000, 2000, 5000, 10000, 20000];
+// Hash function configuration
+// Simplified to focus on key benchmark sizes (1, 100, 1000 elements)
+pub const HASH_ELEMENT_COUNTS: &[usize] = &[1, 100, 1000];
 ```
 
 #### Input Data Generation
