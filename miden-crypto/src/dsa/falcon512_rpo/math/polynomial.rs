@@ -651,11 +651,12 @@ impl<F: Zeroize> ZeroizeOnDrop for Polynomial<F> {}
 #[cfg(all(test, feature = "std"))]
 mod tests {
     use super::{FalconFelt, N, Polynomial};
+    use crate::rand::test_utils::rand_array;
 
     #[test]
     fn test_negacyclic_reduction() {
-        let coef1: [u8; N] = crate::test_utils::rand_array();
-        let coef2: [u8; N] = crate::test_utils::rand_array();
+        let coef1: [u8; N] = rand_array();
+        let coef2: [u8; N] = rand_array();
 
         let poly1 = Polynomial::new(coef1.iter().map(|&a| FalconFelt::new(a as i16)).collect());
         let poly2 = Polynomial::new(coef2.iter().map(|&a| FalconFelt::new(a as i16)).collect());

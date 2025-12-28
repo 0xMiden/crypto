@@ -5,7 +5,9 @@ use p3_field::PrimeField64;
 use proptest::prelude::*;
 
 use super::{Felt, Rpx256};
-use crate::{ONE, Word, ZERO, hash::algebraic_sponge::AlgebraicSponge, test_utils::rand_value};
+use crate::{
+    ONE, Word, ZERO, hash::algebraic_sponge::AlgebraicSponge, rand::test_utils::rand_value,
+};
 
 // The number of iterations to run the `ext_round_matches_reference_many` test.
 #[cfg(all(

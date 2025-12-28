@@ -4,7 +4,7 @@ use assert_matches::assert_matches;
 
 use super::{PartialSmt, SMT_DEPTH};
 #[cfg(any(test, feature = "std"))]
-use crate::test_utils::{rand_array, rand_value};
+use crate::rand::test_utils::{rand_array, rand_value};
 use crate::{
     EMPTY_WORD, Felt, ONE, Word, ZERO,
     merkle::{

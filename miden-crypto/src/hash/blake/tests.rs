@@ -6,7 +6,7 @@ use p3_miden_goldilocks::Goldilocks as Felt;
 use proptest::prelude::*;
 
 use super::*;
-use crate::test_utils::rand_vector;
+use crate::rand::test_utils::rand_vector;
 
 #[test]
 fn blake3_hash_elements() {

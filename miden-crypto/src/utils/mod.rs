@@ -95,6 +95,11 @@ pub fn hex_to_bytes<const N: usize>(value: &str) -> Result<[u8; N], HexParseErro
     Ok(decoded)
 }
 
+// MATH UTILITIES
+// ================================================================================================
+
+pub use p3_field::batch_multiplicative_inverse;
+
 // CONVERSIONS BETWEEN BYTES AND ELEMENTS
 // ================================================================================================
 
@@ -354,8 +359,3 @@ pub fn transpose_slice<T: Copy + Send + Sync, const N: usize>(source: &[T]) -> V
     });
     result
 }
-
-// RANDOMNESS (ported from Winterfell's winter-utils)
-// ================================================================================================
-
-pub use crate::rand::Randomizable;

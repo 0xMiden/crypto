@@ -15,36 +15,44 @@ pub mod rand;
 pub mod utils;
 pub mod word;
 
-// Test utilities for generating random data (used in tests and benchmarks)
-#[cfg(any(test, feature = "std"))]
-pub mod test_utils;
-
 // RE-EXPORTS
 // ================================================================================================
 
 pub use k256::elliptic_curve::zeroize;
-pub use p3_air::{
-    Air, AirBuilder, AirBuilderWithPublicValues, BaseAir, BaseAirWithPublicValues,
-    ExtensionBuilder, FilteredAirBuilder, PairBuilder, PairCol, PermutationAirBuilder,
-    VirtualPairCol,
-};
 pub use p3_field::{
     BasedVectorSpace, ExtensionField, Field, PrimeCharacteristicRing, PrimeField64,
-    batch_multiplicative_inverse, extension::BinomialExtensionField, integers::QuotientMap,
+    extension::BinomialExtensionField, integers::QuotientMap,
 };
-pub use p3_miden_air::{BaseAirWithAuxTrace, FilteredMidenAirBuilder, MidenAir, MidenAirBuilder};
-pub use p3_miden_goldilocks::{Goldilocks as Felt, Poseidon2Goldilocks};
-pub use p3_miden_prover::{
-    Commitments, Domain, Entry, OpenedValues, PackedChallenge, PackedVal, PcsError, Proof,
-    ProverConstraintFolder, StarkConfig, StarkGenericConfig, SymbolicAirBuilder,
-    SymbolicExpression, SymbolicVariable, Val, VerificationError, VerifierConstraintFolder,
-    generate_logup_trace, get_log_quotient_degree, get_max_constraint_degree,
-    get_symbolic_constraints, prove, quotient_values, recompose_quotient_from_chunks, verify,
-    verify_constraints,
-};
+pub use p3_miden_goldilocks::Goldilocks as Felt;
 pub use word::{Word, WordError};
 
-pub use crate::rand::{Randomizable, RpoRandomCoin, RpxRandomCoin};
+pub mod stark {
+    //! Foundational components for the STARK proving system based on Plonky3.
+    //!
+    //! This module contains components needed to build a STARK prover/verifier and define
+    //! Algebraic Intermediate Representation (AIR) for the Miden VM and other components.
+    //! It primarily consists of re-exports from the Plonky3 project with some Miden-specific
+    //! adaptations.
+    pub use p3_miden_prover::{
+        Commitments, Domain, Entry, OpenedValues, PackedChallenge, PackedVal, PcsError, Proof,
+        ProverConstraintFolder, StarkConfig, StarkGenericConfig, SymbolicAirBuilder,
+        SymbolicExpression, SymbolicVariable, Val, VerificationError, VerifierConstraintFolder,
+        generate_logup_trace, get_log_quotient_degree, get_max_constraint_degree,
+        get_symbolic_constraints, prove, quotient_values, recompose_quotient_from_chunks, verify,
+        verify_constraints,
+    };
+
+    pub mod air {
+        pub use p3_air::{
+            Air, AirBuilder, AirBuilderWithPublicValues, BaseAir, BaseAirWithPublicValues,
+            ExtensionBuilder, FilteredAirBuilder, PairBuilder, PairCol, PermutationAirBuilder,
+            VirtualPairCol,
+        };
+        pub use p3_miden_air::{
+            BaseAirWithAuxTrace, FilteredMidenAirBuilder, MidenAir, MidenAirBuilder,
+        };
+    }
+}
 
 // TYPE ALIASES
 // ================================================================================================

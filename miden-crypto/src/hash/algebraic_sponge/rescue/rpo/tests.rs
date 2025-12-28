@@ -10,7 +10,7 @@ use super::{
 use crate::{
     ONE, PrimeCharacteristicRing, PrimeField64, Word, ZERO,
     hash::algebraic_sponge::{AlgebraicSponge, BINARY_CHUNK_SIZE, CAPACITY_RANGE, RATE_WIDTH},
-    test_utils::rand_value,
+    rand::test_utils::rand_value,
 };
 
 #[test]

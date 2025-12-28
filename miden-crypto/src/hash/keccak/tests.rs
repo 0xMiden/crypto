@@ -4,7 +4,7 @@ use alloc::vec::Vec;
 use proptest::prelude::*;
 
 use super::*;
-use crate::test_utils::rand_vector;
+use crate::rand::test_utils::rand_vector;
 
 #[test]
 fn keccak256_hash_elements() {

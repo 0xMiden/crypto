@@ -7,7 +7,7 @@ use super::{CompactLeaf, History, LeafChanges, NodeChanges, error::Result};
 use crate::{
     Felt, Word,
     merkle::{NodeIndex, smt::LeafIndex},
-    test_utils::rand_value,
+    rand::test_utils::rand_value,
 };
 
 // TESTS

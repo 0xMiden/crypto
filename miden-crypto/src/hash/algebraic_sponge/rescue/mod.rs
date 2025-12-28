@@ -16,10 +16,7 @@ mod mds;
 use mds::{MDS, apply_mds};
 
 pub(crate) mod rpo;
-pub use rpo::Rpo256;
-
 pub(crate) mod rpx;
-pub use rpx::Rpx256;
 
 #[cfg(test)]
 mod tests;
