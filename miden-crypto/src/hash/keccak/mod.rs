@@ -177,6 +177,7 @@ where
         const { assert!(FELT_BYTES == 8, "buffer arithmetic assumes 8-byte field elements") };
 
         let mut hasher = sha3::Keccak256::new();
+        // Keccak256 rate: 1600 bits (state) - 512 bits (capacity) = 1088 bits = 136 bytes
         let mut buf = [0_u8; 136];
         let mut buf_offset = 0;
 
