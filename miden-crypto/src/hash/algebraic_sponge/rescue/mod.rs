@@ -15,10 +15,10 @@ pub use arch::optimized::{
 mod mds;
 use mds::{MDS, apply_mds};
 
-pub mod rpo;
+pub(crate) mod rpo;
 pub use rpo::Rpo256;
 
-pub mod rpx;
+pub(crate) mod rpx;
 pub use rpx::Rpx256;
 
 #[cfg(test)]
