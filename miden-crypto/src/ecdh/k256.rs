@@ -21,8 +21,10 @@ use rand::{CryptoRng, RngCore};
 use crate::{
     dsa::ecdsa_k256_keccak::{PUBLIC_KEY_BYTES, PublicKey, SecretKey},
     ecdh::KeyAgreementScheme,
-    utils::{ByteReader, ByteWriter, Deserializable, DeserializationError, Serializable},
-    zeroize::{Zeroize, ZeroizeOnDrop},
+    utils::{
+        ByteReader, ByteWriter, Deserializable, DeserializationError, Serializable,
+        zeroize::{Zeroize, ZeroizeOnDrop},
+    },
 };
 
 // SHARED SECRET

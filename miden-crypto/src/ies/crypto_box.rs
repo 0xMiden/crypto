@@ -9,7 +9,7 @@ use alloc::vec::Vec;
 use rand::{CryptoRng, RngCore};
 
 use super::IesError;
-use crate::{Felt, aead::AeadScheme, ecdh::KeyAgreementScheme, zeroize::Zeroizing};
+use crate::{Felt, aead::AeadScheme, ecdh::KeyAgreementScheme, utils::zeroize::Zeroizing};
 
 // CRYPTO BOX
 // ================================================================================================

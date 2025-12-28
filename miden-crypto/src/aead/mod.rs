@@ -9,8 +9,10 @@ use thiserror::Error;
 
 use crate::{
     Felt,
-    utils::Deserializable,
-    zeroize::{Zeroize, ZeroizeOnDrop},
+    utils::{
+        Deserializable,
+        zeroize::{Zeroize, ZeroizeOnDrop},
+    },
 };
 
 pub mod aead_rpo;

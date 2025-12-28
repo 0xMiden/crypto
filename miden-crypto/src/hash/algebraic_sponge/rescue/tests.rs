@@ -2,7 +2,7 @@
 use p3_field::PrimeCharacteristicRing;
 
 use super::{ALPHA, Felt, INV_ALPHA};
-use crate::test_utils::rand_value;
+use crate::rand::test_utils::rand_value;
 
 #[test]
 fn test_alphas() {

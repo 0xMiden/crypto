@@ -19,13 +19,18 @@ mod iterators;
 #[cfg(feature = "concurrent")]
 use iterators::{IndexedParallelIterator, IntoParallelRefMutIterator, ParallelIterator};
 
-use crate::{Felt, PrimeField64, Word};
+use crate::{Felt, Word, field::PrimeField64};
 
 // CONSTANTS
 // ================================================================================================
 
 /// The number of byte chunks that can be safely embedded in a field element
 const BINARY_CHUNK_SIZE: usize = 7;
+
+// RE-EXPORTS
+// ================================================================================================
+
+pub use k256::elliptic_curve::zeroize;
 
 // UTILITY FUNCTIONS
 // ================================================================================================
@@ -354,8 +359,3 @@ pub fn transpose_slice<T: Copy + Send + Sync, const N: usize>(source: &[T]) -> V
     });
     result
 }
-
-// RANDOMNESS (ported from Winterfell's winter-utils)
-// ================================================================================================
-
-pub use crate::rand::Randomizable;

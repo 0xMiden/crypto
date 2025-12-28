@@ -5,7 +5,8 @@ use rand::{Rng, prelude::IteratorRandom, rng};
 
 use super::MemoryStorage;
 use crate::{
-    EMPTY_WORD, Felt, ONE, PrimeField64, WORD_SIZE, Word,
+    EMPTY_WORD, Felt, ONE, WORD_SIZE, Word,
+    field::PrimeField64,
     merkle::{
         InnerNodeInfo,
         smt::{
