@@ -121,6 +121,7 @@ p3-air        = { default-features = false, version = "0.4" }
 p3-challenger = { default-features = false, version = "0.4" }
 p3-field      = { default-features = false, version = "0.4" }
 p3-symmetric  = { default-features = false, version = "0.4" }
+p3-util       = { default-features = false, version = "0.4" }
 
 # Miden-specific Plonky3 crates
 p3-miden-air        = { default-features = false, version = "0.4" }
