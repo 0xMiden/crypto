@@ -1,8 +1,9 @@
 //! Pseudo-random element generation.
 
+use p3_field::PrimeField64;
 use rand::RngCore;
 
-pub use crate::utils::Randomizable;
+use crate::{Felt, Word};
 
 mod rpo;
 pub use rpo::RpoRandomCoin;
@@ -10,7 +11,94 @@ pub use rpo::RpoRandomCoin;
 mod rpx;
 pub use rpx::RpxRandomCoin;
 
-use crate::{Felt, Word};
+// RANDOMNESS (ported from Winterfell's winter-utils)
+// ================================================================================================
+
+/// Defines how `Self` can be read from a sequence of random bytes.
+pub trait Randomizable: Sized {
+    /// Size of `Self` in bytes.
+    ///
+    /// This is used to determine how many bytes should be passed to the
+    /// [from_random_bytes()](Self::from_random_bytes) function.
+    const VALUE_SIZE: usize;
+
+    /// Returns `Self` if the set of bytes forms a valid value, otherwise returns None.
+    fn from_random_bytes(source: &[u8]) -> Option<Self>;
+}
+
+impl Randomizable for u128 {
+    const VALUE_SIZE: usize = 16;
+
+    fn from_random_bytes(source: &[u8]) -> Option<Self> {
+        if let Ok(bytes) = source[..Self::VALUE_SIZE].try_into() {
+            Some(u128::from_le_bytes(bytes))
+        } else {
+            None
+        }
+    }
+}
+
+impl Randomizable for u64 {
+    const VALUE_SIZE: usize = 8;
+
+    fn from_random_bytes(source: &[u8]) -> Option<Self> {
+        if let Ok(bytes) = source[..Self::VALUE_SIZE].try_into() {
+            Some(u64::from_le_bytes(bytes))
+        } else {
+            None
+        }
+    }
+}
+
+impl Randomizable for u32 {
+    const VALUE_SIZE: usize = 4;
+
+    fn from_random_bytes(source: &[u8]) -> Option<Self> {
+        if let Ok(bytes) = source[..Self::VALUE_SIZE].try_into() {
+            Some(u32::from_le_bytes(bytes))
+        } else {
+            None
+        }
+    }
+}
+
+impl Randomizable for u16 {
+    const VALUE_SIZE: usize = 2;
+
+    fn from_random_bytes(source: &[u8]) -> Option<Self> {
+        if let Ok(bytes) = source[..Self::VALUE_SIZE].try_into() {
+            Some(u16::from_le_bytes(bytes))
+        } else {
+            None
+        }
+    }
+}
+
+impl Randomizable for u8 {
+    const VALUE_SIZE: usize = 1;
+
+    fn from_random_bytes(source: &[u8]) -> Option<Self> {
+        Some(source[0])
+    }
+}
+
+impl Randomizable for Felt {
+    const VALUE_SIZE: usize = 8;
+
+    fn from_random_bytes(source: &[u8]) -> Option<Self> {
+        if let Ok(bytes) = source[..Self::VALUE_SIZE].try_into() {
+            let value = u64::from_le_bytes(bytes);
+            // Ensure the value is within the field modulus
+            if value < Felt::ORDER_U64 {
+                Some(Felt::new(value))
+            } else {
+                None
+            }
+        } else {
+            None
+        }
+    }
+}
 
 /// Pseudo-random element generator.
 ///
