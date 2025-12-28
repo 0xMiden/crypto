@@ -50,8 +50,9 @@ harness = false
 name    = "store"
 
 [[bench]]
-harness = false
-name    = "dsa"
+harness           = false
+name              = "dsa"
+required-features = ["std"]
 
 [[bench]]
 harness = false
@@ -62,16 +63,28 @@ harness = false
 name    = "rand"
 
 [features]
-concurrent = ["dep:rayon"]
+concurrent = ["dep:rayon", "std"]
 default = ["concurrent", "std"]
-executable = ["dep:clap", "dep:rand-utils", "std"]
+executable = ["concurrent", "dep:clap", "dep:rand-utils"]
 fuzzing = []
-internal = []
+internal = ["concurrent"]
 rocksdb = ["concurrent", "dep:rocksdb"]
 serde = ["dep:serde", "serde?/alloc", "winter-math/serde"]
 std = [
   "blake3/std",
   "dep:cc",
+  "rand/std",
+  "rand/thread_rng",
+  "winter-crypto/std",
+  "winter-math/std",
+  "winter-utils/std",
+]
+serde = ["dep:serde", "serde?/alloc", "winter-math/serde"]
+std = [
+  "blake3/std",
+  "dep:cc",
+  "miden-serde-utils/std",
+  "miden-serde-utils/winter-compat",
   "rand/std",
   "rand/thread_rng",
   "winter-crypto/std",
@@ -89,6 +102,7 @@ flume                         = { version = "0.11" }
 hkdf                          = { default-features = false, version = "0.12" }
 k256                          = { features = ["ecdh", "ecdsa"], version = "0.13" }
 miden-crypto-derive.workspace = true
+miden-serde-utils.workspace   = true
 num                           = { default-features = false, features = ["alloc", "libm"], version = "0.4" }
 num-complex                   = { default-features = false, version = "0.4" }
 rand                          = { default-features = false, version = "0.9" }

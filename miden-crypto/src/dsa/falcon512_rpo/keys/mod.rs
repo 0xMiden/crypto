@@ -18,9 +18,12 @@ mod tests {
     use rand::SeedableRng;
     use rand_chacha::ChaCha20Rng;
     use winter_math::FieldElement;
-    use winter_utils::{Deserializable, Serializable};
 
-    use crate::{ONE, Word, dsa::falcon512_rpo::SecretKey};
+    use crate::{
+        ONE, Word,
+        dsa::falcon512_rpo::SecretKey,
+        utils::{Deserializable, Serializable},
+    };
 
     #[test]
     fn test_falcon_verification() {

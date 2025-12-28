@@ -68,23 +68,34 @@ doc: ## Generate and check documentation
 
 .PHONY: test-default
 test-default: ## Run tests with default features
-	$(DEBUG_OVERFLOW_INFO) cargo nextest run --profile default --release --features ${ALL_FEATURES_EXCEPT_ROCKSDB}
+	cargo nextest run --profile default --cargo-profile test-release --features ${ALL_FEATURES_EXCEPT_ROCKSDB}
 
+<<<<<<< HEAD
+=======
+.PHONY: test-hashmaps
+test-hashmaps: ## Run tests with `hashmaps` feature enabled
+	cargo nextest run --profile default --cargo-profile test-release --features hashmaps
+
+>>>>>>> b713678 (feat: create miden-serde-utils + other CI/build fixes (#715))
 .PHONY: test-no-std
 test-no-std: ## Run tests with `no-default-features` (std)
-	$(DEBUG_OVERFLOW_INFO) cargo nextest run --profile default --release --no-default-features
+	cargo nextest run --profile default --cargo-profile test-release --no-default-features
 
 .PHONY: test-smt-concurrent
 test-smt-concurrent: ## Run only concurrent SMT tests
-	$(DEBUG_OVERFLOW_INFO) cargo nextest run --profile smt-concurrent --release
+	cargo nextest run --profile smt-concurrent --cargo-profile test-release
 
 .PHONY: test-docs
 test-docs:
-	$(DEBUG_OVERFLOW_INFO) cargo test --doc --all-features
+	cargo test --doc --all-features --profile test-release
 
 .PHONY: test-large-smt
 test-large-smt: ## Run only large SMT tests
+<<<<<<< HEAD
 	$(DEBUG_OVERFLOW_INFO) cargo nextest run --success-output immediate  --profile large-smt --release --features rocksdb
+=======
+	cargo nextest run --success-output immediate --profile large-smt --cargo-profile test-release --features hashmaps,rocksdb
+>>>>>>> b713678 (feat: create miden-serde-utils + other CI/build fixes (#715))
 
 .PHONY: test
 test: test-default test-no-std test-docs test-large-smt ## Run all tests except concurrent SMT tests

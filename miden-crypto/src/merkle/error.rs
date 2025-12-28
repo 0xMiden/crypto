@@ -1,4 +1,6 @@
-use alloc::string::{String, ToString};
+use alloc::string::String;
+#[cfg(feature = "concurrent")]
+use alloc::string::ToString;
 
 use thiserror::Error;
 
