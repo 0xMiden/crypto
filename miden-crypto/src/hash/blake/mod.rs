@@ -287,6 +287,7 @@ where
         const { assert!(FELT_BYTES == 8, "buffer arithmetic assumes 8-byte field elements") };
 
         let mut hasher = blake3::Hasher::new();
+        // BLAKE3 block size: 64 bytes
         let mut buf = [0_u8; 64];
         let mut buf_offset = 0;
 
