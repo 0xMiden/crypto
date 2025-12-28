@@ -640,6 +640,9 @@ mod tests {
         utils::{Deserializable, Serializable},
     };
 
+    // Note: This function works around the fact that P3 constructors are not const.
+    // Once upstream Plonky3 releases our const constructor changes, this should be
+    // reverted to `const LEAVES: [Word; 7] = [...]`. See issue #731.
     fn leaves() -> [Word; 7] {
         [
             int_to_node(0),
