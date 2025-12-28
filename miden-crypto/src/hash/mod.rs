@@ -26,6 +26,13 @@ pub mod rpx {
     pub use super::algebraic_sponge::rescue::Rpx256;
 }
 
+// Note: The algebraic_sponge module and its submodules (poseidon2, rescue, rpo, rpx) are
+// currently public, which exposes P3 integration types (e.g., RpoPermutation256, RpoHasher).
+// These types are not used internally and generate dead_code warnings.
+//
+// Making these modules pub(crate) would hide the P3 types but requires adding #[allow(dead_code)]
+// annotations to suppress warnings. The decision on whether to keep RPO/RPX and their P3
+// integration types as public API should be made as part of issue #725.
 pub mod algebraic_sponge;
 
 // TRAITS
