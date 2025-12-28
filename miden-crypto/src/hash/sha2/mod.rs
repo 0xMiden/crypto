@@ -314,6 +314,7 @@ where
         const { assert!(FELT_BYTES == 8, "buffer arithmetic assumes 8-byte field elements") };
 
         let mut hasher = sha2::Sha256::new();
+        // SHA-256 block size: 64 bytes
         let mut buf = [0_u8; 64];
         let mut buf_offset = 0;
 
