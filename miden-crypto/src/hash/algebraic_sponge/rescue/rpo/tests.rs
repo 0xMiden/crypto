@@ -31,7 +31,7 @@ fn test_inv_sbox() {
     let state = [Felt::new(rand_value()); STATE_WIDTH];
 
     let mut expected = state;
-    expected.iter_mut().for_each(|v| *v = v.exp_u64(INV_ALPHA));
+    expected.iter_mut().for_each(|v| *v = v.exp_const_u64::<INV_ALPHA>());
 
     let mut actual = state;
     apply_inv_sbox(&mut actual);
