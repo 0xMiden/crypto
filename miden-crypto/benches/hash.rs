@@ -39,16 +39,11 @@ use crate::common::config::HASH_ELEMENT_COUNTS;
 // === RPO256 Hash Benchmarks ===
 
 // 2-to-1 hash merge
-benchmark_hash_merge!(
-    hash_rpo256_merge,
-    "rpo256",
-    &[32, 64, 256],
-    |b: &mut criterion::Bencher, size| {
-        let input1 = Rpo256::hash(&generate_byte_array_random(size));
-        let input2 = Rpo256::hash(&generate_byte_array_random(size));
-        b.iter(|| Rpo256::merge(black_box(&[input1, input2])))
-    }
-);
+benchmark_hash_merge!(hash_rpo256_merge, "rpo256", |b: &mut criterion::Bencher| {
+    let input1 = Rpo256::hash(&generate_byte_array_random(32));
+    let input2 = Rpo256::hash(&generate_byte_array_random(32));
+    b.iter(|| Rpo256::merge(black_box(&[input1, input2])))
+});
 
 // Sequential hashing of Felt elements
 benchmark_hash_felt!(
@@ -65,16 +60,11 @@ benchmark_hash_felt!(
 // === RPX256 Hash Benchmarks ===
 
 // 2-to-1 hash merge
-benchmark_hash_merge!(
-    hash_rpx256_merge,
-    "rpx256",
-    &[32, 64, 256],
-    |b: &mut criterion::Bencher, size| {
-        let input1 = Rpx256::hash(&generate_byte_array_random(size));
-        let input2 = Rpx256::hash(&generate_byte_array_random(size));
-        b.iter(|| Rpx256::merge(black_box(&[input1, input2])))
-    }
-);
+benchmark_hash_merge!(hash_rpx256_merge, "rpx256", |b: &mut criterion::Bencher| {
+    let input1 = Rpx256::hash(&generate_byte_array_random(32));
+    let input2 = Rpx256::hash(&generate_byte_array_random(32));
+    b.iter(|| Rpx256::merge(black_box(&[input1, input2])))
+});
 
 // Sequential hashing of Felt elements
 benchmark_hash_felt!(
@@ -91,16 +81,11 @@ benchmark_hash_felt!(
 // === Poseidon2 Hash Benchmarks ===
 
 // 2-to-1 hash merge
-benchmark_hash_merge!(
-    hash_poseidon2_merge,
-    "poseidon2",
-    &[32, 64, 256],
-    |b: &mut criterion::Bencher, size| {
-        let input1 = Poseidon2::hash(&generate_byte_array_random(size));
-        let input2 = Poseidon2::hash(&generate_byte_array_random(size));
-        b.iter(|| Poseidon2::merge(black_box(&[input1, input2])))
-    }
-);
+benchmark_hash_merge!(hash_poseidon2_merge, "poseidon2", |b: &mut criterion::Bencher| {
+    let input1 = Poseidon2::hash(&generate_byte_array_random(32));
+    let input2 = Poseidon2::hash(&generate_byte_array_random(32));
+    b.iter(|| Poseidon2::merge(black_box(&[input1, input2])))
+});
 
 // Sequential hashing of Felt elements
 benchmark_hash_felt!(
@@ -117,17 +102,12 @@ benchmark_hash_felt!(
 // === Blake3 Hash Benchmarks ===
 
 // 2-to-1 hash merge
-benchmark_hash_merge!(
-    hash_blake3_merge,
-    "blake3_256",
-    &[32, 64, 256],
-    |b: &mut criterion::Bencher, size| {
-        let input1 = Blake3_256::hash(&generate_byte_array_random(size));
-        let input2 = Blake3_256::hash(&generate_byte_array_random(size));
-        let digest_inputs: [<Blake3_256 as HasherExt>::Digest; 2] = [input1, input2];
-        b.iter(|| Blake3_256::merge(black_box(&digest_inputs)))
-    }
-);
+benchmark_hash_merge!(hash_blake3_merge, "blake3_256", |b: &mut criterion::Bencher| {
+    let input1 = Blake3_256::hash(&generate_byte_array_random(32));
+    let input2 = Blake3_256::hash(&generate_byte_array_random(32));
+    let digest_inputs: [<Blake3_256 as HasherExt>::Digest; 2] = [input1, input2];
+    b.iter(|| Blake3_256::merge(black_box(&digest_inputs)))
+});
 
 // Sequential hashing of Felt elements
 benchmark_hash_felt!(
@@ -144,17 +124,12 @@ benchmark_hash_felt!(
 // === Blake3_192 Hash Benchmarks ===
 
 // 2-to-1 hash merge
-benchmark_hash_merge!(
-    hash_blake3_192_merge,
-    "blake3_192",
-    &[32, 64, 256],
-    |b: &mut criterion::Bencher, size| {
-        let input1 = Blake3_192::hash(&generate_byte_array_random(size));
-        let input2 = Blake3_192::hash(&generate_byte_array_random(size));
-        let digest_inputs: [<Blake3_192 as HasherExt>::Digest; 2] = [input1, input2];
-        b.iter(|| Blake3_192::merge(black_box(&digest_inputs)))
-    }
-);
+benchmark_hash_merge!(hash_blake3_192_merge, "blake3_192", |b: &mut criterion::Bencher| {
+    let input1 = Blake3_192::hash(&generate_byte_array_random(32));
+    let input2 = Blake3_192::hash(&generate_byte_array_random(32));
+    let digest_inputs: [<Blake3_192 as HasherExt>::Digest; 2] = [input1, input2];
+    b.iter(|| Blake3_192::merge(black_box(&digest_inputs)))
+});
 
 // Sequential hashing of Felt elements
 benchmark_hash_felt!(
@@ -171,17 +146,12 @@ benchmark_hash_felt!(
 // === Blake3_160 Hash Benchmarks ===
 
 // 2-to-1 hash merge
-benchmark_hash_merge!(
-    hash_blake3_160_merge,
-    "blake3_160",
-    &[32, 64, 256],
-    |b: &mut criterion::Bencher, size| {
-        let input1 = Blake3_160::hash(&generate_byte_array_random(size));
-        let input2 = Blake3_160::hash(&generate_byte_array_random(size));
-        let digest_inputs: [<Blake3_160 as HasherExt>::Digest; 2] = [input1, input2];
-        b.iter(|| Blake3_160::merge(black_box(&digest_inputs)))
-    }
-);
+benchmark_hash_merge!(hash_blake3_160_merge, "blake3_160", |b: &mut criterion::Bencher| {
+    let input1 = Blake3_160::hash(&generate_byte_array_random(32));
+    let input2 = Blake3_160::hash(&generate_byte_array_random(32));
+    let digest_inputs: [<Blake3_160 as HasherExt>::Digest; 2] = [input1, input2];
+    b.iter(|| Blake3_160::merge(black_box(&digest_inputs)))
+});
 
 // Sequential hashing of Felt elements
 benchmark_hash_felt!(
@@ -198,17 +168,12 @@ benchmark_hash_felt!(
 // === Keccak256 benches ===
 
 // 2-to-1 hash merge
-benchmark_hash_merge!(
-    hash_keccak_256_merge,
-    "keccak_256",
-    &[32, 64, 256],
-    |b: &mut criterion::Bencher, size| {
-        let input1 = Keccak256::hash(&generate_byte_array_random(size));
-        let input2 = Keccak256::hash(&generate_byte_array_random(size));
-        let digest_inputs: [<Keccak256 as HasherExt>::Digest; 2] = [input1, input2];
-        b.iter(|| Keccak256::merge(black_box(&digest_inputs)))
-    }
-);
+benchmark_hash_merge!(hash_keccak_256_merge, "keccak_256", |b: &mut criterion::Bencher| {
+    let input1 = Keccak256::hash(&generate_byte_array_random(32));
+    let input2 = Keccak256::hash(&generate_byte_array_random(32));
+    let digest_inputs: [<Keccak256 as HasherExt>::Digest; 2] = [input1, input2];
+    b.iter(|| Keccak256::merge(black_box(&digest_inputs)))
+});
 
 // Sequential hashing of Felt elements
 benchmark_hash_felt!(
