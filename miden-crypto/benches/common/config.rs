@@ -35,8 +35,8 @@ pub const HASH_INPUT_SIZES: &[usize] = &[
 /// Element counts for sequential hashing tests
 /// Focused on the key benchmark size (100 elements) with a few representative sizes
 pub const HASH_ELEMENT_COUNTS: &[usize] = &[
-    1,   // Single element (minimal case)
-    100, // Primary benchmark target - typical use case
+    1,    // Single element (minimal case)
+    100,  // Primary benchmark target - typical use case
     1000, // Larger scale test
 ];
 

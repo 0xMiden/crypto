@@ -31,9 +31,7 @@ use miden_crypto::hash::{
 
 // Import common utilities
 mod common;
-use common::data::{
-    generate_byte_array_random, generate_felt_array_sequential,
-};
+use common::data::{generate_byte_array_random, generate_felt_array_sequential};
 
 // Import config constants
 use crate::common::config::HASH_ELEMENT_COUNTS;
