@@ -1,7 +1,7 @@
 use super::{
     AlgebraicSponge, CAPACITY_RANGE, DIGEST_RANGE, Felt, RATE_RANGE, Range, STATE_WIDTH, Word, ZERO,
 };
-use crate::PrimeCharacteristicRing;
+use crate::field::PrimeCharacteristicRing;
 
 mod constants;
 use constants::{
@@ -134,7 +134,7 @@ impl Poseidon2 {
 
     /// Returns a hash of the provided field elements.
     #[inline(always)]
-    pub fn hash_elements<E: crate::BasedVectorSpace<Felt>>(elements: &[E]) -> Word {
+    pub fn hash_elements<E: crate::field::BasedVectorSpace<Felt>>(elements: &[E]) -> Word {
         <Self as AlgebraicSponge>::hash_elements(elements)
     }
 

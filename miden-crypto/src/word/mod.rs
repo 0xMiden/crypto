@@ -18,7 +18,7 @@ use p3_field::integers::QuotientMap;
 
 use super::{Felt, ZERO};
 use crate::{
-    PrimeCharacteristicRing, PrimeField64,
+    field::{PrimeCharacteristicRing, PrimeField64},
     rand::Randomizable,
     utils::{
         ByteReader, ByteWriter, Deserializable, DeserializationError, HexParseError, Serializable,

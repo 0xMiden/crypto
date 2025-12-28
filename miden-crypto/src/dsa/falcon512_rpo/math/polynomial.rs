@@ -14,7 +14,7 @@ use super::{Inverse, field::FalconFelt};
 use crate::{
     Felt,
     dsa::falcon512_rpo::{MODULUS, N},
-    zeroize::{Zeroize, ZeroizeOnDrop},
+    utils::zeroize::{Zeroize, ZeroizeOnDrop},
 };
 
 /// Represents a polynomial with coefficients of type F.

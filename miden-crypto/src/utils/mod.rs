@@ -19,13 +19,18 @@ mod iterators;
 #[cfg(feature = "concurrent")]
 use iterators::{IndexedParallelIterator, IntoParallelRefMutIterator, ParallelIterator};
 
-use crate::{Felt, PrimeField64, Word};
+use crate::{Felt, Word, field::PrimeField64};
 
 // CONSTANTS
 // ================================================================================================
 
 /// The number of byte chunks that can be safely embedded in a field element
 const BINARY_CHUNK_SIZE: usize = 7;
+
+// RE-EXPORTS
+// ================================================================================================
+
+pub use k256::elliptic_curve::zeroize;
 
 // UTILITY FUNCTIONS
 // ================================================================================================
@@ -94,11 +99,6 @@ pub fn hex_to_bytes<const N: usize>(value: &str) -> Result<[u8; N], HexParseErro
 
     Ok(decoded)
 }
-
-// MATH UTILITIES
-// ================================================================================================
-
-pub use p3_field::batch_multiplicative_inverse;
 
 // CONVERSIONS BETWEEN BYTES AND ELEMENTS
 // ================================================================================================

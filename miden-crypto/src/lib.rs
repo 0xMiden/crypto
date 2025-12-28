@@ -5,6 +5,8 @@ extern crate alloc;
 #[cfg(feature = "std")]
 extern crate std;
 
+use field::PrimeCharacteristicRing;
+
 pub mod aead;
 pub mod dsa;
 pub mod ecdh;
@@ -17,14 +19,18 @@ pub mod word;
 
 // RE-EXPORTS
 // ================================================================================================
-
-pub use k256::elliptic_curve::zeroize;
-pub use p3_field::{
-    BasedVectorSpace, ExtensionField, Field, PrimeCharacteristicRing, PrimeField64,
-    extension::BinomialExtensionField, integers::QuotientMap,
-};
 pub use p3_miden_goldilocks::Goldilocks as Felt;
 pub use word::{Word, WordError};
+
+pub mod field {
+    //! Traits and utilities for working with the Goldilocks finite field (i.e.,
+    //! [Felt](super::Felt)).
+
+    pub use p3_field::{
+        BasedVectorSpace, ExtensionField, Field, PrimeCharacteristicRing, PrimeField64,
+        batch_multiplicative_inverse, extension::BinomialExtensionField, integers::QuotientMap,
+    };
+}
 
 pub mod stark {
     //! Foundational components for the STARK proving system based on Plonky3.

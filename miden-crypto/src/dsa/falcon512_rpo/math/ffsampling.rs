@@ -5,7 +5,7 @@ use num_complex::{Complex, Complex64};
 use rand::Rng;
 
 use super::{fft::FastFft, polynomial::Polynomial, samplerz::sampler_z};
-use crate::zeroize::{Zeroize, ZeroizeOnDrop};
+use crate::utils::zeroize::{Zeroize, ZeroizeOnDrop};
 
 const SIGMIN: f64 = 1.2778336969128337;
 

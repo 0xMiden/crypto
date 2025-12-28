@@ -10,7 +10,7 @@ use sha3::Digest as Sha3Digest;
 
 use super::{Felt, HasherExt};
 use crate::{
-    PrimeField64,
+    field::PrimeField64,
     utils::{
         ByteReader, ByteWriter, Deserializable, DeserializationError, HexParseError, Serializable,
         bytes_to_hex_string, hex_to_bytes,

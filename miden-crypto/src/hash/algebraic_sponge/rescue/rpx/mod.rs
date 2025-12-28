@@ -126,7 +126,7 @@ impl Rpx256 {
 
     /// Returns a hash of the provided field elements.
     #[inline(always)]
-    pub fn hash_elements<E: crate::BasedVectorSpace<Felt>>(elements: &[E]) -> Word {
+    pub fn hash_elements<E: crate::field::BasedVectorSpace<Felt>>(elements: &[E]) -> Word {
         <Self as AlgebraicSponge>::hash_elements(elements)
     }
 
@@ -250,7 +250,7 @@ impl Rpx256 {
 /// over the field arithmetic.
 mod cubic_ext {
     use super::Felt;
-    use crate::PrimeCharacteristicRing;
+    use crate::field::PrimeCharacteristicRing;
 
     /// Multiplies two cubic extension field elements.
     ///
