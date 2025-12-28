@@ -238,8 +238,9 @@ impl Ord for Word {
         // `Equal`. Otherwise, the ordering is equal.
         //
         // We use `as_canonical_u64()` to ensure we're comparing the actual field element values
-        // in their canonical form (that is, `x in [0,p)`). This method works correctly regardless
-        // of whether the underlying field uses Montgomery representation or not.
+        // in their canonical form (that is, `x in [0,p)`). P3's Goldilocks field uses unreduced
+        // representation (not Montgomery form), meaning internal values may be in [0, 2^64) even
+        // though the field order is p = 2^64 - 2^32 + 1. This method canonicalizes to [0, p).
         //
         // We must iterate over and compare each element individually. A simple bytestring
         // comparison would be inappropriate because the `Word`s are represented in
