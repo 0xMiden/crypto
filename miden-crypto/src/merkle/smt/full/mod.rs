@@ -1,11 +1,10 @@
 use alloc::{string::ToString, vec::Vec};
 
-use p3_field::PrimeField64;
-
 use super::{
     EMPTY_WORD, EmptySubtreeRoots, InnerNode, InnerNodeInfo, InnerNodes, LeafIndex, MerkleError,
     MutationSet, NodeIndex, SparseMerklePath, SparseMerkleTree, Word,
 };
+use crate::PrimeField64;
 
 mod error;
 pub use error::{SmtLeafError, SmtProofError};
