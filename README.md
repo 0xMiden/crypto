@@ -123,6 +123,10 @@ Messages sealed as one type must be unsealed using the corresponding method, oth
 - `RpoRandomCoin`: a struct implementing `FeltRng` as well as the [`RandomCoin`](https://github.com/facebook/winterfell/blob/main/crypto/src/random/mod.rs) trait using RPO hash function.
 - `RpxRandomCoin`: a struct implementing `FeltRng` as well as the [`RandomCoin`](https://github.com/facebook/winterfell/blob/main/crypto/src/random/mod.rs) trait using RPX hash function.
 
+## STARK proving system
+
+The STARK module exports foundational components for the STARK proving system. It primarily consists of re-exports from the [Plonky3](https://github.com/Plonky3/Plonky3) project with some Miden-specific [adaptations](https://github.com/0xMiden/p3-miden).
+
 ## Make commands
 
 We use `make` to automate building, testing, and other processes. In most cases, `make` commands are wrappers around `cargo` commands with specific arguments. You can view the list of available commands in the [Makefile](Makefile), or run the following command:

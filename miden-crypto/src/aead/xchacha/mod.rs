@@ -24,8 +24,8 @@ use crate::{
     utils::{
         ByteReader, ByteWriter, Deserializable, DeserializationError, Serializable,
         bytes_to_elements_exact, elements_to_bytes,
+        zeroize::{Zeroize, ZeroizeOnDrop},
     },
-    zeroize::{Zeroize, ZeroizeOnDrop},
 };
 
 #[cfg(all(test, feature = "std"))]

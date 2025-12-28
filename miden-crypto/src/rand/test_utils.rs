@@ -9,13 +9,13 @@ use alloc::vec::Vec;
 use rand::{Rng, SeedableRng};
 use rand_chacha::ChaCha20Rng;
 
-use crate::utils::Randomizable;
+use crate::rand::Randomizable;
 
 /// Generates a random value of type T using the thread-local random number generator.
 ///
 /// # Examples
 /// ```
-/// # use miden_crypto::test_utils::rand_value;
+/// # use miden_crypto::rand::test_utils::rand_value;
 /// let x: u64 = rand_value();
 /// let y: u128 = rand_value();
 /// ```
@@ -31,7 +31,7 @@ pub fn rand_value<T: Randomizable>() -> T {
 ///
 /// # Examples
 /// ```
-/// # use miden_crypto::test_utils::rand_array;
+/// # use miden_crypto::rand::test_utils::rand_array;
 /// let arr: [u64; 4] = rand_array();
 /// ```
 #[cfg(feature = "std")]
@@ -43,7 +43,7 @@ pub fn rand_array<T: Randomizable, const N: usize>() -> [T; N] {
 ///
 /// # Examples
 /// ```
-/// # use miden_crypto::test_utils::rand_vector;
+/// # use miden_crypto::rand::test_utils::rand_vector;
 /// let vec: Vec<u64> = rand_vector(100);
 /// ```
 #[cfg(feature = "std")]
@@ -58,7 +58,7 @@ pub fn rand_vector<T: Randomizable>(length: usize) -> Vec<T> {
 ///
 /// # Examples
 /// ```
-/// # use miden_crypto::test_utils::prng_array;
+/// # use miden_crypto::rand::test_utils::prng_array;
 /// let seed = [0u8; 32];
 /// let arr: [u64; 4] = prng_array(seed);
 /// ```
@@ -75,7 +75,7 @@ pub fn prng_array<T: Randomizable, const N: usize>(seed: [u8; 32]) -> [T; N] {
 ///
 /// # Examples
 /// ```
-/// # use miden_crypto::test_utils::prng_vector;
+/// # use miden_crypto::rand::test_utils::prng_vector;
 /// let seed = [0u8; 32];
 /// let vec: Vec<u64> = prng_vector(seed, 100);
 /// ```

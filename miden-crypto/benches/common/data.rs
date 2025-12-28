@@ -31,7 +31,7 @@ use std::iter;
 
 use miden_crypto::{
     Felt, ONE, Word,
-    test_utils::{prng_array, rand_value},
+    rand::test_utils::{prng_array, rand_value},
 };
 
 // === Byte Array Generation ===
@@ -81,11 +81,11 @@ pub fn generate_word(seed: &mut [u8; 32]) -> Word {
 }
 
 /// Generate a generic value from seed using PRNG
-pub fn generate_value<T: miden_crypto::utils::Randomizable + std::fmt::Debug + Clone>(
+pub fn generate_value<T: miden_crypto::rand::Randomizable + std::fmt::Debug + Clone>(
     seed: &mut [u8; 32],
 ) -> T {
     *seed = prng_array(*seed);
-    let value: [T; 1] = miden_crypto::test_utils::prng_array(*seed);
+    let value: [T; 1] = miden_crypto::rand::test_utils::prng_array(*seed);
     value[0].clone()
 }
 

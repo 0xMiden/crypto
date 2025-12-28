@@ -8,7 +8,7 @@ use miden_crypto::{
         smt::{LeafIndex, SMT_MAX_DEPTH, SimpleSmt},
         store::MerkleStore,
     },
-    test_utils::{rand_array, rand_value},
+    rand::test_utils::{rand_array, rand_value},
 };
 
 /// Since MerkleTree can only be created when a power-of-two number of elements is used, the sample

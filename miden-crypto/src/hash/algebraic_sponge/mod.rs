@@ -17,22 +17,10 @@ use core::ops::Range;
 use p3_field::PrimeCharacteristicRing;
 
 use super::{Felt, Word, ZERO};
-use crate::{BasedVectorSpace, PrimeField64};
+use crate::field::{BasedVectorSpace, PrimeField64};
 
 pub(crate) mod poseidon2;
 pub(crate) mod rescue;
-
-// Re-export the main hash function types
-pub use poseidon2::Poseidon2;
-// Re-export P3 integration types for public API
-pub use poseidon2::{
-    Poseidon2Challenger, Poseidon2Compression, Poseidon2Hasher, Poseidon2Permutation256,
-};
-pub use rescue::{
-    Rpo256, Rpx256,
-    rpo::{RpoChallenger, RpoCompression, RpoHasher, RpoPermutation256},
-    rpx::{RpxChallenger, RpxCompression, RpxHasher, RpxPermutation256},
-};
 
 // CONSTANTS
 // ================================================================================================
