@@ -73,16 +73,6 @@ serde = ["dep:serde", "serde?/alloc", "winter-math/serde"]
 std = [
   "blake3/std",
   "dep:cc",
-  "rand/std",
-  "rand/thread_rng",
-  "winter-crypto/std",
-  "winter-math/std",
-  "winter-utils/std",
-]
-serde = ["dep:serde", "serde?/alloc", "winter-math/serde"]
-std = [
-  "blake3/std",
-  "dep:cc",
   "miden-serde-utils/std",
   "miden-serde-utils/winter-compat",
   "rand/std",

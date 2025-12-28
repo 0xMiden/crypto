@@ -30,12 +30,14 @@ pub use word::{Word, WordError};
 
 /// An alias for a key-value map.
 ///
-/// Note: When the `std` feature is enabled (which is the default), this uses `std::collections::HashMap`,
-/// which does not guarantee deterministic iteration order. This may change the behavior of functions
-/// returning `impl IntoIterator<..>` compared to `no_std` environments (which use `BTreeMap` for
-/// deterministic ordering). Be cautious if your code relies on stable iteration order.
+/// Note: When the `std` feature is enabled (which is the default), this uses
+/// `std::collections::HashMap`, which does not guarantee deterministic iteration order. This may
+/// change the behavior of functions returning `impl IntoIterator<..>` compared to `no_std`
+/// environments (which use `BTreeMap` for deterministic ordering). Be cautious if your code relies
+/// on stable iteration order.
 ///
-/// By default (when the `std` feature is enabled), this is an alias for `std::collections::HashMap`.
+/// By default (when the `std` feature is enabled), this is an alias for
+/// `std::collections::HashMap`.
 #[cfg(feature = "std")]
 pub type Map<K, V> = std::collections::HashMap<K, V>;
 
