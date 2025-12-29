@@ -25,6 +25,7 @@ We benchmark the above hash functions using two scenarios. The first is a 2-to-1
 | Amazon Graviton 3   | 108 ns |        |           |           | *5.3 µs  | *3.1 µs  |
 | Amazon Graviton 4   | 96 ns  |        |           |           | *5.1 µs  | *2.8 µs  |
 | AMD Ryzen 9 5950X   | 64 ns  | 273 ns |           |           | *5.5 µs  |          |
+| AMD Ryzen 9 9950X   | 49 ns  |        | 375 ns    | 0.65 µs   | 3.1 µs   | 1.6 µs   |
 | AMD EPYC 9R14       | 83 ns  |        |           |           | *4.3 µs  | *2.4 µs  |
 | Intel Core i5-8279U | 68 ns  | 536 ns | 514 ns    | *1.7 µs   | *8.5 µs  | *4.4 µs  |
 | Intel Xeon 8375C    | 67 ns  |        |           |           | *8.2 µs  |          |
@@ -39,6 +40,7 @@ We benchmark the above hash functions using two scenarios. The first is a 2-to-1
 | Amazon Graviton 3   | 1.4 µs |        |           |           | *69 µs   | *41 µs   |
 | Amazon Graviton 4   | 1.2 µs |        |           |           | *67 µs   | *36 µs   |
 | AMD Ryzen 9 5950X   | 0.8 µs | 1.7 µs |           |           | *72 µs   |          |
+| AMD Ryzen 9 9950X   | 0.8 µs |        | 2.2 µs    | 8.7 µs    | 40 µs    | 22 µs    |
 | AMD EPYC 9R14       | 0.9 µs |        |           |           | *56 µs   | *32 µs   |
 | Intel Core i5-8279U | 0.9 µs |        | 3.4 µs    | *27 µs    | *107 µs  | *56 µs   |
 | Intel Xeon 8375C    | 0.8 µs |        |           |           | *110 µs  |          |
@@ -46,6 +48,7 @@ We benchmark the above hash functions using two scenarios. The first is a 2-to-1
 Notes:
 - Measurements marked with an `*` are obsolete and need to be re-run.
 - On Graviton 3 and 4, RPO256 and RPX256 are run with SVE acceleration enabled.
+- On AMD Ryzen 9 9950X, benchmarks are run with AVX512 acceleration enabled.
 - On AMD EPYC 9R14, RPO256 and RPX256 are run with AVX2 acceleration enabled.
 
 ### Digital Signature Algorithms (DSA)
