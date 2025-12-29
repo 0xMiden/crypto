@@ -28,7 +28,8 @@ pub mod field {
 
     pub use p3_field::{
         BasedVectorSpace, ExtensionField, Field, PrimeCharacteristicRing, PrimeField64,
-        batch_multiplicative_inverse, extension::BinomialExtensionField, integers::QuotientMap,
+        TwoAdicField, batch_multiplicative_inverse, extension::BinomialExtensionField,
+        integers::QuotientMap,
     };
 }
 
@@ -47,6 +48,16 @@ pub mod stark {
         get_symbolic_constraints, prove, quotient_values, recompose_quotient_from_chunks, verify,
         verify_constraints,
     };
+
+    pub mod challenger {
+        pub use p3_challenger::{HashChallenger, SerializingChallenger64};
+    }
+
+    pub mod symmetric {
+        pub use p3_symmetric::{
+            CompressionFunctionFromHasher, PaddingFreeSponge, SerializingHasher,
+        };
+    }
 
     pub mod air {
         pub use p3_air::{
