@@ -17,11 +17,11 @@ use crate::{
     utils::{
         ByteReader, ByteWriter, Deserializable, DeserializationError, Serializable,
         bytes_to_packed_u32_elements,
+        zeroize::{Zeroize, ZeroizeOnDrop},
     },
-    zeroize::{Zeroize, ZeroizeOnDrop},
 };
 
-#[cfg(test)]
+#[cfg(all(test, feature = "std"))]
 mod tests;
 
 // CONSTANTS

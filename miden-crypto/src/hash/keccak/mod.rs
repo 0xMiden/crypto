@@ -5,12 +5,16 @@ use core::{
     slice::{self, from_raw_parts},
 };
 
+use p3_field::BasedVectorSpace;
 use sha3::Digest as Sha3Digest;
 
-use super::{Digest, ElementHasher, Felt, FieldElement, Hasher, HasherExt};
-use crate::utils::{
-    ByteReader, ByteWriter, Deserializable, DeserializationError, HexParseError, Serializable,
-    bytes_to_hex_string, hex_to_bytes,
+use super::{Felt, HasherExt};
+use crate::{
+    field::PrimeField64,
+    utils::{
+        ByteReader, ByteWriter, Deserializable, DeserializationError, HexParseError, Serializable,
+        bytes_to_hex_string, hex_to_bytes,
+    },
 };
 
 #[cfg(test)]
@@ -26,9 +30,14 @@ const DIGEST_BYTES: usize = 32;
 
 /// Keccak digest
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd)]
+#[repr(transparent)]
 pub struct Keccak256Digest([u8; DIGEST_BYTES]);
 
 impl Keccak256Digest {
+    pub fn as_bytes(&self) -> [u8; 32] {
+        self.0
+    }
+
     pub fn digests_as_bytes(digests: &[Keccak256Digest]) -> &[u8] {
         let p = digests.as_ptr();
         let len = digests.len() * DIGEST_BYTES;
@@ -88,12 +97,6 @@ impl Deserializable for Keccak256Digest {
     }
 }
 
-impl Digest for Keccak256Digest {
-    fn as_bytes(&self) -> [u8; 32] {
-        self.0
-    }
-}
-
 // KECCAK256 HASHER
 // ================================================================================================
 
@@ -102,6 +105,8 @@ impl Digest for Keccak256Digest {
 pub struct Keccak256;
 
 impl HasherExt for Keccak256 {
+    type Digest = Keccak256Digest;
+
     fn hash_iter<'a>(slices: impl Iterator<Item = &'a [u8]>) -> Self::Digest {
         let mut hasher = sha3::Keccak256::new();
         for slice in slices {
@@ -111,24 +116,22 @@ impl HasherExt for Keccak256 {
     }
 }
 
-impl Hasher for Keccak256 {
+impl Keccak256 {
     /// Keccak256 collision resistance is 128-bits for 32-bytes output.
-    const COLLISION_RESISTANCE: u32 = 128;
+    pub const COLLISION_RESISTANCE: u32 = 128;
 
-    type Digest = Keccak256Digest;
-
-    fn hash(bytes: &[u8]) -> Self::Digest {
+    pub fn hash(bytes: &[u8]) -> Keccak256Digest {
         let mut hasher = sha3::Keccak256::new();
         hasher.update(bytes);
 
         Keccak256Digest(hasher.finalize().into())
     }
 
-    fn merge(values: &[Self::Digest; 2]) -> Self::Digest {
+    pub fn merge(values: &[Keccak256Digest; 2]) -> Keccak256Digest {
         Self::hash(prepare_merge(values))
     }
 
-    fn merge_many(values: &[Self::Digest]) -> Self::Digest {
+    pub fn merge_many(values: &[Keccak256Digest]) -> Keccak256Digest {
         let data = Keccak256Digest::digests_as_bytes(values);
         let mut hasher = sha3::Keccak256::new();
         hasher.update(data);
@@ -136,47 +139,21 @@ impl Hasher for Keccak256 {
         Keccak256Digest(hasher.finalize().into())
     }
 
-    fn merge_with_int(seed: Self::Digest, value: u64) -> Self::Digest {
+    pub fn merge_with_int(seed: Keccak256Digest, value: u64) -> Keccak256Digest {
         let mut hasher = sha3::Keccak256::new();
         hasher.update(seed.0);
         hasher.update(value.to_le_bytes());
 
         Keccak256Digest(hasher.finalize().into())
     }
-}
-
-impl ElementHasher for Keccak256 {
-    type BaseField = Felt;
-
-    fn hash_elements<E>(elements: &[E]) -> Self::Digest
-    where
-        E: FieldElement<BaseField = Self::BaseField>,
-    {
-        Keccak256Digest(hash_elements(elements))
-    }
-}
-
-impl Keccak256 {
-    /// Returns a hash of the provided sequence of bytes.
-    #[inline(always)]
-    pub fn hash(bytes: &[u8]) -> Keccak256Digest {
-        <Self as Hasher>::hash(bytes)
-    }
-
-    /// Returns a hash of two digests. This method is intended for use in construction of
-    /// Merkle trees and verification of Merkle paths.
-    #[inline(always)]
-    pub fn merge(values: &[Keccak256Digest; 2]) -> Keccak256Digest {
-        <Self as Hasher>::merge(values)
-    }
 
     /// Returns a hash of the provided field elements.
     #[inline(always)]
     pub fn hash_elements<E>(elements: &[E]) -> Keccak256Digest
     where
-        E: FieldElement<BaseField = Felt>,
+        E: BasedVectorSpace<Felt>,
     {
-        <Self as ElementHasher>::hash_elements(elements)
+        hash_elements(elements).into()
     }
 
     /// Hashes an iterator of byte slices.
@@ -192,33 +169,33 @@ impl Keccak256 {
 /// Hash the elements into bytes and shrink the output.
 fn hash_elements<E>(elements: &[E]) -> [u8; DIGEST_BYTES]
 where
-    E: FieldElement<BaseField = Felt>,
+    E: BasedVectorSpace<Felt>,
 {
     // don't leak assumptions from felt and check its actual implementation.
-    // this is a compile-time branch so it is for free
-    let digest = if Felt::IS_CANONICAL {
+    let digest = {
+        const FELT_BYTES: usize = size_of::<u64>();
+        const { assert!(FELT_BYTES == 8, "buffer arithmetic assumes 8-byte field elements") };
+
         let mut hasher = sha3::Keccak256::new();
-        hasher.update(E::elements_as_bytes(elements));
-        hasher.finalize()
-    } else {
-        let mut hasher = sha3::Keccak256::new();
-        // The Keccak-p permutation has a state of size 1600 bits. For Keccak256, the capacity
-        // is set to 512 bits and the rate is thus of size 1088 bits.
-        // This means that we can absorb 136 bytes into the rate portion of the state per invocation
-        // of the permutation function.
-        // we move the elements into the hasher via the buffer to give the CPU a chance to process
-        // multiple element-to-byte conversions in parallel
+        // Keccak256 rate: 1600 bits (state) - 512 bits (capacity) = 1088 bits = 136 bytes
         let mut buf = [0_u8; 136];
-        let mut chunk_iter = E::slice_as_base_elements(elements).chunks_exact(17);
-        for chunk in chunk_iter.by_ref() {
-            for i in 0..17 {
-                buf[i * 8..(i + 1) * 8].copy_from_slice(&chunk[i].as_int().to_le_bytes());
+        let mut buf_offset = 0;
+
+        for elem in elements.iter() {
+            for &felt in E::as_basis_coefficients_slice(elem) {
+                buf[buf_offset..buf_offset + FELT_BYTES]
+                    .copy_from_slice(&felt.as_canonical_u64().to_le_bytes());
+                buf_offset += FELT_BYTES;
+
+                if buf_offset == 136 {
+                    hasher.update(buf);
+                    buf_offset = 0;
+                }
             }
-            hasher.update(buf);
         }
 
-        for element in chunk_iter.remainder() {
-            hasher.update(element.as_int().to_le_bytes());
+        if buf_offset > 0 {
+            hasher.update(&buf[..buf_offset]);
         }
 
         hasher.finalize()

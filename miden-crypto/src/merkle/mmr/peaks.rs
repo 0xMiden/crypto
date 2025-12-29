@@ -1,7 +1,10 @@
 use alloc::vec::Vec;
 
-use super::{super::ZERO, MmrError, MmrProof, forest::Forest};
-use crate::{Felt, Word, merkle::Rpo256};
+use crate::{
+    Felt, Word, ZERO,
+    hash::rpo::Rpo256,
+    merkle::mmr::{Forest, MmrError, MmrProof},
+};
 
 // MMR PEAKS
 // ================================================================================================
@@ -125,7 +128,8 @@ impl MmrPeaks {
     pub fn verify(&self, value: Word, opening: MmrProof) -> Result<(), MmrError> {
         let root = self.get_peak(opening.peak_index())?;
         opening
-            .merkle_path
+            .path()
+            .merkle_path()
             .verify(opening.relative_pos() as u64, value, root)
             .map_err(MmrError::InvalidMerklePath)
     }

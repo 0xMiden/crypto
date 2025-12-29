@@ -21,8 +21,10 @@ use rand::{CryptoRng, RngCore};
 use crate::{
     dsa::eddsa_25519_sha512::{PublicKey, SecretKey},
     ecdh::KeyAgreementScheme,
-    utils::{ByteReader, ByteWriter, Deserializable, DeserializationError, Serializable},
-    zeroize::{Zeroize, ZeroizeOnDrop},
+    utils::{
+        ByteReader, ByteWriter, Deserializable, DeserializationError, Serializable,
+        zeroize::{Zeroize, ZeroizeOnDrop},
+    },
 };
 
 // SHARED SECRETE
@@ -211,7 +213,7 @@ impl KeyAgreementScheme for X25519 {
 // TESTS
 // ================================================================================================
 
-#[cfg(test)]
+#[cfg(all(test, feature = "std"))]
 mod tests {
     use rand::rng;
 

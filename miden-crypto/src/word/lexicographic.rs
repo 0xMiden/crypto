@@ -1,5 +1,7 @@
 use core::cmp::Ordering;
 
+use p3_field::PrimeField64;
+
 use super::{ByteReader, ByteWriter, Deserializable, DeserializationError, Serializable};
 use crate::{Felt, WORD_SIZE, Word};
 
@@ -72,8 +74,8 @@ impl<T: Into<Word> + Copy> Ord for LexicographicWord<T> {
         for (felt0, felt1) in self_word
             .iter()
             .rev()
-            .map(Felt::as_int)
-            .zip(other_word.iter().rev().map(Felt::as_int))
+            .map(Felt::as_canonical_u64)
+            .zip(other_word.iter().rev().map(Felt::as_canonical_u64))
         {
             let ordering = felt0.cmp(&felt1);
             if let Ordering::Less | Ordering::Greater = ordering {
@@ -111,6 +113,8 @@ impl<T: Into<Word> + From<Word>> Deserializable for LexicographicWord<T> {
 
 #[cfg(test)]
 mod tests {
+    use p3_field::PrimeCharacteristicRing;
+
     use super::*;
 
     #[derive(Debug, Clone, Copy)]
@@ -146,8 +150,8 @@ mod tests {
             (Ordering::Less, [1, 1, 0, 0u32], [0, 0, 1, 0u32]),
         ] {
             assert_eq!(
-                LexicographicWord::from(key0.map(Felt::from))
-                    .cmp(&LexicographicWord::from(key1.map(Felt::from))),
+                LexicographicWord::from(key0.map(Felt::from_u32))
+                    .cmp(&LexicographicWord::from(key1.map(Felt::from_u32))),
                 expected
             );
         }

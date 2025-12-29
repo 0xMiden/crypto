@@ -12,14 +12,16 @@
 //! reestablished.
 use alloc::vec::Vec;
 
-use winter_utils::{ByteReader, ByteWriter, Deserializable, DeserializationError, Serializable};
-
 use super::{
     super::{InnerNodeInfo, MerklePath},
-    MmrDelta, MmrError, MmrPeaks, MmrProof,
+    MmrDelta, MmrError, MmrPath, MmrPeaks, MmrProof,
     forest::{Forest, TreeSizeIterator},
 };
-use crate::{Word, merkle::Rpo256};
+use crate::{
+    Word,
+    merkle::Rpo256,
+    utils::{ByteReader, ByteWriter, Deserializable, DeserializationError, Serializable},
+};
 
 // MMR
 // ===============================================================================================
@@ -100,13 +102,11 @@ impl Mmr {
         if forest > self.forest {
             return Err(MmrError::ForestOutOfBounds(forest.num_leaves(), self.forest.num_leaves()));
         }
-        let (_, path) = self.collect_merkle_path_and_value(pos, forest)?;
+        let (leaf, path) = self.collect_merkle_path_and_value(pos, forest)?;
 
-        Ok(MmrProof {
-            forest,
-            position: pos,
-            merkle_path: MerklePath::new(path),
-        })
+        let path = MmrPath::new(forest, pos, MerklePath::new(path));
+
+        Ok(MmrProof::new(path, leaf))
     }
 
     /// Returns the leaf value at position `pos`.
@@ -453,9 +453,11 @@ impl Iterator for MmrNodes<'_> {
 mod tests {
     use alloc::vec::Vec;
 
-    use winter_utils::{Deserializable, Serializable};
-
-    use crate::{Felt, Word, ZERO, merkle::mmr::Mmr};
+    use crate::{
+        Felt, Word, ZERO,
+        merkle::mmr::Mmr,
+        utils::{Deserializable, Serializable},
+    };
 
     #[test]
     fn test_serialization() {

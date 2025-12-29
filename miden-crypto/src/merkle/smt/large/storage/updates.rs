@@ -1,11 +1,8 @@
 use alloc::vec::Vec;
 
-use crate::{
-    Word,
-    merkle::{
-        NodeIndex,
-        smt::{Map, SmtLeaf, large::subtree::Subtree},
-    },
+use crate::merkle::{
+    NodeIndex,
+    smt::{Map, SmtLeaf, large::subtree::Subtree},
 };
 
 /// Represents a storage update operation for a subtree.
@@ -41,9 +38,6 @@ pub struct StorageUpdateParts {
     /// Vector of subtree storage operations (Store or Delete) to be applied atomically.
     pub subtree_updates: Vec<SubtreeUpdate>,
 
-    /// Root hash of the tree after applying all updates.
-    pub new_root: Word,
-
     /// Net change in the count of non-empty leaves.
     ///
     /// Positive values indicate more leaves were added than removed,
@@ -59,7 +53,7 @@ pub struct StorageUpdateParts {
 
 /// Represents a collection of changes to be applied atomically to an SMT storage backend.
 ///
-/// This struct is used to batch multiple updates (to leaves, subtrees, and the SMT root)
+/// This struct is used to batch multiple updates (to leaves and subtrees)
 /// ensuring that they are persisted together as a single, consistent transaction.
 /// It also tracks deltas for leaf and entry counts, allowing storage implementations
 /// to maintain these counts accurately.
@@ -74,10 +68,6 @@ pub struct StorageUpdates {
     /// Vector of subtree storage operations (Store or Delete) to be applied atomically.
     subtree_updates: Vec<SubtreeUpdate>,
 
-    /// The new root hash of the SMT that should be persisted after applying
-    /// all `leaf_updates` and `subtree_updates`.
-    new_root: Word,
-
     /// The net change in the total count of non-empty leaves resulting from this batch of updates.
     /// For example, if one leaf is added and one is removed, this would be 0.
     /// If two new leaves are added, this would be +2.
@@ -89,12 +79,12 @@ pub struct StorageUpdates {
 }
 
 impl StorageUpdates {
-    /// Creates a new `StorageUpdates` with the specified root hash and default empty updates.
+    /// Creates a new `StorageUpdates` with default empty updates.
     ///
     /// This constructor is ideal for incremental building where you'll add updates
     /// one by one using the convenience methods like `insert_leaf()` and `insert_subtree()`.
-    pub fn new(new_root: Word) -> Self {
-        Self { new_root, ..Default::default() }
+    pub fn new() -> Self {
+        Self::default()
     }
 
     /// Creates a new `StorageUpdates` from pre-computed components.
@@ -105,14 +95,12 @@ impl StorageUpdates {
     pub fn from_parts(
         leaf_updates: Map<u64, Option<SmtLeaf>>,
         subtree_updates: impl IntoIterator<Item = SubtreeUpdate>,
-        new_root: Word,
         leaf_count_delta: isize,
         entry_count_delta: isize,
     ) -> Self {
         Self {
             leaf_updates,
             subtree_updates: subtree_updates.into_iter().collect(),
-            new_root,
             leaf_count_delta,
             entry_count_delta,
         }
@@ -176,11 +164,6 @@ impl StorageUpdates {
         &self.subtree_updates
     }
 
-    /// Returns the new root hash.
-    pub fn new_root(&self) -> Word {
-        self.new_root
-    }
-
     /// Returns the leaf count delta.
     pub fn leaf_count_delta(&self) -> isize {
         self.leaf_count_delta
@@ -226,7 +209,6 @@ impl StorageUpdates {
         StorageUpdateParts {
             leaf_updates: self.leaf_updates,
             subtree_updates: self.subtree_updates,
-            new_root: self.new_root,
             leaf_count_delta: self.leaf_count_delta,
             entry_count_delta: self.entry_count_delta,
         }

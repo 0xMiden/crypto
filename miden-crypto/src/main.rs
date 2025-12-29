@@ -7,9 +7,9 @@ use miden_crypto::{
     EMPTY_WORD, Felt, ONE, Word,
     hash::rpo::Rpo256,
     merkle::smt::{LargeSmt, LargeSmtError, MemoryStorage, SmtStorage},
+    rand::test_utils::rand_value,
 };
 use rand::{Rng, prelude::IteratorRandom, rng};
-use rand_utils::rand_value;
 
 type Storage = Box<dyn SmtStorage>;
 
@@ -101,7 +101,7 @@ pub fn construction(
     let tree = LargeSmt::with_entries(storage, entries)?;
     let elapsed = now.elapsed().as_secs_f32();
     println!("Constructed an SMT with {size} key-value pairs in {elapsed:.1} seconds");
-    println!("Number of leaf nodes: {}\n", tree.num_leaves()?);
+    println!("Number of leaf nodes: {}\n", tree.num_leaves());
 
     Ok(tree)
 }
@@ -113,7 +113,7 @@ pub fn open_existing(
     println!("Opening an existing database:");
     let now = Instant::now();
     let storage = get_storage(storage_path, true, storage);
-    let tree = LargeSmt::new(storage)?;
+    let tree = LargeSmt::load(storage)?;
     let elapsed = now.elapsed().as_secs_f32();
     println!("Opened an existing database in {elapsed:.1} seconds");
     Ok(tree)
@@ -122,7 +122,7 @@ pub fn open_existing(
 pub fn insertion(tree: &mut LargeSmt<Storage>, insertions: usize) -> Result<(), LargeSmtError> {
     println!("Running an insertion benchmark:");
 
-    let size = tree.num_leaves()?;
+    let size = tree.num_leaves();
     let mut insertion_times = Vec::new();
 
     for i in 0..insertions {
@@ -150,7 +150,7 @@ pub fn batched_insertion(
 ) -> Result<(), LargeSmtError> {
     println!("Running a batched insertion benchmark:");
 
-    let size = tree.num_leaves()?;
+    let size = tree.num_leaves();
 
     let new_pairs: Vec<(Word, Word)> = (0..insertions)
         .map(|i| {
@@ -199,7 +199,7 @@ pub fn batched_update(
 
     println!("Running a batched update benchmark:");
 
-    let size = tree.num_leaves()?;
+    let size = tree.num_leaves();
     let mut rng = rng();
 
     let new_pairs =
@@ -252,7 +252,7 @@ pub fn proof_generation(tree: &mut LargeSmt<Storage>) -> Result<(), LargeSmtErro
     println!("Running a proof generation benchmark:");
 
     let mut opening_times = Vec::new();
-    let size = tree.num_leaves()?;
+    let size = tree.num_leaves();
 
     // fetch keys already in the tree to be opened
     let keys = tree

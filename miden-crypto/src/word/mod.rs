@@ -10,14 +10,15 @@ use core::{
 };
 
 use thiserror::Error;
-use winter_crypto::Digest;
-use winter_math::FieldElement;
 
 const WORD_SIZE_FELT: usize = 4;
 const WORD_SIZE_BYTES: usize = 32;
 
-use super::{Felt, StarkField, ZERO};
+use p3_field::integers::QuotientMap;
+
+use super::{Felt, ZERO};
 use crate::{
+    field::{PrimeCharacteristicRing, PrimeField64},
     rand::Randomizable,
     utils::{
         ByteReader, ByteWriter, Deserializable, DeserializationError, HexParseError, Serializable,
@@ -111,7 +112,7 @@ impl Word {
         // This matches the behavior of `Word::try_from(String)`.
         let mut idx = 0;
         while idx < felts.len() {
-            if felts[idx] >= Felt::MODULUS {
+            if felts[idx] >= Felt::ORDER_U64 {
                 return Err("Felt overflow");
             }
             idx += 1;
@@ -131,13 +132,11 @@ impl Word {
     }
 
     /// Returns true if the word consists of four ZERO elements.
-    pub const fn is_empty(&self) -> bool {
-        const ZERO_FELT_INNER: u64 = Felt::ZERO.inner();
-
-        self.0[0].inner() == ZERO_FELT_INNER
-            && self.0[1].inner() == ZERO_FELT_INNER
-            && self.0[2].inner() == ZERO_FELT_INNER
-            && self.0[3].inner() == ZERO_FELT_INNER
+    pub fn is_empty(&self) -> bool {
+        self.0[0] == Felt::ZERO
+            && self.0[1] == Felt::ZERO
+            && self.0[2] == Felt::ZERO
+            && self.0[3] == Felt::ZERO
     }
 
     /// Returns the word as a slice of field elements.
@@ -149,10 +148,10 @@ impl Word {
     pub fn as_bytes(&self) -> [u8; WORD_SIZE_BYTES] {
         let mut result = [0; WORD_SIZE_BYTES];
 
-        result[..8].copy_from_slice(&self.0[0].as_int().to_le_bytes());
-        result[8..16].copy_from_slice(&self.0[1].as_int().to_le_bytes());
-        result[16..24].copy_from_slice(&self.0[2].as_int().to_le_bytes());
-        result[24..].copy_from_slice(&self.0[3].as_int().to_le_bytes());
+        result[..8].copy_from_slice(&self.0[0].as_canonical_u64().to_le_bytes());
+        result[8..16].copy_from_slice(&self.0[1].as_canonical_u64().to_le_bytes());
+        result[16..24].copy_from_slice(&self.0[2].as_canonical_u64().to_le_bytes());
+        result[24..].copy_from_slice(&self.0[3].as_canonical_u64().to_le_bytes());
 
         result
     }
@@ -186,12 +185,6 @@ impl Word {
 impl Hash for Word {
     fn hash<H: Hasher>(&self, state: &mut H) {
         state.write(&self.as_bytes());
-    }
-}
-
-impl Digest for Word {
-    fn as_bytes(&self) -> [u8; WORD_SIZE_BYTES] {
-        self.as_bytes()
     }
 }
 
@@ -239,25 +232,27 @@ impl IndexMut<Range<usize>> for Word {
 
 impl Ord for Word {
     fn cmp(&self, other: &Self) -> Ordering {
-        // Compare the inner u64 of both elements.
+        // Compare the canonical u64 representation of both elements.
         //
         // It will iterate the elements and will return the first computation different than
         // `Equal`. Otherwise, the ordering is equal.
         //
-        // Finally, we use `Felt::inner` instead of `Felt::as_int` so we avoid performing a
-        // montgomery reduction for every limb. That is safe because every inner element of the
-        // word is guaranteed to be in its canonical form (that is, `x in [0,p)`).
+        // We use `as_canonical_u64()` to ensure we're comparing the actual field element values
+        // in their canonical form (that is, `x in [0,p)`). P3's Goldilocks field uses unreduced
+        // representation (not Montgomery form), meaning internal values may be in [0, 2^64) even
+        // though the field order is p = 2^64 - 2^32 + 1. This method canonicalizes to [0, p).
         //
-        // Because we don't perform Montgomery reduction, we must iterate over, and compare,
-        // each element. A simple bytestring comparison would be inappropriate because the `Word`s
-        // are represented in "lexicographical" order.
-        self.0.iter().map(Felt::inner).zip(other.0.iter().map(Felt::inner)).fold(
-            Ordering::Equal,
-            |ord, (a, b)| match ord {
+        // We must iterate over and compare each element individually. A simple bytestring
+        // comparison would be inappropriate because the `Word`s are represented in
+        // "lexicographical" order.
+        self.0
+            .iter()
+            .map(Felt::as_canonical_u64)
+            .zip(other.0.iter().map(Felt::as_canonical_u64))
+            .fold(Ordering::Equal, |ord, (a, b)| match ord {
                 Ordering::Equal => a.cmp(&b),
                 _ => ord,
-            },
-        )
+            })
     }
 }
 
@@ -323,10 +318,10 @@ impl TryFrom<Word> for [bool; WORD_SIZE_FELT] {
         }
 
         Ok([
-            to_bool(value.0[0].as_int()).ok_or(WordError::TypeConversion("bool"))?,
-            to_bool(value.0[1].as_int()).ok_or(WordError::TypeConversion("bool"))?,
-            to_bool(value.0[2].as_int()).ok_or(WordError::TypeConversion("bool"))?,
-            to_bool(value.0[3].as_int()).ok_or(WordError::TypeConversion("bool"))?,
+            to_bool(value.0[0].as_canonical_u64()).ok_or(WordError::TypeConversion("bool"))?,
+            to_bool(value.0[1].as_canonical_u64()).ok_or(WordError::TypeConversion("bool"))?,
+            to_bool(value.0[2].as_canonical_u64()).ok_or(WordError::TypeConversion("bool"))?,
+            to_bool(value.0[3].as_canonical_u64()).ok_or(WordError::TypeConversion("bool"))?,
         ])
     }
 }
@@ -344,10 +339,22 @@ impl TryFrom<Word> for [u8; WORD_SIZE_FELT] {
 
     fn try_from(value: Word) -> Result<Self, Self::Error> {
         Ok([
-            value.0[0].as_int().try_into().map_err(|_| WordError::TypeConversion("u8"))?,
-            value.0[1].as_int().try_into().map_err(|_| WordError::TypeConversion("u8"))?,
-            value.0[2].as_int().try_into().map_err(|_| WordError::TypeConversion("u8"))?,
-            value.0[3].as_int().try_into().map_err(|_| WordError::TypeConversion("u8"))?,
+            value.0[0]
+                .as_canonical_u64()
+                .try_into()
+                .map_err(|_| WordError::TypeConversion("u8"))?,
+            value.0[1]
+                .as_canonical_u64()
+                .try_into()
+                .map_err(|_| WordError::TypeConversion("u8"))?,
+            value.0[2]
+                .as_canonical_u64()
+                .try_into()
+                .map_err(|_| WordError::TypeConversion("u8"))?,
+            value.0[3]
+                .as_canonical_u64()
+                .try_into()
+                .map_err(|_| WordError::TypeConversion("u8"))?,
         ])
     }
 }
@@ -365,10 +372,22 @@ impl TryFrom<Word> for [u16; WORD_SIZE_FELT] {
 
     fn try_from(value: Word) -> Result<Self, Self::Error> {
         Ok([
-            value.0[0].as_int().try_into().map_err(|_| WordError::TypeConversion("u16"))?,
-            value.0[1].as_int().try_into().map_err(|_| WordError::TypeConversion("u16"))?,
-            value.0[2].as_int().try_into().map_err(|_| WordError::TypeConversion("u16"))?,
-            value.0[3].as_int().try_into().map_err(|_| WordError::TypeConversion("u16"))?,
+            value.0[0]
+                .as_canonical_u64()
+                .try_into()
+                .map_err(|_| WordError::TypeConversion("u16"))?,
+            value.0[1]
+                .as_canonical_u64()
+                .try_into()
+                .map_err(|_| WordError::TypeConversion("u16"))?,
+            value.0[2]
+                .as_canonical_u64()
+                .try_into()
+                .map_err(|_| WordError::TypeConversion("u16"))?,
+            value.0[3]
+                .as_canonical_u64()
+                .try_into()
+                .map_err(|_| WordError::TypeConversion("u16"))?,
         ])
     }
 }
@@ -386,10 +405,22 @@ impl TryFrom<Word> for [u32; WORD_SIZE_FELT] {
 
     fn try_from(value: Word) -> Result<Self, Self::Error> {
         Ok([
-            value.0[0].as_int().try_into().map_err(|_| WordError::TypeConversion("u32"))?,
-            value.0[1].as_int().try_into().map_err(|_| WordError::TypeConversion("u32"))?,
-            value.0[2].as_int().try_into().map_err(|_| WordError::TypeConversion("u32"))?,
-            value.0[3].as_int().try_into().map_err(|_| WordError::TypeConversion("u32"))?,
+            value.0[0]
+                .as_canonical_u64()
+                .try_into()
+                .map_err(|_| WordError::TypeConversion("u32"))?,
+            value.0[1]
+                .as_canonical_u64()
+                .try_into()
+                .map_err(|_| WordError::TypeConversion("u32"))?,
+            value.0[2]
+                .as_canonical_u64()
+                .try_into()
+                .map_err(|_| WordError::TypeConversion("u32"))?,
+            value.0[3]
+                .as_canonical_u64()
+                .try_into()
+                .map_err(|_| WordError::TypeConversion("u32"))?,
         ])
     }
 }
@@ -403,10 +434,10 @@ impl From<&Word> for [u64; WORD_SIZE_FELT] {
 impl From<Word> for [u64; WORD_SIZE_FELT] {
     fn from(value: Word) -> Self {
         [
-            value.0[0].as_int(),
-            value.0[1].as_int(),
-            value.0[2].as_int(),
-            value.0[3].as_int(),
+            value.0[0].as_canonical_u64(),
+            value.0[1].as_canonical_u64(),
+            value.0[2].as_canonical_u64(),
+            value.0[3].as_canonical_u64(),
         ]
     }
 }
@@ -472,7 +503,12 @@ impl From<&[u8; WORD_SIZE_FELT]> for Word {
 
 impl From<[u8; WORD_SIZE_FELT]> for Word {
     fn from(value: [u8; WORD_SIZE_FELT]) -> Self {
-        Self([value[0].into(), value[1].into(), value[2].into(), value[3].into()])
+        Self([
+            Felt::from_u8(value[0]),
+            Felt::from_u8(value[1]),
+            Felt::from_u8(value[2]),
+            Felt::from_u8(value[3]),
+        ])
     }
 }
 
@@ -484,7 +520,12 @@ impl From<&[u16; WORD_SIZE_FELT]> for Word {
 
 impl From<[u16; WORD_SIZE_FELT]> for Word {
     fn from(value: [u16; WORD_SIZE_FELT]) -> Self {
-        Self([value[0].into(), value[1].into(), value[2].into(), value[3].into()])
+        Self([
+            Felt::from_u16(value[0]),
+            Felt::from_u16(value[1]),
+            Felt::from_u16(value[2]),
+            Felt::from_u16(value[3]),
+        ])
     }
 }
 
@@ -496,7 +537,12 @@ impl From<&[u32; WORD_SIZE_FELT]> for Word {
 
 impl From<[u32; WORD_SIZE_FELT]> for Word {
     fn from(value: [u32; WORD_SIZE_FELT]) -> Self {
-        Self([value[0].into(), value[1].into(), value[2].into(), value[3].into()])
+        Self([
+            Felt::from_u32(value[0]),
+            Felt::from_u32(value[1]),
+            Felt::from_u32(value[2]),
+            Felt::from_u32(value[3]),
+        ])
     }
 }
 
@@ -512,11 +558,12 @@ impl TryFrom<[u64; WORD_SIZE_FELT]> for Word {
     type Error = WordError;
 
     fn try_from(value: [u64; WORD_SIZE_FELT]) -> Result<Self, WordError> {
+        let err = || WordError::InvalidFieldElement("value >= field modulus".into());
         Ok(Self([
-            value[0].try_into().map_err(WordError::InvalidFieldElement)?,
-            value[1].try_into().map_err(WordError::InvalidFieldElement)?,
-            value[2].try_into().map_err(WordError::InvalidFieldElement)?,
-            value[3].try_into().map_err(WordError::InvalidFieldElement)?,
+            Felt::from_canonical_checked(value[0]).ok_or_else(err)?,
+            Felt::from_canonical_checked(value[1]).ok_or_else(err)?,
+            Felt::from_canonical_checked(value[2]).ok_or_else(err)?,
+            Felt::from_canonical_checked(value[3]).ok_or_else(err)?,
         ]))
     }
 }
@@ -552,10 +599,11 @@ impl TryFrom<[u8; WORD_SIZE_BYTES]> for Word {
         let c = u64::from_le_bytes(value[16..24].try_into().unwrap());
         let d = u64::from_le_bytes(value[24..32].try_into().unwrap());
 
-        let a: Felt = a.try_into().map_err(WordError::InvalidFieldElement)?;
-        let b: Felt = b.try_into().map_err(WordError::InvalidFieldElement)?;
-        let c: Felt = c.try_into().map_err(WordError::InvalidFieldElement)?;
-        let d: Felt = d.try_into().map_err(WordError::InvalidFieldElement)?;
+        let err = || WordError::InvalidFieldElement("value >= field modulus".into());
+        let a: Felt = Felt::from_canonical_checked(a).ok_or_else(err)?;
+        let b: Felt = Felt::from_canonical_checked(b).ok_or_else(err)?;
+        let c: Felt = Felt::from_canonical_checked(c).ok_or_else(err)?;
+        let d: Felt = Felt::from_canonical_checked(d).ok_or_else(err)?;
 
         Ok(Word([a, b, c, d]))
     }
@@ -630,7 +678,7 @@ impl Deserializable for Word {
         let mut inner: [Felt; WORD_SIZE_FELT] = [ZERO; WORD_SIZE_FELT];
         for inner in inner.iter_mut() {
             let e = source.read_u64()?;
-            if e >= Felt::MODULUS {
+            if e >= Felt::ORDER_U64 {
                 return Err(DeserializationError::InvalidValue(String::from(
                     "value not in the appropriate range",
                 )));

@@ -3,15 +3,14 @@ use alloc::{
     vec::Vec,
 };
 
-use winter_utils::{Deserializable, Serializable};
-
-use super::{MmrDelta, MmrProof};
+use super::{MmrDelta, MmrPath};
 use crate::{
     Word,
     merkle::{
         InnerNodeInfo, MerklePath, Rpo256,
         mmr::{InOrderIndex, MmrError, MmrPeaks, forest::Forest},
     },
+    utils::{ByteReader, ByteWriter, Deserializable, Serializable},
 };
 
 // TYPE ALIASES
@@ -159,7 +158,7 @@ impl PartialMmr {
     /// # Errors
     /// Returns an error if the specified position is greater-or-equal than the number of leaves
     /// in the underlying MMR.
-    pub fn open(&self, pos: usize) -> Result<Option<MmrProof>, MmrError> {
+    pub fn open(&self, pos: usize) -> Result<Option<MmrPath>, MmrError> {
         let tree_bit = self
             .forest
             .leaf_to_corresponding_tree(pos)
@@ -181,11 +180,7 @@ impl PartialMmr {
             // The requested `pos` is not being tracked.
             Ok(None)
         } else {
-            Ok(Some(MmrProof {
-                forest: self.forest,
-                position: pos,
-                merkle_path: MerklePath::new(nodes),
-            }))
+            Ok(Some(MmrPath::new(self.forest, pos, MerklePath::new(nodes))))
         }
     }
 
@@ -352,18 +347,29 @@ impl PartialMmr {
 
     /// Removes a leaf of the [PartialMmr] and the unused nodes from the authentication path.
     ///
+    /// Returns a vector of the authentication nodes removed from this [PartialMmr] as a result
+    /// of this operation. This is useful for client-side pruning, where the caller needs to know
+    /// which nodes can be deleted from storage.
+    ///
     /// Note: `leaf_pos` corresponds to the position in the MMR and not on an individual tree.
-    pub fn untrack(&mut self, leaf_pos: usize) {
+    pub fn untrack(&mut self, leaf_pos: usize) -> Vec<(InOrderIndex, Word)> {
         let mut idx = InOrderIndex::from_leaf_pos(leaf_pos);
+        let mut removed = Vec::new();
 
         // `idx` represent the element that can be computed by the authentication path, because
         // these elements can be computed they are not saved for the authentication of the current
         // target. In other words, if the idx is present it was added for the authentication of
         // another element, and no more elements should be removed otherwise it would remove that
         // element's authentication data.
-        while self.nodes.remove(&idx.sibling()).is_some() && !self.nodes.contains_key(&idx) {
+        while let Some(word) = self.nodes.remove(&idx.sibling()) {
+            removed.push((idx.sibling(), word));
+            if self.nodes.contains_key(&idx) {
+                break;
+            }
             idx = idx.parent();
         }
+
+        removed
     }
 
     /// Applies updates to this [PartialMmr] and returns a vector of new authentication nodes
@@ -595,7 +601,7 @@ impl<I: Iterator<Item = (usize, Word)>> Iterator for InnerNodeIterator<'_, I> {
 }
 
 impl Serializable for PartialMmr {
-    fn write_into<W: winter_utils::ByteWriter>(&self, target: &mut W) {
+    fn write_into<W: ByteWriter>(&self, target: &mut W) {
         self.forest.num_leaves().write_into(target);
         self.peaks.write_into(target);
         self.nodes.write_into(target);
@@ -604,9 +610,9 @@ impl Serializable for PartialMmr {
 }
 
 impl Deserializable for PartialMmr {
-    fn read_from<R: winter_utils::ByteReader>(
+    fn read_from<R: ByteReader>(
         source: &mut R,
-    ) -> Result<Self, winter_utils::DeserializationError> {
+    ) -> Result<Self, crate::utils::DeserializationError> {
         let forest = Forest::new(usize::read_from(source)?);
         let peaks = Vec::<Word>::read_from(source)?;
         let nodes = NodeMap::read_from(source)?;
@@ -623,8 +629,6 @@ impl Deserializable for PartialMmr {
 mod tests {
     use alloc::{collections::BTreeSet, vec::Vec};
 
-    use winter_utils::{Deserializable, Serializable};
-
     use super::{MmrPeaks, PartialMmr};
     use crate::{
         Word,
@@ -633,17 +637,23 @@ mod tests {
             mmr::{Mmr, forest::Forest},
             store::MerkleStore,
         },
+        utils::{Deserializable, Serializable},
     };
 
-    const LEAVES: [Word; 7] = [
-        int_to_node(0),
-        int_to_node(1),
-        int_to_node(2),
-        int_to_node(3),
-        int_to_node(4),
-        int_to_node(5),
-        int_to_node(6),
-    ];
+    // Note: This function works around the fact that P3 constructors are not const.
+    // Once upstream Plonky3 releases our const constructor changes, this should be
+    // reverted to `const LEAVES: [Word; 7] = [...]`. See issue #731.
+    fn leaves() -> [Word; 7] {
+        [
+            int_to_node(0),
+            int_to_node(1),
+            int_to_node(2),
+            int_to_node(3),
+            int_to_node(4),
+            int_to_node(5),
+            int_to_node(6),
+        ]
+    }
 
     #[test]
     fn test_partial_mmr_apply_delta() {
@@ -656,13 +666,13 @@ mod tests {
         {
             let node = mmr.get(1).unwrap();
             let proof = mmr.open(1).unwrap();
-            partial_mmr.track(1, node, &proof.merkle_path).unwrap();
+            partial_mmr.track(1, node, proof.path().merkle_path()).unwrap();
         }
 
         {
             let node = mmr.get(8).unwrap();
             let proof = mmr.open(8).unwrap();
-            partial_mmr.track(8, node, &proof.merkle_path).unwrap();
+            partial_mmr.track(8, node, proof.path().merkle_path()).unwrap();
         }
 
         // add 2 more nodes into the MMR and validate apply_delta()
@@ -675,7 +685,7 @@ mod tests {
         {
             let node = mmr.get(12).unwrap();
             let proof = mmr.open(12).unwrap();
-            partial_mmr.track(12, node, &proof.merkle_path).unwrap();
+            partial_mmr.track(12, node, proof.path().merkle_path()).unwrap();
             assert!(partial_mmr.track_latest);
         }
 
@@ -716,14 +726,14 @@ mod tests {
             let pos = index.inner() / 2;
             let proof1 = partial.open(pos).unwrap().unwrap();
             let proof2 = mmr.open(pos).unwrap();
-            assert_eq!(proof1, proof2);
+            assert_eq!(proof1, *proof2.path());
         }
     }
 
     #[test]
     fn test_partial_mmr_inner_nodes_iterator() {
         // build the MMR
-        let mmr: Mmr = LEAVES.into();
+        let mmr: Mmr = leaves().into();
         let first_peak = mmr.peaks().peaks()[0];
 
         // -- test single tree ----------------------------
@@ -734,7 +744,7 @@ mod tests {
 
         // create partial MMR and add authentication path to node at position 1
         let mut partial_mmr: PartialMmr = mmr.peaks().into();
-        partial_mmr.track(1, node1, &proof1.merkle_path).unwrap();
+        partial_mmr.track(1, node1, proof1.path().merkle_path()).unwrap();
 
         // empty iterator should have no nodes
         assert_eq!(partial_mmr.inner_nodes([].iter().cloned()).next(), None);
@@ -746,7 +756,7 @@ mod tests {
         let index1 = NodeIndex::new(2, 1).unwrap();
         let path1 = store.get_path(first_peak, index1).unwrap().path;
 
-        assert_eq!(path1, proof1.merkle_path);
+        assert_eq!(path1, *proof1.path().merkle_path());
 
         // -- test no duplicates --------------------------
 
@@ -759,9 +769,9 @@ mod tests {
         let node2 = mmr.get(2).unwrap();
         let proof2 = mmr.open(2).unwrap();
 
-        partial_mmr.track(0, node0, &proof0.merkle_path).unwrap();
-        partial_mmr.track(1, node1, &proof1.merkle_path).unwrap();
-        partial_mmr.track(2, node2, &proof2.merkle_path).unwrap();
+        partial_mmr.track(0, node0, proof0.path().merkle_path()).unwrap();
+        partial_mmr.track(1, node1, proof1.path().merkle_path()).unwrap();
+        partial_mmr.track(2, node2, proof2.path().merkle_path()).unwrap();
 
         // make sure there are no duplicates
         let leaves = [(0, node0), (1, node1), (2, node2)];
@@ -781,9 +791,9 @@ mod tests {
         let path1 = store.get_path(first_peak, index1).unwrap().path;
         let path2 = store.get_path(first_peak, index2).unwrap().path;
 
-        assert_eq!(path0, proof0.merkle_path);
-        assert_eq!(path1, proof1.merkle_path);
-        assert_eq!(path2, proof2.merkle_path);
+        assert_eq!(path0, *proof0.path().merkle_path());
+        assert_eq!(path1, *proof1.path().merkle_path());
+        assert_eq!(path2, *proof2.path().merkle_path());
 
         // -- test multiple trees -------------------------
 
@@ -793,8 +803,8 @@ mod tests {
         let node5 = mmr.get(5).unwrap();
         let proof5 = mmr.open(5).unwrap();
 
-        partial_mmr.track(1, node1, &proof1.merkle_path).unwrap();
-        partial_mmr.track(5, node5, &proof5.merkle_path).unwrap();
+        partial_mmr.track(1, node1, proof1.path().merkle_path()).unwrap();
+        partial_mmr.track(5, node5, proof5.path().merkle_path()).unwrap();
 
         // build Merkle store from authentication paths in partial MMR
         let mut store: MerkleStore = MerkleStore::new();
@@ -808,8 +818,8 @@ mod tests {
         let path1 = store.get_path(first_peak, index1).unwrap().path;
         let path5 = store.get_path(second_peak, index5).unwrap().path;
 
-        assert_eq!(path1, proof1.merkle_path);
-        assert_eq!(path5, proof5.merkle_path);
+        assert_eq!(path1, *proof1.path().merkle_path());
+        assert_eq!(path5, *proof5.path().merkle_path());
     }
 
     #[test]
@@ -844,7 +854,7 @@ mod tests {
             for pos in 0..i {
                 let mmr_proof = mmr.open(pos).unwrap();
                 let partialmmr_proof = partial_mmr.open(pos).unwrap().unwrap();
-                assert_eq!(mmr_proof, partialmmr_proof);
+                assert_eq!(*mmr_proof.path(), partialmmr_proof);
             }
         }
     }
@@ -855,7 +865,7 @@ mod tests {
 
         // derive a partial Mmr from it which tracks authentication path to leaf 5
         let mut partial_mmr = PartialMmr::from_peaks(mmr.peaks());
-        let path_to_5 = mmr.open(5).unwrap().merkle_path;
+        let path_to_5 = mmr.open(5).unwrap().path().merkle_path().clone();
         let leaf_at_5 = mmr.get(5).unwrap();
         partial_mmr.track(5, leaf_at_5, &path_to_5).unwrap();
 
@@ -865,7 +875,7 @@ mod tests {
         partial_mmr.add(leaf_at_7, false);
 
         // the openings should be the same
-        assert_eq!(mmr.open(5).unwrap(), partial_mmr.open(5).unwrap().unwrap());
+        assert_eq!(*mmr.open(5).unwrap().path(), partial_mmr.open(5).unwrap().unwrap());
     }
 
     #[test]
@@ -882,7 +892,7 @@ mod tests {
     #[test]
     fn test_partial_mmr_untrack() {
         // build the MMR
-        let mmr: Mmr = LEAVES.into();
+        let mmr: Mmr = leaves().into();
 
         // get path and node for position 1
         let node1 = mmr.get(1).unwrap();
@@ -894,8 +904,8 @@ mod tests {
 
         // create partial MMR and add authentication path to nodes at position 1 and 2
         let mut partial_mmr: PartialMmr = mmr.peaks().into();
-        partial_mmr.track(1, node1, &proof1.merkle_path).unwrap();
-        partial_mmr.track(2, node2, &proof2.merkle_path).unwrap();
+        partial_mmr.track(1, node1, proof1.path().merkle_path()).unwrap();
+        partial_mmr.track(2, node2, proof2.path().merkle_path()).unwrap();
 
         // untrack nodes at positions 1 and 2
         partial_mmr.untrack(1);
@@ -905,5 +915,77 @@ mod tests {
         assert!(!partial_mmr.is_tracked(1));
         assert!(!partial_mmr.is_tracked(2));
         assert_eq!(partial_mmr.nodes().count(), 0);
+    }
+
+    #[test]
+    fn test_partial_mmr_untrack_returns_removed_nodes() {
+        // build the MMR
+        let mmr: Mmr = leaves().into();
+
+        // get path and node for position 1
+        let node1 = mmr.get(1).unwrap();
+        let proof1 = mmr.open(1).unwrap();
+
+        // create partial MMR
+        let mut partial_mmr: PartialMmr = mmr.peaks().into();
+
+        // add authentication path for position 1
+        partial_mmr.track(1, node1, proof1.path().merkle_path()).unwrap();
+
+        // collect nodes before untracking
+        let nodes_before: BTreeSet<_> =
+            partial_mmr.nodes().map(|(&idx, &word)| (idx, word)).collect();
+
+        // untrack and capture removed nodes
+        let removed: BTreeSet<_> = partial_mmr.untrack(1).into_iter().collect();
+
+        // verify that all nodes that were in the partial MMR were returned
+        assert_eq!(removed, nodes_before);
+
+        // verify that partial MMR is now empty
+        assert!(!partial_mmr.is_tracked(1));
+        assert_eq!(partial_mmr.nodes().count(), 0);
+    }
+
+    #[test]
+    fn test_partial_mmr_untrack_shared_nodes() {
+        // build the MMR
+        let mmr: Mmr = leaves().into();
+
+        // track two sibling leaves
+        let node0 = mmr.get(0).unwrap();
+        let proof0 = mmr.open(0).unwrap();
+
+        let node1 = mmr.get(1).unwrap();
+        let proof1 = mmr.open(1).unwrap();
+
+        // create partial MMR
+        let mut partial_mmr: PartialMmr = mmr.peaks().into();
+
+        // add authentication paths for position 0 and 1
+        partial_mmr.track(0, node0, proof0.path().merkle_path()).unwrap();
+        partial_mmr.track(1, node1, proof1.path().merkle_path()).unwrap();
+
+        // There are 3 unique authentication nodes stored:
+        // - leaf0's sibling (stored at leaf1's index)
+        // - leaf1's sibling (stored at leaf0's index)
+        // - the parent sibling (shared by both openings)
+        assert_eq!(partial_mmr.nodes().count(), 3);
+
+        // untrack position 0:
+        // removes the node stored at leaf1's index (the sibling of leaf0),
+        // then stops because leaf0's index is still present (needed to authenticate leaf1).
+        let removed0 = partial_mmr.untrack(0);
+        assert_eq!(removed0.len(), 1);
+        assert_eq!(partial_mmr.nodes().count(), 2);
+        assert!(partial_mmr.is_tracked(1));
+
+        // untrack position 1:
+        // removes the node stored at leaf0's index (the sibling of leaf1) and the shared parent
+        // sibling.
+        let removed1 = partial_mmr.untrack(1);
+        assert_eq!(removed1.len(), 2);
+        assert_eq!(partial_mmr.nodes().count(), 0);
+        assert!(!partial_mmr.is_tracked(1));
     }
 }

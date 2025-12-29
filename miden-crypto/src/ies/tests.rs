@@ -1,3 +1,5 @@
+#![cfg(feature = "std")]
+
 use alloc::vec::Vec;
 
 use proptest::prelude::*;
@@ -919,9 +921,8 @@ mod integration_tests {
 // ================================================================================================
 
 mod keys_serialization_tests {
-    use winter_utils::ByteReader;
-
     use super::*;
+    use crate::utils::ByteReader;
 
     fn assert_roundtrip(sealing_key: SealingKey) {
         let expected_scheme = sealing_key.scheme();

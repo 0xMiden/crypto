@@ -1,6 +1,6 @@
 //! Data structures related to Merkle trees based on RPO256 hash function.
 
-use super::{EMPTY_WORD, Felt, Word, ZERO, hash::rpo::Rpo256};
+use super::{EMPTY_WORD, Felt, Word, hash::rpo::Rpo256};
 
 // SUBMODULES
 // ================================================================================================
@@ -35,10 +35,12 @@ pub use sparse_path::SparseMerklePath;
 
 #[cfg(test)]
 const fn int_to_node(value: u64) -> Word {
+    use super::ZERO;
     Word::new([Felt::new(value), ZERO, ZERO, ZERO])
 }
 
 #[cfg(test)]
 const fn int_to_leaf(value: u64) -> Word {
+    use super::ZERO;
     Word::new([Felt::new(value), ZERO, ZERO, ZERO])
 }

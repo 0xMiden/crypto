@@ -21,8 +21,10 @@ use rand::{CryptoRng, RngCore};
 use crate::{
     dsa::ecdsa_k256_keccak::{PUBLIC_KEY_BYTES, PublicKey, SecretKey},
     ecdh::KeyAgreementScheme,
-    utils::{ByteReader, ByteWriter, Deserializable, DeserializationError, Serializable},
-    zeroize::{Zeroize, ZeroizeOnDrop},
+    utils::{
+        ByteReader, ByteWriter, Deserializable, DeserializationError, Serializable,
+        zeroize::{Zeroize, ZeroizeOnDrop},
+    },
 };
 
 // SHARED SECRET
@@ -228,14 +230,16 @@ impl KeyAgreementScheme for K256 {
 // TESTS
 // ================================================================================================
 
-#[cfg(test)]
+#[cfg(all(test, feature = "std"))]
 mod test {
 
     use rand::rng;
-    use winter_utils::{Deserializable, Serializable};
 
     use super::{EphemeralPublicKey, EphemeralSecretKey};
-    use crate::dsa::ecdsa_k256_keccak::SecretKey;
+    use crate::{
+        dsa::ecdsa_k256_keccak::SecretKey,
+        utils::{Deserializable, Serializable},
+    };
 
     #[test]
     fn key_agreement() {

@@ -1,5 +1,7 @@
 use alloc::vec::Vec;
 
+use p3_field::PrimeField64;
+
 use super::{MODULUS, N, Nonce, Polynomial, Rpo256, ZERO, math::FalconFelt};
 use crate::{Felt, Word};
 
@@ -35,6 +37,12 @@ pub fn hash_to_point_rpo256(message: Word, nonce: &Nonce) -> Polynomial<FalconFe
     // squeeze the coefficients of the polynomial
     let mut coefficients: Vec<FalconFelt> = Vec::with_capacity(N);
     for _ in 0..64 {
+        //
+        // Note that `FalconFelt::new((a.as_canonical_u64() % MODULUS as u64) as i16)` will
+        // create a bias as we are mapping $2^64 - 2^31 + 1$ elements to $12289$ elements
+        // and it must not be uniform. A statistical analysis can be applied here to show
+        // that this is still fine: the output distribution is computational IND from
+        // uniform.
         Rpo256::apply_permutation(&mut state);
         state[Rpo256::RATE_RANGE]
             .iter()
@@ -46,7 +54,7 @@ pub fn hash_to_point_rpo256(message: Word, nonce: &Nonce) -> Polynomial<FalconFe
 
 /// Returns a polynomial in Z_p[x]/(phi) representing the hash of the provided message and
 /// nonce using SHAKE256. This is the hash-to-point algorithm used in the reference implementation.
-#[cfg(test)]
+#[cfg(all(test, feature = "std"))]
 pub fn hash_to_point_shake256(message: &[u8], nonce: &Nonce) -> Polynomial<FalconFelt> {
     use sha3::{
         Shake256,
@@ -85,7 +93,7 @@ pub fn hash_to_point_shake256(message: &[u8], nonce: &Nonce) -> Polynomial<Falco
 /// the Miden field element modulo the Falcon prime and then cast the resulting value to an `i16`.
 /// Note that this final cast is safe as the Falcon prime is less than `i16::MAX`.
 fn felt_to_falcon_felt(value: Felt) -> FalconFelt {
-    FalconFelt::new((value.as_int() % MODULUS as u64) as i16)
+    FalconFelt::new((value.as_canonical_u64() % MODULUS as u64) as i16)
 }
 
 /// Converts a `u32` to a field element in the prime field with characteristic the Falcon prime.
@@ -93,7 +101,7 @@ fn felt_to_falcon_felt(value: Felt) -> FalconFelt {
 /// Note that since `FalconFelt::new` accepts `i16`, we first reduce the `u32` value modulo
 /// the Falcon prime and then cast the resulting value to an `i16`.
 /// Note that this final cast is safe as the Falcon prime is less than `i16::MAX`.
-#[cfg(test)]
+#[cfg(all(test, feature = "std"))]
 fn u32_to_falcon_felt(value: u32) -> FalconFelt {
     FalconFelt::new((value % MODULUS as u32) as i16)
 }

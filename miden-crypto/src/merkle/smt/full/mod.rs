@@ -1,9 +1,10 @@
 use alloc::{string::ToString, vec::Vec};
 
 use super::{
-    EMPTY_WORD, EmptySubtreeRoots, Felt, InnerNode, InnerNodeInfo, InnerNodes, LeafIndex,
-    MerkleError, MutationSet, NodeIndex, Rpo256, SparseMerklePath, SparseMerkleTree, Word,
+    EMPTY_WORD, EmptySubtreeRoots, InnerNode, InnerNodeInfo, InnerNodes, LeafIndex, MerkleError,
+    MutationSet, NodeIndex, SparseMerklePath, SparseMerkleTree, Word,
 };
+use crate::field::PrimeField64;
 
 mod error;
 pub use error::{SmtLeafError, SmtProofError};
@@ -13,7 +14,8 @@ pub use leaf::SmtLeaf;
 
 mod proof;
 pub use proof::SmtProof;
-use winter_utils::{ByteReader, ByteWriter, Deserializable, DeserializationError, Serializable};
+
+use crate::utils::{ByteReader, ByteWriter, Deserializable, DeserializationError, Serializable};
 
 // Concurrent implementation
 #[cfg(feature = "concurrent")]
@@ -99,10 +101,9 @@ type Leaves = super::Leaves<SmtLeaf>;
 #[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 pub struct Smt {
     root: Word,
-    // pub(super) for use in PartialSmt.
-    pub(super) num_entries: usize,
-    pub(super) leaves: Leaves,
-    pub(super) inner_nodes: InnerNodes,
+    num_entries: usize,
+    leaves: Leaves,
+    inner_nodes: InnerNodes,
 }
 
 impl Smt {
@@ -554,7 +555,7 @@ impl SparseMerkleTree<SMT_DEPTH> for Smt {
 
     fn key_to_leaf_index(key: &Word) -> LeafIndex<SMT_DEPTH> {
         let most_significant_felt = key[3];
-        LeafIndex::new_max_depth(most_significant_felt.as_int())
+        LeafIndex::new_max_depth(most_significant_felt.as_canonical_u64())
     }
 
     fn path_and_leaf_to_opening(path: SparseMerklePath, leaf: SmtLeaf) -> SmtProof {
@@ -574,7 +575,7 @@ impl Default for Smt {
 impl From<Word> for LeafIndex<SMT_DEPTH> {
     fn from(value: Word) -> Self {
         // We use the most significant `Felt` of a `Word` as the leaf index.
-        Self::new_max_depth(value[3].as_int())
+        Self::new_max_depth(value[3].as_canonical_u64())
     }
 }
 
@@ -641,6 +642,9 @@ impl Smt {
 
 // TESTS
 // ================================================================================================
+
+#[cfg(test)]
+use crate::Felt;
 
 #[test]
 fn test_smt_serialization_deserialization() {

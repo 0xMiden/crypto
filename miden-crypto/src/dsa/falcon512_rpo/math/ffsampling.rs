@@ -1,13 +1,11 @@
 use alloc::boxed::Box;
 
-#[cfg(not(feature = "std"))]
-use num::Float;
 use num::Zero;
 use num_complex::{Complex, Complex64};
 use rand::Rng;
 
 use super::{fft::FastFft, polynomial::Polynomial, samplerz::sampler_z};
-use crate::zeroize::{Zeroize, ZeroizeOnDrop};
+use crate::utils::zeroize::{Zeroize, ZeroizeOnDrop};
 
 const SIGMIN: f64 = 1.2778336969128337;
 
@@ -197,7 +195,7 @@ pub fn ffsampling<R: Rng>(
 // TESTS
 // ================================================================================================
 
-#[cfg(test)]
+#[cfg(all(test, feature = "std"))]
 mod tests {
     use num_complex::Complex64;
     use rand::{Rng, SeedableRng};

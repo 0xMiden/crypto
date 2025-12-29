@@ -1,3 +1,21 @@
+## 0.20.0 (2025-12-28)
+
+- [BREAKING] Renamed `MmrProof` to `MmrPath`, and introduce a new `MmrProof` with the leaf value included ([#656](https://github.com/0xMiden/crypto/pull/656)).
+- Added `+ Sync` bound to `StorageError` and `LargeSmtError` ([#680](https://github.com/0xMiden/crypto/pull/680)).
+- [BREAKING] Refactored `SmtProof` verification API to return `Result<(), SmtProofError>` ([#682](https://github.com/0xMiden/crypto/pull/682)).
+- Added validation to `PartialMerkleTree::with_leaves()` to reject internal nodes ([#684](https://github.com/0xMiden/crypto/pull/684)).
+- Decoupled `PartialSmt` from `Smt` and expanded tracking to include provably empty leaves, allowing updates in empty subtrees ([#691](https://github.com/0xMiden/crypto/pull/691)).
+- Added SHA-256 and SHA-512 hash function wrappers ([#692](https://github.com/0xMiden/crypto/pull/692)).
+- [BREAKING] Moved `LargeSmt` root ownership from storage to in-memory layer ([#694](https://github.com/0xMiden/crypto/pull/694)).
+- Removed use of `transmute()` in blake3 implementation ([#704](https://github.com/0xMiden/crypto/pull/704)).
+- [BREAKING] Made `LargeSmt::num_leaves()` and `LargeSmt::num_entries()` infallible ([#708](https://github.com/0xMiden/crypto/pull/708)).
+- [BREAKING] Changed `SmtStorage` mutator methods from `&self` to `&mut self` ([#709](https://github.com/0xMiden/crypto/pull/709)).
+- `PartialMmr::untrack()` now returns the removed authentication nodes ([#714](https://github.com/0xMiden/crypto/pull/714)).
+- [BREAKING] Imported miden-serde-utils crate for serialization ([#715](https://github.com/0xMiden/crypto/pull/715)).
+- [BREAKING] Replaced underlying field implementation with Plonky3 backend ([#720](https://github.com/0xMiden/crypto/pull/720)).
+- Trimmed down hash benchmarks, restored Poseidon2 testing, removed unnecessary size parameterization from merge benchmarks ([#737](https://github.com/0xMiden/crypto/pull/737))
+- [BREAKING] Removed 160-bit variant of the BLAKE3 hash function.
+
 ## 0.19.2 (2025-12-04)
 
 - [BREAKING] Fixed `Signature` serialization by reducing `SIGNATURE_BYTES` to 65 ([#686](https://github.com/0xMiden/crypto/pull/686)).

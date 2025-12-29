@@ -4,12 +4,13 @@ use core::{
     num::NonZero,
 };
 
-use winter_utils::{Deserializable, DeserializationError, Serializable};
-
 use super::{
     EmptySubtreeRoots, InnerNodeInfo, MerkleError, MerklePath, NodeIndex, Word, smt::SMT_MAX_DEPTH,
 };
-use crate::hash::rpo::Rpo256;
+use crate::{
+    hash::rpo::Rpo256,
+    utils::{ByteReader, ByteWriter, Deserializable, DeserializationError, Serializable},
+};
 
 /// A different representation of [`MerklePath`] designed for memory efficiency for Merkle paths
 /// with empty nodes.
@@ -248,7 +249,7 @@ impl SparseMerklePath {
 // ================================================================================================
 
 impl Serializable for SparseMerklePath {
-    fn write_into<W: winter_utils::ByteWriter>(&self, target: &mut W) {
+    fn write_into<W: ByteWriter>(&self, target: &mut W) {
         target.write_u8(self.depth());
         target.write_u64(self.empty_nodes_mask);
         target.write_many(&self.nodes);
@@ -256,9 +257,7 @@ impl Serializable for SparseMerklePath {
 }
 
 impl Deserializable for SparseMerklePath {
-    fn read_from<R: winter_utils::ByteReader>(
-        source: &mut R,
-    ) -> Result<Self, DeserializationError> {
+    fn read_from<R: ByteReader>(source: &mut R) -> Result<Self, DeserializationError> {
         let depth = source.read_u8()?;
         if depth > SMT_MAX_DEPTH {
             return Err(DeserializationError::InvalidValue(format!(
@@ -459,7 +458,7 @@ mod tests {
     use core::num::NonZero;
 
     use assert_matches::assert_matches;
-    use winter_math::FieldElement;
+    use p3_field::PrimeCharacteristicRing;
 
     use super::SparseMerklePath;
     use crate::{

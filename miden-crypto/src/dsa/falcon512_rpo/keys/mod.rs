@@ -13,14 +13,16 @@ pub(crate) use secret_key::{WIDTH_BIG_POLY_COEFFICIENT, WIDTH_SMALL_POLY_COEFFIC
 // TESTS
 // ================================================================================================
 
-#[cfg(test)]
+#[cfg(all(test, feature = "std"))]
 mod tests {
     use rand::SeedableRng;
     use rand_chacha::ChaCha20Rng;
-    use winter_math::FieldElement;
-    use winter_utils::{Deserializable, Serializable};
 
-    use crate::{ONE, Word, dsa::falcon512_rpo::SecretKey};
+    use crate::{
+        ONE, PrimeCharacteristicRing, Word,
+        dsa::falcon512_rpo::SecretKey,
+        utils::{Deserializable, Serializable},
+    };
 
     #[test]
     fn test_falcon_verification() {

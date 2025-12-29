@@ -1,5 +1,7 @@
 use alloc::vec::Vec;
 
+use p3_field::PrimeField64;
+
 use super::{
     IN_MEMORY_DEPTH, LargeSmt, NUM_SUBTREE_LEVELS, ROOT_MEMORY_INDEX, SMT_DEPTH, SmtStorage,
     StorageError, Subtree,
@@ -36,7 +38,6 @@ impl<S: SmtStorage> SparseMerkleTree<SMT_DEPTH> for LargeSmt<S> {
     }
 
     fn set_root(&mut self, root: Word) {
-        self.storage.set_root(root).expect("Failed to set root");
         self.in_memory_nodes[ROOT_MEMORY_INDEX] = root;
     }
 
@@ -236,7 +237,7 @@ impl<S: SmtStorage> SparseMerkleTree<SMT_DEPTH> for LargeSmt<S> {
 
     fn key_to_leaf_index(key: &Word) -> LeafIndex<SMT_DEPTH> {
         let most_significant_felt = key[3];
-        LeafIndex::new_max_depth(most_significant_felt.as_int())
+        LeafIndex::new_max_depth(most_significant_felt.as_canonical_u64())
     }
 
     fn path_and_leaf_to_opening(path: SparseMerklePath, leaf: SmtLeaf) -> SmtProof {

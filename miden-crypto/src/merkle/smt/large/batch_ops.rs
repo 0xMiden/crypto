@@ -306,6 +306,8 @@ impl<S: SmtStorage> LargeSmt<S> {
     ///
     /// # Example
     /// ```no_run
+    /// # #[cfg(feature = "rocksdb")]
+    /// # {
     /// use miden_crypto::{
     ///     EMPTY_WORD, Felt, Word,
     ///     merkle::smt::{LargeSmt, RocksDbConfig, RocksDbStorage},
@@ -313,7 +315,7 @@ impl<S: SmtStorage> LargeSmt<S> {
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// let storage = RocksDbStorage::open(RocksDbConfig::new("/path/to/db"))?;
-    /// let mut smt = LargeSmt::new(storage)?;
+    /// let mut smt = LargeSmt::load(storage)?;
     ///
     /// let entries = vec![
     ///     // Insert new entries
@@ -331,6 +333,7 @@ impl<S: SmtStorage> LargeSmt<S> {
     ///
     /// let new_root = smt.insert_batch(entries)?;
     /// # Ok(())
+    /// # }
     /// # }
     /// ```
     pub fn insert_batch(
@@ -441,11 +444,14 @@ impl<S: SmtStorage> LargeSmt<S> {
         let updates = StorageUpdates::from_parts(
             leaf_update_map,
             subtree_updates,
-            new_root,
             leaf_count_delta,
             entry_count_delta,
         );
         self.storage.apply(updates)?;
+
+        // Update cached counts
+        self.leaf_count = self.leaf_count.saturating_add_signed(leaf_count_delta);
+        self.entry_count = self.entry_count.saturating_add_signed(entry_count_delta);
 
         Ok(new_root)
     }
@@ -530,6 +536,9 @@ impl<S: SmtStorage> LargeSmt<S> {
     }
 
     /// Applies prepared mutations to the tree, updating storage.
+    ///
+    /// Note: This and [`insert_batch()`](Self::insert_batch) are the only two methods that
+    /// persist changes to storage.
     fn apply_prepared_mutations(
         &mut self,
         prepared: PreparedMutations,
@@ -597,10 +606,11 @@ impl<S: SmtStorage> LargeSmt<S> {
             if value == LargeSmt::<S>::EMPTY_VALUE {
                 if let Some(leaf) = entry {
                     // Leaf exists, handle deletion
-                    if leaf.remove(key).1 {
+                    let (old_value, is_empty) = leaf.remove(key);
+                    if old_value.is_some() {
                         // Key had previous value, decrement entry count
                         entry_count_delta -= 1;
-                        if leaf.is_empty() {
+                        if is_empty {
                             // Leaf is now empty, remove it and decrement leaf count
                             *entry = None;
                             leaf_count_delta -= 1;
@@ -634,11 +644,15 @@ impl<S: SmtStorage> LargeSmt<S> {
                 Some(subtree) => SubtreeUpdate::Store { index, subtree },
                 None => SubtreeUpdate::Delete { index },
             }),
-            new_root,
             leaf_count_delta,
             entry_count_delta,
         );
         self.storage.apply(updates)?;
+
+        // Update cached counts
+        self.leaf_count = self.leaf_count.saturating_add_signed(leaf_count_delta);
+        self.entry_count = self.entry_count.saturating_add_signed(entry_count_delta);
+
         Ok(())
     }
 

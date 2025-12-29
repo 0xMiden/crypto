@@ -3,25 +3,49 @@
 //! `LargeSmt` stores the top of the tree (depths 0–23) in memory and persists the lower
 //! depths (24–64) in storage as fixed-size subtrees. This hybrid layout scales beyond RAM
 //! while keeping common operations fast. With the `rocksdb` feature enabled, the lower
-//! subtrees and leaves are stored in RocksDB. On reopen, the in-memory top is reconstructed
+//! subtrees and leaves are stored in RocksDB. On reload, the in-memory top is reconstructed
 //! from cached depth-24 subtree roots.
 //!
 //! Examples below require the `rocksdb` feature.
 //!
-//! Open an existing RocksDB-backed tree:
+//! Load an existing RocksDB-backed tree with root validation:
 //! ```no_run
+//! # #[cfg(feature = "rocksdb")]
+//! # {
+//! use miden_crypto::{
+//!     Word,
+//!     merkle::smt::{LargeSmt, RocksDbConfig, RocksDbStorage},
+//! };
+//!
+//! # fn main() -> Result<(), Box<dyn std::error::Error>> {
+//! # let expected_root: Word = miden_crypto::EMPTY_WORD;
+//! let storage = RocksDbStorage::open(RocksDbConfig::new("/path/to/db"))?;
+//! let smt = LargeSmt::load_with_root(storage, expected_root)?;
+//! assert_eq!(smt.root(), expected_root);
+//! # Ok(())
+//! # }
+//! # }
+//! ```
+//!
+//! Load an existing tree without root validation (use with caution):
+//! ```no_run
+//! # #[cfg(feature = "rocksdb")]
+//! # {
 //! use miden_crypto::merkle::smt::{LargeSmt, RocksDbConfig, RocksDbStorage};
 //!
 //! # fn main() -> Result<(), Box<dyn std::error::Error>> {
 //! let storage = RocksDbStorage::open(RocksDbConfig::new("/path/to/db"))?;
-//! let smt = LargeSmt::new(storage)?; // reconstructs in-memory top if data exists
+//! let smt = LargeSmt::load(storage)?;
 //! let _root = smt.root();
 //! # Ok(())
+//! # }
 //! # }
 //! ```
 //!
 //! Initialize an empty RocksDB-backed tree and bulk-load entries:
 //! ```no_run
+//! # #[cfg(feature = "rocksdb")]
+//! # {
 //! use miden_crypto::{
 //!     Felt, Word,
 //!     merkle::smt::{LargeSmt, RocksDbConfig, RocksDbStorage},
@@ -53,10 +77,13 @@
 //! smt.insert_batch(entries)?;
 //! # Ok(())
 //! # }
+//! # }
 //! ```
 //!
 //! Apply batch updates (insertions and deletions):
 //! ```no_run
+//! # #[cfg(feature = "rocksdb")]
+//! # {
 //! use miden_crypto::{
 //!     EMPTY_WORD, Felt, Word,
 //!     merkle::smt::{LargeSmt, RocksDbConfig, RocksDbStorage},
@@ -64,7 +91,7 @@
 //!
 //! # fn main() -> Result<(), Box<dyn std::error::Error>> {
 //! let storage = RocksDbStorage::open(RocksDbConfig::new("/path/to/db"))?;
-//! let mut smt = LargeSmt::new(storage)?;
+//! let mut smt = LargeSmt::load(storage)?;
 //!
 //! let k1 = Word::new([Felt::new(101), Felt::new(0), Felt::new(0), Felt::new(0)]);
 //! let v1 = Word::new([Felt::new(1), Felt::new(2), Felt::new(3), Felt::new(4)]);
@@ -77,10 +104,13 @@
 //! smt.insert_batch(updates)?;
 //! # Ok(())
 //! # }
+//! # }
 //! ```
 //!
 //! Quick initialization with `with_entries` (best for modest datasets/tests):
 //! ```no_run
+//! # #[cfg(feature = "rocksdb")]
+//! # {
 //! use miden_crypto::{
 //!     Felt, Word,
 //!     merkle::smt::{LargeSmt, RocksDbConfig, RocksDbStorage},
@@ -108,6 +138,7 @@
 //! ];
 //! let _smt = LargeSmt::with_entries(storage, entries)?;
 //! # Ok(())
+//! # }
 //! # }
 //! ```
 //!
@@ -247,6 +278,12 @@ pub struct LargeSmt<S: SmtStorage> {
     /// Index 0 is unused; index 1 is root.
     /// For node at index i: left child at 2*i, right child at 2*i+1.
     in_memory_nodes: Vec<Word>,
+    /// Cached count of non-empty leaves. Initialized from storage on load,
+    /// updated after each mutation.
+    leaf_count: usize,
+    /// Cached count of key-value entries across all leaves. Initialized from
+    /// storage on load, updated after each mutation.
+    entry_count: usize,
 }
 
 impl<S: SmtStorage> LargeSmt<S> {
@@ -275,25 +312,16 @@ impl<S: SmtStorage> LargeSmt<S> {
     ///
     /// Note that this may return a different value from [Self::num_entries()] as a single leaf may
     /// contain more than one key-value pair.
-    ///
-    /// # Errors
-    /// Returns an error if there is a storage error when retrieving the leaf count.
-    pub fn num_leaves(&self) -> Result<usize, LargeSmtError> {
-        Ok(self.storage.leaf_count()?)
+    pub fn num_leaves(&self) -> usize {
+        self.leaf_count
     }
 
     /// Returns the number of key-value pairs with non-default values in this tree.
     ///
     /// Note that this may return a different value from [Self::num_leaves()] as a single leaf may
     /// contain more than one key-value pair.
-    ///
-    /// Also note that this is currently an expensive operation is counting the number of entries
-    /// requires iterating over all leaves of the tree.
-    ///
-    /// # Errors
-    /// Returns an error if there is a storage error when retrieving the entry count.
-    pub fn num_entries(&self) -> Result<usize, LargeSmtError> {
-        Ok(self.storage.entry_count()?)
+    pub fn num_entries(&self) -> usize {
+        self.entry_count
     }
 
     /// Returns the leaf to which `key` maps
@@ -313,13 +341,10 @@ impl<S: SmtStorage> LargeSmt<S> {
     }
 
     /// Returns a boolean value indicating whether the SMT is empty.
-    ///
-    /// # Errors
-    /// Returns an error if there is a storage error when retrieving the root or leaf count.
-    pub fn is_empty(&self) -> Result<bool, LargeSmtError> {
-        let root = self.storage.get_root()?.unwrap_or(Self::EMPTY_ROOT);
-        debug_assert_eq!(self.num_leaves()? == 0, root == Self::EMPTY_ROOT);
-        Ok(root == Self::EMPTY_ROOT)
+    pub fn is_empty(&self) -> bool {
+        let root = self.root();
+        debug_assert_eq!(self.leaf_count == 0, root == Self::EMPTY_ROOT);
+        root == Self::EMPTY_ROOT
     }
 
     // ITERATORS
@@ -440,8 +465,8 @@ impl<S: SmtStorage> PartialEq for LargeSmt<S> {
     /// equivalent, but this doesn't verify the storage backends are identical.
     fn eq(&self, other: &Self) -> bool {
         self.root() == other.root()
-            && self.num_leaves().unwrap() == other.num_leaves().unwrap()
-            && self.num_entries().unwrap() == other.num_entries().unwrap()
+            && self.leaf_count == other.leaf_count
+            && self.entry_count == other.entry_count
     }
 }
 

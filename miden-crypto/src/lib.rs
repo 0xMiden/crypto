@@ -2,9 +2,10 @@
 
 #[macro_use]
 extern crate alloc;
-
 #[cfg(feature = "std")]
 extern crate std;
+
+use field::PrimeCharacteristicRing;
 
 pub mod aead;
 pub mod dsa;
@@ -18,13 +19,46 @@ pub mod word;
 
 // RE-EXPORTS
 // ================================================================================================
-
-pub use k256::elliptic_curve::zeroize;
-pub use winter_math::{
-    FieldElement, StarkField,
-    fields::{CubeExtension, QuadExtension, f64::BaseElement as Felt},
-};
+pub use p3_miden_goldilocks::Goldilocks as Felt;
 pub use word::{Word, WordError};
+
+pub mod field {
+    //! Traits and utilities for working with the Goldilocks finite field (i.e.,
+    //! [Felt](super::Felt)).
+
+    pub use p3_field::{
+        BasedVectorSpace, ExtensionField, Field, PrimeCharacteristicRing, PrimeField64,
+        batch_multiplicative_inverse, extension::BinomialExtensionField, integers::QuotientMap,
+    };
+}
+
+pub mod stark {
+    //! Foundational components for the STARK proving system based on Plonky3.
+    //!
+    //! This module contains components needed to build a STARK prover/verifier and define
+    //! Algebraic Intermediate Representation (AIR) for the Miden VM and other components.
+    //! It primarily consists of re-exports from the Plonky3 project with some Miden-specific
+    //! adaptations.
+    pub use p3_miden_prover::{
+        Commitments, Domain, Entry, OpenedValues, PackedChallenge, PackedVal, PcsError, Proof,
+        ProverConstraintFolder, StarkConfig, StarkGenericConfig, SymbolicAirBuilder,
+        SymbolicExpression, SymbolicVariable, Val, VerificationError, VerifierConstraintFolder,
+        generate_logup_trace, get_log_quotient_degree, get_max_constraint_degree,
+        get_symbolic_constraints, prove, quotient_values, recompose_quotient_from_chunks, verify,
+        verify_constraints,
+    };
+
+    pub mod air {
+        pub use p3_air::{
+            Air, AirBuilder, AirBuilderWithPublicValues, BaseAir, BaseAirWithPublicValues,
+            ExtensionBuilder, FilteredAirBuilder, PairBuilder, PairCol, PermutationAirBuilder,
+            VirtualPairCol,
+        };
+        pub use p3_miden_air::{
+            BaseAirWithAuxTrace, FilteredMidenAirBuilder, MidenAir, MidenAirBuilder,
+        };
+    }
+}
 
 // TYPE ALIASES
 // ================================================================================================
@@ -48,6 +82,20 @@ pub type Map<K, V> = alloc::collections::BTreeMap<K, V>;
 
 #[cfg(not(feature = "hashmaps"))]
 pub use alloc::collections::btree_map::Entry as MapEntry;
+
+/// An alias for a simple set.
+///
+/// By default, this is an alias for the [`alloc::collections::BTreeSet`]. However, when the
+/// `hashmaps` feature is enabled, this becomes an alias for hashbrown's HashSet.
+#[cfg(feature = "hashmaps")]
+pub type Set<V> = hashbrown::HashSet<V>;
+
+/// An alias for a simple set.
+///
+/// By default, this is an alias for the [`alloc::collections::BTreeSet`]. However, when the
+/// `hashmaps` feature is enabled, this becomes an alias for hashbrown's HashSet.
+#[cfg(not(feature = "hashmaps"))]
+pub type Set<V> = alloc::collections::BTreeSet<V>;
 
 // CONSTANTS
 // ================================================================================================
@@ -90,7 +138,7 @@ pub trait SequentialCommit {
 #[test]
 #[should_panic]
 fn debug_assert_is_checked() {
-    // enforce the release checks to always have `RUSTFLAGS="-C debug-assertions".
+    // enforce the release checks to always have `RUSTFLAGS="-C debug-assertions"`.
     //
     // some upstream tests are performed with `debug_assert`, and we want to assert its correctness
     // downstream.

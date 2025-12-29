@@ -138,8 +138,8 @@ fn run_insert_batch_matches_compute_apply(
     }
 
     // Verify metadata
-    prop_assert_eq!(tree1.num_leaves().unwrap(), tree2.num_leaves().unwrap());
-    prop_assert_eq!(tree1.num_entries().unwrap(), tree2.num_entries().unwrap());
+    prop_assert_eq!(tree1.num_leaves(), tree2.num_leaves());
+    prop_assert_eq!(tree1.num_entries(), tree2.num_entries());
 
     Ok(())
 }

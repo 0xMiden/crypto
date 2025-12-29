@@ -2,8 +2,6 @@ use alloc::{string::ToString, vec::Vec};
 
 use miden_crypto_derive::{SilentDebug, SilentDisplay};
 use num::Complex;
-#[cfg(not(feature = "std"))]
-use num::Float;
 use num_complex::Complex64;
 use rand::Rng;
 
@@ -20,7 +18,7 @@ use crate::{
     Word,
     dsa::falcon512_rpo::{LOG_N, SK_LEN, hash_to_point::hash_to_point_rpo256, math::ntru_gen},
     hash::blake::Blake3_256,
-    zeroize::{Zeroize, ZeroizeOnDrop},
+    utils::zeroize::{Zeroize, ZeroizeOnDrop},
 };
 
 // CONSTANTS

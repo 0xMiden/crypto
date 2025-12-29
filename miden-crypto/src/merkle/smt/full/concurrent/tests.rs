@@ -1,3 +1,5 @@
+#![cfg(feature = "std")]
+
 use alloc::{
     collections::{BTreeMap, BTreeSet},
     vec::Vec,
@@ -13,11 +15,8 @@ use super::{
     build_subtree,
 };
 use crate::{
-    EMPTY_WORD, ONE, ZERO,
-    merkle::{
-        MerkleError,
-        smt::{Felt, LeafIndex},
-    },
+    EMPTY_WORD, Felt, ONE, ZERO,
+    merkle::{MerkleError, smt::LeafIndex},
 };
 
 fn smtleaf_to_subtree_leaf(leaf: &SmtLeaf) -> SubtreeLeaf {

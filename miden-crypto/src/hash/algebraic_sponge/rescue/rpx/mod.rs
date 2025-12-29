@@ -1,17 +1,13 @@
 use super::{
-    ARK1, ARK2, CAPACITY_RANGE, CubeExtension, DIGEST_RANGE, ElementHasher, Felt, FieldElement,
-    Hasher, MDS, NUM_ROUNDS, RATE_RANGE, Range, STATE_WIDTH, Word, add_constants,
-    add_constants_and_apply_ext_round, add_constants_and_apply_inv_sbox,
-    add_constants_and_apply_sbox, apply_inv_sbox, apply_mds, apply_sbox,
+    ARK1, ARK2, CAPACITY_RANGE, DIGEST_RANGE, Felt, MDS, NUM_ROUNDS, RATE_RANGE, Range,
+    STATE_WIDTH, Word, add_constants, add_constants_and_apply_ext_round,
+    add_constants_and_apply_inv_sbox, add_constants_and_apply_sbox, apply_inv_sbox, apply_mds,
+    apply_sbox,
 };
-#[cfg(test)]
-use super::{StarkField, ZERO};
 use crate::hash::algebraic_sponge::AlgebraicSponge;
 
 #[cfg(test)]
 mod tests;
-
-pub type CubicExtElement = CubeExtension<Felt>;
 
 // HASHER IMPLEMENTATION
 // ================================================================================================
@@ -94,6 +90,9 @@ impl Rpx256 {
     // CONSTANTS
     // --------------------------------------------------------------------------------------------
 
+    /// Target collision resistance level in bits.
+    pub const COLLISION_RESISTANCE: u32 = 128;
+
     /// Sponge state is set to 12 field elements or 768 bytes; 8 elements are reserved for rate and
     /// the remaining 4 elements are reserved for capacity.
     pub const STATE_WIDTH: usize = STATE_WIDTH;
@@ -116,26 +115,38 @@ impl Rpx256 {
     /// Round constants added to the hasher state in the second half of the round.
     pub const ARK2: [[Felt; STATE_WIDTH]; NUM_ROUNDS] = ARK2;
 
-    // TRAIT PASS-THROUGH FUNCTIONS
+    // HASH FUNCTIONS
     // --------------------------------------------------------------------------------------------
 
     /// Returns a hash of the provided sequence of bytes.
     #[inline(always)]
     pub fn hash(bytes: &[u8]) -> Word {
-        <Self as Hasher>::hash(bytes)
+        <Self as AlgebraicSponge>::hash(bytes)
+    }
+
+    /// Returns a hash of the provided field elements.
+    #[inline(always)]
+    pub fn hash_elements<E: crate::field::BasedVectorSpace<Felt>>(elements: &[E]) -> Word {
+        <Self as AlgebraicSponge>::hash_elements(elements)
     }
 
     /// Returns a hash of two digests. This method is intended for use in construction of
     /// Merkle trees and verification of Merkle paths.
     #[inline(always)]
     pub fn merge(values: &[Word; 2]) -> Word {
-        <Self as Hasher>::merge(values)
+        <Self as AlgebraicSponge>::merge(values)
     }
 
-    /// Returns a hash of the provided field elements.
+    /// Returns a hash of multiple digests.
     #[inline(always)]
-    pub fn hash_elements<E: FieldElement<BaseField = Felt>>(elements: &[E]) -> Word {
-        <Self as ElementHasher>::hash_elements(elements)
+    pub fn merge_many(values: &[Word]) -> Word {
+        <Self as AlgebraicSponge>::merge_many(values)
+    }
+
+    /// Returns a hash of a digest and a u64 value.
+    #[inline(always)]
+    pub fn merge_with_int(seed: Word, value: u64) -> Word {
+        <Self as AlgebraicSponge>::merge_with_int(seed, value)
     }
 
     /// Returns a hash of two digests and a domain identifier.
@@ -200,18 +211,27 @@ impl Rpx256 {
         add_constants(state, &ARK1[round]);
 
         // decompose the state into 4 elements in the cubic extension field and apply the power 7
-        // map to each of the elements
+        // map to each of the elements using our custom cubic extension implementation
         let [s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11] = *state;
-        let ext0 = Self::exp7(CubicExtElement::new(s0, s1, s2));
-        let ext1 = Self::exp7(CubicExtElement::new(s3, s4, s5));
-        let ext2 = Self::exp7(CubicExtElement::new(s6, s7, s8));
-        let ext3 = Self::exp7(CubicExtElement::new(s9, s10, s11));
 
-        // decompose the state back into 12 base field elements
-        let arr_ext = [ext0, ext1, ext2, ext3];
-        *state = CubicExtElement::slice_as_base_elements(&arr_ext)
-            .try_into()
-            .expect("shouldn't fail");
+        let ext0 = cubic_ext::power7([s0, s1, s2]);
+        let ext1 = cubic_ext::power7([s3, s4, s5]);
+        let ext2 = cubic_ext::power7([s6, s7, s8]);
+        let ext3 = cubic_ext::power7([s9, s10, s11]);
+
+        // write the results back into the state
+        state[0] = ext0[0];
+        state[1] = ext0[1];
+        state[2] = ext0[2];
+        state[3] = ext1[0];
+        state[4] = ext1[1];
+        state[5] = ext1[2];
+        state[6] = ext2[0];
+        state[7] = ext2[1];
+        state[8] = ext2[2];
+        state[9] = ext3[0];
+        state[10] = ext3[1];
+        state[11] = ext3[2];
     }
 
     /// (M) round function.
@@ -220,44 +240,176 @@ impl Rpx256 {
         apply_mds(state);
         add_constants(state, &ARK1[round]);
     }
+}
 
-    /// Computes an exponentiation to the power 7 in cubic extension field.
+// CUBIC EXTENSION FIELD OPERATIONS
+// ================================================================================================
+
+/// Helper functions for cubic extension field operations over the irreducible polynomial
+/// x³ - x - 1. These are used for Plonky3 integration where we need explicit control
+/// over the field arithmetic.
+mod cubic_ext {
+    use super::Felt;
+    use crate::field::PrimeCharacteristicRing;
+
+    /// Multiplies two cubic extension field elements.
+    ///
+    /// Element representation: [a0, a1, a2] = a0 + a1*φ + a2*φ²
+    /// where φ is a root of x³ - x - 1.
     #[inline(always)]
-    pub fn exp7(x: CubeExtension<Felt>) -> CubeExtension<Felt> {
-        let x2 = x.square();
-        let x4 = x2.square();
+    pub fn mul(a: [Felt; 3], b: [Felt; 3]) -> [Felt; 3] {
+        let a0b0 = a[0] * b[0];
+        let a1b1 = a[1] * b[1];
+        let a2b2 = a[2] * b[2];
 
-        let x3 = x2 * x;
-        x3 * x4
+        let a0b0_a0b1_a1b0_a1b1 = (a[0] + a[1]) * (b[0] + b[1]);
+        let a0b0_a0b2_a2b0_a2b2 = (a[0] + a[2]) * (b[0] + b[2]);
+        let a1b1_a1b2_a2b1_a2b2 = (a[1] + a[2]) * (b[1] + b[2]);
+
+        let a0b0_minus_a1b1 = a0b0 - a1b1;
+
+        let a0b0_a1b2_a2b1 = a1b1_a1b2_a2b1_a2b2 + a0b0_minus_a1b1 - a2b2;
+        let a0b1_a1b0_a1b2_a2b1_a2b2 =
+            a0b0_a0b1_a1b0_a1b1 + a1b1_a1b2_a2b1_a2b2 - a1b1.double() - a0b0;
+        let a0b2_a1b1_a2b0_a2b2 = a0b0_a0b2_a2b0_a2b2 - a0b0_minus_a1b1;
+
+        [a0b0_a1b2_a2b1, a0b1_a1b0_a1b2_a2b1_a2b2, a0b2_a1b1_a2b0_a2b2]
+    }
+
+    /// Squares a cubic extension field element.
+    #[inline(always)]
+    pub fn square(a: [Felt; 3]) -> [Felt; 3] {
+        let a0 = a[0];
+        let a1 = a[1];
+        let a2 = a[2];
+
+        let a2_sq = a2.square();
+        let a1_a2 = a1 * a2;
+
+        let out0 = a0.square() + a1_a2.double();
+        let out1 = (a0 * a1 + a1_a2).double() + a2_sq;
+        let out2 = (a0 * a2).double() + a1.square() + a2_sq;
+
+        [out0, out1, out2]
+    }
+
+    /// Computes the 7th power of a cubic extension field element.
+    ///
+    /// Uses the addition chain: x → x² → x³ → x⁶ → x⁷
+    /// - x² (1 squaring)
+    /// - x³ = x² * x (1 multiplication)
+    /// - x⁶ = (x³)² (1 squaring)
+    /// - x⁷ = x⁶ * x (1 multiplication)
+    ///
+    /// Total: 2 squarings + 2 multiplications
+    #[inline(always)]
+    pub fn power7(a: [Felt; 3]) -> [Felt; 3] {
+        let a2 = square(a);
+        let a3 = mul(a2, a);
+        let a6 = square(a3);
+        mul(a6, a)
     }
 }
 
-impl Hasher for Rpx256 {
-    const COLLISION_RESISTANCE: u32 = 128;
+// PLONKY3 INTEGRATION
+// ================================================================================================
 
-    type Digest = Word;
+/// Plonky3-compatible RPX permutation implementation.
+///
+/// This module provides a Plonky3-compatible interface to the RPX256 hash function,
+/// implementing the `Permutation` and `CryptographicPermutation` traits from Plonky3.
+///
+/// This allows RPX to be used with Plonky3's cryptographic infrastructure, including:
+/// - PaddingFreeSponge for hashing
+/// - TruncatedPermutation for compression
+/// - DuplexChallenger for Fiat-Shamir transforms
+use p3_challenger::DuplexChallenger;
+use p3_symmetric::{
+    CryptographicPermutation, PaddingFreeSponge, Permutation, TruncatedPermutation,
+};
 
-    fn hash(bytes: &[u8]) -> Self::Digest {
-        <Self as AlgebraicSponge>::hash(bytes)
-    }
+// RPX PERMUTATION FOR PLONKY3
+// ================================================================================================
 
-    fn merge(values: &[Self::Digest; 2]) -> Self::Digest {
-        <Self as AlgebraicSponge>::merge(values)
-    }
+/// Plonky3-compatible RPX permutation.
+///
+/// This struct wraps the RPX256 permutation and implements Plonky3's `Permutation` and
+/// `CryptographicPermutation` traits, allowing RPX to be used within the Plonky3 ecosystem.
+///
+/// The permutation operates on a state of 12 field elements (STATE_WIDTH = 12), with:
+/// - Rate: 8 elements (positions 4-11)
+/// - Capacity: 4 elements (positions 0-3)
+/// - Digest output: 4 elements (positions 4-7)
+#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+pub struct RpxPermutation256;
 
-    fn merge_many(values: &[Self::Digest]) -> Self::Digest {
-        <Self as AlgebraicSponge>::merge_many(values)
-    }
+impl RpxPermutation256 {
+    // CONSTANTS
+    // --------------------------------------------------------------------------------------------
 
-    fn merge_with_int(seed: Self::Digest, value: u64) -> Self::Digest {
-        <Self as AlgebraicSponge>::merge_with_int(seed, value)
+    /// Sponge state is set to 12 field elements or 768 bytes; 8 elements are reserved for rate and
+    /// the remaining 4 elements are reserved for capacity.
+    pub const STATE_WIDTH: usize = STATE_WIDTH;
+
+    /// The rate portion of the state is located in elements 4 through 11 (inclusive).
+    pub const RATE_RANGE: Range<usize> = Rpx256::RATE_RANGE;
+
+    /// The capacity portion of the state is located in elements 0, 1, 2, and 3.
+    pub const CAPACITY_RANGE: Range<usize> = Rpx256::CAPACITY_RANGE;
+
+    /// The output of the hash function can be read from state elements 4, 5, 6, and 7.
+    pub const DIGEST_RANGE: Range<usize> = Rpx256::DIGEST_RANGE;
+
+    // RPX PERMUTATION
+    // --------------------------------------------------------------------------------------------
+
+    /// Applies RPX permutation to the provided state.
+    ///
+    /// This delegates to the RPX256 implementation.
+    #[inline(always)]
+    pub fn apply_permutation(state: &mut [Felt; STATE_WIDTH]) {
+        Rpx256::apply_permutation(state);
     }
 }
 
-impl ElementHasher for Rpx256 {
-    type BaseField = Felt;
+// PLONKY3 TRAIT IMPLEMENTATIONS
+// ================================================================================================
 
-    fn hash_elements<E: FieldElement<BaseField = Self::BaseField>>(elements: &[E]) -> Self::Digest {
-        <Self as AlgebraicSponge>::hash_elements(elements)
+impl Permutation<[Felt; STATE_WIDTH]> for RpxPermutation256 {
+    fn permute_mut(&self, state: &mut [Felt; STATE_WIDTH]) {
+        Self::apply_permutation(state);
     }
 }
+
+impl CryptographicPermutation<[Felt; STATE_WIDTH]> for RpxPermutation256 {}
+
+// TYPE ALIASES FOR PLONKY3 INTEGRATION
+// ================================================================================================
+
+/// RPX-based hasher using Plonky3's PaddingFreeSponge.
+///
+/// This provides a sponge-based hash function with:
+/// - WIDTH: 12 field elements (total state size)
+/// - RATE: 8 field elements (input/output rate)
+/// - OUT: 4 field elements (digest size)
+pub type RpxHasher = PaddingFreeSponge<RpxPermutation256, 12, 8, 4>;
+
+/// RPX-based compression function using Plonky3's TruncatedPermutation.
+///
+/// This provides a 2-to-1 compression function for Merkle tree construction with:
+/// - CHUNK: 2 (number of input chunks - i.e., 2 digests of 4 elements each = 8 elements)
+/// - N: 4 (output size in field elements)
+/// - WIDTH: 12 (total state size)
+///
+/// The compression function takes 8 field elements (2 digests) as input and produces
+/// 4 field elements (1 digest) as output.
+pub type RpxCompression = TruncatedPermutation<RpxPermutation256, 2, 4, 12>;
+
+/// RPX-based challenger using Plonky3's DuplexChallenger.
+///
+/// This provides a Fiat-Shamir transform implementation for interactive proof protocols,
+/// with:
+/// - F: Generic field type (typically the same as Felt)
+/// - WIDTH: 12 field elements (sponge state size)
+/// - RATE: 8 field elements (rate of absorption/squeezing)
+pub type RpxChallenger<F> = DuplexChallenger<F, RpxPermutation256, 12, 8>;

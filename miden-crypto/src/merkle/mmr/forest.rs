@@ -3,10 +3,12 @@ use core::{
     ops::{BitAnd, BitOr, BitXor, BitXorAssign},
 };
 
-use winter_utils::{ByteReader, ByteWriter, Deserializable, DeserializationError, Serializable};
-
 use super::InOrderIndex;
-use crate::Felt;
+use crate::{
+    Felt,
+    field::PrimeField64,
+    utils::{ByteReader, ByteWriter, Deserializable, DeserializationError, Serializable},
+};
 
 /// A compact representation of trees in a forest. Used in the Merkle forest (MMR).
 ///
@@ -400,7 +402,7 @@ impl BitXorAssign<Forest> for Forest {
 
 impl From<Felt> for Forest {
     fn from(value: Felt) -> Self {
-        Self::new(value.as_int() as usize)
+        Self::new(value.as_canonical_u64() as usize)
     }
 }
 

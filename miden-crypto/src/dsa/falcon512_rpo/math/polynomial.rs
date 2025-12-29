@@ -8,12 +8,13 @@ use core::{
 };
 
 use num::{One, Zero};
+use p3_field::PrimeCharacteristicRing;
 
 use super::{Inverse, field::FalconFelt};
 use crate::{
     Felt,
     dsa::falcon512_rpo::{MODULUS, N},
-    zeroize::{Zeroize, ZeroizeOnDrop},
+    utils::zeroize::{Zeroize, ZeroizeOnDrop},
 };
 
 /// Represents a polynomial with coefficients of type F.
@@ -523,7 +524,7 @@ fn vector_karatsuba<
 impl From<Polynomial<FalconFelt>> for Polynomial<Felt> {
     fn from(item: Polynomial<FalconFelt>) -> Self {
         let res: Vec<Felt> =
-            item.coefficients.iter().map(|a| Felt::from(a.value() as u16)).collect();
+            item.coefficients.iter().map(|a| Felt::from_u16(a.value() as u16)).collect();
         Polynomial::new(res)
     }
 }
@@ -531,7 +532,7 @@ impl From<Polynomial<FalconFelt>> for Polynomial<Felt> {
 impl From<&Polynomial<FalconFelt>> for Polynomial<Felt> {
     fn from(item: &Polynomial<FalconFelt>) -> Self {
         let res: Vec<Felt> =
-            item.coefficients.iter().map(|a| Felt::from(a.value() as u16)).collect();
+            item.coefficients.iter().map(|a| Felt::from_u16(a.value() as u16)).collect();
         Polynomial::new(res)
     }
 }
@@ -579,7 +580,7 @@ impl Polynomial<FalconFelt> {
 
     /// Returns the coefficients of this polynomial as field elements.
     pub fn to_elements(&self) -> Vec<Felt> {
-        self.coefficients.iter().map(|&a| Felt::from(a.value() as u16)).collect()
+        self.coefficients.iter().map(|&a| Felt::from_u16(a.value() as u16)).collect()
     }
 
     // POLYNOMIAL OPERATIONS
@@ -647,14 +648,15 @@ impl<F: Zeroize> ZeroizeOnDrop for Polynomial<F> {}
 // TESTS
 // ================================================================================================
 
-#[cfg(test)]
+#[cfg(all(test, feature = "std"))]
 mod tests {
     use super::{FalconFelt, N, Polynomial};
+    use crate::rand::test_utils::rand_array;
 
     #[test]
     fn test_negacyclic_reduction() {
-        let coef1: [u8; N] = rand_utils::rand_array();
-        let coef2: [u8; N] = rand_utils::rand_array();
+        let coef1: [u8; N] = rand_array();
+        let coef2: [u8; N] = rand_array();
 
         let poly1 = Polynomial::new(coef1.iter().map(|&a| FalconFelt::new(a as i16)).collect());
         let poly2 = Polynomial::new(coef2.iter().map(|&a| FalconFelt::new(a as i16)).collect());

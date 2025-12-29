@@ -7,7 +7,6 @@ help:
 # -- variables --------------------------------------------------------------------------------------
 
 ALL_FEATURES_EXCEPT_ROCKSDB="concurrent executable hashmaps internal serde std"
-DEBUG_OVERFLOW_INFO=RUSTFLAGS="-C debug-assertions -C overflow-checks -C debuginfo=2"
 WARNINGS=RUSTDOCFLAGS="-D warnings"
 
 # -- linting --------------------------------------------------------------------------------------
@@ -51,8 +50,12 @@ typos-check: ## Runs spellchecker
 workspace-check: ## Runs a check that all packages have `lints.workspace = true`
 	cargo workspace-lints
 
+.PHONY: cargo-deny
+cargo-deny: ## Run cargo-deny to check dependencies for security vulnerabilities and license compliance
+	cargo deny check
+
 .PHONY: lint
-lint: format fix clippy toml typos-check machete ## Run all linting tasks at once (Clippy, fixing, formatting, machete)
+lint: format fix clippy toml typos-check machete cargo-deny ## Run all linting tasks at once (Clippy, fixing, formatting, machete, cargo-deny)
 
 # --- docs ----------------------------------------------------------------------------------------
 
@@ -64,27 +67,27 @@ doc: ## Generate and check documentation
 
 .PHONY: test-default
 test-default: ## Run tests with default features
-	$(DEBUG_OVERFLOW_INFO) cargo nextest run --profile default --release --features ${ALL_FEATURES_EXCEPT_ROCKSDB}
+	cargo nextest run --profile default --cargo-profile test-release --features ${ALL_FEATURES_EXCEPT_ROCKSDB}
 
 .PHONY: test-hashmaps
 test-hashmaps: ## Run tests with `hashmaps` feature enabled
-	$(DEBUG_OVERFLOW_INFO) cargo nextest run --profile default --release --features hashmaps
+	cargo nextest run --profile default --cargo-profile test-release --features hashmaps
 
 .PHONY: test-no-std
 test-no-std: ## Run tests with `no-default-features` (std)
-	$(DEBUG_OVERFLOW_INFO) cargo nextest run --profile default --release --no-default-features
+	cargo nextest run --profile default --cargo-profile test-release --no-default-features
 
 .PHONY: test-smt-concurrent
 test-smt-concurrent: ## Run only concurrent SMT tests
-	$(DEBUG_OVERFLOW_INFO) cargo nextest run --profile smt-concurrent --release
+	cargo nextest run --profile smt-concurrent --cargo-profile test-release
 
 .PHONY: test-docs
 test-docs:
-	$(DEBUG_OVERFLOW_INFO) cargo test --doc --all-features
+	cargo test --doc --all-features --profile test-release
 
 .PHONY: test-large-smt
 test-large-smt: ## Run only large SMT tests
-	$(DEBUG_OVERFLOW_INFO) cargo nextest run --success-output immediate  --profile large-smt --release --features hashmaps,rocksdb
+	cargo nextest run --success-output immediate --profile large-smt --cargo-profile test-release --features hashmaps,rocksdb
 
 .PHONY: test
 test: test-default test-hashmaps test-no-std test-docs test-large-smt ## Run all tests except concurrent SMT tests
@@ -158,12 +161,14 @@ check-tools: ## Checks if development tools are installed
 	@command -v cargo nextest >/dev/null 2>&1 && echo "[OK] nextest is installed" || echo "[MISSING] nextest is not installed (run: make install-tools)"
 	@command -v taplo >/dev/null 2>&1 && echo "[OK] taplo is installed" || echo "[MISSING] taplo is not installed (run: make install-tools)"
 	@command -v cargo machete >/dev/null 2>&1 && echo "[OK] machete is installed" || echo "[MISSING] machete is not installed (run: make install-tools)"
+	@command -v cargo deny >/dev/null 2>&1 && echo "[OK] cargo-deny is installed" || echo "[MISSING] cargo-deny is not installed (run: make install-tools)"
 
 .PHONY: install-tools
-install-tools: ## Installs development tools required by the Makefile (typos, nextest, taplo, machete)
+install-tools: ## Installs development tools required by the Makefile (typos, nextest, taplo, machete, cargo-deny)
 	@echo "Installing development tools..."
 	cargo install typos-cli --locked
 	cargo install cargo-nextest --locked
 	cargo install taplo-cli --locked
 	cargo install cargo-machete --locked
+	cargo install cargo-deny --locked
 	@echo "Development tools installation complete!"

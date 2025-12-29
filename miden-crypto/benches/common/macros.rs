@@ -158,6 +158,13 @@ macro_rules! benchmark_hash_auto {
 // ```
 #[macro_export]
 macro_rules! benchmark_hash_merge {
+    // Simple variant without size parameterization - just benchmarks merge operation
+    ($func_name:ident, $hasher_name:literal, $closure:expr) => {
+        fn $func_name(c: &mut Criterion) {
+            c.bench_function(concat!("hash-", $hasher_name, "-merge"), |b| $closure(b));
+        }
+    };
+    // Parameterized variant with multiple sizes (legacy)
     ($func_name:ident, $hasher_name:literal, $sizes:expr, $closure:expr) => {
         fn $func_name(c: &mut Criterion) {
             let mut group = c.benchmark_group(concat!("hash-", $hasher_name, "-merge"));
@@ -745,13 +752,11 @@ macro_rules! benchmark_rand_draw_integers {
                             &(num_values, domain_size),
                             |b, &(num_values, domain_size)| {
                                 b.iter(|| {
-                                    let _result = coin
-                                        .draw_integers(
-                                            black_box(num_values),
-                                            black_box(domain_size),
-                                            black_box(0),
-                                        )
-                                        .unwrap();
+                                    let _result = coin.draw_integers(
+                                        black_box(num_values),
+                                        black_box(domain_size),
+                                        black_box(0),
+                                    );
                                 })
                             },
                         );
