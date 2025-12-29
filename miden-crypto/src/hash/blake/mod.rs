@@ -22,7 +22,6 @@ mod tests;
 
 const DIGEST32_BYTES: usize = 32;
 const DIGEST24_BYTES: usize = 24;
-const DIGEST20_BYTES: usize = 20;
 
 // BLAKE3 N-BIT OUTPUT
 // ================================================================================================
@@ -214,62 +213,6 @@ impl Blake3_192 {
     /// Hashes an iterator of byte slices.
     #[inline(always)]
     pub fn hash_iter<'a>(slices: impl Iterator<Item = &'a [u8]>) -> Blake3Digest<DIGEST24_BYTES> {
-        <Self as HasherExt>::hash_iter(slices)
-    }
-}
-
-// BLAKE3 160-BIT OUTPUT
-// ================================================================================================
-
-/// 160-bit output blake3 hasher.
-#[derive(Debug, Copy, Clone, Eq, PartialEq)]
-pub struct Blake3_160;
-
-impl HasherExt for Blake3_160 {
-    type Digest = Blake3Digest<20>;
-
-    fn hash_iter<'a>(slices: impl Iterator<Item = &'a [u8]>) -> Self::Digest {
-        let mut hasher = blake3::Hasher::new();
-        for slice in slices {
-            hasher.update(slice);
-        }
-        Blake3Digest(shrink_array(hasher.finalize().into()))
-    }
-}
-
-impl Blake3_160 {
-    /// Blake3 collision resistance is 80-bits for 20-bytes output.
-    pub const COLLISION_RESISTANCE: u32 = 80;
-
-    pub fn hash(bytes: &[u8]) -> Blake3Digest<20> {
-        Blake3Digest(shrink_array(blake3::hash(bytes).into()))
-    }
-
-    pub fn merge(values: &[Blake3Digest<20>; 2]) -> Blake3Digest<20> {
-        Self::hash(prepare_merge(values))
-    }
-
-    pub fn merge_many(values: &[Blake3Digest<20>]) -> Blake3Digest<20> {
-        let bytes = Blake3Digest::digests_as_bytes(values);
-        Blake3Digest(shrink_array(blake3::hash(bytes).into()))
-    }
-
-    pub fn merge_with_int(seed: Blake3Digest<20>, value: u64) -> Blake3Digest<20> {
-        let mut hasher = blake3::Hasher::new();
-        hasher.update(&seed.0);
-        hasher.update(&value.to_le_bytes());
-        Blake3Digest(shrink_array(hasher.finalize().into()))
-    }
-
-    /// Returns a hash of the provided field elements.
-    #[inline(always)]
-    pub fn hash_elements<E: BasedVectorSpace<Felt>>(elements: &[E]) -> Blake3Digest<32> {
-        Blake3Digest(hash_elements(elements))
-    }
-
-    /// Hashes an iterator of byte slices.
-    #[inline(always)]
-    pub fn hash_iter<'a>(slices: impl Iterator<Item = &'a [u8]>) -> Blake3Digest<DIGEST20_BYTES> {
         <Self as HasherExt>::hash_iter(slices)
     }
 }

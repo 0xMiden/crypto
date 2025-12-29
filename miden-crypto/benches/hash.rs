@@ -22,7 +22,7 @@ use std::hint::black_box;
 use criterion::{Criterion, criterion_group, criterion_main};
 use miden_crypto::hash::{
     HasherExt,
-    blake::{Blake3_160, Blake3_192, Blake3_256},
+    blake::{Blake3_192, Blake3_256},
     keccak::Keccak256,
     poseidon2::Poseidon2,
     rpo::Rpo256,
@@ -143,28 +143,6 @@ benchmark_hash_felt!(
     |count| Some(criterion::Throughput::Elements(count as u64))
 );
 
-// === Blake3_160 Hash Benchmarks ===
-
-// 2-to-1 hash merge
-benchmark_hash_merge!(hash_blake3_160_merge, "blake3_160", |b: &mut criterion::Bencher| {
-    let input1 = Blake3_160::hash(&generate_byte_array_random(32));
-    let input2 = Blake3_160::hash(&generate_byte_array_random(32));
-    let digest_inputs: [<Blake3_160 as HasherExt>::Digest; 2] = [input1, input2];
-    b.iter(|| Blake3_160::merge(black_box(&digest_inputs)))
-});
-
-// Sequential hashing of Felt elements
-benchmark_hash_felt!(
-    hash_blake3_160_sequential_felt,
-    "blake3_160",
-    HASH_ELEMENT_COUNTS,
-    |b: &mut criterion::Bencher, count| {
-        let elements = generate_felt_array_sequential(count);
-        b.iter(|| Blake3_160::hash_elements(black_box(&elements)))
-    },
-    |count| Some(criterion::Throughput::Elements(count as u64))
-);
-
 // === Keccak256 benches ===
 
 // 2-to-1 hash merge
@@ -204,9 +182,6 @@ criterion_group!(
     // Blake3_192 benchmarks
     hash_blake3_192_merge,
     hash_blake3_192_sequential_felt,
-    // Blake3_160 benchmarks
-    hash_blake3_160_merge,
-    hash_blake3_160_sequential_felt,
     // Keccak256 benchmarks
     hash_keccak_256_merge,
     hash_keccak_256_sequential_felt,
