@@ -945,7 +945,7 @@ checksum = "f52b00d39961fc5b2736ea853c9cc86238e165017a493d1d5c8eac6bdc4cc273"
 
 [[package]]
 name = "miden-crypto"
-version = "0.20.0"
+version = "0.21.0"
 dependencies = [
  "assert_matches",
  "blake3",
@@ -994,7 +994,7 @@ dependencies = [
 
 [[package]]
 name = "miden-crypto-derive"
-version = "0.20.0"
+version = "0.21.0"
 dependencies = [
  "quote",
  "syn",
@@ -1002,7 +1002,7 @@ dependencies = [
 
 [[package]]
 name = "miden-serde-utils"
-version = "0.20.0"
+version = "0.21.0"
 dependencies = [
  "p3-field",
  "p3-miden-goldilocks",
