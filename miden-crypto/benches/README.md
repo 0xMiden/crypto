@@ -17,33 +17,34 @@ We benchmark the above hash functions using two scenarios. The first is a 2-to-1
 
 ### Scenario 1: 2-to-1 hashing `h(a,b)`
 
-| Function            | BLAKE3 | SHA3   | Keccak256 | Poseidon2 | RPO_256 | RPX_256 |
-| ------------------- | :----: | :----: | :-------: | :-------: | :-----: | :-----: |
-| Apple M1 Pro        | 76 ns  | 245 ns |           |           | 5.2 µs  | 2.7 µs  |
-| Apple M2 Max        | 71 ns  | 233 ns |           |           | 4.6 µs  | 2.4 µs  |
-| Apple M4 Max        | 48 ns  |        | 155 ns    | 0.7 µs    | 2.9 µs  | 1.5 µs  |
-| Amazon Graviton 3   | 108 ns |        |           |           | 5.3 µs  | 3.1 µs  |
-| Amazon Graviton 4   | 96 ns  |        |           |           | 5.1 µs  | 2.8 µs  |
-| AMD Ryzen 9 5950X   | 64 ns  | 273 ns |           |           | 5.5 µs  |         |
-| AMD EPYC 9R14       | 83 ns  |        |           |           | 4.3 µs  | 2.4 µs  |
-| Intel Core i5-8279U | 68 ns  | 536 ns | 514 ns    | 1.7 µs    | 8.5 µs  | 4.4 µs  |
-| Intel Xeon 8375C    | 67 ns  |        |           |           | 8.2 µs  |         |
+| Function            | BLAKE3 | SHA3   | Keccak256 | Poseidon2 | RPO_256  | RPX_256  |
+| ------------------- | :----: | :----: | :-------: | :-------: | :------: | :------: |
+| Apple M1 Pro        | 76 ns  | 245 ns |           |           | *5.2 µs  | *2.7 µs  |
+| Apple M2 Max        | 71 ns  | 233 ns |           |           | *4.6 µs  | *2.4 µs  |
+| Apple M4 Max        | 48 ns  |        | 149 ns    | 0.7 µs    | 2.5 µs   | 1.3 µs   |
+| Amazon Graviton 3   | 108 ns |        |           |           | *5.3 µs  | *3.1 µs  |
+| Amazon Graviton 4   | 96 ns  |        |           |           | *5.1 µs  | *2.8 µs  |
+| AMD Ryzen 9 5950X   | 64 ns  | 273 ns |           |           | *5.5 µs  |          |
+| AMD EPYC 9R14       | 83 ns  |        |           |           | *4.3 µs  | *2.4 µs  |
+| Intel Core i5-8279U | 68 ns  | 536 ns | 514 ns    | *1.7 µs   | *8.5 µs  | *4.4 µs  |
+| Intel Xeon 8375C    | 67 ns  |        |           |           | *8.2 µs  |          |
 
 ### Scenario 2: Sequential hashing of 100 elements `h([a_0,...,a_99])`
 
-| Function            | BLAKE3 | SHA3   | Keccak256 | Poseidon2 | RPO_256 | RPX_256 |
-| ------------------- | :----: | :----: | :-------: | :-------: | :-----: | :-----: |
-| Apple M1 Pro        | 1.0 µs | 1.5 µs |           |           | 69 µs   | 35 µs   |
-| Apple M2 Max        | 0.9 µs | 1.5 µs |           |           | 60 µs   | 31 µs   |
-| Apple M4 Max        | 0.7 µs |        | 0.9 µs    | 9.7 µs    | 37.5 µs | 19.4 µs |
-| Amazon Graviton 3   | 1.4 µs |        |           |           | 69 µs   | 41 µs   |
-| Amazon Graviton 4   | 1.2 µs |        |           |           | 67 µs   | 36 µs   |
-| AMD Ryzen 9 5950X   | 0.8 µs | 1.7 µs |           |           | 72 µs   |         |
-| AMD EPYC 9R14       | 0.9 µs |        |           |           | 56 µs   | 32 µs   |
-| Intel Core i5-8279U | 0.9 µs |        | 3.4 µs    | 27 µs     | 107 µs  | 56 µs   |
-| Intel Xeon 8375C    | 0.8 µs |        |           |           | 110 µs  |         |
+| Function            | BLAKE3 | SHA3   | Keccak256 | Poseidon2 | RPO_256   | RPX_256 |
+| ------------------- | :----: | :----: | :-------: | :-------: | :------: | :------: |
+| Apple M1 Pro        | 1.0 µs | 1.5 µs |           |           | *69 µs   | *35 µs   |
+| Apple M2 Max        | 0.9 µs | 1.5 µs |           |           | *60 µs   | *31 µs   |
+| Apple M4 Max        | 0.7 µs |        | 0.7 µs    | 8.7 µs    | 32 µs    | 17 µs    |
+| Amazon Graviton 3   | 1.4 µs |        |           |           | *69 µs   | *41 µs   |
+| Amazon Graviton 4   | 1.2 µs |        |           |           | *67 µs   | *36 µs   |
+| AMD Ryzen 9 5950X   | 0.8 µs | 1.7 µs |           |           | *72 µs   |          |
+| AMD EPYC 9R14       | 0.9 µs |        |           |           | *56 µs   | *32 µs   |
+| Intel Core i5-8279U | 0.9 µs |        | 3.4 µs    | *27 µs    | *107 µs  | *56 µs   |
+| Intel Xeon 8375C    | 0.8 µs |        |           |           | *110 µs  |          |
 
 Notes:
+- Measurements marked with an `*` are obsolete and need to be re-run.
 - On Graviton 3 and 4, RPO256 and RPX256 are run with SVE acceleration enabled.
 - On AMD EPYC 9R14, RPO256 and RPX256 are run with AVX2 acceleration enabled.
 
