@@ -973,6 +973,7 @@ dependencies = [
  "p3-miden-goldilocks",
  "p3-miden-prover",
  "p3-symmetric",
+ "p3-util",
  "proptest",
  "rand",
  "rand_chacha",

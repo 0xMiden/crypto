@@ -1,5 +1,7 @@
 ## 0.21.0 (TBD)
 
+- Use more idiomatic Plonky3 APIs ([#743](https://github.com/0xMiden/crypto/pull/743)).
+
 ## 0.20.0 (2025-12-28)
 
 - [BREAKING] Renamed `MmrProof` to `MmrPath`, and introduce a new `MmrProof` with the leaf value included ([#656](https://github.com/0xMiden/crypto/pull/656)).
