@@ -13,19 +13,12 @@ rust-version.workspace = true
 version.workspace      = true
 
 [features]
-default       = ["std"]
-p3-compat     = ["dep:p3-field", "dep:p3-miden-goldilocks"]
-std           = ["winter-math?/std", "winter-utils?/std"]
-winter-compat = ["dep:winter-math", "dep:winter-utils"]
+default = ["std"]
+std     = []
 
 [dependencies]
-p3-field            = { default-features = false, optional = true, version = "0.4" }
-p3-miden-goldilocks = { default-features = false, optional = true, version = "0.4" }
-winter-math         = { default-features = false, optional = true, version = "0.13" }
-winter-utils        = { default-features = false, optional = true, version = "0.13" }
+p3-field            = { default-features = false, version = "0.4" }
+p3-miden-goldilocks = { default-features = false, version = "0.4" }
 
 [lints]
 workspace = true
-
-[package.metadata.cargo-machete]
-ignored = ["winter-math", "winter-utils"]

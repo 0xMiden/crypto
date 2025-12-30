@@ -49,12 +49,6 @@ pub use byte_reader::{ByteReader, SliceReader};
 mod byte_writer;
 pub use byte_writer::ByteWriter;
 
-#[cfg(feature = "winter-compat")]
-mod winter_compat;
-
-#[cfg(feature = "p3-compat")]
-mod p3_compat;
-
 // SERIALIZABLE TRAIT
 // ================================================================================================
 
@@ -615,5 +609,33 @@ impl Deserializable for String {
         let data = source.read_many(len)?;
 
         String::from_utf8(data).map_err(|err| DeserializationError::InvalidValue(format!("{err}")))
+    }
+}
+
+// GOLDILOCKS FIELD ELEMENT IMPLEMENTATIONS
+// ================================================================================================
+
+impl Serializable for p3_miden_goldilocks::Goldilocks {
+    fn write_into<W: ByteWriter>(&self, target: &mut W) {
+        use p3_field::PrimeField64;
+        target.write_u64(self.as_canonical_u64());
+    }
+
+    fn get_size_hint(&self) -> usize {
+        core::mem::size_of::<u64>()
+    }
+}
+
+impl Deserializable for p3_miden_goldilocks::Goldilocks {
+    fn read_from<R: ByteReader>(source: &mut R) -> Result<Self, DeserializationError> {
+        use p3_field::integers::QuotientMap;
+
+        let value = source.read_u64()?;
+        Self::from_canonical_checked(value).ok_or_else(|| {
+            DeserializationError::InvalidValue(format!(
+                "value {} is not a valid Goldilocks field element",
+                value
+            ))
+        })
     }
 }

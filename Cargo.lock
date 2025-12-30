@@ -1007,8 +1007,6 @@ version = "0.21.0"
 dependencies = [
  "p3-field",
  "p3-miden-goldilocks",
- "winter-math",
- "winter-utils",
 ]
 
 [[package]]
@@ -2175,15 +2173,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5a5364e9d77fcdeeaa6062ced926ee3381faa2ee02d3eb83a5c27a8825540829"
 dependencies = [
  "memchr",
-]
-
-[[package]]
-name = "winter-math"
-version = "0.13.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7aecfb48ee6a8b4746392c8ff31e33e62df8528a3b5628c5af27b92b14aef1ea"
-dependencies = [
- "winter-utils",
 ]
 
 [[package]]
