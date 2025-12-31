@@ -1,4 +1,5 @@
 ## 0.21.0 (TBD)
+- [BREAKING] Removed `p3-compat` and `winter-compat` features ([#745](https://github.com/0xMiden/crypto/pull/745)).
 
 - Use more idiomatic Plonky3 APIs ([#743](https://github.com/0xMiden/crypto/pull/743)).
 

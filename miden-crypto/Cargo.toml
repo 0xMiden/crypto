@@ -71,22 +71,14 @@ required-features = ["std"]
 
 [features]
 concurrent = ["dep:rayon", "hashbrown?/rayon", "std"]
-default = ["concurrent", "std"]
+default    = ["concurrent", "std"]
 executable = ["concurrent", "dep:clap", "dep:rand-utils"]
-fuzzing = []
-hashmaps = ["dep:hashbrown"]
-internal = ["concurrent"]
-rocksdb = ["concurrent", "dep:rocksdb"]
-serde = ["dep:serde", "serde?/alloc"]
-std = [
-  "blake3/std",
-  "dep:cc",
-  "miden-serde-utils/p3-compat",
-  "miden-serde-utils/std",
-  "miden-serde-utils/winter-compat",
-  "rand/std",
-  "rand/thread_rng",
-]
+fuzzing    = []
+hashmaps   = ["dep:hashbrown"]
+internal   = ["concurrent"]
+rocksdb    = ["concurrent", "dep:rocksdb"]
+serde      = ["dep:serde", "serde?/alloc"]
+std        = ["blake3/std", "dep:cc", "miden-serde-utils/std", "rand/std", "rand/thread_rng"]
 
 [dependencies]
 blake3                        = { default-features = false, version = "1.8" }
@@ -148,7 +140,7 @@ glob = "0.3"
 workspace = true
 
 [package.metadata.cargo-machete]
-ignored = ["getrandom", "rand-utils", "winter-math"]
+ignored = ["getrandom", "rand-utils"]
 
 [[test]]
 name              = "rocksdb_large_smt"
