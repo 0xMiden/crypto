@@ -478,7 +478,8 @@ mod p3_tests {
     #[ignore]
     // TODO: The state layout now matches Plonky3 (rate=[0-7], capacity=[8-11]), but there's
     // still a digest position mismatch:
-    // - Miden's Poseidon2::hash_elements() reads digest from state[4..8] (DIGEST_RANGE, middle word)
+    // - Miden's Poseidon2::hash_elements() reads digest from state[4..8] (DIGEST_RANGE, middle
+    //   word)
     // - Plonky3's PaddingFreeSponge reads digest from state[0..OUT] (first 4 elements)
     fn test_poseidon2_hasher_vs_hash_elements() {
         // Test with empty input

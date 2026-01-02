@@ -15,7 +15,9 @@ const INV_ALPHA: u64 = 10540996611094048183;
 use crate::{
     ONE, Word, ZERO,
     field::{PrimeCharacteristicRing, PrimeField64},
-    hash::algebraic_sponge::{AlgebraicSponge, BINARY_CHUNK_SIZE, CAPACITY_RANGE, RATE_RANGE, RATE_WIDTH},
+    hash::algebraic_sponge::{
+        AlgebraicSponge, BINARY_CHUNK_SIZE, CAPACITY_RANGE, RATE_RANGE, RATE_WIDTH,
+    },
     rand::test_utils::rand_value,
 };
 
