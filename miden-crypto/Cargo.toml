@@ -64,11 +64,6 @@ harness           = false
 name              = "word"
 required-features = ["std"]
 
-[[bench]]
-harness           = false
-name              = "rand"
-required-features = ["std"]
-
 [features]
 concurrent = ["dep:rayon", "hashbrown?/rayon", "std"]
 default    = ["concurrent", "std"]
