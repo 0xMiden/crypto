@@ -80,12 +80,12 @@ concurrent = [
 ]
 default = ["concurrent", "std"]
 executable = ["concurrent", "dep:clap", "dep:rand-utils"]
-fuzzing    = []
-hashmaps   = ["dep:hashbrown"]
-internal   = ["concurrent"]
-rocksdb    = ["concurrent", "dep:rocksdb"]
-serde      = ["dep:serde", "serde?/alloc"]
-std        = ["blake3/std", "dep:cc", "miden-serde-utils/std", "rand/std", "rand/thread_rng"]
+fuzzing = []
+hashmaps = ["dep:hashbrown"]
+internal = ["concurrent"]
+rocksdb = ["concurrent", "dep:rocksdb"]
+serde = ["dep:serde", "serde?/alloc"]
+std = ["blake3/std", "dep:cc", "miden-serde-utils/std", "rand/std", "rand/thread_rng"]
 
 [dependencies]
 blake3                        = { default-features = false, version = "1.8" }

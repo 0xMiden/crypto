@@ -969,6 +969,7 @@ dependencies = [
  "p3-air",
  "p3-challenger",
  "p3-field",
+ "p3-maybe-rayon",
  "p3-miden-air",
  "p3-miden-goldilocks",
  "p3-miden-prover",
@@ -1235,6 +1236,9 @@ name = "p3-maybe-rayon"
 version = "0.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0db6a290f867061aed54593d48f0dfd7ff2d0f706a603d03209fd0eac79518f3"
+dependencies = [
+ "rayon",
+]
 
 [[package]]
 name = "p3-mds"
@@ -1395,6 +1399,7 @@ version = "0.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a92074eab13c8a30d23ad7bcf99b82787a04c843133a0cba39ca1cf39d434492"
 dependencies = [
+ "rayon",
  "serde",
 ]
 
