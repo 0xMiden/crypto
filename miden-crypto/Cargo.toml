@@ -70,15 +70,22 @@ name              = "rand"
 required-features = ["std"]
 
 [features]
-concurrent = ["dep:rayon", "hashbrown?/rayon", "std"]
-default    = ["concurrent", "std"]
+concurrent = [
+  "dep:rayon",
+  "hashbrown?/rayon",
+  "p3-maybe-rayon/parallel",
+  "p3-miden-prover/parallel",
+  "p3-util/parallel",
+  "std",
+]
+default = ["concurrent", "std"]
 executable = ["concurrent", "dep:clap", "dep:rand-utils"]
-fuzzing    = []
-hashmaps   = ["dep:hashbrown"]
-internal   = ["concurrent"]
-rocksdb    = ["concurrent", "dep:rocksdb"]
-serde      = ["dep:serde", "serde?/alloc"]
-std        = ["blake3/std", "dep:cc", "miden-serde-utils/std", "rand/std", "rand/thread_rng"]
+fuzzing = []
+hashmaps = ["dep:hashbrown"]
+internal = ["concurrent"]
+rocksdb = ["concurrent", "dep:rocksdb"]
+serde = ["dep:serde", "serde?/alloc"]
+std = ["blake3/std", "dep:cc", "miden-serde-utils/std", "rand/std", "rand/thread_rng"]
 
 [dependencies]
 blake3                        = { default-features = false, version = "1.8" }
@@ -109,11 +116,12 @@ thiserror                     = { default-features = false, version = "2.0" }
 x25519-dalek                  = { default-features = false, features = ["static_secrets"], version = "2.0" }
 
 # Upstream Plonky3 dependencies
-p3-air        = { default-features = false, version = "0.4" }
-p3-challenger = { default-features = false, version = "0.4" }
-p3-field      = { default-features = false, version = "0.4" }
-p3-symmetric  = { default-features = false, version = "0.4" }
-p3-util       = { default-features = false, version = "0.4" }
+p3-air         = { default-features = false, version = "0.4" }
+p3-challenger  = { default-features = false, version = "0.4" }
+p3-field       = { default-features = false, version = "0.4" }
+p3-maybe-rayon = { default-features = false, version = "0.4" }
+p3-symmetric   = { default-features = false, version = "0.4" }
+p3-util        = { default-features = false, version = "0.4" }
 
 # Miden-specific Plonky3 crates
 p3-miden-air        = { default-features = false, version = "0.4" }

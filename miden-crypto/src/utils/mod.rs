@@ -10,11 +10,8 @@ pub use miden_serde_utils::{
     ByteReader, ByteWriter, Deserializable, DeserializationError, Serializable, SliceReader,
 };
 use p3_field::{PrimeCharacteristicRing, RawDataSerializable, integers::QuotientMap};
+use p3_maybe_rayon::prelude::*;
 use thiserror::Error;
-
-mod iterators;
-#[cfg(feature = "concurrent")]
-use iterators::{IndexedParallelIterator, IntoParallelRefMutIterator, ParallelIterator};
 
 use crate::{Felt, Word, field::PrimeField64};
 
@@ -346,7 +343,7 @@ pub fn transpose_slice<T: Copy + Send + Sync, const N: usize>(source: &[T]) -> V
     );
 
     let mut result: Vec<[T; N]> = unsafe { uninit_vector(row_count) };
-    crate::iter_mut!(result, 1024).enumerate().for_each(|(i, element)| {
+    result.par_iter_mut().enumerate().for_each(|(i, element)| {
         for j in 0..N {
             element[j] = source[i + j * row_count]
         }

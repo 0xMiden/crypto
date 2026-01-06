@@ -552,7 +552,7 @@ impl SmtStorage for RocksDbStorage {
     /// - `Ok(...)` if all fetches succeed.
     /// - `Err(StorageError)` if any RocksDB access or deserialization fails.
     fn get_subtrees(&self, indices: &[NodeIndex]) -> Result<Vec<Option<Subtree>>, StorageError> {
-        use rayon::prelude::*;
+        use p3_maybe_rayon::prelude::*;
 
         let mut depth_buckets: [Vec<(usize, NodeIndex)>; 5] = Default::default();
 
@@ -809,7 +809,7 @@ impl SmtStorage for RocksDbStorage {
     /// # Errors
     /// - `StorageError::Backend`: If any column family is missing or a RocksDB write error occurs.
     fn apply(&mut self, updates: StorageUpdates) -> Result<(), StorageError> {
-        use rayon::prelude::*;
+        use p3_maybe_rayon::prelude::*;
 
         let mut batch = WriteBatch::default();
 
