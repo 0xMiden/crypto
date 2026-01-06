@@ -4,6 +4,7 @@
 - Use more idiomatic Plonky3 APIs ([#743](https://github.com/0xMiden/crypto/pull/743)).
 - Make concurrent feature interact with plonky3's parallel features, replace homegrown iterator macros with p3-maybe-rayon ([#749](https://github.com/0xMiden/crypto/pull/749)).
 - Reduce dependency on std in tests, add test helpers to access Rngs in no-std contexts ([#752](https://github.com/0xMiden/crypto/pull/752)).
+- Added SMT integration tests for History mechanism ([#754](https://github.com/0xMiden/crypto/pull/754)).
 - [BREAKING] Changed sponge state layout from `[CAPACITY, RATE1, RATE0]` (BE) to `[RATE0, RATE1, CAPACITY]` (LE) ([#755](https://github.com/0xMiden/crypto/pull/755)).
 - [BREAKING] Add length-prefixing to Serializable/Deserializable impls for collections, fuzz deserialization for panics ([#757](https://github.com/0xMiden/crypto/pull/757)).
 

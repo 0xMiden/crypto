@@ -363,3 +363,116 @@ fn view_at() -> Result<()> {
 
     Ok(())
 }
+
+// SMT INTEGRATION TESTS
+// ================================================================================================
+
+/// Tests that History correctly tracks SMT leaf data across versions.
+///
+/// This test verifies that the History mechanism can store and retrieve leaf data
+/// that corresponds to SMT key-value pairs, maintaining consistency across versions.
+#[test]
+fn smt_leaf_history_tracking() -> Result<()> {
+    use crate::merkle::smt::{Smt, SparseMerkleTree};
+
+    // Create an SMT and get its initial state
+    let smt = Smt::new();
+    let initial_root = smt.root();
+
+    // Create test key-value pairs that would be inserted into the SMT
+    let key_1: Word = rand_value();
+    let value_1: Word = rand_value();
+    let key_2: Word = rand_value();
+    let value_2: Word = rand_value();
+
+    // Compute leaf indices from keys (matching SMT's key-to-leaf mapping)
+    let leaf_index_1 = LeafIndex::new(Smt::key_to_leaf_index(&key_1).value()).unwrap();
+    let leaf_index_2 = LeafIndex::new(Smt::key_to_leaf_index(&key_2).value()).unwrap();
+
+    // Create CompactLeaves containing the key-value pairs
+    let mut leaf_1 = CompactLeaf::new();
+    leaf_1.insert(key_1, value_1);
+
+    let mut leaf_2 = CompactLeaf::new();
+    leaf_2.insert(key_2, value_2);
+
+    // Create history with leaf changes
+    let mut history = History::empty(3);
+
+    // Version 0: initial state with leaf_1
+    let mut leaves_v0 = LeafChanges::default();
+    leaves_v0.insert(leaf_index_1, leaf_1.clone());
+    let nodes_v0 = NodeChanges::default();
+    history.add_version(initial_root, 0, nodes_v0, leaves_v0)?;
+
+    // Version 1: add leaf_2
+    let mut leaves_v1 = LeafChanges::default();
+    leaves_v1.insert(leaf_index_2, leaf_2.clone());
+    let nodes_v1 = NodeChanges::default();
+    let root_v1: Word = rand_value();
+    history.add_version(root_v1, 1, nodes_v1, leaves_v1)?;
+
+    // Verify we can query historical leaf data
+    let view_v0 = history.get_view_at(0)?;
+    assert_eq!(view_v0.leaf_value(&leaf_index_1), Some(&leaf_1));
+
+    // leaf_2 was added in v1, so querying v0 should find it via overlay traversal
+    let view_v1 = history.get_view_at(1)?;
+    assert_eq!(view_v1.leaf_value(&leaf_index_2), Some(&leaf_2));
+
+    // Verify key-value lookups work correctly
+    assert_eq!(view_v0.value(&key_1), Some(Some(&value_1)));
+    assert_eq!(view_v1.value(&key_2), Some(Some(&value_2)));
+
+    Ok(())
+}
+
+/// Tests History node tracking with SMT-compatible node indices.
+///
+/// This test verifies that the History mechanism correctly stores and retrieves
+/// inner node hashes at indices that correspond to the SMT's tree structure.
+#[test]
+fn smt_node_history_tracking() -> Result<()> {
+    use crate::merkle::smt::SMT_DEPTH;
+
+    // Create node changes at SMT-valid depths
+    let mut nodes_v0 = NodeChanges::default();
+    let node_hash_1: Word = rand_value();
+    let node_hash_2: Word = rand_value();
+
+    // Use indices valid for SMT_DEPTH (64)
+    let idx_depth_63 = NodeIndex::new(SMT_DEPTH - 1, 0).unwrap();
+    let idx_depth_32 = NodeIndex::new(32, 100).unwrap();
+
+    nodes_v0.insert(idx_depth_63, node_hash_1);
+    nodes_v0.insert(idx_depth_32, node_hash_2);
+
+    let mut history = History::empty(2);
+    let root_v0: Word = rand_value();
+    history.add_version(root_v0, 0, nodes_v0, LeafChanges::default())?;
+
+    // Add second version with updated node
+    let mut nodes_v1 = NodeChanges::default();
+    let node_hash_3: Word = rand_value();
+    nodes_v1.insert(idx_depth_63, node_hash_3);
+
+    let root_v1: Word = rand_value();
+    history.add_version(root_v1, 1, nodes_v1, LeafChanges::default())?;
+
+    // Query version 0 - should get original values
+    let view_v0 = history.get_view_at(0)?;
+    assert_eq!(view_v0.node_value(&idx_depth_63), Some(&node_hash_1));
+    assert_eq!(view_v0.node_value(&idx_depth_32), Some(&node_hash_2));
+
+    // Query version 1 - should get updated value for idx_depth_63
+    let view_v1 = history.get_view_at(1)?;
+    assert_eq!(view_v1.node_value(&idx_depth_63), Some(&node_hash_3));
+    // idx_depth_32 is not in v1, overlay searches forward only
+    assert!(view_v1.node_value(&idx_depth_32).is_none());
+
+    // Verify roots are tracked
+    assert!(history.is_known_root(root_v0));
+    assert!(history.is_known_root(root_v1));
+
+    Ok(())
+}
