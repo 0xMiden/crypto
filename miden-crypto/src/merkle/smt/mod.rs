@@ -23,8 +23,6 @@ pub use large::{
     LargeSmt, LargeSmtError, MemoryStorage, SmtStorage, StorageUpdateParts, StorageUpdates,
     Subtree, SubtreeError,
 };
-#[cfg(feature = "rocksdb")]
-pub use large::{RocksDbConfig, RocksDbStorage};
 
 mod simple;
 pub use simple::{SimpleSmt, SimpleSmtProof};
