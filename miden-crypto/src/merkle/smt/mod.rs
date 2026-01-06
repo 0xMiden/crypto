@@ -19,7 +19,9 @@ pub use full::{MAX_LEAF_ENTRIES, SMT_DEPTH, Smt, SmtLeaf, SmtLeafError, SmtProof
 #[cfg(feature = "concurrent")]
 mod large;
 #[cfg(feature = "internal")]
-pub use full::concurrent::{SubtreeLeaf, build_subtree_for_bench};
+pub use full::concurrent::build_subtree_for_bench;
+#[cfg(feature = "concurrent")]
+pub use full::concurrent::{SUBTREE_DEPTH, SubtreeLeaf, build_subtree};
 #[cfg(feature = "concurrent")]
 pub use large::{
     LargeSmt, LargeSmtError, MemoryStorage, SmtStorage, StorageUpdateParts, StorageUpdates,
@@ -75,7 +77,7 @@ type NodeMutations = Map<NodeIndex, NodeMutation>;
 /// must accommodate all keys that map to the same leaf.
 ///
 /// [SparseMerkleTree] currently doesn't support optimizations that compress Merkle proofs.
-pub(crate) trait SparseMerkleTree<const DEPTH: u8> {
+pub trait SparseMerkleTree<const DEPTH: u8> {
     /// The type for a key
     type Key: Clone + Ord + Eq + Hash;
     /// The type for a value

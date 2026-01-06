@@ -19,7 +19,7 @@ use crate::utils::{ByteReader, ByteWriter, Deserializable, DeserializationError,
 
 // Concurrent implementation
 #[cfg(feature = "concurrent")]
-pub(in crate::merkle::smt) mod concurrent;
+pub mod concurrent;
 
 #[cfg(test)]
 mod tests;
