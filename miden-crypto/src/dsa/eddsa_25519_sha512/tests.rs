@@ -1,10 +1,9 @@
 use super::*;
+use crate::rand::test_utils::seeded_rng;
 
 #[test]
 fn sign_and_verify_roundtrip() {
-    use rand::rng;
-
-    let mut rng = rng();
+    let mut rng = seeded_rng([0u8; 32]);
     let sk = SecretKey::with_rng(&mut rng);
     let pk = sk.public_key();
 
@@ -16,7 +15,7 @@ fn sign_and_verify_roundtrip() {
 
 #[test]
 fn test_key_generation_serialization() {
-    let mut rng = rand::rng();
+    let mut rng = seeded_rng([1u8; 32]);
 
     let sk = SecretKey::with_rng(&mut rng);
     let pk = sk.public_key();
@@ -36,7 +35,7 @@ fn test_key_generation_serialization() {
 
 #[test]
 fn test_secret_key_debug_redaction() {
-    let mut rng = rand::rng();
+    let mut rng = seeded_rng([2u8; 32]);
     let sk = SecretKey::with_rng(&mut rng);
 
     // Verify Debug impl produces expected redacted output
@@ -50,7 +49,7 @@ fn test_secret_key_debug_redaction() {
 
 #[test]
 fn test_compute_challenge_k_equivalence() {
-    let mut rng = rand::rng();
+    let mut rng = seeded_rng([3u8; 32]);
     let sk = SecretKey::with_rng(&mut rng);
     let pk = sk.public_key();
 

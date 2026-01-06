@@ -2,7 +2,7 @@ use proptest::{
     prelude::{any, prop},
     prop_assert_eq, prop_assert_ne, proptest,
 };
-use rand::{SeedableRng, TryRngCore};
+use rand::{Rng, SeedableRng};
 use rand_chacha::ChaCha20Rng;
 
 use super::*;
@@ -13,15 +13,16 @@ use super::*;
 proptest! {
     #[test]
     fn test_encryption_decryption_roundtrip(
+        seed in any::<u64>(),
         data_len in 1usize..1000,
     ) {
-        let mut rng = rand::rng();
+        let mut rng = ChaCha20Rng::seed_from_u64(seed);
         let key = SecretKey::with_rng(&mut rng);
         let nonce = Nonce::with_rng(&mut rng);
 
         // Generate random field elements
         let data: Vec<Felt> = (0..data_len)
-            .map(|_| Felt::new(rng.try_next_u64().unwrap()))
+            .map(|_| Felt::new(rng.random::<u64>()))
             .collect();
 
         let encrypted = key.encrypt_elements_with_nonce(&data, &[], nonce).unwrap();
@@ -32,19 +33,20 @@ proptest! {
 
     #[test]
     fn test_encryption_decryption_with_ad_roundtrip(
+        seed in any::<u64>(),
         associated_data_len in 1usize..1000,
         data_len in 1usize..1000,
     ) {
-        let mut rng = rand::rng();
+        let mut rng = ChaCha20Rng::seed_from_u64(seed);
         let key = SecretKey::with_rng(&mut rng);
         let nonce = Nonce::with_rng(&mut rng);
 
         // Generate random field elements
         let associated_data: Vec<Felt> = (0..associated_data_len)
-            .map(|_| Felt::new(rng.try_next_u64().unwrap()))
+            .map(|_| Felt::new(rng.random::<u64>()))
             .collect();
         let data: Vec<Felt> = (0..data_len)
-            .map(|_| Felt::new(rng.try_next_u64().unwrap()))
+            .map(|_| Felt::new(rng.random::<u64>()))
             .collect();
 
         let encrypted = key.encrypt_elements_with_nonce(&data, &associated_data, nonce).unwrap();
@@ -55,15 +57,16 @@ proptest! {
 
     #[test]
     fn test_bytes_encryption_decryption_roundtrip(
+        seed in any::<u64>(),
         data_len in 0usize..1000,
     ) {
-        let mut rng = rand::rng();
+        let mut rng = ChaCha20Rng::seed_from_u64(seed);
         let key = SecretKey::with_rng(&mut rng);
         let nonce = Nonce::with_rng(&mut rng);
 
         // Generate random bytes
         let mut data = vec![0_u8; data_len];
-        let _ =  rng.try_fill_bytes(&mut data);
+        rng.fill(&mut data[..]);
 
         let encrypted = key.encrypt_bytes_with_nonce(&data, &[], nonce).unwrap();
         let decrypted = key.decrypt_bytes(&encrypted).unwrap();
@@ -73,19 +76,20 @@ proptest! {
 
     #[test]
     fn test_bytes_encryption_decryption_with_ad_roundtrip(
+        seed in any::<u64>(),
         associated_data_len in 0usize..1000,
         data_len in 0usize..1000,
     ) {
-        let mut rng = rand::rng();
+        let mut rng = ChaCha20Rng::seed_from_u64(seed);
         let key = SecretKey::with_rng(&mut rng);
         let nonce = Nonce::with_rng(&mut rng);
 
         // Generate random bytes
         let mut associated_data = vec![0_u8; associated_data_len];
-        let _ =  rng.try_fill_bytes(&mut associated_data);
+        rng.fill(&mut associated_data[..]);
 
         let mut data = vec![0_u8; data_len];
-        let _ =  rng.try_fill_bytes(&mut data);
+        rng.fill(&mut data[..]);
 
 
         let encrypted = key.encrypt_bytes_with_nonce(&data, &associated_data, nonce).unwrap();
@@ -96,41 +100,45 @@ proptest! {
 
     #[test]
     fn test_different_keys_different_outputs(
+        seed1 in any::<u64>(),
+        seed2 in any::<u64>(),
         associated_data in prop::collection::vec(any::<u8>(), 1..500),
         data in prop::collection::vec(any::<u8>(), 1..500),
     ) {
-
-        let mut rng1 = rand::rng();
-        let mut rng2 = rand::rng();
+        let mut rng1 = ChaCha20Rng::seed_from_u64(seed1);
+        let mut rng2 = ChaCha20Rng::seed_from_u64(seed2);
 
         let key1 = SecretKey::with_rng(&mut rng1);
         let key2 = SecretKey::with_rng(&mut rng2);
         let mut nonce_bytes = [0_u8; 24];
-        let _ = rng2.try_fill_bytes(&mut nonce_bytes);
+        rng2.fill(&mut nonce_bytes[..]);
         let nonce1 = Nonce::from_slice(&nonce_bytes);
         let nonce2 = Nonce::from_slice(&nonce_bytes);
 
         let encrypted1 = key1.encrypt_bytes_with_nonce(&data, &associated_data, nonce1).unwrap();
         let encrypted2 = key2.encrypt_bytes_with_nonce(&data, &associated_data, nonce2).unwrap();
 
-        // Different keys should produce different ciphertexts
-        prop_assert_ne!(encrypted1.ciphertext, encrypted2.ciphertext);
+        // Different keys should produce different ciphertexts (unless seeds collide)
+        if seed1 != seed2 {
+            prop_assert_ne!(encrypted1.ciphertext, encrypted2.ciphertext);
+        }
     }
 
     #[test]
     fn test_different_nonces_different_outputs(
+        seed in any::<u64>(),
         associated_data in prop::collection::vec(any::<u8>(), 1..500),
         data in prop::collection::vec(any::<u8>(), 1..500),
     ) {
-        let mut rng = rand::rng();
+        let mut rng = ChaCha20Rng::seed_from_u64(seed);
         let key = SecretKey::with_rng(&mut rng);
         let mut nonce_bytes = [0_u8; 24];
-        let _ = rng.try_fill_bytes(&mut nonce_bytes);
+        rng.fill(&mut nonce_bytes[..]);
         let nonce1 = Nonce::from_slice(&nonce_bytes);
-        let _ = rng.try_fill_bytes(&mut nonce_bytes);
+        rng.fill(&mut nonce_bytes[..]);
         let nonce2 = Nonce::from_slice(&nonce_bytes);
 
-        let encrypted1 = key.encrypt_bytes_with_nonce(&data,&associated_data, nonce1).unwrap();
+        let encrypted1 = key.encrypt_bytes_with_nonce(&data, &associated_data, nonce1).unwrap();
         let encrypted2 = key.encrypt_bytes_with_nonce(&data, &associated_data, nonce2).unwrap();
 
         // Different nonces should produce different ciphertexts (with very high probability)
@@ -334,9 +342,9 @@ fn test_wrong_nonce_detection() {
 // SECURITY TESTS
 // ================================================================================================
 
-#[cfg(all(test, feature = "std"))]
+#[cfg(test)]
 mod security_tests {
-    use std::collections::HashSet;
+    use alloc::collections::BTreeSet;
 
     use super::*;
 
@@ -345,7 +353,7 @@ mod security_tests {
         let seed = [0_u8; 32];
         let mut rng = ChaCha20Rng::from_seed(seed);
 
-        let mut keys = HashSet::new();
+        let mut keys = BTreeSet::new();
 
         // Generate 1000 keys and ensure they're all unique
         for _ in 0..1000 {
@@ -361,7 +369,7 @@ mod security_tests {
         let mut rng = ChaCha20Rng::from_seed(seed);
 
         // Generate 1000 nonces and ensure they're all unique
-        let mut nonces = HashSet::new();
+        let mut nonces = BTreeSet::new();
         for _ in 0..1000 {
             let nonce = Nonce::with_rng(&mut rng);
             let nonce_bytes = format!("{:?}", nonce.inner);
