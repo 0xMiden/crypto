@@ -16,7 +16,10 @@ use chacha20poly1305::{
     XChaCha20Poly1305,
     aead::{Aead, AeadCore, KeyInit},
 };
-use rand::{CryptoRng, RngCore};
+use rand::{
+    CryptoRng, RngCore,
+    distr::{Distribution, StandardUniform},
+};
 
 use crate::{
     Felt,
@@ -410,5 +413,24 @@ impl Deserializable for EncryptedData {
             nonce: Nonce { inner: inner.into() },
             data_type,
         })
+    }
+}
+
+// DISTRIBUTION IMPLEMENTATIONS
+// ================================================================================================
+
+impl Distribution<SecretKey> for StandardUniform {
+    fn sample<R: rand::Rng + ?Sized>(&self, rng: &mut R) -> SecretKey {
+        let mut bytes = [0u8; SK_SIZE_BYTES];
+        rng.fill_bytes(&mut bytes);
+        SecretKey(bytes)
+    }
+}
+
+impl Distribution<Nonce> for StandardUniform {
+    fn sample<R: rand::Rng + ?Sized>(&self, rng: &mut R) -> Nonce {
+        let mut bytes = [0u8; NONCE_SIZE_BYTES];
+        rng.fill_bytes(&mut bytes);
+        Nonce::from_slice(&bytes)
     }
 }
