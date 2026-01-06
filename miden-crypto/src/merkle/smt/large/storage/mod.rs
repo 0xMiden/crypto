@@ -15,11 +15,6 @@ use crate::{
 mod error;
 pub use error::StorageError;
 
-#[cfg(feature = "rocksdb")]
-mod rocksdb;
-#[cfg(feature = "rocksdb")]
-pub use rocksdb::{RocksDbConfig, RocksDbStorage};
-
 mod memory;
 pub use memory::MemoryStorage;
 

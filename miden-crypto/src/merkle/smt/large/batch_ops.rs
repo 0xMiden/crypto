@@ -305,17 +305,15 @@ impl<S: SmtStorage> LargeSmt<S> {
     /// - Storage operations fail
     ///
     /// # Example
-    /// ```no_run
-    /// # #[cfg(feature = "rocksdb")]
-    /// # {
+    /// ```
     /// use miden_crypto::{
     ///     EMPTY_WORD, Felt, Word,
-    ///     merkle::smt::{LargeSmt, RocksDbConfig, RocksDbStorage},
+    ///     merkle::smt::{LargeSmt, MemoryStorage},
     /// };
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
-    /// let storage = RocksDbStorage::open(RocksDbConfig::new("/path/to/db"))?;
-    /// let mut smt = LargeSmt::load(storage)?;
+    /// let storage = MemoryStorage::new();
+    /// let mut smt = LargeSmt::new(storage)?;
     ///
     /// let entries = vec![
     ///     // Insert new entries
@@ -333,7 +331,6 @@ impl<S: SmtStorage> LargeSmt<S> {
     ///
     /// let new_root = smt.insert_batch(entries)?;
     /// # Ok(())
-    /// # }
     /// # }
     /// ```
     pub fn insert_batch(

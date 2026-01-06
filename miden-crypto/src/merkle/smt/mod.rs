@@ -27,8 +27,6 @@ pub use large::{
     LargeSmt, LargeSmtError, MemoryStorage, SmtStorage, StorageUpdateParts, StorageUpdates,
     Subtree, SubtreeError,
 };
-#[cfg(feature = "rocksdb")]
-pub use large::{RocksDbConfig, RocksDbStorage};
 
 mod large_forest;
 pub use large_forest::{History, HistoryError, HistoryView, LargeSmtForestError};
