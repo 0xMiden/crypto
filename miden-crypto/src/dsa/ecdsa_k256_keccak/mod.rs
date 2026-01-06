@@ -8,7 +8,10 @@ use k256::{
     ecdsa::{RecoveryId, SigningKey, VerifyingKey, signature::hazmat::PrehashVerifier},
 };
 use miden_crypto_derive::{SilentDebug, SilentDisplay};
-use rand::{CryptoRng, RngCore};
+use rand::{
+    CryptoRng, RngCore,
+    distr::{Distribution, StandardUniform},
+};
 use thiserror::Error;
 
 use crate::{
@@ -345,4 +348,18 @@ fn hash_message(message: Word) -> [u8; 32] {
     let message_bytes: [u8; 32] = message.into();
     hasher.update(message_bytes);
     hasher.finalize().into()
+}
+
+// DISTRIBUTION IMPLEMENTATIONS
+// ================================================================================================
+
+impl Distribution<SecretKey> for StandardUniform {
+    fn sample<R: rand::Rng + ?Sized>(&self, rng: &mut R) -> SecretKey {
+        let mut seed = [0u8; SECRET_KEY_BYTES];
+        rng.fill_bytes(&mut seed);
+        let signing_key = SigningKey::from_slice(&seed)
+            .expect("32-byte array is always a valid k256 signing key");
+        seed.zeroize();
+        SecretKey { inner: signing_key }
+    }
 }

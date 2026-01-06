@@ -5,7 +5,10 @@ use alloc::{string::ToString, vec::Vec};
 
 use ed25519_dalek::{Signer, Verifier};
 use miden_crypto_derive::{SilentDebug, SilentDisplay};
-use rand::{CryptoRng, RngCore};
+use rand::{
+    CryptoRng, RngCore,
+    distr::{Distribution, StandardUniform},
+};
 use thiserror::Error;
 
 use crate::{
@@ -413,5 +416,18 @@ impl Deserializable for Signature {
         let bytes: [u8; SIGNATURE_BYTES] = source.read_array()?;
         let inner = ed25519_dalek::Signature::from_bytes(&bytes);
         Ok(Self { inner })
+    }
+}
+
+// DISTRIBUTION IMPLEMENTATIONS
+// ================================================================================================
+
+impl Distribution<SecretKey> for StandardUniform {
+    fn sample<R: rand::Rng + ?Sized>(&self, rng: &mut R) -> SecretKey {
+        let mut seed = [0u8; SECRET_KEY_BYTES];
+        rng.fill_bytes(&mut seed);
+        let inner = ed25519_dalek::SigningKey::from_bytes(&seed);
+        seed.zeroize();
+        SecretKey { inner }
     }
 }

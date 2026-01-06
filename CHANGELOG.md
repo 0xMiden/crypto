@@ -2,6 +2,7 @@
 - [BREAKING] Removed `p3-compat` and `winter-compat` features ([#745](https://github.com/0xMiden/crypto/pull/745)).
 - Use more idiomatic Plonky3 APIs ([#743](https://github.com/0xMiden/crypto/pull/743)).
 - Make concurrent feature interact with plonky3's parallel features, replace homegrown iterator macros with p3-maybe-rayon ([#749](https://github.com/0xMiden/crypto/pull/749))
+- Added `Distribution<T>` implementations for random sampling of cryptographic types ([#753](https://github.com/0xMiden/crypto/pull/753)).
 
 # 0.20.1 (2025-12-29)
 
