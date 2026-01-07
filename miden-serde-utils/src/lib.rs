@@ -35,7 +35,11 @@ pub enum DeserializationError {
 ///
 /// This prevents malicious or corrupted input from causing unbounded memory allocations.
 /// Collections larger than this will fail to deserialize with `DeserializationError::InvalidValue`.
-const MAX_DESERIALIZATION_LEN: usize = u32::MAX as usize;
+///
+/// The limit of 2^24 (16,777,216) elements is chosen to be large enough for legitimate use
+/// cases while providing meaningful protection. At 8 bytes per element, this caps allocation
+/// at ~128 MB per collection.
+const MAX_DESERIALIZATION_LEN: usize = 1 << 24;
 
 #[cfg(feature = "std")]
 impl std::error::Error for DeserializationError {}

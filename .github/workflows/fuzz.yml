@@ -24,7 +24,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        target: [primitives, collections, string, vint64, goldilocks]
+        target: [primitives, collections, string, vint64, goldilocks, budgeted]
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@main
