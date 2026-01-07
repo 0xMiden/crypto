@@ -51,3 +51,10 @@ doc   = false
 name  = "goldilocks"
 path  = "fuzz_targets/goldilocks.rs"
 test  = false
+
+[[bin]]
+bench = false
+doc   = false
+name  = "budgeted"
+path  = "fuzz_targets/budgeted.rs"
+test  = false

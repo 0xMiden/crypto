@@ -687,6 +687,98 @@ impl ByteReader for SliceReader<'_> {
     }
 }
 
+// BUDGETED READER
+// ================================================================================================
+
+/// A reader wrapper that enforces a byte budget during deserialization.
+///
+/// This prevents denial-of-service attacks where malicious input claims to contain
+/// huge collections, causing unbounded memory allocation before the actual data is read.
+///
+/// The budget tracks input bytes consumed, not memory allocated. This is the right metric
+/// because valid deserialization requires reading the actual data bytes.
+///
+/// # Example
+///
+/// ```
+/// use miden_serde_utils::{BudgetedReader, ByteReader, Deserializable, SliceReader};
+///
+/// let data = [1u8, 2, 3, 4, 5, 6, 7, 8];
+/// let inner = SliceReader::new(&data);
+/// let mut reader = BudgetedReader::new(inner, 4); // 4-byte budget
+///
+/// // First 4 bytes succeed
+/// assert!(reader.read_u32().is_ok());
+///
+/// // Next read fails: budget exhausted
+/// assert!(reader.read_u32().is_err());
+/// ```
+pub struct BudgetedReader<R> {
+    inner: R,
+    remaining: usize,
+}
+
+impl<R> BudgetedReader<R> {
+    /// Wraps a reader with the specified byte budget.
+    pub fn new(inner: R, budget: usize) -> Self {
+        Self { inner, remaining: budget }
+    }
+
+    /// Returns remaining budget in bytes.
+    pub fn remaining(&self) -> usize {
+        self.remaining
+    }
+
+    /// Consumes budget, returning an error if insufficient.
+    fn consume_budget(&mut self, n: usize) -> Result<(), DeserializationError> {
+        if n > self.remaining {
+            return Err(DeserializationError::InvalidValue(format!(
+                "budget exhausted: requested {n} bytes, {} remaining",
+                self.remaining
+            )));
+        }
+        self.remaining -= n;
+        Ok(())
+    }
+}
+
+impl<R: ByteReader> ByteReader for BudgetedReader<R> {
+    fn read_u8(&mut self) -> Result<u8, DeserializationError> {
+        self.consume_budget(1)?;
+        self.inner.read_u8()
+    }
+
+    fn peek_u8(&self) -> Result<u8, DeserializationError> {
+        // peek doesn't consume budget since it doesn't advance the reader
+        self.inner.peek_u8()
+    }
+
+    fn read_slice(&mut self, len: usize) -> Result<&[u8], DeserializationError> {
+        self.consume_budget(len)?;
+        self.inner.read_slice(len)
+    }
+
+    fn read_array<const N: usize>(&mut self) -> Result<[u8; N], DeserializationError> {
+        self.consume_budget(N)?;
+        self.inner.read_array()
+    }
+
+    fn check_eor(&self, num_bytes: usize) -> Result<(), DeserializationError> {
+        // check budget first, then delegate
+        if num_bytes > self.remaining {
+            return Err(DeserializationError::InvalidValue(format!(
+                "budget exhausted: requested {num_bytes} bytes, {} remaining",
+                self.remaining
+            )));
+        }
+        self.inner.check_eor(num_bytes)
+    }
+
+    fn has_more_bytes(&self) -> bool {
+        self.remaining > 0 && self.inner.has_more_bytes()
+    }
+}
+
 #[cfg(all(test, feature = "std"))]
 mod tests {
     use std::io::Cursor;
@@ -830,5 +922,92 @@ mod tests {
         // Now we have
         assert_eq!(reader.pos, 513);
         assert!(!reader.has_more_bytes(), "expected there to be no more data in the input");
+    }
+
+    #[test]
+    fn budgeted_reader_basic() {
+        let data = [1u8, 2, 3, 4, 5, 6, 7, 8];
+        let inner = SliceReader::new(&data);
+        let mut reader = BudgetedReader::new(inner, 4);
+
+        assert_eq!(reader.remaining(), 4);
+        assert!(reader.has_more_bytes());
+
+        // read 4 bytes (within budget)
+        assert_eq!(reader.read_u32().unwrap(), 0x04030201);
+        assert_eq!(reader.remaining(), 0);
+
+        // budget exhausted
+        assert!(!reader.has_more_bytes());
+        assert!(reader.read_u8().is_err());
+    }
+
+    #[test]
+    fn budgeted_reader_peek_does_not_consume() {
+        let data = [42u8];
+        let inner = SliceReader::new(&data);
+        let mut reader = BudgetedReader::new(inner, 1);
+
+        // peek multiple times, budget unchanged
+        assert_eq!(reader.peek_u8().unwrap(), 42);
+        assert_eq!(reader.peek_u8().unwrap(), 42);
+        assert_eq!(reader.remaining(), 1);
+
+        // actual read consumes budget
+        assert_eq!(reader.read_u8().unwrap(), 42);
+        assert_eq!(reader.remaining(), 0);
+    }
+
+    #[test]
+    fn budgeted_reader_check_eor_respects_budget() {
+        let data = [0u8; 100];
+        let inner = SliceReader::new(&data);
+        let reader = BudgetedReader::new(inner, 10);
+
+        // within budget
+        assert!(reader.check_eor(10).is_ok());
+
+        // exceeds budget (even though inner has enough bytes)
+        assert!(reader.check_eor(11).is_err());
+    }
+
+    #[test]
+    fn budgeted_reader_read_slice() {
+        let data = [1u8, 2, 3, 4, 5];
+        let inner = SliceReader::new(&data);
+        let mut reader = BudgetedReader::new(inner, 3);
+
+        // read 3 bytes (exactly budget)
+        assert_eq!(reader.read_slice(3).unwrap(), &[1, 2, 3]);
+        assert_eq!(reader.remaining(), 0);
+
+        // can't read more
+        assert!(reader.read_slice(1).is_err());
+    }
+
+    #[test]
+    fn budgeted_reader_read_array() {
+        let data = [0xaau8, 0xbb, 0xcc, 0xdd];
+        let inner = SliceReader::new(&data);
+        let mut reader = BudgetedReader::new(inner, 2);
+
+        // read 2-byte array
+        assert_eq!(reader.read_array::<2>().unwrap(), [0xaa, 0xbb]);
+        assert_eq!(reader.remaining(), 0);
+
+        // budget exhausted
+        assert!(reader.read_array::<2>().is_err());
+    }
+
+    #[test]
+    fn budgeted_reader_zero_budget() {
+        let data = [1u8];
+        let inner = SliceReader::new(&data);
+        let mut reader = BudgetedReader::new(inner, 0);
+
+        assert!(!reader.has_more_bytes());
+        assert!(reader.read_u8().is_err());
+        // peek still works (doesn't consume budget)
+        assert_eq!(reader.peek_u8().unwrap(), 1);
     }
 }

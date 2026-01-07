@@ -68,7 +68,7 @@ fn validate_deserialization_length(len: usize) -> Result<(), DeserializationErro
 mod byte_reader;
 #[cfg(feature = "std")]
 pub use byte_reader::ReadAdapter;
-pub use byte_reader::{ByteReader, SliceReader};
+pub use byte_reader::{BudgetedReader, ByteReader, SliceReader};
 
 mod byte_writer;
 pub use byte_writer::ByteWriter;
@@ -444,6 +444,24 @@ pub trait Deserializable: Sized {
     /// returned.
     fn read_from_bytes(bytes: &[u8]) -> Result<Self, DeserializationError> {
         Self::read_from(&mut SliceReader::new(bytes))
+    }
+
+    /// Deserializes `Self` from bytes with a byte budget limit.
+    ///
+    /// This is the recommended method for deserializing untrusted input. The budget limits
+    /// how many bytes can be consumed during deserialization, preventing denial-of-service
+    /// attacks that exploit length fields to cause huge allocations.
+    ///
+    /// # Errors
+    /// Returns an error if:
+    /// * The budget is exhausted before deserialization completes.
+    /// * The `bytes` do not contain enough information to deserialize `Self`.
+    /// * The `bytes` do not represent a valid value for `Self`.
+    fn read_from_bytes_with_budget(
+        bytes: &[u8],
+        budget: usize,
+    ) -> Result<Self, DeserializationError> {
+        Self::read_from(&mut BudgetedReader::new(SliceReader::new(bytes), budget))
     }
 }
 
