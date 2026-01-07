@@ -412,17 +412,17 @@ fn smt_history_with_real_mutations() -> Result<()> {
     let mut history = History::empty(3);
 
     // Version 0: Insert first key-value pair using real SMT mutation
-    let mutations_v0 = smt.compute_mutations(vec![(key_1, value_1)]);
+    let mutations_v0 = smt.compute_mutations(vec![(key_1, value_1)]).unwrap();
     let (node_changes_v0, leaf_changes_v0) = mutation_set_to_history_changes(&mutations_v0);
-    smt.apply_mutations(mutations_v0)?;
+    smt.apply_mutations(mutations_v0).unwrap();
     let root_v0 = smt.root();
 
     history.add_version(root_v0, 0, node_changes_v0.clone(), leaf_changes_v0.clone())?;
 
     // Version 1: Insert second key-value pair
-    let mutations_v1 = smt.compute_mutations(vec![(key_2, value_2)]);
+    let mutations_v1 = smt.compute_mutations(vec![(key_2, value_2)]).unwrap();
     let (node_changes_v1, leaf_changes_v1) = mutation_set_to_history_changes(&mutations_v1);
-    smt.apply_mutations(mutations_v1)?;
+    smt.apply_mutations(mutations_v1).unwrap();
     let root_v1 = smt.root();
 
     history.add_version(root_v1, 1, node_changes_v1, leaf_changes_v1)?;
@@ -490,15 +490,15 @@ fn smt_history_value_updates() -> Result<()> {
     let mut history = History::empty(2);
 
     // Version 0: Insert initial value
-    let mutations_v0 = smt.compute_mutations(vec![(key, value_v0)]);
+    let mutations_v0 = smt.compute_mutations(vec![(key, value_v0)]).unwrap();
     let (node_changes_v0, leaf_changes_v0) = mutation_set_to_history_changes(&mutations_v0);
-    smt.apply_mutations(mutations_v0)?;
+    smt.apply_mutations(mutations_v0).unwrap();
     history.add_version(smt.root(), 0, node_changes_v0, leaf_changes_v0)?;
 
     // Version 1: Update to new value
-    let mutations_v1 = smt.compute_mutations(vec![(key, value_v1)]);
+    let mutations_v1 = smt.compute_mutations(vec![(key, value_v1)]).unwrap();
     let (node_changes_v1, leaf_changes_v1) = mutation_set_to_history_changes(&mutations_v1);
-    smt.apply_mutations(mutations_v1)?;
+    smt.apply_mutations(mutations_v1).unwrap();
     history.add_version(smt.root(), 1, node_changes_v1, leaf_changes_v1)?;
 
     // Verify version 0 has original value
