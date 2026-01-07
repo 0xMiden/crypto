@@ -143,7 +143,6 @@ mod tests {
             (Ordering::Less, [0, 0, 0, 0u32], [0, 1, 0, 0u32]),
             (Ordering::Less, [0, 0, 0, 0u32], [0, 0, 1, 0u32]),
             (Ordering::Less, [0, 0, 0, 0u32], [0, 0, 0, 1u32]),
-            // In LE convention, word[0] is compared first (most significant)
             (Ordering::Less, [0, 0, 0, 1u32], [1, 1, 1, 0u32]),
             (Ordering::Less, [0, 0, 1, 0u32], [1, 1, 0, 0u32]),
             (Ordering::Greater, [1, 1, 1, 0u32], [0, 0, 0, 1u32]),
