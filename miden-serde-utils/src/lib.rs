@@ -28,6 +28,15 @@ pub enum DeserializationError {
     UnknownError(String),
 }
 
+// CONSTANTS
+// ================================================================================================
+
+/// Maximum number of elements allowed in a dynamically-sized collection during deserialization.
+///
+/// This prevents malicious or corrupted input from causing unbounded memory allocations.
+/// Collections larger than this will fail to deserialize with `DeserializationError::InvalidValue`.
+const MAX_DESERIALIZATION_LEN: usize = u32::MAX as usize;
+
 #[cfg(feature = "std")]
 impl std::error::Error for DeserializationError {}
 
@@ -39,6 +48,21 @@ impl core::fmt::Display for DeserializationError {
             Self::UnknownError(msg) => write!(f, "unknown error: {}", msg),
         }
     }
+}
+
+// HELPER FUNCTIONS
+// ================================================================================================
+
+/// Validates that a length is within acceptable bounds for deserialization.
+///
+/// Returns an error if the length exceeds [`MAX_DESERIALIZATION_LEN`].
+fn validate_deserialization_length(len: usize) -> Result<(), DeserializationError> {
+    if len > MAX_DESERIALIZATION_LEN {
+        return Err(DeserializationError::InvalidValue(format!(
+            "length {len} exceeds maximum allowed length {MAX_DESERIALIZATION_LEN}"
+        )));
+    }
+    Ok(())
 }
 
 mod byte_reader;
@@ -583,6 +607,7 @@ impl<T: Deserializable, const C: usize> Deserializable for [T; C] {
 impl<T: Deserializable> Deserializable for Vec<T> {
     fn read_from<R: ByteReader>(source: &mut R) -> Result<Self, DeserializationError> {
         let len = source.read_usize()?;
+        validate_deserialization_length(len)?;
         source.read_many(len)
     }
 }
@@ -590,6 +615,7 @@ impl<T: Deserializable> Deserializable for Vec<T> {
 impl<K: Deserializable + Ord, V: Deserializable> Deserializable for BTreeMap<K, V> {
     fn read_from<R: ByteReader>(source: &mut R) -> Result<Self, DeserializationError> {
         let len = source.read_usize()?;
+        validate_deserialization_length(len)?;
         let data = source.read_many(len)?;
         Ok(BTreeMap::from_iter(data))
     }
@@ -598,6 +624,7 @@ impl<K: Deserializable + Ord, V: Deserializable> Deserializable for BTreeMap<K, 
 impl<T: Deserializable + Ord> Deserializable for BTreeSet<T> {
     fn read_from<R: ByteReader>(source: &mut R) -> Result<Self, DeserializationError> {
         let len = source.read_usize()?;
+        validate_deserialization_length(len)?;
         let data = source.read_many(len)?;
         Ok(BTreeSet::from_iter(data))
     }
@@ -606,6 +633,7 @@ impl<T: Deserializable + Ord> Deserializable for BTreeSet<T> {
 impl Deserializable for String {
     fn read_from<R: ByteReader>(source: &mut R) -> Result<Self, DeserializationError> {
         let len = source.read_usize()?;
+        validate_deserialization_length(len)?;
         let data = source.read_many(len)?;
 
         String::from_utf8(data).map_err(|err| DeserializationError::InvalidValue(format!("{err}")))
