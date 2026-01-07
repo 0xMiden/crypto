@@ -1,0 +1,53 @@
+[package]
+authors = ["Automated"]
+edition = "2021"
+name    = "miden-serde-utils-fuzz"
+publish = false
+version = "0.0.0"
+
+[workspace]
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+libfuzzer-sys       = "0.4"
+p3-miden-goldilocks = "0.4"
+
+[dependencies.miden-serde-utils]
+path = ".."
+
+[[bin]]
+bench = false
+doc   = false
+name  = "primitives"
+path  = "fuzz_targets/primitives.rs"
+test  = false
+
+[[bin]]
+bench = false
+doc   = false
+name  = "collections"
+path  = "fuzz_targets/collections.rs"
+test  = false
+
+[[bin]]
+bench = false
+doc   = false
+name  = "string"
+path  = "fuzz_targets/string.rs"
+test  = false
+
+[[bin]]
+bench = false
+doc   = false
+name  = "vint64"
+path  = "fuzz_targets/vint64.rs"
+test  = false
+
+[[bin]]
+bench = false
+doc   = false
+name  = "goldilocks"
+path  = "fuzz_targets/goldilocks.rs"
+test  = false
