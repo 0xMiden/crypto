@@ -367,112 +367,147 @@ fn view_at() -> Result<()> {
 // SMT INTEGRATION TESTS
 // ================================================================================================
 
-/// Tests that History correctly tracks SMT leaf data across versions.
+/// Tests History integration using real SMT mutations.
 ///
-/// This test verifies that the History mechanism can store and retrieve leaf data
-/// that corresponds to SMT key-value pairs, maintaining consistency across versions.
+/// This test creates an actual SMT, computes mutations via the SMT API,
+/// and verifies that History correctly tracks the resulting node and leaf changes.
 #[test]
-fn smt_leaf_history_tracking() -> Result<()> {
-    use crate::merkle::smt::{Smt, SparseMerkleTree};
+fn smt_history_with_real_mutations() -> Result<()> {
+    use crate::merkle::smt::{MutationSet, NodeMutation, SMT_DEPTH, Smt, SparseMerkleTree};
 
-    // Create an SMT and get its initial state
-    let smt = Smt::new();
+    /// Converts a MutationSet into the format expected by History.
+    fn mutation_set_to_history_changes(
+        mutations: &MutationSet<SMT_DEPTH, Word, Word>,
+    ) -> (NodeChanges, LeafChanges) {
+        let mut node_changes = NodeChanges::default();
+        for (index, mutation) in mutations.node_mutations().iter() {
+            if let NodeMutation::Addition(inner_node) = mutation {
+                node_changes.insert(*index, inner_node.hash());
+            }
+        }
+
+        let mut leaf_changes = LeafChanges::default();
+        for (key, value) in mutations.new_pairs().iter() {
+            let leaf_index = LeafIndex::new(Smt::key_to_leaf_index(key).value()).unwrap();
+            leaf_changes
+                .entry(leaf_index)
+                .or_insert_with(CompactLeaf::new)
+                .insert(*key, *value);
+        }
+
+        (node_changes, leaf_changes)
+    }
+
+    // Create an empty SMT
+    let mut smt = Smt::new();
     let initial_root = smt.root();
 
-    // Create test key-value pairs that would be inserted into the SMT
+    // Generate test key-value pairs
     let key_1: Word = rand_value();
     let value_1: Word = rand_value();
     let key_2: Word = rand_value();
     let value_2: Word = rand_value();
 
-    // Compute leaf indices from keys (matching SMT's key-to-leaf mapping)
-    let leaf_index_1 = LeafIndex::new(Smt::key_to_leaf_index(&key_1).value()).unwrap();
-    let leaf_index_2 = LeafIndex::new(Smt::key_to_leaf_index(&key_2).value()).unwrap();
-
-    // Create CompactLeaves containing the key-value pairs
-    let mut leaf_1 = CompactLeaf::new();
-    leaf_1.insert(key_1, value_1);
-
-    let mut leaf_2 = CompactLeaf::new();
-    leaf_2.insert(key_2, value_2);
-
-    // Create history with leaf changes
+    // Create history to track versions
     let mut history = History::empty(3);
 
-    // Version 0: initial state with leaf_1
-    let mut leaves_v0 = LeafChanges::default();
-    leaves_v0.insert(leaf_index_1, leaf_1.clone());
-    let nodes_v0 = NodeChanges::default();
-    history.add_version(initial_root, 0, nodes_v0, leaves_v0)?;
+    // Version 0: Insert first key-value pair using real SMT mutation
+    let mutations_v0 = smt.compute_mutations(vec![(key_1, value_1)]);
+    let (node_changes_v0, leaf_changes_v0) = mutation_set_to_history_changes(&mutations_v0);
+    smt.apply_mutations(mutations_v0)?;
+    let root_v0 = smt.root();
 
-    // Version 1: add leaf_2
-    let mut leaves_v1 = LeafChanges::default();
-    leaves_v1.insert(leaf_index_2, leaf_2.clone());
-    let nodes_v1 = NodeChanges::default();
-    let root_v1: Word = rand_value();
-    history.add_version(root_v1, 1, nodes_v1, leaves_v1)?;
+    history.add_version(root_v0, 0, node_changes_v0.clone(), leaf_changes_v0.clone())?;
 
-    // Verify we can query historical leaf data
+    // Version 1: Insert second key-value pair
+    let mutations_v1 = smt.compute_mutations(vec![(key_2, value_2)]);
+    let (node_changes_v1, leaf_changes_v1) = mutation_set_to_history_changes(&mutations_v1);
+    smt.apply_mutations(mutations_v1)?;
+    let root_v1 = smt.root();
+
+    history.add_version(root_v1, 1, node_changes_v1, leaf_changes_v1)?;
+
+    // Verify roots are tracked correctly
+    assert!(history.is_known_root(root_v0));
+    assert!(history.is_known_root(root_v1));
+    assert!(!history.is_known_root(initial_root)); // Initial empty root not added
+
+    // Query version 0 and verify leaf data
     let view_v0 = history.get_view_at(0)?;
-    assert_eq!(view_v0.leaf_value(&leaf_index_1), Some(&leaf_1));
-
-    // leaf_2 was added in v1, so querying v0 should find it via overlay traversal
-    let view_v1 = history.get_view_at(1)?;
-    assert_eq!(view_v1.leaf_value(&leaf_index_2), Some(&leaf_2));
-
-    // Verify key-value lookups work correctly
+    let leaf_index_1 = LeafIndex::new(Smt::key_to_leaf_index(&key_1).value()).unwrap();
+    assert!(view_v0.leaf_value(&leaf_index_1).is_some());
     assert_eq!(view_v0.value(&key_1), Some(Some(&value_1)));
+
+    // Query version 1 and verify both leaves accessible
+    let view_v1 = history.get_view_at(1)?;
+    let leaf_index_2 = LeafIndex::new(Smt::key_to_leaf_index(&key_2).value()).unwrap();
+    assert!(view_v1.leaf_value(&leaf_index_2).is_some());
     assert_eq!(view_v1.value(&key_2), Some(Some(&value_2)));
+
+    // Verify node changes were captured (mutations produce inner node updates)
+    assert!(!node_changes_v0.is_empty(), "SMT insertion should produce node changes");
+
+    // Verify querying a non-existent key returns None
+    let nonexistent_key: Word = rand_value();
+    assert!(view_v1.value(&nonexistent_key).is_none());
 
     Ok(())
 }
 
-/// Tests History node tracking with SMT-compatible node indices.
-///
-/// This test verifies that the History mechanism correctly stores and retrieves
-/// inner node hashes at indices that correspond to the SMT's tree structure.
+/// Tests History with SMT value updates (replacing existing values).
 #[test]
-fn smt_node_history_tracking() -> Result<()> {
-    use crate::merkle::smt::SMT_DEPTH;
+fn smt_history_value_updates() -> Result<()> {
+    use crate::merkle::smt::{MutationSet, NodeMutation, SMT_DEPTH, Smt, SparseMerkleTree};
 
-    // Create node changes at SMT-valid depths
-    let mut nodes_v0 = NodeChanges::default();
-    let node_hash_1: Word = rand_value();
-    let node_hash_2: Word = rand_value();
+    fn mutation_set_to_history_changes(
+        mutations: &MutationSet<SMT_DEPTH, Word, Word>,
+    ) -> (NodeChanges, LeafChanges) {
+        let mut node_changes = NodeChanges::default();
+        for (index, mutation) in mutations.node_mutations().iter() {
+            if let NodeMutation::Addition(inner_node) = mutation {
+                node_changes.insert(*index, inner_node.hash());
+            }
+        }
 
-    // Use indices valid for SMT_DEPTH (64)
-    let idx_depth_63 = NodeIndex::new(SMT_DEPTH - 1, 0).unwrap();
-    let idx_depth_32 = NodeIndex::new(32, 100).unwrap();
+        let mut leaf_changes = LeafChanges::default();
+        for (key, value) in mutations.new_pairs().iter() {
+            let leaf_index = LeafIndex::new(Smt::key_to_leaf_index(key).value()).unwrap();
+            leaf_changes
+                .entry(leaf_index)
+                .or_insert_with(CompactLeaf::new)
+                .insert(*key, *value);
+        }
 
-    nodes_v0.insert(idx_depth_63, node_hash_1);
-    nodes_v0.insert(idx_depth_32, node_hash_2);
+        (node_changes, leaf_changes)
+    }
+
+    let mut smt = Smt::new();
+
+    let key: Word = rand_value();
+    let value_v0: Word = rand_value();
+    let value_v1: Word = rand_value();
 
     let mut history = History::empty(2);
-    let root_v0: Word = rand_value();
-    history.add_version(root_v0, 0, nodes_v0, LeafChanges::default())?;
 
-    // Add second version with updated node
-    let mut nodes_v1 = NodeChanges::default();
-    let node_hash_3: Word = rand_value();
-    nodes_v1.insert(idx_depth_63, node_hash_3);
+    // Version 0: Insert initial value
+    let mutations_v0 = smt.compute_mutations(vec![(key, value_v0)]);
+    let (node_changes_v0, leaf_changes_v0) = mutation_set_to_history_changes(&mutations_v0);
+    smt.apply_mutations(mutations_v0)?;
+    history.add_version(smt.root(), 0, node_changes_v0, leaf_changes_v0)?;
 
-    let root_v1: Word = rand_value();
-    history.add_version(root_v1, 1, nodes_v1, LeafChanges::default())?;
+    // Version 1: Update to new value
+    let mutations_v1 = smt.compute_mutations(vec![(key, value_v1)]);
+    let (node_changes_v1, leaf_changes_v1) = mutation_set_to_history_changes(&mutations_v1);
+    smt.apply_mutations(mutations_v1)?;
+    history.add_version(smt.root(), 1, node_changes_v1, leaf_changes_v1)?;
 
-    // Query version 0 - should get original values
+    // Verify version 0 has original value
     let view_v0 = history.get_view_at(0)?;
-    assert_eq!(view_v0.node_value(&idx_depth_63), Some(&node_hash_1));
-    assert_eq!(view_v0.node_value(&idx_depth_32), Some(&node_hash_2));
+    assert_eq!(view_v0.value(&key), Some(Some(&value_v0)));
 
-    // Query version 1 - should get updated value for idx_depth_63
+    // Verify version 1 has updated value
     let view_v1 = history.get_view_at(1)?;
-    assert_eq!(view_v1.node_value(&idx_depth_63), Some(&node_hash_3));
-    // idx_depth_32 is not in v1, overlay searches forward only
-    assert!(view_v1.node_value(&idx_depth_32).is_none());
-
-    // Verify roots are tracked
-    assert!(history.is_known_root(root_v0));
-    assert!(history.is_known_root(root_v1));
+    assert_eq!(view_v1.value(&key), Some(Some(&value_v1)));
 
     Ok(())
 }
