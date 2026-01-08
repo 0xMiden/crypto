@@ -385,9 +385,9 @@ pub(crate) fn kv_to_elements((key, value): (Word, Word)) -> impl Iterator<Item =
 }
 
 /// Compares two keys, compared element-by-element using their integer representations starting with
-/// the most significant element (i.e., word[0]).
+/// the most significant element.
 pub(crate) fn cmp_keys(key_1: Word, key_2: Word) -> Ordering {
-    for (v1, v2) in key_1.iter().zip(key_2.iter()) {
+    for (v1, v2) in key_1.iter().zip(key_2.iter()).rev() {
         let v1 = (*v1).as_canonical_u64();
         let v2 = (*v2).as_canonical_u64();
         if v1 != v2 {

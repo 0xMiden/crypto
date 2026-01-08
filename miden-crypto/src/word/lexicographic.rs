@@ -73,8 +73,9 @@ impl<T: Into<Word> + Copy> Ord for LexicographicWord<T> {
 
         for (felt0, felt1) in self_word
             .iter()
+            .rev()
             .map(Felt::as_canonical_u64)
-            .zip(other_word.iter().map(Felt::as_canonical_u64))
+            .zip(other_word.iter().rev().map(Felt::as_canonical_u64))
         {
             let ordering = felt0.cmp(&felt1);
             if let Ordering::Less | Ordering::Greater = ordering {
@@ -143,10 +144,10 @@ mod tests {
             (Ordering::Less, [0, 0, 0, 0u32], [0, 1, 0, 0u32]),
             (Ordering::Less, [0, 0, 0, 0u32], [0, 0, 1, 0u32]),
             (Ordering::Less, [0, 0, 0, 0u32], [0, 0, 0, 1u32]),
-            (Ordering::Less, [0, 0, 0, 1u32], [1, 1, 1, 0u32]),
-            (Ordering::Less, [0, 0, 1, 0u32], [1, 1, 0, 0u32]),
-            (Ordering::Greater, [1, 1, 1, 0u32], [0, 0, 0, 1u32]),
-            (Ordering::Greater, [1, 1, 0, 0u32], [0, 0, 1, 0u32]),
+            (Ordering::Greater, [0, 0, 0, 1u32], [1, 1, 1, 0u32]),
+            (Ordering::Greater, [0, 0, 1, 0u32], [1, 1, 0, 0u32]),
+            (Ordering::Less, [1, 1, 1, 0u32], [0, 0, 0, 1u32]),
+            (Ordering::Less, [1, 1, 0, 0u32], [0, 0, 1, 0u32]),
         ] {
             assert_eq!(
                 LexicographicWord::from(key0.map(Felt::from_u32))
