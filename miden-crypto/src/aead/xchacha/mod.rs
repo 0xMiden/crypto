@@ -28,7 +28,7 @@ use crate::{
     },
 };
 
-#[cfg(all(test, feature = "std"))]
+#[cfg(test)]
 mod test;
 
 // CONSTANTS

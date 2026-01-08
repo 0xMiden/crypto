@@ -86,6 +86,7 @@ internal = ["concurrent"]
 rocksdb = ["concurrent", "dep:rocksdb"]
 serde = ["dep:serde", "serde?/alloc"]
 std = ["blake3/std", "dep:cc", "miden-serde-utils/std", "rand/std", "rand/thread_rng"]
+testing = ["dep:proptest"]
 
 [dependencies]
 blake3                        = { default-features = false, version = "1.8" }
@@ -101,6 +102,7 @@ miden-crypto-derive.workspace = true
 miden-serde-utils.workspace   = true
 num                           = { default-features = false, features = ["alloc", "libm"], version = "0.4" }
 num-complex                   = { default-features = false, version = "0.4" }
+proptest                      = { default-features = false, features = ["alloc"], optional = true, version = "1.7" }
 rand                          = { default-features = false, version = "0.9" }
 rand-utils                    = { optional = true, package = "winter-rand-utils", version = "0.13" }
 rand_chacha                   = { default-features = false, version = "0.9" }
@@ -135,7 +137,6 @@ hex            = { default-features = false, features = ["alloc"], version = "0.
 itertools      = { version = "0.14" }
 proptest       = { default-features = false, features = ["alloc"], version = "1.7" }
 rand-utils     = { package = "winter-rand-utils", version = "0.13" }
-rand_chacha    = { default-features = false, version = "0.9" }
 rstest         = { version = "0.26" }
 seq-macro      = { version = "0.3" }
 tempfile       = { version = "3.20" }

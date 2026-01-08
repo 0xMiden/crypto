@@ -7,7 +7,8 @@ use alloc::{
 
 use assert_matches::assert_matches;
 use proptest::prelude::*;
-use rand::{Rng, prelude::IteratorRandom, rng};
+use rand::{Rng, SeedableRng, prelude::IteratorRandom};
+use rand_chacha::ChaCha20Rng;
 
 use super::{
     COLS_PER_SUBTREE, InnerNode, Map, NodeIndex, NodeMutations, PairComputations, SMT_DEPTH,
@@ -116,7 +117,7 @@ fn generate_entries(pair_count: u64) -> Vec<(Word, Word)> {
 
 fn generate_updates(entries: Vec<(Word, Word)>, updates: usize) -> Vec<(Word, Word)> {
     const REMOVAL_PROBABILITY: f64 = 0.2;
-    let mut rng = rng();
+    let mut rng = ChaCha20Rng::from_seed([1u8; 32]);
     // Assertion to ensure input keys are unique
     assert!(
         entries.iter().map(|(key, _)| key).collect::<BTreeSet<_>>().len() == entries.len(),
@@ -381,7 +382,7 @@ fn test_multithreaded_subtrees() {
 fn test_with_entries_concurrent() {
     const PAIR_COUNT: u64 = COLS_PER_SUBTREE * 64;
     let mut entries = generate_entries(PAIR_COUNT);
-    let mut rng = rand::rng();
+    let mut rng = ChaCha20Rng::from_seed([0u8; 32]);
 
     // Set 10% of the entries to have empty words as their values.
     for _ in 0..PAIR_COUNT / 10 {

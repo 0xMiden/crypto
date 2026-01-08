@@ -1,10 +1,12 @@
 use alloc::collections::{BTreeMap, BTreeSet};
 
 use assert_matches::assert_matches;
+use p3_field::PrimeField64;
+use proptest::prelude::*;
+use rand::{Rng, SeedableRng};
+use rand_chacha::ChaCha20Rng;
 
 use super::{PartialSmt, SMT_DEPTH};
-#[cfg(any(test, feature = "std"))]
-use crate::rand::test_utils::{rand_array, rand_value};
 use crate::{
     EMPTY_WORD, Felt, ONE, Word, ZERO,
     merkle::{
@@ -14,12 +16,27 @@ use crate::{
     utils::{Deserializable, Serializable},
 };
 
+// Note: Word's Arbitrary implementation is in word/mod.rs, gated by cfg(any(test, feature =
+// "testing"))
+
+/// Helper to generate a random Word from a seeded RNG.
+/// This is used for deterministic tests that need reproducible sequences of random values.
+fn random_word<R: Rng>(rng: &mut R) -> Word {
+    Word::new([
+        Felt::new(rng.random::<u64>() % Felt::ORDER_U64),
+        Felt::new(rng.random::<u64>() % Felt::ORDER_U64),
+        Felt::new(rng.random::<u64>() % Felt::ORDER_U64),
+        Felt::new(rng.random::<u64>() % Felt::ORDER_U64),
+    ])
+}
+
 /// Tests that a partial SMT constructed from a root is well behaved and returns expected
 /// values.
 #[test]
 fn partial_smt_new_with_no_entries() {
-    let key0 = Word::from(rand_array::<Felt, 4>());
-    let value0 = Word::from(rand_array::<Felt, 4>());
+    let mut rng = ChaCha20Rng::from_seed([1u8; 32]);
+    let key0 = random_word(&mut rng);
+    let value0 = random_word(&mut rng);
     let full = Smt::with_entries([(key0, value0)]).unwrap();
 
     let partial_smt = PartialSmt::new(full.root());
@@ -35,8 +52,9 @@ fn partial_smt_new_with_no_entries() {
 /// Tests that a PartialSmt with a non-empty root but no proofs cannot track or update keys.
 #[test]
 fn partial_smt_non_empty_root_no_proofs() {
-    let key: Word = rand_value();
-    let value: Word = rand_value();
+    let mut rng = ChaCha20Rng::from_seed([2u8; 32]);
+    let key = random_word(&mut rng);
+    let value = random_word(&mut rng);
     let full = Smt::with_entries([(key, value)]).unwrap();
 
     // Create partial with non-empty root but don't add any proofs
@@ -49,7 +67,7 @@ fn partial_smt_non_empty_root_no_proofs() {
     assert!(partial.insert(key, value).is_err());
 
     // Can't get value for empty key either - still not trackable
-    let empty_key: Word = rand_value();
+    let empty_key = random_word(&mut rng);
     assert!(partial.get_value(&empty_key).is_err());
 
     // Can't insert at empty key - not trackable
@@ -61,23 +79,24 @@ fn partial_smt_non_empty_root_no_proofs() {
 /// equivalent update in the full tree.
 #[test]
 fn partial_smt_insert_and_remove() {
-    let key0 = Word::from(rand_array::<Felt, 4>());
-    let key1 = Word::from(rand_array::<Felt, 4>());
-    let key2 = Word::from(rand_array::<Felt, 4>());
+    let mut rng = ChaCha20Rng::from_seed([3u8; 32]);
+    let key0 = random_word(&mut rng);
+    let key1 = random_word(&mut rng);
+    let key2 = random_word(&mut rng);
     // A key for which we won't add a value so it will be empty.
-    let key_empty = Word::from(rand_array::<Felt, 4>());
+    let key_empty = random_word(&mut rng);
 
-    let value0 = Word::from(rand_array::<Felt, 4>());
-    let value1 = Word::from(rand_array::<Felt, 4>());
-    let value2 = Word::from(rand_array::<Felt, 4>());
+    let value0 = random_word(&mut rng);
+    let value1 = random_word(&mut rng);
+    let value2 = random_word(&mut rng);
 
     let mut kv_pairs = vec![(key0, value0), (key1, value1), (key2, value2)];
 
     // Add more random leaves.
     kv_pairs.reserve(1000);
     for _ in 0..1000 {
-        let key = Word::from(rand_array::<Felt, 4>());
-        let value = Word::from(rand_array::<Felt, 4>());
+        let key = random_word(&mut rng);
+        let value = random_word(&mut rng);
         kv_pairs.push((key, value));
     }
 
@@ -103,10 +122,10 @@ fn partial_smt_insert_and_remove() {
     // Insert new values for added keys with empty and non-empty values.
     // ----------------------------------------------------------------------------------------
 
-    let new_value0 = Word::from(rand_array::<Felt, 4>());
-    let new_value2 = Word::from(rand_array::<Felt, 4>());
+    let new_value0 = random_word(&mut rng);
+    let new_value2 = random_word(&mut rng);
     // A non-empty value for the key that was previously empty.
-    let new_value_empty_key = Word::from(rand_array::<Felt, 4>());
+    let new_value_empty_key = random_word(&mut rng);
 
     full.insert(key0, new_value0).unwrap();
     full.insert(key2, new_value2).unwrap();
@@ -142,7 +161,7 @@ fn partial_smt_insert_and_remove() {
     // Attempting to update a key whose merkle path was not added is an error.
     // ----------------------------------------------------------------------------------------
 
-    let error = partial.clone().insert(key1, Word::from(rand_array::<Felt, 4>())).unwrap_err();
+    let error = partial.clone().insert(key1, random_word(&mut rng)).unwrap_err();
     assert_matches!(error, MerkleError::UntrackedKey(_));
 
     let error = partial.insert(key1, EMPTY_WORD).unwrap_err();
@@ -152,14 +171,15 @@ fn partial_smt_insert_and_remove() {
 /// Test that we can add an SmtLeaf::Multiple variant to a partial SMT.
 #[test]
 fn partial_smt_multiple_leaf_success() {
+    let mut rng = ChaCha20Rng::from_seed([4u8; 32]);
     // key0 and key1 have the same felt at index 3 so they will be placed in the same leaf.
     let key0 = Word::from([ZERO, ZERO, ZERO, ONE]);
     let key1 = Word::from([ONE, ONE, ONE, ONE]);
-    let key2 = Word::from(rand_array::<Felt, 4>());
+    let key2 = random_word(&mut rng);
 
-    let value0 = Word::from(rand_array::<Felt, 4>());
-    let value1 = Word::from(rand_array::<Felt, 4>());
-    let value2 = Word::from(rand_array::<Felt, 4>());
+    let value0 = random_word(&mut rng);
+    let value1 = random_word(&mut rng);
+    let value2 = random_word(&mut rng);
 
     let full = Smt::with_entries([(key0, value0), (key1, value1), (key2, value2)]).unwrap();
 
@@ -187,12 +207,13 @@ fn partial_smt_multiple_leaf_success() {
 /// This test uses only empty values in the partial SMT.
 #[test]
 fn partial_smt_root_mismatch_on_empty_values() {
-    let key0 = Word::from(rand_array::<Felt, 4>());
-    let key1 = Word::from(rand_array::<Felt, 4>());
-    let key2 = Word::from(rand_array::<Felt, 4>());
+    let mut rng = ChaCha20Rng::from_seed([5u8; 32]);
+    let key0 = random_word(&mut rng);
+    let key1 = random_word(&mut rng);
+    let key2 = random_word(&mut rng);
 
     let value0 = EMPTY_WORD;
-    let value1 = Word::from(rand_array::<Felt, 4>());
+    let value1 = random_word(&mut rng);
     let value2 = EMPTY_WORD;
 
     let kv_pairs = vec![(key0, value0)];
@@ -220,13 +241,14 @@ fn partial_smt_root_mismatch_on_empty_values() {
 /// This test uses only non-empty values in the partial SMT.
 #[test]
 fn partial_smt_root_mismatch_on_non_empty_values() {
-    let key0 = Word::new(rand_array());
-    let key1 = Word::new(rand_array());
-    let key2 = Word::new(rand_array());
+    let mut rng = ChaCha20Rng::from_seed([6u8; 32]);
+    let key0 = random_word(&mut rng);
+    let key1 = random_word(&mut rng);
+    let key2 = random_word(&mut rng);
 
-    let value0 = Word::new(rand_array());
-    let value1 = Word::new(rand_array());
-    let value2 = Word::new(rand_array());
+    let value0 = random_word(&mut rng);
+    let value1 = random_word(&mut rng);
+    let value2 = random_word(&mut rng);
 
     let kv_pairs = vec![(key0, value0), (key1, value1)];
 
@@ -249,11 +271,12 @@ fn partial_smt_root_mismatch_on_non_empty_values() {
 /// Tests that from_proofs fails when the proofs roots do not match.
 #[test]
 fn partial_smt_from_proofs_fails_on_root_mismatch() {
-    let key0 = Word::new(rand_array());
-    let key1 = Word::new(rand_array());
+    let mut rng = ChaCha20Rng::from_seed([7u8; 32]);
+    let key0 = random_word(&mut rng);
+    let key1 = random_word(&mut rng);
 
-    let value0 = Word::new(rand_array());
-    let value1 = Word::new(rand_array());
+    let value0 = random_word(&mut rng);
+    let value1 = random_word(&mut rng);
 
     let mut full = Smt::with_entries([(key0, value0)]).unwrap();
 
@@ -271,23 +294,24 @@ fn partial_smt_from_proofs_fails_on_root_mismatch() {
 /// Tests that a basic PartialSmt's iterator APIs return the expected values.
 #[test]
 fn partial_smt_iterator_apis() {
-    let key0 = Word::new(rand_array());
-    let key1 = Word::new(rand_array());
-    let key2 = Word::new(rand_array());
+    let mut rng = ChaCha20Rng::from_seed([8u8; 32]);
+    let key0 = random_word(&mut rng);
+    let key1 = random_word(&mut rng);
+    let key2 = random_word(&mut rng);
     // A key for which we won't add a value so it will be empty.
-    let key_empty = Word::new(rand_array());
+    let key_empty = random_word(&mut rng);
 
-    let value0 = Word::new(rand_array());
-    let value1 = Word::new(rand_array());
-    let value2 = Word::new(rand_array());
+    let value0 = random_word(&mut rng);
+    let value1 = random_word(&mut rng);
+    let value2 = random_word(&mut rng);
 
     let mut kv_pairs = vec![(key0, value0), (key1, value1), (key2, value2)];
 
     // Add more random leaves.
     kv_pairs.reserve(1000);
     for _ in 0..1000 {
-        let key = Word::new(rand_array());
-        let value = Word::new(rand_array());
+        let key = random_word(&mut rng);
+        let value = random_word(&mut rng);
         kv_pairs.push((key, value));
     }
 
@@ -365,21 +389,23 @@ fn partial_smt_tracks_leaves() {
 /// `PartialSmt` serde round-trip when constructed from just a root.
 #[test]
 fn partial_smt_with_empty_leaves_serialization_roundtrip() {
-    let partial_smt = PartialSmt::new(rand_value());
+    let mut rng = ChaCha20Rng::from_seed([9u8; 32]);
+    let partial_smt = PartialSmt::new(random_word(&mut rng));
     assert_eq!(partial_smt, PartialSmt::read_from_bytes(&partial_smt.to_bytes()).unwrap());
 }
 
 /// `PartialSmt` serde round-trip. Also tests conversion from SMT.
 #[test]
 fn partial_smt_serialization_roundtrip() {
-    let key = rand_value();
-    let val = rand_value();
+    let mut rng = ChaCha20Rng::from_seed([10u8; 32]);
+    let key = random_word(&mut rng);
+    let val = random_word(&mut rng);
 
-    let key_1 = rand_value();
-    let val_1 = rand_value();
+    let key_1 = random_word(&mut rng);
+    let val_1 = random_word(&mut rng);
 
-    let key_2 = rand_value();
-    let val_2 = rand_value();
+    let key_2 = random_word(&mut rng);
+    let val_2 = random_word(&mut rng);
 
     let smt: Smt = Smt::with_entries([(key, val), (key_1, val_1), (key_2, val_2)]).unwrap();
 
@@ -400,13 +426,14 @@ fn partial_smt_serialization_roundtrip() {
 /// Note that decreasing counts are not possible with the current API.
 #[test]
 fn partial_smt_add_proof_num_entries() {
+    let mut rng = ChaCha20Rng::from_seed([11u8; 32]);
     // key0 and key1 have the same felt at index 3 so they will be placed in the same leaf.
     let key0 = Word::from([ZERO, ZERO, ZERO, ONE]);
     let key1 = Word::from([ONE, ONE, ONE, ONE]);
     let key2 = Word::from([ONE, ONE, ONE, Felt::new(5)]);
-    let value0 = Word::from(rand_array::<Felt, 4>());
-    let value1 = Word::from(rand_array::<Felt, 4>());
-    let value2 = Word::from(rand_array::<Felt, 4>());
+    let value0 = random_word(&mut rng);
+    let value1 = random_word(&mut rng);
+    let value2 = random_word(&mut rng);
 
     let full = Smt::with_entries([(key0, value0), (key1, value1), (key2, value2)]).unwrap();
     let mut partial = PartialSmt::new(full.root());
@@ -468,8 +495,12 @@ fn partial_smt_tracking_visualization() {
     let key_6 = Word::from([ZERO, ZERO, ZERO, Felt::new(LEAF_6)]);
     let key_7 = Word::from([ZERO, ZERO, ZERO, Felt::new(LEAF_7)]);
 
+    let mut rng = ChaCha20Rng::from_seed([12u8; 32]);
+
     // Create full SMT with keys 1 and 3 (key_3 makes node b non-empty)
-    let mut full = Smt::with_entries([(key_1, rand_value()), (key_3, rand_value())]).unwrap();
+    let mut full =
+        Smt::with_entries([(key_1, random_word(&mut rng)), (key_3, random_word(&mut rng))])
+            .unwrap();
 
     // Create partial SMT with ONLY the proof for key 1
     let proof_1 = full.open(&key_1);
@@ -477,19 +508,19 @@ fn partial_smt_tracking_visualization() {
     assert_eq!(full.root(), partial.root());
 
     // Key 1: CAN update (explicitly tracked via proof)
-    let new_value_1: Word = rand_value();
+    let new_value_1 = random_word(&mut rng);
     full.insert(key_1, new_value_1).unwrap();
     partial.insert(key_1, new_value_1).unwrap();
     assert_eq!(full.root(), partial.root());
 
     // Key 0: CAN update (under same parent 'a' as key 1, empty)
-    let value_0: Word = rand_value();
+    let value_0 = random_word(&mut rng);
     full.insert(key_0, value_0).unwrap();
     partial.insert(key_0, value_0).unwrap();
     assert_eq!(full.root(), partial.root());
 
     // Key 4: CAN update (in empty subtree f)
-    let value_4: Word = rand_value();
+    let value_4 = random_word(&mut rng);
     full.insert(key_4, value_4).unwrap();
     partial.insert(key_4, value_4).unwrap();
     assert_eq!(full.root(), partial.root());
@@ -498,29 +529,29 @@ fn partial_smt_tracking_visualization() {
     // remain trackable through the inner nodes created by previous inserts.
 
     // Key 5: CAN update
-    let value_5: Word = rand_value();
+    let value_5 = random_word(&mut rng);
     full.insert(key_5, value_5).unwrap();
     partial.insert(key_5, value_5).unwrap();
     assert_eq!(full.root(), partial.root());
 
     // Key 6: CAN update
-    let value_6: Word = rand_value();
+    let value_6 = random_word(&mut rng);
     full.insert(key_6, value_6).unwrap();
     partial.insert(key_6, value_6).unwrap();
     assert_eq!(full.root(), partial.root());
 
     // Key 7: CAN update
-    let value_7: Word = rand_value();
+    let value_7 = random_word(&mut rng);
     full.insert(key_7, value_7).unwrap();
     partial.insert(key_7, value_7).unwrap();
     assert_eq!(full.root(), partial.root());
 
     // Key 2: CANNOT update (under non-empty node b, only have its hash)
-    let result = partial.insert(key_2, rand_value());
+    let result = partial.insert(key_2, random_word(&mut rng));
     assert_matches!(result, Err(MerkleError::UntrackedKey(_)));
 
     // Key 3: CANNOT update (has data but no proof in partial SMT)
-    let result = partial.insert(key_3, rand_value());
+    let result = partial.insert(key_3, random_word(&mut rng));
     assert_matches!(result, Err(MerkleError::UntrackedKey(_)));
 
     // Verify roots still match (failed inserts should not modify partial SMT)
@@ -529,11 +560,12 @@ fn partial_smt_tracking_visualization() {
 
 #[test]
 fn partial_smt_implicit_empty_tree() {
+    let mut rng = ChaCha20Rng::from_seed([13u8; 32]);
     let mut full = Smt::new();
     let mut partial = PartialSmt::new(full.root());
 
-    let key: Word = rand_value();
-    let value: Word = rand_value();
+    let key = random_word(&mut rng);
+    let value = random_word(&mut rng);
 
     full.insert(key, value).unwrap();
     // Can insert into empty partial SMT (implicitly tracked)
@@ -545,11 +577,12 @@ fn partial_smt_implicit_empty_tree() {
 
 #[test]
 fn partial_smt_implicit_insert_and_remove() {
+    let mut rng = ChaCha20Rng::from_seed([14u8; 32]);
     let mut full = Smt::new();
     let mut partial = PartialSmt::new(full.root());
 
-    let key: Word = rand_value();
-    let value: Word = rand_value();
+    let key = random_word(&mut rng);
+    let value = random_word(&mut rng);
 
     // Insert into implicitly tracked leaf
     full.insert(key, value).unwrap();
@@ -569,8 +602,9 @@ fn partial_smt_implicit_insert_and_remove() {
 /// Tests that deserialization fails when an inner node hash is inconsistent with its parent.
 #[test]
 fn partial_smt_deserialize_invalid_inner_node() {
-    let key: Word = rand_value();
-    let value: Word = rand_value();
+    let mut rng = ChaCha20Rng::from_seed([15u8; 32]);
+    let key = random_word(&mut rng);
+    let value = random_word(&mut rng);
     let smt = Smt::with_entries([(key, value)]).unwrap();
 
     let proof = smt.open(&key);
@@ -593,8 +627,9 @@ fn partial_smt_deserialize_invalid_inner_node() {
 /// node.
 #[test]
 fn partial_smt_deserialize_invalid_leaf() {
-    let key: Word = rand_value();
-    let value: Word = rand_value();
+    let mut rng = ChaCha20Rng::from_seed([16u8; 32]);
+    let key = random_word(&mut rng);
+    let value = random_word(&mut rng);
     let smt = Smt::with_entries([(key, value)]).unwrap();
 
     let proof = smt.open(&key);
@@ -620,8 +655,9 @@ fn partial_smt_deserialize_invalid_leaf() {
 /// Tests that deserialization fails when the root is inconsistent with the inner nodes.
 #[test]
 fn partial_smt_deserialize_invalid_root() {
-    let key: Word = rand_value();
-    let value: Word = rand_value();
+    let mut rng = ChaCha20Rng::from_seed([17u8; 32]);
+    let key = random_word(&mut rng);
+    let value = random_word(&mut rng);
     let smt = Smt::with_entries([(key, value)]).unwrap();
 
     let proof = smt.open(&key);
@@ -639,8 +675,9 @@ fn partial_smt_deserialize_invalid_root() {
 /// Tests that deserialization fails when leaves count is tampered to be smaller.
 #[test]
 fn partial_smt_deserialize_leaves_count_smaller() {
-    let key: Word = rand_value();
-    let value: Word = rand_value();
+    let mut rng = ChaCha20Rng::from_seed([18u8; 32]);
+    let key = random_word(&mut rng);
+    let value = random_word(&mut rng);
     let smt = Smt::with_entries([(key, value)]).unwrap();
 
     let proof = smt.open(&key);
@@ -664,8 +701,9 @@ fn partial_smt_deserialize_leaves_count_smaller() {
 /// Tests that deserialization fails when leaves count is tampered to be larger.
 #[test]
 fn partial_smt_deserialize_leaves_count_larger() {
-    let key: Word = rand_value();
-    let value: Word = rand_value();
+    let mut rng = ChaCha20Rng::from_seed([19u8; 32]);
+    let key = random_word(&mut rng);
+    let value = random_word(&mut rng);
     let smt = Smt::with_entries([(key, value)]).unwrap();
 
     let proof = smt.open(&key);
@@ -684,4 +722,36 @@ fn partial_smt_deserialize_leaves_count_larger() {
 
     let result = PartialSmt::read_from_bytes(&bytes);
     assert!(result.is_err());
+}
+
+// PROPTEST-BASED TESTS
+// ================================================================================================
+// These tests use proptest's Arbitrary trait, which is no_std compatible with the `alloc` feature.
+
+proptest! {
+    /// Property test: inserting a value into an empty partial SMT and then reading it back
+    /// should return the same value.
+    #[test]
+    fn prop_partial_smt_insert_roundtrip(key: Word, value: Word) {
+        // Skip empty values as they have special semantics
+        prop_assume!(value != EMPTY_WORD);
+
+        let mut full = Smt::new();
+        let mut partial = PartialSmt::new(full.root());
+
+        full.insert(key, value).unwrap();
+        partial.insert(key, value).unwrap();
+
+        prop_assert_eq!(full.root(), partial.root());
+        prop_assert_eq!(partial.get_value(&key).unwrap(), value);
+    }
+
+    /// Property test: serialization roundtrip for partial SMT constructed from an empty tree.
+    #[test]
+    fn prop_partial_smt_empty_serialization_roundtrip(root: Word) {
+        let partial_smt = PartialSmt::new(root);
+        let bytes = partial_smt.to_bytes();
+        let decoded = PartialSmt::read_from_bytes(&bytes).unwrap();
+        prop_assert_eq!(partial_smt, decoded);
+    }
 }

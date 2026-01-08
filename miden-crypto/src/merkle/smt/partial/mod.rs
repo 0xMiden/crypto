@@ -8,7 +8,7 @@ use crate::{
     utils::{ByteReader, ByteWriter, Deserializable, DeserializationError, Serializable},
 };
 
-#[cfg(all(test, feature = "std"))]
+#[cfg(test)]
 mod tests;
 
 /// A partial version of an [`super::Smt`].

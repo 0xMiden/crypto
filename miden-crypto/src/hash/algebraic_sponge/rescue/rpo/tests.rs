@@ -4,9 +4,14 @@ use alloc::{collections::BTreeSet, vec::Vec};
 use proptest::prelude::*;
 
 use super::{
-    super::{ALPHA, INV_ALPHA, apply_inv_sbox, apply_sbox},
+    super::{apply_inv_sbox, apply_sbox},
     Felt, Rpo256, STATE_WIDTH,
 };
+
+/// S-Box power for Rescue Prime hash function.
+const ALPHA: u64 = 7;
+/// Inverse S-Box power for Rescue Prime hash function.
+const INV_ALPHA: u64 = 10540996611094048183;
 use crate::{
     ONE, Word, ZERO,
     field::{PrimeCharacteristicRing, PrimeField64},
