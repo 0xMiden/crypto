@@ -24,7 +24,7 @@ We benchmark the above hash functions using two scenarios. The first is a 2-to-1
 | Apple M4 Max        | 48 ns  |        | 149 ns    | 0.7 µs    | 2.5 µs   | 1.3 µs   |
 | Amazon Graviton 3   | 108 ns |        |           |           | *5.3 µs  | *3.1 µs  |
 | Amazon Graviton 4   | 96 ns  |        |           |           | *5.1 µs  | *2.8 µs  |
-| AMD Ryzen 9 5950X   | 64 ns  | 273 ns |           |           | *5.5 µs  |          |
+| AMD Ryzen 9 9950X   | 49 ns  |        | 375 ns    | 0.65 µs   | 3.1 µs   | 1.6 µs   |
 | AMD EPYC 9R14       | 83 ns  |        |           |           | *4.3 µs  | *2.4 µs  |
 | Intel Core i5-8279U | 68 ns  | 536 ns | 514 ns    | *1.7 µs   | *8.5 µs  | *4.4 µs  |
 | Intel Xeon 8375C    | 67 ns  |        |           |           | *8.2 µs  |          |
@@ -38,7 +38,7 @@ We benchmark the above hash functions using two scenarios. The first is a 2-to-1
 | Apple M4 Max        | 0.7 µs |        | 0.7 µs    | 8.7 µs    | 32 µs    | 17 µs    |
 | Amazon Graviton 3   | 1.4 µs |        |           |           | *69 µs   | *41 µs   |
 | Amazon Graviton 4   | 1.2 µs |        |           |           | *67 µs   | *36 µs   |
-| AMD Ryzen 9 5950X   | 0.8 µs | 1.7 µs |           |           | *72 µs   |          |
+| AMD Ryzen 9 9950X   | 0.8 µs |        | 2.2 µs    | 8.7 µs    | 40 µs    | 22 µs    |
 | AMD EPYC 9R14       | 0.9 µs |        |           |           | *56 µs   | *32 µs   |
 | Intel Core i5-8279U | 0.9 µs |        | 3.4 µs    | *27 µs    | *107 µs  | *56 µs   |
 | Intel Xeon 8375C    | 0.8 µs |        |           |           | *110 µs  |          |
@@ -46,6 +46,7 @@ We benchmark the above hash functions using two scenarios. The first is a 2-to-1
 Notes:
 - Measurements marked with an `*` are obsolete and need to be re-run.
 - On Graviton 3 and 4, RPO256 and RPX256 are run with SVE acceleration enabled.
+- On AMD Ryzen 9 9950X, benchmarks are run with AVX512 acceleration enabled.
 - On AMD EPYC 9R14, RPO256 and RPX256 are run with AVX2 acceleration enabled.
 
 ### Digital Signature Algorithms (DSA)
@@ -71,12 +72,14 @@ For each algorithm, we benchmark three core operations:
 
 | Hardware            | Key Generation | Signing | Verification |
 | ------------------- | :------------: | :-----: | :----------: |
+| AMD Ryzen 9 9950X   | 32.2 µs        | 264 µs  | 492 µs       |
 | Apple M4            | 24.4 µs        | 258 µs  | 390 µs       |
 
 #### EdDSA over Ed25519
 
 | Hardware            | Key Generation | Signing | Verification |
 | ------------------- | :------------: | :-----: | :----------: |
+| AMD Ryzen 9 9950X   | 8.7 µs         | 90.8 µs | 177 µs       |
 | Apple M4            | 8.2 µs         | 86.6 µs | 185.6 µs     |
 
 ### Sparse Merkle Tree
@@ -87,7 +90,7 @@ We build cryptographic data structures incorporating these hash functions. What 
 
 | Hardware          | Sequential | Concurrent | Improvement |
 | ----------------- | ---------- | ---------- | ----------- |
-| AMD Ryzen 9 7950X | 196 sec    | 15 sec     | 13x         |
+| AMD Ryzen 9 9950X | 149 sec    | 6.6 sec    | 23x         |
 | Apple M1 Air      | 352 sec    | 57 sec     | 6.2x        |
 | Apple M1 Pro      | 351 sec    | 37 sec     | 9.5x        |
 | Apple M4 Max      | 195 sec    | 15 sec     | 13x         |
@@ -96,7 +99,7 @@ We build cryptographic data structures incorporating these hash functions. What 
 
 | Function          | Sequential | Concurrent | Improvement |
 | ----------------- | ---------- | ---------- | ----------- |
-| AMD Ryzen 9 7950X | 201 ms     | 19 ms      | 11x         |
+| AMD Ryzen 9 9950X | 192 ms     | 25 ms      | 7.7x        |
 | Apple M1 Air      | 729 ms     | 406 ms     | 1.8x        |
 | Apple M1 Pro      | 623 ms     | 86 ms      | 7.2x        |
 | Apple M4 Max      | 212 ms     | 28 ms      | 7.6x        |
@@ -105,13 +108,13 @@ We build cryptographic data structures incorporating these hash functions. What 
 
 | Function          | Sequential | Concurrent | Improvement |
 | ----------------- | ---------- | ---------- | ----------- |
-| AMD Ryzen 9 7950X | 202 ms     | 19 ms      | 11x         |
+| AMD Ryzen 9 9950X | 194 ms     | 26 ms      | 7.4x        |
 | Apple M1 Air      | 691 ms     | 307 ms     | 2.3x        |
 | Apple M1 Pro      | 419 ms     | 56 ms      | 7.5x        |
 | Apple M4 Max      | 218 ms     | 24 ms      | 9.1x        |
 
 Notes:
-- On AMD Ryzen 9 7950X, benchmarks are run with AVX2 acceleration enabled.
+- On AMD Ryzen 9 9950X, benchmarks are run with AVX512 acceleration enabled.
 
 ## Benchmark Explanations
 
