@@ -338,8 +338,8 @@ use p3_symmetric::{
 /// `CryptographicPermutation` traits, allowing RPX to be used within the Plonky3 ecosystem.
 ///
 /// The permutation operates on a state of 12 field elements (STATE_WIDTH = 12), with:
-/// - Rate: 8 elements (positions 4-11)
-/// - Capacity: 4 elements (positions 0-3)
+/// - Rate: 8 elements (positions 0-7)
+/// - Capacity: 4 elements (positions 8-11)
 /// - Digest output: 4 elements (positions 4-7)
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub struct RpxPermutation256;
@@ -352,10 +352,10 @@ impl RpxPermutation256 {
     /// the remaining 4 elements are reserved for capacity.
     pub const STATE_WIDTH: usize = STATE_WIDTH;
 
-    /// The rate portion of the state is located in elements 4 through 11 (inclusive).
+    /// The rate portion of the state is located in elements 0 through 7 (inclusive).
     pub const RATE_RANGE: Range<usize> = Rpx256::RATE_RANGE;
 
-    /// The capacity portion of the state is located in elements 0, 1, 2, and 3.
+    /// The capacity portion of the state is located in elements 8, 9, 10, and 11.
     pub const CAPACITY_RANGE: Range<usize> = Rpx256::CAPACITY_RANGE;
 
     /// The output of the hash function can be read from state elements 4, 5, 6, and 7.
