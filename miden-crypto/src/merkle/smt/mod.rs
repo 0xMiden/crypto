@@ -761,8 +761,8 @@ impl<const DEPTH: u8, K: Deserializable + Ord + Eq + Hash, V: Deserializable> De
         );
 
         let num_new_pairs = source.read_usize()?;
-        let new_pairs = source.read_many(num_new_pairs)?;
-        let new_pairs = Map::from_iter(new_pairs);
+        let new_pairs: Map<_, _> =
+            source.read_many_iter(num_new_pairs)?.collect::<Result<_, _>>()?;
 
         Ok(Self {
             old_root,

@@ -670,11 +670,12 @@ impl Deserializable for EncryptedData {
         })?;
 
         let ciphertext_len = source.read_usize()?;
-        let ciphertext_bytes = source.read_many(ciphertext_len)?;
+        let ciphertext_bytes: Vec<u64> =
+            source.read_many_iter(ciphertext_len)?.collect::<Result<_, _>>()?;
         let ciphertext = felts_from_u64(ciphertext_bytes)
             .ok_or_else(|| DeserializationError::InvalidValue("invalid ciphertext".into()))?;
 
-        let nonce = source.read_many(NONCE_SIZE)?;
+        let nonce: Vec<u64> = source.read_many_iter(NONCE_SIZE)?.collect::<Result<_, _>>()?;
         let nonce: [Felt; NONCE_SIZE] = felts_from_u64(nonce)
             .ok_or_else(|| DeserializationError::InvalidValue("invalid nonce".into()))?
             .try_into()
@@ -682,7 +683,7 @@ impl Deserializable for EncryptedData {
                 DeserializationError::InvalidValue("nonce conversion failed".to_string())
             })?;
 
-        let tag = source.read_many(AUTH_TAG_SIZE)?;
+        let tag: Vec<u64> = source.read_many_iter(AUTH_TAG_SIZE)?.collect::<Result<_, _>>()?;
         let tag: [Felt; AUTH_TAG_SIZE] = felts_from_u64(tag)
             .ok_or_else(|| DeserializationError::InvalidValue("invalid tag".into()))?
             .try_into()

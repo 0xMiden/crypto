@@ -61,6 +61,25 @@ pub trait ByteReader {
     /// Returns true if there are more bytes left to be read from `self`.
     fn has_more_bytes(&self) -> bool;
 
+    /// Returns the maximum number of elements that can be safely allocated, given each
+    /// element requires at least `min_element_bytes` to deserialize.
+    ///
+    /// This can be used by callers to pre-validate collection lengths before iterating,
+    /// preventing denial-of-service attacks from malicious length prefixes that claim
+    /// billions of elements.
+    ///
+    /// The default implementation returns `usize::MAX`, meaning no limit is enforced.
+    /// [`BudgetedReader`] overrides this to return `remaining_budget / min_element_bytes`,
+    /// providing tight, adaptive limits based on the caller's budget.
+    ///
+    /// # Arguments
+    /// * `min_element_bytes` - The minimum number of bytes required to deserialize one element.
+    ///   This should come from [`Deserializable::min_serialized_size`].
+    fn max_alloc(&self, min_element_bytes: usize) -> usize {
+        let _ = min_element_bytes;
+        usize::MAX
+    }
+
     // PROVIDED METHODS
     // --------------------------------------------------------------------------------------------
 
@@ -180,25 +199,84 @@ pub trait ByteReader {
         D::read_from(self)
     }
 
-    /// Reads a sequence of bytes from `self`, attempts to deserialize these bytes into a vector
-    /// with the specified number of `D` elements, and returns the result.
+    /// Returns an iterator that deserializes `num_elements` instances of `D` from this reader.
+    ///
+    /// This method validates the requested count against the reader's capacity before returning
+    /// the iterator, rejecting implausible lengths early. Each element is then deserialized
+    /// lazily as the iterator is consumed.
     ///
     /// # Errors
-    /// Returns a [DeserializationError] if the specified number elements could not be read from
-    /// `self`.
-    fn read_many<D>(&mut self, num_elements: usize) -> Result<Vec<D>, DeserializationError>
+    ///
+    /// Returns an error if `num_elements` exceeds `self.max_alloc(D::min_serialized_size())`,
+    /// indicating the reader cannot possibly contain that many elements.
+    ///
+    /// # Example
+    ///
+    /// ```ignore
+    /// // Collect into a Vec
+    /// let items: Vec<u64> = reader
+    ///     .read_many_iter::<u64>(count)?
+    ///     .collect::<Result<_, _>>()?;
+    ///
+    /// // Collect directly into a BTreeMap (no intermediate Vec)
+    /// let map: BTreeMap<K, V> = reader
+    ///     .read_many_iter::<(K, V)>(count)?
+    ///     .collect::<Result<_, _>>()?;
+    /// ```
+    fn read_many_iter<D>(
+        &mut self,
+        num_elements: usize,
+    ) -> Result<ReadManyIter<'_, Self, D>, DeserializationError>
     where
         Self: Sized,
         D: Deserializable,
     {
-        let mut result = Vec::with_capacity(num_elements);
-        for _ in 0..num_elements {
-            let element = D::read_from(self)?;
-            result.push(element)
+        let max_elements = self.max_alloc(D::min_serialized_size());
+        if num_elements > max_elements {
+            return Err(DeserializationError::InvalidValue(format!(
+                "requested {num_elements} elements but reader can provide at most {max_elements}"
+            )));
         }
-        Ok(result)
+        Ok(ReadManyIter {
+            reader: self,
+            remaining: num_elements,
+            _item: core::marker::PhantomData,
+        })
     }
 }
+
+// READ MANY ITERATOR
+// ================================================================================================
+
+/// Iterator that lazily deserializes elements from a [`ByteReader`].
+///
+/// Created by [`ByteReader::read_many_iter`]. Each call to `next()` deserializes one element.
+/// This avoids upfront allocation and naturally integrates with [`BudgetedReader`] for
+/// protection against malicious inputs.
+pub struct ReadManyIter<'reader, R: ByteReader, D: Deserializable> {
+    reader: &'reader mut R,
+    remaining: usize,
+    _item: core::marker::PhantomData<D>,
+}
+
+impl<'reader, R: ByteReader, D: Deserializable> Iterator for ReadManyIter<'reader, R, D> {
+    type Item = Result<D, DeserializationError>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.remaining > 0 {
+            self.remaining -= 1;
+            Some(D::read_from(self.reader))
+        } else {
+            None
+        }
+    }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        (self.remaining, Some(self.remaining))
+    }
+}
+
+impl<'reader, R: ByteReader, D: Deserializable> ExactSizeIterator for ReadManyIter<'reader, R, D> {}
 
 // STANDARD LIBRARY ADAPTER
 // ================================================================================================
@@ -692,26 +770,73 @@ impl ByteReader for SliceReader<'_> {
 
 /// A reader wrapper that enforces a byte budget during deserialization.
 ///
-/// This prevents denial-of-service attacks where malicious input claims to contain
-/// huge collections, causing unbounded memory allocation before the actual data is read.
+/// # Threat Model
 ///
-/// The budget tracks input bytes consumed, not memory allocated. This is the right metric
-/// because valid deserialization requires reading the actual data bytes.
+/// Malicious input can attack deserialization in two ways:
 ///
-/// # Example
+/// 1. **Fake length prefix**: Input claims `len = 2^60` elements, causing allocation of a huge
+///    `Vec` before any data is read.
+/// 2. **Oversized input**: Attacker sends gigabytes of valid-looking data to exhaust memory over
+///    time.
+///
+/// # Defense Strategy
+///
+/// Use `BudgetedReader` to limit total bytes consumed. Its [`max_alloc`](ByteReader::max_alloc)
+/// method derives a bound from the remaining budget, which
+/// [`read_many_iter`](ByteReader::read_many_iter) checks before iterating.
+///
+/// ## Problem: SliceReader alone doesn't bound allocations
+///
+/// ```
+/// use miden_serde_utils::{ByteReader, Deserializable, SliceReader};
+///
+/// // Malicious input: length prefix says 1 billion u64s, but only 16 bytes of data
+/// let mut data = Vec::new();
+/// data.push(0u8); // vint64 9-byte marker
+/// data.extend_from_slice(&1_000_000_000u64.to_le_bytes());
+/// data.extend_from_slice(&[0u8; 16]);
+///
+/// // SliceReader returns usize::MAX from max_alloc, so read_many_iter accepts
+/// // any length. This would try to iterate 1 billion times (slow, not OOM,
+/// // but still a DoS vector).
+/// let reader = SliceReader::new(&data);
+/// assert_eq!(reader.max_alloc(8), usize::MAX);
+/// ```
+///
+/// ## Solution: BudgetedReader bounds allocations via max_alloc
 ///
 /// ```
 /// use miden_serde_utils::{BudgetedReader, ByteReader, Deserializable, SliceReader};
 ///
-/// let data = [1u8, 2, 3, 4, 5, 6, 7, 8];
+/// // Same malicious input
+/// let mut data = Vec::new();
+/// data.push(0u8);
+/// data.extend_from_slice(&1_000_000_000u64.to_le_bytes());
+/// data.extend_from_slice(&[0u8; 16]);
+///
+/// // BudgetedReader with 64-byte budget: max_alloc(8) = 64/8 = 8 elements
 /// let inner = SliceReader::new(&data);
-/// let mut reader = BudgetedReader::new(inner, 4); // 4-byte budget
+/// let reader = BudgetedReader::new(inner, 64);
+/// assert_eq!(reader.max_alloc(8), 8);
 ///
-/// // First 4 bytes succeed
-/// assert!(reader.read_u32().is_ok());
+/// // read_many_iter rejects the 1B length since 1B > 8
+/// let result = Vec::<u64>::read_from_bytes_with_budget(&data, 64);
+/// assert!(result.is_err());
+/// ```
 ///
-/// // Next read fails: budget exhausted
-/// assert!(reader.read_u32().is_err());
+/// ## Best practice: Set budget to expected input size
+///
+/// ```
+/// use miden_serde_utils::{ByteWriter, Deserializable, Serializable};
+///
+/// // Legitimate input: 3 u64s, properly serialized
+/// let original = vec![1u64, 2, 3];
+/// let mut data = Vec::new();
+/// original.write_into(&mut data);
+///
+/// // Budget = data.len() bounds both fake lengths and total consumption
+/// let result = Vec::<u64>::read_from_bytes_with_budget(&data, data.len());
+/// assert_eq!(result.unwrap(), vec![1, 2, 3]);
 /// ```
 pub struct BudgetedReader<R> {
     inner: R,
@@ -776,6 +901,13 @@ impl<R: ByteReader> ByteReader for BudgetedReader<R> {
 
     fn has_more_bytes(&self) -> bool {
         self.remaining > 0 && self.inner.has_more_bytes()
+    }
+
+    fn max_alloc(&self, min_element_bytes: usize) -> usize {
+        if min_element_bytes == 0 {
+            return usize::MAX; // ZSTs don't consume budget
+        }
+        self.remaining / min_element_bytes
     }
 }
 
@@ -1009,5 +1141,120 @@ mod tests {
         assert!(reader.read_u8().is_err());
         // peek still works (doesn't consume budget)
         assert_eq!(reader.peek_u8().unwrap(), 1);
+    }
+
+    #[test]
+    fn budgeted_reader_max_alloc() {
+        let data = [0u8; 100];
+        let inner = SliceReader::new(&data);
+        let reader = BudgetedReader::new(inner, 64);
+
+        // 64 bytes budget / 8 bytes per u64 = 8 elements max
+        assert_eq!(reader.max_alloc(8), 8);
+
+        // 64 bytes budget / 1 byte per u8 = 64 elements max
+        assert_eq!(reader.max_alloc(1), 64);
+
+        // 64 bytes budget / 16 bytes per u128 = 4 elements max
+        assert_eq!(reader.max_alloc(16), 4);
+
+        // ZSTs (0 bytes) return usize::MAX
+        assert_eq!(reader.max_alloc(0), usize::MAX);
+    }
+
+    #[test]
+    fn unbounded_reader_max_alloc_returns_max() {
+        let data = [0u8; 100];
+        let reader = SliceReader::new(&data);
+
+        // Unbounded readers return usize::MAX
+        assert_eq!(reader.max_alloc(1), usize::MAX);
+        assert_eq!(reader.max_alloc(8), usize::MAX);
+    }
+
+    // ============================================================================================
+    // The following tests document the threat model and defense layers.
+    // ============================================================================================
+
+    /// SliceReader alone does NOT reject fake length prefixes.
+    ///
+    /// A malicious input claiming 1000 elements will be accepted by read_many_iter
+    /// because SliceReader.max_alloc() returns usize::MAX. The deserialization will
+    /// eventually fail with UnexpectedEOF, but only after attempting to iterate
+    /// (which could be slow for huge counts, though not OOM since we don't pre-allocate).
+    #[test]
+    fn slice_reader_accepts_fake_length_prefix() {
+        let mut data = Vec::new();
+        // Write length = 1000 (vint64 encoding: 0x07D0 << 2 | 0b10 = 0x1F42)
+        // For simplicity, use the 9-byte form
+        data.push(0); // 9-byte marker
+        data.extend_from_slice(&1000u64.to_le_bytes());
+        // Only 8 bytes of actual u64 data (1 element, not 1000)
+        data.extend_from_slice(&42u64.to_le_bytes());
+
+        // read_many_iter passes the max_alloc check (usize::MAX >= 1000)
+        let mut reader = SliceReader::new(&data);
+        let _len = reader.read_usize().unwrap();
+        let iter_result = reader.read_many_iter::<u64>(1000);
+
+        // The iterator is created successfully
+        assert!(iter_result.is_ok());
+
+        // But collecting fails on the 2nd element (EOF)
+        let collect_result: Result<Vec<u64>, _> = iter_result.unwrap().collect();
+        assert!(collect_result.is_err());
+        assert!(matches!(collect_result.unwrap_err(), DeserializationError::UnexpectedEOF));
+    }
+
+    /// BudgetedReader rejects fake length prefixes BEFORE iteration begins.
+    ///
+    /// With a 64-byte budget, max_alloc(8) = 8, so a claim of 1000 elements
+    /// is rejected immediately by read_many_iter.
+    #[test]
+    fn budgeted_reader_rejects_fake_length_upfront() {
+        let mut data = Vec::new();
+        data.push(0); // 9-byte vint64 marker
+        data.extend_from_slice(&1000u64.to_le_bytes());
+        data.extend_from_slice(&42u64.to_le_bytes());
+
+        let inner = SliceReader::new(&data);
+        let mut reader = BudgetedReader::new(inner, 64);
+
+        let _len = reader.read_usize().unwrap(); // consumes 9 bytes, 55 remaining
+        // 55 / 8 = 6 elements max
+        let iter_result = reader.read_many_iter::<u64>(1000);
+
+        // Rejected immediately: 1000 > 6
+        match iter_result {
+            Err(DeserializationError::InvalidValue(_)) => {}, // expected
+            other => panic!("expected InvalidValue error, got {:?}", other.map(|_| "Ok")),
+        }
+    }
+
+    /// Best practice: budget = input length provides both protections.
+    ///
+    /// 1. Fake length prefixes are bounded by max_alloc (remaining_bytes / element_size)
+    /// 2. Total consumption is bounded by the budget
+    #[test]
+    fn budget_equals_input_length_is_safe() {
+        // Valid input: 2 u64s
+        let original = vec![100u64, 200];
+        let mut data = Vec::new();
+        crate::Serializable::write_into(&original, &mut data);
+
+        // Budget = exact input size
+        let result = Vec::<u64>::read_from_bytes_with_budget(&data, data.len());
+        assert_eq!(result.unwrap(), vec![100, 200]);
+
+        // Malicious input claiming 1000 elements (same serialized prefix manipulation)
+        let mut evil_data = Vec::new();
+        evil_data.push(0); // 9-byte vint64
+        evil_data.extend_from_slice(&1000u64.to_le_bytes());
+        evil_data.extend_from_slice(&42u64.to_le_bytes()); // only 1 actual element
+
+        // Budget = input length (17 bytes). After reading length (9 bytes), 8 remain.
+        // max_alloc(8) = 8/8 = 1, so 1000 > 1 fails.
+        let result = Vec::<u64>::read_from_bytes_with_budget(&evil_data, evil_data.len());
+        assert!(result.is_err());
     }
 }
