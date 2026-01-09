@@ -1569,12 +1569,7 @@ const EMPTY_SUBTREES: [Word; 256] = [
         Felt::new(0x3e57dafa1a6af337),
         Felt::new(0xc6d722ae0d17a589),
     ]),
-    Word::new([
-        Felt::new(0x0),
-        Felt::new(0x0),
-        Felt::new(0x0),
-        Felt::new(0x0),
-    ]),
+    Word::new([Felt::new(0x0), Felt::new(0x0), Felt::new(0x0), Felt::new(0x0)]),
 ];
 
 #[test]
