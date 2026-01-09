@@ -41,9 +41,8 @@ pub(crate) const INPUT2_RANGE: Range<usize> = 4..8;
 pub(crate) const CAPACITY_RANGE: Range<usize> = 8..12;
 
 /// The output of the hash function is a digest which consists of 4 field elements or 32 bytes,
-/// taken from the second word of the rate portion of the state (the middle word of the 3-word
-/// sponge state).
-pub(crate) const DIGEST_RANGE: Range<usize> = 4..8;
+/// taken from the first word of the rate portion of the state.
+pub(crate) const DIGEST_RANGE: Range<usize> = 0..4;
 
 /// The number of byte chunks defining a field element when hashing a sequence of bytes
 const BINARY_CHUNK_SIZE: usize = 7;

@@ -528,13 +528,13 @@ impl SpongeState {
         squeezed_data
     }
 
-    /// Squeezes an authentication tag
+    /// Squeezes an authentication tag (from RATE0, the first rate word)
     fn squeeze_tag(&mut self) -> AuthTag {
         self.permute();
         AuthTag(
-            self.state[RATE_RANGE_SECOND_HALF]
+            self.state[RATE_RANGE_FIRST_HALF]
                 .try_into()
-                .expect("rate second half is exactly AUTH_TAG_SIZE elements"),
+                .expect("rate first half is exactly AUTH_TAG_SIZE elements"),
         )
     }
 
