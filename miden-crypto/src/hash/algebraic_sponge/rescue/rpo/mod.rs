@@ -1,9 +1,9 @@
 use super::{
-    ARK1, ARK2, AlgebraicSponge, CAPACITY_RANGE, DIGEST_RANGE, Felt, NUM_ROUNDS, RATE_RANGE, Range,
-    STATE_WIDTH, Word, add_constants, add_constants_and_apply_inv_sbox,
-    add_constants_and_apply_sbox, apply_inv_sbox, apply_mds, apply_sbox,
+    ARK1, ARK2, AlgebraicSponge, CAPACITY_RANGE, DIGEST_RANGE, Felt, INPUT1_RANGE, INPUT2_RANGE,
+    MDS, NUM_ROUNDS, RATE_RANGE, Range, STATE_WIDTH, Word, add_constants,
+    add_constants_and_apply_inv_sbox, add_constants_and_apply_sbox, apply_inv_sbox, apply_mds,
+    apply_sbox,
 };
-use crate::hash::algebraic_sponge::rescue::mds::MDS;
 
 #[cfg(test)]
 mod tests;
@@ -229,6 +229,12 @@ impl RpoPermutation256 {
 
     /// The rate portion of the state is located in elements 0 through 7 (inclusive).
     pub const RATE_RANGE: Range<usize> = Rpo256::RATE_RANGE;
+
+    /// The first 4-element word of the rate portion.
+    pub const INPUT1_RANGE: Range<usize> = INPUT1_RANGE;
+
+    /// The second 4-element word of the rate portion.
+    pub const INPUT2_RANGE: Range<usize> = INPUT2_RANGE;
 
     /// The capacity portion of the state is located in elements 8, 9, 10, and 11.
     pub const CAPACITY_RANGE: Range<usize> = Rpo256::CAPACITY_RANGE;
