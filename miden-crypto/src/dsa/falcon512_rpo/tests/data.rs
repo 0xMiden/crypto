@@ -1755,8 +1755,7 @@ pub(crate) static SK_POLYS: [[[i16; 512]; 4]; NUM_TEST_VECTORS] = [
 /// Serialized deterministic RPO-Falcon-512 signature intended for use as a test vector
 /// for the determinism in the signing procedure across platforms.
 ///
-/// This was generated on an `Intel Core i5-8279U` running on Linux kernel `5.4.0-144-generic` and
-/// built with Rust `1.88.0`.
+/// This was generated on an `M4` running on `Sequoia 15.7` and built with Rust `1.90.0`.
 pub(crate) const DETERMINISTIC_SIGNATURE: [u8; SIG_SERIALIZED_LEN] = [
     185, 1, 49, 100, 34, 177, 39, 53, 190, 227, 187, 229, 174, 59, 206, 209, 55, 168, 94, 121, 223,
     102, 175, 213, 188, 26, 185, 233, 198, 252, 249, 138, 82, 22, 171, 253, 118, 25, 164, 99, 187,
