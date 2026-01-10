@@ -98,6 +98,12 @@ impl Rpo256 {
     /// The rate portion of the state is located in elements 0 through 7 (inclusive).
     pub const RATE_RANGE: Range<usize> = RATE_RANGE;
 
+    /// The first 4-element word of the rate portion.
+    pub const INPUT1_RANGE: Range<usize> = INPUT1_RANGE;
+
+    /// The second 4-element word of the rate portion.
+    pub const INPUT2_RANGE: Range<usize> = INPUT2_RANGE;
+
     /// The capacity portion of the state is located in elements 8, 9, 10, and 11.
     pub const CAPACITY_RANGE: Range<usize> = CAPACITY_RANGE;
 
@@ -229,12 +235,6 @@ impl RpoPermutation256 {
 
     /// The rate portion of the state is located in elements 0 through 7 (inclusive).
     pub const RATE_RANGE: Range<usize> = Rpo256::RATE_RANGE;
-
-    /// The first 4-element word of the rate portion.
-    pub const INPUT1_RANGE: Range<usize> = INPUT1_RANGE;
-
-    /// The second 4-element word of the rate portion.
-    pub const INPUT2_RANGE: Range<usize> = INPUT2_RANGE;
 
     /// The capacity portion of the state is located in elements 8, 9, 10, and 11.
     pub const CAPACITY_RANGE: Range<usize> = Rpo256::CAPACITY_RANGE;
