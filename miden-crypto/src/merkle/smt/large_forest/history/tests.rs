@@ -422,7 +422,7 @@ fn smt_history_with_real_mutations() -> Result<()> {
 
     // Verify stored node hashes match what the SMT computed
     for (index, hash) in node_changes_v0.iter() {
-        assert_eq!(*hash, smt.get_inner_node(*index).hash());
+        assert_eq!(*hash, smt.get_node_hash(*index));
     }
 
     history.add_version(root_v0, 0, node_changes_v0.clone(), leaf_changes_v0.clone())?;
@@ -435,7 +435,7 @@ fn smt_history_with_real_mutations() -> Result<()> {
 
     // Verify stored node hashes match what the SMT computed
     for (index, hash) in node_changes_v1.iter() {
-        assert_eq!(*hash, smt.get_inner_node(*index).hash());
+        assert_eq!(*hash, smt.get_node_hash(*index));
     }
 
     history.add_version(root_v1, 1, node_changes_v1, leaf_changes_v1)?;
@@ -485,7 +485,7 @@ fn smt_history_value_updates() -> Result<()> {
 
     // Verify stored node hashes match what the SMT computed
     for (index, hash) in node_changes_v0.iter() {
-        assert_eq!(*hash, smt.get_inner_node(*index).hash());
+        assert_eq!(*hash, smt.get_node_hash(*index));
     }
 
     history.add_version(smt.root(), 0, node_changes_v0, leaf_changes_v0)?;
@@ -497,7 +497,7 @@ fn smt_history_value_updates() -> Result<()> {
 
     // Verify stored node hashes match what the SMT computed
     for (index, hash) in node_changes_v1.iter() {
-        assert_eq!(*hash, smt.get_inner_node(*index).hash());
+        assert_eq!(*hash, smt.get_node_hash(*index));
     }
 
     history.add_version(smt.root(), 1, node_changes_v1, leaf_changes_v1)?;
