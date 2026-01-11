@@ -62,7 +62,7 @@ pub trait ByteReader {
     fn has_more_bytes(&self) -> bool;
 
     /// Returns the maximum number of elements that can be safely allocated, given each
-    /// element occupies `element_size` bytes in memory.
+    /// element occupies `element_size` bytes when serialized.
     ///
     /// This can be used by callers to pre-validate collection lengths before iterating,
     /// preventing denial-of-service attacks from malicious length prefixes that claim
@@ -73,14 +73,9 @@ pub trait ByteReader {
     /// providing tight, adaptive limits based on the caller's budget.
     ///
     /// # Arguments
-    /// * `element_size` - The in-memory size of one element, typically `size_of::<D>()`.
-    ///
-    /// # Note on precision
-    /// Using `size_of::<D>()` bounds memory allocation rather than wire-format bytes.
-    /// For nested collections (e.g., `Vec<Vec<T>>`), the outer `size_of` is small (24 bytes
-    /// for a `Vec`), so the early-abort check may not trigger. However, the budget is still
-    /// enforced during actual reads, so security is maintained *if execution succeeds*
-    /// (just with later detection).
+    /// * `element_size` - The serialized size of one element, from
+    ///   [`Deserializable::min_serialized_size`]. Defaults to `size_of::<D>()` but can be
+    ///   overridden for types where serialized size differs from in-memory size.
     fn max_alloc(&self, _element_size: usize) -> usize {
         usize::MAX
     }
@@ -212,7 +207,7 @@ pub trait ByteReader {
     ///
     /// # Errors
     ///
-    /// Returns an error if `num_elements` exceeds `self.max_alloc(size_of::<D>())`,
+    /// Returns an error if `num_elements` exceeds `self.max_alloc(D::min_serialized_size())`,
     /// indicating the reader cannot allocate that many elements.
     ///
     /// # Example
@@ -236,7 +231,7 @@ pub trait ByteReader {
         Self: Sized,
         D: Deserializable,
     {
-        let max_elements = self.max_alloc(core::mem::size_of::<D>());
+        let max_elements = self.max_alloc(D::min_serialized_size());
         if num_elements > max_elements {
             return Err(DeserializationError::InvalidValue(format!(
                 "requested {num_elements} elements but reader can provide at most {max_elements}"
@@ -1264,15 +1259,16 @@ mod tests {
     }
 
     // ============================================================================================
-    // Tests documenting size_of-based allocation bounds
+    // Tests documenting min_serialized_size()-based allocation bounds (defaults to size_of)
     // ============================================================================================
 
-    /// The max_alloc check uses size_of::<D>() to bound memory allocation.
+    /// The max_alloc check uses D::min_serialized_size() to bound memory allocation.
+    /// By default, min_serialized_size() returns size_of::<D>().
     ///
     /// For flat collections like Vec<u64>, this works well: we check that
-    /// budget / size_of::<u64>() >= requested_count before allocating.
+    /// budget / min_serialized_size() >= requested_count before allocating.
     #[test]
-    fn size_of_bounds_flat_collections() {
+    fn min_serialized_size_bounds_flat_collections() {
         let mut data = Vec::new();
         data.push(0); // 9-byte vint64 marker
         data.extend_from_slice(&1000u64.to_le_bytes()); // claim 1000 u64s
@@ -1280,7 +1276,7 @@ mod tests {
 
         let inner = SliceReader::new(&data);
         // Budget of 80 bytes: after reading 9-byte length, 71 remain.
-        // max_alloc(size_of::<u64>()) = 71 / 8 = 8 elements max
+        // max_alloc(u64::min_serialized_size()) = 71 / 8 = 8 elements max
         let mut reader = BudgetedReader::new(inner, 80);
 
         let _len = reader.read_usize().unwrap();
@@ -1290,18 +1286,16 @@ mod tests {
         assert!(result.is_err());
     }
 
-    /// For nested collections like Vec<Vec<u64>>, size_of only measures the outer Vec's
-    /// in-memory size (24 bytes on 64-bit), not the wire format. This means the early-abort
-    /// check is less precise for nested types.
+    /// For nested collections like Vec<Vec<u64>>, min_serialized_size() returns 1 (the minimum
+    /// vint length prefix), not size_of. This is more permissive but accurate: a
+    /// serialized Vec can be as small as 1 byte (empty vec).
     ///
-    /// Security is still maintained because BudgetedReader catches overruns during actual
-    /// reads, but the early-abort happens later (during deserialization, not before).
+    /// The early-abort check uses this minimum, and budget enforcement during actual
+    /// reads provides the real protection against malicious input.
     #[test]
-    fn size_of_limitation_nested_collections() {
-        // size_of::<Vec<u64>>() is the fat pointer (ptr + len + cap)
-        let vec_size = core::mem::size_of::<Vec<u64>>();
-        // 24 bytes on 64-bit, 12 bytes on 32-bit
-        assert!(vec_size == 24 || vec_size == 12);
+    fn min_serialized_size_override_for_nested_collections() {
+        // Vec<u64>::min_serialized_size() returns 1 (minimum vint prefix), not size_of
+        assert_eq!(<Vec<u64>>::min_serialized_size(), 1);
 
         let mut data = Vec::new();
         data.push(0); // 9-byte vint64 marker
@@ -1310,16 +1304,15 @@ mod tests {
         data.push(0b10); // vint64 for 0 (empty inner vec)
 
         let inner = SliceReader::new(&data);
-        // Budget large enough that 100 inner Vecs passes the early check.
-        // After reading 9-byte length, we need: 100 * vec_size < remaining budget
-        // With budget = 100 * vec_size + 100, we have enough headroom.
-        let budget = 100 * vec_size + 100;
-        let mut reader = BudgetedReader::new(inner, budget);
+        // With min_serialized_size() = 1, we need budget >= 100 to pass the early check.
+        // After reading 9-byte length, 101 - 9 = 92 remaining, 92 / 1 = 92 < 100.
+        // So with budget = 110, we get 110 - 9 = 101 remaining, 101 >= 100.
+        let mut reader = BudgetedReader::new(inner, 110);
 
         let _len = reader.read_usize().unwrap();
         let result = reader.read_many_iter::<Vec<u64>>(100);
 
-        // The early check passes because budget allows 100+ elements at size_of::<Vec>
+        // The early check passes (100 <= 101)
         assert!(result.is_ok());
 
         // But deserialization fails when we try to read 100 inner Vecs with only 1
@@ -1327,12 +1320,12 @@ mod tests {
         assert!(collect_result.is_err());
     }
 
-    /// Demonstrates that size_of approach still provides security for nested collections,
-    /// just with later detection. The budget is enforced during reads.
+    /// Demonstrates that min_serialized_size() approach still provides security for nested
+    /// collections, just with later detection. The budget is enforced during reads.
     #[test]
     fn nested_collections_still_protected_by_budget() {
-        // Even though early-abort is less precise for nested collections,
-        // the budget still catches overruns during actual deserialization.
+        // With Vec::min_serialized_size() = 1, the early check is permissive.
+        // Security comes from budget enforcement during actual reads.
         let mut data = Vec::new();
         data.push(0); // 9-byte vint64 marker
         data.extend_from_slice(&10u64.to_le_bytes()); // claim 10 inner Vecs
@@ -1346,12 +1339,16 @@ mod tests {
         // Small budget: will run out during inner deserialization
         let mut reader = BudgetedReader::new(inner, 100);
 
-        // Outer length read succeeds
+        // Outer length read succeeds (consumes 9 bytes, 91 remaining)
         let _len = reader.read_usize().unwrap();
 
-        // Iterator creation succeeds (100 - 9 = 91 remaining, 91/24 = 3, and 10 > 3 fails)
-        // Actually with 91 bytes and size 24, max is 3, so 10 > 3 triggers early abort
+        // With Vec::min_serialized_size() = 1, early check passes: 91 / 1 = 91 >= 10
         let result = reader.read_many_iter::<Vec<u64>>(10);
-        assert!(result.is_err());
+        assert!(result.is_ok());
+
+        // But collecting fails because the inner vecs claim 1000 u64s each,
+        // exhausting the budget during inner deserialization
+        let collect_result: Result<Vec<Vec<u64>>, _> = result.unwrap().collect();
+        assert!(collect_result.is_err());
     }
 }
