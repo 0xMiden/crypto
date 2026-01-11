@@ -367,37 +367,40 @@ fn view_at() -> Result<()> {
 // SMT INTEGRATION TESTS
 // ================================================================================================
 
+use crate::merkle::smt::{MutationSet, NodeMutation, SMT_DEPTH, Smt, SparseMerkleTree};
+
+/// Converts a MutationSet into the format expected by History.
+///
+/// This helper extracts node additions and leaf changes from an SMT mutation set,
+/// transforming them into the format used by the History tracking mechanism.
+fn mutation_set_to_history_changes(
+    mutations: &MutationSet<SMT_DEPTH, Word, Word>,
+) -> (NodeChanges, LeafChanges) {
+    let mut node_changes = NodeChanges::default();
+    for (index, mutation) in mutations.node_mutations().iter() {
+        if let NodeMutation::Addition(inner_node) = mutation {
+            node_changes.insert(*index, inner_node.hash());
+        }
+    }
+
+    let mut leaf_changes = LeafChanges::default();
+    for (key, value) in mutations.new_pairs().iter() {
+        let leaf_index = LeafIndex::new(Smt::key_to_leaf_index(key).value()).unwrap();
+        leaf_changes
+            .entry(leaf_index)
+            .or_insert_with(CompactLeaf::new)
+            .insert(*key, *value);
+    }
+
+    (node_changes, leaf_changes)
+}
+
 /// Tests History integration using real SMT mutations.
 ///
 /// This test creates an actual SMT, computes mutations via the SMT API,
 /// and verifies that History correctly tracks the resulting node and leaf changes.
 #[test]
 fn smt_history_with_real_mutations() -> Result<()> {
-    use crate::merkle::smt::{MutationSet, NodeMutation, SMT_DEPTH, Smt, SparseMerkleTree};
-
-    /// Converts a MutationSet into the format expected by History.
-    fn mutation_set_to_history_changes(
-        mutations: &MutationSet<SMT_DEPTH, Word, Word>,
-    ) -> (NodeChanges, LeafChanges) {
-        let mut node_changes = NodeChanges::default();
-        for (index, mutation) in mutations.node_mutations().iter() {
-            if let NodeMutation::Addition(inner_node) = mutation {
-                node_changes.insert(*index, inner_node.hash());
-            }
-        }
-
-        let mut leaf_changes = LeafChanges::default();
-        for (key, value) in mutations.new_pairs().iter() {
-            let leaf_index = LeafIndex::new(Smt::key_to_leaf_index(key).value()).unwrap();
-            leaf_changes
-                .entry(leaf_index)
-                .or_insert_with(CompactLeaf::new)
-                .insert(*key, *value);
-        }
-
-        (node_changes, leaf_changes)
-    }
-
     // Create an empty SMT
     let mut smt = Smt::new();
     let initial_root = smt.root();
@@ -417,6 +420,11 @@ fn smt_history_with_real_mutations() -> Result<()> {
     smt.apply_mutations(mutations_v0).unwrap();
     let root_v0 = smt.root();
 
+    // Verify stored node hashes match what the SMT computed
+    for (index, hash) in node_changes_v0.iter() {
+        assert_eq!(*hash, smt.get_inner_node(*index).hash());
+    }
+
     history.add_version(root_v0, 0, node_changes_v0.clone(), leaf_changes_v0.clone())?;
 
     // Version 1: Insert second key-value pair
@@ -424,6 +432,11 @@ fn smt_history_with_real_mutations() -> Result<()> {
     let (node_changes_v1, leaf_changes_v1) = mutation_set_to_history_changes(&mutations_v1);
     smt.apply_mutations(mutations_v1).unwrap();
     let root_v1 = smt.root();
+
+    // Verify stored node hashes match what the SMT computed
+    for (index, hash) in node_changes_v1.iter() {
+        assert_eq!(*hash, smt.get_inner_node(*index).hash());
+    }
 
     history.add_version(root_v1, 1, node_changes_v1, leaf_changes_v1)?;
 
@@ -457,30 +470,6 @@ fn smt_history_with_real_mutations() -> Result<()> {
 /// Tests History with SMT value updates (replacing existing values).
 #[test]
 fn smt_history_value_updates() -> Result<()> {
-    use crate::merkle::smt::{MutationSet, NodeMutation, SMT_DEPTH, Smt, SparseMerkleTree};
-
-    fn mutation_set_to_history_changes(
-        mutations: &MutationSet<SMT_DEPTH, Word, Word>,
-    ) -> (NodeChanges, LeafChanges) {
-        let mut node_changes = NodeChanges::default();
-        for (index, mutation) in mutations.node_mutations().iter() {
-            if let NodeMutation::Addition(inner_node) = mutation {
-                node_changes.insert(*index, inner_node.hash());
-            }
-        }
-
-        let mut leaf_changes = LeafChanges::default();
-        for (key, value) in mutations.new_pairs().iter() {
-            let leaf_index = LeafIndex::new(Smt::key_to_leaf_index(key).value()).unwrap();
-            leaf_changes
-                .entry(leaf_index)
-                .or_insert_with(CompactLeaf::new)
-                .insert(*key, *value);
-        }
-
-        (node_changes, leaf_changes)
-    }
-
     let mut smt = Smt::new();
 
     let key: Word = rand_value();
@@ -493,12 +482,24 @@ fn smt_history_value_updates() -> Result<()> {
     let mutations_v0 = smt.compute_mutations(vec![(key, value_v0)]).unwrap();
     let (node_changes_v0, leaf_changes_v0) = mutation_set_to_history_changes(&mutations_v0);
     smt.apply_mutations(mutations_v0).unwrap();
+
+    // Verify stored node hashes match what the SMT computed
+    for (index, hash) in node_changes_v0.iter() {
+        assert_eq!(*hash, smt.get_inner_node(*index).hash());
+    }
+
     history.add_version(smt.root(), 0, node_changes_v0, leaf_changes_v0)?;
 
     // Version 1: Update to new value
     let mutations_v1 = smt.compute_mutations(vec![(key, value_v1)]).unwrap();
     let (node_changes_v1, leaf_changes_v1) = mutation_set_to_history_changes(&mutations_v1);
     smt.apply_mutations(mutations_v1).unwrap();
+
+    // Verify stored node hashes match what the SMT computed
+    for (index, hash) in node_changes_v1.iter() {
+        assert_eq!(*hash, smt.get_inner_node(*index).hash());
+    }
+
     history.add_version(smt.root(), 1, node_changes_v1, leaf_changes_v1)?;
 
     // Verify version 0 has original value
