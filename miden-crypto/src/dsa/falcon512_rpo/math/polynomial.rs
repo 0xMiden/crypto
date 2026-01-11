@@ -513,14 +513,16 @@ fn vector_karatsuba<
 
 impl From<Polynomial<FalconFelt>> for Polynomial<Felt> {
     fn from(item: Polynomial<FalconFelt>) -> Self {
-        let res: Vec<Felt> = item.coefficients.iter().map(|a| Felt::new(a.value() as u64)).collect();
+        let res: Vec<Felt> =
+            item.coefficients.iter().map(|a| Felt::new(a.value() as u64)).collect();
         Polynomial::new(res)
     }
 }
 
 impl From<&Polynomial<FalconFelt>> for Polynomial<Felt> {
     fn from(item: &Polynomial<FalconFelt>) -> Self {
-        let res: Vec<Felt> = item.coefficients.iter().map(|a| Felt::new(a.value() as u64)).collect();
+        let res: Vec<Felt> =
+            item.coefficients.iter().map(|a| Felt::new(a.value() as u64)).collect();
         Polynomial::new(res)
     }
 }

@@ -6,7 +6,7 @@ use core::{
     ops::{Add, AddAssign, Div, DivAssign, Mul, MulAssign, Neg, Sub, SubAssign},
 };
 
-use crate::zeroize::DefaultIsZeroes;
+use crate::utils::zeroize::DefaultIsZeroes;
 
 // ========================================================================
 // Fixed-point operations

@@ -19,8 +19,7 @@ mod tests {
 
     use crate::{
         ONE, PrimeCharacteristicRing, Word,
-        dsa::falcon512_rpo::SecretKey,
-        dsa::falcon512_rpo::PublicKey,
+        dsa::falcon512_rpo::{PublicKey, SecretKey},
         utils::{Deserializable, Serializable},
     };
 

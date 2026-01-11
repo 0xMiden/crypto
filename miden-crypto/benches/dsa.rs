@@ -102,8 +102,7 @@ benchmark_with_setup_data! {
     DEFAULT_SAMPLE_SIZE,
     "falcon512_rpo_sign",
     || {
-        let secret_key = RpoSecretKey::new();
-        secret_key
+        RpoSecretKey::new()
     },
     |b: &mut criterion::Bencher, secret_key: &RpoSecretKey| {
         let mut counter = 0u64;

@@ -6,6 +6,8 @@
 
 use core::ops::{Add, AddAssign, Div, DivAssign, Mul, MulAssign, Neg, Sub, SubAssign};
 
+use crate::utils::zeroize::{Zeroize, ZeroizeOnDrop};
+
 // ========================================================================
 // Floating-point operations: emulated (from rust-fn-dsa/flr_emu.rs)
 // ========================================================================
@@ -19,13 +21,13 @@ use core::ops::{Add, AddAssign, Div, DivAssign, Mul, MulAssign, Neg, Sub, SubAss
 pub(crate) struct FLR(u64);
 
 // Implement Zeroize for FLR to ensure secure memory clearing
-impl crate::zeroize::Zeroize for FLR {
+impl Zeroize for FLR {
     fn zeroize(&mut self) {
         self.0.zeroize();
     }
 }
 
-impl crate::zeroize::ZeroizeOnDrop for FLR {}
+impl ZeroizeOnDrop for FLR {}
 
 // lzcnt_nz(x) returns the number of leading zeros in the value x, assuming
 // that it is non-zero.

@@ -10,7 +10,7 @@ use super::{
     keys::PublicKey,
     math::{FalconFelt, FastFft, Polynomial},
 };
-use crate::{Word, zeroize::Zeroize};
+use crate::{Word, utils::zeroize::Zeroize};
 
 // FALCON SIGNATURE
 // ================================================================================================

@@ -22,18 +22,20 @@
 // 'f64' type; it should be used only for architectures for which the
 // hardware can be assumed to operate in a sufficiently constant-time way.
 
+use crate::utils::zeroize::{Zeroize, ZeroizeOnDrop};
+
 #[derive(Clone, Copy, Debug, PartialEq, PartialOrd)]
 #[allow(clippy::upper_case_acronyms)] // FLR is the standard name from fn-dsa
 pub(crate) struct FLR(f64);
 
 // Implement Zeroize for FLR to ensure secure memory clearing
-impl crate::zeroize::Zeroize for FLR {
+impl Zeroize for FLR {
     fn zeroize(&mut self) {
         self.0.zeroize();
     }
 }
 
-impl crate::zeroize::ZeroizeOnDrop for FLR {}
+impl ZeroizeOnDrop for FLR {}
 
 impl FLR {
     pub(crate) const ZERO: Self = Self(0.0);

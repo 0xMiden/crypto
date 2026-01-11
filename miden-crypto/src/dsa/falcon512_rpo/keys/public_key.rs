@@ -68,12 +68,7 @@ impl Serializable for &PublicKey {
         // Use fn-dsa-comm's modq_encode to encode 512 coefficients at 14 bits each
         // This encodes 4 coefficients per 7 bytes (512/4 = 128 groups = 896 bytes)
         let written = fn_dsa_comm::codec::modq_encode(&h, &mut buf[1..]);
-        assert_eq!(
-            written,
-            PK_LEN - 1,
-            "modq_encode should write exactly {} bytes",
-            PK_LEN - 1
-        );
+        assert_eq!(written, PK_LEN - 1, "modq_encode should write exactly {} bytes", PK_LEN - 1);
 
         target.write(buf);
     }
@@ -92,12 +87,11 @@ impl Deserializable for PublicKey {
 
         // Use fn-dsa-comm's modq_decode to decode 512 coefficients
         let mut h = [0u16; N];
-        let read_bytes =
-            fn_dsa_comm::codec::modq_decode(&buf[1..], &mut h).ok_or_else(|| {
-                DeserializationError::InvalidValue(
-                    "Failed to decode public key: invalid modq encoding".to_string(),
-                )
-            })?;
+        let read_bytes = fn_dsa_comm::codec::modq_decode(&buf[1..], &mut h).ok_or_else(|| {
+            DeserializationError::InvalidValue(
+                "Failed to decode public key: invalid modq encoding".to_string(),
+            )
+        })?;
 
         // Verify we consumed exactly the expected number of bytes
         if read_bytes != PK_LEN - 1 {

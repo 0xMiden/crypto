@@ -66,21 +66,21 @@ For each algorithm, we benchmark three core operations:
 
 | Hardware            | Key Generation | Signing | Verification |
 | ------------------- | :------------: | :-----: | :----------: |
-| Apple M4            | 4.2 ms         | 520 µs  | 300 µs       |
+| Apple M4            | 3.05 ms        | 335 µs  | 183 µs       |
 
 #### ECDSA over secp256k1 (Keccak256)
 
 | Hardware            | Key Generation | Signing | Verification |
 | ------------------- | :------------: | :-----: | :----------: |
 | AMD Ryzen 9 9950X   | 32.2 µs        | 264 µs  | 492 µs       |
-| Apple M4            | 24.4 µs        | 258 µs  | 390 µs       |
+| Apple M4            | 24.9 µs        | 26.2 µs | 38.8 µs      |
 
 #### EdDSA over Ed25519
 
 | Hardware            | Key Generation | Signing | Verification |
 | ------------------- | :------------: | :-----: | :----------: |
 | AMD Ryzen 9 9950X   | 8.7 µs         | 90.8 µs | 177 µs       |
-| Apple M4            | 8.2 µs         | 86.6 µs | 185.6 µs     |
+| Apple M4            | 8.33 µs        | 8.77 µs | 18.4 µs      |
 
 ### Sparse Merkle Tree
 
