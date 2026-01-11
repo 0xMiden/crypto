@@ -125,7 +125,7 @@ benchmark_with_setup_data! {
     "falcon512_rpo_sign_with_rng",
     || {
         let secret_key = RpoSecretKey::new();
-        let mut rng = rng();
+        let rng = rng();
         (secret_key, rng)
     },
     |b: &mut criterion::Bencher, (secret_key, rng): &(RpoSecretKey, rand::rngs::ThreadRng)| {
@@ -227,7 +227,7 @@ benchmark_with_setup_data! {
         let mut counter = 0u64;
         b.iter(|| {
             // Clone secret key since sign() needs &mut self
-            let mut secret_key_local = secret_key.clone();
+            let secret_key_local = secret_key.clone();
             // Use a different message each iteration for representative performance
             let message = Word::new([Felt::new(counter); 4]);
             counter = counter.wrapping_add(1);
@@ -245,7 +245,7 @@ benchmark_with_setup_data! {
     "ecdsa_k256_verify",
     || {
         let mut rng = rand::rngs::ThreadRng::default();
-        let mut secret_key = ecdsa_k256_keccak::SecretKey::with_rng(&mut rng);
+        let secret_key = ecdsa_k256_keccak::SecretKey::with_rng(&mut rng);
         let public_key = secret_key.public_key();
         let message = Word::new([Felt::new(42); 4]);
         let signature = secret_key.sign(black_box(message));
