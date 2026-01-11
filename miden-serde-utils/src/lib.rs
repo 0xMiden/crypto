@@ -406,21 +406,6 @@ pub trait Deserializable: Sized {
     /// * Bytes read from the `source` do not represent a valid value for `Self`.
     fn read_from<R: ByteReader>(source: &mut R) -> Result<Self, DeserializationError>;
 
-    /// Returns the minimum number of bytes required to deserialize one instance of this type.
-    ///
-    /// This is used by [`ByteReader::max_alloc`] to derive the maximum plausible collection
-    /// length from the reader's remaining budget, preventing denial-of-service attacks
-    /// from malicious length prefixes.
-    ///
-    /// For fixed-size types (e.g., `u64`, `[u8; 32]`), this should return the exact
-    /// serialized size. For variable-size types (e.g., `Vec<T>`, `String`), this should
-    /// return the minimum possible size (typically just the length prefix).
-    ///
-    /// The default implementation returns 1, which is safe but conservative.
-    fn min_serialized_size() -> usize {
-        1
-    }
-
     // PROVIDED METHODS
     // --------------------------------------------------------------------------------------------
 
@@ -556,17 +541,11 @@ impl Deserializable for u8 {
     fn read_from<R: ByteReader>(source: &mut R) -> Result<Self, DeserializationError> {
         source.read_u8()
     }
-    fn min_serialized_size() -> usize {
-        1
-    }
 }
 
 impl Deserializable for u16 {
     fn read_from<R: ByteReader>(source: &mut R) -> Result<Self, DeserializationError> {
         source.read_u16()
-    }
-    fn min_serialized_size() -> usize {
-        2
     }
 }
 
@@ -574,17 +553,11 @@ impl Deserializable for u32 {
     fn read_from<R: ByteReader>(source: &mut R) -> Result<Self, DeserializationError> {
         source.read_u32()
     }
-    fn min_serialized_size() -> usize {
-        4
-    }
 }
 
 impl Deserializable for u64 {
     fn read_from<R: ByteReader>(source: &mut R) -> Result<Self, DeserializationError> {
         source.read_u64()
-    }
-    fn min_serialized_size() -> usize {
-        8
     }
 }
 
@@ -592,17 +565,11 @@ impl Deserializable for u128 {
     fn read_from<R: ByteReader>(source: &mut R) -> Result<Self, DeserializationError> {
         source.read_u128()
     }
-    fn min_serialized_size() -> usize {
-        16
-    }
 }
 
 impl Deserializable for usize {
     fn read_from<R: ByteReader>(source: &mut R) -> Result<Self, DeserializationError> {
         source.read_usize()
-    }
-    fn min_serialized_size() -> usize {
-        8 // serialized as u64
     }
 }
 
@@ -614,9 +581,6 @@ impl<T: Deserializable> Deserializable for Option<T> {
             true => Ok(Some(T::read_from(source)?)),
             false => Ok(None),
         }
-    }
-    fn min_serialized_size() -> usize {
-        1 // just the bool discriminator; Some variant would be 1 + T::min_serialized_size()
     }
 }
 
@@ -632,18 +596,12 @@ impl<T: Deserializable, const C: usize> Deserializable for [T; C] {
 
         Ok(res)
     }
-    fn min_serialized_size() -> usize {
-        C.saturating_mul(T::min_serialized_size())
-    }
 }
 
 impl<T: Deserializable> Deserializable for Vec<T> {
     fn read_from<R: ByteReader>(source: &mut R) -> Result<Self, DeserializationError> {
         let len = source.read_usize()?;
         source.read_many_iter(len)?.collect()
-    }
-    fn min_serialized_size() -> usize {
-        1 // just the length prefix (vint minimum)
     }
 }
 
@@ -652,18 +610,12 @@ impl<K: Deserializable + Ord, V: Deserializable> Deserializable for BTreeMap<K, 
         let len = source.read_usize()?;
         source.read_many_iter(len)?.collect()
     }
-    fn min_serialized_size() -> usize {
-        1 // just the length prefix
-    }
 }
 
 impl<T: Deserializable + Ord> Deserializable for BTreeSet<T> {
     fn read_from<R: ByteReader>(source: &mut R) -> Result<Self, DeserializationError> {
         let len = source.read_usize()?;
         source.read_many_iter(len)?.collect()
-    }
-    fn min_serialized_size() -> usize {
-        1 // just the length prefix
     }
 }
 
@@ -673,9 +625,6 @@ impl Deserializable for String {
         let data: Vec<u8> = source.read_many_iter(len)?.collect::<Result<_, _>>()?;
 
         String::from_utf8(data).map_err(|err| DeserializationError::InvalidValue(format!("{err}")))
-    }
-    fn min_serialized_size() -> usize {
-        1 // just the length prefix
     }
 }
 
@@ -704,8 +653,5 @@ impl Deserializable for p3_goldilocks::Goldilocks {
                 value
             ))
         })
-    }
-    fn min_serialized_size() -> usize {
-        8
     }
 }
