@@ -5,7 +5,7 @@
 
 use alloc::vec::Vec;
 
-use crate::{Map, Set, Word, merkle::smt::large_forest::history::VersionId};
+use crate::{Map, Set, Word};
 
 // FOREST OPERATION
 // ================================================================================================
@@ -50,23 +50,19 @@ impl Operation {
 pub struct SmtUpdateBatch {
     /// The operations to be performed on a tree.
     operations: Vec<Operation>,
-
-    /// The version that corresponds to the tree produced by applying these `operations`.
-    version: VersionId,
 }
 impl SmtUpdateBatch {
     /// Creates an empty batch of operations that, when applied, will produce a tree with the
     /// provided `version` when applied.
-    pub fn empty(version: VersionId) -> Self {
-        Self { operations: vec![], version }
+    pub fn empty() -> Self {
+        Self { operations: vec![] }
     }
 
     /// Creates a batch containing the provided `operations` that will produce a tree with the
     /// provided `version` when applied.
-    pub fn new(version: VersionId, operations: impl Iterator<Item = Operation>) -> Self {
+    pub fn new(operations: impl Iterator<Item = Operation>) -> Self {
         Self {
             operations: operations.collect::<Vec<_>>(),
-            version,
         }
     }
 
@@ -105,11 +101,26 @@ impl SmtUpdateBatch {
     }
 }
 
+impl<I> From<I> for SmtUpdateBatch
+where
+    I: Iterator<Item = Operation>,
+{
+    fn from(value: I) -> Self {
+        Self::new(value)
+    }
+}
+
 impl From<SmtUpdateBatch> for Vec<Operation> {
     /// The vector is guaranteed to be sorted by the key on which an operation is performed, and to
     /// only contain the _last_ operation to be performed on any given key.
     fn from(value: SmtUpdateBatch) -> Self {
         value.consume()
+    }
+}
+
+impl Default for SmtUpdateBatch {
+    fn default() -> Self {
+        Self::empty()
     }
 }
 
@@ -130,15 +141,9 @@ impl SmtForestUpdateBatch {
         Self { operations: Map::new() }
     }
 
-    /// Adds the provided `operations` to be performed on the tree with the provided `root` to
-    /// produce a tree with the provided `version` when applied.
-    pub fn add_operations(
-        &mut self,
-        root: Word,
-        version: VersionId,
-        operations: impl Iterator<Item = Operation>,
-    ) {
-        let batch = self.operations.entry(root).or_insert_with(|| SmtUpdateBatch::empty(version));
+    /// Adds the provided `operations` to be performed on the tree with the provided `root`.
+    pub fn add_operations(&mut self, root: Word, operations: impl Iterator<Item = Operation>) {
+        let batch = self.operations.entry(root).or_insert_with(SmtUpdateBatch::empty);
         batch.add_operations(operations);
     }
 
@@ -146,13 +151,9 @@ impl SmtForestUpdateBatch {
     /// modification.
     ///
     /// It is assumed that calling this means that the caller wants to insert operations into the
-    /// associated batch, so a batch will be created even if one was not previously present. If no
-    /// such batch exists, a new one will be created using the provided `version_if_ne` as the
-    /// version.
-    pub fn operations(&mut self, root: Word, version_if_ne: VersionId) -> &mut SmtUpdateBatch {
-        self.operations
-            .entry(root)
-            .or_insert_with(|| SmtUpdateBatch::empty(version_if_ne))
+    /// associated batch, so a batch will be created even if one was not previously present.
+    pub fn operations(&mut self, root: Word) -> &mut SmtUpdateBatch {
+        self.operations.entry(root).or_insert_with(SmtUpdateBatch::empty)
     }
 
     /// Consumes the batch as a map of batches, with each individual batch guaranteed to be in
@@ -176,7 +177,7 @@ mod test {
     #[test]
     fn tree_batch() {
         // We start by creating an empty tree batch.
-        let mut batch = SmtUpdateBatch::empty(0);
+        let mut batch = SmtUpdateBatch::empty();
 
         // Let's make three operations on different keys...
         let o1_key: Word = rand_value();
@@ -237,13 +238,13 @@ mod test {
         let t1_root: Word = rand_value();
         let t1_o1 = Operation::insert(rand_value(), rand_value());
         let t1_o2 = Operation::remove(rand_value());
-        batch.add_operations(t1_root, 0, vec![t1_o1, t1_o2].into_iter());
+        batch.add_operations(t1_root, vec![t1_o1, t1_o2].into_iter());
 
         // We can also add them differently.
         let t2_root: Word = rand_value();
         let t2_o1 = Operation::remove(rand_value());
         let t2_o2 = Operation::insert(rand_value(), rand_value());
-        batch.operations(t2_root, 1).add_operations(vec![t2_o1, t2_o2].into_iter());
+        batch.operations(t2_root).add_operations(vec![t2_o1, t2_o2].into_iter());
 
         // When we consume the batch, each per-tree batch should be unique by key and sorted.
         let ops = batch.consume();

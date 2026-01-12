@@ -29,7 +29,7 @@ pub use large::{
 pub use large::{RocksDbConfig, RocksDbStorage};
 
 pub mod large_forest;
-pub use large_forest::{LargeSmtForest, LargeSmtForestError, SubtreeLevels};
+pub use large_forest::{LargeSmtForest, LargeSmtForestError};
 
 mod simple;
 pub use simple::{SimpleSmt, SimpleSmtProof};

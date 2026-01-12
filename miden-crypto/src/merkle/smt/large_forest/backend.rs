@@ -1,18 +1,30 @@
 //! This file contains the [`Backend`] trait for the [`LargeSmtForest`] implementation and the
 //! supporting types it needs.
 
+use alloc::vec::Vec;
 use core::{any::Any, error::Error, fmt::Debug};
 
 use crate::{
-    Map, Word,
+    Word,
     merkle::smt::{
         SmtProof,
+        full::SMT_DEPTH,
         large_forest::{
             history::VersionId,
             operation::{SmtForestUpdateBatch, SmtUpdateBatch},
         },
     },
 };
+
+// TYPE ALIASES
+// ================================================================================================
+
+/// The mutation set used by the forest backends.
+///
+/// At the moment this is used for _reverse_ mutations that "undo" the changes made to the tree(s),
+/// but may be harmonised with [`SmtUpdateBatch`] in the future. For more information on its use for
+/// reverse mutations, see [`crate::merkle::smt::SparseMerkleTree::apply_mutations_with_reversion`].
+pub type MutationSet = crate::merkle::smt::MutationSet<SMT_DEPTH, Word, Word>;
 
 // BACKEND
 // ================================================================================================
@@ -65,39 +77,41 @@ where
     // SINGLE-TREE MODIFIERS
     // ============================================================================================
 
-    /// Performs the provided `operations` on the tree with the provided `root`, returning the new
+    /// Performs the provided `updates` on the tree with the provided `root`, returning the new
     /// root.
     ///
     /// Implementations must guarantee the following behavior, with non-conforming implementations
     /// considered to be a bug:
     ///
     /// - At most one new root must be added to the forest for the entire batch.
-    /// - If applying the provided `operations` results in no changes to the tree, no new tree must
-    ///   be allocated.
-    fn modify_tree(
+    /// - If applying the provided `updates` results in no changes to the tree, no new tree must be
+    ///   allocated.
+    fn update_tree(
         &mut self,
         root: Word,
         new_version: VersionId,
-        operations: SmtUpdateBatch,
-    ) -> Result<Word, Self::Error>;
+        updates: SmtUpdateBatch,
+    ) -> Result<MutationSet, Self::Error>;
 
     // MULTI-TREE MODIFIERS
     // ============================================================================================
 
-    /// Performs the provided `operations` on the forest, returning a mapping from old root to new
-    /// root.
+    /// Performs the provided `updates` on the forest, setting all new tree states to have the
+    /// provided `new_version` and returning a vector of the mutation sets that reverse the changes
+    /// to each changed tree.
     ///
     /// Implementations must guarantee the following behaviour, with non-conforming implementations
     /// considered to be a bug:
     ///
     /// - At most one new root must be added to the forest for each target root in the provided
-    ///   `operations`.
-    /// - If applying the provided `operations` results in no changes to a given lineage of trees in
+    ///   `updates`.
+    /// - If applying the provided `updates` results in no changes to a given lineage of trees in
     ///   the forest, then no new tree must be allocated in that lineage.
-    fn modify_forest(
+    fn update_forest(
         &mut self,
-        operations: SmtForestUpdateBatch,
-    ) -> Result<Map<Word, Word>, Self::Error>;
+        new_version: VersionId,
+        updates: SmtForestUpdateBatch,
+    ) -> Result<Vec<MutationSet>, Self::Error>;
 }
 
 // BACKEND ERROR

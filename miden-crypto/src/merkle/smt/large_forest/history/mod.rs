@@ -147,6 +147,14 @@ impl History {
         self.deltas.iter().rev().map(|d| d.root)
     }
 
+    /// Gets the version corresponding to the provided `root`, or returns [`None`] if the provided
+    /// `root` is not found within this history.
+    pub fn version(&self, root: Word) -> Option<VersionId> {
+        self.deltas
+            .iter()
+            .find_map(|d| if d.root == root { Some(d.version_id) } else { None })
+    }
+
     /// Returns `true` if `root` is in the history and `false` otherwise.
     ///
     /// # Complexity
