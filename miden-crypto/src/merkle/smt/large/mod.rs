@@ -176,7 +176,7 @@ use alloc::vec::Vec;
 
 use super::{
     EmptySubtreeRoots, InnerNode, InnerNodeInfo, InnerNodes, LeafIndex, MerkleError, NodeIndex,
-    SMT_DEPTH, SmtLeaf, SmtProof, SparseMerkleTree, Word,
+    NodeMutation, SMT_DEPTH, SmtLeaf, SmtProof, SparseMerkleTree, Word,
 };
 use crate::merkle::smt::{Map, full::concurrent::MutatedSubtreeLeaves};
 
