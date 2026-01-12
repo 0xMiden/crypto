@@ -1,21 +1,25 @@
 //! This file contains the [`Backend`] trait for the [`LargeSmtForest`] implementation and the
 //! supporting types it needs.
 
-use alloc::vec::Vec;
-use core::{any::Any, error::Error, fmt::Debug};
+use alloc::{boxed::Box, vec::Vec};
+use core::fmt::Debug;
+
+use thiserror::Error;
 
 use crate::{
     Word,
-    merkle::smt::{
-        SmtProof,
-        full::SMT_DEPTH,
-        large_forest::{
-            history::VersionId,
-            operation::{SmtForestUpdateBatch, SmtUpdateBatch},
+    merkle::{
+        MerkleError,
+        smt::{
+            SmtProof,
+            full::SMT_DEPTH,
+            large_forest::{
+                history::VersionId,
+                operation::{SmtForestUpdateBatch, SmtUpdateBatch},
+            },
         },
     },
 };
-
 // TYPE ALIASES
 // ================================================================================================
 
@@ -38,41 +42,27 @@ pub type MutationSet = crate::merkle::smt::MutationSet<SMT_DEPTH, Word, Word>;
 /// Having a generic [`Backend`] provides no guarantees to the user about how it stores data and
 /// what patterns are used for data access under the hood. It is, however, guaranteed to store
 /// _only_ the data necessary to describe the latest state of each tree in the forest.
-///
-/// # Errors
-///
-/// The trait allows each implementation to provide its own error type as [`Self::Error`]. This
-/// ensures that each backend can tailor its errors to its operation without having to worry about
-/// using a pre-defined error enum. Every method is made to return this error type by default to
-/// enable accurate error handling, but not all implementations may need to return an error in all
-/// cases.
-///
-/// As a result, specific errors cannot be documented in the trait method documentation blocks and
-/// so are not.
 pub trait Backend
 where
     Self: Debug,
 {
-    /// The error type used by the backend.
-    type Error: BackendError;
-
     // QUERIES
     // ============================================================================================
 
     /// Returns an opening for the specified `key` in the SMT with the specified `root`.
-    fn open(&self, root: Word, key: Word) -> Result<SmtProof, Self::Error>;
+    fn open(&self, root: Word, key: Word) -> Result<SmtProof>;
 
     /// Returns the value associated with the provided `key` in the SMT with the provided `root`, or
     /// [`None`] if no such value exists.
-    fn get(&self, root: Word, key: Word) -> Result<Option<Word>, Self::Error>;
+    fn get(&self, root: Word, key: Word) -> Result<Option<Word>>;
 
     /// Returns the version of the tree with the provided `root`.
-    fn version(&self, root: Word) -> Result<VersionId, Self::Error>;
+    fn version(&self, root: Word) -> Result<VersionId>;
 
     /// Returns an iterator over all the tree roots and versions that the backend knows about.
     ///
     /// The iteration order is unspecified.
-    fn versions(&self) -> Result<impl Iterator<Item = (Word, VersionId)>, Self::Error>;
+    fn versions(&self) -> Result<impl Iterator<Item = (Word, VersionId)>>;
 
     // SINGLE-TREE MODIFIERS
     // ============================================================================================
@@ -91,7 +81,7 @@ where
         root: Word,
         new_version: VersionId,
         updates: SmtUpdateBatch,
-    ) -> Result<MutationSet, Self::Error>;
+    ) -> Result<MutationSet>;
 
     // MULTI-TREE MODIFIERS
     // ============================================================================================
@@ -111,16 +101,23 @@ where
         &mut self,
         new_version: VersionId,
         updates: SmtForestUpdateBatch,
-    ) -> Result<Vec<MutationSet>, Self::Error>;
+    ) -> Result<Vec<MutationSet>>;
 }
 
 // BACKEND ERROR
 // ================================================================================================
 
-/// A trait that must be implemented by the error types for the [`Backend`], primarily serving to
-/// work around the lack of negative impl constraints in Rust.
-pub trait BackendError
-where
-    Self: Any + Debug + Error,
-{
+/// The error type for use within Backends.
+#[derive(Debug, Error)]
+pub enum BackendError {
+    /// Raised when there is an error with the merkle tree semantics within the backend.
+    #[error(transparent)]
+    Merkle(#[from] MerkleError),
+
+    /// Raised for arbitrary other errors within the backend.
+    #[error(transparent)]
+    Other(#[from] Box<dyn core::error::Error + Sync + Send>),
 }
+
+/// The result type for use with backends.
+pub type Result<T> = core::result::Result<T, BackendError>;

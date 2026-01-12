@@ -55,6 +55,7 @@ use crate::{
         },
     },
 };
+
 // SPARSE MERKLE TREE FOREST
 // ================================================================================================
 
@@ -127,9 +128,9 @@ impl<B: Backend> LargeSmtForest<B> {
     ///
     /// # Errors
     ///
-    /// - [`LargeSmtForestError::BackendError`] if the forest cannot be started up correctly using
-    ///   the provided `backend`.
-    pub fn new(_backend: B) -> Result<Self, B::Error> {
+    /// - [`LargeSmtForestError::Other`] if the forest cannot be started up correctly using the
+    ///   provided `backend`.
+    pub fn new(_backend: B) -> Result<Self> {
         todo!("LargeSmtForest::new")
     }
 }
@@ -172,10 +173,7 @@ impl<B: Backend> LargeSmtForest<B> {
     ///
     /// - [`LargeSmtForestError::MerkleError`] if no tree with the provided `root` exists in the
     ///   forest.
-    pub fn historical_roots(
-        &self,
-        current_root: Word,
-    ) -> Result<impl Iterator<Item = Word>, B::Error> {
+    pub fn historical_roots(&self, current_root: Word) -> Result<impl Iterator<Item = Word>> {
         self.histories
             .get(&current_root)
             .map(|h| h.roots())
@@ -228,10 +226,9 @@ impl<B: Backend> LargeSmtForest<B> {
     ///
     /// # Errors
     ///
-    /// - [`LargeSmtForestError::BackendError`] if an error occurs when trying to query the backend.
     /// - [`LargeSmtForestError::MerkleError`] if no tree with the provided `root` exists in the
     ///   forest, or if the forest does not contain sufficient data to provide an opening for `key`.
-    pub fn open(&self, _root: Word, _key: Word) -> Result<Option<SmtProof>, B::Error> {
+    pub fn open(&self, _root: Word, _key: Word) -> Result<Option<SmtProof>> {
         todo!("LargeSmtForest::open")
     }
 
@@ -240,15 +237,14 @@ impl<B: Backend> LargeSmtForest<B> {
     ///
     /// # Errors
     ///
-    /// - [`LargeSmtForestError::BackendError`] if an error occurs when trying to query the backend.
     /// - [`LargeSmtForestError::MerkleError`] if no tree with the provided `root` exists in the
     ///   forest, or if the forest does not contain sufficient data to get the value for `key`.
-    pub fn get(&self, _root: Word, _key: Word) -> Result<Option<Word>, B::Error> {
+    pub fn get(&self, _root: Word, _key: Word) -> Result<Option<Word>> {
         todo!("LargeSmtForest::get")
     }
 
     /// Returns data describing what information the forest knows about the provided `root`.
-    pub fn knows_root(&self, root: Word) -> Result<RootInfo, B::Error> {
+    pub fn knows_root(&self, root: Word) -> Result<RootInfo> {
         if self.histories.contains_key(&root) {
             Ok(RootInfo::LatestVersion(self.backend.version(root)?))
         } else if let Some(v) = self.histories.values().find_map(|h| h.version(root)) {
@@ -286,8 +282,6 @@ impl<B: Backend> LargeSmtForest<B> {
     ///
     /// # Errors
     ///
-    /// - [`LargeSmtForestError::BackendError`] if an error occurs when trying to access the
-    ///   backend.
     /// - [`LargeSmtForestError::InvalidModification`] if `root` corresponds to a tree that is not
     ///   the latest in its lineage.
     /// - [`LargeSmtForestError::MerkleError`] if `root` is not a root known by the forest.
@@ -296,7 +290,7 @@ impl<B: Backend> LargeSmtForest<B> {
         _root: Word,
         _new_version: VersionId,
         _updates: SmtUpdateBatch,
-    ) -> Result<Word, B::Error> {
+    ) -> Result<Word> {
         todo!("LargeSmtForest::modify_tree")
     }
 }
@@ -326,8 +320,6 @@ impl<B: Backend> LargeSmtForest<B> {
     ///
     /// # Errors
     ///
-    /// - [`LargeSmtForestError::BackendError`] if an error occurs when trying to access the
-    ///   backend.
     /// - [`LargeSmtForestError::InvalidModification`] if any root in the batch corresponds to a
     ///   tree that is not the latest in its lineage.
     /// - [`LargeSmtForestError::MerkleError`] if any root in the batch is not a root known by the
@@ -336,7 +328,7 @@ impl<B: Backend> LargeSmtForest<B> {
         &mut self,
         _new_version: Word,
         _updates: SmtForestUpdateBatch,
-    ) -> Result<Map<Word, Word>, B::Error> {
+    ) -> Result<Map<Word, Word>> {
         todo!("LargeSmtForest::modify_forest")
     }
 
@@ -347,13 +339,13 @@ impl<B: Backend> LargeSmtForest<B> {
     ///
     /// # Errors
     ///
-    /// - [`LargeSmtForestError::BackendError`] if the backend cannot be accessed to get the full
-    ///   tree versions.
+    /// - [`LargeSmtForestError::Other`] if the backend cannot be accessed to get the full tree
+    ///   versions.
     ///
     /// # Panics
     ///
     /// - If there is no history that corresponds to one of the trees that is fully stored.
-    pub fn truncate(&mut self, version: VersionId) -> Result<(), B::Error> {
+    pub fn truncate(&mut self, version: VersionId) -> Result<()> {
         // If we have a version that is the current tree version or newer, we want to clear the
         // history sequence of deltas entirely. We cannot do that by calling `History::truncate` as
         // this cannot safely know if a version that is newer than its most recent delta is between
