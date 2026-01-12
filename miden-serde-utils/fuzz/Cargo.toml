@@ -1,6 +1,5 @@
 [package]
-authors = ["Automated"]
-edition = "2021"
+edition = "2024"
 name    = "miden-serde-utils-fuzz"
 publish = false
 version = "0.0.0"

@@ -4,8 +4,6 @@ name    = "miden-crypto-fuzz"
 publish = false
 version = "0.0.0"
 
-[workspace]
-
 [package.metadata]
 cargo-fuzz = true
 

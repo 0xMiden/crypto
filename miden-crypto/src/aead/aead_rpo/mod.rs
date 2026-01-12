@@ -670,10 +670,14 @@ impl Deserializable for EncryptedData {
         })?;
 
         let ciphertext_len = source.read_usize()?;
-        let ciphertext_bytes: Vec<u64> =
-            source.read_many_iter(ciphertext_len)?.collect::<Result<_, _>>()?;
-        let ciphertext = felts_from_u64(ciphertext_bytes)
-            .ok_or_else(|| DeserializationError::InvalidValue("invalid ciphertext".into()))?;
+        let ciphertext: Vec<Felt> = source
+            .read_many_iter::<u64>(ciphertext_len)?
+            .map(|r| {
+                let v = r?;
+                Felt::from_canonical_checked(v)
+                    .ok_or_else(|| DeserializationError::InvalidValue("invalid felt".into()))
+            })
+            .collect::<Result<_, _>>()?;
 
         let nonce: Vec<u64> = source.read_many_iter(NONCE_SIZE)?.collect::<Result<_, _>>()?;
         let nonce: [Felt; NONCE_SIZE] = felts_from_u64(nonce)
