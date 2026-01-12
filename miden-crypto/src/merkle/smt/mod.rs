@@ -73,7 +73,7 @@ type NodeMutations = Map<NodeIndex, NodeMutation>;
 ///
 /// Every key maps to one leaf. If there are as many keys as there are leaves, then
 /// [Self::Leaf] should be the same type as [Self::Value], as is the case with
-/// [crate::merkle::SimpleSmt]. However, if there are more keys than leaves, then [`Self::Leaf`]
+/// [SimpleSmt]. However, if there are more keys than leaves, then [`Self::Leaf`]
 /// must accommodate all keys that map to the same leaf.
 ///
 /// [SparseMerkleTree] currently doesn't support optimizations that compress Merkle proofs.
