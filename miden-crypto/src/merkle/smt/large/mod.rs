@@ -2,33 +2,66 @@
 //!
 //! `LargeSmt` stores the top of the tree (depths 0–23) in memory and persists the lower
 //! depths (24–64) in storage as fixed-size subtrees. This hybrid layout scales beyond RAM
-//! while keeping common operations fast. On reload, the in-memory top is reconstructed
+//! while keeping common operations fast. With the `rocksdb` feature enabled, the lower
+//! subtrees and leaves are stored in RocksDB. On reload, the in-memory top is reconstructed
 //! from cached depth-24 subtree roots.
 //!
-//! # Storage Backends
+//! Examples below require the `rocksdb` feature.
 //!
-//! This module provides [`MemoryStorage`] for in-memory storage. Custom storage backends
-//! can be implemented via the [`SmtStorage`] trait (e.g., for RocksDB or other databases).
-//!
-//! # Examples
-//!
-//! Create an empty tree with in-memory storage:
-//! ```
-//! use miden_crypto::merkle::smt::{LargeSmt, MemoryStorage};
+//! Load an existing RocksDB-backed tree with root validation:
+//! ```no_run
+//! # #[cfg(feature = "rocksdb")]
+//! # {
+//! use miden_crypto::{
+//!     Word,
+//!     merkle::smt::{LargeSmt, RocksDbConfig, RocksDbStorage},
+//! };
 //!
 //! # fn main() -> Result<(), Box<dyn std::error::Error>> {
-//! let storage = MemoryStorage::new();
-//! let smt = LargeSmt::new(storage)?;
+//! # let expected_root: Word = miden_crypto::EMPTY_WORD;
+//! let storage = RocksDbStorage::open(RocksDbConfig::new("/path/to/db"))?;
+//! let smt = LargeSmt::load_with_root(storage, expected_root)?;
+//! assert_eq!(smt.root(), expected_root);
 //! # Ok(())
+//! # }
 //! # }
 //! ```
 //!
-//! Initialize a tree with entries:
-//! ```
-//! use miden_crypto::{Felt, Word, merkle::smt::{LargeSmt, MemoryStorage}};
+//! Load an existing tree without root validation (use with caution):
+//! ```no_run
+//! # #[cfg(feature = "rocksdb")]
+//! # {
+//! use miden_crypto::merkle::smt::{LargeSmt, RocksDbConfig, RocksDbStorage};
 //!
 //! # fn main() -> Result<(), Box<dyn std::error::Error>> {
-//! let storage = MemoryStorage::new();
+//! let storage = RocksDbStorage::open(RocksDbConfig::new("/path/to/db"))?;
+//! let smt = LargeSmt::load(storage)?;
+//! let _root = smt.root();
+//! # Ok(())
+//! # }
+//! # }
+//! ```
+//!
+//! Initialize an empty RocksDB-backed tree and bulk-load entries:
+//! ```no_run
+//! # #[cfg(feature = "rocksdb")]
+//! # {
+//! use miden_crypto::{
+//!     Felt, Word,
+//!     merkle::smt::{LargeSmt, RocksDbConfig, RocksDbStorage},
+//! };
+//!
+//! # fn main() -> Result<(), Box<dyn std::error::Error>> {
+//! let path = "/path/to/new-db";
+//! if std::path::Path::new(path).exists() {
+//!     std::fs::remove_dir_all(path)?;
+//! }
+//! std::fs::create_dir_all(path)?;
+//!
+//! let storage = RocksDbStorage::open(RocksDbConfig::new(path))?;
+//! let mut smt = LargeSmt::new(storage)?; // empty tree
+//!
+//! // Prepare initial entries
 //! let entries = vec![
 //!     (
 //!         Word::new([Felt::new(1), Felt::new(0), Felt::new(0), Felt::new(0)]),
@@ -39,18 +72,26 @@
 //!         Word::new([Felt::new(11), Felt::new(22), Felt::new(33), Felt::new(44)]),
 //!     ),
 //! ];
-//! let smt = LargeSmt::with_entries(storage, entries)?;
+//!
+//! // Bulk insert entries (faster than compute_mutations + apply_mutations)
+//! smt.insert_batch(entries)?;
 //! # Ok(())
+//! # }
 //! # }
 //! ```
 //!
 //! Apply batch updates (insertions and deletions):
-//! ```
-//! use miden_crypto::{EMPTY_WORD, Felt, Word, merkle::smt::{LargeSmt, MemoryStorage}};
+//! ```no_run
+//! # #[cfg(feature = "rocksdb")]
+//! # {
+//! use miden_crypto::{
+//!     EMPTY_WORD, Felt, Word,
+//!     merkle::smt::{LargeSmt, RocksDbConfig, RocksDbStorage},
+//! };
 //!
 //! # fn main() -> Result<(), Box<dyn std::error::Error>> {
-//! let storage = MemoryStorage::new();
-//! let mut smt = LargeSmt::new(storage)?;
+//! let storage = RocksDbStorage::open(RocksDbConfig::new("/path/to/db"))?;
+//! let mut smt = LargeSmt::load(storage)?;
 //!
 //! let k1 = Word::new([Felt::new(101), Felt::new(0), Felt::new(0), Felt::new(0)]);
 //! let v1 = Word::new([Felt::new(1), Felt::new(2), Felt::new(3), Felt::new(4)]);
@@ -62,6 +103,42 @@
 //! let updates = vec![(k1, v1), (k2, EMPTY_WORD), (k3, v3)];
 //! smt.insert_batch(updates)?;
 //! # Ok(())
+//! # }
+//! # }
+//! ```
+//!
+//! Quick initialization with `with_entries` (best for modest datasets/tests):
+//! ```no_run
+//! # #[cfg(feature = "rocksdb")]
+//! # {
+//! use miden_crypto::{
+//!     Felt, Word,
+//!     merkle::smt::{LargeSmt, RocksDbConfig, RocksDbStorage},
+//! };
+//!
+//! # fn main() -> Result<(), Box<dyn std::error::Error>> {
+//! // Note: `with_entries` expects an EMPTY storage and performs an all-at-once build.
+//! // Prefer `insert_batch` for large bulk loads.
+//! let path = "/path/to/new-db";
+//! if std::path::Path::new(path).exists() {
+//!     std::fs::remove_dir_all(path)?;
+//! }
+//! std::fs::create_dir_all(path)?;
+//!
+//! let storage = RocksDbStorage::open(RocksDbConfig::new(path))?;
+//! let entries = vec![
+//!     (
+//!         Word::new([Felt::new(1), Felt::new(0), Felt::new(0), Felt::new(0)]),
+//!         Word::new([Felt::new(10), Felt::new(20), Felt::new(30), Felt::new(40)]),
+//!     ),
+//!     (
+//!         Word::new([Felt::new(2), Felt::new(0), Felt::new(0), Felt::new(0)]),
+//!         Word::new([Felt::new(11), Felt::new(22), Felt::new(33), Felt::new(44)]),
+//!     ),
+//! ];
+//! let _smt = LargeSmt::with_entries(storage, entries)?;
+//! # Ok(())
+//! # }
 //! # }
 //! ```
 //!
@@ -118,6 +195,8 @@ mod storage;
 pub use storage::{
     MemoryStorage, SmtStorage, StorageError, StorageUpdateParts, StorageUpdates, SubtreeUpdate,
 };
+#[cfg(feature = "rocksdb")]
+pub use storage::{RocksDbConfig, RocksDbStorage};
 
 mod iter;
 pub use iter::LargeSmtInnerNodeIterator;

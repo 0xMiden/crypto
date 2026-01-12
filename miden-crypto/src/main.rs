@@ -1,6 +1,8 @@
 use std::{path::PathBuf, time::Instant};
 
-use clap::Parser;
+use clap::{Parser, ValueEnum};
+#[cfg(feature = "rocksdb")]
+use miden_crypto::merkle::smt::{RocksDbConfig, RocksDbStorage};
 use miden_crypto::{
     EMPTY_WORD, Felt, ONE, Word,
     hash::rpo::Rpo256,
@@ -23,15 +25,24 @@ pub struct BenchmarkCmd {
     /// Number of updates
     #[arg(short = 'u', long = "updates", default_value = "10000")]
     updates: usize,
-    /// Path for the benchmark database (unused for memory storage)
+    /// Path for the benchmark database
     #[clap(short = 'p', long = "path")]
     storage_path: Option<PathBuf>,
-    /// Open existing database and skip construction (only works with persistent storage)
+    /// Open existing database and skip construction
     #[clap(short = 'o', long = "open", default_value = "false")]
     open: bool,
     /// Number of batch operations
     #[clap(short = 'b', long = "batches", default_value = "1")]
     batches: usize,
+    /// Storage backend to use at runtime: memory or rocksdb
+    #[arg(short = 's', long = "storage", value_enum, default_value = "memory")]
+    storage: StorageKind,
+}
+
+#[derive(Copy, Clone, Debug, Eq, PartialEq, ValueEnum)]
+pub enum StorageKind {
+    Memory,
+    Rocksdb,
 }
 
 fn main() {
@@ -45,9 +56,16 @@ pub fn benchmark_smt() {
     let tree_size = args.size;
     let insertions = args.insertions;
     let updates = args.updates;
+    let storage_path = args.storage_path;
     let batches = args.batches;
 
-    println!("Running benchmark with memory storage");
+    println!(
+        "Running benchmark with {} storage",
+        match args.storage {
+            StorageKind::Memory => "memory",
+            StorageKind::Rocksdb => "rocksdb",
+        }
+    );
     assert!(updates <= tree_size, "Cannot update more than `size`");
     // prepare the `leaves` vector for tree creation
     let mut entries = Vec::new();
@@ -58,10 +76,9 @@ pub fn benchmark_smt() {
     }
 
     let mut tree = if args.open {
-        eprintln!("Warning: --open flag is ignored for memory storage");
-        construction(entries.clone(), tree_size).unwrap()
+        open_existing(storage_path, args.storage).unwrap()
     } else {
-        construction(entries.clone(), tree_size).unwrap()
+        construction(entries.clone(), tree_size, storage_path, args.storage).unwrap()
     };
     insertion(&mut tree, insertions).unwrap();
     for _ in 0..batches {
@@ -75,10 +92,12 @@ pub fn benchmark_smt() {
 pub fn construction(
     entries: Vec<(Word, Word)>,
     size: usize,
+    database_path: Option<PathBuf>,
+    storage: StorageKind,
 ) -> Result<LargeSmt<Storage>, LargeSmtError> {
     println!("Running a construction benchmark:");
     let now = Instant::now();
-    let storage: Storage = Box::new(MemoryStorage::new());
+    let storage = get_storage(database_path, false, storage);
     let tree = LargeSmt::with_entries(storage, entries)?;
     let elapsed = now.elapsed().as_secs_f32();
     println!("Constructed an SMT with {size} key-value pairs in {elapsed:.1} seconds");
@@ -87,6 +106,18 @@ pub fn construction(
     Ok(tree)
 }
 
+pub fn open_existing(
+    storage_path: Option<PathBuf>,
+    storage: StorageKind,
+) -> Result<LargeSmt<Storage>, LargeSmtError> {
+    println!("Opening an existing database:");
+    let now = Instant::now();
+    let storage = get_storage(storage_path, true, storage);
+    let tree = LargeSmt::load(storage)?;
+    let elapsed = now.elapsed().as_secs_f32();
+    println!("Opened an existing database in {elapsed:.1} seconds");
+    Ok(tree)
+}
 /// Runs the insertion benchmark for the [`Smt`].
 pub fn insertion(tree: &mut LargeSmt<Storage>, insertions: usize) -> Result<(), LargeSmtError> {
     println!("Running an insertion benchmark:");
@@ -243,4 +274,37 @@ pub fn proof_generation(tree: &mut LargeSmt<Storage>) -> Result<(), LargeSmtErro
     );
 
     Ok(())
+}
+
+#[allow(unused_variables)]
+fn get_storage(database_path: Option<PathBuf>, open: bool, kind: StorageKind) -> Storage {
+    match kind {
+        StorageKind::Memory => Box::new(MemoryStorage::new()),
+        StorageKind::Rocksdb => {
+            #[cfg(feature = "rocksdb")]
+            {
+                let path = database_path
+                    .unwrap_or_else(|| std::env::temp_dir().join("miden_crypto_benchmark"));
+                println!("Using database path: {}", path.display());
+                if !open {
+                    // delete the folder if it exists as we are creating a new database
+                    if path.exists() {
+                        std::fs::remove_dir_all(path.clone()).unwrap();
+                    }
+                    std::fs::create_dir_all(path.clone())
+                        .expect("Failed to create database directory");
+                }
+                let db = RocksDbStorage::open(
+                    RocksDbConfig::new(path).with_cache_size(1 << 30).with_max_open_files(2048),
+                )
+                .expect("Failed to open database");
+                Box::new(db)
+            }
+            #[cfg(not(feature = "rocksdb"))]
+            {
+                eprintln!("rocksdb feature not enabled; falling back to memory storage");
+                Box::new(MemoryStorage::new())
+            }
+        },
+    }
 }

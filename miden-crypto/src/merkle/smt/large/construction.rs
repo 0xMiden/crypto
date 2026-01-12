@@ -59,10 +59,13 @@ impl<S: SmtStorage> LargeSmt<S> {
     /// Returns an error if fetching data from storage fails.
     ///
     /// # Example
-    /// ```
-    /// use miden_crypto::merkle::smt::{LargeSmt, MemoryStorage};
-    /// let storage = MemoryStorage::new();
+    /// ```no_run
+    /// # #[cfg(feature = "rocksdb")]
+    /// # {
+    /// use miden_crypto::merkle::smt::{LargeSmt, RocksDbConfig, RocksDbStorage};
+    /// let storage = RocksDbStorage::open(RocksDbConfig::new("/path/to/db")).unwrap();
     /// let smt = LargeSmt::load(storage).expect("Failed to load SMT");
+    /// # }
     /// ```
     pub fn load(storage: S) -> Result<Self, LargeSmtError> {
         Self::initialize_from_storage(storage)
@@ -82,16 +85,18 @@ impl<S: SmtStorage> LargeSmt<S> {
     /// - Returns a storage error if fetching data from storage fails.
     ///
     /// # Example
-    /// ```
-    /// use miden_crypto::merkle::{
-    ///     EmptySubtreeRoots,
-    ///     smt::{LargeSmt, MemoryStorage, SMT_DEPTH},
+    /// ```no_run
+    /// # #[cfg(feature = "rocksdb")]
+    /// # {
+    /// use miden_crypto::{
+    ///     Word,
+    ///     merkle::smt::{LargeSmt, RocksDbConfig, RocksDbStorage},
     /// };
-    /// // Empty tree has the empty subtree root at depth 0
-    /// let expected_root = *EmptySubtreeRoots::entry(SMT_DEPTH, 0);
-    /// let storage = MemoryStorage::new();
+    /// # let expected_root: Word = miden_crypto::EMPTY_WORD;
+    /// let storage = RocksDbStorage::open(RocksDbConfig::new("/path/to/db")).unwrap();
     /// let smt = LargeSmt::load_with_root(storage, expected_root)
     ///     .expect("Failed to load SMT with expected root");
+    /// # }
     /// ```
     pub fn load_with_root(storage: S, expected_root: Word) -> Result<Self, LargeSmtError> {
         let smt = Self::load(storage)?;

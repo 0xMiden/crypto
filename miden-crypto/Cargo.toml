@@ -46,6 +46,11 @@ required-features = ["std"]
 
 [[bench]]
 harness           = false
+name              = "large-smt"
+required-features = ["rocksdb"]
+
+[[bench]]
+harness           = false
 name              = "store"
 required-features = ["std"]
 
@@ -71,6 +76,7 @@ executable = ["concurrent", "dep:clap", "dep:rand-utils"]
 fuzzing    = []
 hashmaps   = ["dep:hashbrown"]
 internal   = ["concurrent"]
+rocksdb    = ["concurrent", "dep:rocksdb"]
 serde      = ["dep:serde", "serde?/alloc"]
 std        = ["blake3/std", "dep:cc", "miden-serde-utils/std", "rand/std", "rand/thread_rng"]
 
@@ -94,6 +100,7 @@ rand_chacha                   = { default-features = false, version = "0.9" }
 rand_core                     = { default-features = false, version = "0.9" }
 rand_hc                       = { version = "0.3" }
 rayon                         = { optional = true, version = "1.10" }
+rocksdb                       = { default-features = false, features = ["bindgen-runtime", "lz4"], optional = true, version = "0.24" }
 serde                         = { default-features = false, features = ["derive"], optional = true, version = "1.0" }
 sha2                          = { default-features = false, version = "0.10" }
 sha3                          = { default-features = false, version = "0.10" }
@@ -134,3 +141,7 @@ workspace = true
 
 [package.metadata.cargo-machete]
 ignored = ["getrandom", "rand-utils"]
+
+[[test]]
+name              = "rocksdb_large_smt"
+required-features = ["concurrent", "rocksdb"]
