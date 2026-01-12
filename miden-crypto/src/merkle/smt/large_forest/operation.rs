@@ -5,7 +5,7 @@
 
 use alloc::vec::Vec;
 
-use crate::{Map, Set, Word, merkle::smt::large_forest::root::RootValue};
+use crate::{Map, Set, Word, merkle::smt::Root};
 // FOREST OPERATION
 // ================================================================================================
 
@@ -37,6 +37,15 @@ impl ForestOperation {
         match self {
             ForestOperation::Insert { key, .. } => *key,
             ForestOperation::Remove { key } => *key,
+        }
+    }
+}
+
+impl From<ForestOperation> for (Word, Word) {
+    fn from(value: ForestOperation) -> Self {
+        match value {
+            ForestOperation::Insert { key, value } => (key, value),
+            ForestOperation::Remove { key } => (key, Word::empty()),
         }
     }
 }
@@ -131,7 +140,7 @@ impl Default for SmtUpdateBatch {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct SmtForestUpdateBatch {
     /// The operations associated with each targeted tree in the forest.
-    operations: Map<RootValue, SmtUpdateBatch>,
+    operations: Map<Root, SmtUpdateBatch>,
 }
 
 impl SmtForestUpdateBatch {
@@ -143,7 +152,7 @@ impl SmtForestUpdateBatch {
     /// Adds the provided `operations` to be performed on the tree with the provided `root`.
     pub fn add_operations(
         &mut self,
-        root: Word,
+        root: Root,
         operations: impl Iterator<Item = ForestOperation>,
     ) {
         let batch = self.operations.entry(root).or_insert_with(SmtUpdateBatch::empty);
@@ -155,13 +164,13 @@ impl SmtForestUpdateBatch {
     ///
     /// It is assumed that calling this means that the caller wants to insert operations into the
     /// associated batch, so a batch will be created even if one was not previously present.
-    pub fn operations(&mut self, root: Word) -> &mut SmtUpdateBatch {
+    pub fn operations(&mut self, root: Root) -> &mut SmtUpdateBatch {
         self.operations.entry(root).or_insert_with(SmtUpdateBatch::empty)
     }
 
     /// Consumes the batch as a map of batches, with each individual batch guaranteed to be in
     /// sorted order and contain only the last operation in the batch for any given key.
-    pub fn consume(self) -> Map<Word, Vec<ForestOperation>> {
+    pub fn consume(self) -> Map<Root, Vec<ForestOperation>> {
         self.operations.into_iter().map(|(k, v)| (k, v.consume())).collect()
     }
 }
@@ -238,13 +247,13 @@ mod test {
         let mut batch = SmtForestUpdateBatch::empty();
 
         // Let's start by adding a few operations to a tree.
-        let t1_root: Word = rand_value();
+        let t1_root = Root::random();
         let t1_o1 = ForestOperation::insert(rand_value(), rand_value());
         let t1_o2 = ForestOperation::remove(rand_value());
         batch.add_operations(t1_root, vec![t1_o1, t1_o2].into_iter());
 
         // We can also add them differently.
-        let t2_root: Word = rand_value();
+        let t2_root = Root::random();
         let t2_o1 = ForestOperation::remove(rand_value());
         let t2_o2 = ForestOperation::insert(rand_value(), rand_value());
         batch.operations(t2_root).add_operations(vec![t2_o1, t2_o2].into_iter());

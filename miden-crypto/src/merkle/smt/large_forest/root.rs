@@ -1,5 +1,7 @@
 //! This module contains utility types for working with roots as part of the forest.
 
+use core::fmt::{Display, Formatter};
+
 use crate::Word;
 #[cfg(all(feature = "std", test))]
 use crate::rand::test_utils::rand_value;
@@ -40,6 +42,11 @@ impl Root {
         Self { domain, value }
     }
 
+    /// Creates a new Root using the same `domain` as `self` but with value `new_root`.
+    pub fn update_root(&self, new_root: RootValue) -> Self {
+        Self::new(self.domain, new_root)
+    }
+
     /// Gets the domain from the identifier.
     pub fn domain(&self) -> DomainId {
         self.domain
@@ -60,6 +67,12 @@ impl Root {
         let domain = rand_value();
         let root = rand_value();
         Self::new(domain, root)
+    }
+}
+
+impl Display for Root {
+    fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
+        write!(f, "Root(domain = {}, value = {})", self.domain, self.value)
     }
 }
 

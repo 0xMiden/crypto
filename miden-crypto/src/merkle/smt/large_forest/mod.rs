@@ -59,8 +59,9 @@ mod operation;
 mod property_tests;
 mod root;
 mod tests;
+mod utils;
 
-pub use backend::{Backend, BackendError};
+pub use backend::{Backend, BackendError, memory::InMemoryBackend};
 pub use error::{LargeSmtForestError, Result};
 pub use operation::{ForestOperation, SmtForestUpdateBatch, SmtUpdateBatch};
 pub use root::{Root, RootInfo, VersionId};

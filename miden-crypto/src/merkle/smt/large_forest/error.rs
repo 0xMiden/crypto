@@ -7,9 +7,11 @@ use thiserror::Error;
 
 use crate::merkle::{
     MerkleError,
-    smt::large_forest::{backend::BackendError, history::error::HistoryError, root::RootValue},
+    smt::{
+        Root,
+        large_forest::{backend::BackendError, history::error::HistoryError, root::RootValue},
+    },
 };
-
 // LARGE SMT FOREST ERROR
 // ================================================================================================
 
@@ -28,6 +30,10 @@ pub enum LargeSmtForestError {
     #[error(transparent)]
     MerkleError(#[from] MerkleError),
 
+    /// Raised when an operation expects that a root is present but it is not.
+    #[error("Root {0} is not present in the forest")]
+    UnknownRoot(Root),
+
     /// Raised for arbitrary other errors.
     #[error(transparent)]
     Other(#[from] Box<dyn core::error::Error + Sync + Send>),
@@ -39,6 +45,7 @@ impl From<BackendError> for LargeSmtForestError {
     fn from(value: BackendError) -> Self {
         match value {
             BackendError::Merkle(e) => LargeSmtForestError::from(e),
+            BackendError::UnknownRoot(r) => LargeSmtForestError::UnknownRoot(r),
             BackendError::Other(e) => LargeSmtForestError::from(e),
         }
     }

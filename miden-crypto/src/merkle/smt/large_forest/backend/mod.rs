@@ -1,5 +1,7 @@
-//! This file contains the [`Backend`] trait for the [`LargeSmtForest`] implementation and the
-//! supporting types it needs.
+//! This file contains the [`Backend`] trait for the SMT forest implementation and the supporting
+//! types it needs.
+
+pub mod memory;
 
 use alloc::{boxed::Box, vec::Vec};
 use core::fmt::Debug;
@@ -12,24 +14,14 @@ use crate::{
         MerkleError,
         smt::{
             Root, SmtProof,
-            full::SMT_DEPTH,
             large_forest::{
                 operation::{SmtForestUpdateBatch, SmtUpdateBatch},
                 root::VersionId,
+                utils::MutationSet,
             },
         },
     },
 };
-// TYPE ALIASES
-// ================================================================================================
-
-/// The mutation set used by the forest backends.
-///
-/// At the moment this is used for _reverse_ mutations that "undo" the changes made to the tree(s),
-/// but may be harmonised with [`SmtUpdateBatch`] in the future. For more information on its use for
-/// reverse mutations, see [`crate::merkle::smt::SparseMerkleTree::apply_mutations_with_reversion`].
-pub type MutationSet = crate::merkle::smt::MutationSet<SMT_DEPTH, Word, Word>;
-
 // BACKEND
 // ================================================================================================
 
@@ -49,8 +41,9 @@ where
     // QUERIES
     // ============================================================================================
 
-    /// Returns an opening for the specified `key` in the SMT with the specified `root`.
-    fn open(&self, root: Root, key: Word) -> Result<SmtProof>;
+    /// Returns an opening for the specified `key` in the SMT with the specified `root`, or returns
+    /// [`None`] if there is no value for the provided `key`.
+    fn open(&self, root: Root, key: Word) -> Result<Option<SmtProof>>;
 
     /// Returns the value associated with the provided `key` in the SMT with the provided `root`, or
     /// [`None`] if no such value exists.
@@ -113,6 +106,10 @@ pub enum BackendError {
     /// Raised when there is an error with the merkle tree semantics within the backend.
     #[error(transparent)]
     Merkle(#[from] MerkleError),
+
+    /// Raised when the backend is queried for a root it doesn't know about.
+    #[error("Root {0} is not known by the backend")]
+    UnknownRoot(Root),
 
     /// Raised for arbitrary other errors within the backend.
     #[error(transparent)]
