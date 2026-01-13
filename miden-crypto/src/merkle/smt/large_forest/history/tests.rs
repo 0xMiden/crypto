@@ -510,5 +510,9 @@ fn smt_history_value_updates() -> Result<()> {
     let view_v1 = history.get_view_at(1)?;
     assert_eq!(view_v1.value(&key), Some(Some(&value_v1)));
 
+    // Verify round-trip consistency: history view matches current SMT value
+    let current_smt_value = smt.get_value(&key);
+    assert_eq!(view_v1.value(&key), Some(Some(&current_smt_value)));
+
     Ok(())
 }
