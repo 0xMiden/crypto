@@ -12,7 +12,7 @@ use core::ops::Range;
 
 use miden_crypto_derive::{SilentDebug, SilentDisplay};
 use num::Integer;
-use p3_field::{PrimeField64, RawDataSerializable, integers::QuotientMap};
+use p3_field::{PrimeField64, RawDataSerializable};
 use rand::{
     Rng,
     distr::{Distribution, StandardUniform, Uniform},
@@ -653,12 +653,10 @@ impl Deserializable for Nonce {
 
 impl Serializable for EncryptedData {
     fn write_into<W: ByteWriter>(&self, target: &mut W) {
-        // we serialize field elements in their canonical form
         target.write_u8(self.data_type as u8);
-        target.write_usize(self.ciphertext.len());
-        target.write_many(self.ciphertext.iter().map(Felt::as_canonical_u64));
-        target.write_many(self.nonce.0.iter().map(Felt::as_canonical_u64));
-        target.write_many(self.auth_tag.0.iter().map(Felt::as_canonical_u64));
+        self.ciphertext.write_into(target);
+        target.write_many(self.nonce.0);
+        target.write_many(self.auth_tag.0);
     }
 }
 
@@ -669,34 +667,14 @@ impl Deserializable for EncryptedData {
             DeserializationError::InvalidValue("invalid data type value".to_string())
         })?;
 
-        let ciphertext_len = source.read_usize()?;
-        let ciphertext: Vec<Felt> = source
-            .read_many_iter::<u64>(ciphertext_len)?
-            .map(|r| {
-                let v = r?;
-                Felt::from_canonical_checked(v)
-                    .ok_or_else(|| DeserializationError::InvalidValue("invalid felt".into()))
-            })
-            .collect::<Result<_, _>>()?;
-
-        let nonce: Vec<u64> = source.read_many_iter(NONCE_SIZE)?.collect::<Result<_, _>>()?;
-        let nonce: [Felt; NONCE_SIZE] = felts_from_u64(nonce)
-            .ok_or_else(|| DeserializationError::InvalidValue("invalid nonce".into()))?
-            .try_into()
-            .map_err(|_| {
-                DeserializationError::InvalidValue("nonce conversion failed".to_string())
-            })?;
-
-        let tag: Vec<u64> = source.read_many_iter(AUTH_TAG_SIZE)?.collect::<Result<_, _>>()?;
-        let tag: [Felt; AUTH_TAG_SIZE] = felts_from_u64(tag)
-            .ok_or_else(|| DeserializationError::InvalidValue("invalid tag".into()))?
-            .try_into()
-            .expect("deserialization reads exactly AUTH_TAG_SIZE elements");
+        let ciphertext = Vec::<Felt>::read_from(source)?;
+        let nonce: [Felt; NONCE_SIZE] = source.read()?;
+        let auth_tag: [Felt; AUTH_TAG_SIZE] = source.read()?;
 
         Ok(Self {
             ciphertext,
             nonce: Nonce(nonce),
-            auth_tag: AuthTag(tag),
+            auth_tag: AuthTag(auth_tag),
             data_type,
         })
     }
@@ -757,12 +735,6 @@ fn unpad(mut plaintext: Vec<Felt>) -> Result<Vec<Felt>, EncryptionError> {
     plaintext.truncate((num_blocks - 1) * RATE_WIDTH + pos);
 
     Ok(plaintext)
-}
-
-/// Converts a vector of u64 values into a vector of field elements, returning `None` if any of
-/// the u64 values is not a valid field element.
-fn felts_from_u64(input: Vec<u64>) -> Option<Vec<Felt>> {
-    input.into_iter().map(Felt::from_canonical_checked).collect()
 }
 
 // AEAD SCHEME IMPLEMENTATION
