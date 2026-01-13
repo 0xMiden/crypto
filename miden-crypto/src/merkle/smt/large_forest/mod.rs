@@ -32,14 +32,16 @@
 
 mod backend;
 mod error;
-pub mod history;
-pub mod operation;
+mod history;
+mod operation;
 mod property_tests;
-pub mod root;
+mod root;
 mod tests;
 
-pub use backend::Backend;
+pub use backend::{Backend, BackendError};
 pub use error::{LargeSmtForestError, Result};
+pub use operation::{ForestOperation, SmtForestUpdateBatch, SmtUpdateBatch};
+pub use root::RootInfo;
 
 use crate::{
     Map, Set, Word,
@@ -47,11 +49,7 @@ use crate::{
         EmptySubtreeRoots, MerkleError,
         smt::{
             SMT_DEPTH, SmtProof,
-            large_forest::{
-                history::{History, VersionId},
-                operation::{SmtForestUpdateBatch, SmtUpdateBatch},
-                root::RootInfo,
-            },
+            large_forest::history::{History, VersionId},
         },
     },
 };
@@ -326,7 +324,7 @@ impl<B: Backend> LargeSmtForest<B> {
     ///   forest.
     pub fn update_forest(
         &mut self,
-        _new_version: Word,
+        _new_version: VersionId,
         _updates: SmtForestUpdateBatch,
     ) -> Result<Map<Word, Word>> {
         todo!("LargeSmtForest::modify_forest")
@@ -346,11 +344,16 @@ impl<B: Backend> LargeSmtForest<B> {
     ///
     /// - If there is no history that corresponds to one of the trees that is fully stored.
     pub fn truncate(&mut self, version: VersionId) -> Result<()> {
-        // If we have a version that is the current tree version or newer, we want to clear the
-        // history sequence of deltas entirely. We cannot do that by calling `History::truncate` as
-        // this cannot safely know if a version that is newer than its most recent delta is between
-        // that delta and the current full tree, or >= the version of the full tree. As a result, we
-        // have to handle this scenario specially by calling `History::clear()`.
+        // Truncation in the history is defined such that it never removes a version that could
+        // possibly serve as the latest delta for a newer version. This is because it cannot safely
+        // know if a version `v` is between the latest delta `d` and the current version `c`, as it
+        // has no knowledge of the current version.
+        //
+        // Thus, if we have a version `v` such that `d <= v < c`, we need to retain the reversion
+        // delta `d` in the history to correctly service queries for `v`. If, however, we have `d <
+        // c <= v` we need to explicitly remove the last delta as well.
+        //
+        // To that end, we handle the latter case first, by explicitly calling `History::clear()`.
         self.backend.versions()?.for_each(|(root, v)| {
             if version >= v {
                 self.histories
@@ -364,14 +367,14 @@ impl<B: Backend> LargeSmtForest<B> {
             }
         });
 
-        // In all other cases, the history can simply be truncated to match the corresponding
-        // version, which may be between the latest delta and the current tree. We do this only for
-        // the known-to-be-non-empty histories for performance.
+        // The other case is `v < c`, which is handled simply by the truncation mechanism in the
+        // history as we want. In other words, it retains the necessary delta, and so we can just
+        // call it here.
         self.non_empty_histories.iter().for_each(|h| {
             self.histories
                 .get_mut(h)
                 .expect("Histories did not contain an entry corresponding to a tree")
-                .clear();
+                .truncate(version);
         });
 
         Ok(())

@@ -87,6 +87,7 @@ pub type VersionId = u64;
 /// The versions are _cumulative_, meaning that querying the history must account for changes from
 /// the current tree that take place in versions that are not the queried version or the current
 /// tree.
+#[allow(dead_code)] // Temporary
 #[derive(Clone, Debug)]
 pub struct History {
     /// The maximum number of historical versions to be stored.
@@ -110,6 +111,7 @@ pub struct History {
     deltas: VecDeque<Delta>,
 }
 
+#[allow(dead_code)] // Temporary
 impl History {
     /// Constructs a new history container, containing at most `max_count` historical versions for
     /// a tree.
@@ -312,6 +314,7 @@ impl History {
 // ================================================================================================
 
 /// A read-only view of the history overlay on the tree at a specified place in the history.
+#[allow(dead_code)] // Temporary
 #[derive(Debug)]
 pub struct HistoryView<'history> {
     /// The index of the target version in the history.
@@ -321,6 +324,7 @@ pub struct HistoryView<'history> {
     history: &'history History,
 }
 
+#[allow(dead_code)] // Temporary
 impl<'history> HistoryView<'history> {
     /// Constructs a new history view that acts as a single overlay of the state represented by the
     /// oldest delta for which `f` returns true.
@@ -423,6 +427,7 @@ struct Delta {
     pub leaves: LeafChanges,
 }
 
+#[allow(dead_code)] // Temporary
 impl Delta {
     /// Creates a new delta with the provided `root`, and representing the provided
     /// changes to `nodes` and `leaves` in the merkle tree.

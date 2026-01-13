@@ -67,8 +67,8 @@ where
     // SINGLE-TREE MODIFIERS
     // ============================================================================================
 
-    /// Performs the provided `updates` on the tree with the provided `root`, returning the new
-    /// root.
+    /// Performs the provided `updates` on the tree with the provided `root`, returning the mutation
+    /// set that will revert the changes made to the tree.
     ///
     /// Implementations must guarantee the following behavior, with non-conforming implementations
     /// considered to be a bug:

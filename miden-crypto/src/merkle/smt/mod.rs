@@ -28,8 +28,11 @@ pub use large::{
 #[cfg(feature = "rocksdb")]
 pub use large::{RocksDbConfig, RocksDbStorage};
 
-pub mod large_forest;
-pub use large_forest::{LargeSmtForest, LargeSmtForestError};
+mod large_forest;
+pub use large_forest::{
+    Backend, BackendError, ForestOperation, LargeSmtForest, LargeSmtForestError, RootInfo,
+    SmtForestUpdateBatch, SmtUpdateBatch,
+};
 
 mod simple;
 pub use simple::{SimpleSmt, SimpleSmtProof};
