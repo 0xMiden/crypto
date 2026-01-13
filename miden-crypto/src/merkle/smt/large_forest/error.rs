@@ -5,12 +5,9 @@ use alloc::boxed::Box;
 
 use thiserror::Error;
 
-use crate::{
-    Word,
-    merkle::{
-        MerkleError,
-        smt::large_forest::{backend::BackendError, history::error::HistoryError},
-    },
+use crate::merkle::{
+    MerkleError,
+    smt::large_forest::{backend::BackendError, history::error::HistoryError, root::RootValue},
 };
 
 // LARGE SMT FOREST ERROR
@@ -25,7 +22,7 @@ pub enum LargeSmtForestError {
 
     /// Raised when an attempt is made to modify a frozen tree.
     #[error("Attempted to modify non-current tree with root {0}")]
-    InvalidModification(Word),
+    InvalidModification(RootValue),
 
     /// Errors with the merkle tree operations of the forest.
     #[error(transparent)]

@@ -11,11 +11,11 @@ use crate::{
     merkle::{
         MerkleError,
         smt::{
-            SmtProof,
+            Root, SmtProof,
             full::SMT_DEPTH,
             large_forest::{
-                history::VersionId,
                 operation::{SmtForestUpdateBatch, SmtUpdateBatch},
+                root::VersionId,
             },
         },
     },
@@ -50,19 +50,19 @@ where
     // ============================================================================================
 
     /// Returns an opening for the specified `key` in the SMT with the specified `root`.
-    fn open(&self, root: Word, key: Word) -> Result<SmtProof>;
+    fn open(&self, root: Root, key: Word) -> Result<SmtProof>;
 
     /// Returns the value associated with the provided `key` in the SMT with the provided `root`, or
     /// [`None`] if no such value exists.
-    fn get(&self, root: Word, key: Word) -> Result<Option<Word>>;
+    fn get(&self, root: Root, key: Word) -> Result<Option<Word>>;
 
     /// Returns the version of the tree with the provided `root`.
-    fn version(&self, root: Word) -> Result<VersionId>;
+    fn version(&self, root: Root) -> Result<VersionId>;
 
     /// Returns an iterator over all the tree roots and versions that the backend knows about.
     ///
     /// The iteration order is unspecified.
-    fn versions(&self) -> Result<impl Iterator<Item = (Word, VersionId)>>;
+    fn versions(&self) -> Result<impl Iterator<Item = (Root, VersionId)>>;
 
     // SINGLE-TREE MODIFIERS
     // ============================================================================================
@@ -78,7 +78,7 @@ where
     ///   allocated.
     fn update_tree(
         &mut self,
-        root: Word,
+        root: Root,
         new_version: VersionId,
         updates: SmtUpdateBatch,
     ) -> Result<MutationSet>;
