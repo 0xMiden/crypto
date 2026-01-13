@@ -44,6 +44,10 @@ pub enum SmtLeafError {
         "multiple leaf contains {actual} entries but the maximum allowed is {MAX_LEAF_ENTRIES}"
     )]
     TooManyLeafEntries { actual: usize },
+
+    /// Multiple leaf contains duplicate keys, which violates the ordering/uniqueness invariant.
+    #[error("multiple leaf contains duplicate key {key}")]
+    DuplicateKeysInMultipleLeaf { key: Word },
 }
 
 // SMT PROOF ERROR

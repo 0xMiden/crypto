@@ -116,6 +116,15 @@ impl SmtLeaf {
             }
         }
 
+        let mut entries = entries;
+        entries.sort_by(|(key_1, _), (key_2, _)| cmp_keys(*key_1, *key_2));
+
+        for pair in entries.windows(2) {
+            if pair[0].0 == pair[1].0 {
+                return Err(SmtLeafError::DuplicateKeysInMultipleLeaf { key: pair[0].0 });
+            }
+        }
+
         Ok(Self::Multiple(entries))
     }
 

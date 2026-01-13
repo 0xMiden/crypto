@@ -63,6 +63,70 @@ fn test_smt_insert_at_same_key() {
     }
 }
 
+#[test]
+fn test_multiple_smt_leaf_new_multiple_sorts_and_hash() {
+    let msb = Felt::new(13);
+    let key_a = Word::new([Felt::new(0), Felt::new(0), Felt::new(5), msb]);
+    let key_b = Word::new([Felt::new(0), Felt::new(0), Felt::new(3), msb]);
+    let key_c = Word::new([Felt::new(0), Felt::new(0), Felt::new(7), msb]);
+
+    let value_a = Word::new([Felt::new(1), Felt::new(1), Felt::new(1), Felt::new(1)]);
+    let value_b = Word::new([Felt::new(2), Felt::new(2), Felt::new(2), Felt::new(2)]);
+    let value_c = Word::new([Felt::new(3), Felt::new(3), Felt::new(3), Felt::new(3)]);
+
+    let unsorted = vec![(key_a, value_a), (key_c, value_c), (key_b, value_b)];
+    let expected_sorted = vec![(key_b, value_b), (key_a, value_a), (key_c, value_c)];
+
+    let leaf = SmtLeaf::new_multiple(unsorted).unwrap();
+    assert_eq!(leaf.entries(), expected_sorted.as_slice());
+    let expected_hash = build_multiple_leaf_node(&expected_sorted);
+    assert_eq!(leaf.hash(), expected_hash);
+}
+
+#[test]
+fn test_multiple_smt_leaf_new_multiple_rejects_duplicate_keys() {
+    let msb = Felt::new(21);
+    let key = Word::new([Felt::new(9), Felt::new(9), Felt::new(9), msb]);
+    let v1 = Word::new([Felt::new(1), Felt::new(0), Felt::new(0), Felt::new(0)]);
+    let v2 = Word::new([Felt::new(2), Felt::new(0), Felt::new(0), Felt::new(0)]);
+
+    let err = SmtLeaf::new_multiple(vec![(key, v1), (key, v2)]).unwrap_err();
+    assert_matches!(err, SmtLeafError::DuplicateKeysInMultipleLeaf { .. });
+}
+
+#[test]
+fn test_multiple_smt_leaf_deserialization_sorts_canonical() {
+    let msb = Felt::new(33);
+
+    let k1 = Word::new([Felt::new(0), Felt::new(0), Felt::new(10), msb]);
+    let k2 = Word::new([Felt::new(0), Felt::new(0), Felt::new(5), msb]);
+
+    let v1 = Word::new([Felt::new(7), Felt::new(7), Felt::new(7), Felt::new(7)]);
+    let v2 = Word::new([Felt::new(8), Felt::new(8), Felt::new(8), Felt::new(8)]);
+
+    let unsorted_leaf = SmtLeaf::Multiple(vec![(k1, v1), (k2, v2)]);
+    let bytes = unsorted_leaf.to_bytes();
+
+    let decoded = SmtLeaf::read_from_bytes(&bytes).unwrap();
+    let expected = SmtLeaf::new_multiple(vec![(k1, v1), (k2, v2)]).unwrap();
+    assert_eq!(decoded, expected);
+    assert_eq!(decoded.hash(), expected.hash());
+}
+
+#[test]
+fn test_multiple_smt_leaf_deserialization_rejects_duplicate_keys() {
+    let msb = Felt::new(44);
+    let key = Word::new([Felt::new(1), Felt::new(2), Felt::new(3), msb]);
+    let v1 = Word::new([Felt::new(10), Felt::new(0), Felt::new(0), Felt::new(0)]);
+    let v2 = Word::new([Felt::new(11), Felt::new(0), Felt::new(0), Felt::new(0)]);
+
+    let bad_leaf = SmtLeaf::Multiple(vec![(key, v1), (key, v2)]);
+    let bytes = bad_leaf.to_bytes();
+
+    let err = SmtLeaf::read_from_bytes(&bytes).unwrap_err();
+    let _ = err;
+}
+
 /// This test checks that inserting twice at the same key functions as expected. The test covers
 /// only the case where the leaf type is `SmtLeaf::Multiple`
 #[test]
