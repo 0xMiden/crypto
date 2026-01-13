@@ -20,9 +20,31 @@
 //! - It is more expensive to query a given tree at an older point in its history than it is to
 //!   query it at a newer point, and querying at the current tree will always take the least time.
 //!
+//! # Lineages
+//!
+//! We term a set of trees where each is derived from the previous version to be a **lineage**. A
+//! single lineage semantically contains the **full information** on the current state of the tree,
+//! alongside a set of deltas which describe how to change that full tree to return to a historical
+//! state of that tree.
+//!
+//! While any given [`Backend`] may choose to share data between lineages, this behavior is not
+//! guaranteed, and must not be relied upon.
+//!
+//! # Tree Identification
+//!
+//! It is possible for multiple lineages to contain a tree with identical leaves and hence an
+//! identical root. As we store lineages separately, we need some way to specify which instance of a
+//! given root we mean.
+//!
+//! This is done by identifying trees using the [`Root`], which combines the tree's root value with
+//! a user-provided identifier that tags the tree with a 'domain'. This allows distinguishing
+//! between otherwise identical trees. Users must take care to ensure that each domain is unique, as
+//! reusing them will result in overwriting data in the wrong domain, and that queries may return
+//! incorrect results.
+//!
 //! # Data Storage
 //!
-//! The SMT forest is parametrised over the [`Backend`] implementation that it uses. These backends
+//! The SMT forest is parametrized over the [`Backend`] implementation that it uses. These backends
 //! may have significantly varied performance characteristics, and hence any performance analysis of
 //! the forest should be done in conjunction with a specific backend. The forest itself takes pains
 //! to not make any assumptions about properties of the backend in use.
@@ -41,7 +63,7 @@ mod tests;
 pub use backend::{Backend, BackendError};
 pub use error::{LargeSmtForestError, Result};
 pub use operation::{ForestOperation, SmtForestUpdateBatch, SmtUpdateBatch};
-pub use root::RootInfo;
+pub use root::{Root, RootInfo, VersionId};
 
 use crate::{
     Map, Set, Word,
@@ -49,7 +71,7 @@ use crate::{
         EmptySubtreeRoots, MerkleError,
         smt::{
             SMT_DEPTH, SmtProof,
-            large_forest::history::{History, VersionId},
+            large_forest::{history::History, root::RootValue},
         },
     },
 };
@@ -92,13 +114,13 @@ pub struct LargeSmtForest<B: Backend> {
     ///
     /// This should contain an entry for every tree lineage contained in the forest, under the root
     /// of its current tree version.
-    histories: Map<Word, History>,
+    histories: Map<Root, History>,
 
     /// A set tracking which lineage histories in `histories` contain actual deltas in order to
     /// speed up querying.
     ///
     /// It must always be maintained as a strict subset of `histories.keys()`.
-    non_empty_histories: Set<Word>,
+    non_empty_histories: Set<Root>,
 }
 
 // CONSTRUCTION AND BASIC QUERIES
@@ -146,17 +168,21 @@ impl<B: Backend> LargeSmtForest<B> {
     /// historical versions.
     ///
     /// The iteration order of the roots is unspecified.
-    pub fn roots(&self) -> impl Iterator<Item = Word> {
-        self.histories
-            .keys()
-            .cloned()
-            .chain(self.histories.values().flat_map(|h| h.roots()))
+    pub fn roots(&self) -> impl Iterator<Item = Root> {
+        // As the history container does not deal in roots with domains, we have to attach the
+        // corresponding domain to each root, and do this as lazily as possible to avoid
+        // materializing more things than we need to.
+        self.histories.keys().cloned().chain(
+            self.histories
+                .iter()
+                .flat_map(|(k, v)| v.roots().map(|r| Root::new(k.lineage(), r))),
+        )
     }
 
     /// Returns an iterator over the roots for the latest version of every tree in the forest.
     ///
     /// The iteration order is unspecified.
-    pub fn current_roots(&self) -> impl Iterator<Item = Word> {
+    pub fn current_roots(&self) -> impl Iterator<Item = Root> {
         self.histories.keys().cloned()
     }
 
@@ -171,11 +197,11 @@ impl<B: Backend> LargeSmtForest<B> {
     ///
     /// - [`LargeSmtForestError::MerkleError`] if no tree with the provided `root` exists in the
     ///   forest.
-    pub fn historical_roots(&self, current_root: Word) -> Result<impl Iterator<Item = Word>> {
+    pub fn historical_roots(&self, current_root: Root) -> Result<impl Iterator<Item = RootValue>> {
         self.histories
             .get(&current_root)
             .map(|h| h.roots())
-            .ok_or(MerkleError::RootNotInStore(current_root).into())
+            .ok_or(MerkleError::RootNotInStore(current_root.value()).into())
     }
 
     /// Returns the number of trees in the forest that have unique identity.
@@ -199,8 +225,9 @@ impl<B: Backend> LargeSmtForest<B> {
     ///
     /// A tree being the latest version is one that can be modified to yield a new version. In other
     /// words it does not represent a historical tree version.
-    pub fn is_latest_version(&self, root: Word) -> bool {
-        self.histories.contains_key(&root) || *EmptySubtreeRoots::entry(SMT_DEPTH, 0) == root
+    pub fn is_latest_version(&self, root: Root) -> bool {
+        self.histories.contains_key(&root)
+            || *EmptySubtreeRoots::entry(SMT_DEPTH, 0) == root.value()
     }
 }
 
@@ -226,7 +253,8 @@ impl<B: Backend> LargeSmtForest<B> {
     ///
     /// - [`LargeSmtForestError::MerkleError`] if no tree with the provided `root` exists in the
     ///   forest, or if the forest does not contain sufficient data to provide an opening for `key`.
-    pub fn open(&self, _root: Word, _key: Word) -> Result<Option<SmtProof>> {
+    /// - [`LargeSmtForestError`] if the backend returns an error as part of the query.
+    pub fn open(&self, _root: Root, _key: Word) -> Result<Option<SmtProof>> {
         todo!("LargeSmtForest::open")
     }
 
@@ -237,21 +265,45 @@ impl<B: Backend> LargeSmtForest<B> {
     ///
     /// - [`LargeSmtForestError::MerkleError`] if no tree with the provided `root` exists in the
     ///   forest, or if the forest does not contain sufficient data to get the value for `key`.
-    pub fn get(&self, _root: Word, _key: Word) -> Result<Option<Word>> {
+    /// - [`LargeSmtForestError`] if the backend returns an error as part of the query.
+    pub fn get(&self, _root: Root, _key: Word) -> Result<Option<Word>> {
         todo!("LargeSmtForest::get")
     }
 
     /// Returns data describing what information the forest knows about the provided `root`.
-    pub fn knows_root(&self, root: Word) -> Result<RootInfo> {
+    ///
+    /// # Errors
+    ///
+    /// - [`LargeSmtForestError`] if the backend returns an error as part of the query.
+    pub fn knows_root(&self, root: Root) -> Result<RootInfo> {
         if self.histories.contains_key(&root) {
             Ok(RootInfo::LatestVersion(self.backend.version(root)?))
-        } else if let Some(v) = self.histories.values().find_map(|h| h.version(root)) {
+        } else if let Some(v) = self.histories.iter().find_map(|(r, h)| {
+            if r.lineage() == root.lineage() {
+                h.version(root.value())
+            } else {
+                None
+            }
+        }) {
             Ok(RootInfo::HistoricalVersion(v))
-        } else if root == *EmptySubtreeRoots::entry(SMT_DEPTH, 0) {
+        } else if root.value() == *EmptySubtreeRoots::entry(SMT_DEPTH, 0) {
             Ok(RootInfo::EmptyTree)
         } else {
             Ok(RootInfo::Missing)
         }
+    }
+
+    /// Gets the version associated with the provided root, or returns [`None`] if the root is
+    /// unknown to the forest.
+    ///
+    /// # Errors
+    ///
+    /// - [`LargeSmtForestError`] if the backend returns an error as part of the query.
+    pub fn version(&self, root: Root) -> Result<Option<VersionId>> {
+        Ok(match self.knows_root(root)? {
+            RootInfo::LatestVersion(v) | RootInfo::HistoricalVersion(v) => Some(v),
+            RootInfo::EmptyTree | RootInfo::Missing => None,
+        })
     }
 }
 
@@ -283,12 +335,13 @@ impl<B: Backend> LargeSmtForest<B> {
     /// - [`LargeSmtForestError::InvalidModification`] if `root` corresponds to a tree that is not
     ///   the latest in its lineage.
     /// - [`LargeSmtForestError::MerkleError`] if `root` is not a root known by the forest.
+    /// - [`LargeSmtForestError`] if the backend returns an error as part of the query.
     pub fn update_tree(
         &mut self,
-        _root: Word,
+        _root: Root,
         _new_version: VersionId,
         _updates: SmtUpdateBatch,
-    ) -> Result<Word> {
+    ) -> Result<Root> {
         todo!("LargeSmtForest::modify_tree")
     }
 }
@@ -322,11 +375,12 @@ impl<B: Backend> LargeSmtForest<B> {
     ///   tree that is not the latest in its lineage.
     /// - [`LargeSmtForestError::MerkleError`] if any root in the batch is not a root known by the
     ///   forest.
+    /// - [`LargeSmtForestError`] if the backend returns an error as part of the query.
     pub fn update_forest(
         &mut self,
         _new_version: VersionId,
         _updates: SmtForestUpdateBatch,
-    ) -> Result<Map<Word, Word>> {
+    ) -> Result<Map<Root, Root>> {
         todo!("LargeSmtForest::modify_forest")
     }
 
@@ -339,6 +393,7 @@ impl<B: Backend> LargeSmtForest<B> {
     ///
     /// - [`LargeSmtForestError::Other`] if the backend cannot be accessed to get the full tree
     ///   versions.
+    /// - [`LargeSmtForestError`] if the backend returns an error as part of the query.
     ///
     /// # Panics
     ///

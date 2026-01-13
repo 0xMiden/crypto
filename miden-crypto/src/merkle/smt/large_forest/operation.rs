@@ -5,8 +5,7 @@
 
 use alloc::vec::Vec;
 
-use crate::{Map, Set, Word};
-
+use crate::{Map, Set, Word, merkle::smt::large_forest::root::RootValue};
 // FOREST OPERATION
 // ================================================================================================
 
@@ -132,7 +131,7 @@ impl Default for SmtUpdateBatch {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct SmtForestUpdateBatch {
     /// The operations associated with each targeted tree in the forest.
-    operations: Map<Word, SmtUpdateBatch>,
+    operations: Map<RootValue, SmtUpdateBatch>,
 }
 
 impl SmtForestUpdateBatch {
