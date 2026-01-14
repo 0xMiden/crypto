@@ -1,8 +1,8 @@
 //! Generic digest types for binary hash functions.
 //!
 //! This module provides reusable digest structs for hash functions with fixed-size outputs:
-//! - [`Digest256`]: 32-byte (256-bit) digest for SHA-256, Blake3-256, etc.
-//! - [`Digest512`]: 64-byte (512-bit) digest for SHA-512, etc.
+//! - `Digest256`: 32-byte (256-bit) digest for SHA-256, Blake3-256, etc.
+//! - `Digest512`: 64-byte (512-bit) digest for SHA-512, etc.
 
 use alloc::string::String;
 use core::{ops::Deref, slice};
