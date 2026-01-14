@@ -2,7 +2,7 @@
 //!
 //! This module contains the key generation and sampling logic compatible with fn-dsa-kgen.
 
-use super::polynomial::Polynomial;
+use crate::dsa::falcon512_rpo::math::Polynomial;
 
 pub(crate) mod gauss;
 pub(crate) mod ntru;

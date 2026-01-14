@@ -20,12 +20,10 @@ pub use field::FalconFelt;
 mod polynomial;
 pub use polynomial::Polynomial;
 
-// FLR (Floating-point Linear Real) implementation
-pub(crate) mod flr;
-
-// FN-DSA (FIPS 204 Falcon) implementation
-pub(crate) mod fndsa;
-pub(crate) use fndsa::ntru_gen;
+// Group fn-dsa derived code under a dedicated module.
+pub(crate) mod fn_dsa;
+pub(crate) use fn_dsa::flr;
+pub(crate) use fn_dsa::ntru_gen;
 
 pub trait Inverse: Copy + Zero + MulAssign + One {
     /// Gets the inverse of a, or zero if it is zero.
