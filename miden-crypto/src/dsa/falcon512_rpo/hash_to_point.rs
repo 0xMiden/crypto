@@ -54,7 +54,7 @@ pub fn hash_to_point_rpo256(message: Word, nonce: &Nonce) -> Polynomial<FalconFe
 
 /// Returns a polynomial in Z_p[x]/(phi) representing the hash of the provided message and
 /// nonce using SHAKE256. This is the hash-to-point algorithm used in the reference implementation.
-#[cfg(all(test, feature = "std"))]
+#[cfg(test)]
 pub fn hash_to_point_shake256(message: &[u8], nonce: &Nonce) -> Polynomial<FalconFelt> {
     use sha3::{
         Shake256,
@@ -101,7 +101,7 @@ fn felt_to_falcon_felt(value: Felt) -> FalconFelt {
 /// Note that since `FalconFelt::new` accepts `i16`, we first reduce the `u32` value modulo
 /// the Falcon prime and then cast the resulting value to an `i16`.
 /// Note that this final cast is safe as the Falcon prime is less than `i16::MAX`.
-#[cfg(all(test, feature = "std"))]
+#[cfg(test)]
 fn u32_to_falcon_felt(value: u32) -> FalconFelt {
     FalconFelt::new((value % MODULUS as u32) as i16)
 }

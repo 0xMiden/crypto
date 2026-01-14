@@ -637,26 +637,6 @@ mod tests {
 
     use proptest::prelude::*;
 
-    // Arbitrary instance for Word
-    impl Arbitrary for Word {
-        type Parameters = ();
-        type Strategy = BoxedStrategy<Self>;
-
-        fn arbitrary_with(_args: Self::Parameters) -> Self::Strategy {
-            prop::collection::vec(any::<u64>(), 4)
-                .prop_map(|vals| {
-                    Word::new([
-                        Felt::new(vals[0]),
-                        Felt::new(vals[1]),
-                        Felt::new(vals[2]),
-                        Felt::new(vals[3]),
-                    ])
-                })
-                .no_shrink()
-                .boxed()
-        }
-    }
-
     // Arbitrary instance for MerklePath
     impl Arbitrary for MerklePath {
         type Parameters = ();

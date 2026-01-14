@@ -33,6 +33,15 @@ pub mod field {
     };
 }
 
+pub mod parallel {
+    //! Conditional parallel iteration primitives.
+    //!
+    //! When the `concurrent` feature is enabled, this module re-exports parallel iterator
+    //! traits from `p3-maybe-rayon` backed by rayon. Without `concurrent`, these traits
+    //! fall back to sequential iteration.
+    pub use p3_maybe_rayon::prelude::*;
+}
+
 pub mod stark {
     //! Foundational components for the STARK proving system based on Plonky3.
     //!

@@ -48,15 +48,6 @@ pub(crate) const DIGEST_RANGE: Range<usize> = 4..8;
 /// The number of byte chunks defining a field element when hashing a sequence of bytes
 const BINARY_CHUNK_SIZE: usize = 7;
 
-/// S-Box and Inverse S-Box powers;
-///
-/// The constants are defined for tests only because the exponentiations in the code are unrolled
-/// for efficiency reasons.
-#[cfg(all(test, feature = "std"))]
-pub(crate) const ALPHA: u64 = 7;
-#[cfg(all(test, feature = "std"))]
-pub(crate) const INV_ALPHA: u64 = 10540996611094048183;
-
 // ALGEBRAIC SPONGE
 // ================================================================================================
 

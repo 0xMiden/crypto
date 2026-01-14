@@ -2,7 +2,7 @@ use alloc::vec::Vec;
 use core::mem;
 
 use num::Integer;
-use rayon::prelude::*;
+use p3_maybe_rayon::prelude::*;
 
 use super::{
     IN_MEMORY_DEPTH, LargeSmt, LargeSmtError, LoadedLeaves, MutatedLeaves, ROOT_MEMORY_INDEX,

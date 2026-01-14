@@ -1,7 +1,7 @@
 use alloc::vec::Vec;
 use core::mem;
 
-use rayon::prelude::*;
+use p3_maybe_rayon::prelude::*;
 
 use super::{
     CONSTRUCTION_SUBTREE_BATCH_SIZE, IN_MEMORY_DEPTH, LargeSmt, LargeSmtError, NUM_IN_MEMORY_NODES,
