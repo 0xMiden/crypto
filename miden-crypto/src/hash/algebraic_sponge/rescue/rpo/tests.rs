@@ -154,7 +154,7 @@ fn hash_padding_no_extra_permutation_call() {
     // padding when hashing bytes
     state[CAPACITY_RANGE.start] = Felt::from_u8(RATE_WIDTH as u8);
     // place the final padded chunk into the last rate element
-    state[RATE_RANGE.start + RATE_WIDTH - 1] = Felt::new(u64::from_le_bytes(final_chunk));
+    state[RATE_RANGE.end - 1] = Felt::new(u64::from_le_bytes(final_chunk));
     Rpo256::apply_permutation(&mut state);
 
     assert_eq!(&r1[0..4], &state[DIGEST_RANGE]);

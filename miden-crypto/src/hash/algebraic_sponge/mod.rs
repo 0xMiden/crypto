@@ -34,8 +34,8 @@ pub(crate) const RATE_RANGE: Range<usize> = 0..8;
 pub(crate) const RATE_WIDTH: usize = RATE_RANGE.end - RATE_RANGE.start;
 
 /// The first and second 4-element words of the rate portion.
-pub(crate) const INPUT1_RANGE: Range<usize> = 0..4;
-pub(crate) const INPUT2_RANGE: Range<usize> = 4..8;
+pub(crate) const RATE0_RANGE: Range<usize> = 0..4;
+pub(crate) const RATE1_RANGE: Range<usize> = 4..8;
 
 /// The capacity portion of the state is located in elements 8, 9, 10, and 11.
 pub(crate) const CAPACITY_RANGE: Range<usize> = 8..12;
@@ -203,12 +203,12 @@ pub(crate) trait AlgebraicSponge {
         // - if the value doesn't fit into a single field element, split it into two field elements,
         //   copy them into rate elements 5 and 6 and set the first capacity element to 6.
         let mut state = [ZERO; STATE_WIDTH];
-        state[INPUT1_RANGE].copy_from_slice(seed.as_elements());
-        state[INPUT2_RANGE.start] = Felt::new(value);
+        state[RATE0_RANGE].copy_from_slice(seed.as_elements());
+        state[RATE1_RANGE.start] = Felt::new(value);
         if value < Felt::ORDER_U64 {
             state[CAPACITY_RANGE.start] = Felt::from_u8(5_u8);
         } else {
-            state[INPUT2_RANGE.start + 1] = Felt::new(value / Felt::ORDER_U64);
+            state[RATE1_RANGE.start + 1] = Felt::new(value / Felt::ORDER_U64);
             state[CAPACITY_RANGE.start] = Felt::from_u8(6_u8);
         }
 

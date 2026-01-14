@@ -1,7 +1,7 @@
 ## 0.21.0 (TBD)
 
-- Use more idiomatic Plonky3 APIs ([#743](https://github.com/0xMiden/crypto/pull/743)).
 - [BREAKING] Removed `p3-compat` and `winter-compat` features ([#745](https://github.com/0xMiden/crypto/pull/745)).
+- Use more idiomatic Plonky3 APIs ([#743](https://github.com/0xMiden/crypto/pull/743)).
 - Make concurrent feature interact with plonky3's parallel features, replace homegrown iterator macros with p3-maybe-rayon ([#749](https://github.com/0xMiden/crypto/pull/749)).
 - Reduce dependency on std in tests, add test helpers to access Rngs in no-std contexts ([#752](https://github.com/0xMiden/crypto/pull/752)).
 - [BREAKING] Changed sponge state layout from `[CAPACITY, RATE1, RATE0]` (BE) to `[RATE0, RATE1, CAPACITY]` (LE) ([#755](https://github.com/0xMiden/crypto/pull/755)).
