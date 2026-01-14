@@ -1,3 +1,5 @@
+use alloc::string::String;
+
 use thiserror::Error;
 
 use crate::{
@@ -44,6 +46,10 @@ pub enum SmtLeafError {
         "multiple leaf contains {actual} entries but the maximum allowed is {MAX_LEAF_ENTRIES}"
     )]
     TooManyLeafEntries { actual: usize },
+
+    /// Elements could not be decoded into a leaf.
+    #[error("decoding error: {0}")]
+    DecodingError(String),
 }
 
 // SMT PROOF ERROR
