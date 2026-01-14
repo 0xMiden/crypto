@@ -37,6 +37,8 @@ mod backend;
 mod backend;
 
 pub(crate) use backend::FLR;
+#[cfg(target_arch = "x86_64")]
+pub(crate) use poly::GM;
 
 impl Default for FLR {
     fn default() -> Self {
