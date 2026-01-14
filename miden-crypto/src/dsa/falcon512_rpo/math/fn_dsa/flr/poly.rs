@@ -27,6 +27,8 @@
 use super::FLR;
 #[cfg(target_arch = "x86_64")]
 use super::poly_avx2;
+#[cfg(target_arch = "x86_64")]
+use std::is_x86_feature_detected;
 
 // ========================================================================
 // Complex multiplication for FLR

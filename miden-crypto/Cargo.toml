@@ -103,7 +103,6 @@ k256                          = { features = ["ecdh", "ecdsa"], version = "0.13"
 miden-crypto-derive.workspace = true
 miden-serde-utils.workspace   = true
 num                           = { default-features = false, features = ["alloc", "libm"], version = "0.4" }
-num-complex                   = { default-features = false, version = "0.4" }
 proptest                      = { default-features = false, features = ["alloc"], optional = true, version = "1.7" }
 rand                          = { default-features = false, version = "0.9" }
 rand-utils                    = { optional = true, package = "winter-rand-utils", version = "0.13" }
@@ -128,7 +127,6 @@ p3-symmetric   = { default-features = false, version = "0.4" }
 p3-util        = { default-features = false, version = "0.4" }
 
 # Miden-specific Plonky3 crates
-fn-dsa-vrfy         = { default-features = false, version = "0.3" }
 p3-miden-air        = { default-features = false, version = "0.4" }
 p3-miden-goldilocks = { default-features = false, version = "0.4" }
 p3-miden-prover     = { default-features = false, version = "0.4" }

@@ -631,15 +631,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "fn-dsa-vrfy"
-version = "0.3.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bc96b904b213160c8804cc2642ccd15cb968318a64648fc5ca3edab9153cda2b"
-dependencies = [
- "fn-dsa-comm",
-]
-
-[[package]]
 name = "foldhash"
 version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -987,7 +978,6 @@ dependencies = [
  "flume",
  "fn-dsa-comm",
  "fn-dsa-kgen",
- "fn-dsa-vrfy",
  "glob",
  "hashbrown",
  "hex",
@@ -997,7 +987,6 @@ dependencies = [
  "miden-crypto-derive",
  "miden-serde-utils",
  "num",
- "num-complex",
  "p3-air",
  "p3-challenger",
  "p3-field",

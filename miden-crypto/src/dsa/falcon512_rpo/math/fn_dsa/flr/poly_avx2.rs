@@ -13,7 +13,7 @@
 
 use core::{arch::x86_64::*, mem::transmute};
 
-use super::{flr::FLR, poly_flr::GM};
+use super::{FLR, GM};
 
 /// Complex multiplication (scalar fallback for small sizes).
 #[inline(always)]
