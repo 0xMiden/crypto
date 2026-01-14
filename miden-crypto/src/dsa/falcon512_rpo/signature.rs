@@ -4,11 +4,11 @@ use core::ops::Deref;
 use num::Zero;
 
 use super::{
-    ByteReader, ByteWriter, Deserializable, DeserializationError, LOG_N, N, Nonce, SIG_L2_BOUND,
+    ByteReader, ByteWriter, Deserializable, DeserializationError, LOG_N, N, Nonce,
     SIG_POLY_BYTE_LEN, Serializable,
     hash_to_point::hash_to_point_rpo256,
     keys::PublicKey,
-    math::{FalconFelt, FastFft, Polynomial},
+    math::{FalconFelt, Polynomial},
 };
 use crate::{Word, utils::zeroize::Zeroize};
 
@@ -56,11 +56,8 @@ use crate::{Word, utils::zeroize::Zeroize};
 /// 4. 625 bytes encoding the `s2` polynomial above.
 ///
 /// In addition to the signature itself, the polynomial h is also serialized with the signature as:
-///
-/// 1. 1 byte representing the log2(512) i.e., 9.
-/// 2. 896 bytes for the public key itself.
-///
-/// The total size of the signature (including the extended public key) is 1524 bytes.
+/// 1 byte for `LOG_N` (9) followed by 896 bytes for the public key. The total size including h is
+/// 1524 bytes.
 ///
 /// [1]: https://github.com/algorand/falcon/blob/main/falcon-det.pdf
 /// [2]: https://datatracker.ietf.org/doc/html/rfc6979#section-3.5
@@ -283,23 +280,48 @@ fn decode_signature_poly(input: &[u8]) -> Result<[FalconFelt; N], Deserializatio
 }
 
 /// Takes the hash-to-point polynomial `c` of a message, the signature polynomial over
-/// the message `s2` and a public key polynomial and returns `true` is the signature is a valid
-/// signature for the given parameters, otherwise it returns `false`.
+/// the message `s2` and a public key polynomial and returns `true` if the signature is valid,
+/// otherwise it returns `false`.
 fn verify_helper(c: &Polynomial<FalconFelt>, s2: &SignaturePoly, h: &PublicKey) -> bool {
-    let h_fft = h.fft();
-    let s2_fft = s2.fft();
-    let c_fft = c.fft();
+    use fn_dsa_comm::mq;
 
-    // compute the signature polynomial s1 using s1 = c - s2 * h
-    let s1_fft = c_fft - s2_fft.hadamard_mul(&h_fft);
-    let s1 = s1_fft.ifft();
+    // Reuse fn-dsa's mq routines for NTT operations and norm checks.
+    // All conversions go through external representation [0, q-1] expected by mq.
+    const LOGN_U32: u32 = LOG_N as u32;
 
-    // compute the norm squared of (s1, s2)
-    let length_squared_s1 = s1.norm_squared();
-    let length_squared_s2 = s2.norm_squared();
-    let length_squared = length_squared_s1 + length_squared_s2;
+    // s2 as signed coefficients (already bounded by SignaturePoly::try_from)
+    let s2_signed = s2.to_i16_balanced_array();
 
-    length_squared < SIG_L2_BOUND
+    // c in external representation
+    let mut t1 = c.to_u16_ext_array();
+    mq::mqpoly_ext_to_int(LOGN_U32, &mut t1);
+
+    // h in NTT domain
+    let mut h_ntt = h.to_u16_ext_array();
+    mq::mqpoly_ext_to_int(LOGN_U32, &mut h_ntt);
+    mq::mqpoly_int_to_NTT(LOGN_U32, &mut h_ntt);
+
+    // t2 <- s2 in NTT domain
+    let mut t2 = [0u16; N];
+    mq::mqpoly_signed_to_ext(LOGN_U32, &s2_signed, &mut t2);
+    mq::mqpoly_ext_to_int(LOGN_U32, &mut t2);
+    mq::mqpoly_int_to_NTT(LOGN_U32, &mut t2);
+
+    // t2 <- s2 * h (in NTT domain)
+    mq::mqpoly_mul_ntt(LOGN_U32, &mut t2, &h_ntt);
+    mq::mqpoly_NTT_to_int(LOGN_U32, &mut t2);
+
+    // t1 <- c - s2*h (internal), then convert to external for norm
+    mq::mqpoly_sub_int(LOGN_U32, &mut t1, &t2);
+    mq::mqpoly_int_to_ext(LOGN_U32, &mut t1);
+
+    // Squared norms of s1 and s2
+    let norm1 = mq::mqpoly_sqnorm(LOGN_U32, &t1);
+    let norm2 = mq::signed_poly_sqnorm(LOGN_U32, &s2_signed);
+
+    // Guard against u32 overflow when adding norms by checking norm1 <= u32::MAX - norm2,
+    // then apply the fn-dsa bound (inclusive) on ||(s1,s2)||^2.
+    norm1 < norm2.wrapping_neg() && (norm1 + norm2) <= mq::SQBETA[LOG_N as usize]
 }
 
 /// Checks whether a set of coefficients is a valid one for a signature polynomial.

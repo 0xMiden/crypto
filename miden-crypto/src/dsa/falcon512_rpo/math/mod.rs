@@ -4,17 +4,15 @@
 //!
 //! 1. The [reference](https://falcon-sign.info/impl/README.txt.html) implementation by Thomas
 //!    Pornin.
-//! 2. The [Rust](https://github.com/aszepieniec/falcon-rust) implementation by Alan Szepieniec.
+//! 2. The Rust fn-dsa implementation by Thomas Pornin: https://github.com/pornin/rust-fn-dsa
+//! 3. The [Rust](https://github.com/aszepieniec/falcon-rust) implementation by Alan Szepieniec in
+//!    earlier versions of this crate.
 use alloc::vec::Vec;
 use core::ops::MulAssign;
 
 use num::{One, Zero};
 
 use super::MODULUS;
-
-// Core types
-mod fft;
-pub use fft::FastFft;
 
 mod field;
 pub use field::FalconFelt;
@@ -53,14 +51,5 @@ pub trait Inverse: Copy + Zero + MulAssign + One {
             }
         }
         rp
-    }
-}
-
-impl Inverse for f64 {
-    fn inverse_or_zero(self) -> Self {
-        1.0 / self
-    }
-    fn batch_inverse_or_zero(batch: &[Self]) -> Vec<Self> {
-        batch.iter().map(|&c| 1.0 / c).collect()
     }
 }

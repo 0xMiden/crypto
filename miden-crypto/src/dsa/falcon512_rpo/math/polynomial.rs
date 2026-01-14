@@ -564,6 +564,36 @@ impl From<&Vec<i8>> for Polynomial<FalconFelt> {
 }
 
 impl Polynomial<FalconFelt> {
+    /// Converts coefficients to external representation [0, q-1].
+    pub fn fill_u16_ext(&self, out: &mut [u16]) {
+        debug_assert_eq!(out.len(), N);
+        for (dst, coeff) in out.iter_mut().zip(self.coefficients.iter()) {
+            *dst = coeff.value();
+        }
+    }
+
+    /// Returns coefficients in external representation [0, q-1] as a fixed array.
+    pub fn to_u16_ext_array(&self) -> [u16; N] {
+        let mut out = [0u16; N];
+        self.fill_u16_ext(&mut out);
+        out
+    }
+
+    /// Builds a polynomial from external representation coefficients.
+    pub fn from_u16_ext_array(values: &[u16; N]) -> Self {
+        let coeffs = values.iter().map(|&v| FalconFelt::new(v)).collect();
+        Polynomial::new(coeffs)
+    }
+
+    /// Returns coefficients in balanced signed representation as a fixed array.
+    pub fn to_i16_balanced_array(&self) -> [i16; N] {
+        let mut out = [0i16; N];
+        for (dst, coeff) in out.iter_mut().zip(self.coefficients.iter()) {
+            *dst = coeff.balanced_value();
+        }
+        out
+    }
+
     /// Computes the squared L2 norm of the polynomial.
     pub fn norm_squared(&self) -> u64 {
         self.coefficients

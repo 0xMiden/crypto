@@ -1,5 +1,6 @@
 use alloc::{string::ToString, vec::Vec};
 
+use fn_dsa_comm::mq;
 use miden_crypto_derive::{SilentDebug, SilentDisplay};
 use rand::Rng;
 
@@ -7,7 +8,7 @@ use super::{
     super::{
         ByteReader, ByteWriter, Deserializable, DeserializationError, MODULUS, N, Nonce,
         SIG_L2_BOUND, Serializable, ShortLatticeBasis, Signature,
-        math::{FalconFelt, FastFft, Polynomial, flr::FLR},
+        math::{FalconFelt, Polynomial, flr::FLR},
         signature::SignaturePoly,
     },
     PublicKey,
@@ -230,20 +231,32 @@ impl SecretKey {
     // HELPER METHODS
     // --------------------------------------------------------------------------------------------
 
-    /// Derives the public key corresponding to this secret key using h = g /f [mod ϕ][mod p].
+    /// Derives the public key corresponding to this secret key using fn-dsa's mq NTT
+    /// (computes h = g / f [mod ϕ][mod p]).
     fn compute_pub_key_poly(&self) -> PublicKey {
-        let g: Polynomial<FalconFelt> = self.secret_key[0].clone().into();
-        let g_fft = g.fft();
-        let f: Polynomial<FalconFelt> = self.secret_key[1].clone().into();
-        let f_fft = f.fft();
-        let h_fft = g_fft.hadamard_div(&f_fft);
-        h_fft.ifft().into()
+        const LOGN_U32: u32 = LOG_N as u32;
+
+        let mut h = [0u16; N];
+        let mut tmp = [0u16; N];
+        // basis layout: [g, f, G, F]
+        let f = &self.secret_key[1].coefficients;
+        let g = &self.secret_key[0].coefficients;
+        mq::mqpoly_div_small(LOGN_U32, f, g, &mut h, &mut tmp);
+
+        let pk = Polynomial::from_u16_ext_array(&h).into();
+
+        // Zeroize temporaries holding secret-derived values
+        h.fill(0);
+        tmp.fill(0);
+
+        pk
     }
 
     /// Signs a message polynomial with the secret key using FLR-based ffsampling.
     ///
     /// This implementation uses Fixed-point Linear Real (FLR) arithmetic ported from
-    /// rust-fn-dsa. It provides deterministic, no_std compatible signing without requiring
+    /// rust-fn-dsa. FLR selects a backend at compile time (native/AVX2 or emulated) depending
+    /// on the target, and provides deterministic, no_std compatible signing without requiring
     /// floating-point hardware.
     ///
     /// Following fn-dsa's default mode, the FFT basis is precomputed during keygen. During
@@ -604,18 +617,19 @@ impl Deserializable for SecretKey {
             "Failed to decode F coefficients".to_string(),
         ))?;
 
+        // Recompute G
+        let big_g_int = compute_big_g_ext(&f_i8, &g_i8, &big_f_i8);
+
         // Convert i8 coefficients to FalconFelt
         let f = Polynomial::new(f_i8.iter().map(|&c| FalconFelt::from(c)).collect());
         let g = Polynomial::new(g_i8.iter().map(|&c| FalconFelt::from(c)).collect());
         let big_f = Polynomial::new(big_f_i8.iter().map(|&c| FalconFelt::from(c)).collect());
+        let big_g = Polynomial::from_u16_ext_array(&big_g_int);
 
         // Zeroize intermediate decoded buffers
         f_i8.zeroize();
         g_i8.zeroize();
         big_f_i8.zeroize();
-
-        // big_g * f - g * big_f = p (mod X^n + 1)
-        let big_g = g.fft().hadamard_div(&f.fft()).hadamard_mul(&big_f.fft()).ifft();
 
         // Store basis as [g, f, G, F] without negations
         // Convert from FalconFelt to i8 (values are guaranteed to fit in i8 range)
@@ -662,4 +676,43 @@ pub fn decode_i8(buf: &[u8], bits: usize) -> Option<Vec<i8>> {
     let mut x = vec![0_i8; N];
     fn_dsa_comm::codec::trim_i8_decode(buf, &mut x, bits as u32)?;
     Some(x)
+}
+
+/// Computes big G in external representation given small f, g, and F using fn-dsa mq routines.
+/// This mirrors fn-dsa's derivation: h = g/f (mod q), then G = h * F (mod q) in NTT domain.
+fn compute_big_g_ext(f_i8: &[i8], g_i8: &[i8], big_f_i8: &[i8]) -> [u16; N] {
+    debug_assert_eq!(f_i8.len(), N);
+    debug_assert_eq!(g_i8.len(), N);
+    debug_assert_eq!(big_f_i8.len(), N);
+
+    const LOGN_U32: u32 = LOG_N as u32;
+
+    // h = g/f mod q (external representation)
+    let mut h = [0u16; N];
+    let mut tmp = [0u16; N];
+    mq::mqpoly_div_small(LOGN_U32, f_i8, g_i8, &mut h, &mut tmp);
+
+    // h in NTT domain
+    let mut h_ntt = h;
+    mq::mqpoly_ext_to_int(LOGN_U32, &mut h_ntt);
+    mq::mqpoly_int_to_NTT(LOGN_U32, &mut h_ntt);
+
+    // F in NTT domain
+    let mut big_f_ntt = [0u16; N];
+    mq::mqpoly_small_to_int(LOGN_U32, big_f_i8, &mut big_f_ntt);
+    mq::mqpoly_int_to_NTT(LOGN_U32, &mut big_f_ntt);
+
+    // G = h * F (external representation)
+    let mut big_g_int = big_f_ntt;
+    mq::mqpoly_mul_ntt(LOGN_U32, &mut big_g_int, &h_ntt);
+    mq::mqpoly_NTT_to_int(LOGN_U32, &mut big_g_int);
+    mq::mqpoly_int_to_ext(LOGN_U32, &mut big_g_int);
+
+    // Zeroize temporaries holding secret-derived values
+    h.fill(0);
+    tmp.fill(0);
+    h_ntt.fill(0);
+    big_f_ntt.fill(0);
+
+    big_g_int
 }

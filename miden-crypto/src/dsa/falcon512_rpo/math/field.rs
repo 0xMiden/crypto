@@ -3,7 +3,7 @@ use core::ops::{Add, AddAssign, Div, DivAssign, Mul, MulAssign, Neg, Sub, SubAss
 
 use num::{One, Zero};
 
-use super::{Inverse, MODULUS, fft::CyclotomicFourier};
+use super::{Inverse, MODULUS};
 
 // ================================================================================================
 // FIELD ELEMENT REPRESENTATIONS
@@ -323,20 +323,6 @@ impl Inverse for FalconFelt {
         // Use fn-dsa's division: 1/x = mq_div(1, x)
         // FalconFelt(1) in internal representation is 1
         FalconFelt(mq_div(1, self.0 as u32) as u16)
-    }
-}
-
-impl CyclotomicFourier for FalconFelt {
-    fn primitive_root_of_unity(n: usize) -> Self {
-        let log2n = n.ilog2();
-        assert!(log2n <= 12);
-        // and 1331 is a twelfth root of unity
-        let mut a = FalconFelt::new(1331);
-        let num_squarings = 12 - n.ilog2();
-        for _ in 0..num_squarings {
-            a *= a;
-        }
-        a
     }
 }
 
