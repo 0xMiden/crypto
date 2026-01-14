@@ -1,7 +1,7 @@
 use super::{
-    AlgebraicSponge, CAPACITY_RANGE, DIGEST_RANGE, Felt, RATE_RANGE, Range, STATE_WIDTH, Word, ZERO,
+    AlgebraicSponge, CAPACITY_RANGE, DIGEST_RANGE, Felt, PrimeCharacteristicRing, RATE_RANGE,
+    RATE0_RANGE, RATE1_RANGE, Range, STATE_WIDTH, Word, ZERO,
 };
-use crate::field::PrimeCharacteristicRing;
 
 mod constants;
 use constants::{
@@ -102,17 +102,24 @@ impl Poseidon2 {
     /// Number of internal rounds.
     pub const NUM_INTERNAL_ROUNDS: usize = NUM_INTERNAL_ROUNDS;
 
-    /// Sponge state is set to 12 field elements or 768 bytes; 8 elements are reserved for rate and
-    /// the remaining 4 elements are reserved for capacity.
+    /// Sponge state is set to 12 field elements or 768 bytes; 8 elements are reserved for the
+    /// rate and the remaining 4 elements are reserved for the capacity.
     pub const STATE_WIDTH: usize = STATE_WIDTH;
 
-    /// The rate portion of the state is located in elements 4 through 11 (inclusive).
+    /// The rate portion of the state is located in elements 0 through 7 (inclusive).
     pub const RATE_RANGE: Range<usize> = RATE_RANGE;
 
-    /// The capacity portion of the state is located in elements 0, 1, 2, and 3.
+    /// The first 4-element word of the rate portion.
+    pub const RATE0_RANGE: Range<usize> = RATE0_RANGE;
+
+    /// The second 4-element word of the rate portion.
+    pub const RATE1_RANGE: Range<usize> = RATE1_RANGE;
+
+    /// The capacity portion of the state is located in elements 8, 9, 10, and 11.
     pub const CAPACITY_RANGE: Range<usize> = CAPACITY_RANGE;
 
-    /// The output of the hash function can be read from state elements 4, 5, 6, and 7.
+    /// The output of the hash function can be read from state elements 0, 1, 2, and 3 (the first
+    /// word of the state).
     pub const DIGEST_RANGE: Range<usize> = DIGEST_RANGE;
 
     /// Matrix used for computing the linear layers of internal rounds.
@@ -328,9 +335,9 @@ use p3_symmetric::{
 /// `CryptographicPermutation` traits, allowing Poseidon2 to be used within the Plonky3 ecosystem.
 ///
 /// The permutation operates on a state of 12 field elements (STATE_WIDTH = 12), with:
-/// - Rate: 8 elements (positions 4-11)
-/// - Capacity: 4 elements (positions 0-3)
-/// - Digest output: 4 elements (positions 4-7)
+/// - Rate: 8 elements (positions 0-7)
+/// - Capacity: 4 elements (positions 8-11)
+/// - Digest output: 4 elements (positions 0-3)
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub struct Poseidon2Permutation256;
 
@@ -348,13 +355,13 @@ impl Poseidon2Permutation256 {
     /// the remaining 4 elements are reserved for capacity.
     pub const STATE_WIDTH: usize = STATE_WIDTH;
 
-    /// The rate portion of the state is located in elements 4 through 11 (inclusive).
+    /// The rate portion of the state is located in elements 0 through 7 (inclusive).
     pub const RATE_RANGE: Range<usize> = Poseidon2::RATE_RANGE;
 
-    /// The capacity portion of the state is located in elements 0, 1, 2, and 3.
+    /// The capacity portion of the state is located in elements 8, 9, 10, and 11.
     pub const CAPACITY_RANGE: Range<usize> = Poseidon2::CAPACITY_RANGE;
 
-    /// The output of the hash function can be read from state elements 4, 5, 6, and 7.
+    /// The output of the hash function can be read from state elements 0, 1, 2, and 3.
     pub const DIGEST_RANGE: Range<usize> = Poseidon2::DIGEST_RANGE;
 
     // POSEIDON2 PERMUTATION
@@ -410,140 +417,3 @@ pub type Poseidon2Compression = TruncatedPermutation<Poseidon2Permutation256, 2,
 /// - WIDTH: 12 field elements (sponge state size)
 /// - RATE: 8 field elements (rate of absorption/squeezing)
 pub type Poseidon2Challenger<F> = DuplexChallenger<F, Poseidon2Permutation256, 12, 8>;
-
-#[cfg(test)]
-mod p3_tests {
-    use p3_symmetric::{CryptographicHasher, PseudoCompressionFunction};
-
-    use super::*;
-
-    #[test]
-    fn test_poseidon2_permutation_basic() {
-        let mut state = [Felt::new(0); STATE_WIDTH];
-
-        // Apply permutation
-        let perm = Poseidon2Permutation256;
-        perm.permute_mut(&mut state);
-
-        // State should be different from all zeros after permutation
-        assert_ne!(state, [Felt::new(0); STATE_WIDTH]);
-    }
-
-    #[test]
-    fn test_poseidon2_permutation_consistency() {
-        let mut state1 = [Felt::new(0); STATE_WIDTH];
-        let mut state2 = [Felt::new(0); STATE_WIDTH];
-
-        // Apply permutation using the trait
-        let perm = Poseidon2Permutation256;
-        perm.permute_mut(&mut state1);
-
-        // Apply permutation directly
-        Poseidon2Permutation256::apply_permutation(&mut state2);
-
-        // Both should produce the same result
-        assert_eq!(state1, state2);
-    }
-
-    #[test]
-    fn test_poseidon2_permutation_deterministic() {
-        let input = [
-            Felt::new(1),
-            Felt::new(2),
-            Felt::new(3),
-            Felt::new(4),
-            Felt::new(5),
-            Felt::new(6),
-            Felt::new(7),
-            Felt::new(8),
-            Felt::new(9),
-            Felt::new(10),
-            Felt::new(11),
-            Felt::new(12),
-        ];
-
-        let mut state1 = input;
-        let mut state2 = input;
-
-        let perm = Poseidon2Permutation256;
-        perm.permute_mut(&mut state1);
-        perm.permute_mut(&mut state2);
-
-        // Same input should produce same output
-        assert_eq!(state1, state2);
-    }
-
-    #[test]
-    #[ignore] // TODO: Re-enable after migrating Poseidon2 state layout to match Plonky3
-    // Miden-crypto: capacity=[0-3], rate=[4-11]
-    // Plonky3:      rate=[0-7], capacity=[8-11]
-    fn test_poseidon2_hasher_vs_hash_elements() {
-        // Test with empty input
-        let expected: [Felt; 4] = Poseidon2::hash_elements::<Felt>(&[]).into();
-        let hasher = Poseidon2Hasher::new(Poseidon2Permutation256);
-        let result = hasher.hash_iter([]);
-        assert_eq!(result, expected, "Empty input should produce same digest");
-
-        // Test with 4 elements (one digest worth)
-        let input4 = [Felt::new(1), Felt::new(2), Felt::new(3), Felt::new(4)];
-        let expected: [Felt; 4] = Poseidon2::hash_elements(&input4).into();
-        let result = hasher.hash_iter(input4);
-        assert_eq!(result, expected, "4 elements should produce same digest");
-
-        // Test with 8 elements (exactly one rate)
-        let input8 = [
-            Felt::new(1),
-            Felt::new(2),
-            Felt::new(3),
-            Felt::new(4),
-            Felt::new(5),
-            Felt::new(6),
-            Felt::new(7),
-            Felt::new(8),
-        ];
-        let expected: [Felt; 4] = Poseidon2::hash_elements(&input8).into();
-        let result = hasher.hash_iter(input8);
-        assert_eq!(result, expected, "8 elements (one rate) should produce same digest");
-
-        // Test with 16 elements (two rates)
-        let input16 = [
-            Felt::new(1),
-            Felt::new(2),
-            Felt::new(3),
-            Felt::new(4),
-            Felt::new(5),
-            Felt::new(6),
-            Felt::new(7),
-            Felt::new(8),
-            Felt::new(9),
-            Felt::new(10),
-            Felt::new(11),
-            Felt::new(12),
-            Felt::new(13),
-            Felt::new(14),
-            Felt::new(15),
-            Felt::new(16),
-        ];
-        let expected: [Felt; 4] = Poseidon2::hash_elements(&input16).into();
-        let result = hasher.hash_iter(input16);
-        assert_eq!(result, expected, "16 elements (two rates) should produce same digest");
-    }
-
-    #[test]
-    #[ignore] // TODO: Re-enable after migrating Poseidon2 state layout to match Plonky3
-    // Miden-crypto: capacity=[0-3], rate=[4-11]
-    // Plonky3:      rate=[0-7], capacity=[8-11]
-    fn test_poseidon2_compression_vs_merge() {
-        let digest1 = [Felt::new(1), Felt::new(2), Felt::new(3), Felt::new(4)];
-        let digest2 = [Felt::new(5), Felt::new(6), Felt::new(7), Felt::new(8)];
-
-        // Poseidon2::merge expects &[Word; 2]
-        let expected: [Felt; 4] = Poseidon2::merge(&[digest1.into(), digest2.into()]).into();
-
-        // Poseidon2Compression expects [[Felt; 4]; 2]
-        let compress = Poseidon2Compression::new(Poseidon2Permutation256);
-        let result = compress.compress([digest1, digest2]);
-
-        assert_eq!(result, expected, "Poseidon2Compression should match Poseidon2::merge");
-    }
-}

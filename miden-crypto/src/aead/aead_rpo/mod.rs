@@ -528,7 +528,7 @@ impl SpongeState {
         squeezed_data
     }
 
-    /// Squeezes an authentication tag
+    /// Squeezes an authentication tag (from RATE0, the first rate word)
     fn squeeze_tag(&mut self) -> AuthTag {
         self.permute();
         AuthTag(

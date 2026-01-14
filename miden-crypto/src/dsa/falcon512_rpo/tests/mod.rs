@@ -1,7 +1,8 @@
 use alloc::vec::Vec;
 
 use data::{
-    EXPECTED_SIG, EXPECTED_SIG_POLYS, NUM_TEST_VECTORS, SK_POLYS, SYNC_DATA_FOR_TEST_VECTOR,
+    DETERMINISTIC_SIGNATURE, EXPECTED_SIG, EXPECTED_SIG_POLYS, NUM_TEST_VECTORS, SK_POLYS,
+    SYNC_DATA_FOR_TEST_VECTOR,
 };
 use prng::Shake256Testing;
 use rand::{RngCore, SeedableRng};
@@ -10,7 +11,6 @@ use rand_chacha::ChaCha20Rng;
 use super::{Serializable, math::Polynomial};
 use crate::dsa::falcon512_rpo::{
     PREVERSIONED_NONCE, PREVERSIONED_NONCE_LEN, SIG_NONCE_LEN, SIG_POLY_BYTE_LEN, SecretKey,
-    tests::data::DETERMINISTIC_SIGNATURE,
 };
 
 mod data;
