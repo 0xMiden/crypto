@@ -6,6 +6,7 @@
 - Reduce dependency on std in tests, add test helpers to access Rngs in no-std contexts ([#752](https://github.com/0xMiden/crypto/pull/752)).
 - [BREAKING] Changed sponge state layout from `[CAPACITY, RATE1, RATE0]` (BE) to `[RATE0, RATE1, CAPACITY]` (LE) ([#755](https://github.com/0xMiden/crypto/pull/755)).
 - [BREAKING] Add length-prefixing to Serializable/Deserializable impls for collections, fuzz deserialization for panics ([#757](https://github.com/0xMiden/crypto/pull/757)).
+- Add `SmtLeaf::try_from_elements()` ([#773](https://github.com/0xMiden/crypto/pull/773)).
 
 # 0.20.1 (2025-12-29)
 
