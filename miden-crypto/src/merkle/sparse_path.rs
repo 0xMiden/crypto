@@ -272,7 +272,7 @@ impl Deserializable for SparseMerklePath {
             )));
         }
         let count = depth as u32 - empty_nodes_count;
-        let nodes = source.read_many::<Word>(count as usize)?;
+        let nodes: Vec<Word> = source.read_many_iter(count as usize)?.collect::<Result<_, _>>()?;
         Ok(Self { empty_nodes_mask, nodes })
     }
 }
