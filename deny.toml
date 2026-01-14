@@ -52,6 +52,3 @@ allow-registry   = ["https://github.com/rust-lang/crates.io-index"]
 unknown-git      = "deny"
 unknown-registry = "deny"
 
-[sources.allow-org]
-# Allow p3-miden crates from the 0xMiden organization (not yet published to crates.io)
-github = ["0xMiden"]
