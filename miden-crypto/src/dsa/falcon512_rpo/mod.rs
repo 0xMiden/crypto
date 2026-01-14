@@ -28,6 +28,8 @@
 //! [1]: https://github.com/algorand/falcon/blob/main/falcon-det.pdf
 //! [2]: https://datatracker.ietf.org/doc/html/rfc6979#section-3.5
 
+use fn_dsa_comm::{FN_DSA_LOGN_512, sign_key_size, vrfy_key_size};
+
 use crate::{
     Felt, ZERO,
     hash::rpo::Rpo256,
@@ -86,10 +88,10 @@ const PREVERSIONED_NONCE: [u8; PREVERSIONED_NONCE_LEN] = [
 const NONCE_ELEMENTS: usize = 8;
 
 /// Public key length as a u8 vector.
-pub const PK_LEN: usize = 897;
+pub const PK_LEN: usize = vrfy_key_size(FN_DSA_LOGN_512);
 
 /// Secret key length as a u8 vector.
-pub const SK_LEN: usize = 1281;
+pub const SK_LEN: usize = sign_key_size(FN_DSA_LOGN_512);
 
 /// Signature length as a u8 vector.
 const SIG_POLY_BYTE_LEN: usize = 625;

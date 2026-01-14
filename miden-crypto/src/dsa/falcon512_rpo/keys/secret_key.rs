@@ -289,10 +289,8 @@ impl SecretKey {
         poly_add(LOGN_U32, &mut g11, &temp);
 
         // Convert hash-to-point polynomial c to FLR and transform to FFT domain
-        let mut c_fft = [FLR::ZERO; N];
-        for (i, coeff) in c.coefficients.iter().enumerate().take(N) {
-            c_fft[i] = FLR::from_i32(coeff.value() as i32);
-        }
+        let mut c_fft: [FLR; N] =
+            core::array::from_fn(|i| FLR::from_i32(c.coefficients[i].value() as i32));
         FFT(LOGN_U32, &mut c_fft);
 
         // Compute target vectors: t0 = -(c/q) * F, t1 = (c/q) * f

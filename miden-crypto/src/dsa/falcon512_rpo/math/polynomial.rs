@@ -587,11 +587,7 @@ impl Polynomial<FalconFelt> {
 
     /// Returns coefficients in balanced signed representation as a fixed array.
     pub fn to_i16_balanced_array(&self) -> [i16; N] {
-        let mut out = [0i16; N];
-        for (dst, coeff) in out.iter_mut().zip(self.coefficients.iter()) {
-            *dst = coeff.balanced_value();
-        }
-        out
+        core::array::from_fn(|i| self.coefficients[i].balanced_value())
     }
 
     /// Computes the squared L2 norm of the polynomial.

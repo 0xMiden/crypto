@@ -55,7 +55,7 @@ benchmark_with_setup! {
     || {},
     |b: &mut criterion::Bencher| {
         b.iter(|| {
-            let _secret_key = RpoSecretKey::new();
+            black_box(RpoSecretKey::new());
         })
     },
 }
@@ -72,7 +72,7 @@ benchmark_with_setup_data! {
     |b: &mut criterion::Bencher, rng: &rand::rngs::ThreadRng| {
         b.iter(|| {
             let mut rng_clone = rng.clone();
-            let _secret_key = RpoSecretKey::with_rng(&mut rng_clone);
+            black_box(RpoSecretKey::with_rng(&mut rng_clone));
         })
     },
 }
@@ -88,7 +88,7 @@ benchmark_with_setup_data! {
     },
     |b: &mut criterion::Bencher, secret_key: &RpoSecretKey| {
         b.iter(|| {
-            let _public_key = secret_key.public_key();
+            black_box(secret_key.public_key());
         })
     },
 }
@@ -111,7 +111,7 @@ benchmark_with_setup_data! {
             // and measure representative performance across different rejection sampling paths
             let message = Word::new([Felt::new(counter); 4]);
             counter = counter.wrapping_add(1);
-            let _signature = secret_key.sign(black_box(message));
+            black_box(secret_key.sign(black_box(message)));
         })
     },
 }
@@ -134,7 +134,7 @@ benchmark_with_setup_data! {
             let message = Word::new([Felt::new(counter); 4]);
             counter = counter.wrapping_add(1);
             let mut rng_clone = rng.clone();
-            let _signature = secret_key.sign_with_rng(black_box(message), &mut rng_clone);
+            black_box(secret_key.sign_with_rng(black_box(message), &mut rng_clone));
         })
     },
 }
@@ -157,7 +157,7 @@ benchmark_with_setup_data! {
     },
     |b: &mut criterion::Bencher, (public_key, message, signature): &(RpoPublicKey, Word, falcon512_rpo::Signature)| {
         b.iter(|| {
-            let _result = public_key.verify(black_box(*message), signature);
+            black_box(public_key.verify(black_box(*message), signature));
         })
     },
 }
@@ -176,7 +176,7 @@ benchmark_with_setup! {
     || {},
     |b: &mut criterion::Bencher| {
         b.iter(|| {
-            let _secret_key = ecdsa_k256_keccak::SecretKey::new();
+            black_box(ecdsa_k256_keccak::SecretKey::new());
         })
     },
 }
@@ -192,7 +192,7 @@ benchmark_with_setup_data! {
     |b: &mut criterion::Bencher, rng: &rand::rngs::ThreadRng| {
         b.iter(|| {
             let mut rng_clone = rng.clone();
-            let _secret_key = ecdsa_k256_keccak::SecretKey::with_rng(&mut rng_clone);
+            black_box(ecdsa_k256_keccak::SecretKey::with_rng(&mut rng_clone));
         })
     },
 }
@@ -207,7 +207,7 @@ benchmark_with_setup_data! {
     },
     |b: &mut criterion::Bencher, secret_key: &ecdsa_k256_keccak::SecretKey| {
         b.iter(|| {
-            let _public_key = secret_key.public_key();
+            black_box(secret_key.public_key());
         })
     },
 }
@@ -230,7 +230,7 @@ benchmark_with_setup_data! {
             // Use a different message each iteration for representative performance
             let message = Word::new([Felt::new(counter); 4]);
             counter = counter.wrapping_add(1);
-            let _signature = secret_key_local.sign(black_box(message));
+            black_box(secret_key_local.sign(black_box(message)));
         })
     },
 }
@@ -252,7 +252,7 @@ benchmark_with_setup_data! {
     },
     |b: &mut criterion::Bencher, (public_key, message, signature): &(ecdsa_k256_keccak::PublicKey, Word, ecdsa_k256_keccak::Signature)| {
         b.iter(|| {
-            let _result = public_key.verify(black_box(*message), signature);
+            black_box(public_key.verify(black_box(*message), signature));
         })
     },
 }
@@ -271,7 +271,7 @@ benchmark_with_setup! {
     || {},
     |b: &mut criterion::Bencher| {
         b.iter(|| {
-            let _secret_key = eddsa_25519_sha512::SecretKey::new();
+            black_box(eddsa_25519_sha512::SecretKey::new());
         })
     },
 }
@@ -287,7 +287,7 @@ benchmark_with_setup_data! {
     |b: &mut criterion::Bencher, rng: &rand::rngs::ThreadRng| {
         b.iter(|| {
             let mut rng_clone = rng.clone();
-            let _secret_key = eddsa_25519_sha512::SecretKey::with_rng(&mut rng_clone);
+            black_box(eddsa_25519_sha512::SecretKey::with_rng(&mut rng_clone));
         })
     },
 }
@@ -302,7 +302,7 @@ benchmark_with_setup_data! {
     },
     |b: &mut criterion::Bencher, secret_key: &eddsa_25519_sha512::SecretKey| {
         b.iter(|| {
-            let _public_key = secret_key.public_key();
+            black_box(secret_key.public_key());
         })
     },
 }
@@ -323,7 +323,7 @@ benchmark_with_setup_data! {
             // Use a different message each iteration for representative performance
             let message = Word::new([Felt::new(counter); 4]);
             counter = counter.wrapping_add(1);
-            let _signature = secret_key.sign(black_box(message));
+            black_box(secret_key.sign(black_box(message)));
         })
     },
 }
@@ -345,7 +345,7 @@ benchmark_with_setup_data! {
     },
     |b: &mut criterion::Bencher, (public_key, message, signature): &(eddsa_25519_sha512::PublicKey, Word, eddsa_25519_sha512::Signature)| {
         b.iter(|| {
-            let _result = public_key.verify(black_box(*message), signature);
+            black_box(public_key.verify(black_box(*message), signature));
         })
     },
 }

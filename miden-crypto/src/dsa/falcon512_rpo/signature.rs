@@ -1,8 +1,6 @@
 use alloc::{string::ToString, vec::Vec};
 use core::ops::Deref;
 
-use num::Zero;
-
 use super::{
     ByteReader, ByteWriter, Deserializable, DeserializationError, LOG_N, N, Nonce,
     SIG_POLY_BYTE_LEN, Serializable,
@@ -271,10 +269,7 @@ fn decode_signature_poly(input: &[u8]) -> Result<[FalconFelt; N], Deserializatio
         ));
     }
 
-    let mut coefficients = [FalconFelt::zero(); N];
-    for (i, &coeff) in coefficients_i16.iter().enumerate() {
-        coefficients[i] = FalconFelt::from(coeff);
-    }
+    let coefficients = core::array::from_fn(|i| FalconFelt::from(coefficients_i16[i]));
 
     Ok(coefficients)
 }
