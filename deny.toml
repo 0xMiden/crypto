@@ -24,6 +24,7 @@ allow = [
   "CC0-1.0",
   "MIT",
   "Unicode-3.0",
+  "Unlicense",
   "Zlib",
 ]
 exceptions = []

@@ -245,7 +245,7 @@ impl<R: SamplerRng> Sampler<R> {
             //
             // We compute x = (z-r)^2 / (2*sigma^2) - z0^2 / (2*sigma0^2)
             // and accept if ber_exp returns true for exp(-x)
-            let mut x = (FLR::from_i64(z as i64) - r).square() * dss;
+            let mut x: FLR = (FLR::from_i64(z as i64) - r).square() * dss;
             x -= FLR::from_i64((z0 * z0) as i64) * INV_2SQRSIGMA0;
 
             let accepted = self.ber_exp(x, ccs);
@@ -298,7 +298,7 @@ impl<R: SamplerRng> Sampler<R> {
     /// true with probability ccs * exp(-x), false otherwise
     fn ber_exp(&mut self, x: FLR, ccs: FLR) -> bool {
         // Reduce x modulo log(2): x = s*log(2) + r, with s an integer and 0 <= r < log(2)
-        let s = (x * INV_LOG2).trunc();
+        let s: i64 = (x * INV_LOG2).trunc();
         let r = x - FLR::from_i64(s) * LOG2;
 
         // Saturate s at 63 to avoid overflow
@@ -407,7 +407,7 @@ impl<R: SamplerRng> Sampler<R> {
             let d00_re = g00_re;
             let l01_re = mu_re;
             let l01_im = -&mu_im;
-            let d11_re = g11_re - zo_re;
+            let d11_re: FLR = g11_re - zo_re;
 
             // Split t1 (trivial for logn=1)
             let w0 = t1[0];

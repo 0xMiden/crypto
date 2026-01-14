@@ -24,11 +24,12 @@
 #![allow(non_snake_case)]
 #![allow(dead_code)]
 
+#[cfg(target_arch = "x86_64")]
+use std::is_x86_feature_detected;
+
 use super::FLR;
 #[cfg(target_arch = "x86_64")]
 use super::poly_avx2;
-#[cfg(target_arch = "x86_64")]
-use std::is_x86_feature_detected;
 
 // ========================================================================
 // Complex multiplication for FLR
@@ -3091,7 +3092,7 @@ pub(crate) fn poly_LDL_fft(logn: u32, g00: &[FLR], g01: &mut [FLR], g11: &mut [F
         let (g01_re, g01_im) = (g01[i], g01[i + hn]);
         let g11_re = g11[i];
         let inv_g00_re = FLR::ONE / g00_re;
-        let (mu_re, mu_im) = (g01_re * inv_g00_re, g01_im * inv_g00_re);
+        let (mu_re, mu_im): (FLR, FLR) = (g01_re * inv_g00_re, g01_im * inv_g00_re);
         let zo_re = mu_re * g01_re + mu_im * g01_im;
         g11[i] = g11_re - zo_re;
         g01[i] = mu_re;
@@ -3124,7 +3125,7 @@ pub(crate) fn poly_split_selfadj_fft(logn: u32, f0: &mut [FLR], f1: &mut [FLR], 
         let a_re = f[i << 1];
         let b_re = f[(i << 1) + 1];
 
-        let t_re = a_re + b_re;
+        let t_re: FLR = a_re + b_re;
         f0[i] = t_re.half();
         f0[i + qn] = FLR::ZERO;
 

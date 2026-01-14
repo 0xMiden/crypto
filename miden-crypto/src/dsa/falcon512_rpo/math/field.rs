@@ -143,10 +143,10 @@ fn mq_div(x: u32, y: u32) -> u32 {
     let y5820 = mq_mmul(y2910, y2910);
     let y6143 = mq_mmul(y5820, y323);
     let y12286 = mq_mmul(y6143, y6143);
-    let iy = mq_mmul(y12286, y);
+    let inv_y = mq_mmul(y12286, y);
 
     // Multiply by x to get x/y
-    mq_mmul(x, iy)
+    mq_mmul(x, inv_y)
 }
 
 /// Convert signed integer to external representation [0, q-1].
