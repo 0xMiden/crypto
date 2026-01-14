@@ -349,7 +349,7 @@ impl Smt {
 // ================================================================================================
 
 /// A subtree is of depth 8.
-pub(in crate::merkle::smt) const SUBTREE_DEPTH: u8 = 8;
+pub const SUBTREE_DEPTH: u8 = 8;
 
 /// A depth-8 subtree contains 256 "columns" that can possibly be occupied.
 pub(in crate::merkle::smt) const COLS_PER_SUBTREE: u64 = u64::pow(2, SUBTREE_DEPTH as u32);
@@ -576,7 +576,7 @@ fn build_subtrees_from_sorted_entries(
 /// more entries than can fit in a depth-8 subtree, if `leaves` contains leaves belonging to
 /// different depth-8 subtrees, if `bottom_depth` is lower in the tree than the specified
 /// maximum depth (`DEPTH`), or if `leaves` is not sorted.
-pub(crate) fn build_subtree(
+pub fn build_subtree(
     mut leaves: Vec<SubtreeLeaf>,
     tree_depth: u8,
     bottom_depth: u8,
