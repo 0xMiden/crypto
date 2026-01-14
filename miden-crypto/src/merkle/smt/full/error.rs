@@ -47,9 +47,9 @@ pub enum SmtLeafError {
     )]
     TooManyLeafEntries { actual: usize },
 
-    /// Elements could not be converted to a leaf.
-    #[error("conversion error: {0}")]
-    ConversionError(String),
+    /// Elements could not be decoded into a leaf.
+    #[error("decoding error: {0}")]
+    DecodingError(String),
 }
 
 // SMT PROOF ERROR

@@ -10,6 +10,9 @@ use crate::{
     utils::{ByteReader, ByteWriter, Deserializable, DeserializationError, Serializable},
 };
 
+/// The number of field elements in a key-value pair (two Words, 4 Felts each).
+const DOUBLE_WORD_LEN: usize = 8;
+
 /// Represents a leaf node in the Sparse Merkle Tree.
 ///
 /// A leaf can be empty, hold a single key-value pair, or multiple key-value pairs.
@@ -176,12 +179,12 @@ impl SmtLeaf {
     // CONVERSIONS
     // ---------------------------------------------------------------------------------------------
 
-    /// Converts a leaf to a list of field elements
-    pub fn to_elements(&self) -> Vec<Felt> {
-        self.clone().into_elements()
+    /// Returns an iterator over the field elements representing this leaf.
+    pub fn to_elements(&self) -> impl Iterator<Item = Felt> + '_ {
+        self.entries().iter().copied().flat_map(kv_to_elements)
     }
 
-    /// Converts a leaf to a list of field elements
+    /// Converts a leaf to a list of field elements.
     pub fn into_elements(self) -> Vec<Felt> {
         self.into_entries().into_iter().flat_map(kv_to_elements).collect()
     }
@@ -205,13 +208,13 @@ impl SmtLeaf {
         }
 
         // Elements should be organized into a contiguous array of K/V Words (4 Felts each).
-        if !elements.len().is_multiple_of(8) {
-            return Err(SmtLeafError::ConversionError(
+        if !elements.len().is_multiple_of(DOUBLE_WORD_LEN) {
+            return Err(SmtLeafError::DecodingError(
                 "elements length is not a multiple of 8".into(),
             ));
         }
 
-        let num_entries = elements.len() / 8;
+        let num_entries = elements.len() / DOUBLE_WORD_LEN;
 
         if num_entries == 1 {
             // Single entry.
@@ -223,7 +226,7 @@ impl SmtLeaf {
             let mut entries = Vec::with_capacity(num_entries);
             // Read k/v pairs from each entry.
             for i in 0..num_entries {
-                let base_idx = i * 8;
+                let base_idx = i * DOUBLE_WORD_LEN;
                 let key = Word::new([
                     elements[base_idx],
                     elements[base_idx + 1],
