@@ -994,6 +994,114 @@ fn test_smt_proof_get_returns_empty_for_absent_key_same_leaf() {
     );
 }
 
+/// Tests that `try_from_elements()` returns an empty leaf when given an empty vector of elements.
+#[test]
+fn test_smt_leaf_try_from_elements_empty() {
+    let elements: Vec<Felt> = vec![];
+    let leaf_index = LeafIndex::new_max_depth(42);
+
+    let result = SmtLeaf::try_from_elements(&elements, leaf_index).unwrap();
+    let expected = SmtLeaf::new_empty(leaf_index);
+
+    assert_eq!(result, expected);
+}
+
+/// Tests that `try_from_elements()` returns a single-entry leaf when given a vector of elements.
+#[test]
+fn test_smt_leaf_try_from_elements_single_entry() {
+    // Create elements for a single key-value pair (8 Felts total: 4 for key, 4 for value).
+    let elements = vec![
+        Felt::from_u32(10),
+        Felt::from_u32(11),
+        Felt::from_u32(12),
+        Felt::from_u32(13), // key
+        Felt::from_u32(1),
+        Felt::from_u32(2),
+        Felt::from_u32(3),
+        Felt::from_u32(4), // value
+    ];
+    let leaf_index = LeafIndex::new_max_depth(42);
+
+    let result = SmtLeaf::try_from_elements(&elements, leaf_index).unwrap();
+    let expected = SmtLeaf::new_single(
+        Word::from([10_u32, 11_u32, 12_u32, 13_u32]),
+        Word::new([
+            Felt::from_u32(1_u32),
+            Felt::from_u32(2_u32),
+            Felt::from_u32(3_u32),
+            Felt::from_u32(4_u32),
+        ]),
+    );
+
+    assert_eq!(result, expected);
+}
+
+/// Tests that `try_from_elements()` can create SmtLeaf from elements containing multiple
+/// key-value pairs.
+#[test]
+fn test_smt_leaf_try_from_elements_multiple_entries() {
+    // Create elements for two key-value pairs (16 Felts total: 8 for first pair, 8 for second).
+    // Keys must have the same value in position 3 to map to the same leaf index.
+    let elements = vec![
+        // First key-value pair.
+        Felt::from_u32(10),
+        Felt::from_u32(11),
+        Felt::from_u32(12),
+        Felt::from_u32(13), // key1
+        Felt::from_u32(1),
+        Felt::from_u32(2),
+        Felt::from_u32(3),
+        Felt::from_u32(4), // value1
+        // Second key-value pair.
+        Felt::from_u32(100),
+        Felt::from_u32(101),
+        Felt::from_u32(102),
+        Felt::from_u32(13), // key2 - same value at position 3 as key1
+        Felt::from_u32(11),
+        Felt::from_u32(12),
+        Felt::from_u32(13),
+        Felt::from_u32(14), // value2
+    ];
+    let leaf_index = LeafIndex::new_max_depth(42);
+
+    let result = SmtLeaf::try_from_elements(&elements, leaf_index).unwrap();
+    let expected = SmtLeaf::new_multiple(vec![
+        (
+            Word::from([10_u32, 11_u32, 12_u32, 13_u32]),
+            Word::new([
+                Felt::from_u32(1_u32),
+                Felt::from_u32(2_u32),
+                Felt::from_u32(3_u32),
+                Felt::from_u32(4_u32),
+            ]),
+        ),
+        (
+            Word::from([100_u32, 101_u32, 102_u32, 13_u32]),
+            Word::new([
+                Felt::from_u32(11_u32),
+                Felt::from_u32(12_u32),
+                Felt::from_u32(13_u32),
+                Felt::from_u32(14_u32),
+            ]),
+        ),
+    ])
+    .unwrap();
+
+    assert_eq!(result, expected);
+}
+
+/// Tests that `try_from_elements()` returns the expected error when the list of elements is
+/// not a multiple of 8.
+#[test]
+fn test_smt_leaf_try_from_elements_invalid_length() {
+    let elements = vec![Felt::from_u32(1), Felt::from_u32(2), Felt::from_u32(3)]; // 3 elements
+    let leaf_index = LeafIndex::new_max_depth(42);
+
+    let result = SmtLeaf::try_from_elements(&elements, leaf_index);
+
+    assert_matches!(result, Err(SmtLeafError::ConversionError(_)));
+}
+
 // HELPERS
 // --------------------------------------------------------------------------------------------
 
