@@ -23,7 +23,6 @@ pub use polynomial::Polynomial;
 // Group fn-dsa derived code under a dedicated module.
 pub(crate) mod fn_dsa;
 pub(crate) use fn_dsa::flr;
-pub(crate) use fn_dsa::ntru_gen;
 
 pub trait Inverse: Copy + Zero + MulAssign + One {
     /// Gets the inverse of a, or zero if it is zero.

@@ -96,6 +96,7 @@ curve25519-dalek              = { default-features = false, version = "4" }
 ed25519-dalek                 = { features = ["zeroize"], version = "2" }
 flume                         = { version = "0.11" }
 fn-dsa-comm                   = { default-features = false, version = "0.3" }
+fn-dsa-kgen                   = { default-features = false, version = "0.3" }
 hashbrown                     = { features = ["serde"], optional = true, version = "0.16" }
 hkdf                          = { default-features = false, version = "0.12" }
 k256                          = { features = ["ecdh", "ecdsa"], version = "0.13" }

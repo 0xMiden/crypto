@@ -1,8 +1,9 @@
 use alloc::{string::ToString, vec::Vec};
 
 use fn_dsa_comm::mq;
+use fn_dsa_kgen::{FN_DSA_LOGN_512, KeyPairGenerator, KeyPairGenerator512};
 use miden_crypto_derive::{SilentDebug, SilentDisplay};
-use rand::Rng;
+use rand::{CryptoRng, Rng, RngCore};
 
 use super::{
     super::{
@@ -15,7 +16,7 @@ use super::{
 };
 use crate::{
     Word,
-    dsa::falcon512_rpo::{LOG_N, SK_LEN, hash_to_point::hash_to_point_rpo256},
+    dsa::falcon512_rpo::{LOG_N, PK_LEN, SK_LEN, hash_to_point::hash_to_point_rpo256},
     hash::blake::Blake3_256,
     utils::zeroize::{Zeroize, ZeroizeOnDrop},
 };
@@ -25,33 +26,6 @@ use crate::{
 
 pub(crate) const WIDTH_BIG_POLY_COEFFICIENT: usize = 8;
 pub(crate) const WIDTH_SMALL_POLY_COEFFICIENT: usize = 6;
-
-// RNG ADAPTER
-// ================================================================================================
-
-use super::super::math::flr::sampler::SamplerRng;
-
-/// Adapter to make a `Rng` compatible with `SamplerRng` trait.
-struct RngAdapter<R: Rng> {
-    rng: R,
-}
-
-impl<R: Rng> SamplerRng for RngAdapter<R> {
-    fn next_u8(&mut self) -> u8 {
-        // Use fill_bytes to get exactly 1 byte efficiently
-        // (random::<u8>() would call next_u32() and waste 3 bytes)
-        let mut buf = [0u8; 1];
-        self.rng.fill_bytes(&mut buf);
-        buf[0]
-    }
-
-    fn next_u64(&mut self) -> u64 {
-        // Use fill_bytes to get exactly 8 bytes efficiently
-        let mut buf = [0u8; 8];
-        self.rng.fill_bytes(&mut buf);
-        u64::from_le_bytes(buf)
-    }
-}
 
 // SECRET KEY
 // ================================================================================================
@@ -129,24 +103,23 @@ impl SecretKey {
     /// The provided RNG must be cryptographically secure. Using a weak or predictable
     /// RNG will completely compromise security. Prefer [`SecretKey::new()`] which uses
     /// OS-provided randomness unless you have specific requirements for the RNG source.
-    pub fn with_rng<R: Rng>(rng: &mut R) -> Self {
-        use fn_dsa_comm::PRNG;
+    pub fn with_rng<R: RngCore + CryptoRng>(rng: &mut R) -> Self {
+        let mut kg = KeyPairGenerator512::default();
+        let mut sign_key = [0u8; SK_LEN];
+        let mut vrfy_key = [0u8; PK_LEN];
 
-        use crate::dsa::falcon512_rpo::math::ntru_gen;
+        // Bridge our rand 0.9 RNG into fn-dsa's rand_core 0.6 traits expected by keygen.
+        let mut adapter = FnDsaRng { rng };
+        kg.keygen(FN_DSA_LOGN_512, &mut adapter, &mut sign_key, &mut vrfy_key);
 
-        // we use fn-dsa's SHAKE256_PRNG seeded with `rng`
-        // this is a work around the fact that the version of the `rand` dependency in our crate
-        // is different than the one used in the `fn-dsa` crates
-        let mut seed = [0u8; 32];
-        rng.fill_bytes(&mut seed);
-        let mut prng = <fn_dsa_comm::shake::SHAKE256_PRNG as PRNG>::new(&seed);
+        let sk = SecretKey::read_from_bytes(&sign_key)
+            .expect("fn-dsa-kgen produced an invalid signing key");
 
-        let basis = ntru_gen(N, &mut prng);
+        // Zeroize key buffers to prevent leakage
+        sign_key.zeroize();
+        vrfy_key.zeroize();
 
-        // Zeroize the seed to prevent leaking secret material
-        seed.zeroize();
-
-        Self::from_short_lattice_basis(basis)
+        sk
     }
 
     /// Given a short basis [g, f, G, F], precomputes the FLR basis in FFT format.
@@ -716,3 +689,56 @@ fn compute_big_g_ext(f_i8: &[i8], g_i8: &[i8], big_f_i8: &[i8]) -> [u16; N] {
 
     big_g_int
 }
+
+// RNG ADAPTER
+// ================================================================================================
+
+/// Adapter to make a `Rng` compatible with `SamplerRng` trait.
+struct RngAdapter<R: Rng> {
+    rng: R,
+}
+
+impl<R: Rng> crate::dsa::falcon512_rpo::math::flr::sampler::SamplerRng for RngAdapter<R> {
+    fn next_u8(&mut self) -> u8 {
+        // Use fill_bytes to get exactly 1 byte efficiently
+        let mut buf = [0u8; 1];
+        self.rng.fill_bytes(&mut buf);
+        buf[0]
+    }
+
+    fn next_u64(&mut self) -> u64 {
+        // Use fill_bytes to get exactly 8 bytes efficiently
+        let mut buf = [0u8; 8];
+        self.rng.fill_bytes(&mut buf);
+        u64::from_le_bytes(buf)
+    }
+}
+
+/// Adapts a rand 0.9 RNG to the rand_core 0.6 traits expected by fn-dsa keygen.
+struct FnDsaRng<'a, R: RngCore + CryptoRng> {
+    rng: &'a mut R,
+}
+
+impl<'a, R: RngCore + CryptoRng> fn_dsa_comm::RngCore for FnDsaRng<'a, R> {
+    fn next_u32(&mut self) -> u32 {
+        self.rng.next_u32()
+    }
+
+    fn next_u64(&mut self) -> u64 {
+        self.rng.next_u64()
+    }
+
+    fn fill_bytes(&mut self, dest: &mut [u8]) {
+        self.rng.fill_bytes(dest);
+    }
+
+    fn try_fill_bytes(
+        &mut self,
+        dest: &mut [u8],
+    ) -> core::result::Result<(), fn_dsa_comm::RngError> {
+        self.fill_bytes(dest);
+        Ok(())
+    }
+}
+
+impl<'a, R: RngCore + CryptoRng> fn_dsa_comm::CryptoRng for FnDsaRng<'a, R> {}
