@@ -374,7 +374,7 @@ fn are_coefficients_valid(x: &[i16]) -> bool {
 // TESTS
 // ================================================================================================
 
-#[cfg(all(test, feature = "std"))]
+#[cfg(test)]
 mod tests {
     use rand::SeedableRng;
     use rand_chacha::ChaCha20Rng;

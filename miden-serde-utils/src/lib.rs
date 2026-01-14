@@ -44,16 +44,10 @@ impl core::fmt::Display for DeserializationError {
 mod byte_reader;
 #[cfg(feature = "std")]
 pub use byte_reader::ReadAdapter;
-pub use byte_reader::{ByteReader, SliceReader};
+pub use byte_reader::{BudgetedReader, ByteReader, ReadManyIter, SliceReader};
 
 mod byte_writer;
 pub use byte_writer::ByteWriter;
-
-#[cfg(feature = "winter-compat")]
-mod winter_compat;
-
-#[cfg(feature = "p3-compat")]
-mod p3_compat;
 
 // SERIALIZABLE TRAIT
 // ================================================================================================
@@ -412,6 +406,22 @@ pub trait Deserializable: Sized {
     /// * Bytes read from the `source` do not represent a valid value for `Self`.
     fn read_from<R: ByteReader>(source: &mut R) -> Result<Self, DeserializationError>;
 
+    /// Returns the minimum serialized size for one instance of this type.
+    ///
+    /// This is used by [`ByteReader::max_alloc`] to estimate how many elements can be
+    /// deserialized from the remaining budget, preventing denial-of-service attacks from
+    /// malicious length prefixes.
+    ///
+    /// The default implementation returns `size_of::<Self>()`, which is conservative: it may
+    /// reject valid input for types where the serialized size is smaller than the in-memory
+    /// size (e.g., structs with computed/cached fields that aren't serialized).
+    ///
+    /// Override this method for types where the serialized representation is smaller than
+    /// the in-memory representation to allow more elements to be deserialized.
+    fn min_serialized_size() -> usize {
+        core::mem::size_of::<Self>()
+    }
+
     // PROVIDED METHODS
     // --------------------------------------------------------------------------------------------
 
@@ -426,6 +436,24 @@ pub trait Deserializable: Sized {
     /// returned.
     fn read_from_bytes(bytes: &[u8]) -> Result<Self, DeserializationError> {
         Self::read_from(&mut SliceReader::new(bytes))
+    }
+
+    /// Deserializes `Self` from bytes with a byte budget limit.
+    ///
+    /// This is the recommended method for deserializing untrusted input. The budget limits
+    /// how many bytes can be consumed during deserialization, preventing denial-of-service
+    /// attacks that exploit length fields to cause huge allocations.
+    ///
+    /// # Errors
+    /// Returns an error if:
+    /// * The budget is exhausted before deserialization completes.
+    /// * The `bytes` do not contain enough information to deserialize `Self`.
+    /// * The `bytes` do not represent a valid value for `Self`.
+    fn read_from_bytes_with_budget(
+        bytes: &[u8],
+        budget: usize,
+    ) -> Result<Self, DeserializationError> {
+        Self::read_from(&mut BudgetedReader::new(SliceReader::new(bytes), budget))
     }
 }
 
@@ -563,57 +591,112 @@ impl Deserializable for usize {
 
 impl<T: Deserializable> Deserializable for Option<T> {
     fn read_from<R: ByteReader>(source: &mut R) -> Result<Self, DeserializationError> {
-        let contains = source.read_bool()?;
-
-        match contains {
-            true => Ok(Some(T::read_from(source)?)),
-            false => Ok(None),
+        if source.read_bool()? {
+            Ok(Some(T::read_from(source)?))
+        } else {
+            Ok(None)
         }
+    }
+
+    /// Returns 1 (just the bool discriminator).
+    ///
+    /// The `Some` variant would be `1 + T::min_serialized_size()`, but we use the minimum
+    /// to allow more elements through the early check.
+    fn min_serialized_size() -> usize {
+        1
     }
 }
 
 impl<T: Deserializable, const C: usize> Deserializable for [T; C] {
     fn read_from<R: ByteReader>(source: &mut R) -> Result<Self, DeserializationError> {
-        let data: Vec<T> = source.read_many(C)?;
+        let data: Vec<T> = source.read_many_iter(C)?.collect::<Result<_, _>>()?;
 
-        // SAFETY: the call above only returns a Vec if there are `C` elements, this conversion
-        // always succeeds
-        let res = data.try_into().unwrap_or_else(|v: Vec<T>| {
+        // The iterator yields exactly C elements (or fails early), so this always succeeds
+        Ok(data.try_into().unwrap_or_else(|v: Vec<T>| {
             panic!("Expected a Vec of length {} but it was {}", C, v.len())
-        });
+        }))
+    }
 
-        Ok(res)
+    fn min_serialized_size() -> usize {
+        C.saturating_mul(T::min_serialized_size())
     }
 }
 
 impl<T: Deserializable> Deserializable for Vec<T> {
     fn read_from<R: ByteReader>(source: &mut R) -> Result<Self, DeserializationError> {
         let len = source.read_usize()?;
-        source.read_many(len)
+        source.read_many_iter(len)?.collect()
+    }
+
+    /// Returns 1 (the minimum vint length prefix size).
+    ///
+    /// The actual serialized size depends on the number of elements, which we don't know
+    /// at the point this is called. Using the minimum allows more elements through the
+    /// early check; budget enforcement during actual reads provides the real protection.
+    fn min_serialized_size() -> usize {
+        1
     }
 }
 
 impl<K: Deserializable + Ord, V: Deserializable> Deserializable for BTreeMap<K, V> {
     fn read_from<R: ByteReader>(source: &mut R) -> Result<Self, DeserializationError> {
         let len = source.read_usize()?;
-        let data = source.read_many(len)?;
-        Ok(BTreeMap::from_iter(data))
+        source.read_many_iter(len)?.collect()
+    }
+
+    fn min_serialized_size() -> usize {
+        1 // minimum vint length prefix
     }
 }
 
 impl<T: Deserializable + Ord> Deserializable for BTreeSet<T> {
     fn read_from<R: ByteReader>(source: &mut R) -> Result<Self, DeserializationError> {
         let len = source.read_usize()?;
-        let data = source.read_many(len)?;
-        Ok(BTreeSet::from_iter(data))
+        source.read_many_iter(len)?.collect()
+    }
+
+    fn min_serialized_size() -> usize {
+        1 // minimum vint length prefix
     }
 }
 
 impl Deserializable for String {
     fn read_from<R: ByteReader>(source: &mut R) -> Result<Self, DeserializationError> {
         let len = source.read_usize()?;
-        let data = source.read_many(len)?;
+        let data: Vec<u8> = source.read_many_iter(len)?.collect::<Result<_, _>>()?;
 
         String::from_utf8(data).map_err(|err| DeserializationError::InvalidValue(format!("{err}")))
+    }
+
+    fn min_serialized_size() -> usize {
+        1 // minimum vint length prefix
+    }
+}
+
+// GOLDILOCKS FIELD ELEMENT IMPLEMENTATIONS
+// ================================================================================================
+
+impl Serializable for p3_goldilocks::Goldilocks {
+    fn write_into<W: ByteWriter>(&self, target: &mut W) {
+        use p3_field::PrimeField64;
+        target.write_u64(self.as_canonical_u64());
+    }
+
+    fn get_size_hint(&self) -> usize {
+        core::mem::size_of::<u64>()
+    }
+}
+
+impl Deserializable for p3_goldilocks::Goldilocks {
+    fn read_from<R: ByteReader>(source: &mut R) -> Result<Self, DeserializationError> {
+        use p3_field::integers::QuotientMap;
+
+        let value = source.read_u64()?;
+        Self::from_canonical_checked(value).ok_or_else(|| {
+            DeserializationError::InvalidValue(format!(
+                "value {} is not a valid Goldilocks field element",
+                value
+            ))
+        })
     }
 }

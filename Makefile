@@ -149,8 +149,20 @@ bench-large-smt-rocksdb-open: ## Run large SMT benchmarks with rocksdb storage a
 # --- fuzzing --------------------------------------------------------------------------------
 
 .PHONY: fuzz-smt
-fuzz-smt: ## Run fuzzing for SMT
+fuzz-smt: ## Run fuzzing for SMT (sequential vs parallel consistency)
 	cargo +nightly fuzz run smt --release --fuzz-dir miden-crypto-fuzz -- -max_len=10485760
+
+.PHONY: fuzz-word
+fuzz-word: ## Run fuzzing for Word serialization
+	cargo +nightly fuzz run word --release --fuzz-dir miden-crypto-fuzz
+
+.PHONY: fuzz-merkle
+fuzz-merkle: ## Run fuzzing for Merkle tree serialization
+	cargo +nightly fuzz run merkle --release --fuzz-dir miden-crypto-fuzz
+
+.PHONY: fuzz-smt-serde
+fuzz-smt-serde: ## Run fuzzing for SMT serialization
+	cargo +nightly fuzz run smt_serde --release --fuzz-dir miden-crypto-fuzz
 
 # --- installing ----------------------------------------------------------------------------------
 

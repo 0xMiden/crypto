@@ -1,10 +1,7 @@
 //! Utilities used in this crate which can also be generally useful downstream.
 
 use alloc::{string::String, vec::Vec};
-use core::{
-    fmt::{self, Write},
-    mem, slice,
-};
+use core::fmt::{self, Write};
 
 // Re-export serialization traits from miden-serde-utils
 #[cfg(feature = "std")]
@@ -13,11 +10,8 @@ pub use miden_serde_utils::{
     ByteReader, ByteWriter, Deserializable, DeserializationError, Serializable, SliceReader,
 };
 use p3_field::{PrimeCharacteristicRing, RawDataSerializable, integers::QuotientMap};
+use p3_maybe_rayon::prelude::*;
 use thiserror::Error;
-
-mod iterators;
-#[cfg(feature = "concurrent")]
-use iterators::{IndexedParallelIterator, IntoParallelRefMutIterator, ParallelIterator};
 
 use crate::{Felt, Word, field::PrimeField64};
 
@@ -306,30 +300,27 @@ pub unsafe fn uninit_vector<T>(length: usize) -> Vec<T> {
 /// # Panics
 /// Panics if `n` is not divisible by `N`.
 pub fn group_slice_elements<T, const N: usize>(source: &[T]) -> &[[T; N]] {
-    assert_eq!(source.len() % N, 0, "source length must be divisible by {N}");
-    let p = source.as_ptr();
-    let len = source.len() / N;
-    unsafe { slice::from_raw_parts(p as *const [T; N], len) }
+    let (chunks, remainder) = source.as_chunks::<N>();
+    assert!(remainder.is_empty(), "source length must be divisible by {N}");
+    chunks
 }
 
 /// Transmutes a slice of `n` arrays each of length `N`, into a slice of `N` * `n` elements.
 ///
 /// This function just re-interprets the underlying memory and is thus zero-copy.
 pub fn flatten_slice_elements<T, const N: usize>(source: &[[T; N]]) -> &[T] {
-    let p = source.as_ptr();
-    let len = source.len() * N;
-    unsafe { slice::from_raw_parts(p as *const T, len) }
+    // SAFETY: [T; N] has the same alignment and memory layout as an array of T.
+    // p3-util's as_base_slice handles the conversion safely.
+    unsafe { p3_util::as_base_slice(source) }
 }
 
 /// Transmutes a vector of `n` arrays each of length `N`, into a vector of `N` * `n` elements.
 ///
 /// This function just re-interprets the underlying memory and is thus zero-copy.
 pub fn flatten_vector_elements<T, const N: usize>(source: Vec<[T; N]>) -> Vec<T> {
-    let v = mem::ManuallyDrop::new(source);
-    let p = v.as_ptr();
-    let len = v.len() * N;
-    let cap = v.capacity() * N;
-    unsafe { Vec::from_raw_parts(p as *mut T, len, cap) }
+    // SAFETY: [T; N] has the same alignment and memory layout as an array of T.
+    // p3-util's flatten_to_base handles the conversion without reallocations.
+    unsafe { p3_util::flatten_to_base(source) }
 }
 
 // TRANSPOSING (ported from Winterfell's winter-utils)
@@ -352,7 +343,7 @@ pub fn transpose_slice<T: Copy + Send + Sync, const N: usize>(source: &[T]) -> V
     );
 
     let mut result: Vec<[T; N]> = unsafe { uninit_vector(row_count) };
-    crate::iter_mut!(result, 1024).enumerate().for_each(|(i, element)| {
+    result.par_iter_mut().enumerate().for_each(|(i, element)| {
         for j in 0..N {
             element[j] = source[i + j * row_count]
         }

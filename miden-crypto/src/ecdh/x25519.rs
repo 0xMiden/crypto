@@ -213,16 +213,14 @@ impl KeyAgreementScheme for X25519 {
 // TESTS
 // ================================================================================================
 
-#[cfg(all(test, feature = "std"))]
+#[cfg(test)]
 mod tests {
-    use rand::rng;
-
     use super::*;
-    use crate::dsa::eddsa_25519_sha512::SecretKey;
+    use crate::{dsa::eddsa_25519_sha512::SecretKey, rand::test_utils::seeded_rng};
 
     #[test]
     fn key_agreement() {
-        let mut rng = rng();
+        let mut rng = seeded_rng([0u8; 32]);
 
         // 1. Generate the static key-pair for Alice
         let sk = SecretKey::with_rng(&mut rng);

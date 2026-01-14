@@ -272,7 +272,7 @@ impl Deserializable for SparseMerklePath {
             )));
         }
         let count = depth as u32 - empty_nodes_count;
-        let nodes = source.read_many::<Word>(count as usize)?;
+        let nodes: Vec<Word> = source.read_many_iter(count as usize)?.collect::<Result<_, _>>()?;
         Ok(Self { empty_nodes_mask, nodes })
     }
 }
@@ -636,26 +636,6 @@ mod tests {
     }
 
     use proptest::prelude::*;
-
-    // Arbitrary instance for Word
-    impl Arbitrary for Word {
-        type Parameters = ();
-        type Strategy = BoxedStrategy<Self>;
-
-        fn arbitrary_with(_args: Self::Parameters) -> Self::Strategy {
-            prop::collection::vec(any::<u64>(), 4)
-                .prop_map(|vals| {
-                    Word::new([
-                        Felt::new(vals[0]),
-                        Felt::new(vals[1]),
-                        Felt::new(vals[2]),
-                        Felt::new(vals[3]),
-                    ])
-                })
-                .no_shrink()
-                .boxed()
-        }
-    }
 
     // Arbitrary instance for MerklePath
     impl Arbitrary for MerklePath {

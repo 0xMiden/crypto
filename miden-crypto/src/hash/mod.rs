@@ -13,7 +13,7 @@ pub mod sha2;
 
 /// Poseidon2 hash function.
 pub mod poseidon2 {
-    pub use p3_miden_goldilocks::Poseidon2Goldilocks;
+    pub use p3_goldilocks::Poseidon2Goldilocks;
 
     pub use super::algebraic_sponge::poseidon2::{
         Poseidon2, Poseidon2Challenger, Poseidon2Compression, Poseidon2Hasher,

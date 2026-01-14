@@ -70,7 +70,14 @@ name              = "rand"
 required-features = ["std"]
 
 [features]
-concurrent = ["dep:rayon", "hashbrown?/rayon", "std"]
+concurrent = [
+  "dep:rayon",
+  "hashbrown?/rayon",
+  "p3-maybe-rayon/parallel",
+  "p3-miden-prover/parallel",
+  "p3-util/parallel",
+  "std",
+]
 default = ["concurrent", "std"]
 executable = ["concurrent", "dep:clap", "dep:rand-utils"]
 fuzzing = []
@@ -78,15 +85,8 @@ hashmaps = ["dep:hashbrown"]
 internal = ["concurrent"]
 rocksdb = ["concurrent", "dep:rocksdb"]
 serde = ["dep:serde", "serde?/alloc"]
-std = [
-  "blake3/std",
-  "dep:cc",
-  "miden-serde-utils/p3-compat",
-  "miden-serde-utils/std",
-  "miden-serde-utils/winter-compat",
-  "rand/std",
-  "rand/thread_rng",
-]
+std = ["blake3/std", "dep:cc", "miden-serde-utils/std", "rand/std", "rand/thread_rng"]
+testing = ["dep:proptest"]
 
 [dependencies]
 blake3                        = { default-features = false, version = "1.8" }
@@ -102,6 +102,7 @@ miden-crypto-derive.workspace = true
 miden-serde-utils.workspace   = true
 num                           = { default-features = false, features = ["alloc", "libm"], version = "0.4" }
 num-complex                   = { default-features = false, version = "0.4" }
+proptest                      = { default-features = false, features = ["alloc"], optional = true, version = "1.7" }
 rand                          = { default-features = false, version = "0.9" }
 rand-utils                    = { optional = true, package = "winter-rand-utils", version = "0.13" }
 rand_chacha                   = { default-features = false, version = "0.9" }
@@ -117,15 +118,17 @@ thiserror                     = { default-features = false, version = "2.0" }
 x25519-dalek                  = { default-features = false, features = ["static_secrets"], version = "2.0" }
 
 # Upstream Plonky3 dependencies
-p3-air        = { default-features = false, version = "0.4" }
-p3-challenger = { default-features = false, version = "0.4" }
-p3-field      = { default-features = false, version = "0.4" }
-p3-symmetric  = { default-features = false, version = "0.4" }
+p3-air         = { default-features = false, version = "0.4.2" }
+p3-challenger  = { default-features = false, version = "0.4.2" }
+p3-field       = { default-features = false, version = "0.4.2" }
+p3-goldilocks  = { default-features = false, version = "0.4.2" }
+p3-maybe-rayon = { default-features = false, version = "0.4.2" }
+p3-symmetric   = { default-features = false, version = "0.4.2" }
+p3-util        = { default-features = false, version = "0.4.2" }
 
 # Miden-specific Plonky3 crates
-p3-miden-air        = { default-features = false, version = "0.4" }
-p3-miden-goldilocks = { default-features = false, version = "0.4" }
-p3-miden-prover     = { default-features = false, version = "0.4" }
+p3-miden-air    = { default-features = false, version = "0.4.2" }
+p3-miden-prover = { default-features = false, version = "0.4.2" }
 
 [dev-dependencies]
 assert_matches = { default-features = false, version = "1.5" }
@@ -134,7 +137,6 @@ hex            = { default-features = false, features = ["alloc"], version = "0.
 itertools      = { version = "0.14" }
 proptest       = { default-features = false, features = ["alloc"], version = "1.7" }
 rand-utils     = { package = "winter-rand-utils", version = "0.13" }
-rand_chacha    = { default-features = false, version = "0.9" }
 rstest         = { version = "0.26" }
 seq-macro      = { version = "0.3" }
 tempfile       = { version = "3.20" }
@@ -147,7 +149,7 @@ glob = "0.3"
 workspace = true
 
 [package.metadata.cargo-machete]
-ignored = ["getrandom", "rand-utils", "winter-math"]
+ignored = ["getrandom", "rand-utils"]
 
 [[test]]
 name              = "rocksdb_large_smt"

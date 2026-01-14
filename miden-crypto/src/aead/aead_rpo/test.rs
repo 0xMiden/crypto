@@ -353,9 +353,9 @@ fn test_wrong_nonce_detection() {
 // SECURITY TESTS
 // ================================================================================================
 
-#[cfg(all(test, feature = "std"))]
+#[cfg(test)]
 mod security_tests {
-    use std::collections::HashSet;
+    use alloc::collections::BTreeSet;
 
     use super::*;
 
@@ -375,7 +375,7 @@ mod security_tests {
     fn test_key_uniqueness() {
         let seed = [0_u8; 32];
         let mut rng = ChaCha20Rng::from_seed(seed);
-        let mut keys = HashSet::new();
+        let mut keys = BTreeSet::new();
 
         // Generate 1000 keys and ensure they're all unique
         for _ in 0..1000 {
@@ -389,7 +389,7 @@ mod security_tests {
     fn test_nonce_uniqueness() {
         let seed = [0_u8; 32];
         let mut rng = ChaCha20Rng::from_seed(seed);
-        let mut nonces = HashSet::new();
+        let mut nonces = BTreeSet::new();
 
         // Generate 1000 nonces and ensure they're all unique
         for _ in 0..1000 {

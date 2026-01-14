@@ -29,7 +29,10 @@ pub use large::{
 pub use large::{RocksDbConfig, RocksDbStorage};
 
 mod large_forest;
-pub use large_forest::{History, HistoryError, HistoryView, LargeSmtForestError};
+pub use large_forest::{
+    Backend, BackendError, ForestOperation, LargeSmtForest, LargeSmtForestError, RootInfo,
+    SmtForestUpdateBatch, SmtUpdateBatch,
+};
 
 mod simple;
 pub use simple::{SimpleSmt, SimpleSmtProof};
@@ -758,8 +761,8 @@ impl<const DEPTH: u8, K: Deserializable + Ord + Eq + Hash, V: Deserializable> De
         );
 
         let num_new_pairs = source.read_usize()?;
-        let new_pairs = source.read_many(num_new_pairs)?;
-        let new_pairs = Map::from_iter(new_pairs);
+        let new_pairs: Map<_, _> =
+            source.read_many_iter(num_new_pairs)?.collect::<Result<_, _>>()?;
 
         Ok(Self {
             old_root,

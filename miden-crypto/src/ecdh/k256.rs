@@ -230,20 +230,18 @@ impl KeyAgreementScheme for K256 {
 // TESTS
 // ================================================================================================
 
-#[cfg(all(test, feature = "std"))]
+#[cfg(test)]
 mod test {
-
-    use rand::rng;
-
     use super::{EphemeralPublicKey, EphemeralSecretKey};
     use crate::{
         dsa::ecdsa_k256_keccak::SecretKey,
+        rand::test_utils::seeded_rng,
         utils::{Deserializable, Serializable},
     };
 
     #[test]
     fn key_agreement() {
-        let mut rng = rng();
+        let mut rng = seeded_rng([0u8; 32]);
 
         // 1. Generate the static key-pair for Alice
         let sk = SecretKey::with_rng(&mut rng);
@@ -271,7 +269,7 @@ mod test {
 
     #[test]
     fn test_serialization_round_trip() {
-        let mut rng = rng();
+        let mut rng = seeded_rng([1u8; 32]);
 
         let sk_e = EphemeralSecretKey::with_rng(&mut rng);
         let pk_e = sk_e.public_key();

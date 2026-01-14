@@ -1,11 +1,9 @@
-use rand::rng;
-
 use super::*;
-use crate::Felt;
+use crate::{Felt, rand::test_utils::seeded_rng};
 
 #[test]
 fn test_key_generation() {
-    let mut rng = rng();
+    let mut rng = seeded_rng([0u8; 32]);
 
     let secret_key = SecretKey::with_rng(&mut rng);
     let public_key = secret_key.public_key();
@@ -22,7 +20,7 @@ fn test_key_generation() {
 
 #[test]
 fn test_public_key_recovery() {
-    let mut rng = rng();
+    let mut rng = seeded_rng([1u8; 32]);
 
     let secret_key = SecretKey::with_rng(&mut rng);
     let public_key = secret_key.public_key();
@@ -43,7 +41,7 @@ fn test_public_key_recovery() {
 
 #[test]
 fn test_sign_and_verify() {
-    let mut rng = rng();
+    let mut rng = seeded_rng([2u8; 32]);
 
     let secret_key = SecretKey::with_rng(&mut rng);
     let public_key = secret_key.public_key();
@@ -64,7 +62,7 @@ fn test_sign_and_verify() {
 
 #[test]
 fn test_signature_serialization_default() {
-    let mut rng = rng();
+    let mut rng = seeded_rng([3u8; 32]);
 
     let secret_key = SecretKey::with_rng(&mut rng);
     let message = [Felt::new(1), Felt::new(2), Felt::new(3), Felt::new(4)].into();
@@ -78,7 +76,7 @@ fn test_signature_serialization_default() {
 
 #[test]
 fn test_signature_serialization() {
-    let mut rng = rng();
+    let mut rng = seeded_rng([4u8; 32]);
 
     let secret_key = SecretKey::with_rng(&mut rng);
     let message = [Felt::new(1), Felt::new(2), Felt::new(3), Felt::new(4)].into();
@@ -100,7 +98,7 @@ fn test_signature_serialization() {
 
 #[test]
 fn test_secret_key_debug_redaction() {
-    let mut rng = rng();
+    let mut rng = seeded_rng([5u8; 32]);
     let secret_key = SecretKey::with_rng(&mut rng);
 
     // Verify Debug impl produces expected redacted output

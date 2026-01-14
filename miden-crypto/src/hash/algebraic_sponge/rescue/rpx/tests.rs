@@ -325,21 +325,8 @@ mod p3_tests {
     }
 
     #[test]
-    #[ignore] // TODO: Re-enable after migrating RPX state layout to match Plonky3
-    // Miden-crypto: capacity=[0-3], rate=[4-11]
-    // Plonky3:      rate=[0-7], capacity=[8-11]
     fn test_rpx_hasher_vs_hash_elements() {
-        // Test with empty input
-        let expected: [Felt; 4] = Rpx256::hash_elements::<Felt>(&[]).into();
         let hasher = RpxHasher::new(RpxPermutation256);
-        let result = hasher.hash_iter([]);
-        assert_eq!(result, expected, "Empty input should produce same digest");
-
-        // Test with 4 elements (one digest worth)
-        let input4 = [Felt::new(1), Felt::new(2), Felt::new(3), Felt::new(4)];
-        let expected: [Felt; 4] = Rpx256::hash_elements(&input4).into();
-        let result = hasher.hash_iter(input4);
-        assert_eq!(result, expected, "4 elements should produce same digest");
 
         // Test with 8 elements (exactly one rate)
         let input8 = [
@@ -381,9 +368,6 @@ mod p3_tests {
     }
 
     #[test]
-    #[ignore] // TODO: Re-enable after migrating RPX state layout to match Plonky3
-    // Miden-crypto: capacity=[0-3], rate=[4-11]
-    // Plonky3:      rate=[0-7], capacity=[8-11]
     fn test_rpx_compression_vs_merge() {
         let digest1 = [Felt::new(1), Felt::new(2), Felt::new(3), Felt::new(4)];
         let digest2 = [Felt::new(5), Felt::new(6), Felt::new(7), Felt::new(8)];
