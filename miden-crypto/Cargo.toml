@@ -118,17 +118,17 @@ thiserror                     = { default-features = false, version = "2.0" }
 x25519-dalek                  = { default-features = false, features = ["static_secrets"], version = "2.0" }
 
 # Upstream Plonky3 dependencies
-p3-air         = { default-features = false, version = "0.4" }
-p3-challenger  = { default-features = false, version = "0.4" }
-p3-field       = { default-features = false, version = "0.4" }
-p3-maybe-rayon = { default-features = false, version = "0.4" }
-p3-symmetric   = { default-features = false, version = "0.4" }
-p3-util        = { default-features = false, version = "0.4" }
+p3-air         = { default-features = false, version = "0.4.2" }
+p3-challenger  = { default-features = false, version = "0.4.2" }
+p3-field       = { default-features = false, version = "0.4.2" }
+p3-goldilocks  = { default-features = false, version = "0.4.2" }
+p3-maybe-rayon = { default-features = false, version = "0.4.2" }
+p3-symmetric   = { default-features = false, version = "0.4.2" }
+p3-util        = { default-features = false, version = "0.4.2" }
 
 # Miden-specific Plonky3 crates
-p3-miden-air        = { default-features = false, version = "0.4" }
-p3-miden-goldilocks = { default-features = false, version = "0.4" }
-p3-miden-prover     = { default-features = false, version = "0.4" }
+p3-miden-air    = { default-features = false, version = "0.4.2" }
+p3-miden-prover = { default-features = false, version = "0.4.2" }
 
 [dev-dependencies]
 assert_matches = { default-features = false, version = "1.5" }
