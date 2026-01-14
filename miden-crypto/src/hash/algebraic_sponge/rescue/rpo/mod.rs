@@ -218,7 +218,7 @@ use p3_symmetric::{
 /// The permutation operates on a state of 12 field elements (STATE_WIDTH = 12), with:
 /// - Rate: 8 elements (positions 0-7)
 /// - Capacity: 4 elements (positions 8-11)
-/// - Digest output: 4 elements (positions 4-7)
+/// - Digest output: 4 elements (positions 0-3)
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub struct RpoPermutation256;
 
