@@ -1,0 +1,109 @@
+site_name: Miden Crypto Documentation
+site_description: Cryptographic primitives used in Polygon Miden
+site_url: https://docs.polygon.technology/miden/crypto
+repo_url: https://github.com/0xMiden/crypto
+repo_name: 0xMiden/crypto
+edit_uri: edit/main/docs/
+
+theme:
+  name: material
+  palette:
+    - scheme: default
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - scheme: slate
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+  features:
+    - navigation.tabs
+    - navigation.sections
+    - navigation.expand
+    - navigation.top
+    - search.suggest
+    - search.highlight
+    - content.code.annotate
+
+markdown_extensions:
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.inlinehilite
+  - pymdownx.snippets
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+  - pymdownx.tabbed:
+      alternate_style: true
+  - admonition
+  - pymdownx.details
+  - attr_list
+  - md_in_html
+
+nav:
+  - Home: index.md
+  - Getting Started:
+    - getting-started/overview.md
+    - getting-started/installation.md
+    - getting-started/basic-usage.md
+  - Hash Functions:
+    - hash/overview.md
+    - hash/rpo.md
+    - hash/rpx.md
+    - hash/poseidon2.md
+    - hash/blake3.md
+    - hash/keccak.md
+    - hash/sha2.md
+  - Merkle Trees:
+    - merkle/overview.md
+    - merkle/merkle-tree.md
+    - merkle/merkle-store.md
+    - merkle/mmr.md
+    - merkle/partial-mt.md
+    - merkle/smt.md
+    - merkle/large-smt.md
+    - merkle/smt-forest.md
+  - Digital Signatures:
+    - dsa/overview.md
+    - dsa/ecdsa-k256.md
+    - dsa/ed25519.md
+    - dsa/falcon512-rpo.md
+  - Encryption:
+    - encryption/overview.md
+    - encryption/aead-rpo.md
+    - encryption/xchacha20poly1305.md
+  - Key Exchange:
+    - key-exchange/overview.md
+    - key-exchange/ecdh.md
+    - key-exchange/ies.md
+  - Random Number Generation:
+    - rand/overview.md
+    - rand/rpo-random-coin.md
+    - rand/rpx-random-coin.md
+  - Core Types:
+    - core/field-elements.md
+    - core/words.md
+  - STARK Proving System:
+    - stark/overview.md
+  - API Reference:
+    - api/overview.md
+  - Contributing:
+    - contributing/guidelines.md
+
+plugins:
+  - search
+  - mkdocstrings:
+      handlers:
+        rust:
+          paths:
+            - miden-crypto/src
+          options:
+            docstring_style: google
+            show_source: true
+
