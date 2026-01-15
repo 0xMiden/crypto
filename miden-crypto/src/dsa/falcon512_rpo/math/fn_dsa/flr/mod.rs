@@ -13,32 +13,14 @@
 use core::ops::{Add, AddAssign, Div, DivAssign, Mul, MulAssign, Neg, Sub, SubAssign};
 
 pub(crate) mod poly;
-pub(crate) mod poly_avx2;
 pub(crate) mod sampler;
 
-// Use native f64 on 64-bit platforms where hardware support is available
-#[cfg(any(
-    target_arch = "x86_64",
-    target_arch = "aarch64",
-    target_arch = "arm64ec",
-    target_arch = "riscv64"
-))]
+// Native f64 backend - all our target platforms (x86_64, aarch64, wasm32) have
+// IEEE 754 compliant hardware f64 operations.
 #[path = "native.rs"]
 mod backend;
 
-// Use emulated fixed-point arithmetic on other platforms
-#[cfg(not(any(
-    target_arch = "x86_64",
-    target_arch = "aarch64",
-    target_arch = "arm64ec",
-    target_arch = "riscv64"
-)))]
-#[path = "emu.rs"]
-mod backend;
-
 pub(crate) use backend::FLR;
-#[cfg(target_arch = "x86_64")]
-pub(crate) use poly::GM;
 
 impl Default for FLR {
     fn default() -> Self {

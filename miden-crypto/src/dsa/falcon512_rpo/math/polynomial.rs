@@ -91,84 +91,6 @@ impl<F: Zero + PartialEq + Clone> Polynomial<F> {
     }
 }
 
-/// The following implementations are specific to cyclotomic polynomial rings,
-/// i.e., F\[ X \] / <X^n + 1>, and are used extensively in Falcon.
-impl<
-    F: One
-        + Zero
-        + Clone
-        + Neg<Output = F>
-        + MulAssign
-        + AddAssign
-        + Div<Output = F>
-        + Sub<Output = F>
-        + PartialEq,
-> Polynomial<F>
-{
-    /// Reduce the polynomial by X^n + 1.
-    pub fn reduce_by_cyclotomic(&self, n: usize) -> Self {
-        let mut coefficients = vec![F::zero(); n];
-        let mut sign = -F::one();
-        for (i, c) in self.coefficients.iter().cloned().enumerate() {
-            if i.is_multiple_of(n) {
-                sign *= -F::one();
-            }
-            coefficients[i % n] += sign.clone() * c;
-        }
-        Polynomial::new(coefficients)
-    }
-
-    /// Computes the field norm of the polynomial as an element of the cyclotomic ring
-    ///  F\[ X \] / <X^n + 1 > relative to one of half the size, i.e., F\[ X \] / <X^(n/2) + 1> .
-    ///
-    /// Corresponds to formula 3.25 in the spec [1, p.30].
-    ///
-    /// [1]: https://falcon-sign.info/falcon.pdf
-    pub fn field_norm(&self) -> Self {
-        let n = self.coefficients.len();
-        let mut f0_coefficients = vec![F::zero(); n / 2];
-        let mut f1_coefficients = vec![F::zero(); n / 2];
-        for i in 0..n / 2 {
-            f0_coefficients[i] = self.coefficients[2 * i].clone();
-            f1_coefficients[i] = self.coefficients[2 * i + 1].clone();
-        }
-        let f0 = Polynomial::new(f0_coefficients);
-        let f1 = Polynomial::new(f1_coefficients);
-        let f0_squared = (f0.clone() * f0).reduce_by_cyclotomic(n / 2);
-        let f1_squared = (f1.clone() * f1).reduce_by_cyclotomic(n / 2);
-        let x = Polynomial::new(vec![F::zero(), F::one()]);
-        f0_squared - (x * f1_squared).reduce_by_cyclotomic(n / 2)
-    }
-
-    /// Lifts an element from a cyclotomic polynomial ring to one of double the size.
-    pub fn lift_next_cyclotomic(&self) -> Self {
-        let n = self.coefficients.len();
-        let mut coefficients = vec![F::zero(); n * 2];
-        for i in 0..n {
-            coefficients[2 * i] = self.coefficients[i].clone();
-        }
-        Self::new(coefficients)
-    }
-
-    /// Computes the galois adjoint of the polynomial in the cyclotomic ring F\[ X \] / < X^n + 1 >
-    /// , which corresponds to f(x^2).
-    pub fn galois_adjoint(&self) -> Self {
-        Self::new(
-            self.coefficients
-                .iter()
-                .enumerate()
-                .map(|(i, c)| {
-                    if i.is_multiple_of(2) {
-                        c.clone()
-                    } else {
-                        c.clone().neg()
-                    }
-                })
-                .collect(),
-        )
-    }
-}
-
 impl<F> PartialEq for Polynomial<F>
 where
     F: Zero + PartialEq + Clone + AddAssign,
@@ -367,15 +289,6 @@ impl<F: Add + Mul<Output = F> + Zero + Clone> Mul<F> for Polynomial<F> {
     }
 }
 
-impl<F: Mul<Output = F> + Sub<Output = F> + AddAssign + Zero + Div<Output = F> + Clone>
-    Polynomial<F>
-{
-    /// Multiply two polynomials using Karatsuba's divide-and-conquer algorithm.
-    pub fn karatsuba(&self, other: &Self) -> Self {
-        Polynomial::new(vector_karatsuba(&self.coefficients, &other.coefficients))
-    }
-}
-
 impl<F> One for Polynomial<F>
 where
     F: Clone + One + PartialEq + Zero + AddAssign,
@@ -462,53 +375,6 @@ where
         }
         quotient
     }
-}
-
-fn vector_karatsuba<
-    F: Zero + AddAssign + Mul<Output = F> + Sub<Output = F> + Div<Output = F> + Clone,
->(
-    left: &[F],
-    right: &[F],
-) -> Vec<F> {
-    let n = left.len();
-    if n <= 8 {
-        let mut product = vec![F::zero(); left.len() + right.len() - 1];
-        for (i, l) in left.iter().enumerate() {
-            for (j, r) in right.iter().enumerate() {
-                product[i + j] += l.clone() * r.clone();
-            }
-        }
-        return product;
-    }
-    let n_over_2 = n / 2;
-    let mut product = vec![F::zero(); 2 * n - 1];
-    let left_lo = &left[0..n_over_2];
-    let right_lo = &right[0..n_over_2];
-    let left_hi = &left[n_over_2..];
-    let right_hi = &right[n_over_2..];
-    let left_sum: Vec<F> =
-        left_lo.iter().zip(left_hi).map(|(a, b)| a.clone() + b.clone()).collect();
-    let right_sum: Vec<F> =
-        right_lo.iter().zip(right_hi).map(|(a, b)| a.clone() + b.clone()).collect();
-
-    let prod_lo = vector_karatsuba(left_lo, right_lo);
-    let prod_hi = vector_karatsuba(left_hi, right_hi);
-    let prod_mid: Vec<F> = vector_karatsuba(&left_sum, &right_sum)
-        .iter()
-        .zip(prod_lo.iter().zip(prod_hi.iter()))
-        .map(|(s, (l, h))| s.clone() - (l.clone() + h.clone()))
-        .collect();
-
-    for (i, l) in prod_lo.into_iter().enumerate() {
-        product[i] = l;
-    }
-    for (i, m) in prod_mid.into_iter().enumerate() {
-        product[i + n_over_2] += m;
-    }
-    for (i, h) in prod_hi.into_iter().enumerate() {
-        product[i + n] += h
-    }
-    product
 }
 
 impl From<Polynomial<FalconFelt>> for Polynomial<Felt> {
@@ -661,27 +527,3 @@ impl<F: Zeroize> Zeroize for Polynomial<F> {
 }
 
 impl<F: Zeroize> ZeroizeOnDrop for Polynomial<F> {}
-
-// TESTS
-// ================================================================================================
-
-#[cfg(test)]
-mod tests {
-    use super::{FalconFelt, N, Polynomial};
-    use crate::rand::test_utils::prng_array;
-
-    #[test]
-    fn test_negacyclic_reduction() {
-        let coef1: [u8; N] = prng_array([0u8; 32]);
-        let coef2: [u8; N] = prng_array([1u8; 32]);
-
-        let poly1 = Polynomial::new(coef1.iter().map(|&a| FalconFelt::new(a as u16)).collect());
-        let poly2 = Polynomial::new(coef2.iter().map(|&a| FalconFelt::new(a as u16)).collect());
-        let prod = poly1.clone() * poly2.clone();
-
-        assert_eq!(
-            prod.reduce_by_cyclotomic(N),
-            Polynomial::reduce_negacyclic(&Polynomial::mul_modulo_p(&poly1, &poly2))
-        );
-    }
-}

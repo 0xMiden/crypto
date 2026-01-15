@@ -4,10 +4,14 @@
 //! All operations use FLR (Fixed-point Linear Real) types instead of native f64.
 //!
 //! Key functions:
-//! - `FFT()` / `iFFT()`: Forward and inverse FFT transforms (with AVX2 dispatch on x86_64)
+//! - `FFT()` / `iFFT()`: Forward and inverse FFT transforms
 //! - `poly_set_small()`: Convert small integer coefficients to FLR
 //! - `poly_add()`, `poly_sub()`, `poly_mul_fft()`: Polynomial arithmetic
 //! - `poly_split_fft()`, `poly_merge_fft()`: Split/merge for recursive sampling
+//!
+//! Uses SSE2 on x86_64, NEON on aarch64, and scalar fallback on other platforms.
+//!
+//! Source: rust-fn-dsa (https://github.com/pornin/rust-fn-dsa)
 
 #![allow(clippy::excessive_precision)] // Precision needed for FLR accuracy
 #![allow(clippy::needless_borrow)] // Match fn-dsa style
@@ -15,21 +19,10 @@
 #![allow(clippy::unnecessary_cast)] // Match fn-dsa style
 #![allow(clippy::useless_transmute)] // Match fn-dsa style
 #![allow(clippy::needless_range_loop)] // Match fn-dsa style
-//!
-//! On x86_64 with AVX2 support, functions automatically dispatch to AVX2-accelerated versions
-//! for 2x wider SIMD parallelism (256-bit vs 128-bit).
-//!
-//! Source: rust-fn-dsa (https://github.com/pornin/rust-fn-dsa)
-
 #![allow(non_snake_case)]
 #![allow(dead_code)]
 
-#[cfg(target_arch = "x86_64")]
-use std::is_x86_feature_detected;
-
 use super::FLR;
-#[cfg(target_arch = "x86_64")]
-use super::poly_avx2;
 
 // ========================================================================
 // Complex multiplication for FLR
@@ -2096,50 +2089,9 @@ pub(crate) const GM: [FLR; 2048] = [
 
 // Removed fn-dsa-sign specific tests that depend on external crates
 
-// ========================================================================
-// Runtime dispatch wrappers (use AVX2 when available on x86_64)
-// ========================================================================
-
-/// FFT with AVX2 runtime dispatch - public API that automatically uses best available
-/// implementation.
-#[cfg(target_arch = "x86_64")]
-#[inline]
-pub(crate) fn FFT_dispatch(logn: u32, f: &mut [FLR]) {
-    if is_x86_feature_detected!("avx2") {
-        unsafe { poly_avx2::FFT(logn, f) }
-    } else {
-        FFT_impl(logn, f)
-    }
-}
-
-/// iFFT with AVX2 runtime dispatch - public API that automatically uses best available
-/// implementation.
-#[cfg(target_arch = "x86_64")]
-#[inline]
-pub(crate) fn iFFT_dispatch(logn: u32, f: &mut [FLR]) {
-    if is_x86_feature_detected!("avx2") {
-        unsafe { poly_avx2::iFFT(logn, f) }
-    } else {
-        iFFT_impl(logn, f)
-    }
-}
-
-// On non-x86_64, dispatch functions are just aliases to the regular implementations
-#[cfg(not(target_arch = "x86_64"))]
-#[inline(always)]
-pub(crate) fn FFT_dispatch(logn: u32, f: &mut [FLR]) {
-    FFT_impl(logn, f)
-}
-
-#[cfg(not(target_arch = "x86_64"))]
-#[inline(always)]
-pub(crate) fn iFFT_dispatch(logn: u32, f: &mut [FLR]) {
-    iFFT_impl(logn, f)
-}
-
-// Maintain the old names as aliases for compatibility
-pub(crate) use FFT_dispatch as FFT;
-pub(crate) use iFFT_dispatch as iFFT;
+// Public API aliases
+pub(crate) use FFT_impl as FFT;
+pub(crate) use iFFT_impl as iFFT;
 
 // ========================================================================
 // FFT - Forward transform (converts polynomial from normal to FFT representation)
@@ -2151,9 +2103,8 @@ pub(crate) use iFFT_dispatch as iFFT;
 /// The first iteration would be a no-op (computing f[j] + i*f[j + n/2]), so we start at iteration
 /// 2.
 ///
-/// This is the SSE2/NEON/scalar implementation. On x86_64, prefer FFT() which dispatches to AVX2
-/// when available.
-fn FFT_impl(logn: u32, f: &mut [FLR]) {
+/// Uses SSE2 on x86_64, NEON on aarch64, and scalar fallback on other platforms.
+pub(crate) fn FFT_impl(logn: u32, f: &mut [FLR]) {
     // First iteration of FFT would compute f[j] + i*f[j + n/2] for all j < n/2;
     // since this is exactly our storage format for complex numbers in FFT representation,
     // that first iteration is a no-op, so we start at the second iteration.
@@ -2329,9 +2280,8 @@ fn FFT_impl(logn: u32, f: &mut [FLR]) {
 /// The last iteration is a no-op (like the first iteration in FFT).
 /// Since we skip it, we must divide by n/2 at the end.
 ///
-/// This is the SSE2/NEON/scalar implementation. On x86_64, prefer iFFT() which dispatches to AVX2
-/// when available.
-fn iFFT_impl(logn: u32, f: &mut [FLR]) {
+/// Uses SSE2 on x86_64, NEON on aarch64, and scalar fallback on other platforms.
+pub(crate) fn iFFT_impl(logn: u32, f: &mut [FLR]) {
     // This is the reverse of FFT. We use the fact that if w = exp(i*k*pi/N),
     // then 1/w is the conjugate of w; thus, we can get inverses from GM[] by
     // simply negating the imaginary part.
