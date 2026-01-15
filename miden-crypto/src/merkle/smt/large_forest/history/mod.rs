@@ -39,7 +39,7 @@ use core::fmt::Debug;
 use error::{HistoryError, Result};
 
 use crate::{
-    Map, Set, Word,
+    Map, Word,
     merkle::{
         NodeIndex,
         smt::{LeafIndex, SMT_DEPTH},
@@ -87,6 +87,7 @@ pub type VersionId = u64;
 /// The versions are _cumulative_, meaning that querying the history must account for changes from
 /// the current tree that take place in versions that are not the queried version or the current
 /// tree.
+#[allow(dead_code)] // Temporary
 #[derive(Clone, Debug)]
 pub struct History {
     /// The maximum number of historical versions to be stored.
@@ -110,6 +111,7 @@ pub struct History {
     deltas: VecDeque<Delta>,
 }
 
+#[allow(dead_code)] // Temporary
 impl History {
     /// Constructs a new history container, containing at most `max_count` historical versions for
     /// a tree.
@@ -136,13 +138,23 @@ impl History {
 
     /// Returns all the roots that the history knows about.
     ///
+    /// The iteration order of the roots is guaranteed to move backward in time, with earlier items
+    /// being roots from versions closer to the present.
+    ///
     /// # Complexity
     ///
-    /// Calling this method requires a traversal of all the versions and is hence linear in the
-    /// number of history versions.
-    #[must_use]
-    pub fn roots(&self) -> Set<Word> {
-        self.deltas.iter().map(|d| d.root).collect()
+    /// Calling this method provides an iterator whose consumption requires a traversal of all the
+    /// versions. The method's complexity is thus `O(n)` in the number of versions.
+    pub fn roots(&self) -> impl Iterator<Item = Word> {
+        self.deltas.iter().rev().map(|d| d.root)
+    }
+
+    /// Gets the version corresponding to the provided `root`, or returns [`None`] if the provided
+    /// `root` is not found within this history.
+    pub fn version(&self, root: Word) -> Option<VersionId> {
+        self.deltas
+            .iter()
+            .find_map(|d| if d.root == root { Some(d.version_id) } else { None })
     }
 
     /// Returns `true` if `root` is in the history and `false` otherwise.
@@ -302,6 +314,7 @@ impl History {
 // ================================================================================================
 
 /// A read-only view of the history overlay on the tree at a specified place in the history.
+#[allow(dead_code)] // Temporary
 #[derive(Debug)]
 pub struct HistoryView<'history> {
     /// The index of the target version in the history.
@@ -311,6 +324,7 @@ pub struct HistoryView<'history> {
     history: &'history History,
 }
 
+#[allow(dead_code)] // Temporary
 impl<'history> HistoryView<'history> {
     /// Constructs a new history view that acts as a single overlay of the state represented by the
     /// oldest delta for which `f` returns true.
@@ -413,6 +427,7 @@ struct Delta {
     pub leaves: LeafChanges,
 }
 
+#[allow(dead_code)] // Temporary
 impl Delta {
     /// Creates a new delta with the provided `root`, and representing the provided
     /// changes to `nodes` and `leaves` in the merkle tree.

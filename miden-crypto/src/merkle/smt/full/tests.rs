@@ -994,6 +994,58 @@ fn test_smt_proof_get_returns_empty_for_absent_key_same_leaf() {
     );
 }
 
+/// Tests that `try_from_elements()` round-trips correctly for an empty leaf.
+#[test]
+fn test_smt_leaf_try_from_elements_empty() {
+    let leaf_index = LeafIndex::new_max_depth(42);
+    let expected = SmtLeaf::new_empty(leaf_index);
+    let elements: Vec<Felt> = expected.to_elements().collect();
+    let actual = SmtLeaf::try_from_elements(&elements, leaf_index).unwrap();
+    assert_eq!(actual, expected);
+}
+
+/// Tests that `try_from_elements()` round-trips correctly for a single-entry leaf.
+#[test]
+fn test_smt_leaf_try_from_elements_single_entry() {
+    let expected = SmtLeaf::new_single(
+        Word::from([10_u32, 11_u32, 12_u32, 13_u32]),
+        Word::from([1_u32, 2_u32, 3_u32, 4_u32]),
+    );
+    let elements: Vec<Felt> = expected.to_elements().collect();
+    let actual = SmtLeaf::try_from_elements(&elements, expected.index()).unwrap();
+    assert_eq!(actual, expected);
+}
+
+/// Tests that `try_from_elements()` round-trips correctly for a multiple-entry leaf.
+#[test]
+fn test_smt_leaf_try_from_elements_multiple_entries() {
+    // Keys must have the same value in position 3 to map to the same leaf index.
+    let expected = SmtLeaf::new_multiple(vec![
+        (
+            Word::from([10_u32, 11_u32, 12_u32, 13_u32]),
+            Word::from([1_u32, 2_u32, 3_u32, 4_u32]),
+        ),
+        (
+            Word::from([100_u32, 101_u32, 102_u32, 13_u32]),
+            Word::from([11_u32, 12_u32, 13_u32, 14_u32]),
+        ),
+    ])
+    .unwrap();
+    let elements: Vec<Felt> = expected.to_elements().collect();
+    let actual = SmtLeaf::try_from_elements(&elements, expected.index()).unwrap();
+    assert_eq!(actual, expected);
+}
+
+/// Tests that `try_from_elements()` returns the expected error when the list of elements is
+/// not a multiple of 8.
+#[test]
+fn test_smt_leaf_try_from_elements_invalid_length() {
+    let elements = vec![Felt::from_u32(1), Felt::from_u32(2), Felt::from_u32(3)];
+    let leaf_index = LeafIndex::new_max_depth(42);
+    let result = SmtLeaf::try_from_elements(&elements, leaf_index);
+    assert_matches!(result, Err(SmtLeafError::DecodingError(_)));
+}
+
 // HELPERS
 // --------------------------------------------------------------------------------------------
 

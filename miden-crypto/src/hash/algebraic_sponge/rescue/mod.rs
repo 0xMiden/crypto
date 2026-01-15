@@ -1,7 +1,8 @@
 use p3_field::{Field, PrimeCharacteristicRing};
 
 use super::{
-    AlgebraicSponge, CAPACITY_RANGE, DIGEST_RANGE, Felt, RATE_RANGE, Range, STATE_WIDTH, Word, ZERO,
+    AlgebraicSponge, CAPACITY_RANGE, DIGEST_RANGE, Felt, RATE_RANGE, RATE0_RANGE, RATE1_RANGE,
+    Range, STATE_WIDTH, Word, ZERO,
 };
 
 mod arch;

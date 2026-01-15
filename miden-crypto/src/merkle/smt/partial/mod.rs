@@ -1,3 +1,5 @@
+use p3_field::PrimeField64;
+
 use super::{EmptySubtreeRoots, LeafIndex, SMT_DEPTH};
 use crate::{
     EMPTY_WORD, Word,
@@ -398,7 +400,7 @@ impl PartialSmt {
     /// Converts a key to a leaf index.
     fn key_to_leaf_index(key: &Word) -> LeafIndex<SMT_DEPTH> {
         let most_significant_felt = key[3];
-        LeafIndex::new_max_depth(most_significant_felt.as_int())
+        LeafIndex::new_max_depth(most_significant_felt.as_canonical_u64())
     }
 
     /// Returns the inner node at the specified index, or `None` if not stored.

@@ -1,6 +1,8 @@
 #![cfg(feature = "std")]
 //! The functional tests for the history component.
 
+use alloc::vec::Vec;
+
 use p3_field::PrimeCharacteristicRing;
 
 use super::{CompactLeaf, History, LeafChanges, NodeChanges, error::Result};
@@ -32,7 +34,7 @@ fn roots() -> Result<()> {
     history.add_version(root_2, 1, nodes.clone(), leaves.clone())?;
 
     // We should be able to get all the roots.
-    let roots = history.roots();
+    let roots = history.roots().collect::<Vec<_>>();
     assert_eq!(roots.len(), 2);
     assert!(roots.contains(&root_1));
     assert!(roots.contains(&root_2));

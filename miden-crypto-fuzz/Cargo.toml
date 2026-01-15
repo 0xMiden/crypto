@@ -12,11 +12,34 @@ libfuzzer-sys = "0.4"
 miden-crypto  = { features = ["concurrent", "fuzzing"], path = "../miden-crypto" }
 rand          = { default-features = false, version = "0.9" }
 
+# Existing SMT fuzz target (for sequential vs parallel consistency)
 [[bin]]
 bench = false
 doc   = false
 name  = "smt"
 path  = "fuzz_targets/smt.rs"
+test  = false
+
+# Serialization/deserialization fuzz targets
+[[bin]]
+bench = false
+doc   = false
+name  = "word"
+path  = "fuzz_targets/word.rs"
+test  = false
+
+[[bin]]
+bench = false
+doc   = false
+name  = "merkle"
+path  = "fuzz_targets/merkle.rs"
+test  = false
+
+[[bin]]
+bench = false
+doc   = false
+name  = "smt_serde"
+path  = "fuzz_targets/smt_serde.rs"
 test  = false
 
 [lints.rust]

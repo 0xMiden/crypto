@@ -249,7 +249,7 @@ impl Serializable for MerklePath {
 impl Deserializable for MerklePath {
     fn read_from<R: ByteReader>(source: &mut R) -> Result<Self, DeserializationError> {
         let count = source.read_u8()?.into();
-        let nodes = source.read_many::<Word>(count)?;
+        let nodes: Vec<Word> = source.read_many_iter(count)?.collect::<Result<_, _>>()?;
         Ok(Self { nodes })
     }
 }
