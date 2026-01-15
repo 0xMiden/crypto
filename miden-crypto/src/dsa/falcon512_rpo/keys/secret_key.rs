@@ -414,7 +414,9 @@ impl SecretKey {
 
     /// Computes the FLR basis B = [[g, -f], [G, -F]] in FFT format.
     /// Returns an array [b00, b01, b10, b11] where each is N FLR values in FFT domain.
-    /// This follows fn-dsa's compute_basis_inner approach for precomputation during keygen.
+    ///
+    /// This follows fn-dsa-sign's `compute_basis_inner` approach for precomputation during keygen.
+    /// We cannot use fn-dsa-sign's function directly because `compute_basis_inner` is private.
     fn compute_basis_fft_flr(basis: &ShortLatticeBasis) -> [FLR; 4 * N] {
         use core::array;
 
@@ -503,17 +505,15 @@ impl Serializable for SecretKey {
     fn write_into<W: ByteWriter>(&self, target: &mut W) {
         let basis = &self.secret_key;
 
-        // header
-        let n = basis[0].coefficients.len();
-        // N is always 512 (2^9), so ilog2 cannot fail
-        let l = n.checked_ilog2().expect("N=512 is a power of 2; ilog2 cannot fail") as u8;
-        let header: u8 = (5 << 4) | l;
+        // Header byte format: high nibble = 0101 (5) indicates signing key with trim encoding,
+        // low nibble = log2(N) = 9 for Falcon-512. See fn-dsa specification.
+        let header: u8 = (5 << 4) | LOG_N;
 
         let f = &basis[1];
         let g = &basis[0];
         let big_f = &basis[3];
 
-        let mut buffer = Vec::with_capacity(1281);
+        let mut buffer = Vec::with_capacity(SK_LEN);
         buffer.push(header);
 
         // Coefficients are already i8 values from ShortLatticeBasis
@@ -564,9 +564,9 @@ impl Deserializable for SecretKey {
             ));
         }
 
-        let chunk_size_f = ((n * WIDTH_SMALL_POLY_COEFFICIENT) + 7) >> 3;
-        let chunk_size_g = ((n * WIDTH_SMALL_POLY_COEFFICIENT) + 7) >> 3;
-        let chunk_size_big_f = ((n * WIDTH_BIG_POLY_COEFFICIENT) + 7) >> 3;
+        let chunk_size_f = bits_to_bytes_ceil(n * WIDTH_SMALL_POLY_COEFFICIENT);
+        let chunk_size_g = bits_to_bytes_ceil(n * WIDTH_SMALL_POLY_COEFFICIENT);
+        let chunk_size_big_f = bits_to_bytes_ceil(n * WIDTH_BIG_POLY_COEFFICIENT);
 
         let mut f_i8 = decode_i8(&byte_vector[1..chunk_size_f + 1], WIDTH_SMALL_POLY_COEFFICIENT)
             .ok_or(DeserializationError::InvalidValue(
@@ -589,13 +589,13 @@ impl Deserializable for SecretKey {
         ))?;
 
         // Recompute G
-        let big_g_int = compute_big_g_ext(&f_i8, &g_i8, &big_f_i8);
+        let big_g_ext = compute_big_g_ext(&f_i8, &g_i8, &big_f_i8);
 
         // Convert i8 coefficients to FalconFelt
         let f = Polynomial::new(f_i8.iter().map(|&c| FalconFelt::from(c)).collect());
         let g = Polynomial::new(g_i8.iter().map(|&c| FalconFelt::from(c)).collect());
         let big_f = Polynomial::new(big_f_i8.iter().map(|&c| FalconFelt::from(c)).collect());
-        let big_g = Polynomial::from_u16_ext_array(&big_g_int);
+        let big_g = Polynomial::from_u16_ext_array(&big_g_ext);
 
         // Zeroize intermediate decoded buffers
         f_i8.zeroize();
@@ -617,6 +617,14 @@ impl Deserializable for SecretKey {
 // HELPER FUNCTIONS
 // ================================================================================================
 
+/// Computes the number of bytes needed to store `num_bits` bits, rounding up.
+///
+/// This is equivalent to ceiling division: `(num_bits + 7) / 8`.
+#[inline]
+const fn bits_to_bytes_ceil(num_bits: usize) -> usize {
+    (num_bits + 7) >> 3
+}
+
 /// Encodes a slice of i8 values using fn-dsa-comm's trim encoding.
 ///
 /// # Returns
@@ -628,7 +636,7 @@ impl Deserializable for SecretKey {
 /// the returned buffer after use. The buffer contains a copy of the input data
 /// in encoded form.
 pub fn encode_i8(x: &[i8], bits: usize) -> Option<Vec<u8>> {
-    let out_len = ((x.len() * bits) + 7) >> 3;
+    let out_len = bits_to_bytes_ceil(x.len() * bits);
     let mut buf = vec![0_u8; out_len];
     let written = fn_dsa_comm::codec::trim_i8_encode(x, bits as u32, &mut buf);
     if written == out_len { Some(buf) } else { None }
