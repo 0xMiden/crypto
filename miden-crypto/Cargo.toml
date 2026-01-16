@@ -95,8 +95,9 @@ clap                          = { features = ["derive"], optional = true, versio
 curve25519-dalek              = { default-features = false, version = "4" }
 ed25519-dalek                 = { features = ["zeroize"], version = "2" }
 flume                         = { version = "0.11" }
-fn-dsa-comm                   = { default-features = false, version = "0.3" }
-fn-dsa-kgen                   = { default-features = false, version = "0.3" }
+fn-dsa-comm                   = { default-features = false, git = "https://github.com/0xMiden/rust-fn-dsa", branch = "expose-internals" }
+fn-dsa-kgen                   = { default-features = false, git = "https://github.com/0xMiden/rust-fn-dsa", branch = "expose-internals" }
+fn-dsa-sign                   = { default-features = false, git = "https://github.com/0xMiden/rust-fn-dsa", branch = "expose-internals" }
 hashbrown                     = { features = ["serde"], optional = true, version = "0.16" }
 hkdf                          = { default-features = false, version = "0.12" }
 k256                          = { features = ["ecdh", "ecdsa"], version = "0.13" }
@@ -134,6 +135,8 @@ p3-miden-prover = { default-features = false, version = "0.4.2" }
 [dev-dependencies]
 assert_matches = { default-features = false, version = "1.5" }
 criterion      = { features = ["html_reports"], version = "0.7" }
+fn-dsa-sign    = { git = "https://github.com/0xMiden/rust-fn-dsa", branch = "expose-internals", features = ["testing"] }
+fn-dsa-vrfy    = { git = "https://github.com/0xMiden/rust-fn-dsa", branch = "expose-internals" }
 hex            = { default-features = false, features = ["alloc"], version = "0.4" }
 itertools      = { version = "0.14" }
 proptest       = { default-features = false, features = ["alloc"], version = "1.7" }

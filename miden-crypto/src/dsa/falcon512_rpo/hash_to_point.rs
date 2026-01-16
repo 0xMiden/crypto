@@ -46,37 +46,6 @@ pub fn hash_to_point_rpo256(message: Word, nonce: &Nonce) -> Polynomial<FalconFe
     Polynomial::new(coefficients)
 }
 
-/// Returns a polynomial in Z_p[x]/(phi) representing the hash of the provided message and
-/// nonce using SHAKE256. This is the hash-to-point algorithm used in the reference implementation.
-#[cfg(test)]
-pub fn hash_to_point_shake256(message: &[u8], nonce: &Nonce) -> Polynomial<FalconFelt> {
-    use sha3::{
-        Shake256,
-        digest::{ExtendableOutput, Update, XofReader},
-    };
-
-    let mut data = vec![];
-    data.extend_from_slice(&nonce.as_bytes());
-    data.extend_from_slice(message);
-    const K: u32 = (1u32 << 16) / MODULUS as u32;
-
-    let mut hasher = Shake256::default();
-    hasher.update(&data);
-    let mut reader = hasher.finalize_xof();
-
-    let mut coefficients: Vec<FalconFelt> = Vec::with_capacity(N);
-    while coefficients.len() != N {
-        let mut randomness = [0u8; 2];
-        reader.read(&mut randomness);
-        let t = ((randomness[0] as u32) << 8) | (randomness[1] as u32);
-        if t < K * MODULUS as u32 {
-            coefficients.push(u32_to_falcon_felt(t));
-        }
-    }
-
-    Polynomial { coefficients }
-}
-
 // HELPER FUNCTIONS
 // ================================================================================================
 
@@ -87,13 +56,4 @@ pub fn hash_to_point_shake256(message: &[u8], nonce: &Nonce) -> Polynomial<Falco
 /// converts it to a FalconFelt. The cast to u16 is safe as the Falcon prime (12289) fits in u16.
 fn felt_to_falcon_felt(value: Felt) -> FalconFelt {
     FalconFelt::new((value.as_canonical_u64() % MODULUS as u64) as u16)
-}
-
-/// Converts a `u32` to a field element in the prime field with characteristic the Falcon prime.
-///
-/// Reduces the `u32` value modulo the Falcon prime and converts it to a FalconFelt.
-/// The cast to u16 is safe as the Falcon prime (12289) fits in u16.
-#[cfg(all(test, feature = "std"))]
-fn u32_to_falcon_felt(value: u32) -> FalconFelt {
-    FalconFelt::new((value % MODULUS as u32) as u16)
 }

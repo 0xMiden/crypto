@@ -1,91 +1,10 @@
-use alloc::vec::Vec;
-
-use data::{
-    DETERMINISTIC_SIGNATURE, EXPECTED_SIG, EXPECTED_SIG_POLYS, NUM_TEST_VECTORS, SK_POLYS,
-    SYNC_DATA_FOR_TEST_VECTOR,
-};
-use prng::Shake256Testing;
-use rand::{RngCore, SeedableRng};
+use data::DETERMINISTIC_SIGNATURE;
+use rand::SeedableRng;
 use rand_chacha::ChaCha20Rng;
 
-use super::{Serializable, math::Polynomial};
-use crate::dsa::falcon512_rpo::{
-    PREVERSIONED_NONCE, PREVERSIONED_NONCE_LEN, SIG_NONCE_LEN, SIG_POLY_BYTE_LEN, SecretKey,
-};
+use crate::dsa::falcon512_rpo::{PREVERSIONED_NONCE, PREVERSIONED_NONCE_LEN, SecretKey, Serializable};
 
 mod data;
-mod prng;
-pub(crate) use prng::ChaCha;
-
-/// Tests the Falcon512 implementation using the test vectors in
-/// https://github.com/tprest/falcon.py/blob/88d01ede1d7fa74a8392116bc5149dee57af93f2/scripts/sign_KAT.py#L1131
-#[test]
-fn test_signature_gen_reference_impl() {
-    // message and initial seed used for generating the test vectors in the reference implementation
-    let message = b"data1";
-    let seed = b"external";
-
-    // the reference implementation uses SHAKE256 for generating:
-    // 1. The nonce for the hash-to-point algorithm.
-    // 2. The seed used for initializing the ChaCha20 PRNG which is used in signature generation.
-    let mut rng_shake = Shake256Testing::new(seed.to_vec());
-
-    // the test vectors in the reference implementation include test vectors for signatures with
-    // parameter N = 2^i for i = 1..10, where N is the exponent of the monic irreducible polynomial
-    // phi. We are only interested in the test vectors for N = 2^9 = 512 and thus need to "sync"
-    // the SHAKE256 PRNG before we can use it in testing the test vectors that are relevant for
-    // N = 512.
-    // The following makes the necessary calls to the PRNG in order to prepare it for use with
-    // the test vectors for N = 512.
-    rng_shake.sync_rng();
-
-    for i in 0..NUM_TEST_VECTORS {
-        // construct the four polynomials defining the secret key for this test vector
-        let [f, g, big_f, big_g] = SK_POLYS[i];
-        // Convert from i16 to i8 (test vectors contain small values that fit in i8)
-        let f = Polynomial::new(f.iter().map(|&x| x as i8).collect());
-        let g = Polynomial::new(g.iter().map(|&x| x as i8).collect());
-        let big_f = Polynomial::new(big_f.iter().map(|&x| x as i8).collect());
-        let big_g = Polynomial::new(big_g.iter().map(|&x| x as i8).collect());
-
-        // we generate the secret key using the above four polynomials
-        let sk = SecretKey::from_short_lattice_basis([g, f, big_g, big_f]);
-
-        // we compare the signature as a polynomial
-
-        // 1. first we synchronize the `SHAKE256` context with the one in the reference C
-        // implementation as done in https://github.com/tprest/falcon.py/blob/88d01ede1d7fa74a8392116bc5149dee57af93f2/test.py#L256
-        let skip_bytes = SYNC_DATA_FOR_TEST_VECTOR[i].0 * 8;
-        let mut dummy = vec![0_u8; skip_bytes];
-        rng_shake.fill_bytes(&mut dummy);
-
-        // 2. generate the signature
-        let signature = sk.sign_with_rng_testing(message, &mut rng_shake);
-
-        // 3. compare against the expected signature
-        let sig_coef: Vec<i16> =
-            signature.sig_poly().coefficients.iter().map(|c| c.balanced_value()).collect();
-        assert_eq!(sig_coef, EXPECTED_SIG_POLYS[i]);
-
-        // 4. compare the encoded signatures including the nonce
-        let sig_bytes = &signature.to_bytes();
-        let expected_sig_bytes = EXPECTED_SIG[i];
-        let hex_expected_sig_bytes = hex::decode(expected_sig_bytes).unwrap();
-        // to compare against the test vectors we:
-        // 1. remove the headers when comparing as RPO_FALCON512 uses a different header format,
-        // 2. compare the nonce part separately as the deterministic version we use omits the
-        //    inclusion of the preversioned portion of the nonce by in its serialized format,
-        // 3. we remove the public key from the RPO_FALCON512 signature as this is not part of the
-        //    signature in the reference implementation,
-        // 4. remove the nonce version byte, in addition to the header, from `sig_bytes`.
-        let nonce = signature.nonce();
-        assert_eq!(hex_expected_sig_bytes[1..1 + SIG_NONCE_LEN], nonce.as_bytes());
-        assert_eq!(
-            &hex_expected_sig_bytes[1 + SIG_NONCE_LEN..],
-            &sig_bytes[2..2 + SIG_POLY_BYTE_LEN]
-        );
-    }
-}
 
 #[test]
 fn test_secret_key_debug_redaction() {
@@ -139,4 +58,195 @@ fn build_preversioned_fixed_nonce() -> [u8; PREVERSIONED_NONCE_LEN] {
         .for_each(|(dst, src)| *dst = *src);
 
     result
+}
+
+/// Tests that sign_shake256 produces signatures verifiable by fn-dsa-vrfy.
+///
+/// This test verifies end-to-end compatibility with fn-dsa by:
+/// 1. Creating a secret key
+/// 2. Signing a message using sign_shake256 (SHAKE256 hash-to-point)
+/// 3. Encoding the signature in fn-dsa's format
+/// 4. Verifying with fn-dsa-vrfy's verification code
+#[test]
+fn test_sign_shake256_verified_by_fn_dsa() {
+    use fn_dsa_comm::{codec::comp_encode, signature_size};
+    use fn_dsa_vrfy::{DOMAIN_NONE, HASH_ID_ORIGINAL_FALCON, VerifyingKey, VerifyingKey512};
+
+    const LOGN: u32 = 9;
+
+    // Create a deterministic RNG for reproducibility
+    let mut rng = ChaCha20Rng::from_seed([42u8; 32]);
+
+    // Generate a secret key
+    let sk = SecretKey::with_rng(&mut rng);
+
+    // Get the public key in fn-dsa's format
+    let pk = sk.public_key();
+    let pk_bytes = (&pk).to_bytes();
+
+    // Decode the public key using fn-dsa-vrfy
+    let vk = VerifyingKey512::decode(&pk_bytes).expect("Failed to decode public key");
+
+    // Sign a message using SHAKE256 hash-to-point
+    let message = b"test message for fn-dsa compatibility";
+    let (nonce, s2) = sk.sign_shake256(message, &mut rng);
+
+    // Encode the signature in fn-dsa's format:
+    // sig[0] = 0x30 + logn (header)
+    // sig[1..41] = nonce (40 bytes)
+    // sig[41..] = compressed s2
+    // The signature must be exactly signature_size(logn) = 666 bytes for Falcon-512
+    let sig_len = signature_size(LOGN);
+    let mut sig = vec![0u8; sig_len];
+    sig[0] = 0x30 + (LOGN as u8);
+    sig[1..41].copy_from_slice(&nonce);
+
+    // Compress s2 into the signature
+    let compressed = comp_encode(&s2, &mut sig[41..]);
+    assert!(compressed, "Signature encoding failed");
+
+    // Verify the signature using fn-dsa-vrfy
+    let verified = vk.verify(&sig, &DOMAIN_NONE, &HASH_ID_ORIGINAL_FALCON, message);
+    assert!(verified, "Signature verification failed");
+
+    // Verify that a modified message fails verification
+    let bad_message = b"different message";
+    let bad_verified = vk.verify(&sig, &DOMAIN_NONE, &HASH_ID_ORIGINAL_FALCON, bad_message);
+    assert!(!bad_verified, "Verification should fail for wrong message");
+}
+
+/// End-to-end test against fn-dsa C reference implementation KAT vectors.
+///
+/// This test verifies the complete signing flow by:
+/// 1. Constructing a SecretKey from the KAT basis polynomials (f, g, F, G)
+/// 2. Verifying the derived public key matches the KAT verification key
+/// 3. Signing with the KAT nonce and seed using sign_shake256_inner
+/// 4. Verifying the signature matches the expected KAT signature
+#[test]
+fn test_end_to_end_against_c_reference_kat() {
+    use crate::dsa::falcon512_rpo::{N, SecretKey, math::Polynomial};
+    use data::{
+        FN_DSA_KAT_512_BIG_F, FN_DSA_KAT_512_BIG_G, FN_DSA_KAT_512_F, FN_DSA_KAT_512_G,
+        FN_DSA_KAT_512_RND, FN_DSA_KAT_512_SIG_RAW, FN_DSA_KAT_512_VK,
+    };
+    use fn_dsa_sign::tests::ChaCha20PRNG;
+
+    // Build the short lattice basis [g, f, G, F] from KAT data
+    let basis = [
+        Polynomial::new(FN_DSA_KAT_512_G.iter().map(|&c| c).collect()),  // g
+        Polynomial::new(FN_DSA_KAT_512_F.iter().map(|&c| c).collect()),  // f
+        Polynomial::new(FN_DSA_KAT_512_BIG_G.iter().map(|&c| c).collect()), // G
+        Polynomial::new(FN_DSA_KAT_512_BIG_F.iter().map(|&c| c).collect()), // F
+    ];
+
+    // Construct SecretKey from the basis
+    let sk = SecretKey::from_short_lattice_basis(basis);
+
+    // Verify the public key matches the KAT verification key
+    let pk = sk.public_key();
+    let pk_bytes = (&pk).to_bytes();
+    assert_eq!(
+        pk_bytes.as_slice(),
+        &FN_DSA_KAT_512_VK[..],
+        "Derived public key does not match KAT verification key"
+    );
+
+    // Extract nonce and seed from KAT data
+    let nonce: [u8; 40] = FN_DSA_KAT_512_RND[0..40].try_into().unwrap();
+    let seed: [u8; 56] = FN_DSA_KAT_512_RND[40..96].try_into().unwrap();
+
+    // Sign using the test method with fixed nonce and seed
+    // Use ChaCha20PRNG to match the C reference implementation
+    let message = b"data1";
+    let s2 = sk.sign_shake256_inner::<ChaCha20PRNG>(message, &nonce, &seed);
+
+    // Verify the signature matches the expected KAT value
+    for i in 0..N {
+        assert_eq!(
+            s2[i], FN_DSA_KAT_512_SIG_RAW[i],
+            "Signature mismatch at coefficient {}: got {}, expected {}",
+            i, s2[i], FN_DSA_KAT_512_SIG_RAW[i]
+        );
+    }
+}
+
+/// Tests sign_poly against the fn-dsa C reference implementation KAT vectors.
+///
+/// This test verifies that our sign_poly implementation produces the correct signature
+/// when given the same inputs (basis, hash-to-point result, PRNG seed) as the C reference
+/// implementation. This ensures compatibility with the upstream fn-dsa library.
+#[test]
+fn test_sign_poly_against_c_reference_kat() {
+    use data::{
+        FN_DSA_KAT_512_BIG_F, FN_DSA_KAT_512_BIG_G, FN_DSA_KAT_512_F, FN_DSA_KAT_512_G,
+        FN_DSA_KAT_512_RND, FN_DSA_KAT_512_SIG_RAW, FN_DSA_KAT_512_VK,
+    };
+    use fn_dsa_sign::{
+        flr::FLR,
+        poly::{self, FFT},
+        sign_core::sign_poly,
+        tests::ChaCha20PRNG,
+        DOMAIN_NONE, HASH_ID_ORIGINAL_FALCON,
+    };
+
+    const LOGN: u32 = 9;
+    const N: usize = 512;
+
+    // Build the FFT basis from f, g, F, G
+    // The basis is B = [[g, -f], [G, -F]] stored as [b00, b01, b10, b11]
+    // where b00 = FFT(g), b01 = FFT(-f), b10 = FFT(G), b11 = FFT(-F)
+    let mut basis = [FLR::ZERO; 4 * N];
+    let (b00, rest) = basis.split_at_mut(N);
+    let (b01, rest) = rest.split_at_mut(N);
+    let (b10, b11) = rest.split_at_mut(N);
+
+    // Set small polynomials and convert to FFT domain
+    poly::poly_set_small(LOGN, b01, &FN_DSA_KAT_512_F);
+    poly::poly_set_small(LOGN, b00, &FN_DSA_KAT_512_G);
+    poly::poly_set_small(LOGN, b11, &FN_DSA_KAT_512_BIG_F);
+    poly::poly_set_small(LOGN, b10, &FN_DSA_KAT_512_BIG_G);
+    FFT(LOGN, b01);
+    FFT(LOGN, b00);
+    FFT(LOGN, b11);
+    FFT(LOGN, b10);
+    poly::poly_neg(LOGN, b01);
+    poly::poly_neg(LOGN, b11);
+
+    // Compute hash-to-point using the original Falcon rules
+    // For original Falcon: hash = SHAKE256(nonce || message)
+    let nonce = &FN_DSA_KAT_512_RND[0..40];
+    let message = b"data1";
+
+    // Hash the verification key for the hash-to-point input
+    let mut hvk = [0u8; 64];
+    {
+        use fn_dsa_comm::shake::SHAKE256;
+        let mut sh = SHAKE256::new();
+        sh.inject(&FN_DSA_KAT_512_VK);
+        sh.flip();
+        sh.extract(&mut hvk);
+    }
+
+    // Compute hash-to-point
+    let mut hm = [0u16; N];
+    fn_dsa_comm::hash_to_point(nonce, &hvk, &DOMAIN_NONE, &HASH_ID_ORIGINAL_FALCON, message, &mut hm);
+
+    // Extract the PRNG seed (bytes 40-95 of KAT_512_RND)
+    let seed: [u8; 56] = FN_DSA_KAT_512_RND[40..96].try_into().unwrap();
+
+    // Allocate temporary buffer
+    let mut tmp = [FLR::ZERO; 9 * N];
+
+    // Sign using sign_poly with ChaCha20PRNG
+    let s2 = sign_poly::<ChaCha20PRNG>(LOGN, &hm, &seed, &basis, &mut tmp);
+
+    // Verify the signature matches the expected KAT value
+    assert_eq!(s2.len(), N);
+    for i in 0..N {
+        assert_eq!(
+            s2[i], FN_DSA_KAT_512_SIG_RAW[i],
+            "Mismatch at coefficient {}: got {}, expected {}",
+            i, s2[i], FN_DSA_KAT_512_SIG_RAW[i]
+        );
+    }
 }

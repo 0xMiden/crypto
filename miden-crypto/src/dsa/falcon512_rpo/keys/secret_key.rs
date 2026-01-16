@@ -7,8 +7,8 @@ use rand::{CryptoRng, Rng, RngCore};
 
 use super::{
     super::{
-        ByteReader, ByteWriter, Deserializable, DeserializationError, MODULUS, N, Nonce,
-        SIG_L2_BOUND, Serializable, ShortLatticeBasis, Signature,
+        ByteReader, ByteWriter, Deserializable, DeserializationError, N, Nonce, Serializable,
+        ShortLatticeBasis, Signature,
         math::{FalconFelt, Polynomial, flr::FLR},
         signature::SignaturePoly,
     },
@@ -17,7 +17,6 @@ use super::{
 use crate::{
     Word,
     dsa::falcon512_rpo::{LOG_N, PK_LEN, SK_LEN, hash_to_point::hash_to_point_rpo256},
-    hash::blake::Blake3_256,
     utils::zeroize::{Zeroize, ZeroizeOnDrop},
 };
 
@@ -148,57 +147,112 @@ impl SecretKey {
     // SIGNATURE GENERATION
     // --------------------------------------------------------------------------------------------
 
-    /// Signs a message with this secret key.
-    pub fn sign(&self, message: crate::Word) -> Signature {
-        use rand::SeedableRng;
-        use rand_chacha::ChaCha20Rng;
-
-        let mut seed = self.generate_seed(&message);
-        let mut rng = ChaCha20Rng::from_seed(seed);
-        let signature = self.sign_with_rng(message, &mut rng);
-
-        // Zeroize the seed to prevent leakage
+    /// Signs a message with this secret key using deterministic signing.
+    ///
+    /// The signing seed is derived from the message and secret key using BLAKE3,
+    /// ensuring the same message always produces the same signature.
+    pub fn sign(&self, message: Word) -> Signature {
+        let mut seed = self.generate_signing_seed(&message);
+        let sig = self.sign_with_seed(message, &seed);
         seed.zeroize();
-
-        signature
+        sig
     }
 
-    /// Signs a message with the secret key relying on the provided randomness generator.
+    /// Signs a message with the secret key using the provided randomness generator.
+    ///
+    /// The RNG is used to generate the 56-byte seed for the internal SHAKE256 PRNG.
     pub fn sign_with_rng<R: Rng>(&self, message: Word, rng: &mut R) -> Signature {
-        let nonce = Nonce::deterministic();
+        let mut seed = [0u8; 56];
+        rng.fill_bytes(&mut seed);
+        let sig = self.sign_with_seed(message, &seed);
+        seed.zeroize();
+        sig
+    }
 
+    /// Signs a message using the provided 56-byte seed for the PRNG.
+    fn sign_with_seed(&self, message: Word, seed: &[u8; 56]) -> Signature {
+        use fn_dsa_comm::shake::SHAKE256_PRNG;
+
+        let nonce = Nonce::deterministic();
         let h = self.compute_pub_key_poly();
         let c = hash_to_point_rpo256(message, &nonce);
-        let s2 = self.sign_helper(c, rng);
+        let s2 = self.sign_helper::<SHAKE256_PRNG>(c, seed);
 
         Signature::new(nonce, h, s2)
     }
 
-    /// Signs a message with the secret key relying on the provided randomness generator.
+    /// Signs a byte message using SHAKE256 hash-to-point with a random nonce.
     ///
-    /// This is similar to [SecretKey::sign_with_rng()] and is used only for testing with
-    /// the main difference being that this method:
+    /// This produces signatures that match fn-dsa 1-to-1, using:
+    /// - SHAKE256-based hash-to-point (original Falcon)
+    /// - Random 40-byte nonce from the provided RNG
+    /// - SHAKE256 PRNG for Gaussian sampling
     ///
-    /// 1. uses `SHAKE256` for the hash-to-point algorithm, and
-    /// 2. uses `ChaCha20` in `Self::sign_helper`.
+    /// Returns a tuple of (nonce, s2_coefficients) representing the raw signature components.
+    /// These can be encoded into fn-dsa's signature format if needed.
     ///
-    /// Hence, in contrast to `Self::sign_with_rng`, the current method uses different random
-    /// number generators for generating the nonce and in `Self::sign_helper`.
+    /// # Parameters
+    /// - `message`: The byte message to sign
+    /// - `rng`: Random number generator for nonce and PRNG seed generation
     ///
-    /// These changes make the signature algorithm compliant with the reference implementation.
-    #[cfg(test)]
-    pub fn sign_with_rng_testing<R: Rng>(&self, message: &[u8], rng: &mut R) -> Signature {
-        use crate::dsa::falcon512_rpo::{hash_to_point::hash_to_point_shake256, tests::ChaCha};
+    /// # Returns
+    /// A tuple containing:
+    /// - `nonce`: The 40-byte random nonce used in signing
+    /// - `s2`: The signature polynomial coefficients as i16 values
+    pub fn sign_shake256<R: Rng>(&self, message: &[u8], rng: &mut R) -> ([u8; 40], [i16; N]) {
+        use fn_dsa_comm::shake::SHAKE256_PRNG;
 
-        let nonce = Nonce::random(rng);
+        // Generate random 40-byte nonce
+        let mut nonce = [0u8; 40];
+        rng.fill_bytes(&mut nonce);
 
-        let h = self.compute_pub_key_poly();
-        let c = hash_to_point_shake256(message, &nonce);
+        // Generate random 56-byte seed for PRNG
+        let mut seed = [0u8; 56];
+        rng.fill_bytes(&mut seed);
 
-        let mut chacha_prng = ChaCha::new(rng);
-        let s2 = self.sign_helper(c, &mut chacha_prng);
+        let s2 = self.sign_shake256_inner::<SHAKE256_PRNG>(message, &nonce, &seed);
 
-        Signature::new(nonce, h, s2)
+        // Zeroize seed
+        seed.zeroize();
+
+        (nonce, s2)
+    }
+
+    /// Inner implementation for SHAKE256 hash-to-point signing.
+    ///
+    /// Generic over PRNG type to support both production use (SHAKE256_PRNG) and
+    /// KAT testing (ChaCha20PRNG to match the C reference implementation).
+    pub(crate) fn sign_shake256_inner<P: fn_dsa_comm::PRNG>(
+        &self,
+        message: &[u8],
+        nonce: &[u8; 40],
+        seed: &[u8; 56],
+    ) -> [i16; N] {
+        use fn_dsa_comm::{DOMAIN_NONE, HASH_ID_ORIGINAL_FALCON, shake::SHAKE256};
+
+        // Compute hvk = SHAKE256(verification_key)
+        let pk = self.compute_pub_key_poly();
+        let vk_bytes = (&pk).to_bytes();
+        let mut hvk = [0u8; 64];
+        {
+            let mut sh = SHAKE256::new();
+            sh.inject(&vk_bytes);
+            sh.flip();
+            sh.extract(&mut hvk);
+        }
+
+        // Compute hash-to-point using SHAKE256 (original Falcon)
+        let mut hm = [0u16; N];
+        fn_dsa_comm::hash_to_point(nonce, &hvk, &DOMAIN_NONE, &HASH_ID_ORIGINAL_FALCON, message, &mut hm);
+
+        // Convert hm to FalconFelt polynomial for sign_helper
+        let c = Polynomial::new(hm.iter().map(|&v| FalconFelt::new(v)).collect());
+
+        // Sign using the internal helper with the specified PRNG type
+        let s2_poly = self.sign_helper::<P>(c, seed);
+
+        // Convert SignaturePoly to i16 array
+        core::array::from_fn(|i| s2_poly.coefficients[i].balanced_value())
     }
 
     // HELPER METHODS
@@ -227,237 +281,54 @@ impl SecretKey {
 
     /// Signs a message polynomial with the secret key using FLR-based ffsampling.
     ///
-    /// This implementation uses Fixed-point Linear Real (FLR) arithmetic ported from
-    /// rust-fn-dsa. FLR selects a backend at compile time (native/AVX2 or emulated) depending
-    /// on the target, and provides deterministic, no_std compatible signing without requiring
-    /// floating-point hardware.
+    /// This is a thin wrapper around `fn_dsa_sign::sign_core::sign_poly` which handles
+    /// the Gaussian sampling and norm bound checking. This implementation uses Fixed-point
+    /// Linear Real (FLR) arithmetic from rust-fn-dsa, providing deterministic, no_std
+    /// compatible signing without requiring floating-point hardware.
     ///
-    /// Following fn-dsa's default mode, the FFT basis is precomputed during keygen. During
-    /// signing, the Gram matrix is computed from the FFT basis (6 polynomial multiplications),
-    /// then the LDL decomposition is computed on-the-fly during recursive sampling. This
-    /// approach is faster than precomputing the full LDL tree due to better cache locality.
-    ///
-    /// Takes a randomness generator implementing `Rng` and message polynomial representing `c`
-    /// the hash-to-point of the message to be signed. It outputs a signature polynomial `s2`.
-    pub(crate) fn sign_helper<R: Rng>(
+    /// Takes a 56-byte seed and message polynomial representing `c` the hash-to-point of the
+    /// message to be signed. It outputs a signature polynomial `s2`.
+    pub(crate) fn sign_helper<P: fn_dsa_comm::PRNG>(
         &self,
         c: Polynomial<FalconFelt>,
-        rng: &mut R,
+        seed: &[u8; 56],
     ) -> SignaturePoly {
-        use super::super::math::flr::{
-            poly::{
-                FFT, iFFT, poly_add, poly_mul_fft, poly_muladj_fft, poly_mulconst,
-                poly_mulownadj_fft,
-            },
-            sampler::Sampler,
-        };
+        use fn_dsa_sign::{flr::FLR as FnFLR, sign_core::sign_poly};
         const LOGN_U32: u32 = LOG_N as u32;
 
-        // Use precomputed FFT basis B = [[g, -f], [G, -F]]
-        // Layout: [b00, b01, b10, b11] where b01 and b11 are already negated
-        let b00 = &self.basis_fft_flr[0..N]; // g in FFT
-        let b01 = &self.basis_fft_flr[N..2 * N]; // -f in FFT
-        let b10 = &self.basis_fft_flr[2 * N..3 * N]; // G in FFT
-        let b11 = &self.basis_fft_flr[3 * N..4 * N]; // -F in FFT
+        // Convert hash-to-point polynomial to u16 coefficients
+        let hm: Vec<u16> = c.coefficients.iter().map(|f| f.value()).collect();
 
-        // Compute Gram matrix G = B^H * B from precomputed FFT basis
-        // This is much faster than computing from scratch (6 muls vs 4 FFTs + 6 muls)
-        let mut g00 = [FLR::ZERO; N];
-        let mut g01 = [FLR::ZERO; N];
-        let mut g11 = [FLR::ZERO; N];
-        let mut temp = [FLR::ZERO; N];
+        // Allocate temporary buffer (sign_poly requires at least 9*N FLR elements)
+        let mut tmp = vec![FnFLR::ZERO; 9 * N];
 
-        // g00 = b00*adj(b00) + b01*adj(b01)
-        g00.copy_from_slice(b00);
-        poly_mulownadj_fft(LOGN_U32, &mut g00);
-        temp.copy_from_slice(b01);
-        poly_mulownadj_fft(LOGN_U32, &mut temp);
-        poly_add(LOGN_U32, &mut g00, &temp);
+        // Call sign_poly which handles sampling, norm checking, and retry loop
+        let s2_vec = sign_poly::<P>(LOGN_U32, &hm, seed, &self.basis_fft_flr, &mut tmp);
 
-        // g01 = b00*adj(b10) + b01*adj(b11)
-        g01.copy_from_slice(b00);
-        poly_muladj_fft(LOGN_U32, &mut g01, b10);
-        temp.copy_from_slice(b01);
-        poly_muladj_fft(LOGN_U32, &mut temp, b11);
-        poly_add(LOGN_U32, &mut g01, &temp);
+        // Zeroize temporary buffer
+        tmp.zeroize();
 
-        // g11 = b10*adj(b10) + b11*adj(b11)
-        g11.copy_from_slice(b10);
-        poly_mulownadj_fft(LOGN_U32, &mut g11);
-        temp.copy_from_slice(b11);
-        poly_mulownadj_fft(LOGN_U32, &mut temp);
-        poly_add(LOGN_U32, &mut g11, &temp);
+        // Convert to SignaturePoly
+        let s2_coef: [i16; N] = s2_vec
+            .try_into()
+            .expect("sign_poly returns exactly N coefficients");
 
-        // Convert hash-to-point polynomial c to FLR and transform to FFT domain
-        let mut c_fft: [FLR; N] =
-            core::array::from_fn(|i| FLR::from_i32(c.coefficients[i].value() as i32));
-        FFT(LOGN_U32, &mut c_fft);
-
-        // Compute target vectors: t0 = -(c/q) * F, t1 = (c/q) * f
-        // Note: b11 = -F and b01 = -f from precomputed basis
-        let one_over_q = FLR::from_f64(1.0 / (MODULUS as f64));
-        let mut t0 = c_fft;
-        let mut t1 = c_fft;
-
-        // t0 = (c/q) * b11 = (c/q) * (-F) = -(c/q) * F
-        poly_mulconst(LOGN_U32, &mut t0, one_over_q);
-        let mut b11_copy = [FLR::ZERO; N];
-        b11_copy.copy_from_slice(b11);
-        poly_mul_fft(LOGN_U32, &mut t0, &b11_copy);
-
-        // t1 = -(c/q) * b01 = -(c/q) * (-f) = (c/q) * f
-        poly_mulconst(LOGN_U32, &mut t1, one_over_q);
-        let mut b01_copy = [FLR::ZERO; N];
-        b01_copy.copy_from_slice(b01);
-        poly_mul_fft(LOGN_U32, &mut t1, &b01_copy);
-        for t in t1.iter_mut().take(N) {
-            *t = -*t;
-        }
-
-        // Create sampler with RNG adapter
-        let rng_adapter = RngAdapter { rng };
-        let mut sampler = Sampler::new(rng_adapter, LOGN_U32);
-        let mut tmp = vec![FLR::ZERO; 4 * N];
-
-        loop {
-            let bold_s = loop {
-                // Clone Gram matrix for this iteration
-                let mut g00_work = g00;
-                let mut g01_work = g01;
-                let mut g11_work = g11;
-
-                // Sample z from discrete Gaussian using Gram matrix
-                let mut t0_work = t0;
-                let mut t1_work = t1;
-                sampler.ffsamp_fft(
-                    &mut t0_work,
-                    &mut t1_work,
-                    &mut g00_work,
-                    &mut g01_work,
-                    &mut g11_work,
-                    &mut tmp,
-                );
-
-                // Compute t - z
-                let mut t0_min_z0 = t0;
-                let mut t1_min_z1 = t1;
-                for i in 0..N {
-                    t0_min_z0[i] -= t0_work[i];
-                    t1_min_z1[i] -= t1_work[i];
-                }
-
-                // Compute s = (t - z) * B where B = [[g, -f], [G, -F]]
-                // s0 = (t0-z0) * g + (t1-z1) * G
-                let mut s0 = t0_min_z0;
-                let mut b00_copy = [FLR::ZERO; N];
-                b00_copy.copy_from_slice(b00);
-                poly_mul_fft(LOGN_U32, &mut s0, &b00_copy);
-                let mut temp = t1_min_z1;
-                let mut b10_copy = [FLR::ZERO; N];
-                b10_copy.copy_from_slice(b10);
-                poly_mul_fft(LOGN_U32, &mut temp, &b10_copy);
-                poly_add(LOGN_U32, &mut s0, &temp);
-
-                // s1 = (t0-z0) * (-f) + (t1-z1) * (-F) = (t0-z0) * b01 + (t1-z1) * b11
-                let mut s1 = t0_min_z0;
-                b01_copy.copy_from_slice(b01);
-                poly_mul_fft(LOGN_U32, &mut s1, &b01_copy);
-                let mut temp = t1_min_z1;
-                b11_copy.copy_from_slice(b11);
-                poly_mul_fft(LOGN_U32, &mut temp, &b11_copy);
-                poly_add(LOGN_U32, &mut s1, &temp);
-
-                // Compute norm ||s||² in FFT domain
-                let mut length_squared = 0.0_f64;
-                for i in 0..(N / 2) {
-                    let s0_re = s0[i].to_f64();
-                    let s0_im = s0[i + N / 2].to_f64();
-                    let s1_re = s1[i].to_f64();
-                    let s1_im = s1[i + N / 2].to_f64();
-                    length_squared += s0_re * s0_re + s0_im * s0_im;
-                    length_squared += s1_re * s1_re + s1_im * s1_im;
-                }
-                length_squared /= N as f64;
-
-                if length_squared > (SIG_L2_BOUND as f64) {
-                    continue;
-                }
-
-                // Negate s0 for output format
-                for s in s0.iter_mut().take(N) {
-                    *s = -*s;
-                }
-
-                break [s0, s1];
-            };
-
-            // Transform s1 back to coefficient domain via inverse FFT
-            let mut s2_fft = bold_s[1];
-            iFFT(LOGN_U32, &mut s2_fft);
-
-            // Convert FLR values to i16 coefficients
-            // The collect and try_into should never fail since we're collecting exactly N elements
-            let s2_coef: [i16; N] = s2_fft[0..N]
-                .iter()
-                .map(|a| (*a).to_f64().round() as i16)
-                .collect::<Vec<i16>>()
-                .try_into()
-                .expect("collected exactly N coefficients; conversion to [i16; N] cannot fail");
-
-            if let Ok(s2) = SignaturePoly::try_from(&s2_coef) {
-                // Zeroize temporary buffer
-                tmp.zeroize();
-                return s2;
-            }
-        }
+        SignaturePoly::try_from(&s2_coef)
+            .expect("signature from sign_poly should be valid; norm was already checked")
     }
 
     /// Computes the FLR basis B = [[g, -f], [G, -F]] in FFT format.
     /// Returns an array [b00, b01, b10, b11] where each is N FLR values in FFT domain.
-    ///
-    /// This follows fn-dsa-sign's `compute_basis_inner` approach for precomputation during keygen.
-    /// We cannot use fn-dsa-sign's function directly because `compute_basis_inner` is private.
     fn compute_basis_fft_flr(basis: &ShortLatticeBasis) -> [FLR; 4 * N] {
-        use core::array;
-
-        use super::super::math::flr::poly::{FFT, poly_set_small};
-        const LOGN_U32: u32 = LOG_N as u32;
-
-        // Convert basis coefficients to fixed-size arrays for poly_set_small
-        // Basis is already i8, so no type conversion needed
-        let basis_i8: [[i8; N]; 4] = [
-            array::from_fn(|i| basis[0].coefficients[i]),
-            array::from_fn(|i| basis[1].coefficients[i]),
-            array::from_fn(|i| basis[2].coefficients[i]),
-            array::from_fn(|i| basis[3].coefficients[i]),
-        ];
-
         let mut result = [FLR::ZERO; 4 * N];
 
-        // Split result into b00, b01, b10, b11
-        let (b00, rest) = result.split_at_mut(N);
-        let (b01, rest) = rest.split_at_mut(N);
-        let (b10, rest) = rest.split_at_mut(N);
-        let (b11, _) = rest.split_at_mut(N);
+        // basis is stored as [g, f, G, F]
+        let g = &basis[0].coefficients;
+        let f = &basis[1].coefficients;
+        let big_g = &basis[2].coefficients;
+        let big_f = &basis[3].coefficients;
 
-        // Load basis: stored as B = [[g, f], [G, F]]
-        poly_set_small(LOGN_U32, b00, &basis_i8[0]); // g
-        poly_set_small(LOGN_U32, b01, &basis_i8[1]); // f
-        poly_set_small(LOGN_U32, b10, &basis_i8[2]); // G
-        poly_set_small(LOGN_U32, b11, &basis_i8[3]); // F
-
-        // Transform to FFT domain
-        FFT(LOGN_U32, b00);
-        FFT(LOGN_U32, b01);
-        FFT(LOGN_U32, b10);
-        FFT(LOGN_U32, b11);
-
-        // Negate f and F in FFT domain to get signing basis B = [[g, -f], [G, -F]]
-        // (matches fn-dsa-sign's compute_basis_inner)
-        for i in 0..N {
-            b01[i] = -b01[i];
-            b11[i] = -b11[i];
-        }
+        fn_dsa_sign::compute_basis_inner(LOG_N as u32, f, g, big_f, big_g, &mut result);
 
         result
     }
@@ -474,18 +345,20 @@ impl SecretKey {
     /// different versions of the Falcon DSA, see [1] Section 3.4.1.
     ///
     /// [1]: https://github.com/algorand/falcon/blob/main/falcon-det.pdf
-    fn generate_seed(&self, message: &Word) -> [u8; 32] {
-        let mut buffer = Vec::with_capacity(1 + SK_LEN + Word::SERIALIZED_SIZE);
-        buffer.push(LOG_N);
-        buffer.extend_from_slice(&self.to_bytes());
-        buffer.extend_from_slice(&message.to_bytes());
+    /// Generates a 56-byte signing seed from the message and secret key.
+    ///
+    /// This uses BLAKE3 in XOF mode to produce a deterministic seed for the
+    /// SHAKE256 PRNG used in signing.
+    fn generate_signing_seed(&self, message: &Word) -> [u8; 56] {
+        let mut hasher = blake3::Hasher::new();
+        hasher.update(&[LOG_N]);
+        hasher.update(&self.to_bytes());
+        hasher.update(&message.to_bytes());
 
-        let digest = Blake3_256::hash(&buffer);
+        let mut seed = [0u8; 56];
+        hasher.finalize_xof().fill(&mut seed);
 
-        // Zeroize the buffer as it contains secret key material
-        buffer.zeroize();
-
-        digest.into()
+        seed
     }
 }
 
@@ -545,70 +418,47 @@ impl Deserializable for SecretKey {
     fn read_from<R: ByteReader>(source: &mut R) -> Result<Self, DeserializationError> {
         let byte_vector: [u8; SK_LEN] = source.read_array()?;
 
-        // read fields
-        let header = byte_vector[0];
+        // Decode using fn-dsa's decode_inner which handles f, g, F decoding and G computation
+        let mut f = [0i8; N];
+        let mut g = [0i8; N];
+        let mut big_f = [0i8; N];
+        let mut big_g = [0i8; N];
+        let mut vrfy_key = [0u8; PK_LEN];
+        let mut hashed_vrfy_key = [0u8; 64];
+        let mut tmp = [0u16; 2 * N];
 
-        // check fixed bits in header
-        if (header >> 4) != 5 {
-            return Err(DeserializationError::InvalidValue("Invalid header format".to_string()));
-        }
+        let logn = fn_dsa_sign::decode_inner(
+            LOG_N as u32,
+            LOG_N as u32,
+            &mut f,
+            &mut g,
+            &mut big_f,
+            &mut big_g,
+            &mut vrfy_key,
+            &mut hashed_vrfy_key,
+            &mut tmp,
+            &byte_vector,
+        )
+        .ok_or(DeserializationError::InvalidValue(
+            "Failed to decode secret key".to_string(),
+        ))?;
 
-        // check log n
-        let logn = (header & 15) as usize;
-        let n = 1 << logn;
-
-        // match against const variant generic parameter
-        if n != N {
+        if logn != LOG_N as u32 {
             return Err(DeserializationError::InvalidValue(
                 "Unsupported Falcon DSA variant".to_string(),
             ));
         }
 
-        let chunk_size_f = bits_to_bytes_ceil(n * WIDTH_SMALL_POLY_COEFFICIENT);
-        let chunk_size_g = bits_to_bytes_ceil(n * WIDTH_SMALL_POLY_COEFFICIENT);
-        let chunk_size_big_f = bits_to_bytes_ceil(n * WIDTH_BIG_POLY_COEFFICIENT);
+        // Zeroize temporaries
+        tmp.fill(0);
+        hashed_vrfy_key.fill(0);
 
-        let mut f_i8 = decode_i8(&byte_vector[1..chunk_size_f + 1], WIDTH_SMALL_POLY_COEFFICIENT)
-            .ok_or(DeserializationError::InvalidValue(
-            "Failed to decode f coefficients".to_string(),
-        ))?;
-        let mut g_i8 = decode_i8(
-            &byte_vector[chunk_size_f + 1..(chunk_size_f + chunk_size_g + 1)],
-            WIDTH_SMALL_POLY_COEFFICIENT,
-        )
-        .ok_or(DeserializationError::InvalidValue(
-            "Failed to decode g coefficients".to_string(),
-        ))?;
-        let mut big_f_i8 = decode_i8(
-            &byte_vector[(chunk_size_f + chunk_size_g + 1)
-                ..(chunk_size_f + chunk_size_g + chunk_size_big_f + 1)],
-            WIDTH_BIG_POLY_COEFFICIENT,
-        )
-        .ok_or(DeserializationError::InvalidValue(
-            "Failed to decode F coefficients".to_string(),
-        ))?;
-
-        // Recompute G
-        let big_g_ext = compute_big_g_ext(&f_i8, &g_i8, &big_f_i8);
-
-        // Convert i8 coefficients to FalconFelt
-        let f = Polynomial::new(f_i8.iter().map(|&c| FalconFelt::from(c)).collect());
-        let g = Polynomial::new(g_i8.iter().map(|&c| FalconFelt::from(c)).collect());
-        let big_f = Polynomial::new(big_f_i8.iter().map(|&c| FalconFelt::from(c)).collect());
-        let big_g = Polynomial::from_u16_ext_array(&big_g_ext);
-
-        // Zeroize intermediate decoded buffers
-        f_i8.zeroize();
-        g_i8.zeroize();
-        big_f_i8.zeroize();
-
-        // Store basis as [g, f, G, F] without negations
-        // Convert from FalconFelt to i8 (values are guaranteed to fit in i8 range)
+        // Store basis as [g, f, G, F]
         let basis = [
-            g.map(|f| f.balanced_value() as i8),
-            f.map(|f| f.balanced_value() as i8),
-            big_g.map(|f| f.balanced_value() as i8),
-            big_f.map(|f| f.balanced_value() as i8),
+            Polynomial::new(g.to_vec()),
+            Polynomial::new(f.to_vec()),
+            Polynomial::new(big_g.to_vec()),
+            Polynomial::new(big_f.to_vec()),
         ];
         Ok(Self::from_short_lattice_basis(basis))
     }
@@ -640,84 +490,6 @@ pub fn encode_i8(x: &[i8], bits: usize) -> Option<Vec<u8>> {
     let mut buf = vec![0_u8; out_len];
     let written = fn_dsa_comm::codec::trim_i8_encode(x, bits as u32, &mut buf);
     if written == out_len { Some(buf) } else { None }
-}
-
-/// Decodes a buffer into a slice of i8 values using fn-dsa-comm's trim decoding.
-///
-/// # Returns
-/// - `Some(Vec<i8>)` containing the decoded coefficients if successful
-/// - `None` if decoding fails (invalid input format)
-///
-/// # Security Note
-/// When decoding secret key material, the caller is responsible for zeroizing
-/// the returned vector after use. The decoded data contains secret key coefficients.
-pub fn decode_i8(buf: &[u8], bits: usize) -> Option<Vec<i8>> {
-    let mut x = vec![0_i8; N];
-    fn_dsa_comm::codec::trim_i8_decode(buf, &mut x, bits as u32)?;
-    Some(x)
-}
-
-/// Computes big G in external representation given small f, g, and F using fn-dsa mq routines.
-/// This mirrors fn-dsa's derivation: h = g/f (mod q), then G = h * F (mod q) in NTT domain.
-fn compute_big_g_ext(f_i8: &[i8], g_i8: &[i8], big_f_i8: &[i8]) -> [u16; N] {
-    debug_assert_eq!(f_i8.len(), N);
-    debug_assert_eq!(g_i8.len(), N);
-    debug_assert_eq!(big_f_i8.len(), N);
-
-    const LOGN_U32: u32 = LOG_N as u32;
-
-    // h = g/f mod q (external representation)
-    let mut h = [0u16; N];
-    let mut tmp = [0u16; N];
-    mq::mqpoly_div_small(LOGN_U32, f_i8, g_i8, &mut h, &mut tmp);
-
-    // h in NTT domain
-    let mut h_ntt = h;
-    mq::mqpoly_ext_to_int(LOGN_U32, &mut h_ntt);
-    mq::mqpoly_int_to_NTT(LOGN_U32, &mut h_ntt);
-
-    // F in NTT domain
-    let mut big_f_ntt = [0u16; N];
-    mq::mqpoly_small_to_int(LOGN_U32, big_f_i8, &mut big_f_ntt);
-    mq::mqpoly_int_to_NTT(LOGN_U32, &mut big_f_ntt);
-
-    // G = h * F (external representation)
-    let mut big_g_int = big_f_ntt;
-    mq::mqpoly_mul_ntt(LOGN_U32, &mut big_g_int, &h_ntt);
-    mq::mqpoly_NTT_to_int(LOGN_U32, &mut big_g_int);
-    mq::mqpoly_int_to_ext(LOGN_U32, &mut big_g_int);
-
-    // Zeroize temporaries holding secret-derived values
-    h.fill(0);
-    tmp.fill(0);
-    h_ntt.fill(0);
-    big_f_ntt.fill(0);
-
-    big_g_int
-}
-
-// RNG ADAPTER
-// ================================================================================================
-
-/// Adapter to make a `Rng` compatible with `SamplerRng` trait.
-struct RngAdapter<R: Rng> {
-    rng: R,
-}
-
-impl<R: Rng> crate::dsa::falcon512_rpo::math::flr::sampler::SamplerRng for RngAdapter<R> {
-    fn next_u8(&mut self) -> u8 {
-        // Use fill_bytes to get exactly 1 byte efficiently
-        let mut buf = [0u8; 1];
-        self.rng.fill_bytes(&mut buf);
-        buf[0]
-    }
-
-    fn next_u64(&mut self) -> u64 {
-        // Use fill_bytes to get exactly 8 bytes efficiently
-        let mut buf = [0u8; 8];
-        self.rng.fill_bytes(&mut buf);
-        u64::from_le_bytes(buf)
-    }
 }
 
 /// Adapts a rand 0.9 RNG to the rand_core 0.6 traits expected by fn-dsa keygen.

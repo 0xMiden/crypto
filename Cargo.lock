@@ -614,8 +614,6 @@ dependencies = [
 [[package]]
 name = "fn-dsa-comm"
 version = "0.3.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "28104bba227c79bff8ffe34dff7c5a5631fd790dfd4d4f0a84b01952ef7c6f46"
 dependencies = [
  "cpufeatures",
  "rand_core 0.6.4",
@@ -624,11 +622,25 @@ dependencies = [
 [[package]]
 name = "fn-dsa-kgen"
 version = "0.3.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b8a04fe82799cc1550d32778b415648d1962a7b4b4860ff5f2e6ca32494fc9aa"
 dependencies = [
  "fn-dsa-comm",
  "zeroize",
+]
+
+[[package]]
+name = "fn-dsa-sign"
+version = "0.3.0"
+dependencies = [
+ "fn-dsa-comm",
+ "zeroize",
+]
+
+[[package]]
+name = "fn-dsa-vrfy"
+version = "0.3.0"
+source = "git+https://github.com/0xMiden/rust-fn-dsa?branch=expose-internals#7d76bf3b81e8ad7f0fc53d8ec23d265f257784d9"
+dependencies = [
+ "fn-dsa-comm",
 ]
 
 [[package]]
@@ -979,6 +991,8 @@ dependencies = [
  "flume",
  "fn-dsa-comm",
  "fn-dsa-kgen",
+ "fn-dsa-sign",
+ "fn-dsa-vrfy",
  "glob",
  "hashbrown",
  "hex",

@@ -22,7 +22,7 @@ use crate::{Word, utils::zeroize::Zeroize};
 ///
 /// The signature  verifies against a public key `pk` if and only if:
 /// 1. s1 = c - s2 * h
-/// 2. |s1|^2 + |s2|^2 <= SIG_L2_BOUND
+/// 2. |s1|^2 + |s2|^2 <= β² (where β² = 34034726 for Falcon-512)
 ///
 /// where |.| is the norm and:
 /// - c = HashToPoint(r || message)

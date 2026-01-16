@@ -100,9 +100,6 @@ const SIG_POLY_BYTE_LEN: usize = 625;
 #[cfg(test)]
 const SIG_SERIALIZED_LEN: usize = 1524;
 
-/// Bound on the squared-norm of the signature.
-const SIG_L2_BOUND: u64 = 34034726;
-
 // TYPE ALIASES
 // ================================================================================================
 
