@@ -1,3 +1,7 @@
+## 0.20.2 (2026-01-16)
+
+- Changed `SmtForest` so that `EMPTY_WORD` is treated as removals ([#780](https://github.com/0xMiden/crypto/pull/780)).
+
 # 0.20.1 (2025-12-29)
 
 - Added more re-exports from Plonky3 dependencies ([#741](https://github.com/0xMiden/crypto/pull/741)).
