@@ -1,4 +1,6 @@
-## 0.21.0 (TBD)
+## 0.22.0 (TBD)
+
+- Replaced `Subtree` internal storage with bitmask layout ([#784](https://github.com/0xMiden/crypto/pull/784)).
 
 ## 0.21.0 (2026-01-14)
 
