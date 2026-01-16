@@ -3,7 +3,7 @@ use itertools::Itertools;
 
 use super::{EmptySubtreeRoots, MerkleError, SmtForest, Word};
 use crate::{
-    Felt, ONE, WORD_SIZE, ZERO,
+    EMPTY_WORD, Felt, ONE, WORD_SIZE, ZERO,
     merkle::{
         int_to_node,
         smt::{SMT_DEPTH, SmtProofError},
@@ -170,6 +170,24 @@ fn test_open_root_in_store() -> Result<(), MerkleError> {
             &root,
         )
         .expect("proof should verify membership");
+
+    Ok(())
+}
+
+#[test]
+fn test_empty_word_removes_key() -> Result<(), MerkleError> {
+    let mut forest = SmtForest::new();
+    let empty_root = *EmptySubtreeRoots::entry(SMT_DEPTH, 0);
+    let key = Word::new([ZERO; WORD_SIZE]);
+    let value = Word::new([ONE; WORD_SIZE]);
+
+    let root_with_value = forest.insert(empty_root, key, value)?;
+    let root_after_remove = forest.insert(root_with_value, key, EMPTY_WORD)?;
+
+    assert_eq!(root_after_remove, empty_root);
+
+    let proof = forest.open(root_after_remove, key)?;
+    proof.verify_unset(&key, &root_after_remove).unwrap();
 
     Ok(())
 }
