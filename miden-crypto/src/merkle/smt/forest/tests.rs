@@ -178,13 +178,14 @@ fn test_open_root_in_store() -> Result<(), MerkleError> {
 fn test_empty_word_removes_key() -> Result<(), MerkleError> {
     let mut forest = SmtForest::new();
     let empty_root = *EmptySubtreeRoots::entry(SMT_DEPTH, 0);
-    let key = Word::new([ZERO; WORD_SIZE]);
-    let value = Word::new([ONE; WORD_SIZE]);
+    let key = Word::from([1_u32; WORD_SIZE]);
+    let value = Word::from([2_u32; WORD_SIZE]);
 
     let root_with_value = forest.insert(empty_root, key, value)?;
     let root_after_remove = forest.insert(root_with_value, key, EMPTY_WORD)?;
 
     assert_eq!(root_after_remove, empty_root);
+    assert!(forest.leaves.get(&key).is_none());
 
     let proof = forest.open(root_after_remove, key)?;
     proof.verify_unset(&key, &root_after_remove).unwrap();
