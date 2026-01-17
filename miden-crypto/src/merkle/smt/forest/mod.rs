@@ -104,10 +104,14 @@ impl SmtForest {
 
         let proof = self.store.get_path(root, leaf_index)?;
         let path = proof.path.try_into()?;
-        let leaf = proof.value;
-
-        let Some(leaf) = self.leaves.get(&leaf).cloned() else {
-            return Err(MerkleError::UntrackedKey(key));
+        let leaf_hash = proof.value;
+        let leaf = if leaf_hash == crate::EMPTY_WORD {
+            SmtLeaf::new_empty(LeafIndex::from(key))
+        } else {
+            let Some(leaf) = self.leaves.get(&leaf_hash).cloned() else {
+                return Err(MerkleError::UntrackedKey(key));
+            };
+            leaf
         };
 
         SmtProof::new(path, leaf).map_err(|error| match error {
@@ -167,7 +171,11 @@ impl SmtForest {
         for (key, value) in entries {
             let index = LeafIndex::from(key);
             let (_old_hash, leaf) = new_leaves.get_mut(&index).unwrap();
-            leaf.insert(key, value).map_err(to_merkle_error)?;
+            if value == crate::EMPTY_WORD {
+                let _ = leaf.remove(key);
+            } else {
+                leaf.insert(key, value).map_err(to_merkle_error)?;
+            }
         }
 
         // Calculate new leaf hashes, skip processing unchanged leaves
@@ -190,7 +198,9 @@ impl SmtForest {
 
         // Update successful, insert new leaves into the forest
         for (leaf_hash, leaf) in new_leaves.into_values() {
-            self.leaves.insert(leaf_hash, leaf);
+            if leaf_hash != crate::EMPTY_WORD {
+                self.leaves.insert(leaf_hash, leaf);
+            }
         }
         self.roots.insert(new_root);
 

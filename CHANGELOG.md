@@ -1,3 +1,7 @@
+## 0.19.3 (2026-01-16)
+
+- Changed `SmtForest` so that `EMPTY_WORD` is treated as removals ([#780](https://github.com/0xMiden/crypto/pull/780)).
+
 ## 0.19.2 (2025-12-04)
 
 - [BREAKING] Fixed `Signature` serialization by reducing `SIGNATURE_BYTES` to 65 ([#686](https://github.com/0xMiden/crypto/pull/686)).
