@@ -1,22 +1,22 @@
 use alloc::{string::ToString, vec::Vec};
 
+use fn_dsa_comm::mq;
+use fn_dsa_kgen::{FN_DSA_LOGN_512, KeyPairGenerator, KeyPairGenerator512};
 use miden_crypto_derive::{SilentDebug, SilentDisplay};
-use num::Complex;
-use num_complex::Complex64;
-use rand::Rng;
+use rand::{CryptoRng, Rng, RngCore};
 
 use super::{
     super::{
         ByteReader, ByteWriter, Deserializable, DeserializationError, MODULUS, N, Nonce,
-        SIG_L2_BOUND, SIGMA, Serializable, ShortLatticeBasis, Signature,
-        math::{FalconFelt, FastFft, LdlTree, Polynomial, ffldl, ffsampling, gram, normalize_tree},
+        SIG_L2_BOUND, Serializable, ShortLatticeBasis, Signature,
+        math::{FalconFelt, Polynomial, flr::FLR},
         signature::SignaturePoly,
     },
     PublicKey,
 };
 use crate::{
     Word,
-    dsa::falcon512_rpo::{LOG_N, SK_LEN, hash_to_point::hash_to_point_rpo256, math::ntru_gen},
+    dsa::falcon512_rpo::{LOG_N, PK_LEN, SK_LEN, hash_to_point::hash_to_point_rpo256},
     hash::blake::Blake3_256,
     utils::zeroize::{Zeroize, ZeroizeOnDrop},
 };
@@ -32,13 +32,14 @@ pub(crate) const WIDTH_SMALL_POLY_COEFFICIENT: usize = 6;
 
 /// Represents the secret key for Falcon DSA.
 ///
-/// The secret key is a quadruple [[g, -f], [G, -F]] of polynomials with integer coefficients. Each
-/// polynomial is of degree at most N = 512 and computations with these polynomials is done modulo
-/// the monic irreducible polynomial ϕ = x^N + 1. The secret key is a basis for a lattice and has
-/// the property of being short with respect to a certain norm and an upper bound appropriate for
-/// a given security parameter. The public key on the other hand is another basis for the same
-/// lattice and can be described by a single polynomial h with integer coefficients modulo ϕ.
-/// The two keys are related by the following relation:
+/// The secret key is stored internally as a quadruple [g, f, G, F] of polynomials with integer
+/// coefficients. During signing, this is transformed to the signing basis [[g, -f], [G, -F]] where
+/// negations are applied. Each polynomial is of degree at most N = 512 and computations with these
+/// polynomials is done modulo the monic irreducible polynomial ϕ = x^N + 1. The secret key is a
+/// basis for a lattice and has the property of being short with respect to a certain norm and an
+/// upper bound appropriate for a given security parameter. The public key on the other hand is
+/// another basis for the same lattice and can be described by a single polynomial h with integer
+/// coefficients modulo ϕ. The two keys are related by the following relation:
 ///
 /// 1. h = g /f [mod ϕ][mod p]
 /// 2. f.G - g.F = p [mod ϕ]
@@ -49,26 +50,32 @@ pub(crate) const WIDTH_SMALL_POLY_COEFFICIENT: usize = 6;
 /// coefficients modulo ϕ. The NTRU equation is then used to find a matching pair (F, G).
 /// The public key is then derived from the secret key using equation 1.
 ///
-/// To allow for fast signature generation, the secret key is pre-processed into a more suitable
-/// form, called the LDL tree, and this allows for fast sampling of short vectors in the lattice
-/// using Fast Fourier sampling during signature generation (ffSampling algorithm 11 in [1]).
+/// To allow for fast signature generation, the secret key basis is precomputed in FFT format
+/// during keygen. During signing, the Gram matrix is computed from this FFT basis, and then
+/// the LDL decomposition is computed on-the-fly for fast sampling of short vectors using the
+/// Fast Fourier sampling algorithm (ffSampling algorithm 11 in [1]).
 ///
 /// [1]: https://falcon-sign.info/falcon.pdf
 #[derive(Clone, SilentDebug, SilentDisplay)]
 pub struct SecretKey {
     secret_key: ShortLatticeBasis,
-    tree: LdlTree,
+    /// Precomputed basis B = [[g, -f], [G, -F]] in FFT format using FLR arithmetic.
+    /// This is used for fast signing with the FLR-based sampler.
+    /// Layout: [b00, b01, b10, b11] where each is N FLR values in FFT domain.
+    basis_fft_flr: [FLR; 4 * N],
 }
 
 impl Zeroize for SecretKey {
     fn zeroize(&mut self) {
         self.secret_key.zeroize();
-        self.tree.zeroize();
+        // Manually zeroize FLR array
+        for i in 0..self.basis_fft_flr.len() {
+            self.basis_fft_flr[i] = FLR::ZERO;
+        }
     }
 }
 
 // Manual Drop implementation to ensure zeroization on drop.
-// Cannot use #[derive(ZeroizeOnDrop)] because it's not available when sourcing zeroize from k256.
 impl Drop for SecretKey {
     fn drop(&mut self) {
         self.zeroize();
@@ -90,22 +97,39 @@ impl SecretKey {
     }
 
     /// Generates a secret_key using the provided random number generator `Rng`.
-    pub fn with_rng<R: Rng>(rng: &mut R) -> Self {
-        let basis = ntru_gen(N, rng);
-        Self::from_short_lattice_basis(basis)
+    ///
+    /// # Security Requirements
+    ///
+    /// The provided RNG must be cryptographically secure. Using a weak or predictable
+    /// RNG will completely compromise security. Prefer [`SecretKey::new()`] which uses
+    /// OS-provided randomness unless you have specific requirements for the RNG source.
+    pub fn with_rng<R: RngCore + CryptoRng>(rng: &mut R) -> Self {
+        let mut kg = KeyPairGenerator512::default();
+        let mut sign_key = [0u8; SK_LEN];
+        let mut vrfy_key = [0u8; PK_LEN];
+
+        // Bridge our rand 0.9 RNG into fn-dsa's rand_core 0.6 traits expected by keygen.
+        let mut adapter = FnDsaRng { rng };
+        kg.keygen(FN_DSA_LOGN_512, &mut adapter, &mut sign_key, &mut vrfy_key);
+
+        let sk = SecretKey::read_from_bytes(&sign_key)
+            .expect("fn-dsa-kgen produced an invalid signing key");
+
+        // Zeroize key buffers to prevent leakage
+        sign_key.zeroize();
+        vrfy_key.zeroize();
+
+        sk
     }
 
-    /// Given a short basis [[g, -f], [G, -F]], computes the normalized LDL tree i.e., Falcon tree.
+    /// Given a short basis [g, f, G, F], precomputes the FLR basis in FFT format.
+    /// Note: The basis is stored as [g, f, G, F]; negations to form [[g, -f], [G, -F]] are
+    /// applied during FLR basis computation.
     pub(crate) fn from_short_lattice_basis(basis: ShortLatticeBasis) -> SecretKey {
-        // FFT each polynomial of the short basis.
-        let basis_fft = to_complex_fft(&basis);
-        // compute the Gram matrix.
-        let gram_fft = gram(basis_fft);
-        // construct the LDL tree of the Gram matrix.
-        let mut tree = ffldl(gram_fft);
-        // normalize the leaves of the LDL tree.
-        normalize_tree(&mut tree, SIGMA);
-        Self { secret_key: basis, tree }
+        // Precompute FLR basis in FFT format for fast signing
+        let basis_fft_flr = Self::compute_basis_fft_flr(&basis);
+
+        Self { secret_key: basis, basis_fft_flr }
     }
 
     // PUBLIC ACCESSORS
@@ -119,11 +143,6 @@ impl SecretKey {
     /// Returns the public key corresponding to this secret key.
     pub fn public_key(&self) -> PublicKey {
         self.compute_pub_key_poly()
-    }
-
-    /// Returns the LDL tree associated to this secret key.
-    pub fn tree(&self) -> &LdlTree {
-        &self.tree
     }
 
     // SIGNATURE GENERATION
@@ -185,67 +204,262 @@ impl SecretKey {
     // HELPER METHODS
     // --------------------------------------------------------------------------------------------
 
-    /// Derives the public key corresponding to this secret key using h = g /f [mod ϕ][mod p].
+    /// Derives the public key corresponding to this secret key using fn-dsa's mq NTT
+    /// (computes h = g / f [mod ϕ][mod p]).
     fn compute_pub_key_poly(&self) -> PublicKey {
-        let g: Polynomial<FalconFelt> = self.secret_key[0].clone().into();
-        let g_fft = g.fft();
-        let minus_f: Polynomial<FalconFelt> = self.secret_key[1].clone().into();
-        let f = -minus_f;
-        let f_fft = f.fft();
-        let h_fft = g_fft.hadamard_div(&f_fft);
-        h_fft.ifft().into()
+        const LOGN_U32: u32 = LOG_N as u32;
+
+        let mut h = [0u16; N];
+        let mut tmp = [0u16; N];
+        // basis layout: [g, f, G, F]
+        let f = &self.secret_key[1].coefficients;
+        let g = &self.secret_key[0].coefficients;
+        mq::mqpoly_div_small(LOGN_U32, f, g, &mut h, &mut tmp);
+
+        let pk = Polynomial::from_u16_ext_array(&h).into();
+
+        // Zeroize temporaries holding secret-derived values
+        h.fill(0);
+        tmp.fill(0);
+
+        pk
     }
 
-    /// Signs a message polynomial with the secret key.
+    /// Signs a message polynomial with the secret key using FLR-based ffsampling.
+    ///
+    /// This implementation uses Fixed-point Linear Real (FLR) arithmetic ported from
+    /// rust-fn-dsa. FLR selects a backend at compile time (native/AVX2 or emulated) depending
+    /// on the target, and provides deterministic, no_std compatible signing without requiring
+    /// floating-point hardware.
+    ///
+    /// Following fn-dsa's default mode, the FFT basis is precomputed during keygen. During
+    /// signing, the Gram matrix is computed from the FFT basis (6 polynomial multiplications),
+    /// then the LDL decomposition is computed on-the-fly during recursive sampling. This
+    /// approach is faster than precomputing the full LDL tree due to better cache locality.
     ///
     /// Takes a randomness generator implementing `Rng` and message polynomial representing `c`
     /// the hash-to-point of the message to be signed. It outputs a signature polynomial `s2`.
-    fn sign_helper<R: Rng>(&self, c: Polynomial<FalconFelt>, rng: &mut R) -> SignaturePoly {
-        let one_over_q = 1.0 / (MODULUS as f64);
-        let c_over_q_fft = c.map(|cc| Complex::new(one_over_q * cc.value() as f64, 0.0)).fft();
+    pub(crate) fn sign_helper<R: Rng>(
+        &self,
+        c: Polynomial<FalconFelt>,
+        rng: &mut R,
+    ) -> SignaturePoly {
+        use super::super::math::flr::{
+            poly::{
+                FFT, iFFT, poly_add, poly_mul_fft, poly_muladj_fft, poly_mulconst,
+                poly_mulownadj_fft,
+            },
+            sampler::Sampler,
+        };
+        const LOGN_U32: u32 = LOG_N as u32;
 
-        // B = [[FFT(g), -FFT(f)], [FFT(G), -FFT(F)]]
-        let [g_fft, minus_f_fft, big_g_fft, minus_big_f_fft] = to_complex_fft(&self.secret_key);
-        let t0 = c_over_q_fft.hadamard_mul(&minus_big_f_fft);
-        let t1 = -c_over_q_fft.hadamard_mul(&minus_f_fft);
+        // Use precomputed FFT basis B = [[g, -f], [G, -F]]
+        // Layout: [b00, b01, b10, b11] where b01 and b11 are already negated
+        let b00 = &self.basis_fft_flr[0..N]; // g in FFT
+        let b01 = &self.basis_fft_flr[N..2 * N]; // -f in FFT
+        let b10 = &self.basis_fft_flr[2 * N..3 * N]; // G in FFT
+        let b11 = &self.basis_fft_flr[3 * N..4 * N]; // -F in FFT
+
+        // Compute Gram matrix G = B^H * B from precomputed FFT basis
+        // This is much faster than computing from scratch (6 muls vs 4 FFTs + 6 muls)
+        let mut g00 = [FLR::ZERO; N];
+        let mut g01 = [FLR::ZERO; N];
+        let mut g11 = [FLR::ZERO; N];
+        let mut temp = [FLR::ZERO; N];
+
+        // g00 = b00*adj(b00) + b01*adj(b01)
+        g00.copy_from_slice(b00);
+        poly_mulownadj_fft(LOGN_U32, &mut g00);
+        temp.copy_from_slice(b01);
+        poly_mulownadj_fft(LOGN_U32, &mut temp);
+        poly_add(LOGN_U32, &mut g00, &temp);
+
+        // g01 = b00*adj(b10) + b01*adj(b11)
+        g01.copy_from_slice(b00);
+        poly_muladj_fft(LOGN_U32, &mut g01, b10);
+        temp.copy_from_slice(b01);
+        poly_muladj_fft(LOGN_U32, &mut temp, b11);
+        poly_add(LOGN_U32, &mut g01, &temp);
+
+        // g11 = b10*adj(b10) + b11*adj(b11)
+        g11.copy_from_slice(b10);
+        poly_mulownadj_fft(LOGN_U32, &mut g11);
+        temp.copy_from_slice(b11);
+        poly_mulownadj_fft(LOGN_U32, &mut temp);
+        poly_add(LOGN_U32, &mut g11, &temp);
+
+        // Convert hash-to-point polynomial c to FLR and transform to FFT domain
+        let mut c_fft: [FLR; N] =
+            core::array::from_fn(|i| FLR::from_i32(c.coefficients[i].value() as i32));
+        FFT(LOGN_U32, &mut c_fft);
+
+        // Compute target vectors: t0 = -(c/q) * F, t1 = (c/q) * f
+        // Note: b11 = -F and b01 = -f from precomputed basis
+        let one_over_q = FLR::from_f64(1.0 / (MODULUS as f64));
+        let mut t0 = c_fft;
+        let mut t1 = c_fft;
+
+        // t0 = (c/q) * b11 = (c/q) * (-F) = -(c/q) * F
+        poly_mulconst(LOGN_U32, &mut t0, one_over_q);
+        let mut b11_copy = [FLR::ZERO; N];
+        b11_copy.copy_from_slice(b11);
+        poly_mul_fft(LOGN_U32, &mut t0, &b11_copy);
+
+        // t1 = -(c/q) * b01 = -(c/q) * (-f) = (c/q) * f
+        poly_mulconst(LOGN_U32, &mut t1, one_over_q);
+        let mut b01_copy = [FLR::ZERO; N];
+        b01_copy.copy_from_slice(b01);
+        poly_mul_fft(LOGN_U32, &mut t1, &b01_copy);
+        for t in t1.iter_mut().take(N) {
+            *t = -*t;
+        }
+
+        // Create sampler with RNG adapter
+        let rng_adapter = RngAdapter { rng };
+        let mut sampler = Sampler::new(rng_adapter, LOGN_U32);
+        let mut tmp = vec![FLR::ZERO; 4 * N];
 
         loop {
             let bold_s = loop {
-                let z = ffsampling(&(t0.clone(), t1.clone()), &self.tree, rng);
-                let t0_min_z0 = t0.clone() - z.0;
-                let t1_min_z1 = t1.clone() - z.1;
+                // Clone Gram matrix for this iteration
+                let mut g00_work = g00;
+                let mut g01_work = g01;
+                let mut g11_work = g11;
 
-                // s = (t-z) * B
-                let s0 = t0_min_z0.hadamard_mul(&g_fft) + t1_min_z1.hadamard_mul(&big_g_fft);
-                let s1 =
-                    t0_min_z0.hadamard_mul(&minus_f_fft) + t1_min_z1.hadamard_mul(&minus_big_f_fft);
+                // Sample z from discrete Gaussian using Gram matrix
+                let mut t0_work = t0;
+                let mut t1_work = t1;
+                sampler.ffsamp_fft(
+                    &mut t0_work,
+                    &mut t1_work,
+                    &mut g00_work,
+                    &mut g01_work,
+                    &mut g11_work,
+                    &mut tmp,
+                );
 
-                // compute the norm of (s0||s1) and note that they are in FFT representation
-                let length_squared: f64 =
-                    (s0.coefficients.iter().map(|a| (a * a.conj()).re).sum::<f64>()
-                        + s1.coefficients.iter().map(|a| (a * a.conj()).re).sum::<f64>())
-                        / (N as f64);
+                // Compute t - z
+                let mut t0_min_z0 = t0;
+                let mut t1_min_z1 = t1;
+                for i in 0..N {
+                    t0_min_z0[i] -= t0_work[i];
+                    t1_min_z1[i] -= t1_work[i];
+                }
+
+                // Compute s = (t - z) * B where B = [[g, -f], [G, -F]]
+                // s0 = (t0-z0) * g + (t1-z1) * G
+                let mut s0 = t0_min_z0;
+                let mut b00_copy = [FLR::ZERO; N];
+                b00_copy.copy_from_slice(b00);
+                poly_mul_fft(LOGN_U32, &mut s0, &b00_copy);
+                let mut temp = t1_min_z1;
+                let mut b10_copy = [FLR::ZERO; N];
+                b10_copy.copy_from_slice(b10);
+                poly_mul_fft(LOGN_U32, &mut temp, &b10_copy);
+                poly_add(LOGN_U32, &mut s0, &temp);
+
+                // s1 = (t0-z0) * (-f) + (t1-z1) * (-F) = (t0-z0) * b01 + (t1-z1) * b11
+                let mut s1 = t0_min_z0;
+                b01_copy.copy_from_slice(b01);
+                poly_mul_fft(LOGN_U32, &mut s1, &b01_copy);
+                let mut temp = t1_min_z1;
+                b11_copy.copy_from_slice(b11);
+                poly_mul_fft(LOGN_U32, &mut temp, &b11_copy);
+                poly_add(LOGN_U32, &mut s1, &temp);
+
+                // Compute norm ||s||² in FFT domain
+                let mut length_squared = 0.0_f64;
+                for i in 0..(N / 2) {
+                    let s0_re = s0[i].to_f64();
+                    let s0_im = s0[i + N / 2].to_f64();
+                    let s1_re = s1[i].to_f64();
+                    let s1_im = s1[i + N / 2].to_f64();
+                    length_squared += s0_re * s0_re + s0_im * s0_im;
+                    length_squared += s1_re * s1_re + s1_im * s1_im;
+                }
+                length_squared /= N as f64;
 
                 if length_squared > (SIG_L2_BOUND as f64) {
                     continue;
                 }
 
-                break [-s0, s1];
+                // Negate s0 for output format
+                for s in s0.iter_mut().take(N) {
+                    *s = -*s;
+                }
+
+                break [s0, s1];
             };
 
-            let s2 = bold_s[1].ifft();
-            let s2_coef: [i16; N] = s2
-                .coefficients
+            // Transform s1 back to coefficient domain via inverse FFT
+            let mut s2_fft = bold_s[1];
+            iFFT(LOGN_U32, &mut s2_fft);
+
+            // Convert FLR values to i16 coefficients
+            // The collect and try_into should never fail since we're collecting exactly N elements
+            let s2_coef: [i16; N] = s2_fft[0..N]
                 .iter()
-                .map(|a| a.re.round() as i16)
+                .map(|a| (*a).to_f64().round() as i16)
                 .collect::<Vec<i16>>()
                 .try_into()
-                .expect("The number of coefficients should be equal to N");
+                .expect("collected exactly N coefficients; conversion to [i16; N] cannot fail");
 
             if let Ok(s2) = SignaturePoly::try_from(&s2_coef) {
+                // Zeroize temporary buffer
+                tmp.zeroize();
                 return s2;
             }
         }
+    }
+
+    /// Computes the FLR basis B = [[g, -f], [G, -F]] in FFT format.
+    /// Returns an array [b00, b01, b10, b11] where each is N FLR values in FFT domain.
+    ///
+    /// This follows fn-dsa-sign's `compute_basis_inner` approach for precomputation during keygen.
+    /// We cannot use fn-dsa-sign's function directly because `compute_basis_inner` is private.
+    fn compute_basis_fft_flr(basis: &ShortLatticeBasis) -> [FLR; 4 * N] {
+        use core::array;
+
+        use super::super::math::flr::poly::{FFT, poly_set_small};
+        const LOGN_U32: u32 = LOG_N as u32;
+
+        // Convert basis coefficients to fixed-size arrays for poly_set_small
+        // Basis is already i8, so no type conversion needed
+        let basis_i8: [[i8; N]; 4] = [
+            array::from_fn(|i| basis[0].coefficients[i]),
+            array::from_fn(|i| basis[1].coefficients[i]),
+            array::from_fn(|i| basis[2].coefficients[i]),
+            array::from_fn(|i| basis[3].coefficients[i]),
+        ];
+
+        let mut result = [FLR::ZERO; 4 * N];
+
+        // Split result into b00, b01, b10, b11
+        let (b00, rest) = result.split_at_mut(N);
+        let (b01, rest) = rest.split_at_mut(N);
+        let (b10, rest) = rest.split_at_mut(N);
+        let (b11, _) = rest.split_at_mut(N);
+
+        // Load basis: stored as B = [[g, f], [G, F]]
+        poly_set_small(LOGN_U32, b00, &basis_i8[0]); // g
+        poly_set_small(LOGN_U32, b01, &basis_i8[1]); // f
+        poly_set_small(LOGN_U32, b10, &basis_i8[2]); // G
+        poly_set_small(LOGN_U32, b11, &basis_i8[3]); // F
+
+        // Transform to FFT domain
+        FFT(LOGN_U32, b00);
+        FFT(LOGN_U32, b01);
+        FFT(LOGN_U32, b10);
+        FFT(LOGN_U32, b11);
+
+        // Negate f and F in FFT domain to get signing basis B = [[g, -f], [G, -F]]
+        // (matches fn-dsa-sign's compute_basis_inner)
+        for i in 0..N {
+            b01[i] = -b01[i];
+            b11[i] = -b11[i];
+        }
+
+        result
     }
 
     /// Deterministically generates a seed for seeding the PRNG used in the trapdoor sampling
@@ -291,48 +505,39 @@ impl Serializable for SecretKey {
     fn write_into<W: ByteWriter>(&self, target: &mut W) {
         let basis = &self.secret_key;
 
-        // header
-        let n = basis[0].coefficients.len();
-        let l = n.checked_ilog2().unwrap() as u8;
-        let header: u8 = (5 << 4) | l;
+        // Header byte format: high nibble = 0101 (5) indicates signing key with trim encoding,
+        // low nibble = log2(N) = 9 for Falcon-512. See fn-dsa specification.
+        let header: u8 = (5 << 4) | LOG_N;
 
-        let neg_f = &basis[1];
+        let f = &basis[1];
         let g = &basis[0];
-        let neg_big_f = &basis[3];
+        let big_f = &basis[3];
 
-        let mut buffer = Vec::with_capacity(1281);
+        let mut buffer = Vec::with_capacity(SK_LEN);
         buffer.push(header);
 
-        let mut f_i8: Vec<i8> = neg_f
-            .coefficients
-            .iter()
-            .map(|&a| FalconFelt::new(-a).balanced_value() as i8)
-            .collect();
-        let f_i8_encoded = encode_i8(&f_i8, WIDTH_SMALL_POLY_COEFFICIENT).unwrap();
+        // Coefficients are already i8 values from ShortLatticeBasis
+        // Encoding can only fail if the output buffer is incorrectly sized, which cannot
+        // happen since encode_i8 allocates the buffer internally based on input length
+        let mut f_i8_encoded = encode_i8(&f.coefficients, WIDTH_SMALL_POLY_COEFFICIENT)
+            .expect("encoding cannot fail with correctly-sized internally-allocated buffer");
         buffer.extend_from_slice(&f_i8_encoded);
-        f_i8.zeroize();
+        f_i8_encoded.zeroize();
 
-        let mut g_i8: Vec<i8> = g
-            .coefficients
-            .iter()
-            .map(|&a| FalconFelt::new(a).balanced_value() as i8)
-            .collect();
-        let g_i8_encoded = encode_i8(&g_i8, WIDTH_SMALL_POLY_COEFFICIENT).unwrap();
+        let mut g_i8_encoded = encode_i8(&g.coefficients, WIDTH_SMALL_POLY_COEFFICIENT)
+            .expect("encoding cannot fail with correctly-sized internally-allocated buffer");
         buffer.extend_from_slice(&g_i8_encoded);
-        g_i8.zeroize();
+        g_i8_encoded.zeroize();
 
-        let mut big_f_i8: Vec<i8> = neg_big_f
-            .coefficients
-            .iter()
-            .map(|&a| FalconFelt::new(-a).balanced_value() as i8)
-            .collect();
-        let big_f_i8_encoded = encode_i8(&big_f_i8, WIDTH_BIG_POLY_COEFFICIENT).unwrap();
+        let mut big_f_i8_encoded = encode_i8(&big_f.coefficients, WIDTH_BIG_POLY_COEFFICIENT)
+            .expect("encoding cannot fail with correctly-sized internally-allocated buffer");
         buffer.extend_from_slice(&big_f_i8_encoded);
-        big_f_i8.zeroize();
+        big_f_i8_encoded.zeroize();
 
         target.write_bytes(&buffer);
-        // Note: buffer is not zeroized here as it's being passed to write_bytes which consumes it
-        // The caller should ensure proper handling of the written bytes
+
+        // Zeroize buffer
+        buffer.zeroize();
     }
 }
 
@@ -359,36 +564,51 @@ impl Deserializable for SecretKey {
             ));
         }
 
-        let chunk_size_f = ((n * WIDTH_SMALL_POLY_COEFFICIENT) + 7) >> 3;
-        let chunk_size_g = ((n * WIDTH_SMALL_POLY_COEFFICIENT) + 7) >> 3;
-        let chunk_size_big_f = ((n * WIDTH_BIG_POLY_COEFFICIENT) + 7) >> 3;
+        let chunk_size_f = bits_to_bytes_ceil(n * WIDTH_SMALL_POLY_COEFFICIENT);
+        let chunk_size_g = bits_to_bytes_ceil(n * WIDTH_SMALL_POLY_COEFFICIENT);
+        let chunk_size_big_f = bits_to_bytes_ceil(n * WIDTH_BIG_POLY_COEFFICIENT);
 
-        let f = decode_i8(&byte_vector[1..chunk_size_f + 1], WIDTH_SMALL_POLY_COEFFICIENT).ok_or(
-            DeserializationError::InvalidValue("Failed to decode f coefficients".to_string()),
-        )?;
-        let g = decode_i8(
+        let mut f_i8 = decode_i8(&byte_vector[1..chunk_size_f + 1], WIDTH_SMALL_POLY_COEFFICIENT)
+            .ok_or(DeserializationError::InvalidValue(
+            "Failed to decode f coefficients".to_string(),
+        ))?;
+        let mut g_i8 = decode_i8(
             &byte_vector[chunk_size_f + 1..(chunk_size_f + chunk_size_g + 1)],
             WIDTH_SMALL_POLY_COEFFICIENT,
         )
-        .unwrap();
-        let big_f = decode_i8(
+        .ok_or(DeserializationError::InvalidValue(
+            "Failed to decode g coefficients".to_string(),
+        ))?;
+        let mut big_f_i8 = decode_i8(
             &byte_vector[(chunk_size_f + chunk_size_g + 1)
                 ..(chunk_size_f + chunk_size_g + chunk_size_big_f + 1)],
             WIDTH_BIG_POLY_COEFFICIENT,
         )
-        .unwrap();
+        .ok_or(DeserializationError::InvalidValue(
+            "Failed to decode F coefficients".to_string(),
+        ))?;
 
-        let f = Polynomial::new(f.iter().map(|&c| FalconFelt::new(c.into())).collect());
-        let g = Polynomial::new(g.iter().map(|&c| FalconFelt::new(c.into())).collect());
-        let big_f = Polynomial::new(big_f.iter().map(|&c| FalconFelt::new(c.into())).collect());
+        // Recompute G
+        let big_g_ext = compute_big_g_ext(&f_i8, &g_i8, &big_f_i8);
 
-        // big_g * f - g * big_f = p (mod X^n + 1)
-        let big_g = g.fft().hadamard_div(&f.fft()).hadamard_mul(&big_f.fft()).ifft();
+        // Convert i8 coefficients to FalconFelt
+        let f = Polynomial::new(f_i8.iter().map(|&c| FalconFelt::from(c)).collect());
+        let g = Polynomial::new(g_i8.iter().map(|&c| FalconFelt::from(c)).collect());
+        let big_f = Polynomial::new(big_f_i8.iter().map(|&c| FalconFelt::from(c)).collect());
+        let big_g = Polynomial::from_u16_ext_array(&big_g_ext);
+
+        // Zeroize intermediate decoded buffers
+        f_i8.zeroize();
+        g_i8.zeroize();
+        big_f_i8.zeroize();
+
+        // Store basis as [g, f, G, F] without negations
+        // Convert from FalconFelt to i8 (values are guaranteed to fit in i8 range)
         let basis = [
-            g.map(|f| f.balanced_value()),
-            -f.map(|f| f.balanced_value()),
-            big_g.map(|f| f.balanced_value()),
-            -big_f.map(|f| f.balanced_value()),
+            g.map(|f| f.balanced_value() as i8),
+            f.map(|f| f.balanced_value() as i8),
+            big_g.map(|f| f.balanced_value() as i8),
+            big_f.map(|f| f.balanced_value() as i8),
         ];
         Ok(Self::from_short_lattice_basis(basis))
     }
@@ -397,87 +617,134 @@ impl Deserializable for SecretKey {
 // HELPER FUNCTIONS
 // ================================================================================================
 
-/// Computes the complex FFT of the secret key polynomials.
-fn to_complex_fft(basis: &[Polynomial<i16>; 4]) -> [Polynomial<Complex<f64>>; 4] {
-    let [g, f, big_g, big_f] = basis.clone();
-    let g_fft = g.map(|cc| Complex64::new(*cc as f64, 0.0)).fft();
-    let minus_f_fft = f.map(|cc| -Complex64::new(*cc as f64, 0.0)).fft();
-    let big_g_fft = big_g.map(|cc| Complex64::new(*cc as f64, 0.0)).fft();
-    let minus_big_f_fft = big_f.map(|cc| -Complex64::new(*cc as f64, 0.0)).fft();
-    [g_fft, minus_f_fft, big_g_fft, minus_big_f_fft]
+/// Computes the number of bytes needed to store `num_bits` bits, rounding up.
+///
+/// This is equivalent to ceiling division: `(num_bits + 7) / 8`.
+#[inline]
+const fn bits_to_bytes_ceil(num_bits: usize) -> usize {
+    (num_bits + 7) >> 3
 }
 
-/// Encodes a sequence of signed integers such that each integer x satisfies |x| < 2^(bits-1)
-/// for a given parameter bits. bits can take either the value 6 or 8.
+/// Encodes a slice of i8 values using fn-dsa-comm's trim encoding.
+///
+/// # Returns
+/// - `Some(Vec<u8>)` containing the encoded bytes if successful
+/// - `None` if encoding fails (buffer size mismatch)
+///
+/// # Security Note
+/// When encoding secret key material, the caller is responsible for zeroizing
+/// the returned buffer after use. The buffer contains a copy of the input data
+/// in encoded form.
 pub fn encode_i8(x: &[i8], bits: usize) -> Option<Vec<u8>> {
-    let maxv = (1 << (bits - 1)) - 1_usize;
-    let maxv = maxv as i8;
-    let minv = -maxv;
-
-    for &c in x {
-        if c > maxv || c < minv {
-            return None;
-        }
-    }
-
-    let out_len = ((N * bits) + 7) >> 3;
+    let out_len = bits_to_bytes_ceil(x.len() * bits);
     let mut buf = vec![0_u8; out_len];
-
-    let mut acc = 0_u32;
-    let mut acc_len = 0;
-    let mask = ((1_u16 << bits) - 1) as u8;
-
-    let mut input_pos = 0;
-    for &c in x {
-        acc = (acc << bits) | (c as u8 & mask) as u32;
-        acc_len += bits;
-        while acc_len >= 8 {
-            acc_len -= 8;
-            buf[input_pos] = (acc >> acc_len) as u8;
-            input_pos += 1;
-        }
-    }
-    if acc_len > 0 {
-        buf[input_pos] = (acc >> (8 - acc_len)) as u8;
-    }
-
-    Some(buf)
+    let written = fn_dsa_comm::codec::trim_i8_encode(x, bits as u32, &mut buf);
+    if written == out_len { Some(buf) } else { None }
 }
 
-/// Decodes a sequence of bytes into a sequence of signed integers such that each integer x
-/// satisfies |x| < 2^(bits-1) for a given parameter bits. bits can take either the value 6 or 8.
+/// Decodes a buffer into a slice of i8 values using fn-dsa-comm's trim decoding.
+///
+/// # Returns
+/// - `Some(Vec<i8>)` containing the decoded coefficients if successful
+/// - `None` if decoding fails (invalid input format)
+///
+/// # Security Note
+/// When decoding secret key material, the caller is responsible for zeroizing
+/// the returned vector after use. The decoded data contains secret key coefficients.
 pub fn decode_i8(buf: &[u8], bits: usize) -> Option<Vec<i8>> {
-    let mut x = [0_i8; N];
+    let mut x = vec![0_i8; N];
+    fn_dsa_comm::codec::trim_i8_decode(buf, &mut x, bits as u32)?;
+    Some(x)
+}
 
-    let mut i = 0;
-    let mut j = 0;
-    let mut acc = 0_u32;
-    let mut acc_len = 0;
-    let mask = (1_u32 << bits) - 1;
-    let a = (1 << bits) as u8;
-    let b = ((1 << (bits - 1)) - 1) as u8;
+/// Computes big G in external representation given small f, g, and F using fn-dsa mq routines.
+/// This mirrors fn-dsa's derivation: h = g/f (mod q), then G = h * F (mod q) in NTT domain.
+fn compute_big_g_ext(f_i8: &[i8], g_i8: &[i8], big_f_i8: &[i8]) -> [u16; N] {
+    debug_assert_eq!(f_i8.len(), N);
+    debug_assert_eq!(g_i8.len(), N);
+    debug_assert_eq!(big_f_i8.len(), N);
 
-    while i < N {
-        acc = (acc << 8) | (buf[j] as u32);
-        j += 1;
-        acc_len += 8;
+    const LOGN_U32: u32 = LOG_N as u32;
 
-        while acc_len >= bits && i < N {
-            acc_len -= bits;
-            let w = (acc >> acc_len) & mask;
+    // h = g/f mod q (external representation)
+    let mut h = [0u16; N];
+    let mut tmp = [0u16; N];
+    mq::mqpoly_div_small(LOGN_U32, f_i8, g_i8, &mut h, &mut tmp);
 
-            let w = w as u8;
+    // h in NTT domain
+    let mut h_ntt = h;
+    mq::mqpoly_ext_to_int(LOGN_U32, &mut h_ntt);
+    mq::mqpoly_int_to_NTT(LOGN_U32, &mut h_ntt);
 
-            let z = if w > b { w as i8 - a as i8 } else { w as i8 };
+    // F in NTT domain
+    let mut big_f_ntt = [0u16; N];
+    mq::mqpoly_small_to_int(LOGN_U32, big_f_i8, &mut big_f_ntt);
+    mq::mqpoly_int_to_NTT(LOGN_U32, &mut big_f_ntt);
 
-            x[i] = z;
-            i += 1;
-        }
+    // G = h * F (external representation)
+    let mut big_g_int = big_f_ntt;
+    mq::mqpoly_mul_ntt(LOGN_U32, &mut big_g_int, &h_ntt);
+    mq::mqpoly_NTT_to_int(LOGN_U32, &mut big_g_int);
+    mq::mqpoly_int_to_ext(LOGN_U32, &mut big_g_int);
+
+    // Zeroize temporaries holding secret-derived values
+    h.fill(0);
+    tmp.fill(0);
+    h_ntt.fill(0);
+    big_f_ntt.fill(0);
+
+    big_g_int
+}
+
+// RNG ADAPTER
+// ================================================================================================
+
+/// Adapter to make a `Rng` compatible with `SamplerRng` trait.
+struct RngAdapter<R: Rng> {
+    rng: R,
+}
+
+impl<R: Rng> crate::dsa::falcon512_rpo::math::flr::sampler::SamplerRng for RngAdapter<R> {
+    fn next_u8(&mut self) -> u8 {
+        // Use fill_bytes to get exactly 1 byte efficiently
+        let mut buf = [0u8; 1];
+        self.rng.fill_bytes(&mut buf);
+        buf[0]
     }
 
-    if (acc & ((1u32 << acc_len) - 1)) == 0 {
-        Some(x.to_vec())
-    } else {
-        None
+    fn next_u64(&mut self) -> u64 {
+        // Use fill_bytes to get exactly 8 bytes efficiently
+        let mut buf = [0u8; 8];
+        self.rng.fill_bytes(&mut buf);
+        u64::from_le_bytes(buf)
     }
 }
+
+/// Adapts a rand 0.9 RNG to the rand_core 0.6 traits expected by fn-dsa keygen.
+struct FnDsaRng<'a, R: RngCore + CryptoRng> {
+    rng: &'a mut R,
+}
+
+impl<'a, R: RngCore + CryptoRng> fn_dsa_comm::RngCore for FnDsaRng<'a, R> {
+    fn next_u32(&mut self) -> u32 {
+        self.rng.next_u32()
+    }
+
+    fn next_u64(&mut self) -> u64 {
+        self.rng.next_u64()
+    }
+
+    fn fill_bytes(&mut self, dest: &mut [u8]) {
+        self.rng.fill_bytes(dest);
+    }
+
+    fn try_fill_bytes(
+        &mut self,
+        dest: &mut [u8],
+    ) -> core::result::Result<(), fn_dsa_comm::RngError> {
+        self.fill_bytes(dest);
+        Ok(())
+    }
+}
+
+impl<'a, R: RngCore + CryptoRng> fn_dsa_comm::CryptoRng for FnDsaRng<'a, R> {}

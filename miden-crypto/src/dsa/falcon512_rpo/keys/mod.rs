@@ -8,21 +8,39 @@ pub use public_key::PublicKey;
 
 mod secret_key;
 pub use secret_key::SecretKey;
-pub(crate) use secret_key::{WIDTH_BIG_POLY_COEFFICIENT, WIDTH_SMALL_POLY_COEFFICIENT};
 
 // TESTS
 // ================================================================================================
 
 #[cfg(test)]
 mod tests {
+    use proptest::prelude::*;
     use rand::SeedableRng;
     use rand_chacha::ChaCha20Rng;
 
     use crate::{
         ONE, PrimeCharacteristicRing, Word,
-        dsa::falcon512_rpo::SecretKey,
+        dsa::falcon512_rpo::{PublicKey, SecretKey},
         utils::{Deserializable, Serializable},
     };
+
+    proptest! {
+        #[test]
+        fn test_public_key_serialization_roundtrip(seed in any::<[u8; 32]>()) {
+            let mut rng = ChaCha20Rng::from_seed(seed);
+
+            // Generate a public key from a secret key
+            let sk = SecretKey::with_rng(&mut rng);
+            let pk = sk.public_key();
+
+            // Serialize and deserialize the public key
+            let serialized = (&pk).to_bytes();
+            let pk_deserialized = PublicKey::read_from_bytes(&serialized).unwrap();
+
+            // Compare the original and deserialized public keys
+            prop_assert_eq!(pk, pk_deserialized);
+        }
+    }
 
     #[test]
     fn test_falcon_verification() {

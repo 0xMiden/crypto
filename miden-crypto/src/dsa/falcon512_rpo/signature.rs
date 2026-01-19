@@ -1,16 +1,14 @@
 use alloc::{string::ToString, vec::Vec};
 use core::ops::Deref;
 
-use num::Zero;
-
 use super::{
-    ByteReader, ByteWriter, Deserializable, DeserializationError, LOG_N, MODULUS, N, Nonce,
-    SIG_L2_BOUND, SIG_POLY_BYTE_LEN, Serializable,
+    ByteReader, ByteWriter, Deserializable, DeserializationError, LOG_N, N, Nonce,
+    SIG_POLY_BYTE_LEN, Serializable,
     hash_to_point::hash_to_point_rpo256,
     keys::PublicKey,
-    math::{FalconFelt, FastFft, Polynomial},
+    math::{FalconFelt, Polynomial},
 };
-use crate::Word;
+use crate::{Word, utils::zeroize::Zeroize};
 
 // FALCON SIGNATURE
 // ================================================================================================
@@ -56,11 +54,8 @@ use crate::Word;
 /// 4. 625 bytes encoding the `s2` polynomial above.
 ///
 /// In addition to the signature itself, the polynomial h is also serialized with the signature as:
-///
-/// 1. 1 byte representing the log2(512) i.e., 9.
-/// 2. 896 bytes for the public key itself.
-///
-/// The total size of the signature (including the extended public key) is 1524 bytes.
+/// 1 byte for `LOG_N` (9) followed by 896 bytes for the public key. The total size including h is
+/// 1524 bytes.
 ///
 /// [1]: https://github.com/algorand/falcon/blob/main/falcon-det.pdf
 /// [2]: https://datatracker.ietf.org/doc/html/rfc6979#section-3.5
@@ -225,56 +220,23 @@ impl TryFrom<&[i16; N]> for SignaturePoly {
 
 impl Serializable for &SignaturePoly {
     fn write_into<W: ByteWriter>(&self, target: &mut W) {
-        let sig_coeff: Vec<i16> = self.0.coefficients.iter().map(|a| a.balanced_value()).collect();
+        let mut sig_coeff: Vec<i16> =
+            self.0.coefficients.iter().map(|a| a.balanced_value()).collect();
         let mut sk_bytes = vec![0_u8; SIG_POLY_BYTE_LEN];
 
-        let mut acc = 0;
-        let mut acc_len = 0;
-        let mut v = 0;
-        let mut t;
-        let mut w;
+        // Use fn-dsa-comm's compressed encoding
+        // This should never fail for valid SignaturePoly instances since they are
+        // constructed via TryFrom which validates coefficient bounds
+        encode_signature_poly(&sig_coeff, &mut sk_bytes).then_some(()).expect(
+            "signature polynomial encoding should never fail for valid coefficients; \
+             this indicates a programming error in SignaturePoly validation",
+        );
 
-        // For each coefficient of x:
-        // - the sign is encoded on 1 bit
-        // - the 7 lower bits are encoded naively (binary)
-        // - the high bits are encoded in unary encoding
-        //
-        // Algorithm 17 p. 47 of the specification [1].
-        //
-        // [1]: https://falcon-sign.info/falcon.pdf
-        for &c in sig_coeff.iter() {
-            acc <<= 1;
-            t = c;
-
-            if t < 0 {
-                t = -t;
-                acc |= 1;
-            }
-            w = t as u16;
-
-            acc <<= 7;
-            let mask = 127_u32;
-            acc |= (w as u32) & mask;
-            w >>= 7;
-
-            acc_len += 8;
-
-            acc <<= w + 1;
-            acc |= 1;
-            acc_len += w + 1;
-
-            while acc_len >= 8 {
-                acc_len -= 8;
-
-                sk_bytes[v] = (acc >> acc_len) as u8;
-                v += 1;
-            }
-        }
-
-        if acc_len > 0 {
-            sk_bytes[v] = (acc << (8 - acc_len)) as u8;
-        }
         target.write_bytes(&sk_bytes);
+
+        // Zeroize temporary buffers
+        sig_coeff.zeroize();
+        sk_bytes.zeroize();
     }
 }
 
@@ -282,53 +244,9 @@ impl Deserializable for SignaturePoly {
     fn read_from<R: ByteReader>(source: &mut R) -> Result<Self, DeserializationError> {
         let input = source.read_array::<SIG_POLY_BYTE_LEN>()?;
 
-        let mut input_idx = 0;
-        let mut acc = 0u32;
-        let mut acc_len = 0;
-        let mut coefficients = [FalconFelt::zero(); N];
+        // Use fn-dsa-comm's compressed decoding
+        let coefficients = decode_signature_poly(&input)?;
 
-        // Algorithm 18 p. 48 of the specification [1].
-        //
-        // [1]: https://falcon-sign.info/falcon.pdf
-        for c in coefficients.iter_mut() {
-            acc = (acc << 8) | (input[input_idx] as u32);
-            input_idx += 1;
-            let b = acc >> acc_len;
-            let s = b & 128;
-            let mut m = b & 127;
-
-            loop {
-                if acc_len == 0 {
-                    acc = (acc << 8) | (input[input_idx] as u32);
-                    input_idx += 1;
-                    acc_len = 8;
-                }
-                acc_len -= 1;
-                if ((acc >> acc_len) & 1) != 0 {
-                    break;
-                }
-                m += 128;
-                if m >= 2048 {
-                    return Err(DeserializationError::InvalidValue(format!(
-                        "Failed to decode signature: high bits {m} exceed 2048",
-                    )));
-                }
-            }
-            if s != 0 && m == 0 {
-                return Err(DeserializationError::InvalidValue(
-                    "Failed to decode signature: -0 is forbidden".to_string(),
-                ));
-            }
-
-            let felt = if s != 0 { (MODULUS as u32 - m) as u16 } else { m as u16 };
-            *c = FalconFelt::new(felt as i16);
-        }
-
-        if (acc & ((1 << acc_len) - 1)) != 0 {
-            return Err(DeserializationError::InvalidValue(
-                "Failed to decode signature: Non-zero unused bits in the last byte".to_string(),
-            ));
-        }
         Ok(Polynomial::new(coefficients.to_vec()).into())
     }
 }
@@ -336,24 +254,69 @@ impl Deserializable for SignaturePoly {
 // HELPER FUNCTIONS
 // ================================================================================================
 
+/// Encodes signature polynomial coefficients using fn-dsa-comm's compressed encoding.
+fn encode_signature_poly(sig_coeff: &[i16], output: &mut [u8]) -> bool {
+    fn_dsa_comm::codec::comp_encode(sig_coeff, output)
+}
+
+/// Decodes signature polynomial coefficients using fn-dsa-comm's compressed encoding.
+fn decode_signature_poly(input: &[u8]) -> Result<[FalconFelt; N], DeserializationError> {
+    let mut coefficients_i16 = [0i16; N];
+
+    if !fn_dsa_comm::codec::comp_decode(input, &mut coefficients_i16) {
+        return Err(DeserializationError::InvalidValue(
+            "Failed to decode signature polynomial".to_string(),
+        ));
+    }
+
+    let coefficients = core::array::from_fn(|i| FalconFelt::from(coefficients_i16[i]));
+
+    Ok(coefficients)
+}
+
 /// Takes the hash-to-point polynomial `c` of a message, the signature polynomial over
-/// the message `s2` and a public key polynomial and returns `true` is the signature is a valid
-/// signature for the given parameters, otherwise it returns `false`.
+/// the message `s2` and a public key polynomial and returns `true` if the signature is valid,
+/// otherwise it returns `false`.
 fn verify_helper(c: &Polynomial<FalconFelt>, s2: &SignaturePoly, h: &PublicKey) -> bool {
-    let h_fft = h.fft();
-    let s2_fft = s2.fft();
-    let c_fft = c.fft();
+    use fn_dsa_comm::mq;
 
-    // compute the signature polynomial s1 using s1 = c - s2 * h
-    let s1_fft = c_fft - s2_fft.hadamard_mul(&h_fft);
-    let s1 = s1_fft.ifft();
+    // Reuse fn-dsa's mq routines for NTT operations and norm checks.
+    // All conversions go through external representation [0, q-1] expected by mq.
+    const LOGN_U32: u32 = LOG_N as u32;
 
-    // compute the norm squared of (s1, s2)
-    let length_squared_s1 = s1.norm_squared();
-    let length_squared_s2 = s2.norm_squared();
-    let length_squared = length_squared_s1 + length_squared_s2;
+    // s2 as signed coefficients (already bounded by SignaturePoly::try_from)
+    let s2_signed = s2.to_i16_balanced_array();
 
-    length_squared < SIG_L2_BOUND
+    // c in external representation
+    let mut t1 = c.to_u16_ext_array();
+    mq::mqpoly_ext_to_int(LOGN_U32, &mut t1);
+
+    // h in NTT domain
+    let mut h_ntt = h.to_u16_ext_array();
+    mq::mqpoly_ext_to_int(LOGN_U32, &mut h_ntt);
+    mq::mqpoly_int_to_NTT(LOGN_U32, &mut h_ntt);
+
+    // t2 <- s2 in NTT domain
+    let mut t2 = [0u16; N];
+    mq::mqpoly_signed_to_ext(LOGN_U32, &s2_signed, &mut t2);
+    mq::mqpoly_ext_to_int(LOGN_U32, &mut t2);
+    mq::mqpoly_int_to_NTT(LOGN_U32, &mut t2);
+
+    // t2 <- s2 * h (in NTT domain)
+    mq::mqpoly_mul_ntt(LOGN_U32, &mut t2, &h_ntt);
+    mq::mqpoly_NTT_to_int(LOGN_U32, &mut t2);
+
+    // t1 <- c - s2*h (internal), then convert to external for norm
+    mq::mqpoly_sub_int(LOGN_U32, &mut t1, &t2);
+    mq::mqpoly_int_to_ext(LOGN_U32, &mut t1);
+
+    // Squared norms of s1 and s2
+    let norm1 = mq::mqpoly_sqnorm(LOGN_U32, &t1);
+    let norm2 = mq::signed_poly_sqnorm(LOGN_U32, &s2_signed);
+
+    // Guard against u32 overflow when adding norms by checking norm1 <= u32::MAX - norm2,
+    // then apply the fn-dsa bound (inclusive) on ||(s1,s2)||^2.
+    norm1 < norm2.wrapping_neg() && (norm1 + norm2) <= mq::SQBETA[LOG_N as usize]
 }
 
 /// Checks whether a set of coefficients is a valid one for a signature polynomial.
