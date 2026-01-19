@@ -7,7 +7,8 @@ use core::fmt::{self, Write};
 #[cfg(feature = "std")]
 pub use miden_serde_utils::ReadAdapter;
 pub use miden_serde_utils::{
-    ByteReader, ByteWriter, Deserializable, DeserializationError, Serializable, SliceReader,
+    BudgetedReader, ByteReader, ByteWriter, Deserializable, DeserializationError, Serializable,
+    SliceReader,
 };
 use p3_field::{PrimeCharacteristicRing, RawDataSerializable, integers::QuotientMap};
 use p3_maybe_rayon::prelude::*;
