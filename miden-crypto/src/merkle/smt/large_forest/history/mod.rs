@@ -42,10 +42,12 @@ use crate::{
     Map, Word,
     merkle::{
         NodeIndex,
-        smt::{LeafIndex, SMT_DEPTH},
+        smt::{
+            LeafIndex, SMT_DEPTH,
+            large_forest::root::{RootValue, VersionId},
+        },
     },
 };
-
 // UTILITY TYPE ALIASES
 // ================================================================================================
 
@@ -74,10 +76,6 @@ pub type NodeChanges = Map<NodeIndex, Word>;
 /// newer, non-default value for that leaf, and thus result in incorrect query results at this point
 /// in the history.
 pub type LeafChanges = Map<LeafIndex<SMT_DEPTH>, CompactLeaf>;
-
-/// An identifier for a historical tree version overlay, which must be monotonic as new versions are
-/// added.
-pub type VersionId = u64;
 
 // HISTORY
 // ================================================================================================
@@ -151,7 +149,7 @@ impl History {
 
     /// Gets the version corresponding to the provided `root`, or returns [`None`] if the provided
     /// `root` is not found within this history.
-    pub fn version(&self, root: Word) -> Option<VersionId> {
+    pub fn version(&self, root: RootValue) -> Option<VersionId> {
         self.deltas
             .iter()
             .find_map(|d| if d.root == root { Some(d.version_id) } else { None })
@@ -164,7 +162,7 @@ impl History {
     /// Calling this method requires a traversal of all the versions and is hence linear in the
     /// number of history versions.
     #[must_use]
-    pub fn is_known_root(&self, root: Word) -> bool {
+    pub fn is_known_root(&self, root: RootValue) -> bool {
         self.deltas.iter().any(|r| r.root == root)
     }
 
@@ -191,7 +189,7 @@ impl History {
     ///   previously added version.
     pub fn add_version(
         &mut self,
-        root: Word,
+        root: RootValue,
         version_id: VersionId,
         nodes: NodeChanges,
         leaves: LeafChanges,
@@ -412,7 +410,7 @@ impl<'history> HistoryView<'history> {
 struct Delta {
     /// The root of the tree in the `version` corresponding to the application of the reversions in
     /// this delta to the previous tree state.
-    pub root: Word,
+    pub root: RootValue,
 
     /// The version of the tree represented by the delta.
     pub version_id: VersionId,
@@ -432,7 +430,12 @@ impl Delta {
     /// Creates a new delta with the provided `root`, and representing the provided
     /// changes to `nodes` and `leaves` in the merkle tree.
     #[must_use]
-    fn new(root: Word, version_id: VersionId, nodes: NodeChanges, leaves: LeafChanges) -> Self {
+    fn new(
+        root: RootValue,
+        version_id: VersionId,
+        nodes: NodeChanges,
+        leaves: LeafChanges,
+    ) -> Self {
         Self { root, version_id, nodes, leaves }
     }
 }
