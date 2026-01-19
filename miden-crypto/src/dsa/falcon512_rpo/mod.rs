@@ -21,15 +21,14 @@
 //! is that the sampling process during signature generation must be ensured to be consistent
 //! across the entire computing stack i.e., hardware, compiler, OS, sampler implementations ...
 //!
-//! This is made even more difficult by the extensive use of floating-point arithmetic by
-//! the sampler. In relation to this point, the current implementation does not use any platform
-//! specific optimizations (e.g., AVX2, NEON, FMA ...) and relies solely on the builtin `f64` type.
-//! Moreover, as per the time of this writing, the implementation does not use any methods or
-//! functions from `std::f64` that have non-deterministic precision mentioned in their
-//! documentation.
+//! This implementation follows fn-dsa for the fixed-point sampler (FLR) and NTT-based arithmetic.
+//! FLR selects an appropriate backend (including AVX2 where available) at compile time, avoiding
+//! reliance on platform floating-point behavior while remaining deterministic and no_std friendly.
 //!
 //! [1]: https://github.com/algorand/falcon/blob/main/falcon-det.pdf
 //! [2]: https://datatracker.ietf.org/doc/html/rfc6979#section-3.5
+
+use fn_dsa_comm::{FN_DSA_LOGN_512, sign_key_size, vrfy_key_size};
 
 use crate::{
     Felt, ZERO,
@@ -56,9 +55,6 @@ pub use self::{
 
 // The Falcon modulus p.
 const MODULUS: i16 = 12289;
-
-// Number of bits needed to encode an element in the Falcon field.
-const FALCON_ENCODING_BITS: u32 = 14;
 
 // The Falcon parameters for Falcon-512. This is the degree of the polynomial `phi := x^N + 1`
 // defining the ring Z_p[x]/(phi).
@@ -92,10 +88,10 @@ const PREVERSIONED_NONCE: [u8; PREVERSIONED_NONCE_LEN] = [
 const NONCE_ELEMENTS: usize = 8;
 
 /// Public key length as a u8 vector.
-pub const PK_LEN: usize = 897;
+pub const PK_LEN: usize = vrfy_key_size(FN_DSA_LOGN_512);
 
 /// Secret key length as a u8 vector.
-pub const SK_LEN: usize = 1281;
+pub const SK_LEN: usize = sign_key_size(FN_DSA_LOGN_512);
 
 /// Signature length as a u8 vector.
 const SIG_POLY_BYTE_LEN: usize = 625;
@@ -104,16 +100,10 @@ const SIG_POLY_BYTE_LEN: usize = 625;
 #[cfg(test)]
 const SIG_SERIALIZED_LEN: usize = 1524;
 
-/// Bound on the squared-norm of the signature.
-const SIG_L2_BOUND: u64 = 34034726;
-
-/// Standard deviation of the Gaussian over the lattice.
-const SIGMA: f64 = 165.7366171829776;
-
 // TYPE ALIASES
 // ================================================================================================
 
-type ShortLatticeBasis = [Polynomial<i16>; 4];
+type ShortLatticeBasis = [Polynomial<i8>; 4];
 
 // NONCE
 // ================================================================================================

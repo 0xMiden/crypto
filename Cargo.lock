@@ -612,6 +612,38 @@ dependencies = [
 ]
 
 [[package]]
+name = "fn-dsa-comm"
+version = "0.3.0"
+dependencies = [
+ "cpufeatures",
+ "rand_core 0.6.4",
+]
+
+[[package]]
+name = "fn-dsa-kgen"
+version = "0.3.0"
+dependencies = [
+ "fn-dsa-comm",
+ "zeroize",
+]
+
+[[package]]
+name = "fn-dsa-sign"
+version = "0.3.0"
+dependencies = [
+ "fn-dsa-comm",
+ "zeroize",
+]
+
+[[package]]
+name = "fn-dsa-vrfy"
+version = "0.3.0"
+source = "git+https://github.com/0xMiden/rust-fn-dsa?branch=expose-internals#7d76bf3b81e8ad7f0fc53d8ec23d265f257784d9"
+dependencies = [
+ "fn-dsa-comm",
+]
+
+[[package]]
 name = "foldhash"
 version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -957,6 +989,10 @@ dependencies = [
  "curve25519-dalek",
  "ed25519-dalek",
  "flume",
+ "fn-dsa-comm",
+ "fn-dsa-kgen",
+ "fn-dsa-sign",
+ "fn-dsa-vrfy",
  "glob",
  "hashbrown",
  "hex",
@@ -966,7 +1002,6 @@ dependencies = [
  "miden-crypto-derive",
  "miden-serde-utils",
  "num",
- "num-complex",
  "p3-air",
  "p3-challenger",
  "p3-field",
@@ -2238,6 +2273,20 @@ name = "zeroize"
 version = "1.8.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b97154e67e32c85465826e8bcc1c59429aaaf107c1e4a9e53c8d8ccd5eff88d0"
+dependencies = [
+ "zeroize_derive",
+]
+
+[[package]]
+name = "zeroize_derive"
+version = "1.4.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "85a5b4158499876c763cb03bc4e49185d3cccbabb15b33c627f7884f43db852e"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn",
+]
 
 [[package]]
 name = "zmij"
