@@ -1,4 +1,6 @@
-## 0.21.0 (TBD)
+## 0.22.0 (TBD)
+
+- Switched Falcon512 implementation to use `fn-dsa` crate ([#774](https://github.com/0xMiden/crypto/pull/774)).
 
 ## 0.21.1 (2026-01-16)
 

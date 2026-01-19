@@ -8,7 +8,6 @@ use core::{
 };
 
 use num::{One, Zero};
-use p3_field::PrimeCharacteristicRing;
 
 use super::{Inverse, field::FalconFelt};
 use crate::{
@@ -170,16 +169,6 @@ impl<
     }
 }
 
-impl<F: Clone + Into<f64>> Polynomial<F> {
-    pub(crate) fn l2_norm_squared(&self) -> f64 {
-        self.coefficients
-            .iter()
-            .map(|i| Into::<f64>::into(i.clone()))
-            .map(|i| i * i)
-            .sum::<f64>()
-    }
-}
-
 impl<F> PartialEq for Polynomial<F>
 where
     F: Zero + PartialEq + Clone + AddAssign,
@@ -190,8 +179,8 @@ where
         } else if self.is_zero() || other.is_zero() {
             false
         } else {
-            let self_degree = self.degree().unwrap();
-            let other_degree = other.degree().unwrap();
+            let self_degree = self.degree().expect("non-zero polynomial must have a degree");
+            let other_degree = other.degree().expect("non-zero polynomial must have a degree");
             self.coefficients[0..=self_degree] == other.coefficients[0..=other_degree]
         }
     }
@@ -460,15 +449,16 @@ where
         }
         let mut remainder = self.clone();
         let mut quotient = Polynomial::<F>::zero();
-        while remainder.degree().unwrap() >= denominator.degree().unwrap() {
-            let shift = remainder.degree().unwrap() - denominator.degree().unwrap();
+        while !remainder.is_zero()
+            && remainder.degree().expect("non-zero remainder must have degree")
+                >= denominator.degree().expect("non-zero denominator must have degree")
+        {
+            let shift = remainder.degree().expect("non-zero remainder must have degree")
+                - denominator.degree().expect("non-zero denominator must have degree");
             let quotient_coefficient = remainder.lc() / denominator.lc();
             let monomial = Self::constant(quotient_coefficient).shift(shift);
             quotient += monomial.clone();
             remainder -= monomial * denominator.clone();
-            if remainder.is_zero() {
-                break;
-            }
         }
         quotient
     }
@@ -524,7 +514,7 @@ fn vector_karatsuba<
 impl From<Polynomial<FalconFelt>> for Polynomial<Felt> {
     fn from(item: Polynomial<FalconFelt>) -> Self {
         let res: Vec<Felt> =
-            item.coefficients.iter().map(|a| Felt::from_u16(a.value() as u16)).collect();
+            item.coefficients.iter().map(|a| Felt::new(a.value() as u64)).collect();
         Polynomial::new(res)
     }
 }
@@ -532,40 +522,74 @@ impl From<Polynomial<FalconFelt>> for Polynomial<Felt> {
 impl From<&Polynomial<FalconFelt>> for Polynomial<Felt> {
     fn from(item: &Polynomial<FalconFelt>) -> Self {
         let res: Vec<Felt> =
-            item.coefficients.iter().map(|a| Felt::from_u16(a.value() as u16)).collect();
-        Polynomial::new(res)
-    }
-}
-
-impl From<Polynomial<i16>> for Polynomial<FalconFelt> {
-    fn from(item: Polynomial<i16>) -> Self {
-        let res: Vec<FalconFelt> = item.coefficients.iter().map(|&a| FalconFelt::new(a)).collect();
-        Polynomial::new(res)
-    }
-}
-
-impl From<&Polynomial<i16>> for Polynomial<FalconFelt> {
-    fn from(item: &Polynomial<i16>) -> Self {
-        let res: Vec<FalconFelt> = item.coefficients.iter().map(|&a| FalconFelt::new(a)).collect();
+            item.coefficients.iter().map(|a| Felt::new(a.value() as u64)).collect();
         Polynomial::new(res)
     }
 }
 
 impl From<Vec<i16>> for Polynomial<FalconFelt> {
     fn from(item: Vec<i16>) -> Self {
-        let res: Vec<FalconFelt> = item.iter().map(|&a| FalconFelt::new(a)).collect();
-        Polynomial::new(res)
+        Polynomial::new(item.iter().map(|&a| FalconFelt::from(a)).collect())
     }
 }
 
 impl From<&Vec<i16>> for Polynomial<FalconFelt> {
     fn from(item: &Vec<i16>) -> Self {
-        let res: Vec<FalconFelt> = item.iter().map(|&a| FalconFelt::new(a)).collect();
-        Polynomial::new(res)
+        Polynomial::new(item.iter().map(|&a| FalconFelt::from(a)).collect())
+    }
+}
+
+impl From<Polynomial<i8>> for Polynomial<FalconFelt> {
+    fn from(item: Polynomial<i8>) -> Self {
+        Polynomial::new(item.coefficients.iter().map(|&a| FalconFelt::from(a)).collect())
+    }
+}
+
+impl From<&Polynomial<i8>> for Polynomial<FalconFelt> {
+    fn from(item: &Polynomial<i8>) -> Self {
+        Polynomial::new(item.coefficients.iter().map(|&a| FalconFelt::from(a)).collect())
+    }
+}
+
+impl From<Vec<i8>> for Polynomial<FalconFelt> {
+    fn from(item: Vec<i8>) -> Self {
+        Polynomial::new(item.iter().map(|&a| FalconFelt::from(a)).collect())
+    }
+}
+
+impl From<&Vec<i8>> for Polynomial<FalconFelt> {
+    fn from(item: &Vec<i8>) -> Self {
+        Polynomial::new(item.iter().map(|&a| FalconFelt::from(a)).collect())
     }
 }
 
 impl Polynomial<FalconFelt> {
+    /// Converts coefficients to external representation [0, q-1].
+    pub fn fill_u16_ext(&self, out: &mut [u16]) {
+        debug_assert_eq!(out.len(), N);
+        for (dst, coeff) in out.iter_mut().zip(self.coefficients.iter()) {
+            *dst = coeff.value();
+        }
+    }
+
+    /// Returns coefficients in external representation [0, q-1] as a fixed array.
+    pub fn to_u16_ext_array(&self) -> [u16; N] {
+        let mut out = [0u16; N];
+        self.fill_u16_ext(&mut out);
+        out
+    }
+
+    /// Builds a polynomial from external representation coefficients.
+    pub fn from_u16_ext_array(values: &[u16; N]) -> Self {
+        let coeffs = values.iter().map(|&v| FalconFelt::new(v)).collect();
+        Polynomial::new(coeffs)
+    }
+
+    /// Returns coefficients in balanced signed representation as a fixed array.
+    pub fn to_i16_balanced_array(&self) -> [i16; N] {
+        core::array::from_fn(|i| self.coefficients[i].balanced_value())
+    }
+
     /// Computes the squared L2 norm of the polynomial.
     pub fn norm_squared(&self) -> u64 {
         self.coefficients
@@ -580,7 +604,7 @@ impl Polynomial<FalconFelt> {
 
     /// Returns the coefficients of this polynomial as field elements.
     pub fn to_elements(&self) -> Vec<Felt> {
-        self.coefficients.iter().map(|&a| Felt::from_u16(a.value() as u16)).collect()
+        self.coefficients.iter().map(|&a| Felt::new(a.value() as u64)).collect()
     }
 
     // POLYNOMIAL OPERATIONS
@@ -613,7 +637,7 @@ impl Polynomial<FalconFelt> {
             let neg_ai = (modulus - ai as u16) % modulus;
 
             let bi = (a[i] % modulus as u64) as u16;
-            c[i] = FalconFelt::new(((neg_ai + bi) % modulus) as i16);
+            c[i] = FalconFelt::new((neg_ai + bi) % modulus);
         }
 
         Self::new(c.to_vec())
@@ -624,13 +648,6 @@ impl Polynomial<Felt> {
     /// Returns the coefficients of this polynomial as Miden field elements.
     pub fn to_elements(&self) -> Vec<Felt> {
         self.coefficients.to_vec()
-    }
-}
-
-impl Polynomial<i16> {
-    /// Returns the balanced values of the coefficients of this polynomial.
-    pub fn to_balanced_values(&self) -> Vec<i16> {
-        self.coefficients.iter().map(|c| FalconFelt::new(*c).balanced_value()).collect()
     }
 }
 
@@ -658,8 +675,8 @@ mod tests {
         let coef1: [u8; N] = prng_array([0u8; 32]);
         let coef2: [u8; N] = prng_array([1u8; 32]);
 
-        let poly1 = Polynomial::new(coef1.iter().map(|&a| FalconFelt::new(a as i16)).collect());
-        let poly2 = Polynomial::new(coef2.iter().map(|&a| FalconFelt::new(a as i16)).collect());
+        let poly1 = Polynomial::new(coef1.iter().map(|&a| FalconFelt::new(a as u16)).collect());
+        let poly2 = Polynomial::new(coef2.iter().map(|&a| FalconFelt::new(a as u16)).collect());
         let prod = poly1.clone() * poly2.clone();
 
         assert_eq!(

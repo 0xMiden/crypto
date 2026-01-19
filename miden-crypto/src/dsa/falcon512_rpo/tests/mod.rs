@@ -42,10 +42,11 @@ fn test_signature_gen_reference_impl() {
     for i in 0..NUM_TEST_VECTORS {
         // construct the four polynomials defining the secret key for this test vector
         let [f, g, big_f, big_g] = SK_POLYS[i];
-        let f = Polynomial::new(f.to_vec());
-        let g = Polynomial::new(g.to_vec());
-        let big_f = Polynomial::new(big_f.to_vec());
-        let big_g = Polynomial::new(big_g.to_vec());
+        // Convert from i16 to i8 (test vectors contain small values that fit in i8)
+        let f = Polynomial::new(f.iter().map(|&x| x as i8).collect());
+        let g = Polynomial::new(g.iter().map(|&x| x as i8).collect());
+        let big_f = Polynomial::new(big_f.iter().map(|&x| x as i8).collect());
+        let big_g = Polynomial::new(big_g.iter().map(|&x| x as i8).collect());
 
         // we generate the secret key using the above four polynomials
         let sk = SecretKey::from_short_lattice_basis([g, f, big_g, big_f]);
