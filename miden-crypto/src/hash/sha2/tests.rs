@@ -230,7 +230,11 @@ fn test_memory_layout_assumptions() {
 
 #[test]
 fn test_sha256_digests_as_bytes_correctness() {
-    let digests = vec![Sha256Digest([1u8; 32]), Sha256Digest([2u8; 32]), Sha256Digest([3u8; 32])];
+    let digests = vec![
+        Sha256Digest::from([1u8; 32]),
+        Sha256Digest::from([2u8; 32]),
+        Sha256Digest::from([3u8; 32]),
+    ];
 
     let bytes = Sha256Digest::digests_as_bytes(&digests);
 
@@ -245,7 +249,11 @@ fn test_sha256_digests_as_bytes_correctness() {
 
 #[test]
 fn test_sha512_digests_as_bytes_correctness() {
-    let digests = vec![Sha512Digest([1u8; 64]), Sha512Digest([2u8; 64]), Sha512Digest([3u8; 64])];
+    let digests = vec![
+        Sha512Digest::from([1u8; 64]),
+        Sha512Digest::from([2u8; 64]),
+        Sha512Digest::from([3u8; 64]),
+    ];
 
     let bytes = Sha512Digest::digests_as_bytes(&digests);
 
@@ -267,7 +275,7 @@ proptest! {
         digests in prop::collection::vec(any::<[u8; 32]>(), 1..10)
     ) {
         let sha_digests: Vec<Sha256Digest> =
-            digests.iter().map(|&d| Sha256Digest(d)).collect();
+            digests.iter().map(|&d| Sha256Digest::from(d)).collect();
 
         // Method 1: Using merge_many (uses unsafe digests_as_bytes)
         let result1 = Sha256::merge_many(&sha_digests);
@@ -275,7 +283,7 @@ proptest! {
         // Method 2: Safe concatenation for comparison
         let mut concat = Vec::new();
         for d in &sha_digests {
-            concat.extend_from_slice(&d.0);
+            concat.extend_from_slice(d.as_bytes());
         }
         let result2 = Sha256::hash(&concat);
 
@@ -288,13 +296,13 @@ proptest! {
         digests in prop::collection::vec(any::<[u8; 64]>(), 1..10)
     ) {
         let sha_digests: Vec<Sha512Digest> =
-            digests.iter().map(|&d| Sha512Digest(d)).collect();
+            digests.iter().map(|&d| Sha512Digest::from(d)).collect();
 
         let result1 = Sha512::merge_many(&sha_digests);
 
         let mut concat = Vec::new();
         for d in &sha_digests {
-            concat.extend_from_slice(&d.0);
+            concat.extend_from_slice(d.as_bytes());
         }
         let result2 = Sha512::hash(&concat);
 
