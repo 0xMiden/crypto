@@ -1,4 +1,4 @@
-## 0.21.2 (TBD)
+## 0.21.2 (2026-01-20)
 
 - Exported `BudgetedReader` to allow for defense-in-depth against deserialization panics ([#786](https://github.com/0xMiden/crypto/pull/786)).
 
