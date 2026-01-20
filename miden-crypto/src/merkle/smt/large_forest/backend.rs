@@ -11,15 +11,16 @@ use crate::{
     merkle::{
         MerkleError,
         smt::{
-            Root, SmtProof,
+            SmtProof, TreeId,
             full::SMT_DEPTH,
             large_forest::{
                 operation::{SmtForestUpdateBatch, SmtUpdateBatch},
-                root::VersionId,
+                root::{LineageId, RootValue, VersionId},
             },
         },
     },
 };
+
 // TYPE ALIASES
 // ================================================================================================
 
@@ -49,26 +50,41 @@ where
     // QUERIES
     // ============================================================================================
 
-    /// Returns an opening for the specified `key` in the SMT with the specified `root`.
-    fn open(&self, root: Root, key: Word) -> Result<SmtProof>;
+    /// Returns an opening for the specified `key` in the SMT with the specified `lineage`.
+    ///
+    /// It is the responsibility of the forest to ensure lineage existence before querying the
+    /// backend. The backend must return an error if the lineage does not exist.
+    fn open(&self, lineage: LineageId, key: Word) -> Result<SmtProof>;
 
-    /// Returns the value associated with the provided `key` in the SMT with the provided `root`, or
-    /// [`None`] if no such value exists.
-    fn get(&self, root: Root, key: Word) -> Result<Option<Word>>;
+    /// Returns the value associated with the provided `key` in the SMT with the specified
+    /// `lineage`, or [`None`] if no such value exists.
+    ///
+    /// It is the responsibility of the forest to ensure lineage existence before querying the
+    /// backend. The backend must return an error if the lineage does not exist.
+    fn get(&self, lineage: LineageId, key: Word) -> Result<Option<Word>>;
 
-    /// Returns the version of the tree with the provided `root`.
-    fn version(&self, root: Root) -> Result<VersionId>;
+    /// Returns the version of the tree with the specified `lineage`.
+    ///
+    /// It is the responsibility of the forest to ensure lineage existence before querying the
+    /// backend. The backend must return an error if the lineage does not exist.
+    fn version(&self, lineage: LineageId) -> Result<VersionId>;
 
-    /// Returns an iterator over all the tree roots and versions that the backend knows about.
+    /// Returns an iterator over all the lineages that the backend knows about.
     ///
     /// The iteration order is unspecified.
-    fn versions(&self) -> Result<impl Iterator<Item = (Root, VersionId)>>;
+    fn lineages(&self) -> Result<impl Iterator<Item = LineageId>>;
+
+    /// Returns an iterator over all the trees (and their corresponding roots) that the backend
+    /// knows about.
+    ///
+    /// The iteration order is unspecified.
+    fn trees(&self) -> Result<impl Iterator<Item = (TreeId, RootValue)>>;
 
     // SINGLE-TREE MODIFIERS
     // ============================================================================================
 
-    /// Performs the provided `updates` on the tree with the provided `root`, returning the mutation
-    /// set that will revert the changes made to the tree.
+    /// Performs the provided `updates` on the tree with the specified `lineage`, returning the
+    /// mutation set that will revert the changes made to the tree.
     ///
     /// Implementations must guarantee the following behavior, with non-conforming implementations
     /// considered to be a bug:
@@ -78,7 +94,7 @@ where
     ///   allocated.
     fn update_tree(
         &mut self,
-        root: Root,
+        lineage: LineageId,
         new_version: VersionId,
         updates: SmtUpdateBatch,
     ) -> Result<MutationSet>;

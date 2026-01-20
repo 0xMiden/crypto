@@ -5,7 +5,8 @@
 
 use alloc::vec::Vec;
 
-use crate::{Map, Set, Word, merkle::smt::large_forest::root::RootValue};
+use crate::{Map, Set, Word, merkle::smt::large_forest::root::LineageId};
+
 // FOREST OPERATION
 // ================================================================================================
 
@@ -130,8 +131,8 @@ impl Default for SmtUpdateBatch {
 /// associated with specified trees in that forest.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct SmtForestUpdateBatch {
-    /// The operations associated with each targeted tree in the forest.
-    operations: Map<RootValue, SmtUpdateBatch>,
+    /// The operations associated with each targeted lineage in the forest.
+    operations: Map<LineageId, SmtUpdateBatch>,
 }
 
 impl SmtForestUpdateBatch {
@@ -140,28 +141,28 @@ impl SmtForestUpdateBatch {
         Self { operations: Map::new() }
     }
 
-    /// Adds the provided `operations` to be performed on the tree with the provided `root`.
+    /// Adds the provided `operations` to be performed on the tree with the specified `lineage`.
     pub fn add_operations(
         &mut self,
-        root: Word,
+        lineage: LineageId,
         operations: impl Iterator<Item = ForestOperation>,
     ) {
-        let batch = self.operations.entry(root).or_insert_with(SmtUpdateBatch::empty);
+        let batch = self.operations.entry(lineage).or_insert_with(SmtUpdateBatch::empty);
         batch.add_operations(operations);
     }
 
-    /// Gets the batch of operations for the tree with the provided `root` for inspection and/or
+    /// Gets the batch of operations for the tree with the specified `lineage` for inspection and/or
     /// modification.
     ///
     /// It is assumed that calling this means that the caller wants to insert operations into the
     /// associated batch, so a batch will be created even if one was not previously present.
-    pub fn operations(&mut self, root: Word) -> &mut SmtUpdateBatch {
-        self.operations.entry(root).or_insert_with(SmtUpdateBatch::empty)
+    pub fn operations(&mut self, lineage: LineageId) -> &mut SmtUpdateBatch {
+        self.operations.entry(lineage).or_insert_with(SmtUpdateBatch::empty)
     }
 
     /// Consumes the batch as a map of batches, with each individual batch guaranteed to be in
     /// sorted order and contain only the last operation in the batch for any given key.
-    pub fn consume(self) -> Map<Word, Vec<ForestOperation>> {
+    pub fn consume(self) -> Map<LineageId, Vec<ForestOperation>> {
         self.operations.into_iter().map(|(k, v)| (k, v.consume())).collect()
     }
 }
@@ -238,26 +239,26 @@ mod test {
         let mut batch = SmtForestUpdateBatch::empty();
 
         // Let's start by adding a few operations to a tree.
-        let t1_root: Word = rand_value();
+        let t1_lineage: LineageId = rand_value();
         let t1_o1 = ForestOperation::insert(rand_value(), rand_value());
         let t1_o2 = ForestOperation::remove(rand_value());
-        batch.add_operations(t1_root, vec![t1_o1, t1_o2].into_iter());
+        batch.add_operations(t1_lineage, vec![t1_o1, t1_o2].into_iter());
 
         // We can also add them differently.
-        let t2_root: Word = rand_value();
+        let t2_lineage: LineageId = rand_value();
         let t2_o1 = ForestOperation::remove(rand_value());
         let t2_o2 = ForestOperation::insert(rand_value(), rand_value());
-        batch.operations(t2_root).add_operations(vec![t2_o1, t2_o2].into_iter());
+        batch.operations(t2_lineage).add_operations(vec![t2_o1, t2_o2].into_iter());
 
         // When we consume the batch, each per-tree batch should be unique by key and sorted.
         let ops = batch.consume();
         assert_eq!(ops.len(), 2);
 
-        let t1_ops = ops.get(&t1_root).unwrap();
+        let t1_ops = ops.get(&t1_lineage).unwrap();
         assert!(t1_ops.is_sorted_by_key(|o| o.key()));
         assert_eq!(t1_ops.iter().unique_by(|o| o.key()).count(), 2);
 
-        let t2_ops = ops.get(&t2_root).unwrap();
+        let t2_ops = ops.get(&t2_lineage).unwrap();
         assert!(t2_ops.is_sorted_by_key(|o| o.key()));
         assert_eq!(t2_ops.iter().unique_by(|o| o.key()).count(), 2);
     }

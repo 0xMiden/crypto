@@ -7,7 +7,10 @@ use thiserror::Error;
 
 use crate::merkle::{
     MerkleError,
-    smt::large_forest::{backend::BackendError, history::error::HistoryError, root::RootValue},
+    smt::{
+        TreeId, VersionId,
+        large_forest::{backend::BackendError, history::error::HistoryError, root::LineageId},
+    },
 };
 
 // LARGE SMT FOREST ERROR
@@ -20,13 +23,21 @@ pub enum LargeSmtForestError {
     #[error(transparent)]
     HistoryError(#[from] HistoryError),
 
-    /// Raised when an attempt is made to modify a frozen tree.
-    #[error("Attempted to modify non-current tree with root {0}")]
-    InvalidModification(RootValue),
-
     /// Errors with the merkle tree operations of the forest.
     #[error(transparent)]
     MerkleError(#[from] MerkleError),
+
+    /// Raised when an operation specifies a lineage that is not known.
+    #[error("The lineage {0:?} is not in the forest")]
+    UnknownLineage(LineageId),
+
+    /// Raised when an operation specifies a tree that is not known.
+    #[error("The tree")]
+    UnknownTree(TreeId),
+
+    /// Raised when an operation requests a version that is not known.
+    #[error("The version {0} is not known by the forest")]
+    UnknownVersion(VersionId),
 
     /// Raised for arbitrary other errors.
     #[error(transparent)]

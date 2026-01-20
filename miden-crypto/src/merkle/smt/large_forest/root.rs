@@ -1,80 +1,174 @@
-//! This module contains utility types for working with roots as part of the forest.
+//! This module contains utility types for working with roots and trees as part of the forest.
 
-#[cfg(all(feature = "std", test))]
-use crate::rand::test_utils::rand_value;
-use crate::{Word, rand::Randomizable};
+use crate::Word;
+#[cfg(test)]
+use crate::rand::Randomizable;
 
 // TYPES
+// ================================================================================================
+
+/// A root for a tree in the forest.
+pub type RootValue = Word;
+
+/// An identifier for the version of a tree in a given lineage
+pub type VersionId = u64;
+
+// LINEAGE ID
 // ================================================================================================
 
 /// An identifier for a lineage of trees.
 ///
 /// This is an arbitrary, user-provided identifier that is used to disambiguate cases where trees in
 /// distinct lineages are otherwise identical and have the same root.
-pub type LineageId = [u8; 32];
-
-// TODO LineageId?
-
-// TODO Map lineage + version
-
-/// A root for a tree in the forest.
-pub type RootValue = Word;
-
-/// An identifier for the version of a tree and hence a root.
-pub type VersionId = u64;
-
-// ROOT IDENTIFIER
-// ================================================================================================
-
-/// An identifier that is capable of uniquely referring to a root in the forest, even in the
-/// presence of otherwise-identical trees.
 #[derive(Copy, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
-pub struct Root {
-    /// An identifier for the lineage in which the root may exist.
-    lineage: LineageId,
+pub struct LineageId([u8; 32]);
 
-    /// The root value of the tree in question.
-    value: RootValue,
+impl LineageId {
+    /// Constructs a new lineage ID from the provided bytes.
+    pub fn new(bytes: [u8; 32]) -> Self {
+        Self(bytes)
+    }
 }
 
-/// The base API for the `RootId`.
-impl Root {
-    /// Constructs a new root identifier for the provided `root` in the specified `lineage`.
-    pub fn new(lineage: LineageId, value: RootValue) -> Self {
-        Self { lineage, value }
+impl core::fmt::Display for LineageId {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        write!(f, "[")?;
+        for i in 0..4 {
+            let byte = self.0[i];
+            write!(f, "{byte:x}, ")?;
+        }
+        write!(f, "...]")
+    }
+}
+
+#[cfg(test)]
+impl Randomizable for LineageId {
+    const VALUE_SIZE: usize = size_of::<Self>();
+
+    fn from_random_bytes(source: &[u8]) -> Option<Self> {
+        let bytes = Randomizable::from_random_bytes(source)?;
+        Some(Self::new(bytes))
+    }
+}
+
+// TREE IDENTIFIER
+// ================================================================================================
+
+/// An identifier that is capable of uniquely referring to a tree in the forest.
+#[derive(Copy, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+pub struct TreeId {
+    /// An identifier for the lineage in which the tree exists.
+    lineage: LineageId,
+
+    /// The version of the tree to find in the lineage.
+    version: VersionId,
+}
+
+/// The base API of the identifier.
+impl TreeId {
+    /// Constructs a new tree identifier for the tree with the specified `version` in the specified
+    /// `lineage`.
+    pub fn new(lineage: LineageId, version: VersionId) -> Self {
+        Self { lineage, version }
     }
 
-    /// Gets the lineage from the identifier.
+    /// Gets the tree's lineage from the identifier.
     pub fn lineage(&self) -> LineageId {
         self.lineage
     }
 
-    /// Gets the root value from the identifier.
+    /// Gets the tree's version from the identifier.
+    pub fn version(&self) -> VersionId {
+        self.version
+    }
+}
+
+impl core::fmt::Display for TreeId {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        write!(f, "TreeId(lineage = {}, version = {}", self.lineage, self.version)
+    }
+}
+
+#[cfg(test)]
+impl Randomizable for TreeId {
+    const VALUE_SIZE: usize = size_of::<Self>();
+
+    fn from_random_bytes(source: &[u8]) -> Option<Self> {
+        let domain = Randomizable::from_random_bytes(source)?;
+        let version = Randomizable::from_random_bytes(source)?;
+        Some(Self::new(domain, version))
+    }
+}
+
+// UNIQUE ROOT
+// ================================================================================================
+
+/// A root in the forest within a given lineage.
+#[derive(Copy, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+pub struct UniqueRoot {
+    lineage: LineageId,
+    value: RootValue,
+}
+
+impl UniqueRoot {
+    /// Constructs a new unique root with the provided `value` and `lineage`.
+    pub fn new(lineage: LineageId, value: RootValue) -> Self {
+        Self { lineage, value }
+    }
+
+    /// Gets the lineage in which the root is found.
+    pub fn lineage(&self) -> LineageId {
+        self.lineage
+    }
+
+    /// Gets the value of the tree root itself.
     pub fn value(&self) -> RootValue {
         self.value
     }
 }
 
-/// Additional functionality for `RootId` for use during testing only.
-#[cfg(test)]
-impl Root {
-    /// Generates a random root identifier.
-    #[cfg(feature = "std")]
-    pub fn random() -> Self {
-        let domain = rand_value();
-        let root = rand_value();
-        Self::new(domain, root)
+// TREE ID WITH ROOT
+// ================================================================================================
+
+/// The unique identifier for a given tree, along with the value of its root.
+#[derive(Copy, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+pub struct TreeWithRoot {
+    id: TreeId,
+    root: RootValue,
+}
+
+impl TreeWithRoot {
+    /// Constructs a new tree identifier from the provided `lineage`, `version`, and `root`.
+    pub fn new(lineage: LineageId, version: VersionId, root: RootValue) -> Self {
+        let id = TreeId::new(lineage, version);
+        Self { id, root }
+    }
+
+    /// Gets the tree's lineage.
+    pub fn lineage(&self) -> LineageId {
+        self.id.lineage
+    }
+
+    /// Gets the tree's version.
+    pub fn version(&self) -> VersionId {
+        self.id.version
+    }
+
+    /// Gets the tree's root value.
+    pub fn root(&self) -> RootValue {
+        self.root
     }
 }
 
-impl Randomizable for LineageId {
-    const VALUE_SIZE: usize = size_of::<LineageId>();
+impl From<TreeWithRoot> for TreeId {
+    fn from(value: TreeWithRoot) -> Self {
+        value.id
+    }
+}
 
-    fn from_random_bytes(source: &[u8]) -> Option<Self> {
-        let mut result = [0u8; Self::VALUE_SIZE];
-        result.copy_from_slice(source);
-
-        Some(result)
+impl From<TreeWithRoot> for UniqueRoot {
+    fn from(value: TreeWithRoot) -> Self {
+        UniqueRoot::new(value.id.lineage, value.root)
     }
 }
 
@@ -86,14 +180,11 @@ impl Randomizable for LineageId {
 pub enum RootInfo {
     /// The queried root corresponds to a tree that is the latest version of a given tree in the
     /// forest.
-    LatestVersion(VersionId),
+    LatestVersion(RootValue),
 
     /// The queried root corresponds to a tree that is _not_ the latest version of a given tree in
     /// the forest.
-    HistoricalVersion(VersionId),
-
-    /// The queried root corresponds to the empty tree.
-    EmptyTree,
+    HistoricalVersion(RootValue),
 
     /// The queried root does not belong to any tree that the forest knows about.
     Missing,

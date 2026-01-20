@@ -48,6 +48,7 @@ use crate::{
         },
     },
 };
+
 // UTILITY TYPE ALIASES
 // ================================================================================================
 
@@ -143,7 +144,7 @@ impl History {
     ///
     /// Calling this method provides an iterator whose consumption requires a traversal of all the
     /// versions. The method's complexity is thus `O(n)` in the number of versions.
-    pub fn roots(&self) -> impl Iterator<Item = Word> {
+    pub fn roots(&self) -> impl Iterator<Item = RootValue> {
         self.deltas.iter().rev().map(|d| d.root)
     }
 
@@ -164,6 +165,15 @@ impl History {
     #[must_use]
     pub fn is_known_root(&self, root: RootValue) -> bool {
         self.deltas.iter().any(|r| r.root == root)
+    }
+
+    /// Returns the root value that corresponds to the provided `version`.
+    pub fn root_for_version(&self, version: VersionId) -> Result<RootValue> {
+        let ix = self.find_latest_corresponding_version(version)?;
+
+        // The direct index is safe here because `find_latest_...` will have returned an error if
+        // there is no such version, and is hence guaranteed to have returned a valid index.
+        Ok(self.deltas[ix].root)
     }
 
     /// Adds a version to the history with the provided `root` and represented by the changes from
