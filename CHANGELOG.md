@@ -1,5 +1,7 @@
 ## 0.21.0 (TBD)
 
+- Added `MmrPath::with_forest()` and `MmrProof::with_forest()` to adjust proofs for smaller forests ([#788](https://github.com/0xMiden/crypto/pull/788)).
+
 ## 0.21.1 (2026-01-16)
 
 - Changed `SmtForest` so that `EMPTY_WORD` is treated as removals ([#780](https://github.com/0xMiden/crypto/pull/780)).
