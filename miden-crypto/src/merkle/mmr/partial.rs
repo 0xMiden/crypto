@@ -3,7 +3,7 @@ use alloc::{
     vec::Vec,
 };
 
-use super::{MmrDelta, MmrPath};
+use super::{MmrDelta, MmrPath, MmrProof};
 use crate::{
     Word,
     merkle::{
@@ -17,14 +17,14 @@ use crate::{
 // ================================================================================================
 
 type NodeMap = BTreeMap<InOrderIndex, Word>;
+type LeafMap = BTreeMap<usize, Word>;
 
 // PARTIAL MERKLE MOUNTAIN RANGE
 // ================================================================================================
 /// Partially materialized Merkle Mountain Range (MMR), used to efficiently store and update the
 /// authentication paths for a subset of the elements in a full MMR.
 ///
-/// This structure store only the authentication path for a value, the value itself is stored
-/// separately.
+/// This structure stores both the authentication paths and the leaf values for tracked leaves.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PartialMmr {
     /// The version of the MMR.
@@ -65,6 +65,12 @@ pub struct PartialMmr {
     /// trees in the MMR can be represented without rewrites of the indexes.
     pub(crate) nodes: NodeMap,
 
+    /// The values of tracked leaves, keyed by their position in the MMR.
+    ///
+    /// This allows [PartialMmr::open()] to return a complete [MmrProof] containing both the
+    /// authentication path and the leaf value.
+    pub(crate) leaves: LeafMap,
+
     /// Flag indicating if the odd element should be tracked.
     ///
     /// This flag is necessary because the sibling of the odd doesn't exist yet, so it can not be
@@ -78,9 +84,16 @@ impl Default for PartialMmr {
         let forest = Forest::empty();
         let peaks = Vec::new();
         let nodes = BTreeMap::new();
+        let leaves = BTreeMap::new();
         let track_latest = false;
 
-        Self { forest, peaks, nodes, track_latest }
+        Self {
+            forest,
+            peaks,
+            nodes,
+            leaves,
+            track_latest,
+        }
     }
 }
 
@@ -93,20 +106,39 @@ impl PartialMmr {
         let forest = peaks.forest();
         let peaks = peaks.into();
         let nodes = BTreeMap::new();
+        let leaves = BTreeMap::new();
         let track_latest = false;
 
-        Self { forest, peaks, nodes, track_latest }
+        Self {
+            forest,
+            peaks,
+            nodes,
+            leaves,
+            track_latest,
+        }
     }
 
     /// Returns a new [PartialMmr] instantiated from the specified components.
     ///
-    /// This constructor does not check the consistency between peaks and nodes. If the specified
-    /// peaks are nodes are inconsistent, the returned partial MMR may exhibit undefined behavior.
-    pub fn from_parts(peaks: MmrPeaks, nodes: NodeMap, track_latest: bool) -> Self {
+    /// This constructor does not check the consistency between peaks, nodes, and leaves. If the
+    /// specified components are inconsistent, the returned partial MMR may exhibit undefined
+    /// behavior.
+    pub fn from_parts(
+        peaks: MmrPeaks,
+        nodes: NodeMap,
+        leaves: LeafMap,
+        track_latest: bool,
+    ) -> Self {
         let forest = peaks.forest();
         let peaks = peaks.into();
 
-        Self { forest, peaks, nodes, track_latest }
+        Self {
+            forest,
+            peaks,
+            nodes,
+            leaves,
+            track_latest,
+        }
     }
 
     // PUBLIC ACCESSORS
@@ -148,8 +180,8 @@ impl PartialMmr {
         self.is_tracked_node(&leaf_index)
     }
 
-    /// Given a leaf position, returns the Merkle path to its corresponding peak, or None if this
-    /// partial MMR does not track an authentication paths for the specified leaf.
+    /// Given a leaf position, returns an [MmrProof] for the
+    /// specified leaf, or None if this partial MMR does not track the leaf.
     ///
     /// Note: The leaf position is the 0-indexed number corresponding to the order the leaves were
     /// added, this corresponds to the MMR size _prior_ to adding the element. So the 1st element
@@ -158,7 +190,7 @@ impl PartialMmr {
     /// # Errors
     /// Returns an error if the specified position is greater-or-equal than the number of leaves
     /// in the underlying MMR.
-    pub fn open(&self, pos: usize) -> Result<Option<MmrPath>, MmrError> {
+    pub fn open(&self, pos: usize) -> Result<Option<MmrProof>, MmrError> {
         let tree_bit = self
             .forest
             .leaf_to_corresponding_tree(pos)
@@ -178,10 +210,16 @@ impl PartialMmr {
 
         if nodes.len() != depth {
             // The requested `pos` is not being tracked.
-            Ok(None)
-        } else {
-            Ok(Some(MmrPath::new(self.forest, pos, MerklePath::new(nodes))))
+            return Ok(None);
         }
+
+        // Get the leaf value - it should be present if the path is tracked
+        let Some(&leaf) = self.leaves.get(&pos) else {
+            return Ok(None);
+        };
+
+        let path = MmrPath::new(self.forest, pos, MerklePath::new(nodes));
+        Ok(Some(MmrProof::new(path, leaf)))
     }
 
     // ITERATORS
@@ -221,12 +259,18 @@ impl PartialMmr {
     /// Adds a new peak and optionally track it. Returns a vector of the authentication nodes
     /// inserted into this [PartialMmr] as a result of this operation.
     ///
-    /// When `track` is `true` the new leaf is tracked.
+    /// When `track` is `true` the new leaf is tracked and its value is stored.
     pub fn add(&mut self, leaf: Word, track: bool) -> Vec<(InOrderIndex, Word)> {
         self.forest.append_leaf();
         // We just incremented the forest, so this cannot panic.
         let merges = self.forest.smallest_tree_height_unchecked();
         let mut new_nodes = Vec::with_capacity(merges);
+
+        // Store the leaf value if tracking
+        if track {
+            let leaf_pos = self.forest.num_leaves() - 1;
+            self.leaves.insert(leaf_pos, leaf);
+        }
 
         let peak = if merges == 0 {
             self.track_latest = track;
@@ -295,9 +339,8 @@ impl PartialMmr {
     /// this value corresponds to the values used in the MMR structure.
     ///
     /// The `leaf` corresponds to the value at `leaf_pos`, and `path` is the authentication path for
-    /// that element up to its corresponding Mmr peak. The `leaf` is only used to compute the root
-    /// from the authentication path to valid the data, only the authentication data is saved in
-    /// the structure. If the value is required it should be stored out-of-band.
+    /// that element up to its corresponding Mmr peak. Both the authentication path and the leaf
+    /// value are stored.
     pub fn track(
         &mut self,
         leaf_pos: usize,
@@ -316,6 +359,7 @@ impl PartialMmr {
             && self.peaks.last().is_some_and(|v| *v == leaf)
         {
             self.track_latest = true;
+            self.leaves.insert(leaf_pos, leaf);
             return Ok(());
         }
 
@@ -337,10 +381,12 @@ impl PartialMmr {
         }
 
         let mut idx = InOrderIndex::from_leaf_pos(leaf_pos);
-        for leaf in path.nodes() {
-            self.nodes.insert(idx.sibling(), *leaf);
+        for node in path.nodes() {
+            self.nodes.insert(idx.sibling(), *node);
             idx = idx.parent();
         }
+
+        self.leaves.insert(leaf_pos, leaf);
 
         Ok(())
     }
@@ -355,6 +401,8 @@ impl PartialMmr {
     pub fn untrack(&mut self, leaf_pos: usize) -> Vec<(InOrderIndex, Word)> {
         let mut idx = InOrderIndex::from_leaf_pos(leaf_pos);
         let mut removed = Vec::new();
+
+        self.leaves.remove(&leaf_pos);
 
         // `idx` represent the element that can be computed by the authentication path, because
         // these elements can be computed they are not saved for the authentication of the current
@@ -605,6 +653,7 @@ impl Serializable for PartialMmr {
         self.forest.num_leaves().write_into(target);
         self.peaks.write_into(target);
         self.nodes.write_into(target);
+        self.leaves.write_into(target);
         target.write_bool(self.track_latest);
     }
 }
@@ -616,9 +665,16 @@ impl Deserializable for PartialMmr {
         let forest = Forest::new(usize::read_from(source)?);
         let peaks = Vec::<Word>::read_from(source)?;
         let nodes = NodeMap::read_from(source)?;
+        let leaves = LeafMap::read_from(source)?;
         let track_latest = source.read_bool()?;
 
-        Ok(Self { forest, peaks, nodes, track_latest })
+        Ok(Self {
+            forest,
+            peaks,
+            nodes,
+            leaves,
+            track_latest,
+        })
     }
 }
 
@@ -721,7 +777,7 @@ mod tests {
             let pos = index.inner() / 2;
             let proof1 = partial.open(pos).unwrap().unwrap();
             let proof2 = mmr.open(pos).unwrap();
-            assert_eq!(proof1, *proof2.path());
+            assert_eq!(proof1, proof2);
         }
     }
 
@@ -849,7 +905,7 @@ mod tests {
             for pos in 0..i {
                 let mmr_proof = mmr.open(pos).unwrap();
                 let partialmmr_proof = partial_mmr.open(pos).unwrap().unwrap();
-                assert_eq!(*mmr_proof.path(), partialmmr_proof);
+                assert_eq!(mmr_proof, partialmmr_proof);
             }
         }
     }
@@ -870,7 +926,7 @@ mod tests {
         partial_mmr.add(leaf_at_7, false);
 
         // the openings should be the same
-        assert_eq!(*mmr.open(5).unwrap().path(), partial_mmr.open(5).unwrap().unwrap());
+        assert_eq!(mmr.open(5).unwrap(), partial_mmr.open(5).unwrap().unwrap());
     }
 
     #[test]
@@ -982,5 +1038,57 @@ mod tests {
         assert_eq!(removed1.len(), 2);
         assert_eq!(partial_mmr.nodes().count(), 0);
         assert!(!partial_mmr.is_tracked(1));
+    }
+
+    #[test]
+    fn test_partial_mmr_open_returns_proof_with_leaf() {
+        // build the MMR
+        let mmr: Mmr = LEAVES.into();
+
+        // get leaf and proof for position 1
+        let leaf1 = mmr.get(1).unwrap();
+        let mmr_proof = mmr.open(1).unwrap();
+
+        // create partial MMR and track position 1
+        let mut partial_mmr: PartialMmr = mmr.peaks().into();
+        partial_mmr.track(1, leaf1, mmr_proof.path().merkle_path()).unwrap();
+
+        // open should return MmrProof with the correct leaf value
+        let partial_proof = partial_mmr.open(1).unwrap().unwrap();
+        assert_eq!(partial_proof.leaf(), leaf1);
+        assert_eq!(partial_proof, mmr_proof);
+
+        // untrack and verify open returns None
+        partial_mmr.untrack(1);
+        assert!(partial_mmr.open(1).unwrap().is_none());
+    }
+
+    #[test]
+    fn test_partial_mmr_add_tracks_leaf() {
+        // create empty partial MMR
+        let mut partial_mmr = PartialMmr::default();
+
+        // add leaves, tracking some
+        let leaf0 = int_to_node(0);
+        let leaf1 = int_to_node(1);
+        let leaf2 = int_to_node(2);
+
+        partial_mmr.add(leaf0, true); // track
+        partial_mmr.add(leaf1, false); // don't track
+        partial_mmr.add(leaf2, true); // track
+
+        // verify tracked leaves can be opened
+        let proof0 = partial_mmr.open(0).unwrap();
+        assert!(proof0.is_some());
+        assert_eq!(proof0.unwrap().leaf(), leaf0);
+
+        // verify untracked leaf returns None
+        let proof1 = partial_mmr.open(1).unwrap();
+        assert!(proof1.is_none());
+
+        // verify tracked leaf can be opened
+        let proof2 = partial_mmr.open(2).unwrap();
+        assert!(proof2.is_some());
+        assert_eq!(proof2.unwrap().leaf(), leaf2);
     }
 }
