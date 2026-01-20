@@ -25,10 +25,10 @@ pub const DIGEST512_BYTES: usize = 64;
 // ================================================================================================
 
 /// A 256-bit (32-byte) digest. Type alias for `Digest<32>`.
-pub type Digest256 = Digest;
+pub type Digest256 = Digest<DIGEST256_BYTES>;
 
 /// A 512-bit (64-byte) digest. Type alias for `Digest<64>`.
-pub type Digest512 = Digest<64>;
+pub type Digest512 = Digest<DIGEST512_BYTES>;
 
 // DIGEST
 // ================================================================================================
@@ -42,7 +42,7 @@ pub type Digest512 = Digest<64>;
 #[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 #[cfg_attr(feature = "serde", serde(into = "String", try_from = "&str"))]
 #[repr(transparent)]
-pub struct Digest<const N: usize = 32>([u8; N]);
+pub struct Digest<const N: usize = DIGEST256_BYTES>([u8; N]);
 
 impl<const N: usize> Digest<N> {
     /// Creates a new digest from the given bytes.
