@@ -1,0 +1,32 @@
+name: Workspace release dry-run
+
+on:
+  push:
+    branches:
+      - main
+      - next
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: "${{ github.workflow }} @ ${{ github.ref }}"
+  cancel-in-progress: true
+
+jobs:
+  release-dry-run:
+    if: ${{ github.repository_owner == '0xMiden' }}
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Dry-run workspace release
+        uses: ./.github/actions/workspace-release
+        with:
+          mode: "dry-run"
+          verify-main-head: "false"
