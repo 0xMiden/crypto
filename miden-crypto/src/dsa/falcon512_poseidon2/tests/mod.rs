@@ -9,7 +9,7 @@ use rand::{RngCore, SeedableRng};
 use rand_chacha::ChaCha20Rng;
 
 use super::{Serializable, math::Polynomial};
-use crate::dsa::falcon512_rpo::{
+use crate::dsa::falcon512_poseidon2::{
     PREVERSIONED_NONCE, PREVERSIONED_NONCE_LEN, SIG_NONCE_LEN, SIG_POLY_BYTE_LEN, SecretKey,
 };
 
@@ -71,11 +71,12 @@ fn test_signature_gen_reference_impl() {
         let expected_sig_bytes = EXPECTED_SIG[i];
         let hex_expected_sig_bytes = hex::decode(expected_sig_bytes).unwrap();
         // to compare against the test vectors we:
-        // 1. remove the headers when comparing as RPO_FALCON512 uses a different header format,
+        // 1. remove the headers when comparing as Poseidon2_FALCON512 uses a different header
+        //    format,
         // 2. compare the nonce part separately as the deterministic version we use omits the
         //    inclusion of the preversioned portion of the nonce by in its serialized format,
-        // 3. we remove the public key from the RPO_FALCON512 signature as this is not part of the
-        //    signature in the reference implementation,
+        // 3. we remove the public key from the Poseidon2_FALCON512 signature as this is not part of
+        //    the signature in the reference implementation,
         // 4. remove the nonce version byte, in addition to the header, from `sig_bytes`.
         let nonce = signature.nonce();
         assert_eq!(hex_expected_sig_bytes[1..1 + SIG_NONCE_LEN], nonce.as_bytes());
@@ -125,11 +126,11 @@ fn check_preversioned_fixed_nonce() {
 ///
 /// [1]: https://github.com/algorand/falcon/blob/main/falcon-det.pdf
 fn build_preversioned_fixed_nonce() -> [u8; PREVERSIONED_NONCE_LEN] {
-    use crate::dsa::falcon512_rpo::LOG_N;
+    use crate::dsa::falcon512_poseidon2::LOG_N;
 
     let mut result = [0_u8; 39];
     result[0] = LOG_N;
-    let domain_separator = "RPO-FALCON-DET".as_bytes();
+    let domain_separator = "POSEIDON2-FALCON-DET".as_bytes();
 
     result
         .iter_mut()

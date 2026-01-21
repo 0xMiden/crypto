@@ -6,7 +6,7 @@ use num::Zero;
 use super::{
     ByteReader, ByteWriter, Deserializable, DeserializationError, LOG_N, MODULUS, N, Nonce,
     SIG_L2_BOUND, SIG_POLY_BYTE_LEN, Serializable,
-    hash_to_point::hash_to_point_rpo256,
+    hash_to_point::hash_to_point_poseidon2,
     keys::PublicKey,
     math::{FalconFelt, FastFft, Polynomial},
 };
@@ -15,7 +15,7 @@ use crate::Word;
 // FALCON SIGNATURE
 // ================================================================================================
 
-/// A deterministic RPO Falcon512 signature over a message.
+/// A deterministic Poseidon2 Falcon512 signature over a message.
 ///
 /// The signature is a pair of polynomials (s1, s2) in (Z_p\[x\]/(phi))^2 a nonce `r`, and a public
 /// key polynomial `h` where:
@@ -28,9 +28,9 @@ use crate::Word;
 ///
 /// where |.| is the norm and:
 /// - c = HashToPoint(r || message)
-/// - pk = Rpo256::hash(h)
+/// - pk = Poseidon2::hash(h)
 ///
-/// Here h is a polynomial representing the public key and pk is its digest using the Rpo256 hash
+/// Here h is a polynomial representing the public key and pk is its digest using the Poseidon2 hash
 /// function. c is a polynomial that is the hash-to-point of the message being signed.
 ///  
 ///  To summarize the main points of differences with the reference implementation, we have that:
@@ -38,20 +38,20 @@ use crate::Word;
 /// 1. the hash-to-point algorithm is made deterministic by using a fixed nonce `r`. This fixed
 ///    nonce is formed as `nonce_version_byte || preversioned_nonce` where `preversioned_nonce` is a
 ///    39-byte string that is defined as: i. a byte representing `log_2(512)`, followed by ii. the
-///    UTF8 representation of the string "RPO-FALCON-DET", followed by iii. the required number of
-///    0_u8 padding to make the total length equal 39 bytes. Note that the above means in particular
-///    that only the `nonce_version_byte` needs to be serialized when serializing the signature.
-///    This reduces the deterministic signature compared to the reference implementation by 39
-///    bytes.
+///    UTF8 representation of the string "Poseidon2-FALCON-DET", followed by iii. the required
+///    number of 0_u8 padding to make the total length equal 39 bytes. Note that the above means in
+///    particular that only the `nonce_version_byte` needs to be serialized when serializing the
+///    signature. This reduces the deterministic signature compared to the reference implementation
+///    by 39 bytes.
 /// 2. the RNG used in the trapdoor sampler (i.e., the ffSampling algorithm) is ChaCha20Rng seeded
 ///    with the `Blake3` hash of `log_2(512) || sk || message`.
 ///
 /// The signature is serialized as:
 ///
 /// 1. A header byte specifying the algorithm used to encode the coefficients of the `s2` polynomial
-///    together with the degree of the irreducible polynomial phi. For RPO Falcon512, the header
-///    byte is set to `10111001` to differentiate it from the standardized instantiation of the
-///    Falcon signature.
+///    together with the degree of the irreducible polynomial phi. For Poseidon2 Falcon512, the
+///    header byte is set to `10111001` to differentiate it from the standardized instantiation of
+///    the Falcon signature.
 /// 2. 1 byte for the nonce version.
 /// 4. 625 bytes encoding the `s2` polynomial above.
 ///
@@ -114,7 +114,7 @@ impl Signature {
         if self.h != *pub_key {
             return false;
         }
-        let c = hash_to_point_rpo256(message, &self.nonce);
+        let c = hash_to_point_poseidon2(message, &self.nonce);
         verify_helper(&c, &self.s2, pub_key)
     }
 }
@@ -154,9 +154,9 @@ impl Default for SignatureHeader {
     ///    and `10` denotes encoding using the uncompressed method.
     /// 2. `nnnn` encodes `LOG_N`.
     ///
-    /// For RPO Falcon 512 we use compression encoding and N = 512. Moreover, to differentiate the
-    /// RPO Falcon variant from the reference variant using SHAKE256, we flip the first bit in the
-    /// header. Thus, for RPO Falcon 512 the header is `10111001`
+    /// For Poseidon2 Falcon 512 we use compression encoding and N = 512. Moreover, to differentiate
+    /// the Poseidon2 Falcon variant from the reference variant using SHAKE256, we flip the
+    /// first bit in the header. Thus, for Poseidon2 Falcon 512 the header is `10111001`
     ///
     /// [1]: https://falcon-sign.info/falcon.pdf
     fn default() -> Self {

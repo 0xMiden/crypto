@@ -139,6 +139,12 @@ impl Poseidon2 {
         <Self as AlgebraicSponge>::hash(bytes)
     }
 
+    /// Applies the Poseidon2 permutation to the provided state in-place.
+    #[inline(always)]
+    pub fn apply_permutation(state: &mut [Felt; STATE_WIDTH]) {
+        <Self as AlgebraicSponge>::apply_permutation(state);
+    }
+
     /// Returns a hash of the provided field elements.
     #[inline(always)]
     pub fn hash_elements<E: crate::field::BasedVectorSpace<Felt>>(elements: &[E]) -> Word {

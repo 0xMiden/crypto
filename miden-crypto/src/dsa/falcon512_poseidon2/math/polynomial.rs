@@ -13,7 +13,7 @@ use p3_field::PrimeCharacteristicRing;
 use super::{Inverse, field::FalconFelt};
 use crate::{
     Felt,
-    dsa::falcon512_rpo::{MODULUS, N},
+    dsa::falcon512_poseidon2::{MODULUS, N},
     utils::zeroize::{Zeroize, ZeroizeOnDrop},
 };
 
