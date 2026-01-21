@@ -164,14 +164,6 @@ impl<B: Backend> LargeSmtForest<B> {
 /// predictable on a given machine regardless of the choice of [`Backend`] instance being used by
 /// the forest.
 impl<B: Backend> LargeSmtForest<B> {
-    /// Returns an iterator that yields the (uniquely identified) root of the latest tree in each
-    /// lineage contained in the forest.
-    ///
-    /// The iteration order is unspecified.
-    pub fn current_roots(&self) -> impl Iterator<Item = UniqueRoot> {
-        self.lineage_data.iter().map(|(l, d)| UniqueRoot::new(*l, d.latest_root))
-    }
-
     /// Returns an iterator that yields all the (uniquely identified) roots that the forest knows
     /// about, including those from historical versions.
     ///

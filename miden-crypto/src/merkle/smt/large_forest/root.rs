@@ -57,10 +57,7 @@ impl Randomizable for LineageId {
 /// An identifier that is capable of uniquely referring to a tree in the forest.
 #[derive(Copy, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct TreeId {
-    /// An identifier for the lineage in which the tree exists.
     lineage: LineageId,
-
-    /// The version of the tree to find in the lineage.
     version: VersionId,
 }
 
@@ -103,7 +100,7 @@ impl Randomizable for TreeId {
 // UNIQUE ROOT
 // ================================================================================================
 
-/// A root in the forest within a given lineage.
+/// A root in the forest that is anchored to a lineage.
 #[derive(Copy, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct UniqueRoot {
     lineage: LineageId,
