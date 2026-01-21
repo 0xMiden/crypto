@@ -651,14 +651,10 @@ impl SmtStorage for RocksDbStorage {
         Ok(())
     }
 
-    /// Bulk-writes subtrees to storage (bypassing WAL).
+    /// Bulk-writes subtrees to storage.
     ///
     /// This method writes a vector of serialized `Subtree` objects directly to their
     /// corresponding RocksDB column families based on their root index.
-    ///
-    /// ⚠️ **Warning:** This function should only be used during **initial SMT construction**.
-    /// It disables the WAL, meaning writes are **not crash-safe** and can result in data loss
-    /// if the process terminates unexpectedly.
     ///
     /// # Parameters
     /// - `subtrees`: A vector of `Subtree` objects to be serialized and persisted.
@@ -667,8 +663,6 @@ impl SmtStorage for RocksDbStorage {
     /// - Returns `StorageError::Backend` if any column family lookup or RocksDB write fails.
     fn set_subtrees(&mut self, subtrees: Vec<Subtree>) -> Result<(), StorageError> {
         let depth24_cf = self.cf_handle(DEPTH_24_CF)?;
-        let mut write_opts = WriteOptions::default();
-        write_opts.disable_wal(true);
         let mut batch = WriteBatch::default();
 
         for subtree in subtrees {
@@ -685,7 +679,7 @@ impl SmtStorage for RocksDbStorage {
             }
         }
 
-        self.db.write_opt(batch, &write_opts)?;
+        self.db.write(batch)?;
         Ok(())
     }
 
