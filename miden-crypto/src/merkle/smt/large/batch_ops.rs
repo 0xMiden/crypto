@@ -78,16 +78,8 @@ impl<S: SmtStorage> LargeSmt<S> {
             // Storage nodes: apply mutations to loaded subtree and determine storage action
             let modified = !mutations.is_empty();
             if let Some(subtree) = subtree_opt.as_mut() {
-                for (index, mutation) in mutations {
-                    match mutation {
-                        NodeMutation::Removal => {
-                            subtree.remove_inner_node(index);
-                        },
-                        NodeMutation::Addition(node) => {
-                            subtree.insert_inner_node(index, node);
-                        },
-                    }
-                }
+                // Apply all mutations in a single batch for efficiency
+                subtree.apply_mutations(mutations.iter());
             }
 
             let update = if !modified {
@@ -557,9 +549,14 @@ impl<S: SmtStorage> LargeSmt<S> {
         // Update the root in memory
         self.in_memory_nodes[ROOT_MEMORY_INDEX] = new_root;
 
-        // Process node mutations
+        // Process node mutations - group by subtree and apply in batch
+        // Since mutations are sorted by subtree root, we can process them in groups
+        let mut current_subtree_root: Option<NodeIndex> = None;
+        let mut current_batch: Vec<(NodeIndex, NodeMutation)> = Vec::new();
+
         for (index, mutation) in sorted_node_mutations {
             if index.depth() < IN_MEMORY_DEPTH {
+                // In-memory mutations are applied directly
                 match mutation {
                     Removal => {
                         SparseMerkleTree::<SMT_DEPTH>::remove_inner_node(self, index);
@@ -570,21 +567,33 @@ impl<S: SmtStorage> LargeSmt<S> {
                 };
             } else {
                 let subtree_root_index = Subtree::find_subtree_root(index);
-                let subtree = loaded_subtrees
-                    .get_mut(&subtree_root_index)
-                    .expect("Subtree map entry must exist")
-                    .as_mut()
-                    .expect("Subtree must exist as it was either fetched or created");
 
-                match mutation {
-                    Removal => {
-                        subtree.remove_inner_node(index);
-                    },
-                    Addition(node) => {
-                        subtree.insert_inner_node(index, node);
-                    },
-                };
+                // If we've moved to a new subtree, flush the previous batch
+                if current_subtree_root != Some(subtree_root_index) {
+                    if let Some(prev_root) = current_subtree_root {
+                        let subtree = loaded_subtrees
+                            .get_mut(&prev_root)
+                            .expect("Subtree map entry must exist")
+                            .as_mut()
+                            .expect("Subtree must exist");
+                        subtree.apply_mutations(current_batch.iter().map(|(idx, m)| (idx, m)));
+                        current_batch.clear();
+                    }
+                    current_subtree_root = Some(subtree_root_index);
+                }
+
+                current_batch.push((index, mutation));
             }
+        }
+
+        // Flush the final batch
+        if let Some(subtree_root) = current_subtree_root {
+            let subtree = loaded_subtrees
+                .get_mut(&subtree_root)
+                .expect("Subtree map entry must exist")
+                .as_mut()
+                .expect("Subtree must exist");
+            subtree.apply_mutations(current_batch.iter().map(|(idx, m)| (idx, m)));
         }
 
         // Go through subtrees, see if any are empty, and if so remove them
