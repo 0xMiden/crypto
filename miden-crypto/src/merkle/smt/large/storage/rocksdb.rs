@@ -4,7 +4,6 @@ use std::{path::PathBuf, sync::Arc};
 use rocksdb::{
     BlockBasedOptions, Cache, ColumnFamilyDescriptor, DB, DBCompactionStyle, DBCompressionType,
     DBIteratorWithThreadMode, FlushOptions, IteratorMode, Options, ReadOptions, WriteBatch,
-    WriteOptions,
 };
 use winter_utils::{Deserializable, Serializable};
 
