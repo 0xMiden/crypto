@@ -1,3 +1,7 @@
+## 0.19.3 (2026-01-21)
+
+- Fix: don't disable WAL during subtree construction in `LargeSmt`'s RocksDB backend ([#792](https://github.com/0xMiden/crypto/pull/792)).
+
 ## 0.19.3 (2026-01-16)
 
 - Changed `SmtForest` so that `EMPTY_WORD` is treated as removals ([#780](https://github.com/0xMiden/crypto/pull/780)).
