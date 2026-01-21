@@ -80,14 +80,14 @@ impl MmrPath {
             ));
         }
 
-        // Get expected depth for the target forest
-        let target_depth = target_forest
+        // Get expected path length for the target forest
+        let target_path_len = target_forest
             .leaf_to_corresponding_tree(self.position)
             .expect("position is in target forest") as usize;
 
-        // Trim the merkle path to the target depth
+        // Trim the merkle path to the target length
         let trimmed_nodes: Vec<_> =
-            self.merkle_path.nodes().iter().take(target_depth).copied().collect();
+            self.merkle_path.nodes().iter().take(target_path_len).copied().collect();
         let trimmed_path = MerklePath::new(trimmed_nodes);
 
         Ok(MmrPath::new(target_forest, self.position, trimmed_path))
@@ -171,7 +171,10 @@ mod tests {
     use super::{MerklePath, MmrPath, MmrProof};
     use crate::{
         Word,
-        merkle::{int_to_node, mmr::forest::Forest},
+        merkle::{
+            int_to_node,
+            mmr::{Mmr, forest::Forest},
+        },
     };
 
     #[test]
@@ -230,35 +233,50 @@ mod tests {
     }
 
     #[test]
-    fn test_mmr_path_with_forest() {
-        // Create a path for position 2 in a forest of 15 leaves (tree of depth 3)
-        let large_forest = Forest::new(15);
-        let node0 = int_to_node(1);
-        let node1 = int_to_node(2);
-        let node2 = int_to_node(3);
-        let nodes = vec![node0, node1, node2];
-        let path = MmrPath::new(large_forest, 2, MerklePath::new(nodes));
+    fn test_mmr_proof_with_forest() {
+        // Create an MMR with 5 leaves
+        let mut small_mmr = Mmr::new();
+        for i in 0..5 {
+            small_mmr.add(int_to_node(i));
+        }
+        let small_forest = small_mmr.forest();
 
-        // Adjust for a smaller forest of 7 leaves (tree of depth 2 for position 2)
-        let small_forest = Forest::new(7);
-        let adjusted = path.with_forest(small_forest).unwrap();
+        // Clone and add 5 more leaves to create larger MMR
+        let mut large_mmr = small_mmr.clone();
+        for i in 5..10 {
+            large_mmr.add(int_to_node(i));
+        }
 
-        assert_eq!(adjusted.forest(), small_forest);
-        assert_eq!(adjusted.position(), 2);
-        // Depth for position 2 in forest 7 is 2 (it's in the 4-leaf tree)
-        assert_eq!(adjusted.merkle_path().depth(), 2);
+        // Get proof for position 2 from the larger MMR
+        let large_proof = large_mmr.open(2).unwrap();
+        let small_path_len = small_forest.leaf_to_corresponding_tree(2).unwrap() as u8;
 
-        // Verify the actual nodes are the first 2 from the original path
-        let adjusted_nodes = adjusted.merkle_path().nodes();
-        assert_eq!(adjusted_nodes.len(), 2);
-        assert_eq!(adjusted_nodes[0], node0);
-        assert_eq!(adjusted_nodes[1], node1);
+        // Sanity check: larger MMR should have a longer path (otherwise we're not testing trimming)
+        assert!(large_proof.merkle_path().depth() > small_path_len);
+
+        // Adjust proof to smaller forest (should remove 1 node from the path)
+        let adjusted_proof = large_proof.with_forest(small_forest).unwrap();
+        assert_eq!(large_proof.merkle_path().depth() - adjusted_proof.merkle_path().depth(), 1);
+
+        // Verify the adjusted proof is valid in the smaller MMR
+        let peak_idx = adjusted_proof.peak_index();
+        let relative_pos = adjusted_proof.relative_pos();
+        let computed_root = adjusted_proof
+            .merkle_path()
+            .compute_root(relative_pos as u64, adjusted_proof.leaf())
+            .unwrap();
+        assert_eq!(computed_root, small_mmr.peaks().peaks()[peak_idx]);
     }
 
     #[test]
     fn test_mmr_path_with_forest_errors() {
-        let forest = Forest::new(7);
-        let path = MmrPath::new(forest, 2, MerklePath::default());
+        // Create a MMR with 7 leaves
+        let mut mmr = Mmr::new();
+        for i in 0..7 {
+            mmr.add(int_to_node(i));
+        }
+        let proof = mmr.open(2).unwrap();
+        let path = proof.path();
 
         // Error: target forest doesn't include position
         let small_forest = Forest::new(2);
@@ -269,25 +287,6 @@ mod tests {
         assert!(path.with_forest(large_forest).is_err());
 
         // Same forest should work
-        assert!(path.with_forest(forest).is_ok());
-    }
-
-    #[test]
-    fn test_mmr_proof_with_forest() {
-        // Create a proof for position 2 in a forest of 15 leaves
-        let large_forest = Forest::new(15);
-        let nodes = vec![int_to_node(1), int_to_node(2), int_to_node(3)];
-        let path = MmrPath::new(large_forest, 2, MerklePath::new(nodes));
-        let leaf = int_to_node(42);
-        let proof = MmrProof::new(path, leaf);
-
-        // Adjust for a smaller forest
-        let small_forest = Forest::new(7);
-        let adjusted = proof.with_forest(small_forest).unwrap();
-
-        assert_eq!(adjusted.forest(), small_forest);
-        assert_eq!(adjusted.position(), 2);
-        assert_eq!(adjusted.leaf(), leaf);
-        assert_eq!(adjusted.merkle_path().depth(), 2);
+        assert!(path.with_forest(mmr.forest()).is_ok());
     }
 }
