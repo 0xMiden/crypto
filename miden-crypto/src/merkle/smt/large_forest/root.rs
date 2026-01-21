@@ -186,3 +186,13 @@ pub enum RootInfo {
     /// The queried root does not belong to any tree that the forest knows about.
     Missing,
 }
+
+// TREE ENTRY
+// ================================================================================================
+
+/// An entry in a given tree.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct TreeEntry {
+    pub key: Word,
+    pub value: Word,
+}

@@ -15,12 +15,11 @@ use crate::{
             full::SMT_DEPTH,
             large_forest::{
                 operation::{SmtForestUpdateBatch, SmtUpdateBatch},
-                root::{LineageId, RootValue, VersionId},
+                root::{LineageId, RootValue, TreeEntry, VersionId},
             },
         },
     },
 };
-
 // TYPE ALIASES
 // ================================================================================================
 
@@ -80,6 +79,18 @@ where
     /// The iteration order is unspecified.
     fn trees(&self) -> Result<impl Iterator<Item = (TreeId, RootValue)>>;
 
+    /// Returns the total number of non-empty leaves in the specified `tree`.
+    ///
+    /// It is the responsibility of the forest to ensure lineage existence before querying the
+    /// backend. The backend must return an error if the lineage does not exist.
+    fn entry_count(&self, tree: TreeId) -> Result<usize>;
+
+    /// Returns an iterator that yields the populated entries for the specified `tree`.
+    ///
+    /// It is the responsibility of the forest to ensure lineage existence before querying the
+    /// backend. The backend must return an error if the lineage does not exist.
+    fn entries(&self, tree: TreeId) -> Result<impl Iterator<Item = TreeEntry>>;
+
     // SINGLE-TREE MODIFIERS
     // ============================================================================================
 
@@ -106,7 +117,7 @@ where
     /// provided `new_version` and returning a vector of the mutation sets that reverse the changes
     /// to each changed tree.
     ///
-    /// Implementations must guarantee the following behaviour, with non-conforming implementations
+    /// Implementations must guarantee the following behavior, with non-conforming implementations
     /// considered to be a bug:
     ///
     /// - At most one new root must be added to the forest for each target root in the provided
