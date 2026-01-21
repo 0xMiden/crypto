@@ -698,8 +698,6 @@ impl SmtStorage for RocksDbStorage {
     /// - Returns `StorageError::Backend` if any column family lookup or RocksDB write fails.
     fn set_subtrees(&self, subtrees: Vec<Subtree>) -> Result<(), StorageError> {
         let depth24_cf = self.cf_handle(DEPTH_24_CF)?;
-        let mut write_opts = WriteOptions::default();
-        write_opts.disable_wal(true);
         let mut batch = WriteBatch::default();
 
         for subtree in subtrees {
@@ -716,7 +714,7 @@ impl SmtStorage for RocksDbStorage {
             }
         }
 
-        self.db.write_opt(batch, &write_opts)?;
+        self.db.write(batch)?;
         Ok(())
     }
 
