@@ -1,3 +1,7 @@
+## 0.21.3 (2026-01-21)
+
+- Fix: don't disable WAL during subtree construction in `LargeSmt`'s RocksDB backend ([#794](https://github.com/0xMiden/crypto/pull/794)).
+
 ## 0.21.2 (2026-01-20)
 
 - Exported `BudgetedReader` to allow for defense-in-depth against deserialization panics ([#786](https://github.com/0xMiden/crypto/pull/786)).
