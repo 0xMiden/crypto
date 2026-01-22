@@ -655,6 +655,10 @@ impl SmtStorage for RocksDbStorage {
     /// This method writes a vector of serialized `Subtree` objects directly to their
     /// corresponding RocksDB column families based on their root index.
     ///
+    /// Uses default write options to keep WAL enabled. Disabling WAL would make writes
+    /// non-crash-safe: data in the memtable is lost on unexpected termination, causing root
+    /// mismatch on restart (see miden-node#1558).
+    ///
     /// # Parameters
     /// - `subtrees`: A vector of `Subtree` objects to be serialized and persisted.
     ///
