@@ -1,14 +1,10 @@
 use alloc::string::String;
-use core::{
-    mem::size_of,
-    ops::Deref,
-    slice::{self, from_raw_parts},
-};
+use core::{mem::size_of, ops::Deref, slice};
 
 use p3_field::{BasedVectorSpace, PrimeField64};
 use p3_goldilocks::Goldilocks as Felt;
 
-use super::HasherExt;
+use super::{HasherExt, digest::prepare_merge};
 use crate::utils::{
     ByteReader, ByteWriter, Deserializable, DeserializationError, HexParseError, Serializable,
     bytes_to_hex_string, hex_to_bytes,
@@ -274,19 +270,4 @@ fn expand_bytes<const M: usize, const N: usize>(bytes: &[u8; M]) -> [u8; N] {
     let mut expanded = [0u8; N];
     expanded[..M].copy_from_slice(bytes);
     expanded
-}
-
-// Cast the slice into contiguous bytes.
-fn prepare_merge<const N: usize, D>(args: &[D; N]) -> &[u8]
-where
-    D: Deref<Target = [u8]>,
-{
-    // compile-time assertion
-    assert!(N > 0, "N shouldn't represent an empty slice!");
-    let values = args.as_ptr() as *const u8;
-    let len = size_of::<D>() * N;
-    // safety: the values are tested to be contiguous
-    let bytes = unsafe { from_raw_parts(values, len) };
-    debug_assert_eq!(args[0].deref(), &bytes[..len / N]);
-    bytes
 }

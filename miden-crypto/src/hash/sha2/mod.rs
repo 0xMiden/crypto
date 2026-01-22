@@ -10,14 +10,14 @@
 //! See <https://github.com/facebook/winterfell/issues/406> for a proposal to make the
 //! `Digest` trait generic over output size.
 
-use core::{mem::size_of, ops::Deref, slice::from_raw_parts};
+use core::mem::size_of;
 
 use p3_field::{BasedVectorSpace, PrimeField64};
 use sha2::Digest as Sha2Digest;
 
 use super::{
     Felt, HasherExt,
-    digest::{DIGEST256_BYTES, DIGEST512_BYTES, Digest256, Digest512},
+    digest::{DIGEST256_BYTES, DIGEST512_BYTES, Digest256, Digest512, prepare_merge},
 };
 
 #[cfg(test)]
@@ -231,19 +231,4 @@ where
         hasher.finalize()
     };
     digest.into()
-}
-
-/// Cast the slice into contiguous bytes.
-fn prepare_merge<const N: usize, D>(args: &[D; N]) -> &[u8]
-where
-    D: Deref<Target = [u8]>,
-{
-    // compile-time assertion
-    assert!(N > 0, "N shouldn't represent an empty slice!");
-    let values = args.as_ptr() as *const u8;
-    let len = size_of::<D>() * N;
-    // safety: the values are tested to be contiguous
-    let bytes = unsafe { from_raw_parts(values, len) };
-    debug_assert_eq!(args[0].deref(), &bytes[..len / N]);
-    bytes
 }
