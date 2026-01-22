@@ -1,4 +1,6 @@
-## 0.21.0 (TBD)
+## 0.22.0 (TBD)
+
+- Added `MmrPath::with_forest()` and `MmrProof::with_forest()` to adjust proofs for smaller forests ([#788](https://github.com/0xMiden/crypto/pull/788)).
 
 ## 0.21.2 (2026-01-20)
 
