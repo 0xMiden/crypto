@@ -212,7 +212,7 @@ impl Poseidon2 {
         }
     }
 
-    /// Applies the M_E linear layer to the state.
+    /// Applies the M_E (external) linear layer to the state in-place.
     ///
     /// This basically takes any 4 x 4 MDS matrix M and computes the matrix-vector product with
     /// the matrix defined by `[[2M, M, ..., M], [M, 2M, ..., M], ..., [M, M, ..., 2M]]`.
@@ -220,7 +220,7 @@ impl Poseidon2 {
     /// Given the structure of the above matrix, we can compute the product of the state with
     /// matrix `[M, M, ..., M]` and compute the final result using a few addition.
     #[inline(always)]
-    fn apply_matmul_external(state: &mut [Felt; STATE_WIDTH]) {
+    pub fn apply_matmul_external(state: &mut [Felt; STATE_WIDTH]) {
         // multiply the state by `[M, M, ..., M]` block-wise
         Self::matmul_m4(state);
 
@@ -274,13 +274,13 @@ impl Poseidon2 {
         }
     }
 
-    /// Applies the M_I linear layer to the state.
+    /// Applies the M_I (internal) linear layer to the state in-place.
     ///
     /// The matrix is given by its diagonal entries with the remaining entries set equal to 1.
     /// Hence, given the sum of the state entries, the matrix-vector product is computed using
     /// a multiply-and-add per state entry.
     #[inline(always)]
-    fn matmul_internal(state: &mut [Felt; STATE_WIDTH], mat_diag: [Felt; 12]) {
+    pub fn matmul_internal(state: &mut [Felt; STATE_WIDTH], mat_diag: [Felt; 12]) {
         let mut sum = ZERO;
         for s in state.iter().take(STATE_WIDTH) {
             sum += *s
@@ -291,15 +291,15 @@ impl Poseidon2 {
         }
     }
 
-    /// Adds the round-constants to the state during external rounds.
+    /// Adds the round constants to the state in-place.
     #[inline(always)]
-    fn add_rc(state: &mut [Felt; STATE_WIDTH], ark: &[Felt; 12]) {
+    pub fn add_rc(state: &mut [Felt; STATE_WIDTH], ark: &[Felt; 12]) {
         state.iter_mut().zip(ark).for_each(|(s, &k)| *s += k);
     }
 
-    /// Applies the sbox entry-wise to the state.
+    /// Applies the S-box (x^7) to each element of the state in-place.
     #[inline(always)]
-    fn apply_sbox(state: &mut [Felt; STATE_WIDTH]) {
+    pub fn apply_sbox(state: &mut [Felt; STATE_WIDTH]) {
         state[0] = state[0].exp_const_u64::<7>();
         state[1] = state[1].exp_const_u64::<7>();
         state[2] = state[2].exp_const_u64::<7>();
