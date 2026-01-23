@@ -1,6 +1,10 @@
 ## 0.22.0 (TBD)
 
 - Added `MmrPath::with_forest()` and `MmrProof::with_forest()` to adjust proofs for smaller forests ([#788](https://github.com/0xMiden/crypto/pull/788)).
+- 
+## 0.21.4 (2026-01-22)
+
+- Fix an issue where `BudgetedReader` rejects valid usize collections with tight budgets ([#798](https://github.com/0xMiden/crypto/pull/798)).
 
 ## 0.21.3 (2026-01-21)
 
