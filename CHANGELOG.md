@@ -1,4 +1,4 @@
-## 0.21.4 (TBD)
+## 0.21.4 (2026-01-22)
 
 - Fix an issue where `BudgetedReader` rejects valid usize collections with tight budgets ([#798](https://github.com/0xMiden/crypto/pull/798)).
 
