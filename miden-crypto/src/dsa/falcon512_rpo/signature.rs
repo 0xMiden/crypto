@@ -15,50 +15,38 @@ use crate::{Word, utils::zeroize::Zeroize};
 
 /// A deterministic RPO Falcon512 signature over a message.
 ///
-/// The signature is a pair of polynomials (s1, s2) in (Z_p\[x\]/(phi))^2 a nonce `r`, and a public
+/// The signature is a pair of polynomials (s1, s2) in (Z_p\[x\]/(phi))^2, a nonce `r`, and a public
 /// key polynomial `h` where:
 /// - p := 12289
 /// - phi := x^512 + 1
 ///
-/// The signature  verifies against a public key `pk` if and only if:
+/// The signature verifies against a public key `pk` if and only if:
 /// 1. s1 = c - s2 * h
 /// 2. |s1|^2 + |s2|^2 <= β² (where β² = 34034726 for Falcon-512)
 ///
 /// where |.| is the norm and:
-/// - c = HashToPoint(r || message)
+/// - c = HashToPoint(r || message) using RPO256
 /// - pk = Rpo256::hash(h)
 ///
 /// Here h is a polynomial representing the public key and pk is its digest using the Rpo256 hash
 /// function. c is a polynomial that is the hash-to-point of the message being signed.
-///  
-///  To summarize the main points of differences with the reference implementation, we have that:
 ///
-/// 1. the hash-to-point algorithm is made deterministic by using a fixed nonce `r`. This fixed
-///    nonce is formed as `nonce_version_byte || preversioned_nonce` where `preversioned_nonce` is a
-///    39-byte string that is defined as: i. a byte representing `log_2(512)`, followed by ii. the
-///    UTF8 representation of the string "RPO-FALCON-DET", followed by iii. the required number of
-///    0_u8 padding to make the total length equal 39 bytes. Note that the above means in particular
-///    that only the `nonce_version_byte` needs to be serialized when serializing the signature.
-///    This reduces the deterministic signature compared to the reference implementation by 39
-///    bytes.
-/// 2. the RNG used in the trapdoor sampler (i.e., the ffSampling algorithm) is ChaCha20Rng seeded
-///    with the `Blake3` hash of `log_2(512) || sk || message`.
+/// ## Differences from Standard FN-DSA
+///
+/// 1. **Hash-to-point**: Uses RPO256 instead of SHAKE256 for efficient ZK verification.
+/// 2. **Deterministic signing**: The PRNG seed is derived from BLAKE3(LOG_N || sk || message),
+///    ensuring reproducible signatures. Following FN-DSA semantics, each signing attempt generates
+///    a fresh nonce and recomputes hash-to-point.
+///
+/// ## Serialization Format
 ///
 /// The signature is serialized as:
+/// 1. Header byte (1 byte): Specifies encoding algorithm. Set to `0xB9` for RPO Falcon512.
+/// 2. Nonce (40 bytes): The nonce used in hash-to-point.
+/// 3. s2 polynomial (625 bytes): Compressed signature polynomial.
+/// 4. Public key (897 bytes): 1 byte LOG_N + 896 bytes encoded h polynomial.
 ///
-/// 1. A header byte specifying the algorithm used to encode the coefficients of the `s2` polynomial
-///    together with the degree of the irreducible polynomial phi. For RPO Falcon512, the header
-///    byte is set to `10111001` to differentiate it from the standardized instantiation of the
-///    Falcon signature.
-/// 2. 1 byte for the nonce version.
-/// 4. 625 bytes encoding the `s2` polynomial above.
-///
-/// In addition to the signature itself, the polynomial h is also serialized with the signature as:
-/// 1 byte for `LOG_N` (9) followed by 896 bytes for the public key. The total size including h is
-/// 1524 bytes.
-///
-/// [1]: https://github.com/algorand/falcon/blob/main/falcon-det.pdf
-/// [2]: https://datatracker.ietf.org/doc/html/rfc6979#section-3.5
+/// Total serialized size: 1563 bytes.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Signature {
     header: SignatureHeader,
@@ -278,45 +266,22 @@ fn decode_signature_poly(input: &[u8]) -> Result<[FalconFelt; N], Deserializatio
 /// the message `s2` and a public key polynomial and returns `true` if the signature is valid,
 /// otherwise it returns `false`.
 fn verify_helper(c: &Polynomial<FalconFelt>, s2: &SignaturePoly, h: &PublicKey) -> bool {
-    use fn_dsa_comm::mq;
+    use fn_dsa_vrfy::VerifyingKey;
 
-    // Reuse fn-dsa's mq routines for NTT operations and norm checks.
-    // All conversions go through external representation [0, q-1] expected by mq.
-    const LOGN_U32: u32 = LOG_N as u32;
+    // Decode the public key into fn-dsa's VerifyingKey512.
+    let vk = match h.decode_verifying_key() {
+        Some(vk) => vk,
+        None => return false,
+    };
 
-    // s2 as signed coefficients (already bounded by SignaturePoly::try_from)
+    // Convert c to external representation [0, q-1]
+    let hm: [u16; N] = core::array::from_fn(|i| c.coefficients[i].value());
+
+    // Convert s2 to signed coefficients
     let s2_signed = s2.to_i16_balanced_array();
 
-    // c in external representation
-    let mut t1 = c.to_u16_ext_array();
-    mq::mqpoly_ext_to_int(LOGN_U32, &mut t1);
-
-    // h in NTT domain
-    let mut h_ntt = h.to_u16_ext_array();
-    mq::mqpoly_ext_to_int(LOGN_U32, &mut h_ntt);
-    mq::mqpoly_int_to_NTT(LOGN_U32, &mut h_ntt);
-
-    // t2 <- s2 in NTT domain
-    let mut t2 = [0u16; N];
-    mq::mqpoly_signed_to_ext(LOGN_U32, &s2_signed, &mut t2);
-    mq::mqpoly_ext_to_int(LOGN_U32, &mut t2);
-    mq::mqpoly_int_to_NTT(LOGN_U32, &mut t2);
-
-    // t2 <- s2 * h (in NTT domain)
-    mq::mqpoly_mul_ntt(LOGN_U32, &mut t2, &h_ntt);
-    mq::mqpoly_NTT_to_int(LOGN_U32, &mut t2);
-
-    // t1 <- c - s2*h (internal), then convert to external for norm
-    mq::mqpoly_sub_int(LOGN_U32, &mut t1, &t2);
-    mq::mqpoly_int_to_ext(LOGN_U32, &mut t1);
-
-    // Squared norms of s1 and s2
-    let norm1 = mq::mqpoly_sqnorm(LOGN_U32, &t1);
-    let norm2 = mq::signed_poly_sqnorm(LOGN_U32, &s2_signed);
-
-    // Guard against u32 overflow when adding norms by checking norm1 <= u32::MAX - norm2,
-    // then apply the fn-dsa bound (inclusive) on ||(s1,s2)||^2.
-    norm1 < norm2.wrapping_neg() && (norm1 + norm2) <= mq::SQBETA[LOG_N as usize]
+    // Use fn-dsa's verify_prehash
+    vk.verify_prehash(&hm, &s2_signed)
 }
 
 /// Checks whether a set of coefficients is a valid one for a signature polynomial.

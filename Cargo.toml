@@ -26,9 +26,3 @@ debug            = 2
 debug-assertions = true
 inherits         = "release"
 overflow-checks  = true
-
-# Local patch for faster iteration during development
-[patch."https://github.com/0xMiden/rust-fn-dsa"]
-fn-dsa-comm = { path = "/Users/al/Code/rust-fn-dsa/fn-dsa-comm" }
-fn-dsa-kgen = { path = "/Users/al/Code/rust-fn-dsa/fn-dsa-kgen" }
-fn-dsa-sign = { path = "/Users/al/Code/rust-fn-dsa/fn-dsa-sign" }

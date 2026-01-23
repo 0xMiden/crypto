@@ -1,6 +1,5 @@
 use super::{
     ByteReader, ByteWriter, Deserializable, DeserializationError, Felt, Serializable, Signature,
-    math::{FalconFelt, Polynomial},
 };
 
 mod public_key;
@@ -55,7 +54,7 @@ mod tests {
         let mut buffer = vec![];
         sk.write_into(&mut buffer);
         let sk_deserialized = SecretKey::read_from_bytes(&buffer).unwrap();
-        assert_eq!(sk.short_lattice_basis(), sk_deserialized.short_lattice_basis());
+        assert_eq!(sk, sk_deserialized);
 
         // sign a random message
         let message = Word::new([ONE; 4]);
