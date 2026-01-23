@@ -1,3 +1,7 @@
+## 0.21.4 (TBD)
+
+- Fix an issue where `BudgetedReader` rejects valid usize collections with tight budgets ([#798](https://github.com/0xMiden/crypto/pull/798)).
+
 ## 0.21.3 (2026-01-21)
 
 - Fix: don't disable WAL during subtree construction in `LargeSmt`'s RocksDB backend ([#794](https://github.com/0xMiden/crypto/pull/794)).
