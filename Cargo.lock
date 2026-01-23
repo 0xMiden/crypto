@@ -614,6 +614,7 @@ dependencies = [
 [[package]]
 name = "fn-dsa-comm"
 version = "0.3.0"
+source = "git+https://github.com/0xMiden/rust-fn-dsa?branch=sign-prehash#ef52824b2005fee6c6307563ac26b7e10b0b6f65"
 dependencies = [
  "cpufeatures",
  "rand_core 0.6.4",
@@ -622,6 +623,7 @@ dependencies = [
 [[package]]
 name = "fn-dsa-kgen"
 version = "0.3.0"
+source = "git+https://github.com/0xMiden/rust-fn-dsa?branch=sign-prehash#ef52824b2005fee6c6307563ac26b7e10b0b6f65"
 dependencies = [
  "fn-dsa-comm",
  "zeroize",
@@ -630,6 +632,7 @@ dependencies = [
 [[package]]
 name = "fn-dsa-sign"
 version = "0.3.0"
+source = "git+https://github.com/0xMiden/rust-fn-dsa?branch=sign-prehash#ef52824b2005fee6c6307563ac26b7e10b0b6f65"
 dependencies = [
  "fn-dsa-comm",
  "zeroize",
@@ -638,7 +641,7 @@ dependencies = [
 [[package]]
 name = "fn-dsa-vrfy"
 version = "0.3.0"
-source = "git+https://github.com/0xMiden/rust-fn-dsa?branch=expose-internals#7d76bf3b81e8ad7f0fc53d8ec23d265f257784d9"
+source = "git+https://github.com/0xMiden/rust-fn-dsa?branch=sign-prehash#ef52824b2005fee6c6307563ac26b7e10b0b6f65"
 dependencies = [
  "fn-dsa-comm",
 ]

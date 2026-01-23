@@ -1,32 +1,18 @@
-//! A deterministic RPO Falcon512 signature over a message.
+//! Deterministic RPO Falcon512 signature scheme.
 //!
-//! This version differs from the reference implementation in its use of the RPO algebraic hash
-//! function in its hash-to-point algorithm.
+//! This implementation differs from standard FN-DSA (FIPS 206) in its use of RPO256 for
+//! the hash-to-point algorithm instead of SHAKE256. This enables efficient verification
+//! inside Miden's VM.
 //!
-//! Another point of difference is the determinism in the signing process. The approach used to
-//! achieve this is the one proposed in [1].
-//! The main challenge in making the signing procedure deterministic is ensuring that the same
-//! secret key is never used to produce two inequivalent signatures for the same `c`.
-//! For a precise definition of equivalence of signatures see [1].
-//! The reference implementation uses a random nonce per signature in order to make sure that,
-//! with overwhelming probability, no two c-s will ever repeat and this non-repetition turns out
-//! to be enough to make the security proof of the underlying construction go through in
-//! the random-oracle model.
+//! ## Deterministic Signing
 //!
-//! Making the signing process deterministic means that we cannot rely on the above use of nonce
-//! in the hash-to-point algorithm, i.e., the hash-to-point algorithm is deterministic. It also
-//! means that we have to derandomize the trapdoor sampling process and use the entropy in
-//! the secret key, together with the message, as the seed of a CPRNG. This is exactly the approach
-//! taken in [2] but, as explained at length in [1], this is not enough. The reason for this
-//! is that the sampling process during signature generation must be ensured to be consistent
-//! across the entire computing stack i.e., hardware, compiler, OS, sampler implementations ...
+//! The signing process is deterministic: the same (secret_key, message) pair always produces
+//! the same signature. This is achieved by deriving the PRNG seed from the secret key and
+//! message using BLAKE3.
 //!
-//! This implementation follows fn-dsa for the fixed-point sampler (FLR) and NTT-based arithmetic.
-//! FLR selects an appropriate backend (including AVX2 where available) at compile time, avoiding
-//! reliance on platform floating-point behavior while remaining deterministic and no_std friendly.
-//!
-//! [1]: https://github.com/algorand/falcon/blob/main/falcon-det.pdf
-//! [2]: https://datatracker.ietf.org/doc/html/rfc6979#section-3.5
+//! Following FN-DSA semantics, each signing attempt generates a fresh nonce and recomputes
+//! hash-to-point. The deterministic seed controls both the nonce generation and signature
+//! sampling PRNGs, ensuring reproducibility across retries.
 
 use fn_dsa_comm::{FN_DSA_LOGN_512, sign_key_size, vrfy_key_size};
 
@@ -64,27 +50,7 @@ const LOG_N: u8 = 9;
 /// Length of nonce used for signature generation.
 const SIG_NONCE_LEN: usize = 40;
 
-/// Length of the preversioned portion of the fixed nonce.
-///
-/// Since we use one byte to encode the version of the nonce, this is equal to `SIG_NONCE_LEN - 1`.
-const PREVERSIONED_NONCE_LEN: usize = 39;
-
-/// Current version of the fixed nonce.
-///
-/// The usefulness of the notion of versioned fixed nonce is discussed in Section 2.1 in [1].
-///
-/// [1]: https://github.com/algorand/falcon/blob/main/falcon-det.pdf
-const NONCE_VERSION_BYTE: u8 = 1;
-
-/// The preversioned portion of the fixed nonce constructed following [1].
-///
-/// Note that reference [1] uses the term salt instead of nonce.
-const PREVERSIONED_NONCE: [u8; PREVERSIONED_NONCE_LEN] = [
-    9, 82, 80, 79, 45, 70, 65, 76, 67, 79, 78, 45, 68, 69, 84, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-];
-
-/// Number of filed elements used to encode a nonce.
+/// Number of field elements used to encode a nonce.
 const NONCE_ELEMENTS: usize = 8;
 
 /// Public key length as a u8 vector.
@@ -97,13 +63,9 @@ pub const SK_LEN: usize = sign_key_size(FN_DSA_LOGN_512);
 const SIG_POLY_BYTE_LEN: usize = 625;
 
 /// Signature size when serialized as a u8 vector.
+/// 1 (header) + 40 (nonce) + 625 (s2 poly) + 897 (public key) = 1563
 #[cfg(test)]
-const SIG_SERIALIZED_LEN: usize = 1524;
-
-// TYPE ALIASES
-// ================================================================================================
-
-type ShortLatticeBasis = [Polynomial<i8>; 4];
+const SIG_SERIALIZED_LEN: usize = 1563;
 
 // NONCE
 // ================================================================================================
@@ -113,35 +75,6 @@ type ShortLatticeBasis = [Polynomial<i8>; 4];
 pub struct Nonce([u8; SIG_NONCE_LEN]);
 
 impl Nonce {
-    /// Returns a new deterministic [Nonce].
-    ///
-    /// This is used in deterministic signing following [1] and is composed of two parts:
-    ///
-    /// 1. a byte serving as a version byte,
-    /// 2. a pre-versioned fixed nonce which is the UTF8 encoding of the domain separator
-    ///    "RPO-FALCON-DET" padded with enough zeros to make it of size 39 bytes.
-    ///
-    /// The usefulness of the notion of versioned fixed nonce is discussed in Section 2.1 in [1].
-    ///
-    /// [1]: https://github.com/algorand/falcon/blob/main/falcon-det.pdf
-    pub fn deterministic() -> Self {
-        let mut nonce_bytes = [0u8; SIG_NONCE_LEN];
-        nonce_bytes[0] = NONCE_VERSION_BYTE;
-        nonce_bytes[1..].copy_from_slice(&PREVERSIONED_NONCE);
-        Self(nonce_bytes)
-    }
-
-    /// Returns a new [Nonce] drawn from the provided RNG.
-    ///
-    /// This is used only in testing against the test vectors of the reference (non-deterministic)
-    /// Falcon DSA implementation.
-    #[cfg(test)]
-    pub fn random<R: rand::Rng>(rng: &mut R) -> Self {
-        let mut nonce_bytes = [0u8; SIG_NONCE_LEN];
-        rng.fill_bytes(&mut nonce_bytes);
-        Self::from_bytes(nonce_bytes)
-    }
-
     /// Returns the underlying concatenated bytes of this nonce.
     pub fn as_bytes(&self) -> [u8; SIG_NONCE_LEN] {
         self.0
@@ -172,18 +105,13 @@ impl Nonce {
 
 impl Serializable for &Nonce {
     fn write_into<W: ByteWriter>(&self, target: &mut W) {
-        target.write_u8(self.0[0])
+        target.write_bytes(&self.0);
     }
 }
 
 impl Deserializable for Nonce {
     fn read_from<R: ByteReader>(source: &mut R) -> Result<Self, DeserializationError> {
-        let nonce_version: u8 = source.read()?;
-
-        let mut nonce_bytes = [0u8; SIG_NONCE_LEN];
-        nonce_bytes[0] = nonce_version;
-        nonce_bytes[1..].copy_from_slice(&PREVERSIONED_NONCE);
-
+        let nonce_bytes: [u8; SIG_NONCE_LEN] = source.read_array()?;
         Ok(Self(nonce_bytes))
     }
 }

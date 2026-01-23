@@ -20,9 +20,6 @@ pub use field::FalconFelt;
 mod polynomial;
 pub use polynomial::Polynomial;
 
-// Re-export flr module from fn-dsa-sign fork
-pub(crate) use fn_dsa_sign::flr;
-
 pub trait Inverse: Copy + Zero + MulAssign + One {
     /// Gets the inverse of a, or zero if it is zero.
     fn inverse_or_zero(self) -> Self;
