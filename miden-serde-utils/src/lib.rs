@@ -587,6 +587,10 @@ impl Deserializable for usize {
     fn read_from<R: ByteReader>(source: &mut R) -> Result<Self, DeserializationError> {
         source.read_usize()
     }
+
+    fn min_serialized_size() -> usize {
+        1 // vint64 encoding: minimum 1 byte for values 0-127
+    }
 }
 
 impl<T: Deserializable> Deserializable for Option<T> {
