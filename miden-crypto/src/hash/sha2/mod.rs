@@ -1,14 +1,4 @@
 //! SHA2 hash function wrappers (SHA-256 and SHA-512).
-//!
-//! # Note on SHA-512 and the Digest trait
-//!
-//! `Sha512Digest` does not implement the `Digest` trait because Winterfell's `Digest` trait
-//! requires a fixed 32-byte output via `as_bytes() -> [u8; 32]`, which is incompatible with
-//! SHA-512's native 64-byte output. Truncating to 32 bytes would create confusion with
-//! SHA-512/256 (which uses different initialization vectors per FIPS 180-4).
-//!
-//! See <https://github.com/facebook/winterfell/issues/406> for a proposal to make the
-//! `Digest` trait generic over output size.
 
 use core::mem::size_of;
 
@@ -97,21 +87,26 @@ impl Sha256 {
 /// SHA-512 digest (64 bytes).
 ///
 /// This is a type alias to the generic [`Digest512`] type.
-///
-/// NOTE: Sha512 intentionally does not implement the Hasher, HasherExt, ElementHasher,
-/// or Digest traits. See the module-level documentation for details.
 pub type Sha512Digest = Digest512;
 
 // SHA512 HASHER
 // ================================================================================================
 
 /// SHA-512 hash function.
-///
-/// Unlike [Sha256], this struct does not implement the `Hasher`, `HasherExt`, or `ElementHasher`
-/// traits because those traits require `Digest`, which mandates a 32-byte output. SHA-512
-/// produces a 64-byte digest, and truncating it would create confusion with SHA-512/256.
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub struct Sha512;
+
+impl HasherExt for Sha512 {
+    type Digest = Sha512Digest;
+
+    fn hash_iter<'a>(slices: impl Iterator<Item = &'a [u8]>) -> Self::Digest {
+        let mut hasher = sha2::Sha512::new();
+        for slice in slices {
+            hasher.update(slice);
+        }
+        Sha512Digest::from(<[u8; DIGEST512_BYTES]>::from(hasher.finalize()))
+    }
+}
 
 impl Sha512 {
     /// Returns a hash of the provided sequence of bytes.
@@ -150,11 +145,7 @@ impl Sha512 {
     /// Hashes an iterator of byte slices.
     #[inline(always)]
     pub fn hash_iter<'a>(slices: impl Iterator<Item = &'a [u8]>) -> Sha512Digest {
-        let mut hasher = sha2::Sha512::new();
-        for slice in slices {
-            hasher.update(slice);
-        }
-        Sha512Digest::from(<[u8; DIGEST512_BYTES]>::from(hasher.finalize()))
+        <Self as HasherExt>::hash_iter(slices)
     }
 }
 
