@@ -18,7 +18,7 @@ mod tests;
 
 /// SHA-256 digest (32 bytes).
 ///
-/// This is a type alias to the generic [`Digest256`] type.
+/// This is a type alias to the generic `Digest256` type.
 pub type Sha256Digest = Digest256;
 
 // SHA256 HASHER
@@ -86,7 +86,7 @@ impl Sha256 {
 
 /// SHA-512 digest (64 bytes).
 ///
-/// This is a type alias to the generic [`Digest512`] type.
+/// This is a type alias to the generic `Digest512` type.
 pub type Sha512Digest = Digest512;
 
 // SHA512 HASHER

@@ -17,7 +17,7 @@ mod tests;
 
 /// Keccak-256 digest (32 bytes).
 ///
-/// This is a type alias to the generic [`Digest256`] type.
+/// This is a type alias to the generic `Digest256` type.
 pub type Keccak256Digest = Digest256;
 
 // KECCAK256 HASHER
