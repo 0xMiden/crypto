@@ -104,6 +104,17 @@ impl Randomizable for Felt {
     }
 }
 
+impl<const N: usize> Randomizable for [u8; N] {
+    const VALUE_SIZE: usize = N;
+
+    fn from_random_bytes(source: &[u8]) -> Option<Self> {
+        let mut result = [Default::default(); N];
+        result.copy_from_slice(source);
+
+        Some(result)
+    }
+}
+
 /// Pseudo-random element generator.
 ///
 /// An instance can be used to draw, uniformly at random, base field elements as well as [Word]s.

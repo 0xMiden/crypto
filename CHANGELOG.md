@@ -1,12 +1,35 @@
-## 0.21.0 (TBD)
+## 0.22.0 (TBD)
 
-- [BREAKING] Removed `p3-compat` and `winter-compat` features ([#745](https://github.com/0xMiden/crypto/pull/745)).
-- Use more idiomatic Plonky3 APIs ([#743](https://github.com/0xMiden/crypto/pull/743)).
-- Make concurrent feature interact with plonky3's parallel features, replace homegrown iterator macros with p3-maybe-rayon ([#749](https://github.com/0xMiden/crypto/pull/749)).
-- Reduce dependency on std in tests, add test helpers to access Rngs in no-std contexts ([#752](https://github.com/0xMiden/crypto/pull/752)).
 - Added SMT integration tests for History mechanism ([#754](https://github.com/0xMiden/crypto/pull/754)).
+- Added const-generic `Digest<N>` struct for binary hash functions with `Digest256` and `Digest512` type aliases ([#777](https://github.com/0xMiden/crypto/pull/777)).
+- Added `MmrPath::with_forest()` and `MmrProof::with_forest()` to adjust proofs for smaller forests ([#788](https://github.com/0xMiden/crypto/pull/788)).
+
+## 0.21.4 (2026-01-22)
+
+- Fix an issue where `BudgetedReader` rejects valid usize collections with tight budgets ([#798](https://github.com/0xMiden/crypto/pull/798)).
+
+## 0.21.3 (2026-01-21)
+
+- Fix: don't disable WAL during subtree construction in `LargeSmt`'s RocksDB backend ([#794](https://github.com/0xMiden/crypto/pull/794)).
+
+## 0.21.2 (2026-01-20)
+
+- Exported `BudgetedReader` to allow for defense-in-depth against deserialization panics ([#786](https://github.com/0xMiden/crypto/pull/786)).
+
+## 0.21.1 (2026-01-16)
+
+- Changed `SmtForest` so that `EMPTY_WORD` is treated as removals ([#780](https://github.com/0xMiden/crypto/pull/780)).
+
+## 0.21.0 (2026-01-14)
+
+- Use more idiomatic Plonky3 APIs ([#743](https://github.com/0xMiden/crypto/pull/743)).
+- [BREAKING] Removed `p3-compat` and `winter-compat` features ([#745](https://github.com/0xMiden/crypto/pull/745)).
+- Made concurrent feature interact with plonky3's parallel features, replace homegrown iterator macros with p3-maybe-rayon ([#749](https://github.com/0xMiden/crypto/pull/749)).
+- Reduced dependency on std in tests, add test helpers to access Rngs in no-std contexts ([#752](https://github.com/0xMiden/crypto/pull/752)).
 - [BREAKING] Changed sponge state layout from `[CAPACITY, RATE1, RATE0]` (BE) to `[RATE0, RATE1, CAPACITY]` (LE) ([#755](https://github.com/0xMiden/crypto/pull/755)).
-- [BREAKING] Add length-prefixing to Serializable/Deserializable impls for collections, fuzz deserialization for panics ([#757](https://github.com/0xMiden/crypto/pull/757)).
+- [BREAKING] Added length-prefixing to Serializable/Deserializable impls for collections, fuzz deserialization for panics ([#757](https://github.com/0xMiden/crypto/pull/757)).
+- Added `SmtLeaf::try_from_elements()` ([#773](https://github.com/0xMiden/crypto/pull/773)).
+- Copied `WordWrapper` macro from `miden-base` to `miden-crypto-derive`.
 
 # 0.20.1 (2025-12-29)
 

@@ -10,6 +10,9 @@ use crate::{
     utils::{ByteReader, ByteWriter, Deserializable, DeserializationError, Serializable},
 };
 
+/// The number of field elements in a key-value pair (two Words, 4 Felts each).
+const DOUBLE_WORD_LEN: usize = 8;
+
 /// Represents a leaf node in the Sparse Merkle Tree.
 ///
 /// A leaf can be empty, hold a single key-value pair, or multiple key-value pairs.
@@ -176,12 +179,12 @@ impl SmtLeaf {
     // CONVERSIONS
     // ---------------------------------------------------------------------------------------------
 
-    /// Converts a leaf to a list of field elements
-    pub fn to_elements(&self) -> Vec<Felt> {
-        self.clone().into_elements()
+    /// Returns an iterator over the field elements representing this leaf.
+    pub fn to_elements(&self) -> impl Iterator<Item = Felt> + '_ {
+        self.entries().iter().copied().flat_map(kv_to_elements)
     }
 
-    /// Converts a leaf to a list of field elements
+    /// Converts a leaf to a list of field elements.
     pub fn into_elements(self) -> Vec<Felt> {
         self.into_entries().into_iter().flat_map(kv_to_elements).collect()
     }
@@ -192,6 +195,54 @@ impl SmtLeaf {
             SmtLeaf::Empty(_) => Vec::new(),
             SmtLeaf::Single(kv_pair) => vec![kv_pair],
             SmtLeaf::Multiple(kv_pairs) => kv_pairs,
+        }
+    }
+
+    /// Converts a list of elements into a leaf
+    pub fn try_from_elements(
+        elements: &[Felt],
+        leaf_index: LeafIndex<SMT_DEPTH>,
+    ) -> Result<SmtLeaf, SmtLeafError> {
+        if elements.is_empty() {
+            return Ok(SmtLeaf::new_empty(leaf_index));
+        }
+
+        // Elements should be organized into a contiguous array of K/V Words (4 Felts each).
+        if !elements.len().is_multiple_of(DOUBLE_WORD_LEN) {
+            return Err(SmtLeafError::DecodingError(
+                "elements length is not a multiple of 8".into(),
+            ));
+        }
+
+        let num_entries = elements.len() / DOUBLE_WORD_LEN;
+
+        if num_entries == 1 {
+            // Single entry.
+            let key = Word::new([elements[0], elements[1], elements[2], elements[3]]);
+            let value = Word::new([elements[4], elements[5], elements[6], elements[7]]);
+            Ok(SmtLeaf::new_single(key, value))
+        } else {
+            // Multiple entries.
+            let mut entries = Vec::with_capacity(num_entries);
+            // Read k/v pairs from each entry.
+            for i in 0..num_entries {
+                let base_idx = i * DOUBLE_WORD_LEN;
+                let key = Word::new([
+                    elements[base_idx],
+                    elements[base_idx + 1],
+                    elements[base_idx + 2],
+                    elements[base_idx + 3],
+                ]);
+                let value = Word::new([
+                    elements[base_idx + 4],
+                    elements[base_idx + 5],
+                    elements[base_idx + 6],
+                    elements[base_idx + 7],
+                ]);
+                entries.push((key, value));
+            }
+            let leaf = SmtLeaf::new_multiple(entries)?;
+            Ok(leaf)
         }
     }
 
