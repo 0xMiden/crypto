@@ -1,101 +1,24 @@
-use alloc::string::String;
-use core::{
-    mem::size_of,
-    ops::Deref,
-    slice::{self, from_raw_parts},
-};
+use core::mem::size_of;
 
 use p3_field::BasedVectorSpace;
 use sha3::Digest as Sha3Digest;
 
-use super::{Felt, HasherExt};
-use crate::{
-    field::PrimeField64,
-    utils::{
-        ByteReader, ByteWriter, Deserializable, DeserializationError, HexParseError, Serializable,
-        bytes_to_hex_string, hex_to_bytes,
-    },
+use super::{
+    Felt, HasherExt,
+    digest::{DIGEST256_BYTES, Digest256},
 };
+use crate::field::PrimeField64;
 
 #[cfg(test)]
 mod tests;
 
-// CONSTANTS
+// KECCAK256 DIGEST
 // ================================================================================================
 
-const DIGEST_BYTES: usize = 32;
-
-// DIGEST
-// ================================================================================================
-
-/// Keccak digest
-#[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd)]
-#[repr(transparent)]
-pub struct Keccak256Digest([u8; DIGEST_BYTES]);
-
-impl Keccak256Digest {
-    pub fn as_bytes(&self) -> [u8; 32] {
-        self.0
-    }
-
-    pub fn digests_as_bytes(digests: &[Keccak256Digest]) -> &[u8] {
-        let p = digests.as_ptr();
-        let len = digests.len() * DIGEST_BYTES;
-        unsafe { slice::from_raw_parts(p as *const u8, len) }
-    }
-}
-
-impl Default for Keccak256Digest {
-    fn default() -> Self {
-        Self([0; DIGEST_BYTES])
-    }
-}
-
-impl Deref for Keccak256Digest {
-    type Target = [u8];
-
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-
-impl From<Keccak256Digest> for [u8; DIGEST_BYTES] {
-    fn from(value: Keccak256Digest) -> Self {
-        value.0
-    }
-}
-
-impl From<[u8; DIGEST_BYTES]> for Keccak256Digest {
-    fn from(value: [u8; DIGEST_BYTES]) -> Self {
-        Self(value)
-    }
-}
-
-impl From<Keccak256Digest> for String {
-    fn from(value: Keccak256Digest) -> Self {
-        bytes_to_hex_string(value.as_bytes())
-    }
-}
-
-impl TryFrom<&str> for Keccak256Digest {
-    type Error = HexParseError;
-
-    fn try_from(value: &str) -> Result<Self, Self::Error> {
-        hex_to_bytes(value).map(|v| v.into())
-    }
-}
-
-impl Serializable for Keccak256Digest {
-    fn write_into<W: ByteWriter>(&self, target: &mut W) {
-        target.write_bytes(&self.0);
-    }
-}
-
-impl Deserializable for Keccak256Digest {
-    fn read_from<R: ByteReader>(source: &mut R) -> Result<Self, DeserializationError> {
-        source.read_array().map(Self)
-    }
-}
+/// Keccak-256 digest (32 bytes).
+///
+/// This is a type alias to the generic `Digest256` type.
+pub type Keccak256Digest = Digest256;
 
 // KECCAK256 HASHER
 // ================================================================================================
@@ -112,7 +35,7 @@ impl HasherExt for Keccak256 {
         for slice in slices {
             hasher.update(slice);
         }
-        Keccak256Digest(hasher.finalize().into())
+        Keccak256Digest::from(<[u8; DIGEST256_BYTES]>::from(hasher.finalize()))
     }
 }
 
@@ -123,28 +46,25 @@ impl Keccak256 {
     pub fn hash(bytes: &[u8]) -> Keccak256Digest {
         let mut hasher = sha3::Keccak256::new();
         hasher.update(bytes);
-
-        Keccak256Digest(hasher.finalize().into())
+        Keccak256Digest::from(<[u8; DIGEST256_BYTES]>::from(hasher.finalize()))
     }
 
     pub fn merge(values: &[Keccak256Digest; 2]) -> Keccak256Digest {
-        Self::hash(prepare_merge(values))
+        Self::hash(Keccak256Digest::digests_as_bytes(values))
     }
 
     pub fn merge_many(values: &[Keccak256Digest]) -> Keccak256Digest {
         let data = Keccak256Digest::digests_as_bytes(values);
         let mut hasher = sha3::Keccak256::new();
         hasher.update(data);
-
-        Keccak256Digest(hasher.finalize().into())
+        Keccak256Digest::from(<[u8; DIGEST256_BYTES]>::from(hasher.finalize()))
     }
 
     pub fn merge_with_int(seed: Keccak256Digest, value: u64) -> Keccak256Digest {
         let mut hasher = sha3::Keccak256::new();
-        hasher.update(seed.0);
+        hasher.update(&*seed);
         hasher.update(value.to_le_bytes());
-
-        Keccak256Digest(hasher.finalize().into())
+        Keccak256Digest::from(<[u8; DIGEST256_BYTES]>::from(hasher.finalize()))
     }
 
     /// Returns a hash of the provided field elements.
@@ -166,8 +86,8 @@ impl Keccak256 {
 // HELPER FUNCTIONS
 // ================================================================================================
 
-/// Hash the elements into bytes and shrink the output.
-fn hash_elements<E>(elements: &[E]) -> [u8; DIGEST_BYTES]
+/// Hash the elements into bytes.
+fn hash_elements<E>(elements: &[E]) -> [u8; DIGEST256_BYTES]
 where
     E: BasedVectorSpace<Felt>,
 {
@@ -201,19 +121,4 @@ where
         hasher.finalize()
     };
     digest.into()
-}
-
-// Cast the slice into contiguous bytes.
-fn prepare_merge<const N: usize, D>(args: &[D; N]) -> &[u8]
-where
-    D: Deref<Target = [u8]>,
-{
-    // compile-time assertion
-    assert!(N > 0, "N shouldn't represent an empty slice!");
-    let values = args.as_ptr() as *const u8;
-    let len = size_of::<D>() * N;
-    // safety: the values are tested to be contiguous
-    let bytes = unsafe { from_raw_parts(values, len) };
-    debug_assert_eq!(args[0].deref(), &bytes[..len / N]);
-    bytes
 }
