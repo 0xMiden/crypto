@@ -7,7 +7,7 @@ use sha2::Digest as Sha2Digest;
 
 use super::{
     Felt, HasherExt,
-    digest::{DIGEST256_BYTES, DIGEST512_BYTES, Digest256, Digest512, prepare_merge},
+    digest::{DIGEST256_BYTES, DIGEST512_BYTES, Digest256, Digest512},
 };
 
 #[cfg(test)]
@@ -51,7 +51,7 @@ impl Sha256 {
     }
 
     pub fn merge(values: &[Sha256Digest; 2]) -> Sha256Digest {
-        Self::hash(prepare_merge(values))
+        Self::hash(Sha256Digest::digests_as_bytes(values))
     }
 
     pub fn merge_many(values: &[Sha256Digest]) -> Sha256Digest {
@@ -121,7 +121,7 @@ impl Sha512 {
     /// Merkle trees and verification of Merkle paths.
     #[inline(always)]
     pub fn merge(values: &[Sha512Digest; 2]) -> Sha512Digest {
-        Self::hash(prepare_merge(values))
+        Self::hash(Sha512Digest::digests_as_bytes(values))
     }
 
     /// Returns a hash of the provided digests.

@@ -4,7 +4,7 @@ use core::{mem::size_of, ops::Deref, slice};
 use p3_field::{BasedVectorSpace, PrimeField64};
 use p3_goldilocks::Goldilocks as Felt;
 
-use super::{HasherExt, digest::prepare_merge};
+use super::HasherExt;
 use crate::utils::{
     ByteReader, ByteWriter, Deserializable, DeserializationError, HexParseError, Serializable,
     bytes_to_hex_string, hex_to_bytes,
@@ -129,7 +129,7 @@ impl Blake3_256 {
     // (<Self as Hasher>::merge). They're now direct implementations as part of removing
     // the Winterfell Hasher trait dependency. These are public API used in benchmarks.
     pub fn merge(values: &[Blake3Digest<32>; 2]) -> Blake3Digest<32> {
-        Self::hash(prepare_merge(values))
+        Self::hash(Blake3Digest::digests_as_bytes(values))
     }
 
     pub fn merge_many(values: &[Blake3Digest<32>]) -> Blake3Digest<32> {
@@ -190,7 +190,7 @@ impl Blake3_192 {
     }
 
     pub fn merge(values: &[Blake3Digest<24>; 2]) -> Blake3Digest<24> {
-        Self::hash(prepare_merge(values))
+        Self::hash(Blake3Digest::digests_as_bytes(values))
     }
 
     pub fn merge_with_int(seed: Blake3Digest<24>, value: u64) -> Blake3Digest<24> {

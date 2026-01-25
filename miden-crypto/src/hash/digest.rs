@@ -5,7 +5,7 @@
 //! Blake3-256, etc. For 64-byte outputs (e.g., SHA-512), use `Digest<64>`.
 
 use alloc::string::String;
-use core::{mem::size_of, ops::Deref, slice};
+use core::{ops::Deref, slice};
 
 use crate::utils::{
     ByteReader, ByteWriter, Deserializable, DeserializationError, HexParseError, Serializable,
@@ -118,27 +118,6 @@ impl<const N: usize> Deserializable for Digest<N> {
     }
 }
 
-// HELPER FUNCTIONS
-// ================================================================================================
-
-/// Cast the slice into contiguous bytes.
-///
-/// This function is used by hash implementations to efficiently convert an array of digests
-/// into a byte slice for hashing in merge operations.
-pub fn prepare_merge<const N: usize, D>(args: &[D; N]) -> &[u8]
-where
-    D: Deref<Target = [u8]>,
-{
-    // compile-time assertion
-    assert!(N > 0, "N shouldn't represent an empty slice!");
-    let values = args.as_ptr() as *const u8;
-    let len = size_of::<D>() * N;
-    // safety: the values are tested to be contiguous
-    let bytes = unsafe { slice::from_raw_parts(values, len) };
-    debug_assert_eq!(args[0].deref(), &bytes[..len / N]);
-    bytes
-}
-
 // TESTS
 // ================================================================================================
 
@@ -151,7 +130,7 @@ mod tests {
     #[test]
     fn test_memory_layout_assumptions() {
         // Verify that Digest<N> has the same size and alignment as [u8; N].
-        // The unsafe code in digests_as_bytes and prepare_merge relies on this.
+        // The unsafe code in digests_as_bytes relies on this.
         assert_eq!(size_of::<Digest<32>>(), size_of::<[u8; 32]>());
         assert_eq!(align_of::<Digest<32>>(), align_of::<[u8; 32]>());
 

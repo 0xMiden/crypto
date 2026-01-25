@@ -5,7 +5,7 @@ use sha3::Digest as Sha3Digest;
 
 use super::{
     Felt, HasherExt,
-    digest::{DIGEST256_BYTES, Digest256, prepare_merge},
+    digest::{DIGEST256_BYTES, Digest256},
 };
 use crate::field::PrimeField64;
 
@@ -50,7 +50,7 @@ impl Keccak256 {
     }
 
     pub fn merge(values: &[Keccak256Digest; 2]) -> Keccak256Digest {
-        Self::hash(prepare_merge(values))
+        Self::hash(Keccak256Digest::digests_as_bytes(values))
     }
 
     pub fn merge_many(values: &[Keccak256Digest]) -> Keccak256Digest {
