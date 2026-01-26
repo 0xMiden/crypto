@@ -2,13 +2,17 @@
 //! The functional tests for the history component.
 
 use alloc::vec::Vec;
+use core::iter::once;
 
 use p3_field::PrimeCharacteristicRing;
 
 use super::{CompactLeaf, History, LeafChanges, NodeChanges, error::Result};
 use crate::{
     Felt, Word,
-    merkle::{NodeIndex, smt::LeafIndex},
+    merkle::{
+        NodeIndex,
+        smt::{LeafIndex, Smt, VersionId},
+    },
     rand::test_utils::rand_value,
 };
 
@@ -143,6 +147,46 @@ fn add_version() -> Result<()> {
 
     // If we try and add a version with a non-monotonic version number, we should see an error.
     assert!(history.add_version(root_3, id_1, nodes, leaves).is_err());
+
+    Ok(())
+}
+
+#[test]
+fn add_version_from_mutation_set() -> Result<()> {
+    // We start by producing values.
+    let l1_k1: Word = rand_value();
+    let leaf_1_ix = LeafIndex::from(l1_k1);
+    let l1_v1: Word = rand_value();
+    let mut l1_k2: Word = rand_value();
+    l1_k2[3] = Felt::from_u64(leaf_1_ix.value());
+    let l1_v2: Word = rand_value();
+
+    let l2_k1: Word = rand_value();
+    let leaf_2_ix = LeafIndex::from(l2_k1);
+    let l2_v1: Word = rand_value();
+    let mut l2_k2: Word = rand_value();
+    l2_k2[3] = Felt::from_u64(leaf_2_ix.value());
+    let l2_v2: Word = rand_value();
+
+    // We produce a changeset by applying these changes to a merkle tree to put things back in the
+    // right state.
+    let tree = Smt::new();
+    let mutations = tree
+        .compute_mutations([(l1_k1, l1_v1), (l1_k2, l1_v2), (l2_k1, l2_v1), (l2_k2, l2_v2)])
+        .expect("Failed to compute mutations");
+
+    // We then set up our history and apply it.
+    let mut history = History::empty(2);
+    let version: VersionId = rand_value();
+
+    history.add_version_from_mutation_set(version, mutations)?;
+
+    // Now we can check that it did things correctly.
+    let view = history.get_view_at(version)?;
+    let expected_leaf_1 = CompactLeaf::from([(l1_k1, l1_v1), (l1_k2, l1_v2)]);
+    assert_eq!(view.leaf_delta(&leaf_1_ix), expected_leaf_1);
+    let expected_leaf_2 = CompactLeaf::from([(l2_k1, l2_v1), (l2_k2, l2_v2)]);
+    assert_eq!(view.leaf_delta(&leaf_2_ix), expected_leaf_2);
 
     Ok(())
 }
@@ -297,8 +341,14 @@ fn view_at() -> Result<()> {
     let leaf_4_ix = LeafIndex::from(l4_e1_key);
     leaf_4.insert(l4_e1_key, l4_e1_value);
 
+    let mut leaf_1n = CompactLeaf::new();
+    let l1n_e1_key = l1_e1_key;
+    let l1n_e1_value: Word = rand_value();
+    leaf_1n.insert(l1n_e1_key, l1n_e1_value);
+
     let mut leaves_3 = LeafChanges::default();
     leaves_3.insert(leaf_4_ix, leaf_4.clone());
+    leaves_3.insert(leaf_1_ix, leaf_1n);
 
     history.add_version(root_3, id_3, nodes_3.clone(), leaves_3.clone())?;
     assert_eq!(history.num_versions(), 3);
@@ -324,32 +374,40 @@ fn view_at() -> Result<()> {
     // Getting a node that doesn't exist in ANY versions should return none.
     assert!(view.node_value(&NodeIndex::new(45, 100).unwrap()).is_none());
 
-    // Similarly, getting a leaf from the targeted version should just return it.
-    assert_eq!(view.leaf_value(&leaf_1_ix), Some(&leaf_1));
-    assert_eq!(view.leaf_value(&leaf_2_ix), Some(&leaf_2));
+    // Getting a leaf from the targeted version will compose with other (newer) deltas to yield the
+    // correct changes. The first test here checks that a value updated in a newer delta is
+    // nevertheless reverted to the correct value.
+    assert_eq!(view.leaf_delta(&leaf_1_ix), leaf_1);
+
+    // This test checks that the delta for a single leaf correctly combines non-overlapping key
+    // reversions.
+    let leaf_2_delta: CompactLeaf = once((l3_e1_key, l3_e1_value))
+        .chain(leaf_2.iter().map(|(k, v)| (*k, *v)))
+        .collect();
+    assert_eq!(view.leaf_delta(&leaf_2_ix), leaf_2_delta);
 
     // But getting a leaf that is not in the target delta directly should result in the same
     // traversal.
-    assert_eq!(view.leaf_value(&leaf_4_ix), Some(&leaf_4));
+    assert_eq!(view.leaf_delta(&leaf_4_ix), leaf_4);
 
-    // And getting a leaf that does not exist in any of the versions should return one.
-    assert!(view.leaf_value(&LeafIndex::new(1024).unwrap()).is_none());
+    // And getting a leaf that does not exist in any of the versions should return an empty delta.
+    assert!(view.leaf_delta(&LeafIndex::new(1024).unwrap()).is_empty());
 
     // Finally, getting a full value from a compact leaf should yield the value directly from
     // the target version if the target version overlays it AND contains it.
-    assert_eq!(view.value(&l1_e1_key), Some(Some(&l1_e1_value)));
-    assert_eq!(view.value(&l2_e1_key), Some(Some(&l2_e1_value)));
-    assert_eq!(view.value(&l2_e2_key), Some(Some(&l2_e2_value)));
+    assert_eq!(view.value(&l1_e1_key), Some(l1_e1_value));
+    assert_eq!(view.value(&l2_e1_key), Some(l2_e1_value));
+    assert_eq!(view.value(&l2_e2_key), Some(l2_e2_value));
 
     // However, if the leaf exists but does not contain the provided word, it should return the
     // sentinel `Some(None)`.
     let mut ne_key_in_existing_leaf: Word = rand_value();
     ne_key_in_existing_leaf[3] = Felt::from_u64(leaf_1_ix.value());
-    assert_eq!(view.value(&ne_key_in_existing_leaf), Some(None));
+    assert_eq!(view.value(&ne_key_in_existing_leaf), None);
 
     // If the leaf is not overlaid, then the lookup should go up the chain just as in the other
     // cases.
-    assert_eq!(view.value(&l4_e1_key), Some(Some(&l4_e1_value)));
+    assert_eq!(view.value(&l4_e1_key), Some(l4_e1_value));
 
     // But if nothing is found, it should just return None;
     let ne_key: Word = rand_value();
@@ -367,40 +425,12 @@ fn view_at() -> Result<()> {
 // SMT INTEGRATION TESTS
 // ================================================================================================
 
-use crate::merkle::smt::{MutationSet, NodeMutation, SMT_DEPTH, Smt, SparseMerkleTree};
-
-/// Converts a MutationSet into the format expected by History.
-///
-/// This helper extracts node additions and leaf changes from an SMT mutation set,
-/// transforming them into the format used by the History tracking mechanism.
-fn mutation_set_to_history_changes(
-    mutations: &MutationSet<SMT_DEPTH, Word, Word>,
-) -> (NodeChanges, LeafChanges) {
-    let mut node_changes = NodeChanges::default();
-    for (index, mutation) in mutations.node_mutations().iter() {
-        if let NodeMutation::Addition(inner_node) = mutation {
-            node_changes.insert(*index, inner_node.hash());
-        }
-    }
-
-    let mut leaf_changes = LeafChanges::default();
-    for (key, value) in mutations.new_pairs().iter() {
-        let leaf_index = LeafIndex::new(Smt::key_to_leaf_index(key).value()).unwrap();
-        leaf_changes
-            .entry(leaf_index)
-            .or_insert_with(CompactLeaf::new)
-            .insert(*key, *value);
-    }
-
-    (node_changes, leaf_changes)
-}
-
 /// Tests History integration using real SMT mutations.
 ///
 /// This test creates an actual SMT, computes mutations via the SMT API,
 /// and verifies that History correctly tracks the resulting node and leaf changes.
 #[test]
-fn smt_history_with_real_mutations() -> Result<()> {
+fn history_from_smt_non_overlapping() -> Result<()> {
     // Create an empty SMT
     let mut smt = Smt::new();
     let initial_root = smt.root();
@@ -414,51 +444,39 @@ fn smt_history_with_real_mutations() -> Result<()> {
     // Create history to track versions
     let mut history = History::empty(3);
 
-    // Version 0: Insert first key-value pair using real SMT mutation
+    // Version 0: Insert first key-value pair using real SMT mutation while getting the reversion
+    // set for the history.
     let mutations_v0 = smt.compute_mutations(vec![(key_1, value_1)]).unwrap();
-    let (node_changes_v0, leaf_changes_v0) = mutation_set_to_history_changes(&mutations_v0);
-    smt.apply_mutations(mutations_v0).unwrap();
+    let reversion_set = smt.apply_mutations_with_reversion(mutations_v0).unwrap();
     let root_v0 = smt.root();
-
-    // Verify stored node hashes match what the SMT computed
-    for (index, hash) in node_changes_v0.iter() {
-        assert_eq!(*hash, smt.get_node_hash(*index));
-    }
-
-    history.add_version(root_v0, 0, node_changes_v0.clone(), leaf_changes_v0.clone())?;
+    history.add_version_from_mutation_set(0, reversion_set)?;
+    assert_eq!(history.num_versions(), 1);
 
     // Version 1: Insert second key-value pair
     let mutations_v1 = smt.compute_mutations(vec![(key_2, value_2)]).unwrap();
-    let (node_changes_v1, leaf_changes_v1) = mutation_set_to_history_changes(&mutations_v1);
-    smt.apply_mutations(mutations_v1).unwrap();
+    let reversion_set = smt.apply_mutations_with_reversion(mutations_v1).unwrap();
     let root_v1 = smt.root();
+    history.add_version_from_mutation_set(1, reversion_set)?;
 
-    // Verify stored node hashes match what the SMT computed
-    for (index, hash) in node_changes_v1.iter() {
-        assert_eq!(*hash, smt.get_node_hash(*index));
-    }
-
-    history.add_version(root_v1, 1, node_changes_v1, leaf_changes_v1)?;
-
-    // Verify roots are tracked correctly
+    // Verify the roots for older states are tracked correctly in the history.
+    assert!(history.is_known_root(initial_root));
     assert!(history.is_known_root(root_v0));
-    assert!(history.is_known_root(root_v1));
-    assert!(!history.is_known_root(initial_root)); // Initial empty root not added
 
-    // Query version 0 and verify leaf data
+    // And that the latest root of the tree is not.
+    assert!(!history.is_known_root(root_v1));
+
+    // We can start by checking that version 0 performs the correct reversion operations,
+    // encompassing _both_ changes made to obtain the current version.
     let view_v0 = history.get_view_at(0)?;
-    let leaf_index_1 = LeafIndex::new(Smt::key_to_leaf_index(&key_1).value()).unwrap();
-    assert!(view_v0.leaf_value(&leaf_index_1).is_some());
-    assert_eq!(view_v0.value(&key_1), Some(Some(&value_1)));
+    assert_eq!(view_v0.value(&key_1), Some(Word::empty()));
+    assert_eq!(view_v0.value(&key_2), Some(Word::empty()));
+    assert_eq!(view_v0.leaf_delta(&key_1.into()).len(), 1);
+    assert_eq!(view_v0.leaf_delta(&key_2.into()).len(), 1);
 
-    // Query version 1 and verify both leaves accessible
+    // When we query version 1 it should only make revert one change on top of the current tree.
     let view_v1 = history.get_view_at(1)?;
-    let leaf_index_2 = LeafIndex::new(Smt::key_to_leaf_index(&key_2).value()).unwrap();
-    assert!(view_v1.leaf_value(&leaf_index_2).is_some());
-    assert_eq!(view_v1.value(&key_2), Some(Some(&value_2)));
-
-    // Verify node changes were captured (mutations produce inner node updates)
-    assert!(!node_changes_v0.is_empty(), "SMT insertion should produce node changes");
+    assert_eq!(view_v0.value(&key_2), Some(Word::empty()));
+    assert_eq!(view_v0.leaf_delta(&key_2.into()).len(), 1);
 
     // Verify querying a non-existent key returns None
     let nonexistent_key: Word = rand_value();
@@ -469,7 +487,7 @@ fn smt_history_with_real_mutations() -> Result<()> {
 
 /// Tests History with SMT value updates (replacing existing values).
 #[test]
-fn smt_history_value_updates() -> Result<()> {
+fn history_from_smt_overlapping() -> Result<()> {
     let mut smt = Smt::new();
 
     let key: Word = rand_value();
@@ -480,39 +498,21 @@ fn smt_history_value_updates() -> Result<()> {
 
     // Version 0: Insert initial value
     let mutations_v0 = smt.compute_mutations(vec![(key, value_v0)]).unwrap();
-    let (node_changes_v0, leaf_changes_v0) = mutation_set_to_history_changes(&mutations_v0);
-    smt.apply_mutations(mutations_v0).unwrap();
-
-    // Verify stored node hashes match what the SMT computed
-    for (index, hash) in node_changes_v0.iter() {
-        assert_eq!(*hash, smt.get_node_hash(*index));
-    }
-
-    history.add_version(smt.root(), 0, node_changes_v0, leaf_changes_v0)?;
+    let reversion_set = smt.apply_mutations_with_reversion(mutations_v0).unwrap();
+    history.add_version_from_mutation_set(0, reversion_set)?;
 
     // Version 1: Update to new value
     let mutations_v1 = smt.compute_mutations(vec![(key, value_v1)]).unwrap();
-    let (node_changes_v1, leaf_changes_v1) = mutation_set_to_history_changes(&mutations_v1);
-    smt.apply_mutations(mutations_v1).unwrap();
+    let reversion_set = smt.apply_mutations_with_reversion(mutations_v1).unwrap();
+    history.add_version_from_mutation_set(1, reversion_set)?;
 
-    // Verify stored node hashes match what the SMT computed
-    for (index, hash) in node_changes_v1.iter() {
-        assert_eq!(*hash, smt.get_node_hash(*index));
-    }
-
-    history.add_version(smt.root(), 1, node_changes_v1, leaf_changes_v1)?;
-
-    // Verify version 0 has original value
+    // In version 0 we should have the correct (empty) value when reverted.
     let view_v0 = history.get_view_at(0)?;
-    assert_eq!(view_v0.value(&key), Some(Some(&value_v0)));
+    assert_eq!(view_v0.value(&key), Some(Word::empty()));
 
-    // Verify version 1 has updated value
+    // In version 1 we should have the value set in the transition to version 0.
     let view_v1 = history.get_view_at(1)?;
-    assert_eq!(view_v1.value(&key), Some(Some(&value_v1)));
-
-    // Verify round-trip consistency: history view matches current SMT value
-    let current_smt_value = smt.get_value(&key);
-    assert_eq!(view_v1.value(&key), Some(Some(&current_smt_value)));
+    assert_eq!(view_v1.value(&key), Some(value_v0));
 
     Ok(())
 }

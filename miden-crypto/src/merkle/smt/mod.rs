@@ -30,7 +30,8 @@ pub use large::{RocksDbConfig, RocksDbStorage};
 
 mod large_forest;
 pub use large_forest::{
-    Backend, BackendError, ForestOperation, LargeSmtForest, LargeSmtForestError, RootInfo,
+    Backend, BackendError, Config as ForestConfig, ForestOperation,
+    InMemoryBackend as ForestInMemoryBackend, LargeSmtForest, LargeSmtForestError, RootInfo,
     SmtForestUpdateBatch, SmtUpdateBatch, TreeId, VersionId,
 };
 

@@ -15,6 +15,7 @@ use crate::{
 pub struct SmtProof {
     /// The sparse Merkle path from the leaf to the root.
     path: SparseMerklePath,
+
     /// The leaf node containing one or more key-value pairs.
     leaf: SmtLeaf,
 }

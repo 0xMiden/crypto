@@ -8,24 +8,43 @@ use thiserror::Error;
 use crate::merkle::{
     MerkleError,
     smt::{
-        TreeId, VersionId,
+        SmtLeafError, TreeId, VersionId,
         large_forest::{backend::BackendError, history::error::HistoryError, root::LineageId},
     },
 };
-
 // LARGE SMT FOREST ERROR
 // ================================================================================================
 
 /// The type of errors returned by operations on the large SMT forest.
 #[derive(Debug, Error)]
 pub enum LargeSmtForestError {
+    /// Raised when the provided version for any update is older than the latest-known version for
+    /// the lineage being updated.
+    #[error("Version {0} is not newer than latest-known {1}")]
+    BadVersion(VersionId, VersionId),
+
+    /// Raised when there is a conflict between an existing lineage ID and one already in the
+    /// forest.
+    #[error("Duplicate lineage ID {0} provided")]
+    DuplicateLineage(LineageId),
+
+    /// Raised for arbitrary errors that are not derived from user-input. These **must be considered
+    /// fatal by the caller**, but exist to provide the caller with control over process termination
+    /// (e.g. for improved diagnostics) wherever possible.
+    #[error(transparent)]
+    Fatal(Box<dyn core::error::Error + Sync + Send>),
+
     /// Errors in the history subsystem of the forest.
     #[error(transparent)]
-    HistoryError(#[from] HistoryError),
+    History(#[from] HistoryError),
 
     /// Errors with the merkle tree operations of the forest.
     #[error(transparent)]
-    MerkleError(#[from] MerkleError),
+    Merkle(#[from] MerkleError),
+
+    /// Errors in working with leaves in the merkle trees.
+    #[error(transparent)]
+    SmtLeaf(#[from] SmtLeafError),
 
     /// Raised when an operation specifies a lineage that is not known.
     #[error("The lineage {0:?} is not in the forest")]
@@ -49,8 +68,11 @@ pub enum LargeSmtForestError {
 impl From<BackendError> for LargeSmtForestError {
     fn from(value: BackendError) -> Self {
         match value {
+            BackendError::DuplicateLineage(l) => LargeSmtForestError::DuplicateLineage(l),
+            BackendError::Internal(e) => LargeSmtForestError::Fatal(e),
             BackendError::Merkle(e) => LargeSmtForestError::from(e),
             BackendError::Other(e) => LargeSmtForestError::from(e),
+            BackendError::UnknownLineage(t) => LargeSmtForestError::UnknownLineage(t),
         }
     }
 }

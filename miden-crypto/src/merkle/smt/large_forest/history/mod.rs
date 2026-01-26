@@ -41,14 +41,16 @@ use error::{HistoryError, Result};
 use crate::{
     Map, Word,
     merkle::{
-        NodeIndex,
+        EmptySubtreeRoots, NodeIndex,
         smt::{
-            LeafIndex, SMT_DEPTH,
-            large_forest::root::{RootValue, VersionId},
+            LeafIndex, NodeMutation, SMT_DEPTH,
+            large_forest::{
+                root::{RootValue, VersionId},
+                utils::MutationSet,
+            },
         },
     },
 };
-
 // UTILITY TYPE ALIASES
 // ================================================================================================
 
@@ -69,8 +71,8 @@ pub type NodeChanges = Map<NodeIndex, Word>;
 
 /// A collection of changes to arbitrary leaf nodes in a merkle tree.
 ///
-/// This represents the state of the leaf wholesale, rather than as a delta from the newer version.
-/// This massively simplifies querying leaves in the history.
+/// While represented as a single leaf, it only contains the changes to the leaf as part of the
+/// delta, and still needs to be combined with the actual leaf data for querying.
 ///
 /// Note that if in the version of the tree represented by these `LeafChanges` had the default value
 /// at the leaf, this default value must be made concrete in the map. Failure to do so will retain a
@@ -222,6 +224,52 @@ impl History {
         }
     }
 
+    /// Adds a version to the history and represented by the changes from the current tree given
+    /// `mutations`.
+    ///
+    /// If adding this version would result in exceeding `self.max_count` historical versions, then
+    /// the oldest of the versions is automatically removed.
+    ///
+    /// # Gotchas
+    ///
+    /// When constructing the `mutations`, keep in mind that the set must contain entries for the
+    /// **default value of a node or leaf** at any position where the tree was sparse in the state
+    /// represented by `root`. If this is not done, incorrect values may be returned.
+    ///
+    /// This is necessary because the changes are the _reverse_ from what one might expect. Namely,
+    /// the changes in a given version `v` must "_revert_" the changes made in the transition from
+    /// version `v` to version `v + 1`.
+    ///
+    /// # Errors
+    ///
+    /// - [`HistoryError::NonMonotonicVersions`] if the provided version is not greater than the
+    ///   previously added version.
+    pub fn add_version_from_mutation_set(
+        &mut self,
+        version_id: VersionId,
+        mutations: MutationSet,
+    ) -> Result<()> {
+        // The leaf changes must be grouped by parent leaf when being inserted, so we do that here.
+        let mut leaf_changes = LeafChanges::default();
+        for (key, val) in mutations.new_pairs {
+            leaf_changes.entry(LeafIndex::from(key)).or_default().insert(key, val);
+        }
+
+        // The node changes are more complex, as we have to explicitly handle reversions to empty
+        // specially.
+        let node_changes: NodeChanges = mutations
+            .node_mutations
+            .into_iter()
+            .map(|(ix, m)| match m {
+                NodeMutation::Removal => (ix, *EmptySubtreeRoots::entry(SMT_DEPTH, ix.depth())),
+                NodeMutation::Addition(n) => (ix, n.hash()),
+            })
+            .collect();
+
+        // Now we can simply delegate to the standard function.
+        self.add_version(mutations.new_root, version_id, node_changes, leaf_changes)
+    }
+
     /// Returns the index in the sequence of deltas of the version that corresponds to the provided
     /// `version_id`.
     ///
@@ -361,36 +409,42 @@ impl<'history> HistoryView<'history> {
             .find_map(|v| v.nodes.get(index))
     }
 
-    /// Gets the value of the entire leaf in the history at the specified `index`, or returns `None`
-    /// if the version does not overlay the current tree at that leaf.
+    /// Gets a single leaf that represents the delta from the current version of the tree to the
+    /// point in the history at the specified `index`, or returns `None` if the version does not
+    /// overlay that leaf.
+    ///
+    /// If the specified version does not overlay the current tree at that leaf, it will return an
+    /// empty compact leaf.
     ///
     /// # Complexity
     ///
     /// The computational complexity of this method is linear in the number of versions due to the
     /// need to traverse to find the correct overlay value.
     #[must_use]
-    pub fn leaf_value(&self, index: &LeafIndex<SMT_DEPTH>) -> Option<&CompactLeaf> {
-        self.history
-            .deltas
-            .iter()
-            .skip(self.version_ix)
-            .find_map(|v| v.leaves.get(index))
+    pub fn leaf_delta(&self, index: &LeafIndex<SMT_DEPTH>) -> CompactLeaf {
+        let mut leaf = CompactLeaf::default();
+
+        // We have to reverse here as we want to keep the _oldest_ change for any particular key in
+        // a leaf, where `extend` will keep the newest if done naïvely.
+        for delta in self.history.deltas.iter().skip(self.version_ix).rev() {
+            if let Some(leaf_delta) = delta.leaves.get(index) {
+                leaf.extend(leaf_delta);
+            }
+        }
+
+        leaf
     }
 
-    /// Queries the value of a specific key in a leaf in the overlay, returning:
-    ///
-    /// - `None` if the version does not overlay that leaf in the current tree,
-    /// - `Some(None)` if the version does overlay that leaf but the compact leaf does not contain
-    ///   that value,
-    /// - and `Some(Some(v))` if the version does overlay the leaf and the key exists in that leaf.
+    /// Queries the value of a specific `key` in a leaf in the overlay, returning the value for that
+    /// `key` if it has been changed, and [`None`] otherwise.
     ///
     /// # Complexity
     ///
     /// The computational complexity of this method is linear in the number of versions due to the
     /// need to traverse to find the correct overlay value.
     #[must_use]
-    pub fn value(&self, key: &Word) -> Option<Option<&Word>> {
-        self.leaf_value(&LeafIndex::from(*key)).map(|leaf| leaf.get(key))
+    pub fn value(&self, key: &Word) -> Option<Word> {
+        self.leaf_delta(&LeafIndex::from(*key)).get(key).copied()
     }
 }
 

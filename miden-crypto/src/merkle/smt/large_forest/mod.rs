@@ -59,10 +59,11 @@ mod operation;
 mod property_tests;
 mod root;
 mod tests;
+mod utils;
 
 use core::iter::once;
 
-pub use backend::{Backend, BackendError};
+pub use backend::{Backend, BackendError, memory::InMemoryBackend};
 pub use error::{LargeSmtForestError, Result};
 pub use operation::{ForestOperation, SmtForestUpdateBatch, SmtUpdateBatch};
 pub use root::{RootInfo, TreeId, VersionId};
@@ -70,13 +71,14 @@ pub use root::{RootInfo, TreeId, VersionId};
 use crate::{
     Map, Set, Word,
     merkle::smt::{
-        SmtProof,
+        LeafIndex, SmtProof,
         large_forest::{
             history::History,
             root::{LineageId, RootValue, TreeEntry, TreeWithRoot, UniqueRoot},
         },
     },
 };
+
 // SPARSE MERKLE TREE FOREST
 // ================================================================================================
 
@@ -105,6 +107,9 @@ use crate::{
 #[allow(dead_code)] // Temporarily
 #[derive(Debug)]
 pub struct LargeSmtForest<B: Backend> {
+    /// The configuration for the forest's behaviour.
+    config: Config,
+
     /// The backend for storing the full trees that exist as part of the forest. It makes no
     /// guarantees as to where the tree data is stored, and **must not be exposed** in the API of
     /// the forest for correctness.
@@ -122,6 +127,8 @@ pub struct LargeSmtForest<B: Backend> {
     non_empty_histories: Set<LineageId>,
 }
 
+// TODO: Invariant docs for all methods.
+
 // CONSTRUCTION AND BASIC QUERIES
 // ================================================================================================
 
@@ -137,9 +144,10 @@ pub struct LargeSmtForest<B: Backend> {
 /// Where anything more specific can be said about performance, the method documentation will
 /// contain more detail.
 impl<B: Backend> LargeSmtForest<B> {
-    /// Constructs a new forest backed by the provided `backend`.
+    /// Constructs a new forest backed by the provided `backend` using the default [`Config`] for
+    /// the forest's behavior.
     ///
-    /// The constructor will treat whatever state is contained within the provided `backend` as the
+    /// This constructor will treat whatever state is contained within the provided `backend` as the
     /// starting state for the forest. This means that, if you pass a newly-initialized storage, the
     /// forest will start in an empty state. Similarly, if you pass a `backend` that already
     /// contains some data (loaded from disk, for example), then the forest will start in that state
@@ -149,8 +157,48 @@ impl<B: Backend> LargeSmtForest<B> {
     ///
     /// - [`LargeSmtForestError::Other`] if the forest cannot be started up correctly using the
     ///   provided `backend`.
-    pub fn new(_backend: B) -> Result<Self> {
-        todo!("LargeSmtForest::new")
+    pub fn new(backend: B) -> Result<Self> {
+        Self::with_config(backend, Config::default())
+    }
+
+    /// Constructs a new forest backed by the provided `backend` and configuring behavior using the
+    /// provided `config`.
+    ///
+    /// This constructor will treat whatever state is contained within the provided `backend` as the
+    /// starting state for the forest. This means that, if you pass a newly-initialized storage, the
+    /// forest will start in an empty state. Similarly, if you pass a `backend` that already
+    /// contains some data (loaded from disk, for example), then the forest will start in that state
+    /// instead.
+    ///
+    /// # Errors
+    ///
+    /// - [`LargeSmtForestError::Other`] if the forest cannot be started up correctly using the
+    ///   provided `backend`.
+    pub fn with_config(backend: B, config: Config) -> Result<Self> {
+        // The lineages at initialization time are whichever ones the backend knows about. To that
+        // end, we read from the backend and construct the starting state for each known lineage.
+        let lineage_data = backend
+            .trees()?
+            .map(|t| {
+                let data = LineageData {
+                    history: History::empty(config.max_historical_versions),
+                    latest_version: t.version(),
+                    latest_root: t.root(),
+                };
+                (t.lineage(), data)
+            })
+            .collect::<Map<LineageId, LineageData>>();
+
+        // As no backend is able to preserve history, we can unconditionally initialize the tracking
+        // for non-empty histories as empty.
+        let non_empty_histories = Set::default();
+
+        Ok(Self {
+            config,
+            backend,
+            lineage_data,
+            non_empty_histories,
+        })
     }
 }
 
@@ -198,18 +246,6 @@ impl<B: Backend> LargeSmtForest<B> {
         self.lineage_data.get(&lineage).map(|d| d.latest_root)
     }
 
-    /// Returns an iterator that yields the historical root values for trees within the specified
-    /// `lineage`, or [`None`] if the lineage is not known.
-    ///
-    /// The iteration order of the roots is guaranteed to move backward in time, with earlier items
-    /// being roots from versions closer to the present. It does _not_ include the latest root in
-    /// the specified `lineage`.
-    pub fn historical_roots(&self, lineage: LineageId) -> Option<impl Iterator<Item = RootValue>> {
-        // We skip the first element as this is always guaranteed to be the current root for the
-        // lineage.
-        self.lineage_roots(lineage).map(|i| i.skip(1))
-    }
-
     /// Returns the number of trees in the forest that have unique identity.
     ///
     /// This is **not** the number of unique tree lineages in the forest, as it includes all
@@ -231,6 +267,8 @@ impl<B: Backend> LargeSmtForest<B> {
         if let Some(d) = self.lineage_data.get(&root.lineage()) {
             if d.latest_version == root.version() {
                 RootInfo::LatestVersion(d.latest_root)
+            } else if root.version() > d.latest_version {
+                RootInfo::Missing
             } else {
                 match d.history.root_for_version(root.version()) {
                     Ok(r) => RootInfo::HistoricalVersion(r),
@@ -274,19 +312,54 @@ impl<B: Backend> LargeSmtForest<B> {
 /// Where anything more specific can be said about performance, the method documentation will
 /// contain more detail.
 impl<B: Backend> LargeSmtForest<B> {
-    /// Returns an opening for the specified `key` in the specified `tree`, or [`None`] if there is
-    /// no value corresponding to the provided `key` in that tree.
+    /// Returns an opening for the specified `key` in the specified `tree`.
     ///
     /// # Errors
     ///
+    /// - [`LargeSmtForestError::Fatal`] if the backend fails to operate properly during the query.
     /// - [`LargeSmtForestError::UnknownLineage`] If the provided `tree` specifies a lineage that is
     ///   not one known by the forest.
     /// - [`LargeSmtForestError::UnknownTree`] If the provided `tree` refers to a tree that is not a
     ///   member of the forest.
-    /// - [`LargeSmtForestError::MerkleError`] If there is insufficient data in the specified `tree`
-    ///   to provide an opening for `key`.
-    pub fn open(&self, _tree: TreeId, _key: Word) -> Result<Option<SmtProof>> {
-        todo!("LargeSmtForest::open")
+    /// - [`LargeSmtForestError::Merkle`] If there is insufficient data in the specified `tree` to
+    ///   provide an opening for `key`.
+    pub fn open(&self, tree: TreeId, key: Word) -> Result<SmtProof> {
+        // TODO: This needs to
+        //   1. Check that the tree corresponds to a known lineage.
+        //   2. Query the opening from the full tree in that lineage.
+        //   3. Modify the opening if there is an overlay.
+
+        // We want to return an error if the lineage is unknown.
+        let lineage_data = self
+            .lineage_data
+            .get(&tree.lineage())
+            .ok_or(LargeSmtForestError::UnknownLineage(tree.lineage()))?;
+
+        // We then check if the version exists in the forest. We do this before fetching the full
+        // tree as to do so otherwise would represent a possible denial-of-service vector.
+        if tree.version() == lineage_data.latest_version {
+            // In this case we can service the opening directly from the backend as the query is for
+            // the latest version of the tree.
+            self.backend.open(tree.lineage(), key).map_err(Into::into)
+        } else if let Ok(_view) = lineage_data.history.get_view_at(tree.version()) {
+            let opening = self
+                .backend
+                .open(tree.lineage(), key)
+                .map_err(Into::<LargeSmtForestError>::into)?;
+
+            // This `from` conversion is the canonical way to convert from a full key into a leaf
+            // index.
+            let _leaf_index = LeafIndex::from(key);
+
+            // TODO Use the history to "edit" it.
+
+            Ok(opening)
+        } else {
+            // In this case, either the version in `tree` is newer than the latest we know about, so
+            // we can't provide an opening, or it is not serviceable by the history. In either case,
+            // the specified tree is unknown to the forest.
+            Err(LargeSmtForestError::UnknownTree(tree))
+        }
     }
 
     /// Returns the value associated with the provided `key` in the specified `tree`, or [`None`] if
@@ -294,23 +367,48 @@ impl<B: Backend> LargeSmtForest<B> {
     ///
     /// # Errors
     ///
+    /// - [`LargeSmtForestError::Fatal`] if the backend fails to operate properly during the query.
     /// - [`LargeSmtForestError::UnknownLineage`] If the provided `tree` specifies a lineage that is
     ///   not one known by the forest.
     /// - [`LargeSmtForestError::UnknownTree`] If the provided `tree` refers to a tree that is not a
     ///   member of the forest.
-    pub fn get(&self, _root: TreeId, _key: Word) -> Result<Option<Word>> {
+    pub fn get(&self, _tree: TreeId, _key: Word) -> Result<Option<Word>> {
+        // TODO: This needs to
+        //   1. Check that the tree corresponds to a known lineage.
+        //   2. Find the overlay if one exists.
+        //   3. Query the overlay.
+        //   4. Fall back to open in the backend.
+
         todo!("LargeSmtForest::get")
     }
 
     /// Returns the number of populated entries in the specified `tree`.
     ///
+    /// # Performance
+    ///
+    /// Due to the way that tree data is stored, this method exhibits a split performance profile.
+    ///
+    /// - If querying for a `tree` that is the latest in its lineage, the time to return a result
+    ///   should be constant.
+    /// - If querying for a `tree` that is a historical version, the time to return a result will be
+    ///   linear in the number of entries in the tree. This is because an overlaid iterator has to
+    ///   be created to yield the correct entries for the historical version, and then queried for
+    ///   its length.
+    ///
     /// # Errors
     ///
+    /// - [`LargeSmtForestError::Fatal`] if the backend fails to operate properly during the query.
     /// - [`LargeSmtForestError::UnknownLineage`] If the provided `tree` specifies a lineage that is
     ///   not one known by the forest.
     /// - [`LargeSmtForestError::UnknownTree`] If the provided `tree` refers to a tree that is not a
     ///   member of the forest.
     pub fn entry_count(&self, _tree: TreeId) -> Result<usize> {
+        // TODO: This needs to
+        //   1. Check that the tree corresponds to a known lineage.
+        //   2. Check that the tree corresponds to an available version.
+        //   3. Fast path for the current tree in each lineage by calling into the backend.
+        //   4. If not, call `self.entries()?.count()` to yield the result.
+
         todo!("LargeSmtForest::entry_count")
     }
 
@@ -318,6 +416,7 @@ impl<B: Backend> LargeSmtForest<B> {
     ///
     /// # Errors
     ///
+    /// - [`LargeSmtForestError::Fatal`] if the backend fails to operate properly during the query.
     /// - [`LargeSmtForestError::UnknownLineage`] If the provided `tree` specifies a lineage that is
     ///   not one known by the forest.
     /// - [`LargeSmtForestError::UnknownTree`] If the provided `tree` refers to a tree that is not a
@@ -325,7 +424,37 @@ impl<B: Backend> LargeSmtForest<B> {
     pub fn entries<I: Iterator<Item = TreeEntry>>(&self, _tree: TreeId) -> Result<I> {
         // TODO Turn this signature back to an `impl Iterator<...>` once there is a body. `impl`
         //      generics are fussy alongside `todo!`s.
+        //
+        // TODO: This needs to
+        //   1. Check that the tree corresponds to a known lineage.
+        //   2. Check that the tree corresponds to an available version.
+        //   3. Call `self.entries_iterator()` to yield the actual iterator.
+
         todo!("LargeSmtForest::entries")
+    }
+
+    /// This internal function creates the iterator over entries for a given tree in the forest but
+    /// **does not** perform the check for the lineage existing.
+    ///
+    /// It exists to avoid redundant checks of the tree's existence, but as a result must have that
+    /// particular precondition checked beforehand.
+    ///
+    /// # Errors
+    ///
+    /// - [`LargeSmtForestError::Fatal`] if the backend fails to operate properly during the query.
+    #[allow(dead_code)] // Temporary
+    fn entries_iterator<I: Iterator<Item = TreeEntry>>(&self, _tree: TreeId) -> Result<I> {
+        // TODO this needs to construct an iterator that yields the _merger_ of entries from the
+        //   full tree and the overlays.
+        //
+        // - The complexity arises from the fact that the overlays can _remove_ items, not just
+        //   replace them.
+        // - This means that it is not sufficient to query the overlay for every entry in the
+        //   concrete tree's iterator, and instead has to rely on some merging and sorting logic.
+        // - Still, we may be able to get by without having to create our own iterator type for this
+        //   operation, which would be nice.
+
+        todo!("LargeSmtForest::entries_iterator")
     }
 }
 
@@ -345,6 +474,39 @@ impl<B: Backend> LargeSmtForest<B> {
 /// contain more detail.
 #[allow(dead_code)] // Temporarily
 impl<B: Backend> LargeSmtForest<B> {
+    /// Adds a new `lineage` to the tree, creating an empty tree and modifying it as specified by
+    /// `updates`, with the result taking the provided `new_version`.
+    ///
+    /// # Errors
+    ///
+    /// - [`LargeSmtForestError::DuplicateLineage`] if the provided `lineage` is the same as an
+    ///   already-known lineage.
+    /// - [`BackendError::Merkle`] if the provided `updates` cannot be applied to the empty tree.
+    pub fn add_lineage(
+        &mut self,
+        lineage: LineageId,
+        new_version: VersionId,
+        updates: SmtUpdateBatch,
+    ) -> Result<TreeWithRoot> {
+        // We can immediately add lineage in the backend, as by its contract it should return
+        // `DuplicateLineage` if the new lineage is a duplicate. We forward that, and any other
+        // errors as this is the correct behavior for conformant backends, relying on the conversion
+        // operations between `BackendError` and the forest's error type.
+        let tree_info = self.backend.add_lineage(lineage, new_version, updates)?;
+
+        // We then construct the lineage tracking data and shove it into the corresponding map. The
+        // history is guaranteed to be empty here, so we do not need to put an entry in the
+        // non-empty histories set.
+        let lineage_data = LineageData {
+            history: History::empty(self.config.max_historical_versions),
+            latest_version: tree_info.version(),
+            latest_root: tree_info.root(),
+        };
+        self.lineage_data.insert(lineage, lineage_data);
+
+        Ok(tree_info)
+    }
+
     /// Performs the provided `updates` on the latest tree in the specified `lineage`, adding a
     /// single new root to the forest (corresponding to `new_version`) for the entire batch, and
     /// returning the data for the new root of the tree.
@@ -354,15 +516,55 @@ impl<B: Backend> LargeSmtForest<B> {
     ///
     /// # Errors
     ///
+    /// - [`LargeSmtForestError::BadVersion`] if the `new_version` is older than the latest version
+    ///   for the provided `lineage`.
     /// - [`LargeSmtForestError::UnknownLineage`] If the provided `tree` specifies a lineage that is
     ///   not one known by the forest.
     pub fn update_tree(
         &mut self,
-        _lineage: LineageId,
-        _new_version: VersionId,
-        _updates: SmtUpdateBatch,
+        lineage: LineageId,
+        new_version: VersionId,
+        updates: SmtUpdateBatch,
     ) -> Result<TreeWithRoot> {
-        todo!("LargeSmtForest::modify_tree")
+        // TODO Ensure that no reallocation happens if no changes are actually made.
+
+        // We initially check that the lineage is known and that the version is greater than the
+        // last known version for that lineage.
+        let lineage_data = if let Some(lineage_data) = self.lineage_data.get_mut(&lineage) {
+            if lineage_data.latest_version < new_version {
+                lineage_data
+            } else {
+                return Err(LargeSmtForestError::BadVersion(
+                    new_version,
+                    lineage_data.latest_version,
+                ));
+            }
+        } else {
+            return Err(LargeSmtForestError::UnknownLineage(lineage));
+        };
+
+        // We now know that we have a valid lineage and a valid version, so we perform the update in
+        // the backend.
+        let reversion_set = self.backend.update_tree(lineage, new_version, updates)?;
+
+        // The new root of the latest tree is actually given by the **old root** in our reverse
+        // mutation set.
+        let updated_root = reversion_set.old_root;
+
+        // The mutation set that we get back is the set of changes to revert the tree changes, so we
+        // use these to create a new version in the history. The version here is the version we are
+        // moving _away_ from, and so we get it from the lineage data before we overwrite it with
+        // the new version.
+        lineage_data
+            .history
+            .add_version_from_mutation_set(lineage_data.latest_version, reversion_set)?;
+
+        // Now we just have to update the other portions of the lineage data in place...
+        lineage_data.latest_root = updated_root;
+        lineage_data.latest_version = new_version;
+
+        // ...and return the correct value.
+        Ok(TreeWithRoot::new(lineage, new_version, updated_root))
     }
 }
 
@@ -399,6 +601,41 @@ impl<B: Backend> LargeSmtForest<B> {
         _updates: SmtForestUpdateBatch,
     ) -> Result<Map<TreeId, TreeWithRoot>> {
         todo!("LargeSmtForest::modify_forest")
+    }
+}
+
+// TESTING FUNCTIONALITY
+// ================================================================================================
+
+/// This block contains functions that are exclusively for testing, providing some extra tools to
+/// inspect the internal state of the forest that should not be visible to users.
+#[cfg(test)]
+impl<B: Backend> LargeSmtForest<B> {
+    /// Gets an immutable reference to the underlying configuration object for the forest.
+    pub fn get_config(&self) -> &Config {
+        &self.config
+    }
+
+    /// Gets an immutable reference to the underlying backend of the forest.
+    pub fn get_backend(&self) -> &B {
+        &self.backend
+    }
+
+    /// Gets a mutable reference to the underlying backend of the forest.
+    pub fn get_backend_mut(&mut self) -> &mut B {
+        &mut self.backend
+    }
+
+    /// Gets the history container corresponding to the provided `lineage`.
+    ///
+    /// # Panics
+    ///
+    /// - If the `lineage` is not one that the tree knows about.
+    pub fn get_history(&self, lineage: LineageId) -> &History {
+        self.lineage_data
+            .get(&lineage)
+            .map(|d| &d.history)
+            .unwrap_or_else(|| panic!("Lineage {lineage} had no data"))
     }
 }
 
@@ -455,5 +692,43 @@ impl LineageData {
             self.history.truncate(version);
             false
         }
+    }
+}
+
+// FOREST CONFIG
+// ================================================================================================
+
+/// The configuration for the forest's behavior.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct Config {
+    /// The maximum number of historical versions that the forest will keep for any given lineage.
+    max_historical_versions: usize,
+}
+
+/// This impl block contains the builder functions for the configuration options.
+impl Config {
+    /// Sets the maximum number of historical versions that the forest will store for any given
+    /// lineage.
+    ///
+    /// This defaults to 10.
+    pub fn with_max_history_versions(mut self, max_historical_versions: usize) -> Self {
+        self.max_historical_versions = max_historical_versions;
+        self
+    }
+}
+
+/// This impl block contains the accessors for the configuration options.
+impl Config {
+    /// Gets the maximum number of historical versions that the forest will keep for any given
+    /// lineage.
+    pub fn max_history_versions(&self) -> usize {
+        self.max_historical_versions
+    }
+}
+
+impl Default for Config {
+    fn default() -> Self {
+        let max_historical_versions = 10;
+        Self { max_historical_versions }
     }
 }
