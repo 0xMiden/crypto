@@ -5,7 +5,7 @@
 
 use alloc::vec::Vec;
 
-use crate::{Map, Set, Word, merkle::smt::large_forest::root::LineageId};
+use crate::{EMPTY_WORD, Map, Set, Word, merkle::smt::large_forest::root::LineageId};
 
 // FOREST OPERATION
 // ================================================================================================
@@ -38,6 +38,15 @@ impl ForestOperation {
         match self {
             ForestOperation::Insert { key, .. } => *key,
             ForestOperation::Remove { key } => *key,
+        }
+    }
+}
+
+impl From<ForestOperation> for (Word, Word) {
+    fn from(value: ForestOperation) -> Self {
+        match value {
+            ForestOperation::Insert { key, value } => (key, value),
+            ForestOperation::Remove { key } => (key, EMPTY_WORD),
         }
     }
 }
@@ -98,6 +107,19 @@ impl SmtUpdateBatch {
             .collect::<Vec<_>>();
         ops.sort_by_key(|o| o.key());
         ops
+    }
+}
+
+impl IntoIterator for SmtUpdateBatch {
+    type Item = ForestOperation;
+    type IntoIter = alloc::vec::IntoIter<Self::Item>;
+
+    /// Consumes the batch as an iterator yielding operations while respecting the guarantees given
+    /// by [`Self::consume`].
+    ///
+    /// The iteration order is unspecified.
+    fn into_iter(self) -> Self::IntoIter {
+        self.consume().into_iter()
     }
 }
 
@@ -164,6 +186,19 @@ impl SmtForestUpdateBatch {
     /// sorted order and contain only the last operation in the batch for any given key.
     pub fn consume(self) -> Map<LineageId, Vec<ForestOperation>> {
         self.operations.into_iter().map(|(k, v)| (k, v.consume())).collect()
+    }
+}
+
+impl IntoIterator for SmtForestUpdateBatch {
+    type Item = (LineageId, Vec<ForestOperation>);
+    type IntoIter = crate::MapIntoIter<LineageId, Vec<ForestOperation>>;
+
+    /// Consumes the batch as an iterator yielding pairs of `(lineage, operations)` while respecting
+    /// the guarantees given by [`Self::consume`].
+    ///
+    /// The iteration order is unspecified.
+    fn into_iter(self) -> Self::IntoIter {
+        self.consume().into_iter()
     }
 }
 

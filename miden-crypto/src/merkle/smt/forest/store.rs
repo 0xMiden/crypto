@@ -1,7 +1,7 @@
 use alloc::vec::Vec;
 
 use crate::{
-    Map, Word,
+    EMPTY_WORD, Map, Word,
     hash::poseidon2::Poseidon2,
     merkle::{EmptySubtreeRoots, MerkleError, MerklePath, MerkleProof, NodeIndex, smt::SMT_DEPTH},
 };
@@ -247,7 +247,7 @@ impl SmtStore {
             store: &mut Map<Word, ForestInnerNode>,
             new_nodes: &mut Map<Word, ForestInnerNode>,
         ) {
-            if node == Word::empty() {
+            if node == EMPTY_WORD {
                 return;
             }
             if let Some(node) = store.get_mut(&node) {

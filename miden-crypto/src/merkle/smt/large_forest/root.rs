@@ -191,7 +191,7 @@ pub enum RootInfo {
 // ================================================================================================
 
 /// An entry in a given tree.
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd)]
 pub struct TreeEntry {
     pub key: Word,
     pub value: Word,
