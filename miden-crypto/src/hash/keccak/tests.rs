@@ -89,7 +89,7 @@ fn test_ethereum_test_vectors() {
 // HELPER FUNCTION AND STRUCT
 // ================================================================================================
 
-fn compute_expected_element_hash(elements: &[Felt]) -> [u8; DIGEST_BYTES] {
+fn compute_expected_element_hash(elements: &[Felt]) -> [u8; DIGEST256_BYTES] {
     let mut bytes = Vec::new();
     for element in elements.iter() {
         bytes.extend_from_slice(&element.as_canonical_u64().to_le_bytes());
