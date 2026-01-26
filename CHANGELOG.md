@@ -11,6 +11,8 @@
 
 - Fix: don't disable WAL during subtree construction in `LargeSmt`'s RocksDB backend ([#794](https://github.com/0xMiden/crypto/pull/794)).
 
+- [BREAKING] Migrate from RPO to Poseidon2 for AEAD, Falcon DSA, IES, and Merkle trees ([#793](https://github.com/0xMiden/crypto/pull/793)).
+
 ## 0.21.2 (2026-01-20)
 
 - Exported `BudgetedReader` to allow for defense-in-depth against deserialization panics ([#786](https://github.com/0xMiden/crypto/pull/786)).

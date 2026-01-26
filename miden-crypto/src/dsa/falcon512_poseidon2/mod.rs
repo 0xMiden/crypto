@@ -1,4 +1,4 @@
-//! A deterministic Poseidon2 Falcon512 signature over a message.
+//! A deterministic Falcon512 Poseidon2 signature over a message.
 //!
 //! This version differs from the reference implementation in its use of the Poseidon2 algebraic
 //! hash function in its hash-to-point algorithm.
@@ -84,7 +84,7 @@ const NONCE_VERSION_BYTE: u8 = 1;
 ///
 /// Note that reference [1] uses the term salt instead of nonce.
 const PREVERSIONED_NONCE: [u8; PREVERSIONED_NONCE_LEN] = [
-    9, 80, 79, 83, 69, 73, 68, 79, 78, 50, 45, 70, 65, 76, 67, 79, 78, 45, 68, 69, 84, 0, 0, 0, 0,
+    9, 70, 65, 76, 67, 79, 78, 45, 80, 79, 83, 69, 73, 68, 79, 78, 50, 45, 68, 69, 84, 0, 0, 0, 0,
     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
 ];
 
@@ -129,7 +129,7 @@ impl Nonce {
     ///
     /// 1. a byte serving as a version byte,
     /// 2. a pre-versioned fixed nonce which is the UTF8 encoding of the domain separator
-    ///    "Poseidon2-FALCON-DET" padded with enough zeros to make it of size 39 bytes.
+    ///    "FALCON-POSEIDON2-DET" padded with enough zeros to make it of size 39 bytes.
     ///
     /// The usefulness of the notion of versioned fixed nonce is discussed in Section 2.1 in [1].
     ///

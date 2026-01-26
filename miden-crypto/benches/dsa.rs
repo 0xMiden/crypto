@@ -1,7 +1,7 @@
 //! Comprehensive Digital Signature Algorithm (DSA) benchmarks
 //!
 //! This module benchmarks all DSA operations implemented in the library:
-//! - Poseidon2-Falcon512 (Falcon using Poseidon2 for hashing)
+//! - Falcon512-Poseidon2 (Falcon using Poseidon2 for hashing the message)
 //! - ECDSA over secp256k1 (using Keccak for hashing)
 //! - EdDSA (Ed25519 using SHA-512)
 //!

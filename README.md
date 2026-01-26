@@ -13,7 +13,7 @@ This crate contains cryptographic primitives used in Miden.
 [AEAD module](./miden-crypto/src/aead) provides authenticated encryption with associated data (AEAD) schemes. Currently, this includes:
 
 - [AEAD-Poseidon2](https://eprint.iacr.org/2023/1668): a scheme optimized for speed within SNARKs/STARKs. The design is based on the MonkeySpongeWrap construction and uses the Poseidon2 permutation, creating an encryption scheme that is highly efficient when executed within zero-knowledge proof systems.
-- [XChaCha20Poly1305](https://datatracker.ietf.org/doc/html/draft-irtf-cfrg-xchacha): Extended nonce variant of ChaCha20Poly1305 providing both confidentiality and authenticity. This implementation offers significant performance advantages, showing approximately 100x faster encryption/decryption compared to the arithmetization-friendly alternative based on the Poseidon2 permutation.
+- [XChaCha20Poly1305](https://datatracker.ietf.org/doc/html/draft-irtf-cfrg-xchacha): Extended nonce variant of ChaCha20Poly1305 providing both confidentiality and authenticity. This implementation offers significant performance advantages, showing approximately 25x faster encryption/decryption compared to the arithmetization-friendly alternative based on the Poseidon2 permutation.
 
 ## Hash
 
@@ -60,7 +60,7 @@ When the `rocksdb` feature is enabled, `LargeSmt` can persist the lower subtrees
 
 - `ECDSA k256`: Elliptic Curve Digital Signature Algorithm using the `k256` curve (also known as `secp256k1`) using `Keccak` to hash messages. This is a widely adopted signature scheme known for its compact key and signature sizes, making it efficient for storage and transmission.
 - `Ed25519`: Elliptic Curve Digital Signature Algorithm using the `Curve25519` elliptic curve with `SHA-512` to hash messages. This is a state-of-the-art signature scheme known for its exceptional performance, strong security guarantees, and resistance to implementation vulnerabilities, making it the preferred choice for modern cryptographic applications.
-- `Poseidon2 Falcon512`: a variant of the [Falcon](https://falcon-sign.info/) signature scheme. This variant differs from the standard in that instead of using SHAKE256 hash function in the _hash-to-point_ algorithm we use Poseidon2. This makes the signature more efficient to verify in Miden VM. Another point of difference is with respect to the signing process, which is deterministic in our case.
+- `Falcon512 Poseidon2`: a variant of the [Falcon](https://falcon-sign.info/) signature scheme. This variant differs from the standard in that instead of using SHAKE256 hash function in the _hash-to-point_ algorithm we use Poseidon2. This makes the signature more efficient to verify in Miden VM. Another point of difference is with respect to the signing process, which is deterministic in our case.
 
 For the above signatures, key generation, signing, and signature verification are available for both `std` and `no_std` contexts (see [crate features](#crate-features) below). However, in `no_std` context, the user is responsible for supplying the key generation and signing procedures with a random number generator.
 

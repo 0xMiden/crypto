@@ -71,11 +71,11 @@ fn test_signature_gen_reference_impl() {
         let expected_sig_bytes = EXPECTED_SIG[i];
         let hex_expected_sig_bytes = hex::decode(expected_sig_bytes).unwrap();
         // to compare against the test vectors we:
-        // 1. remove the headers when comparing as Poseidon2_FALCON512 uses a different header
+        // 1. remove the headers when comparing as FALCON512_Poseidon2 uses a different header
         //    format,
         // 2. compare the nonce part separately as the deterministic version we use omits the
         //    inclusion of the preversioned portion of the nonce by in its serialized format,
-        // 3. we remove the public key from the Poseidon2_FALCON512 signature as this is not part of
+        // 3. we remove the public key from the FALCON512_Poseidon2 signature as this is not part of
         //    the signature in the reference implementation,
         // 4. remove the nonce version byte, in addition to the header, from `sig_bytes`.
         let nonce = signature.nonce();
@@ -130,7 +130,7 @@ fn build_preversioned_fixed_nonce() -> [u8; PREVERSIONED_NONCE_LEN] {
 
     let mut result = [0_u8; 39];
     result[0] = LOG_N;
-    let domain_separator = "POSEIDON2-FALCON-DET".as_bytes();
+    let domain_separator = "FALCON-POSEIDON2-DET".as_bytes();
 
     result
         .iter_mut()
