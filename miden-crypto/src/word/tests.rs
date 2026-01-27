@@ -16,7 +16,7 @@ fn word_serialization() {
     let e3 = Felt::new(rand_value());
     let e4 = Felt::new(rand_value());
 
-    let d1 = Word([e1, e2, e3, e4]);
+    let d1 = Word::new([e1, e2, e3, e4]);
 
     let mut bytes = vec![];
     d1.write_into(&mut bytes);
@@ -31,7 +31,7 @@ fn word_serialization() {
 
 #[test]
 fn word_encoding() {
-    let word = Word([
+    let word = Word::new([
         Felt::new(rand_value()),
         Felt::new(rand_value()),
         Felt::new(rand_value()),
@@ -46,7 +46,7 @@ fn word_encoding() {
 
 #[test]
 fn test_conversions() {
-    let word = Word([
+    let word = Word::new([
         Felt::new(rand_value()),
         Felt::new(rand_value()),
         Felt::new(rand_value()),

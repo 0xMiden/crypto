@@ -1,6 +1,6 @@
 [workspace]
 exclude  = ["miden-crypto-fuzz"]
-members  = ["miden-crypto", "miden-crypto-derive", "miden-serde-utils"]
+members  = ["miden-crypto", "miden-crypto-derive", "miden-field", "miden-serde-utils"]
 resolver = "3"
 
 [workspace.package]

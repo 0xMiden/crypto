@@ -99,6 +99,7 @@ hashbrown                     = { features = ["serde"], optional = true, version
 hkdf                          = { default-features = false, version = "0.12" }
 k256                          = { features = ["ecdh", "ecdsa"], version = "0.13" }
 miden-crypto-derive.workspace = true
+miden-field                   = { path = "../miden-field" }
 miden-serde-utils.workspace   = true
 num                           = { default-features = false, features = ["alloc", "libm"], version = "0.4" }
 num-complex                   = { default-features = false, version = "0.4" }
