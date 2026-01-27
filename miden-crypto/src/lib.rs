@@ -19,7 +19,7 @@ pub mod word;
 
 // RE-EXPORTS
 // ================================================================================================
-pub use p3_goldilocks::Goldilocks as Felt;
+pub use miden_field::Felt;
 pub use word::{Word, WordError};
 
 pub mod field {
