@@ -2,6 +2,7 @@
 
 - Added `MmrPath::with_forest()` and `MmrProof::with_forest()` to adjust proofs for smaller forests ([#788](https://github.com/0xMiden/crypto/pull/788)).
 - Added const-generic `Digest<N>` struct for binary hash functions with `Digest256` and `Digest512` type aliases ([#777](https://github.com/0xMiden/crypto/pull/777)).
+- [BREAKING] Migrate from RPO to Poseidon2 for AEAD, Falcon DSA, IES, and Merkle trees ([#793](https://github.com/0xMiden/crypto/pull/793)).
 
 ## 0.21.4 (2026-01-22)
 
