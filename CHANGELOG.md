@@ -1,5 +1,6 @@
 ## 0.22.0 (TBD)
 
+- [BREAKING] `PartialMmr::open()` now returns `Option<MmrProof>` instead of `Option<MmrPath>` ([#787](https://github.com/0xMiden/crypto/pull/787)).
 - Added `MmrPath::with_forest()` and `MmrProof::with_forest()` to adjust proofs for smaller forests ([#788](https://github.com/0xMiden/crypto/pull/788)).
 - Added const-generic `Digest<N>` struct for binary hash functions with `Digest256` and `Digest512` type aliases ([#777](https://github.com/0xMiden/crypto/pull/777)).
 
@@ -14,8 +15,6 @@
 ## 0.21.2 (2026-01-20)
 
 - Exported `BudgetedReader` to allow for defense-in-depth against deserialization panics ([#786](https://github.com/0xMiden/crypto/pull/786)).
-
-- [BREAKING] `PartialMmr::open()` now returns `Option<MmrProof>` instead of `Option<MmrPath>` ([#787](https://github.com/0xMiden/crypto/pull/787)).
 
 ## 0.21.1 (2026-01-16)
 

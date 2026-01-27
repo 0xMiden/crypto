@@ -31,7 +31,7 @@ fn test_empty_partial_mmr() {
     assert_eq!(mmr.forest(), Forest::empty());
     assert_eq!(mmr.peaks(), MmrPeaks::default());
     assert!(mmr.nodes.is_empty());
-    assert!(!mmr.track_latest);
+    assert!(mmr.leaves.is_empty());
 }
 
 #[test]
