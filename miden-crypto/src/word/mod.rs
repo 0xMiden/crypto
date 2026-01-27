@@ -14,11 +14,8 @@ use thiserror::Error;
 const WORD_SIZE_FELT: usize = 4;
 const WORD_SIZE_BYTES: usize = 32;
 
-use p3_field::integers::QuotientMap;
-
 use super::{Felt, ZERO};
 use crate::{
-    field::{PrimeCharacteristicRing, PrimeField64},
     rand::Randomizable,
     utils::{
         ByteReader, ByteWriter, Deserializable, DeserializationError, HexParseError, Serializable,

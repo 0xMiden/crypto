@@ -1,12 +1,10 @@
 #![cfg(feature = "std")]
 use alloc::vec::Vec;
 
-use p3_field::PrimeField64;
-use p3_goldilocks::Goldilocks as Felt;
 use proptest::prelude::*;
 
 use super::*;
-use crate::rand::test_utils::rand_vector;
+use crate::{Felt, rand::test_utils::rand_vector};
 
 #[test]
 fn blake3_hash_elements() {

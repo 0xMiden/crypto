@@ -5,8 +5,6 @@ extern crate alloc;
 #[cfg(feature = "std")]
 extern crate std;
 
-use field::PrimeCharacteristicRing;
-
 pub mod aead;
 pub mod dsa;
 pub mod ecdh;
@@ -19,7 +17,7 @@ pub mod word;
 
 // RE-EXPORTS
 // ================================================================================================
-pub use p3_goldilocks::Goldilocks as Felt;
+pub use miden_field::Felt;
 pub use word::{Word, WordError};
 
 pub mod field {

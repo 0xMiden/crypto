@@ -3,8 +3,6 @@
 
 use alloc::vec::Vec;
 
-use p3_field::PrimeCharacteristicRing;
-
 use super::{CompactLeaf, History, LeafChanges, NodeChanges, error::Result};
 use crate::{
     Felt, Word,

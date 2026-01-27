@@ -1,7 +1,5 @@
 use core::cmp::Ordering;
 
-use p3_field::PrimeField64;
-
 use super::{ByteReader, ByteWriter, Deserializable, DeserializationError, Serializable};
 use crate::{Felt, WORD_SIZE, Word};
 
@@ -113,8 +111,6 @@ impl<T: Into<Word> + From<Word>> Deserializable for LexicographicWord<T> {
 
 #[cfg(test)]
 mod tests {
-    use p3_field::PrimeCharacteristicRing;
-
     use super::*;
 
     #[derive(Debug, Clone, Copy)]

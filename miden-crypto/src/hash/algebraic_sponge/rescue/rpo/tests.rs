@@ -14,7 +14,7 @@ const ALPHA: u64 = 7;
 const INV_ALPHA: u64 = 10540996611094048183;
 use crate::{
     ONE, Word, ZERO,
-    field::{PrimeCharacteristicRing, PrimeField64},
+    field::PrimeCharacteristicRing,
     hash::algebraic_sponge::{
         AlgebraicSponge, BINARY_CHUNK_SIZE, CAPACITY_RANGE, RATE_RANGE, RATE_WIDTH,
     },

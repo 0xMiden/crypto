@@ -1,7 +1,6 @@
 use alloc::collections::{BTreeMap, BTreeSet};
 
 use assert_matches::assert_matches;
-use p3_field::PrimeField64;
 use proptest::prelude::*;
 use rand::{Rng, SeedableRng};
 use rand_chacha::ChaCha20Rng;

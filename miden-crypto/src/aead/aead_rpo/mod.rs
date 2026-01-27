@@ -12,7 +12,6 @@ use core::ops::Range;
 
 use miden_crypto_derive::{SilentDebug, SilentDisplay};
 use num::Integer;
-use p3_field::{PrimeField64, RawDataSerializable};
 use rand::{
     Rng,
     distr::{Distribution, StandardUniform, Uniform},

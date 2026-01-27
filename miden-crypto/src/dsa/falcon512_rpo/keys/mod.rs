@@ -15,11 +15,12 @@ pub(crate) use secret_key::{WIDTH_BIG_POLY_COEFFICIENT, WIDTH_SMALL_POLY_COEFFIC
 
 #[cfg(test)]
 mod tests {
+    use p3_field::PrimeCharacteristicRing;
     use rand::SeedableRng;
     use rand_chacha::ChaCha20Rng;
 
     use crate::{
-        ONE, PrimeCharacteristicRing, Word,
+        ONE, Word,
         dsa::falcon512_rpo::SecretKey,
         utils::{Deserializable, Serializable},
     };

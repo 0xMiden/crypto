@@ -1,7 +1,6 @@
 #![cfg(feature = "std")]
 use alloc::{collections::BTreeSet, vec::Vec};
 
-use p3_field::PrimeField64;
 use proptest::prelude::*;
 
 use super::{Felt, Rpx256};

@@ -8,7 +8,6 @@ use core::{
 };
 
 use num::{One, Zero};
-use p3_field::PrimeCharacteristicRing;
 
 use super::{Inverse, field::FalconFelt};
 use crate::{

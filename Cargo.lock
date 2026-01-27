@@ -964,6 +964,7 @@ dependencies = [
  "itertools 0.14.0",
  "k256",
  "miden-crypto-derive",
+ "miden-field",
  "miden-serde-utils",
  "num",
  "num-complex",
@@ -1001,6 +1002,17 @@ version = "0.22.0"
 dependencies = [
  "quote",
  "syn",
+]
+
+[[package]]
+name = "miden-field"
+version = "0.22.0"
+dependencies = [
+ "miden-serde-utils",
+ "num-bigint",
+ "p3-field",
+ "p3-goldilocks",
+ "serde",
 ]
 
 [[package]]

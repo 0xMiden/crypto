@@ -1,8 +1,6 @@
 #![cfg(feature = "std")]
 use alloc::string::String;
 
-use p3_field::PrimeCharacteristicRing;
-
 use super::{Deserializable, Felt, Serializable, WORD_SIZE_BYTES, WORD_SIZE_FELT, Word};
 use crate::{rand::test_utils::rand_value, utils::SliceReader, word};
 

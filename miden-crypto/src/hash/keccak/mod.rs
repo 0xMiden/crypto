@@ -7,7 +7,6 @@ use super::{
     Felt, HasherExt,
     digest::{DIGEST256_BYTES, Digest256},
 };
-use crate::field::PrimeField64;
 
 #[cfg(test)]
 mod tests;

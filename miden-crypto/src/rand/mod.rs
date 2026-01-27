@@ -1,6 +1,5 @@
 //! Pseudo-random element generation.
 
-use p3_field::PrimeField64;
 use rand::RngCore;
 
 use crate::{Felt, Word};

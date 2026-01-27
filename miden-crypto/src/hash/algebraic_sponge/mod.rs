@@ -17,7 +17,7 @@ use core::ops::Range;
 use p3_field::PrimeCharacteristicRing;
 
 use super::{Felt, Word, ZERO};
-use crate::field::{BasedVectorSpace, PrimeField64};
+use crate::field::BasedVectorSpace;
 
 pub(crate) mod poseidon2;
 pub(crate) mod rescue;
