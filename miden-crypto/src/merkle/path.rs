@@ -4,7 +4,7 @@ use core::{
     ops::{Deref, DerefMut},
 };
 
-use super::{InnerNodeInfo, MerkleError, NodeIndex, Rpo256, Word};
+use super::{InnerNodeInfo, MerkleError, NodeIndex, Poseidon2, Word};
 use crate::utils::{ByteReader, ByteWriter, Deserializable, DeserializationError, Serializable};
 
 // MERKLE PATH
@@ -62,7 +62,7 @@ impl MerklePath {
             // compute the node and move to the next iteration.
             let input = index.build_node(node, sibling);
             index.move_up();
-            Rpo256::merge(&input)
+            Poseidon2::merge(&input)
         });
         Ok(root)
     }
@@ -188,7 +188,7 @@ impl Iterator for InnerNodeIterator<'_> {
                 (self.value, self.nodes[sibling_pos])
             };
 
-            self.value = Rpo256::merge(&[left, right]);
+            self.value = Poseidon2::merge(&[left, right]);
             self.index.move_up();
 
             Some(InnerNodeInfo { value: self.value, left, right })

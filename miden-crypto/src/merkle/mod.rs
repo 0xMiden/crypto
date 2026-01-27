@@ -1,6 +1,6 @@
-//! Data structures related to Merkle trees based on RPO256 hash function.
+//! Data structures related to Merkle trees based on Poseidon2 hash function.
 
-use super::{EMPTY_WORD, Felt, Word, hash::rpo::Rpo256};
+use super::{EMPTY_WORD, Felt, Word, hash::poseidon2::Poseidon2};
 
 // SUBMODULES
 // ================================================================================================

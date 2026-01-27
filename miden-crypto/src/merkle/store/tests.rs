@@ -9,8 +9,8 @@ use {
 };
 
 use super::{
-    EmptySubtreeRoots, MerkleError, MerklePath, MerkleStore, NodeIndex, PartialMerkleTree, Rpo256,
-    Word,
+    EmptySubtreeRoots, MerkleError, MerklePath, MerkleStore, NodeIndex, PartialMerkleTree,
+    Poseidon2, Word,
 };
 use crate::{
     Felt, ONE, WORD_SIZE, ZERO,
@@ -184,7 +184,7 @@ fn test_empty_roots() {
     let mut root = Word::default();
 
     for depth in 0..255 {
-        root = Rpo256::merge(&[root; 2]);
+        root = Poseidon2::merge(&[root; 2]);
         assert!(
             store.get_node(root, NodeIndex::make(0, 0)).is_ok(),
             "The root of the empty tree of depth {depth} must be registered"
@@ -543,9 +543,9 @@ fn wont_open_to_different_depth_root() {
     // Compute the root for a different depth. We cherry-pick this specific depth to prevent a
     // regression to a bug in the past that allowed the user to fetch a node at a depth lower than
     // the inserted path of a Merkle tree.
-    let mut root = Rpo256::merge(&[a, b]);
+    let mut root = Poseidon2::merge(&[a, b]);
     for depth in (1..=63).rev() {
-        root = Rpo256::merge(&[root, empty[depth]]);
+        root = Poseidon2::merge(&[root, empty[depth]]);
     }
 
     // For this example, the depth of the Merkle tree is 1, as we have only two leaves. Here we
@@ -569,15 +569,15 @@ fn store_path_opens_from_leaf() {
     let g = Word::new([Felt::new(7); 4]);
     let h = Word::new([Felt::new(8); 4]);
 
-    let i = Rpo256::merge(&[a, b]);
-    let j = Rpo256::merge(&[c, d]);
-    let k = Rpo256::merge(&[e, f]);
-    let l = Rpo256::merge(&[g, h]);
+    let i = Poseidon2::merge(&[a, b]);
+    let j = Poseidon2::merge(&[c, d]);
+    let k = Poseidon2::merge(&[e, f]);
+    let l = Poseidon2::merge(&[g, h]);
 
-    let m = Rpo256::merge(&[i, j]);
-    let n = Rpo256::merge(&[k, l]);
+    let m = Poseidon2::merge(&[i, j]);
+    let n = Poseidon2::merge(&[k, l]);
 
-    let root = Rpo256::merge(&[m, n]);
+    let root = Poseidon2::merge(&[m, n]);
 
     let mtree = MerkleTree::new(vec![a, b, c, d, e, f, g, h]).unwrap();
     let store = MerkleStore::from(&mtree);

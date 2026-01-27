@@ -2,7 +2,7 @@ use alloc::vec::Vec;
 
 use crate::{
     Map, Word,
-    hash::rpo::Rpo256,
+    hash::poseidon2::Poseidon2,
     merkle::{EmptySubtreeRoots, MerkleError, MerklePath, MerkleProof, NodeIndex, smt::SMT_DEPTH},
 };
 
@@ -18,7 +18,7 @@ struct ForestInnerNode {
 
 impl ForestInnerNode {
     pub fn hash(&self) -> Word {
-        Rpo256::merge(&[self.left, self.right])
+        Poseidon2::merge(&[self.left, self.right])
     }
 }
 

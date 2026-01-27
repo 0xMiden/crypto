@@ -1,7 +1,7 @@
-//! A deterministic RPO Falcon512 signature over a message.
+//! A deterministic Falcon512 Poseidon2 signature over a message.
 //!
-//! This version differs from the reference implementation in its use of the RPO algebraic hash
-//! function in its hash-to-point algorithm.
+//! This version differs from the reference implementation in its use of the Poseidon2 algebraic
+//! hash function in its hash-to-point algorithm.
 //!
 //! Another point of difference is the determinism in the signing process. The approach used to
 //! achieve this is the one proposed in [1].
@@ -33,7 +33,7 @@
 
 use crate::{
     Felt, ZERO,
-    hash::rpo::Rpo256,
+    hash::poseidon2::Poseidon2,
     utils::{ByteReader, ByteWriter, Deserializable, DeserializationError, Serializable},
 };
 
@@ -84,8 +84,8 @@ const NONCE_VERSION_BYTE: u8 = 1;
 ///
 /// Note that reference [1] uses the term salt instead of nonce.
 const PREVERSIONED_NONCE: [u8; PREVERSIONED_NONCE_LEN] = [
-    9, 82, 80, 79, 45, 70, 65, 76, 67, 79, 78, 45, 68, 69, 84, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    9, 70, 65, 76, 67, 79, 78, 45, 80, 79, 83, 69, 73, 68, 79, 78, 50, 45, 68, 69, 84, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
 ];
 
 /// Number of filed elements used to encode a nonce.
@@ -129,7 +129,7 @@ impl Nonce {
     ///
     /// 1. a byte serving as a version byte,
     /// 2. a pre-versioned fixed nonce which is the UTF8 encoding of the domain separator
-    ///    "RPO-FALCON-DET" padded with enough zeros to make it of size 39 bytes.
+    ///    "FALCON-POSEIDON2-DET" padded with enough zeros to make it of size 39 bytes.
     ///
     /// The usefulness of the notion of versioned fixed nonce is discussed in Section 2.1 in [1].
     ///

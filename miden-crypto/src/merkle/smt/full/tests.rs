@@ -6,7 +6,7 @@ use p3_field::PrimeCharacteristicRing;
 use super::{EMPTY_WORD, LeafIndex, NodeIndex, SMT_DEPTH, Smt, SmtLeaf};
 use crate::{
     Felt, ONE, WORD_SIZE, Word,
-    hash::rpo::Rpo256,
+    hash::poseidon2::Poseidon2,
     merkle::{
         EmptySubtreeRoots,
         smt::{
@@ -1068,7 +1068,7 @@ fn build_multiple_leaf_node(kv_pairs: &[(Word, Word)]) -> Word {
         })
         .collect();
 
-    Rpo256::hash_elements(&elements)
+    Poseidon2::hash_elements(&elements)
 }
 
 /// Applies mutations with and without reversion to the given SMT, comparing resulting SMTs,

@@ -2,8 +2,8 @@
 //!
 //! This module implements an AEAD scheme optimized for speed within SNARKs/STARKs.
 //! The design is described in \[1\] and is based on the MonkeySpongeWrap construction and uses
-//! the RPO (Rescue Prime Optimized) permutation, creating an encryption scheme that is highly
-//! efficient when executed within zero-knowledge proof systems.
+//! the Poseidon2 permutation, creating an encryption scheme that is highly efficient when executed
+//! within zero-knowledge proof systems.
 //!
 //! \[1\] <https://eprint.iacr.org/2023/1668>
 
@@ -22,7 +22,7 @@ use subtle::ConstantTimeEq;
 use crate::{
     Felt, ONE, Word, ZERO,
     aead::{AeadScheme, DataType, EncryptionError},
-    hash::rpo::Rpo256,
+    hash::poseidon2::Poseidon2,
     utils::{
         ByteReader, ByteWriter, Deserializable, DeserializationError, Serializable,
         bytes_to_elements_exact, bytes_to_elements_with_padding, elements_to_bytes,
@@ -53,30 +53,30 @@ pub const NONCE_SIZE_BYTES: usize = NONCE_SIZE * Felt::NUM_BYTES;
 pub const AUTH_TAG_SIZE: usize = 4;
 
 /// Size of the sponge state field elements
-const STATE_WIDTH: usize = Rpo256::STATE_WIDTH;
+const STATE_WIDTH: usize = Poseidon2::STATE_WIDTH;
 
 /// Capacity portion of the sponge state.
-const CAPACITY_RANGE: Range<usize> = Rpo256::CAPACITY_RANGE;
+const CAPACITY_RANGE: Range<usize> = Poseidon2::CAPACITY_RANGE;
 
 /// Rate portion of the sponge state
-const RATE_RANGE: Range<usize> = Rpo256::RATE_RANGE;
+const RATE_RANGE: Range<usize> = Poseidon2::RATE_RANGE;
 
 /// Size of the rate portion of the sponge state in field elements
 const RATE_WIDTH: usize = RATE_RANGE.end - RATE_RANGE.start;
 
 /// Size of either the 1st or 2nd half of the rate portion of the sponge state in field elements
-const HALF_RATE_WIDTH: usize = (Rpo256::RATE_RANGE.end - Rpo256::RATE_RANGE.start) / 2;
+const HALF_RATE_WIDTH: usize = (Poseidon2::RATE_RANGE.end - Poseidon2::RATE_RANGE.start) / 2;
 
 /// First half of the rate portion of the sponge state
 const RATE_RANGE_FIRST_HALF: Range<usize> =
-    Rpo256::RATE_RANGE.start..Rpo256::RATE_RANGE.start + HALF_RATE_WIDTH;
+    Poseidon2::RATE_RANGE.start..Poseidon2::RATE_RANGE.start + HALF_RATE_WIDTH;
 
 /// Second half of the rate portion of the sponge state
 const RATE_RANGE_SECOND_HALF: Range<usize> =
-    Rpo256::RATE_RANGE.start + HALF_RATE_WIDTH..Rpo256::RATE_RANGE.end;
+    Poseidon2::RATE_RANGE.start + HALF_RATE_WIDTH..Poseidon2::RATE_RANGE.end;
 
 /// Index of the first element of the rate portion of the sponge state
-const RATE_START: usize = Rpo256::RATE_RANGE.start;
+const RATE_START: usize = Poseidon2::RATE_RANGE.start;
 
 /// Padding block used when the length of the data to encrypt is a multiple of `RATE_WIDTH`
 const PADDING_BLOCK: [Felt; RATE_WIDTH] = [ONE, ZERO, ZERO, ZERO, ZERO, ZERO, ZERO, ZERO];
@@ -538,9 +538,9 @@ impl SpongeState {
         )
     }
 
-    /// Applies the RPO permutation to the sponge state
+    /// Applies the Poseidon2 permutation to the sponge state
     fn permute(&mut self) {
-        Rpo256::apply_permutation(&mut self.state);
+        Poseidon2::apply_permutation(&mut self.state);
     }
 
     /// Squeeze the rate portion of the state
@@ -740,10 +740,10 @@ fn unpad(mut plaintext: Vec<Felt>) -> Result<Vec<Felt>, EncryptionError> {
 // AEAD SCHEME IMPLEMENTATION
 // ================================================================================================
 
-/// RPO256-based AEAD scheme implementation
-pub struct AeadRpo;
+/// Poseidon2-based AEAD scheme implementation
+pub struct AeadPoseidon2;
 
-impl AeadScheme for AeadRpo {
+impl AeadScheme for AeadPoseidon2 {
     const KEY_SIZE: usize = SK_SIZE_BYTES;
 
     type Key = SecretKey;
