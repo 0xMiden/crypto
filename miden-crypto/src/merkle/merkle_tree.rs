@@ -1,7 +1,7 @@
 use alloc::{string::String, vec::Vec};
 use core::{fmt, slice};
 
-use super::{InnerNodeInfo, MerkleError, MerklePath, NodeIndex, Rpo256, Word};
+use super::{InnerNodeInfo, MerkleError, MerklePath, NodeIndex, Poseidon2, Word};
 use crate::utils::{uninit_vector, word_to_hex};
 
 // MERKLE TREE
@@ -50,7 +50,7 @@ impl MerkleTree {
 
         // calculate all internal tree nodes
         for i in (1..n).rev() {
-            nodes[i] = Rpo256::merge(&pairs[i]);
+            nodes[i] = Poseidon2::merge(&pairs[i]);
         }
 
         Ok(Self { nodes })
@@ -158,7 +158,7 @@ impl MerkleTree {
         for _ in 0..index.depth() {
             index.move_up();
             let pos = index.to_scalar_index() as usize;
-            let value = Rpo256::merge(&pairs[pos]);
+            let value = Poseidon2::merge(&pairs[pos]);
             self.nodes[pos] = value;
         }
 
@@ -416,9 +416,9 @@ mod tests {
     // --------------------------------------------------------------------------------------------
 
     fn compute_internal_nodes() -> (Word, Word, Word) {
-        let node2 = Rpo256::hash_elements(&[*LEAVES4[0], *LEAVES4[1]].concat());
-        let node3 = Rpo256::hash_elements(&[*LEAVES4[2], *LEAVES4[3]].concat());
-        let root = Rpo256::merge(&[node2, node3]);
+        let node2 = Poseidon2::hash_elements(&[*LEAVES4[0], *LEAVES4[1]].concat());
+        let node3 = Poseidon2::hash_elements(&[*LEAVES4[2], *LEAVES4[3]].concat());
+        let root = Poseidon2::merge(&[node2, node3]);
 
         (root, node2, node3)
     }

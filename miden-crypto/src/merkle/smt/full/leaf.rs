@@ -5,7 +5,7 @@ use super::EMPTY_WORD;
 use crate::{
     Felt, Word,
     field::PrimeField64,
-    hash::rpo::Rpo256,
+    hash::poseidon2::Poseidon2,
     merkle::smt::{LeafIndex, MAX_LEAF_ENTRIES, SMT_DEPTH, SmtLeafError},
     utils::{ByteReader, ByteWriter, Deserializable, DeserializationError, Serializable},
 };
@@ -156,10 +156,10 @@ impl SmtLeaf {
     pub fn hash(&self) -> Word {
         match self {
             SmtLeaf::Empty(_) => EMPTY_WORD,
-            SmtLeaf::Single((key, value)) => Rpo256::merge(&[*key, *value]),
+            SmtLeaf::Single((key, value)) => Poseidon2::merge(&[*key, *value]),
             SmtLeaf::Multiple(kvs) => {
                 let elements: Vec<Felt> = kvs.iter().copied().flat_map(kv_to_elements).collect();
-                Rpo256::hash_elements(&elements)
+                Poseidon2::hash_elements(&elements)
             },
         }
     }

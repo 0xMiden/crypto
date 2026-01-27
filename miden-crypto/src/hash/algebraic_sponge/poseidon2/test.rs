@@ -1,7 +1,7 @@
 use p3_symmetric::{CryptographicHasher, PseudoCompressionFunction};
 
 use super::*;
-use crate::hash::{algebraic_sponge::AlgebraicSponge, poseidon2::Poseidon2};
+use crate::hash::poseidon2::Poseidon2;
 
 #[test]
 fn permutation_test_vector() {
