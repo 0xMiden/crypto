@@ -455,7 +455,7 @@ impl PartialSmt {
         leaf_index: LeafIndex<SMT_DEPTH>,
         leaf_hash: Word,
     ) {
-        use crate::hash::rpo::Rpo256;
+        use crate::hash::poseidon2::Poseidon2;
 
         let mut index: NodeIndex = leaf_index.into();
         let mut node_hash = leaf_hash;
@@ -469,7 +469,7 @@ impl PartialSmt {
             } else {
                 (node_hash, right)
             };
-            node_hash = Rpo256::merge(&[left, right]);
+            node_hash = Poseidon2::merge(&[left, right]);
 
             // insert_inner_node handles removing empty subtree roots
             self.insert_inner_node(index, InnerNode { left, right });

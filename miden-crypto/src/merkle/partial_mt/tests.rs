@@ -304,7 +304,7 @@ fn leaves() {
     let value32 = mt.get_node(NODE32).unwrap();
     let value33 = mt.get_node(NODE33).unwrap();
 
-    let leaves = vec![
+    let leaves = [
         (NODE20, value20),
         (NODE22, value22),
         (NODE23, value23),
