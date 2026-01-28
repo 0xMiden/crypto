@@ -1,4 +1,6 @@
-## 0.22.0 (TBD)
+## 0.23.0 (TBD)
+
+## 0.22.0 (2026-01-27)
 
 - Added const-generic `Digest<N>` struct for binary hash functions with `Digest256` and `Digest512` type aliases ([#777](https://github.com/0xMiden/crypto/pull/777)).
 - [BREAKING] `PartialMmr::open()` now returns `Option<MmrProof>` instead of `Option<MmrPath>` ([#787](https://github.com/0xMiden/crypto/pull/787)).
