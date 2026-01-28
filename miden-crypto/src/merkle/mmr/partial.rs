@@ -18,7 +18,6 @@ use crate::{
 // ================================================================================================
 
 type NodeMap = BTreeMap<InOrderIndex, Word>;
-type LeafMap = BTreeMap<usize, Word>;
 
 // PARTIAL MERKLE MOUNTAIN RANGE
 // ================================================================================================
@@ -53,12 +52,11 @@ pub struct PartialMmr {
     /// leaves, starting from the peak with most children, to the one with least.
     pub(crate) peaks: Vec<Word>,
 
-    /// Authentication nodes used to construct merkle paths for a subset of the MMR's leaves.
+    /// Nodes used to construct merkle paths for a subset of the MMR's leaves.
     ///
-    /// This does not include the MMR's peaks nor the tracked nodes, only the elements required to
-    /// construct their authentication paths. This property is used to detect when elements can be
-    /// safely removed, because they are no longer required to authenticate any element in the
-    /// [PartialMmr].
+    /// This includes both:
+    /// - Tracked leaf values at their own in-order index
+    /// - Authentication nodes needed for the merkle paths
     ///
     /// The elements in the MMR are referenced using a in-order tree index. This indexing scheme
     /// permits for easy computation of the relative nodes (left/right children, sibling, parent),
@@ -66,11 +64,8 @@ pub struct PartialMmr {
     /// trees in the MMR can be represented without rewrites of the indexes.
     pub(crate) nodes: NodeMap,
 
-    /// The values of tracked leaves, keyed by their position in the MMR.
-    ///
-    /// This allows [PartialMmr::open()] to return a complete [MmrProof] containing both the
-    /// authentication path and the leaf value.
-    pub(crate) leaves: LeafMap,
+    /// Set of leaf positions that are being tracked.
+    pub(crate) tracked_leaves: BTreeSet<usize>,
 }
 
 impl Default for PartialMmr {
@@ -79,9 +74,9 @@ impl Default for PartialMmr {
         let forest = Forest::empty();
         let peaks = Vec::new();
         let nodes = BTreeMap::new();
-        let leaves = BTreeMap::new();
+        let tracked_leaves = BTreeSet::new();
 
-        Self { forest, peaks, nodes, leaves }
+        Self { forest, peaks, nodes, tracked_leaves }
     }
 }
 
@@ -94,21 +89,21 @@ impl PartialMmr {
         let forest = peaks.forest();
         let peaks = peaks.into();
         let nodes = BTreeMap::new();
-        let leaves = BTreeMap::new();
+        let tracked_leaves = BTreeSet::new();
 
-        Self { forest, peaks, nodes, leaves }
+        Self { forest, peaks, nodes, tracked_leaves }
     }
 
     /// Returns a new [PartialMmr] instantiated from the specified components.
     ///
-    /// This constructor does not check the consistency between peaks, nodes, and leaves. If the
-    /// specified components are inconsistent, the returned partial MMR may exhibit undefined
-    /// behavior.
-    pub fn from_parts(peaks: MmrPeaks, nodes: NodeMap, leaves: LeafMap) -> Self {
+    /// This constructor does not check the consistency between peaks, nodes, and tracked_leaves.
+    /// If the specified components are inconsistent, the returned partial MMR may exhibit
+    /// undefined behavior.
+    pub fn from_parts(peaks: MmrPeaks, nodes: NodeMap, tracked_leaves: BTreeSet<usize>) -> Self {
         let forest = peaks.forest();
         let peaks = peaks.into();
 
-        Self { forest, peaks, nodes, leaves }
+        Self { forest, peaks, nodes, tracked_leaves }
     }
 
     // PUBLIC ACCESSORS
@@ -137,21 +132,28 @@ impl PartialMmr {
     /// Returns true if this partial MMR tracks an authentication path for the leaf at the
     /// specified position.
     pub fn is_tracked(&self, pos: usize) -> bool {
-        self.leaves.contains_key(&pos)
+        self.tracked_leaves.contains(&pos)
     }
 
     /// Returns the leaf value at the specified position, or `None` if the leaf is not tracked.
     pub fn get(&self, pos: usize) -> Option<Word> {
-        self.leaves.get(&pos).copied()
+        if !self.tracked_leaves.contains(&pos) {
+            return None;
+        }
+        let leaf_idx = InOrderIndex::from_leaf_pos(pos);
+        self.nodes.get(&leaf_idx).copied()
     }
 
     /// Returns an iterator over the tracked leaves as (position, value) pairs.
     pub fn leaves(&self) -> impl Iterator<Item = (usize, Word)> + '_ {
-        self.leaves.iter().map(|(&pos, &leaf)| (pos, leaf))
+        self.tracked_leaves.iter().map(|&pos| {
+            let leaf_idx = InOrderIndex::from_leaf_pos(pos);
+            let leaf = *self.nodes.get(&leaf_idx).expect("tracked leaf must have value in nodes");
+            (pos, leaf)
+        })
     }
 
-    /// Given a leaf position, returns an [MmrProof] for the
-    /// specified leaf, or None if this partial MMR does not track the leaf.
+    /// Returns an [MmrProof] for the leaf at the specified position, or `None` if not tracked.
     ///
     /// Note: The leaf position is the 0-indexed number corresponding to the order the leaves were
     /// added, this corresponds to the MMR size _prior_ to adding the element. So the 1st element
@@ -165,28 +167,28 @@ impl PartialMmr {
             .forest
             .leaf_to_corresponding_tree(pos)
             .ok_or(MmrError::PositionNotFound(pos))?;
-        let depth = tree_bit as usize;
 
+        // Check if the leaf is tracked
+        if !self.tracked_leaves.contains(&pos) {
+            return Ok(None);
+        }
+
+        // Get the leaf value from nodes
+        let leaf_idx = InOrderIndex::from_leaf_pos(pos);
+        let leaf = *self.nodes.get(&leaf_idx).expect("tracked leaf must have value in nodes");
+
+        // Collect authentication path nodes
+        let depth = tree_bit as usize;
         let mut nodes = Vec::with_capacity(depth);
-        let mut idx = InOrderIndex::from_leaf_pos(pos);
+        let mut idx = leaf_idx;
 
         while let Some(node) = self.nodes.get(&idx.sibling()) {
             nodes.push(*node);
             idx = idx.parent();
         }
 
-        // If there are nodes then the path must be complete, otherwise it is a bug
-        debug_assert!(nodes.is_empty() || nodes.len() == depth);
-
-        if nodes.len() != depth {
-            // The requested `pos` is not being tracked.
-            return Ok(None);
-        }
-
-        // Get the leaf value - it should be present if the path is tracked
-        let Some(&leaf) = self.leaves.get(&pos) else {
-            return Ok(None);
-        };
+        // If the leaf is tracked, the path must be complete
+        debug_assert!(nodes.len() == depth);
 
         let path = MmrPath::new(self.forest, pos, MerklePath::new(nodes));
         Ok(Some(MmrProof::new(path, leaf)))
@@ -232,49 +234,58 @@ impl PartialMmr {
     /// When `track` is `true` the new leaf is tracked and its value is stored.
     pub fn add(&mut self, leaf: Word, track: bool) -> Vec<(InOrderIndex, Word)> {
         self.forest.append_leaf();
-        // We just incremented the forest, so this cannot panic.
-        let merges = self.forest.smallest_tree_height_unchecked();
-        let mut new_nodes = Vec::with_capacity(merges);
+        // The smallest tree height equals the number of merges because adding a leaf is like
+        // adding 1 in binary: each carry corresponds to a merge. For example, forest 3 (0b11)
+        // + 1 = 4 (0b100) requires 2 carries/merges to form a tree of height 2.
+        let num_merges = self.forest.smallest_tree_height_unchecked();
+        let mut new_nodes = Vec::with_capacity(num_merges + 1);
 
-        // Store the leaf value if tracking
+        // Store the leaf value at its own index if tracking
+        let leaf_pos = self.forest.num_leaves() - 1;
+        let leaf_idx = InOrderIndex::from_leaf_pos(leaf_pos);
         if track {
-            let leaf_pos = self.forest.num_leaves() - 1;
-            self.leaves.insert(leaf_pos, leaf);
+            self.tracked_leaves.insert(leaf_pos);
+            self.nodes.insert(leaf_idx, leaf);
+            new_nodes.push((leaf_idx, leaf));
         }
 
-        let peak = if merges == 0 {
+        let peak = if num_merges == 0 {
             leaf
         } else {
             let mut track_right = track;
-            // Check if the previous dangling leaf (now at position num_leaves - 2) was tracked.
-            // If merges > 0, there was a single-leaf tree that is now being merged.
+            // Check if the previous dangling leaf was tracked.
+            // If num_merges > 0, there was a single-leaf tree that is now being merged.
             let prev_last_pos = self.forest.num_leaves() - 2;
-            let mut track_left = self.leaves.contains_key(&prev_last_pos);
+            let mut track_left = self.tracked_leaves.contains(&prev_last_pos);
 
             let mut right = leaf;
             let mut right_idx = self.forest.rightmost_in_order_index();
 
-            for _ in 0..merges {
+            for _ in 0..num_merges {
                 let left = self.peaks.pop().expect("Missing peak");
                 let left_idx = right_idx.sibling();
 
                 if track_right {
                     let old = self.nodes.insert(left_idx, left);
-                    new_nodes.push((left_idx, left));
-
+                    // It's valid to insert if: nothing was there, or same value was there
+                    // (tracked leaf value can match auth node for its sibling)
                     debug_assert!(
-                        old.is_none(),
-                        "Idx {left_idx:?} already contained an element {old:?}",
+                        old.is_none() || old == Some(left),
+                        "Idx {left_idx:?} already contained a different element {old:?}",
                     );
+                    if old.is_none() {
+                        new_nodes.push((left_idx, left));
+                    }
                 };
                 if track_left {
                     let old = self.nodes.insert(right_idx, right);
-                    new_nodes.push((right_idx, right));
-
                     debug_assert!(
-                        old.is_none(),
-                        "Idx {right_idx:?} already contained an element {old:?}",
+                        old.is_none() || old == Some(right),
+                        "Idx {right_idx:?} already contained a different element {old:?}",
                     );
+                    if old.is_none() {
+                        new_nodes.push((right_idx, right));
+                    }
                 };
 
                 // Update state for the next iteration.
@@ -326,11 +337,14 @@ impl PartialMmr {
             return Err(MmrError::UnknownPeak(path.depth()));
         };
 
+        // Handle dangling leaf (single-leaf tree with empty path)
         if leaf_pos + 1 == self.forest.num_leaves()
             && path.depth() == 0
             && self.peaks.last().is_some_and(|v| *v == leaf)
         {
-            self.leaves.insert(leaf_pos, leaf);
+            self.tracked_leaves.insert(leaf_pos);
+            let leaf_idx = InOrderIndex::from_leaf_pos(leaf_pos);
+            self.nodes.insert(leaf_idx, leaf);
             return Ok(());
         }
 
@@ -351,13 +365,19 @@ impl PartialMmr {
             return Err(MmrError::PeakPathMismatch);
         }
 
-        let mut idx = InOrderIndex::from_leaf_pos(leaf_pos);
+        // Mark the leaf as tracked
+        self.tracked_leaves.insert(leaf_pos);
+
+        // Store the leaf value at its own index
+        let leaf_idx = InOrderIndex::from_leaf_pos(leaf_pos);
+        self.nodes.insert(leaf_idx, leaf);
+
+        // Store the authentication path nodes
+        let mut idx = leaf_idx;
         for node in path.nodes() {
             self.nodes.insert(idx.sibling(), *node);
             idx = idx.parent();
         }
-
-        self.leaves.insert(leaf_pos, leaf);
 
         Ok(())
     }
@@ -370,18 +390,38 @@ impl PartialMmr {
     ///
     /// Note: `leaf_pos` corresponds to the position in the MMR and not on an individual tree.
     pub fn untrack(&mut self, leaf_pos: usize) -> Vec<(InOrderIndex, Word)> {
+        // Remove from tracked leaves set
+        self.tracked_leaves.remove(&leaf_pos);
+
         let mut idx = InOrderIndex::from_leaf_pos(leaf_pos);
         let mut removed = Vec::new();
 
-        self.leaves.remove(&leaf_pos);
+        // Check if the sibling leaf is still tracked. If so, we need to keep our leaf value
+        // as an auth node for the sibling, and keep all auth nodes above.
+        let sibling_idx = idx.sibling();
+        let sibling_pos = sibling_idx.inner() / 2;
+        if self.tracked_leaves.contains(&sibling_pos) {
+            // Sibling is tracked, so don't remove anything - our leaf value and all auth
+            // nodes above are still needed for the sibling's proof.
+            return removed;
+        }
 
-        // `idx` represent the element that can be computed by the authentication path, because
-        // these elements can be computed they are not saved for the authentication of the current
-        // target. In other words, if the idx is present it was added for the authentication of
-        // another element, and no more elements should be removed otherwise it would remove that
-        // element's authentication data.
-        while let Some(word) = self.nodes.remove(&idx.sibling()) {
-            removed.push((idx.sibling(), word));
+        // Remove the leaf value itself
+        if let Some(word) = self.nodes.remove(&idx) {
+            removed.push((idx, word));
+        }
+
+        // Remove authentication path nodes that are no longer needed.
+        loop {
+            let sibling_idx = idx.sibling();
+
+            // Try to remove the sibling auth node
+            let Some(word) = self.nodes.remove(&sibling_idx) else {
+                break;
+            };
+            removed.push((sibling_idx, word));
+
+            // If `idx` is present, it was added for another element's authentication.
             if self.nodes.contains_key(&idx) {
                 break;
             }
@@ -411,20 +451,20 @@ impl PartialMmr {
             return Ok(inserted_nodes);
         }
 
-        // find the tree merges
+        // find the trees to merge (bitmask of existing trees that will be combined)
         let changes = self.forest ^ delta.forest;
         // `largest_tree_unchecked()` panics if `changes` is empty. `changes` cannot be empty
         // unless `self.forest == delta.forest`, which is guarded against above.
         let largest = changes.largest_tree_unchecked();
         // The largest tree itself also cannot be an empty forest, so this cannot panic either.
-        let merges = self.forest & largest.all_smaller_trees_unchecked();
+        let trees_to_merge = self.forest & largest.all_smaller_trees_unchecked();
 
         // count the number elements needed to produce largest from the current state
-        let (merge_count, new_peaks) = if !merges.is_empty() {
+        let (merge_count, new_peaks) = if !trees_to_merge.is_empty() {
             let depth = largest.smallest_tree_height_unchecked();
-            // `merges` also cannot be an empty forest, so this cannot panic either.
-            let skipped = merges.smallest_tree_height_unchecked();
-            let computed = merges.num_trees() - 1;
+            // `trees_to_merge` also cannot be an empty forest, so this cannot panic either.
+            let skipped = trees_to_merge.smallest_tree_height_unchecked();
+            let computed = trees_to_merge.num_trees() - 1;
             let merge_count = depth - skipped - computed;
 
             let new_peaks = delta.forest & largest.all_smaller_trees_unchecked();
@@ -442,7 +482,7 @@ impl PartialMmr {
         // keeps track of how many data elements from the update have been consumed
         let mut update_count = 0;
 
-        if !merges.is_empty() {
+        if !trees_to_merge.is_empty() {
             // starts at the smallest peak and follows the merged peaks
             let mut peak_idx = self.forest.root_in_order_index();
 
@@ -450,11 +490,12 @@ impl PartialMmr {
             self.peaks.reverse();
 
             // set to true when the data is needed for authentication paths updates
-            let mut track = merges.has_single_leaf_tree()
-                && self.leaves.contains_key(&(self.forest.num_leaves() - 1));
+            // Check if the dangling leaf (if any) was tracked
+            let mut track = trees_to_merge.has_single_leaf_tree()
+                && self.tracked_leaves.contains(&(self.forest.num_leaves() - 1));
 
             let mut peak_count = 0;
-            let mut target = merges.smallest_tree_unchecked();
+            let mut target = trees_to_merge.smallest_tree_unchecked();
             let mut new = delta.data[0];
             update_count += 1;
 
@@ -467,7 +508,7 @@ impl PartialMmr {
 
                 // update data only contains the nodes from the right subtrees, left nodes are
                 // either previously known peaks or computed values
-                let (left, right) = if !(target & merges).is_empty() {
+                let (left, right) = if !(target & trees_to_merge).is_empty() {
                     let peak = self.peaks[peak_count];
                     let sibling_idx = peak_idx.sibling();
 
@@ -501,13 +542,13 @@ impl PartialMmr {
                 target = target.next_larger_tree();
             }
 
-            debug_assert!(peak_count == merges.num_trees());
+            debug_assert!(peak_count == trees_to_merge.num_trees());
 
             // restore the peaks order
             self.peaks.reverse();
             // remove the merged peaks
             self.peaks.truncate(self.peaks.len() - peak_count);
-            // add the newly computed peak, the result of the merges
+            // add the newly computed peak, the result of the tree merges
             self.peaks.push(new);
         }
 
@@ -529,7 +570,9 @@ impl PartialMmr {
     /// index.
     fn is_tracked_node(&self, node_index: &InOrderIndex) -> bool {
         if node_index.is_leaf() {
-            self.nodes.contains_key(&node_index.sibling())
+            // For leaf nodes, check if the leaf is in the tracked set
+            let leaf_pos = node_index.inner() / 2;
+            self.tracked_leaves.contains(&leaf_pos)
         } else {
             let left_child = node_index.left_child();
             let right_child = node_index.right_child();
@@ -619,7 +662,9 @@ impl Serializable for PartialMmr {
         self.forest.num_leaves().write_into(target);
         self.peaks.write_into(target);
         self.nodes.write_into(target);
-        self.leaves.write_into(target);
+        // Serialize tracked_leaves as a Vec<usize>
+        let tracked: Vec<usize> = self.tracked_leaves.iter().copied().collect();
+        tracked.write_into(target);
     }
 }
 
@@ -630,9 +675,10 @@ impl Deserializable for PartialMmr {
         let forest = Forest::new(usize::read_from(source)?);
         let peaks = Vec::<Word>::read_from(source)?;
         let nodes = NodeMap::read_from(source)?;
-        let leaves = LeafMap::read_from(source)?;
+        let tracked: Vec<usize> = Vec::read_from(source)?;
+        let tracked_leaves: BTreeSet<usize> = tracked.into_iter().collect();
 
-        Ok(Self { forest, peaks, nodes, leaves })
+        Ok(Self { forest, peaks, nodes, tracked_leaves })
     }
 }
 
@@ -707,12 +753,8 @@ mod tests {
     }
 
     fn validate_apply_delta(mmr: &Mmr, partial: &mut PartialMmr) {
-        let tracked_leaves = partial
-            .nodes
-            .iter()
-            .filter(|&(index, _)| index.is_leaf())
-            .map(|(index, _)| index.sibling())
-            .collect::<Vec<_>>();
+        // Get tracked leaf positions
+        let tracked_positions: Vec<_> = partial.tracked_leaves.iter().copied().collect();
         let nodes_before = partial.nodes.clone();
 
         // compute and apply delta
@@ -732,8 +774,7 @@ mod tests {
         assert_eq!(expected_nodes, partial.nodes);
 
         // make sure tracked leaves open to the same proofs as in the underlying MMR
-        for index in tracked_leaves {
-            let pos = index.inner() / 2;
+        for pos in tracked_positions {
             let proof1 = partial.open(pos).unwrap().unwrap();
             let proof2 = mmr.open(pos).unwrap();
             assert_eq!(proof1, proof2);
@@ -988,7 +1029,7 @@ mod tests {
         // build the MMR
         let mmr: Mmr = LEAVES.into();
 
-        // track two sibling leaves
+        // track two sibling leaves (positions 0 and 1)
         let node0 = mmr.get(0).unwrap();
         let proof0 = mmr.open(0).unwrap();
 
@@ -1002,25 +1043,34 @@ mod tests {
         partial_mmr.track(0, node0, proof0.path().merkle_path()).unwrap();
         partial_mmr.track(1, node1, proof1.path().merkle_path()).unwrap();
 
-        // There are 3 unique authentication nodes stored:
-        // - leaf0's sibling (stored at leaf1's index)
-        // - leaf1's sibling (stored at leaf0's index)
-        // - the parent sibling (shared by both openings)
+        // There are 3 unique nodes stored in `nodes`:
+        // - nodes[idx0] = leaf0 (tracked leaf value, also serves as auth sibling for leaf1)
+        // - nodes[idx1] = leaf1 (tracked leaf value, also serves as auth sibling for leaf0)
+        // - nodes[parent_sibling] = shared higher-level auth node
+        //
+        // Note: Each tracked leaf's value is stored at its own InOrderIndex so that `open()`
+        // can return an MmrProof containing the leaf value. These values also double as the
+        // authentication siblings for their neighboring leaves.
         assert_eq!(partial_mmr.nodes().count(), 3);
 
         // untrack position 0:
-        // removes the node stored at leaf1's index (the sibling of leaf0),
-        // then stops because leaf0's index is still present (needed to authenticate leaf1).
+        // Even though pos 0 is no longer tracked, we cannot remove any nodes because:
+        // - leaf0's value (at idx0) is still needed as the auth sibling for leaf1's path
+        // - leaf1's value (at idx1) is needed for open(1) to return MmrProof
+        // - parent_sibling is still needed for leaf1's path
         let removed0 = partial_mmr.untrack(0);
-        assert_eq!(removed0.len(), 1);
-        assert_eq!(partial_mmr.nodes().count(), 2);
+        assert_eq!(removed0.len(), 0);
+        assert_eq!(partial_mmr.nodes().count(), 3);
         assert!(partial_mmr.is_tracked(1));
+        assert!(!partial_mmr.is_tracked(0));
 
         // untrack position 1:
-        // removes the node stored at leaf0's index (the sibling of leaf1) and the shared parent
-        // sibling.
+        // Now sibling (pos 0) is NOT tracked, so all nodes can be removed:
+        // - leaf1's value at idx1 (no longer needed for open())
+        // - leaf0's value at idx0 (no longer needed as auth sibling)
+        // - parent_sibling (no longer needed for any path)
         let removed1 = partial_mmr.untrack(1);
-        assert_eq!(removed1.len(), 2);
+        assert_eq!(removed1.len(), 3);
         assert_eq!(partial_mmr.nodes().count(), 0);
         assert!(!partial_mmr.is_tracked(1));
     }
