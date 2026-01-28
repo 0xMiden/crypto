@@ -26,3 +26,9 @@ debug            = 2
 debug-assertions = true
 inherits         = "release"
 overflow-checks  = true
+
+[patch.crates-io]
+p3-miden-air = { git = "https://github.com/0xMiden/p3-miden", branch = "al-updates" }
+p3-miden-prover = { git = "https://github.com/0xMiden/p3-miden", branch = "al-updates" }
+p3-miden-fri = { git = "https://github.com/0xMiden/p3-miden", branch = "al-updates" }
+p3-miden-uni-stark = { git = "https://github.com/0xMiden/p3-miden", branch = "al-updates" }
