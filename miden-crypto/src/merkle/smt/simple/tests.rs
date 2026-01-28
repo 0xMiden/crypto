@@ -8,7 +8,7 @@ use super::{
 };
 use crate::{
     EMPTY_WORD,
-    hash::rpo::Rpo256,
+    hash::poseidon2::Poseidon2,
     merkle::{
         EmptySubtreeRoots, InnerNodeInfo, MerklePath, MerkleTree, int_to_leaf, int_to_node,
         smt::{LeafIndex, SparseMerkleTree},
@@ -218,20 +218,20 @@ fn small_tree_opening_is_consistent() {
 
     let z = EMPTY_WORD;
 
-    let a = Rpo256::merge(&[z; 2]);
-    let b = Rpo256::merge(&[a; 2]);
-    let c = Rpo256::merge(&[b; 2]);
-    let d = Rpo256::merge(&[c; 2]);
+    let a = Poseidon2::merge(&[z; 2]);
+    let b = Poseidon2::merge(&[a; 2]);
+    let c = Poseidon2::merge(&[b; 2]);
+    let d = Poseidon2::merge(&[c; 2]);
 
-    let e = Rpo256::merge(&[a, b]);
-    let f = Rpo256::merge(&[z, z]);
-    let g = Rpo256::merge(&[c, z]);
-    let h = Rpo256::merge(&[z, d]);
+    let e = Poseidon2::merge(&[a, b]);
+    let f = Poseidon2::merge(&[z, z]);
+    let g = Poseidon2::merge(&[c, z]);
+    let h = Poseidon2::merge(&[z, d]);
 
-    let i = Rpo256::merge(&[e, f]);
-    let j = Rpo256::merge(&[g, h]);
+    let i = Poseidon2::merge(&[e, f]);
+    let j = Poseidon2::merge(&[g, h]);
 
-    let k = Rpo256::merge(&[i, j]);
+    let k = Poseidon2::merge(&[i, j]);
 
     let entries = vec![(0, a), (1, b), (4, c), (7, d)];
     let tree = SimpleSmt::<3>::with_leaves(entries).unwrap();
@@ -337,20 +337,20 @@ fn test_simplesmt_set_subtree() {
 
     let z = EMPTY_WORD;
 
-    let a = Rpo256::merge(&[z; 2]);
-    let b = Rpo256::merge(&[a; 2]);
-    let c = Rpo256::merge(&[b; 2]);
-    let d = Rpo256::merge(&[c; 2]);
+    let a = Poseidon2::merge(&[z; 2]);
+    let b = Poseidon2::merge(&[a; 2]);
+    let c = Poseidon2::merge(&[b; 2]);
+    let d = Poseidon2::merge(&[c; 2]);
 
-    let e = Rpo256::merge(&[a, b]);
-    let f = Rpo256::merge(&[z, z]);
-    let g = Rpo256::merge(&[c, z]);
-    let h = Rpo256::merge(&[z, d]);
+    let e = Poseidon2::merge(&[a, b]);
+    let f = Poseidon2::merge(&[z, z]);
+    let g = Poseidon2::merge(&[c, z]);
+    let h = Poseidon2::merge(&[z, d]);
 
-    let i = Rpo256::merge(&[e, f]);
-    let j = Rpo256::merge(&[g, h]);
+    let i = Poseidon2::merge(&[e, f]);
+    let j = Poseidon2::merge(&[g, h]);
 
-    let k = Rpo256::merge(&[i, j]);
+    let k = Poseidon2::merge(&[i, j]);
 
     // subtree:
     //   g
@@ -392,10 +392,10 @@ fn test_simplesmt_set_subtree_unchanged_for_wrong_index() {
 
     let z = EMPTY_WORD;
 
-    let a = Rpo256::merge(&[z; 2]);
-    let b = Rpo256::merge(&[a; 2]);
-    let c = Rpo256::merge(&[b; 2]);
-    let d = Rpo256::merge(&[c; 2]);
+    let a = Poseidon2::merge(&[z; 2]);
+    let b = Poseidon2::merge(&[a; 2]);
+    let c = Poseidon2::merge(&[b; 2]);
+    let d = Poseidon2::merge(&[c; 2]);
 
     // subtree:
     //   g
@@ -433,10 +433,10 @@ fn test_simplesmt_set_subtree_entire_tree() {
 
     let z = EMPTY_WORD;
 
-    let a = Rpo256::merge(&[z; 2]);
-    let b = Rpo256::merge(&[a; 2]);
-    let c = Rpo256::merge(&[b; 2]);
-    let d = Rpo256::merge(&[c; 2]);
+    let a = Poseidon2::merge(&[z; 2]);
+    let b = Poseidon2::merge(&[a; 2]);
+    let c = Poseidon2::merge(&[b; 2]);
+    let d = Poseidon2::merge(&[c; 2]);
 
     // subtree: E3
     const DEPTH: u8 = 3;
@@ -475,9 +475,9 @@ fn test_simplesmt_check_empty_root_constant() {
 // --------------------------------------------------------------------------------------------
 
 fn compute_internal_nodes() -> (Word, Word, Word) {
-    let node2 = Rpo256::merge(&[VALUES4[0], VALUES4[1]]);
-    let node3 = Rpo256::merge(&[VALUES4[2], VALUES4[3]]);
-    let root = Rpo256::merge(&[node2, node3]);
+    let node2 = Poseidon2::merge(&[VALUES4[0], VALUES4[1]]);
+    let node3 = Poseidon2::merge(&[VALUES4[2], VALUES4[3]]);
+    let root = Poseidon2::merge(&[node2, node3]);
 
     (root, node2, node3)
 }

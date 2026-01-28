@@ -5,7 +5,7 @@ use core::borrow::Borrow;
 
 use super::{
     EmptySubtreeRoots, InnerNodeInfo, MerkleError, MerklePath, MerkleProof, MerkleTree, NodeIndex,
-    PartialMerkleTree, RootPath, Rpo256, Word,
+    PartialMerkleTree, Poseidon2, RootPath, Word,
     mmr::Mmr,
     smt::{SimpleSmt, Smt},
 };
@@ -38,7 +38,7 @@ pub struct StoreNode {
 /// ```rust
 /// # use miden_crypto::{ZERO, Felt, Word};
 /// # use miden_crypto::merkle::{NodeIndex, MerkleTree, store::MerkleStore};
-/// # use miden_crypto::hash::rpo::Rpo256;
+/// # use miden_crypto::hash::poseidon2::Poseidon2;
 /// # use miden_crypto::field::PrimeCharacteristicRing;
 /// # const fn int_to_node(value: u64) -> Word {
 /// #     Word::new([Felt::new(value), ZERO, ZERO, ZERO])
@@ -424,7 +424,7 @@ impl MerkleStore {
             let left: Word = node.left;
             let right: Word = node.right;
 
-            debug_assert_eq!(Rpo256::merge(&[left, right]), value);
+            debug_assert_eq!(Poseidon2::merge(&[left, right]), value);
             self.nodes.insert(value, StoreNode { left, right });
 
             node.value
@@ -476,7 +476,7 @@ impl MerkleStore {
     ///
     /// Merges arbitrary values. They may be leaves, nodes, or a mixture of both.
     pub fn merge_roots(&mut self, left_root: Word, right_root: Word) -> Result<Word, MerkleError> {
-        let parent = Rpo256::merge(&[left_root, right_root]);
+        let parent = Poseidon2::merge(&[left_root, right_root]);
         self.nodes.insert(parent, StoreNode { left: left_root, right: right_root });
 
         Ok(parent)

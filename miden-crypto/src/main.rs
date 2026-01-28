@@ -5,7 +5,7 @@ use clap::{Parser, ValueEnum};
 use miden_crypto::merkle::smt::{RocksDbConfig, RocksDbStorage};
 use miden_crypto::{
     EMPTY_WORD, Felt, ONE, Word,
-    hash::rpo::Rpo256,
+    hash::poseidon2::Poseidon2,
     merkle::smt::{LargeSmt, LargeSmtError, MemoryStorage, SmtStorage},
     rand::test_utils::rand_value,
 };
@@ -126,7 +126,7 @@ pub fn insertion(tree: &mut LargeSmt<Storage>, insertions: usize) -> Result<(), 
     let mut insertion_times = Vec::new();
 
     for i in 0..insertions {
-        let test_key = Rpo256::hash(&rand_value::<u64>().to_be_bytes());
+        let test_key = Poseidon2::hash(&rand_value::<u64>().to_be_bytes());
         let test_value = Word::new([ONE, ONE, ONE, Felt::new((size + i) as u64)]);
 
         let now = Instant::now();
@@ -154,7 +154,7 @@ pub fn batched_insertion(
 
     let new_pairs: Vec<(Word, Word)> = (0..insertions)
         .map(|i| {
-            let key = Rpo256::hash(&rand_value::<u64>().to_be_bytes());
+            let key = Poseidon2::hash(&rand_value::<u64>().to_be_bytes());
             let value = Word::new([ONE, ONE, ONE, Felt::new((size + i) as u64)]);
             (key, value)
         })

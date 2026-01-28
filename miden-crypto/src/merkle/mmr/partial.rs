@@ -6,8 +6,9 @@ use alloc::{
 use super::{MmrDelta, MmrPath, MmrProof};
 use crate::{
     Word,
+    hash::poseidon2::Poseidon2,
     merkle::{
-        InnerNodeInfo, MerklePath, Rpo256,
+        InnerNodeInfo, MerklePath,
         mmr::{InOrderIndex, MmrError, MmrPeaks, forest::Forest},
     },
     utils::{ByteReader, ByteWriter, Deserializable, Serializable},
@@ -284,7 +285,7 @@ impl PartialMmr {
 
                 // Merge the current layer. The result is either the right element of the next
                 // merge, or a new peak.
-                right = Rpo256::merge(&[left, right]);
+                right = Poseidon2::merge(&[left, right]);
 
                 // This iteration merged the left and right nodes, the new value is always used as
                 // the next iteration's right node. Therefore the tracking flags of this iteration
@@ -496,7 +497,7 @@ impl PartialMmr {
                 }
 
                 peak_idx = peak_idx.parent();
-                new = Rpo256::merge(&[left, right]);
+                new = Poseidon2::merge(&[left, right]);
                 target = target.next_larger_tree();
             }
 
@@ -595,7 +596,7 @@ impl<I: Iterator<Item = (usize, Word)>> Iterator for InnerNodeIterator<'_, I> {
                 } else {
                     (*sibling, node)
                 };
-                let parent = Rpo256::merge(&[left, right]);
+                let parent = Poseidon2::merge(&[left, right]);
                 let inner_node = InnerNodeInfo { value: parent, left, right };
 
                 self.stack.push((parent_idx, parent));

@@ -15,7 +15,7 @@ use crate::{
     },
 };
 
-pub mod aead_rpo;
+pub mod aead_poseidon2;
 pub mod xchacha;
 
 /// Indicates whether encrypted data originated from field elements or raw bytes.
