@@ -31,7 +31,7 @@ fn test_empty_partial_mmr() {
     assert_eq!(mmr.forest(), Forest::empty());
     assert_eq!(mmr.peaks(), MmrPeaks::default());
     assert!(mmr.nodes.is_empty());
-    assert!(!mmr.track_latest);
+    assert!(mmr.tracked_leaves.is_empty());
 }
 
 #[test]
@@ -1033,10 +1033,12 @@ fn test_partial_mmr_simple() {
         .track(proof1.path().position(), el1, proof1.path().merkle_path())
         .unwrap();
 
-    // check the number of nodes increased by the number of nodes in the proof
-    assert_eq!(partial.nodes.len(), proof1.path().merkle_path().len());
-    // check the values match
+    // check the number of nodes: leaf value + authentication path nodes
+    assert_eq!(partial.nodes.len(), 1 + proof1.path().merkle_path().len());
+    // check the leaf value is stored
     let idx = InOrderIndex::from_leaf_pos(proof1.path().position());
+    assert_eq!(partial.nodes[&idx], el1);
+    // check the path values match
     assert_eq!(partial.nodes[&idx.sibling()], proof1.path().merkle_path()[0]);
     let idx = idx.parent();
     assert_eq!(partial.nodes[&idx.sibling()], proof1.path().merkle_path()[1]);
@@ -1047,10 +1049,14 @@ fn test_partial_mmr_simple() {
         .track(proof2.path().position(), el2, proof2.path().merkle_path())
         .unwrap();
 
-    // check the number of nodes increased by a single element (the one that is not shared)
+    // After tracking pos 1: we add leaf1 at its index, but its sibling (pos 0's sibling)
+    // was already stored as an auth node. So we only add: leaf1 value.
+    // Total: leaf0, leaf1 (=sibling of leaf0), shared path node = 3 unique indices
     assert_eq!(partial.nodes.len(), 3);
-    // check the values match
+    // check the leaf value is stored
     let idx = InOrderIndex::from_leaf_pos(proof2.path().position());
+    assert_eq!(partial.nodes[&idx], el2);
+    // check the path values match
     assert_eq!(partial.nodes[&idx.sibling()], proof2.path().merkle_path()[0]);
     let idx = idx.parent();
     assert_eq!(partial.nodes[&idx.sibling()], proof2.path().merkle_path()[1]);
