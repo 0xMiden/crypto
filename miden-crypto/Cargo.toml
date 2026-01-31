@@ -72,7 +72,6 @@ required-features = ["std"]
 [features]
 concurrent = [
   "dep:rayon",
-  "hashbrown?/rayon",
   "p3-maybe-rayon/parallel",
   "p3-miden-prover/parallel",
   "p3-util/parallel",
@@ -81,11 +80,10 @@ concurrent = [
 default = ["concurrent", "std"]
 executable = ["concurrent", "dep:clap", "dep:rand-utils"]
 fuzzing = []
-hashmaps = ["dep:hashbrown"]
 internal = ["concurrent"]
 rocksdb = ["concurrent", "dep:rocksdb"]
 serde = ["dep:serde", "serde?/alloc"]
-std = ["blake3/std", "dep:cc", "miden-serde-utils/std", "rand/std", "rand/thread_rng"]
+std = ["blake3/std", "dep:cc", "miden-serde-utils/std", "rand/std", "rand/thread_rng", "serde?/std"]
 testing = ["dep:proptest"]
 
 [dependencies]
@@ -95,7 +93,6 @@ clap                          = { features = ["derive"], optional = true, versio
 curve25519-dalek              = { default-features = false, version = "4" }
 ed25519-dalek                 = { features = ["zeroize"], version = "2" }
 flume                         = { version = "0.11.1" }
-hashbrown                     = { features = ["serde"], optional = true, version = "0.16" }
 hkdf                          = { default-features = false, version = "0.12" }
 k256                          = { features = ["ecdh", "ecdsa"], version = "0.13" }
 miden-crypto-derive.workspace = true
