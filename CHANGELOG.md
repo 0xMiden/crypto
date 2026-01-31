@@ -1,5 +1,7 @@
 ## 0.23.0 (TBD)
 
+- Refactored BLAKE3 to use `Digest<N>` struct, added `Digest192` type alias, deprecated `Blake3Digest` ([#811](https://github.com/0xMiden/crypto/pull/811)).
+
 ## 0.22.0 (2026-01-27)
 
 - Added const-generic `Digest<N>` struct for binary hash functions with `Digest256` and `Digest512` type aliases ([#777](https://github.com/0xMiden/crypto/pull/777)).
