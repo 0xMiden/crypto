@@ -1,5 +1,6 @@
 ## 0.23.0 (TBD)
 
+- [BREAKING] Removed `hashbrown` dependency and `hashmaps` feature; `Map`/`Set` type aliases are now tied to the `std` feature ([#813](https://github.com/0xMiden/crypto/pull/813)).
 
 ## 0.22.2 (2026-02-01)
 
