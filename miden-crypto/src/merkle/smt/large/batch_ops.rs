@@ -115,7 +115,7 @@ impl<S: SmtStorage> LargeSmt<S> {
         // Collect the unique leaf indices
         let mut leaf_indices: Vec<u64> = sorted_kv_pairs
             .iter()
-            .map(|(key, _)| Self::key_to_leaf_index(key).value())
+            .map(|(key, _)| Self::key_to_leaf_index(key).position())
             .collect();
         leaf_indices.dedup();
         leaf_indices.par_sort_unstable();
@@ -149,7 +149,7 @@ impl<S: SmtStorage> LargeSmt<S> {
 
         let accumulator = process_sorted_pairs_to_leaves(pairs, |leaf_pairs| {
             let leaf_index = LeafIndex::<SMT_DEPTH>::from(leaf_pairs[0].0);
-            let old_leaf_opt = leaf_map.get(&leaf_index.value()).and_then(|opt| opt.as_ref());
+            let old_leaf_opt = leaf_map.get(&leaf_index.position()).and_then(|opt| opt.as_ref());
             let old_entry_count = old_leaf_opt.map(|leaf| leaf.entries().len()).unwrap_or(0);
 
             let mut leaf = old_leaf_opt
@@ -265,7 +265,7 @@ impl<S: SmtStorage> LargeSmt<S> {
 
                 // Add the parent node even if it is empty for proper upward updates
                 next_leaves.push(SubtreeLeaf {
-                    col: parent_index.value(),
+                    col: parent_index.position(),
                     hash: combined_hash,
                 });
 
@@ -345,7 +345,7 @@ impl<S: SmtStorage> LargeSmt<S> {
     {
         // Sort key-value pairs by leaf index
         let mut sorted_kv_pairs: Vec<_> = kv_pairs.into_iter().collect();
-        sorted_kv_pairs.par_sort_by_key(|(key, _)| Self::key_to_leaf_index(key).value());
+        sorted_kv_pairs.par_sort_by_key(|(key, _)| Self::key_to_leaf_index(key).position());
 
         // Load leaves from storage
         let (_leaf_indices, leaf_map) = self.load_leaves_for_pairs(&sorted_kv_pairs)?;
@@ -509,12 +509,13 @@ impl<S: SmtStorage> LargeSmt<S> {
 
         // Collect and sort key-value pairs by their corresponding leaf index
         let mut sorted_kv_pairs: Vec<_> = new_pairs.iter().map(|(k, v)| (*k, *v)).collect();
-        sorted_kv_pairs.par_sort_by_key(|(key, _)| LargeSmt::<S>::key_to_leaf_index(key).value());
+        sorted_kv_pairs
+            .par_sort_by_key(|(key, _)| LargeSmt::<S>::key_to_leaf_index(key).position());
 
         // Collect the unique leaf indices
         let mut leaf_indices: Vec<u64> = sorted_kv_pairs
             .iter()
-            .map(|(key, _)| LargeSmt::<S>::key_to_leaf_index(key).value())
+            .map(|(key, _)| LargeSmt::<S>::key_to_leaf_index(key).position())
             .collect();
         leaf_indices.par_sort_unstable();
         leaf_indices.dedup();
@@ -599,7 +600,7 @@ impl<S: SmtStorage> LargeSmt<S> {
         let mut entry_count_delta = 0isize;
 
         for (key, value) in new_pairs {
-            let idx = LargeSmt::<S>::key_to_leaf_index(&key).value();
+            let idx = LargeSmt::<S>::key_to_leaf_index(&key).position();
             let entry = leaf_map.entry(idx).or_insert(None);
 
             // New value is empty, handle deletion
@@ -686,7 +687,7 @@ impl<S: SmtStorage> LargeSmt<S> {
         // Collect and sort key-value pairs by their corresponding leaf index
         let mut sorted_kv_pairs: Vec<_> = kv_pairs.into_iter().collect();
         sorted_kv_pairs
-            .par_sort_unstable_by_key(|(key, _)| LargeSmt::<S>::key_to_leaf_index(key).value());
+            .par_sort_unstable_by_key(|(key, _)| LargeSmt::<S>::key_to_leaf_index(key).position());
 
         // Load leaves from storage using helper
         let (_leaf_indices, leaf_map) = self.load_leaves_for_pairs(&sorted_kv_pairs)?;
@@ -835,7 +836,7 @@ impl<S: SmtStorage> LargeSmt<S> {
             .new_pairs
             .keys()
             .map(|key| {
-                let leaf_idx = LargeSmt::<S>::key_to_leaf_index(key).value();
+                let leaf_idx = LargeSmt::<S>::key_to_leaf_index(key).position();
                 let old_value = prepared
                     .leaf_map
                     .get(&leaf_idx)

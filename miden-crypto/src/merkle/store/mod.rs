@@ -466,7 +466,7 @@ impl MerkleStore {
 
         // performs the update only if the node value differs from the opening
         if node != value {
-            root = self.add_merkle_path(index.value(), node, path.clone())?;
+            root = self.add_merkle_path(index.position(), node, path.clone())?;
         }
 
         Ok(RootPath { root, path })

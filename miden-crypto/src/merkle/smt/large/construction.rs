@@ -229,7 +229,7 @@ impl<S: SmtStorage> LargeSmt<S> {
     fn build_subtrees(&mut self, mut entries: Vec<(Word, Word)>) -> Result<(), MerkleError> {
         entries.par_sort_unstable_by_key(|item| {
             let index = Self::key_to_leaf_index(&item.0);
-            index.value()
+            index.position()
         });
         self.build_subtrees_from_sorted_entries(entries)?;
         Ok(())
