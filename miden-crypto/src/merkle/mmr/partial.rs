@@ -96,10 +96,65 @@ impl PartialMmr {
 
     /// Returns a new [PartialMmr] instantiated from the specified components.
     ///
+    /// This constructor validates the consistency between peaks, nodes, and tracked_leaves:
+    /// - All tracked leaf positions must be within forest bounds.
+    /// - All tracked leaves must have their values in the nodes map.
+    /// - All node indices must be valid leaf or internal node positions within the forest.
+    ///
+    /// # Errors
+    /// Returns an error if the components are inconsistent.
+    pub fn from_parts(
+        peaks: MmrPeaks,
+        nodes: NodeMap,
+        tracked_leaves: BTreeSet<usize>,
+    ) -> Result<Self, MmrError> {
+        let forest = peaks.forest();
+        let num_leaves = forest.num_leaves();
+
+        // Validate that all tracked leaf positions are within forest bounds and have values
+        for &pos in &tracked_leaves {
+            if pos >= num_leaves {
+                return Err(MmrError::InconsistentPartialMmr(format!(
+                    "tracked leaf position {} is out of bounds (forest has {} leaves)",
+                    pos, num_leaves
+                )));
+            }
+            let leaf_idx = InOrderIndex::from_leaf_pos(pos);
+            if !nodes.contains_key(&leaf_idx) {
+                return Err(MmrError::InconsistentPartialMmr(format!(
+                    "tracked leaf at position {} has no value in nodes",
+                    pos
+                )));
+            }
+        }
+
+        // Validate that all node indices are within forest bounds
+        for idx in nodes.keys() {
+            if idx.is_leaf() {
+                let leaf_pos = idx.inner() / 2;
+                if leaf_pos >= num_leaves {
+                    return Err(MmrError::InconsistentPartialMmr(format!(
+                        "node index corresponds to leaf position {} but forest only has {} leaves",
+                        leaf_pos, num_leaves
+                    )));
+                }
+            }
+        }
+
+        let peaks = peaks.into();
+        Ok(Self { forest, peaks, nodes, tracked_leaves })
+    }
+
+    /// Returns a new [PartialMmr] instantiated from the specified components without validation.
+    ///
+    /// # Safety
     /// This constructor does not check the consistency between peaks, nodes, and tracked_leaves.
     /// If the specified components are inconsistent, the returned partial MMR may exhibit
     /// undefined behavior.
-    pub fn from_parts(peaks: MmrPeaks, nodes: NodeMap, tracked_leaves: BTreeSet<usize>) -> Self {
+    ///
+    /// Use this method only when you are certain the components are valid, for example when
+    /// constructing from trusted sources or for performance-critical code paths.
+    pub fn from_parts_unchecked(peaks: MmrPeaks, nodes: NodeMap, tracked_leaves: BTreeSet<usize>) -> Self {
         let forest = peaks.forest();
         let peaks = peaks.into();
 
@@ -659,13 +714,22 @@ impl Deserializable for PartialMmr {
     fn read_from<R: ByteReader>(
         source: &mut R,
     ) -> Result<Self, crate::utils::DeserializationError> {
+        use crate::utils::DeserializationError;
+
         let forest = Forest::new(usize::read_from(source)?);
-        let peaks = Vec::<Word>::read_from(source)?;
+        let peaks_vec = Vec::<Word>::read_from(source)?;
         let nodes = NodeMap::read_from(source)?;
         let tracked: Vec<usize> = Vec::read_from(source)?;
         let tracked_leaves: BTreeSet<usize> = tracked.into_iter().collect();
 
-        Ok(Self { forest, peaks, nodes, tracked_leaves })
+        // Construct MmrPeaks to validate forest/peaks consistency
+        let peaks = MmrPeaks::new(forest, peaks_vec).map_err(|e| {
+            DeserializationError::InvalidValue(format!("invalid partial mmr peaks: {}", e))
+        })?;
+
+        // Use validating constructor
+        Self::from_parts(peaks, nodes, tracked_leaves)
+            .map_err(|e| DeserializationError::InvalidValue(format!("invalid partial mmr: {}", e)))
     }
 }
 
@@ -1140,5 +1204,69 @@ mod tests {
         // It should now be tracked and open to the same proof as the full MMR.
         assert!(partial_mmr.is_tracked(0));
         assert_eq!(partial_mmr.open(0).unwrap().unwrap(), proof0);
+    }
+
+    #[test]
+    fn test_from_parts_validation() {
+        use alloc::collections::BTreeMap;
+
+        // Build a valid MMR with 7 leaves
+        let mmr: Mmr = LEAVES.into();
+        let peaks = mmr.peaks();
+
+        // Valid case: empty nodes and empty tracked_leaves
+        let result = PartialMmr::from_parts(peaks.clone(), BTreeMap::new(), BTreeSet::new());
+        assert!(result.is_ok());
+
+        // Invalid case: tracked leaf position out of bounds
+        let mut out_of_bounds = BTreeSet::new();
+        out_of_bounds.insert(100);
+        let result = PartialMmr::from_parts(peaks.clone(), BTreeMap::new(), out_of_bounds);
+        assert!(result.is_err());
+
+        // Invalid case: tracked leaf has no value in nodes
+        let mut tracked_no_value = BTreeSet::new();
+        tracked_no_value.insert(0);
+        let result =
+            PartialMmr::from_parts(peaks.clone(), BTreeMap::new(), tracked_no_value);
+        assert!(result.is_err());
+
+        // Valid case: tracked leaf with its value in nodes
+        let mut nodes_with_leaf = BTreeMap::new();
+        let leaf_idx = super::InOrderIndex::from_leaf_pos(0);
+        nodes_with_leaf.insert(leaf_idx, int_to_node(0));
+        let mut tracked_valid = BTreeSet::new();
+        tracked_valid.insert(0);
+        let result =
+            PartialMmr::from_parts(peaks.clone(), nodes_with_leaf, tracked_valid);
+        assert!(result.is_ok());
+
+        // Invalid case: node index out of bounds (leaf position beyond forest)
+        let mut invalid_nodes = BTreeMap::new();
+        let invalid_idx = super::InOrderIndex::from_leaf_pos(100); // way out of bounds
+        invalid_nodes.insert(invalid_idx, int_to_node(0));
+        let result = PartialMmr::from_parts(peaks.clone(), invalid_nodes, BTreeSet::new());
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_from_parts_unchecked() {
+        use alloc::collections::BTreeMap;
+
+        // Build a valid MMR
+        let mmr: Mmr = LEAVES.into();
+        let peaks = mmr.peaks();
+
+        // from_parts_unchecked should not validate and always succeed
+        let partial =
+            PartialMmr::from_parts_unchecked(peaks.clone(), BTreeMap::new(), BTreeSet::new());
+        assert_eq!(partial.forest(), peaks.forest());
+
+        // Even invalid combinations should work (no validation)
+        let mut invalid_tracked = BTreeSet::new();
+        invalid_tracked.insert(999);
+        let partial =
+            PartialMmr::from_parts_unchecked(peaks.clone(), BTreeMap::new(), invalid_tracked);
+        assert!(partial.tracked_leaves.contains(&999));
     }
 }
