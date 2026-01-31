@@ -182,7 +182,7 @@ impl Iterator for InnerNodeIterator<'_> {
     fn next(&mut self) -> Option<Self::Item> {
         if !self.index.is_root() {
             let sibling_pos = self.nodes.len() - self.index.depth() as usize;
-            let (left, right) = if self.index.is_value_odd() {
+            let (left, right) = if self.index.is_position_odd() {
                 (self.nodes[sibling_pos], self.value)
             } else {
                 (self.value, self.nodes[sibling_pos])

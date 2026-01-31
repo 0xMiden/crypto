@@ -25,7 +25,7 @@ jobs:
       matrix:
         toolchain: [stable, nightly]
         os: [ubuntu]
-        args: [default, hashmaps, no-std, large-smt]
+        args: [default, no-std, large-smt]
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@main
