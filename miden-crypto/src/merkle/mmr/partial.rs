@@ -101,9 +101,56 @@ impl PartialMmr {
 
     /// Returns a new [PartialMmr] instantiated from the specified components.
     ///
+    /// This constructor validates the consistency between peaks, nodes, and track_latest:
+    /// - The forest (derived from peaks) must have a consistent number of peaks.
+    /// - If `track_latest` is true, the forest must have an odd number of leaves.
+    /// - All nodes must have valid indices within the forest bounds.
+    ///
+    /// # Errors
+    /// Returns an error if the components are inconsistent.
+    pub fn from_parts(
+        peaks: MmrPeaks,
+        nodes: NodeMap,
+        track_latest: bool,
+    ) -> Result<Self, MmrError> {
+        let forest = peaks.forest();
+
+        // Validate track_latest: can only be true if forest has an odd element (single leaf tree)
+        if track_latest && !forest.has_single_leaf_tree() {
+            return Err(MmrError::InconsistentPartialMmr(
+                "track_latest is true but forest has no single leaf tree".into(),
+            ));
+        }
+
+        // Validate that all node indices are within forest bounds
+        let num_leaves = forest.num_leaves();
+        for idx in nodes.keys() {
+            // Check if the leaf position derived from this index is valid
+            if idx.is_leaf() {
+                // For leaves: idx = (leaf_pos + 1) * 2 - 1, so leaf_pos = idx / 2
+                let leaf_pos = idx.inner() / 2;
+                if leaf_pos >= num_leaves {
+                    return Err(MmrError::InconsistentPartialMmr(format!(
+                        "node index corresponds to leaf position {} but forest only has {} leaves",
+                        leaf_pos, num_leaves
+                    )));
+                }
+            }
+        }
+
+        let peaks = peaks.into();
+        Ok(Self { forest, peaks, nodes, track_latest })
+    }
+
+    /// Returns a new [PartialMmr] instantiated from the specified components without validation.
+    ///
+    /// # Safety
     /// This constructor does not check the consistency between peaks and nodes. If the specified
-    /// peaks are nodes are inconsistent, the returned partial MMR may exhibit undefined behavior.
-    pub fn from_parts(peaks: MmrPeaks, nodes: NodeMap, track_latest: bool) -> Self {
+    /// peaks and nodes are inconsistent, the returned partial MMR may exhibit undefined behavior.
+    ///
+    /// Use this method only when you are certain the components are valid, for example when
+    /// constructing from trusted sources or for performance-critical code paths.
+    pub fn from_parts_unchecked(peaks: MmrPeaks, nodes: NodeMap, track_latest: bool) -> Self {
         let forest = peaks.forest();
         let peaks = peaks.into();
 
@@ -614,12 +661,21 @@ impl Deserializable for PartialMmr {
     fn read_from<R: ByteReader>(
         source: &mut R,
     ) -> Result<Self, crate::utils::DeserializationError> {
+        use crate::utils::DeserializationError;
+
         let forest = Forest::new(usize::read_from(source)?);
-        let peaks = Vec::<Word>::read_from(source)?;
+        let peaks_vec = Vec::<Word>::read_from(source)?;
         let nodes = NodeMap::read_from(source)?;
         let track_latest = source.read_bool()?;
 
-        Ok(Self { forest, peaks, nodes, track_latest })
+        // Construct MmrPeaks to validate forest/peaks consistency
+        let peaks = MmrPeaks::new(forest, peaks_vec).map_err(|e| {
+            DeserializationError::InvalidValue(format!("invalid partial mmr peaks: {}", e))
+        })?;
+
+        // Use validating constructor
+        Self::from_parts(peaks, nodes, track_latest)
+            .map_err(|e| DeserializationError::InvalidValue(format!("invalid partial mmr: {}", e)))
     }
 }
 
@@ -983,5 +1039,58 @@ mod tests {
         assert_eq!(removed1.len(), 2);
         assert_eq!(partial_mmr.nodes().count(), 0);
         assert!(!partial_mmr.is_tracked(1));
+    }
+
+    #[test]
+    fn test_from_parts_validation() {
+        use alloc::collections::BTreeMap;
+
+        // Build a valid MMR with 7 leaves (has single leaf tree: 0b111)
+        let mmr: Mmr = LEAVES.into();
+        let peaks = mmr.peaks();
+
+        // Valid case: empty nodes and track_latest = false
+        let result = PartialMmr::from_parts(peaks.clone(), BTreeMap::new(), false);
+        assert!(result.is_ok());
+
+        // Valid case: 7 leaves has a single leaf tree (0b111 & 1 = 1), so track_latest = true is ok
+        let result = PartialMmr::from_parts(peaks.clone(), BTreeMap::new(), true);
+        assert!(result.is_ok());
+
+        // Build an MMR with 8 leaves (no single leaf tree: 0b1000)
+        let mmr_even: Mmr = Mmr::from((0..8).map(int_to_node));
+        let peaks_even = mmr_even.peaks();
+
+        // Invalid case: track_latest = true but forest has no single leaf tree
+        let result = PartialMmr::from_parts(peaks_even.clone(), BTreeMap::new(), true);
+        assert!(result.is_err());
+
+        // Valid case: track_latest = false with even leaves
+        let result = PartialMmr::from_parts(peaks_even.clone(), BTreeMap::new(), false);
+        assert!(result.is_ok());
+
+        // Invalid case: node index out of bounds
+        let mut invalid_nodes = BTreeMap::new();
+        let invalid_idx = super::InOrderIndex::from_leaf_pos(100); // way out of bounds
+        invalid_nodes.insert(invalid_idx, int_to_node(0));
+        let result = PartialMmr::from_parts(peaks.clone(), invalid_nodes, false);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_from_parts_unchecked() {
+        use alloc::collections::BTreeMap;
+
+        // Build a valid MMR
+        let mmr: Mmr = LEAVES.into();
+        let peaks = mmr.peaks();
+
+        // from_parts_unchecked should not validate and always succeed
+        let partial = PartialMmr::from_parts_unchecked(peaks.clone(), BTreeMap::new(), false);
+        assert_eq!(partial.forest(), peaks.forest());
+
+        // Even invalid combinations should work (no validation)
+        let partial = PartialMmr::from_parts_unchecked(peaks.clone(), BTreeMap::new(), true);
+        assert!(partial.track_latest);
     }
 }
