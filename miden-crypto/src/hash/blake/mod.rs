@@ -1,102 +1,22 @@
-use alloc::string::String;
-use core::{mem::size_of, ops::Deref, slice};
+use core::mem::size_of;
 
 use p3_field::{BasedVectorSpace, PrimeField64};
 use p3_goldilocks::Goldilocks as Felt;
 
-use super::HasherExt;
-use crate::utils::{
-    ByteReader, ByteWriter, Deserializable, DeserializationError, HexParseError, Serializable,
-    bytes_to_hex_string, hex_to_bytes,
+use super::{
+    HasherExt,
+    digest::{Digest, Digest192, Digest256},
 };
 
 #[cfg(test)]
 mod tests;
 
-// CONSTANTS
+// TYPE ALIASES
 // ================================================================================================
 
-const DIGEST32_BYTES: usize = 32;
-const DIGEST24_BYTES: usize = 24;
-
-// BLAKE3 N-BIT OUTPUT
-// ================================================================================================
-
-/// N-bytes output of a blake3 function.
-///
-/// Note: `N` can't be greater than `32` because [`Blake3Digest::as_bytes`] currently supports only
-/// 32 bytes.
-#[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd)]
-#[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
-#[cfg_attr(feature = "serde", serde(into = "String", try_from = "&str"))]
-#[repr(transparent)]
-pub struct Blake3Digest<const N: usize>([u8; N]);
-
-impl<const N: usize> Blake3Digest<N> {
-    pub fn as_bytes(&self) -> [u8; 32] {
-        // compile-time assertion
-        assert!(N <= 32, "digest currently supports only 32 bytes!");
-        expand_bytes(&self.0)
-    }
-
-    pub fn digests_as_bytes(digests: &[Blake3Digest<N>]) -> &[u8] {
-        let p = digests.as_ptr();
-        let len = digests.len() * N;
-        unsafe { slice::from_raw_parts(p as *const u8, len) }
-    }
-}
-
-impl<const N: usize> Default for Blake3Digest<N> {
-    fn default() -> Self {
-        Self([0; N])
-    }
-}
-
-impl<const N: usize> Deref for Blake3Digest<N> {
-    type Target = [u8];
-
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-
-impl<const N: usize> From<Blake3Digest<N>> for [u8; N] {
-    fn from(value: Blake3Digest<N>) -> Self {
-        value.0
-    }
-}
-
-impl<const N: usize> From<[u8; N]> for Blake3Digest<N> {
-    fn from(value: [u8; N]) -> Self {
-        Self(value)
-    }
-}
-
-impl<const N: usize> From<Blake3Digest<N>> for String {
-    fn from(value: Blake3Digest<N>) -> Self {
-        bytes_to_hex_string(value.as_bytes())
-    }
-}
-
-impl<const N: usize> TryFrom<&str> for Blake3Digest<N> {
-    type Error = HexParseError;
-
-    fn try_from(value: &str) -> Result<Self, Self::Error> {
-        hex_to_bytes(value).map(|v| v.into())
-    }
-}
-
-impl<const N: usize> Serializable for Blake3Digest<N> {
-    fn write_into<W: ByteWriter>(&self, target: &mut W) {
-        target.write_bytes(&self.0);
-    }
-}
-
-impl<const N: usize> Deserializable for Blake3Digest<N> {
-    fn read_from<R: ByteReader>(source: &mut R) -> Result<Self, DeserializationError> {
-        source.read_array().map(Self)
-    }
-}
+/// Alias for backward compatibility. Use [`Digest`] directly for new code.
+#[deprecated(since = "0.23.0", note = "use `Digest<N>` instead")]
+pub type Blake3Digest<const N: usize> = Digest<N>;
 
 // BLAKE3 256-BIT OUTPUT
 // ================================================================================================
@@ -106,14 +26,14 @@ impl<const N: usize> Deserializable for Blake3Digest<N> {
 pub struct Blake3_256;
 
 impl HasherExt for Blake3_256 {
-    type Digest = Blake3Digest<32>;
+    type Digest = Digest256;
 
     fn hash_iter<'a>(slices: impl Iterator<Item = &'a [u8]>) -> Self::Digest {
         let mut hasher = blake3::Hasher::new();
         for slice in slices {
             hasher.update(slice);
         }
-        Blake3Digest(hasher.finalize().into())
+        Digest::new(hasher.finalize().into())
     }
 }
 
@@ -121,37 +41,37 @@ impl Blake3_256 {
     /// Blake3 collision resistance is 128-bits for 32-bytes output.
     pub const COLLISION_RESISTANCE: u32 = 128;
 
-    pub fn hash(bytes: &[u8]) -> Blake3Digest<32> {
-        Blake3Digest(blake3::hash(bytes).into())
+    pub fn hash(bytes: &[u8]) -> Digest256 {
+        Digest::new(blake3::hash(bytes).into())
     }
 
     // Note: merge/merge_many/merge_with_int methods were previously trait delegations
     // (<Self as Hasher>::merge). They're now direct implementations as part of removing
     // the Winterfell Hasher trait dependency. These are public API used in benchmarks.
-    pub fn merge(values: &[Blake3Digest<32>; 2]) -> Blake3Digest<32> {
-        Self::hash(Blake3Digest::digests_as_bytes(values))
+    pub fn merge(values: &[Digest256; 2]) -> Digest256 {
+        Self::hash(Digest::digests_as_bytes(values))
     }
 
-    pub fn merge_many(values: &[Blake3Digest<32>]) -> Blake3Digest<32> {
-        Blake3Digest(blake3::hash(Blake3Digest::digests_as_bytes(values)).into())
+    pub fn merge_many(values: &[Digest256]) -> Digest256 {
+        Digest::new(blake3::hash(Digest::digests_as_bytes(values)).into())
     }
 
-    pub fn merge_with_int(seed: Blake3Digest<32>, value: u64) -> Blake3Digest<32> {
+    pub fn merge_with_int(seed: Digest256, value: u64) -> Digest256 {
         let mut hasher = blake3::Hasher::new();
-        hasher.update(&seed.0);
+        hasher.update(seed.as_bytes());
         hasher.update(&value.to_le_bytes());
-        Blake3Digest(hasher.finalize().into())
+        Digest::new(hasher.finalize().into())
     }
 
     /// Returns a hash of the provided field elements.
     #[inline(always)]
-    pub fn hash_elements<E: BasedVectorSpace<Felt>>(elements: &[E]) -> Blake3Digest<32> {
-        Blake3Digest(hash_elements(elements))
+    pub fn hash_elements<E: BasedVectorSpace<Felt>>(elements: &[E]) -> Digest256 {
+        Digest::new(hash_elements(elements))
     }
 
     /// Hashes an iterator of byte slices.
     #[inline(always)]
-    pub fn hash_iter<'a>(slices: impl Iterator<Item = &'a [u8]>) -> Blake3Digest<DIGEST32_BYTES> {
+    pub fn hash_iter<'a>(slices: impl Iterator<Item = &'a [u8]>) -> Digest256 {
         <Self as HasherExt>::hash_iter(slices)
     }
 }
@@ -164,14 +84,14 @@ impl Blake3_256 {
 pub struct Blake3_192;
 
 impl HasherExt for Blake3_192 {
-    type Digest = Blake3Digest<24>;
+    type Digest = Digest192;
 
     fn hash_iter<'a>(slices: impl Iterator<Item = &'a [u8]>) -> Self::Digest {
         let mut hasher = blake3::Hasher::new();
         for slice in slices {
             hasher.update(slice);
         }
-        Blake3Digest(shrink_array(hasher.finalize().into()))
+        Digest::new(shrink_array(hasher.finalize().into()))
     }
 }
 
@@ -179,36 +99,36 @@ impl Blake3_192 {
     /// Blake3 collision resistance is 96-bits for 24-bytes output.
     pub const COLLISION_RESISTANCE: u32 = 96;
 
-    pub fn hash(bytes: &[u8]) -> Blake3Digest<24> {
-        Blake3Digest(shrink_array(blake3::hash(bytes).into()))
+    pub fn hash(bytes: &[u8]) -> Digest192 {
+        Digest::new(shrink_array(blake3::hash(bytes).into()))
     }
 
     // Note: Same as Blake3_256 - these methods replaced trait delegations to remove Winterfell.
-    pub fn merge_many(values: &[Blake3Digest<24>]) -> Blake3Digest<24> {
-        let bytes = Blake3Digest::digests_as_bytes(values);
-        Blake3Digest(shrink_array(blake3::hash(bytes).into()))
+    pub fn merge_many(values: &[Digest192]) -> Digest192 {
+        let bytes = Digest::digests_as_bytes(values);
+        Digest::new(shrink_array(blake3::hash(bytes).into()))
     }
 
-    pub fn merge(values: &[Blake3Digest<24>; 2]) -> Blake3Digest<24> {
-        Self::hash(Blake3Digest::digests_as_bytes(values))
+    pub fn merge(values: &[Digest192; 2]) -> Digest192 {
+        Self::hash(Digest::digests_as_bytes(values))
     }
 
-    pub fn merge_with_int(seed: Blake3Digest<24>, value: u64) -> Blake3Digest<24> {
+    pub fn merge_with_int(seed: Digest192, value: u64) -> Digest192 {
         let mut hasher = blake3::Hasher::new();
-        hasher.update(&seed.0);
+        hasher.update(seed.as_bytes());
         hasher.update(&value.to_le_bytes());
-        Blake3Digest(shrink_array(hasher.finalize().into()))
+        Digest::new(shrink_array(hasher.finalize().into()))
     }
 
     /// Returns a hash of the provided field elements.
     #[inline(always)]
-    pub fn hash_elements<E: BasedVectorSpace<Felt>>(elements: &[E]) -> Blake3Digest<32> {
-        Blake3Digest(hash_elements(elements))
+    pub fn hash_elements<E: BasedVectorSpace<Felt>>(elements: &[E]) -> Digest256 {
+        Digest::new(hash_elements(elements))
     }
 
     /// Hashes an iterator of byte slices.
     #[inline(always)]
-    pub fn hash_iter<'a>(slices: impl Iterator<Item = &'a [u8]>) -> Blake3Digest<DIGEST24_BYTES> {
+    pub fn hash_iter<'a>(slices: impl Iterator<Item = &'a [u8]>) -> Digest192 {
         <Self as HasherExt>::hash_iter(slices)
     }
 }
@@ -261,13 +181,4 @@ fn shrink_array<const M: usize, const N: usize>(source: [u8; M]) -> [u8; N] {
         assert!(M >= N, "size of destination should be smaller or equal than source");
     }
     core::array::from_fn(|i| source[i])
-}
-
-/// Owned bytes expansion.
-fn expand_bytes<const M: usize, const N: usize>(bytes: &[u8; M]) -> [u8; N] {
-    // compile-time assertion
-    assert!(M <= N, "M should fit in N so M can be expanded!");
-    let mut expanded = [0u8; N];
-    expanded[..M].copy_from_slice(bytes);
-    expanded
 }
