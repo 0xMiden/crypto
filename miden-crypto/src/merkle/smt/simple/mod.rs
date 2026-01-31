@@ -330,7 +330,7 @@ impl<const DEPTH: u8> SimpleSmt<DEPTH> {
             let new_branch_idx = {
                 let new_depth = subtree_root_insertion_depth + branch_idx.depth();
                 let new_value = subtree_insertion_index * 2_u64.pow(branch_idx.depth().into())
-                    + branch_idx.value();
+                    + branch_idx.position();
 
                 NodeIndex::new(new_depth, new_value).expect("index guaranteed to be valid")
             };
@@ -401,9 +401,9 @@ impl<const DEPTH: u8> SparseMerkleTree<DEPTH> for SimpleSmt<DEPTH> {
         value: Word,
     ) -> Result<Option<Word>, MerkleError> {
         let result = if value == Self::EMPTY_VALUE {
-            self.leaves.remove(&key.value())
+            self.leaves.remove(&key.position())
         } else {
-            self.leaves.insert(key.value(), value)
+            self.leaves.insert(key.position(), value)
         };
         Ok(result)
     }
@@ -413,7 +413,7 @@ impl<const DEPTH: u8> SparseMerkleTree<DEPTH> for SimpleSmt<DEPTH> {
     }
 
     fn get_leaf(&self, key: &LeafIndex<DEPTH>) -> Word {
-        let leaf_pos = key.value();
+        let leaf_pos = key.position();
         match self.leaves.get(&leaf_pos) {
             Some(word) => *word,
             None => Self::EMPTY_VALUE,

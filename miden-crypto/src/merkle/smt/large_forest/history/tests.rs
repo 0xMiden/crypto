@@ -249,7 +249,7 @@ fn view_at() -> Result<()> {
     let l2_e1_value: Word = rand_value();
     let leaf_2_ix = LeafIndex::from(l2_e1_key);
     let mut l2_e2_key: Word = rand_value();
-    l2_e2_key[3] = Felt::from_u64(leaf_2_ix.value());
+    l2_e2_key[3] = Felt::from_u64(leaf_2_ix.position());
     let l2_e2_value: Word = rand_value();
     leaf_2.insert(l2_e1_key, l2_e1_value);
     leaf_2.insert(l2_e2_key, l2_e2_value);
@@ -274,7 +274,7 @@ fn view_at() -> Result<()> {
     let mut leaf_3 = CompactLeaf::new();
     let leaf_3_ix = leaf_2_ix;
     let mut l3_e1_key: Word = rand_value();
-    l3_e1_key[3] = Felt::from_u64(leaf_3_ix.value());
+    l3_e1_key[3] = Felt::from_u64(leaf_3_ix.position());
     let l3_e1_value: Word = rand_value();
     leaf_3.insert(l3_e1_key, l3_e1_value);
 
@@ -344,7 +344,7 @@ fn view_at() -> Result<()> {
     // However, if the leaf exists but does not contain the provided word, it should return the
     // sentinel `Some(None)`.
     let mut ne_key_in_existing_leaf: Word = rand_value();
-    ne_key_in_existing_leaf[3] = Felt::from_u64(leaf_1_ix.value());
+    ne_key_in_existing_leaf[3] = Felt::from_u64(leaf_1_ix.position());
     assert_eq!(view.value(&ne_key_in_existing_leaf), Some(None));
 
     // If the leaf is not overlaid, then the lookup should go up the chain just as in the other
@@ -385,7 +385,7 @@ fn mutation_set_to_history_changes(
 
     let mut leaf_changes = LeafChanges::default();
     for (key, value) in mutations.new_pairs().iter() {
-        let leaf_index = LeafIndex::new(Smt::key_to_leaf_index(key).value()).unwrap();
+        let leaf_index = LeafIndex::new(Smt::key_to_leaf_index(key).position()).unwrap();
         leaf_changes
             .entry(leaf_index)
             .or_insert_with(CompactLeaf::new)
@@ -447,13 +447,13 @@ fn smt_history_with_real_mutations() -> Result<()> {
 
     // Query version 0 and verify leaf data
     let view_v0 = history.get_view_at(0)?;
-    let leaf_index_1 = LeafIndex::new(Smt::key_to_leaf_index(&key_1).value()).unwrap();
+    let leaf_index_1 = LeafIndex::new(Smt::key_to_leaf_index(&key_1).position()).unwrap();
     assert!(view_v0.leaf_value(&leaf_index_1).is_some());
     assert_eq!(view_v0.value(&key_1), Some(Some(&value_1)));
 
     // Query version 1 and verify both leaves accessible
     let view_v1 = history.get_view_at(1)?;
-    let leaf_index_2 = LeafIndex::new(Smt::key_to_leaf_index(&key_2).value()).unwrap();
+    let leaf_index_2 = LeafIndex::new(Smt::key_to_leaf_index(&key_2).position()).unwrap();
     assert!(view_v1.leaf_value(&leaf_index_2).is_some());
     assert_eq!(view_v1.value(&key_2), Some(Some(&value_2)));
 

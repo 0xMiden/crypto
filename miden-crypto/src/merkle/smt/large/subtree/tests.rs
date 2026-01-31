@@ -288,7 +288,7 @@ fn find_subtree_root_for_various_nodes() {
             subtree_0_root,
             "Node at depth {}, value {} should belong to subtree rooted at depth {}, value 0",
             node_idx.depth(),
-            node_idx.value(),
+            node_idx.position(),
             SUBTREE_DEPTH
         );
     }
@@ -307,7 +307,7 @@ fn find_subtree_root_for_various_nodes() {
             subtree_1_root,
             "Node at depth {}, value {} should belong to subtree rooted at depth {}, value 1",
             node_idx.depth(),
-            node_idx.value(),
+            node_idx.position(),
             SUBTREE_DEPTH
         );
     }
@@ -325,7 +325,7 @@ fn find_subtree_root_for_various_nodes() {
             deep_subtree_root,
             "Node at depth {}, value {} should belong to deep subtree",
             node_idx.depth(),
-            node_idx.value()
+            node_idx.position()
         );
     }
 }

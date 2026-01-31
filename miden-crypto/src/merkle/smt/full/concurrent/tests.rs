@@ -22,7 +22,7 @@ use crate::{
 
 fn smtleaf_to_subtree_leaf(leaf: &SmtLeaf) -> SubtreeLeaf {
     SubtreeLeaf {
-        col: leaf.index().index.value(),
+        col: leaf.index().index.position(),
         hash: leaf.hash(),
     }
 }
@@ -89,7 +89,7 @@ fn test_sorted_pairs_to_leaves() {
     // Then finally we might as well check the computed leaf nodes too.
     let control_leaves: BTreeMap<u64, SmtLeaf> = control
         .leaves()
-        .map(|(index, value)| (index.index.value(), value.clone()))
+        .map(|(index, value)| (index.index.position(), value.clone()))
         .collect();
 
     for (column, test_leaf) in subtrees.nodes {
@@ -136,7 +136,7 @@ fn generate_updates(entries: Vec<(Word, Word)>, updates: usize) -> Vec<(Word, Wo
             (key, value)
         })
         .collect();
-    sorted_entries.sort_by_key(|(key, _)| Smt::key_to_leaf_index(key).value());
+    sorted_entries.sort_by_key(|(key, _)| Smt::key_to_leaf_index(key).position());
     sorted_entries
 }
 
@@ -491,7 +491,7 @@ fn test_smt_construction_with_entries_duplicate_keys() {
         ([ONE; 4].into(), [ONE; 4].into()),
         ([ONE, ONE, ONE, Felt::new(16)].into(), [ONE; 4].into()),
     ];
-    let expected_col = Smt::key_to_leaf_index(&entries[0].0).index.value();
+    let expected_col = Smt::key_to_leaf_index(&entries[0].0).index.position();
     let err = Smt::with_entries(entries).unwrap_err();
     assert_matches!(err, MerkleError::DuplicateValuesForIndex(col) if col == expected_col);
 }
@@ -637,7 +637,7 @@ fn arb_entries() -> impl Strategy<Value = Vec<(Word, Word)>> {
         let mut result = Vec::new();
 
         for (key, value) in entries {
-            let leaf_index = LeafIndex::<SMT_DEPTH>::from(key).value();
+            let leaf_index = LeafIndex::<SMT_DEPTH>::from(key).position();
             if used_indices.insert(leaf_index) && used_keys.insert(key) {
                 result.push((key, value));
             }

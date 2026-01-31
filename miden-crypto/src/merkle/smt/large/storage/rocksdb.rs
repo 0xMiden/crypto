@@ -227,7 +227,7 @@ impl RocksDbStorage {
             56 => 7,
             d => panic!("unsupported depth {d}"),
         };
-        KeyBytes::new(index.value(), keep)
+        KeyBytes::new(index.position(), keep)
     }
 
     /// Retrieves a handle to a RocksDB column family by its name.
@@ -642,7 +642,7 @@ impl SmtStorage for RocksDbStorage {
                 .hash();
 
             let depth24_cf = self.cf_handle(DEPTH_24_CF)?;
-            let hash_key = Self::index_db_key(subtree.root_index().value());
+            let hash_key = Self::index_db_key(subtree.root_index().position());
             batch.put_cf(depth24_cf, hash_key, root_hash.to_bytes());
         }
 
@@ -677,7 +677,7 @@ impl SmtStorage for RocksDbStorage {
             if subtree.root_index().depth() == IN_MEMORY_DEPTH
                 && let Some(root_node) = subtree.get_inner_node(subtree.root_index())
             {
-                let hash_key = Self::index_db_key(subtree.root_index().value());
+                let hash_key = Self::index_db_key(subtree.root_index().position());
                 batch.put_cf(depth24_cf, hash_key, root_node.hash().to_bytes());
             }
         }
@@ -701,7 +701,7 @@ impl SmtStorage for RocksDbStorage {
         // Also remove level 24 hash cache if this is a level 24 subtree
         if index.depth() == IN_MEMORY_DEPTH {
             let depth24_cf = self.cf_handle(DEPTH_24_CF)?;
-            let hash_key = Self::index_db_key(index.value());
+            let hash_key = Self::index_db_key(index.position());
             batch.delete_cf(depth24_cf, hash_key);
         }
 
@@ -844,14 +844,14 @@ impl SmtStorage for RocksDbStorage {
                             .then(|| subtree.get_inner_node(index))
                             .flatten()
                             .map(|root_node| {
-                                let hash_key = Self::index_db_key(index.value());
+                                let hash_key = Self::index_db_key(index.position());
                                 (hash_key, Some(root_node.hash().to_bytes()))
                             });
                         (index, Some(bytes), depth24_op)
                     },
                     SubtreeUpdate::Delete { index } => {
                         let depth24_op = is_depth_24(index).then(|| {
-                            let hash_key = Self::index_db_key(index.value());
+                            let hash_key = Self::index_db_key(index.position());
                             (hash_key, None)
                         });
                         (index, None, depth24_op)
