@@ -1,5 +1,6 @@
 ## 0.23.0 (TBD)
 
+- Added validation to `PartialMmr::from_parts()` and `Deserializable` implementation, added `from_parts_unchecked()` for performance-critical code ([#812](https://github.com/0xMiden/crypto/pull/812)).
 
 ## 0.22.2 (2026-02-01)
 
