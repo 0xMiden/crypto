@@ -464,7 +464,7 @@ benchmark_multi! {
                     .iter()
                     .map(|(key, value)| {
                         let leaf = SmtLeaf::new_single(*key, *value);
-                        let col = leaf.index().value();
+                        let col = leaf.index().position();
                         let hash = leaf.hash();
                         SubtreeLeaf { col, hash }
                     })
@@ -509,7 +509,7 @@ benchmark_multi! {
                     .iter()
                     .map(|(key, value)| {
                         let leaf = SmtLeaf::new_single(*key, *value);
-                        let col = leaf.index().value();
+                        let col = leaf.index().position();
                         let hash = leaf.hash();
                         SubtreeLeaf { col, hash }
                     })
