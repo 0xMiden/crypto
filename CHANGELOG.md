@@ -1,5 +1,7 @@
 ## 0.23.0 (TBD)
 
+- [BREAKING] Removed `hashbrown` dependency and `hashmaps` feature; `Map`/`Set` type aliases are now tied to the `std` feature ([#813](https://github.com/0xMiden/crypto/pull/813)).
+
 ## 0.22.0 (2026-01-27)
 
 - Added const-generic `Digest<N>` struct for binary hash functions with `Digest256` and `Digest512` type aliases ([#777](https://github.com/0xMiden/crypto/pull/777)).
