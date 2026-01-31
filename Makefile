@@ -6,7 +6,7 @@ help:
 
 # -- variables --------------------------------------------------------------------------------------
 
-ALL_FEATURES_EXCEPT_ROCKSDB="concurrent executable hashmaps internal serde std"
+ALL_FEATURES_EXCEPT_ROCKSDB="concurrent executable internal serde std"
 WARNINGS=RUSTDOCFLAGS="-D warnings"
 
 # -- linting --------------------------------------------------------------------------------------
