@@ -70,21 +70,15 @@ name              = "rand"
 required-features = ["std"]
 
 [features]
-concurrent = [
-  "dep:rayon",
-  "p3-maybe-rayon/parallel",
-  "p3-miden-prover/parallel",
-  "p3-util/parallel",
-  "std",
-]
-default = ["concurrent", "std"]
+concurrent = ["dep:rayon", "p3-maybe-rayon/parallel", "p3-miden-prover/parallel", "p3-util/parallel", "std"]
+default    = ["concurrent", "std"]
 executable = ["concurrent", "dep:clap", "dep:rand-utils"]
-fuzzing = []
-internal = ["concurrent"]
-rocksdb = ["concurrent", "dep:rocksdb"]
-serde = ["dep:serde", "serde?/alloc"]
-std = ["blake3/std", "dep:cc", "miden-serde-utils/std", "rand/std", "rand/thread_rng", "serde?/std"]
-testing = ["dep:proptest"]
+fuzzing    = []
+internal   = ["concurrent"]
+rocksdb    = ["concurrent", "dep:rocksdb"]
+serde      = ["dep:serde", "serde?/alloc"]
+std        = ["blake3/std", "dep:cc", "miden-serde-utils/std", "rand/std", "rand/thread_rng", "serde?/std"]
+testing    = ["dep:proptest"]
 
 [dependencies]
 blake3                        = { default-features = false, version = "1.8" }
