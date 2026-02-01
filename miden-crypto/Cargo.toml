@@ -119,15 +119,22 @@ x25519-dalek                  = { default-features = false, features = ["static_
 
 # Upstream Plonky3 dependencies
 p3-air         = { default-features = false, version = "0.4.2" }
+p3-blake3      = { default-features = false, version = "0.4.2" }
 p3-challenger  = { default-features = false, version = "0.4.2" }
+p3-commit      = { default-features = false, version = "0.4.2" }
+p3-dft         = { default-features = false, version = "0.4.2" }
 p3-field       = { default-features = false, version = "0.4.2" }
 p3-goldilocks  = { default-features = false, version = "0.4.2" }
+p3-keccak      = { default-features = false, version = "0.4.2" }
+p3-matrix      = { default-features = false, version = "0.4.2" }
 p3-maybe-rayon = { default-features = false, version = "0.4.2" }
+p3-merkle-tree = { default-features = false, version = "0.4.2" }
 p3-symmetric   = { default-features = false, version = "0.4.2" }
 p3-util        = { default-features = false, version = "0.4.2" }
 
 # Miden-specific Plonky3 crates
 p3-miden-air    = { default-features = false, version = "0.4.2" }
+p3-miden-fri    = { default-features = false, version = "0.4.2" }
 p3-miden-prover = { default-features = false, version = "0.4.2" }
 
 [dev-dependencies]

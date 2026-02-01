@@ -1,5 +1,10 @@
 ## 0.23.0 (TBD)
 
+## 0.22.1 (2026-02-01)
+
+- Re-exported additional Plonky3 modules and structs.
+- Implemented `batch_inversion_allow_zeros()` function.
+
 ## 0.22.0 (2026-01-27)
 
 - Added const-generic `Digest<N>` struct for binary hash functions with `Digest256` and `Digest512` type aliases ([#777](https://github.com/0xMiden/crypto/pull/777)).
