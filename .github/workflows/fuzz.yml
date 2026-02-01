@@ -23,6 +23,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
+      max-parallel: 1
       matrix:
         target: [primitives, collections, string, vint64, goldilocks, budgeted]
     timeout-minutes: 15
@@ -46,6 +47,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
+      max-parallel: 1
       matrix:
         target: [word, merkle, smt_serde]
     timeout-minutes: 15
