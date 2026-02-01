@@ -1,16 +1,21 @@
 use core::mem::size_of;
 
-use p3_field::BasedVectorSpace;
 use sha3::Digest as Sha3Digest;
 
 use super::{
     Felt, HasherExt,
     digest::{DIGEST256_BYTES, Digest256},
 };
-use crate::field::PrimeField64;
+use crate::field::{BasedVectorSpace, PrimeField64};
 
 #[cfg(test)]
 mod tests;
+
+// RE-EXPORTS
+// ================================================================================================
+
+/// Re-export of the Keccak hasher from Plonky3 for use in the prover config downstream.
+pub use p3_keccak::{Keccak256Hash, KeccakF};
 
 // KECCAK256 DIGEST
 // ================================================================================================
