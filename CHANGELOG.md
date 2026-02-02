@@ -1,5 +1,10 @@
 ## 0.23.0 (TBD)
 
+
+## 0.22.2 (2026-02-01)
+
+- Re-exported `p3_keccak::VECTOR_LEN`.
+
 ## 0.22.1 (2026-02-01)
 
 - Re-exported additional Plonky3 modules and structs.

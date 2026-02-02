@@ -15,7 +15,7 @@ mod tests;
 // ================================================================================================
 
 /// Re-export of the Keccak hasher from Plonky3 for use in the prover config downstream.
-pub use p3_keccak::{Keccak256Hash, KeccakF};
+pub use p3_keccak::{Keccak256Hash, KeccakF, VECTOR_LEN};
 
 // KECCAK256 DIGEST
 // ================================================================================================
