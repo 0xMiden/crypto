@@ -1,6 +1,16 @@
 ## 0.23.0 (TBD)
 
 - Refactored BLAKE3 to use `Digest<N>` struct, added `Digest192` type alias, deprecated `Blake3Digest` ([#811](https://github.com/0xMiden/crypto/pull/811)).
+- [BREAKING] Removed `hashbrown` dependency and `hashmaps` feature; `Map`/`Set` type aliases are now tied to the `std` feature ([#813](https://github.com/0xMiden/crypto/pull/813)).
+
+## 0.22.2 (2026-02-01)
+
+- Re-exported `p3_keccak::VECTOR_LEN`.
+
+## 0.22.1 (2026-02-01)
+
+- Re-exported additional Plonky3 modules and structs.
+- Implemented `batch_inversion_allow_zeros()` function.
 
 ## 0.22.0 (2026-01-27)
 
