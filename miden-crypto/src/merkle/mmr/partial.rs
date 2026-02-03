@@ -123,16 +123,29 @@ impl PartialMmr {
         }
 
         // Validate that all node indices are within forest bounds
-        let num_leaves = forest.num_leaves();
-        for idx in nodes.keys() {
-            // Check if the leaf position derived from this index is valid
-            if idx.is_leaf() {
-                // For leaves: idx = (leaf_pos + 1) * 2 - 1, so leaf_pos = idx / 2
-                let leaf_pos = idx.inner() / 2;
-                if leaf_pos >= num_leaves {
+        // For an empty forest, no nodes are valid
+        if !nodes.is_empty() && forest.is_empty() {
+            return Err(MmrError::InconsistentPartialMmr(
+                "nodes present but forest is empty".into(),
+            ));
+        }
+
+        if !nodes.is_empty() {
+            // Get the upper bound for valid indices
+            let max_valid_idx = forest.rightmost_in_order_index();
+
+            for idx in nodes.keys() {
+                // Index 0 is never valid (InOrderIndex starts at 1)
+                if idx.inner() == 0 {
+                    return Err(MmrError::InconsistentPartialMmr("node index 0 is invalid".into()));
+                }
+
+                // All indices must be within the forest bounds
+                if idx.inner() > max_valid_idx.inner() {
                     return Err(MmrError::InconsistentPartialMmr(format!(
-                        "node index corresponds to leaf position {} but forest only has {} leaves",
-                        leaf_pos, num_leaves
+                        "node index {} exceeds forest bounds (max: {})",
+                        idx.inner(),
+                        max_valid_idx.inner()
                     )));
                 }
             }
@@ -1045,6 +1058,8 @@ mod tests {
     fn test_from_parts_validation() {
         use alloc::collections::BTreeMap;
 
+        use super::InOrderIndex;
+
         // Build a valid MMR with 7 leaves (has single leaf tree: 0b111)
         let mmr: Mmr = LEAVES.into();
         let peaks = mmr.peaks();
@@ -1069,11 +1084,81 @@ mod tests {
         let result = PartialMmr::from_parts(peaks_even.clone(), BTreeMap::new(), false);
         assert!(result.is_ok());
 
-        // Invalid case: node index out of bounds
+        // Invalid case: node index out of bounds (leaf index)
         let mut invalid_nodes = BTreeMap::new();
-        let invalid_idx = super::InOrderIndex::from_leaf_pos(100); // way out of bounds
+        let invalid_idx = InOrderIndex::from_leaf_pos(100); // way out of bounds
         invalid_nodes.insert(invalid_idx, int_to_node(0));
         let result = PartialMmr::from_parts(peaks.clone(), invalid_nodes, false);
+        assert!(result.is_err());
+
+        // Invalid case: index 0 (which is never valid for InOrderIndex)
+        let mut nodes_with_zero = BTreeMap::new();
+        // Create an InOrderIndex with value 0 via deserialization
+        let zero_idx = InOrderIndex::read_from_bytes(&0usize.to_bytes()).unwrap();
+        nodes_with_zero.insert(zero_idx, int_to_node(0));
+        let result = PartialMmr::from_parts(peaks.clone(), nodes_with_zero, false);
+        assert!(result.is_err());
+
+        // Invalid case: large even index (internal node) beyond forest bounds
+        // For 7 leaves, the rightmost in-order index is 12 (forest has 13 nodes: 7*2-1=13, plus
+        // gaps) Create an internal node index (even number) that's beyond bounds
+        let mut nodes_with_large_even = BTreeMap::new();
+        let large_even_idx = InOrderIndex::read_from_bytes(&1000usize.to_bytes()).unwrap();
+        nodes_with_large_even.insert(large_even_idx, int_to_node(0));
+        let result = PartialMmr::from_parts(peaks.clone(), nodes_with_large_even, false);
+        assert!(result.is_err());
+
+        // Invalid case: nodes with empty forest
+        let empty_peaks = MmrPeaks::new(Forest::empty(), vec![]).unwrap();
+        let mut nodes_with_empty_forest = BTreeMap::new();
+        nodes_with_empty_forest.insert(InOrderIndex::from_leaf_pos(0), int_to_node(0));
+        let result = PartialMmr::from_parts(empty_peaks, nodes_with_empty_forest, false);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_from_parts_validation_deserialization() {
+        // Build an MMR with 7 leaves
+        let mmr: Mmr = LEAVES.into();
+        let partial_mmr = PartialMmr::from_peaks(mmr.peaks());
+
+        // Valid serialization/deserialization
+        let bytes = partial_mmr.to_bytes();
+        let decoded = PartialMmr::read_from_bytes(&bytes);
+        assert!(decoded.is_ok());
+
+        // Test that deserialization rejects bad data:
+        // We'll construct invalid bytes that would create an invalid PartialMmr
+
+        // Create a PartialMmr with a valid node, serialize it, then manually corrupt the node index
+        let mut partial_with_node = PartialMmr::from_peaks(mmr.peaks());
+        let node = mmr.get(1).unwrap();
+        let proof = mmr.open(1).unwrap();
+        partial_with_node.track(1, node, proof.path().merkle_path()).unwrap();
+
+        // Serialize and verify it deserializes correctly first
+        let valid_bytes = partial_with_node.to_bytes();
+        let valid_decoded = PartialMmr::read_from_bytes(&valid_bytes);
+        assert!(valid_decoded.is_ok());
+
+        // Now create malformed data with index 0 via manual byte construction
+        // This tests that deserialization properly validates inputs
+        let mut bad_bytes = Vec::new();
+        // forest (7 leaves)
+        bad_bytes.extend_from_slice(&7usize.to_bytes());
+        // peaks (3 peaks for forest 0b111)
+        bad_bytes.extend_from_slice(&3usize.to_bytes()); // vec length
+        for i in 0..3 {
+            bad_bytes.extend_from_slice(&int_to_node(i as u64).to_bytes());
+        }
+        // nodes: 1 entry with index 0
+        bad_bytes.extend_from_slice(&1usize.to_bytes()); // BTreeMap length
+        bad_bytes.extend_from_slice(&0usize.to_bytes()); // invalid index 0
+        bad_bytes.extend_from_slice(&int_to_node(0).to_bytes()); // value
+        // track_latest
+        bad_bytes.push(0);
+
+        let result = PartialMmr::read_from_bytes(&bad_bytes);
         assert!(result.is_err());
     }
 
