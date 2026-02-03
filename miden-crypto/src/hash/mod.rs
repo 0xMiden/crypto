@@ -2,6 +2,9 @@
 
 use crate::{Felt, Word, ZERO};
 
+/// Generic digest types for binary hash functions.
+pub(crate) mod digest;
+
 /// Blake3 hash function.
 pub mod blake;
 

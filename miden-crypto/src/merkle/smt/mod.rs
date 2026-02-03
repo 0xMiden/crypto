@@ -9,7 +9,7 @@ use core::{
 use super::{EmptySubtreeRoots, InnerNodeInfo, MerkleError, NodeIndex, SparseMerklePath};
 use crate::{
     EMPTY_WORD, Map, Word,
-    hash::rpo::Rpo256,
+    hash::poseidon2::Poseidon2,
     utils::{ByteReader, ByteWriter, Deserializable, DeserializationError, Serializable},
 };
 
@@ -176,7 +176,7 @@ pub(crate) trait SparseMerkleTree<const DEPTH: u8> {
             } else {
                 (node_hash, right)
             };
-            node_hash = Rpo256::merge(&[left, right]);
+            node_hash = Poseidon2::merge(&[left, right]);
 
             if node_hash == *EmptySubtreeRoots::entry(DEPTH, node_depth) {
                 // If a subtree is empty, then can remove the inner node, since it's equal to the
@@ -525,7 +525,7 @@ pub struct InnerNode {
 
 impl InnerNode {
     pub fn hash(&self) -> Word {
-        Rpo256::merge(&[self.left, self.right])
+        Poseidon2::merge(&[self.left, self.right])
     }
 }
 

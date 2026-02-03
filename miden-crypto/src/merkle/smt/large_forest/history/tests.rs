@@ -363,3 +363,156 @@ fn view_at() -> Result<()> {
 
     Ok(())
 }
+
+// SMT INTEGRATION TESTS
+// ================================================================================================
+
+use crate::merkle::smt::{MutationSet, NodeMutation, SMT_DEPTH, Smt, SparseMerkleTree};
+
+/// Converts a MutationSet into the format expected by History.
+///
+/// This helper extracts node additions and leaf changes from an SMT mutation set,
+/// transforming them into the format used by the History tracking mechanism.
+fn mutation_set_to_history_changes(
+    mutations: &MutationSet<SMT_DEPTH, Word, Word>,
+) -> (NodeChanges, LeafChanges) {
+    let mut node_changes = NodeChanges::default();
+    for (index, mutation) in mutations.node_mutations().iter() {
+        if let NodeMutation::Addition(inner_node) = mutation {
+            node_changes.insert(*index, inner_node.hash());
+        }
+    }
+
+    let mut leaf_changes = LeafChanges::default();
+    for (key, value) in mutations.new_pairs().iter() {
+        let leaf_index = LeafIndex::new(Smt::key_to_leaf_index(key).value()).unwrap();
+        leaf_changes
+            .entry(leaf_index)
+            .or_insert_with(CompactLeaf::new)
+            .insert(*key, *value);
+    }
+
+    (node_changes, leaf_changes)
+}
+
+/// Tests History integration using real SMT mutations.
+///
+/// This test creates an actual SMT, computes mutations via the SMT API,
+/// and verifies that History correctly tracks the resulting node and leaf changes.
+#[test]
+fn smt_history_with_real_mutations() -> Result<()> {
+    // Create an empty SMT
+    let mut smt = Smt::new();
+    let initial_root = smt.root();
+
+    // Generate test key-value pairs
+    let key_1: Word = rand_value();
+    let value_1: Word = rand_value();
+    let key_2: Word = rand_value();
+    let value_2: Word = rand_value();
+
+    // Create history to track versions
+    let mut history = History::empty(3);
+
+    // Version 0: Insert first key-value pair using real SMT mutation
+    let mutations_v0 = smt.compute_mutations(vec![(key_1, value_1)]).unwrap();
+    let (node_changes_v0, leaf_changes_v0) = mutation_set_to_history_changes(&mutations_v0);
+    smt.apply_mutations(mutations_v0).unwrap();
+    let root_v0 = smt.root();
+
+    // Verify stored node hashes match what the SMT computed
+    for (index, hash) in node_changes_v0.iter() {
+        assert_eq!(*hash, smt.get_node_hash(*index));
+    }
+
+    history.add_version(root_v0, 0, node_changes_v0.clone(), leaf_changes_v0.clone())?;
+
+    // Version 1: Insert second key-value pair
+    let mutations_v1 = smt.compute_mutations(vec![(key_2, value_2)]).unwrap();
+    let (node_changes_v1, leaf_changes_v1) = mutation_set_to_history_changes(&mutations_v1);
+    smt.apply_mutations(mutations_v1).unwrap();
+    let root_v1 = smt.root();
+
+    // Verify stored node hashes match what the SMT computed
+    for (index, hash) in node_changes_v1.iter() {
+        assert_eq!(*hash, smt.get_node_hash(*index));
+    }
+
+    history.add_version(root_v1, 1, node_changes_v1, leaf_changes_v1)?;
+
+    // Verify roots are tracked correctly
+    assert!(history.is_known_root(root_v0));
+    assert!(history.is_known_root(root_v1));
+    assert!(!history.is_known_root(initial_root)); // Initial empty root not added
+
+    // Query version 0 and verify leaf data
+    let view_v0 = history.get_view_at(0)?;
+    let leaf_index_1 = LeafIndex::new(Smt::key_to_leaf_index(&key_1).value()).unwrap();
+    assert!(view_v0.leaf_value(&leaf_index_1).is_some());
+    assert_eq!(view_v0.value(&key_1), Some(Some(&value_1)));
+
+    // Query version 1 and verify both leaves accessible
+    let view_v1 = history.get_view_at(1)?;
+    let leaf_index_2 = LeafIndex::new(Smt::key_to_leaf_index(&key_2).value()).unwrap();
+    assert!(view_v1.leaf_value(&leaf_index_2).is_some());
+    assert_eq!(view_v1.value(&key_2), Some(Some(&value_2)));
+
+    // Verify node changes were captured (mutations produce inner node updates)
+    assert!(!node_changes_v0.is_empty(), "SMT insertion should produce node changes");
+
+    // Verify querying a non-existent key returns None
+    let nonexistent_key: Word = rand_value();
+    assert!(view_v1.value(&nonexistent_key).is_none());
+
+    Ok(())
+}
+
+/// Tests History with SMT value updates (replacing existing values).
+#[test]
+fn smt_history_value_updates() -> Result<()> {
+    let mut smt = Smt::new();
+
+    let key: Word = rand_value();
+    let value_v0: Word = rand_value();
+    let value_v1: Word = rand_value();
+
+    let mut history = History::empty(2);
+
+    // Version 0: Insert initial value
+    let mutations_v0 = smt.compute_mutations(vec![(key, value_v0)]).unwrap();
+    let (node_changes_v0, leaf_changes_v0) = mutation_set_to_history_changes(&mutations_v0);
+    smt.apply_mutations(mutations_v0).unwrap();
+
+    // Verify stored node hashes match what the SMT computed
+    for (index, hash) in node_changes_v0.iter() {
+        assert_eq!(*hash, smt.get_node_hash(*index));
+    }
+
+    history.add_version(smt.root(), 0, node_changes_v0, leaf_changes_v0)?;
+
+    // Version 1: Update to new value
+    let mutations_v1 = smt.compute_mutations(vec![(key, value_v1)]).unwrap();
+    let (node_changes_v1, leaf_changes_v1) = mutation_set_to_history_changes(&mutations_v1);
+    smt.apply_mutations(mutations_v1).unwrap();
+
+    // Verify stored node hashes match what the SMT computed
+    for (index, hash) in node_changes_v1.iter() {
+        assert_eq!(*hash, smt.get_node_hash(*index));
+    }
+
+    history.add_version(smt.root(), 1, node_changes_v1, leaf_changes_v1)?;
+
+    // Verify version 0 has original value
+    let view_v0 = history.get_view_at(0)?;
+    assert_eq!(view_v0.value(&key), Some(Some(&value_v0)));
+
+    // Verify version 1 has updated value
+    let view_v1 = history.get_view_at(1)?;
+    assert_eq!(view_v1.value(&key), Some(Some(&value_v1)));
+
+    // Verify round-trip consistency: history view matches current SMT value
+    let current_smt_value = smt.get_value(&key);
+    assert_eq!(view_v1.value(&key), Some(Some(&current_smt_value)));
+
+    Ok(())
+}

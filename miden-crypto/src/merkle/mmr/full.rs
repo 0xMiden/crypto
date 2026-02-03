@@ -19,7 +19,7 @@ use super::{
 };
 use crate::{
     Word,
-    merkle::Rpo256,
+    hash::poseidon2::Poseidon2,
     utils::{ByteReader, ByteWriter, Deserializable, DeserializationError, Serializable},
 };
 
@@ -132,7 +132,7 @@ impl Mmr {
         let mut right = el;
         let mut left_tree = 1;
         while !(self.forest & Forest::new(left_tree)).is_empty() {
-            right = Rpo256::merge(&[self.nodes[left_offset], right]);
+            right = Poseidon2::merge(&[self.nodes[left_offset], right]);
             self.nodes.push(right);
 
             left_offset = left_offset.saturating_sub(Forest::new(left_tree).num_nodes());

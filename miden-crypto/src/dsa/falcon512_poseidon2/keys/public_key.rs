@@ -1,4 +1,4 @@
-//! Public key types for the RPO Falcon 512 digital signature scheme used in Miden VM.
+//! Public key types for the Poseidon2 Falcon 512 digital signature scheme used in Miden VM.
 
 use alloc::{string::ToString, vec::Vec};
 use core::ops::Deref;
@@ -10,7 +10,7 @@ use super::{
     ByteReader, ByteWriter, Deserializable, DeserializationError, FalconFelt, Felt, Polynomial,
     Serializable, Signature,
 };
-use crate::{SequentialCommit, Word, dsa::falcon512_rpo::FALCON_ENCODING_BITS};
+use crate::{SequentialCommit, Word, dsa::falcon512_poseidon2::FALCON_ENCODING_BITS};
 
 // PUBLIC KEY
 // ================================================================================================
@@ -31,7 +31,7 @@ impl PublicKey {
         signature.public_key().clone()
     }
 
-    /// Returns a commitment to the public key using the RPO256 hash function.
+    /// Returns a commitment to the public key using the Poseidon2 hash function.
     pub fn to_commitment(&self) -> Word {
         <Self as SequentialCommit>::to_commitment(self)
     }

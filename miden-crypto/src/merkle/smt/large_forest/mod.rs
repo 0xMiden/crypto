@@ -73,11 +73,10 @@ use crate::{
         SmtProof,
         large_forest::{
             history::History,
-            root::{LineageId, RootValue, TreeWithRoot, UniqueRoot},
+            root::{LineageId, RootValue, TreeEntry, TreeWithRoot, UniqueRoot},
         },
     },
 };
-
 // SPARSE MERKLE TREE FOREST
 // ================================================================================================
 
@@ -301,6 +300,32 @@ impl<B: Backend> LargeSmtForest<B> {
     ///   member of the forest.
     pub fn get(&self, _root: TreeId, _key: Word) -> Result<Option<Word>> {
         todo!("LargeSmtForest::get")
+    }
+
+    /// Returns the number of populated entries in the specified `tree`.
+    ///
+    /// # Errors
+    ///
+    /// - [`LargeSmtForestError::UnknownLineage`] If the provided `tree` specifies a lineage that is
+    ///   not one known by the forest.
+    /// - [`LargeSmtForestError::UnknownTree`] If the provided `tree` refers to a tree that is not a
+    ///   member of the forest.
+    pub fn entry_count(&self, _tree: TreeId) -> Result<usize> {
+        todo!("LargeSmtForest::entry_count")
+    }
+
+    /// Returns an iterator that yields the entries in the specified `tree`.
+    ///
+    /// # Errors
+    ///
+    /// - [`LargeSmtForestError::UnknownLineage`] If the provided `tree` specifies a lineage that is
+    ///   not one known by the forest.
+    /// - [`LargeSmtForestError::UnknownTree`] If the provided `tree` refers to a tree that is not a
+    ///   member of the forest.
+    pub fn entries<I: Iterator<Item = TreeEntry>>(&self, _tree: TreeId) -> Result<I> {
+        // TODO Turn this signature back to an `impl Iterator<...>` once there is a body. `impl`
+        //      generics are fussy alongside `todo!`s.
+        todo!("LargeSmtForest::entries")
     }
 }
 

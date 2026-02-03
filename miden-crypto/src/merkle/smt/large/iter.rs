@@ -3,7 +3,8 @@ use alloc::{boxed::Box, vec::Vec};
 use super::{IN_MEMORY_DEPTH, LargeSmt, SmtStorage, is_empty_parent};
 use crate::{
     Word,
-    merkle::{InnerNodeInfo, Rpo256, smt::large::subtree::Subtree},
+    hash::poseidon2::Poseidon2,
+    merkle::{InnerNodeInfo, smt::large::subtree::Subtree},
 };
 
 // ITERATORS
@@ -75,7 +76,7 @@ impl<S: SmtStorage> Iterator for LargeSmtInnerNodeIterator<'_, S> {
 
                         if !is_empty_parent(left, right, child_depth) {
                             return Some(InnerNodeInfo {
-                                value: Rpo256::merge(&[left, right]),
+                                value: Poseidon2::merge(&[left, right]),
                                 left,
                                 right,
                             });

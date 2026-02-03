@@ -1,21 +1,24 @@
 use alloc::string::String;
-use core::{
-    mem::size_of,
-    ops::Deref,
-    slice::{self, from_raw_parts},
-};
-
-use p3_field::{BasedVectorSpace, PrimeField64};
-use p3_goldilocks::Goldilocks as Felt;
+use core::{mem::size_of, ops::Deref, slice};
 
 use super::HasherExt;
-use crate::utils::{
-    ByteReader, ByteWriter, Deserializable, DeserializationError, HexParseError, Serializable,
-    bytes_to_hex_string, hex_to_bytes,
+use crate::{
+    Felt,
+    field::{BasedVectorSpace, PrimeField64},
+    utils::{
+        ByteReader, ByteWriter, Deserializable, DeserializationError, HexParseError, Serializable,
+        bytes_to_hex_string, hex_to_bytes,
+    },
 };
 
 #[cfg(test)]
 mod tests;
+
+// RE-EXPORTS
+// ================================================================================================
+
+/// Re-export of the Blake3 hasher from Plonky3 for use in the prover config downstream.
+pub use p3_blake3::Blake3 as Blake3Hasher;
 
 // CONSTANTS
 // ================================================================================================
@@ -133,7 +136,7 @@ impl Blake3_256 {
     // (<Self as Hasher>::merge). They're now direct implementations as part of removing
     // the Winterfell Hasher trait dependency. These are public API used in benchmarks.
     pub fn merge(values: &[Blake3Digest<32>; 2]) -> Blake3Digest<32> {
-        Self::hash(prepare_merge(values))
+        Self::hash(Blake3Digest::digests_as_bytes(values))
     }
 
     pub fn merge_many(values: &[Blake3Digest<32>]) -> Blake3Digest<32> {
@@ -194,7 +197,7 @@ impl Blake3_192 {
     }
 
     pub fn merge(values: &[Blake3Digest<24>; 2]) -> Blake3Digest<24> {
-        Self::hash(prepare_merge(values))
+        Self::hash(Blake3Digest::digests_as_bytes(values))
     }
 
     pub fn merge_with_int(seed: Blake3Digest<24>, value: u64) -> Blake3Digest<24> {
@@ -274,19 +277,4 @@ fn expand_bytes<const M: usize, const N: usize>(bytes: &[u8; M]) -> [u8; N] {
     let mut expanded = [0u8; N];
     expanded[..M].copy_from_slice(bytes);
     expanded
-}
-
-// Cast the slice into contiguous bytes.
-fn prepare_merge<const N: usize, D>(args: &[D; N]) -> &[u8]
-where
-    D: Deref<Target = [u8]>,
-{
-    // compile-time assertion
-    assert!(N > 0, "N shouldn't represent an empty slice!");
-    let values = args.as_ptr() as *const u8;
-    let len = size_of::<D>() * N;
-    // safety: the values are tested to be contiguous
-    let bytes = unsafe { from_raw_parts(values, len) };
-    debug_assert_eq!(args[0].deref(), &bytes[..len / N]);
-    bytes
 }

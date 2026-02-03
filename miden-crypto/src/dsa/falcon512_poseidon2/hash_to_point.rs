@@ -2,14 +2,14 @@ use alloc::vec::Vec;
 
 use p3_field::PrimeField64;
 
-use super::{MODULUS, N, Nonce, Polynomial, Rpo256, ZERO, math::FalconFelt};
+use super::{MODULUS, N, Nonce, Polynomial, Poseidon2, ZERO, math::FalconFelt};
 use crate::{Felt, Word};
 
 // HASH-TO-POINT FUNCTIONS
 // ================================================================================================
 
 /// Returns a polynomial in Z_p[x]/(phi) representing the hash of the provided message and
-/// nonce using RPO256.
+/// nonce using Poseidon2.
 ///
 /// Note that, in contrast to the SHAKE256-based reference implementation, this implementation
 /// does not use rejection sampling but instead uses one of the variants listed in the specification
@@ -19,18 +19,18 @@ use crate::{Felt, Word};
 /// pseudo-random bits per call to the hash-to-point algorithm.
 ///
 /// [1]: https://falcon-sign.info/falcon.pdf
-pub fn hash_to_point_rpo256(message: Word, nonce: &Nonce) -> Polynomial<FalconFelt> {
-    let mut state = [ZERO; Rpo256::STATE_WIDTH];
+pub fn hash_to_point_poseidon2(message: Word, nonce: &Nonce) -> Polynomial<FalconFelt> {
+    let mut state = [ZERO; Poseidon2::STATE_WIDTH];
 
     // absorb the nonce into the state
     let nonce_elements = nonce.to_elements();
-    for (&n, s) in nonce_elements.iter().zip(state[Rpo256::RATE_RANGE].iter_mut()) {
+    for (&n, s) in nonce_elements.iter().zip(state[Poseidon2::RATE_RANGE].iter_mut()) {
         *s = n;
     }
-    Rpo256::apply_permutation(&mut state);
+    Poseidon2::apply_permutation(&mut state);
 
     // absorb message into the state
-    for (&m, s) in message.iter().zip(state[Rpo256::RATE_RANGE].iter_mut()) {
+    for (&m, s) in message.iter().zip(state[Poseidon2::RATE_RANGE].iter_mut()) {
         *s = m;
     }
 
@@ -43,8 +43,8 @@ pub fn hash_to_point_rpo256(message: Word, nonce: &Nonce) -> Polynomial<FalconFe
         // and it must not be uniform. A statistical analysis can be applied here to show
         // that this is still fine: the output distribution is computational IND from
         // uniform.
-        Rpo256::apply_permutation(&mut state);
-        state[Rpo256::RATE_RANGE]
+        Poseidon2::apply_permutation(&mut state);
+        state[Poseidon2::RATE_RANGE]
             .iter()
             .for_each(|value| coefficients.push(felt_to_falcon_felt(*value)));
     }

@@ -2,7 +2,7 @@ use alloc::vec::Vec;
 
 use crate::{
     Map, Word,
-    hash::rpo::Rpo256,
+    hash::poseidon2::Poseidon2,
     merkle::{EmptySubtreeRoots, MerkleError, MerklePath, MerkleProof, NodeIndex, smt::SMT_DEPTH},
 };
 
@@ -18,7 +18,7 @@ struct ForestInnerNode {
 
 impl ForestInnerNode {
     pub fn hash(&self) -> Word {
-        Rpo256::merge(&[self.left, self.right])
+        Poseidon2::merge(&[self.left, self.right])
     }
 }
 
@@ -169,9 +169,9 @@ impl SmtStore {
         #[allow(unused_mut)]
         let mut sorted_leaf_indices = leaves_by_index.keys().cloned().collect::<Vec<_>>();
 
-        #[cfg(feature = "hashmaps")]
+        #[cfg(feature = "std")]
         // Sort leaves by NodeIndex to easily detect when leaves share a parent (only neighboring
-        // leaves can share a parent). Hashbrown::HashMap doesn't maintain key ordering, so
+        // leaves can share a parent). std::collections::HashMap doesn't maintain key ordering, so
         // we need to sort the indices.
         sorted_leaf_indices.sort();
 
