@@ -60,8 +60,9 @@ lint: format fix clippy toml typos-check machete cargo-deny ## Run all linting t
 # --- docs ----------------------------------------------------------------------------------------
 
 .PHONY: doc
-doc: ## Generate and check documentation
-	$(WARNINGS) cargo doc --all-features --keep-going --release
+doc: ## Generate and check documentation for workspace crates only
+	rm -rf "${CARGO_TARGET_DIR:-target}/doc"
+	RUSTDOCFLAGS="--enable-index-page -Zunstable-options -D warnings" cargo +nightly doc --all-features --keep-going --release --no-deps
 
 # --- testing -------------------------------------------------------------------------------------
 
