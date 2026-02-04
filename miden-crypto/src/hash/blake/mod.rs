@@ -2,15 +2,11 @@ use core::mem::size_of;
 
 use super::{
     HasherExt,
-    digest::{Digest, Digest192, Digest256}
+    digest::{Digest, Digest192, Digest256},
 };
 use crate::{
     Felt,
     field::{BasedVectorSpace, PrimeField64},
-    utils::{
-        ByteReader, ByteWriter, Deserializable, DeserializationError, HexParseError, Serializable,
-        bytes_to_hex_string, hex_to_bytes,
-    },
 };
 
 #[cfg(test)]
