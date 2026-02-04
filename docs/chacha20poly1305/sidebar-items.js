@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"mod":["consts"],"struct":["ChaChaPoly1305","Error"],"trait":["AeadCore","AeadInPlace","KeyInit","KeySizeUser"],"type":["ChaCha20Poly1305","Key","Nonce","Tag","XChaCha20Poly1305","XNonce"]};

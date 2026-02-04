@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"enum":["DeserializationError"],"fn":["flatten_slice_elements","flatten_vector_elements","group_slice_elements","transpose_slice","uninit_vector"],"macro":["batch_iter_mut","iter","iter_mut"],"mod":["iterators"],"struct":["ReadAdapter","SliceReader"],"trait":["AsBytes","ByteReader","ByteWriter","Deserializable","Randomizable","Serializable"]};

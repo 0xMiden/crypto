@@ -1,0 +1,41 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Calculate the convolution of two vectors using a Karatsuba-style decomposition and the CRT."><title>p3_mds::karatsuba_convolution - Rust</title><script>if(window.location.protocol!=="file:")document.head.insertAdjacentHTML("beforeend","SourceSerif4-Regular-6b053e98.ttf.woff2,FiraSans-Italic-81dc35de.woff2,FiraSans-Regular-0fe48ade.woff2,FiraSans-MediumItalic-ccf7e434.woff2,FiraSans-Medium-e1aa3f0a.woff2,SourceCodePro-Regular-8badfe75.ttf.woff2,SourceCodePro-Semibold-aa29a496.ttf.woff2".split(",").map(f=>`<link rel="preload" as="font" type="font/woff2" crossorigin href="../../static.files/${f}">`).join(""))</script><link rel="stylesheet" href="../../static.files/normalize-9960930a.css"><link rel="stylesheet" href="../../static.files/rustdoc-aa0817cf.css"><meta name="rustdoc-vars" data-root-path="../../" data-static-root-path="../../static.files/" data-current-crate="p3_mds" data-themes="" data-resource-suffix="" data-rustdoc-version="1.90.0 (1159e78c4 2025-09-14)" data-channel="1.90.0" data-search-js="search-fa3e91e5.js" data-settings-js="settings-5514c975.js" ><script src="../../static.files/storage-68b7e25d.js"></script><script defer src="../sidebar-items.js"></script><script defer src="../../static.files/main-eebb9057.js"></script><noscript><link rel="stylesheet" href="../../static.files/noscript-32bb7600.css"></noscript><link rel="alternate icon" type="image/png" href="../../static.files/favicon-32x32-6580c154.png"><link rel="icon" type="image/svg+xml" href="../../static.files/favicon-044be391.svg"></head><body class="rustdoc mod"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle" title="show sidebar"></button></nav><nav class="sidebar"><div class="sidebar-crate"><h2><a href="../../p3_mds/index.html">p3_mds</a><span class="version">0.4.2</span></h2></div><div class="sidebar-elems"><section id="rustdoc-toc"><h2 class="location"><a href="#">Module karatsuba_<wbr>convolution</a></h2><h3><a href="#traits">Module Items</a></h3><ul class="block"><li><a href="#traits" title="Traits">Traits</a></li></ul></section><div id="rustdoc-modnav"><h2 class="in-crate"><a href="../index.html">In crate p3_<wbr>mds</a></h2></div></div></nav><div class="sidebar-resizer" title="Drag to resize sidebar"></div><main><div class="width-limiter"><rustdoc-search></rustdoc-search><section id="main-content" class="content"><div class="main-heading"><div class="rustdoc-breadcrumbs"><a href="../index.html">p3_mds</a></div><h1>Module <span>karatsuba_convolution</span><button id="copy-path" title="Copy item path to clipboard">Copy item path</button></h1><rustdoc-toolbar></rustdoc-toolbar><span class="sub-heading"><a class="src" href="../../src/p3_mds/karatsuba_convolution.rs.html#1-346">Source</a> </span></div><details class="toggle top-doc" open><summary class="hideme"><span>Expand description</span></summary><div class="docblock"><p>Calculate the convolution of two vectors using a Karatsuba-style
+decomposition and the CRT.</p>
+<p>This is not a new idea, but we did have the pleasure of
+reinventing it independently. Some references:</p>
+<ul>
+<li><code>&lt;https://cr.yp.to/lineartime/multapps-20080515.pdf&gt;</code></li>
+<li><code>&lt;https://2π.com/23/convolution/&gt;</code></li>
+</ul>
+<p>Given a vector v \in F^N, let v(x) \in F[x] denote the polynomial
+v_0 + v_1 x + … + v_{N - 1} x^{N - 1}.  Then w is equal to the
+convolution v * u if and only if w(x) = v(x)u(x) mod x^N - 1.
+Additionally, define the negacyclic convolution by w(x) = v(x)u(x)
+mod x^N + 1.  Using the Chinese remainder theorem we can compute
+w(x) as
+w(x) = 1/2 (w_0(x) + w_1(x)) + x^{N/2}/2 (w_0(x) - w_1(x))
+where
+w_0 = v(x)u(x) mod x^{N/2} - 1
+w_1 = v(x)u(x) mod x^{N/2} + 1</p>
+<p>To compute w_0 and w_1 we first compute
+v_0(x) = v(x) mod x^{N/2} - 1
+v_1(x) = v(x) mod x^{N/2} + 1
+u_0(x) = u(x) mod x^{N/2} - 1
+u_1(x) = u(x) mod x^{N/2} + 1</p>
+<p>Now w_0 is the convolution of v_0 and u_0 which we can compute
+recursively.  For w_1 we compute the negacyclic convolution
+v_1(x)u_1(x) mod x^{N/2} + 1 using Karatsuba.</p>
+<p>There are 2 possible approaches to applying Karatsuba which mirror
+the DIT vs DIF approaches to FFT’s, the left/right decomposition
+or the even/odd decomposition. The latter seems to have fewer
+operations and so it is the one implemented below, though it does
+require a bit more data manipulation. It works as follows:</p>
+<p>Define the even v_e and odd v_o parts so that v(x) = (v_e(x^2) + x v_o(x^2)).
+Then v(x)u(x)
+= (v_e(x^2)u_e(x^2) + x^2 v_o(x^2)u_o(x^2))
++ x ((v_e(x^2) + v_o(x^2))(u_e(x^2) + u_o(x^2))
+- (v_e(x^2)u_e(x^2) + v_o(x^2)u_o(x^2)))
+This reduces the problem to 3 negacyclic convolutions of size N/2 which
+can be computed recursively.</p>
+<p>Of course, for small sizes we just explicitly write out the O(n^2)
+approach.</p>
+</div></details><h2 id="traits" class="section-header">Traits<a href="#traits" class="anchor">§</a></h2><dl class="item-table"><dt><a class="trait" href="trait.Convolve.html" title="trait p3_mds::karatsuba_convolution::Convolve">Convolve</a></dt><dd>Template function to perform convolution of vectors.</dd><dt><a class="trait" href="trait.RngElt.html" title="trait p3_mds::karatsuba_convolution::RngElt">RngElt</a></dt><dd>This trait collects the operations needed by <code>Convolve</code> below.</dd></dl></section></div></main></body></html>

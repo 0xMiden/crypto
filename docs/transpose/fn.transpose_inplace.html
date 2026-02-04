@@ -1,0 +1,33 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Transpose the input array in-place."><title>transpose_inplace in transpose - Rust</title><script>if(window.location.protocol!=="file:")document.head.insertAdjacentHTML("beforeend","SourceSerif4-Regular-6b053e98.ttf.woff2,FiraSans-Italic-81dc35de.woff2,FiraSans-Regular-0fe48ade.woff2,FiraSans-MediumItalic-ccf7e434.woff2,FiraSans-Medium-e1aa3f0a.woff2,SourceCodePro-Regular-8badfe75.ttf.woff2,SourceCodePro-Semibold-aa29a496.ttf.woff2".split(",").map(f=>`<link rel="preload" as="font" type="font/woff2" crossorigin href="../static.files/${f}">`).join(""))</script><link rel="stylesheet" href="../static.files/normalize-9960930a.css"><link rel="stylesheet" href="../static.files/rustdoc-aa0817cf.css"><meta name="rustdoc-vars" data-root-path="../" data-static-root-path="../static.files/" data-current-crate="transpose" data-themes="" data-resource-suffix="" data-rustdoc-version="1.90.0 (1159e78c4 2025-09-14)" data-channel="1.90.0" data-search-js="search-fa3e91e5.js" data-settings-js="settings-5514c975.js" ><script src="../static.files/storage-68b7e25d.js"></script><script defer src="sidebar-items.js"></script><script defer src="../static.files/main-eebb9057.js"></script><noscript><link rel="stylesheet" href="../static.files/noscript-32bb7600.css"></noscript><link rel="alternate icon" type="image/png" href="../static.files/favicon-32x32-6580c154.png"><link rel="icon" type="image/svg+xml" href="../static.files/favicon-044be391.svg"></head><body class="rustdoc fn"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle" title="show sidebar"></button></nav><nav class="sidebar"><div class="sidebar-crate"><h2><a href="../transpose/index.html">transpose</a><span class="version">0.2.3</span></h2></div><div class="sidebar-elems"><section id="rustdoc-toc"><h2 class="location"><a href="#">transpose_<wbr>inplace</a></h2><h3><a href="#">Sections</a></h3><ul class="block top-toc"><li><a href="#panics" title="Panics">Panics</a></li></ul></section><div id="rustdoc-modnav"><h2 class="in-crate"><a href="index.html">In crate transpose</a></h2></div></div></nav><div class="sidebar-resizer" title="Drag to resize sidebar"></div><main><div class="width-limiter"><rustdoc-search></rustdoc-search><section id="main-content" class="content"><div class="main-heading"><div class="rustdoc-breadcrumbs"><a href="index.html">transpose</a></div><h1>Function <span class="fn">transpose_inplace</span><button id="copy-path" title="Copy item path to clipboard">Copy item path</button></h1><rustdoc-toolbar></rustdoc-toolbar><span class="sub-heading"><a class="src" href="../src/transpose/in_place.rs.html#69-137">Source</a> </span></div><pre class="rust item-decl"><code>pub fn transpose_inplace&lt;T: <a class="trait" href="https://doc.rust-lang.org/1.90.0/core/marker/trait.Copy.html" title="trait core::marker::Copy">Copy</a>&gt;(
+    buffer: &amp;mut <a class="primitive" href="https://doc.rust-lang.org/1.90.0/core/primitive.slice.html">[T]</a>,
+    scratch: &amp;mut <a class="primitive" href="https://doc.rust-lang.org/1.90.0/core/primitive.slice.html">[T]</a>,
+    width: <a class="primitive" href="https://doc.rust-lang.org/1.90.0/core/primitive.usize.html">usize</a>,
+    height: <a class="primitive" href="https://doc.rust-lang.org/1.90.0/core/primitive.usize.html">usize</a>,
+)</code></pre><details class="toggle top-doc" open><summary class="hideme"><span>Expand description</span></summary><div class="docblock"><p>Transpose the input array in-place.</p>
+<p>Given an input array of size input_width * input_height, representing flattened 2D data stored in row-major order,
+transpose the rows and columns of that input array, in-place.</p>
+<p>Despite being in-place, this algorithm requires max(width, height) in scratch space.</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="comment">// row-major order: the rows of our 2D array are contiguous,
+// and the columns are strided
+</span><span class="kw">let </span>original_array = <span class="macro">vec!</span>[ <span class="number">1</span>, <span class="number">2</span>, <span class="number">3</span>,
+						   <span class="number">4</span>, <span class="number">5</span>, <span class="number">6</span>];
+<span class="kw">let </span><span class="kw-2">mut </span>input_array = original_array.clone();
+
+<span class="comment">// Treat our 6-element array as a 2D 3x2 array, and transpose it to a 2x3 array
+// transpose_inplace requires max(width, height) scratch space, which is in this case 3
+</span><span class="kw">let </span><span class="kw-2">mut </span>scratch = <span class="macro">vec!</span>[<span class="number">0</span>; <span class="number">3</span>];
+transpose::transpose_inplace(<span class="kw-2">&amp;mut </span>input_array, <span class="kw-2">&amp;mut </span>scratch, <span class="number">3</span>, <span class="number">2</span>);
+
+<span class="comment">// The rows have become the columns, and the columns have become the rows
+</span><span class="kw">let </span>expected_array =  <span class="macro">vec!</span>[ <span class="number">1</span>, <span class="number">4</span>,
+							<span class="number">2</span>, <span class="number">5</span>,
+							<span class="number">3</span>, <span class="number">6</span>];
+<span class="macro">assert_eq!</span>(input_array, expected_array);
+
+<span class="comment">// If we transpose it again, we should get our original data back.
+</span>transpose::transpose_inplace(<span class="kw-2">&amp;mut </span>input_array, <span class="kw-2">&amp;mut </span>scratch, <span class="number">2</span>, <span class="number">3</span>);
+<span class="macro">assert_eq!</span>(original_array, input_array);</code></pre></div>
+<h2 id="panics"><a class="doc-anchor" href="#panics">§</a>Panics</h2>
+<p>Panics if <code>input.len() != input_width * input_height</code> or if <code>scratch.len() != max(width, height)</code></p>
+</div></details></section></div></main></body></html>

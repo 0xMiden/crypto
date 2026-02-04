@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"fn":["interpolate_coset","interpolate_coset_with_precomputation","interpolate_subgroup"]};

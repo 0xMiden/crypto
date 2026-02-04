@@ -1,0 +1,1078 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `/home/runner/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/p3-field-0.4.2/src/field.rs`."><title>field.rs - source</title><script>if(window.location.protocol!=="file:")document.head.insertAdjacentHTML("beforeend","SourceSerif4-Regular-6b053e98.ttf.woff2,FiraSans-Italic-81dc35de.woff2,FiraSans-Regular-0fe48ade.woff2,FiraSans-MediumItalic-ccf7e434.woff2,FiraSans-Medium-e1aa3f0a.woff2,SourceCodePro-Regular-8badfe75.ttf.woff2,SourceCodePro-Semibold-aa29a496.ttf.woff2".split(",").map(f=>`<link rel="preload" as="font" type="font/woff2" crossorigin href="../../static.files/${f}">`).join(""))</script><link rel="stylesheet" href="../../static.files/normalize-9960930a.css"><link rel="stylesheet" href="../../static.files/rustdoc-aa0817cf.css"><meta name="rustdoc-vars" data-root-path="../../" data-static-root-path="../../static.files/" data-current-crate="p3_field" data-themes="" data-resource-suffix="" data-rustdoc-version="1.90.0 (1159e78c4 2025-09-14)" data-channel="1.90.0" data-search-js="search-fa3e91e5.js" data-settings-js="settings-5514c975.js" ><script src="../../static.files/storage-68b7e25d.js"></script><script defer src="../../static.files/src-script-813739b1.js"></script><script defer src="../../src-files.js"></script><script defer src="../../static.files/main-eebb9057.js"></script><noscript><link rel="stylesheet" href="../../static.files/noscript-32bb7600.css"></noscript><link rel="alternate icon" type="image/png" href="../../static.files/favicon-32x32-6580c154.png"><link rel="icon" type="image/svg+xml" href="../../static.files/favicon-044be391.svg"></head><body class="rustdoc src"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="src-sidebar-title"><h2>Files</h2></div></nav><div class="sidebar-resizer" title="Drag to resize sidebar"></div><main><rustdoc-search></rustdoc-search><section id="main-content" class="content"><div class="main-heading"><h1><div class="sub-heading">p3_field/</div>field.rs</h1><rustdoc-toolbar></rustdoc-toolbar></div><div class="example-wrap digits-4"><pre class="rust"><code><a href=#1 id=1 data-nosnippet>1</a><span class="kw">use </span>alloc::vec;
+<a href=#2 id=2 data-nosnippet>2</a><span class="kw">use </span>alloc::vec::Vec;
+<a href=#3 id=3 data-nosnippet>3</a><span class="kw">use </span>core::fmt::{Debug, Display};
+<a href=#4 id=4 data-nosnippet>4</a><span class="kw">use </span>core::hash::Hash;
+<a href=#5 id=5 data-nosnippet>5</a><span class="kw">use </span>core::iter::{Product, Sum};
+<a href=#6 id=6 data-nosnippet>6</a><span class="kw">use </span>core::ops::{Add, AddAssign, Div, DivAssign, Mul, MulAssign, Neg, Sub, SubAssign};
+<a href=#7 id=7 data-nosnippet>7</a><span class="kw">use </span>core::{array, slice};
+<a href=#8 id=8 data-nosnippet>8</a>
+<a href=#9 id=9 data-nosnippet>9</a><span class="kw">use </span>num_bigint::BigUint;
+<a href=#10 id=10 data-nosnippet>10</a><span class="kw">use </span>p3_maybe_rayon::prelude::<span class="kw-2">*</span>;
+<a href=#11 id=11 data-nosnippet>11</a><span class="kw">use </span>p3_util::{flatten_to_base, iter_array_chunks_padded};
+<a href=#12 id=12 data-nosnippet>12</a><span class="kw">use </span>serde::Serialize;
+<a href=#13 id=13 data-nosnippet>13</a><span class="kw">use </span>serde::de::DeserializeOwned;
+<a href=#14 id=14 data-nosnippet>14</a>
+<a href=#15 id=15 data-nosnippet>15</a><span class="kw">use </span><span class="kw">crate</span>::exponentiation::bits_u64;
+<a href=#16 id=16 data-nosnippet>16</a><span class="kw">use </span><span class="kw">crate</span>::integers::{QuotientMap, from_integer_types};
+<a href=#17 id=17 data-nosnippet>17</a><span class="kw">use </span><span class="kw">crate</span>::packed::PackedField;
+<a href=#18 id=18 data-nosnippet>18</a><span class="kw">use crate</span>::{Packable, PackedFieldExtension, PackedValue};
+<a href=#19 id=19 data-nosnippet>19</a>
+<a href=#20 id=20 data-nosnippet>20</a><span class="doccomment">/// A commutative ring, `R`, with prime characteristic, `p`.
+<a href=#21 id=21 data-nosnippet>21</a>///
+<a href=#22 id=22 data-nosnippet>22</a>/// This permits elements like:
+<a href=#23 id=23 data-nosnippet>23</a>/// - A single finite field element.
+<a href=#24 id=24 data-nosnippet>24</a>/// - A symbolic expression which would evaluate to a field element.
+<a href=#25 id=25 data-nosnippet>25</a>/// - An array of finite field elements.
+<a href=#26 id=26 data-nosnippet>26</a>/// - A polynomial with coefficients in a finite field.
+<a href=#27 id=27 data-nosnippet>27</a>///
+<a href=#28 id=28 data-nosnippet>28</a>/// ### Mathematical Description
+<a href=#29 id=29 data-nosnippet>29</a>///
+<a href=#30 id=30 data-nosnippet>30</a>/// Mathematically, a commutative ring is a set of objects which supports an addition-like
+<a href=#31 id=31 data-nosnippet>31</a>/// like operation, `+`, and a multiplication-like operation `*`.
+<a href=#32 id=32 data-nosnippet>32</a>///
+<a href=#33 id=33 data-nosnippet>33</a>/// Let `x, y, z` denote arbitrary elements of the set.
+<a href=#34 id=34 data-nosnippet>34</a>///
+<a href=#35 id=35 data-nosnippet>35</a>/// Then, an operation is addition-like if it satisfies the following properties:
+<a href=#36 id=36 data-nosnippet>36</a>/// - Commutativity =&gt; `x + y = y + x`
+<a href=#37 id=37 data-nosnippet>37</a>/// - Associativity =&gt; `x + (y + z) = (x + y) + z`
+<a href=#38 id=38 data-nosnippet>38</a>/// - Unit =&gt; There exists an identity element `ZERO` satisfying `x + ZERO = x`.
+<a href=#39 id=39 data-nosnippet>39</a>/// - Inverses =&gt; For every `x` there exists a unique inverse `(-x)` satisfying `x + (-x) = ZERO`
+<a href=#40 id=40 data-nosnippet>40</a>///
+<a href=#41 id=41 data-nosnippet>41</a>/// Similarly, an operation is multiplication-like if it satisfies the following properties:
+<a href=#42 id=42 data-nosnippet>42</a>/// - Commutativity =&gt; `x * y = y * x`
+<a href=#43 id=43 data-nosnippet>43</a>/// - Associativity =&gt; `x * (y * z) = (x * y) * z`
+<a href=#44 id=44 data-nosnippet>44</a>/// - Unit =&gt; There exists an identity element `ONE` satisfying `x * ONE = x`.
+<a href=#45 id=45 data-nosnippet>45</a>/// - Distributivity =&gt; The two operations `+` and `*` must together satisfy `x * (y + z) = (x * y) + (x * z)`
+<a href=#46 id=46 data-nosnippet>46</a>///
+<a href=#47 id=47 data-nosnippet>47</a>/// Unlike in the addition case, we do not require inverses to exist with respect to `*`.
+<a href=#48 id=48 data-nosnippet>48</a>///
+<a href=#49 id=49 data-nosnippet>49</a>/// The simplest examples of commutative rings are the integers (`ℤ`), and the integers mod `N` (`ℤ/N`).
+<a href=#50 id=50 data-nosnippet>50</a>///
+<a href=#51 id=51 data-nosnippet>51</a>/// The characteristic of a ring is the smallest positive integer `r` such that `0 = r . 1 = 1 + 1 + ... + 1 (r times)`.
+<a href=#52 id=52 data-nosnippet>52</a>/// For example, the characteristic of the modulo ring `ℤ/N` is `N`.
+<a href=#53 id=53 data-nosnippet>53</a>///
+<a href=#54 id=54 data-nosnippet>54</a>/// Rings with prime characteristic are particularly special due to their close relationship with finite fields.
+<a href=#55 id=55 data-nosnippet>55</a></span><span class="kw">pub trait </span>PrimeCharacteristicRing:
+<a href=#56 id=56 data-nosnippet>56</a>    Sized
+<a href=#57 id=57 data-nosnippet>57</a>    + Default
+<a href=#58 id=58 data-nosnippet>58</a>    + Clone
+<a href=#59 id=59 data-nosnippet>59</a>    + Add&lt;Output = <span class="self">Self</span>&gt;
+<a href=#60 id=60 data-nosnippet>60</a>    + AddAssign
+<a href=#61 id=61 data-nosnippet>61</a>    + Sub&lt;Output = <span class="self">Self</span>&gt;
+<a href=#62 id=62 data-nosnippet>62</a>    + SubAssign
+<a href=#63 id=63 data-nosnippet>63</a>    + Neg&lt;Output = <span class="self">Self</span>&gt;
+<a href=#64 id=64 data-nosnippet>64</a>    + Mul&lt;Output = <span class="self">Self</span>&gt;
+<a href=#65 id=65 data-nosnippet>65</a>    + MulAssign
+<a href=#66 id=66 data-nosnippet>66</a>    + Sum
+<a href=#67 id=67 data-nosnippet>67</a>    + Product
+<a href=#68 id=68 data-nosnippet>68</a>    + Debug
+<a href=#69 id=69 data-nosnippet>69</a>{
+<a href=#70 id=70 data-nosnippet>70</a>    <span class="doccomment">/// The field `ℤ/p` where the characteristic of this ring is p.
+<a href=#71 id=71 data-nosnippet>71</a>    </span><span class="kw">type </span>PrimeSubfield: PrimeField;
+<a href=#72 id=72 data-nosnippet>72</a>
+<a href=#73 id=73 data-nosnippet>73</a>    <span class="doccomment">/// The additive identity of the ring.
+<a href=#74 id=74 data-nosnippet>74</a>    ///
+<a href=#75 id=75 data-nosnippet>75</a>    /// For every element `a` in the ring we require the following properties:
+<a href=#76 id=76 data-nosnippet>76</a>    ///
+<a href=#77 id=77 data-nosnippet>77</a>    /// `a + ZERO = ZERO + a = a,`
+<a href=#78 id=78 data-nosnippet>78</a>    ///
+<a href=#79 id=79 data-nosnippet>79</a>    /// `a + (-a) = (-a) + a = ZERO.`
+<a href=#80 id=80 data-nosnippet>80</a>    </span><span class="kw">const </span>ZERO: <span class="self">Self</span>;
+<a href=#81 id=81 data-nosnippet>81</a>
+<a href=#82 id=82 data-nosnippet>82</a>    <span class="doccomment">/// The multiplicative identity of the ring.
+<a href=#83 id=83 data-nosnippet>83</a>    ///
+<a href=#84 id=84 data-nosnippet>84</a>    /// For every element `a` in the ring we require the following property:
+<a href=#85 id=85 data-nosnippet>85</a>    ///
+<a href=#86 id=86 data-nosnippet>86</a>    /// `a*ONE = ONE*a = a.`
+<a href=#87 id=87 data-nosnippet>87</a>    </span><span class="kw">const </span>ONE: <span class="self">Self</span>;
+<a href=#88 id=88 data-nosnippet>88</a>
+<a href=#89 id=89 data-nosnippet>89</a>    <span class="doccomment">/// The element in the ring given by `ONE + ONE`.
+<a href=#90 id=90 data-nosnippet>90</a>    ///
+<a href=#91 id=91 data-nosnippet>91</a>    /// This is provided as a convenience as `TWO` occurs regularly in
+<a href=#92 id=92 data-nosnippet>92</a>    /// the proving system. This also is slightly faster than computing
+<a href=#93 id=93 data-nosnippet>93</a>    /// it via addition. Note that multiplication by `TWO` is discouraged.
+<a href=#94 id=94 data-nosnippet>94</a>    /// Instead of `a * TWO` use `a.double()` which will be faster.
+<a href=#95 id=95 data-nosnippet>95</a>    ///
+<a href=#96 id=96 data-nosnippet>96</a>    /// If the field has characteristic 2 this is equal to ZERO.
+<a href=#97 id=97 data-nosnippet>97</a>    </span><span class="kw">const </span>TWO: <span class="self">Self</span>;
+<a href=#98 id=98 data-nosnippet>98</a>
+<a href=#99 id=99 data-nosnippet>99</a>    <span class="doccomment">/// The element in the ring given by `-ONE`.
+<a href=#100 id=100 data-nosnippet>100</a>    ///
+<a href=#101 id=101 data-nosnippet>101</a>    /// This is provided as a convenience as `NEG_ONE` occurs regularly in
+<a href=#102 id=102 data-nosnippet>102</a>    /// the proving system. This also is slightly faster than computing
+<a href=#103 id=103 data-nosnippet>103</a>    /// it via negation. Note that where possible `NEG_ONE` should be absorbed
+<a href=#104 id=104 data-nosnippet>104</a>    /// into mathematical operations. For example `a - b` will be faster
+<a href=#105 id=105 data-nosnippet>105</a>    /// than `a + NEG_ONE * b` and similarly `(-b)` is faster than `NEG_ONE * b`.
+<a href=#106 id=106 data-nosnippet>106</a>    ///
+<a href=#107 id=107 data-nosnippet>107</a>    /// If the field has characteristic 2 this is equal to ONE.
+<a href=#108 id=108 data-nosnippet>108</a>    </span><span class="kw">const </span>NEG_ONE: <span class="self">Self</span>;
+<a href=#109 id=109 data-nosnippet>109</a>
+<a href=#110 id=110 data-nosnippet>110</a>    <span class="doccomment">/// Embed an element of the prime field `ℤ/p` into the ring `R`.
+<a href=#111 id=111 data-nosnippet>111</a>    ///
+<a href=#112 id=112 data-nosnippet>112</a>    /// Given any element `[r] ∈ ℤ/p`, represented by an integer `r` between `0` and `p - 1`
+<a href=#113 id=113 data-nosnippet>113</a>    /// `from_prime_subfield([r])` will be equal to:
+<a href=#114 id=114 data-nosnippet>114</a>    ///
+<a href=#115 id=115 data-nosnippet>115</a>    /// `Self::ONE + ... + Self::ONE (r times)`
+<a href=#116 id=116 data-nosnippet>116</a>    </span><span class="attr">#[must_use]
+<a href=#117 id=117 data-nosnippet>117</a>    </span><span class="kw">fn </span>from_prime_subfield(f: <span class="self">Self</span>::PrimeSubfield) -&gt; <span class="self">Self</span>;
+<a href=#118 id=118 data-nosnippet>118</a>
+<a href=#119 id=119 data-nosnippet>119</a>    <span class="doccomment">/// Return `Self::ONE` if `b` is `true` and `Self::ZERO` if `b` is `false`.
+<a href=#120 id=120 data-nosnippet>120</a>    </span><span class="attr">#[must_use]
+<a href=#121 id=121 data-nosnippet>121</a>    #[inline(always)]
+<a href=#122 id=122 data-nosnippet>122</a>    </span><span class="kw">fn </span>from_bool(b: bool) -&gt; <span class="self">Self </span>{
+<a href=#123 id=123 data-nosnippet>123</a>        <span class="comment">// Some rings might reimplement this to avoid the branch.
+<a href=#124 id=124 data-nosnippet>124</a>        </span><span class="kw">if </span>b { <span class="self">Self</span>::ONE } <span class="kw">else </span>{ <span class="self">Self</span>::ZERO }
+<a href=#125 id=125 data-nosnippet>125</a>    }
+<a href=#126 id=126 data-nosnippet>126</a>
+<a href=#127 id=127 data-nosnippet>127</a>    <span class="macro">from_integer_types!</span>(
+<a href=#128 id=128 data-nosnippet>128</a>        u8, u16, u32, u64, u128, usize, i8, i16, i32, i64, i128, isize
+<a href=#129 id=129 data-nosnippet>129</a>    );
+<a href=#130 id=130 data-nosnippet>130</a>
+<a href=#131 id=131 data-nosnippet>131</a>    <span class="doccomment">/// The elementary function `double(a) = 2*a`.
+<a href=#132 id=132 data-nosnippet>132</a>    ///
+<a href=#133 id=133 data-nosnippet>133</a>    /// This function should be preferred over calling `a + a` or `TWO * a` as a faster implementation may be available for some rings.
+<a href=#134 id=134 data-nosnippet>134</a>    /// If the field has characteristic 2 then this returns 0.
+<a href=#135 id=135 data-nosnippet>135</a>    </span><span class="attr">#[must_use]
+<a href=#136 id=136 data-nosnippet>136</a>    #[inline(always)]
+<a href=#137 id=137 data-nosnippet>137</a>    </span><span class="kw">fn </span>double(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="self">Self </span>{
+<a href=#138 id=138 data-nosnippet>138</a>        <span class="self">self</span>.clone() + <span class="self">self</span>.clone()
+<a href=#139 id=139 data-nosnippet>139</a>    }
+<a href=#140 id=140 data-nosnippet>140</a>
+<a href=#141 id=141 data-nosnippet>141</a>    <span class="doccomment">/// The elementary function `halve(a) = a/2`.
+<a href=#142 id=142 data-nosnippet>142</a>    ///
+<a href=#143 id=143 data-nosnippet>143</a>    /// # Panics
+<a href=#144 id=144 data-nosnippet>144</a>    /// The function will panic if the field has characteristic 2.
+<a href=#145 id=145 data-nosnippet>145</a>    </span><span class="attr">#[must_use]
+<a href=#146 id=146 data-nosnippet>146</a>    #[inline]
+<a href=#147 id=147 data-nosnippet>147</a>    </span><span class="kw">fn </span>halve(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="self">Self </span>{
+<a href=#148 id=148 data-nosnippet>148</a>        <span class="comment">// This must be overwritten by PrimeField implementations as this definition
+<a href=#149 id=149 data-nosnippet>149</a>        // is circular when PrimeSubfield = Self. It should also be overwritten by
+<a href=#150 id=150 data-nosnippet>150</a>        // most rings to avoid the multiplication.
+<a href=#151 id=151 data-nosnippet>151</a>        </span><span class="kw">let </span>half = <span class="self">Self</span>::from_prime_subfield(<span class="self">Self</span>::PrimeSubfield::ONE.halve());
+<a href=#152 id=152 data-nosnippet>152</a>        <span class="self">self</span>.clone() * half
+<a href=#153 id=153 data-nosnippet>153</a>    }
+<a href=#154 id=154 data-nosnippet>154</a>
+<a href=#155 id=155 data-nosnippet>155</a>    <span class="doccomment">/// The elementary function `square(a) = a^2`.
+<a href=#156 id=156 data-nosnippet>156</a>    ///
+<a href=#157 id=157 data-nosnippet>157</a>    /// This function should be preferred over calling `a * a`, as a faster implementation may be available for some rings.
+<a href=#158 id=158 data-nosnippet>158</a>    </span><span class="attr">#[must_use]
+<a href=#159 id=159 data-nosnippet>159</a>    #[inline(always)]
+<a href=#160 id=160 data-nosnippet>160</a>    </span><span class="kw">fn </span>square(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="self">Self </span>{
+<a href=#161 id=161 data-nosnippet>161</a>        <span class="self">self</span>.clone() * <span class="self">self</span>.clone()
+<a href=#162 id=162 data-nosnippet>162</a>    }
+<a href=#163 id=163 data-nosnippet>163</a>
+<a href=#164 id=164 data-nosnippet>164</a>    <span class="doccomment">/// The elementary function `cube(a) = a^3`.
+<a href=#165 id=165 data-nosnippet>165</a>    ///
+<a href=#166 id=166 data-nosnippet>166</a>    /// This function should be preferred over calling `a * a * a`, as a faster implementation may be available for some rings.
+<a href=#167 id=167 data-nosnippet>167</a>    </span><span class="attr">#[must_use]
+<a href=#168 id=168 data-nosnippet>168</a>    #[inline(always)]
+<a href=#169 id=169 data-nosnippet>169</a>    </span><span class="kw">fn </span>cube(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="self">Self </span>{
+<a href=#170 id=170 data-nosnippet>170</a>        <span class="self">self</span>.square() * <span class="self">self</span>.clone()
+<a href=#171 id=171 data-nosnippet>171</a>    }
+<a href=#172 id=172 data-nosnippet>172</a>
+<a href=#173 id=173 data-nosnippet>173</a>    <span class="doccomment">/// Computes the arithmetic generalization of boolean `xor`.
+<a href=#174 id=174 data-nosnippet>174</a>    ///
+<a href=#175 id=175 data-nosnippet>175</a>    /// For boolean inputs, `x ^ y = x + y - 2 xy`.
+<a href=#176 id=176 data-nosnippet>176</a>    </span><span class="attr">#[must_use]
+<a href=#177 id=177 data-nosnippet>177</a>    #[inline(always)]
+<a href=#178 id=178 data-nosnippet>178</a>    </span><span class="kw">fn </span>xor(<span class="kw-2">&amp;</span><span class="self">self</span>, y: <span class="kw-2">&amp;</span><span class="self">Self</span>) -&gt; <span class="self">Self </span>{
+<a href=#179 id=179 data-nosnippet>179</a>        <span class="self">self</span>.clone() + y.clone() - <span class="self">self</span>.clone() * y.clone().double()
+<a href=#180 id=180 data-nosnippet>180</a>    }
+<a href=#181 id=181 data-nosnippet>181</a>
+<a href=#182 id=182 data-nosnippet>182</a>    <span class="doccomment">/// Computes the arithmetic generalization of a triple `xor`.
+<a href=#183 id=183 data-nosnippet>183</a>    ///
+<a href=#184 id=184 data-nosnippet>184</a>    /// For boolean inputs `x ^ y ^ z = x + y + z - 2(xy + xz + yz) + 4xyz`.
+<a href=#185 id=185 data-nosnippet>185</a>    </span><span class="attr">#[must_use]
+<a href=#186 id=186 data-nosnippet>186</a>    #[inline(always)]
+<a href=#187 id=187 data-nosnippet>187</a>    </span><span class="kw">fn </span>xor3(<span class="kw-2">&amp;</span><span class="self">self</span>, y: <span class="kw-2">&amp;</span><span class="self">Self</span>, z: <span class="kw-2">&amp;</span><span class="self">Self</span>) -&gt; <span class="self">Self </span>{
+<a href=#188 id=188 data-nosnippet>188</a>        <span class="self">self</span>.xor(y).xor(z)
+<a href=#189 id=189 data-nosnippet>189</a>    }
+<a href=#190 id=190 data-nosnippet>190</a>
+<a href=#191 id=191 data-nosnippet>191</a>    <span class="doccomment">/// Computes the arithmetic generalization of `andnot`.
+<a href=#192 id=192 data-nosnippet>192</a>    ///
+<a href=#193 id=193 data-nosnippet>193</a>    /// For boolean inputs `(!x) &amp; y = (1 - x)y`.
+<a href=#194 id=194 data-nosnippet>194</a>    </span><span class="attr">#[must_use]
+<a href=#195 id=195 data-nosnippet>195</a>    #[inline(always)]
+<a href=#196 id=196 data-nosnippet>196</a>    </span><span class="kw">fn </span>andn(<span class="kw-2">&amp;</span><span class="self">self</span>, y: <span class="kw-2">&amp;</span><span class="self">Self</span>) -&gt; <span class="self">Self </span>{
+<a href=#197 id=197 data-nosnippet>197</a>        (<span class="self">Self</span>::ONE - <span class="self">self</span>.clone()) * y.clone()
+<a href=#198 id=198 data-nosnippet>198</a>    }
+<a href=#199 id=199 data-nosnippet>199</a>
+<a href=#200 id=200 data-nosnippet>200</a>    <span class="doccomment">/// The vanishing polynomial for boolean values: `x * (x - 1)`.
+<a href=#201 id=201 data-nosnippet>201</a>    ///
+<a href=#202 id=202 data-nosnippet>202</a>    /// This is a polynomial of degree `2` that evaluates to `0` if the input is `0` or `1`.
+<a href=#203 id=203 data-nosnippet>203</a>    /// If our space is a field, then this will be nonzero on all other inputs.
+<a href=#204 id=204 data-nosnippet>204</a>    </span><span class="attr">#[must_use]
+<a href=#205 id=205 data-nosnippet>205</a>    #[inline(always)]
+<a href=#206 id=206 data-nosnippet>206</a>    </span><span class="kw">fn </span>bool_check(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="self">Self </span>{
+<a href=#207 id=207 data-nosnippet>207</a>        <span class="comment">// Note: We could delegate to `andn`, but to maintain backwards
+<a href=#208 id=208 data-nosnippet>208</a>        // compatible AIR definitions, we stick with `x * (x - 1)` here.
+<a href=#209 id=209 data-nosnippet>209</a>        </span><span class="self">self</span>.clone() * (<span class="self">self</span>.clone() - <span class="self">Self</span>::ONE)
+<a href=#210 id=210 data-nosnippet>210</a>    }
+<a href=#211 id=211 data-nosnippet>211</a>
+<a href=#212 id=212 data-nosnippet>212</a>    <span class="doccomment">/// Exponentiation by a `u64` power.
+<a href=#213 id=213 data-nosnippet>213</a>    ///
+<a href=#214 id=214 data-nosnippet>214</a>    /// This uses the standard square and multiply approach.
+<a href=#215 id=215 data-nosnippet>215</a>    /// For specific powers regularly used and known in advance,
+<a href=#216 id=216 data-nosnippet>216</a>    /// this will be slower than custom addition chain exponentiation.
+<a href=#217 id=217 data-nosnippet>217</a>    </span><span class="attr">#[must_use]
+<a href=#218 id=218 data-nosnippet>218</a>    #[inline]
+<a href=#219 id=219 data-nosnippet>219</a>    </span><span class="kw">fn </span>exp_u64(<span class="kw-2">&amp;</span><span class="self">self</span>, power: u64) -&gt; <span class="self">Self </span>{
+<a href=#220 id=220 data-nosnippet>220</a>        <span class="kw">let </span><span class="kw-2">mut </span>current = <span class="self">self</span>.clone();
+<a href=#221 id=221 data-nosnippet>221</a>        <span class="kw">let </span><span class="kw-2">mut </span>product = <span class="self">Self</span>::ONE;
+<a href=#222 id=222 data-nosnippet>222</a>
+<a href=#223 id=223 data-nosnippet>223</a>        <span class="kw">for </span>j <span class="kw">in </span><span class="number">0</span>..bits_u64(power) {
+<a href=#224 id=224 data-nosnippet>224</a>            <span class="kw">if </span>(power &gt;&gt; j) &amp; <span class="number">1 </span>!= <span class="number">0 </span>{
+<a href=#225 id=225 data-nosnippet>225</a>                product <span class="kw-2">*</span>= current.clone();
+<a href=#226 id=226 data-nosnippet>226</a>            }
+<a href=#227 id=227 data-nosnippet>227</a>            current = current.square();
+<a href=#228 id=228 data-nosnippet>228</a>        }
+<a href=#229 id=229 data-nosnippet>229</a>        product
+<a href=#230 id=230 data-nosnippet>230</a>    }
+<a href=#231 id=231 data-nosnippet>231</a>
+<a href=#232 id=232 data-nosnippet>232</a>    <span class="doccomment">/// Exponentiation by a small constant power.
+<a href=#233 id=233 data-nosnippet>233</a>    ///
+<a href=#234 id=234 data-nosnippet>234</a>    /// For a collection of small values we implement custom multiplication chain circuits which can be faster than the
+<a href=#235 id=235 data-nosnippet>235</a>    /// simpler square and multiply approach.
+<a href=#236 id=236 data-nosnippet>236</a>    ///
+<a href=#237 id=237 data-nosnippet>237</a>    /// For large values this defaults back to `self.exp_u64`.
+<a href=#238 id=238 data-nosnippet>238</a>    </span><span class="attr">#[must_use]
+<a href=#239 id=239 data-nosnippet>239</a>    #[inline(always)]
+<a href=#240 id=240 data-nosnippet>240</a>    </span><span class="kw">fn </span>exp_const_u64&lt;<span class="kw">const </span>POWER: u64&gt;(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="self">Self </span>{
+<a href=#241 id=241 data-nosnippet>241</a>        <span class="kw">match </span>POWER {
+<a href=#242 id=242 data-nosnippet>242</a>            <span class="number">0 </span>=&gt; <span class="self">Self</span>::ONE,
+<a href=#243 id=243 data-nosnippet>243</a>            <span class="number">1 </span>=&gt; <span class="self">self</span>.clone(),
+<a href=#244 id=244 data-nosnippet>244</a>            <span class="number">2 </span>=&gt; <span class="self">self</span>.square(),
+<a href=#245 id=245 data-nosnippet>245</a>            <span class="number">3 </span>=&gt; <span class="self">self</span>.cube(),
+<a href=#246 id=246 data-nosnippet>246</a>            <span class="number">4 </span>=&gt; <span class="self">self</span>.square().square(),
+<a href=#247 id=247 data-nosnippet>247</a>            <span class="number">5 </span>=&gt; <span class="self">self</span>.square().square() * <span class="self">self</span>.clone(),
+<a href=#248 id=248 data-nosnippet>248</a>            <span class="number">6 </span>=&gt; <span class="self">self</span>.square().cube(),
+<a href=#249 id=249 data-nosnippet>249</a>            <span class="number">7 </span>=&gt; {
+<a href=#250 id=250 data-nosnippet>250</a>                <span class="kw">let </span>x2 = <span class="self">self</span>.square();
+<a href=#251 id=251 data-nosnippet>251</a>                <span class="kw">let </span>x3 = x2.clone() * <span class="self">self</span>.clone();
+<a href=#252 id=252 data-nosnippet>252</a>                <span class="kw">let </span>x4 = x2.square();
+<a href=#253 id=253 data-nosnippet>253</a>                x3 * x4
+<a href=#254 id=254 data-nosnippet>254</a>            }
+<a href=#255 id=255 data-nosnippet>255</a>            <span class="kw">_ </span>=&gt; <span class="self">self</span>.exp_u64(POWER),
+<a href=#256 id=256 data-nosnippet>256</a>        }
+<a href=#257 id=257 data-nosnippet>257</a>    }
+<a href=#258 id=258 data-nosnippet>258</a>
+<a href=#259 id=259 data-nosnippet>259</a>    <span class="doccomment">/// The elementary function `exp_power_of_2(a, power_log) = a^{2^power_log}`.
+<a href=#260 id=260 data-nosnippet>260</a>    ///
+<a href=#261 id=261 data-nosnippet>261</a>    /// Computed via repeated squaring.
+<a href=#262 id=262 data-nosnippet>262</a>    </span><span class="attr">#[must_use]
+<a href=#263 id=263 data-nosnippet>263</a>    #[inline]
+<a href=#264 id=264 data-nosnippet>264</a>    </span><span class="kw">fn </span>exp_power_of_2(<span class="kw-2">&amp;</span><span class="self">self</span>, power_log: usize) -&gt; <span class="self">Self </span>{
+<a href=#265 id=265 data-nosnippet>265</a>        <span class="kw">let </span><span class="kw-2">mut </span>res = <span class="self">self</span>.clone();
+<a href=#266 id=266 data-nosnippet>266</a>        <span class="kw">for _ in </span><span class="number">0</span>..power_log {
+<a href=#267 id=267 data-nosnippet>267</a>            res = res.square();
+<a href=#268 id=268 data-nosnippet>268</a>        }
+<a href=#269 id=269 data-nosnippet>269</a>        res
+<a href=#270 id=270 data-nosnippet>270</a>    }
+<a href=#271 id=271 data-nosnippet>271</a>
+<a href=#272 id=272 data-nosnippet>272</a>    <span class="doccomment">/// The elementary function `mul_2exp_u64(a, exp) = a * 2^{exp}`.
+<a href=#273 id=273 data-nosnippet>273</a>    ///
+<a href=#274 id=274 data-nosnippet>274</a>    /// Here `2^{exp}` is computed using the square and multiply approach.
+<a href=#275 id=275 data-nosnippet>275</a>    </span><span class="attr">#[must_use]
+<a href=#276 id=276 data-nosnippet>276</a>    #[inline]
+<a href=#277 id=277 data-nosnippet>277</a>    </span><span class="kw">fn </span>mul_2exp_u64(<span class="kw-2">&amp;</span><span class="self">self</span>, exp: u64) -&gt; <span class="self">Self </span>{
+<a href=#278 id=278 data-nosnippet>278</a>        <span class="comment">// Some rings might want to reimplement this to avoid the
+<a href=#279 id=279 data-nosnippet>279</a>        // exponentiations (and potentially even the multiplication).
+<a href=#280 id=280 data-nosnippet>280</a>        </span><span class="self">self</span>.clone() * <span class="self">Self</span>::TWO.exp_u64(exp)
+<a href=#281 id=281 data-nosnippet>281</a>    }
+<a href=#282 id=282 data-nosnippet>282</a>
+<a href=#283 id=283 data-nosnippet>283</a>    <span class="doccomment">/// Divide by a given power of two. `div_2exp_u64(a, exp) = a/2^exp`
+<a href=#284 id=284 data-nosnippet>284</a>    ///
+<a href=#285 id=285 data-nosnippet>285</a>    /// # Panics
+<a href=#286 id=286 data-nosnippet>286</a>    /// The function will panic if the field has characteristic 2.
+<a href=#287 id=287 data-nosnippet>287</a>    </span><span class="attr">#[must_use]
+<a href=#288 id=288 data-nosnippet>288</a>    #[inline]
+<a href=#289 id=289 data-nosnippet>289</a>    </span><span class="kw">fn </span>div_2exp_u64(<span class="kw-2">&amp;</span><span class="self">self</span>, exp: u64) -&gt; <span class="self">Self </span>{
+<a href=#290 id=290 data-nosnippet>290</a>        <span class="comment">// Some rings might want to reimplement this to avoid the
+<a href=#291 id=291 data-nosnippet>291</a>        // exponentiations (and potentially even the multiplication).
+<a href=#292 id=292 data-nosnippet>292</a>        </span><span class="self">self</span>.clone() * <span class="self">Self</span>::from_prime_subfield(<span class="self">Self</span>::PrimeSubfield::ONE.halve().exp_u64(exp))
+<a href=#293 id=293 data-nosnippet>293</a>    }
+<a href=#294 id=294 data-nosnippet>294</a>
+<a href=#295 id=295 data-nosnippet>295</a>    <span class="doccomment">/// Construct an iterator which returns powers of `self`: `self^0, self^1, self^2, ...`.
+<a href=#296 id=296 data-nosnippet>296</a>    </span><span class="attr">#[must_use]
+<a href=#297 id=297 data-nosnippet>297</a>    #[inline]
+<a href=#298 id=298 data-nosnippet>298</a>    </span><span class="kw">fn </span>powers(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; Powers&lt;<span class="self">Self</span>&gt; {
+<a href=#299 id=299 data-nosnippet>299</a>        <span class="self">self</span>.shifted_powers(<span class="self">Self</span>::ONE)
+<a href=#300 id=300 data-nosnippet>300</a>    }
+<a href=#301 id=301 data-nosnippet>301</a>
+<a href=#302 id=302 data-nosnippet>302</a>    <span class="doccomment">/// Construct an iterator which returns powers of `self` shifted by `start`: `start, start*self^1, start*self^2, ...`.
+<a href=#303 id=303 data-nosnippet>303</a>    </span><span class="attr">#[must_use]
+<a href=#304 id=304 data-nosnippet>304</a>    #[inline]
+<a href=#305 id=305 data-nosnippet>305</a>    </span><span class="kw">fn </span>shifted_powers(<span class="kw-2">&amp;</span><span class="self">self</span>, start: <span class="self">Self</span>) -&gt; Powers&lt;<span class="self">Self</span>&gt; {
+<a href=#306 id=306 data-nosnippet>306</a>        Powers {
+<a href=#307 id=307 data-nosnippet>307</a>            base: <span class="self">self</span>.clone(),
+<a href=#308 id=308 data-nosnippet>308</a>            current: start,
+<a href=#309 id=309 data-nosnippet>309</a>        }
+<a href=#310 id=310 data-nosnippet>310</a>    }
+<a href=#311 id=311 data-nosnippet>311</a>
+<a href=#312 id=312 data-nosnippet>312</a>    <span class="doccomment">/// Compute the dot product of two vectors.
+<a href=#313 id=313 data-nosnippet>313</a>    </span><span class="attr">#[must_use]
+<a href=#314 id=314 data-nosnippet>314</a>    #[inline]
+<a href=#315 id=315 data-nosnippet>315</a>    </span><span class="kw">fn </span>dot_product&lt;<span class="kw">const </span>N: usize&gt;(u: <span class="kw-2">&amp;</span>[<span class="self">Self</span>; N], v: <span class="kw-2">&amp;</span>[<span class="self">Self</span>; N]) -&gt; <span class="self">Self </span>{
+<a href=#316 id=316 data-nosnippet>316</a>        u.iter().zip(v).map(|(x, y)| x.clone() * y.clone()).sum()
+<a href=#317 id=317 data-nosnippet>317</a>    }
+<a href=#318 id=318 data-nosnippet>318</a>
+<a href=#319 id=319 data-nosnippet>319</a>    <span class="doccomment">/// Compute the sum of a slice of elements whose length is a compile time constant.
+<a href=#320 id=320 data-nosnippet>320</a>    ///
+<a href=#321 id=321 data-nosnippet>321</a>    /// The rust compiler doesn't realize that add is associative
+<a href=#322 id=322 data-nosnippet>322</a>    /// so we help it out and minimize the dependency chains by hand.
+<a href=#323 id=323 data-nosnippet>323</a>    /// Thus while this function has the same throughput as `input.iter().sum()`,
+<a href=#324 id=324 data-nosnippet>324</a>    /// it will usually have much lower latency.
+<a href=#325 id=325 data-nosnippet>325</a>    ///
+<a href=#326 id=326 data-nosnippet>326</a>    /// # Panics
+<a href=#327 id=327 data-nosnippet>327</a>    ///
+<a href=#328 id=328 data-nosnippet>328</a>    /// May panic if the length of the input slice is not equal to `N`.
+<a href=#329 id=329 data-nosnippet>329</a>    </span><span class="attr">#[must_use]
+<a href=#330 id=330 data-nosnippet>330</a>    #[inline]
+<a href=#331 id=331 data-nosnippet>331</a>    </span><span class="kw">fn </span>sum_array&lt;<span class="kw">const </span>N: usize&gt;(input: <span class="kw-2">&amp;</span>[<span class="self">Self</span>]) -&gt; <span class="self">Self </span>{
+<a href=#332 id=332 data-nosnippet>332</a>        <span class="comment">// It looks a little strange but using a const parameter and an assert_eq! instead of
+<a href=#333 id=333 data-nosnippet>333</a>        // using input.len() leads to a significant performance improvement.
+<a href=#334 id=334 data-nosnippet>334</a>        // We could make this input &amp;[Self; N] but that would require sticking .try_into().unwrap() everywhere.
+<a href=#335 id=335 data-nosnippet>335</a>        // Checking godbolt, the compiler seems to unroll everything anyway.
+<a href=#336 id=336 data-nosnippet>336</a>        </span><span class="macro">assert_eq!</span>(N, input.len());
+<a href=#337 id=337 data-nosnippet>337</a>
+<a href=#338 id=338 data-nosnippet>338</a>        <span class="comment">// For `N &lt;= 8` we implement a tree sum structure and for `N &gt; 8` we break the input into
+<a href=#339 id=339 data-nosnippet>339</a>        // chunks of `8`, perform a tree sum on each chunk and sum the results. The parameter `8`
+<a href=#340 id=340 data-nosnippet>340</a>        // was determined experimentally by testing the speed of the poseidon2 internal layer computations.
+<a href=#341 id=341 data-nosnippet>341</a>        // This is a useful benchmark as we have a mix of summations of size 15, 23 with other work in between.
+<a href=#342 id=342 data-nosnippet>342</a>        // I only tested this on `AVX2` though so there might be a better value for other architectures.
+<a href=#343 id=343 data-nosnippet>343</a>        </span><span class="kw">match </span>N {
+<a href=#344 id=344 data-nosnippet>344</a>            <span class="number">0 </span>=&gt; <span class="self">Self</span>::ZERO,
+<a href=#345 id=345 data-nosnippet>345</a>            <span class="number">1 </span>=&gt; input[<span class="number">0</span>].clone(),
+<a href=#346 id=346 data-nosnippet>346</a>            <span class="number">2 </span>=&gt; input[<span class="number">0</span>].clone() + input[<span class="number">1</span>].clone(),
+<a href=#347 id=347 data-nosnippet>347</a>            <span class="number">3 </span>=&gt; input[<span class="number">0</span>].clone() + input[<span class="number">1</span>].clone() + input[<span class="number">2</span>].clone(),
+<a href=#348 id=348 data-nosnippet>348</a>            <span class="number">4 </span>=&gt; (input[<span class="number">0</span>].clone() + input[<span class="number">1</span>].clone()) + (input[<span class="number">2</span>].clone() + input[<span class="number">3</span>].clone()),
+<a href=#349 id=349 data-nosnippet>349</a>            <span class="number">5 </span>=&gt; <span class="self">Self</span>::sum_array::&lt;<span class="number">4</span>&gt;(<span class="kw-2">&amp;</span>input[..<span class="number">4</span>]) + <span class="self">Self</span>::sum_array::&lt;<span class="number">1</span>&gt;(<span class="kw-2">&amp;</span>input[<span class="number">4</span>..]),
+<a href=#350 id=350 data-nosnippet>350</a>            <span class="number">6 </span>=&gt; <span class="self">Self</span>::sum_array::&lt;<span class="number">4</span>&gt;(<span class="kw-2">&amp;</span>input[..<span class="number">4</span>]) + <span class="self">Self</span>::sum_array::&lt;<span class="number">2</span>&gt;(<span class="kw-2">&amp;</span>input[<span class="number">4</span>..]),
+<a href=#351 id=351 data-nosnippet>351</a>            <span class="number">7 </span>=&gt; <span class="self">Self</span>::sum_array::&lt;<span class="number">4</span>&gt;(<span class="kw-2">&amp;</span>input[..<span class="number">4</span>]) + <span class="self">Self</span>::sum_array::&lt;<span class="number">3</span>&gt;(<span class="kw-2">&amp;</span>input[<span class="number">4</span>..]),
+<a href=#352 id=352 data-nosnippet>352</a>            <span class="number">8 </span>=&gt; <span class="self">Self</span>::sum_array::&lt;<span class="number">4</span>&gt;(<span class="kw-2">&amp;</span>input[..<span class="number">4</span>]) + <span class="self">Self</span>::sum_array::&lt;<span class="number">4</span>&gt;(<span class="kw-2">&amp;</span>input[<span class="number">4</span>..]),
+<a href=#353 id=353 data-nosnippet>353</a>            <span class="kw">_ </span>=&gt; {
+<a href=#354 id=354 data-nosnippet>354</a>                <span class="comment">// We know that N &gt; 8 here so this saves an add over the usual
+<a href=#355 id=355 data-nosnippet>355</a>                // initialisation of acc to Self::ZERO.
+<a href=#356 id=356 data-nosnippet>356</a>                </span><span class="kw">let </span><span class="kw-2">mut </span>acc = <span class="self">Self</span>::sum_array::&lt;<span class="number">8</span>&gt;(<span class="kw-2">&amp;</span>input[..<span class="number">8</span>]);
+<a href=#357 id=357 data-nosnippet>357</a>                <span class="kw">for </span>i <span class="kw">in </span>(<span class="number">16</span>..=N).step_by(<span class="number">8</span>) {
+<a href=#358 id=358 data-nosnippet>358</a>                    acc += <span class="self">Self</span>::sum_array::&lt;<span class="number">8</span>&gt;(<span class="kw-2">&amp;</span>input[(i - <span class="number">8</span>)..i]);
+<a href=#359 id=359 data-nosnippet>359</a>                }
+<a href=#360 id=360 data-nosnippet>360</a>                <span class="comment">// This would be much cleaner if we could use const generic expressions but
+<a href=#361 id=361 data-nosnippet>361</a>                // this will do for now.
+<a href=#362 id=362 data-nosnippet>362</a>                </span><span class="kw">match </span>N &amp; <span class="number">7 </span>{
+<a href=#363 id=363 data-nosnippet>363</a>                    <span class="number">0 </span>=&gt; acc,
+<a href=#364 id=364 data-nosnippet>364</a>                    <span class="number">1 </span>=&gt; acc + <span class="self">Self</span>::sum_array::&lt;<span class="number">1</span>&gt;(<span class="kw-2">&amp;</span>input[(<span class="number">8 </span>* (N / <span class="number">8</span>))..]),
+<a href=#365 id=365 data-nosnippet>365</a>                    <span class="number">2 </span>=&gt; acc + <span class="self">Self</span>::sum_array::&lt;<span class="number">2</span>&gt;(<span class="kw-2">&amp;</span>input[(<span class="number">8 </span>* (N / <span class="number">8</span>))..]),
+<a href=#366 id=366 data-nosnippet>366</a>                    <span class="number">3 </span>=&gt; acc + <span class="self">Self</span>::sum_array::&lt;<span class="number">3</span>&gt;(<span class="kw-2">&amp;</span>input[(<span class="number">8 </span>* (N / <span class="number">8</span>))..]),
+<a href=#367 id=367 data-nosnippet>367</a>                    <span class="number">4 </span>=&gt; acc + <span class="self">Self</span>::sum_array::&lt;<span class="number">4</span>&gt;(<span class="kw-2">&amp;</span>input[(<span class="number">8 </span>* (N / <span class="number">8</span>))..]),
+<a href=#368 id=368 data-nosnippet>368</a>                    <span class="number">5 </span>=&gt; acc + <span class="self">Self</span>::sum_array::&lt;<span class="number">5</span>&gt;(<span class="kw-2">&amp;</span>input[(<span class="number">8 </span>* (N / <span class="number">8</span>))..]),
+<a href=#369 id=369 data-nosnippet>369</a>                    <span class="number">6 </span>=&gt; acc + <span class="self">Self</span>::sum_array::&lt;<span class="number">6</span>&gt;(<span class="kw-2">&amp;</span>input[(<span class="number">8 </span>* (N / <span class="number">8</span>))..]),
+<a href=#370 id=370 data-nosnippet>370</a>                    <span class="number">7 </span>=&gt; acc + <span class="self">Self</span>::sum_array::&lt;<span class="number">7</span>&gt;(<span class="kw-2">&amp;</span>input[(<span class="number">8 </span>* (N / <span class="number">8</span>))..]),
+<a href=#371 id=371 data-nosnippet>371</a>                    <span class="kw">_ </span>=&gt; <span class="macro">unreachable!</span>(),
+<a href=#372 id=372 data-nosnippet>372</a>                }
+<a href=#373 id=373 data-nosnippet>373</a>            }
+<a href=#374 id=374 data-nosnippet>374</a>        }
+<a href=#375 id=375 data-nosnippet>375</a>    }
+<a href=#376 id=376 data-nosnippet>376</a>
+<a href=#377 id=377 data-nosnippet>377</a>    <span class="doccomment">/// Allocates a vector of zero elements of length `len`. Many operating systems zero pages
+<a href=#378 id=378 data-nosnippet>378</a>    /// before assigning them to a userspace process. In that case, our process should not need to
+<a href=#379 id=379 data-nosnippet>379</a>    /// write zeros, which would be redundant. However, the compiler may not always recognize this.
+<a href=#380 id=380 data-nosnippet>380</a>    ///
+<a href=#381 id=381 data-nosnippet>381</a>    /// In particular, `vec![Self::ZERO; len]` appears to result in redundant userspace zeroing.
+<a href=#382 id=382 data-nosnippet>382</a>    /// This is the default implementation, but implementers may wish to provide their own
+<a href=#383 id=383 data-nosnippet>383</a>    /// implementation which transmutes something like `vec![0u32; len]`.
+<a href=#384 id=384 data-nosnippet>384</a>    </span><span class="attr">#[must_use]
+<a href=#385 id=385 data-nosnippet>385</a>    #[inline]
+<a href=#386 id=386 data-nosnippet>386</a>    </span><span class="kw">fn </span>zero_vec(len: usize) -&gt; Vec&lt;<span class="self">Self</span>&gt; {
+<a href=#387 id=387 data-nosnippet>387</a>        <span class="macro">vec!</span>[<span class="self">Self</span>::ZERO; len]
+<a href=#388 id=388 data-nosnippet>388</a>    }
+<a href=#389 id=389 data-nosnippet>389</a>}
+<a href=#390 id=390 data-nosnippet>390</a>
+<a href=#391 id=391 data-nosnippet>391</a><span class="doccomment">/// A vector space `V` over `F` with a fixed basis. Fixing the basis allows elements of `V` to be
+<a href=#392 id=392 data-nosnippet>392</a>/// converted to and from `DIMENSION` many elements of `F` which are interpreted as basis coefficients.
+<a href=#393 id=393 data-nosnippet>393</a>///
+<a href=#394 id=394 data-nosnippet>394</a>/// We usually expect `F` to be a field but do not enforce this and so allow it to be just a ring.
+<a href=#395 id=395 data-nosnippet>395</a>/// This lets every ring implement `BasedVectorSpace&lt;Self&gt;` and is useful in a couple of other cases.
+<a href=#396 id=396 data-nosnippet>396</a>///
+<a href=#397 id=397 data-nosnippet>397</a>/// ## Safety
+<a href=#398 id=398 data-nosnippet>398</a>/// We make no guarantees about consistency of the choice of basis across different versions of Plonky3.
+<a href=#399 id=399 data-nosnippet>399</a>/// If this choice of basis changes, the behaviour of `BasedVectorSpace` will also change. Due to this,
+<a href=#400 id=400 data-nosnippet>400</a>/// we recommend avoiding using this trait unless absolutely necessary.
+<a href=#401 id=401 data-nosnippet>401</a>///
+<a href=#402 id=402 data-nosnippet>402</a>/// ### Mathematical Description
+<a href=#403 id=403 data-nosnippet>403</a>/// Given a vector space, `A` over `F`, a basis is a set of elements `B = {b_0, ..., b_{n-1}}`
+<a href=#404 id=404 data-nosnippet>404</a>/// in `A` such that, given any element `a`, we can find a unique set of `n` elements of `F`,
+<a href=#405 id=405 data-nosnippet>405</a>/// `f_0, ..., f_{n - 1}` satisfying `a = f_0 b_0 + ... + f_{n - 1} b_{n - 1}`. Thus the choice
+<a href=#406 id=406 data-nosnippet>406</a>/// of `B` gives rise to a natural linear map between the vector space `A` and the canonical
+<a href=#407 id=407 data-nosnippet>407</a>/// `n` dimensional vector space `F^n`.
+<a href=#408 id=408 data-nosnippet>408</a>///
+<a href=#409 id=409 data-nosnippet>409</a>/// This allows us to map between elements of `A` and arrays of `n` elements of `F`.
+<a href=#410 id=410 data-nosnippet>410</a>/// Clearly this map depends entirely on the choice of basis `B` which may change
+<a href=#411 id=411 data-nosnippet>411</a>/// across versions of Plonky3.
+<a href=#412 id=412 data-nosnippet>412</a>///
+<a href=#413 id=413 data-nosnippet>413</a>/// The situation is slightly more complicated in cases where `F` is not a field but boils down
+<a href=#414 id=414 data-nosnippet>414</a>/// to an identical description once we enforce that `A` is a free module over `F`.
+<a href=#415 id=415 data-nosnippet>415</a></span><span class="kw">pub trait </span>BasedVectorSpace&lt;F: PrimeCharacteristicRing&gt;: Sized {
+<a href=#416 id=416 data-nosnippet>416</a>    <span class="doccomment">/// The dimension of the vector space, i.e. the number of elements in
+<a href=#417 id=417 data-nosnippet>417</a>    /// its basis.
+<a href=#418 id=418 data-nosnippet>418</a>    </span><span class="kw">const </span>DIMENSION: usize;
+<a href=#419 id=419 data-nosnippet>419</a>
+<a href=#420 id=420 data-nosnippet>420</a>    <span class="doccomment">/// Fixes a basis for the algebra `A` and uses this to
+<a href=#421 id=421 data-nosnippet>421</a>    /// map an element of `A` to a slice of `DIMENSION` `F` elements.
+<a href=#422 id=422 data-nosnippet>422</a>    ///
+<a href=#423 id=423 data-nosnippet>423</a>    /// # Safety
+<a href=#424 id=424 data-nosnippet>424</a>    ///
+<a href=#425 id=425 data-nosnippet>425</a>    /// The value produced by this function fundamentally depends
+<a href=#426 id=426 data-nosnippet>426</a>    /// on the choice of basis. Care must be taken
+<a href=#427 id=427 data-nosnippet>427</a>    /// to ensure portability if these values might ever be passed to
+<a href=#428 id=428 data-nosnippet>428</a>    /// (or rederived within) another compilation environment where a
+<a href=#429 id=429 data-nosnippet>429</a>    /// different basis might have been used.
+<a href=#430 id=430 data-nosnippet>430</a>    </span><span class="attr">#[must_use]
+<a href=#431 id=431 data-nosnippet>431</a>    </span><span class="kw">fn </span>as_basis_coefficients_slice(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span>[F];
+<a href=#432 id=432 data-nosnippet>432</a>
+<a href=#433 id=433 data-nosnippet>433</a>    <span class="doccomment">/// Fixes a basis for the algebra `A` and uses this to
+<a href=#434 id=434 data-nosnippet>434</a>    /// map `DIMENSION` `F` elements to an element of `A`.
+<a href=#435 id=435 data-nosnippet>435</a>    ///
+<a href=#436 id=436 data-nosnippet>436</a>    /// # Safety
+<a href=#437 id=437 data-nosnippet>437</a>    ///
+<a href=#438 id=438 data-nosnippet>438</a>    /// The value produced by this function fundamentally depends
+<a href=#439 id=439 data-nosnippet>439</a>    /// on the choice of basis. Care must be taken
+<a href=#440 id=440 data-nosnippet>440</a>    /// to ensure portability if these values might ever be passed to
+<a href=#441 id=441 data-nosnippet>441</a>    /// (or rederived within) another compilation environment where a
+<a href=#442 id=442 data-nosnippet>442</a>    /// different basis might have been used.
+<a href=#443 id=443 data-nosnippet>443</a>    ///
+<a href=#444 id=444 data-nosnippet>444</a>    /// Returns `None` if the length of the slice is different to `DIMENSION`.
+<a href=#445 id=445 data-nosnippet>445</a>    </span><span class="attr">#[must_use]
+<a href=#446 id=446 data-nosnippet>446</a>    #[inline]
+<a href=#447 id=447 data-nosnippet>447</a>    </span><span class="kw">fn </span>from_basis_coefficients_slice(slice: <span class="kw-2">&amp;</span>[F]) -&gt; <span class="prelude-ty">Option</span>&lt;<span class="self">Self</span>&gt; {
+<a href=#448 id=448 data-nosnippet>448</a>        <span class="self">Self</span>::from_basis_coefficients_iter(slice.iter().cloned())
+<a href=#449 id=449 data-nosnippet>449</a>    }
+<a href=#450 id=450 data-nosnippet>450</a>
+<a href=#451 id=451 data-nosnippet>451</a>    <span class="doccomment">/// Fixes a basis for the algebra `A` and uses this to
+<a href=#452 id=452 data-nosnippet>452</a>    /// map `DIMENSION` `F` elements to an element of `A`. Similar
+<a href=#453 id=453 data-nosnippet>453</a>    /// to `core:array::from_fn`, the `DIMENSION` `F` elements are
+<a href=#454 id=454 data-nosnippet>454</a>    /// given by `Fn(0), ..., Fn(DIMENSION - 1)` called in that order.
+<a href=#455 id=455 data-nosnippet>455</a>    ///
+<a href=#456 id=456 data-nosnippet>456</a>    /// # Safety
+<a href=#457 id=457 data-nosnippet>457</a>    ///
+<a href=#458 id=458 data-nosnippet>458</a>    /// The value produced by this function fundamentally depends
+<a href=#459 id=459 data-nosnippet>459</a>    /// on the choice of basis. Care must be taken
+<a href=#460 id=460 data-nosnippet>460</a>    /// to ensure portability if these values might ever be passed to
+<a href=#461 id=461 data-nosnippet>461</a>    /// (or rederived within) another compilation environment where a
+<a href=#462 id=462 data-nosnippet>462</a>    /// different basis might have been used.
+<a href=#463 id=463 data-nosnippet>463</a>    </span><span class="attr">#[must_use]
+<a href=#464 id=464 data-nosnippet>464</a>    </span><span class="kw">fn </span>from_basis_coefficients_fn&lt;Fn: FnMut(usize) -&gt; F&gt;(f: Fn) -&gt; <span class="self">Self</span>;
+<a href=#465 id=465 data-nosnippet>465</a>
+<a href=#466 id=466 data-nosnippet>466</a>    <span class="doccomment">/// Fixes a basis for the algebra `A` and uses this to
+<a href=#467 id=467 data-nosnippet>467</a>    /// map `DIMENSION` `F` elements to an element of `A`.
+<a href=#468 id=468 data-nosnippet>468</a>    ///
+<a href=#469 id=469 data-nosnippet>469</a>    /// # Safety
+<a href=#470 id=470 data-nosnippet>470</a>    ///
+<a href=#471 id=471 data-nosnippet>471</a>    /// The value produced by this function fundamentally depends
+<a href=#472 id=472 data-nosnippet>472</a>    /// on the choice of basis. Care must be taken
+<a href=#473 id=473 data-nosnippet>473</a>    /// to ensure portability if these values might ever be passed to
+<a href=#474 id=474 data-nosnippet>474</a>    /// (or rederived within) another compilation environment where a
+<a href=#475 id=475 data-nosnippet>475</a>    /// different basis might have been used.
+<a href=#476 id=476 data-nosnippet>476</a>    ///
+<a href=#477 id=477 data-nosnippet>477</a>    /// Returns `None` if the length of the iterator is different to `DIMENSION`.
+<a href=#478 id=478 data-nosnippet>478</a>    </span><span class="attr">#[must_use]
+<a href=#479 id=479 data-nosnippet>479</a>    </span><span class="kw">fn </span>from_basis_coefficients_iter&lt;I: ExactSizeIterator&lt;Item = F&gt;&gt;(iter: I) -&gt; <span class="prelude-ty">Option</span>&lt;<span class="self">Self</span>&gt;;
+<a href=#480 id=480 data-nosnippet>480</a>
+<a href=#481 id=481 data-nosnippet>481</a>    <span class="doccomment">/// Given a basis for the Algebra `A`, return the i'th basis element.
+<a href=#482 id=482 data-nosnippet>482</a>    ///
+<a href=#483 id=483 data-nosnippet>483</a>    /// # Safety
+<a href=#484 id=484 data-nosnippet>484</a>    ///
+<a href=#485 id=485 data-nosnippet>485</a>    /// The value produced by this function fundamentally depends
+<a href=#486 id=486 data-nosnippet>486</a>    /// on the choice of basis. Care must be taken
+<a href=#487 id=487 data-nosnippet>487</a>    /// to ensure portability if these values might ever be passed to
+<a href=#488 id=488 data-nosnippet>488</a>    /// (or rederived within) another compilation environment where a
+<a href=#489 id=489 data-nosnippet>489</a>    /// different basis might have been used.
+<a href=#490 id=490 data-nosnippet>490</a>    ///
+<a href=#491 id=491 data-nosnippet>491</a>    /// Returns `None` if `i` is greater than or equal to `DIMENSION`.
+<a href=#492 id=492 data-nosnippet>492</a>    </span><span class="attr">#[must_use]
+<a href=#493 id=493 data-nosnippet>493</a>    #[inline]
+<a href=#494 id=494 data-nosnippet>494</a>    </span><span class="kw">fn </span>ith_basis_element(i: usize) -&gt; <span class="prelude-ty">Option</span>&lt;<span class="self">Self</span>&gt; {
+<a href=#495 id=495 data-nosnippet>495</a>        (i &lt; <span class="self">Self</span>::DIMENSION).then(|| <span class="self">Self</span>::from_basis_coefficients_fn(|j| F::from_bool(i == j)))
+<a href=#496 id=496 data-nosnippet>496</a>    }
+<a href=#497 id=497 data-nosnippet>497</a>
+<a href=#498 id=498 data-nosnippet>498</a>    <span class="doccomment">/// Convert from a vector of `Self` to a vector of `F` by flattening the basis coefficients.
+<a href=#499 id=499 data-nosnippet>499</a>    ///
+<a href=#500 id=500 data-nosnippet>500</a>    /// Depending on the `BasedVectorSpace` this may be essentially a no-op and should certainly
+<a href=#501 id=501 data-nosnippet>501</a>    /// be reimplemented in those cases.
+<a href=#502 id=502 data-nosnippet>502</a>    ///
+<a href=#503 id=503 data-nosnippet>503</a>    /// # Safety
+<a href=#504 id=504 data-nosnippet>504</a>    ///
+<a href=#505 id=505 data-nosnippet>505</a>    /// The value produced by this function fundamentally depends
+<a href=#506 id=506 data-nosnippet>506</a>    /// on the choice of basis. Care must be taken
+<a href=#507 id=507 data-nosnippet>507</a>    /// to ensure portability if these values might ever be passed to
+<a href=#508 id=508 data-nosnippet>508</a>    /// (or rederived within) another compilation environment where a
+<a href=#509 id=509 data-nosnippet>509</a>    /// different basis might have been used.
+<a href=#510 id=510 data-nosnippet>510</a>    </span><span class="attr">#[must_use]
+<a href=#511 id=511 data-nosnippet>511</a>    #[inline]
+<a href=#512 id=512 data-nosnippet>512</a>    </span><span class="kw">fn </span>flatten_to_base(vec: Vec&lt;<span class="self">Self</span>&gt;) -&gt; Vec&lt;F&gt; {
+<a href=#513 id=513 data-nosnippet>513</a>        vec.into_iter()
+<a href=#514 id=514 data-nosnippet>514</a>            .flat_map(|x| x.as_basis_coefficients_slice().to_vec())
+<a href=#515 id=515 data-nosnippet>515</a>            .collect()
+<a href=#516 id=516 data-nosnippet>516</a>    }
+<a href=#517 id=517 data-nosnippet>517</a>
+<a href=#518 id=518 data-nosnippet>518</a>    <span class="doccomment">/// Convert from a vector of `F` to a vector of `Self` by combining the basis coefficients.
+<a href=#519 id=519 data-nosnippet>519</a>    ///
+<a href=#520 id=520 data-nosnippet>520</a>    /// Depending on the `BasedVectorSpace` this may be essentially a no-op and should certainly
+<a href=#521 id=521 data-nosnippet>521</a>    /// be reimplemented in those cases.
+<a href=#522 id=522 data-nosnippet>522</a>    ///
+<a href=#523 id=523 data-nosnippet>523</a>    /// # Panics
+<a href=#524 id=524 data-nosnippet>524</a>    /// This will panic if the length of `vec` is not a multiple of `Self::DIMENSION`.
+<a href=#525 id=525 data-nosnippet>525</a>    ///
+<a href=#526 id=526 data-nosnippet>526</a>    /// # Safety
+<a href=#527 id=527 data-nosnippet>527</a>    ///
+<a href=#528 id=528 data-nosnippet>528</a>    /// The value produced by this function fundamentally depends
+<a href=#529 id=529 data-nosnippet>529</a>    /// on the choice of basis. Care must be taken
+<a href=#530 id=530 data-nosnippet>530</a>    /// to ensure portability if these values might ever be passed to
+<a href=#531 id=531 data-nosnippet>531</a>    /// (or rederived within) another compilation environment where a
+<a href=#532 id=532 data-nosnippet>532</a>    /// different basis might have been used.
+<a href=#533 id=533 data-nosnippet>533</a>    </span><span class="attr">#[must_use]
+<a href=#534 id=534 data-nosnippet>534</a>    #[inline]
+<a href=#535 id=535 data-nosnippet>535</a>    </span><span class="kw">fn </span>reconstitute_from_base(vec: Vec&lt;F&gt;) -&gt; Vec&lt;<span class="self">Self</span>&gt;
+<a href=#536 id=536 data-nosnippet>536</a>    <span class="kw">where
+<a href=#537 id=537 data-nosnippet>537</a>        </span>F: Sync,
+<a href=#538 id=538 data-nosnippet>538</a>        <span class="self">Self</span>: Send,
+<a href=#539 id=539 data-nosnippet>539</a>    {
+<a href=#540 id=540 data-nosnippet>540</a>        <span class="macro">assert_eq!</span>(vec.len() % <span class="self">Self</span>::DIMENSION, <span class="number">0</span>);
+<a href=#541 id=541 data-nosnippet>541</a>
+<a href=#542 id=542 data-nosnippet>542</a>        vec.par_chunks_exact(<span class="self">Self</span>::DIMENSION)
+<a href=#543 id=543 data-nosnippet>543</a>            .map(|chunk| {
+<a href=#544 id=544 data-nosnippet>544</a>                <span class="self">Self</span>::from_basis_coefficients_slice(chunk)
+<a href=#545 id=545 data-nosnippet>545</a>                    .expect(<span class="string">"Chunk length not equal to dimension"</span>)
+<a href=#546 id=546 data-nosnippet>546</a>            })
+<a href=#547 id=547 data-nosnippet>547</a>            .collect()
+<a href=#548 id=548 data-nosnippet>548</a>    }
+<a href=#549 id=549 data-nosnippet>549</a>}
+<a href=#550 id=550 data-nosnippet>550</a>
+<a href=#551 id=551 data-nosnippet>551</a><span class="kw">impl</span>&lt;F: PrimeCharacteristicRing&gt; BasedVectorSpace&lt;F&gt; <span class="kw">for </span>F {
+<a href=#552 id=552 data-nosnippet>552</a>    <span class="kw">const </span>DIMENSION: usize = <span class="number">1</span>;
+<a href=#553 id=553 data-nosnippet>553</a>
+<a href=#554 id=554 data-nosnippet>554</a>    <span class="attr">#[inline]
+<a href=#555 id=555 data-nosnippet>555</a>    </span><span class="kw">fn </span>as_basis_coefficients_slice(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span>[F] {
+<a href=#556 id=556 data-nosnippet>556</a>        slice::from_ref(<span class="self">self</span>)
+<a href=#557 id=557 data-nosnippet>557</a>    }
+<a href=#558 id=558 data-nosnippet>558</a>
+<a href=#559 id=559 data-nosnippet>559</a>    <span class="attr">#[inline]
+<a href=#560 id=560 data-nosnippet>560</a>    </span><span class="kw">fn </span>from_basis_coefficients_fn&lt;Fn: FnMut(usize) -&gt; F&gt;(<span class="kw-2">mut </span>f: Fn) -&gt; <span class="self">Self </span>{
+<a href=#561 id=561 data-nosnippet>561</a>        f(<span class="number">0</span>)
+<a href=#562 id=562 data-nosnippet>562</a>    }
+<a href=#563 id=563 data-nosnippet>563</a>
+<a href=#564 id=564 data-nosnippet>564</a>    <span class="attr">#[inline]
+<a href=#565 id=565 data-nosnippet>565</a>    </span><span class="kw">fn </span>from_basis_coefficients_iter&lt;I: ExactSizeIterator&lt;Item = F&gt;&gt;(<span class="kw-2">mut </span>iter: I) -&gt; <span class="prelude-ty">Option</span>&lt;<span class="self">Self</span>&gt; {
+<a href=#566 id=566 data-nosnippet>566</a>        (iter.len() == <span class="number">1</span>).then(|| iter.next().unwrap()) <span class="comment">// Unwrap will not panic as we know the length is 1.
+<a href=#567 id=567 data-nosnippet>567</a>    </span>}
+<a href=#568 id=568 data-nosnippet>568</a>
+<a href=#569 id=569 data-nosnippet>569</a>    <span class="attr">#[inline]
+<a href=#570 id=570 data-nosnippet>570</a>    </span><span class="kw">fn </span>flatten_to_base(vec: Vec&lt;<span class="self">Self</span>&gt;) -&gt; Vec&lt;F&gt; {
+<a href=#571 id=571 data-nosnippet>571</a>        vec
+<a href=#572 id=572 data-nosnippet>572</a>    }
+<a href=#573 id=573 data-nosnippet>573</a>
+<a href=#574 id=574 data-nosnippet>574</a>    <span class="attr">#[inline]
+<a href=#575 id=575 data-nosnippet>575</a>    </span><span class="kw">fn </span>reconstitute_from_base(vec: Vec&lt;F&gt;) -&gt; Vec&lt;<span class="self">Self</span>&gt; {
+<a href=#576 id=576 data-nosnippet>576</a>        vec
+<a href=#577 id=577 data-nosnippet>577</a>    }
+<a href=#578 id=578 data-nosnippet>578</a>}
+<a href=#579 id=579 data-nosnippet>579</a>
+<a href=#580 id=580 data-nosnippet>580</a><span class="doccomment">/// A ring implements `InjectiveMonomial&lt;N&gt;` if the algebraic function
+<a href=#581 id=581 data-nosnippet>581</a>/// `f(x) = x^N` is an injective map on elements of the ring.
+<a href=#582 id=582 data-nosnippet>582</a>///
+<a href=#583 id=583 data-nosnippet>583</a>/// We do not enforce that this map be invertible as there are useful
+<a href=#584 id=584 data-nosnippet>584</a>/// cases such as polynomials or symbolic expressions where no inverse exists.
+<a href=#585 id=585 data-nosnippet>585</a>///
+<a href=#586 id=586 data-nosnippet>586</a>/// However, if the ring is a field with order `q` or an array of such field elements,
+<a href=#587 id=587 data-nosnippet>587</a>/// then `f(x) = x^N` will be injective if and only if it is invertible and so in
+<a href=#588 id=588 data-nosnippet>588</a>/// such cases this monomial acts as a permutation. Moreover, this will occur
+<a href=#589 id=589 data-nosnippet>589</a>/// exactly when `N` and `q - 1` are relatively prime i.e. `gcd(N, q - 1) = 1`.
+<a href=#590 id=590 data-nosnippet>590</a></span><span class="kw">pub trait </span>InjectiveMonomial&lt;<span class="kw">const </span>N: u64&gt;: PrimeCharacteristicRing {
+<a href=#591 id=591 data-nosnippet>591</a>    <span class="doccomment">/// Compute `x -&gt; x^n` for a given `n &gt; 1` such that this
+<a href=#592 id=592 data-nosnippet>592</a>    /// map is injective.
+<a href=#593 id=593 data-nosnippet>593</a>    </span><span class="attr">#[must_use]
+<a href=#594 id=594 data-nosnippet>594</a>    #[inline]
+<a href=#595 id=595 data-nosnippet>595</a>    </span><span class="kw">fn </span>injective_exp_n(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="self">Self </span>{
+<a href=#596 id=596 data-nosnippet>596</a>        <span class="self">self</span>.exp_const_u64::&lt;N&gt;()
+<a href=#597 id=597 data-nosnippet>597</a>    }
+<a href=#598 id=598 data-nosnippet>598</a>}
+<a href=#599 id=599 data-nosnippet>599</a>
+<a href=#600 id=600 data-nosnippet>600</a><span class="doccomment">/// A ring implements `PermutationMonomial&lt;N&gt;` if the algebraic function
+<a href=#601 id=601 data-nosnippet>601</a>/// `f(x) = x^N` is invertible and thus acts as a permutation on elements of the ring.
+<a href=#602 id=602 data-nosnippet>602</a>///
+<a href=#603 id=603 data-nosnippet>603</a>/// In all cases we care about, this means that we can find another integer `K` such
+<a href=#604 id=604 data-nosnippet>604</a>/// that `x = x^{NK}` for all elements of our ring.
+<a href=#605 id=605 data-nosnippet>605</a></span><span class="kw">pub trait </span>PermutationMonomial&lt;<span class="kw">const </span>N: u64&gt;: InjectiveMonomial&lt;N&gt; {
+<a href=#606 id=606 data-nosnippet>606</a>    <span class="doccomment">/// Compute `x -&gt; x^K` for a given `K &gt; 1` such that
+<a href=#607 id=607 data-nosnippet>607</a>    /// `x^{NK} = x` for all elements `x`.
+<a href=#608 id=608 data-nosnippet>608</a>    </span><span class="attr">#[must_use]
+<a href=#609 id=609 data-nosnippet>609</a>    </span><span class="kw">fn </span>injective_exp_root_n(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="self">Self</span>;
+<a href=#610 id=610 data-nosnippet>610</a>}
+<a href=#611 id=611 data-nosnippet>611</a>
+<a href=#612 id=612 data-nosnippet>612</a><span class="doccomment">/// A ring `R` implements `Algebra&lt;F&gt;` if there is an injective homomorphism
+<a href=#613 id=613 data-nosnippet>613</a>///  from `F` into `R`; in particular only `F::ZERO` maps to `R::ZERO`.
+<a href=#614 id=614 data-nosnippet>614</a>///
+<a href=#615 id=615 data-nosnippet>615</a>/// For the most part, we will usually expect `F` to be a field but there
+<a href=#616 id=616 data-nosnippet>616</a>/// are a few cases where it is handy to allow it to just be a ring. In
+<a href=#617 id=617 data-nosnippet>617</a>/// particular, every ring naturally implements `Algebra&lt;Self&gt;`.
+<a href=#618 id=618 data-nosnippet>618</a>///
+<a href=#619 id=619 data-nosnippet>619</a>/// ### Mathematical Description
+<a href=#620 id=620 data-nosnippet>620</a>///
+<a href=#621 id=621 data-nosnippet>621</a>/// Let `x` and `y` denote arbitrary elements of `F`. Then
+<a href=#622 id=622 data-nosnippet>622</a>/// we require that our map `from` has the properties:
+<a href=#623 id=623 data-nosnippet>623</a>/// - Preserves Identity: `from(F::ONE) = R::ONE`
+<a href=#624 id=624 data-nosnippet>624</a>/// - Commutes with Addition: `from(x + y) = from(x) + from(y)`
+<a href=#625 id=625 data-nosnippet>625</a>/// - Commutes with Multiplication: `from(x * y) = from(x) * from(y)`
+<a href=#626 id=626 data-nosnippet>626</a>///
+<a href=#627 id=627 data-nosnippet>627</a>/// Such maps are known as ring homomorphisms and are injective if the
+<a href=#628 id=628 data-nosnippet>628</a>/// only element which maps to `R::ZERO` is `F::ZERO`.
+<a href=#629 id=629 data-nosnippet>629</a>///
+<a href=#630 id=630 data-nosnippet>630</a>/// The existence of this map makes `R` into an `F`-module and hence an `F`-algebra.
+<a href=#631 id=631 data-nosnippet>631</a>/// If, additionally, `R` is a field, then this makes `R` a field extension of `F`.
+<a href=#632 id=632 data-nosnippet>632</a></span><span class="kw">pub trait </span>Algebra&lt;F&gt;:
+<a href=#633 id=633 data-nosnippet>633</a>    PrimeCharacteristicRing
+<a href=#634 id=634 data-nosnippet>634</a>    + From&lt;F&gt;
+<a href=#635 id=635 data-nosnippet>635</a>    + Add&lt;F, Output = <span class="self">Self</span>&gt;
+<a href=#636 id=636 data-nosnippet>636</a>    + AddAssign&lt;F&gt;
+<a href=#637 id=637 data-nosnippet>637</a>    + Sub&lt;F, Output = <span class="self">Self</span>&gt;
+<a href=#638 id=638 data-nosnippet>638</a>    + SubAssign&lt;F&gt;
+<a href=#639 id=639 data-nosnippet>639</a>    + Mul&lt;F, Output = <span class="self">Self</span>&gt;
+<a href=#640 id=640 data-nosnippet>640</a>    + MulAssign&lt;F&gt;
+<a href=#641 id=641 data-nosnippet>641</a>{
+<a href=#642 id=642 data-nosnippet>642</a>}
+<a href=#643 id=643 data-nosnippet>643</a>
+<a href=#644 id=644 data-nosnippet>644</a><span class="comment">// Every ring is an algebra over itself.
+<a href=#645 id=645 data-nosnippet>645</a></span><span class="kw">impl</span>&lt;R: PrimeCharacteristicRing&gt; Algebra&lt;R&gt; <span class="kw">for </span>R {}
+<a href=#646 id=646 data-nosnippet>646</a>
+<a href=#647 id=647 data-nosnippet>647</a><span class="doccomment">/// A collection of methods designed to help hash field elements.
+<a href=#648 id=648 data-nosnippet>648</a>///
+<a href=#649 id=649 data-nosnippet>649</a>/// Most fields will want to reimplement many/all of these methods as the default implementations
+<a href=#650 id=650 data-nosnippet>650</a>/// are slow and involve converting to/from byte representations.
+<a href=#651 id=651 data-nosnippet>651</a></span><span class="kw">pub trait </span>RawDataSerializable: Sized {
+<a href=#652 id=652 data-nosnippet>652</a>    <span class="doccomment">/// The number of bytes which this field element occupies in memory.
+<a href=#653 id=653 data-nosnippet>653</a>    /// Must be equal to the length of self.into_bytes().
+<a href=#654 id=654 data-nosnippet>654</a>    </span><span class="kw">const </span>NUM_BYTES: usize;
+<a href=#655 id=655 data-nosnippet>655</a>
+<a href=#656 id=656 data-nosnippet>656</a>    <span class="doccomment">/// Convert a field element into a collection of bytes.
+<a href=#657 id=657 data-nosnippet>657</a>    </span><span class="attr">#[must_use]
+<a href=#658 id=658 data-nosnippet>658</a>    </span><span class="kw">fn </span>into_bytes(<span class="self">self</span>) -&gt; <span class="kw">impl </span>IntoIterator&lt;Item = u8&gt;;
+<a href=#659 id=659 data-nosnippet>659</a>
+<a href=#660 id=660 data-nosnippet>660</a>    <span class="doccomment">/// Convert an iterator of field elements into an iterator of bytes.
+<a href=#661 id=661 data-nosnippet>661</a>    </span><span class="attr">#[must_use]
+<a href=#662 id=662 data-nosnippet>662</a>    </span><span class="kw">fn </span>into_byte_stream(input: <span class="kw">impl </span>IntoIterator&lt;Item = <span class="self">Self</span>&gt;) -&gt; <span class="kw">impl </span>IntoIterator&lt;Item = u8&gt; {
+<a href=#663 id=663 data-nosnippet>663</a>        input.into_iter().flat_map(|elem| elem.into_bytes())
+<a href=#664 id=664 data-nosnippet>664</a>    }
+<a href=#665 id=665 data-nosnippet>665</a>
+<a href=#666 id=666 data-nosnippet>666</a>    <span class="doccomment">/// Convert an iterator of field elements into an iterator of u32s.
+<a href=#667 id=667 data-nosnippet>667</a>    ///
+<a href=#668 id=668 data-nosnippet>668</a>    /// If `NUM_BYTES` does not divide `4`, multiple `F`s may be packed together to make a single `u32`. Furthermore,
+<a href=#669 id=669 data-nosnippet>669</a>    /// if `NUM_BYTES * input.len()` does not divide `4`, the final `u32` will involve padding bytes which are set to `0`.
+<a href=#670 id=670 data-nosnippet>670</a>    </span><span class="attr">#[must_use]
+<a href=#671 id=671 data-nosnippet>671</a>    </span><span class="kw">fn </span>into_u32_stream(input: <span class="kw">impl </span>IntoIterator&lt;Item = <span class="self">Self</span>&gt;) -&gt; <span class="kw">impl </span>IntoIterator&lt;Item = u32&gt; {
+<a href=#672 id=672 data-nosnippet>672</a>        <span class="kw">let </span>bytes = <span class="self">Self</span>::into_byte_stream(input);
+<a href=#673 id=673 data-nosnippet>673</a>        iter_array_chunks_padded(bytes, <span class="number">0</span>).map(u32::from_le_bytes)
+<a href=#674 id=674 data-nosnippet>674</a>    }
+<a href=#675 id=675 data-nosnippet>675</a>
+<a href=#676 id=676 data-nosnippet>676</a>    <span class="doccomment">/// Convert an iterator of field elements into an iterator of u64s.
+<a href=#677 id=677 data-nosnippet>677</a>    ///
+<a href=#678 id=678 data-nosnippet>678</a>    /// If `NUM_BYTES` does not divide `8`, multiple `F`s may be packed together to make a single `u64`. Furthermore,
+<a href=#679 id=679 data-nosnippet>679</a>    /// if `NUM_BYTES * input.len()` does not divide `8`, the final `u64` will involve padding bytes which are set to `0`.
+<a href=#680 id=680 data-nosnippet>680</a>    </span><span class="attr">#[must_use]
+<a href=#681 id=681 data-nosnippet>681</a>    </span><span class="kw">fn </span>into_u64_stream(input: <span class="kw">impl </span>IntoIterator&lt;Item = <span class="self">Self</span>&gt;) -&gt; <span class="kw">impl </span>IntoIterator&lt;Item = u64&gt; {
+<a href=#682 id=682 data-nosnippet>682</a>        <span class="kw">let </span>bytes = <span class="self">Self</span>::into_byte_stream(input);
+<a href=#683 id=683 data-nosnippet>683</a>        iter_array_chunks_padded(bytes, <span class="number">0</span>).map(u64::from_le_bytes)
+<a href=#684 id=684 data-nosnippet>684</a>    }
+<a href=#685 id=685 data-nosnippet>685</a>
+<a href=#686 id=686 data-nosnippet>686</a>    <span class="doccomment">/// Convert an iterator of field element arrays into an iterator of byte arrays.
+<a href=#687 id=687 data-nosnippet>687</a>    ///
+<a href=#688 id=688 data-nosnippet>688</a>    /// Converts an element `[F; N]` into the byte array `[[u8; N]; NUM_BYTES]`. This is
+<a href=#689 id=689 data-nosnippet>689</a>    /// intended for use with vectorized hash functions which use vector operations
+<a href=#690 id=690 data-nosnippet>690</a>    /// to compute several hashes in parallel.
+<a href=#691 id=691 data-nosnippet>691</a>    </span><span class="attr">#[must_use]
+<a href=#692 id=692 data-nosnippet>692</a>    </span><span class="kw">fn </span>into_parallel_byte_streams&lt;<span class="kw">const </span>N: usize&gt;(
+<a href=#693 id=693 data-nosnippet>693</a>        input: <span class="kw">impl </span>IntoIterator&lt;Item = [<span class="self">Self</span>; N]&gt;,
+<a href=#694 id=694 data-nosnippet>694</a>    ) -&gt; <span class="kw">impl </span>IntoIterator&lt;Item = [u8; N]&gt; {
+<a href=#695 id=695 data-nosnippet>695</a>        input.into_iter().flat_map(|vector| {
+<a href=#696 id=696 data-nosnippet>696</a>            <span class="kw">let </span>bytes = vector.map(|elem| elem.into_bytes().into_iter().collect::&lt;Vec&lt;<span class="kw">_</span>&gt;&gt;());
+<a href=#697 id=697 data-nosnippet>697</a>            (<span class="number">0</span>..<span class="self">Self</span>::NUM_BYTES).map(<span class="kw">move </span>|i| array::from_fn(|j| bytes[j][i]))
+<a href=#698 id=698 data-nosnippet>698</a>        })
+<a href=#699 id=699 data-nosnippet>699</a>    }
+<a href=#700 id=700 data-nosnippet>700</a>
+<a href=#701 id=701 data-nosnippet>701</a>    <span class="doccomment">/// Convert an iterator of field element arrays into an iterator of u32 arrays.
+<a href=#702 id=702 data-nosnippet>702</a>    ///
+<a href=#703 id=703 data-nosnippet>703</a>    /// Converts an element `[F; N]` into the u32 array `[[u32; N]; NUM_BYTES/4]`. This is
+<a href=#704 id=704 data-nosnippet>704</a>    /// intended for use with vectorized hash functions which use vector operations
+<a href=#705 id=705 data-nosnippet>705</a>    /// to compute several hashes in parallel.
+<a href=#706 id=706 data-nosnippet>706</a>    ///
+<a href=#707 id=707 data-nosnippet>707</a>    /// This function is guaranteed to be equivalent to starting with `Iterator&lt;[F; N]&gt;` performing a transpose
+<a href=#708 id=708 data-nosnippet>708</a>    /// operation to get `[Iterator&lt;F&gt;; N]`, calling `into_u32_stream` on each element to get `[Iterator&lt;u32&gt;; N]` and then
+<a href=#709 id=709 data-nosnippet>709</a>    /// performing another transpose operation to get `Iterator&lt;[u32; N]&gt;`.
+<a href=#710 id=710 data-nosnippet>710</a>    ///
+<a href=#711 id=711 data-nosnippet>711</a>    /// If `NUM_BYTES` does not divide `4`, multiple `[F; N]`s may be packed together to make a single `[u32; N]`. Furthermore,
+<a href=#712 id=712 data-nosnippet>712</a>    /// if `NUM_BYTES * input.len()` does not divide `4`, the final `[u32; N]` will involve padding bytes which are set to `0`.
+<a href=#713 id=713 data-nosnippet>713</a>    </span><span class="attr">#[must_use]
+<a href=#714 id=714 data-nosnippet>714</a>    </span><span class="kw">fn </span>into_parallel_u32_streams&lt;<span class="kw">const </span>N: usize&gt;(
+<a href=#715 id=715 data-nosnippet>715</a>        input: <span class="kw">impl </span>IntoIterator&lt;Item = [<span class="self">Self</span>; N]&gt;,
+<a href=#716 id=716 data-nosnippet>716</a>    ) -&gt; <span class="kw">impl </span>IntoIterator&lt;Item = [u32; N]&gt; {
+<a href=#717 id=717 data-nosnippet>717</a>        <span class="kw">let </span>bytes = <span class="self">Self</span>::into_parallel_byte_streams(input);
+<a href=#718 id=718 data-nosnippet>718</a>        iter_array_chunks_padded(bytes, [<span class="number">0</span>; N]).map(|byte_array: [[u8; N]; <span class="number">4</span>]| {
+<a href=#719 id=719 data-nosnippet>719</a>            array::from_fn(|i| u32::from_le_bytes(array::from_fn(|j| byte_array[j][i])))
+<a href=#720 id=720 data-nosnippet>720</a>        })
+<a href=#721 id=721 data-nosnippet>721</a>    }
+<a href=#722 id=722 data-nosnippet>722</a>
+<a href=#723 id=723 data-nosnippet>723</a>    <span class="doccomment">/// Convert an iterator of field element arrays into an iterator of u64 arrays.
+<a href=#724 id=724 data-nosnippet>724</a>    ///
+<a href=#725 id=725 data-nosnippet>725</a>    /// Converts an element `[F; N]` into the u64 array `[[u64; N]; NUM_BYTES/8]`. This is
+<a href=#726 id=726 data-nosnippet>726</a>    /// intended for use with vectorized hash functions which use vector operations
+<a href=#727 id=727 data-nosnippet>727</a>    /// to compute several hashes in parallel.
+<a href=#728 id=728 data-nosnippet>728</a>    ///
+<a href=#729 id=729 data-nosnippet>729</a>    /// This function is guaranteed to be equivalent to starting with `Iterator&lt;[F; N]&gt;` performing a transpose
+<a href=#730 id=730 data-nosnippet>730</a>    /// operation to get `[Iterator&lt;F&gt;; N]`, calling `into_u64_stream` on each element to get `[Iterator&lt;u64&gt;; N]` and then
+<a href=#731 id=731 data-nosnippet>731</a>    /// performing another transpose operation to get `Iterator&lt;[u64; N]&gt;`.
+<a href=#732 id=732 data-nosnippet>732</a>    ///
+<a href=#733 id=733 data-nosnippet>733</a>    /// If `NUM_BYTES` does not divide `8`, multiple `[F; N]`s may be packed together to make a single `[u64; N]`. Furthermore,
+<a href=#734 id=734 data-nosnippet>734</a>    /// if `NUM_BYTES * input.len()` does not divide `8`, the final `[u64; N]` will involve padding bytes which are set to `0`.
+<a href=#735 id=735 data-nosnippet>735</a>    </span><span class="attr">#[must_use]
+<a href=#736 id=736 data-nosnippet>736</a>    </span><span class="kw">fn </span>into_parallel_u64_streams&lt;<span class="kw">const </span>N: usize&gt;(
+<a href=#737 id=737 data-nosnippet>737</a>        input: <span class="kw">impl </span>IntoIterator&lt;Item = [<span class="self">Self</span>; N]&gt;,
+<a href=#738 id=738 data-nosnippet>738</a>    ) -&gt; <span class="kw">impl </span>IntoIterator&lt;Item = [u64; N]&gt; {
+<a href=#739 id=739 data-nosnippet>739</a>        <span class="kw">let </span>bytes = <span class="self">Self</span>::into_parallel_byte_streams(input);
+<a href=#740 id=740 data-nosnippet>740</a>        iter_array_chunks_padded(bytes, [<span class="number">0</span>; N]).map(|byte_array: [[u8; N]; <span class="number">8</span>]| {
+<a href=#741 id=741 data-nosnippet>741</a>            array::from_fn(|i| u64::from_le_bytes(array::from_fn(|j| byte_array[j][i])))
+<a href=#742 id=742 data-nosnippet>742</a>        })
+<a href=#743 id=743 data-nosnippet>743</a>    }
+<a href=#744 id=744 data-nosnippet>744</a>}
+<a href=#745 id=745 data-nosnippet>745</a>
+<a href=#746 id=746 data-nosnippet>746</a><span class="doccomment">/// A field `F`. This permits both modular fields `ℤ/p` along with their field extensions.
+<a href=#747 id=747 data-nosnippet>747</a>///
+<a href=#748 id=748 data-nosnippet>748</a>/// A ring is a field if every element `x` has a unique multiplicative inverse `x^{-1}`
+<a href=#749 id=749 data-nosnippet>749</a>/// which satisfies `x * x^{-1} = F::ONE`.
+<a href=#750 id=750 data-nosnippet>750</a></span><span class="kw">pub trait </span>Field:
+<a href=#751 id=751 data-nosnippet>751</a>    Algebra&lt;<span class="self">Self</span>&gt;
+<a href=#752 id=752 data-nosnippet>752</a>    + RawDataSerializable
+<a href=#753 id=753 data-nosnippet>753</a>    + Packable
+<a href=#754 id=754 data-nosnippet>754</a>    + <span class="lifetime">'static
+<a href=#755 id=755 data-nosnippet>755</a>    </span>+ Copy
+<a href=#756 id=756 data-nosnippet>756</a>    + Div&lt;<span class="self">Self</span>, Output = <span class="self">Self</span>&gt;
+<a href=#757 id=757 data-nosnippet>757</a>    + DivAssign
+<a href=#758 id=758 data-nosnippet>758</a>    + Add&lt;<span class="self">Self</span>::Packing, Output = <span class="self">Self</span>::Packing&gt;
+<a href=#759 id=759 data-nosnippet>759</a>    + Sub&lt;<span class="self">Self</span>::Packing, Output = <span class="self">Self</span>::Packing&gt;
+<a href=#760 id=760 data-nosnippet>760</a>    + Mul&lt;<span class="self">Self</span>::Packing, Output = <span class="self">Self</span>::Packing&gt;
+<a href=#761 id=761 data-nosnippet>761</a>    + Eq
+<a href=#762 id=762 data-nosnippet>762</a>    + Hash
+<a href=#763 id=763 data-nosnippet>763</a>    + Send
+<a href=#764 id=764 data-nosnippet>764</a>    + Sync
+<a href=#765 id=765 data-nosnippet>765</a>    + Display
+<a href=#766 id=766 data-nosnippet>766</a>    + Serialize
+<a href=#767 id=767 data-nosnippet>767</a>    + DeserializeOwned
+<a href=#768 id=768 data-nosnippet>768</a>{
+<a href=#769 id=769 data-nosnippet>769</a>    <span class="kw">type </span>Packing: PackedField&lt;Scalar = <span class="self">Self</span>&gt;;
+<a href=#770 id=770 data-nosnippet>770</a>
+<a href=#771 id=771 data-nosnippet>771</a>    <span class="doccomment">/// A generator of this field's multiplicative group.
+<a href=#772 id=772 data-nosnippet>772</a>    </span><span class="kw">const </span>GENERATOR: <span class="self">Self</span>;
+<a href=#773 id=773 data-nosnippet>773</a>
+<a href=#774 id=774 data-nosnippet>774</a>    <span class="doccomment">/// Check if the given field element is equal to the unique additive identity (ZERO).
+<a href=#775 id=775 data-nosnippet>775</a>    </span><span class="attr">#[must_use]
+<a href=#776 id=776 data-nosnippet>776</a>    #[inline]
+<a href=#777 id=777 data-nosnippet>777</a>    </span><span class="kw">fn </span>is_zero(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool {
+<a href=#778 id=778 data-nosnippet>778</a>        <span class="kw-2">*</span><span class="self">self </span>== <span class="self">Self</span>::ZERO
+<a href=#779 id=779 data-nosnippet>779</a>    }
+<a href=#780 id=780 data-nosnippet>780</a>
+<a href=#781 id=781 data-nosnippet>781</a>    <span class="doccomment">/// Check if the given field element is equal to the unique multiplicative identity (ONE).
+<a href=#782 id=782 data-nosnippet>782</a>    </span><span class="attr">#[must_use]
+<a href=#783 id=783 data-nosnippet>783</a>    #[inline]
+<a href=#784 id=784 data-nosnippet>784</a>    </span><span class="kw">fn </span>is_one(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool {
+<a href=#785 id=785 data-nosnippet>785</a>        <span class="kw-2">*</span><span class="self">self </span>== <span class="self">Self</span>::ONE
+<a href=#786 id=786 data-nosnippet>786</a>    }
+<a href=#787 id=787 data-nosnippet>787</a>
+<a href=#788 id=788 data-nosnippet>788</a>    <span class="doccomment">/// The multiplicative inverse of this field element, if it exists.
+<a href=#789 id=789 data-nosnippet>789</a>    ///
+<a href=#790 id=790 data-nosnippet>790</a>    /// NOTE: The inverse of `0` is undefined and will return `None`.
+<a href=#791 id=791 data-nosnippet>791</a>    </span><span class="attr">#[must_use]
+<a href=#792 id=792 data-nosnippet>792</a>    </span><span class="kw">fn </span>try_inverse(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span>&lt;<span class="self">Self</span>&gt;;
+<a href=#793 id=793 data-nosnippet>793</a>
+<a href=#794 id=794 data-nosnippet>794</a>    <span class="doccomment">/// The multiplicative inverse of this field element.
+<a href=#795 id=795 data-nosnippet>795</a>    ///
+<a href=#796 id=796 data-nosnippet>796</a>    /// # Panics
+<a href=#797 id=797 data-nosnippet>797</a>    /// The function will panic if the field element is `0`.
+<a href=#798 id=798 data-nosnippet>798</a>    /// Use try_inverse if you want to handle this case.
+<a href=#799 id=799 data-nosnippet>799</a>    </span><span class="attr">#[must_use]
+<a href=#800 id=800 data-nosnippet>800</a>    </span><span class="kw">fn </span>inverse(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="self">Self </span>{
+<a href=#801 id=801 data-nosnippet>801</a>        <span class="self">self</span>.try_inverse().expect(<span class="string">"Tried to invert zero"</span>)
+<a href=#802 id=802 data-nosnippet>802</a>    }
+<a href=#803 id=803 data-nosnippet>803</a>
+<a href=#804 id=804 data-nosnippet>804</a>    <span class="doccomment">/// Add two slices of field elements together, returning the result in the first slice.
+<a href=#805 id=805 data-nosnippet>805</a>    ///
+<a href=#806 id=806 data-nosnippet>806</a>    /// Makes use of packing to speed up the addition.
+<a href=#807 id=807 data-nosnippet>807</a>    ///
+<a href=#808 id=808 data-nosnippet>808</a>    /// This is optimal for cases where the two slices are small to medium length. E.g. between
+<a href=#809 id=809 data-nosnippet>809</a>    /// `F::Packing::WIDTH` and roughly however many elements fit in a cache line.
+<a href=#810 id=810 data-nosnippet>810</a>    ///
+<a href=#811 id=811 data-nosnippet>811</a>    /// For larger slices, it's likely worthwhile to use parallelization before calling this.
+<a href=#812 id=812 data-nosnippet>812</a>    /// Similarly if you need to add a large number of slices together, it's best to
+<a href=#813 id=813 data-nosnippet>813</a>    /// break them into small chunks and call this on the smaller chunks.
+<a href=#814 id=814 data-nosnippet>814</a>    ///
+<a href=#815 id=815 data-nosnippet>815</a>    /// # Panics
+<a href=#816 id=816 data-nosnippet>816</a>    /// The function will panic if the lengths of the two slices are not equal.
+<a href=#817 id=817 data-nosnippet>817</a>    </span><span class="attr">#[inline]
+<a href=#818 id=818 data-nosnippet>818</a>    </span><span class="kw">fn </span>add_slices(slice_1: <span class="kw-2">&amp;mut </span>[<span class="self">Self</span>], slice_2: <span class="kw-2">&amp;</span>[<span class="self">Self</span>]) {
+<a href=#819 id=819 data-nosnippet>819</a>        <span class="kw">let </span>(shorts_1, suffix_1) = <span class="self">Self</span>::Packing::pack_slice_with_suffix_mut(slice_1);
+<a href=#820 id=820 data-nosnippet>820</a>        <span class="kw">let </span>(shorts_2, suffix_2) = <span class="self">Self</span>::Packing::pack_slice_with_suffix(slice_2);
+<a href=#821 id=821 data-nosnippet>821</a>        <span class="macro">debug_assert_eq!</span>(shorts_1.len(), shorts_2.len());
+<a href=#822 id=822 data-nosnippet>822</a>        <span class="macro">debug_assert_eq!</span>(suffix_1.len(), suffix_2.len());
+<a href=#823 id=823 data-nosnippet>823</a>        <span class="kw">for </span>(x_1, <span class="kw-2">&amp;</span>x_2) <span class="kw">in </span>shorts_1.iter_mut().zip(shorts_2) {
+<a href=#824 id=824 data-nosnippet>824</a>            <span class="kw-2">*</span>x_1 += x_2;
+<a href=#825 id=825 data-nosnippet>825</a>        }
+<a href=#826 id=826 data-nosnippet>826</a>        <span class="kw">for </span>(x_1, <span class="kw-2">&amp;</span>x_2) <span class="kw">in </span>suffix_1.iter_mut().zip(suffix_2) {
+<a href=#827 id=827 data-nosnippet>827</a>            <span class="kw-2">*</span>x_1 += x_2;
+<a href=#828 id=828 data-nosnippet>828</a>        }
+<a href=#829 id=829 data-nosnippet>829</a>    }
+<a href=#830 id=830 data-nosnippet>830</a>
+<a href=#831 id=831 data-nosnippet>831</a>    <span class="doccomment">/// The number of elements in the field.
+<a href=#832 id=832 data-nosnippet>832</a>    ///
+<a href=#833 id=833 data-nosnippet>833</a>    /// This will either be prime if the field is a PrimeField or a power of a
+<a href=#834 id=834 data-nosnippet>834</a>    /// prime if the field is an extension field.
+<a href=#835 id=835 data-nosnippet>835</a>    </span><span class="attr">#[must_use]
+<a href=#836 id=836 data-nosnippet>836</a>    </span><span class="kw">fn </span>order() -&gt; BigUint;
+<a href=#837 id=837 data-nosnippet>837</a>
+<a href=#838 id=838 data-nosnippet>838</a>    <span class="doccomment">/// The number of bits required to define an element of this field.
+<a href=#839 id=839 data-nosnippet>839</a>    ///
+<a href=#840 id=840 data-nosnippet>840</a>    /// Usually due to storage and practical reasons the memory size of
+<a href=#841 id=841 data-nosnippet>841</a>    /// a field element will be a little larger than bits().
+<a href=#842 id=842 data-nosnippet>842</a>    </span><span class="attr">#[must_use]
+<a href=#843 id=843 data-nosnippet>843</a>    #[inline]
+<a href=#844 id=844 data-nosnippet>844</a>    </span><span class="kw">fn </span>bits() -&gt; usize {
+<a href=#845 id=845 data-nosnippet>845</a>        <span class="self">Self</span>::order().bits() <span class="kw">as </span>usize
+<a href=#846 id=846 data-nosnippet>846</a>    }
+<a href=#847 id=847 data-nosnippet>847</a>}
+<a href=#848 id=848 data-nosnippet>848</a>
+<a href=#849 id=849 data-nosnippet>849</a><span class="doccomment">/// A field isomorphic to `ℤ/p` for some prime `p`.
+<a href=#850 id=850 data-nosnippet>850</a>///
+<a href=#851 id=851 data-nosnippet>851</a>/// There is a natural map from `ℤ` to `ℤ/p` which sends an integer `r` to its conjugacy class `[r]`.
+<a href=#852 id=852 data-nosnippet>852</a>/// Canonically, each conjugacy class `[r]` can be represented by the unique integer `s` in `[0, p - 1)`
+<a href=#853 id=853 data-nosnippet>853</a>/// satisfying `s = r mod p`. This however is often not the most convenient computational representation
+<a href=#854 id=854 data-nosnippet>854</a>/// and so internal representations of field elements might differ from this and may change over time.
+<a href=#855 id=855 data-nosnippet>855</a></span><span class="kw">pub trait </span>PrimeField:
+<a href=#856 id=856 data-nosnippet>856</a>    Field
+<a href=#857 id=857 data-nosnippet>857</a>    + Ord
+<a href=#858 id=858 data-nosnippet>858</a>    + QuotientMap&lt;u8&gt;
+<a href=#859 id=859 data-nosnippet>859</a>    + QuotientMap&lt;u16&gt;
+<a href=#860 id=860 data-nosnippet>860</a>    + QuotientMap&lt;u32&gt;
+<a href=#861 id=861 data-nosnippet>861</a>    + QuotientMap&lt;u64&gt;
+<a href=#862 id=862 data-nosnippet>862</a>    + QuotientMap&lt;u128&gt;
+<a href=#863 id=863 data-nosnippet>863</a>    + QuotientMap&lt;usize&gt;
+<a href=#864 id=864 data-nosnippet>864</a>    + QuotientMap&lt;i8&gt;
+<a href=#865 id=865 data-nosnippet>865</a>    + QuotientMap&lt;i16&gt;
+<a href=#866 id=866 data-nosnippet>866</a>    + QuotientMap&lt;i32&gt;
+<a href=#867 id=867 data-nosnippet>867</a>    + QuotientMap&lt;i64&gt;
+<a href=#868 id=868 data-nosnippet>868</a>    + QuotientMap&lt;i128&gt;
+<a href=#869 id=869 data-nosnippet>869</a>    + QuotientMap&lt;isize&gt;
+<a href=#870 id=870 data-nosnippet>870</a>{
+<a href=#871 id=871 data-nosnippet>871</a>    <span class="doccomment">/// Return the representative of `value` in canonical form
+<a href=#872 id=872 data-nosnippet>872</a>    /// which lies in the range `0 &lt;= x &lt; self.order()`.
+<a href=#873 id=873 data-nosnippet>873</a>    </span><span class="attr">#[must_use]
+<a href=#874 id=874 data-nosnippet>874</a>    </span><span class="kw">fn </span>as_canonical_biguint(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; BigUint;
+<a href=#875 id=875 data-nosnippet>875</a>}
+<a href=#876 id=876 data-nosnippet>876</a>
+<a href=#877 id=877 data-nosnippet>877</a><span class="doccomment">/// A prime field `ℤ/p` with order, `p &lt; 2^64`.
+<a href=#878 id=878 data-nosnippet>878</a></span><span class="kw">pub trait </span>PrimeField64: PrimeField {
+<a href=#879 id=879 data-nosnippet>879</a>    <span class="kw">const </span>ORDER_U64: u64;
+<a href=#880 id=880 data-nosnippet>880</a>
+<a href=#881 id=881 data-nosnippet>881</a>    <span class="doccomment">/// Return the representative of `value` in canonical form
+<a href=#882 id=882 data-nosnippet>882</a>    /// which lies in the range `0 &lt;= x &lt; ORDER_U64`.
+<a href=#883 id=883 data-nosnippet>883</a>    </span><span class="attr">#[must_use]
+<a href=#884 id=884 data-nosnippet>884</a>    </span><span class="kw">fn </span>as_canonical_u64(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; u64;
+<a href=#885 id=885 data-nosnippet>885</a>
+<a href=#886 id=886 data-nosnippet>886</a>    <span class="doccomment">/// Convert a field element to a `u64` such that any two field elements
+<a href=#887 id=887 data-nosnippet>887</a>    /// are converted to the same `u64` if and only if they represent the same value.
+<a href=#888 id=888 data-nosnippet>888</a>    ///
+<a href=#889 id=889 data-nosnippet>889</a>    /// This will be the fastest way to convert a field element to a `u64` and
+<a href=#890 id=890 data-nosnippet>890</a>    /// is intended for use in hashing. It will also be consistent across different targets.
+<a href=#891 id=891 data-nosnippet>891</a>    </span><span class="attr">#[must_use]
+<a href=#892 id=892 data-nosnippet>892</a>    #[inline(always)]
+<a href=#893 id=893 data-nosnippet>893</a>    </span><span class="kw">fn </span>to_unique_u64(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; u64 {
+<a href=#894 id=894 data-nosnippet>894</a>        <span class="comment">// A simple default which is optimal for some fields.
+<a href=#895 id=895 data-nosnippet>895</a>        </span><span class="self">self</span>.as_canonical_u64()
+<a href=#896 id=896 data-nosnippet>896</a>    }
+<a href=#897 id=897 data-nosnippet>897</a>}
+<a href=#898 id=898 data-nosnippet>898</a>
+<a href=#899 id=899 data-nosnippet>899</a><span class="doccomment">/// A prime field `ℤ/p` with order `p &lt; 2^32`.
+<a href=#900 id=900 data-nosnippet>900</a></span><span class="kw">pub trait </span>PrimeField32: PrimeField64 {
+<a href=#901 id=901 data-nosnippet>901</a>    <span class="kw">const </span>ORDER_U32: u32;
+<a href=#902 id=902 data-nosnippet>902</a>
+<a href=#903 id=903 data-nosnippet>903</a>    <span class="doccomment">/// Return the representative of `value` in canonical form
+<a href=#904 id=904 data-nosnippet>904</a>    /// which lies in the range `0 &lt;= x &lt; ORDER_U64`.
+<a href=#905 id=905 data-nosnippet>905</a>    </span><span class="attr">#[must_use]
+<a href=#906 id=906 data-nosnippet>906</a>    </span><span class="kw">fn </span>as_canonical_u32(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; u32;
+<a href=#907 id=907 data-nosnippet>907</a>
+<a href=#908 id=908 data-nosnippet>908</a>    <span class="doccomment">/// Convert a field element to a `u32` such that any two field elements
+<a href=#909 id=909 data-nosnippet>909</a>    /// are converted to the same `u32` if and only if they represent the same value.
+<a href=#910 id=910 data-nosnippet>910</a>    ///
+<a href=#911 id=911 data-nosnippet>911</a>    /// This will be the fastest way to convert a field element to a `u32` and
+<a href=#912 id=912 data-nosnippet>912</a>    /// is intended for use in hashing. It will also be consistent across different targets.
+<a href=#913 id=913 data-nosnippet>913</a>    </span><span class="attr">#[must_use]
+<a href=#914 id=914 data-nosnippet>914</a>    #[inline(always)]
+<a href=#915 id=915 data-nosnippet>915</a>    </span><span class="kw">fn </span>to_unique_u32(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; u32 {
+<a href=#916 id=916 data-nosnippet>916</a>        <span class="comment">// A simple default which is optimal for some fields.
+<a href=#917 id=917 data-nosnippet>917</a>        </span><span class="self">self</span>.as_canonical_u32()
+<a href=#918 id=918 data-nosnippet>918</a>    }
+<a href=#919 id=919 data-nosnippet>919</a>}
+<a href=#920 id=920 data-nosnippet>920</a>
+<a href=#921 id=921 data-nosnippet>921</a><span class="doccomment">/// A field `EF` which is also an algebra over a field `F`.
+<a href=#922 id=922 data-nosnippet>922</a>///
+<a href=#923 id=923 data-nosnippet>923</a>/// This provides a couple of convenience methods on top of the
+<a href=#924 id=924 data-nosnippet>924</a>/// standard methods provided by `Field`, `Algebra&lt;F&gt;` and `BasedVectorSpace&lt;F&gt;`.
+<a href=#925 id=925 data-nosnippet>925</a>///
+<a href=#926 id=926 data-nosnippet>926</a>/// It also provides a type which handles packed vectors of extension field elements.
+<a href=#927 id=927 data-nosnippet>927</a></span><span class="kw">pub trait </span>ExtensionField&lt;Base: Field&gt;: Field + Algebra&lt;Base&gt; + BasedVectorSpace&lt;Base&gt; {
+<a href=#928 id=928 data-nosnippet>928</a>    <span class="kw">type </span>ExtensionPacking: PackedFieldExtension&lt;Base, <span class="self">Self</span>&gt; + <span class="lifetime">'static </span>+ Copy + Send + Sync;
+<a href=#929 id=929 data-nosnippet>929</a>
+<a href=#930 id=930 data-nosnippet>930</a>    <span class="doccomment">/// Determine if the given element lies in the base field.
+<a href=#931 id=931 data-nosnippet>931</a>    </span><span class="attr">#[must_use]
+<a href=#932 id=932 data-nosnippet>932</a>    </span><span class="kw">fn </span>is_in_basefield(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool;
+<a href=#933 id=933 data-nosnippet>933</a>
+<a href=#934 id=934 data-nosnippet>934</a>    <span class="doccomment">/// If the element lies in the base field project it down.
+<a href=#935 id=935 data-nosnippet>935</a>    /// Otherwise return None.
+<a href=#936 id=936 data-nosnippet>936</a>    </span><span class="attr">#[must_use]
+<a href=#937 id=937 data-nosnippet>937</a>    </span><span class="kw">fn </span>as_base(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span>&lt;Base&gt;;
+<a href=#938 id=938 data-nosnippet>938</a>}
+<a href=#939 id=939 data-nosnippet>939</a>
+<a href=#940 id=940 data-nosnippet>940</a><span class="comment">// Every field is trivially a one dimensional extension over itself.
+<a href=#941 id=941 data-nosnippet>941</a></span><span class="kw">impl</span>&lt;F: Field&gt; ExtensionField&lt;F&gt; <span class="kw">for </span>F {
+<a href=#942 id=942 data-nosnippet>942</a>    <span class="kw">type </span>ExtensionPacking = F::Packing;
+<a href=#943 id=943 data-nosnippet>943</a>
+<a href=#944 id=944 data-nosnippet>944</a>    <span class="attr">#[inline]
+<a href=#945 id=945 data-nosnippet>945</a>    </span><span class="kw">fn </span>is_in_basefield(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool {
+<a href=#946 id=946 data-nosnippet>946</a>        <span class="bool-val">true
+<a href=#947 id=947 data-nosnippet>947</a>    </span>}
+<a href=#948 id=948 data-nosnippet>948</a>
+<a href=#949 id=949 data-nosnippet>949</a>    <span class="attr">#[inline]
+<a href=#950 id=950 data-nosnippet>950</a>    </span><span class="kw">fn </span>as_base(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span>&lt;F&gt; {
+<a href=#951 id=951 data-nosnippet>951</a>        <span class="prelude-val">Some</span>(<span class="kw-2">*</span><span class="self">self</span>)
+<a href=#952 id=952 data-nosnippet>952</a>    }
+<a href=#953 id=953 data-nosnippet>953</a>}
+<a href=#954 id=954 data-nosnippet>954</a>
+<a href=#955 id=955 data-nosnippet>955</a><span class="doccomment">/// A field which supplies information like the two-adicity of its multiplicative group, and methods
+<a href=#956 id=956 data-nosnippet>956</a>/// for obtaining two-adic generators.
+<a href=#957 id=957 data-nosnippet>957</a></span><span class="kw">pub trait </span>TwoAdicField: Field {
+<a href=#958 id=958 data-nosnippet>958</a>    <span class="doccomment">/// The number of factors of two in this field's multiplicative group.
+<a href=#959 id=959 data-nosnippet>959</a>    </span><span class="kw">const </span>TWO_ADICITY: usize;
+<a href=#960 id=960 data-nosnippet>960</a>
+<a href=#961 id=961 data-nosnippet>961</a>    <span class="doccomment">/// Returns a generator of the multiplicative group of order `2^bits`.
+<a href=#962 id=962 data-nosnippet>962</a>    /// Assumes `bits &lt;= TWO_ADICITY`, otherwise the result is undefined.
+<a href=#963 id=963 data-nosnippet>963</a>    </span><span class="attr">#[must_use]
+<a href=#964 id=964 data-nosnippet>964</a>    </span><span class="kw">fn </span>two_adic_generator(bits: usize) -&gt; <span class="self">Self</span>;
+<a href=#965 id=965 data-nosnippet>965</a>}
+<a href=#966 id=966 data-nosnippet>966</a>
+<a href=#967 id=967 data-nosnippet>967</a><span class="doccomment">/// An iterator which returns the powers of a base element `b` shifted by current `c`: `c, c * b, c * b^2, ...`.
+<a href=#968 id=968 data-nosnippet>968</a></span><span class="attr">#[derive(Clone, Debug)]
+<a href=#969 id=969 data-nosnippet>969</a></span><span class="kw">pub struct </span>Powers&lt;R: PrimeCharacteristicRing&gt; {
+<a href=#970 id=970 data-nosnippet>970</a>    <span class="kw">pub </span>base: R,
+<a href=#971 id=971 data-nosnippet>971</a>    <span class="kw">pub </span>current: R,
+<a href=#972 id=972 data-nosnippet>972</a>}
+<a href=#973 id=973 data-nosnippet>973</a>
+<a href=#974 id=974 data-nosnippet>974</a><span class="kw">impl</span>&lt;R: PrimeCharacteristicRing&gt; Iterator <span class="kw">for </span>Powers&lt;R&gt; {
+<a href=#975 id=975 data-nosnippet>975</a>    <span class="kw">type </span>Item = R;
+<a href=#976 id=976 data-nosnippet>976</a>
+<a href=#977 id=977 data-nosnippet>977</a>    <span class="kw">fn </span>next(<span class="kw-2">&amp;mut </span><span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span>&lt;R&gt; {
+<a href=#978 id=978 data-nosnippet>978</a>        <span class="kw">let </span>result = <span class="self">self</span>.current.clone();
+<a href=#979 id=979 data-nosnippet>979</a>        <span class="self">self</span>.current <span class="kw-2">*</span>= <span class="self">self</span>.base.clone();
+<a href=#980 id=980 data-nosnippet>980</a>        <span class="prelude-val">Some</span>(result)
+<a href=#981 id=981 data-nosnippet>981</a>    }
+<a href=#982 id=982 data-nosnippet>982</a>}
+<a href=#983 id=983 data-nosnippet>983</a>
+<a href=#984 id=984 data-nosnippet>984</a><span class="kw">impl</span>&lt;R: PrimeCharacteristicRing&gt; Powers&lt;R&gt; {
+<a href=#985 id=985 data-nosnippet>985</a>    <span class="doccomment">/// Returns an iterator yielding the first `n` powers.
+<a href=#986 id=986 data-nosnippet>986</a>    </span><span class="attr">#[inline]
+<a href=#987 id=987 data-nosnippet>987</a>    #[must_use]
+<a href=#988 id=988 data-nosnippet>988</a>    </span><span class="kw">pub const fn </span>take(<span class="self">self</span>, n: usize) -&gt; BoundedPowers&lt;R&gt; {
+<a href=#989 id=989 data-nosnippet>989</a>        BoundedPowers { iter: <span class="self">self</span>, n }
+<a href=#990 id=990 data-nosnippet>990</a>    }
+<a href=#991 id=991 data-nosnippet>991</a>
+<a href=#992 id=992 data-nosnippet>992</a>    <span class="doccomment">/// Fills `slice` with the next `slice.len()` powers yielded by the iterator.
+<a href=#993 id=993 data-nosnippet>993</a>    </span><span class="attr">#[inline]
+<a href=#994 id=994 data-nosnippet>994</a>    </span><span class="kw">pub fn </span>fill(<span class="self">self</span>, slice: <span class="kw-2">&amp;mut </span>[R]) {
+<a href=#995 id=995 data-nosnippet>995</a>        slice
+<a href=#996 id=996 data-nosnippet>996</a>            .iter_mut()
+<a href=#997 id=997 data-nosnippet>997</a>            .zip(<span class="self">self</span>)
+<a href=#998 id=998 data-nosnippet>998</a>            .for_each(|(out, next)| <span class="kw-2">*</span>out = next);
+<a href=#999 id=999 data-nosnippet>999</a>    }
+<a href=#1000 id=1000 data-nosnippet>1000</a>
+<a href=#1001 id=1001 data-nosnippet>1001</a>    <span class="doccomment">/// Wrapper for `self.take(n).collect()`.
+<a href=#1002 id=1002 data-nosnippet>1002</a>    </span><span class="attr">#[inline]
+<a href=#1003 id=1003 data-nosnippet>1003</a>    #[must_use]
+<a href=#1004 id=1004 data-nosnippet>1004</a>    </span><span class="kw">pub fn </span>collect_n(<span class="self">self</span>, n: usize) -&gt; Vec&lt;R&gt; {
+<a href=#1005 id=1005 data-nosnippet>1005</a>        <span class="self">self</span>.take(n).collect()
+<a href=#1006 id=1006 data-nosnippet>1006</a>    }
+<a href=#1007 id=1007 data-nosnippet>1007</a>}
+<a href=#1008 id=1008 data-nosnippet>1008</a>
+<a href=#1009 id=1009 data-nosnippet>1009</a><span class="kw">impl</span>&lt;F: Field&gt; BoundedPowers&lt;F&gt; {
+<a href=#1010 id=1010 data-nosnippet>1010</a>    <span class="doccomment">/// Collect exactly `num_powers` ascending powers of `self.base`, starting at `self.current`.
+<a href=#1011 id=1011 data-nosnippet>1011</a>    ///
+<a href=#1012 id=1012 data-nosnippet>1012</a>    /// # Details
+<a href=#1013 id=1013 data-nosnippet>1013</a>    ///
+<a href=#1014 id=1014 data-nosnippet>1014</a>    /// The computation is split evenly amongst available threads, and each chunk is computed
+<a href=#1015 id=1015 data-nosnippet>1015</a>    /// using packed fields.
+<a href=#1016 id=1016 data-nosnippet>1016</a>    ///
+<a href=#1017 id=1017 data-nosnippet>1017</a>    /// # Performance
+<a href=#1018 id=1018 data-nosnippet>1018</a>    ///
+<a href=#1019 id=1019 data-nosnippet>1019</a>    /// Enable the `parallel` feature to enable parallelization.
+<a href=#1020 id=1020 data-nosnippet>1020</a>    </span><span class="attr">#[must_use]
+<a href=#1021 id=1021 data-nosnippet>1021</a>    </span><span class="kw">pub fn </span>collect(<span class="self">self</span>) -&gt; Vec&lt;F&gt; {
+<a href=#1022 id=1022 data-nosnippet>1022</a>        <span class="kw">let </span>num_powers = <span class="self">self</span>.n;
+<a href=#1023 id=1023 data-nosnippet>1023</a>
+<a href=#1024 id=1024 data-nosnippet>1024</a>        <span class="comment">// When num_powers is small, fallback to serial computation
+<a href=#1025 id=1025 data-nosnippet>1025</a>        </span><span class="kw">if </span>num_powers &lt; <span class="number">16 </span>{
+<a href=#1026 id=1026 data-nosnippet>1026</a>            <span class="kw">return </span><span class="self">self</span>.take(num_powers).collect();
+<a href=#1027 id=1027 data-nosnippet>1027</a>        }
+<a href=#1028 id=1028 data-nosnippet>1028</a>
+<a href=#1029 id=1029 data-nosnippet>1029</a>        <span class="comment">// Allocate buffer storing packed powers, containing at least `num_powers` scalars.
+<a href=#1030 id=1030 data-nosnippet>1030</a>        </span><span class="kw">let </span>width = F::Packing::WIDTH;
+<a href=#1031 id=1031 data-nosnippet>1031</a>        <span class="kw">let </span>num_packed = num_powers.div_ceil(width);
+<a href=#1032 id=1032 data-nosnippet>1032</a>        <span class="kw">let </span><span class="kw-2">mut </span>points_packed = F::Packing::zero_vec(num_packed);
+<a href=#1033 id=1033 data-nosnippet>1033</a>
+<a href=#1034 id=1034 data-nosnippet>1034</a>        <span class="comment">// Split computation evenly among threads
+<a href=#1035 id=1035 data-nosnippet>1035</a>        </span><span class="kw">let </span>num_threads = current_num_threads().max(<span class="number">1</span>);
+<a href=#1036 id=1036 data-nosnippet>1036</a>        <span class="kw">let </span>chunk_size = num_packed.div_ceil(num_threads);
+<a href=#1037 id=1037 data-nosnippet>1037</a>
+<a href=#1038 id=1038 data-nosnippet>1038</a>        <span class="comment">// Precompute base for each chunk.
+<a href=#1039 id=1039 data-nosnippet>1039</a>        </span><span class="kw">let </span>base = <span class="self">self</span>.iter.base;
+<a href=#1040 id=1040 data-nosnippet>1040</a>        <span class="kw">let </span>chunk_base = base.exp_u64((chunk_size * width) <span class="kw">as </span>u64);
+<a href=#1041 id=1041 data-nosnippet>1041</a>        <span class="kw">let </span>shift = <span class="self">self</span>.iter.current;
+<a href=#1042 id=1042 data-nosnippet>1042</a>
+<a href=#1043 id=1043 data-nosnippet>1043</a>        points_packed
+<a href=#1044 id=1044 data-nosnippet>1044</a>            .par_chunks_mut(chunk_size)
+<a href=#1045 id=1045 data-nosnippet>1045</a>            .enumerate()
+<a href=#1046 id=1046 data-nosnippet>1046</a>            .for_each(|(chunk_idx, chunk_slice)| {
+<a href=#1047 id=1047 data-nosnippet>1047</a>                <span class="comment">// First power in this chunk
+<a href=#1048 id=1048 data-nosnippet>1048</a>                </span><span class="kw">let </span>chunk_start = shift * chunk_base.exp_u64(chunk_idx <span class="kw">as </span>u64);
+<a href=#1049 id=1049 data-nosnippet>1049</a>
+<a href=#1050 id=1050 data-nosnippet>1050</a>                <span class="comment">// Fill the chunk with packed powers.
+<a href=#1051 id=1051 data-nosnippet>1051</a>                </span>F::Packing::packed_shifted_powers(base, chunk_start).fill(chunk_slice);
+<a href=#1052 id=1052 data-nosnippet>1052</a>            });
+<a href=#1053 id=1053 data-nosnippet>1053</a>
+<a href=#1054 id=1054 data-nosnippet>1054</a>        <span class="comment">// return the number of requested points, discarding the unused packed powers
+<a href=#1055 id=1055 data-nosnippet>1055</a>        // SAFETY: size_of::&lt;F::Packing&gt; always divides size_of::&lt;F::Packing&gt;.
+<a href=#1056 id=1056 data-nosnippet>1056</a>        </span><span class="kw">let </span><span class="kw-2">mut </span>points = <span class="kw">unsafe </span>{ flatten_to_base(points_packed) };
+<a href=#1057 id=1057 data-nosnippet>1057</a>        points.truncate(num_powers);
+<a href=#1058 id=1058 data-nosnippet>1058</a>        points
+<a href=#1059 id=1059 data-nosnippet>1059</a>    }
+<a href=#1060 id=1060 data-nosnippet>1060</a>}
+<a href=#1061 id=1061 data-nosnippet>1061</a>
+<a href=#1062 id=1062 data-nosnippet>1062</a><span class="doccomment">/// Same as [`Powers`], but returns a bounded number of powers.
+<a href=#1063 id=1063 data-nosnippet>1063</a></span><span class="attr">#[derive(Clone, Debug)]
+<a href=#1064 id=1064 data-nosnippet>1064</a></span><span class="kw">pub struct </span>BoundedPowers&lt;R: PrimeCharacteristicRing&gt; {
+<a href=#1065 id=1065 data-nosnippet>1065</a>    iter: Powers&lt;R&gt;,
+<a href=#1066 id=1066 data-nosnippet>1066</a>    n: usize,
+<a href=#1067 id=1067 data-nosnippet>1067</a>}
+<a href=#1068 id=1068 data-nosnippet>1068</a>
+<a href=#1069 id=1069 data-nosnippet>1069</a><span class="kw">impl</span>&lt;R: PrimeCharacteristicRing&gt; Iterator <span class="kw">for </span>BoundedPowers&lt;R&gt; {
+<a href=#1070 id=1070 data-nosnippet>1070</a>    <span class="kw">type </span>Item = R;
+<a href=#1071 id=1071 data-nosnippet>1071</a>
+<a href=#1072 id=1072 data-nosnippet>1072</a>    <span class="kw">fn </span>next(<span class="kw-2">&amp;mut </span><span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span>&lt;R&gt; {
+<a href=#1073 id=1073 data-nosnippet>1073</a>        (<span class="self">self</span>.n != <span class="number">0</span>).then(|| {
+<a href=#1074 id=1074 data-nosnippet>1074</a>            <span class="self">self</span>.n -= <span class="number">1</span>;
+<a href=#1075 id=1075 data-nosnippet>1075</a>            <span class="self">self</span>.iter.next().unwrap()
+<a href=#1076 id=1076 data-nosnippet>1076</a>        })
+<a href=#1077 id=1077 data-nosnippet>1077</a>    }
+<a href=#1078 id=1078 data-nosnippet>1078</a>}</code></pre></div></section></main></body></html>

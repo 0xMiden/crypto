@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"fn":["set_global_default"],"struct":["Interest","NoSubscriber","SetGlobalDefaultError"],"trait":["Subscriber"]};

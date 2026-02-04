@@ -1,0 +1,45 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Taproot Schnorr signatures as defined in BIP340."><title>k256::schnorr - Rust</title><script>if(window.location.protocol!=="file:")document.head.insertAdjacentHTML("beforeend","SourceSerif4-Regular-6b053e98.ttf.woff2,FiraSans-Italic-81dc35de.woff2,FiraSans-Regular-0fe48ade.woff2,FiraSans-MediumItalic-ccf7e434.woff2,FiraSans-Medium-e1aa3f0a.woff2,SourceCodePro-Regular-8badfe75.ttf.woff2,SourceCodePro-Semibold-aa29a496.ttf.woff2".split(",").map(f=>`<link rel="preload" as="font" type="font/woff2" crossorigin href="../../static.files/${f}">`).join(""))</script><link rel="stylesheet" href="../../static.files/normalize-9960930a.css"><link rel="stylesheet" href="../../static.files/rustdoc-aa0817cf.css"><meta name="rustdoc-vars" data-root-path="../../" data-static-root-path="../../static.files/" data-current-crate="k256" data-themes="" data-resource-suffix="" data-rustdoc-version="1.90.0 (1159e78c4 2025-09-14)" data-channel="1.90.0" data-search-js="search-fa3e91e5.js" data-settings-js="settings-5514c975.js" ><script src="../../static.files/storage-68b7e25d.js"></script><script defer src="../sidebar-items.js"></script><script defer src="../../static.files/main-eebb9057.js"></script><noscript><link rel="stylesheet" href="../../static.files/noscript-32bb7600.css"></noscript><link rel="icon" href="https://raw.githubusercontent.com/RustCrypto/meta/master/logo.svg"></head><body class="rustdoc mod"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle" title="show sidebar"></button><a class="logo-container" href="../../k256/index.html"><img src="https://raw.githubusercontent.com/RustCrypto/meta/master/logo.svg" alt=""></a></nav><nav class="sidebar"><div class="sidebar-crate"><a class="logo-container" href="../../k256/index.html"><img src="https://raw.githubusercontent.com/RustCrypto/meta/master/logo.svg" alt="logo"></a><h2><a href="../../k256/index.html">k256</a><span class="version">0.13.4</span></h2></div><div class="sidebar-elems"><section id="rustdoc-toc"><h2 class="location"><a href="#">Module schnorr</a></h2><h3><a href="#">Sections</a></h3><ul class="block top-toc"><li><a href="#about" title="About">About</a></li><li><a href="#usage" title="Usage">Usage</a></li></ul><h3><a href="#reexports">Module Items</a></h3><ul class="block"><li><a href="#reexports" title="Re-exports">Re-exports</a></li><li><a href="#structs" title="Structs">Structs</a></li><li><a href="#traits" title="Traits">Traits</a></li><li><a href="#types" title="Type Aliases">Type Aliases</a></li></ul></section><div id="rustdoc-modnav"><h2 class="in-crate"><a href="../index.html">In crate k256</a></h2></div></div></nav><div class="sidebar-resizer" title="Drag to resize sidebar"></div><main><div class="width-limiter"><rustdoc-search></rustdoc-search><section id="main-content" class="content"><div class="main-heading"><div class="rustdoc-breadcrumbs"><a href="../index.html">k256</a></div><h1>Module <span>schnorr</span><button id="copy-path" title="Copy item path to clipboard">Copy item path</button></h1><rustdoc-toolbar></rustdoc-toolbar><span class="sub-heading"><a class="src" href="../../src/k256/schnorr.rs.html#1-511">Source</a> </span></div><details class="toggle top-doc" open><summary class="hideme"><span>Expand description</span></summary><div class="docblock"><p>Taproot Schnorr signatures as defined in <a href="https://github.com/bitcoin/bips/blob/master/bip-0340.mediawiki">BIP340</a>.</p>
+<h2 id="about"><a class="doc-anchor" href="#about">§</a>About</h2>
+<p><a href="https://en.wikipedia.org/wiki/Schnorr_signature">Schnorr signatures</a> are a simple group-based digital signature scheme with
+a number of desirable properties relating to security and composability:</p>
+<ul>
+<li>Provably secure: strongly unforgable under chosen message attack (SUF-CMA).</li>
+<li>Non-malleable: signatures cannot be altered by an attacker and still verify.</li>
+<li>Linear: multiple parties can collaborate to produce a valid signature
+a.k.a. multisignatures.</li>
+</ul>
+<p>Originally described in the late 1980s by their eponymous creator Claus
+Schnorr, they were patent-encumbered and thus lingered in obscurity until
+the <a href="https://patents.google.com/patent/US4995082">relevant patents</a> expired in 2010.</p>
+<p>Since then, Schnorr signatures have seen something of a resurgence, with
+<a href="https://en.wikipedia.org/wiki/EdDSA">EdDSA</a> and its concrete instantiation Ed25519 over the Curve25519 elliptic
+curve becoming the first Schnorr variant to see mainstream standardization.</p>
+<p>The Taproot upgrade to Bitcoin includes a variant of Schnorr which operates
+over the secp256k1 elliptic curve, and is specified in <a href="https://github.com/bitcoin/bips/blob/master/bip-0340.mediawiki">BIP340</a>.
+That is the variant which is implemented by this crate.</p>
+<p>Because Taproot Schnorr is intended for use in consensus-critical
+applications (e.g. Bitcoin), it is fully specified such that no two
+implementations should disagree on the validity of a signature.</p>
+<h2 id="usage"><a class="doc-anchor" href="#usage">§</a>Usage</h2>
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">use </span>k256::schnorr::{
+    signature::{Signer, Verifier},
+    SigningKey, VerifyingKey
+};
+<span class="kw">use </span>rand_core::OsRng; <span class="comment">// requires 'getrandom' feature
+
+//
+// Signing
+//
+</span><span class="kw">let </span>signing_key = SigningKey::random(<span class="kw-2">&amp;mut </span>OsRng); <span class="comment">// serialize with `.to_bytes()`
+</span><span class="kw">let </span>verifying_key_bytes = signing_key.verifying_key().to_bytes(); <span class="comment">// 32-bytes
+
+</span><span class="kw">let </span>message = <span class="string">b"Schnorr signatures prove knowledge of a secret in the random oracle model"</span>;
+<span class="kw">let </span>signature = signing_key.sign(message); <span class="comment">// returns `k256::schnorr::Signature`
+
+//
+// Verification
+//
+</span><span class="kw">let </span>verifying_key = VerifyingKey::from_bytes(<span class="kw-2">&amp;</span>verifying_key_bytes)<span class="question-mark">?</span>;
+verifying_key.verify(message, <span class="kw-2">&amp;</span>signature)<span class="question-mark">?</span>;</code></pre></div>
+</div></details><h2 id="reexports" class="section-header">Re-exports<a href="#reexports" class="anchor">§</a></h2><dl class="item-table reexports"><dt id="reexport.signature"><code>pub use <a class="mod" href="../../signature/index.html" title="mod signature">signature</a>;</code></dt></dl><h2 id="structs" class="section-header">Structs<a href="#structs" class="anchor">§</a></h2><dl class="item-table"><dt><a class="struct" href="struct.Error.html" title="struct k256::schnorr::Error">Error</a></dt><dd>Signature errors.</dd><dt><a class="struct" href="struct.Signature.html" title="struct k256::schnorr::Signature">Signature</a></dt><dd>Taproot Schnorr signature as defined in <a href="https://github.com/bitcoin/bips/blob/master/bip-0340.mediawiki">BIP340</a>.</dd><dt><a class="struct" href="struct.SigningKey.html" title="struct k256::schnorr::SigningKey">Signing<wbr>Key</a></dt><dd>Taproot Schnorr signing key.</dd><dt><a class="struct" href="struct.VerifyingKey.html" title="struct k256::schnorr::VerifyingKey">Verifying<wbr>Key</a></dt><dd>Taproot Schnorr verifying key.</dd></dl><h2 id="traits" class="section-header">Traits<a href="#traits" class="anchor">§</a></h2><dl class="item-table"><dt><a class="trait" href="trait.CryptoRngCore.html" title="trait k256::schnorr::CryptoRngCore">Crypto<wbr>RngCore</a></dt><dd>An extension trait that is automatically implemented for any type
+implementing <a href="../../rand_core/trait.RngCore.html" title="trait rand_core::RngCore"><code>RngCore</code></a> and <a href="../../rand_core/trait.CryptoRng.html" title="trait rand_core::CryptoRng"><code>CryptoRng</code></a>.</dd></dl><h2 id="types" class="section-header">Type Aliases<a href="#types" class="anchor">§</a></h2><dl class="item-table"><dt><a class="type" href="type.SignatureBytes.html" title="type k256::schnorr::SignatureBytes">Signature<wbr>Bytes</a></dt><dd>Taproot Schnorr signature serialized as bytes.</dd></dl></section></div></main></body></html>

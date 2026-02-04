@@ -1,0 +1,1 @@
+searchState.loadedDescShard("p3_blake3", 0, "The blake3 hash function.\nThe blake3 hash function.\nReturns the argument unchanged.\nCalls <code>U::from(self)</code>.")

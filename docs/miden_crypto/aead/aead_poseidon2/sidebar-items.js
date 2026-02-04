@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"constant":["AUTH_TAG_SIZE","NONCE_SIZE","NONCE_SIZE_BYTES","SECRET_KEY_SIZE","SK_SIZE_BYTES"],"struct":["AeadPoseidon2","AuthTag","EncryptedData","Nonce","SecretKey"]};

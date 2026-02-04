@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"mod":["testing"],"struct":["BatchOpening","BatchOpeningRef","ExtensionMmcs","LagrangeSelectors"],"trait":["Mmcs","Pcs","PolynomialSpace"],"type":["OpenedValues","OpenedValuesForMatrix","OpenedValuesForPoint","OpenedValuesForRound","Val"]};

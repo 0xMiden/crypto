@@ -1,0 +1,44 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Generates accessor methods for tuple structs wrapping a `Word` type."><title>WordWrapper in miden_crypto_derive - Rust</title><script>if(window.location.protocol!=="file:")document.head.insertAdjacentHTML("beforeend","SourceSerif4-Regular-6b053e98.ttf.woff2,FiraSans-Italic-81dc35de.woff2,FiraSans-Regular-0fe48ade.woff2,FiraSans-MediumItalic-ccf7e434.woff2,FiraSans-Medium-e1aa3f0a.woff2,SourceCodePro-Regular-8badfe75.ttf.woff2,SourceCodePro-Semibold-aa29a496.ttf.woff2".split(",").map(f=>`<link rel="preload" as="font" type="font/woff2" crossorigin href="../static.files/${f}">`).join(""))</script><link rel="stylesheet" href="../static.files/normalize-9960930a.css"><link rel="stylesheet" href="../static.files/rustdoc-aa0817cf.css"><meta name="rustdoc-vars" data-root-path="../" data-static-root-path="../static.files/" data-current-crate="miden_crypto_derive" data-themes="" data-resource-suffix="" data-rustdoc-version="1.90.0 (1159e78c4 2025-09-14)" data-channel="1.90.0" data-search-js="search-fa3e91e5.js" data-settings-js="settings-5514c975.js" ><script src="../static.files/storage-68b7e25d.js"></script><script defer src="sidebar-items.js"></script><script defer src="../static.files/main-eebb9057.js"></script><noscript><link rel="stylesheet" href="../static.files/noscript-32bb7600.css"></noscript><link rel="alternate icon" type="image/png" href="../static.files/favicon-32x32-6580c154.png"><link rel="icon" type="image/svg+xml" href="../static.files/favicon-044be391.svg"></head><body class="rustdoc derive"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle" title="show sidebar"></button></nav><nav class="sidebar"><div class="sidebar-crate"><h2><a href="../miden_crypto_derive/index.html">miden_<wbr>crypto_<wbr>derive</a><span class="version">0.23.0</span></h2></div><div class="sidebar-elems"><section id="rustdoc-toc"><h2 class="location"><a href="#">Word<wbr>Wrapper</a></h2><h3><a href="#">Sections</a></h3><ul class="block top-toc"><li><a href="#example" title="Example">Example</a></li></ul></section><div id="rustdoc-modnav"><h2 class="in-crate"><a href="index.html">In crate miden_<wbr>crypto_<wbr>derive</a></h2></div></div></nav><div class="sidebar-resizer" title="Drag to resize sidebar"></div><main><div class="width-limiter"><rustdoc-search></rustdoc-search><section id="main-content" class="content"><div class="main-heading"><div class="rustdoc-breadcrumbs"><a href="index.html">miden_crypto_derive</a></div><h1>Derive Macro <span class="derive">WordWrapper</span><button id="copy-path" title="Copy item path to clipboard">Copy item path</button></h1><rustdoc-toolbar></rustdoc-toolbar><span class="sub-heading"><a class="src" href="../src/miden_crypto_derive/lib.rs.html#136-236">Source</a> </span></div><pre class="rust item-decl"><code>#[derive(WordWrapper)]</code></pre><details class="toggle top-doc" open><summary class="hideme"><span>Expand description</span></summary><div class="docblock"><p>Generates accessor methods for tuple structs wrapping a <code>Word</code> type.</p>
+<p>Automatically implements:</p>
+<ul>
+<li><code>from_raw(Word) -&gt; Self</code> - Construct without further checks</li>
+<li><code>as_elements(&amp;self) -&gt; &amp;[Felt]</code> - Returns the elements representation</li>
+<li><code>as_bytes(&amp;self) -&gt; [u8; 32]</code> - Returns the byte representation</li>
+<li><code>to_hex(&amp;self) -&gt; String</code> - Returns a big-endian, hex-encoded string</li>
+<li><code>as_word(&amp;self) -&gt; Word</code> - Returns the underlying Word</li>
+</ul>
+<p>Note: This macro does NOT generate <code>From</code> trait implementations. If you need conversions
+to/from <code>Word</code> or <code>[u8; 32]</code>, implement them manually for your type.</p>
+<h2 id="example"><a class="doc-anchor" href="#example">§</a>Example</h2>
+<div class="example-wrap ignore"><a href="#" class="tooltip" title="This example is not tested">ⓘ</a><pre class="rust rust-example-rendered"><code><span class="attr">#[derive(WordWrapper)]
+</span><span class="kw">pub struct </span>NoteId(Word);</code></pre></div>
+<p>This will generate implementations equivalent to:</p>
+
+<div class="example-wrap ignore"><a href="#" class="tooltip" title="This example is not tested">ⓘ</a><pre class="rust rust-example-rendered"><code><span class="kw">impl </span>NoteId {
+    <span class="doccomment">/// Construct without further checks from a given `Word`
+    ///
+    /// # Warning
+    ///
+    /// This requires the caller to uphold the guarantees/invariants of this type (if any).
+    /// Check the type-level documentation for guarantees/invariants.
+    </span><span class="kw">pub fn </span>from_raw(word: Word) -&gt; <span class="self">Self </span>{
+        <span class="self">Self</span>(word)
+    }
+
+    <span class="kw">pub fn </span>as_elements(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span>[Felt] {
+        <span class="self">self</span>.<span class="number">0</span>.as_elements()
+    }
+
+    <span class="kw">pub fn </span>as_bytes(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; [u8; <span class="number">32</span>] {
+        <span class="self">self</span>.<span class="number">0</span>.as_bytes()
+    }
+
+    <span class="kw">pub fn </span>to_hex(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; String {
+        <span class="self">self</span>.<span class="number">0</span>.to_hex()
+    }
+
+    <span class="kw">pub fn </span>as_word(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; Word {
+        <span class="self">self</span>.<span class="number">0
+    </span>}
+}</code></pre></div>
+</div></details></section></div></main></body></html>

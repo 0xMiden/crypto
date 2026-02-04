@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"fn":["divide_by_height"],"struct":["DifButterfly","DifButterflyZeros","DitButterfly","NaiveDft","Radix2Bowers","Radix2DFTSmallBatch","Radix2Dit","Radix2DitParallel","TwiddleFreeButterfly"],"trait":["Butterfly","TwoAdicSubgroupDft"]};

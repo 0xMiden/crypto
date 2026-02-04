@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"mod":["coset_mds","integrated_coset_mds","karatsuba_convolution","util"],"trait":["MdsPermutation"]};

@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"fn":["batch_inversion_allow_zeros","batch_multiplicative_inverse"],"struct":["BinomialExtensionField"],"trait":["BasedVectorSpace","ExtensionField","Field","PrimeCharacteristicRing","PrimeField64","QuotientMap","TwoAdicField"]};

@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"enum":["DeserializationError"],"struct":["BudgetedReader","ReadAdapter","ReadManyIter","SliceReader"],"trait":["ByteReader","ByteWriter","Deserializable","Serializable"]};

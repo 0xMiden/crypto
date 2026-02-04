@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"struct":["Poseidon2","Poseidon2Permutation256"],"type":["Poseidon2Challenger","Poseidon2Compression","Poseidon2Goldilocks","Poseidon2Hasher"]};

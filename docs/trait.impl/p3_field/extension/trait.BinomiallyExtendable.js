@@ -1,0 +1,9 @@
+(function() {
+    var implementors = Object.fromEntries([["p3_field",[]],["p3_goldilocks",[["impl <a class=\"trait\" href=\"p3_field/extension/trait.BinomiallyExtendable.html\" title=\"trait p3_field::extension::BinomiallyExtendable\">BinomiallyExtendable</a>&lt;2&gt; for <a class=\"struct\" href=\"p3_goldilocks/struct.Goldilocks.html\" title=\"struct p3_goldilocks::Goldilocks\">Goldilocks</a>"],["impl <a class=\"trait\" href=\"p3_field/extension/trait.BinomiallyExtendable.html\" title=\"trait p3_field::extension::BinomiallyExtendable\">BinomiallyExtendable</a>&lt;5&gt; for <a class=\"struct\" href=\"p3_goldilocks/struct.Goldilocks.html\" title=\"struct p3_goldilocks::Goldilocks\">Goldilocks</a>"]]],["p3_monty_31",[["impl&lt;const WIDTH: <a class=\"primitive\" href=\"https://doc.rust-lang.org/1.90.0/std/primitive.usize.html\">usize</a>, FP&gt; <a class=\"trait\" href=\"p3_field/extension/trait.BinomiallyExtendable.html\" title=\"trait p3_field::extension::BinomiallyExtendable\">BinomiallyExtendable</a>&lt;WIDTH&gt; for <a class=\"struct\" href=\"p3_monty_31/struct.MontyField31.html\" title=\"struct p3_monty_31::MontyField31\">MontyField31</a>&lt;FP&gt;<div class=\"where\">where\n    FP: <a class=\"trait\" href=\"p3_monty_31/trait.BinomialExtensionData.html\" title=\"trait p3_monty_31::BinomialExtensionData\">BinomialExtensionData</a>&lt;WIDTH&gt; + <a class=\"trait\" href=\"p3_monty_31/trait.FieldParameters.html\" title=\"trait p3_monty_31::FieldParameters\">FieldParameters</a>,</div>"]]]]);
+    if (window.register_implementors) {
+        window.register_implementors(implementors);
+    } else {
+        window.pending_implementors = implementors;
+    }
+})()
+//{"start":57,"fragment_lengths":[15,636,805]}

@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"struct":["DenseMatrix"],"trait":["DenseStorage"],"type":["RowMajorMatrix","RowMajorMatrixCow","RowMajorMatrixView","RowMajorMatrixViewMut"]};
