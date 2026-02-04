@@ -70,23 +70,15 @@ name              = "rand"
 required-features = ["std"]
 
 [features]
-concurrent = [
-  "dep:rayon",
-  "hashbrown?/rayon",
-  "p3-maybe-rayon/parallel",
-  "p3-miden-prover/parallel",
-  "p3-util/parallel",
-  "std",
-]
-default = ["concurrent", "std"]
+concurrent = ["dep:rayon", "p3-maybe-rayon/parallel", "p3-miden-prover/parallel", "p3-util/parallel", "std"]
+default    = ["concurrent", "std"]
 executable = ["concurrent", "dep:clap", "dep:rand-utils"]
-fuzzing = []
-hashmaps = ["dep:hashbrown"]
-internal = ["concurrent"]
-rocksdb = ["concurrent", "dep:rocksdb"]
-serde = ["dep:serde", "serde?/alloc"]
-std = ["blake3/std", "dep:cc", "miden-serde-utils/std", "rand/std", "rand/thread_rng"]
-testing = ["dep:proptest"]
+fuzzing    = []
+internal   = ["concurrent"]
+rocksdb    = ["concurrent", "dep:rocksdb"]
+serde      = ["dep:serde", "serde?/alloc"]
+std        = ["blake3/std", "dep:cc", "miden-serde-utils/std", "rand/std", "rand/thread_rng", "serde?/std"]
+testing    = ["dep:proptest"]
 
 [dependencies]
 blake3                        = { default-features = false, version = "1.8" }
@@ -95,7 +87,6 @@ clap                          = { features = ["derive"], optional = true, versio
 curve25519-dalek              = { default-features = false, version = "4" }
 ed25519-dalek                 = { features = ["zeroize"], version = "2" }
 flume                         = { version = "0.11.1" }
-hashbrown                     = { features = ["serde"], optional = true, version = "0.16" }
 hkdf                          = { default-features = false, version = "0.12" }
 k256                          = { features = ["ecdh", "ecdsa"], version = "0.13" }
 miden-crypto-derive.workspace = true
@@ -119,15 +110,22 @@ x25519-dalek                  = { default-features = false, features = ["static_
 
 # Upstream Plonky3 dependencies
 p3-air         = { default-features = false, version = "0.4.2" }
+p3-blake3      = { default-features = false, version = "0.4.2" }
 p3-challenger  = { default-features = false, version = "0.4.2" }
+p3-commit      = { default-features = false, version = "0.4.2" }
+p3-dft         = { default-features = false, version = "0.4.2" }
 p3-field       = { default-features = false, version = "0.4.2" }
 p3-goldilocks  = { default-features = false, version = "0.4.2" }
+p3-keccak      = { default-features = false, version = "0.4.2" }
+p3-matrix      = { default-features = false, version = "0.4.2" }
 p3-maybe-rayon = { default-features = false, version = "0.4.2" }
+p3-merkle-tree = { default-features = false, version = "0.4.2" }
 p3-symmetric   = { default-features = false, version = "0.4.2" }
 p3-util        = { default-features = false, version = "0.4.2" }
 
 # Miden-specific Plonky3 crates
 p3-miden-air    = { default-features = false, version = "0.4.2" }
+p3-miden-fri    = { default-features = false, version = "0.4.2" }
 p3-miden-prover = { default-features = false, version = "0.4.2" }
 
 [dev-dependencies]
