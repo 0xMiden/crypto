@@ -1,17 +1,24 @@
 use alloc::string::String;
 use core::{mem::size_of, ops::Deref, slice};
 
-use p3_field::{BasedVectorSpace, PrimeField64};
-use p3_goldilocks::Goldilocks as Felt;
-
 use super::HasherExt;
-use crate::utils::{
-    ByteReader, ByteWriter, Deserializable, DeserializationError, HexParseError, Serializable,
-    bytes_to_hex_string, hex_to_bytes,
+use crate::{
+    Felt,
+    field::{BasedVectorSpace, PrimeField64},
+    utils::{
+        ByteReader, ByteWriter, Deserializable, DeserializationError, HexParseError, Serializable,
+        bytes_to_hex_string, hex_to_bytes,
+    },
 };
 
 #[cfg(test)]
 mod tests;
+
+// RE-EXPORTS
+// ================================================================================================
+
+/// Re-export of the Blake3 hasher from Plonky3 for use in the prover config downstream.
+pub use p3_blake3::Blake3 as Blake3Hasher;
 
 // CONSTANTS
 // ================================================================================================
