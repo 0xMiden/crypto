@@ -122,32 +122,14 @@ impl PartialMmr {
             ));
         }
 
-        // Validate that all node indices are within forest bounds
-        // For an empty forest, no nodes are valid
-        if !nodes.is_empty() && forest.is_empty() {
-            return Err(MmrError::InconsistentPartialMmr(
-                "nodes present but forest is empty".into(),
-            ));
-        }
-
-        if !nodes.is_empty() {
-            // Get the upper bound for valid indices
-            let max_valid_idx = forest.rightmost_in_order_index();
-
-            for idx in nodes.keys() {
-                // Index 0 is never valid (InOrderIndex starts at 1)
-                if idx.inner() == 0 {
-                    return Err(MmrError::InconsistentPartialMmr("node index 0 is invalid".into()));
-                }
-
-                // All indices must be within the forest bounds
-                if idx.inner() > max_valid_idx.inner() {
-                    return Err(MmrError::InconsistentPartialMmr(format!(
-                        "node index {} exceeds forest bounds (max: {})",
-                        idx.inner(),
-                        max_valid_idx.inner()
-                    )));
-                }
+        // Validate that all node indices correspond to actual nodes in the forest
+        // This catches: empty forest with nodes, index 0, out of bounds, and separator indices
+        for idx in nodes.keys() {
+            if !forest.is_valid_in_order_index(idx) {
+                return Err(MmrError::InconsistentPartialMmr(format!(
+                    "node index {} is not a valid index in the forest",
+                    idx.inner()
+                )));
             }
         }
 
@@ -1100,13 +1082,29 @@ mod tests {
         assert!(result.is_err());
 
         // Invalid case: large even index (internal node) beyond forest bounds
-        // For 7 leaves, the rightmost in-order index is 12 (forest has 13 nodes: 7*2-1=13, plus
-        // gaps) Create an internal node index (even number) that's beyond bounds
+        // For 7 leaves, the rightmost in-order index is 13 (see test_forest_to_rightmost_index)
+        // Create an internal node index (even number) that's beyond bounds
         let mut nodes_with_large_even = BTreeMap::new();
         let large_even_idx = InOrderIndex::read_from_bytes(&1000usize.to_bytes()).unwrap();
         nodes_with_large_even.insert(large_even_idx, int_to_node(0));
         let result = PartialMmr::from_parts(peaks.clone(), nodes_with_large_even, false);
         assert!(result.is_err());
+
+        // Invalid case: separator index between trees
+        // For 7 leaves (0b111 = 4+2+1), index 8 is a separator between the first tree (1-7)
+        // and the second tree (9-11). Similarly, index 12 is a separator between the second
+        // tree and the third tree (13).
+        let mut nodes_with_separator = BTreeMap::new();
+        let separator_idx = InOrderIndex::read_from_bytes(&8usize.to_bytes()).unwrap();
+        nodes_with_separator.insert(separator_idx, int_to_node(0));
+        let result = PartialMmr::from_parts(peaks.clone(), nodes_with_separator, false);
+        assert!(result.is_err(), "separator index 8 should be rejected");
+
+        let mut nodes_with_separator_12 = BTreeMap::new();
+        let separator_idx_12 = InOrderIndex::read_from_bytes(&12usize.to_bytes()).unwrap();
+        nodes_with_separator_12.insert(separator_idx_12, int_to_node(0));
+        let result = PartialMmr::from_parts(peaks.clone(), nodes_with_separator_12, false);
+        assert!(result.is_err(), "separator index 12 should be rejected");
 
         // Invalid case: nodes with empty forest
         let empty_peaks = MmrPeaks::new(Forest::empty(), vec![]).unwrap();

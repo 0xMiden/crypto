@@ -200,6 +200,93 @@ fn test_forest_to_rightmost_index() {
 }
 
 #[test]
+fn test_is_valid_in_order_index() {
+    fn idx(pos: usize) -> InOrderIndex {
+        InOrderIndex::new(pos.try_into().unwrap())
+    }
+
+    // Empty forest has no valid indices
+    let empty = Forest::empty();
+    assert!(!empty.is_valid_in_order_index(&idx(1)));
+
+    // Single tree forests (power of 2 leaves) have no separators
+    // Forest with 1 leaf: valid indices are just 1
+    let forest_1 = Forest::new(0b0001);
+    assert!(!forest_1.is_valid_in_order_index(&idx(2)), "index 0 is invalid");
+    assert!(forest_1.is_valid_in_order_index(&idx(1)));
+    assert!(!forest_1.is_valid_in_order_index(&idx(2)), "beyond bounds");
+
+    // Forest with 2 leaves: valid indices are 1, 2, 3
+    let forest_2 = Forest::new(0b0010);
+    assert!(forest_2.is_valid_in_order_index(&idx(1)));
+    assert!(forest_2.is_valid_in_order_index(&idx(2)));
+    assert!(forest_2.is_valid_in_order_index(&idx(3)));
+    assert!(!forest_2.is_valid_in_order_index(&idx(4)), "beyond bounds");
+
+    // Forest with 4 leaves: valid indices are 1-7
+    let forest_4 = Forest::new(0b0100);
+    for i in 1..=7 {
+        assert!(forest_4.is_valid_in_order_index(&idx(i)), "index {} should be valid", i);
+    }
+    assert!(!forest_4.is_valid_in_order_index(&idx(8)), "beyond bounds");
+
+    // Multi-tree forest: 7 leaves (0b111 = 4 + 2 + 1)
+    // Tree 1 (4 leaves): indices 1-7
+    // Separator: index 8
+    // Tree 2 (2 leaves): indices 9-11
+    // Separator: index 12
+    // Tree 3 (1 leaf): index 13
+    let forest_7 = Forest::new(0b0111);
+
+    // Valid indices in first tree (4 leaves, 7 nodes)
+    for i in 1..=7 {
+        assert!(
+            forest_7.is_valid_in_order_index(&idx(i)),
+            "index {} should be valid in first tree",
+            i
+        );
+    }
+
+    // Separator between first and second tree
+    assert!(!forest_7.is_valid_in_order_index(&idx(8)), "index 8 is a separator");
+
+    // Valid indices in second tree (2 leaves, 3 nodes)
+    for i in 9..=11 {
+        assert!(
+            forest_7.is_valid_in_order_index(&idx(i)),
+            "index {} should be valid in second tree",
+            i
+        );
+    }
+
+    // Separator between second and third tree
+    assert!(!forest_7.is_valid_in_order_index(&idx(12)), "index 12 is a separator");
+
+    // Valid index in third tree (1 leaf)
+    assert!(
+        forest_7.is_valid_in_order_index(&idx(13)),
+        "index 13 should be valid in third tree"
+    );
+
+    // Beyond bounds
+    assert!(!forest_7.is_valid_in_order_index(&idx(14)), "index 14 is beyond bounds");
+
+    // Another multi-tree example: 6 leaves (0b110 = 4 + 2)
+    // Tree 1 (4 leaves): indices 1-7
+    // Separator: index 8
+    // Tree 2 (2 leaves): indices 9-11
+    let forest_6 = Forest::new(0b0110);
+    for i in 1..=7 {
+        assert!(forest_6.is_valid_in_order_index(&idx(i)), "index {} should be valid", i);
+    }
+    assert!(!forest_6.is_valid_in_order_index(&idx(8)), "index 8 is a separator");
+    for i in 9..=11 {
+        assert!(forest_6.is_valid_in_order_index(&idx(i)), "index {} should be valid", i);
+    }
+    assert!(!forest_6.is_valid_in_order_index(&idx(12)), "index 12 is beyond bounds");
+}
+
+#[test]
 fn test_bit_position_iterator() {
     assert_eq!(TreeSizeIterator::new(Forest::empty()).count(), 0);
     assert_eq!(TreeSizeIterator::new(Forest::empty()).rev().count(), 0);
