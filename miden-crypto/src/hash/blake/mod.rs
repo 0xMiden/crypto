@@ -21,8 +21,7 @@ pub use p3_blake3::Blake3 as Blake3Hasher;
 // TYPE ALIASES
 // ================================================================================================
 
-/// Alias for backward compatibility. Use [`Digest`] directly for new code.
-#[deprecated(since = "0.23.0", note = "use `Digest<N>` instead")]
+/// Alias for the generic `Digest` type, for consistency with other hash modules.
 pub type Blake3Digest<const N: usize> = Digest<N>;
 
 // BLAKE3 256-BIT OUTPUT
