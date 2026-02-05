@@ -128,34 +128,14 @@ impl PartialMmr {
             }
         }
 
-        // Validate that all node indices are within forest bounds
-        // For an empty forest, no nodes are valid
-        if !nodes.is_empty() && forest.is_empty() {
-            return Err(MmrError::InconsistentPartialMmr(
-                "nodes present but forest is empty".into(),
-            ));
-        }
-
-        if !nodes.is_empty() {
-            // Get the upper bound for valid indices
-            let max_valid_idx = forest.rightmost_in_order_index();
-
-            for idx in nodes.keys() {
-                // Index 0 is never valid (InOrderIndex starts at 1)
-                if idx.inner() == 0 {
-                    return Err(MmrError::InconsistentPartialMmr(
-                        "node index 0 is invalid".into(),
-                    ));
-                }
-
-                // All indices must be within the forest bounds
-                if idx.inner() > max_valid_idx.inner() {
-                    return Err(MmrError::InconsistentPartialMmr(format!(
-                        "node index {} exceeds forest bounds (max: {})",
-                        idx.inner(),
-                        max_valid_idx.inner()
-                    )));
-                }
+        // Validate that all node indices correspond to actual nodes in the forest
+        // This catches: empty forest with nodes, index 0, out of bounds, and separator indices
+        for idx in nodes.keys() {
+            if !forest.is_valid_in_order_index(idx) {
+                return Err(MmrError::InconsistentPartialMmr(format!(
+                    "node index {} is not a valid index in the forest",
+                    idx.inner()
+                )));
             }
         }
 
@@ -172,7 +152,11 @@ impl PartialMmr {
     ///
     /// Use this method only when you are certain the components are valid, for example when
     /// constructing from trusted sources or for performance-critical code paths.
-    pub fn from_parts_unchecked(peaks: MmrPeaks, nodes: NodeMap, tracked_leaves: BTreeSet<usize>) -> Self {
+    pub fn from_parts_unchecked(
+        peaks: MmrPeaks,
+        nodes: NodeMap,
+        tracked_leaves: BTreeSet<usize>,
+    ) -> Self {
         let forest = peaks.forest();
         let peaks = peaks.into();
 
@@ -1247,8 +1231,7 @@ mod tests {
         // Invalid case: tracked leaf has no value in nodes
         let mut tracked_no_value = BTreeSet::new();
         tracked_no_value.insert(0);
-        let result =
-            PartialMmr::from_parts(peaks.clone(), BTreeMap::new(), tracked_no_value);
+        let result = PartialMmr::from_parts(peaks.clone(), BTreeMap::new(), tracked_no_value);
         assert!(result.is_err());
 
         // Valid case: tracked leaf with its value in nodes
@@ -1257,8 +1240,7 @@ mod tests {
         nodes_with_leaf.insert(leaf_idx, int_to_node(0));
         let mut tracked_valid = BTreeSet::new();
         tracked_valid.insert(0);
-        let result =
-            PartialMmr::from_parts(peaks.clone(), nodes_with_leaf, tracked_valid);
+        let result = PartialMmr::from_parts(peaks.clone(), nodes_with_leaf, tracked_valid);
         assert!(result.is_ok());
 
         // Invalid case: node index out of bounds (leaf index)
@@ -1273,24 +1255,38 @@ mod tests {
         // Create an InOrderIndex with value 0 via deserialization
         let zero_idx = InOrderIndex::read_from_bytes(&0usize.to_bytes()).unwrap();
         nodes_with_zero.insert(zero_idx, int_to_node(0));
-        let result =
-            PartialMmr::from_parts(peaks.clone(), nodes_with_zero, BTreeSet::new());
+        let result = PartialMmr::from_parts(peaks.clone(), nodes_with_zero, BTreeSet::new());
         assert!(result.is_err());
 
         // Invalid case: large even index (internal node) beyond forest bounds
         let mut nodes_with_large_even = BTreeMap::new();
         let large_even_idx = InOrderIndex::read_from_bytes(&1000usize.to_bytes()).unwrap();
         nodes_with_large_even.insert(large_even_idx, int_to_node(0));
-        let result =
-            PartialMmr::from_parts(peaks.clone(), nodes_with_large_even, BTreeSet::new());
+        let result = PartialMmr::from_parts(peaks.clone(), nodes_with_large_even, BTreeSet::new());
         assert!(result.is_err());
+
+        // Invalid case: separator index between trees
+        // For 7 leaves (0b111 = 4+2+1), index 8 is a separator between the first tree (1-7)
+        // and the second tree (9-11). Similarly, index 12 is a separator between the second
+        // tree and the third tree (13).
+        let mut nodes_with_separator = BTreeMap::new();
+        let separator_idx = InOrderIndex::read_from_bytes(&8usize.to_bytes()).unwrap();
+        nodes_with_separator.insert(separator_idx, int_to_node(0));
+        let result = PartialMmr::from_parts(peaks.clone(), nodes_with_separator, BTreeSet::new());
+        assert!(result.is_err(), "separator index 8 should be rejected");
+
+        let mut nodes_with_separator_12 = BTreeMap::new();
+        let separator_idx_12 = InOrderIndex::read_from_bytes(&12usize.to_bytes()).unwrap();
+        nodes_with_separator_12.insert(separator_idx_12, int_to_node(0));
+        let result =
+            PartialMmr::from_parts(peaks.clone(), nodes_with_separator_12, BTreeSet::new());
+        assert!(result.is_err(), "separator index 12 should be rejected");
 
         // Invalid case: nodes with empty forest
         let empty_peaks = MmrPeaks::new(Forest::empty(), vec![]).unwrap();
         let mut nodes_with_empty_forest = BTreeMap::new();
         nodes_with_empty_forest.insert(InOrderIndex::from_leaf_pos(0), int_to_node(0));
-        let result =
-            PartialMmr::from_parts(empty_peaks, nodes_with_empty_forest, BTreeSet::new());
+        let result = PartialMmr::from_parts(empty_peaks, nodes_with_empty_forest, BTreeSet::new());
         assert!(result.is_err());
     }
 
