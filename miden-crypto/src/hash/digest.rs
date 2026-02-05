@@ -209,6 +209,15 @@ mod tests {
     }
 
     #[test]
+    fn test_digest_hex_roundtrip_24() {
+        let bytes = [0xef; 24];
+        let digest = Digest::<24>::from(bytes);
+        let hex: String = digest.into();
+        let recovered = Digest::<24>::try_from(hex.as_str()).unwrap();
+        assert_eq!(recovered.as_bytes(), &bytes);
+    }
+
+    #[test]
     fn test_digest_digests_as_bytes_32() {
         let d1 = Digest::<32>::from([1u8; 32]);
         let d2 = Digest::<32>::from([2u8; 32]);
