@@ -15,6 +15,9 @@ use crate::utils::{
 // CONSTANTS
 // ================================================================================================
 
+/// Size of a 192-bit digest in bytes.
+pub const DIGEST192_BYTES: usize = 24;
+
 /// Size of a 256-bit digest in bytes.
 pub const DIGEST256_BYTES: usize = 32;
 
@@ -23,6 +26,9 @@ pub const DIGEST512_BYTES: usize = 64;
 
 // TYPE ALIASES
 // ================================================================================================
+
+/// A 192-bit (24-byte) digest. Type alias for `Digest<24>`.
+pub type Digest192 = Digest<DIGEST192_BYTES>;
 
 /// A 256-bit (32-byte) digest. Type alias for `Digest<32>`.
 pub type Digest256 = Digest<DIGEST256_BYTES>;
@@ -137,7 +143,11 @@ mod tests {
         assert_eq!(size_of::<Digest<64>>(), size_of::<[u8; 64]>());
         assert_eq!(align_of::<Digest<64>>(), align_of::<[u8; 64]>());
 
+        assert_eq!(size_of::<Digest<24>>(), size_of::<[u8; 24]>());
+        assert_eq!(align_of::<Digest<24>>(), align_of::<[u8; 24]>());
+
         // Verify type aliases as well
+        assert_eq!(size_of::<Digest192>(), 24);
         assert_eq!(size_of::<Digest256>(), 32);
         assert_eq!(size_of::<Digest512>(), 64);
     }
@@ -195,6 +205,15 @@ mod tests {
         let digest = Digest::<64>::from(bytes);
         let hex: String = digest.into();
         let recovered = Digest::<64>::try_from(hex.as_str()).unwrap();
+        assert_eq!(recovered.as_bytes(), &bytes);
+    }
+
+    #[test]
+    fn test_digest_hex_roundtrip_24() {
+        let bytes = [0xef; 24];
+        let digest = Digest::<24>::from(bytes);
+        let hex: String = digest.into();
+        let recovered = Digest::<24>::try_from(hex.as_str()).unwrap();
         assert_eq!(recovered.as_bytes(), &bytes);
     }
 
