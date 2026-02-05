@@ -1,1 +1,0 @@
-window.SIDEBAR_ITEMS = {"enum":["PairCol"],"mod":["utils"],"struct":["FilteredAirBuilder","VirtualPairCol"],"trait":["Air","AirBuilder","AirBuilderWithPublicValues","BaseAir","BaseAirWithPublicValues","ExtensionBuilder","PairBuilder","PermutationAirBuilder"]};

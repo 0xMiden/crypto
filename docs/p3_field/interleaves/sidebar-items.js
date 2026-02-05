@@ -1,1 +1,0 @@
-window.SIDEBAR_ITEMS = {"macro":["impl_packed_field_pow_2"]};

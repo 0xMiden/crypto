@@ -1,1 +1,0 @@
-window.SIDEBAR_ITEMS = {"fn":["binary_heap","btree_map","btree_set","linked_list","size_range","vec","vec_deque"],"struct":["BTreeMapStrategy","BTreeMapValueTree","BTreeSetStrategy","BTreeSetValueTree","BinaryHeapStrategy","BinaryHeapValueTree","LinkedListStrategy","LinkedListValueTree","SizeRange","VecDequeStrategy","VecDequeValueTree","VecStrategy","VecValueTree"]};

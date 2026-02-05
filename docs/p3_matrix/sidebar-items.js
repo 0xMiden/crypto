@@ -1,1 +1,0 @@
-window.SIDEBAR_ITEMS = {"mod":["bitrev","dense","extension","horizontally_truncated","row_index_mapped","stack","strided","util"],"struct":["Dimensions"],"trait":["Matrix"]};

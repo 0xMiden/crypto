@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"struct":["Blake3Digest","Blake3Hasher","Blake3_192","Blake3_256"]};
+window.SIDEBAR_ITEMS = {"struct":["Blake3Hasher","Blake3_192","Blake3_256"],"type":["Blake3Digest"]};

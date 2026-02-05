@@ -1,1 +1,0 @@
-window.SIDEBAR_ITEMS = {"mod":["hazmat"],"struct":["Error","RecoveryId"],"type":["DerSignature","Signature","SigningKey","VerifyingKey"]};

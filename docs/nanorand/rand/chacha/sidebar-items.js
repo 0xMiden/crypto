@@ -1,1 +1,0 @@
-window.SIDEBAR_ITEMS = {"struct":["ChaCha"],"type":["ChaCha12","ChaCha20","ChaCha8"]};

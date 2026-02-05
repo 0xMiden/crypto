@@ -1,1 +1,0 @@
-window.SIDEBAR_ITEMS = {"struct":["ChunkBy","ChunkByMut","Chunks","ChunksExact","ChunksExactMut","ChunksMut","Iter","IterMut","RChunks","RChunksExact","RChunksExactMut","RChunksMut","Split","SplitInclusive","SplitInclusiveMut","SplitMut","Windows"],"trait":["ParallelSlice","ParallelSliceMut"]};

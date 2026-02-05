@@ -1,1 +1,0 @@
-searchState.loadedDescShard("p3_keccak", 0, "The Keccak-f permutation, and hash functions built from it.\nThe <code>Keccak</code> hash functions defined in Keccak SHA3 submission…\nThe Keccak-f permutation.\nReturns the argument unchanged.\nReturns the argument unchanged.\nCalls <code>U::from(self)</code>.\nCalls <code>U::from(self)</code>.")

@@ -1,1 +1,0 @@
-window.SIDEBAR_ITEMS = {"fn":["delete_callback","destructor_callback","full_merge_callback","name_callback","partial_merge_callback"],"struct":["MergeOperands","MergeOperandsIter","MergeOperatorCallback"],"trait":["MergeFn"]};

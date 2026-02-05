@@ -1,1 +1,0 @@
-searchState.loadedDescShard("miden_crypto_derive", 0, "Derives a Debug implementation that elides secret values.\nDerives a Display implementation that elides secret values.\nGenerates accessor methods for tuple structs wrapping a …")

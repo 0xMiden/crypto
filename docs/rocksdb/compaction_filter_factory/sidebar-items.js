@@ -1,1 +1,0 @@
-window.SIDEBAR_ITEMS = {"fn":["create_compaction_filter_callback","destructor_callback","name_callback"],"struct":["CompactionFilterContext"],"trait":["CompactionFilterFactory"]};

@@ -1,1 +1,0 @@
-searchState.loadedDescShard("p3_interpolation", 0, "Tools for Lagrange interpolation.\nGiven evaluations of a batch of polynomials over the given …\nGiven evaluations of a batch of polynomials over the given …\nGiven evaluations of a batch of polynomials over the …")

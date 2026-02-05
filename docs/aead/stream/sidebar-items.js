@@ -1,1 +1,0 @@
-window.SIDEBAR_ITEMS = {"struct":["Decryptor","Encryptor","StreamBE32","StreamLE31"],"trait":["NewStream","StreamPrimitive"],"type":["DecryptorBE32","DecryptorLE31","EncryptorBE32","EncryptorLE31","Nonce","NonceSize"]};

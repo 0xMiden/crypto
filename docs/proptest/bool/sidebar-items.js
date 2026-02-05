@@ -1,1 +1,0 @@
-window.SIDEBAR_ITEMS = {"constant":["ANY"],"fn":["weighted"],"struct":["Any","BoolValueTree","Weighted"]};

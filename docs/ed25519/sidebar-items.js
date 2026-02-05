@@ -1,1 +1,0 @@
-window.SIDEBAR_ITEMS = {"struct":["Error","Signature"],"trait":["SignatureEncoding"],"type":["ComponentBytes","SignatureBytes"]};

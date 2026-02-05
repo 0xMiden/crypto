@@ -1,1 +1,0 @@
-window.SIDEBAR_ITEMS = {"struct":["StrengthReducedU128","StrengthReducedU16","StrengthReducedU32","StrengthReducedU64","StrengthReducedU8","StrengthReducedUsize"]};

@@ -1,1 +1,0 @@
-window.SIDEBAR_ITEMS = {"fn":["any","any_with","arbitrary","arbitrary_with"],"mod":["functor"],"trait":["Arbitrary"],"type":["Mapped","ParamsFor","SMapped","StrategyFor"]};

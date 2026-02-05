@@ -1,9 +1,0 @@
-(function() {
-    var implementors = Object.fromEntries([["p3_goldilocks",[["impl <a class=\"trait\" href=\"p3_poseidon2/internal/trait.InternalLayerConstructor.html\" title=\"trait p3_poseidon2::internal::InternalLayerConstructor\">InternalLayerConstructor</a>&lt;<a class=\"struct\" href=\"p3_goldilocks/struct.Goldilocks.html\" title=\"struct p3_goldilocks::Goldilocks\">Goldilocks</a>&gt; for <a class=\"struct\" href=\"p3_goldilocks/struct.Poseidon2InternalLayerGoldilocks.html\" title=\"struct p3_goldilocks::Poseidon2InternalLayerGoldilocks\">Poseidon2InternalLayerGoldilocks</a>"]]],["p3_monty_31",[["impl&lt;FP: <a class=\"trait\" href=\"p3_monty_31/trait.FieldParameters.html\" title=\"trait p3_monty_31::FieldParameters\">FieldParameters</a>, const WIDTH: <a class=\"primitive\" href=\"https://doc.rust-lang.org/1.90.0/std/primitive.usize.html\">usize</a>, ILP: <a class=\"trait\" href=\"p3_monty_31/trait.InternalLayerBaseParameters.html\" title=\"trait p3_monty_31::InternalLayerBaseParameters\">InternalLayerBaseParameters</a>&lt;FP, WIDTH&gt;&gt; <a class=\"trait\" href=\"p3_poseidon2/internal/trait.InternalLayerConstructor.html\" title=\"trait p3_poseidon2::internal::InternalLayerConstructor\">InternalLayerConstructor</a>&lt;<a class=\"struct\" href=\"p3_monty_31/struct.MontyField31.html\" title=\"struct p3_monty_31::MontyField31\">MontyField31</a>&lt;FP&gt;&gt; for <a class=\"struct\" href=\"p3_monty_31/struct.Poseidon2InternalLayerMonty31.html\" title=\"struct p3_monty_31::Poseidon2InternalLayerMonty31\">Poseidon2InternalLayerMonty31</a>&lt;FP, WIDTH, ILP&gt;"]]]]);
-    if (window.register_implementors) {
-        window.register_implementors(implementors);
-    } else {
-        window.pending_implementors = implementors;
-    }
-})()
-//{"start":57,"fragment_lengths":[533,1001]}

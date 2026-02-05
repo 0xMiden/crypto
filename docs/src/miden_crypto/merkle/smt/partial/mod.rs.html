@@ -1,7 +1,7 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `miden-crypto/src/merkle/smt/partial/mod.rs`."><title>mod.rs - source</title><script>if(window.location.protocol!=="file:")document.head.insertAdjacentHTML("beforeend","SourceSerif4-Regular-6b053e98.ttf.woff2,FiraSans-Italic-81dc35de.woff2,FiraSans-Regular-0fe48ade.woff2,FiraSans-MediumItalic-ccf7e434.woff2,FiraSans-Medium-e1aa3f0a.woff2,SourceCodePro-Regular-8badfe75.ttf.woff2,SourceCodePro-Semibold-aa29a496.ttf.woff2".split(",").map(f=>`<link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../../static.files/${f}">`).join(""))</script><link rel="stylesheet" href="../../../../../static.files/normalize-9960930a.css"><link rel="stylesheet" href="../../../../../static.files/rustdoc-aa0817cf.css"><meta name="rustdoc-vars" data-root-path="../../../../../" data-static-root-path="../../../../../static.files/" data-current-crate="miden_crypto" data-themes="" data-resource-suffix="" data-rustdoc-version="1.90.0 (1159e78c4 2025-09-14)" data-channel="1.90.0" data-search-js="search-fa3e91e5.js" data-settings-js="settings-5514c975.js" ><script src="../../../../../static.files/storage-68b7e25d.js"></script><script defer src="../../../../../static.files/src-script-813739b1.js"></script><script defer src="../../../../../src-files.js"></script><script defer src="../../../../../static.files/main-eebb9057.js"></script><noscript><link rel="stylesheet" href="../../../../../static.files/noscript-32bb7600.css"></noscript><link rel="alternate icon" type="image/png" href="../../../../../static.files/favicon-32x32-6580c154.png"><link rel="icon" type="image/svg+xml" href="../../../../../static.files/favicon-044be391.svg"></head><body class="rustdoc src"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="src-sidebar-title"><h2>Files</h2></div></nav><div class="sidebar-resizer" title="Drag to resize sidebar"></div><main><rustdoc-search></rustdoc-search><section id="main-content" class="content"><div class="main-heading"><h1><div class="sub-heading">miden_crypto/merkle/smt/partial/</div>mod.rs</h1><rustdoc-toolbar></rustdoc-toolbar></div><div class="example-wrap digits-3"><pre class="rust"><code><a href=#1 id=1 data-nosnippet>1</a><span class="kw">use </span>p3_field::PrimeField64;
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `miden-crypto/src/merkle/smt/partial/mod.rs`."><title>mod.rs - source</title><script>if(window.location.protocol!=="file:")document.head.insertAdjacentHTML("beforeend","SourceSerif4-Regular-6b053e98.ttf.woff2,FiraSans-Italic-81dc35de.woff2,FiraSans-Regular-0fe48ade.woff2,FiraSans-MediumItalic-ccf7e434.woff2,FiraSans-Medium-e1aa3f0a.woff2,SourceCodePro-Regular-8badfe75.ttf.woff2,SourceCodePro-Semibold-aa29a496.ttf.woff2".split(",").map(f=>`<link rel="preload" as="font" type="font/woff2"href="../../../../../static.files/${f}">`).join(""))</script><link rel="stylesheet" href="../../../../../static.files/normalize-9960930a.css"><link rel="stylesheet" href="../../../../../static.files/rustdoc-b7b9f40b.css"><meta name="rustdoc-vars" data-root-path="../../../../../" data-static-root-path="../../../../../static.files/" data-current-crate="miden_crypto" data-themes="" data-resource-suffix="" data-rustdoc-version="1.95.0-nightly (db3e99bba 2026-02-04)" data-channel="nightly" data-search-js="search-fb33671b.js" data-stringdex-js="stringdex-b897f86f.js" data-settings-js="settings-170eb4bf.js" ><script src="../../../../../static.files/storage-f9617a14.js"></script><script defer src="../../../../../static.files/src-script-813739b1.js"></script><script defer src="../../../../../src-files.js"></script><script defer src="../../../../../static.files/main-12f88f4f.js"></script><noscript><link rel="stylesheet" href="../../../../../static.files/noscript-f7c3ffd8.css"></noscript><link rel="alternate icon" type="image/png" href="../../../../../static.files/favicon-32x32-eab170b8.png"><link rel="icon" type="image/svg+xml" href="../../../../../static.files/favicon-044be391.svg"></head><body class="rustdoc src"><a class="skip-main-content" href="#main-content">Skip to main content</a><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="src-sidebar-title"><h2>Files</h2></div></nav><div class="sidebar-resizer" title="Drag to resize sidebar"></div><main><section id="main-content" class="content" tabindex="-1"><div class="main-heading"><h1><div class="sub-heading">miden_crypto/merkle/smt/partial/</div>mod.rs</h1><rustdoc-toolbar></rustdoc-toolbar></div><div class="example-wrap digits-3"><pre class="rust"><code><a href=#1 id=1 data-nosnippet>1</a><span class="kw">use </span>p3_field::PrimeField64;
 <a href=#2 id=2 data-nosnippet>2</a>
-<a href=#3 id=3 data-nosnippet>3</a><span class="kw">use super</span>::{EmptySubtreeRoots, LeafIndex, SMT_DEPTH};
-<a href=#4 id=4 data-nosnippet>4</a><span class="kw">use crate</span>::{
+<a href=#3 id=3 data-nosnippet>3</a><span class="kw">use </span>super::{EmptySubtreeRoots, LeafIndex, SMT_DEPTH};
+<a href=#4 id=4 data-nosnippet>4</a><span class="kw">use </span>crate::{
 <a href=#5 id=5 data-nosnippet>5</a>    EMPTY_WORD, Word,
 <a href=#6 id=6 data-nosnippet>6</a>    merkle::{
 <a href=#7 id=7 data-nosnippet>7</a>        InnerNodeInfo, MerkleError, NodeIndex, SparseMerklePath,
@@ -232,7 +232,7 @@
 <a href=#232 id=232 data-nosnippet>232</a>            .entry(leaf_index.value())
 <a href=#233 id=233 data-nosnippet>233</a>            .or_insert_with(|| SmtLeaf::new_empty(leaf_index));
 <a href=#234 id=234 data-nosnippet>234</a>
-<a href=#235 id=235 data-nosnippet>235</a>        <span class="kw">if </span>value != EMPTY_WORD {
+<a href=#235 id=235 data-nosnippet>235</a>        <span class="kw">if </span><span class="macro">value !</span>= EMPTY_WORD {
 <a href=#236 id=236 data-nosnippet>236</a>            leaf.insert(key, value).map_err(|e| <span class="kw">match </span>e {
 <a href=#237 id=237 data-nosnippet>237</a>                SmtLeafError::TooManyLeafEntries { actual } =&gt; {
 <a href=#238 id=238 data-nosnippet>238</a>                    MerkleError::TooManyLeafEntries { actual }
@@ -488,7 +488,7 @@
 <a href=#488 id=488 data-nosnippet>488</a>            <span class="kw">let </span>node_hash = node.hash();
 <a href=#489 id=489 data-nosnippet>489</a>            <span class="kw">let </span>expected_hash = <span class="self">self</span>.get_node_hash(idx);
 <a href=#490 id=490 data-nosnippet>490</a>
-<a href=#491 id=491 data-nosnippet>491</a>            <span class="kw">if </span>node_hash != expected_hash {
+<a href=#491 id=491 data-nosnippet>491</a>            <span class="kw">if </span><span class="macro">node_hash !</span>= expected_hash {
 <a href=#492 id=492 data-nosnippet>492</a>                <span class="kw">return </span><span class="prelude-val">Err</span>(DeserializationError::InvalidValue(
 <a href=#493 id=493 data-nosnippet>493</a>                    <span class="string">"inner node hash is inconsistent with parent"</span>.into(),
 <a href=#494 id=494 data-nosnippet>494</a>                ));
@@ -502,7 +502,7 @@
 <a href=#502 id=502 data-nosnippet>502</a>            <span class="kw">let </span>leaf_hash = leaf.hash();
 <a href=#503 id=503 data-nosnippet>503</a>            <span class="kw">let </span>expected_hash = <span class="self">self</span>.get_node_hash(node_index);
 <a href=#504 id=504 data-nosnippet>504</a>
-<a href=#505 id=505 data-nosnippet>505</a>            <span class="kw">if </span>leaf_hash != expected_hash {
+<a href=#505 id=505 data-nosnippet>505</a>            <span class="kw">if </span><span class="macro">leaf_hash !</span>= expected_hash {
 <a href=#506 id=506 data-nosnippet>506</a>                <span class="kw">return </span><span class="prelude-val">Err</span>(DeserializationError::InvalidValue(
 <a href=#507 id=507 data-nosnippet>507</a>                    <span class="string">"leaf hash is inconsistent with parent inner node"</span>.into(),
 <a href=#508 id=508 data-nosnippet>508</a>                ));
@@ -580,4 +580,5 @@
 <a href=#580 id=580 data-nosnippet>580</a>
 <a href=#581 id=581 data-nosnippet>581</a>        <span class="prelude-val">Ok</span>(partial)
 <a href=#582 id=582 data-nosnippet>582</a>    }
-<a href=#583 id=583 data-nosnippet>583</a>}</code></pre></div></section></main></body></html>
+<a href=#583 id=583 data-nosnippet>583</a>}
+</code></pre></div></section></main></body></html>

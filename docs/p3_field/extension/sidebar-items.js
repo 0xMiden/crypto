@@ -1,1 +1,0 @@
-window.SIDEBAR_ITEMS = {"fn":["octic_mul","quartic_mul","quintic_mul","vector_add"],"struct":["BinomialExtensionField","PackedBinomialExtensionField"],"trait":["BinomiallyExtendable","BinomiallyExtendableAlgebra","ComplexExtendable","HasComplexBinomialExtension","HasFrobenius","HasTwoAdicBinomialExtension","HasTwoAdicComplexBinomialExtension"],"type":["Complex"]};

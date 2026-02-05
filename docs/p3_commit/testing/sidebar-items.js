@@ -1,1 +1,0 @@
-window.SIDEBAR_ITEMS = {"fn":["eval_coeffs_at_pt"],"struct":["TrivialPcs"]};

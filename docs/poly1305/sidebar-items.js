@@ -1,1 +1,0 @@
-window.SIDEBAR_ITEMS = {"constant":["BLOCK_SIZE","KEY_SIZE"],"struct":["Poly1305"],"type":["Block","Key","Tag"]};

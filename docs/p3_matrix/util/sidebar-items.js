@@ -1,1 +1,0 @@
-window.SIDEBAR_ITEMS = {"fn":["reverse_matrix_index_bits","swap_rows"]};

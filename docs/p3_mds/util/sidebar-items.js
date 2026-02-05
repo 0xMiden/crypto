@@ -1,1 +1,0 @@
-window.SIDEBAR_ITEMS = {"fn":["apply_circulant","apply_circulant_fft","dot_product","first_row_to_first_col"]};

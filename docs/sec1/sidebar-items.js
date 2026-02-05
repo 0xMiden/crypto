@@ -1,1 +1,0 @@
-window.SIDEBAR_ITEMS = {"enum":["EcParameters","Error"],"mod":["consts","point"],"struct":["EcPrivateKey"],"trait":["DecodeEcPrivateKey","EncodeEcPrivateKey"],"type":["Result"]};

@@ -1,1 +1,0 @@
-searchState.loadedDescShard("transpose", 0, "Utility for transposing multi-dimensional data stored as a …\nTranspose the input array into the output array.\nTranspose the input array in-place.")

@@ -1,1 +1,0 @@
-window.SIDEBAR_ITEMS = {"fn":["current_num_threads","join"],"trait":["FromParallelIterator","IndexedParallelIterator","IntoParallelIterator","IntoParallelRefIterator","IntoParallelRefMutIterator","ParallelBridge","ParallelDrainFull","ParallelDrainRange","ParallelExtend","ParallelIterator","ParallelSlice","ParallelSliceMut","ParallelString","SharedExt"]};
