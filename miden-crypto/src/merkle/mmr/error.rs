@@ -24,4 +24,6 @@ pub enum MmrError {
     InvalidMerklePath(#[source] MerkleError),
     #[error("merkle root computation failed")]
     MerkleRootComputationFailed(#[source] MerkleError),
+    #[error("inconsistent partial mmr: {0}")]
+    InconsistentPartialMmr(String),
 }
