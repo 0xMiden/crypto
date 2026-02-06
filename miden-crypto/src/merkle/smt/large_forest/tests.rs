@@ -430,6 +430,7 @@ fn open() -> Result<()> {
             [
                 ForestOperation::insert(key_1, value_1_v2),
                 ForestOperation::insert(key_3, value_3_v1),
+                ForestOperation::remove(key_2),
             ]
             .into_iter(),
         ),
@@ -439,6 +440,7 @@ fn open() -> Result<()> {
     let mut tree_v2 = tree_v1.clone();
     tree_v2.insert(key_1, value_1_v2)?;
     tree_v2.insert(key_3, value_3_v1)?;
+    tree_v2.insert(key_2, EMPTY_WORD)?;
 
     // These two should again produce the same opening when we query for the latest version.
     let random_key: Word = rng.value();
@@ -778,7 +780,8 @@ fn update_tree() -> Result<()> {
     assert!(result.is_err());
     assert_matches!(
         result.unwrap_err(),
-        LargeSmtForestError::BadVersion(v1, v2) if v1 == older_version && v2 == version_1
+        LargeSmtForestError::BadVersion { provided, latest }
+            if provided == older_version && latest == version_1
     );
 
     // Let's create some data and actually add it.
@@ -900,7 +903,11 @@ fn update_forest() -> Result<()> {
     // We also want to test that we get an error when we ask for a bad version transition.
     let result = forest.update_forest(version_bad, operations_basic.clone());
     assert!(result.is_err());
-    assert_matches!(result.unwrap_err(), LargeSmtForestError::BadVersion(v1, v2) if v1 == version_bad && v2 == version_1);
+    assert_matches!(
+        result.unwrap_err(),
+        LargeSmtForestError::BadVersion { provided, latest }
+            if provided == version_bad && latest == version_1
+    );
 
     // This should also leave the internal state unchanged.
     assert_eq!(

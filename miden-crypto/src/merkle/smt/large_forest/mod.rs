@@ -704,9 +704,7 @@ impl<B: Backend> LargeSmtForest<B> {
 
         if tree.version() == lineage_data.latest_version {
             // If we match the current version, we can construct the simple iterator variant.
-            Ok(EntriesIterator::new_without_history(
-                self.backend.entries(tree.lineage()).map_err(LargeSmtForestError::fatal_from)?,
-            ))
+            Ok(EntriesIterator::new_without_history(self.backend.entries(tree.lineage())?))
         } else if let Ok(view) = lineage_data.history.get_view_at(tree.version()) {
             // If we can serve it from the history we need to instead construct the complex version.
             Ok(EntriesIterator::new_with_history(
@@ -798,10 +796,10 @@ impl<B: Backend> LargeSmtForest<B> {
             if lineage_data.latest_version < new_version {
                 lineage_data
             } else {
-                return Err(LargeSmtForestError::BadVersion(
-                    new_version,
-                    lineage_data.latest_version,
-                ));
+                return Err(LargeSmtForestError::BadVersion {
+                    provided: new_version,
+                    latest: lineage_data.latest_version,
+                });
             }
         } else {
             return Err(LargeSmtForestError::UnknownLineage(lineage));
@@ -824,13 +822,16 @@ impl<B: Backend> LargeSmtForest<B> {
         // mutation set.
         let updated_root = reversion_set.old_root;
 
-        // The mutation set that we get back is the set of changes to revert the tree changes, so we
-        // use these to create a new version in the history. The version here is the version we are
-        // moving _away_ from, and so we get it from the lineage data before we overwrite it with
-        // the new version.
+        // The call to `add_version_from_mutation_set` should only yield an error if the
+        // provided version does not pass the version check. This check has already been
+        // performed as a precondition for reaching this point of the tree update, and
+        // hence should only ever fail due to a programmer bug so we panic if it does fail.
         lineage_data
             .history
-            .add_version_from_mutation_set(lineage_data.latest_version, reversion_set)?;
+            .add_version_from_mutation_set(lineage_data.latest_version, reversion_set)
+            .unwrap_or_else(|_| {
+                panic!("Unable to add valid version {} to history", lineage_data.latest_version)
+            });
 
         // At this point we now have a historical version added, so we track that the lineage has a
         // non-empty history.
@@ -891,10 +892,10 @@ impl<B: Backend> LargeSmtForest<B> {
                     if lineage_data.latest_version < new_version {
                         Ok(())
                     } else {
-                        Err(LargeSmtForestError::BadVersion(
-                            new_version,
-                            lineage_data.latest_version,
-                        ))
+                        Err(LargeSmtForestError::BadVersion {
+                            provided: new_version,
+                            latest: lineage_data.latest_version,
+                        })
                     }
                 } else {
                     Err(LargeSmtForestError::UnknownLineage(*lineage))
@@ -927,12 +928,19 @@ impl<B: Backend> LargeSmtForest<B> {
 
                 let updated_root = reversion.old_root;
 
-                // At this point any failure leaves us in an inconsistent state, so we have to turn
-                // all errors here into fatal ones.
+                // The call to `add_version_from_mutation_set` should only yield an error if the
+                // provided version does not pass the version check. This check has already been
+                // performed as a precondition for reaching this point of the forest update, and
+                // hence should only ever fail due to a programmer bug so we panic if it does fail.
                 lineage_data
                     .history
                     .add_version_from_mutation_set(lineage_data.latest_version, reversion)
-                    .map_err(LargeSmtForestError::fatal_from)?;
+                    .unwrap_or_else(|_| {
+                        panic!(
+                            "Unable to add valid version {} to history",
+                            lineage_data.latest_version
+                        )
+                    });
 
                 // At this point we know that we have a historical version for that tree, so we
                 // should track it as having a non-empty history.
@@ -960,11 +968,15 @@ impl<B: Backend> LargeSmtForest<B> {
         full_tree_leaf: &SmtLeaf,
         historical_delta: &CompactLeaf,
     ) -> Result<SmtLeaf> {
+        // We apply the historical delta on top of the existing entries to perform the reversion
+        // back to the previous state.
         let mut leaf_entries = Map::new();
         leaf_entries.extend(full_tree_leaf.to_entries().map(|(k, v)| (*k, *v)));
         leaf_entries.extend(historical_delta);
 
-        Ok(SmtLeaf::new(leaf_entries.into_iter().collect(), full_tree_leaf.index())?)
+        // Any entries that are still empty at this point should be removed.
+        let non_empties_only = leaf_entries.into_iter().filter(|(_, v)| *v != EMPTY_WORD).collect();
+        Ok(SmtLeaf::new(non_empties_only, full_tree_leaf.index())?)
     }
 
     /// Applies any historical changes contained in `history_view` on top of the merkle path
@@ -989,13 +1001,8 @@ impl<B: Backend> LargeSmtForest<B> {
             } else {
                 // If there isn't a historical value, we should delegate to the corresponding
                 // element in the path from the full-tree opening.
-                //
-                // We know here that the possible values of `depth` in the loop range from 64 to
-                // 1 (inclusive). All values in this range are non-zero, and hence we do not
-                // need to perform the check when constructing our NonZeroU8 for the indexing
-                // operation.
-                path_elems[depth as usize - 1] =
-                    full_tree_path.at_depth(unsafe { NonZeroU8::new_unchecked(depth) })?
+                let bounded_depth = NonZeroU8::new(depth).expect("depth ∈ 1 ..= SMT_DEPTH]");
+                path_elems[depth as usize - 1] = full_tree_path.at_depth(bounded_depth)?
             }
 
             // We then need to move upward in the tree of the nodes we know.

@@ -302,7 +302,8 @@ struct TreeData {
 /// An iterator over entries in a given tree in the backend.
 ///
 /// It is guaranteed to yield entries such that they are sorted by their leaf index, and then for
-/// entries that share the same leaf index they are sorted by their key.
+/// entries that share the same leaf index they are sorted by their key. It should never yield
+/// entries that have `value == EMPTY_WORD`.
 #[derive(Clone, Debug)]
 struct InMemoryBackendEntriesIterator<'backend> {
     /// A reference to the tree over which the iterator is running.

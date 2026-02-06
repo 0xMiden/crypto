@@ -186,6 +186,7 @@ impl SmtLeaf {
 
     /// Returns an iterator over the key-value pairs in the leaf.
     pub fn to_entries(&self) -> impl Iterator<Item = (&Word, &Word)> + '_ {
+        // Needed for type conversion from `&(T, T)` to `(&T, &T)`.
         self.entries().iter().map(|(k, v)| (k, v))
     }
 

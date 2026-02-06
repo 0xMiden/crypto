@@ -21,8 +21,8 @@ use crate::merkle::{
 pub enum LargeSmtForestError {
     /// Raised when the provided version for any update is older than the latest-known version for
     /// the lineage being updated.
-    #[error("Version {0} is not newer than latest-known {1}")]
-    BadVersion(VersionId, VersionId),
+    #[error("Version {provided} is not newer than latest-known {latest}")]
+    BadVersion { provided: VersionId, latest: VersionId },
 
     /// Raised when there is a conflict between an existing lineage ID and one already in the
     /// forest.

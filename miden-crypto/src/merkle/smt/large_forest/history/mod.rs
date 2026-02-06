@@ -421,11 +421,12 @@ impl<'history> HistoryView<'history> {
     pub fn leaf_delta(&self, index: &LeafIndex<SMT_DEPTH>) -> CompactLeaf {
         let mut leaf = CompactLeaf::default();
 
-        // We have to reverse here as we want to keep the _oldest_ change for any particular key in
-        // a leaf, where `extend` will keep the newest if done naïvely.
-        for delta in self.history.deltas.iter().skip(self.version_ix).rev() {
+        // We want to keep the _oldest_ change for any particular key in a leaf.
+        for delta in self.history.deltas.iter().skip(self.version_ix) {
             if let Some(leaf_delta) = delta.leaves.get(index) {
-                leaf.extend(leaf_delta);
+                for (key, value) in leaf_delta {
+                    leaf.entry(*key).or_insert(*value);
+                }
             }
         }
 

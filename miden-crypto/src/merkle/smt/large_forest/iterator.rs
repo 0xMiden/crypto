@@ -42,9 +42,17 @@ pub(super) enum EntriesIterator<'forest> {
     /// historical overlay.
     WithHistory {
         /// The iterator over the entries in the full tree.
+        ///
+        /// This iterator should never yield any entries where `value == EMPTY_WORD`.
         full_tree_iter: Peekable<Box<dyn Iterator<Item = TreeEntry> + 'forest>>,
 
         /// The iterator over the entries in the history.
+        ///
+        /// This iterator may yield entries with `value == EMPTY_WORD`. These are explicit
+        /// reversions of entries newly-set in newer versions, and so should be used. While they
+        /// technically should only ever correspond to a case where they _are_ reverting a
+        /// newly-set entry, care must be taken to remove them regardless if they do not match up
+        /// for some reason.
         history_entries_iter: Peekable<Box<dyn Iterator<Item = TreeEntry> + 'forest>>,
 
         /// The current state of the iteration state machine.
@@ -161,8 +169,15 @@ impl<'forest> EntriesIterator<'forest> {
             },
             EntriesIteratorState::HistOnly => {
                 // In this state we simply can continue yielding the history entries iterator until
-                // it is empty. When it returns `None` we have `HistOnly -> End`
-                history_entries_iter.next()
+                // it is empty. We just have to check that we're not yielding EMPTY_WORD entries
+                // directly as these should not be seen.
+                history_entries_iter.next().and_then(|e| {
+                    if e.value == EMPTY_WORD {
+                        self.next_with_history()
+                    } else {
+                        Some(e)
+                    }
+                })
             },
             EntriesIteratorState::TreeOnly => {
                 // In this state we can simply continue yielding the tree entries iterator until it
@@ -172,9 +187,16 @@ impl<'forest> EntriesIterator<'forest> {
             EntriesIteratorState::InLeafHistOnly => {
                 // Here, we are in a leaf that is only in the history. We technically only want to
                 // transition out of this state once we have exhausted the leaf, but in actuality we
-                // can rely on the logic for `NotInLeaf` to do the right thing here.
+                // can rely on the logic for `NotInLeaf` to do the right thing here. We only have to
+                // skip empty words as these should never be yielded.
                 *state = EntriesIteratorState::NotInLeaf;
-                history_entries_iter.next()
+                history_entries_iter.next().and_then(|e| {
+                    if e.value == EMPTY_WORD {
+                        self.next_with_history()
+                    } else {
+                        Some(e)
+                    }
+                })
             },
             EntriesIteratorState::InLeafTreeOnly => {
                 // Here we are in a leaf that is only in the full tree. We technically only want to
