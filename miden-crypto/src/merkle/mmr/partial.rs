@@ -399,7 +399,7 @@ impl PartialMmr {
         // Check if the sibling leaf is still tracked. If so, we need to keep our leaf value
         // as an auth node for the sibling, and keep all auth nodes above.
         let sibling_idx = idx.sibling();
-        let sibling_pos = sibling_idx.inner() / 2;
+        let sibling_pos = sibling_idx.to_leaf_pos().expect("sibling of a leaf is always a leaf");
         if self.tracked_leaves.contains(&sibling_pos) {
             // Sibling is tracked, so don't remove anything - our leaf value and all auth
             // nodes above are still needed for the sibling's proof.
@@ -489,10 +489,7 @@ impl PartialMmr {
             // match order of the update data while applying it
             self.peaks.reverse();
 
-            // set to true when the data is needed for authentication paths updates
-            // Check if the dangling leaf (if any) was tracked
-            let mut track = trees_to_merge.has_single_leaf_tree()
-                && self.tracked_leaves.contains(&(self.forest.num_leaves() - 1));
+            let mut track = false;
 
             let mut peak_count = 0;
             let mut target = trees_to_merge.smallest_tree_unchecked();
@@ -500,9 +497,9 @@ impl PartialMmr {
             update_count += 1;
 
             while target < largest {
-                // check if either the left or right subtrees have saved for authentication paths.
-                // If so, turn tracking on to update those paths.
-                if target != Forest::new(1) && !track {
+                // Check if either the left or right subtrees have nodes saved for authentication
+                // paths. If so, turn tracking on to update those paths.
+                if !track {
                     track = self.is_tracked_node(&peak_idx);
                 }
 
@@ -569,9 +566,8 @@ impl PartialMmr {
     /// Returns true if this [PartialMmr] tracks authentication path for the node at the specified
     /// index.
     fn is_tracked_node(&self, node_index: &InOrderIndex) -> bool {
-        if node_index.is_leaf() {
-            // For leaf nodes, check if the leaf is in the tracked set
-            let leaf_pos = node_index.inner() / 2;
+        if let Some(leaf_pos) = node_index.to_leaf_pos() {
+            // For leaf nodes, check if the leaf is in the tracked set.
             self.tracked_leaves.contains(&leaf_pos)
         } else {
             let left_child = node_index.left_child();
