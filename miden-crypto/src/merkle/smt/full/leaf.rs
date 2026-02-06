@@ -388,7 +388,7 @@ impl Serializable for SmtLeaf {
         self.num_entries().write_into(target);
 
         // Write: leaf index
-        let leaf_index: u64 = self.index().value();
+        let leaf_index: u64 = self.index().position();
         leaf_index.write_into(target);
 
         // Write: entries

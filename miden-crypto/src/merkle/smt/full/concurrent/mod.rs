@@ -104,7 +104,8 @@ impl Smt {
     {
         // Collect and sort key-value pairs by their corresponding leaf index
         let mut sorted_kv_pairs: Vec<_> = kv_pairs.into_iter().collect();
-        sorted_kv_pairs.par_sort_unstable_by_key(|(key, _)| Self::key_to_leaf_index(key).value());
+        sorted_kv_pairs
+            .par_sort_unstable_by_key(|(key, _)| Self::key_to_leaf_index(key).position());
 
         // Convert sorted pairs into mutated leaves and capture any new pairs
         let (mut subtree_leaves, new_pairs) =
@@ -199,7 +200,7 @@ impl Smt {
 
                 // Add the parent node even if it is empty for proper upward updates
                 next_leaves.push(SubtreeLeaf {
-                    col: parent_index.value(),
+                    col: parent_index.position(),
                     hash: combined_hash,
                 });
 
@@ -233,7 +234,7 @@ impl Smt {
     fn build_subtrees(mut entries: Vec<(Word, Word)>) -> Result<(InnerNodes, Leaves), MerkleError> {
         entries.par_sort_unstable_by_key(|item| {
             let index = Self::key_to_leaf_index(&item.0);
-            index.value()
+            index.position()
         });
         build_subtrees_from_sorted_entries(entries)
     }
@@ -278,7 +279,7 @@ impl Smt {
             // Check for duplicates in a sorted list by comparing adjacent pairs
             if let Some(window) = pairs.windows(2).find(|window| window[0].0 == window[1].0) {
                 // If we find a duplicate, return an error
-                let col = Self::key_to_leaf_index(&window[0].0).index.value();
+                let col = Self::key_to_leaf_index(&window[0].0).index.position();
                 return Err(MerkleError::DuplicateValuesForIndex(col));
             }
             Ok(Some(SmtLeaf::new_multiple(pairs).unwrap()))
@@ -473,7 +474,7 @@ pub(crate) fn process_sorted_pairs_to_leaves<F>(
 where
     F: FnMut(Vec<(Word, Word)>) -> Result<Option<SmtLeaf>, MerkleError>,
 {
-    debug_assert!(pairs.is_sorted_by_key(|(key, _)| Smt::key_to_leaf_index(key).value()));
+    debug_assert!(pairs.is_sorted_by_key(|(key, _)| Smt::key_to_leaf_index(key).position()));
     let mut accumulator: PairComputations<u64, SmtLeaf> = Default::default();
     // As we iterate, we'll keep track of the kv-pairs we've seen so far that correspond to a
     // single leaf. When we see a pair that's in a different leaf, we'll swap these pairs
@@ -481,10 +482,10 @@ where
     let mut current_leaf_buffer: Vec<(Word, Word)> = Default::default();
     let mut iter = pairs.into_iter().peekable();
     while let Some((key, value)) = iter.next() {
-        let col = Smt::key_to_leaf_index(&key).index.value();
+        let col = Smt::key_to_leaf_index(&key).index.position();
         let peeked_col = iter.peek().map(|(key, _v)| {
             let index = Smt::key_to_leaf_index(key);
-            let next_col = index.index.value();
+            let next_col = index.index.position();
             // We panic if `pairs` is not sorted by column.
             debug_assert!(next_col >= col);
             next_col
@@ -649,7 +650,7 @@ pub(crate) fn build_subtree(
             // as a leaf for the next depth.
             if hash != equivalent_empty_hash {
                 inner_nodes.insert(index, node);
-                next_leaves.push(SubtreeLeaf { col: index.value(), hash });
+                next_leaves.push(SubtreeLeaf { col: index.position(), hash });
             }
         }
         // Stop borrowing `leaves`, so we can swap it.
