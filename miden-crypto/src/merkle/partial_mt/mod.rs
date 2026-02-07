@@ -467,19 +467,21 @@ impl Serializable for PartialMerkleTree {
 impl Deserializable for PartialMerkleTree {
     fn read_from<R: ByteReader>(source: &mut R) -> Result<Self, DeserializationError> {
         let leaves_len = source.read_u64()? as usize;
-        let mut leaf_nodes = Vec::with_capacity(leaves_len);
 
-        // add leaf nodes to the vector
-        for _ in 0..leaves_len {
-            let index = NodeIndex::read_from(source)?;
-            let hash = Word::read_from(source)?;
-            leaf_nodes.push((index, hash));
-        }
+        // Use read_many_iter to avoid eager allocation and respect BudgetedReader limits
+        let leaf_nodes: Vec<(NodeIndex, Word)> =
+            source.read_many_iter(leaves_len)?.collect::<Result<_, _>>()?;
 
         let pmt = PartialMerkleTree::with_leaves(leaf_nodes).map_err(|_| {
             DeserializationError::InvalidValue("Invalid data for PartialMerkleTree creation".into())
         })?;
 
         Ok(pmt)
+    }
+
+    /// Minimum serialized size: u64 length prefix + (NodeIndex + Word) per element
+    /// NodeIndex = u8 + u64 = 9 bytes, Word = 32 bytes = 41 bytes per element
+    fn min_serialized_size() -> usize {
+        8 + NodeIndex::min_serialized_size() + Word::min_serialized_size()
     }
 }
