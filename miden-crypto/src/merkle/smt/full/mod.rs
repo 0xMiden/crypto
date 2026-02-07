@@ -612,16 +612,19 @@ impl Deserializable for Smt {
     fn read_from<R: ByteReader>(source: &mut R) -> Result<Self, DeserializationError> {
         // Read the number of filled leaves for this Smt
         let num_filled_leaves = source.read_usize()?;
-        let mut entries = Vec::with_capacity(num_filled_leaves);
 
-        for _ in 0..num_filled_leaves {
-            let key = source.read()?;
-            let value = source.read()?;
-            entries.push((key, value));
-        }
+        // Use read_many_iter to avoid eager allocation and respect BudgetedReader limits
+        let entries: Vec<(Word, Word)> =
+            source.read_many_iter(num_filled_leaves)?.collect::<Result<_, _>>()?;
 
         Self::with_entries(entries)
             .map_err(|err| DeserializationError::InvalidValue(err.to_string()))
+    }
+
+    /// Minimum serialized size: vint64 length prefix + (Word + Word) per element
+    /// Word = 32 bytes, so 64 bytes per element. Length prefix min = 1 byte.
+    fn min_serialized_size() -> usize {
+        1 + Word::min_serialized_size() + Word::min_serialized_size()
     }
 }
 
