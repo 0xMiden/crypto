@@ -688,6 +688,10 @@ impl Deserializable for Word {
 
         Ok(Self(inner))
     }
+
+    fn min_serialized_size() -> usize {
+        Self::SERIALIZED_SIZE
+    }
 }
 
 // ITERATORS

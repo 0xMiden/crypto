@@ -709,6 +709,16 @@ fn test_smt_check_empty_root_constant() {
     assert_eq!(empty_root_64_depth, Smt::EMPTY_ROOT);
 }
 
+/// Tests that empty SMT deserializes under a tight budget.
+#[test]
+fn test_empty_smt_deserialization_with_budget() {
+    let smt = Smt::default();
+    let bytes = smt.to_bytes();
+
+    let parsed = Smt::read_from_bytes_with_budget(&bytes, bytes.len()).unwrap();
+    assert_eq!(smt, parsed);
+}
+
 // SMT LEAF
 // --------------------------------------------------------------------------------------------
 
@@ -721,6 +731,15 @@ fn test_empty_smt_leaf_serialization() {
     serialized.extend([1, 2, 3, 4, 5]);
     let deserialized = SmtLeaf::read_from_bytes(&serialized).unwrap();
 
+    assert_eq!(empty_leaf, deserialized);
+}
+
+#[test]
+fn test_empty_smt_leaf_deserialization_with_budget() {
+    let empty_leaf = SmtLeaf::new_empty(LeafIndex::new_max_depth(42));
+    let bytes = empty_leaf.to_bytes();
+
+    let deserialized = SmtLeaf::read_from_bytes_with_budget(&bytes, bytes.len()).unwrap();
     assert_eq!(empty_leaf, deserialized);
 }
 
