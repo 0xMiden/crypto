@@ -424,9 +424,9 @@ impl Deserializable for SmtLeaf {
             .map_err(|err| DeserializationError::InvalidValue(err.to_string()))
     }
 
-    /// Minimum serialized size: vint64 (num_entries) + u64 (leaf_index) + (Word + Word) per entry
+    /// Minimum serialized size: vint64 (num_entries) + u64 (leaf_index) with 0 entries.
     fn min_serialized_size() -> usize {
-        1 + 8 + Word::min_serialized_size() + Word::min_serialized_size()
+        1 + 8
     }
 }
 

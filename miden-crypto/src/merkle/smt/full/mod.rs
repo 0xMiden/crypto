@@ -621,10 +621,9 @@ impl Deserializable for Smt {
             .map_err(|err| DeserializationError::InvalidValue(err.to_string()))
     }
 
-    /// Minimum serialized size: vint64 length prefix + (Word + Word) per element
-    /// Word = 32 bytes, so 64 bytes per element. Length prefix min = 1 byte.
+    /// Minimum serialized size: vint64 length prefix (0 entries).
     fn min_serialized_size() -> usize {
-        1 + Word::min_serialized_size() + Word::min_serialized_size()
+        1
     }
 }
 
