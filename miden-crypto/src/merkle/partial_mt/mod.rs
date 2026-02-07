@@ -88,10 +88,12 @@ impl PartialMerkleTree {
     ///
     /// # Errors
     /// Returns an error if:
-    /// - If the depth is 0 or is greater than 64.
+    /// - Any entry has depth 0 or is greater than 64.
     /// - The number of entries exceeds the maximum tree capacity, that is 2^{depth}.
     /// - The provided entries contain an insufficient set of nodes.
     /// - Any entry is an ancestor of another entry (creates hash ambiguity).
+    ///
+    /// An empty input returns an empty tree.
     pub fn with_leaves<R, I>(entries: R) -> Result<Self, MerkleError>
     where
         R: IntoIterator<IntoIter = I>,
@@ -471,7 +473,10 @@ impl Serializable for PartialMerkleTree {
 
 impl Deserializable for PartialMerkleTree {
     fn read_from<R: ByteReader>(source: &mut R) -> Result<Self, DeserializationError> {
-        let leaves_len = source.read_u64()? as usize;
+        let leaves_len_u64 = source.read_u64()?;
+        let leaves_len = usize::try_from(leaves_len_u64).map_err(|_| {
+            DeserializationError::InvalidValue("PartialMerkleTree leaf count too large".into())
+        })?;
 
         // Use read_many_iter to avoid eager allocation and respect BudgetedReader limits
         let leaf_nodes: Vec<(NodeIndex, Word)> =
@@ -484,9 +489,8 @@ impl Deserializable for PartialMerkleTree {
         Ok(pmt)
     }
 
-    /// Minimum serialized size: u64 length prefix + (NodeIndex + Word) per element
-    /// NodeIndex = u8 + u64 = 9 bytes, Word = 32 bytes = 41 bytes per element
+    /// Minimum serialized size: u64 length prefix (0 entries).
     fn min_serialized_size() -> usize {
-        8 + NodeIndex::min_serialized_size() + Word::min_serialized_size()
+        8
     }
 }
