@@ -89,6 +89,17 @@ fn err_with_leaves() {
     assert!(PartialMerkleTree::with_leaves(leaf_nodes).is_err());
 }
 
+/// Checks that `with_leaves()` accepts an empty input and returns an empty tree.
+#[test]
+fn with_leaves_empty() {
+    let leaf_nodes: BTreeMap<NodeIndex, Word> = BTreeMap::new();
+
+    let pmt = PartialMerkleTree::with_leaves(leaf_nodes).unwrap();
+
+    assert_eq!(PartialMerkleTree::new().root(), pmt.root());
+    assert_eq!(0, pmt.max_depth());
+}
+
 /// Tests that `with_leaves()` returns `EntryIsNotLeaf` error when an entry
 /// is an ancestor of another entry.
 #[test]

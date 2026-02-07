@@ -97,13 +97,18 @@ impl PartialMerkleTree {
         R: IntoIterator<IntoIter = I>,
         I: Iterator<Item = (NodeIndex, Word)> + ExactSizeIterator,
     {
+        let entries = entries.into_iter();
+        if entries.len() == 0 {
+            return Ok(PartialMerkleTree::new());
+        }
+
         let mut layers: BTreeMap<u8, Vec<u64>> = BTreeMap::new();
         let mut leaves = BTreeSet::new();
         let mut nodes = BTreeMap::new();
 
         // add data to the leaves and nodes maps and also fill layers map, where the key is the
         // depth of the node and value is its index.
-        for (node_index, hash) in entries.into_iter() {
+        for (node_index, hash) in entries {
             leaves.insert(node_index);
             nodes.insert(node_index, hash);
             layers
