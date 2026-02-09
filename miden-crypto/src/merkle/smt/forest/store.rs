@@ -285,6 +285,7 @@ impl SmtStore {
 
         let left = smt_node.left;
         let right = smt_node.right;
+        self.nodes.remove(&node);
 
         let mut result = Vec::new();
         result.extend(self.remove_node(left));
