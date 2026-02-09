@@ -270,6 +270,35 @@ fn test_pop_roots() -> Result<(), MerkleError> {
 }
 
 #[test]
+fn test_pop_and_reinsert_same_tree() -> Result<(), MerkleError> {
+    let mut forest = SmtForest::new();
+
+    let empty_tree_root = *EmptySubtreeRoots::entry(SMT_DEPTH, 0);
+    let key = Word::new([ZERO; WORD_SIZE]);
+    let value = Word::new([ONE; WORD_SIZE]);
+
+    // Insert a key, then pop the tree
+    let root1 = forest.insert(empty_tree_root, key, value)?;
+    forest.pop_smts(vec![root1]);
+
+    // Re-insert the same key-value pair (produces the same tree hashes)
+    let root2 = forest.insert(empty_tree_root, key, value)?;
+    assert_eq!(root1, root2, "same key-value must produce the same root");
+
+    // Verify the proof is valid
+    let proof = forest.open(root2, key)?;
+    proof.verify_presence(&key, &value, &root2).unwrap();
+
+    // Pop again — without the fix this would panic due to rc underflow
+    forest.pop_smts(vec![root2]);
+
+    assert_eq!(forest.roots.len(), 0);
+    assert_eq!(forest.leaves.len(), 0);
+
+    Ok(())
+}
+
+#[test]
 fn test_removing_empty_smt_from_forest() {
     let mut forest = SmtForest::new();
     let empty_tree_root = *EmptySubtreeRoots::entry(SMT_DEPTH, 0);
