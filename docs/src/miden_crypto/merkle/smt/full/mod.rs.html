@@ -1,4 +1,4 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `miden-crypto/src/merkle/smt/full/mod.rs`."><title>mod.rs - source</title><script>if(window.location.protocol!=="file:")document.head.insertAdjacentHTML("beforeend","SourceSerif4-Regular-6b053e98.ttf.woff2,FiraSans-Italic-81dc35de.woff2,FiraSans-Regular-0fe48ade.woff2,FiraSans-MediumItalic-ccf7e434.woff2,FiraSans-Medium-e1aa3f0a.woff2,SourceCodePro-Regular-8badfe75.ttf.woff2,SourceCodePro-Semibold-aa29a496.ttf.woff2".split(",").map(f=>`<link rel="preload" as="font" type="font/woff2"href="../../../../../static.files/${f}">`).join(""))</script><link rel="stylesheet" href="../../../../../static.files/normalize-9960930a.css"><link rel="stylesheet" href="../../../../../static.files/rustdoc-b7b9f40b.css"><meta name="rustdoc-vars" data-root-path="../../../../../" data-static-root-path="../../../../../static.files/" data-current-crate="miden_crypto" data-themes="" data-resource-suffix="" data-rustdoc-version="1.95.0-nightly (db3e99bba 2026-02-04)" data-channel="nightly" data-search-js="search-fb33671b.js" data-stringdex-js="stringdex-b897f86f.js" data-settings-js="settings-170eb4bf.js" ><script src="../../../../../static.files/storage-f9617a14.js"></script><script defer src="../../../../../static.files/src-script-813739b1.js"></script><script defer src="../../../../../src-files.js"></script><script defer src="../../../../../static.files/main-12f88f4f.js"></script><noscript><link rel="stylesheet" href="../../../../../static.files/noscript-f7c3ffd8.css"></noscript><link rel="alternate icon" type="image/png" href="../../../../../static.files/favicon-32x32-eab170b8.png"><link rel="icon" type="image/svg+xml" href="../../../../../static.files/favicon-044be391.svg"></head><body class="rustdoc src"><a class="skip-main-content" href="#main-content">Skip to main content</a><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="src-sidebar-title"><h2>Files</h2></div></nav><div class="sidebar-resizer" title="Drag to resize sidebar"></div><main><section id="main-content" class="content" tabindex="-1"><div class="main-heading"><h1><div class="sub-heading">miden_crypto/merkle/smt/full/</div>mod.rs</h1><rustdoc-toolbar></rustdoc-toolbar></div><div class="example-wrap digits-3"><pre class="rust"><code><a href=#1 id=1 data-nosnippet>1</a><span class="kw">use </span>alloc::{string::ToString, vec::Vec};
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `miden-crypto/src/merkle/smt/full/mod.rs`."><title>mod.rs - source</title><script>if(window.location.protocol!=="file:")document.head.insertAdjacentHTML("beforeend","SourceSerif4-Regular-6b053e98.ttf.woff2,FiraSans-Italic-81dc35de.woff2,FiraSans-Regular-0fe48ade.woff2,FiraSans-MediumItalic-ccf7e434.woff2,FiraSans-Medium-e1aa3f0a.woff2,SourceCodePro-Regular-8badfe75.ttf.woff2,SourceCodePro-Semibold-aa29a496.ttf.woff2".split(",").map(f=>`<link rel="preload" as="font" type="font/woff2"href="../../../../../static.files/${f}">`).join(""))</script><link rel="stylesheet" href="../../../../../static.files/normalize-9960930a.css"><link rel="stylesheet" href="../../../../../static.files/rustdoc-b7b9f40b.css"><meta name="rustdoc-vars" data-root-path="../../../../../" data-static-root-path="../../../../../static.files/" data-current-crate="miden_crypto" data-themes="" data-resource-suffix="" data-rustdoc-version="1.95.0-nightly (18d13b533 2026-02-09)" data-channel="nightly" data-search-js="search-fb33671b.js" data-stringdex-js="stringdex-b897f86f.js" data-settings-js="settings-170eb4bf.js" ><script src="../../../../../static.files/storage-f9617a14.js"></script><script defer src="../../../../../static.files/src-script-813739b1.js"></script><script defer src="../../../../../src-files.js"></script><script defer src="../../../../../static.files/main-12f88f4f.js"></script><noscript><link rel="stylesheet" href="../../../../../static.files/noscript-f7c3ffd8.css"></noscript><link rel="alternate icon" type="image/png" href="../../../../../static.files/favicon-32x32-eab170b8.png"><link rel="icon" type="image/svg+xml" href="../../../../../static.files/favicon-044be391.svg"></head><body class="rustdoc src"><a class="skip-main-content" href="#main-content">Skip to main content</a><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="src-sidebar-title"><h2>Files</h2></div></nav><div class="sidebar-resizer" title="Drag to resize sidebar"></div><main><section id="main-content" class="content" tabindex="-1"><div class="main-heading"><h1><div class="sub-heading">miden_crypto/merkle/smt/full/</div>mod.rs</h1><rustdoc-toolbar></rustdoc-toolbar></div><div class="example-wrap digits-3"><pre class="rust"><code><a href=#1 id=1 data-nosnippet>1</a><span class="kw">use </span>alloc::{string::ToString, vec::Vec};
 <a href=#2 id=2 data-nosnippet>2</a>
 <a href=#3 id=3 data-nosnippet>3</a><span class="kw">use </span>super::{
 <a href=#4 id=4 data-nosnippet>4</a>    EMPTY_WORD, EmptySubtreeRoots, InnerNode, InnerNodeInfo, InnerNodes, LeafIndex, MerkleError,
@@ -202,7 +202,7 @@
 <a href=#202 id=202 data-nosnippet>202</a>
 <a href=#203 id=203 data-nosnippet>203</a>            <span class="kw">if </span><span class="macro">old_value !</span>= EMPTY_WORD || key_set_to_zero.contains(<span class="kw-2">&amp;</span>key) {
 <a href=#204 id=204 data-nosnippet>204</a>                <span class="kw">return </span><span class="prelude-val">Err</span>(MerkleError::DuplicateValuesForIndex(
-<a href=#205 id=205 data-nosnippet>205</a>                    LeafIndex::&lt;SMT_DEPTH&gt;::from(key).value(),
+<a href=#205 id=205 data-nosnippet>205</a>                    LeafIndex::&lt;SMT_DEPTH&gt;::from(key).position(),
 <a href=#206 id=206 data-nosnippet>206</a>                ));
 <a href=#207 id=207 data-nosnippet>207</a>            }
 <a href=#208 id=208 data-nosnippet>208</a>
@@ -402,7 +402,7 @@
 <a href=#402 id=402 data-nosnippet>402</a>
 <a href=#403 id=403 data-nosnippet>403</a>        <span class="kw">let </span>leaf_index: LeafIndex&lt;SMT_DEPTH&gt; = <span class="self">Self</span>::key_to_leaf_index(<span class="kw-2">&amp;</span>key);
 <a href=#404 id=404 data-nosnippet>404</a>
-<a href=#405 id=405 data-nosnippet>405</a>        <span class="kw">match </span><span class="self">self</span>.leaves.get_mut(<span class="kw-2">&amp;</span>leaf_index.value()) {
+<a href=#405 id=405 data-nosnippet>405</a>        <span class="kw">match </span><span class="self">self</span>.leaves.get_mut(<span class="kw-2">&amp;</span>leaf_index.position()) {
 <a href=#406 id=406 data-nosnippet>406</a>            <span class="prelude-val">Some</span>(leaf) =&gt; {
 <a href=#407 id=407 data-nosnippet>407</a>                <span class="kw">let </span>prev_entries = leaf.num_entries();
 <a href=#408 id=408 data-nosnippet>408</a>                <span class="kw">let </span>result = leaf.insert(key, value).map_err(|e| <span class="kw">match </span>e {
@@ -416,7 +416,7 @@
 <a href=#416 id=416 data-nosnippet>416</a>                <span class="prelude-val">Ok</span>(result)
 <a href=#417 id=417 data-nosnippet>417</a>            },
 <a href=#418 id=418 data-nosnippet>418</a>            <span class="prelude-val">None </span>=&gt; {
-<a href=#419 id=419 data-nosnippet>419</a>                <span class="self">self</span>.leaves.insert(leaf_index.value(), SmtLeaf::Single((key, value)));
+<a href=#419 id=419 data-nosnippet>419</a>                <span class="self">self</span>.leaves.insert(leaf_index.position(), SmtLeaf::Single((key, value)));
 <a href=#420 id=420 data-nosnippet>420</a>                <span class="self">self</span>.num_entries += <span class="number">1</span>;
 <a href=#421 id=421 data-nosnippet>421</a>                <span class="prelude-val">Ok</span>(<span class="prelude-val">None</span>)
 <a href=#422 id=422 data-nosnippet>422</a>            },
@@ -427,13 +427,13 @@
 <a href=#427 id=427 data-nosnippet>427</a>    </span><span class="kw">fn </span>perform_remove(<span class="kw-2">&amp;mut </span><span class="self">self</span>, key: Word) -&gt; <span class="prelude-ty">Option</span>&lt;Word&gt; {
 <a href=#428 id=428 data-nosnippet>428</a>        <span class="kw">let </span>leaf_index: LeafIndex&lt;SMT_DEPTH&gt; = <span class="self">Self</span>::key_to_leaf_index(<span class="kw-2">&amp;</span>key);
 <a href=#429 id=429 data-nosnippet>429</a>
-<a href=#430 id=430 data-nosnippet>430</a>        <span class="kw">if let </span><span class="prelude-val">Some</span>(leaf) = <span class="self">self</span>.leaves.get_mut(<span class="kw-2">&amp;</span>leaf_index.value()) {
+<a href=#430 id=430 data-nosnippet>430</a>        <span class="kw">if let </span><span class="prelude-val">Some</span>(leaf) = <span class="self">self</span>.leaves.get_mut(<span class="kw-2">&amp;</span>leaf_index.position()) {
 <a href=#431 id=431 data-nosnippet>431</a>            <span class="kw">let </span>prev_entries = leaf.num_entries();
 <a href=#432 id=432 data-nosnippet>432</a>            <span class="kw">let </span>(old_value, is_empty) = leaf.remove(key);
 <a href=#433 id=433 data-nosnippet>433</a>            <span class="kw">let </span>current_entries = leaf.num_entries();
 <a href=#434 id=434 data-nosnippet>434</a>            <span class="self">self</span>.num_entries -= prev_entries - current_entries;
 <a href=#435 id=435 data-nosnippet>435</a>            <span class="kw">if </span>is_empty {
-<a href=#436 id=436 data-nosnippet>436</a>                <span class="self">self</span>.leaves.remove(<span class="kw-2">&amp;</span>leaf_index.value());
+<a href=#436 id=436 data-nosnippet>436</a>                <span class="self">self</span>.leaves.remove(<span class="kw-2">&amp;</span>leaf_index.position());
 <a href=#437 id=437 data-nosnippet>437</a>            }
 <a href=#438 id=438 data-nosnippet>438</a>            old_value
 <a href=#439 id=439 data-nosnippet>439</a>        } <span class="kw">else </span>{
@@ -510,7 +510,7 @@
 <a href=#510 id=510 data-nosnippet>510</a>    }
 <a href=#511 id=511 data-nosnippet>511</a>
 <a href=#512 id=512 data-nosnippet>512</a>    <span class="kw">fn </span>get_value(<span class="kw-2">&amp;</span><span class="self">self</span>, key: <span class="kw-2">&amp;</span><span class="self">Self</span>::Key) -&gt; <span class="self">Self</span>::Value {
-<a href=#513 id=513 data-nosnippet>513</a>        <span class="kw">let </span>leaf_pos = LeafIndex::&lt;SMT_DEPTH&gt;::from(<span class="kw-2">*</span>key).value();
+<a href=#513 id=513 data-nosnippet>513</a>        <span class="kw">let </span>leaf_pos = LeafIndex::&lt;SMT_DEPTH&gt;::from(<span class="kw-2">*</span>key).position();
 <a href=#514 id=514 data-nosnippet>514</a>
 <a href=#515 id=515 data-nosnippet>515</a>        <span class="kw">match </span><span class="self">self</span>.leaves.get(<span class="kw-2">&amp;</span>leaf_pos) {
 <a href=#516 id=516 data-nosnippet>516</a>            <span class="prelude-val">Some</span>(leaf) =&gt; leaf.get_value(key).unwrap_or_default(),
@@ -519,7 +519,7 @@
 <a href=#519 id=519 data-nosnippet>519</a>    }
 <a href=#520 id=520 data-nosnippet>520</a>
 <a href=#521 id=521 data-nosnippet>521</a>    <span class="kw">fn </span>get_leaf(<span class="kw-2">&amp;</span><span class="self">self</span>, key: <span class="kw-2">&amp;</span>Word) -&gt; <span class="self">Self</span>::Leaf {
-<a href=#522 id=522 data-nosnippet>522</a>        <span class="kw">let </span>leaf_pos = LeafIndex::&lt;SMT_DEPTH&gt;::from(<span class="kw-2">*</span>key).value();
+<a href=#522 id=522 data-nosnippet>522</a>        <span class="kw">let </span>leaf_pos = LeafIndex::&lt;SMT_DEPTH&gt;::from(<span class="kw-2">*</span>key).position();
 <a href=#523 id=523 data-nosnippet>523</a>
 <a href=#524 id=524 data-nosnippet>524</a>        <span class="kw">match </span><span class="self">self</span>.leaves.get(<span class="kw-2">&amp;</span>leaf_pos) {
 <a href=#525 id=525 data-nosnippet>525</a>            <span class="prelude-val">Some</span>(leaf) =&gt; leaf.clone(),
