@@ -108,8 +108,8 @@ impl PartialMerkleTree {
             nodes.insert(node_index, hash);
             layers
                 .entry(node_index.depth())
-                .and_modify(|layer_vec| layer_vec.push(node_index.value()))
-                .or_insert(vec![node_index.value()]);
+                .and_modify(|layer_vec| layer_vec.push(node_index.position()))
+                .or_insert(vec![node_index.position()]);
         }
 
         // make sure the depth of the last layer is 64 or smaller
@@ -143,7 +143,7 @@ impl PartialMerkleTree {
 
                 // If parent already exists, check if it's user-provided (invalid) or computed
                 // (skip)
-                if parent_layer.contains(&parent_node.value()) {
+                if parent_layer.contains(&parent_node.position()) {
                     // If the parent was provided as a leaf, that's invalid - we can't have both
                     // a node and its descendant in the input set.
                     if leaves.contains(&parent_node) {
@@ -165,7 +165,7 @@ impl PartialMerkleTree {
                 let parent = Poseidon2::merge(&index.build_node(*node, *sibling));
 
                 // add index value of the calculated node to the parents layer
-                parent_layer.push(parent_node.value());
+                parent_layer.push(parent_node.position());
                 // add index and hash to the nodes map
                 nodes.insert(parent_node, parent);
             }
@@ -421,7 +421,7 @@ impl PartialMerkleTree {
                 for _ in 0..d {
                     s.push_str(indent);
                 }
-                s.push_str(&format!("({}, {}): ", index.depth(), index.value()));
+                s.push_str(&format!("({}, {}): ", index.depth(), index.position()));
                 s.push_str(&word_to_hex(&node)?);
                 s.push('\n');
             }
