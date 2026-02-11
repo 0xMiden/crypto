@@ -139,8 +139,10 @@ impl RpxRandomCoin {
         self.state[RATE_START] += nonce;
         Rpx256::apply_permutation(&mut self.state);
 
-        // reset the buffer
-        self.current = RATE_START;
+        // reset the buffer and move the next random element pointer to the second rate element.
+        // this is done as the first rate element will be "biased" via the provided `nonce` to
+        // contain some number of leading zeros.
+        self.current = RATE_START + 1;
 
         // determine how many bits are needed to represent valid values in the domain
         let v_mask = (domain_size - 1) as u64;
@@ -275,6 +277,60 @@ mod tests {
         let expected = Word::new(expected);
 
         assert_eq!(output, expected);
+    }
+
+    /// Regression test: `draw_integers` must skip the first rate element after absorbing the
+    /// nonce because proof-of-work selects a nonce that biases `state[RATE_START]` toward
+    /// having trailing zeros. Before the fix, `current` was set to `RATE_START` instead of
+    /// `RATE_START + 1`, causing the first drawn integer to come from the biased element.
+    #[test]
+    fn test_draw_integers_skips_biased_element() {
+        use alloc::vec::Vec;
+
+        use p3_field::PrimeField64;
+
+        use super::{Felt, RATE_START};
+        use crate::hash::rpx::Rpx256;
+
+        let seed = Word::new([ONE; 4]);
+        let nonce = 42u64;
+        let domain_size = 64;
+        let num_values = 4;
+
+        // draw_integers result
+        let mut coin = RpxRandomCoin::new(seed);
+        let values = coin.draw_integers(num_values, domain_size, nonce);
+
+        // manually replicate expected behavior: absorb nonce, permute, then draw
+        // starting from RATE_START + 1 (skipping the biased first rate element)
+        let mut coin2 = RpxRandomCoin::new(seed);
+        let nonce_felt = Felt::new(nonce);
+        coin2.state[RATE_START] += nonce_felt;
+        Rpx256::apply_permutation(&mut coin2.state);
+        coin2.current = RATE_START + 1;
+
+        let v_mask = (domain_size - 1) as u64;
+        let mut expected = Vec::new();
+        for _ in 0..num_values {
+            let v = (coin2.draw_basefield().as_canonical_u64() & v_mask) as usize;
+            expected.push(v);
+        }
+
+        assert_eq!(values, expected, "draw_integers must skip the biased first rate element");
+
+        // also verify it does NOT match drawing from RATE_START (the old buggy behavior)
+        let mut coin3 = RpxRandomCoin::new(seed);
+        coin3.state[RATE_START] += nonce_felt;
+        Rpx256::apply_permutation(&mut coin3.state);
+        coin3.current = RATE_START; // old buggy offset
+
+        let mut buggy = Vec::new();
+        for _ in 0..num_values {
+            let v = (coin3.draw_basefield().as_canonical_u64() & v_mask) as usize;
+            buggy.push(v);
+        }
+
+        assert_ne!(values, buggy, "output must differ from the old buggy behavior");
     }
 
     #[test]
