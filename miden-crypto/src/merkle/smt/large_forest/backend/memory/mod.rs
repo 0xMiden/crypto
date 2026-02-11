@@ -1,9 +1,8 @@
 //! This module contains a non-persistent, in-memory [`Backend`] for the SMT forest. It is
 //! non-parallel and is not intended to be such, allowing its use on effectively any platform where
 //! this library can be built.
-//!
-//! # Performance
 
+mod property_tests;
 mod tests;
 
 use alloc::vec::Vec;
@@ -60,7 +59,7 @@ impl Backend for InMemoryBackend {
     ///
     /// # Errors
     ///
-    /// - [`BackendError::UnknownLineage`] If the provided `lineage` is one not known by this
+    /// - [`BackendError::UnknownLineage`] if the provided `lineage` is one not known by this
     ///   backend.
     fn get(&self, lineage: LineageId, key: Word) -> Result<Option<Word>> {
         let tree = self.trees.get(&lineage).ok_or(BackendError::UnknownLineage(lineage))?;
@@ -97,7 +96,7 @@ impl Backend for InMemoryBackend {
     ///
     /// # Errors
     ///
-    /// - [`BackendError::UnknownLineage`] If the provided `lineage` is one not known by this
+    /// - [`BackendError::UnknownLineage`] if the provided `lineage` is one not known by this
     ///   backend.
     fn entry_count(&self, lineage: LineageId) -> Result<usize> {
         let tree = self.trees.get(&lineage).ok_or(BackendError::UnknownLineage(lineage))?;
@@ -112,7 +111,7 @@ impl Backend for InMemoryBackend {
     ///
     /// # Errors
     ///
-    /// - [`BackendError::UnknownLineage`] If the provided `lineage` is one not known by this
+    /// - [`BackendError::UnknownLineage`] if the provided `lineage` is one not known by this
     ///   backend.
     fn entries(&self, lineage: LineageId) -> Result<impl Iterator<Item = TreeEntry>> {
         let tree = self.trees.get(&lineage).ok_or(BackendError::UnknownLineage(lineage))?;
@@ -206,8 +205,8 @@ impl Backend for InMemoryBackend {
         Ok(reversion_set)
     }
 
-    /// Performs the provided `updates` on the entire forest, returning the mutation
-    /// sets that would reverse the changes to each tree in the forest.
+    /// Performs the provided `updates` on the entire forest, returning the mutation sets that would
+    /// reverse the changes to each tree in the forest.
     ///
     /// The order of application of these mutations is unspecified.
     ///

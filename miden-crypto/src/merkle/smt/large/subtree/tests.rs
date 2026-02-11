@@ -444,3 +444,45 @@ fn test_apply_mutations() {
     let deserialized = Subtree::from_vec(root_index, &serialized).unwrap();
     assert!(deserialized.is_empty());
 }
+
+#[test]
+fn local_to_global() {
+    // We start by testing the edge-case behavior in the uppermost subtree.
+    let subtree = Subtree::new(NodeIndex::root());
+    assert_eq!(subtree.local_to_global(NodeIndex::root()), NodeIndex::new_unchecked(0, 0));
+    assert_eq!(
+        subtree.local_to_global(NodeIndex::new_unchecked(7, 0)),
+        NodeIndex::new_unchecked(7, 0)
+    );
+    assert_eq!(
+        subtree.local_to_global(NodeIndex::new_unchecked(7, 127)),
+        NodeIndex::new_unchecked(7, 127)
+    );
+
+    // Next we can test the left and right bottom-most trees, starting with the left.
+    let subtree = Subtree::new(NodeIndex::new_unchecked(56, 0));
+    assert_eq!(subtree.local_to_global(NodeIndex::root()), NodeIndex::new_unchecked(56, 0));
+    assert_eq!(
+        subtree.local_to_global(NodeIndex::new_unchecked(7, 0)),
+        NodeIndex::new_unchecked(63, 0)
+    );
+    assert_eq!(
+        subtree.local_to_global(NodeIndex::new_unchecked(7, 127)),
+        NodeIndex::new_unchecked(63, 127)
+    );
+
+    // And now the right.
+    let subtree = Subtree::new(NodeIndex::new_unchecked(56, 2u64.pow(56) - 1));
+    assert_eq!(
+        subtree.local_to_global(NodeIndex::root()),
+        NodeIndex::new_unchecked(56, 2u64.pow(56) - 1)
+    );
+    assert_eq!(
+        subtree.local_to_global(NodeIndex::new_unchecked(7, 0)),
+        NodeIndex::new_unchecked(63, 2u64.pow(63) - 128)
+    );
+    assert_eq!(
+        subtree.local_to_global(NodeIndex::new_unchecked(7, 127)),
+        NodeIndex::new_unchecked(63, 2u64.pow(63) - 1)
+    );
+}
