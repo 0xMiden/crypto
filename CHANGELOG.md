@@ -2,6 +2,7 @@
 
 - [BREAKING] Refactored BLAKE3 to use `Digest<N>` struct, added `Digest192` type alias ([#811](https://github.com/0xMiden/crypto/pull/811)).
 - [BREAKING] Removed `hashbrown` dependency and `hashmaps` feature; `Map`/`Set` type aliases are now tied to the `std` feature ([#813](https://github.com/0xMiden/crypto/pull/813)).
+- Fixed `LargeSmtForest::truncate` to remove emptied lineages from `non_empty_histories` ([#818](https://github.com/0xMiden/crypto/pull/818)).
 
 ## 0.22.2 (2026-02-01)
 
