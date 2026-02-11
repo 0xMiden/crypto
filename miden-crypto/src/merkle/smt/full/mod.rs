@@ -202,7 +202,7 @@ impl Smt {
 
             if old_value != EMPTY_WORD || key_set_to_zero.contains(&key) {
                 return Err(MerkleError::DuplicateValuesForIndex(
-                    LeafIndex::<SMT_DEPTH>::from(key).value(),
+                    LeafIndex::<SMT_DEPTH>::from(key).position(),
                 ));
             }
 
@@ -402,7 +402,7 @@ impl Smt {
 
         let leaf_index: LeafIndex<SMT_DEPTH> = Self::key_to_leaf_index(&key);
 
-        match self.leaves.get_mut(&leaf_index.value()) {
+        match self.leaves.get_mut(&leaf_index.position()) {
             Some(leaf) => {
                 let prev_entries = leaf.num_entries();
                 let result = leaf.insert(key, value).map_err(|e| match e {
@@ -416,7 +416,7 @@ impl Smt {
                 Ok(result)
             },
             None => {
-                self.leaves.insert(leaf_index.value(), SmtLeaf::Single((key, value)));
+                self.leaves.insert(leaf_index.position(), SmtLeaf::Single((key, value)));
                 self.num_entries += 1;
                 Ok(None)
             },
@@ -427,13 +427,13 @@ impl Smt {
     fn perform_remove(&mut self, key: Word) -> Option<Word> {
         let leaf_index: LeafIndex<SMT_DEPTH> = Self::key_to_leaf_index(&key);
 
-        if let Some(leaf) = self.leaves.get_mut(&leaf_index.value()) {
+        if let Some(leaf) = self.leaves.get_mut(&leaf_index.position()) {
             let prev_entries = leaf.num_entries();
             let (old_value, is_empty) = leaf.remove(key);
             let current_entries = leaf.num_entries();
             self.num_entries -= prev_entries - current_entries;
             if is_empty {
-                self.leaves.remove(&leaf_index.value());
+                self.leaves.remove(&leaf_index.position());
             }
             old_value
         } else {
@@ -510,7 +510,7 @@ impl SparseMerkleTree<SMT_DEPTH> for Smt {
     }
 
     fn get_value(&self, key: &Self::Key) -> Self::Value {
-        let leaf_pos = LeafIndex::<SMT_DEPTH>::from(*key).value();
+        let leaf_pos = LeafIndex::<SMT_DEPTH>::from(*key).position();
 
         match self.leaves.get(&leaf_pos) {
             Some(leaf) => leaf.get_value(key).unwrap_or_default(),
@@ -519,7 +519,7 @@ impl SparseMerkleTree<SMT_DEPTH> for Smt {
     }
 
     fn get_leaf(&self, key: &Word) -> Self::Leaf {
-        let leaf_pos = LeafIndex::<SMT_DEPTH>::from(*key).value();
+        let leaf_pos = LeafIndex::<SMT_DEPTH>::from(*key).position();
 
         match self.leaves.get(&leaf_pos) {
             Some(leaf) => leaf.clone(),

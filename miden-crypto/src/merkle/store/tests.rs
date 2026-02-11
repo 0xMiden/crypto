@@ -613,7 +613,7 @@ fn test_constructors() -> Result<(), MerkleError> {
         assert!(
             store.has_path(mtree.root(), index),
             "path for index {} at depth {} must exist",
-            index.value(),
+            index.position(),
             depth
         );
     }
@@ -693,7 +693,7 @@ fn node_path_should_be_truncated_by_midtier_insert() {
     let path = store.get_path(root, index).unwrap().path;
     assert_eq!(node, result);
     assert_eq!(path.depth(), depth);
-    assert!(path.verify(index.value(), result, &root).is_ok());
+    assert!(path.verify(index.position(), result, &root).is_ok());
     assert!(store.has_path(root, index), "path for first inserted node must exist");
 
     // flip the first bit of the key and insert the second node on a different depth
@@ -707,7 +707,7 @@ fn node_path_should_be_truncated_by_midtier_insert() {
     let path = store.get_path(root, index).unwrap().path;
     assert_eq!(node, result);
     assert_eq!(path.depth(), depth);
-    assert!(path.verify(index.value(), result, &root).is_ok());
+    assert!(path.verify(index.position(), result, &root).is_ok());
     assert!(store.has_path(root, index), "path for second inserted node must exist");
 
     // attempt to fetch a path of the second node to depth 64
