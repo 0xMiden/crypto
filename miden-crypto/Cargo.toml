@@ -86,7 +86,7 @@ internal = ["concurrent"]
 rocksdb = ["concurrent", "dep:rocksdb"]
 serde = ["dep:serde", "serde?/alloc"]
 std = ["blake3/std", "dep:cc", "miden-serde-utils/std", "rand/std", "rand/thread_rng"]
-testing = ["dep:proptest"]
+testing = ["dep:proptest", "miden-field/testing"]
 
 [dependencies]
 blake3                        = { default-features = false, version = "1.8" }
@@ -143,6 +143,7 @@ assert_matches = { default-features = false, version = "1.5" }
 criterion      = { features = ["html_reports"], version = "0.7" }
 hex            = { default-features = false, features = ["alloc"], version = "0.4" }
 itertools      = { version = "0.14" }
+miden-field     = { path = "../miden-field", features = ["testing"] }
 proptest       = { default-features = false, features = ["alloc"], version = "1.7" }
 rand-utils     = { package = "winter-rand-utils", version = "0.13" }
 rstest         = { version = "0.26" }

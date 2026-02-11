@@ -18,3 +18,9 @@ pub use wasm_miden::Felt;
 mod native;
 #[cfg(not(all(target_family = "wasm", miden)))]
 pub use native::Felt;
+
+pub mod utils;
+
+pub mod word;
+
+pub use word::{Word, WordError};

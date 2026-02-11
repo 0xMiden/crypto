@@ -1021,8 +1021,11 @@ dependencies = [
  "p3-field",
  "p3-goldilocks",
  "paste",
+ "proptest",
  "rand",
+ "rstest",
  "serde",
+ "thiserror",
 ]
 
 [[package]]

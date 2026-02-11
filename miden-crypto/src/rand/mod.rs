@@ -1,5 +1,6 @@
 //! Pseudo-random element generation.
 
+use miden_field::word::WORD_SIZE_BYTES;
 use p3_field::PrimeField64;
 use rand::RngCore;
 
@@ -98,6 +99,19 @@ impl Randomizable for Felt {
             } else {
                 None
             }
+        } else {
+            None
+        }
+    }
+}
+
+impl Randomizable for Word {
+    const VALUE_SIZE: usize = WORD_SIZE_BYTES;
+
+    fn from_random_bytes(bytes: &[u8]) -> Option<Self> {
+        let bytes_array: Option<[u8; 32]> = bytes.try_into().ok();
+        if let Some(bytes_array) = bytes_array {
+            Self::try_from(bytes_array).ok()
         } else {
             None
         }

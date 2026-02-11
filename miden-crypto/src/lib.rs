@@ -15,12 +15,12 @@ pub mod ies;
 pub mod merkle;
 pub mod rand;
 pub mod utils;
-pub mod word;
 
+use miden_field::word;
 // RE-EXPORTS
 // ================================================================================================
 pub use miden_field::Felt;
-pub use word::{Word, WordError};
+pub use miden_field::{Word, WordError};
 
 pub mod field {
     //! Traits and utilities for working with the Goldilocks finite field (i.e.,
@@ -140,7 +140,7 @@ pub type Set<V> = alloc::collections::BTreeSet<V>;
 // ================================================================================================
 
 /// Number of field elements in a word.
-pub const WORD_SIZE: usize = 4;
+pub const WORD_SIZE: usize = word::WORD_SIZE_FELT;
 
 /// Field element representing ZERO in the Miden base filed.
 pub const ZERO: Felt = Felt::ZERO;
