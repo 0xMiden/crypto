@@ -1,7 +1,6 @@
 use alloc::collections::{BTreeMap, BTreeSet};
 
 use assert_matches::assert_matches;
-use p3_field::PrimeField64;
 use proptest::prelude::*;
 use rand::{Rng, SeedableRng};
 use rand_chacha::ChaCha20Rng;
@@ -21,13 +20,11 @@ use crate::{
 
 /// Helper to generate a random Word from a seeded RNG.
 /// This is used for deterministic tests that need reproducible sequences of random values.
+///
+/// Uses the `Distribution<Word> for StandardUniform` implementation which uniformly samples
+/// field elements from the Goldilocks field.
 fn random_word<R: Rng>(rng: &mut R) -> Word {
-    Word::new([
-        Felt::new(rng.random::<u64>() % Felt::ORDER_U64),
-        Felt::new(rng.random::<u64>() % Felt::ORDER_U64),
-        Felt::new(rng.random::<u64>() % Felt::ORDER_U64),
-        Felt::new(rng.random::<u64>() % Felt::ORDER_U64),
-    ])
+    rng.random::<Word>()
 }
 
 /// Tests that a partial SMT constructed from a root is well behaved and returns expected

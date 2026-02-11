@@ -129,22 +129,25 @@ pub trait FeltRng: RngCore {
 // RANDOM VALUE GENERATION FOR TESTING
 // ================================================================================================
 
-/// Generates a random field element for testing purposes.
+/// Generates a random field element uniformly sampled from the Goldilocks field for testing
+/// purposes.
 ///
 /// This function is only available with the `std` feature.
 #[cfg(feature = "std")]
 pub fn random_felt() -> Felt {
-    use rand::Rng;
+    use rand::distr::{Distribution, Uniform};
     let mut rng = rand::rng();
-    // Goldilocks field order is 2^64 - 2^32 + 1
-    // Generate a random u64 and reduce modulo the field order
-    Felt::new(rng.random::<u64>())
+    let uni_dist =
+        Uniform::new(0u64, Felt::ORDER_U64).expect("should not fail given the size of the field");
+    Felt::new(uni_dist.sample(&mut rng))
 }
 
-/// Generates a random word (4 field elements) for testing purposes.
+/// Generates a random word (4 field elements) uniformly sampled from the Goldilocks field for
+/// testing purposes.
 ///
 /// This function is only available with the `std` feature.
 #[cfg(feature = "std")]
 pub fn random_word() -> Word {
-    Word::new([random_felt(), random_felt(), random_felt(), random_felt()])
+    use rand::Rng;
+    rand::rng().random::<Word>()
 }

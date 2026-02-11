@@ -1,8 +1,12 @@
+use p3_field::PrimeField64;
 use proptest::{
     prelude::{any, prop},
     prop_assert_eq, prop_assert_ne, proptest,
 };
-use rand::{Rng, SeedableRng};
+use rand::{
+    Rng, SeedableRng,
+    distr::{Distribution, Uniform},
+};
 use rand_chacha::ChaCha20Rng;
 
 use super::*;
@@ -20,9 +24,10 @@ proptest! {
         let key = SecretKey::with_rng(&mut rng);
         let nonce = Nonce::with_rng(&mut rng);
 
-        // Generate random field elements
+        // Generate random field elements uniformly sampled from the Goldilocks field
+        let uni_dist = Uniform::new(0u64, Felt::ORDER_U64).unwrap();
         let data: Vec<Felt> = (0..data_len)
-            .map(|_| Felt::new(rng.random::<u64>()))
+            .map(|_| Felt::new(uni_dist.sample(&mut rng)))
             .collect();
 
         let encrypted = key.encrypt_elements_with_nonce(&data, &[], nonce).unwrap();
@@ -41,12 +46,13 @@ proptest! {
         let key = SecretKey::with_rng(&mut rng);
         let nonce = Nonce::with_rng(&mut rng);
 
-        // Generate random field elements
+        // Generate random field elements uniformly sampled from the Goldilocks field
+        let uni_dist = Uniform::new(0u64, Felt::ORDER_U64).unwrap();
         let associated_data: Vec<Felt> = (0..associated_data_len)
-            .map(|_| Felt::new(rng.random::<u64>()))
+            .map(|_| Felt::new(uni_dist.sample(&mut rng)))
             .collect();
         let data: Vec<Felt> = (0..data_len)
-            .map(|_| Felt::new(rng.random::<u64>()))
+            .map(|_| Felt::new(uni_dist.sample(&mut rng)))
             .collect();
 
         let encrypted = key.encrypt_elements_with_nonce(&data, &associated_data, nonce).unwrap();

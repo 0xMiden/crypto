@@ -2,8 +2,12 @@
 
 use alloc::vec::Vec;
 
+use p3_field::PrimeField64;
 use proptest::prelude::*;
-use rand::{RngCore, SeedableRng};
+use rand::{
+    SeedableRng,
+    distr::{Distribution, Uniform},
+};
 use rand_chacha::ChaCha20Rng;
 
 use crate::{
@@ -20,11 +24,14 @@ fn arbitrary_bytes() -> impl Strategy<Value = Vec<u8>> {
     prop::collection::vec(any::<u8>(), 0..500)
 }
 
-/// Generates arbitrary field element vectors for property testing
+/// Generates arbitrary field element vectors for property testing.
+///
+/// Field elements are uniformly sampled from the Goldilocks field.
 fn arbitrary_field_elements() -> impl Strategy<Value = Vec<crate::Felt>> {
     (1usize..100, any::<u64>()).prop_map(|(len, seed)| {
         let mut rng = ChaCha20Rng::seed_from_u64(seed);
-        (0..len).map(|_| crate::Felt::new(rng.next_u64())).collect()
+        let uni_dist = Uniform::new(0u64, crate::Felt::ORDER_U64).unwrap();
+        (0..len).map(|_| crate::Felt::new(uni_dist.sample(&mut rng))).collect()
     })
 }
 

@@ -281,6 +281,23 @@ impl Randomizable for Word {
     }
 }
 
+// RANDOM SAMPLING
+// ================================================================================================
+
+impl rand::distr::Distribution<Word> for rand::distr::StandardUniform {
+    fn sample<R: rand::Rng + ?Sized>(&self, rng: &mut R) -> Word {
+        use rand::distr::Uniform;
+        let uni_dist = Uniform::new(0u64, Felt::ORDER_U64)
+            .expect("should not fail given the size of the field");
+        Word::new([
+            Felt::new(uni_dist.sample(rng)),
+            Felt::new(uni_dist.sample(rng)),
+            Felt::new(uni_dist.sample(rng)),
+            Felt::new(uni_dist.sample(rng)),
+        ])
+    }
+}
+
 // CONVERSIONS: FROM WORD
 // ================================================================================================
 

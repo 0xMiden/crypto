@@ -2,22 +2,23 @@ use std::hint::black_box;
 
 use criterion::{BatchSize, BenchmarkId, Criterion, criterion_group, criterion_main};
 use miden_crypto::{
-    Felt, Word,
+    Word,
     merkle::{
         MerkleTree, NodeIndex,
         smt::{LeafIndex, SMT_MAX_DEPTH, SimpleSmt},
         store::MerkleStore,
     },
-    rand::test_utils::{rand_array, rand_value},
+    rand::test_utils::rand_value,
 };
+use rand::Rng;
 
 /// Since MerkleTree can only be created when a power-of-two number of elements is used, the sample
 /// sizes are limited to that.
 static BATCH_SIZES: [usize; 3] = [2usize.pow(4), 2usize.pow(7), 2usize.pow(10)];
 
-/// Generates a random `Word`.
+/// Generates a random `Word` using the `Distribution<Word>` implementation.
 fn random_word() -> Word {
-    rand_array::<Felt, 4>().into()
+    rand::rng().random::<Word>()
 }
 
 /// Generates an index at the specified depth in `0..range`.
