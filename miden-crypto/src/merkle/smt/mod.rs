@@ -30,8 +30,11 @@ pub use large::{RocksDbConfig, RocksDbStorage};
 
 mod large_forest;
 pub use large_forest::{
-    Backend, BackendError, ForestOperation, LargeSmtForest, LargeSmtForestError, RootInfo,
-    SmtForestUpdateBatch, SmtUpdateBatch, TreeId, VersionId,
+    Backend, BackendError, Config as ForestConfig,
+    DEFAULT_MAX_HISTORY_VERSIONS as FOREST_DEFAULT_MAX_HISTORY_VERSIONS, ForestOperation,
+    InMemoryBackend as ForestInMemoryBackend, LargeSmtForest, LargeSmtForestError, LineageId,
+    MIN_HISTORY_VERSIONS as FOREST_MIN_HISTORY_VERSIONS, RootInfo, SmtForestUpdateBatch,
+    SmtUpdateBatch, TreeEntry, TreeId, TreeWithRoot, VersionId,
 };
 
 mod simple;
@@ -667,6 +670,13 @@ impl<const DEPTH: u8, K: Eq + Hash, V> MutationSet<DEPTH, K, V> {
     /// (i.e. set to `EMPTY_WORD`).
     pub fn new_pairs(&self) -> &Map<K, V> {
         &self.new_pairs
+    }
+
+    /// Returns `true` if the mutation set represents no changes to the tree, and `false` otherwise.
+    pub fn is_empty(&self) -> bool {
+        self.node_mutations.is_empty()
+            && self.new_pairs.is_empty()
+            && self.old_root == self.new_root
     }
 }
 
