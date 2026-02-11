@@ -70,15 +70,16 @@ name              = "rand"
 required-features = ["std"]
 
 [features]
-concurrent = ["dep:rayon", "p3-maybe-rayon/parallel", "p3-miden-prover/parallel", "p3-util/parallel", "std"]
-default    = ["concurrent", "std"]
-executable = ["concurrent", "dep:clap", "dep:rand-utils"]
-fuzzing    = []
-internal   = ["concurrent"]
-rocksdb    = ["concurrent", "dep:rocksdb"]
-serde      = ["dep:serde", "serde?/alloc"]
-std        = ["blake3/std", "dep:cc", "miden-serde-utils/std", "rand/std", "rand/thread_rng", "serde?/std"]
-testing    = ["dep:proptest"]
+concurrent        = ["dep:rayon", "p3-maybe-rayon/parallel", "p3-miden-prover/parallel", "p3-util/parallel", "std"]
+default           = ["concurrent", "std"]
+executable        = ["concurrent", "dep:clap", "dep:rand-utils"]
+fuzzing           = []
+internal          = ["concurrent"]
+persistent-forest = ["dep:messagepack-serde", "rocksdb", "serde"]
+rocksdb           = ["concurrent", "dep:rocksdb"]
+serde             = ["dep:serde", "serde?/alloc"]
+std               = ["blake3/std", "dep:cc", "miden-serde-utils/std", "rand/std", "rand/thread_rng", "serde?/std"]
+testing           = ["dep:proptest"]
 
 [dependencies]
 blake3                        = { default-features = false, version = "1.8" }
@@ -89,6 +90,7 @@ ed25519-dalek                 = { features = ["zeroize"], version = "2" }
 flume                         = { version = "0.11.1" }
 hkdf                          = { default-features = false, version = "0.12" }
 k256                          = { features = ["ecdh", "ecdsa"], version = "0.13" }
+messagepack-serde             = { default-features = false, optional = true, version = "0.2.1" }
 miden-crypto-derive.workspace = true
 miden-serde-utils.workspace   = true
 num                           = { default-features = false, features = ["alloc", "libm"], version = "0.4" }

@@ -299,6 +299,8 @@ mod utils;
 use alloc::vec::Vec;
 use core::num::NonZeroU8;
 
+#[cfg(feature = "persistent-forest")]
+pub use backend::persistent::PersistentBackend;
 pub use backend::{Backend, BackendError, memory::InMemoryBackend};
 pub use config::{Config, DEFAULT_MAX_HISTORY_VERSIONS, MIN_HISTORY_VERSIONS};
 pub use error::{LargeSmtForestError, Result};

@@ -24,6 +24,7 @@ pub type VersionId = u64;
 /// This is an arbitrary, user-provided identifier that is used to disambiguate cases where trees in
 /// distinct lineages are otherwise identical and have the same root.
 #[derive(Copy, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct LineageId([u8; 32]);
 
 impl LineageId {

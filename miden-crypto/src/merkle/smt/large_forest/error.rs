@@ -1,7 +1,7 @@
 //! This module contains the error types and helpers for working with errors from the large SMT
 //! forest.
 
-use alloc::boxed::Box;
+use alloc::{boxed::Box, string::String};
 
 use thiserror::Error;
 
@@ -66,6 +66,10 @@ pub enum LargeSmtForestError {
     /// Raised for arbitrary other errors.
     #[error(transparent)]
     Other(#[from] Box<dyn core::error::Error + Sync + Send>),
+
+    /// An unspecified, non-fatal error.
+    #[error("Unspecified error: {0}")]
+    Unspecified(String),
 }
 
 impl LargeSmtForestError {
@@ -80,11 +84,13 @@ impl LargeSmtForestError {
 impl From<BackendError> for LargeSmtForestError {
     fn from(value: BackendError) -> Self {
         match value {
+            BackendError::CorruptedData(_) => LargeSmtForestError::fatal_from(value),
             BackendError::DuplicateLineage(l) => LargeSmtForestError::DuplicateLineage(l),
             BackendError::Internal(e) => LargeSmtForestError::Fatal(e),
             BackendError::Merkle(e) => LargeSmtForestError::from(e),
             BackendError::Other(e) => LargeSmtForestError::from(e),
             BackendError::UnknownLineage(t) => LargeSmtForestError::UnknownLineage(t),
+            BackendError::Unspecified(msg) => LargeSmtForestError::Unspecified(msg),
         }
     }
 }

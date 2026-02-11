@@ -1,8 +1,6 @@
 //! This module contains a non-persistent, in-memory [`Backend`] for the SMT forest. It is
 //! non-parallel and is not intended to be such, allowing its use on effectively any platform where
 //! this library can be built.
-//!
-//! # Performance
 
 mod tests;
 

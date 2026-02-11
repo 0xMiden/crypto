@@ -2,8 +2,10 @@
 //! types it needs.
 
 pub mod memory;
+#[cfg(feature = "persistent-forest")]
+pub mod persistent;
 
-use alloc::{boxed::Box, vec::Vec};
+use alloc::{boxed::Box, string::String, vec::Vec};
 use core::fmt::Debug;
 
 use thiserror::Error;
@@ -186,6 +188,13 @@ where
 /// The error type for use within Backends.
 #[derive(Debug, Error)]
 pub enum BackendError {
+    /// Raised when corrupted data is encountered in the backend.
+    ///
+    /// It exists as a separate error variant to allow the forest itself to handle it better if
+    /// possible, but should be considered a fatal error.
+    #[error("Backend data corruption encountered: {0}")]
+    CorruptedData(String),
+
     /// Raised when there is a conflict between an existing lineage ID and one already in the
     /// forest.
     #[error("Duplicate lineage ID {0} provided")]
@@ -208,6 +217,10 @@ pub enum BackendError {
     /// Raised when the backend is queried for a lineage it doesn't know about.
     #[error("Lineage {0} is not known by the backend")]
     UnknownLineage(LineageId),
+
+    /// Raised for other errors in the backend that are user-specified.
+    #[error("Unspecified error: {0}")]
+    Unspecified(String),
 }
 
 impl BackendError {

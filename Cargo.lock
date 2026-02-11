@@ -925,6 +925,26 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f52b00d39961fc5b2736ea853c9cc86238e165017a493d1d5c8eac6bdc4cc273"
 
 [[package]]
+name = "messagepack-core"
+version = "0.2.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1ea64101f426eff856e07dcf9d3ceded9a0af52ee711b1ab3c80925519fde123"
+dependencies = [
+ "num-traits",
+]
+
+[[package]]
+name = "messagepack-serde"
+version = "0.2.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "38d1000583aa9ca8baca1c4e8081403a717dcaba948a199a9e434e1931039169"
+dependencies = [
+ "messagepack-core",
+ "num-traits",
+ "serde",
+]
+
+[[package]]
 name = "miden-crypto"
 version = "0.23.0"
 dependencies = [
@@ -942,6 +962,7 @@ dependencies = [
  "hkdf",
  "itertools 0.14.0",
  "k256",
+ "messagepack-serde",
  "miden-crypto-derive",
  "miden-serde-utils",
  "num",
