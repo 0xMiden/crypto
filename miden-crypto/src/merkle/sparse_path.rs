@@ -1025,7 +1025,7 @@ mod tests {
                 let (merkle_path, leaf) = tree.open(key).into_parts();
                 let sparse_path = SparseMerklePath::from_sized_iter(merkle_path.clone().into_iter()).unwrap();
 
-                let leaf_index = Smt::key_to_leaf_index(key).value();
+                let leaf_index = Smt::key_to_leaf_index(key).position();
                 let actual_value = leaf.hash(); // Use the actual leaf hash
 
                 // Verify both paths have same depth

@@ -16,8 +16,8 @@ pub enum MerkleError {
     DuplicateValuesForIndex(u64),
     #[error("entry {node} is not a leaf")]
     EntryIsNotLeaf { node: NodeIndex },
-    #[error("node index value {value} is not valid for depth {depth}")]
-    InvalidNodeIndex { depth: u8, value: u64 },
+    #[error("node index position {position} is not valid for depth {depth}")]
+    InvalidNodeIndex { depth: u8, position: u64 },
     #[error("provided node index depth {provided} does not match expected depth {expected}")]
     InvalidNodeIndexDepth { expected: u8, provided: u8 },
     #[error("provided node list should have a minimum length of {0}")]

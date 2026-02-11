@@ -105,7 +105,7 @@ fn err_with_leaves_entry_is_not_leaf() {
     match PartialMerkleTree::with_leaves(entries) {
         Err(MerkleError::EntryIsNotLeaf { node }) => {
             assert_eq!(node.depth(), 1);
-            assert_eq!(node.value(), 0);
+            assert_eq!(node.position(), 0);
         },
         other => panic!("Expected EntryIsNotLeaf error, got {:?}", other),
     }
