@@ -235,10 +235,9 @@ fn hash_test_vectors() {
         Felt::new(18),
     ];
 
-    for i in 0..elements.len() {
-        let expected = EXPECTED[i];
+    for (i, expected) in EXPECTED.iter().enumerate() {
         let result = Rpo256::hash_elements(&elements[..(i + 1)]);
-        assert_eq!(result, expected);
+        assert_eq!(result, *expected);
     }
 }
 
