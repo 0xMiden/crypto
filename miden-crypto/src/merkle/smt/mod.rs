@@ -29,6 +29,8 @@ pub use large::{
 pub use large::{RocksDbConfig, RocksDbStorage};
 
 mod large_forest;
+#[cfg(feature = "persistent-forest")]
+pub use large_forest::PersistentBackend as ForestPersistentBackend;
 pub use large_forest::{
     Backend, BackendError, Config as ForestConfig,
     DEFAULT_MAX_HISTORY_VERSIONS as FOREST_DEFAULT_MAX_HISTORY_VERSIONS, ForestOperation,
