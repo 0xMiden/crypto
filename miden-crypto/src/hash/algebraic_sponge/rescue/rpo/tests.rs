@@ -237,9 +237,9 @@ fn hash_iter_vs_hash_elements() {
     assert_eq!(Rpo256::hash_iter(multi.iter().copied()), Rpo256::hash_elements(&multi));
 
     // verify against known test vectors
-    for i in 0..19 {
+    for (i, expected) in EXPECTED.iter().enumerate() {
         let elements: Vec<Felt> = (0..=i).map(|j| Felt::new(j as u64)).collect();
-        assert_eq!(Rpo256::hash_iter(elements.iter().copied()), EXPECTED[i]);
+        assert_eq!(Rpo256::hash_iter(elements.iter().copied()), *expected);
     }
 }
 

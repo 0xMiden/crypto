@@ -3,6 +3,7 @@
 - [BREAKING] Refactored BLAKE3 to use `Digest<N>` struct, added `Digest192` type alias ([#811](https://github.com/0xMiden/crypto/pull/811)).
 - [BREAKING] Removed `hashbrown` dependency and `hashmaps` feature; `Map`/`Set` type aliases are now tied to the `std` feature ([#813](https://github.com/0xMiden/crypto/pull/813)).
 - [BREAKING] Renamed `NodeIndex::value()` to `NodeIndex::position()`, `NodeIndex::is_value_odd()` to `NodeIndex::is_position_odd()`, and `LeafIndex::value()` to `LeafIndex::position()` ([#814](https://github.com/0xMiden/crypto/pull/814)).
+- Added `hash_iter()` to `Rpo256`, `Rpx256`, and `Poseidon2` for hashing field elements from iterators without allocation ([#823](https://github.com/0xMiden/crypto/pull/823)).
 
 ## 0.22.2 (2026-02-01)
 
