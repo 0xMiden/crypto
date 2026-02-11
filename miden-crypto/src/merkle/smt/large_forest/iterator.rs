@@ -149,7 +149,7 @@ impl<'forest> EntriesIterator<'forest> {
                                 .map(|(key, value)| TreeEntry { key, value }),
                         );
                         *state = EntriesIteratorState::ReadingHistory { iterator };
-                        return self.next_with_history();
+                        continue;
                     }
 
                     let Some(entry) = full_tree_iter.next() else {

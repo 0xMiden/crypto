@@ -445,7 +445,7 @@ fn history_from_smt_non_overlapping() -> Result<()> {
 
     // When we query version 1 it should only make revert one change on top of the current tree.
     let view_v1 = history.get_view_at(1)?;
-    assert_eq!(view_v0.value(&key_2), Some(EMPTY_WORD));
+    assert_eq!(view_v1.value(&key_2), Some(EMPTY_WORD));
 
     // Verify querying a non-existent key returns None
     let nonexistent_key: Word = rng.value();
