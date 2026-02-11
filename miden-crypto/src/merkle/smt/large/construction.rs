@@ -9,8 +9,9 @@ use super::{
 };
 use crate::{
     EMPTY_WORD, Word,
+    hash::poseidon2::Poseidon2,
     merkle::smt::{
-        EmptySubtreeRoots, InnerNode, Map, MerkleError, NodeIndex, Rpo256, Smt, SparseMerkleTree,
+        EmptySubtreeRoots, InnerNode, Map, MerkleError, NodeIndex, Smt, SparseMerkleTree,
         full::concurrent::{
             PairComputations, SUBTREE_DEPTH, SubtreeLeaf, SubtreeLeavesIter, build_subtree,
         },
@@ -212,7 +213,7 @@ impl<S: SmtStorage> LargeSmt<S> {
         }
 
         // Compute the root from children at indices 2 and 3
-        let calculated_root = Rpo256::merge(&[in_memory_nodes[2], in_memory_nodes[3]]);
+        let calculated_root = Poseidon2::merge(&[in_memory_nodes[2], in_memory_nodes[3]]);
 
         // Set the root node
         in_memory_nodes[ROOT_MEMORY_INDEX] = calculated_root;
@@ -228,7 +229,7 @@ impl<S: SmtStorage> LargeSmt<S> {
     fn build_subtrees(&mut self, mut entries: Vec<(Word, Word)>) -> Result<(), MerkleError> {
         entries.par_sort_unstable_by_key(|item| {
             let index = Self::key_to_leaf_index(&item.0);
-            index.value()
+            index.position()
         });
         self.build_subtrees_from_sorted_entries(entries)?;
         Ok(())

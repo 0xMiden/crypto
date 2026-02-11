@@ -5,7 +5,7 @@ use super::EMPTY_WORD;
 use crate::{
     Felt, Word,
     field::PrimeField64,
-    hash::rpo::Rpo256,
+    hash::poseidon2::Poseidon2,
     merkle::smt::{LeafIndex, MAX_LEAF_ENTRIES, SMT_DEPTH, SmtLeafError},
     utils::{ByteReader, ByteWriter, Deserializable, DeserializationError, Serializable},
 };
@@ -156,10 +156,10 @@ impl SmtLeaf {
     pub fn hash(&self) -> Word {
         match self {
             SmtLeaf::Empty(_) => EMPTY_WORD,
-            SmtLeaf::Single((key, value)) => Rpo256::merge(&[*key, *value]),
+            SmtLeaf::Single((key, value)) => Poseidon2::merge(&[*key, *value]),
             SmtLeaf::Multiple(kvs) => {
                 let elements: Vec<Felt> = kvs.iter().copied().flat_map(kv_to_elements).collect();
-                Rpo256::hash_elements(&elements)
+                Poseidon2::hash_elements(&elements)
             },
         }
     }
@@ -182,6 +182,12 @@ impl SmtLeaf {
     /// Returns an iterator over the field elements representing this leaf.
     pub fn to_elements(&self) -> impl Iterator<Item = Felt> + '_ {
         self.entries().iter().copied().flat_map(kv_to_elements)
+    }
+
+    /// Returns an iterator over the key-value pairs in the leaf.
+    pub fn to_entries(&self) -> impl Iterator<Item = (&Word, &Word)> + '_ {
+        // Needed for type conversion from `&(T, T)` to `(&T, &T)`.
+        self.entries().iter().map(|(k, v)| (k, v))
     }
 
     /// Converts a leaf to a list of field elements.
@@ -388,7 +394,7 @@ impl Serializable for SmtLeaf {
         self.num_entries().write_into(target);
 
         // Write: leaf index
-        let leaf_index: u64 = self.index().value();
+        let leaf_index: u64 = self.index().position();
         leaf_index.write_into(target);
 
         // Write: entries

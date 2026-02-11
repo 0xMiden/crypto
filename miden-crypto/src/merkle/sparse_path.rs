@@ -8,7 +8,7 @@ use super::{
     EmptySubtreeRoots, InnerNodeInfo, MerkleError, MerklePath, NodeIndex, Word, smt::SMT_MAX_DEPTH,
 };
 use crate::{
-    hash::rpo::Rpo256,
+    hash::poseidon2::Poseidon2,
     utils::{ByteReader, ByteWriter, Deserializable, DeserializationError, Serializable},
 };
 
@@ -163,7 +163,7 @@ impl SparseMerklePath {
             // Compute the node and move to the next iteration.
             let children = index.build_node(node, sibling);
             index.move_up();
-            Rpo256::merge(&children)
+            Poseidon2::merge(&children)
         });
 
         Ok(root)
@@ -398,7 +398,7 @@ impl Iterator for InnerNodeIterator<'_> {
         let path_node = self.path.at_depth(index_depth).unwrap();
 
         let children = self.index.build_node(self.value, path_node);
-        self.value = Rpo256::merge(&children);
+        self.value = Poseidon2::merge(&children);
         self.index.move_up();
 
         Some(InnerNodeInfo {
@@ -1025,7 +1025,7 @@ mod tests {
                 let (merkle_path, leaf) = tree.open(key).into_parts();
                 let sparse_path = SparseMerklePath::from_sized_iter(merkle_path.clone().into_iter()).unwrap();
 
-                let leaf_index = Smt::key_to_leaf_index(key).value();
+                let leaf_index = Smt::key_to_leaf_index(key).position();
                 let actual_value = leaf.hash(); // Use the actual leaf hash
 
                 // Verify both paths have same depth

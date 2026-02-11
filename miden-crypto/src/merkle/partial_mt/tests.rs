@@ -105,7 +105,7 @@ fn err_with_leaves_entry_is_not_leaf() {
     match PartialMerkleTree::with_leaves(entries) {
         Err(MerkleError::EntryIsNotLeaf { node }) => {
             assert_eq!(node.depth(), 1);
-            assert_eq!(node.value(), 0);
+            assert_eq!(node.position(), 0);
         },
         other => panic!("Expected EntryIsNotLeaf error, got {:?}", other),
     }
@@ -304,7 +304,7 @@ fn leaves() {
     let value32 = mt.get_node(NODE32).unwrap();
     let value33 = mt.get_node(NODE33).unwrap();
 
-    let leaves = vec![
+    let leaves = [
         (NODE20, value20),
         (NODE22, value22),
         (NODE23, value23),

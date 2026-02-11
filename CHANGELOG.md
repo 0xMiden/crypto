@@ -1,6 +1,41 @@
-## 0.22.0 (TBD)
+## 0.23.0 (TBD)
 
 - Replaced `Subtree` internal storage with bitmask layout ([#784](https://github.com/0xMiden/crypto/pull/784)).
+- [BREAKING] Refactored BLAKE3 to use `Digest<N>` struct, added `Digest192` type alias ([#811](https://github.com/0xMiden/crypto/pull/811)).
+- [BREAKING] Removed `hashbrown` dependency and `hashmaps` feature; `Map`/`Set` type aliases are now tied to the `std` feature ([#813](https://github.com/0xMiden/crypto/pull/813)).
+- [BREAKING] Renamed `NodeIndex::value()` to `NodeIndex::position()`, `NodeIndex::is_value_odd()` to `NodeIndex::is_position_odd()`, and `LeafIndex::value()` to `LeafIndex::position()` ([#814](https://github.com/0xMiden/crypto/pull/814)).
+
+## 0.22.2 (2026-02-01)
+
+- Re-exported `p3_keccak::VECTOR_LEN`.
+
+## 0.22.1 (2026-02-01)
+
+- Re-exported additional Plonky3 modules and structs.
+- Implemented `batch_inversion_allow_zeros()` function.
+
+## 0.22.0 (2026-01-27)
+
+- Added const-generic `Digest<N>` struct for binary hash functions with `Digest256` and `Digest512` type aliases ([#777](https://github.com/0xMiden/crypto/pull/777)).
+- Added `MmrPath::with_forest()` and `MmrProof::with_forest()` to adjust proofs for smaller forests ([#788](https://github.com/0xMiden/crypto/pull/788)).
+- [BREAKING] Migrate from RPO to Poseidon2 for AEAD, Falcon DSA, IES, and Merkle trees ([#793](https://github.com/0xMiden/crypto/pull/793)).
+- Updated SMT benchmark executable to use Poseidon2 instead of Rpo256 ([#800](https://github.com/0xMiden/crypto/pull/800)).
+
+## 0.21.4 (2026-01-22)
+
+- Fix an issue where `BudgetedReader` rejects valid usize collections with tight budgets ([#798](https://github.com/0xMiden/crypto/pull/798)).
+
+## 0.21.3 (2026-01-21)
+
+- Fix: don't disable WAL during subtree construction in `LargeSmt`'s RocksDB backend ([#794](https://github.com/0xMiden/crypto/pull/794)).
+
+## 0.21.2 (2026-01-20)
+
+- Exported `BudgetedReader` to allow for defense-in-depth against deserialization panics ([#786](https://github.com/0xMiden/crypto/pull/786)).
+
+## 0.21.1 (2026-01-16)
+
+- Changed `SmtForest` so that `EMPTY_WORD` is treated as removals ([#780](https://github.com/0xMiden/crypto/pull/780)).
 
 ## 0.21.0 (2026-01-14)
 

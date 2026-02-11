@@ -973,7 +973,7 @@ macro_rules! benchmark_word_conversions {
 /// throughput measurement, and reduced boilerplate.
 ///
 /// # Arguments
-/// * `$aead_module` - The AEAD module name (e.g., aead_rpo)
+/// * `$aead_module` - The AEAD module name (e.g., aead_poseidon2)
 /// * `$group_prefix` - Human-readable prefix for benchmark group names
 /// * `$bytes_fn` - The name of the benchmark function to generate for bytes
 /// * `$group_ident` - The identifier for the criterion group
@@ -1056,7 +1056,7 @@ macro_rules! benchmark_aead_bytes {
 /// throughput measurement, and reduced boilerplate.
 ///
 /// # Arguments
-/// * `$aead_module` - The AEAD module name (e.g., aead_rpo)
+/// * `$aead_module` - The AEAD module name (e.g., aead_poseidon2)
 /// * `$group_prefix` - Human-readable prefix for benchmark group names
 /// * `$felts_fn` - The name of the benchmark function to generate for Felts
 /// * `$group_ident` - The identifier for the criterion group

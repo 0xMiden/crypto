@@ -4,7 +4,6 @@ use std::{path::PathBuf, sync::Arc};
 use rocksdb::{
     BlockBasedOptions, Cache, ColumnFamilyDescriptor, DB, DBCompactionStyle, DBCompressionType,
     DBIteratorWithThreadMode, FlushOptions, IteratorMode, Options, ReadOptions, WriteBatch,
-    WriteOptions,
 };
 
 use super::{SmtStorage, StorageError, StorageUpdateParts, StorageUpdates, SubtreeUpdate};
@@ -228,7 +227,7 @@ impl RocksDbStorage {
             56 => 7,
             d => panic!("unsupported depth {d}"),
         };
-        KeyBytes::new(index.value(), keep)
+        KeyBytes::new(index.position(), keep)
     }
 
     /// Retrieves a handle to a RocksDB column family by its name.
@@ -643,7 +642,7 @@ impl SmtStorage for RocksDbStorage {
                 .hash();
 
             let depth24_cf = self.cf_handle(DEPTH_24_CF)?;
-            let hash_key = Self::index_db_key(subtree.root_index().value());
+            let hash_key = Self::index_db_key(subtree.root_index().position());
             batch.put_cf(depth24_cf, hash_key, root_hash.to_bytes());
         }
 
@@ -651,14 +650,14 @@ impl SmtStorage for RocksDbStorage {
         Ok(())
     }
 
-    /// Bulk-writes subtrees to storage (bypassing WAL).
+    /// Bulk-writes subtrees to storage.
     ///
     /// This method writes a vector of serialized `Subtree` objects directly to their
     /// corresponding RocksDB column families based on their root index.
     ///
-    /// ⚠️ **Warning:** This function should only be used during **initial SMT construction**.
-    /// It disables the WAL, meaning writes are **not crash-safe** and can result in data loss
-    /// if the process terminates unexpectedly.
+    /// Uses default write options to keep WAL enabled. Disabling WAL would make writes
+    /// non-crash-safe: data in the memtable is lost on unexpected termination, causing root
+    /// mismatch on restart (see miden-node#1558).
     ///
     /// # Parameters
     /// - `subtrees`: A vector of `Subtree` objects to be serialized and persisted.
@@ -667,8 +666,6 @@ impl SmtStorage for RocksDbStorage {
     /// - Returns `StorageError::Backend` if any column family lookup or RocksDB write fails.
     fn set_subtrees(&mut self, subtrees: Vec<Subtree>) -> Result<(), StorageError> {
         let depth24_cf = self.cf_handle(DEPTH_24_CF)?;
-        let mut write_opts = WriteOptions::default();
-        write_opts.disable_wal(true);
         let mut batch = WriteBatch::default();
 
         for subtree in subtrees {
@@ -680,12 +677,12 @@ impl SmtStorage for RocksDbStorage {
             if subtree.root_index().depth() == IN_MEMORY_DEPTH
                 && let Some(root_node) = subtree.get_inner_node(subtree.root_index())
             {
-                let hash_key = Self::index_db_key(subtree.root_index().value());
+                let hash_key = Self::index_db_key(subtree.root_index().position());
                 batch.put_cf(depth24_cf, hash_key, root_node.hash().to_bytes());
             }
         }
 
-        self.db.write_opt(batch, &write_opts)?;
+        self.db.write(batch)?;
         Ok(())
     }
 
@@ -704,7 +701,7 @@ impl SmtStorage for RocksDbStorage {
         // Also remove level 24 hash cache if this is a level 24 subtree
         if index.depth() == IN_MEMORY_DEPTH {
             let depth24_cf = self.cf_handle(DEPTH_24_CF)?;
-            let hash_key = Self::index_db_key(index.value());
+            let hash_key = Self::index_db_key(index.position());
             batch.delete_cf(depth24_cf, hash_key);
         }
 
@@ -847,14 +844,14 @@ impl SmtStorage for RocksDbStorage {
                             .then(|| subtree.get_inner_node(index))
                             .flatten()
                             .map(|root_node| {
-                                let hash_key = Self::index_db_key(index.value());
+                                let hash_key = Self::index_db_key(index.position());
                                 (hash_key, Some(root_node.hash().to_bytes()))
                             });
                         (index, Some(bytes), depth24_op)
                     },
                     SubtreeUpdate::Delete { index } => {
                         let depth24_op = is_depth_24(index).then(|| {
-                            let hash_key = Self::index_db_key(index.value());
+                            let hash_key = Self::index_db_key(index.position());
                             (hash_key, None)
                         });
                         (index, None, depth24_op)

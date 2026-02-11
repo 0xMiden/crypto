@@ -223,7 +223,7 @@ impl Subtree {
         let relative_depth = global.depth() - base.depth();
         let base_offset = (1 << relative_depth) - 1;
         let mask = (1 << relative_depth) - 1;
-        let local_position = (global.value() & mask) as u8;
+        let local_position = (global.position() & mask) as u8;
         base_offset + local_position
     }
 
@@ -231,7 +231,7 @@ impl Subtree {
     pub fn subtree_key(root_index: NodeIndex) -> [u8; 9] {
         let mut key = [0u8; 9];
         key[0] = root_index.depth();
-        key[1..].copy_from_slice(&root_index.value().to_be_bytes());
+        key[1..].copy_from_slice(&root_index.position().to_be_bytes());
         key
     }
 
@@ -243,7 +243,7 @@ impl Subtree {
         } else {
             let subtree_root_depth = depth - (depth % SUBTREE_DEPTH);
             let relative_depth = depth - subtree_root_depth;
-            let base_value = node_index.value() >> relative_depth;
+            let base_value = node_index.position() >> relative_depth;
 
             NodeIndex::new(subtree_root_depth, base_value).unwrap()
         }

@@ -53,7 +53,7 @@ Notes:
 
 We benchmark the performance of digital signature algorithms used in the Miden VM. These include:
 
-* **RPO-Falcon512** - Falcon512 signature scheme using RPO256 for message hashing
+* **Falcon512-Poseidon2** - Falcon512 signature scheme using Poseidon2 for message hashing
 * **ECDSA over secp256k1** - Elliptic Curve Digital Signature Algorithm using Keccak256 for message hashing
 * **EdDSA over Ed25519** - Edwards-curve Digital Signature Algorithm using SHA-512 for message hashing
 
@@ -62,7 +62,7 @@ For each algorithm, we benchmark three core operations:
 2. **Signing** - Generating a signature for a message
 3. **Verification** - Verifying a signature against a message and public key
 
-#### RPO-Falcon512
+#### Falcon512-Poseidon2
 
 | Hardware            | Key Generation | Signing | Verification |
 | ------------------- | :------------: | :-----: | :----------: |
@@ -84,7 +84,7 @@ For each algorithm, we benchmark three core operations:
 
 ### Sparse Merkle Tree
 
-We build cryptographic data structures incorporating these hash functions. What follows are benchmarks of operations on sparse Merkle trees (SMTs) which use the above `RPO_256` hash function. We perform a batched modification of 1,000 values in a tree with 1,000,000 leaves (with the `hashmaps` feature to use the `hashbrown` crate).
+We build cryptographic data structures incorporating these hash functions. What follows are benchmarks of operations on sparse Merkle trees (SMTs) which use the `Poseidon2` hash function. We perform a batched modification of 1,000 values in a tree with 1,000,000 leaves.
 
 ### Scenario 1: SMT Construction (1M pairs)
 
@@ -138,7 +138,7 @@ cargo bench hash
 
 #### Digital Signature Algorithm (DSA) Benchmarks
 
-To run the benchmarks for all DSA implementations (RPO-Falcon512, ECDSA k256, and EdDSA), from the root directory run:
+To run the benchmarks for all DSA implementations (Falcon512-Poseidon2, ECDSA k256, and EdDSA), from the root directory run:
 
 ```
 cargo bench dsa
@@ -155,7 +155,7 @@ cargo run --features=executable
 The `concurrent` feature enables the concurrent benchmark, and is enabled by default. To run a sequential benchmark, disable the crate's default features:
 
 ```
-cargo run --no-default-features --features=executable,hashmaps
+cargo run --no-default-features --features=executable,std
 ```
 
 The benchmark parameters may also be customized with the `-s`/`--size`, `-i`/`--insertions`, and `-u`/`--updates` options.

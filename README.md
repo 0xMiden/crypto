@@ -12,8 +12,8 @@ This crate contains cryptographic primitives used in Miden.
 
 [AEAD module](./miden-crypto/src/aead) provides authenticated encryption with associated data (AEAD) schemes. Currently, this includes:
 
-- [AEAD-RPO](https://eprint.iacr.org/2023/1668): a scheme optimized for speed within SNARKs/STARKs. The design is based on the MonkeySpongeWrap construction and uses the RPO (Rescue Prime Optimized) permutation, creating an encryption scheme that is highly efficient when executed within zero-knowledge proof systems.
-- [XChaCha20Poly1305](https://datatracker.ietf.org/doc/html/draft-irtf-cfrg-xchacha): Extended nonce variant of ChaCha20Poly1305 providing both confidentiality and authenticity. This implementation offers significant performance advantages, showing approximately 100x faster encryption/decryption compared to the arithmetization-friendly alternative based on the RPO permutation.
+- [AEAD-Poseidon2](https://eprint.iacr.org/2023/1668): a scheme optimized for speed within SNARKs/STARKs. The design is based on the MonkeySpongeWrap construction and uses the Poseidon2 permutation, creating an encryption scheme that is highly efficient when executed within zero-knowledge proof systems.
+- [XChaCha20Poly1305](https://datatracker.ietf.org/doc/html/draft-irtf-cfrg-xchacha): Extended nonce variant of ChaCha20Poly1305 providing both confidentiality and authenticity. This implementation offers significant performance advantages, showing approximately 25x faster encryption/decryption compared to the arithmetization-friendly alternative based on the Poseidon2 permutation.
 
 ## Hash
 
@@ -29,7 +29,7 @@ For performance benchmarks of these hash functions and their comparison to other
 
 ## Merkle
 
-[Merkle module](./miden-crypto/src/merkle/) provides a set of data structures related to Merkle trees. All these data structures are implemented using the RPO hash function described above. The data structures are:
+[Merkle module](./miden-crypto/src/merkle/) provides a set of data structures related to Merkle trees. All these data structures are implemented using the Poseidon2 hash function described above. The data structures are:
 
 - `MerkleStore`: a collection of Merkle trees of different heights designed to efficiently store trees with common subtrees.
 - `MerkleTree`: a regular fully-balanced binary Merkle tree. The depth of this tree can be at most 64.
@@ -60,7 +60,7 @@ When the `rocksdb` feature is enabled, `LargeSmt` can persist the lower subtrees
 
 - `ECDSA k256`: Elliptic Curve Digital Signature Algorithm using the `k256` curve (also known as `secp256k1`) using `Keccak` to hash messages. This is a widely adopted signature scheme known for its compact key and signature sizes, making it efficient for storage and transmission.
 - `Ed25519`: Elliptic Curve Digital Signature Algorithm using the `Curve25519` elliptic curve with `SHA-512` to hash messages. This is a state-of-the-art signature scheme known for its exceptional performance, strong security guarantees, and resistance to implementation vulnerabilities, making it the preferred choice for modern cryptographic applications.
-- `RPO Falcon512`: a variant of the [Falcon](https://falcon-sign.info/) signature scheme. This variant differs from the standard in that instead of using SHAKE256 hash function in the _hash-to-point_ algorithm we use RPO256. This makes the signature more efficient to verify in Miden VM. Another point of difference is with respect to the signing process, which is deterministic in our case.
+- `Falcon512 Poseidon2`: a variant of the [Falcon](https://falcon-sign.info/) signature scheme. This variant differs from the standard in that instead of using SHAKE256 hash function in the _hash-to-point_ algorithm we use Poseidon2. This makes the signature more efficient to verify in Miden VM. Another point of difference is with respect to the signing process, which is deterministic in our case.
 
 For the above signatures, key generation, signing, and signature verification are available for both `std` and `no_std` contexts (see [crate features](#crate-features) below). However, in `no_std` context, the user is responsible for supplying the key generation and signing procedures with a random number generator.
 
@@ -98,13 +98,13 @@ The implementation supports multiple combinations of key exchange and encryption
 
 **AEAD Encryption**:
 - `XChaCha20Poly1305`
-- `AEAD-RPO`
+- `AEAD-Poseidon2`
 
 This gives four scheme combinations:
 - `K256XChaCha20Poly1305`: Best for general-purpose applications requiring secp256k1 compatibility
 - `X25519XChaCha20Poly1305`: Best for general-purpose applications **not** requiring secp256k1 compatibility
-- `K256AeadRpo`: Best for STARK proof systems requiring secp256k1 compatibility
-- `X25519AeadRpo`: Best for STARK proof systems **not** requiring secp256k1 compatibility
+- `K256AeadPoseidon2`: Best for STARK proof systems requiring secp256k1 compatibility
+- `X25519AeadPoseidon2`: Best for STARK proof systems **not** requiring secp256k1 compatibility
 
 ### Data type support
 
@@ -142,7 +142,6 @@ This crate can be compiled with the following features:
 - `concurrent`- enabled by default; enables multi-threaded implementation of `Smt::with_entries()` which significantly improves performance on multi-core CPUs.
 - `std` - enabled by default and relies on the Rust standard library.
 - `no_std` does not rely on the Rust standard library and enables compilation to WebAssembly.
-- `hashmaps` - uses hashbrown hashmaps in SMT and Merkle Store implementation which significantly improves performance of updates. Keys ordering in iterators is not guaranteed when this feature is enabled.
 - `rocksdb` - enables the RocksDB-backed storage for `LargeSmt` and related utilities. Implies `concurrent`.
 All of these features imply the use of [alloc](https://doc.rust-lang.org/alloc/) to support heap-allocated collections.
 
