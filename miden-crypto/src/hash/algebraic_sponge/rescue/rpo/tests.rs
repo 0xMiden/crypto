@@ -212,6 +212,38 @@ fn hash_empty_bytes() {
 }
 
 #[test]
+fn hash_iter_vs_hash_elements() {
+    // empty input
+    let empty: Vec<Felt> = vec![];
+    assert_eq!(Rpo256::hash_iter(empty.iter().copied()), Rpo256::hash_elements(&empty));
+
+    // single element
+    let single = [Felt::new(42)];
+    assert_eq!(Rpo256::hash_iter(single.iter().copied()), Rpo256::hash_elements(&single));
+
+    // partial rate (less than 8 elements)
+    let partial: Vec<Felt> = (0..5).map(Felt::new).collect();
+    assert_eq!(Rpo256::hash_iter(partial.iter().copied()), Rpo256::hash_elements(&partial));
+
+    // exact rate (exactly 8 elements)
+    let exact_rate: Vec<Felt> = (0..8).map(Felt::new).collect();
+    assert_eq!(
+        Rpo256::hash_iter(exact_rate.iter().copied()),
+        Rpo256::hash_elements(&exact_rate)
+    );
+
+    // multiple rates (more than 8 elements)
+    let multi: Vec<Felt> = (0..19).map(Felt::new).collect();
+    assert_eq!(Rpo256::hash_iter(multi.iter().copied()), Rpo256::hash_elements(&multi));
+
+    // verify against known test vectors
+    for i in 0..19 {
+        let elements: Vec<Felt> = (0..=i).map(|j| Felt::new(j as u64)).collect();
+        assert_eq!(Rpo256::hash_iter(elements.iter().copied()), EXPECTED[i]);
+    }
+}
+
+#[test]
 fn hash_test_vectors() {
     let elements = [
         ZERO,

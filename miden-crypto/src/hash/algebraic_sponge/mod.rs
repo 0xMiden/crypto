@@ -99,6 +99,50 @@ pub(crate) trait AlgebraicSponge {
         Word::new(state[DIGEST_RANGE].try_into().unwrap())
     }
 
+    /// Returns a hash of field elements provided via an iterator.
+    ///
+    /// This is functionally equivalent to [hash_elements()](Self::hash_elements) but avoids
+    /// requiring a contiguous slice, which can eliminate intermediate allocations when the
+    /// elements are produced lazily or come from multiple sources.
+    ///
+    /// The iterator must implement [ExactSizeIterator] because the total element count is needed
+    /// upfront for domain separation.
+    fn hash_iter<I>(iter: I) -> Word
+    where
+        I: IntoIterator<Item = Felt>,
+        I::IntoIter: ExactSizeIterator,
+    {
+        let iter = iter.into_iter();
+        let total_len = iter.len();
+
+        if total_len == 0 {
+            return Word::default();
+        }
+
+        let mut state = [ZERO; STATE_WIDTH];
+        state[CAPACITY_RANGE.start] = Felt::from_u8((total_len % RATE_WIDTH) as u8);
+
+        let mut i = 0;
+        for felt in iter {
+            state[RATE_RANGE.start + i] = felt;
+            i += 1;
+            if i == RATE_WIDTH {
+                Self::apply_permutation(&mut state);
+                i = 0;
+            }
+        }
+
+        if i > 0 {
+            while i != RATE_WIDTH {
+                state[RATE_RANGE.start + i] = ZERO;
+                i += 1;
+            }
+            Self::apply_permutation(&mut state);
+        }
+
+        Word::new(state[DIGEST_RANGE].try_into().unwrap())
+    }
+
     /// Returns a hash of the provided sequence of bytes.
     fn hash(bytes: &[u8]) -> Word {
         // initialize the state with zeroes
