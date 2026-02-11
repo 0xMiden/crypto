@@ -182,13 +182,13 @@ impl PartialMmr {
         let mut nodes = Vec::with_capacity(depth);
         let mut idx = leaf_idx;
 
-        while let Some(node) = self.nodes.get(&idx.sibling()) {
+        for _ in 0..depth {
+            let Some(node) = self.nodes.get(&idx.sibling()) else {
+                return Ok(None);
+            };
             nodes.push(*node);
             idx = idx.parent();
         }
-
-        // If the leaf is tracked, the path must be complete
-        debug_assert!(nodes.len() == depth);
 
         let path = MmrPath::new(self.forest, pos, MerklePath::new(nodes));
         Ok(Some(MmrProof::new(path, leaf)))
