@@ -285,45 +285,46 @@
 <a href=#285 id=285 data-nosnippet>285</a>
 <a href=#286 id=286 data-nosnippet>286</a>        <span class="kw">let </span>left = smt_node.left;
 <a href=#287 id=287 data-nosnippet>287</a>        <span class="kw">let </span>right = smt_node.right;
-<a href=#288 id=288 data-nosnippet>288</a>
-<a href=#289 id=289 data-nosnippet>289</a>        <span class="kw">let </span><span class="kw-2">mut </span>result = Vec::new();
-<a href=#290 id=290 data-nosnippet>290</a>        result.extend(<span class="self">self</span>.remove_node(left));
-<a href=#291 id=291 data-nosnippet>291</a>        result.extend(<span class="self">self</span>.remove_node(right));
-<a href=#292 id=292 data-nosnippet>292</a>        result
-<a href=#293 id=293 data-nosnippet>293</a>    }
-<a href=#294 id=294 data-nosnippet>294</a>
-<a href=#295 id=295 data-nosnippet>295</a>    <span class="doccomment">/// Removes the specified roots from the store and releases memory used by now
-<a href=#296 id=296 data-nosnippet>296</a>    /// unreachable nodes.
-<a href=#297 id=297 data-nosnippet>297</a>    ///
-<a href=#298 id=298 data-nosnippet>298</a>    /// Returns the terminal nodes (leaves) that were removed.
-<a href=#299 id=299 data-nosnippet>299</a>    </span><span class="kw">pub fn </span>remove_roots(<span class="kw-2">&amp;mut </span><span class="self">self</span>, roots: <span class="kw">impl </span>IntoIterator&lt;Item = Word&gt;) -&gt; Vec&lt;Word&gt; {
-<a href=#300 id=300 data-nosnippet>300</a>        <span class="kw">let </span><span class="kw-2">mut </span>removed_leaves = Vec::new();
-<a href=#301 id=301 data-nosnippet>301</a>        <span class="kw">for </span>root <span class="kw">in </span>roots {
-<a href=#302 id=302 data-nosnippet>302</a>            removed_leaves.extend(<span class="self">self</span>.remove_node(root));
-<a href=#303 id=303 data-nosnippet>303</a>        }
-<a href=#304 id=304 data-nosnippet>304</a>        removed_leaves
-<a href=#305 id=305 data-nosnippet>305</a>    }
-<a href=#306 id=306 data-nosnippet>306</a>}
-<a href=#307 id=307 data-nosnippet>307</a>
-<a href=#308 id=308 data-nosnippet>308</a><span class="comment">// HELPER FUNCTIONS
-<a href=#309 id=309 data-nosnippet>309</a>// ================================================================================================
-<a href=#310 id=310 data-nosnippet>310</a>
-<a href=#311 id=311 data-nosnippet>311</a></span><span class="doccomment">/// Creates empty hashes for all the subtrees of a tree with a max depth of [`SMT_DEPTH`].
-<a href=#312 id=312 data-nosnippet>312</a></span><span class="kw">fn </span>empty_hashes() -&gt; <span class="kw">impl </span>Iterator&lt;Item = (Word, ForestInnerNode)&gt; {
-<a href=#313 id=313 data-nosnippet>313</a>    <span class="kw">let </span>subtrees = EmptySubtreeRoots::empty_hashes(SMT_DEPTH);
-<a href=#314 id=314 data-nosnippet>314</a>    subtrees
-<a href=#315 id=315 data-nosnippet>315</a>        .iter()
-<a href=#316 id=316 data-nosnippet>316</a>        .rev()
-<a href=#317 id=317 data-nosnippet>317</a>        .copied()
-<a href=#318 id=318 data-nosnippet>318</a>        .zip(subtrees.iter().rev().skip(<span class="number">1</span>).copied())
-<a href=#319 id=319 data-nosnippet>319</a>        .map(|(child, parent)| (parent, ForestInnerNode { left: child, right: child, rc: <span class="number">1 </span>}))
-<a href=#320 id=320 data-nosnippet>320</a>}
-<a href=#321 id=321 data-nosnippet>321</a>
-<a href=#322 id=322 data-nosnippet>322</a><span class="doccomment">/// A Merkle opening that starts below the root and ends at the sibling of the target leaf.
-<a href=#323 id=323 data-nosnippet>323</a>/// Indexed by the NodeIndex at each level to efficiently query all the hashes needed for a batch
-<a href=#324 id=324 data-nosnippet>324</a>/// update.
-<a href=#325 id=325 data-nosnippet>325</a></span><span class="kw">struct </span>IndexedPath {
-<a href=#326 id=326 data-nosnippet>326</a>    value: Word,
-<a href=#327 id=327 data-nosnippet>327</a>    path: Vec&lt;(NodeIndex, Word)&gt;,
-<a href=#328 id=328 data-nosnippet>328</a>}
+<a href=#288 id=288 data-nosnippet>288</a>        <span class="self">self</span>.nodes.remove(<span class="kw-2">&amp;</span>node);
+<a href=#289 id=289 data-nosnippet>289</a>
+<a href=#290 id=290 data-nosnippet>290</a>        <span class="kw">let </span><span class="kw-2">mut </span>result = Vec::new();
+<a href=#291 id=291 data-nosnippet>291</a>        result.extend(<span class="self">self</span>.remove_node(left));
+<a href=#292 id=292 data-nosnippet>292</a>        result.extend(<span class="self">self</span>.remove_node(right));
+<a href=#293 id=293 data-nosnippet>293</a>        result
+<a href=#294 id=294 data-nosnippet>294</a>    }
+<a href=#295 id=295 data-nosnippet>295</a>
+<a href=#296 id=296 data-nosnippet>296</a>    <span class="doccomment">/// Removes the specified roots from the store and releases memory used by now
+<a href=#297 id=297 data-nosnippet>297</a>    /// unreachable nodes.
+<a href=#298 id=298 data-nosnippet>298</a>    ///
+<a href=#299 id=299 data-nosnippet>299</a>    /// Returns the terminal nodes (leaves) that were removed.
+<a href=#300 id=300 data-nosnippet>300</a>    </span><span class="kw">pub fn </span>remove_roots(<span class="kw-2">&amp;mut </span><span class="self">self</span>, roots: <span class="kw">impl </span>IntoIterator&lt;Item = Word&gt;) -&gt; Vec&lt;Word&gt; {
+<a href=#301 id=301 data-nosnippet>301</a>        <span class="kw">let </span><span class="kw-2">mut </span>removed_leaves = Vec::new();
+<a href=#302 id=302 data-nosnippet>302</a>        <span class="kw">for </span>root <span class="kw">in </span>roots {
+<a href=#303 id=303 data-nosnippet>303</a>            removed_leaves.extend(<span class="self">self</span>.remove_node(root));
+<a href=#304 id=304 data-nosnippet>304</a>        }
+<a href=#305 id=305 data-nosnippet>305</a>        removed_leaves
+<a href=#306 id=306 data-nosnippet>306</a>    }
+<a href=#307 id=307 data-nosnippet>307</a>}
+<a href=#308 id=308 data-nosnippet>308</a>
+<a href=#309 id=309 data-nosnippet>309</a><span class="comment">// HELPER FUNCTIONS
+<a href=#310 id=310 data-nosnippet>310</a>// ================================================================================================
+<a href=#311 id=311 data-nosnippet>311</a>
+<a href=#312 id=312 data-nosnippet>312</a></span><span class="doccomment">/// Creates empty hashes for all the subtrees of a tree with a max depth of [`SMT_DEPTH`].
+<a href=#313 id=313 data-nosnippet>313</a></span><span class="kw">fn </span>empty_hashes() -&gt; <span class="kw">impl </span>Iterator&lt;Item = (Word, ForestInnerNode)&gt; {
+<a href=#314 id=314 data-nosnippet>314</a>    <span class="kw">let </span>subtrees = EmptySubtreeRoots::empty_hashes(SMT_DEPTH);
+<a href=#315 id=315 data-nosnippet>315</a>    subtrees
+<a href=#316 id=316 data-nosnippet>316</a>        .iter()
+<a href=#317 id=317 data-nosnippet>317</a>        .rev()
+<a href=#318 id=318 data-nosnippet>318</a>        .copied()
+<a href=#319 id=319 data-nosnippet>319</a>        .zip(subtrees.iter().rev().skip(<span class="number">1</span>).copied())
+<a href=#320 id=320 data-nosnippet>320</a>        .map(|(child, parent)| (parent, ForestInnerNode { left: child, right: child, rc: <span class="number">1 </span>}))
+<a href=#321 id=321 data-nosnippet>321</a>}
+<a href=#322 id=322 data-nosnippet>322</a>
+<a href=#323 id=323 data-nosnippet>323</a><span class="doccomment">/// A Merkle opening that starts below the root and ends at the sibling of the target leaf.
+<a href=#324 id=324 data-nosnippet>324</a>/// Indexed by the NodeIndex at each level to efficiently query all the hashes needed for a batch
+<a href=#325 id=325 data-nosnippet>325</a>/// update.
+<a href=#326 id=326 data-nosnippet>326</a></span><span class="kw">struct </span>IndexedPath {
+<a href=#327 id=327 data-nosnippet>327</a>    value: Word,
+<a href=#328 id=328 data-nosnippet>328</a>    path: Vec&lt;(NodeIndex, Word)&gt;,
+<a href=#329 id=329 data-nosnippet>329</a>}
 </code></pre></div></section></main></body></html>
