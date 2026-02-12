@@ -229,7 +229,7 @@ impl PartialSmt {
 
         let leaf = self
             .leaves
-            .entry(leaf_index.value())
+            .entry(leaf_index.position())
             .or_insert_with(|| SmtLeaf::new_empty(leaf_index));
 
         if value != EMPTY_WORD {
@@ -248,7 +248,7 @@ impl PartialSmt {
 
         // Remove empty leaf
         if current_entries == 0 {
-            self.leaves.remove(&leaf_index.value());
+            self.leaves.remove(&leaf_index.position());
         }
 
         // Recompute the path from leaf to root
@@ -307,15 +307,15 @@ impl PartialSmt {
 
         let prev_entries = self
             .leaves
-            .get(&current_index.value())
+            .get(&current_index.position())
             .map(|leaf| leaf.num_entries())
             .unwrap_or(0);
         let current_entries = leaf.num_entries();
         // Only store non-empty leaves
         if current_entries > 0 {
-            self.leaves.insert(current_index.value(), leaf);
+            self.leaves.insert(current_index.position(), leaf);
         } else {
-            self.leaves.remove(&current_index.value());
+            self.leaves.remove(&current_index.position());
         }
 
         // Guaranteed not to over/underflow. All variables are <= MAX_LEAF_ENTRIES and result > 0.
@@ -323,7 +323,7 @@ impl PartialSmt {
 
         for sibling_hash in path {
             // Find the index of the sibling node and compute whether it is a left or right child.
-            let is_sibling_right = current_index.sibling().is_value_odd();
+            let is_sibling_right = current_index.sibling().is_position_odd();
 
             // Move the index up so it points to the parent of the current index and the sibling.
             current_index.move_up();
@@ -362,7 +362,7 @@ impl PartialSmt {
         let leaf_index = Self::key_to_leaf_index(key);
 
         // Explicitly stored leaves are always trackable
-        if let Some(leaf) = self.leaves.get(&leaf_index.value()) {
+        if let Some(leaf) = self.leaves.get(&leaf_index.position()) {
             return Some(leaf.clone());
         }
 
@@ -446,7 +446,7 @@ impl PartialSmt {
 
         let InnerNode { left, right } = self.get_inner_node_or_empty(index.parent());
 
-        if index.is_value_odd() { right } else { left }
+        if index.is_position_odd() { right } else { left }
     }
 
     /// Recomputes all inner nodes from a leaf up to the root after a leaf value change.
@@ -461,7 +461,7 @@ impl PartialSmt {
         let mut node_hash = leaf_hash;
 
         for _ in (0..index.depth()).rev() {
-            let is_right = index.is_value_odd();
+            let is_right = index.is_position_odd();
             index.move_up();
             let InnerNode { left, right } = self.get_inner_node_or_empty(index);
             let (left, right) = if is_right {
@@ -530,7 +530,7 @@ impl From<super::Smt> for PartialSmt {
         Self {
             root: smt.root(),
             num_entries: smt.num_entries(),
-            leaves: smt.leaves().map(|(idx, leaf)| (idx.value(), leaf.clone())).collect(),
+            leaves: smt.leaves().map(|(idx, leaf)| (idx.position(), leaf.clone())).collect(),
             inner_nodes: smt.inner_node_indices().collect(),
         }
     }

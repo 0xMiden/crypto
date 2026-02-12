@@ -132,7 +132,7 @@ impl SmtProof {
     /// Computes the root of a [`super::Smt`] to which this proof resolves.
     pub fn compute_root(&self) -> Word {
         self.path
-            .compute_root(self.leaf.index().value(), self.leaf.hash())
+            .compute_root(self.leaf.index().position(), self.leaf.hash())
             .expect("failed to compute Merkle path root")
     }
 
@@ -149,7 +149,7 @@ impl SmtProof {
     /// Returns an iterator over every inner node of this proof's merkle path.
     pub fn authenticated_nodes(&self) -> impl Iterator<Item = InnerNodeInfo> + '_ {
         self.path
-            .authenticated_nodes(self.leaf.index().value(), self.leaf.hash())
+            .authenticated_nodes(self.leaf.index().position(), self.leaf.hash())
             .expect("leaf index is u64 and should be less than 2^SMT_DEPTH")
     }
 

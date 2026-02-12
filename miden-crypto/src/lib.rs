@@ -111,6 +111,8 @@ pub type Map<K, V> = std::collections::HashMap<K, V>;
 
 #[cfg(feature = "std")]
 pub use std::collections::hash_map::Entry as MapEntry;
+#[cfg(feature = "std")]
+pub use std::collections::hash_map::IntoIter as MapIntoIter;
 
 /// An alias for a key-value map.
 ///
@@ -121,6 +123,8 @@ pub type Map<K, V> = alloc::collections::BTreeMap<K, V>;
 
 #[cfg(not(feature = "std"))]
 pub use alloc::collections::btree_map::Entry as MapEntry;
+#[cfg(not(feature = "std"))]
+pub use alloc::collections::btree_map::IntoIter as MapIntoIter;
 
 /// An alias for a simple set.
 ///
@@ -175,7 +179,6 @@ pub trait SequentialCommit {
 // ================================================================================================
 
 mod batch_inversion {
-
     use alloc::vec::Vec;
 
     use p3_maybe_rayon::prelude::*;

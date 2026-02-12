@@ -184,6 +184,12 @@ impl SmtLeaf {
         self.entries().iter().copied().flat_map(kv_to_elements)
     }
 
+    /// Returns an iterator over the key-value pairs in the leaf.
+    pub fn to_entries(&self) -> impl Iterator<Item = (&Word, &Word)> + '_ {
+        // Needed for type conversion from `&(T, T)` to `(&T, &T)`.
+        self.entries().iter().map(|(k, v)| (k, v))
+    }
+
     /// Converts a leaf to a list of field elements.
     pub fn into_elements(self) -> Vec<Felt> {
         self.into_entries().into_iter().flat_map(kv_to_elements).collect()
@@ -388,7 +394,7 @@ impl Serializable for SmtLeaf {
         self.num_entries().write_into(target);
 
         // Write: leaf index
-        let leaf_index: u64 = self.index().value();
+        let leaf_index: u64 = self.index().position();
         leaf_index.write_into(target);
 
         // Write: entries
