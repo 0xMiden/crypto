@@ -184,6 +184,8 @@ impl PartialMmr {
 
         for _ in 0..depth {
             let Some(node) = self.nodes.get(&idx.sibling()) else {
+                // This is expected for partial MMRs that don't track all authentication paths.
+                // The sibling node is simply not available, so we can't construct a full proof.
                 return Ok(None);
             };
             nodes.push(*node);
@@ -336,17 +338,6 @@ impl PartialMmr {
         if (tree & self.forest).is_empty() {
             return Err(MmrError::UnknownPeak(path.depth()));
         };
-
-        // Handle dangling leaf (single-leaf tree with empty path)
-        if leaf_pos + 1 == self.forest.num_leaves()
-            && path.depth() == 0
-            && self.peaks.last().is_some_and(|v| *v == leaf)
-        {
-            self.tracked_leaves.insert(leaf_pos);
-            let leaf_idx = InOrderIndex::from_leaf_pos(leaf_pos);
-            self.nodes.insert(leaf_idx, leaf);
-            return Ok(());
-        }
 
         // ignore the trees smaller than the target (these elements are position after the current
         // target and don't affect the target leaf_pos)
@@ -1130,5 +1121,24 @@ mod tests {
         // verify leaves() iterator returns only tracked leaves
         let tracked: Vec<_> = partial_mmr.leaves().collect();
         assert_eq!(tracked, vec![(0, leaf0), (2, leaf2)]);
+    }
+
+    #[test]
+    fn test_partial_mmr_track_dangling_leaf() {
+        // Single-leaf MMR: forest = 1, leaf 0 is a peak with an empty path.
+        let mut mmr = Mmr::default();
+        mmr.add(int_to_node(0));
+        let mut partial_mmr: PartialMmr = mmr.peaks().into();
+
+        let leaf0 = mmr.get(0).unwrap();
+        // depth-0 MerklePath
+        let proof0 = mmr.open(0).unwrap();
+
+        // Track the dangling leaf via `track` using the empty path.
+        partial_mmr.track(0, leaf0, proof0.path().merkle_path()).unwrap();
+
+        // It should now be tracked and open to the same proof as the full MMR.
+        assert!(partial_mmr.is_tracked(0));
+        assert_eq!(partial_mmr.open(0).unwrap().unwrap(), proof0);
     }
 }
