@@ -185,9 +185,25 @@ impl Subtree {
 
     /// Returns the number of non-empty inner nodes in this subtree.
     ///
-    /// A node "exists" if at least one of its two child bits is set. Since each node uses a
-    /// 2-bit pair `(left, right)`, we count nodes per word by OR-ing `w | (w >> 1)` to combine
-    /// each pair into the even position, then masking with `0x5555...` and popcounting.
+    /// A node "exists" if at least one of its two child bits is set. Each node occupies a
+    /// 2-bit pair `(left, right)` in `child_bits`, so we collapse each pair into one bit and
+    /// count. For a word `w`:
+    ///
+    /// 1. `w | (w >> 1)` — propagates right-child bits into the even (left) position
+    /// 2. `& 0x5555...`  — keeps only even positions (one bit per node)
+    /// 3. `count_ones()` — counts occupied nodes
+    ///
+    /// Example with 4 nodes:
+    ///   `w = 0b10_01_11_00`
+    ///
+    ///   Node 0 (bits 0-1): left=0, right=0 → empty
+    ///   Node 1 (bits 2-3): left=1, right=1 → both children
+    ///   Node 2 (bits 4-5): left=1, right=0 → left only
+    ///   Node 3 (bits 6-7): left=0, right=1 → right only
+    ///
+    ///   - `w | (w >> 1)` = `0b11_01_11_10` (OR each pair into even positions)
+    ///   - `& 0x55`       = `0b01_01_01_00` (mask to keep only even bits)
+    ///   - popcount = 3 (nodes 1, 2, 3 exist; node 0 is empty)
     pub fn len(&self) -> usize {
         const EVEN_BIT_MASK: u64 = 0x5555_5555_5555_5555;
 
@@ -221,10 +237,9 @@ impl Subtree {
         );
 
         let relative_depth = global.depth() - base.depth();
-        let base_offset = (1 << relative_depth) - 1;
-        let mask = (1 << relative_depth) - 1;
-        let local_position = (global.position() & mask) as u8;
-        base_offset + local_position
+        let level_mask = (1u64 << relative_depth) - 1;
+        let local_position = (global.position() & level_mask) as u8;
+        level_mask as u8 + local_position
     }
 
     /// Creates the storage key for a subtree.
@@ -241,8 +256,8 @@ impl Subtree {
         if depth < SUBTREE_DEPTH {
             NodeIndex::root()
         } else {
-            let subtree_root_depth = depth - (depth % SUBTREE_DEPTH);
-            let relative_depth = depth - subtree_root_depth;
+            let relative_depth = depth % SUBTREE_DEPTH;
+            let subtree_root_depth = depth - relative_depth;
             let base_value = node_index.position() >> relative_depth;
 
             NodeIndex::new(subtree_root_depth, base_value).unwrap()
@@ -363,6 +378,12 @@ impl Subtree {
         let mut child_bits = [0u64; 8];
         for (i, chunk) in bits_data.chunks_exact(8).enumerate() {
             child_bits[i] = u64::from_le_bytes(chunk.try_into().unwrap());
+        }
+
+        // Bits 510-511 are unused - reject corrupted data where these bits are set.
+        const UNUSED_BITS_MASK: u64 = 0b11 << 62;
+        if child_bits[7] & UNUSED_BITS_MASK != 0 {
+            return Err(SubtreeError::InvalidBitmask);
         }
 
         let set_bits: usize = child_bits.iter().map(|w| w.count_ones() as usize).sum();
@@ -575,7 +596,7 @@ impl Subtree {
     /// Splits a bit offset into `(word_idx, bit_idx)` for indexing into `child_bits`.
     #[inline]
     const fn bit_position(bit_offset: usize) -> (usize, usize) {
-        (bit_offset / 64, bit_offset % 64)
+        (bit_offset / 64, bit_offset & 0b_0011_1111)
     }
 
     /// Gets a bit from the child_bits array.

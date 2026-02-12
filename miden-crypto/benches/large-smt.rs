@@ -9,6 +9,7 @@ use miden_crypto::{
             InnerNode, LargeSmt, MemoryStorage, RocksDbConfig, RocksDbStorage, SMT_DEPTH, Subtree,
         },
     },
+    rand::random_word,
 };
 
 mod common;
@@ -28,7 +29,6 @@ const SUBTREE_DEPTH: u8 = 8;
 fn create_dense_subtree() -> Subtree {
     let root_index = NodeIndex::new(ROOT_DEPTH, 0).unwrap();
     let mut subtree = Subtree::new(root_index);
-    let node_hash: Word = Word::new([Felt::new(1), Felt::new(1), Felt::new(1), Felt::new(1)]);
 
     for relative_depth in (1..=SUBTREE_DEPTH).rev() {
         let depth = ROOT_DEPTH + relative_depth;
@@ -37,8 +37,9 @@ fn create_dense_subtree() -> Subtree {
 
         for offset in 0..nodes_at_depth {
             let idx = NodeIndex::new(depth, first_value + offset).unwrap();
-            let node = InnerNode { left: node_hash, right: node_hash };
-            subtree.insert_inner_node(idx, node);
+            let left = random_word();
+            let right = random_word();
+            subtree.insert_inner_node(idx, InnerNode { left, right });
         }
     }
     subtree
