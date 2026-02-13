@@ -92,6 +92,21 @@ impl Felt {
         unsafe { extern_from_u64_unchecked(value) }
     }
 
+    #[inline(always)]
+    pub fn from_canonical_checked(int: u64) -> Option<Self> {
+        (int < Self::ORDER_U64).then(|| Self::new(int))
+    }
+
+    #[inline(always)]
+    pub fn from_u8(int: u8) -> Self {
+        int.into()
+    }
+
+    #[inline(always)]
+    pub fn from_u16(int: u16) -> Self {
+        int.into()
+    }
+
     /// Creates a new field element from any `u32`.
     pub fn from_u32(value: u32) -> Self {
         unsafe { extern_from_u32(value) }
