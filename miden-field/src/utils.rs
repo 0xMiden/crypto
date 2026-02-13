@@ -1,4 +1,3 @@
-#[cfg(not(all(target_family = "wasm", miden)))]
 use thiserror::Error;
 
 use alloc::string::String;
@@ -17,7 +16,6 @@ pub fn bytes_to_hex_string<const N: usize>(data: [u8; N]) -> String {
 }
 
 /// Defines errors which can occur during parsing of hexadecimal strings.
-#[cfg(not(all(target_family = "wasm", miden)))]
 #[derive(Debug, Error)]
 pub enum HexParseError {
     #[error("expected hex data to have length {expected}, including the 0x prefix, found {actual}")]
@@ -31,7 +29,6 @@ pub enum HexParseError {
 }
 
 /// Parses a hex string into an array of bytes of known size.
-#[cfg(not(all(target_family = "wasm", miden)))]
 pub fn hex_to_bytes<const N: usize>(value: &str) -> Result<[u8; N], HexParseError> {
     let expected: usize = (N * 2) + 2;
     if value.len() != expected {

@@ -1,30 +1,33 @@
 //! A [Word] type used in the Miden protocol and associated utilities.
 
 use alloc::{string::String, vec::Vec};
+
+#[cfg(not(all(target_family = "wasm", miden)))]
+use core::fmt::Display;
+
 use core::{
     cmp::Ordering,
-    fmt::Display,
     hash::{Hash, Hasher},
     ops::{Deref, DerefMut, Index, IndexMut, Range},
     slice,
 };
 
+#[cfg(not(all(target_family = "wasm", miden)))]
+use miden_serde_utils::{
+    ByteReader, ByteWriter, Deserializable, DeserializationError, Serializable,
+};
+
 use thiserror::Error;
 
-const WORD_SIZE_FELT: usize = 4;
-const WORD_SIZE_BYTES: usize = 32;
+pub const WORD_SIZE_FELT: usize = 4;
+pub const WORD_SIZE_BYTES: usize = 32;
 
-use p3_field::integers::QuotientMap;
+#[cfg(not(all(target_family = "wasm", miden)))]
+use p3_field::{PrimeCharacteristicRing, PrimeField64, integers::QuotientMap};
 
-use super::{Felt, ZERO};
-use crate::{
-    field::{PrimeCharacteristicRing, PrimeField64},
-    rand::Randomizable,
-    utils::{
-        ByteReader, ByteWriter, Deserializable, DeserializationError, HexParseError, Serializable,
-        bytes_to_hex_string, hex_to_bytes,
-    },
-};
+use crate::utils::bytes_to_hex_string;
+
+use super::Felt;
 
 mod lexicographic;
 pub use lexicographic::LexicographicWord;
@@ -37,8 +40,14 @@ mod tests;
 
 /// A unit of data consisting of 4 field elements.
 #[derive(Default, Copy, Clone, Eq, PartialEq)]
-#[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
-#[cfg_attr(feature = "serde", serde(into = "String", try_from = "&str"))]
+#[cfg_attr(
+    not(all(target_family = "wasm", miden)),
+    derive(serde::Deserialize, serde::Serialize)
+)]
+#[cfg_attr(
+    not(all(target_family = "wasm", miden)),
+    serde(into = "String", try_from = "&str")
+)]
 #[repr(C, align(16))]
 pub struct Word {
     /// The underlying elements of this word.
@@ -106,10 +115,11 @@ impl Word {
     /// This function is usually used via the `word!` macro.
     ///
     /// ```
-    /// use miden_crypto::{Felt, Word, word};
+    /// use miden_field::{Felt, Word, word};
     /// let word = word!("0x1000000000000000200000000000000030000000000000004000000000000000");
     /// assert_eq!(word, Word::new([Felt::new(16), Felt::new(32), Felt::new(48), Felt::new(64)]));
     /// ```
+    #[cfg(not(all(target_family = "wasm", miden)))]
     pub const fn parse(hex: &str) -> Result<Self, &'static str> {
         const fn parse_hex_digit(digit: u8) -> Result<u8, &'static str> {
             match digit {
@@ -187,7 +197,7 @@ impl Word {
 
     /// Returns the word as a slice of field elements.
     pub fn as_elements(&self) -> &[Felt] {
-        self.as_ref()
+        self.as_elements_array()
     }
 
     /// Returns the word as a byte array.
@@ -204,7 +214,7 @@ impl Word {
     }
 
     /// Returns an iterator over the elements of multiple words.
-    pub(crate) fn words_as_elements_iter<'a, I>(words: I) -> impl Iterator<Item = &'a Felt>
+    pub fn words_as_elements_iter<'a, I>(words: I) -> impl Iterator<Item = &'a Felt>
     where
         I: Iterator<Item = &'a Self>,
     {
@@ -226,11 +236,23 @@ impl Word {
     pub fn to_vec(&self) -> Vec<Felt> {
         self.as_elements().to_vec()
     }
+
+    pub fn reversed(&self) -> Self {
+        Word {
+            inner: (self.inner.3, self.inner.2, self.inner.1, self.inner.0),
+        }
+    }
 }
 
 impl Hash for Word {
     fn hash<H: Hasher>(&self, state: &mut H) {
         state.write(&self.as_bytes());
+    }
+}
+
+impl AsRef<Word> for Word {
+    fn as_ref(&self) -> &Word {
+        self
     }
 }
 
@@ -308,22 +330,10 @@ impl PartialOrd for Word {
     }
 }
 
+#[cfg(not(all(target_family = "wasm", miden)))]
 impl Display for Word {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         write!(f, "{}", self.to_hex())
-    }
-}
-
-impl Randomizable for Word {
-    const VALUE_SIZE: usize = WORD_SIZE_BYTES;
-
-    fn from_random_bytes(bytes: &[u8]) -> Option<Self> {
-        let bytes_array: Option<[u8; 32]> = bytes.try_into().ok();
-        if let Some(bytes_array) = bytes_array {
-            Self::try_from(bytes_array).ok()
-        } else {
-            None
-        }
     }
 }
 
@@ -335,7 +345,7 @@ impl Randomizable for Word {
 pub enum WordError {
     /// Hex-encoded field elements parsed are invalid.
     #[error("hex encoded values of a word are invalid")]
-    HexParse(#[from] HexParseError),
+    HexParse(#[from] crate::utils::HexParseError),
     /// Field element conversion failed due to invalid value.
     #[error("failed to convert to field element: {0}")]
     InvalidFieldElement(String),
@@ -475,6 +485,7 @@ impl From<Word> for [u8; WORD_SIZE_BYTES] {
     }
 }
 
+#[cfg(not(all(target_family = "wasm", miden)))]
 impl From<&Word> for String {
     /// The returned string starts with `0x`.
     fn from(value: &Word) -> Self {
@@ -482,6 +493,7 @@ impl From<&Word> for String {
     }
 }
 
+#[cfg(not(all(target_family = "wasm", miden)))]
 impl From<Word> for String {
     /// The returned string starts with `0x`.
     fn from(value: Word) -> Self {
@@ -640,17 +652,19 @@ impl TryFrom<&[Felt]> for Word {
     }
 }
 
+#[cfg(not(all(target_family = "wasm", miden)))]
 impl TryFrom<&str> for Word {
     type Error = WordError;
 
     /// Expects the string to start with `0x`.
     fn try_from(value: &str) -> Result<Self, Self::Error> {
-        hex_to_bytes::<WORD_SIZE_BYTES>(value)
+        crate::utils::hex_to_bytes::<WORD_SIZE_BYTES>(value)
             .map_err(WordError::HexParse)
             .and_then(Word::try_from)
     }
 }
 
+#[cfg(not(all(target_family = "wasm", miden)))]
 impl TryFrom<String> for Word {
     type Error = WordError;
 
@@ -660,6 +674,7 @@ impl TryFrom<String> for Word {
     }
 }
 
+#[cfg(not(all(target_family = "wasm", miden)))]
 impl TryFrom<&String> for Word {
     type Error = WordError;
 
@@ -672,6 +687,7 @@ impl TryFrom<&String> for Word {
 // SERIALIZATION / DESERIALIZATION
 // ================================================================================================
 
+#[cfg(not(all(target_family = "wasm", miden)))]
 impl Serializable for Word {
     fn write_into<W: ByteWriter>(&self, target: &mut W) {
         target.write_bytes(&self.as_bytes());
@@ -682,9 +698,10 @@ impl Serializable for Word {
     }
 }
 
+#[cfg(not(all(target_family = "wasm", miden)))]
 impl Deserializable for Word {
     fn read_from<R: ByteReader>(source: &mut R) -> Result<Self, DeserializationError> {
-        let mut inner: [Felt; WORD_SIZE_FELT] = [ZERO; WORD_SIZE_FELT];
+        let mut inner: [Felt; WORD_SIZE_FELT] = [Felt::ZERO; WORD_SIZE_FELT];
         for inner in inner.iter_mut() {
             let e = source.read_u64()?;
             if e >= Felt::ORDER_U64 {

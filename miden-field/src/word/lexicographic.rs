@@ -1,9 +1,11 @@
 use core::cmp::Ordering;
 
+#[cfg(not(all(target_family = "wasm", miden)))]
 use p3_field::PrimeField64;
 
+#[cfg(not(all(target_family = "wasm", miden)))]
 use super::{ByteReader, ByteWriter, Deserializable, DeserializationError, Serializable};
-use crate::{Felt, WORD_SIZE, Word};
+use crate::{Felt, Word, word::WORD_SIZE_FELT};
 
 // LEXICOGRAPHIC WORD
 // ================================================================================================
@@ -32,8 +34,8 @@ impl<T: Into<Word>> LexicographicWord<T> {
     }
 }
 
-impl From<[Felt; WORD_SIZE]> for LexicographicWord {
-    fn from(value: [Felt; WORD_SIZE]) -> Self {
+impl From<[Felt; WORD_SIZE_FELT]> for LexicographicWord {
+    fn from(value: [Felt; WORD_SIZE_FELT]) -> Self {
         Self(value.into())
     }
 }
@@ -90,6 +92,7 @@ impl<T: Into<Word> + Copy> Ord for LexicographicWord<T> {
 // SERIALIZATION
 // ================================================================================================
 
+#[cfg(not(all(target_family = "wasm", miden)))]
 impl<T: Into<Word> + Copy> Serializable for LexicographicWord<T> {
     fn write_into<W: ByteWriter>(&self, target: &mut W) {
         self.0.into().write_into(target);
@@ -100,6 +103,7 @@ impl<T: Into<Word> + Copy> Serializable for LexicographicWord<T> {
     }
 }
 
+#[cfg(not(all(target_family = "wasm", miden)))]
 impl<T: Into<Word> + From<Word>> Deserializable for LexicographicWord<T> {
     fn read_from<R: ByteReader>(source: &mut R) -> Result<Self, DeserializationError> {
         let word = Word::read_from(source)?;

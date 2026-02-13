@@ -1,20 +1,30 @@
-#![cfg(feature = "std")]
-use alloc::string::String;
+use alloc::{string::String, vec};
 
+use miden_serde_utils::SliceReader;
 use p3_field::PrimeCharacteristicRing;
+use rand::Rng;
 
 use super::{Deserializable, Felt, Serializable, WORD_SIZE_BYTES, WORD_SIZE_FELT, Word};
-use crate::{rand::test_utils::rand_value, utils::SliceReader, word};
+use crate::word;
+
+/// Generates a random value of type u64 from an RNG.
+pub fn rand_u64() -> u64 {
+    let mut bytes = [0u8; 8];
+    let rng = &mut rand::rng();
+    rng.fill(&mut bytes[..]);
+    let bytes = bytes[..8].try_into().unwrap();
+    u64::from_le_bytes(bytes)
+}
 
 // TESTS
 // ================================================================================================
 
 #[test]
 fn word_serialization() {
-    let e1 = Felt::new(rand_value());
-    let e2 = Felt::new(rand_value());
-    let e3 = Felt::new(rand_value());
-    let e4 = Felt::new(rand_value());
+    let e1 = Felt::new(rand_u64());
+    let e2 = Felt::new(rand_u64());
+    let e3 = Felt::new(rand_u64());
+    let e4 = Felt::new(rand_u64());
 
     let d1 = Word::new([e1, e2, e3, e4]);
 
@@ -32,10 +42,10 @@ fn word_serialization() {
 #[test]
 fn word_encoding() {
     let word = Word::new([
-        Felt::new(rand_value()),
-        Felt::new(rand_value()),
-        Felt::new(rand_value()),
-        Felt::new(rand_value()),
+        Felt::new(rand_u64()),
+        Felt::new(rand_u64()),
+        Felt::new(rand_u64()),
+        Felt::new(rand_u64()),
     ]);
 
     let string: String = word.into();
@@ -47,10 +57,10 @@ fn word_encoding() {
 #[test]
 fn test_conversions() {
     let word = Word::new([
-        Felt::new(rand_value()),
-        Felt::new(rand_value()),
-        Felt::new(rand_value()),
-        Felt::new(rand_value()),
+        Felt::new(rand_u64()),
+        Felt::new(rand_u64()),
+        Felt::new(rand_u64()),
+        Felt::new(rand_u64()),
     ]);
 
     // BY VALUE
@@ -196,6 +206,8 @@ fn word_macro_invalid(#[case] bad_input: &str) {
 #[case::unique_felt("0x111111111111111155555555555555559999999999999999cccccccccccccccc")]
 #[case::digits_on_repeat("0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef")]
 fn word_macro(#[case] input: &str) {
+    use alloc::format;
+
     let uut = word!(input);
 
     // Right pad to 64 hex digits (66 including prefix). This is required by the
