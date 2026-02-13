@@ -112,6 +112,10 @@ build: ## Build with default features enabled
 build-no-std: ## Build without the standard library
 	cargo build --release --no-default-features --target wasm32-unknown-unknown
 
+.PHONY: build-target-miden
+build-target-miden: ## Build `miden-field` for wasm32-wasip2 with `--cfg miden`
+	RUSTFLAGS="--cfg miden" cargo build --release -p miden-field --target wasm32-wasip2
+
 .PHONY: build-avx2
 build-avx2: ## Build with avx2 support
 	RUSTFLAGS="-C target-feature=+avx2" cargo build --release
