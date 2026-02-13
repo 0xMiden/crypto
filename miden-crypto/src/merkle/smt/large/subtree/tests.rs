@@ -1,4 +1,4 @@
-use alloc::{vec, vec::Vec};
+use alloc::vec;
 
 use super::{InnerNode, NodeIndex, NodeMutation, SUBTREE_DEPTH, Subtree};
 use crate::Word;
@@ -379,31 +379,38 @@ fn test_apply_mutations() {
     assert_eq!(subtree.len(), 2);
 
     // Empty batch should be a no-op
-    let empty: Vec<(&NodeIndex, &NodeMutation)> = vec![];
+    let empty: [(&NodeIndex, &NodeMutation); 0] = [];
+    assert_eq!(subtree.would_patch_in_place(empty), None);
     subtree.apply_mutations(empty);
     assert_eq!(subtree.len(), 2);
 
     // Update node1 with different hashes but same structure (both children still non-empty).
-    // This exercises the patch-in-place path.
+    // This should take the patch-in-place path.
     let node1_updated = InnerNode {
         left: Word::from([10u32; 4]),
         right: Word::from([20u32; 4]),
     };
     let mutation = NodeMutation::Addition(node1_updated.clone());
+    assert_eq!(subtree.would_patch_in_place([(&idx1, &mutation)]), Some(true));
     subtree.apply_mutations([(&idx1, &mutation)]);
 
     assert_eq!(subtree.len(), 2);
     assert_eq!(subtree.get_inner_node(idx1), Some(node1_updated));
     assert_eq!(subtree.get_inner_node(idx2), Some(node2.clone()));
 
-    // Mixed batch: remove node1, add node3. This triggers a rebuild since the structure changes.
+    // Mixed batch: remove node1, add node3. This changes structure, triggering a rebuild.
     let idx3 = NodeIndex::new(SUBTREE_DEPTH + 2, 2).unwrap();
     let node3 = InnerNode {
         left: Word::from([5u32; 4]),
         right: Word::from([6u32; 4]),
     };
-    let mutations = [(idx1, NodeMutation::Removal), (idx3, NodeMutation::Addition(node3.clone()))];
-    subtree.apply_mutations(mutations.iter().map(|(idx, m)| (idx, m)));
+    let removal = NodeMutation::Removal;
+    let addition = NodeMutation::Addition(node3.clone());
+    assert_eq!(
+        subtree.would_patch_in_place([(&idx1, &removal), (&idx3, &addition)]),
+        Some(false)
+    );
+    subtree.apply_mutations([(&idx1, &removal), (&idx3, &addition)]);
 
     assert!(subtree.get_inner_node(idx1).is_none(), "node1 should be removed");
     assert_eq!(subtree.get_inner_node(idx2), Some(node2), "node2 should be unchanged");
@@ -411,8 +418,9 @@ fn test_apply_mutations() {
     assert_eq!(subtree.len(), 2);
 
     // Remove remaining nodes to verify we get back to empty
-    let mutations = [(idx2, NodeMutation::Removal), (idx3, NodeMutation::Removal)];
-    subtree.apply_mutations(mutations.iter().map(|(idx, m)| (idx, m)));
+    let r1 = NodeMutation::Removal;
+    let r2 = NodeMutation::Removal;
+    subtree.apply_mutations([(&idx2, &r1), (&idx3, &r2)]);
     assert!(subtree.is_empty());
 
     // Verify round-trip serialization on the emptied subtree

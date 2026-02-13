@@ -635,4 +635,16 @@ impl Subtree {
     fn node_iter(&self) -> SubtreeNodeIter<'_> {
         SubtreeNodeIter::new(self)
     }
+
+    /// Returns whether the given mutations would take the patch-in-place path.
+    ///
+    /// `None` means no mutations to apply; `Some(true)` means patch-in-place;
+    /// `Some(false)` means rebuild.
+    #[cfg(test)]
+    fn would_patch_in_place<'a>(
+        &self,
+        mutations: impl IntoIterator<Item = (&'a NodeIndex, &'a NodeMutation)>,
+    ) -> Option<bool> {
+        self.collect_local_mutations(mutations).map(|(_, can_patch)| can_patch)
+    }
 }
