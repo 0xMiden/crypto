@@ -416,17 +416,17 @@ impl Deserializable for SmtLeaf {
             LeafIndex::new_max_depth(value)
         };
 
-        // Read: entries
-        let mut entries: Vec<(Word, Word)> = Vec::new();
-        for _ in 0..num_entries {
-            let key: Word = source.read()?;
-            let value: Word = source.read()?;
-
-            entries.push((key, value));
-        }
+        // Read: entries using read_many_iter to avoid eager allocation
+        let entries: Vec<(Word, Word)> =
+            source.read_many_iter(num_entries)?.collect::<Result<_, _>>()?;
 
         Self::new(entries, leaf_index)
             .map_err(|err| DeserializationError::InvalidValue(err.to_string()))
+    }
+
+    /// Minimum serialized size: vint64 (num_entries) + u64 (leaf_index) with 0 entries.
+    fn min_serialized_size() -> usize {
+        1 + 8
     }
 }
 
