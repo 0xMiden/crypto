@@ -612,88 +612,90 @@
 <a href=#612 id=612 data-nosnippet>612</a>    <span class="kw">fn </span>read_from&lt;R: ByteReader&gt;(source: <span class="kw-2">&amp;mut </span>R) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="self">Self</span>, DeserializationError&gt; {
 <a href=#613 id=613 data-nosnippet>613</a>        <span class="comment">// Read the number of filled leaves for this Smt
 <a href=#614 id=614 data-nosnippet>614</a>        </span><span class="kw">let </span>num_filled_leaves = source.read_usize()<span class="question-mark">?</span>;
-<a href=#615 id=615 data-nosnippet>615</a>        <span class="kw">let </span><span class="kw-2">mut </span>entries = Vec::with_capacity(num_filled_leaves);
-<a href=#616 id=616 data-nosnippet>616</a>
-<a href=#617 id=617 data-nosnippet>617</a>        <span class="kw">for _ in </span><span class="number">0</span>..num_filled_leaves {
-<a href=#618 id=618 data-nosnippet>618</a>            <span class="kw">let </span>key = source.read()<span class="question-mark">?</span>;
-<a href=#619 id=619 data-nosnippet>619</a>            <span class="kw">let </span>value = source.read()<span class="question-mark">?</span>;
-<a href=#620 id=620 data-nosnippet>620</a>            entries.push((key, value));
-<a href=#621 id=621 data-nosnippet>621</a>        }
-<a href=#622 id=622 data-nosnippet>622</a>
-<a href=#623 id=623 data-nosnippet>623</a>        <span class="self">Self</span>::with_entries(entries)
-<a href=#624 id=624 data-nosnippet>624</a>            .map_err(|err| DeserializationError::InvalidValue(err.to_string()))
-<a href=#625 id=625 data-nosnippet>625</a>    }
-<a href=#626 id=626 data-nosnippet>626</a>}
-<a href=#627 id=627 data-nosnippet>627</a>
-<a href=#628 id=628 data-nosnippet>628</a><span class="comment">// FUZZING
-<a href=#629 id=629 data-nosnippet>629</a>// ================================================================================================
-<a href=#630 id=630 data-nosnippet>630</a>
-<a href=#631 id=631 data-nosnippet>631</a></span><span class="attr">#[cfg(any(fuzzing, feature = <span class="string">"fuzzing"</span>))]
-<a href=#632 id=632 data-nosnippet>632</a></span><span class="kw">impl </span>Smt {
-<a href=#633 id=633 data-nosnippet>633</a>    <span class="kw">pub fn </span>fuzz_with_entries_sequential(
-<a href=#634 id=634 data-nosnippet>634</a>        entries: <span class="kw">impl </span>IntoIterator&lt;Item = (Word, Word)&gt;,
-<a href=#635 id=635 data-nosnippet>635</a>    ) -&gt; <span class="prelude-ty">Result</span>&lt;Smt, MerkleError&gt; {
-<a href=#636 id=636 data-nosnippet>636</a>        <span class="self">Self</span>::with_entries_sequential(entries)
-<a href=#637 id=637 data-nosnippet>637</a>    }
-<a href=#638 id=638 data-nosnippet>638</a>
-<a href=#639 id=639 data-nosnippet>639</a>    <span class="kw">pub fn </span>fuzz_compute_mutations_sequential(
-<a href=#640 id=640 data-nosnippet>640</a>        <span class="kw-2">&amp;</span><span class="self">self</span>,
-<a href=#641 id=641 data-nosnippet>641</a>        kv_pairs: <span class="kw">impl </span>IntoIterator&lt;Item = (Word, Word)&gt;,
-<a href=#642 id=642 data-nosnippet>642</a>    ) -&gt; MutationSet&lt;SMT_DEPTH, Word, Word&gt; {
-<a href=#643 id=643 data-nosnippet>643</a>        &lt;<span class="self">Self </span><span class="kw">as </span>SparseMerkleTree&lt;SMT_DEPTH&gt;&gt;::compute_mutations(<span class="self">self</span>, kv_pairs)
-<a href=#644 id=644 data-nosnippet>644</a>            .expect(<span class="string">"Failed to compute mutations in fuzzing"</span>)
-<a href=#645 id=645 data-nosnippet>645</a>    }
-<a href=#646 id=646 data-nosnippet>646</a>}
-<a href=#647 id=647 data-nosnippet>647</a>
-<a href=#648 id=648 data-nosnippet>648</a><span class="comment">// TESTS
-<a href=#649 id=649 data-nosnippet>649</a>// ================================================================================================
-<a href=#650 id=650 data-nosnippet>650</a>
-<a href=#651 id=651 data-nosnippet>651</a></span><span class="attr">#[cfg(test)]
-<a href=#652 id=652 data-nosnippet>652</a></span><span class="kw">use </span><span class="kw">crate</span>::Felt;
-<a href=#653 id=653 data-nosnippet>653</a>
-<a href=#654 id=654 data-nosnippet>654</a><span class="attr">#[test]
-<a href=#655 id=655 data-nosnippet>655</a></span><span class="kw">fn </span>test_smt_serialization_deserialization() {
-<a href=#656 id=656 data-nosnippet>656</a>    <span class="comment">// Smt for default types (empty map)
-<a href=#657 id=657 data-nosnippet>657</a>    </span><span class="kw">let </span>smt_default = Smt::default();
-<a href=#658 id=658 data-nosnippet>658</a>    <span class="kw">let </span>bytes = smt_default.to_bytes();
-<a href=#659 id=659 data-nosnippet>659</a>    <span class="macro">assert_eq!</span>(smt_default, Smt::read_from_bytes(<span class="kw-2">&amp;</span>bytes).unwrap());
-<a href=#660 id=660 data-nosnippet>660</a>    <span class="macro">assert_eq!</span>(bytes.len(), smt_default.get_size_hint());
-<a href=#661 id=661 data-nosnippet>661</a>
-<a href=#662 id=662 data-nosnippet>662</a>    <span class="comment">// Smt with values
-<a href=#663 id=663 data-nosnippet>663</a>    </span><span class="kw">let </span>smt_leaves_2: [(Word, Word); <span class="number">2</span>] = [
-<a href=#664 id=664 data-nosnippet>664</a>        (
-<a href=#665 id=665 data-nosnippet>665</a>            Word::new([Felt::new(<span class="number">105</span>), Felt::new(<span class="number">106</span>), Felt::new(<span class="number">107</span>), Felt::new(<span class="number">108</span>)]),
-<a href=#666 id=666 data-nosnippet>666</a>            [Felt::new(<span class="number">5_u64</span>), Felt::new(<span class="number">6_u64</span>), Felt::new(<span class="number">7_u64</span>), Felt::new(<span class="number">8_u64</span>)].into(),
-<a href=#667 id=667 data-nosnippet>667</a>        ),
-<a href=#668 id=668 data-nosnippet>668</a>        (
-<a href=#669 id=669 data-nosnippet>669</a>            Word::new([Felt::new(<span class="number">101</span>), Felt::new(<span class="number">102</span>), Felt::new(<span class="number">103</span>), Felt::new(<span class="number">104</span>)]),
-<a href=#670 id=670 data-nosnippet>670</a>            [Felt::new(<span class="number">1_u64</span>), Felt::new(<span class="number">2_u64</span>), Felt::new(<span class="number">3_u64</span>), Felt::new(<span class="number">4_u64</span>)].into(),
-<a href=#671 id=671 data-nosnippet>671</a>        ),
-<a href=#672 id=672 data-nosnippet>672</a>    ];
-<a href=#673 id=673 data-nosnippet>673</a>    <span class="kw">let </span>smt = Smt::with_entries(smt_leaves_2).unwrap();
-<a href=#674 id=674 data-nosnippet>674</a>
-<a href=#675 id=675 data-nosnippet>675</a>    <span class="kw">let </span>bytes = smt.to_bytes();
-<a href=#676 id=676 data-nosnippet>676</a>    <span class="macro">assert_eq!</span>(smt, Smt::read_from_bytes(<span class="kw-2">&amp;</span>bytes).unwrap());
-<a href=#677 id=677 data-nosnippet>677</a>    <span class="macro">assert_eq!</span>(bytes.len(), smt.get_size_hint());
-<a href=#678 id=678 data-nosnippet>678</a>}
-<a href=#679 id=679 data-nosnippet>679</a>
-<a href=#680 id=680 data-nosnippet>680</a><span class="attr">#[test]
-<a href=#681 id=681 data-nosnippet>681</a></span><span class="kw">fn </span>smt_with_sorted_entries() {
-<a href=#682 id=682 data-nosnippet>682</a>    <span class="comment">// Smt with sorted values
-<a href=#683 id=683 data-nosnippet>683</a>    </span><span class="kw">let </span>smt_leaves_2: [(Word, Word); <span class="number">2</span>] = [
-<a href=#684 id=684 data-nosnippet>684</a>        (
-<a href=#685 id=685 data-nosnippet>685</a>            Word::new([Felt::new(<span class="number">101</span>), Felt::new(<span class="number">102</span>), Felt::new(<span class="number">103</span>), Felt::new(<span class="number">104</span>)]),
-<a href=#686 id=686 data-nosnippet>686</a>            [Felt::new(<span class="number">1_u64</span>), Felt::new(<span class="number">2_u64</span>), Felt::new(<span class="number">3_u64</span>), Felt::new(<span class="number">4_u64</span>)].into(),
-<a href=#687 id=687 data-nosnippet>687</a>        ),
-<a href=#688 id=688 data-nosnippet>688</a>        (
-<a href=#689 id=689 data-nosnippet>689</a>            Word::new([Felt::new(<span class="number">105</span>), Felt::new(<span class="number">106</span>), Felt::new(<span class="number">107</span>), Felt::new(<span class="number">108</span>)]),
-<a href=#690 id=690 data-nosnippet>690</a>            [Felt::new(<span class="number">5_u64</span>), Felt::new(<span class="number">6_u64</span>), Felt::new(<span class="number">7_u64</span>), Felt::new(<span class="number">8_u64</span>)].into(),
-<a href=#691 id=691 data-nosnippet>691</a>        ),
-<a href=#692 id=692 data-nosnippet>692</a>    ];
-<a href=#693 id=693 data-nosnippet>693</a>
-<a href=#694 id=694 data-nosnippet>694</a>    <span class="kw">let </span>smt = Smt::with_sorted_entries(smt_leaves_2).unwrap();
-<a href=#695 id=695 data-nosnippet>695</a>    <span class="kw">let </span>expected_smt = Smt::with_entries(smt_leaves_2).unwrap();
-<a href=#696 id=696 data-nosnippet>696</a>
-<a href=#697 id=697 data-nosnippet>697</a>    <span class="macro">assert_eq!</span>(smt, expected_smt);
-<a href=#698 id=698 data-nosnippet>698</a>}
+<a href=#615 id=615 data-nosnippet>615</a>
+<a href=#616 id=616 data-nosnippet>616</a>        <span class="comment">// Use read_many_iter to avoid eager allocation and respect BudgetedReader limits
+<a href=#617 id=617 data-nosnippet>617</a>        </span><span class="kw">let </span>entries: Vec&lt;(Word, Word)&gt; =
+<a href=#618 id=618 data-nosnippet>618</a>            source.read_many_iter(num_filled_leaves)<span class="question-mark">?</span>.collect::&lt;<span class="prelude-ty">Result</span>&lt;<span class="kw">_</span>, <span class="kw">_</span>&gt;&gt;()<span class="question-mark">?</span>;
+<a href=#619 id=619 data-nosnippet>619</a>
+<a href=#620 id=620 data-nosnippet>620</a>        <span class="self">Self</span>::with_entries(entries)
+<a href=#621 id=621 data-nosnippet>621</a>            .map_err(|err| DeserializationError::InvalidValue(err.to_string()))
+<a href=#622 id=622 data-nosnippet>622</a>    }
+<a href=#623 id=623 data-nosnippet>623</a>
+<a href=#624 id=624 data-nosnippet>624</a>    <span class="doccomment">/// Minimum serialized size: vint64 length prefix (0 entries).
+<a href=#625 id=625 data-nosnippet>625</a>    </span><span class="kw">fn </span>min_serialized_size() -&gt; usize {
+<a href=#626 id=626 data-nosnippet>626</a>        <span class="number">1
+<a href=#627 id=627 data-nosnippet>627</a>    </span>}
+<a href=#628 id=628 data-nosnippet>628</a>}
+<a href=#629 id=629 data-nosnippet>629</a>
+<a href=#630 id=630 data-nosnippet>630</a><span class="comment">// FUZZING
+<a href=#631 id=631 data-nosnippet>631</a>// ================================================================================================
+<a href=#632 id=632 data-nosnippet>632</a>
+<a href=#633 id=633 data-nosnippet>633</a></span><span class="attr">#[cfg(any(fuzzing, feature = <span class="string">"fuzzing"</span>))]
+<a href=#634 id=634 data-nosnippet>634</a></span><span class="kw">impl </span>Smt {
+<a href=#635 id=635 data-nosnippet>635</a>    <span class="kw">pub fn </span>fuzz_with_entries_sequential(
+<a href=#636 id=636 data-nosnippet>636</a>        entries: <span class="kw">impl </span>IntoIterator&lt;Item = (Word, Word)&gt;,
+<a href=#637 id=637 data-nosnippet>637</a>    ) -&gt; <span class="prelude-ty">Result</span>&lt;Smt, MerkleError&gt; {
+<a href=#638 id=638 data-nosnippet>638</a>        <span class="self">Self</span>::with_entries_sequential(entries)
+<a href=#639 id=639 data-nosnippet>639</a>    }
+<a href=#640 id=640 data-nosnippet>640</a>
+<a href=#641 id=641 data-nosnippet>641</a>    <span class="kw">pub fn </span>fuzz_compute_mutations_sequential(
+<a href=#642 id=642 data-nosnippet>642</a>        <span class="kw-2">&amp;</span><span class="self">self</span>,
+<a href=#643 id=643 data-nosnippet>643</a>        kv_pairs: <span class="kw">impl </span>IntoIterator&lt;Item = (Word, Word)&gt;,
+<a href=#644 id=644 data-nosnippet>644</a>    ) -&gt; MutationSet&lt;SMT_DEPTH, Word, Word&gt; {
+<a href=#645 id=645 data-nosnippet>645</a>        &lt;<span class="self">Self </span><span class="kw">as </span>SparseMerkleTree&lt;SMT_DEPTH&gt;&gt;::compute_mutations(<span class="self">self</span>, kv_pairs)
+<a href=#646 id=646 data-nosnippet>646</a>            .expect(<span class="string">"Failed to compute mutations in fuzzing"</span>)
+<a href=#647 id=647 data-nosnippet>647</a>    }
+<a href=#648 id=648 data-nosnippet>648</a>}
+<a href=#649 id=649 data-nosnippet>649</a>
+<a href=#650 id=650 data-nosnippet>650</a><span class="comment">// TESTS
+<a href=#651 id=651 data-nosnippet>651</a>// ================================================================================================
+<a href=#652 id=652 data-nosnippet>652</a>
+<a href=#653 id=653 data-nosnippet>653</a></span><span class="attr">#[cfg(test)]
+<a href=#654 id=654 data-nosnippet>654</a></span><span class="kw">use </span><span class="kw">crate</span>::Felt;
+<a href=#655 id=655 data-nosnippet>655</a>
+<a href=#656 id=656 data-nosnippet>656</a><span class="attr">#[test]
+<a href=#657 id=657 data-nosnippet>657</a></span><span class="kw">fn </span>test_smt_serialization_deserialization() {
+<a href=#658 id=658 data-nosnippet>658</a>    <span class="comment">// Smt for default types (empty map)
+<a href=#659 id=659 data-nosnippet>659</a>    </span><span class="kw">let </span>smt_default = Smt::default();
+<a href=#660 id=660 data-nosnippet>660</a>    <span class="kw">let </span>bytes = smt_default.to_bytes();
+<a href=#661 id=661 data-nosnippet>661</a>    <span class="macro">assert_eq!</span>(smt_default, Smt::read_from_bytes(<span class="kw-2">&amp;</span>bytes).unwrap());
+<a href=#662 id=662 data-nosnippet>662</a>    <span class="macro">assert_eq!</span>(bytes.len(), smt_default.get_size_hint());
+<a href=#663 id=663 data-nosnippet>663</a>
+<a href=#664 id=664 data-nosnippet>664</a>    <span class="comment">// Smt with values
+<a href=#665 id=665 data-nosnippet>665</a>    </span><span class="kw">let </span>smt_leaves_2: [(Word, Word); <span class="number">2</span>] = [
+<a href=#666 id=666 data-nosnippet>666</a>        (
+<a href=#667 id=667 data-nosnippet>667</a>            Word::new([Felt::new(<span class="number">105</span>), Felt::new(<span class="number">106</span>), Felt::new(<span class="number">107</span>), Felt::new(<span class="number">108</span>)]),
+<a href=#668 id=668 data-nosnippet>668</a>            [Felt::new(<span class="number">5_u64</span>), Felt::new(<span class="number">6_u64</span>), Felt::new(<span class="number">7_u64</span>), Felt::new(<span class="number">8_u64</span>)].into(),
+<a href=#669 id=669 data-nosnippet>669</a>        ),
+<a href=#670 id=670 data-nosnippet>670</a>        (
+<a href=#671 id=671 data-nosnippet>671</a>            Word::new([Felt::new(<span class="number">101</span>), Felt::new(<span class="number">102</span>), Felt::new(<span class="number">103</span>), Felt::new(<span class="number">104</span>)]),
+<a href=#672 id=672 data-nosnippet>672</a>            [Felt::new(<span class="number">1_u64</span>), Felt::new(<span class="number">2_u64</span>), Felt::new(<span class="number">3_u64</span>), Felt::new(<span class="number">4_u64</span>)].into(),
+<a href=#673 id=673 data-nosnippet>673</a>        ),
+<a href=#674 id=674 data-nosnippet>674</a>    ];
+<a href=#675 id=675 data-nosnippet>675</a>    <span class="kw">let </span>smt = Smt::with_entries(smt_leaves_2).unwrap();
+<a href=#676 id=676 data-nosnippet>676</a>
+<a href=#677 id=677 data-nosnippet>677</a>    <span class="kw">let </span>bytes = smt.to_bytes();
+<a href=#678 id=678 data-nosnippet>678</a>    <span class="macro">assert_eq!</span>(smt, Smt::read_from_bytes(<span class="kw-2">&amp;</span>bytes).unwrap());
+<a href=#679 id=679 data-nosnippet>679</a>    <span class="macro">assert_eq!</span>(bytes.len(), smt.get_size_hint());
+<a href=#680 id=680 data-nosnippet>680</a>}
+<a href=#681 id=681 data-nosnippet>681</a>
+<a href=#682 id=682 data-nosnippet>682</a><span class="attr">#[test]
+<a href=#683 id=683 data-nosnippet>683</a></span><span class="kw">fn </span>smt_with_sorted_entries() {
+<a href=#684 id=684 data-nosnippet>684</a>    <span class="comment">// Smt with sorted values
+<a href=#685 id=685 data-nosnippet>685</a>    </span><span class="kw">let </span>smt_leaves_2: [(Word, Word); <span class="number">2</span>] = [
+<a href=#686 id=686 data-nosnippet>686</a>        (
+<a href=#687 id=687 data-nosnippet>687</a>            Word::new([Felt::new(<span class="number">101</span>), Felt::new(<span class="number">102</span>), Felt::new(<span class="number">103</span>), Felt::new(<span class="number">104</span>)]),
+<a href=#688 id=688 data-nosnippet>688</a>            [Felt::new(<span class="number">1_u64</span>), Felt::new(<span class="number">2_u64</span>), Felt::new(<span class="number">3_u64</span>), Felt::new(<span class="number">4_u64</span>)].into(),
+<a href=#689 id=689 data-nosnippet>689</a>        ),
+<a href=#690 id=690 data-nosnippet>690</a>        (
+<a href=#691 id=691 data-nosnippet>691</a>            Word::new([Felt::new(<span class="number">105</span>), Felt::new(<span class="number">106</span>), Felt::new(<span class="number">107</span>), Felt::new(<span class="number">108</span>)]),
+<a href=#692 id=692 data-nosnippet>692</a>            [Felt::new(<span class="number">5_u64</span>), Felt::new(<span class="number">6_u64</span>), Felt::new(<span class="number">7_u64</span>), Felt::new(<span class="number">8_u64</span>)].into(),
+<a href=#693 id=693 data-nosnippet>693</a>        ),
+<a href=#694 id=694 data-nosnippet>694</a>    ];
+<a href=#695 id=695 data-nosnippet>695</a>
+<a href=#696 id=696 data-nosnippet>696</a>    <span class="kw">let </span>smt = Smt::with_sorted_entries(smt_leaves_2).unwrap();
+<a href=#697 id=697 data-nosnippet>697</a>    <span class="kw">let </span>expected_smt = Smt::with_entries(smt_leaves_2).unwrap();
+<a href=#698 id=698 data-nosnippet>698</a>
+<a href=#699 id=699 data-nosnippet>699</a>    <span class="macro">assert_eq!</span>(smt, expected_smt);
+<a href=#700 id=700 data-nosnippet>700</a>}
 </code></pre></div></section></main></body></html>

@@ -210,93 +210,98 @@
 <a href=#210 id=210 data-nosnippet>210</a>        NodeIndex::new(depth, position)
 <a href=#211 id=211 data-nosnippet>211</a>            .map_err(|<span class="kw">_</span>| DeserializationError::InvalidValue(<span class="string">"Invalid index"</span>.into()))
 <a href=#212 id=212 data-nosnippet>212</a>    }
-<a href=#213 id=213 data-nosnippet>213</a>}
-<a href=#214 id=214 data-nosnippet>214</a>
-<a href=#215 id=215 data-nosnippet>215</a><span class="doccomment">/// Implementation for [`NodeIndex::proof_indices()`].
-<a href=#216 id=216 data-nosnippet>216</a></span><span class="attr">#[derive(Debug, Default, Copy, Clone, Eq, PartialEq, Hash)]
-<a href=#217 id=217 data-nosnippet>217</a></span><span class="kw">struct </span>ProofIter {
-<a href=#218 id=218 data-nosnippet>218</a>    next_index: NodeIndex,
-<a href=#219 id=219 data-nosnippet>219</a>}
-<a href=#220 id=220 data-nosnippet>220</a>
-<a href=#221 id=221 data-nosnippet>221</a><span class="kw">impl </span>Iterator <span class="kw">for </span>ProofIter {
-<a href=#222 id=222 data-nosnippet>222</a>    <span class="kw">type </span>Item = NodeIndex;
-<a href=#223 id=223 data-nosnippet>223</a>
-<a href=#224 id=224 data-nosnippet>224</a>    <span class="kw">fn </span>next(<span class="kw-2">&amp;mut </span><span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span>&lt;NodeIndex&gt; {
-<a href=#225 id=225 data-nosnippet>225</a>        <span class="kw">if </span><span class="self">self</span>.next_index.is_root() {
-<a href=#226 id=226 data-nosnippet>226</a>            <span class="kw">return </span><span class="prelude-val">None</span>;
-<a href=#227 id=227 data-nosnippet>227</a>        }
+<a href=#213 id=213 data-nosnippet>213</a>
+<a href=#214 id=214 data-nosnippet>214</a>    <span class="kw">fn </span>min_serialized_size() -&gt; usize {
+<a href=#215 id=215 data-nosnippet>215</a>        <span class="comment">// u8 (depth) + u64 (value)
+<a href=#216 id=216 data-nosnippet>216</a>        </span><span class="number">9
+<a href=#217 id=217 data-nosnippet>217</a>    </span>}
+<a href=#218 id=218 data-nosnippet>218</a>}
+<a href=#219 id=219 data-nosnippet>219</a>
+<a href=#220 id=220 data-nosnippet>220</a><span class="doccomment">/// Implementation for [`NodeIndex::proof_indices()`].
+<a href=#221 id=221 data-nosnippet>221</a></span><span class="attr">#[derive(Debug, Default, Copy, Clone, Eq, PartialEq, Hash)]
+<a href=#222 id=222 data-nosnippet>222</a></span><span class="kw">struct </span>ProofIter {
+<a href=#223 id=223 data-nosnippet>223</a>    next_index: NodeIndex,
+<a href=#224 id=224 data-nosnippet>224</a>}
+<a href=#225 id=225 data-nosnippet>225</a>
+<a href=#226 id=226 data-nosnippet>226</a><span class="kw">impl </span>Iterator <span class="kw">for </span>ProofIter {
+<a href=#227 id=227 data-nosnippet>227</a>    <span class="kw">type </span>Item = NodeIndex;
 <a href=#228 id=228 data-nosnippet>228</a>
-<a href=#229 id=229 data-nosnippet>229</a>        <span class="kw">let </span>index = <span class="self">self</span>.next_index;
-<a href=#230 id=230 data-nosnippet>230</a>        <span class="self">self</span>.next_index = index.parent().sibling();
-<a href=#231 id=231 data-nosnippet>231</a>
-<a href=#232 id=232 data-nosnippet>232</a>        <span class="prelude-val">Some</span>(index)
-<a href=#233 id=233 data-nosnippet>233</a>    }
-<a href=#234 id=234 data-nosnippet>234</a>
-<a href=#235 id=235 data-nosnippet>235</a>    <span class="kw">fn </span>size_hint(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; (usize, <span class="prelude-ty">Option</span>&lt;usize&gt;) {
-<a href=#236 id=236 data-nosnippet>236</a>        <span class="kw">let </span>remaining = ExactSizeIterator::len(<span class="self">self</span>);
-<a href=#237 id=237 data-nosnippet>237</a>
-<a href=#238 id=238 data-nosnippet>238</a>        (remaining, <span class="prelude-val">Some</span>(remaining))
-<a href=#239 id=239 data-nosnippet>239</a>    }
-<a href=#240 id=240 data-nosnippet>240</a>}
-<a href=#241 id=241 data-nosnippet>241</a>
-<a href=#242 id=242 data-nosnippet>242</a><span class="kw">impl </span>ExactSizeIterator <span class="kw">for </span>ProofIter {
-<a href=#243 id=243 data-nosnippet>243</a>    <span class="kw">fn </span>len(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; usize {
-<a href=#244 id=244 data-nosnippet>244</a>        <span class="self">self</span>.next_index.depth() <span class="kw">as </span>usize
-<a href=#245 id=245 data-nosnippet>245</a>    }
-<a href=#246 id=246 data-nosnippet>246</a>}
-<a href=#247 id=247 data-nosnippet>247</a>
-<a href=#248 id=248 data-nosnippet>248</a><span class="attr">#[cfg(test)]
-<a href=#249 id=249 data-nosnippet>249</a></span><span class="kw">mod </span>tests {
-<a href=#250 id=250 data-nosnippet>250</a>    <span class="kw">use </span>assert_matches::assert_matches;
-<a href=#251 id=251 data-nosnippet>251</a>    <span class="kw">use </span>proptest::prelude::<span class="kw-2">*</span>;
+<a href=#229 id=229 data-nosnippet>229</a>    <span class="kw">fn </span>next(<span class="kw-2">&amp;mut </span><span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span>&lt;NodeIndex&gt; {
+<a href=#230 id=230 data-nosnippet>230</a>        <span class="kw">if </span><span class="self">self</span>.next_index.is_root() {
+<a href=#231 id=231 data-nosnippet>231</a>            <span class="kw">return </span><span class="prelude-val">None</span>;
+<a href=#232 id=232 data-nosnippet>232</a>        }
+<a href=#233 id=233 data-nosnippet>233</a>
+<a href=#234 id=234 data-nosnippet>234</a>        <span class="kw">let </span>index = <span class="self">self</span>.next_index;
+<a href=#235 id=235 data-nosnippet>235</a>        <span class="self">self</span>.next_index = index.parent().sibling();
+<a href=#236 id=236 data-nosnippet>236</a>
+<a href=#237 id=237 data-nosnippet>237</a>        <span class="prelude-val">Some</span>(index)
+<a href=#238 id=238 data-nosnippet>238</a>    }
+<a href=#239 id=239 data-nosnippet>239</a>
+<a href=#240 id=240 data-nosnippet>240</a>    <span class="kw">fn </span>size_hint(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; (usize, <span class="prelude-ty">Option</span>&lt;usize&gt;) {
+<a href=#241 id=241 data-nosnippet>241</a>        <span class="kw">let </span>remaining = ExactSizeIterator::len(<span class="self">self</span>);
+<a href=#242 id=242 data-nosnippet>242</a>
+<a href=#243 id=243 data-nosnippet>243</a>        (remaining, <span class="prelude-val">Some</span>(remaining))
+<a href=#244 id=244 data-nosnippet>244</a>    }
+<a href=#245 id=245 data-nosnippet>245</a>}
+<a href=#246 id=246 data-nosnippet>246</a>
+<a href=#247 id=247 data-nosnippet>247</a><span class="kw">impl </span>ExactSizeIterator <span class="kw">for </span>ProofIter {
+<a href=#248 id=248 data-nosnippet>248</a>    <span class="kw">fn </span>len(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; usize {
+<a href=#249 id=249 data-nosnippet>249</a>        <span class="self">self</span>.next_index.depth() <span class="kw">as </span>usize
+<a href=#250 id=250 data-nosnippet>250</a>    }
+<a href=#251 id=251 data-nosnippet>251</a>}
 <a href=#252 id=252 data-nosnippet>252</a>
-<a href=#253 id=253 data-nosnippet>253</a>    <span class="kw">use </span>super::<span class="kw-2">*</span>;
-<a href=#254 id=254 data-nosnippet>254</a>
-<a href=#255 id=255 data-nosnippet>255</a>    <span class="attr">#[test]
-<a href=#256 id=256 data-nosnippet>256</a>    </span><span class="kw">fn </span>test_node_index_position_too_high() {
-<a href=#257 id=257 data-nosnippet>257</a>        <span class="macro">assert_eq!</span>(NodeIndex::new(<span class="number">0</span>, <span class="number">0</span>).unwrap(), NodeIndex { depth: <span class="number">0</span>, position: <span class="number">0 </span>});
-<a href=#258 id=258 data-nosnippet>258</a>        <span class="kw">let </span>err = NodeIndex::new(<span class="number">0</span>, <span class="number">1</span>).unwrap_err();
-<a href=#259 id=259 data-nosnippet>259</a>        <span class="macro">assert_matches!</span>(err, MerkleError::InvalidNodeIndex { depth: <span class="number">0</span>, position: <span class="number">1 </span>});
-<a href=#260 id=260 data-nosnippet>260</a>
-<a href=#261 id=261 data-nosnippet>261</a>        <span class="macro">assert_eq!</span>(NodeIndex::new(<span class="number">1</span>, <span class="number">1</span>).unwrap(), NodeIndex { depth: <span class="number">1</span>, position: <span class="number">1 </span>});
-<a href=#262 id=262 data-nosnippet>262</a>        <span class="kw">let </span>err = NodeIndex::new(<span class="number">1</span>, <span class="number">2</span>).unwrap_err();
-<a href=#263 id=263 data-nosnippet>263</a>        <span class="macro">assert_matches!</span>(err, MerkleError::InvalidNodeIndex { depth: <span class="number">1</span>, position: <span class="number">2 </span>});
-<a href=#264 id=264 data-nosnippet>264</a>
-<a href=#265 id=265 data-nosnippet>265</a>        <span class="macro">assert_eq!</span>(NodeIndex::new(<span class="number">2</span>, <span class="number">3</span>).unwrap(), NodeIndex { depth: <span class="number">2</span>, position: <span class="number">3 </span>});
-<a href=#266 id=266 data-nosnippet>266</a>        <span class="kw">let </span>err = NodeIndex::new(<span class="number">2</span>, <span class="number">4</span>).unwrap_err();
-<a href=#267 id=267 data-nosnippet>267</a>        <span class="macro">assert_matches!</span>(err, MerkleError::InvalidNodeIndex { depth: <span class="number">2</span>, position: <span class="number">4 </span>});
-<a href=#268 id=268 data-nosnippet>268</a>
-<a href=#269 id=269 data-nosnippet>269</a>        <span class="macro">assert_eq!</span>(NodeIndex::new(<span class="number">3</span>, <span class="number">7</span>).unwrap(), NodeIndex { depth: <span class="number">3</span>, position: <span class="number">7 </span>});
-<a href=#270 id=270 data-nosnippet>270</a>        <span class="kw">let </span>err = NodeIndex::new(<span class="number">3</span>, <span class="number">8</span>).unwrap_err();
-<a href=#271 id=271 data-nosnippet>271</a>        <span class="macro">assert_matches!</span>(err, MerkleError::InvalidNodeIndex { depth: <span class="number">3</span>, position: <span class="number">8 </span>});
-<a href=#272 id=272 data-nosnippet>272</a>    }
+<a href=#253 id=253 data-nosnippet>253</a><span class="attr">#[cfg(test)]
+<a href=#254 id=254 data-nosnippet>254</a></span><span class="kw">mod </span>tests {
+<a href=#255 id=255 data-nosnippet>255</a>    <span class="kw">use </span>assert_matches::assert_matches;
+<a href=#256 id=256 data-nosnippet>256</a>    <span class="kw">use </span>proptest::prelude::<span class="kw-2">*</span>;
+<a href=#257 id=257 data-nosnippet>257</a>
+<a href=#258 id=258 data-nosnippet>258</a>    <span class="kw">use </span>super::<span class="kw-2">*</span>;
+<a href=#259 id=259 data-nosnippet>259</a>
+<a href=#260 id=260 data-nosnippet>260</a>    <span class="attr">#[test]
+<a href=#261 id=261 data-nosnippet>261</a>    </span><span class="kw">fn </span>test_node_index_position_too_high() {
+<a href=#262 id=262 data-nosnippet>262</a>        <span class="macro">assert_eq!</span>(NodeIndex::new(<span class="number">0</span>, <span class="number">0</span>).unwrap(), NodeIndex { depth: <span class="number">0</span>, position: <span class="number">0 </span>});
+<a href=#263 id=263 data-nosnippet>263</a>        <span class="kw">let </span>err = NodeIndex::new(<span class="number">0</span>, <span class="number">1</span>).unwrap_err();
+<a href=#264 id=264 data-nosnippet>264</a>        <span class="macro">assert_matches!</span>(err, MerkleError::InvalidNodeIndex { depth: <span class="number">0</span>, position: <span class="number">1 </span>});
+<a href=#265 id=265 data-nosnippet>265</a>
+<a href=#266 id=266 data-nosnippet>266</a>        <span class="macro">assert_eq!</span>(NodeIndex::new(<span class="number">1</span>, <span class="number">1</span>).unwrap(), NodeIndex { depth: <span class="number">1</span>, position: <span class="number">1 </span>});
+<a href=#267 id=267 data-nosnippet>267</a>        <span class="kw">let </span>err = NodeIndex::new(<span class="number">1</span>, <span class="number">2</span>).unwrap_err();
+<a href=#268 id=268 data-nosnippet>268</a>        <span class="macro">assert_matches!</span>(err, MerkleError::InvalidNodeIndex { depth: <span class="number">1</span>, position: <span class="number">2 </span>});
+<a href=#269 id=269 data-nosnippet>269</a>
+<a href=#270 id=270 data-nosnippet>270</a>        <span class="macro">assert_eq!</span>(NodeIndex::new(<span class="number">2</span>, <span class="number">3</span>).unwrap(), NodeIndex { depth: <span class="number">2</span>, position: <span class="number">3 </span>});
+<a href=#271 id=271 data-nosnippet>271</a>        <span class="kw">let </span>err = NodeIndex::new(<span class="number">2</span>, <span class="number">4</span>).unwrap_err();
+<a href=#272 id=272 data-nosnippet>272</a>        <span class="macro">assert_matches!</span>(err, MerkleError::InvalidNodeIndex { depth: <span class="number">2</span>, position: <span class="number">4 </span>});
 <a href=#273 id=273 data-nosnippet>273</a>
-<a href=#274 id=274 data-nosnippet>274</a>    <span class="attr">#[test]
-<a href=#275 id=275 data-nosnippet>275</a>    </span><span class="kw">fn </span>test_node_index_can_represent_depth_64() {
-<a href=#276 id=276 data-nosnippet>276</a>        <span class="macro">assert!</span>(NodeIndex::new(<span class="number">64</span>, u64::MAX).is_ok());
+<a href=#274 id=274 data-nosnippet>274</a>        <span class="macro">assert_eq!</span>(NodeIndex::new(<span class="number">3</span>, <span class="number">7</span>).unwrap(), NodeIndex { depth: <span class="number">3</span>, position: <span class="number">7 </span>});
+<a href=#275 id=275 data-nosnippet>275</a>        <span class="kw">let </span>err = NodeIndex::new(<span class="number">3</span>, <span class="number">8</span>).unwrap_err();
+<a href=#276 id=276 data-nosnippet>276</a>        <span class="macro">assert_matches!</span>(err, MerkleError::InvalidNodeIndex { depth: <span class="number">3</span>, position: <span class="number">8 </span>});
 <a href=#277 id=277 data-nosnippet>277</a>    }
 <a href=#278 id=278 data-nosnippet>278</a>
-<a href=#279 id=279 data-nosnippet>279</a>    <span class="macro">prop_compose!</span> {
-<a href=#280 id=280 data-nosnippet>280</a>        <span class="kw">fn </span>node_index()(position <span class="kw">in </span><span class="number">0</span>..<span class="number">2u64</span>.pow(u64::BITS - <span class="number">1</span>)) -&gt; NodeIndex {
-<a href=#281 id=281 data-nosnippet>281</a>            <span class="comment">// unwrap never panics because the range of depth is 0..u64::BITS
-<a href=#282 id=282 data-nosnippet>282</a>            </span><span class="kw">let </span><span class="kw-2">mut </span>depth = position.ilog2() <span class="kw">as </span>u8;
-<a href=#283 id=283 data-nosnippet>283</a>            <span class="kw">if </span>position &gt; (<span class="number">1 </span>&lt;&lt; depth) { <span class="comment">// round up
-<a href=#284 id=284 data-nosnippet>284</a>                </span>depth += <span class="number">1</span>;
-<a href=#285 id=285 data-nosnippet>285</a>            }
-<a href=#286 id=286 data-nosnippet>286</a>            NodeIndex::new(depth, position).unwrap()
-<a href=#287 id=287 data-nosnippet>287</a>        }
-<a href=#288 id=288 data-nosnippet>288</a>    }
-<a href=#289 id=289 data-nosnippet>289</a>
-<a href=#290 id=290 data-nosnippet>290</a>    <span class="macro">proptest!</span> {
-<a href=#291 id=291 data-nosnippet>291</a>        <span class="attr">#[test]
-<a href=#292 id=292 data-nosnippet>292</a>        </span><span class="kw">fn </span>arbitrary_index_wont_panic_on_move_up(
-<a href=#293 id=293 data-nosnippet>293</a>            <span class="kw-2">mut </span>index <span class="kw">in </span>node_index(),
-<a href=#294 id=294 data-nosnippet>294</a>            count <span class="kw">in </span>prop::num::u8::ANY,
-<a href=#295 id=295 data-nosnippet>295</a>        ) {
-<a href=#296 id=296 data-nosnippet>296</a>            <span class="kw">for _ in </span><span class="number">0</span>..count {
-<a href=#297 id=297 data-nosnippet>297</a>                index.move_up();
-<a href=#298 id=298 data-nosnippet>298</a>            }
-<a href=#299 id=299 data-nosnippet>299</a>        }
-<a href=#300 id=300 data-nosnippet>300</a>    }
-<a href=#301 id=301 data-nosnippet>301</a>}
+<a href=#279 id=279 data-nosnippet>279</a>    <span class="attr">#[test]
+<a href=#280 id=280 data-nosnippet>280</a>    </span><span class="kw">fn </span>test_node_index_can_represent_depth_64() {
+<a href=#281 id=281 data-nosnippet>281</a>        <span class="macro">assert!</span>(NodeIndex::new(<span class="number">64</span>, u64::MAX).is_ok());
+<a href=#282 id=282 data-nosnippet>282</a>    }
+<a href=#283 id=283 data-nosnippet>283</a>
+<a href=#284 id=284 data-nosnippet>284</a>    <span class="macro">prop_compose!</span> {
+<a href=#285 id=285 data-nosnippet>285</a>        <span class="kw">fn </span>node_index()(position <span class="kw">in </span><span class="number">0</span>..<span class="number">2u64</span>.pow(u64::BITS - <span class="number">1</span>)) -&gt; NodeIndex {
+<a href=#286 id=286 data-nosnippet>286</a>            <span class="comment">// unwrap never panics because the range of depth is 0..u64::BITS
+<a href=#287 id=287 data-nosnippet>287</a>            </span><span class="kw">let </span><span class="kw-2">mut </span>depth = position.ilog2() <span class="kw">as </span>u8;
+<a href=#288 id=288 data-nosnippet>288</a>            <span class="kw">if </span>position &gt; (<span class="number">1 </span>&lt;&lt; depth) { <span class="comment">// round up
+<a href=#289 id=289 data-nosnippet>289</a>                </span>depth += <span class="number">1</span>;
+<a href=#290 id=290 data-nosnippet>290</a>            }
+<a href=#291 id=291 data-nosnippet>291</a>            NodeIndex::new(depth, position).unwrap()
+<a href=#292 id=292 data-nosnippet>292</a>        }
+<a href=#293 id=293 data-nosnippet>293</a>    }
+<a href=#294 id=294 data-nosnippet>294</a>
+<a href=#295 id=295 data-nosnippet>295</a>    <span class="macro">proptest!</span> {
+<a href=#296 id=296 data-nosnippet>296</a>        <span class="attr">#[test]
+<a href=#297 id=297 data-nosnippet>297</a>        </span><span class="kw">fn </span>arbitrary_index_wont_panic_on_move_up(
+<a href=#298 id=298 data-nosnippet>298</a>            <span class="kw-2">mut </span>index <span class="kw">in </span>node_index(),
+<a href=#299 id=299 data-nosnippet>299</a>            count <span class="kw">in </span>prop::num::u8::ANY,
+<a href=#300 id=300 data-nosnippet>300</a>        ) {
+<a href=#301 id=301 data-nosnippet>301</a>            <span class="kw">for _ in </span><span class="number">0</span>..count {
+<a href=#302 id=302 data-nosnippet>302</a>                index.move_up();
+<a href=#303 id=303 data-nosnippet>303</a>            }
+<a href=#304 id=304 data-nosnippet>304</a>        }
+<a href=#305 id=305 data-nosnippet>305</a>    }
+<a href=#306 id=306 data-nosnippet>306</a>}
 </code></pre></div></section></main></body></html>
