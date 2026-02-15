@@ -4,7 +4,7 @@ use super::{
     super::{
         MerkleError, MerkleTree, NodeIndex, PartialMerkleTree, int_to_node, store::MerkleStore,
     },
-    Deserializable, InnerNodeInfo, MerkleProof, Serializable, Word,
+    Deserializable, DeserializationError, InnerNodeInfo, MerkleProof, Serializable, Word,
 };
 
 // TEST DATA
@@ -87,6 +87,37 @@ fn err_with_leaves() {
     let leaf_nodes: BTreeMap<NodeIndex, Word> = leaf_nodes_vec.into_iter().collect();
 
     assert!(PartialMerkleTree::with_leaves(leaf_nodes).is_err());
+}
+
+/// Checks that `with_leaves()` accepts an empty input and returns an empty tree.
+#[test]
+fn with_leaves_empty() {
+    let leaf_nodes: BTreeMap<NodeIndex, Word> = BTreeMap::new();
+
+    let pmt = PartialMerkleTree::with_leaves(leaf_nodes).unwrap();
+
+    assert_eq!(PartialMerkleTree::new().root(), pmt.root());
+    assert_eq!(0, pmt.max_depth());
+}
+
+/// Checks that `read_from_bytes_with_budget()` accepts an empty input.
+#[test]
+fn deserialize_empty_with_budget() {
+    let pmt = PartialMerkleTree::new();
+    let bytes = pmt.to_bytes();
+
+    let parsed = PartialMerkleTree::read_from_bytes_with_budget(&bytes, bytes.len()).unwrap();
+    assert_eq!(pmt, parsed);
+}
+
+/// Checks that oversized leaf counts are rejected during deserialization.
+#[test]
+fn deserialize_rejects_oversized_length() {
+    let mut bytes = Vec::new();
+    u64::MAX.write_into(&mut bytes);
+
+    let result = PartialMerkleTree::read_from_bytes_with_budget(&bytes, bytes.len());
+    assert!(matches!(result, Err(DeserializationError::InvalidValue(_))));
 }
 
 /// Tests that `with_leaves()` returns `EntryIsNotLeaf` error when an entry
