@@ -101,6 +101,10 @@ impl PartialMmr {
     /// - All tracked leaves must have their values in the nodes map.
     /// - All node indices must be valid leaf or internal node positions within the forest.
     ///
+    /// Note: This performs structural validation only. It does not verify that authentication
+    /// paths for tracked leaves are complete or that node values are cryptographically
+    /// consistent with the peaks.
+    ///
     /// # Errors
     /// Returns an error if the components are inconsistent.
     pub fn from_parts(
@@ -145,7 +149,7 @@ impl PartialMmr {
 
     /// Returns a new [PartialMmr] instantiated from the specified components without validation.
     ///
-    /// # Safety
+    /// # Preconditions
     /// This constructor does not check the consistency between peaks, nodes, and tracked_leaves.
     /// If the specified components are inconsistent, the returned partial MMR may exhibit
     /// undefined behavior.

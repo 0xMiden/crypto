@@ -212,7 +212,7 @@ fn test_is_valid_in_order_index() {
     // Single tree forests (power of 2 leaves) have no separators
     // Forest with 1 leaf: valid indices are just 1
     let forest_1 = Forest::new(0b0001);
-    assert!(!forest_1.is_valid_in_order_index(&idx(2)), "index 0 is invalid");
+    assert!(!forest_1.is_valid_in_order_index(&idx(2)), "index 2 is invalid");
     assert!(forest_1.is_valid_in_order_index(&idx(1)));
     assert!(!forest_1.is_valid_in_order_index(&idx(2)), "beyond bounds");
 
