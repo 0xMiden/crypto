@@ -210,6 +210,11 @@ impl Deserializable for NodeIndex {
         NodeIndex::new(depth, position)
             .map_err(|_| DeserializationError::InvalidValue("Invalid index".into()))
     }
+
+    fn min_serialized_size() -> usize {
+        // u8 (depth) + u64 (value)
+        9
+    }
 }
 
 /// Implementation for [`NodeIndex::proof_indices()`].
