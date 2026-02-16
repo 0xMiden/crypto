@@ -1,6 +1,6 @@
 //! Off-chain implementation of [`crate::Felt`].
 
-use alloc::string::String;
+use alloc::format;
 use core::{
     array, fmt,
     hash::{Hash, Hasher},
@@ -56,12 +56,9 @@ impl miden_serde_utils::Deserializable for Felt {
     ) -> Result<Self, miden_serde_utils::DeserializationError> {
         let value = source.read_u64()?;
         Self::from_canonical_checked(value).ok_or_else(|| {
-            use core::fmt::Write;
-
-            let mut msg = String::new();
-            write!(&mut msg, "value {value} is not a valid felt")
-                .expect("writing to string should not fail");
-            miden_serde_utils::DeserializationError::InvalidValue(msg)
+            miden_serde_utils::DeserializationError::InvalidValue(format!(
+                "value {value} is not a valid felt"
+            ))
         })
     }
 }
