@@ -1602,6 +1602,7 @@ dependencies = [
  "rand",
  "rand_chacha",
  "rand_xorshift",
+ "regex-syntax",
  "unarray",
 ]
 

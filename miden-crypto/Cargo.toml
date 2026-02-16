@@ -89,34 +89,37 @@ std = ["blake3/std", "dep:cc", "miden-serde-utils/std", "rand/std", "rand/thread
 testing = ["dep:proptest", "miden-field/testing"]
 
 [dependencies]
-blake3                        = { default-features = false, version = "1.8" }
-chacha20poly1305              = { features = ["alloc", "stream"], version = "0.10" }
-clap                          = { features = ["derive"], optional = true, version = "4.5" }
-curve25519-dalek              = { default-features = false, version = "4" }
-ed25519-dalek                 = { features = ["zeroize"], version = "2" }
-flume                         = { version = "0.11.1" }
-hashbrown                     = { features = ["serde"], optional = true, version = "0.16" }
-hkdf                          = { default-features = false, version = "0.12" }
-k256                          = { features = ["ecdh", "ecdsa"], version = "0.13" }
+# Miden dependencies
 miden-crypto-derive.workspace = true
-miden-field                   = { path = "../miden-field" }
+miden-field.workspace         = true
 miden-serde-utils.workspace   = true
-num                           = { default-features = false, features = ["alloc", "libm"], version = "0.4" }
-num-complex                   = { default-features = false, version = "0.4" }
-proptest                      = { default-features = false, features = ["alloc"], optional = true, version = "1.7" }
-rand                          = { default-features = false, version = "0.9" }
-rand-utils                    = { optional = true, package = "winter-rand-utils", version = "0.13" }
-rand_chacha                   = { default-features = false, version = "0.9" }
-rand_core                     = { default-features = false, version = "0.9" }
-rand_hc                       = { version = "0.3" }
-rayon                         = { optional = true, version = "1.10" }
-rocksdb                       = { default-features = false, features = ["bindgen-runtime", "lz4"], optional = true, version = "0.24" }
-serde                         = { default-features = false, features = ["derive"], optional = true, version = "1.0" }
-sha2                          = { default-features = false, version = "0.10" }
-sha3                          = { default-features = false, version = "0.10" }
-subtle                        = { default-features = false, version = "2.6" }
-thiserror                     = { default-features = false, version = "2.0" }
-x25519-dalek                  = { default-features = false, features = ["static_secrets"], version = "2.0" }
+
+# External dependencies
+blake3           = { default-features = false, version = "1.8" }
+chacha20poly1305 = { features = ["alloc", "stream"], version = "0.10" }
+clap             = { features = ["derive"], optional = true, version = "4.5" }
+curve25519-dalek = { default-features = false, version = "4" }
+ed25519-dalek    = { features = ["zeroize"], version = "2" }
+flume            = { version = "0.11.1" }
+hashbrown        = { features = ["serde"], optional = true, version = "0.16" }
+hkdf             = { default-features = false, version = "0.12" }
+k256             = { features = ["ecdh", "ecdsa"], version = "0.13" }
+num              = { default-features = false, features = ["alloc", "libm"], version = "0.4" }
+num-complex      = { default-features = false, version = "0.4" }
+proptest         = { default-features = false, features = ["alloc"], optional = true, version = "1.7" }
+rand             = { default-features = false, version = "0.9" }
+rand-utils       = { optional = true, package = "winter-rand-utils", version = "0.13" }
+rand_chacha      = { default-features = false, version = "0.9" }
+rand_core        = { default-features = false, version = "0.9" }
+rand_hc          = { version = "0.3" }
+rayon            = { optional = true, version = "1.10" }
+rocksdb          = { default-features = false, features = ["bindgen-runtime", "lz4"], optional = true, version = "0.24" }
+serde            = { default-features = false, features = ["derive"], optional = true, version = "1.0" }
+sha2             = { default-features = false, version = "0.10" }
+sha3             = { default-features = false, version = "0.10" }
+subtle           = { default-features = false, version = "2.6" }
+thiserror        = { default-features = false, version = "2.0" }
+x25519-dalek     = { default-features = false, features = ["static_secrets"], version = "2.0" }
 
 # Upstream Plonky3 dependencies
 p3-air         = { default-features = false, version = "0.4.2" }
@@ -143,7 +146,7 @@ assert_matches = { default-features = false, version = "1.5" }
 criterion      = { features = ["html_reports"], version = "0.7" }
 hex            = { default-features = false, features = ["alloc"], version = "0.4" }
 itertools      = { version = "0.14" }
-miden-field    = { features = ["testing"], path = "../miden-field" }
+miden-field    = { features = ["testing"], workspace = true }
 proptest       = { default-features = false, features = ["alloc"], version = "1.7" }
 rand-utils     = { package = "winter-rand-utils", version = "0.13" }
 rstest         = { version = "0.26" }

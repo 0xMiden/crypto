@@ -15,6 +15,7 @@ version      = "0.22.2"
 
 [workspace.dependencies]
 miden-crypto-derive = { path = "miden-crypto-derive", version = "0.22" }
+miden-field         = { path = "miden-field", version = "0.22" }
 miden-serde-utils   = { path = "miden-serde-utils", version = "0.22" }
 
 [workspace.lints.rust]
