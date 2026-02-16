@@ -27,7 +27,7 @@ use rand::{
 /// A `Felt` backed by Plonky3's Goldilocks field element.
 #[derive(Copy, Clone, Default, serde::Serialize, serde::Deserialize)]
 #[repr(transparent)]
-pub struct Felt(pub Goldilocks);
+pub struct Felt(Goldilocks);
 
 impl Felt {
     /// Creates a new field element from any `u64`.
