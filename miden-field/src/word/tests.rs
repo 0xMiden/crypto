@@ -2,18 +2,13 @@ use alloc::{string::String, vec};
 
 use miden_serde_utils::SliceReader;
 use p3_field::PrimeCharacteristicRing;
-use rand::Rng;
 
 use super::{Deserializable, Felt, Serializable, WORD_SIZE_BYTES, WORD_SIZE_FELT, Word};
 use crate::word;
 
 /// Generates a random value of type u64 from an RNG.
 pub fn rand_u64() -> u64 {
-    let mut bytes = [0u8; 8];
-    let rng = &mut rand::rng();
-    rng.fill(&mut bytes[..]);
-    let bytes = bytes[..8].try_into().unwrap();
-    u64::from_le_bytes(bytes)
+    rand::random()
 }
 
 // TESTS
@@ -130,6 +125,24 @@ fn test_conversions() {
     let v: String = (&word).into();
     let v2: Word = (&v).try_into().unwrap();
     assert_eq!(word, v2);
+}
+
+#[test]
+fn word_elements_array_layout_roundtrip() {
+    let mut word = Word::new([Felt::new(1), Felt::new(2), Felt::new(3), Felt::new(4)]);
+
+    let elements = word.as_elements_array();
+    assert_eq!(elements, &[Felt::new(1), Felt::new(2), Felt::new(3), Felt::new(4)]);
+
+    let base = core::ptr::addr_of!(word.a);
+    assert_eq!(elements.as_ptr(), base);
+    assert_eq!(core::ptr::addr_of!(word.b), unsafe { base.add(1) });
+    assert_eq!(core::ptr::addr_of!(word.c), unsafe { base.add(2) });
+    assert_eq!(core::ptr::addr_of!(word.d), unsafe { base.add(3) });
+
+    let elements_mut = word.as_elements_array_mut();
+    elements_mut[2] = Felt::new(42);
+    assert_eq!(word.c, Felt::new(42));
 }
 
 #[test]

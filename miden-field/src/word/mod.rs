@@ -51,19 +51,16 @@ mod tests;
 #[repr(C, align(16))]
 pub struct Word {
     /// The underlying elements of this word.
-    pub inner: (Felt, Felt, Felt, Felt),
+    pub a: Felt,
+    pub b: Felt,
+    pub c: Felt,
+    pub d: Felt,
     // We cannot define this type as `Word([Felt;4])` since there is no struct tuple support
     // and fixed array support is not complete in WIT. For the type remapping to work the
     // bindings are expecting the remapped type to be the same shape as the one generated from
     // WIT.
     //
-    // In WIT it's defined as
-    // ```wit
-    // record word {
-    //   inner: tuple<felt, felt, felt, felt>
-    // }
-    //```
-    // see sdk/base-macros/wit/miden.wit so we have to define it like that here.
+    // see sdk/base-macros/wit/miden.wit in the compiler repo, so we have to define it like that here.
 }
 
 impl core::fmt::Debug for Word {
@@ -79,29 +76,30 @@ impl Word {
     /// Creates a new [`Word`] from the given field elements.
     pub const fn new(value: [Felt; WORD_SIZE_FELT]) -> Self {
         let [a, b, c, d] = value;
-        Self { inner: (a, b, c, d) }
+        Self { a, b, c, d }
     }
 
     /// Returns the elements of this word as an array.
     pub const fn into_elements(self) -> [Felt; WORD_SIZE_FELT] {
-        let (a, b, c, d) = self.inner;
-        [a, b, c, d]
+        [self.a, self.b, self.c, self.d]
     }
 
     /// Returns the elements of this word as an array reference.
     ///
     /// # Safety
-    /// This assumes `(Felt, Felt, Felt, Felt)` has the same memory layout as `[Felt; 4]`.
+    /// This assumes the four fields of [`Word`] are laid out contiguously with no padding, in
+    /// the same order as `[Felt; 4]`.
     fn as_elements_array(&self) -> &[Felt; WORD_SIZE_FELT] {
-        unsafe { &*(&self.inner as *const (Felt, Felt, Felt, Felt) as *const [Felt; 4]) }
+        unsafe { &*(&self.a as *const Felt as *const [Felt; WORD_SIZE_FELT]) }
     }
 
     /// Returns the elements of this word as a mutable array reference.
     ///
     /// # Safety
-    /// This assumes `(Felt, Felt, Felt, Felt)` has the same memory layout as `[Felt; 4]`.
+    /// This assumes the four fields of [`Word`] are laid out contiguously with no padding, in
+    /// the same order as `[Felt; 4]`.
     fn as_elements_array_mut(&mut self) -> &mut [Felt; WORD_SIZE_FELT] {
-        unsafe { &mut *(&mut self.inner as *mut (Felt, Felt, Felt, Felt) as *mut [Felt; 4]) }
+        unsafe { &mut *(&mut self.a as *mut Felt as *mut [Felt; WORD_SIZE_FELT]) }
     }
 
     /// Parses a hex string into a new [`Word`].
@@ -239,7 +237,10 @@ impl Word {
 
     pub fn reversed(&self) -> Self {
         Word {
-            inner: (self.inner.3, self.inner.2, self.inner.1, self.inner.0),
+            a: self.d,
+            b: self.c,
+            c: self.b,
+            d: self.a,
         }
     }
 }
