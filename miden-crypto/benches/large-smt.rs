@@ -30,7 +30,7 @@ fn create_dense_subtree() -> Subtree {
     let root_index = NodeIndex::new(ROOT_DEPTH, 0).unwrap();
     let mut subtree = Subtree::new(root_index);
 
-    for relative_depth in (1..=SUBTREE_DEPTH).rev() {
+    for relative_depth in (1..SUBTREE_DEPTH).rev() {
         let depth = ROOT_DEPTH + relative_depth;
         let nodes_at_depth = 1u64 << (relative_depth - 1);
         let first_value = nodes_at_depth;
