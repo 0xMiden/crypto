@@ -22,7 +22,7 @@
 
 use criterion::{Criterion, criterion_group, criterion_main};
 // Import Word modules
-use miden_crypto::{Felt, Word, word::LexicographicWord};
+use miden_crypto::{Felt, LexicographicWord, Word};
 
 // Import common utilities
 mod common;

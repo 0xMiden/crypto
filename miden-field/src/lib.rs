@@ -23,4 +23,4 @@ pub mod utils;
 
 pub mod word;
 
-pub use word::{Word, WordError};
+pub use word::{LexicographicWord, Word, WordError};

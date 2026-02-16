@@ -250,12 +250,6 @@ impl Hash for Word {
     }
 }
 
-impl AsRef<Word> for Word {
-    fn as_ref(&self) -> &Word {
-        self
-    }
-}
-
 impl Deref for Word {
     type Target = [Felt; WORD_SIZE_FELT];
 
