@@ -260,6 +260,11 @@ impl Smt {
         <Self as SparseMerkleTree<SMT_DEPTH>>::get_leaf(self, key)
     }
 
+    /// Returns the leaf corresponding to the provided `index`.
+    pub fn get_leaf_by_index(&self, index: LeafIndex<SMT_DEPTH>) -> Option<SmtLeaf> {
+        self.leaves.get(&index.position()).cloned()
+    }
+
     /// Returns the value associated with `key`
     pub fn get_value(&self, key: &Word) -> Word {
         <Self as SparseMerkleTree<SMT_DEPTH>>::get_value(self, key)
@@ -607,16 +612,18 @@ impl Deserializable for Smt {
     fn read_from<R: ByteReader>(source: &mut R) -> Result<Self, DeserializationError> {
         // Read the number of filled leaves for this Smt
         let num_filled_leaves = source.read_usize()?;
-        let mut entries = Vec::with_capacity(num_filled_leaves);
 
-        for _ in 0..num_filled_leaves {
-            let key = source.read()?;
-            let value = source.read()?;
-            entries.push((key, value));
-        }
+        // Use read_many_iter to avoid eager allocation and respect BudgetedReader limits
+        let entries: Vec<(Word, Word)> =
+            source.read_many_iter(num_filled_leaves)?.collect::<Result<_, _>>()?;
 
         Self::with_entries(entries)
             .map_err(|err| DeserializationError::InvalidValue(err.to_string()))
+    }
+
+    /// Minimum serialized size: vint64 length prefix (0 entries).
+    fn min_serialized_size() -> usize {
+        1
     }
 }
 

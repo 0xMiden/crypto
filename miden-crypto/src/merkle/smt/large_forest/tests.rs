@@ -1,4 +1,1117 @@
-//! This module contains the handwritten tests for the SMT forest.
+#![cfg(test)]
+//! This module contains the handwritten tests of the functionality for the SMT forest. These tests
+//! are for the basic functionality, and rely on the
+//!
+//! Wherever possible, these tests rely on the correctness of the existing [`Smt`] implementation.
+//! It is used as a point of comparison to avoid the need to hard-code specific values and scenarios
+//! for the trees, instead allowing us to compare things directly.
+
+use alloc::vec::Vec;
+
+use assert_matches::assert_matches;
+use itertools::Itertools;
+
+use super::{Config, Result};
+use crate::{
+    EMPTY_WORD, Word,
+    merkle::{
+        EmptySubtreeRoots,
+        smt::{
+            Backend, ForestInMemoryBackend, ForestOperation, LargeSmtForest, LargeSmtForestError,
+            LeafIndex, RootInfo, Smt, SmtForestUpdateBatch, SmtUpdateBatch, TreeId, VersionId,
+            large_forest::root::{LineageId, TreeEntry, TreeWithRoot},
+        },
+    },
+    rand::test_utils::ContinuousRng,
+};
+
+// TYPE ALIASES
+// ================================================================================================
+
+/// We only care about testing with the in-memory backend here for correct functionality.
+type Forest = LargeSmtForest<ForestInMemoryBackend>;
+
+// CONSTRUCTION TESTS
+// ================================================================================================
+
+#[test]
+fn new() -> Result<()> {
+    // Constructing a forest using the default constructor should yield the default configuration.
+    let backend = ForestInMemoryBackend::new();
+    let forest = Forest::new(backend)?;
+
+    // We can just sanity-check the configuration to ensure that things started up right.
+    let config = forest.get_config();
+
+    assert_eq!(config.max_history_versions(), 10);
+
+    Ok(())
+}
+
+#[test]
+fn with_config() -> Result<()> {
+    let backend = ForestInMemoryBackend::new();
+    let forest = Forest::with_config(backend, Config::default().with_max_history_versions(30))?;
+
+    // Let us sanity check using the config again.
+    let config = forest.get_config();
+
+    assert_eq!(config.max_history_versions(), 30);
+
+    Ok(())
+}
+
+// BASIC QUERIES TESTS
+// ================================================================================================
+
+#[test]
+fn roots() -> Result<()> {
+    // We start by constructing our forest.
+    let backend = ForestInMemoryBackend::new();
+    let mut forest = Forest::new(backend)?;
+    let mut rng = ContinuousRng::new([0x96; 32]);
+
+    // We add a number of lineages to the forest, some of which have the same _root_ value.
+    let version_1: VersionId = rng.value();
+    let lineage_1: LineageId = rng.value();
+    let lineage_2: LineageId = rng.value();
+    let lineage_3: LineageId = rng.value();
+
+    let root_1 = forest.add_lineage(lineage_1, version_1, SmtUpdateBatch::default())?;
+    assert_eq!(
+        root_1,
+        TreeWithRoot::new(lineage_1, version_1, *EmptySubtreeRoots::entry(64, 0))
+    );
+    let root_2 = forest.add_lineage(lineage_2, version_1, SmtUpdateBatch::default())?;
+    assert_eq!(
+        root_2,
+        TreeWithRoot::new(lineage_2, version_1, *EmptySubtreeRoots::entry(64, 0))
+    );
+    let root_3 = forest.add_lineage(lineage_3, version_1, SmtUpdateBatch::default())?;
+    assert_eq!(
+        root_3,
+        TreeWithRoot::new(lineage_3, version_1, *EmptySubtreeRoots::entry(64, 0))
+    );
+
+    // We then update one of them to make sure it ends up with a historical root as well.
+    let k1: Word = rng.value();
+    let v1: Word = rng.value();
+    let k2: Word = rng.value();
+    let v2: Word = rng.value();
+
+    let mut operations = SmtUpdateBatch::default();
+    operations.add_insert(k1, v1);
+    operations.add_insert(k2, v2);
+
+    let version_2: VersionId = version_1 + 1;
+    let root_4 = forest.update_tree(lineage_1, version_2, operations)?;
+
+    // We can now check that the roots iterator contains the items we expect.
+    let roots = forest.roots().collect::<Vec<_>>();
+    assert_eq!(roots.len(), 4);
+    assert!(roots.contains(&root_1.into()));
+    assert!(roots.contains(&root_2.into()));
+    assert!(roots.contains(&root_3.into()));
+    assert!(roots.contains(&root_4.into()));
+
+    Ok(())
+}
+
+#[test]
+fn latest_version() -> Result<()> {
+    let backend = ForestInMemoryBackend::new();
+    let mut forest = Forest::new(backend)?;
+    let mut rng = ContinuousRng::new([0x69; 32]);
+
+    // Let's add some trees to the forest. Two are empty and one is added with data.
+    let version_1: VersionId = rng.value();
+    let version_2: VersionId = version_1 + 1;
+    let version_3: VersionId = version_2 + 1;
+
+    let lineage_1: LineageId = rng.value();
+    let lineage_2: LineageId = rng.value();
+    let lineage_3: LineageId = rng.value();
+
+    let k1: Word = rng.value();
+    let v1: Word = rng.value();
+    let k2: Word = rng.value();
+    let v2: Word = rng.value();
+
+    let mut operations = SmtUpdateBatch::default();
+    operations.add_insert(k1, v1);
+    operations.add_insert(k2, v2);
+
+    forest.add_lineage(lineage_1, version_1, SmtUpdateBatch::default())?;
+    forest.add_lineage(lineage_2, version_1, SmtUpdateBatch::default())?;
+    forest.add_lineage(lineage_3, version_1, operations)?;
+
+    // Now let's update one of the empty ones twice...
+    let k3: Word = rng.value();
+    let v3: Word = rng.value();
+    let mut operations = SmtUpdateBatch::default();
+    operations.add_insert(k3, v3);
+    forest.update_tree(lineage_1, version_2, operations)?;
+
+    let k4: Word = rng.value();
+    let v4: Word = rng.value();
+    let mut operations = SmtUpdateBatch::default();
+    operations.add_insert(k4, v4);
+    forest.update_tree(lineage_1, version_3, operations)?;
+
+    // ...and the non-empty one once with a non-contiguous version.
+    let k5: Word = rng.value();
+    let v5: Word = rng.value();
+    let mut operations = SmtUpdateBatch::default();
+    operations.add_insert(k5, v5);
+    forest.update_tree(lineage_3, version_3, operations)?;
+
+    // Now let's query the latest version for all of them.
+    assert_eq!(forest.latest_version(lineage_1).unwrap(), version_3);
+    assert_eq!(forest.latest_version(lineage_2).unwrap(), version_1);
+    assert_eq!(forest.latest_version(lineage_3).unwrap(), version_3);
+
+    // Finally, if we look for a lineage that doesn't exist, we should get `None` back.
+    let ne_lineage: LineageId = rng.value();
+    assert!(forest.latest_version(ne_lineage).is_none());
+
+    Ok(())
+}
+
+#[test]
+fn lineage_roots() -> Result<()> {
+    let backend = ForestInMemoryBackend::new();
+    let mut forest = Forest::new(backend)?;
+    let mut rng = ContinuousRng::new([0x42; 32]);
+
+    // Let's add a lineage to the forest and update it a few times.
+    let lineage: LineageId = rng.value();
+    let version_1: VersionId = rng.value();
+    let version_2 = version_1 + 1;
+    let version_3 = version_2 + 1;
+    let root_1 = forest.add_lineage(lineage, version_1, SmtUpdateBatch::default())?;
+
+    let k1: Word = rng.value();
+    let v1: Word = rng.value();
+    let mut operations = SmtUpdateBatch::default();
+    operations.add_insert(k1, v1);
+    let root_2 = forest.update_tree(lineage, version_2, operations)?;
+
+    let k2: Word = rng.value();
+    let v2: Word = rng.value();
+    let mut operations = SmtUpdateBatch::default();
+    operations.add_insert(k2, v2);
+    let root_3 = forest.update_tree(lineage, version_3, operations)?;
+
+    // Now we can query for the roots in this lineage.
+    let lineage_roots = forest
+        .lineage_roots(lineage)
+        .expect("Existing lineage should have roots")
+        .collect::<Vec<_>>();
+    assert_eq!(lineage_roots.len(), 3);
+
+    // For this method, the contract insists that it is ordered from newer roots in the lineage to
+    // older roots.
+    assert_eq!(lineage_roots[0], root_3.root());
+    assert_eq!(lineage_roots[1], root_2.root());
+    assert_eq!(lineage_roots[2], root_1.root());
+
+    // If, however, we query for the roots of a non-existent lineage, we should get `None` back.
+    let ne_lineage: LineageId = rng.value();
+    assert!(forest.lineage_roots(ne_lineage).is_none());
+
+    Ok(())
+}
+
+#[test]
+fn latest_root() -> Result<()> {
+    let backend = ForestInMemoryBackend::new();
+    let mut forest = Forest::new(backend)?;
+    let mut rng = ContinuousRng::new([0x97; 32]);
+
+    // Let's add a lineage to the forest.
+    let lineage: LineageId = rng.value();
+    let version_1: VersionId = rng.value();
+    let version_2 = version_1 + 1;
+    let root_1 = forest.add_lineage(lineage, version_1, SmtUpdateBatch::default())?;
+
+    // We can get its latest root.
+    assert_eq!(forest.latest_root(lineage), Some(root_1.root()));
+
+    // And then update it...
+    let k1: Word = rng.value();
+    let v1: Word = rng.value();
+    let mut operations = SmtUpdateBatch::default();
+    operations.add_insert(k1, v1);
+    let root_2 = forest.update_tree(lineage, version_2, operations)?;
+
+    // ...to check that we get the updated root.
+    assert_eq!(forest.latest_root(lineage), Some(root_2.root()));
+
+    // However, if we query for a nonexistent lineage, we should get `None` back.
+    let ne_lineage: LineageId = rng.value();
+    assert!(forest.latest_root(ne_lineage).is_none());
+
+    Ok(())
+}
+
+#[test]
+fn tree_count() -> Result<()> {
+    let backend = ForestInMemoryBackend::new();
+    let mut forest = Forest::new(backend)?;
+    let mut rng = ContinuousRng::new([0x67; 32]);
+
+    // A newly-initialized forest should know about only the trees that its backend knows about.
+    assert_eq!(forest.tree_count(), forest.get_backend().trees()?.count());
+
+    // Now let's add some trees.
+    let lineage_1: LineageId = rng.value();
+    let version_1: VersionId = rng.value();
+    let version_2 = version_1 + 1;
+    let version_3 = version_2 + 1;
+    forest.add_lineage(lineage_1, version_1, SmtUpdateBatch::default())?;
+
+    let k1: Word = rng.value();
+    let v1: Word = rng.value();
+    let mut operations = SmtUpdateBatch::default();
+    operations.add_insert(k1, v1);
+    forest.update_tree(lineage_1, version_2, operations)?;
+
+    let k2: Word = rng.value();
+    let v2: Word = rng.value();
+    let mut operations = SmtUpdateBatch::default();
+    operations.add_insert(k2, v2);
+    forest.update_tree(lineage_1, version_3, operations)?;
+
+    let lineage_2: LineageId = rng.value();
+    forest.add_lineage(lineage_2, version_1, SmtUpdateBatch::default())?;
+
+    // As there are two current trees and two historical versions, we should see four trees total.
+    assert_eq!(forest.tree_count(), 4);
+
+    Ok(())
+}
+
+#[test]
+fn lineage_count() -> Result<()> {
+    let backend = ForestInMemoryBackend::new();
+    let mut forest = Forest::new(backend)?;
+    let mut rng = ContinuousRng::new([0x64; 32]);
+
+    // A newly-initialized forest should know about only the lineages that its backend knows about.
+    assert_eq!(forest.lineage_count(), forest.get_backend().lineages()?.count());
+
+    // So now let's add some lineages.
+    let version: VersionId = rng.value();
+    let lineage_1: LineageId = rng.value();
+    forest.add_lineage(lineage_1, version, SmtUpdateBatch::default())?;
+    let lineage_2: LineageId = rng.value();
+    forest.add_lineage(lineage_2, version, SmtUpdateBatch::default())?;
+    let lineage_3: LineageId = rng.value();
+    forest.add_lineage(lineage_3, version, SmtUpdateBatch::default())?;
+
+    // We should see three lineages.
+    assert_eq!(forest.lineage_count(), 3);
+
+    // This should stay the same if we update a tree.
+    let operations =
+        SmtUpdateBatch::new([ForestOperation::insert(rng.value(), rng.value())].into_iter());
+    forest.update_tree(lineage_1, version + 1, operations)?;
+    assert_eq!(forest.lineage_count(), 3);
+
+    Ok(())
+}
+
+#[test]
+fn root_info() -> Result<()> {
+    let backend = ForestInMemoryBackend::new();
+    let mut forest = Forest::new(backend)?;
+    let mut rng = ContinuousRng::new([0x32; 32]);
+
+    // Let's start by adding a lineage and updating it.
+    let lineage_1: LineageId = rng.value();
+    let version_1: VersionId = rng.value();
+    let operations =
+        SmtUpdateBatch::new([ForestOperation::insert(rng.value(), rng.value())].into_iter());
+    let historical_root = forest.add_lineage(lineage_1, version_1, operations)?;
+
+    let version_2 = version_1 + 1;
+    let operations =
+        SmtUpdateBatch::new([ForestOperation::insert(rng.value(), rng.value())].into_iter());
+    let current_root = forest.update_tree(lineage_1, version_2, operations)?;
+
+    // When we query for a root (lineage_1, version_1), we should get back HistoricalVersion.
+    assert_eq!(
+        forest.root_info(TreeId::new(lineage_1, version_1)),
+        RootInfo::HistoricalVersion(historical_root.root())
+    );
+
+    // When we query for a root (lineage_1, version_2), we should get back LatestVersion.
+    assert_eq!(
+        forest.root_info(TreeId::new(lineage_1, version_2)),
+        RootInfo::LatestVersion(current_root.root())
+    );
+
+    // When we query for a nonexistent version in an existing lineage we should get back Missing.
+    let version_3 = version_2 + 1;
+    assert_eq!(forest.root_info(TreeId::new(lineage_1, version_3)), RootInfo::Missing);
+
+    // As we should also get back when the lineage doesn't exist.
+    let lineage_2: LineageId = rng.value();
+    assert_eq!(forest.root_info(TreeId::new(lineage_2, version_1)), RootInfo::Missing);
+
+    Ok(())
+}
+
+// QUERIES TESTS
+// ================================================================================================
+
+#[test]
+fn open() -> Result<()> {
+    let backend = ForestInMemoryBackend::new();
+    let mut forest = Forest::new(backend)?;
+    let mut rng = ContinuousRng::new([0x08; 32]);
+
+    // When we query for a tree with a lineage that is not known by the forest, we should get an
+    // error back.
+    let missing_lineage: LineageId = rng.value();
+    let missing_version: VersionId = rng.value();
+    let missing_key: Word = rng.value();
+
+    let result = forest.open(TreeId::new(missing_lineage, missing_version), missing_key);
+    assert!(result.is_err());
+    assert_matches!(result.unwrap_err(), LargeSmtForestError::UnknownLineage(l) if l == missing_lineage);
+
+    // Now let's add an (empty) lineage to the forest.
+    let lineage_1: LineageId = rng.value();
+    let version_1: VersionId = rng.value();
+    let key_1: Word = rng.value();
+    let value_1_v1: Word = rng.value();
+    let key_2: Word = rng.value();
+    let value_2_v1: Word = rng.value();
+    forest.add_lineage(
+        lineage_1,
+        version_1,
+        SmtUpdateBatch::new(
+            [
+                ForestOperation::insert(key_1, value_1_v1),
+                ForestOperation::insert(key_2, value_2_v1),
+            ]
+            .into_iter(),
+        ),
+    )?;
+
+    // If we query for a tree with a known lineage but unknown version, we should also get an error
+    // back.
+    let missing_tree = TreeId::new(lineage_1, missing_version);
+    let result = forest.open(missing_tree, missing_key);
+    assert!(result.is_err());
+    assert_matches!(result.unwrap_err(), LargeSmtForestError::UnknownTree(t) if t == missing_tree);
+
+    // We should also get an error back if we query for a version that is NEWER than the
+    // latest-known version.
+    let too_new_version = version_1 + 1;
+    let too_new_tree = TreeId::new(lineage_1, too_new_version);
+    let result = forest.open(too_new_tree, missing_key);
+    assert!(result.is_err());
+    assert_matches!(result.unwrap_err(), LargeSmtForestError::UnknownTree(t) if t == too_new_tree);
+
+    // Let's set up a basic SMT to compare the forest's openings again for correctness.
+    let mut tree_v1 = Smt::new();
+    tree_v1.insert(key_1, value_1_v1)?;
+    tree_v1.insert(key_2, value_2_v1)?;
+
+    // And get a random opening on the initial tree.
+    let random_key: Word = rng.value();
+    let forest_opening = forest.open(TreeId::new(lineage_1, version_1), random_key)?;
+    let tree_v1_opening = tree_v1.open(&random_key);
+    assert_eq!(forest_opening, tree_v1_opening);
+
+    // Now let's make some modifications to the tree.
+    let version_2: VersionId = rng.value();
+    let value_1_v2: Word = rng.value();
+    let key_3: Word = rng.value();
+    let value_3_v1: Word = rng.value();
+    forest.update_tree(
+        lineage_1,
+        version_2,
+        SmtUpdateBatch::new(
+            [
+                ForestOperation::insert(key_1, value_1_v2),
+                ForestOperation::insert(key_3, value_3_v1),
+                ForestOperation::remove(key_2),
+            ]
+            .into_iter(),
+        ),
+    )?;
+
+    // And mirror it on our tree.
+    let mut tree_v2 = tree_v1.clone();
+    tree_v2.insert(key_1, value_1_v2)?;
+    tree_v2.insert(key_3, value_3_v1)?;
+    tree_v2.insert(key_2, EMPTY_WORD)?;
+
+    // These two should again produce the same opening when we query for the latest version.
+    let random_key: Word = rng.value();
+    let forest_opening = forest.open(TreeId::new(lineage_1, version_2), random_key)?;
+    let tree_v2_opening = tree_v2.open(&random_key);
+    assert_eq!(forest_opening, tree_v2_opening);
+
+    // Most importantly, however, we should get the same opening from the forest when querying a
+    // historical tree version as we do from the actual tree.
+    let forest_opening = forest.open(TreeId::new(lineage_1, version_1), random_key)?;
+    let tree_v1_opening = tree_v1.open(&random_key);
+    assert_eq!(forest_opening, tree_v1_opening);
+
+    Ok(())
+}
+
+#[test]
+fn get() -> Result<()> {
+    let backend = ForestInMemoryBackend::new();
+    let mut forest = Forest::new(backend)?;
+    let mut rng = ContinuousRng::new([0x12; 32]);
+
+    // When we query for a tree with a lineage that is not known by the forest, we should get an
+    // error back.
+    let missing_lineage: LineageId = rng.value();
+    let missing_version: VersionId = rng.value();
+    let missing_key: Word = rng.value();
+
+    let result = forest.get(TreeId::new(missing_lineage, missing_version), missing_key);
+    assert!(result.is_err());
+    assert_matches!(result.unwrap_err(), LargeSmtForestError::UnknownLineage(l) if l == missing_lineage);
+
+    // Now let's add an (empty) lineage to the forest.
+    let lineage_1: LineageId = rng.value();
+    let version_1: VersionId = rng.value();
+    let key_1: Word = rng.value();
+    let value_1_v1: Word = rng.value();
+    let key_2: Word = rng.value();
+    let value_2_v1: Word = rng.value();
+    forest.add_lineage(
+        lineage_1,
+        version_1,
+        SmtUpdateBatch::new(
+            [
+                ForestOperation::insert(key_1, value_1_v1),
+                ForestOperation::insert(key_2, value_2_v1),
+            ]
+            .into_iter(),
+        ),
+    )?;
+
+    // If we query for a tree with a known lineage but unknown version, we should also get an error
+    // back.
+    let missing_tree = TreeId::new(lineage_1, missing_version);
+    let result = forest.get(missing_tree, missing_key);
+    assert!(result.is_err());
+    assert_matches!(result.unwrap_err(), LargeSmtForestError::UnknownTree(t) if t == missing_tree);
+
+    // We should also get an error back if we query for a version that is NEWER than the
+    // latest-known version.
+    let too_new_version = version_1 + 1;
+    let too_new_tree = TreeId::new(lineage_1, too_new_version);
+    let result = forest.get(too_new_tree, missing_key);
+    assert!(result.is_err());
+    assert_matches!(result.unwrap_err(), LargeSmtForestError::UnknownTree(t) if t == too_new_tree);
+
+    // If we query for a key that has never been inserted we want to get back `None`.
+    let tree_v1 = TreeId::new(lineage_1, version_1);
+    let non_inserted_key: Word = rng.value();
+    assert!(forest.get(tree_v1, non_inserted_key)?.is_none());
+
+    // But if we query for a key that has been, we should get back the corresponding value.
+    assert_eq!(forest.get(tree_v1, key_1)?, Some(value_1_v1));
+    assert_eq!(forest.get(tree_v1, key_2)?, Some(value_2_v1));
+
+    // Now let's add another version.
+    let version_2: VersionId = version_1 + 1;
+    let value_1_v2: Word = rng.value();
+    let key_3: Word = rng.value();
+    let value_3_v1: Word = rng.value();
+    forest.update_tree(
+        lineage_1,
+        version_2,
+        SmtUpdateBatch::new(
+            [
+                ForestOperation::insert(key_1, value_1_v2),
+                ForestOperation::insert(key_3, value_3_v1),
+            ]
+            .into_iter(),
+        ),
+    )?;
+
+    // When we query at the new version we should see the updated values for all extant keys.
+    let tree_v2 = TreeId::new(lineage_1, version_2);
+    assert_eq!(forest.get(tree_v2, key_1)?, Some(value_1_v2));
+    assert_eq!(forest.get(tree_v2, key_2)?, Some(value_2_v1));
+    assert_eq!(forest.get(tree_v2, key_3)?, Some(value_3_v1));
+
+    // But if we query for the older version we should still see the older values.
+    assert_eq!(forest.get(tree_v1, key_1)?, Some(value_1_v1));
+    assert_eq!(forest.get(tree_v1, key_2)?, Some(value_2_v1));
+    assert!(forest.get(tree_v1, key_3)?.is_none());
+
+    Ok(())
+}
+
+#[test]
+fn entry_count() -> Result<()> {
+    let backend = ForestInMemoryBackend::new();
+    let mut forest = Forest::new(backend)?;
+    let mut rng = ContinuousRng::new([0x22; 32]);
+
+    // Let's start by adding a lineage with some values.
+    let lineage_1: LineageId = rng.value();
+    let version_1: VersionId = rng.value();
+    let key_1: Word = rng.value();
+    let value_1_v1: Word = rng.value();
+    let key_2: Word = rng.value();
+    let value_2_v1: Word = rng.value();
+    let mut key_3: Word = rng.value();
+    key_3[3] = key_1[3];
+    let value_3_v1: Word = rng.value();
+
+    let mut operations = SmtUpdateBatch::empty();
+    operations.add_insert(key_1, value_1_v1);
+    operations.add_insert(key_2, value_2_v1);
+    operations.add_insert(key_3, value_3_v1);
+
+    forest.add_lineage(lineage_1, version_1, operations)?;
+
+    // We'll also update this so we have a historical version in play to be sure things work.
+    let version_2: VersionId = version_1 + 1;
+    let value_1_v2: Word = rng.value();
+    let mut key_4: Word = rng.value();
+    key_4[3] = key_2[3];
+    let value_4_v1: Word = rng.value();
+
+    let mut operations = SmtUpdateBatch::empty();
+    operations.add_remove(key_3);
+    operations.add_insert(key_1, value_1_v2);
+    operations.add_insert(key_4, value_4_v1);
+
+    forest.update_tree(lineage_1, version_2, operations)?;
+
+    // If we try and get the entry count over a lineage that does not exist we should see an error.
+    let ne_lineage: LineageId = rng.value();
+    match forest.entry_count(TreeId::new(ne_lineage, version_1)) {
+        Err(e) => assert_matches!(e, LargeSmtForestError::UnknownLineage(l) if l == ne_lineage),
+        Ok(_) => panic!("Result was not an error"),
+    };
+
+    // Similarly, if we try and get the entry count for a nonexistent version in an existing lineage
+    // we should also see an error.
+    let tree = TreeId::new(lineage_1, version_1 - 1);
+    match forest.entry_count(tree) {
+        Err(e) => assert_matches!(e, LargeSmtForestError::UnknownTree(t) if t == tree),
+        Ok(_) => panic!("Result was not an error"),
+    };
+
+    // We should also get an error back if we query for a version that is NEWER than the
+    // latest-known version.
+    let too_new_version = version_2 + 1;
+    let too_new_tree = TreeId::new(lineage_1, too_new_version);
+    let result = forest.entry_count(too_new_tree);
+    assert!(result.is_err());
+    assert_matches!(result.unwrap_err(), LargeSmtForestError::UnknownTree(t) if t == too_new_tree);
+
+    // If we query for extant trees we should see the correct count regardless of whether it is the
+    // current tree or a historical tree.
+    assert_eq!(forest.entry_count(TreeId::new(lineage_1, version_1))?, 3);
+    assert_eq!(forest.entry_count(TreeId::new(lineage_1, version_2))?, 3);
+
+    Ok(())
+}
+
+#[test]
+fn entries() -> Result<()> {
+    let backend = ForestInMemoryBackend::new();
+    let mut forest = Forest::new(backend)?;
+    let mut rng = ContinuousRng::new([0x47; 32]);
+
+    // Let's start by adding a lineage with some values.
+    let lineage_1: LineageId = rng.value();
+    let version_1: VersionId = rng.value();
+    let key_1: Word = rng.value();
+    let value_1_v1: Word = rng.value();
+    let key_2: Word = rng.value();
+    let value_2_v1: Word = rng.value();
+    let mut key_3: Word = rng.value();
+    key_3[3] = key_1[3];
+    let value_3_v1: Word = rng.value();
+
+    let mut operations = SmtUpdateBatch::empty();
+    operations.add_insert(key_1, value_1_v1);
+    operations.add_insert(key_2, value_2_v1);
+    operations.add_insert(key_3, value_3_v1);
+
+    forest.add_lineage(lineage_1, version_1, operations)?;
+
+    // We'll also update this so we have a historical version in play to be sure things work.
+    let version_2: VersionId = version_1 + 1;
+    let value_1_v2: Word = rng.value();
+    let mut key_4: Word = rng.value();
+    key_4[3] = key_2[3];
+    let value_4_v1: Word = rng.value();
+
+    let mut operations = SmtUpdateBatch::empty();
+    operations.add_remove(key_3);
+    operations.add_insert(key_1, value_1_v2);
+    operations.add_insert(key_4, value_4_v1);
+
+    forest.update_tree(lineage_1, version_2, operations)?;
+
+    // If we try and get entries over a lineage that does not exist we should see an error.
+    let ne_lineage: LineageId = rng.value();
+    match forest.entries(TreeId::new(ne_lineage, version_1)) {
+        Err(e) => assert_matches!(e, LargeSmtForestError::UnknownLineage(l) if l == ne_lineage),
+        Ok(_) => panic!("Result was not an error"),
+    };
+
+    // Similarly, if we try and get entries for a nonexistent version in an existing lineage we
+    // should also see an error.
+    let tree = TreeId::new(lineage_1, version_1 - 1);
+    match forest.entries(tree) {
+        Err(e) => assert_matches!(e, LargeSmtForestError::UnknownTree(t) if t == tree),
+        Ok(_) => panic!("Result was not an error"),
+    };
+
+    // We should also get an error back if we query for a version that is NEWER than the
+    // latest-known version.
+    let too_new_version = version_2 + 1;
+    let too_new_tree = TreeId::new(lineage_1, too_new_version);
+    match forest.entries(too_new_tree) {
+        Err(e) => assert_matches!(e, LargeSmtForestError::UnknownTree(t) if t == too_new_tree),
+        Ok(_) => panic!("Result was not an error"),
+    }
+
+    // Grabbing the entries for the latest version in a lineage should do the right thing.
+    let current_tree = TreeId::new(lineage_1, version_2);
+    assert_eq!(forest.entries(current_tree)?.count(), 3);
+    assert!(
+        forest
+            .entries(current_tree)?
+            .contains(&TreeEntry { key: key_1, value: value_1_v2 })
+    );
+    assert!(
+        forest
+            .entries(current_tree)?
+            .contains(&TreeEntry { key: key_2, value: value_2_v1 })
+    );
+    assert!(
+        forest
+            .entries(current_tree)?
+            .contains(&TreeEntry { key: key_4, value: value_4_v1 })
+    );
+    assert!(
+        !forest
+            .entries(current_tree)?
+            .contains(&TreeEntry { key: key_3, value: value_3_v1 })
+    );
+
+    // If we ask for a historical version, things are more complex but should still work.
+    let historical_tree = TreeId::new(lineage_1, version_1);
+    assert_eq!(forest.entries(historical_tree)?.count(), 3);
+    assert!(
+        forest
+            .entries(historical_tree)?
+            .contains(&TreeEntry { key: key_1, value: value_1_v1 })
+    );
+    assert!(
+        forest
+            .entries(historical_tree)?
+            .contains(&TreeEntry { key: key_2, value: value_2_v1 })
+    );
+    assert!(
+        forest
+            .entries(historical_tree)?
+            .contains(&TreeEntry { key: key_3, value: value_3_v1 })
+    );
+    assert!(
+        !forest
+            .entries(historical_tree)?
+            .contains(&TreeEntry { key: key_4, value: value_4_v1 })
+    );
+
+    Ok(())
+}
+
+#[test]
+fn entries_never_returns_empty_entry() -> Result<()> {
+    // We risk yielding empty entries in a few situations, but all of those situations involve
+    // iterating over the history on its own. Let's go through them one by one.
+    //
+    // For more detailed testing of this behavior, see the `property_tests`.
+    let backend = ForestInMemoryBackend::new();
+    let mut forest = Forest::new(backend)?;
+    let mut rng = ContinuousRng::new([0x44; 32]);
+
+    // The FIRST such situation is when the iterator contains _only_ historical entries in its
+    // remaining tail. We can produce such a state by adding an empty lineage and then setting
+    // values in that lineage.
+    let lineage_1: LineageId = rng.value();
+    let version_1: VersionId = rng.value();
+    forest.add_lineage(lineage_1, version_1, SmtUpdateBatch::empty())?;
+
+    // We now set values in that lineage.
+    let version_2 = version_1 + 1;
+    let key_1: Word = rng.value();
+    let value_1: Word = rng.value();
+    let key_2: Word = rng.value();
+    let value_2: Word = rng.value();
+    let operations = SmtUpdateBatch::new(
+        [ForestOperation::insert(key_1, value_1), ForestOperation::insert(key_2, value_2)]
+            .into_iter(),
+    );
+    forest.update_tree(lineage_1, version_2, operations)?;
+
+    // At this point, we should see an empty iterator for entries if we query in the history.
+    let historical_tree = TreeId::new(lineage_1, version_1);
+    assert_eq!(forest.entries(historical_tree)?.count(), 0);
+
+    // The SECOND scenario is where only some entries are added, so we end up with entire leaves
+    // that are history only and contain empty values.
+    let lineage_2: LineageId = rng.value();
+    let key_1 = Word::from([1u32, 0, 0, 42]);
+    let value_1: Word = rng.value();
+    forest.add_lineage(
+        lineage_2,
+        version_1,
+        SmtUpdateBatch::new([ForestOperation::insert(key_1, value_1)].into_iter()),
+    )?;
+
+    // Now we add an update to a different leaf.
+    let key_2 = Word::from([2u32, 0, 0, 43]);
+    let value_2: Word = rng.value();
+    forest.update_tree(
+        lineage_2,
+        version_2,
+        SmtUpdateBatch::new([ForestOperation::insert(key_2, value_2)].into_iter()),
+    )?;
+
+    // Now, when we query for entries on the historical version, we should only see one entry, and
+    // no entries should be the empty word.
+    let historical_tree = TreeId::new(lineage_2, version_1);
+    assert_eq!(forest.entries(historical_tree)?.count(), 1);
+    assert!(forest.entries(historical_tree)?.all(|e| e.value != EMPTY_WORD));
+
+    // The third scenario is where entries are added within a shared leaf, where we should only see
+    // the historical leaf entries and not their reversions.
+    let lineage_3: LineageId = rng.value();
+    let key_1 = Word::from([1u32, 0, 0, 42]);
+    let value_1: Word = rng.value();
+    forest.add_lineage(
+        lineage_3,
+        version_1,
+        SmtUpdateBatch::new([ForestOperation::insert(key_1, value_1)].into_iter()),
+    )?;
+
+    // We now add an update in the same leaf.
+    let key_2 = Word::from([2u32, 0, 0, 42]);
+    let value_2: Word = rng.value();
+    forest.update_tree(
+        lineage_3,
+        version_2,
+        SmtUpdateBatch::new([ForestOperation::insert(key_2, value_2)].into_iter()),
+    )?;
+
+    // Now when we query the historical version, we should only see one entry, and no reversions.
+    let historical_tree = TreeId::new(lineage_3, version_1);
+    assert_eq!(forest.entries(historical_tree)?.count(), 1);
+    assert!(forest.entries(historical_tree)?.all(|e| e.value != EMPTY_WORD));
+
+    Ok(())
+}
+
+// SINGLE-TREE MODIFIER TESTS
+// ================================================================================================
+
+#[test]
+fn add_lineage() -> Result<()> {
+    let backend = ForestInMemoryBackend::new();
+    let mut forest = Forest::new(backend)?;
+    let mut rng = ContinuousRng::new([0x42; 32]);
+
+    // We can add an initial lineage to the forest, starting with no changes from the default tree.
+    let lineage: LineageId = rng.value();
+    let version: VersionId = rng.value();
+    let result = forest.add_lineage(lineage, version, SmtUpdateBatch::default());
+    assert!(result.is_ok());
+
+    // This should yield the correct value, which we'll check using a Smt.
+    let tree = Smt::new();
+
+    let result = result?;
+    assert_eq!(result.root(), tree.root());
+    assert_eq!(result.lineage(), lineage);
+    assert_eq!(result.version(), version);
+
+    // The newly-added lineage should also not be listed as having a non-empty history.
+    assert!(!forest.get_non_empty_histories().contains(&lineage));
+
+    // If we try and add a duplicated lineage again, we should get an error.
+    let result = forest.add_lineage(lineage, version, SmtUpdateBatch::default());
+    assert!(result.is_err());
+    assert_matches!(result.unwrap_err(), LargeSmtForestError::DuplicateLineage(l) if l == lineage);
+
+    Ok(())
+}
+
+#[test]
+fn update_tree() -> Result<()> {
+    let backend = ForestInMemoryBackend::new();
+    let mut forest = Forest::new(backend)?;
+    let mut rng = ContinuousRng::new([0x69; 32]);
+
+    // Let's start by adding a lineage to the forest...
+    let lineage_1: LineageId = rng.value();
+    let version_1: VersionId = rng.value();
+    let key_1: Word = rng.value();
+    let value_1: Word = rng.value();
+
+    let mut operations = SmtUpdateBatch::default();
+    operations.add_insert(key_1, value_1);
+
+    let result = forest.add_lineage(lineage_1, version_1, operations)?;
+
+    // ... and creating an auxiliary tree with the same value to check consistency.
+    let mut tree = Smt::new();
+    tree.insert(key_1, value_1)?;
+
+    assert_eq!(result.root(), tree.root());
+
+    // Initially, this new lineage should not be listed as having a non-empty history.
+    assert!(!forest.get_non_empty_histories().contains(&lineage_1));
+
+    // If we try and update a lineage that is unknown, we should see an error.
+    let unknown_lineage: LineageId = rng.value();
+    let result = forest.update_tree(unknown_lineage, version_1, SmtUpdateBatch::default());
+    assert!(result.is_err());
+    assert_matches!(
+        result.unwrap_err(),
+        LargeSmtForestError::UnknownLineage(l) if l == unknown_lineage
+    );
+
+    // If we add a version that is older than the latest known version for that lineage, we should
+    // see an error.
+    let older_version = version_1 - 1;
+    let result = forest.update_tree(lineage_1, older_version, SmtUpdateBatch::default());
+    assert!(result.is_err());
+    assert_matches!(
+        result.unwrap_err(),
+        LargeSmtForestError::BadVersion { provided, latest }
+            if provided == older_version && latest == version_1
+    );
+
+    // Let's create some data and actually add it.
+    let key_2: Word = rng.value();
+    let value_2: Word = rng.value();
+    let key_3: Word = rng.value();
+    let value_3: Word = rng.value();
+
+    let mut operations = SmtUpdateBatch::default();
+    operations.add_insert(key_2, value_2);
+    operations.add_insert(key_3, value_3);
+    operations.add_remove(key_1);
+
+    let version_2: VersionId = rng.value();
+    let result = forest.update_tree(lineage_1, version_2, operations)?;
+
+    // And we can check this against the tree.
+    let mutations =
+        tree.compute_mutations(vec![(key_1, EMPTY_WORD), (key_2, value_2), (key_3, value_3)])?;
+    tree.apply_mutations(mutations)?;
+
+    assert_eq!(result.root(), tree.root());
+
+    // And we should also now have a history version that corresponds to the previous version, which
+    // we are going to get at via some test helpers.
+    let history = forest.get_history(lineage_1);
+    assert_eq!(history.num_versions(), 1);
+
+    // If we query for each value, we should see the correct reversions.
+    let view = history.get_view_at(version_1)?;
+
+    assert_eq!(view.leaf_delta(&LeafIndex::from(key_1)).get(&key_1), Some(&value_1));
+    assert_eq!(view.leaf_delta(&LeafIndex::from(key_2)).get(&key_2), Some(&EMPTY_WORD));
+    assert_eq!(view.leaf_delta(&LeafIndex::from(key_3)).get(&key_3), Some(&EMPTY_WORD));
+
+    // We should also now see this lineage listed as having a non-empty history.
+    assert!(forest.get_non_empty_histories().contains(&lineage_1));
+
+    // Finally, if we provide an update that does not change the tree, the method should succeed but
+    // not result in any state changes.
+    assert_eq!(forest.lineage_roots(lineage_1).unwrap().count(), 2);
+    let empty_ops = SmtUpdateBatch::default();
+    let version_3 = version_2 + 1;
+    forest.update_tree(lineage_1, version_3, empty_ops)?;
+    assert_eq!(forest.lineage_roots(lineage_1).unwrap().count(), 2);
+    let history = forest.get_history(lineage_1);
+    assert_eq!(history.num_versions(), 1);
+
+    Ok(())
+}
+
+// MULTI-TREE MODIFIER TESTS
+// ================================================================================================
+
+#[test]
+fn update_forest() -> Result<()> {
+    let backend = ForestInMemoryBackend::new();
+    let mut forest = Forest::new(backend)?;
+    let mut rng = ContinuousRng::new([0x69; 32]);
+
+    // Let's start by adding a few empty lineages to the forest, just so we have a starting point.
+    // Adding all of these should succeed as they are disjoint lineages.
+    let version_1: VersionId = rng.value();
+    let lineage_1: LineageId = rng.value();
+    let lineage_2: LineageId = rng.value();
+    let lineage_3: LineageId = rng.value();
+    let lineage_4: LineageId = rng.value();
+
+    let l1_r1 = forest.add_lineage(lineage_1, version_1, SmtUpdateBatch::default())?;
+    let l2_r1 = forest.add_lineage(lineage_2, version_1, SmtUpdateBatch::default())?;
+    let l3_r1 = forest.add_lineage(lineage_3, version_1, SmtUpdateBatch::default())?;
+    let l4_r1 = forest.add_lineage(lineage_4, version_1, SmtUpdateBatch::default())?;
+
+    // Let's compose some updates.
+    let l1_key_1: Word = rng.value();
+    let l1_value_1: Word = rng.value();
+    let l2_key_1: Word = rng.value();
+    let l2_value_1: Word = rng.value();
+    let l3_key_1: Word = rng.value();
+    let l3_value_1: Word = rng.value();
+    let l4_key_1: Word = rng.value();
+    let l4_value_1: Word = rng.value();
+
+    // First we want to test the case where we refer to a lineage that doesn't exist. In this case,
+    // we should get an error.
+    let ne_lineage: LineageId = rng.value();
+    let version_bad = version_1 - 1;
+    let version_2 = version_1 + 1;
+    let mut operations_ne_lineage = SmtForestUpdateBatch::empty();
+    operations_ne_lineage.operations(lineage_1).add_insert(l1_key_1, l1_value_1);
+    operations_ne_lineage.operations(lineage_2).add_insert(l2_key_1, l2_value_1);
+    operations_ne_lineage.operations(lineage_3).add_insert(l3_key_1, l3_value_1);
+    operations_ne_lineage.operations(lineage_4).add_insert(l4_key_1, l4_value_1);
+    let operations_basic = operations_ne_lineage.clone();
+    operations_ne_lineage.operations(ne_lineage);
+
+    let result = forest.update_forest(version_2, operations_ne_lineage);
+    assert!(result.is_err());
+    assert_matches!(result.unwrap_err(), LargeSmtForestError::UnknownLineage(l) if l == ne_lineage);
+
+    // When a precondition check like this fails, we should also have unchanged state.
+    assert_eq!(
+        forest.root_info(TreeId::new(lineage_1, version_1)),
+        RootInfo::LatestVersion(l1_r1.root())
+    );
+    assert_eq!(
+        forest.root_info(TreeId::new(lineage_2, version_1)),
+        RootInfo::LatestVersion(l2_r1.root())
+    );
+    assert_eq!(
+        forest.root_info(TreeId::new(lineage_3, version_1)),
+        RootInfo::LatestVersion(l3_r1.root())
+    );
+    assert_eq!(
+        forest.root_info(TreeId::new(lineage_4, version_1)),
+        RootInfo::LatestVersion(l4_r1.root())
+    );
+
+    // We also want to test that we get an error when we ask for a bad version transition.
+    let result = forest.update_forest(version_bad, operations_basic.clone());
+    assert!(result.is_err());
+    assert_matches!(
+        result.unwrap_err(),
+        LargeSmtForestError::BadVersion { provided, latest }
+            if provided == version_bad && latest == version_1
+    );
+
+    // This should also leave the internal state unchanged.
+    assert_eq!(
+        forest.root_info(TreeId::new(lineage_1, version_1)),
+        RootInfo::LatestVersion(l1_r1.root())
+    );
+    assert_eq!(
+        forest.root_info(TreeId::new(lineage_2, version_1)),
+        RootInfo::LatestVersion(l2_r1.root())
+    );
+    assert_eq!(
+        forest.root_info(TreeId::new(lineage_3, version_1)),
+        RootInfo::LatestVersion(l3_r1.root())
+    );
+    assert_eq!(
+        forest.root_info(TreeId::new(lineage_4, version_1)),
+        RootInfo::LatestVersion(l4_r1.root())
+    );
+
+    // When a batch goes ahead successfully we should just get back the new roots to the trees,
+    // which can be associated by their lineages.
+    let roots = forest.update_forest(version_2, operations_basic)?;
+    assert_eq!(roots.len(), 4);
+
+    // We can check that the updates went correctly by using auxiliary trees, and checking the
+    // values in the returned roots.
+    let mut tree_1 = Smt::new();
+    tree_1.insert(l1_key_1, l1_value_1)?;
+    let mut tree_2 = Smt::new();
+    tree_2.insert(l2_key_1, l2_value_1)?;
+    let mut tree_3 = Smt::new();
+    tree_3.insert(l3_key_1, l3_value_1)?;
+    let mut tree_4 = Smt::new();
+    tree_4.insert(l4_key_1, l4_value_1)?;
+
+    assert!(roots.iter().any(|e| e.root() == tree_1.root()
+        && e.version() == version_2
+        && e.lineage() == lineage_1));
+    assert!(roots.iter().any(|e| e.root() == tree_2.root()
+        && e.version() == version_2
+        && e.lineage() == lineage_2));
+    assert!(roots.iter().any(|e| e.root() == tree_3.root()
+        && e.version() == version_2
+        && e.lineage() == lineage_3));
+    assert!(roots.iter().any(|e| e.root() == tree_4.root()
+        && e.version() == version_2
+        && e.lineage() == lineage_4));
+
+    // We also want to see that each of the updated lineages is now listed as having a non-empty
+    // history.
+    assert!(forest.get_non_empty_histories().contains(&lineage_1));
+    assert!(forest.get_non_empty_histories().contains(&lineage_2));
+    assert!(forest.get_non_empty_histories().contains(&lineage_3));
+    assert!(forest.get_non_empty_histories().contains(&lineage_4));
+
+    // We also want to see that if a batch is processed that does not result in changes for a given
+    // tree, no state changes are made to that lineage. We check both the case where there are
+    // operations that result in no changes, and where no operations are specified.
+    let version_3 = version_2 + 1;
+    let key_5: Word = rng.value();
+    let value_5: Word = rng.value();
+    let mut operations_with_nop = SmtForestUpdateBatch::empty();
+    operations_with_nop.operations(lineage_1).add_insert(l1_key_1, l1_value_1);
+    operations_with_nop.operations(lineage_2);
+    operations_with_nop.operations(lineage_3).add_insert(key_5, value_5);
+
+    // Before we make these batches happen, let's check where things stand.
+    assert_eq!(forest.lineage_roots(lineage_1).unwrap().count(), 2);
+    assert_eq!(forest.lineage_roots(lineage_2).unwrap().count(), 2);
+    assert_eq!(forest.lineage_roots(lineage_3).unwrap().count(), 2);
+    assert_eq!(forest.lineage_roots(lineage_4).unwrap().count(), 2);
+
+    // Then we should apply the batch.
+    let roots = forest.update_forest(version_3, operations_with_nop)?;
+    assert_eq!(roots.len(), 3);
+
+    // And for the no-op or unchanged cases we should not have new roots.
+    assert_eq!(forest.lineage_roots(lineage_1).unwrap().count(), 2);
+    assert_eq!(forest.lineage_roots(lineage_2).unwrap().count(), 2);
+    assert_eq!(forest.lineage_roots(lineage_3).unwrap().count(), 3);
+    assert_eq!(forest.lineage_roots(lineage_4).unwrap().count(), 2);
+
+    Ok(())
+}
 
 #![cfg(all(test, feature = "std"))]
 

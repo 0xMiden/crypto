@@ -235,10 +235,9 @@ fn hash_test_vectors() {
         Felt::new(18),
     ];
 
-    for i in 0..elements.len() {
-        let expected = EXPECTED[i];
+    for (i, expected) in EXPECTED.iter().enumerate() {
         let result = Rpo256::hash_elements(&elements[..(i + 1)]);
-        assert_eq!(result, expected);
+        assert_eq!(result, *expected);
     }
 }
 
@@ -279,6 +278,15 @@ proptest! {
     }
 }
 
+/// Expected hash outputs for RPO with the state layout `[RATE0, RATE1, CAPACITY]`.
+///
+/// These test vectors have been cross-checked against a Python reference implementation adapted
+/// from the original specification at <https://github.com/ASDiscreteMathematics/rpo>. The
+/// reference uses the same permutation (MDS matrix, round constants, S-Box) but with the
+/// original layout `[CAPACITY, RATE0, RATE1]`. This script adapts it to use the current layout
+/// `[RATE0, RATE1, CAPACITY]` and verifies all 19 vectors match.
+///
+/// The verification script is located at `generate_test_vectors.py` in this directory.
 const EXPECTED: [Word; 19] = [
     Word::new([
         Felt::new(8563248028282119176),

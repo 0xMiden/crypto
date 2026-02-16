@@ -112,6 +112,13 @@ impl InOrderIndex {
     pub fn inner(&self) -> usize {
         self.idx
     }
+
+    /// Returns the leaf position if this index points to a leaf.
+    ///
+    /// Leaf positions are 0-indexed and correspond to `from_leaf_pos`.
+    pub fn to_leaf_pos(&self) -> Option<usize> {
+        if self.is_leaf() { Some((self.idx - 1) / 2) } else { None }
+    }
 }
 
 impl Serializable for InOrderIndex {

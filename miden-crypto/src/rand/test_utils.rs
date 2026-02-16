@@ -124,3 +124,23 @@ pub fn prng_vector<T: Randomizable>(seed: [u8; 32], length: usize) -> Vec<T> {
     let mut rng = seeded_rng(seed);
     (0..length).map(|_| rng_value(&mut rng)).collect()
 }
+
+// CONTINUOUS RNG
+// ================================================================================================
+
+/// A continuous random number generator that works in `no-std` contexts.
+#[derive(Debug)]
+pub struct ContinuousRng {
+    rng: ChaCha20Rng,
+}
+impl ContinuousRng {
+    /// Creates a new instance of the random number generator from the seed.
+    pub fn new(seed: [u8; 32]) -> ContinuousRng {
+        ContinuousRng { rng: ChaCha20Rng::from_seed(seed) }
+    }
+
+    /// Generates a random value of the [`Randomizable`] type `T`.
+    pub fn value<T: Randomizable>(&mut self) -> T {
+        rng_value(&mut self.rng)
+    }
+}
