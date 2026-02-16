@@ -1,10 +1,8 @@
 //! A [Word] type used in the Miden protocol and associated utilities.
 
 use alloc::{string::String, vec::Vec};
-
 #[cfg(not(all(target_family = "wasm", miden)))]
 use core::fmt::Display;
-
 use core::{
     cmp::Ordering,
     hash::{Hash, Hasher},
@@ -16,7 +14,6 @@ use core::{
 use miden_serde_utils::{
     ByteReader, ByteWriter, Deserializable, DeserializationError, Serializable,
 };
-
 use thiserror::Error;
 
 pub const WORD_SIZE_FELT: usize = 4;
@@ -25,9 +22,8 @@ pub const WORD_SIZE_BYTES: usize = 32;
 #[cfg(not(all(target_family = "wasm", miden)))]
 use p3_field::{PrimeCharacteristicRing, PrimeField64, integers::QuotientMap};
 
-use crate::utils::bytes_to_hex_string;
-
 use super::Felt;
+use crate::utils::bytes_to_hex_string;
 
 mod lexicographic;
 pub use lexicographic::LexicographicWord;
@@ -60,7 +56,8 @@ pub struct Word {
     // bindings are expecting the remapped type to be the same shape as the one generated from
     // WIT.
     //
-    // see sdk/base-macros/wit/miden.wit in the compiler repo, so we have to define it like that here.
+    // see sdk/base-macros/wit/miden.wit in the compiler repo, so we have to define it like that
+    // here.
 }
 
 impl core::fmt::Debug for Word {

@@ -15,7 +15,11 @@ version.workspace      = true
 [lib]
 crate-type = ["rlib"]
 
-# dependendies for off-chain target
+# dependendies for both off-chain and on-chain targets
+[dependencies]
+thiserror = { default-features = false, version = "2.0" }
+
+# dependendies for the off-chain target only
 [target.'cfg(not(all(target_family = "wasm", miden)))'.dependencies]
 miden-serde-utils = { workspace = true }
 num-bigint        = { default-features = false, version = "0.4" }
@@ -27,17 +31,13 @@ proptest          = { default-features = false, features = ["alloc"], optional =
 rand              = { default-features = false, features = ["small_rng"], version = "0.9.0" }
 serde             = { default-features = false, features = ["derive"], version = "1.0" }
 
-# dependendies for on-chain target
-[dependencies]
-thiserror         = { default-features = false, version = "2.0" }
-
 [features]
 default = []
 testing = ["dep:proptest"]
 
 [dev-dependencies]
-rand                          = { default-features = false, version = "0.9" }
-rstest         = { version = "0.26" }
+rand   = { default-features = false, version = "0.9" }
+rstest = { version = "0.26" }
 
 [lints]
 workspace = true

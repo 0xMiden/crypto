@@ -1,7 +1,7 @@
-use thiserror::Error;
-
 use alloc::string::String;
 use core::fmt::Write;
+
+use thiserror::Error;
 
 /// Renders an array of bytes as hex into a String.
 pub fn bytes_to_hex_string<const N: usize>(data: [u8; N]) -> String {
