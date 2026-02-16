@@ -396,8 +396,8 @@ impl Subtree {
 
         let hashes: Vec<Word> = hash_data
             .chunks_exact(Self::HASH_SIZE)
-            .map(|chunk| Word::try_from(chunk).expect("chunk size is exactly HASH_SIZE"))
-            .collect();
+            .map(|chunk| Word::try_from(chunk).map_err(|_| SubtreeError::InvalidHashData))
+            .collect::<Result<_, _>>()?;
 
         Ok(Self { root_index, child_bits, hashes })
     }

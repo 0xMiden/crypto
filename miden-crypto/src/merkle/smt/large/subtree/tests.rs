@@ -360,6 +360,22 @@ fn test_from_vec_rejects_unused_bitmask_bits() {
 }
 
 #[test]
+fn test_from_vec_rejects_invalid_field_element() {
+    let root_index = NodeIndex::new(SUBTREE_DEPTH, 0).unwrap();
+
+    // One hash slot with a limb >= the Goldilocks prime.
+    let mut data = vec![0u8; Subtree::BITMASK_SIZE];
+    data[0] |= 1;
+    data.extend_from_slice(&u64::MAX.to_le_bytes());
+    data.extend_from_slice(&[0u8; 24]);
+
+    assert!(matches!(
+        Subtree::from_vec(root_index, &data),
+        Err(super::SubtreeError::InvalidHashData)
+    ));
+}
+
+#[test]
 fn test_apply_mutations() {
     let root_index = NodeIndex::new(SUBTREE_DEPTH, 0).unwrap();
     let mut subtree = Subtree::new(root_index);
