@@ -3,6 +3,7 @@
 - [BREAKING] `PartialMmr::open()` now returns `Option<MmrProof>` instead of `Option<MmrPath>` ([#787](https://github.com/0xMiden/crypto/pull/787)).
 - [BREAKING] Refactored BLAKE3 to use `Digest<N>` struct, added `Digest192` type alias ([#811](https://github.com/0xMiden/crypto/pull/811)).
 - [BREAKING] Removed `hashbrown` dependency and `hashmaps` feature; `Map`/`Set` type aliases are now tied to the `std` feature ([#813](https://github.com/0xMiden/crypto/pull/813)).
+- Fixed `LargeSmtForest::truncate` to remove emptied lineages from `non_empty_histories` ([#818](https://github.com/0xMiden/crypto/pull/818)).
 - [BREAKING] Renamed `NodeIndex::value()` to `NodeIndex::position()`, `NodeIndex::is_value_odd()` to `NodeIndex::is_position_odd()`, and `LeafIndex::value()` to `LeafIndex::position()` ([#814](https://github.com/0xMiden/crypto/pull/814)).
 - [BREAKING] Fix OOMs in Merkle/SMT deserialization ([#820](https://github.com/0xMiden/crypto/pull/820)).
 - Fixed `SmtForest` to remove nodes with zero reference count from store ([#821](https://github.com/0xMiden/crypto/pull/821)).

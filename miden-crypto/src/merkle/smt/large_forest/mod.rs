@@ -526,7 +526,9 @@ impl<B: Backend> LargeSmtForest<B> {
             }
         });
 
-        self.non_empty_histories.extend(newly_empty);
+        for l in &newly_empty {
+            self.non_empty_histories.remove(l);
+        }
     }
 }
 

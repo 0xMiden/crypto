@@ -13,16 +13,20 @@ use itertools::Itertools;
 
 use super::{Config, Result};
 use crate::{
-    EMPTY_WORD, Word,
+    EMPTY_WORD, Map, Set, Word,
     merkle::{
         EmptySubtreeRoots,
         smt::{
             Backend, ForestInMemoryBackend, ForestOperation, LargeSmtForest, LargeSmtForestError,
             LeafIndex, RootInfo, Smt, SmtForestUpdateBatch, SmtUpdateBatch, TreeId, VersionId,
-            large_forest::root::{LineageId, TreeEntry, TreeWithRoot},
+            large_forest::{
+                LineageData,
+                history::{History, LeafChanges, NodeChanges},
+                root::{LineageId, TreeEntry, TreeWithRoot},
+            },
         },
     },
-    rand::test_utils::ContinuousRng,
+    rand::test_utils::{ContinuousRng, rand_value},
 };
 
 // TYPE ALIASES
@@ -1111,4 +1115,94 @@ fn update_forest() -> Result<()> {
     assert_eq!(forest.lineage_roots(lineage_4).unwrap().count(), 2);
 
     Ok(())
+}
+
+// TRUNCATION
+// ================================================================================================
+
+#[test]
+fn truncate_removes_emptied_lineages_from_non_empty_histories() {
+    let lineage: LineageId = rand_value();
+    let root: Word = rand_value();
+
+    // Build a lineage with one historical version at version 5, and a latest version of 10.
+    let mut history = History::empty(4);
+    let nodes = NodeChanges::default();
+    let leaves = LeafChanges::default();
+    history.add_version(rand_value(), 5, nodes, leaves).unwrap();
+    assert_eq!(history.num_versions(), 1);
+
+    let lineage_data = LineageData {
+        history,
+        latest_version: 10,
+        latest_root: root,
+    };
+
+    let mut lineage_map = Map::default();
+    lineage_map.insert(lineage, lineage_data);
+
+    let mut non_empty = Set::default();
+    non_empty.insert(lineage);
+
+    let mut forest = LargeSmtForest {
+        config: Config::default(),
+        backend: ForestInMemoryBackend::new(),
+        lineage_data: lineage_map,
+        non_empty_histories: non_empty,
+    };
+
+    // Sanity: the lineage is tracked as having a non-empty history.
+    assert!(forest.non_empty_histories.contains(&lineage));
+
+    // Truncate to a version >= latest_version, which clears the history entirely.
+    forest.truncate(10);
+
+    // The lineage's history should now be empty, and it must have been removed from the set.
+    assert!(
+        !forest.non_empty_histories.contains(&lineage),
+        "emptied lineage must be removed from non_empty_histories after truncation"
+    );
+}
+
+#[test]
+fn truncate_retains_non_empty_lineages_in_non_empty_histories() {
+    let lineage: LineageId = rand_value();
+    let root: Word = rand_value();
+
+    // Build a lineage with two historical versions (5 and 8), latest version 15.
+    let mut history = History::empty(4);
+    let nodes = NodeChanges::default();
+    let leaves = LeafChanges::default();
+    history.add_version(rand_value(), 5, nodes.clone(), leaves.clone()).unwrap();
+    history.add_version(rand_value(), 8, nodes, leaves).unwrap();
+    assert_eq!(history.num_versions(), 2);
+
+    let lineage_data = LineageData {
+        history,
+        latest_version: 15,
+        latest_root: root,
+    };
+
+    let mut lineage_map = Map::new();
+    lineage_map.insert(lineage, lineage_data);
+
+    let mut non_empty = Set::default();
+    non_empty.insert(lineage);
+
+    let mut forest = LargeSmtForest {
+        config: Config::default(),
+        backend: ForestInMemoryBackend::new(),
+        lineage_data: lineage_map,
+        non_empty_histories: non_empty,
+    };
+
+    // Truncate to version 7: removes versions older than 7, but version 8 should remain.
+    // Since version < latest_version (15), LineageData::truncate returns false.
+    forest.truncate(7);
+
+    // The history still has data, so the lineage must stay in non_empty_histories.
+    assert!(
+        forest.non_empty_histories.contains(&lineage),
+        "lineage with remaining history must stay in non_empty_histories"
+    );
 }
