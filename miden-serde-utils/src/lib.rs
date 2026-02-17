@@ -483,6 +483,10 @@ where
         let v2 = T2::read_from(source)?;
         Ok((v1, v2))
     }
+
+    fn min_serialized_size() -> usize {
+        T1::min_serialized_size().saturating_add(T2::min_serialized_size())
+    }
 }
 
 impl<T1, T2, T3> Deserializable for (T1, T2, T3)
@@ -496,6 +500,12 @@ where
         let v2 = T2::read_from(source)?;
         let v3 = T3::read_from(source)?;
         Ok((v1, v2, v3))
+    }
+
+    fn min_serialized_size() -> usize {
+        T1::min_serialized_size()
+            .saturating_add(T2::min_serialized_size())
+            .saturating_add(T3::min_serialized_size())
     }
 }
 
@@ -512,6 +522,13 @@ where
         let v3 = T3::read_from(source)?;
         let v4 = T4::read_from(source)?;
         Ok((v1, v2, v3, v4))
+    }
+
+    fn min_serialized_size() -> usize {
+        T1::min_serialized_size()
+            .saturating_add(T2::min_serialized_size())
+            .saturating_add(T3::min_serialized_size())
+            .saturating_add(T4::min_serialized_size())
     }
 }
 
@@ -530,6 +547,14 @@ where
         let v4 = T4::read_from(source)?;
         let v5 = T5::read_from(source)?;
         Ok((v1, v2, v3, v4, v5))
+    }
+
+    fn min_serialized_size() -> usize {
+        T1::min_serialized_size()
+            .saturating_add(T2::min_serialized_size())
+            .saturating_add(T3::min_serialized_size())
+            .saturating_add(T4::min_serialized_size())
+            .saturating_add(T5::min_serialized_size())
     }
 }
 
@@ -550,6 +575,15 @@ where
         let v5 = T5::read_from(source)?;
         let v6 = T6::read_from(source)?;
         Ok((v1, v2, v3, v4, v5, v6))
+    }
+
+    fn min_serialized_size() -> usize {
+        T1::min_serialized_size()
+            .saturating_add(T2::min_serialized_size())
+            .saturating_add(T3::min_serialized_size())
+            .saturating_add(T4::min_serialized_size())
+            .saturating_add(T5::min_serialized_size())
+            .saturating_add(T6::min_serialized_size())
     }
 }
 

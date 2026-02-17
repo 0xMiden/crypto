@@ -104,36 +104,40 @@ pub mod stark {
 
 /// An alias for a key-value map.
 ///
-/// By default, this is an alias for the [`alloc::collections::BTreeMap`], however, when the
-/// `hashmaps` feature is enabled, this is an alias for the `hashbrown`'s `HashMap`.
-#[cfg(feature = "hashmaps")]
-pub type Map<K, V> = hashbrown::HashMap<K, V>;
+/// When the `std` feature is enabled, this is an alias for [`std::collections::HashMap`].
+/// Otherwise, this is an alias for [`alloc::collections::BTreeMap`].
+#[cfg(feature = "std")]
+pub type Map<K, V> = std::collections::HashMap<K, V>;
 
-#[cfg(feature = "hashmaps")]
-pub use hashbrown::hash_map::Entry as MapEntry;
+#[cfg(feature = "std")]
+pub use std::collections::hash_map::Entry as MapEntry;
+#[cfg(feature = "std")]
+pub use std::collections::hash_map::IntoIter as MapIntoIter;
 
 /// An alias for a key-value map.
 ///
-/// By default, this is an alias for the [`alloc::collections::BTreeMap`], however, when the
-/// `hashmaps` feature is enabled, this is an alias for the `hashbrown`'s `HashMap`.
-#[cfg(not(feature = "hashmaps"))]
+/// When the `std` feature is enabled, this is an alias for [`std::collections::HashMap`].
+/// Otherwise, this is an alias for [`alloc::collections::BTreeMap`].
+#[cfg(not(feature = "std"))]
 pub type Map<K, V> = alloc::collections::BTreeMap<K, V>;
 
-#[cfg(not(feature = "hashmaps"))]
+#[cfg(not(feature = "std"))]
 pub use alloc::collections::btree_map::Entry as MapEntry;
+#[cfg(not(feature = "std"))]
+pub use alloc::collections::btree_map::IntoIter as MapIntoIter;
 
 /// An alias for a simple set.
 ///
-/// By default, this is an alias for the [`alloc::collections::BTreeSet`]. However, when the
-/// `hashmaps` feature is enabled, this becomes an alias for hashbrown's HashSet.
-#[cfg(feature = "hashmaps")]
-pub type Set<V> = hashbrown::HashSet<V>;
+/// When the `std` feature is enabled, this is an alias for [`std::collections::HashSet`].
+/// Otherwise, this is an alias for [`alloc::collections::BTreeSet`].
+#[cfg(feature = "std")]
+pub type Set<V> = std::collections::HashSet<V>;
 
 /// An alias for a simple set.
 ///
-/// By default, this is an alias for the [`alloc::collections::BTreeSet`]. However, when the
-/// `hashmaps` feature is enabled, this becomes an alias for hashbrown's HashSet.
-#[cfg(not(feature = "hashmaps"))]
+/// When the `std` feature is enabled, this is an alias for [`std::collections::HashSet`].
+/// Otherwise, this is an alias for [`alloc::collections::BTreeSet`].
+#[cfg(not(feature = "std"))]
 pub type Set<V> = alloc::collections::BTreeSet<V>;
 
 // CONSTANTS
@@ -175,7 +179,6 @@ pub trait SequentialCommit {
 // ================================================================================================
 
 mod batch_inversion {
-
     use alloc::vec::Vec;
 
     use p3_maybe_rayon::prelude::*;

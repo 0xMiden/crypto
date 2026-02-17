@@ -27,7 +27,7 @@ use crate::utils::{ByteReader, ByteWriter, Deserializable, DeserializationError,
 #[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 pub struct NodeIndex {
     depth: u8,
-    value: u64,
+    position: u64,
 }
 
 impl NodeIndex {
@@ -39,68 +39,68 @@ impl NodeIndex {
     /// # Errors
     /// Returns an error if:
     /// - `depth` is greater than 64.
-    /// - `value` is greater than or equal to 2^{depth}.
-    pub const fn new(depth: u8, value: u64) -> Result<Self, MerkleError> {
+    /// - `position` is greater than or equal to 2^{depth}.
+    pub const fn new(depth: u8, position: u64) -> Result<Self, MerkleError> {
         if depth > 64 {
             Err(MerkleError::DepthTooBig(depth as u64))
-        } else if (64 - value.leading_zeros()) > depth as u32 {
-            Err(MerkleError::InvalidNodeIndex { depth, value })
+        } else if (64 - position.leading_zeros()) > depth as u32 {
+            Err(MerkleError::InvalidNodeIndex { depth, position })
         } else {
-            Ok(Self { depth, value })
+            Ok(Self { depth, position })
         }
     }
 
     /// Creates a new node index without checking its validity.
-    pub const fn new_unchecked(depth: u8, value: u64) -> Self {
+    pub const fn new_unchecked(depth: u8, position: u64) -> Self {
         debug_assert!(depth <= 64);
-        debug_assert!((64 - value.leading_zeros()) <= depth as u32);
-        Self { depth, value }
+        debug_assert!((64 - position.leading_zeros()) <= depth as u32);
+        Self { depth, position }
     }
 
     /// Creates a new node index for testing purposes.
     ///
     /// # Panics
-    /// Panics if the `value` is greater than or equal to 2^{depth}.
+    /// Panics if the `position` is greater than or equal to 2^{depth}.
     #[cfg(test)]
-    pub fn make(depth: u8, value: u64) -> Self {
-        Self::new(depth, value).unwrap()
+    pub fn make(depth: u8, position: u64) -> Self {
+        Self::new(depth, position).unwrap()
     }
 
-    /// Creates a node index from a pair of field elements representing the depth and value.
+    /// Creates a node index from a pair of field elements representing the depth and position.
     ///
     /// # Errors
     /// Returns an error if:
     /// - `depth` is greater than 64.
-    /// - `value` is greater than or equal to 2^{depth}.
-    pub fn from_elements(depth: &Felt, value: &Felt) -> Result<Self, MerkleError> {
+    /// - `position` is greater than or equal to 2^{depth}.
+    pub fn from_elements(depth: &Felt, position: &Felt) -> Result<Self, MerkleError> {
         let depth = depth.as_canonical_u64();
         let depth = u8::try_from(depth).map_err(|_| MerkleError::DepthTooBig(depth))?;
-        let value = value.as_canonical_u64();
-        Self::new(depth, value)
+        let position = position.as_canonical_u64();
+        Self::new(depth, position)
     }
 
     /// Creates a new node index pointing to the root of the tree.
     pub const fn root() -> Self {
-        Self { depth: 0, value: 0 }
+        Self { depth: 0, position: 0 }
     }
 
     /// Computes sibling index of the current node.
     pub const fn sibling(mut self) -> Self {
-        self.value ^= 1;
+        self.position ^= 1;
         self
     }
 
     /// Returns left child index of the current node.
     pub const fn left_child(mut self) -> Self {
         self.depth += 1;
-        self.value <<= 1;
+        self.position <<= 1;
         self
     }
 
     /// Returns right child index of the current node.
     pub const fn right_child(mut self) -> Self {
         self.depth += 1;
-        self.value = (self.value << 1) + 1;
+        self.position = (self.position << 1) + 1;
         self
     }
 
@@ -108,7 +108,7 @@ impl NodeIndex {
     /// a new value instead of mutating `self`.
     pub const fn parent(mut self) -> Self {
         self.depth = self.depth.saturating_sub(1);
-        self.value >>= 1;
+        self.position >>= 1;
         self
     }
 
@@ -119,18 +119,18 @@ impl NodeIndex {
     ///
     /// Will evaluate the parity of the current instance to define the result.
     pub const fn build_node(&self, slf: Word, sibling: Word) -> [Word; 2] {
-        if self.is_value_odd() {
+        if self.is_position_odd() {
             [sibling, slf]
         } else {
             [slf, sibling]
         }
     }
 
-    /// Returns the scalar representation of the depth/value pair.
+    /// Returns the scalar representation of the depth/position pair.
     ///
-    /// It is computed as `2^depth + value`.
+    /// It is computed as `2^depth + position`.
     pub const fn to_scalar_index(&self) -> u64 {
-        (1 << self.depth as u64) + self.value
+        (1 << self.depth as u64) + self.position
     }
 
     /// Returns the depth of the current instance.
@@ -138,19 +138,19 @@ impl NodeIndex {
         self.depth
     }
 
-    /// Returns the value of this index.
-    pub const fn value(&self) -> u64 {
-        self.value
+    /// Returns the position of this index within its depth layer.
+    pub const fn position(&self) -> u64 {
+        self.position
     }
 
     /// Returns `true` if the current instance points to a right sibling node.
-    pub const fn is_value_odd(&self) -> bool {
-        (self.value & 1) == 1
+    pub const fn is_position_odd(&self) -> bool {
+        (self.position & 1) == 1
     }
 
     /// Returns `true` if the n-th node on the path points to a right child.
     pub const fn is_nth_bit_odd(&self, n: u8) -> bool {
-        (self.value >> n) & 1 == 1
+        (self.position >> n) & 1 == 1
     }
 
     /// Returns `true` if the depth is `0`.
@@ -164,7 +164,7 @@ impl NodeIndex {
     /// Traverses one level towards the root, decrementing the depth by `1`.
     pub fn move_up(&mut self) {
         self.depth = self.depth.saturating_sub(1);
-        self.value >>= 1;
+        self.position >>= 1;
     }
 
     /// Traverses towards the root until the specified depth is reached.
@@ -174,7 +174,7 @@ impl NodeIndex {
         debug_assert!(depth < self.depth);
         let delta = self.depth.saturating_sub(depth);
         self.depth = self.depth.saturating_sub(delta);
-        self.value >>= delta as u32;
+        self.position >>= delta as u32;
     }
 
     // ITERATORS
@@ -192,23 +192,28 @@ impl NodeIndex {
 
 impl Display for NodeIndex {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        write!(f, "depth={}, value={}", self.depth, self.value)
+        write!(f, "depth={}, position={}", self.depth, self.position)
     }
 }
 
 impl Serializable for NodeIndex {
     fn write_into<W: ByteWriter>(&self, target: &mut W) {
         target.write_u8(self.depth);
-        target.write_u64(self.value);
+        target.write_u64(self.position);
     }
 }
 
 impl Deserializable for NodeIndex {
     fn read_from<R: ByteReader>(source: &mut R) -> Result<Self, DeserializationError> {
         let depth = source.read_u8()?;
-        let value = source.read_u64()?;
-        NodeIndex::new(depth, value)
+        let position = source.read_u64()?;
+        NodeIndex::new(depth, position)
             .map_err(|_| DeserializationError::InvalidValue("Invalid index".into()))
+    }
+
+    fn min_serialized_size() -> usize {
+        // u8 (depth) + u64 (value)
+        9
     }
 }
 
@@ -253,22 +258,22 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_node_index_value_too_high() {
-        assert_eq!(NodeIndex::new(0, 0).unwrap(), NodeIndex { depth: 0, value: 0 });
+    fn test_node_index_position_too_high() {
+        assert_eq!(NodeIndex::new(0, 0).unwrap(), NodeIndex { depth: 0, position: 0 });
         let err = NodeIndex::new(0, 1).unwrap_err();
-        assert_matches!(err, MerkleError::InvalidNodeIndex { depth: 0, value: 1 });
+        assert_matches!(err, MerkleError::InvalidNodeIndex { depth: 0, position: 1 });
 
-        assert_eq!(NodeIndex::new(1, 1).unwrap(), NodeIndex { depth: 1, value: 1 });
+        assert_eq!(NodeIndex::new(1, 1).unwrap(), NodeIndex { depth: 1, position: 1 });
         let err = NodeIndex::new(1, 2).unwrap_err();
-        assert_matches!(err, MerkleError::InvalidNodeIndex { depth: 1, value: 2 });
+        assert_matches!(err, MerkleError::InvalidNodeIndex { depth: 1, position: 2 });
 
-        assert_eq!(NodeIndex::new(2, 3).unwrap(), NodeIndex { depth: 2, value: 3 });
+        assert_eq!(NodeIndex::new(2, 3).unwrap(), NodeIndex { depth: 2, position: 3 });
         let err = NodeIndex::new(2, 4).unwrap_err();
-        assert_matches!(err, MerkleError::InvalidNodeIndex { depth: 2, value: 4 });
+        assert_matches!(err, MerkleError::InvalidNodeIndex { depth: 2, position: 4 });
 
-        assert_eq!(NodeIndex::new(3, 7).unwrap(), NodeIndex { depth: 3, value: 7 });
+        assert_eq!(NodeIndex::new(3, 7).unwrap(), NodeIndex { depth: 3, position: 7 });
         let err = NodeIndex::new(3, 8).unwrap_err();
-        assert_matches!(err, MerkleError::InvalidNodeIndex { depth: 3, value: 8 });
+        assert_matches!(err, MerkleError::InvalidNodeIndex { depth: 3, position: 8 });
     }
 
     #[test]
@@ -277,13 +282,13 @@ mod tests {
     }
 
     prop_compose! {
-        fn node_index()(value in 0..2u64.pow(u64::BITS - 1)) -> NodeIndex {
+        fn node_index()(position in 0..2u64.pow(u64::BITS - 1)) -> NodeIndex {
             // unwrap never panics because the range of depth is 0..u64::BITS
-            let mut depth = value.ilog2() as u8;
-            if value > (1 << depth) { // round up
+            let mut depth = position.ilog2() as u8;
+            if position > (1 << depth) { // round up
                 depth += 1;
             }
-            NodeIndex::new(depth, value).unwrap()
+            NodeIndex::new(depth, position).unwrap()
         }
     }
 

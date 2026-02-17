@@ -184,6 +184,12 @@ impl SmtLeaf {
         self.entries().iter().copied().flat_map(kv_to_elements)
     }
 
+    /// Returns an iterator over the key-value pairs in the leaf.
+    pub fn to_entries(&self) -> impl Iterator<Item = (&Word, &Word)> + '_ {
+        // Needed for type conversion from `&(T, T)` to `(&T, &T)`.
+        self.entries().iter().map(|(k, v)| (k, v))
+    }
+
     /// Converts a leaf to a list of field elements.
     pub fn into_elements(self) -> Vec<Felt> {
         self.into_entries().into_iter().flat_map(kv_to_elements).collect()
@@ -388,7 +394,7 @@ impl Serializable for SmtLeaf {
         self.num_entries().write_into(target);
 
         // Write: leaf index
-        let leaf_index: u64 = self.index().value();
+        let leaf_index: u64 = self.index().position();
         leaf_index.write_into(target);
 
         // Write: entries
@@ -410,17 +416,17 @@ impl Deserializable for SmtLeaf {
             LeafIndex::new_max_depth(value)
         };
 
-        // Read: entries
-        let mut entries: Vec<(Word, Word)> = Vec::new();
-        for _ in 0..num_entries {
-            let key: Word = source.read()?;
-            let value: Word = source.read()?;
-
-            entries.push((key, value));
-        }
+        // Read: entries using read_many_iter to avoid eager allocation
+        let entries: Vec<(Word, Word)> =
+            source.read_many_iter(num_entries)?.collect::<Result<_, _>>()?;
 
         Self::new(entries, leaf_index)
             .map_err(|err| DeserializationError::InvalidValue(err.to_string()))
+    }
+
+    /// Minimum serialized size: vint64 (num_entries) + u64 (leaf_index) with 0 entries.
+    fn min_serialized_size() -> usize {
+        1 + 8
     }
 }
 

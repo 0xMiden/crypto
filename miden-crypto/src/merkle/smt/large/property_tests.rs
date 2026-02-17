@@ -32,7 +32,7 @@ fn arb_entries(min_size: usize, max_size: usize) -> impl Strategy<Value = Vec<(W
         let mut result = Vec::new();
 
         for (key, value) in entries {
-            let leaf_index = LeafIndex::<SMT_DEPTH>::from(key).value();
+            let leaf_index = LeafIndex::<SMT_DEPTH>::from(key).position();
             if used_indices.insert(leaf_index) && used_keys.insert(key) {
                 result.push((key, value));
             }

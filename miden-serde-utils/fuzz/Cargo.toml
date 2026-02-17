@@ -10,8 +10,8 @@ version = "0.0.0"
 cargo-fuzz = true
 
 [dependencies]
-libfuzzer-sys       = "0.4"
-p3-miden-goldilocks = "0.4"
+libfuzzer-sys = "0.4"
+p3-goldilocks = { default-features = false, version = "0.4.2" }
 
 [dependencies.miden-serde-utils]
 path = ".."
