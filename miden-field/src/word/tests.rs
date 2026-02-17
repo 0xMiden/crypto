@@ -2,13 +2,21 @@ use alloc::{string::String, vec};
 
 use miden_serde_utils::SliceReader;
 use p3_field::PrimeCharacteristicRing;
+use rand::{RngCore, SeedableRng, rngs::SmallRng};
 
 use super::{Deserializable, Felt, Serializable, WORD_SIZE_BYTES, WORD_SIZE_FELTS, Word};
 use crate::word;
 
-/// Generates a random value of type u64 from an RNG.
-pub fn rand_u64() -> u64 {
-    rand::random()
+/// Returns a random test [Word].
+fn test_word() -> Word {
+    const TEST_WORD_SEED: u64 = 0x0b8d_9b8a_1e7a_49d5;
+    let mut rng = SmallRng::seed_from_u64(TEST_WORD_SEED);
+    Word::new([
+        Felt::new(rng.next_u64()),
+        Felt::new(rng.next_u64()),
+        Felt::new(rng.next_u64()),
+        Felt::new(rng.next_u64()),
+    ])
 }
 
 // TESTS
@@ -16,12 +24,7 @@ pub fn rand_u64() -> u64 {
 
 #[test]
 fn word_serialization() {
-    let e1 = Felt::new(rand_u64());
-    let e2 = Felt::new(rand_u64());
-    let e3 = Felt::new(rand_u64());
-    let e4 = Felt::new(rand_u64());
-
-    let d1 = Word::new([e1, e2, e3, e4]);
+    let d1 = test_word();
 
     let mut bytes = vec![];
     d1.write_into(&mut bytes);
@@ -36,12 +39,7 @@ fn word_serialization() {
 
 #[test]
 fn word_encoding() {
-    let word = Word::new([
-        Felt::new(rand_u64()),
-        Felt::new(rand_u64()),
-        Felt::new(rand_u64()),
-        Felt::new(rand_u64()),
-    ]);
+    let word = test_word();
 
     let string: String = word.into();
     let round_trip: Word = string.try_into().expect("decoding failed");
@@ -51,12 +49,7 @@ fn word_encoding() {
 
 #[test]
 fn test_conversions() {
-    let word = Word::new([
-        Felt::new(rand_u64()),
-        Felt::new(rand_u64()),
-        Felt::new(rand_u64()),
-        Felt::new(rand_u64()),
-    ]);
+    let word = test_word();
 
     // BY VALUE
     // ----------------------------------------------------------------------------------------

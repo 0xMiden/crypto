@@ -36,7 +36,7 @@ default = []
 testing = ["dep:proptest"]
 
 [dev-dependencies]
-rand   = { default-features = false, version = "0.9" }
+rand   = { default-features = false, features = ["small_rng"], version = "0.9" }
 rstest = { version = "0.26" }
 
 [lints]
