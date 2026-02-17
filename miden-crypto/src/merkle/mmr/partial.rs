@@ -96,10 +96,71 @@ impl PartialMmr {
 
     /// Returns a new [PartialMmr] instantiated from the specified components.
     ///
+    /// This constructor validates the consistency between peaks, nodes, and tracked_leaves:
+    /// - All tracked leaf positions must be within forest bounds.
+    /// - All tracked leaves must have their values in the nodes map.
+    /// - All node indices must be valid leaf or internal node positions within the forest.
+    ///
+    /// Note: This performs structural validation only. It does not verify that authentication
+    /// paths for tracked leaves are complete or that node values are cryptographically
+    /// consistent with the peaks.
+    ///
+    /// # Errors
+    /// Returns an error if the components are inconsistent.
+    pub fn from_parts(
+        peaks: MmrPeaks,
+        nodes: NodeMap,
+        tracked_leaves: BTreeSet<usize>,
+    ) -> Result<Self, MmrError> {
+        let forest = peaks.forest();
+        let num_leaves = forest.num_leaves();
+
+        // Validate that all tracked leaf positions are within forest bounds and have values
+        for &pos in &tracked_leaves {
+            if pos >= num_leaves {
+                return Err(MmrError::InconsistentPartialMmr(format!(
+                    "tracked leaf position {} is out of bounds (forest has {} leaves)",
+                    pos, num_leaves
+                )));
+            }
+            let leaf_idx = InOrderIndex::from_leaf_pos(pos);
+            if !nodes.contains_key(&leaf_idx) {
+                return Err(MmrError::InconsistentPartialMmr(format!(
+                    "tracked leaf at position {} has no value in nodes",
+                    pos
+                )));
+            }
+        }
+
+        // Validate that all node indices correspond to actual nodes in the forest
+        // This catches: empty forest with nodes, index 0, out of bounds, and separator indices
+        for idx in nodes.keys() {
+            if !forest.is_valid_in_order_index(idx) {
+                return Err(MmrError::InconsistentPartialMmr(format!(
+                    "node index {} is not a valid index in the forest",
+                    idx.inner()
+                )));
+            }
+        }
+
+        let peaks = peaks.into();
+        Ok(Self { forest, peaks, nodes, tracked_leaves })
+    }
+
+    /// Returns a new [PartialMmr] instantiated from the specified components without validation.
+    ///
+    /// # Preconditions
     /// This constructor does not check the consistency between peaks, nodes, and tracked_leaves.
     /// If the specified components are inconsistent, the returned partial MMR may exhibit
     /// undefined behavior.
-    pub fn from_parts(peaks: MmrPeaks, nodes: NodeMap, tracked_leaves: BTreeSet<usize>) -> Self {
+    ///
+    /// Use this method only when you are certain the components are valid, for example when
+    /// constructing from trusted sources or for performance-critical code paths.
+    pub fn from_parts_unchecked(
+        peaks: MmrPeaks,
+        nodes: NodeMap,
+        tracked_leaves: BTreeSet<usize>,
+    ) -> Self {
         let forest = peaks.forest();
         let peaks = peaks.into();
 
@@ -659,13 +720,22 @@ impl Deserializable for PartialMmr {
     fn read_from<R: ByteReader>(
         source: &mut R,
     ) -> Result<Self, crate::utils::DeserializationError> {
+        use crate::utils::DeserializationError;
+
         let forest = Forest::new(usize::read_from(source)?);
-        let peaks = Vec::<Word>::read_from(source)?;
+        let peaks_vec = Vec::<Word>::read_from(source)?;
         let nodes = NodeMap::read_from(source)?;
         let tracked: Vec<usize> = Vec::read_from(source)?;
         let tracked_leaves: BTreeSet<usize> = tracked.into_iter().collect();
 
-        Ok(Self { forest, peaks, nodes, tracked_leaves })
+        // Construct MmrPeaks to validate forest/peaks consistency
+        let peaks = MmrPeaks::new(forest, peaks_vec).map_err(|e| {
+            DeserializationError::InvalidValue(format!("invalid partial mmr peaks: {}", e))
+        })?;
+
+        // Use validating constructor
+        Self::from_parts(peaks, nodes, tracked_leaves)
+            .map_err(|e| DeserializationError::InvalidValue(format!("invalid partial mmr: {}", e)))
     }
 }
 
@@ -1140,5 +1210,154 @@ mod tests {
         // It should now be tracked and open to the same proof as the full MMR.
         assert!(partial_mmr.is_tracked(0));
         assert_eq!(partial_mmr.open(0).unwrap().unwrap(), proof0);
+    }
+
+    #[test]
+    fn test_from_parts_validation() {
+        use alloc::collections::BTreeMap;
+
+        use super::InOrderIndex;
+
+        // Build a valid MMR with 7 leaves
+        let mmr: Mmr = LEAVES.into();
+        let peaks = mmr.peaks();
+
+        // Valid case: empty nodes and empty tracked_leaves
+        let result = PartialMmr::from_parts(peaks.clone(), BTreeMap::new(), BTreeSet::new());
+        assert!(result.is_ok());
+
+        // Invalid case: tracked leaf position out of bounds
+        let mut out_of_bounds = BTreeSet::new();
+        out_of_bounds.insert(100);
+        let result = PartialMmr::from_parts(peaks.clone(), BTreeMap::new(), out_of_bounds);
+        assert!(result.is_err());
+
+        // Invalid case: tracked leaf has no value in nodes
+        let mut tracked_no_value = BTreeSet::new();
+        tracked_no_value.insert(0);
+        let result = PartialMmr::from_parts(peaks.clone(), BTreeMap::new(), tracked_no_value);
+        assert!(result.is_err());
+
+        // Valid case: tracked leaf with its value in nodes
+        let mut nodes_with_leaf = BTreeMap::new();
+        let leaf_idx = super::InOrderIndex::from_leaf_pos(0);
+        nodes_with_leaf.insert(leaf_idx, int_to_node(0));
+        let mut tracked_valid = BTreeSet::new();
+        tracked_valid.insert(0);
+        let result = PartialMmr::from_parts(peaks.clone(), nodes_with_leaf, tracked_valid);
+        assert!(result.is_ok());
+
+        // Invalid case: node index out of bounds (leaf index)
+        let mut invalid_nodes = BTreeMap::new();
+        let invalid_idx = InOrderIndex::from_leaf_pos(100); // way out of bounds
+        invalid_nodes.insert(invalid_idx, int_to_node(0));
+        let result = PartialMmr::from_parts(peaks.clone(), invalid_nodes, BTreeSet::new());
+        assert!(result.is_err());
+
+        // Invalid case: index 0 (which is never valid for InOrderIndex)
+        let mut nodes_with_zero = BTreeMap::new();
+        // Create an InOrderIndex with value 0 via deserialization
+        let zero_idx = InOrderIndex::read_from_bytes(&0usize.to_bytes()).unwrap();
+        nodes_with_zero.insert(zero_idx, int_to_node(0));
+        let result = PartialMmr::from_parts(peaks.clone(), nodes_with_zero, BTreeSet::new());
+        assert!(result.is_err());
+
+        // Invalid case: large even index (internal node) beyond forest bounds
+        let mut nodes_with_large_even = BTreeMap::new();
+        let large_even_idx = InOrderIndex::read_from_bytes(&1000usize.to_bytes()).unwrap();
+        nodes_with_large_even.insert(large_even_idx, int_to_node(0));
+        let result = PartialMmr::from_parts(peaks.clone(), nodes_with_large_even, BTreeSet::new());
+        assert!(result.is_err());
+
+        // Invalid case: separator index between trees
+        // For 7 leaves (0b111 = 4+2+1), index 8 is a separator between the first tree (1-7)
+        // and the second tree (9-11). Similarly, index 12 is a separator between the second
+        // tree and the third tree (13).
+        let mut nodes_with_separator = BTreeMap::new();
+        let separator_idx = InOrderIndex::read_from_bytes(&8usize.to_bytes()).unwrap();
+        nodes_with_separator.insert(separator_idx, int_to_node(0));
+        let result = PartialMmr::from_parts(peaks.clone(), nodes_with_separator, BTreeSet::new());
+        assert!(result.is_err(), "separator index 8 should be rejected");
+
+        let mut nodes_with_separator_12 = BTreeMap::new();
+        let separator_idx_12 = InOrderIndex::read_from_bytes(&12usize.to_bytes()).unwrap();
+        nodes_with_separator_12.insert(separator_idx_12, int_to_node(0));
+        let result =
+            PartialMmr::from_parts(peaks.clone(), nodes_with_separator_12, BTreeSet::new());
+        assert!(result.is_err(), "separator index 12 should be rejected");
+
+        // Invalid case: nodes with empty forest
+        let empty_peaks = MmrPeaks::new(Forest::empty(), vec![]).unwrap();
+        let mut nodes_with_empty_forest = BTreeMap::new();
+        nodes_with_empty_forest.insert(InOrderIndex::from_leaf_pos(0), int_to_node(0));
+        let result = PartialMmr::from_parts(empty_peaks, nodes_with_empty_forest, BTreeSet::new());
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_from_parts_validation_deserialization() {
+        // Build an MMR with 7 leaves
+        let mmr: Mmr = LEAVES.into();
+        let partial_mmr = PartialMmr::from_peaks(mmr.peaks());
+
+        // Valid serialization/deserialization
+        let bytes = partial_mmr.to_bytes();
+        let decoded = PartialMmr::read_from_bytes(&bytes);
+        assert!(decoded.is_ok());
+
+        // Test that deserialization rejects bad data:
+        // We'll construct invalid bytes that would create an invalid PartialMmr
+
+        // Create a PartialMmr with a valid node, serialize it, then manually corrupt the node index
+        let mut partial_with_node = PartialMmr::from_peaks(mmr.peaks());
+        let node = mmr.get(1).unwrap();
+        let proof = mmr.open(1).unwrap();
+        partial_with_node.track(1, node, proof.path().merkle_path()).unwrap();
+
+        // Serialize and verify it deserializes correctly first
+        let valid_bytes = partial_with_node.to_bytes();
+        let valid_decoded = PartialMmr::read_from_bytes(&valid_bytes);
+        assert!(valid_decoded.is_ok());
+
+        // Now create malformed data with index 0 via manual byte construction
+        // This tests that deserialization properly validates inputs
+        let mut bad_bytes = Vec::new();
+        // forest (7 leaves)
+        bad_bytes.extend_from_slice(&7usize.to_bytes());
+        // peaks (3 peaks for forest 0b111)
+        bad_bytes.extend_from_slice(&3usize.to_bytes()); // vec length
+        for i in 0..3 {
+            bad_bytes.extend_from_slice(&int_to_node(i as u64).to_bytes());
+        }
+        // nodes: 1 entry with index 0
+        bad_bytes.extend_from_slice(&1usize.to_bytes()); // BTreeMap length
+        bad_bytes.extend_from_slice(&0usize.to_bytes()); // invalid index 0
+        bad_bytes.extend_from_slice(&int_to_node(0).to_bytes()); // value
+        // tracked_leaves: empty vec
+        bad_bytes.extend_from_slice(&0usize.to_bytes());
+
+        let result = PartialMmr::read_from_bytes(&bad_bytes);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_from_parts_unchecked() {
+        use alloc::collections::BTreeMap;
+
+        // Build a valid MMR
+        let mmr: Mmr = LEAVES.into();
+        let peaks = mmr.peaks();
+
+        // from_parts_unchecked should not validate and always succeed
+        let partial =
+            PartialMmr::from_parts_unchecked(peaks.clone(), BTreeMap::new(), BTreeSet::new());
+        assert_eq!(partial.forest(), peaks.forest());
+
+        // Even invalid combinations should work (no validation)
+        let mut invalid_tracked = BTreeSet::new();
+        invalid_tracked.insert(999);
+        let partial =
+            PartialMmr::from_parts_unchecked(peaks.clone(), BTreeMap::new(), invalid_tracked);
+        assert!(partial.tracked_leaves.contains(&999));
     }
 }

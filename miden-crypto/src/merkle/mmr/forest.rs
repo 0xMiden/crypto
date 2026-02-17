@@ -304,6 +304,50 @@ impl Forest {
         InOrderIndex::new(idx.try_into().unwrap())
     }
 
+    /// Checks if an in-order index corresponds to a valid node in the forest.
+    ///
+    /// Returns `true` if the index points to an actual node within one of the trees,
+    /// `false` if the index is:
+    /// - Zero (invalid, as `InOrderIndex` is 1-indexed)
+    /// - Beyond the forest bounds
+    /// - A separator position between trees (these positions are reserved for future parent nodes
+    ///   when trees are merged, but don't correspond to actual nodes yet)
+    ///
+    /// # Example
+    /// For a forest with 7 leaves (0b111 = trees of 4, 2, and 1 leaves):
+    /// - Valid indices: 1-7 (first tree), 9-11 (second tree), 13 (third tree)
+    /// - Invalid separator indices: 8 (between first and second), 12 (between second and third)
+    pub fn is_valid_in_order_index(&self, idx: &InOrderIndex) -> bool {
+        // Index 0 is never valid (InOrderIndex is 1-indexed)
+        if idx.inner() == 0 {
+            return false;
+        }
+
+        // Empty forest has no valid indices
+        if self.is_empty() {
+            return false;
+        }
+
+        let idx_val = idx.inner();
+        let mut offset = 0usize;
+
+        // Iterate through trees from largest to smallest
+        for tree in TreeSizeIterator::new(*self).rev() {
+            let tree_nodes = tree.num_nodes();
+            let tree_start = offset + 1;
+            let tree_end = offset + tree_nodes;
+
+            if idx_val >= tree_start && idx_val <= tree_end {
+                return true;
+            }
+
+            // Move offset past this tree and the separator position
+            offset = tree_end + 1;
+        }
+
+        false
+    }
+
     /// Given a leaf index in the current forest, return the tree number responsible for the
     /// leaf.
     ///
