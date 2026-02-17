@@ -5,7 +5,7 @@ use p3_field::PrimeField64;
 
 #[cfg(not(all(target_family = "wasm", miden)))]
 use super::{ByteReader, ByteWriter, Deserializable, DeserializationError, Serializable};
-use crate::{Felt, Word, word::WORD_SIZE_FELT};
+use crate::{Felt, Word, word::WORD_SIZE_FELTS};
 
 // LEXICOGRAPHIC WORD
 // ================================================================================================
@@ -34,8 +34,8 @@ impl<T: Into<Word>> LexicographicWord<T> {
     }
 }
 
-impl From<[Felt; WORD_SIZE_FELT]> for LexicographicWord {
-    fn from(value: [Felt; WORD_SIZE_FELT]) -> Self {
+impl From<[Felt; WORD_SIZE_FELTS]> for LexicographicWord {
+    fn from(value: [Felt; WORD_SIZE_FELTS]) -> Self {
         Self(value.into())
     }
 }

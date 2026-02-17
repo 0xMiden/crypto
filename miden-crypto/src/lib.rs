@@ -138,7 +138,7 @@ pub type Set<V> = alloc::collections::BTreeSet<V>;
 // ================================================================================================
 
 /// Number of field elements in a word.
-pub const WORD_SIZE: usize = word::WORD_SIZE_FELT;
+pub const WORD_SIZE: usize = word::WORD_SIZE_FELTS;
 
 /// Field element representing ZERO in the Miden base filed.
 pub const ZERO: Felt = Felt::ZERO;

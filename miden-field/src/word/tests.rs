@@ -3,7 +3,7 @@ use alloc::{string::String, vec};
 use miden_serde_utils::SliceReader;
 use p3_field::PrimeCharacteristicRing;
 
-use super::{Deserializable, Felt, Serializable, WORD_SIZE_BYTES, WORD_SIZE_FELT, Word};
+use super::{Deserializable, Felt, Serializable, WORD_SIZE_BYTES, WORD_SIZE_FELTS, Word};
 use crate::word;
 
 /// Generates a random value of type u64 from an RNG.
@@ -60,27 +60,27 @@ fn test_conversions() {
 
     // BY VALUE
     // ----------------------------------------------------------------------------------------
-    let v: [bool; WORD_SIZE_FELT] = [true, false, true, true];
+    let v: [bool; WORD_SIZE_FELTS] = [true, false, true, true];
     let v2: Word = v.into();
-    assert_eq!(v, <[bool; WORD_SIZE_FELT]>::try_from(v2).unwrap());
+    assert_eq!(v, <[bool; WORD_SIZE_FELTS]>::try_from(v2).unwrap());
 
-    let v: [u8; WORD_SIZE_FELT] = [0_u8, 1_u8, 2_u8, 3_u8];
+    let v: [u8; WORD_SIZE_FELTS] = [0_u8, 1_u8, 2_u8, 3_u8];
     let v2: Word = v.into();
-    assert_eq!(v, <[u8; WORD_SIZE_FELT]>::try_from(v2).unwrap());
+    assert_eq!(v, <[u8; WORD_SIZE_FELTS]>::try_from(v2).unwrap());
 
-    let v: [u16; WORD_SIZE_FELT] = [0_u16, 1_u16, 2_u16, 3_u16];
+    let v: [u16; WORD_SIZE_FELTS] = [0_u16, 1_u16, 2_u16, 3_u16];
     let v2: Word = v.into();
-    assert_eq!(v, <[u16; WORD_SIZE_FELT]>::try_from(v2).unwrap());
+    assert_eq!(v, <[u16; WORD_SIZE_FELTS]>::try_from(v2).unwrap());
 
-    let v: [u32; WORD_SIZE_FELT] = [0_u32, 1_u32, 2_u32, 3_u32];
+    let v: [u32; WORD_SIZE_FELTS] = [0_u32, 1_u32, 2_u32, 3_u32];
     let v2: Word = v.into();
-    assert_eq!(v, <[u32; WORD_SIZE_FELT]>::try_from(v2).unwrap());
+    assert_eq!(v, <[u32; WORD_SIZE_FELTS]>::try_from(v2).unwrap());
 
-    let v: [u64; WORD_SIZE_FELT] = word.into();
+    let v: [u64; WORD_SIZE_FELTS] = word.into();
     let v2: Word = v.try_into().unwrap();
     assert_eq!(word, v2);
 
-    let v: [Felt; WORD_SIZE_FELT] = word.into();
+    let v: [Felt; WORD_SIZE_FELTS] = word.into();
     let v2: Word = v.into();
     assert_eq!(word, v2);
 
@@ -94,27 +94,27 @@ fn test_conversions() {
 
     // BY REF
     // ----------------------------------------------------------------------------------------
-    let v: [bool; WORD_SIZE_FELT] = [true, false, true, true];
+    let v: [bool; WORD_SIZE_FELTS] = [true, false, true, true];
     let v2: Word = (&v).into();
-    assert_eq!(v, <[bool; WORD_SIZE_FELT]>::try_from(&v2).unwrap());
+    assert_eq!(v, <[bool; WORD_SIZE_FELTS]>::try_from(&v2).unwrap());
 
-    let v: [u8; WORD_SIZE_FELT] = [0_u8, 1_u8, 2_u8, 3_u8];
+    let v: [u8; WORD_SIZE_FELTS] = [0_u8, 1_u8, 2_u8, 3_u8];
     let v2: Word = (&v).into();
-    assert_eq!(v, <[u8; WORD_SIZE_FELT]>::try_from(&v2).unwrap());
+    assert_eq!(v, <[u8; WORD_SIZE_FELTS]>::try_from(&v2).unwrap());
 
-    let v: [u16; WORD_SIZE_FELT] = [0_u16, 1_u16, 2_u16, 3_u16];
+    let v: [u16; WORD_SIZE_FELTS] = [0_u16, 1_u16, 2_u16, 3_u16];
     let v2: Word = (&v).into();
-    assert_eq!(v, <[u16; WORD_SIZE_FELT]>::try_from(&v2).unwrap());
+    assert_eq!(v, <[u16; WORD_SIZE_FELTS]>::try_from(&v2).unwrap());
 
-    let v: [u32; WORD_SIZE_FELT] = [0_u32, 1_u32, 2_u32, 3_u32];
+    let v: [u32; WORD_SIZE_FELTS] = [0_u32, 1_u32, 2_u32, 3_u32];
     let v2: Word = (&v).into();
-    assert_eq!(v, <[u32; WORD_SIZE_FELT]>::try_from(&v2).unwrap());
+    assert_eq!(v, <[u32; WORD_SIZE_FELTS]>::try_from(&v2).unwrap());
 
-    let v: [u64; WORD_SIZE_FELT] = (&word).into();
+    let v: [u64; WORD_SIZE_FELTS] = (&word).into();
     let v2: Word = (&v).try_into().unwrap();
     assert_eq!(word, v2);
 
-    let v: [Felt; WORD_SIZE_FELT] = (&word).into();
+    let v: [Felt; WORD_SIZE_FELTS] = (&word).into();
     let v2: Word = (&v).into();
     assert_eq!(word, v2);
 
