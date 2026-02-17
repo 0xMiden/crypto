@@ -13,16 +13,20 @@ use itertools::Itertools;
 
 use super::{Config, Result};
 use crate::{
-    EMPTY_WORD, Word,
+    EMPTY_WORD, Map, Set, Word,
     merkle::{
         EmptySubtreeRoots,
         smt::{
             Backend, ForestInMemoryBackend, ForestOperation, LargeSmtForest, LargeSmtForestError,
             LeafIndex, RootInfo, Smt, SmtForestUpdateBatch, SmtUpdateBatch, TreeId, VersionId,
-            large_forest::root::{LineageId, TreeEntry, TreeWithRoot},
+            large_forest::{
+                LineageData,
+                history::{History, LeafChanges, NodeChanges},
+                root::{LineageId, TreeEntry, TreeWithRoot},
+            },
         },
     },
-    rand::test_utils::ContinuousRng,
+    rand::test_utils::{ContinuousRng, rand_value},
 };
 
 // TYPE ALIASES
@@ -1113,79 +1117,9 @@ fn update_forest() -> Result<()> {
     Ok(())
 }
 
-#![cfg(all(test, feature = "std"))]
-
-use alloc::vec::Vec;
-
-use super::{
-    LargeSmtForest, LineageData,
-    backend::{self, Backend, MutationSet},
-    history::{History, LeafChanges, NodeChanges},
-    operation::{SmtForestUpdateBatch, SmtUpdateBatch},
-    root::{LineageId, RootValue, TreeEntry, TreeId, VersionId},
-};
-use crate::{Map, Set, Word, merkle::smt::SmtProof, rand::test_utils::rand_value};
-
-// MOCK BACKEND
+// TRUNCATION
 // ================================================================================================
 
-/// A minimal mock backend for testing forest methods that do not touch the backend.
-#[derive(Debug)]
-struct MockBackend;
-
-impl Backend for MockBackend {
-    fn open(&self, _: LineageId, _: Word) -> backend::Result<SmtProof> {
-        unimplemented!("not needed for this test")
-    }
-
-    fn get(&self, _: LineageId, _: Word) -> backend::Result<Option<Word>> {
-        unimplemented!("not needed for this test")
-    }
-
-    fn version(&self, _: LineageId) -> backend::Result<VersionId> {
-        unimplemented!("not needed for this test")
-    }
-
-    fn lineages(&self) -> backend::Result<impl Iterator<Item = LineageId>> {
-        Ok(core::iter::empty())
-    }
-
-    fn trees(&self) -> backend::Result<impl Iterator<Item = (TreeId, RootValue)>> {
-        Ok(core::iter::empty())
-    }
-
-    fn entry_count(&self, _: TreeId) -> backend::Result<usize> {
-        unimplemented!("not needed for this test")
-    }
-
-    fn entries(&self, _: TreeId) -> backend::Result<impl Iterator<Item = TreeEntry>> {
-        Ok(core::iter::empty())
-    }
-
-    fn update_tree(
-        &mut self,
-        _: LineageId,
-        _: VersionId,
-        _: SmtUpdateBatch,
-    ) -> backend::Result<MutationSet> {
-        unimplemented!("not needed for this test")
-    }
-
-    fn update_forest(
-        &mut self,
-        _: VersionId,
-        _: SmtForestUpdateBatch,
-    ) -> backend::Result<Vec<MutationSet>> {
-        unimplemented!("not needed for this test")
-    }
-}
-
-// TESTS
-// ================================================================================================
-
-/// Regression test: `truncate` must remove lineages whose histories become empty from
-/// `non_empty_histories`. Previously, `extend` was used instead of `remove`, which caused emptied
-/// lineages to be incorrectly retained (or even duplicated) in the set.
 #[test]
 fn truncate_removes_emptied_lineages_from_non_empty_histories() {
     let lineage: LineageId = rand_value();
@@ -1211,7 +1145,8 @@ fn truncate_removes_emptied_lineages_from_non_empty_histories() {
     non_empty.insert(lineage);
 
     let mut forest = LargeSmtForest {
-        backend: MockBackend,
+        config: Config::default(),
+        backend: ForestInMemoryBackend::new(),
         lineage_data: lineage_map,
         non_empty_histories: non_empty,
     };
@@ -1229,8 +1164,6 @@ fn truncate_removes_emptied_lineages_from_non_empty_histories() {
     );
 }
 
-/// Verifies that `truncate` retains lineages in `non_empty_histories` when their history is only
-/// partially truncated and still contains versions.
 #[test]
 fn truncate_retains_non_empty_lineages_in_non_empty_histories() {
     let lineage: LineageId = rand_value();
@@ -1250,14 +1183,15 @@ fn truncate_retains_non_empty_lineages_in_non_empty_histories() {
         latest_root: root,
     };
 
-    let mut lineage_map = Map::default();
+    let mut lineage_map = Map::new();
     lineage_map.insert(lineage, lineage_data);
 
     let mut non_empty = Set::default();
     non_empty.insert(lineage);
 
     let mut forest = LargeSmtForest {
-        backend: MockBackend,
+        config: Config::default(),
+        backend: ForestInMemoryBackend::new(),
         lineage_data: lineage_map,
         non_empty_histories: non_empty,
     };

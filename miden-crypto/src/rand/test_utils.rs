@@ -53,7 +53,6 @@ fn rng_value<T: Randomizable>(rng: &mut impl Rng) -> T {
 /// let x: u64 = rand_value();
 /// let y: u128 = rand_value();
 /// ```
-#[cfg(feature = "std")]
 pub fn rand_value<T: Randomizable>() -> T {
     rng_value(&mut rand::rng())
 }
