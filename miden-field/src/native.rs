@@ -463,3 +463,28 @@ impl<'a> Product<&'a Felt> for Felt {
         Self(iter.map(|x| x.0).product())
     }
 }
+
+// ARBITRARY (proptest)
+// ================================================================================================
+
+#[cfg(all(feature = "testing", not(all(target_family = "wasm", miden))))]
+mod arbitrary {
+    use p3_field::PrimeField64;
+    use proptest::prelude::*;
+
+    use super::Felt;
+
+    impl Arbitrary for Felt {
+        type Parameters = ();
+        type Strategy = BoxedStrategy<Self>;
+
+        fn arbitrary_with(_args: Self::Parameters) -> Self::Strategy {
+            let canonical = (0u64..Felt::ORDER_U64).prop_map(Felt::new).boxed();
+            // Goldilocks uses representation where values above the field order are valid and
+            // represent wrapped field elements. Generate such values 1/5 of the time to exercise
+            // this behavior.
+            let non_canonical = (Felt::ORDER_U64..=u64::MAX).prop_map(Felt::new).boxed();
+            prop_oneof![4 => canonical, 1 => non_canonical].no_shrink().boxed()
+        }
+    }
+}

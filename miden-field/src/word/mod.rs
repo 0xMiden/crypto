@@ -751,17 +751,7 @@ mod arbitrary {
         type Strategy = BoxedStrategy<Self>;
 
         fn arbitrary_with(_args: Self::Parameters) -> Self::Strategy {
-            prop::collection::vec(any::<u64>(), 4)
-                .prop_map(|vals| {
-                    Word::new([
-                        Felt::new(vals[0]),
-                        Felt::new(vals[1]),
-                        Felt::new(vals[2]),
-                        Felt::new(vals[3]),
-                    ])
-                })
-                .no_shrink()
-                .boxed()
+            prop::array::uniform4(any::<Felt>()).prop_map(Word::new).no_shrink().boxed()
         }
     }
 }
