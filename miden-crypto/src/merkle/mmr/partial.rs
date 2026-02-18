@@ -239,6 +239,10 @@ impl PartialMmr {
         } else {
             let mut track_right = track;
             let mut track_left = self.track_latest;
+            // After merges the forest no longer has a single-leaf tree, so
+            // `track_latest` must be cleared. The old value is already captured
+            // in `track_left` above.
+            self.track_latest = false;
 
             let mut right = leaf;
             let mut right_idx = self.forest.rightmost_in_order_index();
