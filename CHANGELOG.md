@@ -1,3 +1,7 @@
+## 0.19.5 (2026-02-17)
+
+- Fixed `PartialMmr::add()` not clearing `track_latest` flag after peak merges, which could result in incorrect tracking state.
+
 ## 0.19.3 (2026-01-21)
 
 - Fix: don't disable WAL during subtree construction in `LargeSmt`'s RocksDB backend ([#792](https://github.com/0xMiden/crypto/pull/792)).
