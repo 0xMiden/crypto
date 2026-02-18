@@ -873,6 +873,32 @@ mod tests {
     }
 
     #[test]
+    fn test_partial_mmr_add_clears_track_latest_after_merge() {
+        let mut mmr = Mmr::default();
+        let empty_peaks = MmrPeaks::new(Forest::empty(), vec![]).unwrap();
+        let mut partial_mmr = PartialMmr::from_peaks(empty_peaks);
+
+        let leaf_0 = int_to_node(0);
+        mmr.add(leaf_0);
+        partial_mmr.add(leaf_0, true);
+        assert!(partial_mmr.track_latest);
+
+        // This append triggers a merge and there is no longer a single-leaf tree in the forest.
+        let leaf_1 = int_to_node(1);
+        mmr.add(leaf_1);
+        partial_mmr.add(leaf_1, false);
+        assert!(!partial_mmr.track_latest);
+
+        // With stale `track_latest` this panicked in debug mode.
+        mmr.add(int_to_node(2));
+        let delta = mmr.get_delta(partial_mmr.forest(), mmr.forest()).unwrap();
+        partial_mmr.apply(delta).unwrap();
+
+        assert_eq!(mmr.peaks(), partial_mmr.peaks());
+        assert_eq!(mmr.open(0).unwrap(), partial_mmr.open(0).unwrap().unwrap());
+    }
+
+    #[test]
     fn test_partial_mmr_serialization() {
         let mmr = Mmr::from((0..7).map(int_to_node));
         let partial_mmr = PartialMmr::from_peaks(mmr.peaks());
