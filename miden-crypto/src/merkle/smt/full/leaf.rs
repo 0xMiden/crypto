@@ -175,6 +175,10 @@ impl SmtLeaf {
         self.clone().into_elements()
     }
 
+    pub fn to_entries(&self) -> impl Iterator<Item = (&Word, &Word)> {
+        self.entries().iter().map(|(k, v)| (k, v))
+    }
+
     /// Converts a leaf to a list of field elements
     pub fn into_elements(self) -> Vec<Felt> {
         self.into_entries().into_iter().flat_map(kv_to_elements).collect()

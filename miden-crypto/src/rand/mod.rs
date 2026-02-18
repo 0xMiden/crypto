@@ -11,6 +11,9 @@ mod rpx;
 pub use rpo::RpoRandomCoin;
 pub use rpx::RpxRandomCoin;
 
+#[cfg(any(test, feature = "std"))]
+pub mod test_utils;
+
 /// Pseudo-random element generator.
 ///
 /// An instance can be used to draw, uniformly at random, base field elements as well as [Word]s.

@@ -259,6 +259,11 @@ impl Smt {
         <Self as SparseMerkleTree<SMT_DEPTH>>::get_leaf(self, key)
     }
 
+    /// Returns the leaf corresponding to the provided `index`.
+    pub fn get_leaf_by_index(&self, index: LeafIndex<SMT_DEPTH>) -> Option<SmtLeaf> {
+        self.leaves.get(&index.position()).cloned()
+    }
+
     /// Returns the value associated with `key`
     pub fn get_value(&self, key: &Word) -> Word {
         <Self as SparseMerkleTree<SMT_DEPTH>>::get_value(self, key)
