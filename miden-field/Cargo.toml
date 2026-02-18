@@ -37,8 +37,8 @@ testing = ["dep:proptest"]
 
 [dev-dependencies]
 proptest = { default-features = false, features = ["alloc", "std"], version = "1.7" }
-rand   = { default-features = false, features = ["small_rng"], version = "0.9" }
-rstest = { version = "0.26" }
+rand     = { default-features = false, features = ["small_rng"], version = "0.9" }
+rstest   = { version = "0.26" }
 
 [lints]
 workspace = true

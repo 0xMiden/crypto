@@ -740,7 +740,7 @@ macro_rules! word {
 // ARBITRARY (proptest)
 // ================================================================================================
 
-#[cfg(all(feature = "testing", not(all(target_family = "wasm", miden))))]
+#[cfg(all(any(test, feature = "testing"), not(all(target_family = "wasm", miden))))]
 mod arbitrary {
     use proptest::prelude::*;
 

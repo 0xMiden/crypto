@@ -474,7 +474,7 @@ impl<'a> Product<&'a Felt> for Felt {
 // ARBITRARY (proptest)
 // ================================================================================================
 
-#[cfg(all(feature = "testing", not(all(target_family = "wasm", miden))))]
+#[cfg(all(any(test, feature = "testing"), not(all(target_family = "wasm", miden))))]
 mod arbitrary {
     use p3_field::PrimeField64;
     use proptest::prelude::*;

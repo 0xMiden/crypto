@@ -1,123 +1,131 @@
-use alloc::{string::String, vec};
+use alloc::{collections::BTreeMap, string::String, vec::Vec};
 
 use miden_serde_utils::SliceReader;
-use p3_field::PrimeCharacteristicRing;
-use rand::{RngCore, SeedableRng, rngs::SmallRng};
+use p3_field::PrimeField64;
+use proptest::prelude::*;
 
 use super::{Deserializable, Felt, Serializable, WORD_SIZE_BYTES, WORD_SIZE_FELTS, Word};
 use crate::word;
 
-/// Returns a random test [Word].
-fn test_word() -> Word {
-    const TEST_WORD_SEED: u64 = 0x0b8d_9b8a_1e7a_49d5;
-    let mut rng = SmallRng::seed_from_u64(TEST_WORD_SEED);
-    Word::new([
-        Felt::new(rng.next_u64()),
-        Felt::new(rng.next_u64()),
-        Felt::new(rng.next_u64()),
-        Felt::new(rng.next_u64()),
-    ])
-}
-
 // TESTS
 // ================================================================================================
 
-#[test]
-fn word_serialization() {
-    let d1 = test_word();
-
-    let mut bytes = vec![];
-    d1.write_into(&mut bytes);
-    assert_eq!(WORD_SIZE_BYTES, bytes.len());
-    assert_eq!(bytes.len(), d1.get_size_hint());
-
-    let mut reader = SliceReader::new(&bytes);
-    let d2 = Word::read_from(&mut reader).unwrap();
-
-    assert_eq!(d1, d2);
+/// Returns a strategy which generates a `[u64; 4]` where all values are canonical field elements.
+fn any_word_elements_u64_canonical() -> BoxedStrategy<[u64; WORD_SIZE_FELTS]> {
+    prop::array::uniform4(0u64..Felt::ORDER_U64).no_shrink().boxed()
 }
 
-#[test]
-fn word_encoding() {
-    let word = test_word();
+proptest! {
+    #[test]
+    fn word_is_equal_to_itself(word in any::<Word>()) {
+        use core::cmp::Ordering;
 
-    let string: String = word.into();
-    let round_trip: Word = string.try_into().expect("decoding failed");
+        prop_assert_eq!(word, word);
+        prop_assert_eq!(word.cmp(&word), Ordering::Equal);
+        prop_assert_eq!(word.partial_cmp(&word), Some(Ordering::Equal));
+    }
 
-    assert_eq!(word, round_trip);
-}
+    #[test]
+    fn word_serialization_roundtrip(word in any::<Word>()) {
+        let mut bytes = Vec::new();
+        word.write_into(&mut bytes);
+        prop_assert_eq!(WORD_SIZE_BYTES, bytes.len());
+        prop_assert_eq!(bytes.len(), word.get_size_hint());
 
-#[test]
-fn test_conversions() {
-    let word = test_word();
+        let mut reader = SliceReader::new(&bytes);
+        let round_trip = Word::read_from(&mut reader).unwrap();
 
-    // BY VALUE
-    // ----------------------------------------------------------------------------------------
-    let v: [bool; WORD_SIZE_FELTS] = [true, false, true, true];
-    let v2: Word = v.into();
-    assert_eq!(v, <[bool; WORD_SIZE_FELTS]>::try_from(v2).unwrap());
+        prop_assert_eq!(word, round_trip);
+    }
 
-    let v: [u8; WORD_SIZE_FELTS] = [0_u8, 1_u8, 2_u8, 3_u8];
-    let v2: Word = v.into();
-    assert_eq!(v, <[u8; WORD_SIZE_FELTS]>::try_from(v2).unwrap());
+    #[test]
+    fn word_encoding_roundtrip(word in any::<Word>()) {
+        let string: String = word.into();
+        let round_trip: Word = string.try_into().expect("decoding failed");
+        prop_assert_eq!(word, round_trip);
+    }
 
-    let v: [u16; WORD_SIZE_FELTS] = [0_u16, 1_u16, 2_u16, 3_u16];
-    let v2: Word = v.into();
-    assert_eq!(v, <[u16; WORD_SIZE_FELTS]>::try_from(v2).unwrap());
+    #[test]
+    fn word_bool_conversion_roundtrip(v in any::<[bool; WORD_SIZE_FELTS]>()) {
+        let word: Word = v.into();
+        prop_assert_eq!(v, <[bool; WORD_SIZE_FELTS]>::try_from(word).unwrap());
 
-    let v: [u32; WORD_SIZE_FELTS] = [0_u32, 1_u32, 2_u32, 3_u32];
-    let v2: Word = v.into();
-    assert_eq!(v, <[u32; WORD_SIZE_FELTS]>::try_from(v2).unwrap());
+        let word: Word = (&v).into();
+        prop_assert_eq!(v, <[bool; WORD_SIZE_FELTS]>::try_from(&word).unwrap());
+    }
 
-    let v: [u64; WORD_SIZE_FELTS] = word.into();
-    let v2: Word = v.try_into().unwrap();
-    assert_eq!(word, v2);
+    #[test]
+    fn word_u8_conversion_roundtrip(v in any::<[u8; WORD_SIZE_FELTS]>()) {
+        let word: Word = v.into();
+        prop_assert_eq!(v, <[u8; WORD_SIZE_FELTS]>::try_from(word).unwrap());
 
-    let v: [Felt; WORD_SIZE_FELTS] = word.into();
-    let v2: Word = v.into();
-    assert_eq!(word, v2);
+        let word: Word = (&v).into();
+        prop_assert_eq!(v, <[u8; WORD_SIZE_FELTS]>::try_from(&word).unwrap());
+    }
 
-    let v: [u8; WORD_SIZE_BYTES] = word.into();
-    let v2: Word = v.try_into().unwrap();
-    assert_eq!(word, v2);
+    #[test]
+    fn word_u16_conversion_roundtrip(v in any::<[u16; WORD_SIZE_FELTS]>()) {
+        let word: Word = v.into();
+        prop_assert_eq!(v, <[u16; WORD_SIZE_FELTS]>::try_from(word).unwrap());
 
-    let v: String = word.into();
-    let v2: Word = v.try_into().unwrap();
-    assert_eq!(word, v2);
+        let word: Word = (&v).into();
+        prop_assert_eq!(v, <[u16; WORD_SIZE_FELTS]>::try_from(&word).unwrap());
+    }
 
-    // BY REF
-    // ----------------------------------------------------------------------------------------
-    let v: [bool; WORD_SIZE_FELTS] = [true, false, true, true];
-    let v2: Word = (&v).into();
-    assert_eq!(v, <[bool; WORD_SIZE_FELTS]>::try_from(&v2).unwrap());
+    #[test]
+    fn word_u32_conversion_roundtrip(v in any::<[u32; WORD_SIZE_FELTS]>()) {
+        let word: Word = v.into();
+        prop_assert_eq!(v, <[u32; WORD_SIZE_FELTS]>::try_from(word).unwrap());
 
-    let v: [u8; WORD_SIZE_FELTS] = [0_u8, 1_u8, 2_u8, 3_u8];
-    let v2: Word = (&v).into();
-    assert_eq!(v, <[u8; WORD_SIZE_FELTS]>::try_from(&v2).unwrap());
+        let word: Word = (&v).into();
+        prop_assert_eq!(v, <[u32; WORD_SIZE_FELTS]>::try_from(&word).unwrap());
+    }
 
-    let v: [u16; WORD_SIZE_FELTS] = [0_u16, 1_u16, 2_u16, 3_u16];
-    let v2: Word = (&v).into();
-    assert_eq!(v, <[u16; WORD_SIZE_FELTS]>::try_from(&v2).unwrap());
+    #[test]
+    fn word_u64_conversion_roundtrip(v in any_word_elements_u64_canonical()) {
+        let word: Word = v.try_into().unwrap();
+        let round_trip: [u64; WORD_SIZE_FELTS] = word.into();
+        prop_assert_eq!(v, round_trip);
 
-    let v: [u32; WORD_SIZE_FELTS] = [0_u32, 1_u32, 2_u32, 3_u32];
-    let v2: Word = (&v).into();
-    assert_eq!(v, <[u32; WORD_SIZE_FELTS]>::try_from(&v2).unwrap());
+        let word: Word = (&v).try_into().unwrap();
+        let round_trip: [u64; WORD_SIZE_FELTS] = (&word).into();
+        prop_assert_eq!(v, round_trip);
+    }
 
-    let v: [u64; WORD_SIZE_FELTS] = (&word).into();
-    let v2: Word = (&v).try_into().unwrap();
-    assert_eq!(word, v2);
+    #[test]
+    fn word_felt_conversion_roundtrip(elements in prop::array::uniform4(any::<u64>())) {
+        let elements = elements.map(Felt::new);
 
-    let v: [Felt; WORD_SIZE_FELTS] = (&word).into();
-    let v2: Word = (&v).into();
-    assert_eq!(word, v2);
+        let word: Word = elements.into();
+        let round_trip: [Felt; WORD_SIZE_FELTS] = word.into();
+        prop_assert_eq!(elements, round_trip);
 
-    let v: [u8; WORD_SIZE_BYTES] = (&word).into();
-    let v2: Word = (&v).try_into().unwrap();
-    assert_eq!(word, v2);
+        let word: Word = (&elements).into();
+        let round_trip: [Felt; WORD_SIZE_FELTS] = (&word).into();
+        prop_assert_eq!(elements, round_trip);
+    }
 
-    let v: String = (&word).into();
-    let v2: Word = (&v).try_into().unwrap();
-    assert_eq!(word, v2);
+    #[test]
+    fn word_bytes_conversion_roundtrip(word in any::<Word>()) {
+        let bytes: [u8; WORD_SIZE_BYTES] = word.into();
+        let round_trip: Word = bytes.try_into().unwrap();
+        prop_assert_eq!(word, round_trip);
+
+        let bytes: [u8; WORD_SIZE_BYTES] = (&word).into();
+        let round_trip: Word = (&bytes).try_into().unwrap();
+        prop_assert_eq!(word, round_trip);
+    }
+
+    #[test]
+    fn word_string_conversion_roundtrip(word in any::<Word>()) {
+        let string: String = word.into();
+        let round_trip: Word = string.try_into().unwrap();
+        prop_assert_eq!(word, round_trip);
+
+        let string: String = (&word).into();
+        let round_trip: Word = (&string).try_into().unwrap();
+        prop_assert_eq!(word, round_trip);
+    }
 }
 
 #[test]
@@ -138,51 +146,37 @@ fn word_elements_array_layout_roundtrip() {
     assert_eq!(word.c, Felt::new(42));
 }
 
-#[test]
-fn test_index() {
-    let word = Word::new([
-        Felt::from_u32(1_u32),
-        Felt::from_u32(2_u32),
-        Felt::from_u32(3_u32),
-        Felt::from_u32(4_u32),
-    ]);
-    assert_eq!(word[0], Felt::from_u32(1_u32));
-    assert_eq!(word[1], Felt::from_u32(2_u32));
-    assert_eq!(word[2], Felt::from_u32(3_u32));
-    assert_eq!(word[3], Felt::from_u32(4_u32));
-}
+proptest! {
+    #[test]
+    fn word_index_matches_into_elements(word in any::<Word>()) {
+        let elements = word.into_elements();
+        for idx in 0..WORD_SIZE_FELTS {
+            prop_assert_eq!(word[idx], elements[idx]);
+        }
+    }
 
-#[test]
-fn test_index_mut() {
-    let mut word = Word::new([
-        Felt::from_u32(1_u32),
-        Felt::from_u32(2_u32),
-        Felt::from_u32(3_u32),
-        Felt::from_u32(4_u32),
-    ]);
+    #[test]
+    fn word_index_mut_updates_all_elements(word in any::<Word>(), values in any::<[u64; WORD_SIZE_FELTS]>()) {
+        let mut word = word;
 
-    word[0] = Felt::from_u32(5_u32);
-    word[1] = Felt::from_u32(6_u32);
-    word[2] = Felt::from_u32(7_u32);
-    word[3] = Felt::from_u32(8_u32);
-    assert_eq!(word[0], Felt::from_u32(5_u32));
-    assert_eq!(word[1], Felt::from_u32(6_u32));
-    assert_eq!(word[2], Felt::from_u32(7_u32));
-    assert_eq!(word[3], Felt::from_u32(8_u32));
-}
+        let mut expected = word.into_elements();
+        for idx in 0..WORD_SIZE_FELTS {
+            let value = values[idx];
+            expected[idx] = Felt::new(value);
+            word[idx] = Felt::new(value);
+        }
+        prop_assert_eq!(word.into_elements(), expected);
+    }
 
-#[test]
-fn test_index_mut_range() {
-    let mut word = Word::new([
-        Felt::from_u32(1_u32),
-        Felt::from_u32(2_u32),
-        Felt::from_u32(3_u32),
-        Felt::from_u32(4_u32),
-    ]);
+    #[test]
+    fn word_index_mut_range_updates_slice(word in any::<Word>(), v0 in any::<u64>(), v1 in any::<u64>()) {
+        let mut word = word;
+        let expected = [Felt::new(v0), Felt::new(v1)];
 
-    word[1..3].copy_from_slice(&[Felt::from_u32(6_u32), Felt::from_u32(7_u32)]);
-    assert_eq!(word[1], Felt::from_u32(6_u32));
-    assert_eq!(word[2], Felt::from_u32(7_u32));
+        word[1..3].copy_from_slice(&expected);
+        prop_assert_eq!(word[1], expected[0]);
+        prop_assert_eq!(word[2], expected[1]);
+    }
 }
 
 #[rstest::rstest]
@@ -234,108 +228,30 @@ fn word_macro_endianness(#[case] input: &str, #[case] expected: crate::Word) {
     assert_eq!(uut, expected);
 }
 
-#[test]
-fn word_ord_respects_partialeq() {
-    use core::cmp::Ordering;
+proptest! {
+    #[test]
+    fn word_ord_is_consistent_with_partialeq(a in any::<Word>(), b in any::<Word>()) {
+        use core::cmp::Ordering;
 
-    // Test that Word::cmp() respects the PartialEq invariant:
-    // if a == b, then a.cmp(b) must equal Ordering::Equal
-
-    let test_cases = vec![
-        Word::new([Felt::new(2), Felt::new(0), Felt::new(0), Felt::new(0)]),
-        Word::new([Felt::new(0), Felt::new(0), Felt::new(0), Felt::new(0)]),
-        Word::new([Felt::new(1), Felt::new(2), Felt::new(3), Felt::new(4)]),
-        Word::new([Felt::new(100), Felt::new(200), Felt::new(300), Felt::new(400)]),
-    ];
-
-    for word in test_cases {
-        let word_copy = word;
-
-        assert_eq!(word, word_copy, "Word should be equal to itself");
-        assert_eq!(
-            word.cmp(&word_copy),
-            Ordering::Equal,
-            "Word::cmp() should return Ordering::Equal for equal words: {:?}",
-            word
-        );
+        prop_assert_eq!(a == b, a.cmp(&b) == Ordering::Equal);
+        prop_assert_eq!(b == a, b.cmp(&a) == Ordering::Equal);
     }
-}
 
-#[test]
-fn word_ord_btreemap_usage() {
-    use alloc::collections::BTreeMap;
+    #[test]
+    fn word_ord_supports_btreemap_key_usage(word in any::<Word>()) {
+        let mut map: BTreeMap<Word, u64> = BTreeMap::new();
+        map.insert(word, 1);
 
-    // Test that Word works correctly as a BTreeMap key
-    // This will fail if Ord and PartialEq are inconsistent
+        // Round-trip via bytes to create an equivalent key.
+        let bytes: [u8; WORD_SIZE_BYTES] = word.into();
+        let key2: Word = bytes.try_into().unwrap();
+        prop_assert_eq!(word, key2);
 
-    let mut map = BTreeMap::new();
-    let key1 = Word::new([Felt::new(2), Felt::new(0), Felt::new(0), Felt::new(0)]);
-    let key2 = Word::new([Felt::new(2), Felt::new(0), Felt::new(0), Felt::new(0)]);
+        prop_assert!(map.contains_key(&key2));
+        prop_assert_eq!(map.get(&key2), Some(&1));
 
-    map.insert(key1, "value1");
-
-    // key2 should be equal to key1
-    assert_eq!(key1, key2);
-
-    // So map should contain key2
-    assert!(map.contains_key(&key2), "BTreeMap should find key2 since it's equal to key1");
-
-    // And getting by key2 should return the same value
-    assert_eq!(map.get(&key2), Some(&"value1"));
-
-    // Inserting with key2 should update the existing entry
-    map.insert(key2, "value2");
-    assert_eq!(map.len(), 1, "Map should still have only one entry");
-    assert_eq!(map.get(&key1), Some(&"value2"));
-}
-
-#[test]
-fn word_ord_consistency_with_partialeq() {
-    use core::cmp::Ordering;
-
-    // Comprehensive test that Ord is consistent with PartialEq
-    // This is required by Rust's trait contract: if a == b, then a.cmp(b) == Ordering::Equal
-
-    let test_pairs = vec![
-        // Same values
-        (
-            Word::new([Felt::new(1), Felt::new(2), Felt::new(3), Felt::new(4)]),
-            Word::new([Felt::new(1), Felt::new(2), Felt::new(3), Felt::new(4)]),
-            Ordering::Equal,
-        ),
-        // Different first element
-        (
-            Word::new([Felt::new(1), Felt::new(2), Felt::new(3), Felt::new(4)]),
-            Word::new([Felt::new(2), Felt::new(2), Felt::new(3), Felt::new(4)]),
-            Ordering::Less,
-        ),
-        // Different last element
-        (
-            Word::new([Felt::new(1), Felt::new(2), Felt::new(3), Felt::new(4)]),
-            Word::new([Felt::new(1), Felt::new(2), Felt::new(3), Felt::new(3)]),
-            Ordering::Greater,
-        ),
-    ];
-
-    for (w1, w2, expected_ordering) in test_pairs {
-        let actual_ordering = w1.cmp(&w2);
-        assert_eq!(
-            actual_ordering, expected_ordering,
-            "Word::cmp mismatch: {:?}.cmp({:?}) returned {:?}, expected {:?}",
-            w1, w2, actual_ordering, expected_ordering
-        );
-
-        // Verify consistency with PartialEq
-        match expected_ordering {
-            Ordering::Equal => {
-                assert_eq!(w1, w2, "Words should be equal when cmp returns Equal");
-            },
-            Ordering::Less => {
-                assert_ne!(w1, w2, "Words should not be equal when cmp returns Less");
-            },
-            Ordering::Greater => {
-                assert_ne!(w1, w2, "Words should not be equal when cmp returns Greater");
-            },
-        }
+        map.insert(key2, 2);
+        prop_assert_eq!(map.len(), 1);
+        prop_assert_eq!(map.get(&word), Some(&2));
     }
 }
