@@ -399,6 +399,13 @@ impl PartialEq for Felt {
     }
 }
 
+impl PartialEq<Goldilocks> for Felt {
+    #[inline]
+    fn eq(&self, other: &Goldilocks) -> bool {
+        self.0 == *other
+    }
+}
+
 impl Eq for Felt {}
 
 impl PartialOrd for Felt {
@@ -488,3 +495,9 @@ mod arbitrary {
         }
     }
 }
+
+// TESTS
+// ================================================================================================
+
+#[cfg(test)]
+mod tests;
