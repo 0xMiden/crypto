@@ -25,9 +25,18 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
       - name: Install cargo-msrv
-        run: cargo install cargo-msrv
+        run: cargo install cargo-msrv --locked
       - name: Cache rustup toolchains
-        run: rustup update
+        run: |
+          for attempt in 1 2 3; do
+            if rustup update; then
+              exit 0
+            fi
+            if [ "$attempt" -lt 3 ]; then
+              sleep 10
+            fi
+          done
+          exit 1
       - name: Check MSRV for each workspace member
         run: |
           chmod +x scripts/check-msrv.sh
