@@ -1,3 +1,7 @@
+## 0.19.4 (unreleased)
+
+- Backport `LargeSmtForest` with its `InMemory` backend ([#834](https://github.com/0xMiden/crypto/pull/834)).
+
 ## 0.19.3 (2026-01-21)
 
 - Fix: don't disable WAL during subtree construction in `LargeSmt`'s RocksDB backend ([#792](https://github.com/0xMiden/crypto/pull/792)).
