@@ -1,8 +1,16 @@
 //! This module contains utility types for working with roots and trees as part of the forest.
 
-use crate::Word;
+#[cfg(feature = "serde")]
+use miden_serde_utils::{
+    ByteReader, ByteWriter, Deserializable, DeserializationError, Serializable,
+};
+
 #[cfg(test)]
 use crate::rand::Randomizable;
+use crate::{
+    Word,
+    merkle::smt::{LeafIndex, SMT_DEPTH},
+};
 
 // TYPES
 // ================================================================================================
@@ -21,6 +29,7 @@ pub type VersionId = u64;
 /// This is an arbitrary, user-provided identifier that is used to disambiguate cases where trees in
 /// distinct lineages are otherwise identical and have the same root.
 #[derive(Copy, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct LineageId([u8; 32]);
 
 impl LineageId {
@@ -38,6 +47,24 @@ impl core::fmt::Display for LineageId {
             write!(f, "{byte:x}, ")?;
         }
         write!(f, "...]")
+    }
+}
+
+#[cfg(feature = "serde")]
+impl Serializable for LineageId {
+    fn write_into<W: ByteWriter>(&self, target: &mut W) {
+        target.write_bytes(&self.0)
+    }
+
+    fn get_size_hint(&self) -> usize {
+        size_of_val(&self.0)
+    }
+}
+
+#[cfg(feature = "serde")]
+impl Deserializable for LineageId {
+    fn read_from<R: ByteReader>(source: &mut R) -> Result<Self, DeserializationError> {
+        Ok(Self(source.read_array()?))
     }
 }
 
@@ -82,7 +109,7 @@ impl TreeId {
 
 impl core::fmt::Display for TreeId {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        write!(f, "TreeId(lineage = {}, version = {}", self.lineage, self.version)
+        write!(f, "TreeId(lineage = {}, version = {})", self.lineage, self.version)
     }
 }
 
@@ -91,8 +118,11 @@ impl Randomizable for TreeId {
     const VALUE_SIZE: usize = size_of::<Self>();
 
     fn from_random_bytes(source: &[u8]) -> Option<Self> {
-        let domain = Randomizable::from_random_bytes(source)?;
-        let version = Randomizable::from_random_bytes(source)?;
+        const LINEAGE_SIZE: usize = size_of::<LineageId>();
+        const VERSION_SIZE: usize = size_of::<VersionId>();
+        let domain = Randomizable::from_random_bytes(&source[0..LINEAGE_SIZE])?;
+        let version =
+            Randomizable::from_random_bytes(&source[LINEAGE_SIZE..LINEAGE_SIZE + VERSION_SIZE])?;
         Some(Self::new(domain, version))
     }
 }
@@ -191,8 +221,13 @@ pub enum RootInfo {
 // ================================================================================================
 
 /// An entry in a given tree.
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd)]
 pub struct TreeEntry {
     pub key: Word,
     pub value: Word,
+}
+impl TreeEntry {
+    pub fn index(&self) -> LeafIndex<SMT_DEPTH> {
+        LeafIndex::from(self.key)
+    }
 }

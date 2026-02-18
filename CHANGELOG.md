@@ -1,5 +1,6 @@
 ## 0.22.6 (2026-03-13)
 
+- Backport `LargeSmtForest` with its `InMemory` backend ([#834](https://github.com/0xMiden/crypto/pull/834)).
 - Added `Signature::from_der()` for ECDSA signatures over secp256k1 ([#842](https://github.com/0xMiden/crypto/pull/842)).
 - Added `PublicKey::from_der()` for ECDSA public keys over secp256k1 ([#855](https://github.com/0xMiden/crypto/pull/855)).
 

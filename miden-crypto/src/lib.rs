@@ -108,6 +108,8 @@ pub type Map<K, V> = hashbrown::HashMap<K, V>;
 
 #[cfg(feature = "hashmaps")]
 pub use hashbrown::hash_map::Entry as MapEntry;
+#[cfg(feature = "hashmaps")]
+pub use hashbrown::hash_map::IntoIter as MapIntoIter;
 
 /// An alias for a key-value map.
 ///
@@ -118,6 +120,8 @@ pub type Map<K, V> = alloc::collections::BTreeMap<K, V>;
 
 #[cfg(not(feature = "hashmaps"))]
 pub use alloc::collections::btree_map::Entry as MapEntry;
+#[cfg(not(feature = "hashmaps"))]
+pub use alloc::collections::btree_map::IntoIter as MapIntoIter;
 
 /// An alias for a simple set.
 ///
