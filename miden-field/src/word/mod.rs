@@ -232,6 +232,7 @@ impl Word {
         self.as_elements().to_vec()
     }
 
+    /// Returns a copy of this word with its elements in reverse order.
     pub fn reversed(&self) -> Self {
         Word {
             a: self.d,
