@@ -8,6 +8,7 @@
 - [BREAKING] Fix OOMs in Merkle/SMT deserialization ([#820](https://github.com/0xMiden/crypto/pull/820)).
 - Fixed `SmtForest` to remove nodes with zero reference count from store ([#821](https://github.com/0xMiden/crypto/pull/821)).
 - Cross-checked RPO test vectors against the Python reference implementation after state layout change ([#822](https://github.com/0xMiden/crypto/pull/822)).
+- Added `hash_iter()` to `Rpo256`, `Rpx256`, and `Poseidon2` for hashing field elements from iterators without allocation ([#823](https://github.com/0xMiden/crypto/pull/823)).
 - Fixed tuple `min_serialized_size()` to exclude alignment padding, fixing `BudgetedReader` rejecting valid data ([#827](https://github.com/0xMiden/crypto/pull/827)).
 - [BREAKING] Added validation to `PartialMmr::from_parts()` and `Deserializable` implementation, added `from_parts_unchecked()` for performance-critical code ([#812](https://github.com/0xMiden/crypto/pull/812)).
 
