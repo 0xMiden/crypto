@@ -24,10 +24,11 @@ pub mod field {
     //! Traits and utilities for working with the Goldilocks finite field (i.e.,
     //! [Felt](super::Felt)).
 
-    pub use p3_field::{
-        BasedVectorSpace, ExtensionField, Field, PrimeCharacteristicRing, PrimeField64,
-        TwoAdicField, batch_multiplicative_inverse, extension::BinomialExtensionField,
-        integers::QuotientMap,
+    pub use miden_field::{
+        BasedVectorSpace, BinomialExtensionField, BinomiallyExtendable,
+        BinomiallyExtendableAlgebra, ExtensionField, Field, HasTwoAdicBinomialExtension,
+        InjectiveMonomial, Packable, PermutationMonomial, PrimeCharacteristicRing, PrimeField,
+        PrimeField64, QuotientMap, RawDataSerializable, TwoAdicField, batch_multiplicative_inverse,
     };
 
     pub use super::batch_inversion::batch_inversion_allow_zeros;
