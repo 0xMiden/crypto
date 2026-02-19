@@ -126,6 +126,11 @@ proptest! {
         let round_trip: Word = (&string).try_into().unwrap();
         prop_assert_eq!(word, round_trip);
     }
+
+    #[test]
+    fn word_reversed_roundtrip(word in any::<Word>()) {
+        prop_assert_eq!(word, word.reversed().reversed());
+    }
 }
 
 #[test]
