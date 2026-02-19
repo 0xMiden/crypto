@@ -44,7 +44,8 @@ mod tests;
     not(all(target_family = "wasm", miden)),
     serde(into = "String", try_from = "&str")
 )]
-#[repr(C, align(16))]
+#[repr(C)]
+#[cfg_attr(all(target_family = "wasm", miden), repr(align(16)))]
 pub struct Word {
     /// The underlying elements of this word.
     pub a: Felt,
