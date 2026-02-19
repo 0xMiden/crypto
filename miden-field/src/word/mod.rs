@@ -725,6 +725,7 @@ impl IntoIterator for Word {
 /// Construct a new [Word](super::Word) from a hex value.
 ///
 /// Expects a '0x' prefixed hex string followed by up to 64 hex digits.
+#[cfg(not(all(target_family = "wasm", miden)))]
 #[macro_export]
 macro_rules! word {
     ($hex:expr) => {{
