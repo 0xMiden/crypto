@@ -161,6 +161,14 @@ fuzz-merkle: ## Run fuzzing for Merkle tree serialization
 fuzz-smt-serde: ## Run fuzzing for SMT serialization
 	cargo +nightly fuzz run smt_serde --release --fuzz-dir miden-crypto-fuzz
 
+.PHONY: fuzz-mmr
+fuzz-mmr: ## Run fuzzing for MMR structures serialization
+	cargo +nightly fuzz run mmr --release --fuzz-dir miden-crypto-fuzz
+
+.PHONY: fuzz-crypto
+fuzz-crypto: ## Run fuzzing for cryptographic types serialization
+	cargo +nightly fuzz run crypto --release --fuzz-dir miden-crypto-fuzz
+
 # --- installing ----------------------------------------------------------------------------------
 
 .PHONY: check-tools
