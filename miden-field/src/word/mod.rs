@@ -61,6 +61,16 @@ pub struct Word {
     // here.
 }
 
+// Compile-time assertions to ensure `Word` has the same layout as `[Felt; 4]`. This is relied upon
+// in `as_elements_array`/`as_elements_array_mut`.
+const _: () = {
+    assert!(core::mem::size_of::<Word>() == WORD_SIZE_FELTS * core::mem::size_of::<Felt>());
+    assert!(core::mem::offset_of!(Word, a) == 0);
+    assert!(core::mem::offset_of!(Word, b) == core::mem::size_of::<Felt>());
+    assert!(core::mem::offset_of!(Word, c) == 2 * core::mem::size_of::<Felt>());
+    assert!(core::mem::offset_of!(Word, d) == 3 * core::mem::size_of::<Felt>());
+};
+
 impl core::fmt::Debug for Word {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         f.debug_tuple("Word").field(&self.into_elements()).finish()
