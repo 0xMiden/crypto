@@ -1,30 +1,29 @@
 //! A [Word] type used in the Miden protocol and associated utilities.
 
 use alloc::{string::String, vec::Vec};
+#[cfg(not(all(target_family = "wasm", miden)))]
+use core::fmt::Display;
 use core::{
     cmp::Ordering,
-    fmt::Display,
     hash::{Hash, Hasher},
     ops::{Deref, DerefMut, Index, IndexMut, Range},
     slice,
 };
 
+#[cfg(not(all(target_family = "wasm", miden)))]
+use miden_serde_utils::{
+    ByteReader, ByteWriter, Deserializable, DeserializationError, Serializable,
+};
 use thiserror::Error;
 
-const WORD_SIZE_FELT: usize = 4;
-const WORD_SIZE_BYTES: usize = 32;
+pub const WORD_SIZE_FELTS: usize = 4;
+pub const WORD_SIZE_BYTES: usize = 32;
 
-use p3_field::integers::QuotientMap;
+#[cfg(not(all(target_family = "wasm", miden)))]
+use p3_field::{PrimeCharacteristicRing, PrimeField64, integers::QuotientMap};
 
-use super::{Felt, ZERO};
-use crate::{
-    field::{PrimeCharacteristicRing, PrimeField64},
-    rand::Randomizable,
-    utils::{
-        ByteReader, ByteWriter, Deserializable, DeserializationError, HexParseError, Serializable,
-        bytes_to_hex_string, hex_to_bytes,
-    },
-};
+use super::Felt;
+use crate::utils::bytes_to_hex_string;
 
 mod lexicographic;
 pub use lexicographic::LexicographicWord;
@@ -36,18 +35,79 @@ mod tests;
 // ================================================================================================
 
 /// A unit of data consisting of 4 field elements.
-#[derive(Debug, Default, Copy, Clone, Eq, PartialEq)]
-#[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
-#[cfg_attr(feature = "serde", serde(into = "String", try_from = "&str"))]
-pub struct Word([Felt; WORD_SIZE_FELT]);
+#[derive(Default, Copy, Clone, Eq, PartialEq)]
+#[cfg_attr(
+    not(all(target_family = "wasm", miden)),
+    derive(serde::Deserialize, serde::Serialize)
+)]
+#[cfg_attr(
+    not(all(target_family = "wasm", miden)),
+    serde(into = "String", try_from = "&str")
+)]
+#[repr(C)]
+#[cfg_attr(all(target_family = "wasm", miden), repr(align(16)))]
+pub struct Word {
+    /// The underlying elements of this word.
+    pub a: Felt,
+    pub b: Felt,
+    pub c: Felt,
+    pub d: Felt,
+    // We cannot define this type as `Word([Felt;4])` since there is no struct tuple support
+    // and fixed array support is not complete in WIT. For the type remapping to work the
+    // bindings are expecting the remapped type to be the same shape as the one generated from
+    // WIT.
+    //
+    // see sdk/base-macros/wit/miden.wit in the compiler repo, so we have to define it like that
+    // here.
+}
+
+// Compile-time assertions to ensure `Word` has the same layout as `[Felt; 4]`. This is relied upon
+// in `as_elements_array`/`as_elements_array_mut`.
+const _: () = {
+    assert!(core::mem::size_of::<Word>() == WORD_SIZE_FELTS * core::mem::size_of::<Felt>());
+    assert!(core::mem::offset_of!(Word, a) == 0);
+    assert!(core::mem::offset_of!(Word, b) == core::mem::size_of::<Felt>());
+    assert!(core::mem::offset_of!(Word, c) == 2 * core::mem::size_of::<Felt>());
+    assert!(core::mem::offset_of!(Word, d) == 3 * core::mem::size_of::<Felt>());
+};
+
+impl core::fmt::Debug for Word {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.debug_tuple("Word").field(&self.into_elements()).finish()
+    }
+}
 
 impl Word {
     /// The serialized size of the word in bytes.
     pub const SERIALIZED_SIZE: usize = WORD_SIZE_BYTES;
 
     /// Creates a new [`Word`] from the given field elements.
-    pub const fn new(value: [Felt; WORD_SIZE_FELT]) -> Self {
-        Self(value)
+    pub const fn new(value: [Felt; WORD_SIZE_FELTS]) -> Self {
+        let [a, b, c, d] = value;
+        Self { a, b, c, d }
+    }
+
+    /// Returns the elements of this word as an array.
+    pub const fn into_elements(self) -> [Felt; WORD_SIZE_FELTS] {
+        [self.a, self.b, self.c, self.d]
+    }
+
+    /// Returns the elements of this word as an array reference.
+    ///
+    /// # Safety
+    /// This assumes the four fields of [`Word`] are laid out contiguously with no padding, in
+    /// the same order as `[Felt; 4]`.
+    fn as_elements_array(&self) -> &[Felt; WORD_SIZE_FELTS] {
+        unsafe { &*(&self.a as *const Felt as *const [Felt; WORD_SIZE_FELTS]) }
+    }
+
+    /// Returns the elements of this word as a mutable array reference.
+    ///
+    /// # Safety
+    /// This assumes the four fields of [`Word`] are laid out contiguously with no padding, in
+    /// the same order as `[Felt; 4]`.
+    fn as_elements_array_mut(&mut self) -> &mut [Felt; WORD_SIZE_FELTS] {
+        unsafe { &mut *(&mut self.a as *mut Felt as *mut [Felt; WORD_SIZE_FELTS]) }
     }
 
     /// Parses a hex string into a new [`Word`].
@@ -61,10 +121,11 @@ impl Word {
     /// This function is usually used via the `word!` macro.
     ///
     /// ```
-    /// use miden_crypto::{Felt, Word, word};
+    /// use miden_field::{Felt, Word, word};
     /// let word = word!("0x1000000000000000200000000000000030000000000000004000000000000000");
     /// assert_eq!(word, Word::new([Felt::new(16), Felt::new(32), Felt::new(48), Felt::new(64)]));
     /// ```
+    #[cfg(not(all(target_family = "wasm", miden)))]
     pub const fn parse(hex: &str) -> Result<Self, &'static str> {
         const fn parse_hex_digit(digit: u8) -> Result<u8, &'static str> {
             match digit {
@@ -128,47 +189,48 @@ impl Word {
 
     /// Returns a new [Word] consisting of four ZERO elements.
     pub const fn empty() -> Self {
-        Self([Felt::ZERO; WORD_SIZE_FELT])
+        Self::new([Felt::ZERO; WORD_SIZE_FELTS])
     }
 
     /// Returns true if the word consists of four ZERO elements.
     pub fn is_empty(&self) -> bool {
-        self.0[0] == Felt::ZERO
-            && self.0[1] == Felt::ZERO
-            && self.0[2] == Felt::ZERO
-            && self.0[3] == Felt::ZERO
+        let elements = self.as_elements_array();
+        elements[0] == Felt::ZERO
+            && elements[1] == Felt::ZERO
+            && elements[2] == Felt::ZERO
+            && elements[3] == Felt::ZERO
     }
 
     /// Returns the word as a slice of field elements.
     pub fn as_elements(&self) -> &[Felt] {
-        self.as_ref()
+        self.as_elements_array()
     }
 
     /// Returns the word as a byte array.
     pub fn as_bytes(&self) -> [u8; WORD_SIZE_BYTES] {
         let mut result = [0; WORD_SIZE_BYTES];
 
-        result[..8].copy_from_slice(&self.0[0].as_canonical_u64().to_le_bytes());
-        result[8..16].copy_from_slice(&self.0[1].as_canonical_u64().to_le_bytes());
-        result[16..24].copy_from_slice(&self.0[2].as_canonical_u64().to_le_bytes());
-        result[24..].copy_from_slice(&self.0[3].as_canonical_u64().to_le_bytes());
+        let elements = self.as_elements_array();
+        result[..8].copy_from_slice(&elements[0].as_canonical_u64().to_le_bytes());
+        result[8..16].copy_from_slice(&elements[1].as_canonical_u64().to_le_bytes());
+        result[16..24].copy_from_slice(&elements[2].as_canonical_u64().to_le_bytes());
+        result[24..].copy_from_slice(&elements[3].as_canonical_u64().to_le_bytes());
 
         result
     }
 
     /// Returns an iterator over the elements of multiple words.
-    pub(crate) fn words_as_elements_iter<'a, I>(words: I) -> impl Iterator<Item = &'a Felt>
+    pub fn words_as_elements_iter<'a, I>(words: I) -> impl Iterator<Item = &'a Felt>
     where
         I: Iterator<Item = &'a Self>,
     {
-        words.flat_map(|d| d.0.iter())
+        words.flat_map(|d| d.as_elements().iter())
     }
 
     /// Returns all elements of multiple words as a slice.
     pub fn words_as_elements(words: &[Self]) -> &[Felt] {
-        let p = words.as_ptr();
-        let len = words.len() * WORD_SIZE_FELT;
-        unsafe { slice::from_raw_parts(p as *const Felt, len) }
+        let len = words.len() * WORD_SIZE_FELTS;
+        unsafe { slice::from_raw_parts(words.as_ptr() as *const Felt, len) }
     }
 
     /// Returns hexadecimal representation of this word prefixed with `0x`.
@@ -178,7 +240,17 @@ impl Word {
 
     /// Returns internal elements of this word as a vector.
     pub fn to_vec(&self) -> Vec<Felt> {
-        self.0.to_vec()
+        self.as_elements().to_vec()
+    }
+
+    /// Returns a copy of this word with its elements in reverse order.
+    pub fn reversed(&self) -> Self {
+        Word {
+            a: self.d,
+            b: self.c,
+            c: self.b,
+            d: self.a,
+        }
     }
 }
 
@@ -189,16 +261,16 @@ impl Hash for Word {
 }
 
 impl Deref for Word {
-    type Target = [Felt; WORD_SIZE_FELT];
+    type Target = [Felt; WORD_SIZE_FELTS];
 
     fn deref(&self) -> &Self::Target {
-        &self.0
+        self.as_elements_array()
     }
 }
 
 impl DerefMut for Word {
     fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.0
+        self.as_elements_array_mut()
     }
 }
 
@@ -206,13 +278,13 @@ impl Index<usize> for Word {
     type Output = Felt;
 
     fn index(&self, index: usize) -> &Self::Output {
-        &self.0[index]
+        &self.as_elements_array()[index]
     }
 }
 
 impl IndexMut<usize> for Word {
     fn index_mut(&mut self, index: usize) -> &mut Self::Output {
-        &mut self.0[index]
+        &mut self.as_elements_array_mut()[index]
     }
 }
 
@@ -220,13 +292,13 @@ impl Index<Range<usize>> for Word {
     type Output = [Felt];
 
     fn index(&self, index: Range<usize>) -> &Self::Output {
-        &self.0[index]
+        &self.as_elements_array()[index]
     }
 }
 
 impl IndexMut<Range<usize>> for Word {
     fn index_mut(&mut self, index: Range<usize>) -> &mut Self::Output {
-        &mut self.0[index]
+        &mut self.as_elements_array_mut()[index]
     }
 }
 
@@ -245,10 +317,10 @@ impl Ord for Word {
         // We must iterate over and compare each element individually. A simple bytestring
         // comparison would be inappropriate because the `Word`s are represented in
         // "lexicographical" order.
-        self.0
+        self.as_elements_array()
             .iter()
             .map(Felt::as_canonical_u64)
-            .zip(other.0.iter().map(Felt::as_canonical_u64))
+            .zip(other.as_elements_array().iter().map(Felt::as_canonical_u64))
             .fold(Ordering::Equal, |ord, (a, b)| match ord {
                 Ordering::Equal => a.cmp(&b),
                 _ => ord,
@@ -262,22 +334,10 @@ impl PartialOrd for Word {
     }
 }
 
+#[cfg(not(all(target_family = "wasm", miden)))]
 impl Display for Word {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         write!(f, "{}", self.to_hex())
-    }
-}
-
-impl Randomizable for Word {
-    const VALUE_SIZE: usize = WORD_SIZE_BYTES;
-
-    fn from_random_bytes(bytes: &[u8]) -> Option<Self> {
-        let bytes_array: Option<[u8; 32]> = bytes.try_into().ok();
-        if let Some(bytes_array) = bytes_array {
-            Self::try_from(bytes_array).ok()
-        } else {
-            None
-        }
     }
 }
 
@@ -289,7 +349,7 @@ impl Randomizable for Word {
 pub enum WordError {
     /// Hex-encoded field elements parsed are invalid.
     #[error("hex encoded values of a word are invalid")]
-    HexParse(#[from] HexParseError),
+    HexParse(#[from] crate::utils::HexParseError),
     /// Field element conversion failed due to invalid value.
     #[error("failed to convert to field element: {0}")]
     InvalidFieldElement(String),
@@ -301,7 +361,7 @@ pub enum WordError {
     TypeConversion(&'static str),
 }
 
-impl TryFrom<&Word> for [bool; WORD_SIZE_FELT] {
+impl TryFrom<&Word> for [bool; WORD_SIZE_FELTS] {
     type Error = WordError;
 
     fn try_from(value: &Word) -> Result<Self, Self::Error> {
@@ -309,7 +369,7 @@ impl TryFrom<&Word> for [bool; WORD_SIZE_FELT] {
     }
 }
 
-impl TryFrom<Word> for [bool; WORD_SIZE_FELT] {
+impl TryFrom<Word> for [bool; WORD_SIZE_FELTS] {
     type Error = WordError;
 
     fn try_from(value: Word) -> Result<Self, Self::Error> {
@@ -317,16 +377,17 @@ impl TryFrom<Word> for [bool; WORD_SIZE_FELT] {
             if v <= 1 { Some(v == 1) } else { None }
         }
 
+        let [a, b, c, d] = value.into_elements();
         Ok([
-            to_bool(value.0[0].as_canonical_u64()).ok_or(WordError::TypeConversion("bool"))?,
-            to_bool(value.0[1].as_canonical_u64()).ok_or(WordError::TypeConversion("bool"))?,
-            to_bool(value.0[2].as_canonical_u64()).ok_or(WordError::TypeConversion("bool"))?,
-            to_bool(value.0[3].as_canonical_u64()).ok_or(WordError::TypeConversion("bool"))?,
+            to_bool(a.as_canonical_u64()).ok_or(WordError::TypeConversion("bool"))?,
+            to_bool(b.as_canonical_u64()).ok_or(WordError::TypeConversion("bool"))?,
+            to_bool(c.as_canonical_u64()).ok_or(WordError::TypeConversion("bool"))?,
+            to_bool(d.as_canonical_u64()).ok_or(WordError::TypeConversion("bool"))?,
         ])
     }
 }
 
-impl TryFrom<&Word> for [u8; WORD_SIZE_FELT] {
+impl TryFrom<&Word> for [u8; WORD_SIZE_FELTS] {
     type Error = WordError;
 
     fn try_from(value: &Word) -> Result<Self, Self::Error> {
@@ -334,32 +395,21 @@ impl TryFrom<&Word> for [u8; WORD_SIZE_FELT] {
     }
 }
 
-impl TryFrom<Word> for [u8; WORD_SIZE_FELT] {
+impl TryFrom<Word> for [u8; WORD_SIZE_FELTS] {
     type Error = WordError;
 
     fn try_from(value: Word) -> Result<Self, Self::Error> {
+        let [a, b, c, d] = value.into_elements();
         Ok([
-            value.0[0]
-                .as_canonical_u64()
-                .try_into()
-                .map_err(|_| WordError::TypeConversion("u8"))?,
-            value.0[1]
-                .as_canonical_u64()
-                .try_into()
-                .map_err(|_| WordError::TypeConversion("u8"))?,
-            value.0[2]
-                .as_canonical_u64()
-                .try_into()
-                .map_err(|_| WordError::TypeConversion("u8"))?,
-            value.0[3]
-                .as_canonical_u64()
-                .try_into()
-                .map_err(|_| WordError::TypeConversion("u8"))?,
+            a.as_canonical_u64().try_into().map_err(|_| WordError::TypeConversion("u8"))?,
+            b.as_canonical_u64().try_into().map_err(|_| WordError::TypeConversion("u8"))?,
+            c.as_canonical_u64().try_into().map_err(|_| WordError::TypeConversion("u8"))?,
+            d.as_canonical_u64().try_into().map_err(|_| WordError::TypeConversion("u8"))?,
         ])
     }
 }
 
-impl TryFrom<&Word> for [u16; WORD_SIZE_FELT] {
+impl TryFrom<&Word> for [u16; WORD_SIZE_FELTS] {
     type Error = WordError;
 
     fn try_from(value: &Word) -> Result<Self, Self::Error> {
@@ -367,32 +417,21 @@ impl TryFrom<&Word> for [u16; WORD_SIZE_FELT] {
     }
 }
 
-impl TryFrom<Word> for [u16; WORD_SIZE_FELT] {
+impl TryFrom<Word> for [u16; WORD_SIZE_FELTS] {
     type Error = WordError;
 
     fn try_from(value: Word) -> Result<Self, Self::Error> {
+        let [a, b, c, d] = value.into_elements();
         Ok([
-            value.0[0]
-                .as_canonical_u64()
-                .try_into()
-                .map_err(|_| WordError::TypeConversion("u16"))?,
-            value.0[1]
-                .as_canonical_u64()
-                .try_into()
-                .map_err(|_| WordError::TypeConversion("u16"))?,
-            value.0[2]
-                .as_canonical_u64()
-                .try_into()
-                .map_err(|_| WordError::TypeConversion("u16"))?,
-            value.0[3]
-                .as_canonical_u64()
-                .try_into()
-                .map_err(|_| WordError::TypeConversion("u16"))?,
+            a.as_canonical_u64().try_into().map_err(|_| WordError::TypeConversion("u16"))?,
+            b.as_canonical_u64().try_into().map_err(|_| WordError::TypeConversion("u16"))?,
+            c.as_canonical_u64().try_into().map_err(|_| WordError::TypeConversion("u16"))?,
+            d.as_canonical_u64().try_into().map_err(|_| WordError::TypeConversion("u16"))?,
         ])
     }
 }
 
-impl TryFrom<&Word> for [u32; WORD_SIZE_FELT] {
+impl TryFrom<&Word> for [u32; WORD_SIZE_FELTS] {
     type Error = WordError;
 
     fn try_from(value: &Word) -> Result<Self, Self::Error> {
@@ -400,57 +439,41 @@ impl TryFrom<&Word> for [u32; WORD_SIZE_FELT] {
     }
 }
 
-impl TryFrom<Word> for [u32; WORD_SIZE_FELT] {
+impl TryFrom<Word> for [u32; WORD_SIZE_FELTS] {
     type Error = WordError;
 
     fn try_from(value: Word) -> Result<Self, Self::Error> {
+        let [a, b, c, d] = value.into_elements();
         Ok([
-            value.0[0]
-                .as_canonical_u64()
-                .try_into()
-                .map_err(|_| WordError::TypeConversion("u32"))?,
-            value.0[1]
-                .as_canonical_u64()
-                .try_into()
-                .map_err(|_| WordError::TypeConversion("u32"))?,
-            value.0[2]
-                .as_canonical_u64()
-                .try_into()
-                .map_err(|_| WordError::TypeConversion("u32"))?,
-            value.0[3]
-                .as_canonical_u64()
-                .try_into()
-                .map_err(|_| WordError::TypeConversion("u32"))?,
+            a.as_canonical_u64().try_into().map_err(|_| WordError::TypeConversion("u32"))?,
+            b.as_canonical_u64().try_into().map_err(|_| WordError::TypeConversion("u32"))?,
+            c.as_canonical_u64().try_into().map_err(|_| WordError::TypeConversion("u32"))?,
+            d.as_canonical_u64().try_into().map_err(|_| WordError::TypeConversion("u32"))?,
         ])
     }
 }
 
-impl From<&Word> for [u64; WORD_SIZE_FELT] {
+impl From<&Word> for [u64; WORD_SIZE_FELTS] {
     fn from(value: &Word) -> Self {
         (*value).into()
     }
 }
 
-impl From<Word> for [u64; WORD_SIZE_FELT] {
+impl From<Word> for [u64; WORD_SIZE_FELTS] {
     fn from(value: Word) -> Self {
-        [
-            value.0[0].as_canonical_u64(),
-            value.0[1].as_canonical_u64(),
-            value.0[2].as_canonical_u64(),
-            value.0[3].as_canonical_u64(),
-        ]
+        value.into_elements().map(|felt| felt.as_canonical_u64())
     }
 }
 
-impl From<&Word> for [Felt; WORD_SIZE_FELT] {
+impl From<&Word> for [Felt; WORD_SIZE_FELTS] {
     fn from(value: &Word) -> Self {
         (*value).into()
     }
 }
 
-impl From<Word> for [Felt; WORD_SIZE_FELT] {
+impl From<Word> for [Felt; WORD_SIZE_FELTS] {
     fn from(value: Word) -> Self {
-        value.0
+        value.into_elements()
     }
 }
 
@@ -466,6 +489,7 @@ impl From<Word> for [u8; WORD_SIZE_BYTES] {
     }
 }
 
+#[cfg(not(all(target_family = "wasm", miden)))]
 impl From<&Word> for String {
     /// The returned string starts with `0x`.
     fn from(value: &Word) -> Self {
@@ -473,6 +497,7 @@ impl From<&Word> for String {
     }
 }
 
+#[cfg(not(all(target_family = "wasm", miden)))]
 impl From<Word> for String {
     /// The returned string starts with `0x`.
     fn from(value: Word) -> Self {
@@ -483,27 +508,27 @@ impl From<Word> for String {
 // CONVERSIONS: TO WORD
 // ================================================================================================
 
-impl From<&[bool; WORD_SIZE_FELT]> for Word {
-    fn from(value: &[bool; WORD_SIZE_FELT]) -> Self {
+impl From<&[bool; WORD_SIZE_FELTS]> for Word {
+    fn from(value: &[bool; WORD_SIZE_FELTS]) -> Self {
         (*value).into()
     }
 }
 
-impl From<[bool; WORD_SIZE_FELT]> for Word {
-    fn from(value: [bool; WORD_SIZE_FELT]) -> Self {
+impl From<[bool; WORD_SIZE_FELTS]> for Word {
+    fn from(value: [bool; WORD_SIZE_FELTS]) -> Self {
         [value[0] as u32, value[1] as u32, value[2] as u32, value[3] as u32].into()
     }
 }
 
-impl From<&[u8; WORD_SIZE_FELT]> for Word {
-    fn from(value: &[u8; WORD_SIZE_FELT]) -> Self {
+impl From<&[u8; WORD_SIZE_FELTS]> for Word {
+    fn from(value: &[u8; WORD_SIZE_FELTS]) -> Self {
         (*value).into()
     }
 }
 
-impl From<[u8; WORD_SIZE_FELT]> for Word {
-    fn from(value: [u8; WORD_SIZE_FELT]) -> Self {
-        Self([
+impl From<[u8; WORD_SIZE_FELTS]> for Word {
+    fn from(value: [u8; WORD_SIZE_FELTS]) -> Self {
+        Self::new([
             Felt::from_u8(value[0]),
             Felt::from_u8(value[1]),
             Felt::from_u8(value[2]),
@@ -512,15 +537,15 @@ impl From<[u8; WORD_SIZE_FELT]> for Word {
     }
 }
 
-impl From<&[u16; WORD_SIZE_FELT]> for Word {
-    fn from(value: &[u16; WORD_SIZE_FELT]) -> Self {
+impl From<&[u16; WORD_SIZE_FELTS]> for Word {
+    fn from(value: &[u16; WORD_SIZE_FELTS]) -> Self {
         (*value).into()
     }
 }
 
-impl From<[u16; WORD_SIZE_FELT]> for Word {
-    fn from(value: [u16; WORD_SIZE_FELT]) -> Self {
-        Self([
+impl From<[u16; WORD_SIZE_FELTS]> for Word {
+    fn from(value: [u16; WORD_SIZE_FELTS]) -> Self {
+        Self::new([
             Felt::from_u16(value[0]),
             Felt::from_u16(value[1]),
             Felt::from_u16(value[2]),
@@ -529,15 +554,15 @@ impl From<[u16; WORD_SIZE_FELT]> for Word {
     }
 }
 
-impl From<&[u32; WORD_SIZE_FELT]> for Word {
-    fn from(value: &[u32; WORD_SIZE_FELT]) -> Self {
+impl From<&[u32; WORD_SIZE_FELTS]> for Word {
+    fn from(value: &[u32; WORD_SIZE_FELTS]) -> Self {
         (*value).into()
     }
 }
 
-impl From<[u32; WORD_SIZE_FELT]> for Word {
-    fn from(value: [u32; WORD_SIZE_FELT]) -> Self {
-        Self([
+impl From<[u32; WORD_SIZE_FELTS]> for Word {
+    fn from(value: [u32; WORD_SIZE_FELTS]) -> Self {
+        Self::new([
             Felt::from_u32(value[0]),
             Felt::from_u32(value[1]),
             Felt::from_u32(value[2]),
@@ -546,20 +571,20 @@ impl From<[u32; WORD_SIZE_FELT]> for Word {
     }
 }
 
-impl TryFrom<&[u64; WORD_SIZE_FELT]> for Word {
+impl TryFrom<&[u64; WORD_SIZE_FELTS]> for Word {
     type Error = WordError;
 
-    fn try_from(value: &[u64; WORD_SIZE_FELT]) -> Result<Self, WordError> {
+    fn try_from(value: &[u64; WORD_SIZE_FELTS]) -> Result<Self, WordError> {
         (*value).try_into()
     }
 }
 
-impl TryFrom<[u64; WORD_SIZE_FELT]> for Word {
+impl TryFrom<[u64; WORD_SIZE_FELTS]> for Word {
     type Error = WordError;
 
-    fn try_from(value: [u64; WORD_SIZE_FELT]) -> Result<Self, WordError> {
+    fn try_from(value: [u64; WORD_SIZE_FELTS]) -> Result<Self, WordError> {
         let err = || WordError::InvalidFieldElement("value >= field modulus".into());
-        Ok(Self([
+        Ok(Self::new([
             Felt::from_canonical_checked(value[0]).ok_or_else(err)?,
             Felt::from_canonical_checked(value[1]).ok_or_else(err)?,
             Felt::from_canonical_checked(value[2]).ok_or_else(err)?,
@@ -568,15 +593,15 @@ impl TryFrom<[u64; WORD_SIZE_FELT]> for Word {
     }
 }
 
-impl From<&[Felt; WORD_SIZE_FELT]> for Word {
-    fn from(value: &[Felt; WORD_SIZE_FELT]) -> Self {
-        Self(*value)
+impl From<&[Felt; WORD_SIZE_FELTS]> for Word {
+    fn from(value: &[Felt; WORD_SIZE_FELTS]) -> Self {
+        Self::new(*value)
     }
 }
 
-impl From<[Felt; WORD_SIZE_FELT]> for Word {
-    fn from(value: [Felt; WORD_SIZE_FELT]) -> Self {
-        Self(value)
+impl From<[Felt; WORD_SIZE_FELTS]> for Word {
+    fn from(value: [Felt; WORD_SIZE_FELTS]) -> Self {
+        Self::new(value)
     }
 }
 
@@ -605,7 +630,7 @@ impl TryFrom<[u8; WORD_SIZE_BYTES]> for Word {
         let c: Felt = Felt::from_canonical_checked(c).ok_or_else(err)?;
         let d: Felt = Felt::from_canonical_checked(d).ok_or_else(err)?;
 
-        Ok(Word([a, b, c, d]))
+        Ok(Self::new([a, b, c, d]))
     }
 }
 
@@ -624,24 +649,26 @@ impl TryFrom<&[Felt]> for Word {
     type Error = WordError;
 
     fn try_from(value: &[Felt]) -> Result<Self, Self::Error> {
-        let value: [Felt; WORD_SIZE_FELT] = value
+        let value: [Felt; WORD_SIZE_FELTS] = value
             .try_into()
-            .map_err(|_| WordError::InvalidInputLength("elements", WORD_SIZE_FELT, value.len()))?;
+            .map_err(|_| WordError::InvalidInputLength("elements", WORD_SIZE_FELTS, value.len()))?;
         Ok(value.into())
     }
 }
 
+#[cfg(not(all(target_family = "wasm", miden)))]
 impl TryFrom<&str> for Word {
     type Error = WordError;
 
     /// Expects the string to start with `0x`.
     fn try_from(value: &str) -> Result<Self, Self::Error> {
-        hex_to_bytes::<WORD_SIZE_BYTES>(value)
+        crate::utils::hex_to_bytes::<WORD_SIZE_BYTES>(value)
             .map_err(WordError::HexParse)
             .and_then(Word::try_from)
     }
 }
 
+#[cfg(not(all(target_family = "wasm", miden)))]
 impl TryFrom<String> for Word {
     type Error = WordError;
 
@@ -651,6 +678,7 @@ impl TryFrom<String> for Word {
     }
 }
 
+#[cfg(not(all(target_family = "wasm", miden)))]
 impl TryFrom<&String> for Word {
     type Error = WordError;
 
@@ -663,6 +691,7 @@ impl TryFrom<&String> for Word {
 // SERIALIZATION / DESERIALIZATION
 // ================================================================================================
 
+#[cfg(not(all(target_family = "wasm", miden)))]
 impl Serializable for Word {
     fn write_into<W: ByteWriter>(&self, target: &mut W) {
         target.write_bytes(&self.as_bytes());
@@ -673,9 +702,10 @@ impl Serializable for Word {
     }
 }
 
+#[cfg(not(all(target_family = "wasm", miden)))]
 impl Deserializable for Word {
     fn read_from<R: ByteReader>(source: &mut R) -> Result<Self, DeserializationError> {
-        let mut inner: [Felt; WORD_SIZE_FELT] = [ZERO; WORD_SIZE_FELT];
+        let mut inner: [Felt; WORD_SIZE_FELTS] = [Felt::ZERO; WORD_SIZE_FELTS];
         for inner in inner.iter_mut() {
             let e = source.read_u64()?;
             if e >= Felt::ORDER_U64 {
@@ -686,7 +716,7 @@ impl Deserializable for Word {
             *inner = Felt::new(e);
         }
 
-        Ok(Self(inner))
+        Ok(Self::new(inner))
     }
 }
 
@@ -697,7 +727,7 @@ impl IntoIterator for Word {
     type IntoIter = <[Felt; 4] as IntoIterator>::IntoIter;
 
     fn into_iter(self) -> Self::IntoIter {
-        self.0.into_iter()
+        self.into_elements().into_iter()
     }
 }
 
@@ -707,6 +737,7 @@ impl IntoIterator for Word {
 /// Construct a new [Word](super::Word) from a hex value.
 ///
 /// Expects a '0x' prefixed hex string followed by up to 64 hex digits.
+#[cfg(not(all(target_family = "wasm", miden)))]
 #[macro_export]
 macro_rules! word {
     ($hex:expr) => {{
@@ -722,7 +753,7 @@ macro_rules! word {
 // ARBITRARY (proptest)
 // ================================================================================================
 
-#[cfg(any(test, feature = "testing"))]
+#[cfg(all(any(test, feature = "testing"), not(all(target_family = "wasm", miden))))]
 mod arbitrary {
     use proptest::prelude::*;
 
@@ -733,17 +764,7 @@ mod arbitrary {
         type Strategy = BoxedStrategy<Self>;
 
         fn arbitrary_with(_args: Self::Parameters) -> Self::Strategy {
-            prop::collection::vec(any::<u64>(), 4)
-                .prop_map(|vals| {
-                    Word::new([
-                        Felt::new(vals[0]),
-                        Felt::new(vals[1]),
-                        Felt::new(vals[2]),
-                        Felt::new(vals[3]),
-                    ])
-                })
-                .no_shrink()
-                .boxed()
+            prop::array::uniform4(any::<Felt>()).prop_map(Word::new).no_shrink().boxed()
         }
     }
 }

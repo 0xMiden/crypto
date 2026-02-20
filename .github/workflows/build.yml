@@ -34,3 +34,21 @@ jobs:
           rustup default ${{ matrix.toolchain }}
           rustup target add wasm32-unknown-unknown
           make build-no-std
+
+  target-miden:
+    name: Build miden-field for on-chain target
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        toolchain: [stable, nightly]
+    steps:
+      - uses: actions/checkout@main
+      - name: Cleanup large tools for build space
+        uses: ./.github/actions/cleanup-runner
+      - name: Build miden-field for on-chain target
+        run: |
+          rustup update --no-self-update ${{ matrix.toolchain }}
+          rustup default ${{ matrix.toolchain }}
+          rustup target add wasm32-wasip2
+          make build-target-miden

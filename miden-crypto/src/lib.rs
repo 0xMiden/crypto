@@ -15,21 +15,20 @@ pub mod ies;
 pub mod merkle;
 pub mod rand;
 pub mod utils;
-pub mod word;
 
 // RE-EXPORTS
 // ================================================================================================
-pub use p3_goldilocks::Goldilocks as Felt;
-pub use word::{Word, WordError};
+pub use miden_field::{Felt, LexicographicWord, Word, WordError, word};
 
 pub mod field {
     //! Traits and utilities for working with the Goldilocks finite field (i.e.,
     //! [Felt](super::Felt)).
 
-    pub use p3_field::{
-        BasedVectorSpace, ExtensionField, Field, PrimeCharacteristicRing, PrimeField64,
-        TwoAdicField, batch_multiplicative_inverse, extension::BinomialExtensionField,
-        integers::QuotientMap,
+    pub use miden_field::{
+        BasedVectorSpace, BinomialExtensionField, BinomiallyExtendable,
+        BinomiallyExtendableAlgebra, ExtensionField, Field, HasTwoAdicBinomialExtension,
+        InjectiveMonomial, Packable, PermutationMonomial, PrimeCharacteristicRing, PrimeField,
+        PrimeField64, QuotientMap, RawDataSerializable, TwoAdicField, batch_multiplicative_inverse,
     };
 
     pub use super::batch_inversion::batch_inversion_allow_zeros;
@@ -140,7 +139,7 @@ pub type Set<V> = alloc::collections::BTreeSet<V>;
 // ================================================================================================
 
 /// Number of field elements in a word.
-pub const WORD_SIZE: usize = 4;
+pub const WORD_SIZE: usize = word::WORD_SIZE_FELTS;
 
 /// Field element representing ZERO in the Miden base filed.
 pub const ZERO: Felt = Felt::ZERO;
