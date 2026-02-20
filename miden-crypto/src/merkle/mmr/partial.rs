@@ -239,6 +239,10 @@ impl PartialMmr {
         } else {
             let mut track_right = track;
             let mut track_left = self.track_latest;
+            // After merges the forest no longer has a single-leaf tree, so
+            // `track_latest` must be cleared. The old value is already captured
+            // in `track_left` above.
+            self.track_latest = false;
 
             let mut right = leaf;
             let mut right_idx = self.forest.rightmost_in_order_index();
@@ -866,6 +870,32 @@ mod tests {
 
         // the openings should be the same
         assert_eq!(mmr.open(5).unwrap(), partial_mmr.open(5).unwrap().unwrap());
+    }
+
+    #[test]
+    fn test_partial_mmr_add_clears_track_latest_after_merge() {
+        let mut mmr = Mmr::default();
+        let empty_peaks = MmrPeaks::new(Forest::empty(), vec![]).unwrap();
+        let mut partial_mmr = PartialMmr::from_peaks(empty_peaks);
+
+        let leaf_0 = int_to_node(0);
+        mmr.add(leaf_0);
+        partial_mmr.add(leaf_0, true);
+        assert!(partial_mmr.track_latest);
+
+        // This append triggers a merge and there is no longer a single-leaf tree in the forest.
+        let leaf_1 = int_to_node(1);
+        mmr.add(leaf_1);
+        partial_mmr.add(leaf_1, false);
+        assert!(!partial_mmr.track_latest);
+
+        // With stale `track_latest` this panicked in debug mode.
+        mmr.add(int_to_node(2));
+        let delta = mmr.get_delta(partial_mmr.forest(), mmr.forest()).unwrap();
+        partial_mmr.apply(delta).unwrap();
+
+        assert_eq!(mmr.peaks(), partial_mmr.peaks());
+        assert_eq!(mmr.open(0).unwrap(), partial_mmr.open(0).unwrap().unwrap());
     }
 
     #[test]
