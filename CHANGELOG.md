@@ -10,6 +10,7 @@
 - Cross-checked RPO test vectors against the Python reference implementation after state layout change ([#822](https://github.com/0xMiden/crypto/pull/822)).
 - Fixed tuple `min_serialized_size()` to exclude alignment padding, fixing `BudgetedReader` rejecting valid data ([#827](https://github.com/0xMiden/crypto/pull/827)).
 - [BREAKING] Added validation to `PartialMmr::from_parts()` and `Deserializable` implementation, added `from_parts_unchecked()` for performance-critical code ([#812](https://github.com/0xMiden/crypto/pull/812)).
+- Fix possible panic in `XChaCha::decrypt_bytes_with_associated_data` and harden deserialization with fuzzing across 7 new targets ([#836](https://github.com/0xMiden/crypto/pull/836)).
 
 ## 0.22.2 (2026-02-01)
 
