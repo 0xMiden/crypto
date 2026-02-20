@@ -58,5 +58,13 @@ name  = "crypto"
 path  = "fuzz_targets/crypto.rs"
 test  = false
 
+# AEAD decryption fuzz target
+[[bin]]
+bench = false
+doc   = false
+name  = "aead"
+path  = "fuzz_targets/aead.rs"
+test  = false
+
 [lints.rust]
 unexpected_cfgs = { check-cfg = ['cfg(fuzzing)'], level = "warn" }

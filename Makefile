@@ -169,6 +169,10 @@ fuzz-mmr: ## Run fuzzing for MMR structures serialization
 fuzz-crypto: ## Run fuzzing for cryptographic types serialization
 	cargo +nightly fuzz run crypto --release --fuzz-dir miden-crypto-fuzz
 
+.PHONY: fuzz-aead
+fuzz-aead: ## Run fuzzing for AEAD decryption paths
+	cargo +nightly fuzz run aead --release --fuzz-dir miden-crypto-fuzz
+
 # --- installing ----------------------------------------------------------------------------------
 
 .PHONY: check-tools
