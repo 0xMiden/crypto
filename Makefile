@@ -173,6 +173,10 @@ fuzz-crypto: ## Run fuzzing for cryptographic types serialization
 fuzz-aead: ## Run fuzzing for AEAD decryption paths
 	cargo +nightly fuzz run aead --release --fuzz-dir miden-crypto-fuzz
 
+.PHONY: fuzz-signatures
+fuzz-signatures: ## Run fuzzing for DSA signature deserialization
+	cargo +nightly fuzz run signatures --release --fuzz-dir miden-crypto-fuzz
+
 # --- installing ----------------------------------------------------------------------------------
 
 .PHONY: check-tools

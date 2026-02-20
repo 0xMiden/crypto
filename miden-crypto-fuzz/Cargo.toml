@@ -66,5 +66,13 @@ name  = "aead"
 path  = "fuzz_targets/aead.rs"
 test  = false
 
+# DSA signatures fuzz target
+[[bin]]
+bench = false
+doc   = false
+name  = "signatures"
+path  = "fuzz_targets/signatures.rs"
+test  = false
+
 [lints.rust]
 unexpected_cfgs = { check-cfg = ['cfg(fuzzing)'], level = "warn" }
