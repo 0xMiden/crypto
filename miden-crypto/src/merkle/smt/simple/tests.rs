@@ -452,6 +452,40 @@ fn test_simplesmt_set_subtree_entire_tree() {
     tree.set_subtree(0, subtree).unwrap();
 
     assert_eq!(tree.root(), *EmptySubtreeRoots::entry(DEPTH, 0));
+    // Verify leaves and inner_nodes are properly cleared
+    assert_eq!(tree.num_leaves(), 0);
+    assert!(tree.is_empty());
+}
+
+/// Verifies that set_subtree properly removes existing leaves and inner nodes in the insertion
+/// region
+#[test]
+fn test_simplesmt_set_subtree_clears_region() {
+    let z = EMPTY_WORD;
+
+    let a = Poseidon2::merge(&[z; 2]);
+    let b = Poseidon2::merge(&[a; 2]);
+    let c = Poseidon2::merge(&[b; 2]);
+    let d = Poseidon2::merge(&[c; 2]);
+
+    // Create tree with leaves at positions 0, 1, 4, 5, 7
+    let mut tree = {
+        let entries = vec![(0, a), (1, b), (4, c), (5, d), (7, d)];
+        SimpleSmt::<3>::with_leaves(entries).unwrap()
+    };
+    assert_eq!(tree.num_leaves(), 5);
+
+    // Insert empty subtree of depth 1 at index 2 (covers leaves 4-5)
+    let empty_subtree = SimpleSmt::<1>::new().unwrap();
+    tree.set_subtree(2, empty_subtree).unwrap();
+
+    // Leaves 4 and 5 should be removed, leaves 0, 1, 7 should remain
+    assert_eq!(tree.num_leaves(), 3);
+    assert_eq!(tree.get_leaf(&LeafIndex::<3>::new(0).unwrap()), a);
+    assert_eq!(tree.get_leaf(&LeafIndex::<3>::new(1).unwrap()), b);
+    assert_eq!(tree.get_leaf(&LeafIndex::<3>::new(4).unwrap()), EMPTY_WORD);
+    assert_eq!(tree.get_leaf(&LeafIndex::<3>::new(5).unwrap()), EMPTY_WORD);
+    assert_eq!(tree.get_leaf(&LeafIndex::<3>::new(7).unwrap()), d);
 }
 
 /// Tests that `EMPTY_ROOT` constant generated in the `SimpleSmt` equals to the root of the empty
