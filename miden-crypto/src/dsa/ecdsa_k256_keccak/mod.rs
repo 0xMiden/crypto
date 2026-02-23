@@ -268,6 +268,39 @@ impl Signature {
 
         Ok(Signature { r, s, v })
     }
+
+    /// Creates a signature from ASN.1 DER format bytes with a given recovery id.
+    ///
+    /// # Arguments
+    /// * `bytes` - ASN.1 DER format bytes
+    /// * `recovery_id` - recovery ID (0-3)
+    pub fn from_der(bytes: &[u8], v: u8) -> Result<Self, SignatureError> {
+        let sig = k256::ecdsa::Signature::from_der(bytes).map_err(SignatureError::DerError)?;
+
+        // Normalize to 64 bytes if necessary.
+        let rs = if let Some(norm) = sig.normalize_s() {
+            norm.to_bytes()
+        } else {
+            sig.to_bytes()
+        };
+
+        // Append a recovery byte `v` to make 65 bytes (r||s||v).
+        let mut sig65 = [0u8; 65];
+        sig65[..64].copy_from_slice(&rs);
+        sig65[64] = v;
+
+        Signature::read_from_bytes(&sig65).map_err(SignatureError::SignatureFormatError)
+    }
+}
+
+#[derive(Debug, Error)]
+pub enum SignatureError {
+    /// ...
+    #[error("k256 signature error")]
+    DerError(#[source] k256::ecdsa::Error),
+    /// ...
+    #[error("invalid signature format")]
+    SignatureFormatError(#[source] DeserializationError),
 }
 
 // SERIALIZATION / DESERIALIZATION

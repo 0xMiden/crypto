@@ -122,3 +122,57 @@ fn test_signature_serde() {
     assert!(!slice_reader.has_more_bytes());
     assert_eq!(sig0, sig0_deserialized);
 }
+
+#[test]
+fn test_signature_from_der_success() {
+    // DER-encoded form of an ASN.1 SEQUENCE containing two INTEGER values.
+    let der: [u8; 8] = [
+        0x30, 0x06, // Sequence tag and length of sequence contents.
+        0x02, 0x01, 0x01, // Integer 1.
+        0x02, 0x01, 0x09, // Integer 2.
+    ];
+    let v = 2u8;
+
+    let sig = Signature::from_der(&der, v).expect("from_der should parse valid DER");
+
+    // Expect r = 1 and s = 9 in 32-byte big-endian form.
+    let mut expected_r = [0u8; 32];
+    expected_r[31] = 1;
+    let mut expected_s = [0u8; 32];
+    expected_s[31] = 9;
+
+    assert_eq!(sig.r(), &expected_r);
+    assert_eq!(sig.s(), &expected_s);
+    assert_eq!(sig.v(), v);
+}
+
+#[test]
+fn test_signature_from_der_recovery_id_variation() {
+    // DER encoding with two integers both equal to 1.
+    let der: [u8; 8] = [0x30, 0x06, 0x02, 0x01, 0x01, 0x02, 0x01, 0x01];
+
+    let sig_v0 = Signature::from_der(&der, 0).unwrap();
+    let sig_v3 = Signature::from_der(&der, 3).unwrap();
+
+    // r and s must be identical; v differs, so signatures should not be equal.
+    assert_eq!(sig_v0.r(), sig_v3.r());
+    assert_eq!(sig_v0.s(), sig_v3.s());
+    assert_ne!(sig_v0.v(), sig_v3.v());
+    assert_ne!(sig_v0, sig_v3);
+}
+
+#[test]
+fn test_signature_from_der_invalid() {
+    // Empty input should fail at DER parsing stage (der error).
+    match Signature::from_der(&[], 0) {
+        Err(SignatureError::DerError(_)) => {},
+        other => panic!("expected DerError for empty DER, got {:?}", other),
+    }
+
+    // Malformed/truncated DER should also fail.
+    let der_bad: [u8; 2] = [0x30, 0x01];
+    match Signature::from_der(&der_bad, 0) {
+        Err(SignatureError::DerError(_)) => {},
+        other => panic!("expected DerError for malformed DER, got {:?}", other),
+    }
+}
