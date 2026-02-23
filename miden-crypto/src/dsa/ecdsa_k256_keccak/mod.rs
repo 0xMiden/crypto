@@ -283,7 +283,7 @@ impl Signature {
             .map_err(|err| DeserializationError::InvalidValue(err.to_string()))?;
 
         let sig = if let Some(norm) = sig.normalize_s() {
-            // Flip recovery parity.
+            // Flip recovery parity. Else recovery can point to the wrong key.
             recovery_id ^= 1;
             norm
         } else {

@@ -176,3 +176,36 @@ fn test_signature_from_der_invalid() {
         other => panic!("expected InvalidValue for malformed DER, got {:?}", other),
     }
 }
+
+#[test]
+fn test_signature_from_der_high_s_normalizes_and_flips_v() {
+    // Construct a DER signature with r = 1 and s = n - 1 (high-S), which requires a leading 0x00
+    // in DER to force a positive INTEGER.
+    //
+    // secp256k1 curve order (n):
+    // n = FFFFFFFF FFFFFFFF FFFFFFFF FFFFFFFE BAAEDCE6 AF48A03B BFD25E8C D0364141
+    // We set s = n - 1 = ... D0364140 (> n/2), so normalize_s() should trigger and flip recovery
+    // id.
+    let der: [u8; 40] = [
+        0x30, 0x26, // SEQUENCE, length 38
+        0x02, 0x01, 0x01, // INTEGER r = 1
+        0x02, 0x21, 0x00, // INTEGER s, length 33 with leading 0x00 to keep positive
+        0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+        0xfe, 0xba, 0xae, 0xdc, 0xe6, 0xaf, 0x48, 0xa0, 0x3b, 0xbf, 0xd2, 0x5e, 0x8c, 0xd0, 0x36,
+        0x41, 0x40,
+    ];
+    let v_initial: u8 = 2;
+    let sig = Signature::from_der(&der, v_initial).expect("from_der should parse valid high-S DER");
+
+    // After normalization:
+    // - v should have its parity bit flipped (XOR with 1).
+    // - s should be normalized to low-s; since s = n - 1, the normalized s is 1.
+    let mut expected_r = [0u8; 32];
+    expected_r[31] = 1;
+    let mut expected_s_low = [0u8; 32];
+    expected_s_low[31] = 1;
+
+    assert_eq!(sig.r(), &expected_r);
+    assert_eq!(sig.s(), &expected_s_low);
+    assert_eq!(sig.v(), v_initial ^ 1);
+}
