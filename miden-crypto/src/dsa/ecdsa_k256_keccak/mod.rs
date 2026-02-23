@@ -282,8 +282,13 @@ impl Signature {
         let sig = k256::ecdsa::Signature::from_der(bytes)
             .map_err(|err| DeserializationError::InvalidValue(err.to_string()))?;
 
+        // Normalize signature into "low s" form.
+        // See https://github.com/bitcoin/bips/blob/master/bip-0062.mediawiki.
         let sig = if let Some(norm) = sig.normalize_s() {
-            // Flip recovery parity. Else recovery can point to the wrong key.
+            // Replacing s with (n - s) corresponds to negating the ephemeral point R
+            // (i.e. R -> -R), which flips the y-parity of R. A recoverable signature's
+            // `v` encodes that y-parity in its LSB, so we must toggle only that bit to
+            // preserve recoverability.
             recovery_id ^= 1;
             norm
         } else {
