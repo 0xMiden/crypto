@@ -12,6 +12,10 @@
 - Fixed tuple `min_serialized_size()` to exclude alignment padding, fixing `BudgetedReader` rejecting valid data ([#827](https://github.com/0xMiden/crypto/pull/827)).
 - [BREAKING] Added validation to `PartialMmr::from_parts()` and `Deserializable` implementation, added `from_parts_unchecked()` for performance-critical code ([#812](https://github.com/0xMiden/crypto/pull/812)).
 
+## 0.22.3 (unreleased)
+
+- Refactored to introduce a unified `Felt` type for on-chain and off-chain code ([#819](https://github.com/0xMiden/crypto/pull/819)).
+
 ## 0.22.2 (2026-02-01)
 
 - Re-exported `p3_keccak::VECTOR_LEN`.
