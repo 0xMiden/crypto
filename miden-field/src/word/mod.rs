@@ -52,6 +52,8 @@ pub struct Word {
     pub b: Felt,
     pub c: Felt,
     pub d: Felt,
+    // The fields have to be public since the WIT->Rust bindings generation uses the fields
+    // directly.
     // We cannot define this type as `Word([Felt;4])` since there is no struct tuple support
     // and fixed array support is not complete in WIT. For the type remapping to work the
     // bindings are expecting the remapped type to be the same shape as the one generated from
