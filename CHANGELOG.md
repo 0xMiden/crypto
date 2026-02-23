@@ -1,3 +1,7 @@
+## 0.22.3 (unreleased)
+
+- Refactored to introduce a unified `Felt` type for on-chain and off-chain code ([#819](https://github.com/0xMiden/crypto/pull/819)).
+
 ## 0.22.2 (2026-02-01)
 
 - Re-exported `p3_keccak::VECTOR_LEN`.
