@@ -165,14 +165,14 @@ fn test_signature_from_der_recovery_id_variation() {
 fn test_signature_from_der_invalid() {
     // Empty input should fail at DER parsing stage (der error).
     match Signature::from_der(&[], 0) {
-        Err(SignatureError::DerError(_)) => {},
-        other => panic!("expected DerError for empty DER, got {:?}", other),
+        Err(SignatureError::DerDecodeError(_)) => {},
+        other => panic!("expected DerDecodeError for empty DER, got {:?}", other),
     }
 
     // Malformed/truncated DER should also fail.
     let der_bad: [u8; 2] = [0x30, 0x01];
     match Signature::from_der(&der_bad, 0) {
-        Err(SignatureError::DerError(_)) => {},
-        other => panic!("expected DerError for malformed DER, got {:?}", other),
+        Err(SignatureError::DerDecodeError(_)) => {},
+        other => panic!("expected DerDecodeError for malformed DER, got {:?}", other),
     }
 }
