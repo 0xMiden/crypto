@@ -46,6 +46,7 @@ pub(crate) trait KeyAgreementScheme {
     fn extract_key_material(
         shared_secret: &Self::SharedSecret,
         length: usize,
+        info: &[u8],
     ) -> Result<Vec<u8>, KeyAgreementError>;
 }
 

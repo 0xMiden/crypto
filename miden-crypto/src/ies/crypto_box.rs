@@ -8,8 +8,13 @@ use alloc::vec::Vec;
 
 use rand::{CryptoRng, RngCore};
 
-use super::IesError;
-use crate::{Felt, aead::AeadScheme, ecdh::KeyAgreementScheme, utils::zeroize::Zeroizing};
+use super::{IesError, IesScheme};
+use crate::{
+    Felt,
+    aead::AeadScheme,
+    ecdh::KeyAgreementScheme,
+    utils::{Serializable, zeroize::Zeroizing},
+};
 
 // CRYPTO BOX
 // ================================================================================================
@@ -20,12 +25,24 @@ pub(super) struct CryptoBox<K: KeyAgreementScheme, A: AeadScheme> {
 }
 
 impl<K: KeyAgreementScheme, A: AeadScheme> CryptoBox<K, A> {
+    const KDF_CONTEXT: &'static [u8] = b"miden-crypto/ies/hkdf-v1";
+
+    fn build_kdf_info(scheme: IesScheme, ephemeral_public_key: &K::EphemeralPublicKey) -> Vec<u8> {
+        let mut info =
+            Vec::with_capacity(Self::KDF_CONTEXT.len() + 1 + ephemeral_public_key.to_bytes().len());
+        info.extend_from_slice(Self::KDF_CONTEXT);
+        info.push(scheme as u8);
+        info.extend_from_slice(&ephemeral_public_key.to_bytes());
+        info
+    }
+
     // BYTE-SPECIFIC METHODS
     // --------------------------------------------------------------------------------------------
 
     pub fn seal_bytes_with_associated_data<R: CryptoRng + RngCore>(
         rng: &mut R,
         recipient_public_key: &K::PublicKey,
+        scheme: IesScheme,
         plaintext: &[u8],
         associated_data: &[u8],
     ) -> Result<(Vec<u8>, K::EphemeralPublicKey), IesError> {
@@ -36,8 +53,9 @@ impl<K: KeyAgreementScheme, A: AeadScheme> CryptoBox<K, A> {
                 .map_err(|_| IesError::KeyAgreementFailed)?,
         );
 
+        let kdf_info = Self::build_kdf_info(scheme, &ephemeral_public);
         let encryption_key_bytes = Zeroizing::new(
-            K::extract_key_material(&shared_secret, <A as AeadScheme>::KEY_SIZE)
+            K::extract_key_material(&shared_secret, <A as AeadScheme>::KEY_SIZE, &kdf_info)
                 .map_err(|_| IesError::FailedExtractKeyMaterial)?,
         );
 
@@ -55,6 +73,7 @@ impl<K: KeyAgreementScheme, A: AeadScheme> CryptoBox<K, A> {
     pub fn unseal_bytes_with_associated_data(
         recipient_private_key: &K::SecretKey,
         ephemeral_public_key: &K::EphemeralPublicKey,
+        scheme: IesScheme,
         ciphertext: &[u8],
         associated_data: &[u8],
     ) -> Result<Vec<u8>, IesError> {
@@ -63,8 +82,9 @@ impl<K: KeyAgreementScheme, A: AeadScheme> CryptoBox<K, A> {
                 .map_err(|_| IesError::KeyAgreementFailed)?,
         );
 
+        let kdf_info = Self::build_kdf_info(scheme, ephemeral_public_key);
         let decryption_key_bytes = Zeroizing::new(
-            K::extract_key_material(&shared_secret, <A as AeadScheme>::KEY_SIZE)
+            K::extract_key_material(&shared_secret, <A as AeadScheme>::KEY_SIZE, &kdf_info)
                 .map_err(|_| IesError::FailedExtractKeyMaterial)?,
         );
 
@@ -83,6 +103,7 @@ impl<K: KeyAgreementScheme, A: AeadScheme> CryptoBox<K, A> {
     pub fn seal_elements_with_associated_data<R: CryptoRng + RngCore>(
         rng: &mut R,
         recipient_public_key: &K::PublicKey,
+        scheme: IesScheme,
         plaintext: &[Felt],
         associated_data: &[Felt],
     ) -> Result<(Vec<u8>, K::EphemeralPublicKey), IesError> {
@@ -93,8 +114,9 @@ impl<K: KeyAgreementScheme, A: AeadScheme> CryptoBox<K, A> {
                 .map_err(|_| IesError::KeyAgreementFailed)?,
         );
 
+        let kdf_info = Self::build_kdf_info(scheme, &ephemeral_public);
         let encryption_key_bytes = Zeroizing::new(
-            K::extract_key_material(&shared_secret, <A as AeadScheme>::KEY_SIZE)
+            K::extract_key_material(&shared_secret, <A as AeadScheme>::KEY_SIZE, &kdf_info)
                 .map_err(|_| IesError::FailedExtractKeyMaterial)?,
         );
 
@@ -112,6 +134,7 @@ impl<K: KeyAgreementScheme, A: AeadScheme> CryptoBox<K, A> {
     pub fn unseal_elements_with_associated_data(
         recipient_private_key: &K::SecretKey,
         ephemeral_public_key: &K::EphemeralPublicKey,
+        scheme: IesScheme,
         ciphertext: &[u8],
         associated_data: &[Felt],
     ) -> Result<Vec<Felt>, IesError> {
@@ -120,8 +143,9 @@ impl<K: KeyAgreementScheme, A: AeadScheme> CryptoBox<K, A> {
                 .map_err(|_| IesError::KeyAgreementFailed)?,
         );
 
+        let kdf_info = Self::build_kdf_info(scheme, ephemeral_public_key);
         let decryption_key_bytes = Zeroizing::new(
-            K::extract_key_material(&shared_secret, <A as AeadScheme>::KEY_SIZE)
+            K::extract_key_material(&shared_secret, <A as AeadScheme>::KEY_SIZE, &kdf_info)
                 .map_err(|_| IesError::FailedExtractKeyMaterial)?,
         );
 

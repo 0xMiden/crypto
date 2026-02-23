@@ -201,10 +201,11 @@ impl KeyAgreementScheme for X25519 {
     fn extract_key_material(
         shared_secret: &Self::SharedSecret,
         length: usize,
+        info: &[u8],
     ) -> Result<Vec<u8>, super::KeyAgreementError> {
         let hkdf = shared_secret.extract(None);
         let mut buf = vec![0_u8; length];
-        hkdf.expand(&[], &mut buf)
+        hkdf.expand(info, &mut buf)
             .map_err(|_| super::KeyAgreementError::HkdfExpansionFailed)?;
         Ok(buf)
     }

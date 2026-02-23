@@ -47,9 +47,11 @@ macro_rules! impl_seal_bytes_with_associated_data {
             match self {
                 $(
                     $variant(key) => {
+                        let scheme = self.scheme();
                         let (ciphertext, ephemeral) = <$crypto_box>::seal_bytes_with_associated_data(
                             rng,
                             key,
+                            scheme,
                             plaintext,
                             associated_data,
                         )?;
@@ -82,9 +84,11 @@ macro_rules! impl_seal_elements_with_associated_data {
             match self {
                 $(
                     $variant(key) => {
+                        let scheme = self.scheme();
                         let (ciphertext, ephemeral) = <$crypto_box>::seal_elements_with_associated_data(
                             rng,
                             key,
+                            scheme,
                             plaintext,
                             associated_data,
                         )?;
@@ -130,7 +134,13 @@ macro_rules! impl_unseal_bytes_with_associated_data {
             match (self, ephemeral_key) {
                 $(
                     ($variant(key), $ephemeral_variant(ephemeral)) => {
-                        <$crypto_box>::unseal_bytes_with_associated_data(key, &ephemeral, &ciphertext, associated_data)
+                        <$crypto_box>::unseal_bytes_with_associated_data(
+                            key,
+                            &ephemeral,
+                            self.scheme(),
+                            &ciphertext,
+                            associated_data,
+                        )
                     }
                 )*
                 _ => Err(IesError::SchemeMismatch),
@@ -169,7 +179,13 @@ macro_rules! impl_unseal_elements_with_associated_data {
             match (self, ephemeral_key) {
                 $(
                     ($variant(key), $ephemeral_variant(ephemeral)) => {
-                        <$crypto_box>::unseal_elements_with_associated_data(key, &ephemeral, &ciphertext, associated_data)
+                        <$crypto_box>::unseal_elements_with_associated_data(
+                            key,
+                            &ephemeral,
+                            self.scheme(),
+                            &ciphertext,
+                            associated_data,
+                        )
                     }
                 )*
                 _ => Err(IesError::SchemeMismatch),
