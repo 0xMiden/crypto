@@ -155,6 +155,17 @@ impl Serializable for EphemeralPublicKey {
 impl Deserializable for EphemeralPublicKey {
     fn read_from<R: ByteReader>(source: &mut R) -> Result<Self, DeserializationError> {
         let bytes: [u8; 32] = source.read_array()?;
+        // Reject twist points and low-order points. We intentionally avoid the more expensive
+        // torsion-free check; small-order rejection mitigates the most dangerous malleability
+        // issues, even though it does not guarantee torsion-freeness.
+        let mont = curve25519_dalek::montgomery::MontgomeryPoint(bytes);
+        let edwards = mont.to_edwards(0).ok_or_else(|| {
+            DeserializationError::InvalidValue("Invalid X25519 public key".into())
+        })?;
+        if edwards.is_small_order() {
+            return Err(DeserializationError::InvalidValue("Invalid X25519 public key".into()));
+        }
+
         Ok(Self {
             inner: x25519_dalek::PublicKey::from(bytes),
         })
