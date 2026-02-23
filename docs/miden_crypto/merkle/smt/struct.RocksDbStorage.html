@@ -50,9 +50,9 @@ occurs.</li>
 </div></details><details class="toggle method-toggle" open><summary><section id="method.insert_value" class="method trait-impl"><a class="src rightside" href="../../../src/miden_crypto/merkle/smt/large/storage/rocksdb.rs.html#307-363">Source</a><a href="#method.insert_value" class="anchor">§</a><h4 class="code-header">fn <a href="trait.SmtStorage.html#tymethod.insert_value" class="fn">insert_value</a>(
     &amp;mut self,
     index: <a class="primitive" href="https://doc.rust-lang.org/nightly/std/primitive.u64.html">u64</a>,
-    key: <a class="struct" href="../../word/struct.Word.html" title="struct miden_crypto::word::Word">Word</a>,
-    value: <a class="struct" href="../../word/struct.Word.html" title="struct miden_crypto::word::Word">Word</a>,
-) -&gt; <a class="enum" href="https://doc.rust-lang.org/nightly/core/result/enum.Result.html" title="enum core::result::Result">Result</a>&lt;<a class="enum" href="https://doc.rust-lang.org/nightly/core/option/enum.Option.html" title="enum core::option::Option">Option</a>&lt;<a class="struct" href="../../word/struct.Word.html" title="struct miden_crypto::word::Word">Word</a>&gt;, StorageError&gt;</h4></section></summary><div class="docblock"><p>Inserts a key-value pair into the SMT leaf at the specified logical <code>index</code>.</p>
+    key: <a class="struct" href="../../struct.Word.html" title="struct miden_crypto::Word">Word</a>,
+    value: <a class="struct" href="../../struct.Word.html" title="struct miden_crypto::Word">Word</a>,
+) -&gt; <a class="enum" href="https://doc.rust-lang.org/nightly/core/result/enum.Result.html" title="enum core::result::Result">Result</a>&lt;<a class="enum" href="https://doc.rust-lang.org/nightly/core/option/enum.Option.html" title="enum core::option::Option">Option</a>&lt;<a class="struct" href="../../struct.Word.html" title="struct miden_crypto::Word">Word</a>&gt;, StorageError&gt;</h4></section></summary><div class="docblock"><p>Inserts a key-value pair into the SMT leaf at the specified logical <code>index</code>.</p>
 <p>This operation involves:</p>
 <ol>
 <li>Retrieving the current leaf (if any) at <code>index</code>.</li>
@@ -70,8 +70,8 @@ persisting the corresponding inner nodes.</p>
 </div></details><details class="toggle method-toggle" open><summary><section id="method.remove_value" class="method trait-impl"><a class="src rightside" href="../../../src/miden_crypto/merkle/smt/large/storage/rocksdb.rs.html#381-409">Source</a><a href="#method.remove_value" class="anchor">§</a><h4 class="code-header">fn <a href="trait.SmtStorage.html#tymethod.remove_value" class="fn">remove_value</a>(
     &amp;mut self,
     index: <a class="primitive" href="https://doc.rust-lang.org/nightly/std/primitive.u64.html">u64</a>,
-    key: <a class="struct" href="../../word/struct.Word.html" title="struct miden_crypto::word::Word">Word</a>,
-) -&gt; <a class="enum" href="https://doc.rust-lang.org/nightly/core/result/enum.Result.html" title="enum core::result::Result">Result</a>&lt;<a class="enum" href="https://doc.rust-lang.org/nightly/core/option/enum.Option.html" title="enum core::option::Option">Option</a>&lt;<a class="struct" href="../../word/struct.Word.html" title="struct miden_crypto::word::Word">Word</a>&gt;, StorageError&gt;</h4></section></summary><div class="docblock"><p>Removes a key-value pair from the SMT leaf at the specified logical <code>index</code>.</p>
+    key: <a class="struct" href="../../struct.Word.html" title="struct miden_crypto::Word">Word</a>,
+) -&gt; <a class="enum" href="https://doc.rust-lang.org/nightly/core/result/enum.Result.html" title="enum core::result::Result">Result</a>&lt;<a class="enum" href="https://doc.rust-lang.org/nightly/core/option/enum.Option.html" title="enum core::option::Option">Option</a>&lt;<a class="struct" href="../../struct.Word.html" title="struct miden_crypto::Word">Word</a>&gt;, StorageError&gt;</h4></section></summary><div class="docblock"><p>Removes a key-value pair from the SMT leaf at the specified logical <code>index</code>.</p>
 <p>This operation involves:</p>
 <ol>
 <li>Retrieving the leaf at <code>index</code>.</li>
@@ -274,7 +274,7 @@ the problematic item and attempt to continue.</p>
 <li><code>StorageError::Backend</code>: If any subtree column family is missing or a RocksDB error occurs
 during iterator creation.</li>
 </ul>
-</div></details><details class="toggle method-toggle" open><summary><section id="method.get_depth24" class="method trait-impl"><a class="src rightside" href="../../../src/miden_crypto/merkle/smt/large/storage/rocksdb.rs.html#949-964">Source</a><a href="#method.get_depth24" class="anchor">§</a><h4 class="code-header">fn <a href="trait.SmtStorage.html#tymethod.get_depth24" class="fn">get_depth24</a>(&amp;self) -&gt; <a class="enum" href="https://doc.rust-lang.org/nightly/core/result/enum.Result.html" title="enum core::result::Result">Result</a>&lt;<a class="struct" href="https://doc.rust-lang.org/nightly/alloc/vec/struct.Vec.html" title="struct alloc::vec::Vec">Vec</a>&lt;(<a class="primitive" href="https://doc.rust-lang.org/nightly/std/primitive.u64.html">u64</a>, <a class="struct" href="../../word/struct.Word.html" title="struct miden_crypto::word::Word">Word</a>)&gt;, StorageError&gt;</h4></section></summary><div class="docblock"><p>Retrieves all depth 24 hashes for fast tree rebuilding.</p>
+</div></details><details class="toggle method-toggle" open><summary><section id="method.get_depth24" class="method trait-impl"><a class="src rightside" href="../../../src/miden_crypto/merkle/smt/large/storage/rocksdb.rs.html#949-964">Source</a><a href="#method.get_depth24" class="anchor">§</a><h4 class="code-header">fn <a href="trait.SmtStorage.html#tymethod.get_depth24" class="fn">get_depth24</a>(&amp;self) -&gt; <a class="enum" href="https://doc.rust-lang.org/nightly/core/result/enum.Result.html" title="enum core::result::Result">Result</a>&lt;<a class="struct" href="https://doc.rust-lang.org/nightly/alloc/vec/struct.Vec.html" title="struct alloc::vec::Vec">Vec</a>&lt;(<a class="primitive" href="https://doc.rust-lang.org/nightly/std/primitive.u64.html">u64</a>, <a class="struct" href="../../struct.Word.html" title="struct miden_crypto::Word">Word</a>)&gt;, StorageError&gt;</h4></section></summary><div class="docblock"><p>Retrieves all depth 24 hashes for fast tree rebuilding.</p>
 <h5 id="errors-19"><a class="doc-anchor" href="#errors-19">§</a>Errors</h5>
 <ul>
 <li><code>StorageError::Backend</code>: If the depth24 column family is missing or a RocksDB error

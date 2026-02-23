@@ -2,16 +2,16 @@
     Merkle(<a class="enum" href="../enum.MerkleError.html" title="enum miden_crypto::merkle::MerkleError">MerkleError</a>),
     Storage(StorageError),
     RootMismatch {
-        expected: <a class="struct" href="../../word/struct.Word.html" title="struct miden_crypto::word::Word">Word</a>,
-        actual: <a class="struct" href="../../word/struct.Word.html" title="struct miden_crypto::word::Word">Word</a>,
+        expected: <a class="struct" href="../../struct.Word.html" title="struct miden_crypto::Word">Word</a>,
+        actual: <a class="struct" href="../../struct.Word.html" title="struct miden_crypto::Word">Word</a>,
     },
     StorageNotEmpty,
 }</code></pre><details class="toggle top-doc" open><summary class="hideme"><span>Expand description</span></summary><div class="docblock"><p>Errors that can occur during LargeSmt operations.</p>
 </div></details><h2 id="variants" class="variants section-header">Variants<a href="#variants" class="anchor">§</a></h2><div class="variants"><section id="variant.Merkle" class="variant"><a href="#variant.Merkle" class="anchor">§</a><h3 class="code-header">Merkle(<a class="enum" href="../enum.MerkleError.html" title="enum miden_crypto::merkle::MerkleError">MerkleError</a>)</h3></section><div class="docblock"><p>A Merkle tree operation failed.</p>
 </div><section id="variant.Storage" class="variant"><a href="#variant.Storage" class="anchor">§</a><h3 class="code-header">Storage(StorageError)</h3></section><div class="docblock"><p>A storage operation failed.</p>
 </div><section id="variant.RootMismatch" class="variant"><a href="#variant.RootMismatch" class="anchor">§</a><h3 class="code-header">RootMismatch</h3></section><div class="docblock"><p>The reconstructed root does not match the expected root.</p>
-</div><div class="sub-variant" id="variant.RootMismatch.fields"><h4>Fields</h4><div class="sub-variant-field"><span id="variant.RootMismatch.field.expected" class="section-header"><a href="#variant.RootMismatch.field.expected" class="anchor field">§</a><code>expected: <a class="struct" href="../../word/struct.Word.html" title="struct miden_crypto::word::Word">Word</a></code></span><div class="docblock"><p>The expected root hash.</p>
-</div></div><div class="sub-variant-field"><span id="variant.RootMismatch.field.actual" class="section-header"><a href="#variant.RootMismatch.field.actual" class="anchor field">§</a><code>actual: <a class="struct" href="../../word/struct.Word.html" title="struct miden_crypto::word::Word">Word</a></code></span><div class="docblock"><p>The actual reconstructed root hash.</p>
+</div><div class="sub-variant" id="variant.RootMismatch.fields"><h4>Fields</h4><div class="sub-variant-field"><span id="variant.RootMismatch.field.expected" class="section-header"><a href="#variant.RootMismatch.field.expected" class="anchor field">§</a><code>expected: <a class="struct" href="../../struct.Word.html" title="struct miden_crypto::Word">Word</a></code></span><div class="docblock"><p>The expected root hash.</p>
+</div></div><div class="sub-variant-field"><span id="variant.RootMismatch.field.actual" class="section-header"><a href="#variant.RootMismatch.field.actual" class="anchor field">§</a><code>actual: <a class="struct" href="../../struct.Word.html" title="struct miden_crypto::Word">Word</a></code></span><div class="docblock"><p>The actual reconstructed root hash.</p>
 </div></div></div><section id="variant.StorageNotEmpty" class="variant"><a href="#variant.StorageNotEmpty" class="anchor">§</a><h3 class="code-header">StorageNotEmpty</h3></section><div class="docblock"><p>Storage already contains data when trying to create a new tree.</p>
 <p>Use <a href="struct.LargeSmt.html#method.load_with_root" title="associated function miden_crypto::merkle::smt::LargeSmt::load_with_root"><code>super::LargeSmt::load_with_root()</code></a> or <a href="struct.LargeSmt.html#method.load" title="associated function miden_crypto::merkle::smt::LargeSmt::load"><code>super::LargeSmt::load()</code></a> to load
 existing storage.</p>
