@@ -274,13 +274,21 @@ impl Signature {
     /// # Arguments
     /// * `bytes` - ASN.1 DER format bytes
     /// * `recovery_id` - recovery ID (0-3)
-    pub fn from_der(bytes: &[u8], recovery_id: u8) -> Result<Self, DeserializationError> {
+    pub fn from_der(bytes: &[u8], mut recovery_id: u8) -> Result<Self, DeserializationError> {
         if recovery_id > 3 {
             return Err(DeserializationError::InvalidValue(r#"Invalid recovery ID"#.to_string()));
         }
 
         let sig = k256::ecdsa::Signature::from_der(bytes)
             .map_err(|err| DeserializationError::InvalidValue(err.to_string()))?;
+
+        let sig = if let Some(norm) = sig.normalize_s() {
+            // Flip recovery parity.
+            recovery_id ^= 1;
+            norm
+        } else {
+            sig
+        };
 
         let (r, s) = sig.split_scalars();
 
