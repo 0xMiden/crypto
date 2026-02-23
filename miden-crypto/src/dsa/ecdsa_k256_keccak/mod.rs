@@ -300,14 +300,6 @@ impl Signature {
     }
 }
 
-#[derive(Debug, Error)]
-pub enum SignatureError {
-    #[error("Failed to decode ASN.1 DER format bytes")]
-    DerDecodeError(#[source] k256::ecdsa::Error),
-    #[error("Failed to deserialize signature bytes")]
-    SignatureFormatError(#[source] DeserializationError),
-}
-
 // SERIALIZATION / DESERIALIZATION
 // ================================================================================================
 
