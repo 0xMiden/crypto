@@ -255,18 +255,18 @@ impl Signature {
     /// * `recovery_id` - recovery ID (0-3)
     pub fn from_sec1_bytes_and_recovery_id(
         bytes: [u8; SIGNATURE_STANDARD_BYTES],
-        v: u8,
+        recovery_id: u8,
     ) -> Result<Self, DeserializationError> {
         let mut r = [0u8; SCALARS_SIZE_BYTES];
         let mut s = [0u8; SCALARS_SIZE_BYTES];
         r.copy_from_slice(&bytes[0..SCALARS_SIZE_BYTES]);
         s.copy_from_slice(&bytes[SCALARS_SIZE_BYTES..2 * SCALARS_SIZE_BYTES]);
 
-        if v > 3 {
+        if recovery_id > 3 {
             return Err(DeserializationError::InvalidValue(r#"Invalid recovery ID"#.to_string()));
         }
 
-        Ok(Signature { r, s, v })
+        Ok(Signature { r, s, v: recovery_id })
     }
 
     /// Creates a signature from ASN.1 DER format bytes with a given recovery id.
@@ -274,12 +274,18 @@ impl Signature {
     /// # Arguments
     /// * `bytes` - ASN.1 DER format bytes
     /// * `recovery_id` - recovery ID (0-3)
-    pub fn from_der(bytes: &[u8], v: u8) -> Result<Self, SignatureError> {
-        let sig =
-            k256::ecdsa::Signature::from_der(bytes).map_err(SignatureError::DerDecodeError)?;
+    pub fn from_der(bytes: &[u8], mut recovery_id: u8) -> Result<Self, DeserializationError> {
+        if recovery_id > 3 {
+            return Err(DeserializationError::InvalidValue(r#"Invalid recovery ID"#.to_string()));
+        }
+
+        let sig = k256::ecdsa::Signature::from_der(bytes)
+            .map_err(|err| DeserializationError::InvalidValue(err.to_string()))?;
 
         // Normalize to 64 bytes if necessary.
         let rs = if let Some(norm) = sig.normalize_s() {
+            // ...
+            recovery_id ^= 1;
             norm.to_bytes()
         } else {
             sig.to_bytes()
@@ -288,9 +294,9 @@ impl Signature {
         // Append a recovery byte `v` to make 65 bytes (r||s||v).
         let mut sig65 = [0u8; 65];
         sig65[..64].copy_from_slice(&rs);
-        sig65[64] = v;
+        sig65[64] = recovery_id;
 
-        Signature::read_from_bytes(&sig65).map_err(SignatureError::SignatureFormatError)
+        Signature::read_from_bytes(&sig65)
     }
 }
 
