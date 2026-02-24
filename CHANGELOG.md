@@ -13,6 +13,7 @@
 - [BREAKING] Added validation to `PartialMmr::from_parts()` and `Deserializable` implementation, added `from_parts_unchecked()` for performance-critical code ([#812](https://github.com/0xMiden/crypto/pull/812)).
 - Added `Signature::from_der()` for ECDSA signatures over secp256k1 ([#842](https://github.com/0xMiden/crypto/pull/842)).
 - Fix possible panic in `XChaCha::decrypt_bytes_with_associated_data` and harden deserialization with fuzzing across 7 new targets ([#836](https://github.com/0xMiden/crypto/pull/836)).
+- Use read_from_bytes_with_budget instead of read_from_bytes for deserialization from untrusted sources, setting the budget to the actual input byte slice length. ([#846](https://github.com/0xMiden/crypto/pull/846)).
 
 ## 0.22.3 (2026-02-23)
 

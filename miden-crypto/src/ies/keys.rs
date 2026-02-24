@@ -7,6 +7,10 @@ use super::{IesError, IesScheme, crypto_box::CryptoBox, message::SealedMessage};
 use crate::{
     Felt,
     aead::{aead_poseidon2::AeadPoseidon2, xchacha::XChaCha},
+    dsa::{
+        ecdsa_k256_keccak::PUBLIC_KEY_BYTES as K256_PUBLIC_KEY_BYTES,
+        eddsa_25519_sha512::PUBLIC_KEY_BYTES as X25519_PUBLIC_KEY_BYTES,
+    },
     ecdh::{KeyAgreementScheme, k256::K256, x25519::X25519},
     utils::{ByteReader, ByteWriter, Deserializable, DeserializationError, Serializable},
 };
@@ -419,26 +423,53 @@ impl EphemeralPublicKey {
 
     /// Deserialize from bytes with explicit scheme
     pub fn from_bytes(scheme: IesScheme, bytes: &[u8]) -> Result<Self, IesError> {
+        let expected_len = match scheme {
+            IesScheme::K256XChaCha20Poly1305 | IesScheme::K256AeadPoseidon2 => {
+                K256_PUBLIC_KEY_BYTES
+            },
+            IesScheme::X25519XChaCha20Poly1305 | IesScheme::X25519AeadPoseidon2 => {
+                X25519_PUBLIC_KEY_BYTES
+            },
+        };
+
+        if bytes.len() != expected_len {
+            return Err(IesError::EphemeralPublicKeyDeserializationFailed);
+        }
+
         match scheme {
             IesScheme::K256XChaCha20Poly1305 => {
-                let key = <K256 as KeyAgreementScheme>::EphemeralPublicKey::read_from_bytes(bytes)
+                let key =
+                    <K256 as KeyAgreementScheme>::EphemeralPublicKey::read_from_bytes_with_budget(
+                        bytes,
+                        expected_len,
+                    )
                     .map_err(|_| IesError::EphemeralPublicKeyDeserializationFailed)?;
                 Ok(EphemeralPublicKey::K256XChaCha20Poly1305(key))
             },
             IesScheme::K256AeadPoseidon2 => {
-                let key = <K256 as KeyAgreementScheme>::EphemeralPublicKey::read_from_bytes(bytes)
+                let key =
+                    <K256 as KeyAgreementScheme>::EphemeralPublicKey::read_from_bytes_with_budget(
+                        bytes,
+                        expected_len,
+                    )
                     .map_err(|_| IesError::EphemeralPublicKeyDeserializationFailed)?;
                 Ok(EphemeralPublicKey::K256AeadPoseidon2(key))
             },
             IesScheme::X25519XChaCha20Poly1305 => {
                 let key =
-                    <X25519 as KeyAgreementScheme>::EphemeralPublicKey::read_from_bytes(bytes)
+                    <X25519 as KeyAgreementScheme>::EphemeralPublicKey::read_from_bytes_with_budget(
+                        bytes,
+                        expected_len,
+                    )
                         .map_err(|_| IesError::EphemeralPublicKeyDeserializationFailed)?;
                 Ok(EphemeralPublicKey::X25519XChaCha20Poly1305(key))
             },
             IesScheme::X25519AeadPoseidon2 => {
                 let key =
-                    <X25519 as KeyAgreementScheme>::EphemeralPublicKey::read_from_bytes(bytes)
+                    <X25519 as KeyAgreementScheme>::EphemeralPublicKey::read_from_bytes_with_budget(
+                        bytes,
+                        expected_len,
+                    )
                         .map_err(|_| IesError::EphemeralPublicKeyDeserializationFailed)?;
                 Ok(EphemeralPublicKey::X25519AeadPoseidon2(key))
             },
