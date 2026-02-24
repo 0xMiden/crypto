@@ -27,6 +27,9 @@ pub(super) struct CryptoBox<K: KeyAgreementScheme, A: AeadScheme> {
 impl<K: KeyAgreementScheme, A: AeadScheme> CryptoBox<K, A> {
     const KDF_CONTEXT: &'static [u8] = b"miden-crypto/ies/hkdf-v1";
 
+    /// Builds the HKDF `info` used for IES key derivation.
+    /// Layout: `[KDF_CONTEXT || scheme_id || ephemeral_public_key]` where `scheme_id = scheme as
+    /// u8`.
     fn build_kdf_info(scheme: IesScheme, ephemeral_public_key: &K::EphemeralPublicKey) -> Vec<u8> {
         let mut info =
             Vec::with_capacity(Self::KDF_CONTEXT.len() + 1 + ephemeral_public_key.to_bytes().len());
