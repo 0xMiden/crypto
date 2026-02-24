@@ -124,3 +124,90 @@ fn test_signature_serde() {
     assert!(!slice_reader.has_more_bytes());
     assert_eq!(sig0, sig0_deserialized);
 }
+
+#[test]
+fn test_signature_from_der_success() {
+    // DER-encoded form of an ASN.1 SEQUENCE containing two INTEGER values.
+    let der: [u8; 8] = [
+        0x30, 0x06, // Sequence tag and length of sequence contents.
+        0x02, 0x01, 0x01, // Integer 1.
+        0x02, 0x01, 0x09, // Integer 2.
+    ];
+    let v = 2u8;
+
+    let sig = Signature::from_der(&der, v).expect("from_der should parse valid DER");
+
+    // Expect r = 1 and s = 9 in 32-byte big-endian form.
+    let mut expected_r = [0u8; 32];
+    expected_r[31] = 1;
+    let mut expected_s = [0u8; 32];
+    expected_s[31] = 9;
+
+    assert_eq!(sig.r(), &expected_r);
+    assert_eq!(sig.s(), &expected_s);
+    assert_eq!(sig.v(), v);
+}
+
+#[test]
+fn test_signature_from_der_recovery_id_variation() {
+    // DER encoding with two integers both equal to 1.
+    let der: [u8; 8] = [0x30, 0x06, 0x02, 0x01, 0x01, 0x02, 0x01, 0x01];
+
+    let sig_v0 = Signature::from_der(&der, 0).unwrap();
+    let sig_v3 = Signature::from_der(&der, 3).unwrap();
+
+    // r and s must be identical; v differs, so signatures should not be equal.
+    assert_eq!(sig_v0.r(), sig_v3.r());
+    assert_eq!(sig_v0.s(), sig_v3.s());
+    assert_ne!(sig_v0.v(), sig_v3.v());
+    assert_ne!(sig_v0, sig_v3);
+}
+
+#[test]
+fn test_signature_from_der_invalid() {
+    // Empty input should fail at DER parsing stage (der error).
+    match Signature::from_der(&[], 0) {
+        Err(super::DeserializationError::InvalidValue(_)) => {},
+        other => panic!("expected InvalidValue for empty DER, got {:?}", other),
+    }
+
+    // Malformed/truncated DER should also fail.
+    let der_bad: [u8; 2] = [0x30, 0x01];
+    match Signature::from_der(&der_bad, 0) {
+        Err(super::DeserializationError::InvalidValue(_)) => {},
+        other => panic!("expected InvalidValue for malformed DER, got {:?}", other),
+    }
+}
+
+#[test]
+fn test_signature_from_der_high_s_normalizes_and_flips_v() {
+    // Construct a DER signature with r = 3 and s = n - 2 (high-S), which requires a leading 0x00
+    // in DER to force a positive INTEGER.
+    //
+    // secp256k1 curve order (n):
+    // n = FFFFFFFF FFFFFFFF FFFFFFFF FFFFFFFE BAAEDCE6 AF48A03B BFD25E8C D0364141
+    // We set s = n - 2 = ... D036413F (> n/2), so normalize_s() should trigger and flip recovery
+    // id.
+    let der: [u8; 40] = [
+        0x30, 0x26, // SEQUENCE, length 38
+        0x02, 0x01, 0x03, // INTEGER r = 3
+        0x02, 0x21, 0x00, // INTEGER s, length 33 with leading 0x00 to keep positive
+        0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+        0xfe, 0xba, 0xae, 0xdc, 0xe6, 0xaf, 0x48, 0xa0, 0x3b, 0xbf, 0xd2, 0x5e, 0x8c, 0xd0, 0x36,
+        0x41, 0x3f,
+    ];
+    let v_initial: u8 = 2;
+    let sig = Signature::from_der(&der, v_initial).expect("from_der should parse valid high-S DER");
+
+    // After normalization:
+    // - v should have its parity bit flipped (XOR with 1).
+    // - s should be normalized to low-s; since s = n - 2, the normalized s is 2.
+    let mut expected_r = [0u8; 32];
+    expected_r[31] = 3;
+    let mut expected_s_low = [0u8; 32];
+    expected_s_low[31] = 2;
+
+    assert_eq!(sig.r(), &expected_r);
+    assert_eq!(sig.s(), &expected_s_low);
+    assert_eq!(sig.v(), v_initial ^ 1);
+}

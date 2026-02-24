@@ -1,3 +1,7 @@
+## 0.19.6 (2026-02-24)
+
+- Added `Signature::from_der()` for ECDSA signatures over secp256k1 ([#842](https://github.com/0xMiden/crypto/pull/842)).
+
 ## 0.19.5 (2026-02-18)
 
 - Fixed `PartialMmr::add()` not clearing `track_latest` flag after peak merges, which could result in incorrect tracking state ([#835](https://github.com/0xMiden/crypto/pull/835)).
