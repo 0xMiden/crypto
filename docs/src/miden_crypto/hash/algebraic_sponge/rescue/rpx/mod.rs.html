@@ -256,168 +256,167 @@
 <a href=#256 id=256 data-nosnippet>256</a>/// over the field arithmetic.
 <a href=#257 id=257 data-nosnippet>257</a></span><span class="kw">mod </span>cubic_ext {
 <a href=#258 id=258 data-nosnippet>258</a>    <span class="kw">use </span><span class="kw">super</span>::Felt;
-<a href=#259 id=259 data-nosnippet>259</a>    <span class="kw">use </span><span class="kw">crate</span>::field::PrimeCharacteristicRing;
-<a href=#260 id=260 data-nosnippet>260</a>
-<a href=#261 id=261 data-nosnippet>261</a>    <span class="doccomment">/// Multiplies two cubic extension field elements.
-<a href=#262 id=262 data-nosnippet>262</a>    ///
-<a href=#263 id=263 data-nosnippet>263</a>    /// Element representation: [a0, a1, a2] = a0 + a1*φ + a2*φ²
-<a href=#264 id=264 data-nosnippet>264</a>    /// where φ is a root of x³ - x - 1.
-<a href=#265 id=265 data-nosnippet>265</a>    </span><span class="attr">#[inline(always)]
-<a href=#266 id=266 data-nosnippet>266</a>    </span><span class="kw">pub fn </span>mul(a: [Felt; <span class="number">3</span>], b: [Felt; <span class="number">3</span>]) -&gt; [Felt; <span class="number">3</span>] {
-<a href=#267 id=267 data-nosnippet>267</a>        <span class="kw">let </span>a0b0 = a[<span class="number">0</span>] * b[<span class="number">0</span>];
-<a href=#268 id=268 data-nosnippet>268</a>        <span class="kw">let </span>a1b1 = a[<span class="number">1</span>] * b[<span class="number">1</span>];
-<a href=#269 id=269 data-nosnippet>269</a>        <span class="kw">let </span>a2b2 = a[<span class="number">2</span>] * b[<span class="number">2</span>];
-<a href=#270 id=270 data-nosnippet>270</a>
-<a href=#271 id=271 data-nosnippet>271</a>        <span class="kw">let </span>a0b0_a0b1_a1b0_a1b1 = (a[<span class="number">0</span>] + a[<span class="number">1</span>]) * (b[<span class="number">0</span>] + b[<span class="number">1</span>]);
-<a href=#272 id=272 data-nosnippet>272</a>        <span class="kw">let </span>a0b0_a0b2_a2b0_a2b2 = (a[<span class="number">0</span>] + a[<span class="number">2</span>]) * (b[<span class="number">0</span>] + b[<span class="number">2</span>]);
-<a href=#273 id=273 data-nosnippet>273</a>        <span class="kw">let </span>a1b1_a1b2_a2b1_a2b2 = (a[<span class="number">1</span>] + a[<span class="number">2</span>]) * (b[<span class="number">1</span>] + b[<span class="number">2</span>]);
-<a href=#274 id=274 data-nosnippet>274</a>
-<a href=#275 id=275 data-nosnippet>275</a>        <span class="kw">let </span>a0b0_minus_a1b1 = a0b0 - a1b1;
-<a href=#276 id=276 data-nosnippet>276</a>
-<a href=#277 id=277 data-nosnippet>277</a>        <span class="kw">let </span>a0b0_a1b2_a2b1 = a1b1_a1b2_a2b1_a2b2 + a0b0_minus_a1b1 - a2b2;
-<a href=#278 id=278 data-nosnippet>278</a>        <span class="kw">let </span>a0b1_a1b0_a1b2_a2b1_a2b2 =
-<a href=#279 id=279 data-nosnippet>279</a>            a0b0_a0b1_a1b0_a1b1 + a1b1_a1b2_a2b1_a2b2 - a1b1.double() - a0b0;
-<a href=#280 id=280 data-nosnippet>280</a>        <span class="kw">let </span>a0b2_a1b1_a2b0_a2b2 = a0b0_a0b2_a2b0_a2b2 - a0b0_minus_a1b1;
-<a href=#281 id=281 data-nosnippet>281</a>
-<a href=#282 id=282 data-nosnippet>282</a>        [a0b0_a1b2_a2b1, a0b1_a1b0_a1b2_a2b1_a2b2, a0b2_a1b1_a2b0_a2b2]
-<a href=#283 id=283 data-nosnippet>283</a>    }
-<a href=#284 id=284 data-nosnippet>284</a>
-<a href=#285 id=285 data-nosnippet>285</a>    <span class="doccomment">/// Squares a cubic extension field element.
-<a href=#286 id=286 data-nosnippet>286</a>    </span><span class="attr">#[inline(always)]
-<a href=#287 id=287 data-nosnippet>287</a>    </span><span class="kw">pub fn </span>square(a: [Felt; <span class="number">3</span>]) -&gt; [Felt; <span class="number">3</span>] {
-<a href=#288 id=288 data-nosnippet>288</a>        <span class="kw">let </span>a0 = a[<span class="number">0</span>];
-<a href=#289 id=289 data-nosnippet>289</a>        <span class="kw">let </span>a1 = a[<span class="number">1</span>];
-<a href=#290 id=290 data-nosnippet>290</a>        <span class="kw">let </span>a2 = a[<span class="number">2</span>];
-<a href=#291 id=291 data-nosnippet>291</a>
-<a href=#292 id=292 data-nosnippet>292</a>        <span class="kw">let </span>a2_sq = a2.square();
-<a href=#293 id=293 data-nosnippet>293</a>        <span class="kw">let </span>a1_a2 = a1 * a2;
-<a href=#294 id=294 data-nosnippet>294</a>
-<a href=#295 id=295 data-nosnippet>295</a>        <span class="kw">let </span>out0 = a0.square() + a1_a2.double();
-<a href=#296 id=296 data-nosnippet>296</a>        <span class="kw">let </span>out1 = (a0 * a1 + a1_a2).double() + a2_sq;
-<a href=#297 id=297 data-nosnippet>297</a>        <span class="kw">let </span>out2 = (a0 * a2).double() + a1.square() + a2_sq;
-<a href=#298 id=298 data-nosnippet>298</a>
-<a href=#299 id=299 data-nosnippet>299</a>        [out0, out1, out2]
-<a href=#300 id=300 data-nosnippet>300</a>    }
-<a href=#301 id=301 data-nosnippet>301</a>
-<a href=#302 id=302 data-nosnippet>302</a>    <span class="doccomment">/// Computes the 7th power of a cubic extension field element.
-<a href=#303 id=303 data-nosnippet>303</a>    ///
-<a href=#304 id=304 data-nosnippet>304</a>    /// Uses the addition chain: x → x² → x³ → x⁶ → x⁷
-<a href=#305 id=305 data-nosnippet>305</a>    /// - x² (1 squaring)
-<a href=#306 id=306 data-nosnippet>306</a>    /// - x³ = x² * x (1 multiplication)
-<a href=#307 id=307 data-nosnippet>307</a>    /// - x⁶ = (x³)² (1 squaring)
-<a href=#308 id=308 data-nosnippet>308</a>    /// - x⁷ = x⁶ * x (1 multiplication)
-<a href=#309 id=309 data-nosnippet>309</a>    ///
-<a href=#310 id=310 data-nosnippet>310</a>    /// Total: 2 squarings + 2 multiplications
-<a href=#311 id=311 data-nosnippet>311</a>    </span><span class="attr">#[inline(always)]
-<a href=#312 id=312 data-nosnippet>312</a>    </span><span class="kw">pub fn </span>power7(a: [Felt; <span class="number">3</span>]) -&gt; [Felt; <span class="number">3</span>] {
-<a href=#313 id=313 data-nosnippet>313</a>        <span class="kw">let </span>a2 = square(a);
-<a href=#314 id=314 data-nosnippet>314</a>        <span class="kw">let </span>a3 = mul(a2, a);
-<a href=#315 id=315 data-nosnippet>315</a>        <span class="kw">let </span>a6 = square(a3);
-<a href=#316 id=316 data-nosnippet>316</a>        mul(a6, a)
-<a href=#317 id=317 data-nosnippet>317</a>    }
-<a href=#318 id=318 data-nosnippet>318</a>}
-<a href=#319 id=319 data-nosnippet>319</a>
-<a href=#320 id=320 data-nosnippet>320</a><span class="comment">// PLONKY3 INTEGRATION
-<a href=#321 id=321 data-nosnippet>321</a>// ================================================================================================
-<a href=#322 id=322 data-nosnippet>322</a>
-<a href=#323 id=323 data-nosnippet>323</a></span><span class="doccomment">/// Plonky3-compatible RPX permutation implementation.
-<a href=#324 id=324 data-nosnippet>324</a>///
-<a href=#325 id=325 data-nosnippet>325</a>/// This module provides a Plonky3-compatible interface to the RPX256 hash function,
-<a href=#326 id=326 data-nosnippet>326</a>/// implementing the `Permutation` and `CryptographicPermutation` traits from Plonky3.
-<a href=#327 id=327 data-nosnippet>327</a>///
-<a href=#328 id=328 data-nosnippet>328</a>/// This allows RPX to be used with Plonky3's cryptographic infrastructure, including:
-<a href=#329 id=329 data-nosnippet>329</a>/// - PaddingFreeSponge for hashing
-<a href=#330 id=330 data-nosnippet>330</a>/// - TruncatedPermutation for compression
-<a href=#331 id=331 data-nosnippet>331</a>/// - DuplexChallenger for Fiat-Shamir transforms
-<a href=#332 id=332 data-nosnippet>332</a></span><span class="kw">use </span>p3_challenger::DuplexChallenger;
-<a href=#333 id=333 data-nosnippet>333</a><span class="kw">use </span>p3_symmetric::{
-<a href=#334 id=334 data-nosnippet>334</a>    CryptographicPermutation, PaddingFreeSponge, Permutation, TruncatedPermutation,
-<a href=#335 id=335 data-nosnippet>335</a>};
-<a href=#336 id=336 data-nosnippet>336</a>
-<a href=#337 id=337 data-nosnippet>337</a><span class="comment">// RPX PERMUTATION FOR PLONKY3
-<a href=#338 id=338 data-nosnippet>338</a>// ================================================================================================
-<a href=#339 id=339 data-nosnippet>339</a>
-<a href=#340 id=340 data-nosnippet>340</a></span><span class="doccomment">/// Plonky3-compatible RPX permutation.
-<a href=#341 id=341 data-nosnippet>341</a>///
-<a href=#342 id=342 data-nosnippet>342</a>/// This struct wraps the RPX256 permutation and implements Plonky3's `Permutation` and
-<a href=#343 id=343 data-nosnippet>343</a>/// `CryptographicPermutation` traits, allowing RPX to be used within the Plonky3 ecosystem.
-<a href=#344 id=344 data-nosnippet>344</a>///
-<a href=#345 id=345 data-nosnippet>345</a>/// The permutation operates on a state of 12 field elements (STATE_WIDTH = 12), with:
-<a href=#346 id=346 data-nosnippet>346</a>/// - Rate: 8 elements (positions 0-7)
-<a href=#347 id=347 data-nosnippet>347</a>/// - Capacity: 4 elements (positions 8-11)
-<a href=#348 id=348 data-nosnippet>348</a>/// - Digest output: 4 elements (positions 0-3)
-<a href=#349 id=349 data-nosnippet>349</a></span><span class="attr">#[derive(Debug, Copy, Clone, Eq, PartialEq)]
-<a href=#350 id=350 data-nosnippet>350</a></span><span class="kw">pub struct </span>RpxPermutation256;
-<a href=#351 id=351 data-nosnippet>351</a>
-<a href=#352 id=352 data-nosnippet>352</a><span class="kw">impl </span>RpxPermutation256 {
-<a href=#353 id=353 data-nosnippet>353</a>    <span class="comment">// CONSTANTS
-<a href=#354 id=354 data-nosnippet>354</a>    // --------------------------------------------------------------------------------------------
-<a href=#355 id=355 data-nosnippet>355</a>
-<a href=#356 id=356 data-nosnippet>356</a>    </span><span class="doccomment">/// Sponge state is set to 12 field elements or 768 bytes; 8 elements are reserved for rate and
-<a href=#357 id=357 data-nosnippet>357</a>    /// the remaining 4 elements are reserved for capacity.
-<a href=#358 id=358 data-nosnippet>358</a>    </span><span class="kw">pub const </span>STATE_WIDTH: usize = STATE_WIDTH;
-<a href=#359 id=359 data-nosnippet>359</a>
-<a href=#360 id=360 data-nosnippet>360</a>    <span class="doccomment">/// The rate portion of the state is located in elements 0 through 7 (inclusive).
-<a href=#361 id=361 data-nosnippet>361</a>    </span><span class="kw">pub const </span>RATE_RANGE: Range&lt;usize&gt; = Rpx256::RATE_RANGE;
-<a href=#362 id=362 data-nosnippet>362</a>
-<a href=#363 id=363 data-nosnippet>363</a>    <span class="doccomment">/// The capacity portion of the state is located in elements 8, 9, 10, and 11.
-<a href=#364 id=364 data-nosnippet>364</a>    </span><span class="kw">pub const </span>CAPACITY_RANGE: Range&lt;usize&gt; = Rpx256::CAPACITY_RANGE;
-<a href=#365 id=365 data-nosnippet>365</a>
-<a href=#366 id=366 data-nosnippet>366</a>    <span class="doccomment">/// The output of the hash function can be read from state elements 0, 1, 2, and 3 (the first
-<a href=#367 id=367 data-nosnippet>367</a>    /// word of the state).
-<a href=#368 id=368 data-nosnippet>368</a>    </span><span class="kw">pub const </span>DIGEST_RANGE: Range&lt;usize&gt; = Rpx256::DIGEST_RANGE;
-<a href=#369 id=369 data-nosnippet>369</a>
-<a href=#370 id=370 data-nosnippet>370</a>    <span class="comment">// RPX PERMUTATION
-<a href=#371 id=371 data-nosnippet>371</a>    // --------------------------------------------------------------------------------------------
-<a href=#372 id=372 data-nosnippet>372</a>
-<a href=#373 id=373 data-nosnippet>373</a>    </span><span class="doccomment">/// Applies RPX permutation to the provided state.
-<a href=#374 id=374 data-nosnippet>374</a>    ///
-<a href=#375 id=375 data-nosnippet>375</a>    /// This delegates to the RPX256 implementation.
-<a href=#376 id=376 data-nosnippet>376</a>    </span><span class="attr">#[inline(always)]
-<a href=#377 id=377 data-nosnippet>377</a>    </span><span class="kw">pub fn </span>apply_permutation(state: <span class="kw-2">&amp;mut </span>[Felt; STATE_WIDTH]) {
-<a href=#378 id=378 data-nosnippet>378</a>        Rpx256::apply_permutation(state);
-<a href=#379 id=379 data-nosnippet>379</a>    }
-<a href=#380 id=380 data-nosnippet>380</a>}
-<a href=#381 id=381 data-nosnippet>381</a>
-<a href=#382 id=382 data-nosnippet>382</a><span class="comment">// PLONKY3 TRAIT IMPLEMENTATIONS
-<a href=#383 id=383 data-nosnippet>383</a>// ================================================================================================
-<a href=#384 id=384 data-nosnippet>384</a>
-<a href=#385 id=385 data-nosnippet>385</a></span><span class="kw">impl </span>Permutation&lt;[Felt; STATE_WIDTH]&gt; <span class="kw">for </span>RpxPermutation256 {
-<a href=#386 id=386 data-nosnippet>386</a>    <span class="kw">fn </span>permute_mut(<span class="kw-2">&amp;</span><span class="self">self</span>, state: <span class="kw-2">&amp;mut </span>[Felt; STATE_WIDTH]) {
-<a href=#387 id=387 data-nosnippet>387</a>        <span class="self">Self</span>::apply_permutation(state);
-<a href=#388 id=388 data-nosnippet>388</a>    }
-<a href=#389 id=389 data-nosnippet>389</a>}
-<a href=#390 id=390 data-nosnippet>390</a>
-<a href=#391 id=391 data-nosnippet>391</a><span class="kw">impl </span>CryptographicPermutation&lt;[Felt; STATE_WIDTH]&gt; <span class="kw">for </span>RpxPermutation256 {}
-<a href=#392 id=392 data-nosnippet>392</a>
-<a href=#393 id=393 data-nosnippet>393</a><span class="comment">// TYPE ALIASES FOR PLONKY3 INTEGRATION
-<a href=#394 id=394 data-nosnippet>394</a>// ================================================================================================
-<a href=#395 id=395 data-nosnippet>395</a>
-<a href=#396 id=396 data-nosnippet>396</a></span><span class="doccomment">/// RPX-based hasher using Plonky3's PaddingFreeSponge.
-<a href=#397 id=397 data-nosnippet>397</a>///
-<a href=#398 id=398 data-nosnippet>398</a>/// This provides a sponge-based hash function with:
-<a href=#399 id=399 data-nosnippet>399</a>/// - WIDTH: 12 field elements (total state size)
-<a href=#400 id=400 data-nosnippet>400</a>/// - RATE: 8 field elements (input/output rate)
-<a href=#401 id=401 data-nosnippet>401</a>/// - OUT: 4 field elements (digest size)
-<a href=#402 id=402 data-nosnippet>402</a></span><span class="kw">pub type </span>RpxHasher = PaddingFreeSponge&lt;RpxPermutation256, <span class="number">12</span>, <span class="number">8</span>, <span class="number">4</span>&gt;;
-<a href=#403 id=403 data-nosnippet>403</a>
-<a href=#404 id=404 data-nosnippet>404</a><span class="doccomment">/// RPX-based compression function using Plonky3's TruncatedPermutation.
-<a href=#405 id=405 data-nosnippet>405</a>///
-<a href=#406 id=406 data-nosnippet>406</a>/// This provides a 2-to-1 compression function for Merkle tree construction with:
-<a href=#407 id=407 data-nosnippet>407</a>/// - CHUNK: 2 (number of input chunks - i.e., 2 digests of 4 elements each = 8 elements)
-<a href=#408 id=408 data-nosnippet>408</a>/// - N: 4 (output size in field elements)
-<a href=#409 id=409 data-nosnippet>409</a>/// - WIDTH: 12 (total state size)
-<a href=#410 id=410 data-nosnippet>410</a>///
-<a href=#411 id=411 data-nosnippet>411</a>/// The compression function takes 8 field elements (2 digests) as input and produces
-<a href=#412 id=412 data-nosnippet>412</a>/// 4 field elements (1 digest) as output.
-<a href=#413 id=413 data-nosnippet>413</a></span><span class="kw">pub type </span>RpxCompression = TruncatedPermutation&lt;RpxPermutation256, <span class="number">2</span>, <span class="number">4</span>, <span class="number">12</span>&gt;;
-<a href=#414 id=414 data-nosnippet>414</a>
-<a href=#415 id=415 data-nosnippet>415</a><span class="doccomment">/// RPX-based challenger using Plonky3's DuplexChallenger.
-<a href=#416 id=416 data-nosnippet>416</a>///
-<a href=#417 id=417 data-nosnippet>417</a>/// This provides a Fiat-Shamir transform implementation for interactive proof protocols,
-<a href=#418 id=418 data-nosnippet>418</a>/// with:
-<a href=#419 id=419 data-nosnippet>419</a>/// - F: Generic field type (typically the same as Felt)
-<a href=#420 id=420 data-nosnippet>420</a>/// - WIDTH: 12 field elements (sponge state size)
-<a href=#421 id=421 data-nosnippet>421</a>/// - RATE: 8 field elements (rate of absorption/squeezing)
-<a href=#422 id=422 data-nosnippet>422</a></span><span class="kw">pub type </span>RpxChallenger&lt;F&gt; = DuplexChallenger&lt;F, RpxPermutation256, <span class="number">12</span>, <span class="number">8</span>&gt;;
+<a href=#259 id=259 data-nosnippet>259</a>
+<a href=#260 id=260 data-nosnippet>260</a>    <span class="doccomment">/// Multiplies two cubic extension field elements.
+<a href=#261 id=261 data-nosnippet>261</a>    ///
+<a href=#262 id=262 data-nosnippet>262</a>    /// Element representation: [a0, a1, a2] = a0 + a1*φ + a2*φ²
+<a href=#263 id=263 data-nosnippet>263</a>    /// where φ is a root of x³ - x - 1.
+<a href=#264 id=264 data-nosnippet>264</a>    </span><span class="attr">#[inline(always)]
+<a href=#265 id=265 data-nosnippet>265</a>    </span><span class="kw">pub fn </span>mul(a: [Felt; <span class="number">3</span>], b: [Felt; <span class="number">3</span>]) -&gt; [Felt; <span class="number">3</span>] {
+<a href=#266 id=266 data-nosnippet>266</a>        <span class="kw">let </span>a0b0 = a[<span class="number">0</span>] * b[<span class="number">0</span>];
+<a href=#267 id=267 data-nosnippet>267</a>        <span class="kw">let </span>a1b1 = a[<span class="number">1</span>] * b[<span class="number">1</span>];
+<a href=#268 id=268 data-nosnippet>268</a>        <span class="kw">let </span>a2b2 = a[<span class="number">2</span>] * b[<span class="number">2</span>];
+<a href=#269 id=269 data-nosnippet>269</a>
+<a href=#270 id=270 data-nosnippet>270</a>        <span class="kw">let </span>a0b0_a0b1_a1b0_a1b1 = (a[<span class="number">0</span>] + a[<span class="number">1</span>]) * (b[<span class="number">0</span>] + b[<span class="number">1</span>]);
+<a href=#271 id=271 data-nosnippet>271</a>        <span class="kw">let </span>a0b0_a0b2_a2b0_a2b2 = (a[<span class="number">0</span>] + a[<span class="number">2</span>]) * (b[<span class="number">0</span>] + b[<span class="number">2</span>]);
+<a href=#272 id=272 data-nosnippet>272</a>        <span class="kw">let </span>a1b1_a1b2_a2b1_a2b2 = (a[<span class="number">1</span>] + a[<span class="number">2</span>]) * (b[<span class="number">1</span>] + b[<span class="number">2</span>]);
+<a href=#273 id=273 data-nosnippet>273</a>
+<a href=#274 id=274 data-nosnippet>274</a>        <span class="kw">let </span>a0b0_minus_a1b1 = a0b0 - a1b1;
+<a href=#275 id=275 data-nosnippet>275</a>
+<a href=#276 id=276 data-nosnippet>276</a>        <span class="kw">let </span>a0b0_a1b2_a2b1 = a1b1_a1b2_a2b1_a2b2 + a0b0_minus_a1b1 - a2b2;
+<a href=#277 id=277 data-nosnippet>277</a>        <span class="kw">let </span>a0b1_a1b0_a1b2_a2b1_a2b2 =
+<a href=#278 id=278 data-nosnippet>278</a>            a0b0_a0b1_a1b0_a1b1 + a1b1_a1b2_a2b1_a2b2 - a1b1.double() - a0b0;
+<a href=#279 id=279 data-nosnippet>279</a>        <span class="kw">let </span>a0b2_a1b1_a2b0_a2b2 = a0b0_a0b2_a2b0_a2b2 - a0b0_minus_a1b1;
+<a href=#280 id=280 data-nosnippet>280</a>
+<a href=#281 id=281 data-nosnippet>281</a>        [a0b0_a1b2_a2b1, a0b1_a1b0_a1b2_a2b1_a2b2, a0b2_a1b1_a2b0_a2b2]
+<a href=#282 id=282 data-nosnippet>282</a>    }
+<a href=#283 id=283 data-nosnippet>283</a>
+<a href=#284 id=284 data-nosnippet>284</a>    <span class="doccomment">/// Squares a cubic extension field element.
+<a href=#285 id=285 data-nosnippet>285</a>    </span><span class="attr">#[inline(always)]
+<a href=#286 id=286 data-nosnippet>286</a>    </span><span class="kw">pub fn </span>square(a: [Felt; <span class="number">3</span>]) -&gt; [Felt; <span class="number">3</span>] {
+<a href=#287 id=287 data-nosnippet>287</a>        <span class="kw">let </span>a0 = a[<span class="number">0</span>];
+<a href=#288 id=288 data-nosnippet>288</a>        <span class="kw">let </span>a1 = a[<span class="number">1</span>];
+<a href=#289 id=289 data-nosnippet>289</a>        <span class="kw">let </span>a2 = a[<span class="number">2</span>];
+<a href=#290 id=290 data-nosnippet>290</a>
+<a href=#291 id=291 data-nosnippet>291</a>        <span class="kw">let </span>a2_sq = a2.square();
+<a href=#292 id=292 data-nosnippet>292</a>        <span class="kw">let </span>a1_a2 = a1 * a2;
+<a href=#293 id=293 data-nosnippet>293</a>
+<a href=#294 id=294 data-nosnippet>294</a>        <span class="kw">let </span>out0 = a0.square() + a1_a2.double();
+<a href=#295 id=295 data-nosnippet>295</a>        <span class="kw">let </span>out1 = (a0 * a1 + a1_a2).double() + a2_sq;
+<a href=#296 id=296 data-nosnippet>296</a>        <span class="kw">let </span>out2 = (a0 * a2).double() + a1.square() + a2_sq;
+<a href=#297 id=297 data-nosnippet>297</a>
+<a href=#298 id=298 data-nosnippet>298</a>        [out0, out1, out2]
+<a href=#299 id=299 data-nosnippet>299</a>    }
+<a href=#300 id=300 data-nosnippet>300</a>
+<a href=#301 id=301 data-nosnippet>301</a>    <span class="doccomment">/// Computes the 7th power of a cubic extension field element.
+<a href=#302 id=302 data-nosnippet>302</a>    ///
+<a href=#303 id=303 data-nosnippet>303</a>    /// Uses the addition chain: x → x² → x³ → x⁶ → x⁷
+<a href=#304 id=304 data-nosnippet>304</a>    /// - x² (1 squaring)
+<a href=#305 id=305 data-nosnippet>305</a>    /// - x³ = x² * x (1 multiplication)
+<a href=#306 id=306 data-nosnippet>306</a>    /// - x⁶ = (x³)² (1 squaring)
+<a href=#307 id=307 data-nosnippet>307</a>    /// - x⁷ = x⁶ * x (1 multiplication)
+<a href=#308 id=308 data-nosnippet>308</a>    ///
+<a href=#309 id=309 data-nosnippet>309</a>    /// Total: 2 squarings + 2 multiplications
+<a href=#310 id=310 data-nosnippet>310</a>    </span><span class="attr">#[inline(always)]
+<a href=#311 id=311 data-nosnippet>311</a>    </span><span class="kw">pub fn </span>power7(a: [Felt; <span class="number">3</span>]) -&gt; [Felt; <span class="number">3</span>] {
+<a href=#312 id=312 data-nosnippet>312</a>        <span class="kw">let </span>a2 = square(a);
+<a href=#313 id=313 data-nosnippet>313</a>        <span class="kw">let </span>a3 = mul(a2, a);
+<a href=#314 id=314 data-nosnippet>314</a>        <span class="kw">let </span>a6 = square(a3);
+<a href=#315 id=315 data-nosnippet>315</a>        mul(a6, a)
+<a href=#316 id=316 data-nosnippet>316</a>    }
+<a href=#317 id=317 data-nosnippet>317</a>}
+<a href=#318 id=318 data-nosnippet>318</a>
+<a href=#319 id=319 data-nosnippet>319</a><span class="comment">// PLONKY3 INTEGRATION
+<a href=#320 id=320 data-nosnippet>320</a>// ================================================================================================
+<a href=#321 id=321 data-nosnippet>321</a>
+<a href=#322 id=322 data-nosnippet>322</a></span><span class="doccomment">/// Plonky3-compatible RPX permutation implementation.
+<a href=#323 id=323 data-nosnippet>323</a>///
+<a href=#324 id=324 data-nosnippet>324</a>/// This module provides a Plonky3-compatible interface to the RPX256 hash function,
+<a href=#325 id=325 data-nosnippet>325</a>/// implementing the `Permutation` and `CryptographicPermutation` traits from Plonky3.
+<a href=#326 id=326 data-nosnippet>326</a>///
+<a href=#327 id=327 data-nosnippet>327</a>/// This allows RPX to be used with Plonky3's cryptographic infrastructure, including:
+<a href=#328 id=328 data-nosnippet>328</a>/// - PaddingFreeSponge for hashing
+<a href=#329 id=329 data-nosnippet>329</a>/// - TruncatedPermutation for compression
+<a href=#330 id=330 data-nosnippet>330</a>/// - DuplexChallenger for Fiat-Shamir transforms
+<a href=#331 id=331 data-nosnippet>331</a></span><span class="kw">use </span>p3_challenger::DuplexChallenger;
+<a href=#332 id=332 data-nosnippet>332</a><span class="kw">use </span>p3_symmetric::{
+<a href=#333 id=333 data-nosnippet>333</a>    CryptographicPermutation, PaddingFreeSponge, Permutation, TruncatedPermutation,
+<a href=#334 id=334 data-nosnippet>334</a>};
+<a href=#335 id=335 data-nosnippet>335</a>
+<a href=#336 id=336 data-nosnippet>336</a><span class="comment">// RPX PERMUTATION FOR PLONKY3
+<a href=#337 id=337 data-nosnippet>337</a>// ================================================================================================
+<a href=#338 id=338 data-nosnippet>338</a>
+<a href=#339 id=339 data-nosnippet>339</a></span><span class="doccomment">/// Plonky3-compatible RPX permutation.
+<a href=#340 id=340 data-nosnippet>340</a>///
+<a href=#341 id=341 data-nosnippet>341</a>/// This struct wraps the RPX256 permutation and implements Plonky3's `Permutation` and
+<a href=#342 id=342 data-nosnippet>342</a>/// `CryptographicPermutation` traits, allowing RPX to be used within the Plonky3 ecosystem.
+<a href=#343 id=343 data-nosnippet>343</a>///
+<a href=#344 id=344 data-nosnippet>344</a>/// The permutation operates on a state of 12 field elements (STATE_WIDTH = 12), with:
+<a href=#345 id=345 data-nosnippet>345</a>/// - Rate: 8 elements (positions 0-7)
+<a href=#346 id=346 data-nosnippet>346</a>/// - Capacity: 4 elements (positions 8-11)
+<a href=#347 id=347 data-nosnippet>347</a>/// - Digest output: 4 elements (positions 0-3)
+<a href=#348 id=348 data-nosnippet>348</a></span><span class="attr">#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+<a href=#349 id=349 data-nosnippet>349</a></span><span class="kw">pub struct </span>RpxPermutation256;
+<a href=#350 id=350 data-nosnippet>350</a>
+<a href=#351 id=351 data-nosnippet>351</a><span class="kw">impl </span>RpxPermutation256 {
+<a href=#352 id=352 data-nosnippet>352</a>    <span class="comment">// CONSTANTS
+<a href=#353 id=353 data-nosnippet>353</a>    // --------------------------------------------------------------------------------------------
+<a href=#354 id=354 data-nosnippet>354</a>
+<a href=#355 id=355 data-nosnippet>355</a>    </span><span class="doccomment">/// Sponge state is set to 12 field elements or 768 bytes; 8 elements are reserved for rate and
+<a href=#356 id=356 data-nosnippet>356</a>    /// the remaining 4 elements are reserved for capacity.
+<a href=#357 id=357 data-nosnippet>357</a>    </span><span class="kw">pub const </span>STATE_WIDTH: usize = STATE_WIDTH;
+<a href=#358 id=358 data-nosnippet>358</a>
+<a href=#359 id=359 data-nosnippet>359</a>    <span class="doccomment">/// The rate portion of the state is located in elements 0 through 7 (inclusive).
+<a href=#360 id=360 data-nosnippet>360</a>    </span><span class="kw">pub const </span>RATE_RANGE: Range&lt;usize&gt; = Rpx256::RATE_RANGE;
+<a href=#361 id=361 data-nosnippet>361</a>
+<a href=#362 id=362 data-nosnippet>362</a>    <span class="doccomment">/// The capacity portion of the state is located in elements 8, 9, 10, and 11.
+<a href=#363 id=363 data-nosnippet>363</a>    </span><span class="kw">pub const </span>CAPACITY_RANGE: Range&lt;usize&gt; = Rpx256::CAPACITY_RANGE;
+<a href=#364 id=364 data-nosnippet>364</a>
+<a href=#365 id=365 data-nosnippet>365</a>    <span class="doccomment">/// The output of the hash function can be read from state elements 0, 1, 2, and 3 (the first
+<a href=#366 id=366 data-nosnippet>366</a>    /// word of the state).
+<a href=#367 id=367 data-nosnippet>367</a>    </span><span class="kw">pub const </span>DIGEST_RANGE: Range&lt;usize&gt; = Rpx256::DIGEST_RANGE;
+<a href=#368 id=368 data-nosnippet>368</a>
+<a href=#369 id=369 data-nosnippet>369</a>    <span class="comment">// RPX PERMUTATION
+<a href=#370 id=370 data-nosnippet>370</a>    // --------------------------------------------------------------------------------------------
+<a href=#371 id=371 data-nosnippet>371</a>
+<a href=#372 id=372 data-nosnippet>372</a>    </span><span class="doccomment">/// Applies RPX permutation to the provided state.
+<a href=#373 id=373 data-nosnippet>373</a>    ///
+<a href=#374 id=374 data-nosnippet>374</a>    /// This delegates to the RPX256 implementation.
+<a href=#375 id=375 data-nosnippet>375</a>    </span><span class="attr">#[inline(always)]
+<a href=#376 id=376 data-nosnippet>376</a>    </span><span class="kw">pub fn </span>apply_permutation(state: <span class="kw-2">&amp;mut </span>[Felt; STATE_WIDTH]) {
+<a href=#377 id=377 data-nosnippet>377</a>        Rpx256::apply_permutation(state);
+<a href=#378 id=378 data-nosnippet>378</a>    }
+<a href=#379 id=379 data-nosnippet>379</a>}
+<a href=#380 id=380 data-nosnippet>380</a>
+<a href=#381 id=381 data-nosnippet>381</a><span class="comment">// PLONKY3 TRAIT IMPLEMENTATIONS
+<a href=#382 id=382 data-nosnippet>382</a>// ================================================================================================
+<a href=#383 id=383 data-nosnippet>383</a>
+<a href=#384 id=384 data-nosnippet>384</a></span><span class="kw">impl </span>Permutation&lt;[Felt; STATE_WIDTH]&gt; <span class="kw">for </span>RpxPermutation256 {
+<a href=#385 id=385 data-nosnippet>385</a>    <span class="kw">fn </span>permute_mut(<span class="kw-2">&amp;</span><span class="self">self</span>, state: <span class="kw-2">&amp;mut </span>[Felt; STATE_WIDTH]) {
+<a href=#386 id=386 data-nosnippet>386</a>        <span class="self">Self</span>::apply_permutation(state);
+<a href=#387 id=387 data-nosnippet>387</a>    }
+<a href=#388 id=388 data-nosnippet>388</a>}
+<a href=#389 id=389 data-nosnippet>389</a>
+<a href=#390 id=390 data-nosnippet>390</a><span class="kw">impl </span>CryptographicPermutation&lt;[Felt; STATE_WIDTH]&gt; <span class="kw">for </span>RpxPermutation256 {}
+<a href=#391 id=391 data-nosnippet>391</a>
+<a href=#392 id=392 data-nosnippet>392</a><span class="comment">// TYPE ALIASES FOR PLONKY3 INTEGRATION
+<a href=#393 id=393 data-nosnippet>393</a>// ================================================================================================
+<a href=#394 id=394 data-nosnippet>394</a>
+<a href=#395 id=395 data-nosnippet>395</a></span><span class="doccomment">/// RPX-based hasher using Plonky3's PaddingFreeSponge.
+<a href=#396 id=396 data-nosnippet>396</a>///
+<a href=#397 id=397 data-nosnippet>397</a>/// This provides a sponge-based hash function with:
+<a href=#398 id=398 data-nosnippet>398</a>/// - WIDTH: 12 field elements (total state size)
+<a href=#399 id=399 data-nosnippet>399</a>/// - RATE: 8 field elements (input/output rate)
+<a href=#400 id=400 data-nosnippet>400</a>/// - OUT: 4 field elements (digest size)
+<a href=#401 id=401 data-nosnippet>401</a></span><span class="kw">pub type </span>RpxHasher = PaddingFreeSponge&lt;RpxPermutation256, <span class="number">12</span>, <span class="number">8</span>, <span class="number">4</span>&gt;;
+<a href=#402 id=402 data-nosnippet>402</a>
+<a href=#403 id=403 data-nosnippet>403</a><span class="doccomment">/// RPX-based compression function using Plonky3's TruncatedPermutation.
+<a href=#404 id=404 data-nosnippet>404</a>///
+<a href=#405 id=405 data-nosnippet>405</a>/// This provides a 2-to-1 compression function for Merkle tree construction with:
+<a href=#406 id=406 data-nosnippet>406</a>/// - CHUNK: 2 (number of input chunks - i.e., 2 digests of 4 elements each = 8 elements)
+<a href=#407 id=407 data-nosnippet>407</a>/// - N: 4 (output size in field elements)
+<a href=#408 id=408 data-nosnippet>408</a>/// - WIDTH: 12 (total state size)
+<a href=#409 id=409 data-nosnippet>409</a>///
+<a href=#410 id=410 data-nosnippet>410</a>/// The compression function takes 8 field elements (2 digests) as input and produces
+<a href=#411 id=411 data-nosnippet>411</a>/// 4 field elements (1 digest) as output.
+<a href=#412 id=412 data-nosnippet>412</a></span><span class="kw">pub type </span>RpxCompression = TruncatedPermutation&lt;RpxPermutation256, <span class="number">2</span>, <span class="number">4</span>, <span class="number">12</span>&gt;;
+<a href=#413 id=413 data-nosnippet>413</a>
+<a href=#414 id=414 data-nosnippet>414</a><span class="doccomment">/// RPX-based challenger using Plonky3's DuplexChallenger.
+<a href=#415 id=415 data-nosnippet>415</a>///
+<a href=#416 id=416 data-nosnippet>416</a>/// This provides a Fiat-Shamir transform implementation for interactive proof protocols,
+<a href=#417 id=417 data-nosnippet>417</a>/// with:
+<a href=#418 id=418 data-nosnippet>418</a>/// - F: Generic field type (typically the same as Felt)
+<a href=#419 id=419 data-nosnippet>419</a>/// - WIDTH: 12 field elements (sponge state size)
+<a href=#420 id=420 data-nosnippet>420</a>/// - RATE: 8 field elements (rate of absorption/squeezing)
+<a href=#421 id=421 data-nosnippet>421</a></span><span class="kw">pub type </span>RpxChallenger&lt;F&gt; = DuplexChallenger&lt;F, RpxPermutation256, <span class="number">12</span>, <span class="number">8</span>&gt;;
 </code></pre></div></section></main></body></html>

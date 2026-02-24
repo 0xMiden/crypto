@@ -20,7 +20,7 @@
 <a href=#20 id=20 data-nosnippet>20</a><span class="kw">pub const </span>WORD_SIZE_BYTES: usize = <span class="number">32</span>;
 <a href=#21 id=21 data-nosnippet>21</a>
 <a href=#22 id=22 data-nosnippet>22</a><span class="attr">#[cfg(not(all(target_family = <span class="string">"wasm"</span>, miden)))]
-<a href=#23 id=23 data-nosnippet>23</a></span><span class="kw">use </span>p3_field::{PrimeCharacteristicRing, PrimeField64, integers::QuotientMap};
+<a href=#23 id=23 data-nosnippet>23</a></span><span class="kw">use </span>p3_field::integers::QuotientMap;
 <a href=#24 id=24 data-nosnippet>24</a>
 <a href=#25 id=25 data-nosnippet>25</a><span class="kw">use </span><span class="kw">super</span>::Felt;
 <a href=#26 id=26 data-nosnippet>26</a><span class="kw">use </span><span class="kw">crate</span>::utils::bytes_to_hex_string;
@@ -175,7 +175,7 @@
 <a href=#175 id=175 data-nosnippet>175</a>        // This matches the behavior of `Word::try_from(String)`.
 <a href=#176 id=176 data-nosnippet>176</a>        </span><span class="kw">let </span><span class="kw-2">mut </span>idx = <span class="number">0</span>;
 <a href=#177 id=177 data-nosnippet>177</a>        <span class="kw">while </span>idx &lt; felts.len() {
-<a href=#178 id=178 data-nosnippet>178</a>            <span class="kw">if </span>felts[idx] &gt;= Felt::ORDER_U64 {
+<a href=#178 id=178 data-nosnippet>178</a>            <span class="kw">if </span>felts[idx] &gt;= Felt::ORDER {
 <a href=#179 id=179 data-nosnippet>179</a>                <span class="kw">return </span><span class="prelude-val">Err</span>(<span class="string">"Felt overflow"</span>);
 <a href=#180 id=180 data-nosnippet>180</a>            }
 <a href=#181 id=181 data-nosnippet>181</a>            idx += <span class="number">1</span>;
@@ -710,7 +710,7 @@
 <a href=#710 id=710 data-nosnippet>710</a>        <span class="kw">let </span><span class="kw-2">mut </span>inner: [Felt; WORD_SIZE_FELTS] = [Felt::ZERO; WORD_SIZE_FELTS];
 <a href=#711 id=711 data-nosnippet>711</a>        <span class="kw">for </span>inner <span class="kw">in </span>inner.iter_mut() {
 <a href=#712 id=712 data-nosnippet>712</a>            <span class="kw">let </span>e = source.read_u64()<span class="question-mark">?</span>;
-<a href=#713 id=713 data-nosnippet>713</a>            <span class="kw">if </span>e &gt;= Felt::ORDER_U64 {
+<a href=#713 id=713 data-nosnippet>713</a>            <span class="kw">if </span>e &gt;= Felt::ORDER {
 <a href=#714 id=714 data-nosnippet>714</a>                <span class="kw">return </span><span class="prelude-val">Err</span>(DeserializationError::InvalidValue(String::from(
 <a href=#715 id=715 data-nosnippet>715</a>                    <span class="string">"value not in the appropriate range"</span>,
 <a href=#716 id=716 data-nosnippet>716</a>                )));
