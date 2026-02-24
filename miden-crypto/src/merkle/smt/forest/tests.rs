@@ -180,7 +180,7 @@ fn test_empty_word_removes_key() -> Result<(), MerkleError> {
     let root_after_remove = forest.insert(root_with_value, key, EMPTY_WORD)?;
 
     assert_eq!(root_after_remove, empty_root);
-    assert!(!forest.leaves.contains_key(&key));
+    assert!(forest.leaves.get(&key).is_none());
 
     Ok(())
 }
