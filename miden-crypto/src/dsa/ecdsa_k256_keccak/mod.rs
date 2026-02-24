@@ -366,7 +366,11 @@ impl Deserializable for Signature {
         let s: [u8; SCALARS_SIZE_BYTES] = source.read_array()?;
         let v: u8 = source.read_u8()?;
 
-        Ok(Signature { r, s, v })
+        if v > 3 {
+            Err(DeserializationError::InvalidValue(r#"Invalid recovery ID"#.to_string()))
+        } else {
+            Ok(Signature { r, s, v })
+        }
     }
 }
 
