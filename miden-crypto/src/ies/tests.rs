@@ -230,6 +230,8 @@ mod k256_xchacha_tests {
 
 /// X25519 + XChaCha20-Poly1305 test suite
 mod x25519_xchacha_tests {
+    use curve25519_dalek::{constants::EIGHT_TORSION, montgomery::MontgomeryPoint};
+
     use super::*;
 
     #[test]
@@ -312,6 +314,41 @@ mod x25519_xchacha_tests {
             .unwrap();
         let unsealing_key = UnsealingKey::X25519XChaCha20Poly1305(secret_key);
         let result = unsealing_key.unseal_bytes_with_associated_data(sealed, incorrect_ad);
+        assert!(result.is_err());
+    }
+
+    // Scenario: if anti-replay is based on sealed-message bytes rather than decrypted identity,
+    // malleability would allow repeated redemption of the same underlying coupon.
+    #[test]
+    fn test_x25519_ephemeral_torsion_rejected() {
+        let mut rng = rand::rng();
+        let plaintext = b"malleability check";
+
+        let secret_key = SecretKey25519::with_rng(&mut rng);
+        let public_key = secret_key.public_key();
+        let sealing_key = SealingKey::X25519XChaCha20Poly1305(public_key);
+        let unsealing_key = UnsealingKey::X25519XChaCha20Poly1305(secret_key);
+
+        let mut sealed = sealing_key.seal_bytes(&mut rng, plaintext).unwrap();
+
+        let eph_bytes = sealed.ephemeral_key.to_bytes();
+        let mut eph_array = [0u8; 32];
+        eph_array.copy_from_slice(&eph_bytes);
+
+        let mont = MontgomeryPoint(eph_array);
+        let edwards = mont.to_edwards(0).expect("ephemeral key should be on Curve25519");
+
+        let torsion = EIGHT_TORSION[1];
+        let altered = (edwards + torsion).to_montgomery().to_bytes();
+
+        assert_ne!(altered, eph_array);
+
+        let altered_key =
+            EphemeralPublicKey::from_bytes(IesScheme::X25519XChaCha20Poly1305, &altered).unwrap();
+
+        sealed.ephemeral_key = altered_key;
+
+        let result = unsealing_key.unseal_bytes(sealed);
         assert!(result.is_err());
     }
 

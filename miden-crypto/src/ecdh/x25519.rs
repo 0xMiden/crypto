@@ -155,6 +155,17 @@ impl Serializable for EphemeralPublicKey {
 impl Deserializable for EphemeralPublicKey {
     fn read_from<R: ByteReader>(source: &mut R) -> Result<Self, DeserializationError> {
         let bytes: [u8; 32] = source.read_array()?;
+        // Reject twist points and low-order points. We intentionally avoid the more expensive
+        // torsion-free check; small-order rejection mitigates the most dangerous malleability
+        // issues, even though it does not guarantee torsion-freeness.
+        let mont = curve25519_dalek::montgomery::MontgomeryPoint(bytes);
+        let edwards = mont.to_edwards(0).ok_or_else(|| {
+            DeserializationError::InvalidValue("Invalid X25519 public key".into())
+        })?;
+        if edwards.is_small_order() {
+            return Err(DeserializationError::InvalidValue("Invalid X25519 public key".into()));
+        }
+
         Ok(Self {
             inner: x25519_dalek::PublicKey::from(bytes),
         })
@@ -188,23 +199,28 @@ impl KeyAgreementScheme for X25519 {
         ephemeral_sk: Self::EphemeralSecretKey,
         static_pk: &Self::PublicKey,
     ) -> Result<Self::SharedSecret, super::KeyAgreementError> {
-        Ok(ephemeral_sk.diffie_hellman(static_pk))
+        let shared = ephemeral_sk.diffie_hellman(static_pk);
+        debug_assert!(!shared.as_ref().iter().all(|byte| *byte == 0), "all-zero shared secret");
+        Ok(shared)
     }
 
     fn exchange_static_ephemeral(
         static_sk: &Self::SecretKey,
         ephemeral_pk: &Self::EphemeralPublicKey,
     ) -> Result<Self::SharedSecret, super::KeyAgreementError> {
-        Ok(static_sk.get_shared_secret(ephemeral_pk.clone()))
+        let shared = static_sk.get_shared_secret(ephemeral_pk.clone());
+        debug_assert!(!shared.as_ref().iter().all(|byte| *byte == 0), "all-zero shared secret");
+        Ok(shared)
     }
 
     fn extract_key_material(
         shared_secret: &Self::SharedSecret,
         length: usize,
+        info: &[u8],
     ) -> Result<Vec<u8>, super::KeyAgreementError> {
         let hkdf = shared_secret.extract(None);
         let mut buf = vec![0_u8; length];
-        hkdf.expand(&[], &mut buf)
+        hkdf.expand(info, &mut buf)
             .map_err(|_| super::KeyAgreementError::HkdfExpansionFailed)?;
         Ok(buf)
     }
@@ -215,8 +231,12 @@ impl KeyAgreementScheme for X25519 {
 
 #[cfg(test)]
 mod tests {
+    use curve25519_dalek::{constants::EIGHT_TORSION, montgomery::MontgomeryPoint};
+
     use super::*;
-    use crate::{dsa::eddsa_25519_sha512::SecretKey, rand::test_utils::seeded_rng};
+    use crate::{
+        dsa::eddsa_25519_sha512::SecretKey, rand::test_utils::seeded_rng, utils::Deserializable,
+    };
 
     #[test]
     fn key_agreement() {
@@ -241,5 +261,31 @@ mod tests {
 
         // Check that the computed shared secret keys are equal
         assert_eq!(shared_secret_key_1.inner.to_bytes(), shared_secret_key_2.inner.to_bytes());
+    }
+
+    #[test]
+    fn ephemeral_public_key_rejects_small_order() {
+        let bytes = EIGHT_TORSION[1].to_montgomery().to_bytes();
+        let result = EphemeralPublicKey::read_from_bytes(&bytes);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn ephemeral_public_key_rejects_twist_point() {
+        let bytes = find_twist_point_bytes();
+        let result = EphemeralPublicKey::read_from_bytes(&bytes);
+        assert!(result.is_err());
+    }
+
+    fn find_twist_point_bytes() -> [u8; 32] {
+        let mut bytes = [0u8; 32];
+        for i in 0u16..=u16::MAX {
+            bytes[0] = (i & 0xff) as u8;
+            bytes[1] = (i >> 8) as u8;
+            if MontgomeryPoint(bytes).to_edwards(0).is_none() {
+                return bytes;
+            }
+        }
+        panic!("no twist point found in 16-bit search space");
     }
 }
