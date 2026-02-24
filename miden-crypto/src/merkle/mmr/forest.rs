@@ -6,7 +6,6 @@ use core::{
 use super::InOrderIndex;
 use crate::{
     Felt,
-    field::PrimeField64,
     utils::{ByteReader, ByteWriter, Deserializable, DeserializationError, Serializable},
 };
 

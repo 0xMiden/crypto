@@ -6,7 +6,7 @@ use super::{
     Felt, HasherExt,
     digest::{DIGEST256_BYTES, Digest256},
 };
-use crate::field::{BasedVectorSpace, PrimeField64};
+use crate::field::BasedVectorSpace;
 
 #[cfg(test)]
 mod tests;

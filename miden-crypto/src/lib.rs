@@ -5,8 +5,6 @@ extern crate alloc;
 #[cfg(feature = "std")]
 extern crate std;
 
-use field::PrimeCharacteristicRing;
-
 pub mod aead;
 pub mod dsa;
 pub mod ecdh;

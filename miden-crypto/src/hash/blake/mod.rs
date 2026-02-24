@@ -4,10 +4,7 @@ use super::{
     HasherExt,
     digest::{Digest, Digest192, Digest256},
 };
-use crate::{
-    Felt,
-    field::{BasedVectorSpace, PrimeField64},
-};
+use crate::{Felt, field::BasedVectorSpace};
 
 #[cfg(test)]
 mod tests;

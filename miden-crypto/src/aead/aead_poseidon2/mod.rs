@@ -12,7 +12,6 @@ use core::ops::Range;
 
 use miden_crypto_derive::{SilentDebug, SilentDisplay};
 use num::Integer;
-use p3_field::{PrimeField64, RawDataSerializable};
 use rand::{
     Rng,
     distr::{Distribution, StandardUniform, Uniform},
@@ -425,7 +424,7 @@ impl Distribution<SecretKey> for StandardUniform {
     fn sample<R: rand::Rng + ?Sized>(&self, rng: &mut R) -> SecretKey {
         let mut res = [ZERO; SECRET_KEY_SIZE];
         let uni_dist =
-            Uniform::new(0, Felt::ORDER_U64).expect("should not fail given the size of the field");
+            Uniform::new(0, Felt::ORDER).expect("should not fail given the size of the field");
         for r in res.iter_mut() {
             let sampled_integer = uni_dist.sample(rng);
             *r = Felt::new(sampled_integer);
@@ -593,7 +592,7 @@ impl Distribution<Nonce> for StandardUniform {
     fn sample<R: rand::Rng + ?Sized>(&self, rng: &mut R) -> Nonce {
         let mut res = [ZERO; NONCE_SIZE];
         let uni_dist =
-            Uniform::new(0, Felt::ORDER_U64).expect("should not fail given the size of the field");
+            Uniform::new(0, Felt::ORDER).expect("should not fail given the size of the field");
         for r in res.iter_mut() {
             let sampled_integer = uni_dist.sample(rng);
             *r = Felt::new(sampled_integer);

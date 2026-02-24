@@ -1,7 +1,6 @@
 use alloc::collections::{BTreeMap, BTreeSet};
 
 use assert_matches::assert_matches;
-use p3_field::PrimeField64;
 use proptest::prelude::*;
 use rand::{Rng, SeedableRng};
 use rand_chacha::ChaCha20Rng;
@@ -23,10 +22,10 @@ use crate::{
 /// This is used for deterministic tests that need reproducible sequences of random values.
 fn random_word<R: Rng>(rng: &mut R) -> Word {
     Word::new([
-        Felt::new(rng.random::<u64>() % Felt::ORDER_U64),
-        Felt::new(rng.random::<u64>() % Felt::ORDER_U64),
-        Felt::new(rng.random::<u64>() % Felt::ORDER_U64),
-        Felt::new(rng.random::<u64>() % Felt::ORDER_U64),
+        Felt::new(rng.random::<u64>() % Felt::ORDER),
+        Felt::new(rng.random::<u64>() % Felt::ORDER),
+        Felt::new(rng.random::<u64>() % Felt::ORDER),
+        Felt::new(rng.random::<u64>() % Felt::ORDER),
     ])
 }
 

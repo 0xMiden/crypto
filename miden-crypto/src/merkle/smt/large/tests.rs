@@ -1,12 +1,10 @@
 use alloc::{collections::BTreeSet, vec::Vec};
 
-use p3_field::PrimeCharacteristicRing;
 use rand::{Rng, prelude::IteratorRandom, rng};
 
 use super::MemoryStorage;
 use crate::{
     EMPTY_WORD, Felt, ONE, WORD_SIZE, Word,
-    field::PrimeField64,
     merkle::{
         InnerNodeInfo,
         smt::{

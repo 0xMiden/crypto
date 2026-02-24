@@ -8,6 +8,9 @@ use core::{
     ops::{Add, AddAssign, Deref, DerefMut, Div, DivAssign, Mul, MulAssign, Neg, Sub, SubAssign},
 };
 
+use miden_serde_utils::{
+    ByteReader, ByteWriter, Deserializable, DeserializationError, Serializable,
+};
 use num_bigint::BigUint;
 use p3_challenger::UniformSamplingField;
 use p3_field::{
@@ -24,12 +27,27 @@ use rand::{
     distr::{Distribution, StandardUniform},
 };
 
+#[cfg(test)]
+mod tests;
+
+// FELT
+// ================================================================================================
+
 /// A `Felt` backed by Plonky3's Goldilocks field element.
 #[derive(Copy, Clone, Default, serde::Serialize, serde::Deserialize)]
 #[repr(transparent)]
 pub struct Felt(Goldilocks);
 
 impl Felt {
+    /// Order of the field.
+    pub const ORDER: u64 = <Goldilocks as PrimeField64>::ORDER_U64;
+
+    pub const ZERO: Self = Self(Goldilocks::ZERO);
+    pub const ONE: Self = Self(Goldilocks::ONE);
+
+    /// The number of bytes which this field element occupies in memory.
+    pub const NUM_BYTES: usize = Goldilocks::NUM_BYTES;
+
     /// Creates a new field element from any `u64`.
     ///
     /// Any `u64` value is accepted. No reduction is performed since Goldilocks uses a
@@ -38,30 +56,100 @@ impl Felt {
     pub const fn new(value: u64) -> Self {
         Self(Goldilocks::new(value))
     }
-}
 
-impl miden_serde_utils::Serializable for Felt {
-    fn write_into<W: miden_serde_utils::ByteWriter>(&self, target: &mut W) {
-        target.write_u64(self.as_canonical_u64());
+    #[inline]
+    pub fn from_u8(value: u8) -> Self {
+        <Self as PrimeCharacteristicRing>::from_u8(value)
     }
 
-    fn get_size_hint(&self) -> usize {
-        core::mem::size_of::<u64>()
+    #[inline]
+    pub fn from_u16(value: u16) -> Self {
+        <Self as PrimeCharacteristicRing>::from_u16(value)
+    }
+
+    #[inline]
+    pub fn from_u32(value: u32) -> Self {
+        <Self as PrimeCharacteristicRing>::from_u32(value)
+    }
+
+    /// The elementary function `double(a) = 2*a`.
+    #[inline]
+    pub fn double(&self) -> Self {
+        <Self as PrimeCharacteristicRing>::double(self)
+    }
+
+    /// The elementary function `square(a) = a^2`.
+    #[inline]
+    pub fn square(&self) -> Self {
+        <Self as PrimeCharacteristicRing>::square(self)
+    }
+
+    /// Exponentiation by a `u64` power.
+    #[inline]
+    pub fn exp_u64(&self, power: u64) -> Self {
+        <Self as PrimeCharacteristicRing>::exp_u64(self, power)
+    }
+
+    /// Exponentiation by a small constant power.
+    #[inline]
+    pub fn exp_const_u64<const POWER: u64>(&self) -> Self {
+        <Self as PrimeCharacteristicRing>::exp_const_u64::<POWER>(self)
+    }
+
+    /// Return the representative of element in canonical form which lies in the range
+    /// `0 <= x < ORDER`.
+    #[inline]
+    pub fn as_canonical_u64(&self) -> u64 {
+        <Self as PrimeField64>::as_canonical_u64(self)
     }
 }
 
-impl miden_serde_utils::Deserializable for Felt {
-    fn read_from<R: miden_serde_utils::ByteReader>(
-        source: &mut R,
-    ) -> Result<Self, miden_serde_utils::DeserializationError> {
-        let value = source.read_u64()?;
-        Self::from_canonical_checked(value).ok_or_else(|| {
-            miden_serde_utils::DeserializationError::InvalidValue(format!(
-                "value {value} is not a valid felt"
-            ))
-        })
+impl fmt::Display for Felt {
+    #[inline]
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        fmt::Display::fmt(&self.0, f)
     }
 }
+
+impl fmt::Debug for Felt {
+    #[inline]
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        fmt::Debug::fmt(&self.0, f)
+    }
+}
+
+impl Hash for Felt {
+    #[inline]
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        state.write_u64(self.as_canonical_u64());
+    }
+}
+
+// FIELD
+// ================================================================================================
+
+impl Field for Felt {
+    type Packing = Self;
+
+    const GENERATOR: Self = Self(Goldilocks::GENERATOR);
+
+    #[inline]
+    fn is_zero(&self) -> bool {
+        self.0.is_zero()
+    }
+
+    #[inline]
+    fn try_inverse(&self) -> Option<Self> {
+        self.0.try_inverse().map(Self)
+    }
+
+    #[inline]
+    fn order() -> BigUint {
+        <Goldilocks as Field>::order()
+    }
+}
+
+impl Packable for Felt {}
 
 impl PrimeCharacteristicRing for Felt {
     type PrimeSubfield = Goldilocks;
@@ -243,29 +331,6 @@ impl RawDataSerializable for Felt {
     impl_raw_serializable_primefield64!();
 }
 
-impl Packable for Felt {}
-
-impl Field for Felt {
-    type Packing = Self;
-
-    const GENERATOR: Self = Self(Goldilocks::GENERATOR);
-
-    #[inline]
-    fn is_zero(&self) -> bool {
-        self.0.is_zero()
-    }
-
-    #[inline]
-    fn try_inverse(&self) -> Option<Self> {
-        self.0.try_inverse().map(Self)
-    }
-
-    #[inline]
-    fn order() -> BigUint {
-        <Goldilocks as Field>::order()
-    }
-}
-
 impl Distribution<Felt> for StandardUniform {
     #[inline]
     fn sample<R: Rng + ?Sized>(&self, rng: &mut R) -> Felt {
@@ -288,6 +353,9 @@ impl PermutationMonomial<7> for Felt {
         Self(self.0.injective_exp_root_n())
     }
 }
+
+// CONVERSIONS
+// ================================================================================================
 
 impl Deref for Felt {
     type Target = Goldilocks;
@@ -318,6 +386,9 @@ impl From<Felt> for Goldilocks {
         value.0
     }
 }
+
+// ARITHMETIC OPERATIONS
+// ================================================================================================
 
 impl Add for Felt {
     type Output = Self;
@@ -392,6 +463,37 @@ impl Neg for Felt {
     }
 }
 
+impl Sum for Felt {
+    #[inline]
+    fn sum<I: Iterator<Item = Self>>(iter: I) -> Self {
+        Self(iter.map(|x| x.0).sum())
+    }
+}
+
+impl<'a> Sum<&'a Felt> for Felt {
+    #[inline]
+    fn sum<I: Iterator<Item = &'a Felt>>(iter: I) -> Self {
+        Self(iter.map(|x| x.0).sum())
+    }
+}
+
+impl Product for Felt {
+    #[inline]
+    fn product<I: Iterator<Item = Self>>(iter: I) -> Self {
+        Self(iter.map(|x| x.0).product())
+    }
+}
+
+impl<'a> Product<&'a Felt> for Felt {
+    #[inline]
+    fn product<I: Iterator<Item = &'a Felt>>(iter: I) -> Self {
+        Self(iter.map(|x| x.0).product())
+    }
+}
+
+// EQUALITY AND COMPARISON OPERATIONS
+// ================================================================================================
+
 impl PartialEq for Felt {
     #[inline]
     fn eq(&self, other: &Self) -> bool {
@@ -422,52 +524,25 @@ impl Ord for Felt {
     }
 }
 
-impl fmt::Display for Felt {
-    #[inline]
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        fmt::Display::fmt(&self.0, f)
+// SERIALIZATION
+// ================================================================================================
+
+impl Serializable for Felt {
+    fn write_into<W: ByteWriter>(&self, target: &mut W) {
+        target.write_u64(self.as_canonical_u64());
+    }
+
+    fn get_size_hint(&self) -> usize {
+        core::mem::size_of::<u64>()
     }
 }
 
-impl fmt::Debug for Felt {
-    #[inline]
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        fmt::Debug::fmt(&self.0, f)
-    }
-}
-
-impl Hash for Felt {
-    #[inline]
-    fn hash<H: Hasher>(&self, state: &mut H) {
-        state.write_u64(self.as_canonical_u64());
-    }
-}
-
-impl Sum for Felt {
-    #[inline]
-    fn sum<I: Iterator<Item = Self>>(iter: I) -> Self {
-        Self(iter.map(|x| x.0).sum())
-    }
-}
-
-impl<'a> Sum<&'a Felt> for Felt {
-    #[inline]
-    fn sum<I: Iterator<Item = &'a Felt>>(iter: I) -> Self {
-        Self(iter.map(|x| x.0).sum())
-    }
-}
-
-impl Product for Felt {
-    #[inline]
-    fn product<I: Iterator<Item = Self>>(iter: I) -> Self {
-        Self(iter.map(|x| x.0).product())
-    }
-}
-
-impl<'a> Product<&'a Felt> for Felt {
-    #[inline]
-    fn product<I: Iterator<Item = &'a Felt>>(iter: I) -> Self {
-        Self(iter.map(|x| x.0).product())
+impl Deserializable for Felt {
+    fn read_from<R: ByteReader>(source: &mut R) -> Result<Self, DeserializationError> {
+        let value = source.read_u64()?;
+        Self::from_canonical_checked(value).ok_or_else(|| {
+            DeserializationError::InvalidValue(format!("value {value} is not a valid felt"))
+        })
     }
 }
 
@@ -476,7 +551,6 @@ impl<'a> Product<&'a Felt> for Felt {
 
 #[cfg(all(any(test, feature = "testing"), not(all(target_family = "wasm", miden))))]
 mod arbitrary {
-    use p3_field::PrimeField64;
     use proptest::prelude::*;
 
     use super::Felt;
@@ -486,18 +560,12 @@ mod arbitrary {
         type Strategy = BoxedStrategy<Self>;
 
         fn arbitrary_with(_args: Self::Parameters) -> Self::Strategy {
-            let canonical = (0u64..Felt::ORDER_U64).prop_map(Felt::new).boxed();
+            let canonical = (0u64..Felt::ORDER).prop_map(Felt::new).boxed();
             // Goldilocks uses representation where values above the field order are valid and
             // represent wrapped field elements. Generate such values 1/5 of the time to exercise
             // this behavior.
-            let non_canonical = (Felt::ORDER_U64..=u64::MAX).prop_map(Felt::new).boxed();
+            let non_canonical = (Felt::ORDER..=u64::MAX).prop_map(Felt::new).boxed();
             prop_oneof![4 => canonical, 1 => non_canonical].no_shrink().boxed()
         }
     }
 }
-
-// TESTS
-// ================================================================================================
-
-#[cfg(test)]
-mod tests;

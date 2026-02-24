@@ -10,10 +10,9 @@ pub use miden_serde_utils::{
     BudgetedReader, ByteReader, ByteWriter, Deserializable, DeserializationError, Serializable,
     SliceReader,
 };
-use p3_field::{PrimeCharacteristicRing, RawDataSerializable, integers::QuotientMap};
 use p3_maybe_rayon::prelude::*;
 
-use crate::{Felt, Word, field::PrimeField64};
+use crate::{Felt, Word, field::QuotientMap};
 
 // CONSTANTS
 // ================================================================================================

@@ -1,6 +1,6 @@
 use alloc::{string::ToString, vec::Vec};
 
-use p3_field::{ExtensionField, PrimeField64};
+use p3_field::ExtensionField;
 use rand_core::impls;
 
 use super::{Felt, FeltRng, RngCore, Word};
