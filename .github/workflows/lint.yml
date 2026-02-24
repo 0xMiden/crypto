@@ -42,11 +42,6 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      # Added: LLVM/Clang for RocksDB/bindgen
-      - name: Install LLVM/Clang
-        uses: KyleMayes/install-llvm-action@v2
-        with:
-          version: "17"
       - name: Rustup
         run: |
           rustup update --no-self-update
@@ -83,11 +78,6 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      # Added: LLVM/Clang for RocksDB/bindgen
-      - name: Install LLVM/Clang
-        uses: ./.github/actions/install-llvm
-        with:
-          version: "17"
       - name: Rustup
         run: rustup update --no-self-update
       - uses: Swatinem/rust-cache@v2

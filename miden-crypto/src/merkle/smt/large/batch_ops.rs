@@ -308,11 +308,11 @@ impl<S: SmtStorage> LargeSmt<S> {
     /// ```no_run
     /// use miden_crypto::{
     ///     EMPTY_WORD, Felt, Word,
-    ///     merkle::smt::{LargeSmt, RocksDbConfig, RocksDbStorage},
+    ///     merkle::smt::{LargeSmt, MemoryStorage},
     /// };
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
-    /// let storage = RocksDbStorage::open(RocksDbConfig::new("/path/to/db"))?;
+    /// let storage = MemoryStorage::default();
     /// let mut smt = LargeSmt::new(storage)?;
     ///
     /// let entries = vec![

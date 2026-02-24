@@ -6,7 +6,7 @@ help:
 
 # -- variables --------------------------------------------------------------------------------------
 
-ALL_FEATURES_EXCEPT_ROCKSDB="concurrent executable hashmaps internal serde std"
+ALL_FEATURES="concurrent executable hashmaps internal serde std"
 DEBUG_OVERFLOW_INFO=RUSTFLAGS="-C debug-assertions -C overflow-checks -C debuginfo=2"
 WARNINGS=RUSTDOCFLAGS="-D warnings"
 
@@ -64,7 +64,7 @@ doc: ## Generate and check documentation
 
 .PHONY: test-default
 test-default: ## Run tests with default features
-	$(DEBUG_OVERFLOW_INFO) cargo nextest run --profile default --release --features ${ALL_FEATURES_EXCEPT_ROCKSDB}
+	$(DEBUG_OVERFLOW_INFO) cargo nextest run --profile default --release --features ${ALL_FEATURES}
 
 .PHONY: test-hashmaps
 test-hashmaps: ## Run tests with `hashmaps` feature enabled
@@ -84,7 +84,7 @@ test-docs:
 
 .PHONY: test-large-smt
 test-large-smt: ## Run only large SMT tests
-	$(DEBUG_OVERFLOW_INFO) cargo nextest run --success-output immediate  --profile large-smt --release --features hashmaps,rocksdb
+	$(DEBUG_OVERFLOW_INFO) cargo nextest run --success-output immediate  --profile large-smt --release --features hashmaps
 
 .PHONY: test
 test: test-default test-hashmaps test-no-std test-docs test-large-smt ## Run all tests except concurrent SMT tests
@@ -134,14 +134,6 @@ bench-smt-concurrent: ## Run SMT benchmarks with concurrent feature
 .PHONY: bench-large-smt-memory
 bench-large-smt-memory: ## Run large SMT benchmarks with memory storage
 	cargo run --release --features concurrent,hashmaps,executable -- --size 1000000
-
-.PHONY: bench-large-smt-rocksdb
-bench-large-smt-rocksdb: ## Run large SMT benchmarks with rocksdb storage
-	cargo run --release --features concurrent,hashmaps,rocksdb,executable -- --storage rocksdb --size 1000000
-
-.PHONY: bench-large-smt-rocksdb-open
-bench-large-smt-rocksdb-open: ## Run large SMT benchmarks with rocksdb storage and open existing database
-	cargo run --release --features concurrent,hashmaps,rocksdb,executable -- --storage rocksdb --open
 
 # --- fuzzing --------------------------------------------------------------------------------
 
