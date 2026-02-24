@@ -20,8 +20,8 @@ mod large;
 pub use full::concurrent::{SubtreeLeaf, build_subtree_for_bench};
 #[cfg(feature = "concurrent")]
 pub use large::{
-    LargeSmt, LargeSmtError, MemoryStorage, SmtStorage, StorageUpdateParts, StorageUpdates,
-    Subtree, SubtreeError,
+    LargeSmt, LargeSmtError, MemoryStorage, SmtStorage, StorageError, StorageUpdateParts,
+    StorageUpdates, Subtree, SubtreeError, SubtreeUpdate,
 };
 #[cfg(feature = "rocksdb")]
 pub use large::{RocksDbConfig, RocksDbStorage};
