@@ -1,6 +1,7 @@
 ## 0.19.6 (2026-02-24)
 
-- Add `SmtLeaf::try_from_elements()` ([#773](https://github.com/0xMiden/crypto/pull/773)).
+- Added `SmtLeaf::try_from_elements()` ([#773](https://github.com/0xMiden/crypto/pull/773)).
+- Added `Signature::from_der()` for ECDSA signatures over secp256k1 ([#842](https://github.com/0xMiden/crypto/pull/842)).
 
 ## 0.19.5 (2026-02-18)
 
