@@ -828,6 +828,40 @@ fn entries_never_returns_empty_entry() -> Result<()> {
     Ok(())
 }
 
+#[test]
+fn entries_does_not_stack_overflow_with_many_empty_words() -> Result<()> {
+    // Regression test for: https://github.com/0xMiden/crypto/issues/829
+    //
+    // When iterating a historical tree version that predates many insertions, the history provides
+    // EMPTY_WORD entries for keys that didn't exist back then. Previously, the iterator skipped
+    // these via recursive calls to `next_with_history()`, which caused a stack overflow when
+    // thousands of consecutive EMPTY_WORD entries existed.
+    let backend = ForestInMemoryBackend::new();
+    let mut forest = Forest::new(backend)?;
+    let mut rng = ContinuousRng::new([0x99; 32]);
+
+    // Version 1: empty tree.
+    let lineage: LineageId = rng.value();
+    let version_1: VersionId = rng.value();
+    forest.add_lineage(lineage, version_1, SmtUpdateBatch::empty())?;
+
+    // Version 2: insert many keys so that the history contains thousands of EMPTY_WORD entries
+    // when querying version 1.
+    let version_2 = version_1 + 1;
+    let operations = SmtUpdateBatch::new((0..5000u32).map(|i| {
+        let key = Word::from([1u32, 0, 0, i]);
+        let value: Word = rng.value();
+        ForestOperation::insert(key, value)
+    }));
+    forest.update_tree(lineage, version_2, operations)?;
+
+    // This previously caused a stack overflow due to recursive skipping of EMPTY_WORD entries.
+    let historical_tree = TreeId::new(lineage, version_1);
+    assert_eq!(forest.entries(historical_tree)?.count(), 0);
+
+    Ok(())
+}
+
 // SINGLE-TREE MODIFIER TESTS
 // ================================================================================================
 
