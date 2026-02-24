@@ -199,14 +199,18 @@ impl KeyAgreementScheme for X25519 {
         ephemeral_sk: Self::EphemeralSecretKey,
         static_pk: &Self::PublicKey,
     ) -> Result<Self::SharedSecret, super::KeyAgreementError> {
-        Ok(ephemeral_sk.diffie_hellman(static_pk))
+        let shared = ephemeral_sk.diffie_hellman(static_pk);
+        debug_assert!(!shared.as_ref().iter().all(|byte| *byte == 0), "all-zero shared secret");
+        Ok(shared)
     }
 
     fn exchange_static_ephemeral(
         static_sk: &Self::SecretKey,
         ephemeral_pk: &Self::EphemeralPublicKey,
     ) -> Result<Self::SharedSecret, super::KeyAgreementError> {
-        Ok(static_sk.get_shared_secret(ephemeral_pk.clone()))
+        let shared = static_sk.get_shared_secret(ephemeral_pk.clone());
+        debug_assert!(!shared.as_ref().iter().all(|byte| *byte == 0), "all-zero shared secret");
+        Ok(shared)
     }
 
     fn extract_key_material(
