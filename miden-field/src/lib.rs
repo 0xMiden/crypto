@@ -17,7 +17,7 @@ pub use wasm_miden::Felt;
 #[cfg(not(all(target_family = "wasm", miden)))]
 mod native;
 #[cfg(not(all(target_family = "wasm", miden)))]
-pub use native::{Felt, TryFromIntError};
+pub use native::{Felt, FeltFromIntError};
 
 pub mod utils;
 

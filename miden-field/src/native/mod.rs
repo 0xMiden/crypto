@@ -376,18 +376,18 @@ impl From<u32> for Felt {
 }
 
 impl TryFrom<u64> for Felt {
-    type Error = TryFromIntError;
+    type Error = FeltFromIntError;
 
     fn try_from(int: u64) -> Result<Felt, Self::Error> {
-        Felt::from_canonical_checked(int).ok_or(TryFromIntError(int))
+        Felt::from_canonical_checked(int).ok_or(FeltFromIntError(int))
     }
 }
 
 #[derive(Debug, thiserror::Error)]
 #[error("integer {0} is equal to or exceeds the felt modulus {modulus}", modulus = Felt::ORDER)]
-pub struct TryFromIntError(u64);
+pub struct FeltFromIntError(u64);
 
-impl TryFromIntError {
+impl FeltFromIntError {
     /// Returns the integer for which the conversion failed.
     pub fn as_u64(&self) -> u64 {
         self.0
