@@ -227,8 +227,12 @@ impl KeyAgreementScheme for X25519 {
 
 #[cfg(test)]
 mod tests {
+    use curve25519_dalek::{constants::EIGHT_TORSION, montgomery::MontgomeryPoint};
+
     use super::*;
-    use crate::{dsa::eddsa_25519_sha512::SecretKey, rand::test_utils::seeded_rng};
+    use crate::{
+        dsa::eddsa_25519_sha512::SecretKey, rand::test_utils::seeded_rng, utils::Deserializable,
+    };
 
     #[test]
     fn key_agreement() {
@@ -253,5 +257,31 @@ mod tests {
 
         // Check that the computed shared secret keys are equal
         assert_eq!(shared_secret_key_1.inner.to_bytes(), shared_secret_key_2.inner.to_bytes());
+    }
+
+    #[test]
+    fn ephemeral_public_key_rejects_small_order() {
+        let bytes = EIGHT_TORSION[1].to_montgomery().to_bytes();
+        let result = EphemeralPublicKey::read_from_bytes(&bytes);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn ephemeral_public_key_rejects_twist_point() {
+        let bytes = find_twist_point_bytes();
+        let result = EphemeralPublicKey::read_from_bytes(&bytes);
+        assert!(result.is_err());
+    }
+
+    fn find_twist_point_bytes() -> [u8; 32] {
+        let mut bytes = [0u8; 32];
+        for i in 0u16..=u16::MAX {
+            bytes[0] = (i & 0xff) as u8;
+            bytes[1] = (i >> 8) as u8;
+            if MontgomeryPoint(bytes).to_edwards(0).is_none() {
+                return bytes;
+            }
+        }
+        panic!("no twist point found in 16-bit search space");
     }
 }
