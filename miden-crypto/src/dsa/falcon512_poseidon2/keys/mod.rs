@@ -19,7 +19,7 @@ mod tests {
     use rand_chacha::ChaCha20Rng;
 
     use crate::{
-        ONE, PrimeCharacteristicRing, Word,
+        ONE, Word,
         dsa::falcon512_poseidon2::SecretKey,
         utils::{Deserializable, Serializable},
     };

@@ -1,9 +1,6 @@
 use core::cmp::Ordering;
 
 #[cfg(not(all(target_family = "wasm", miden)))]
-use p3_field::PrimeField64;
-
-#[cfg(not(all(target_family = "wasm", miden)))]
 use super::{ByteReader, ByteWriter, Deserializable, DeserializationError, Serializable};
 use crate::{Felt, Word, word::WORD_SIZE_FELTS};
 
@@ -117,7 +114,6 @@ impl<T: Into<Word> + From<Word>> Deserializable for LexicographicWord<T> {
 
 #[cfg(test)]
 mod tests {
-    use p3_field::PrimeCharacteristicRing;
 
     use super::*;
 

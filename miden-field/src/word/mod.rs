@@ -20,7 +20,7 @@ pub const WORD_SIZE_FELTS: usize = 4;
 pub const WORD_SIZE_BYTES: usize = 32;
 
 #[cfg(not(all(target_family = "wasm", miden)))]
-use p3_field::{PrimeCharacteristicRing, PrimeField64, integers::QuotientMap};
+use p3_field::integers::QuotientMap;
 
 use super::Felt;
 use crate::utils::bytes_to_hex_string;
@@ -175,7 +175,7 @@ impl Word {
         // This matches the behavior of `Word::try_from(String)`.
         let mut idx = 0;
         while idx < felts.len() {
-            if felts[idx] >= Felt::ORDER_U64 {
+            if felts[idx] >= Felt::ORDER {
                 return Err("Felt overflow");
             }
             idx += 1;
@@ -710,7 +710,7 @@ impl Deserializable for Word {
         let mut inner: [Felt; WORD_SIZE_FELTS] = [Felt::ZERO; WORD_SIZE_FELTS];
         for inner in inner.iter_mut() {
             let e = source.read_u64()?;
-            if e >= Felt::ORDER_U64 {
+            if e >= Felt::ORDER {
                 return Err(DeserializationError::InvalidValue(String::from(
                     "value not in the appropriate range",
                 )));

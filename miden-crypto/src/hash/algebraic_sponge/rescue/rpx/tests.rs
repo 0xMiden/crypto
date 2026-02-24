@@ -1,7 +1,6 @@
 #![cfg(feature = "std")]
 use alloc::{collections::BTreeSet, vec::Vec};
 
-use p3_field::PrimeField64;
 use proptest::prelude::*;
 
 use super::{Felt, Rpx256};
@@ -76,7 +75,7 @@ fn hash_elements_vs_merge_with_int() {
     assert_eq!(m_result, h_result);
 
     // ----- value does not fit into a field element ----------------------------------------------
-    let val = Felt::ORDER_U64 + 2;
+    let val = Felt::ORDER + 2;
     let m_result = <Rpx256 as AlgebraicSponge>::merge_with_int(seed, val);
 
     let mut elements = seed.as_elements().to_vec();
@@ -175,7 +174,7 @@ fn sponge_bytes_with_remainder_length_wont_panic() {
 #[test]
 fn sponge_collision_for_wrapped_field_element() {
     let a = Rpx256::hash(&[0; 8]);
-    let b = Rpx256::hash(&Felt::ORDER_U64.to_le_bytes());
+    let b = Rpx256::hash(&Felt::ORDER.to_le_bytes());
     assert_ne!(a, b);
 }
 

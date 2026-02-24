@@ -1,7 +1,6 @@
 use alloc::vec::Vec;
 
 use assert_matches::assert_matches;
-use p3_field::PrimeCharacteristicRing;
 
 use super::{EMPTY_WORD, LeafIndex, NodeIndex, SMT_DEPTH, Smt, SmtLeaf};
 use crate::{

@@ -2,7 +2,7 @@
 
 use core::mem::size_of;
 
-use p3_field::{BasedVectorSpace, PrimeField64};
+use p3_field::BasedVectorSpace;
 use sha2::Digest as Sha2Digest;
 
 use super::{

@@ -1,7 +1,6 @@
 //! Pseudo-random element generation.
 
 use miden_field::word::WORD_SIZE_BYTES;
-use p3_field::PrimeField64;
 use rand::RngCore;
 
 use crate::{Felt, Word};
@@ -94,7 +93,7 @@ impl Randomizable for Felt {
         if let Ok(bytes) = source[..Self::VALUE_SIZE].try_into() {
             let value = u64::from_le_bytes(bytes);
             // Ensure the value is within the field modulus
-            if value < Felt::ORDER_U64 {
+            if value < Felt::ORDER {
                 Some(Felt::new(value))
             } else {
                 None

@@ -1,7 +1,6 @@
 use alloc::{collections::BTreeMap, string::String, vec::Vec};
 
 use miden_serde_utils::SliceReader;
-use p3_field::PrimeField64;
 use proptest::prelude::*;
 
 use super::{Deserializable, Felt, Serializable, WORD_SIZE_BYTES, WORD_SIZE_FELTS, Word};
@@ -12,7 +11,7 @@ use crate::word;
 
 /// Returns a strategy which generates a `[u64; 4]` where all values are canonical field elements.
 fn any_word_elements_u64_canonical() -> BoxedStrategy<[u64; WORD_SIZE_FELTS]> {
-    prop::array::uniform4(0u64..Felt::ORDER_U64).no_shrink().boxed()
+    prop::array::uniform4(0u64..Felt::ORDER).no_shrink().boxed()
 }
 
 proptest! {

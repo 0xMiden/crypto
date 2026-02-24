@@ -4,7 +4,7 @@ use core::{mem::size_of, ops::Deref, slice};
 use super::HasherExt;
 use crate::{
     Felt,
-    field::{BasedVectorSpace, PrimeField64},
+    field::BasedVectorSpace,
     utils::{
         ByteReader, ByteWriter, Deserializable, DeserializationError, HexParseError, Serializable,
         bytes_to_hex_string, hex_to_bytes,

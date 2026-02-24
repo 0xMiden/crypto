@@ -268,7 +268,7 @@ fn felt_injective_monomial_matches_goldilocks() {
     let inputs = [
         Felt::ZERO,
         Felt::ONE,
-        Felt::new(Felt::ORDER_U64),
+        Felt::new(Felt::ORDER),
         Felt::new(u64::MAX),
         Felt::new(100),
     ];

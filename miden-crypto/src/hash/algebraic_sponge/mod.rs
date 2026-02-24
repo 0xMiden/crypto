@@ -14,10 +14,8 @@
 
 use core::ops::Range;
 
-use p3_field::PrimeCharacteristicRing;
-
 use super::{Felt, Word, ZERO};
-use crate::field::{BasedVectorSpace, PrimeField64};
+use crate::field::BasedVectorSpace;
 
 pub(crate) mod poseidon2;
 pub(crate) mod rescue;
@@ -205,10 +203,10 @@ pub(crate) trait AlgebraicSponge {
         let mut state = [ZERO; STATE_WIDTH];
         state[RATE0_RANGE].copy_from_slice(seed.as_elements());
         state[RATE1_RANGE.start] = Felt::new(value);
-        if value < Felt::ORDER_U64 {
+        if value < Felt::ORDER {
             state[CAPACITY_RANGE.start] = Felt::from_u8(5_u8);
         } else {
-            state[RATE1_RANGE.start + 1] = Felt::new(value / Felt::ORDER_U64);
+            state[RATE1_RANGE.start + 1] = Felt::new(value / Felt::ORDER);
             state[CAPACITY_RANGE.start] = Felt::from_u8(6_u8);
         }
 

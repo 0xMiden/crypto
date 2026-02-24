@@ -256,7 +256,6 @@ impl Rpx256 {
 /// over the field arithmetic.
 mod cubic_ext {
     use super::Felt;
-    use crate::field::PrimeCharacteristicRing;
 
     /// Multiplies two cubic extension field elements.
     ///

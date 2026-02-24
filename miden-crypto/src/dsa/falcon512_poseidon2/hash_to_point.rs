@@ -1,7 +1,5 @@
 use alloc::vec::Vec;
 
-use p3_field::PrimeField64;
-
 use super::{MODULUS, N, Nonce, Polynomial, Poseidon2, ZERO, math::FalconFelt};
 use crate::{Felt, Word};
 

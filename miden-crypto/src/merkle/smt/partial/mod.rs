@@ -1,5 +1,3 @@
-use p3_field::PrimeField64;
-
 use super::{EmptySubtreeRoots, LeafIndex, SMT_DEPTH};
 use crate::{
     EMPTY_WORD, Word,

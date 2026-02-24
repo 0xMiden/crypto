@@ -1,7 +1,5 @@
 use alloc::vec::Vec;
 
-use p3_field::PrimeField64;
-
 use super::{
     IN_MEMORY_DEPTH, LargeSmt, NUM_SUBTREE_LEVELS, ROOT_MEMORY_INDEX, SMT_DEPTH, SmtStorage,
     StorageError, Subtree,

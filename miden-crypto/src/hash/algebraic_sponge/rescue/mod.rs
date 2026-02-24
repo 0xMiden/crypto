@@ -1,4 +1,4 @@
-use p3_field::{Field, PrimeCharacteristicRing};
+use p3_field::Field;
 
 use super::{
     AlgebraicSponge, CAPACITY_RANGE, DIGEST_RANGE, Felt, RATE_RANGE, RATE0_RANGE, RATE1_RANGE,
