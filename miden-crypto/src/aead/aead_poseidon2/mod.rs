@@ -748,7 +748,8 @@ impl AeadScheme for AeadPoseidon2 {
     type Key = SecretKey;
 
     fn key_from_bytes(bytes: &[u8]) -> Result<Self::Key, EncryptionError> {
-        SecretKey::read_from_bytes(bytes).map_err(|_| EncryptionError::FailedOperation)
+        SecretKey::read_from_bytes_with_budget(bytes, bytes.len())
+            .map_err(|_| EncryptionError::FailedOperation)
     }
 
     fn encrypt_bytes<R: rand::CryptoRng + rand::RngCore>(
@@ -770,8 +771,9 @@ impl AeadScheme for AeadPoseidon2 {
         ciphertext: &[u8],
         associated_data: &[u8],
     ) -> Result<Vec<u8>, EncryptionError> {
-        let encrypted_data = EncryptedData::read_from_bytes(ciphertext)
-            .map_err(|_| EncryptionError::FailedOperation)?;
+        let encrypted_data =
+            EncryptedData::read_from_bytes_with_budget(ciphertext, ciphertext.len())
+                .map_err(|_| EncryptionError::FailedOperation)?;
 
         key.decrypt_bytes_with_associated_data(&encrypted_data, associated_data)
     }
@@ -798,8 +800,9 @@ impl AeadScheme for AeadPoseidon2 {
         ciphertext: &[u8],
         associated_data: &[Felt],
     ) -> Result<Vec<Felt>, EncryptionError> {
-        let encrypted_data = EncryptedData::read_from_bytes(ciphertext)
-            .map_err(|_| EncryptionError::FailedOperation)?;
+        let encrypted_data =
+            EncryptedData::read_from_bytes_with_budget(ciphertext, ciphertext.len())
+                .map_err(|_| EncryptionError::FailedOperation)?;
 
         key.decrypt_elements_with_associated_data(&encrypted_data, associated_data)
     }

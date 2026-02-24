@@ -421,24 +421,38 @@ impl EphemeralPublicKey {
     pub fn from_bytes(scheme: IesScheme, bytes: &[u8]) -> Result<Self, IesError> {
         match scheme {
             IesScheme::K256XChaCha20Poly1305 => {
-                let key = <K256 as KeyAgreementScheme>::EphemeralPublicKey::read_from_bytes(bytes)
+                let key =
+                    <K256 as KeyAgreementScheme>::EphemeralPublicKey::read_from_bytes_with_budget(
+                        bytes,
+                        bytes.len(),
+                    )
                     .map_err(|_| IesError::EphemeralPublicKeyDeserializationFailed)?;
                 Ok(EphemeralPublicKey::K256XChaCha20Poly1305(key))
             },
             IesScheme::K256AeadPoseidon2 => {
-                let key = <K256 as KeyAgreementScheme>::EphemeralPublicKey::read_from_bytes(bytes)
+                let key =
+                    <K256 as KeyAgreementScheme>::EphemeralPublicKey::read_from_bytes_with_budget(
+                        bytes,
+                        bytes.len(),
+                    )
                     .map_err(|_| IesError::EphemeralPublicKeyDeserializationFailed)?;
                 Ok(EphemeralPublicKey::K256AeadPoseidon2(key))
             },
             IesScheme::X25519XChaCha20Poly1305 => {
                 let key =
-                    <X25519 as KeyAgreementScheme>::EphemeralPublicKey::read_from_bytes(bytes)
+                    <X25519 as KeyAgreementScheme>::EphemeralPublicKey::read_from_bytes_with_budget(
+                        bytes,
+                        bytes.len(),
+                    )
                         .map_err(|_| IesError::EphemeralPublicKeyDeserializationFailed)?;
                 Ok(EphemeralPublicKey::X25519XChaCha20Poly1305(key))
             },
             IesScheme::X25519AeadPoseidon2 => {
                 let key =
-                    <X25519 as KeyAgreementScheme>::EphemeralPublicKey::read_from_bytes(bytes)
+                    <X25519 as KeyAgreementScheme>::EphemeralPublicKey::read_from_bytes_with_budget(
+                        bytes,
+                        bytes.len(),
+                    )
                         .map_err(|_| IesError::EphemeralPublicKeyDeserializationFailed)?;
                 Ok(EphemeralPublicKey::X25519AeadPoseidon2(key))
             },
