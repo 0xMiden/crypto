@@ -327,7 +327,11 @@ impl AeadScheme for XChaCha {
     type Key = SecretKey;
 
     fn key_from_bytes(bytes: &[u8]) -> Result<Self::Key, EncryptionError> {
-        SecretKey::read_from_bytes_with_budget(bytes, bytes.len())
+        if bytes.len() != SK_SIZE_BYTES {
+            return Err(EncryptionError::FailedOperation);
+        }
+
+        SecretKey::read_from_bytes_with_budget(bytes, SK_SIZE_BYTES)
             .map_err(|_| EncryptionError::FailedOperation)
     }
 
