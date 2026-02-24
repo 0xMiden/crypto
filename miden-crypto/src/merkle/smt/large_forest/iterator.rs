@@ -206,8 +206,7 @@ impl<'forest> EntriesIterator<'forest> {
                     // have the same item.
                     let hist_item =
                         history_entries_iter.peek().expect("Entry already checked to exist");
-                    let tree_item =
-                        full_tree_iter.peek().expect("Entry already checked to exist");
+                    let tree_item = full_tree_iter.peek().expect("Entry already checked to exist");
 
                     if hist_item.key == tree_item.key {
                         *state = EntriesIteratorState::InLeafBothKeysEq;
