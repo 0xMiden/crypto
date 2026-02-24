@@ -70,19 +70,7 @@ impl<T: Into<Word> + Copy> Ord for LexicographicWord<T> {
         let self_word: Word = self.0.into();
         let other_word: Word = other.0.into();
 
-        for (felt0, felt1) in self_word
-            .iter()
-            .rev()
-            .map(Felt::as_canonical_u64)
-            .zip(other_word.iter().rev().map(Felt::as_canonical_u64))
-        {
-            let ordering = felt0.cmp(&felt1);
-            if let Ordering::Less | Ordering::Greater = ordering {
-                return ordering;
-            }
-        }
-
-        Ordering::Equal
+        self_word.cmp(&other_word)
     }
 }
 
@@ -129,31 +117,6 @@ mod tests {
     impl From<NoteId> for Word {
         fn from(value: NoteId) -> Self {
             value.0
-        }
-    }
-
-    #[test]
-    fn lexicographic_word_ordering() {
-        for (expected, key0, key1) in [
-            (Ordering::Equal, [0, 0, 0, 0u32], [0, 0, 0, 0u32]),
-            (Ordering::Greater, [1, 0, 0, 0u32], [0, 0, 0, 0u32]),
-            (Ordering::Greater, [0, 1, 0, 0u32], [0, 0, 0, 0u32]),
-            (Ordering::Greater, [0, 0, 1, 0u32], [0, 0, 0, 0u32]),
-            (Ordering::Greater, [0, 0, 0, 1u32], [0, 0, 0, 0u32]),
-            (Ordering::Less, [0, 0, 0, 0u32], [1, 0, 0, 0u32]),
-            (Ordering::Less, [0, 0, 0, 0u32], [0, 1, 0, 0u32]),
-            (Ordering::Less, [0, 0, 0, 0u32], [0, 0, 1, 0u32]),
-            (Ordering::Less, [0, 0, 0, 0u32], [0, 0, 0, 1u32]),
-            (Ordering::Greater, [0, 0, 0, 1u32], [1, 1, 1, 0u32]),
-            (Ordering::Greater, [0, 0, 1, 0u32], [1, 1, 0, 0u32]),
-            (Ordering::Less, [1, 1, 1, 0u32], [0, 0, 0, 1u32]),
-            (Ordering::Less, [1, 1, 0, 0u32], [0, 0, 1, 0u32]),
-        ] {
-            assert_eq!(
-                LexicographicWord::from(key0.map(Felt::from_u32))
-                    .cmp(&LexicographicWord::from(key1.map(Felt::from_u32))),
-                expected
-            );
         }
     }
 

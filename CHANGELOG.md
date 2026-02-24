@@ -13,9 +13,11 @@
 - [BREAKING] Added validation to `PartialMmr::from_parts()` and `Deserializable` implementation, added `from_parts_unchecked()` for performance-critical code ([#812](https://github.com/0xMiden/crypto/pull/812)).
 - Added `Signature::from_der()` for ECDSA signatures over secp256k1 ([#842](https://github.com/0xMiden/crypto/pull/842)).
 
-## 0.22.3 (unreleased)
+## 0.22.3 (2026-02-23)
 
 - Refactored to introduce a unified `Felt` type for on-chain and off-chain code ([#819](https://github.com/0xMiden/crypto/pull/819)).
+- Change `Ord for Word` to use lexicographic ordering ([#847](https://github.com/0xMiden/crypto/pull/847)).
+- Add `From<{u8, u16, u32}> for Felt` and `TryFrom<u64> for Felt` ([#848](https://github.com/0xMiden/crypto/pull/848)).
 
 ## 0.22.2 (2026-02-01)
 

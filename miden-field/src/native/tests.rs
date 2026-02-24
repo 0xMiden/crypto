@@ -293,3 +293,10 @@ fn felt_from_prime_subfield_is_transparent() {
     let f = Felt::from_prime_subfield(g);
     assert_eq!(f, g);
 }
+
+/// Ensures TryFrom<u64> fails for inputs at or exceeding the modulus.
+#[test]
+fn felt_try_from_u64_fails_on_large_inputs() {
+    Felt::try_from(u64::MAX).unwrap_err();
+    Felt::try_from(Felt::ORDER).unwrap_err();
+}
