@@ -1,6 +1,7 @@
 ## 0.22.3 (unreleased)
 
 - Refactored to introduce a unified `Felt` type for on-chain and off-chain code ([#819](https://github.com/0xMiden/crypto/pull/819)).
+- Add `From<{u8, u16, u32}> for Felt` and `TryFrom<u64> for Felt` ([#848](https://github.com/0xMiden/crypto/pull/848)).
 
 ## 0.22.2 (2026-02-01)
 

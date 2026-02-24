@@ -357,6 +357,43 @@ impl PermutationMonomial<7> for Felt {
 // CONVERSIONS
 // ================================================================================================
 
+impl From<u8> for Felt {
+    fn from(int: u8) -> Self {
+        Self::from_u8(int)
+    }
+}
+
+impl From<u16> for Felt {
+    fn from(int: u16) -> Self {
+        Self::from_u16(int)
+    }
+}
+
+impl From<u32> for Felt {
+    fn from(int: u32) -> Self {
+        Self::from_u32(int)
+    }
+}
+
+impl TryFrom<u64> for Felt {
+    type Error = FeltFromIntError;
+
+    fn try_from(int: u64) -> Result<Felt, Self::Error> {
+        Felt::from_canonical_checked(int).ok_or(FeltFromIntError(int))
+    }
+}
+
+#[derive(Debug, thiserror::Error)]
+#[error("integer {0} is equal to or exceeds the felt modulus {modulus}", modulus = Felt::ORDER)]
+pub struct FeltFromIntError(u64);
+
+impl FeltFromIntError {
+    /// Returns the integer for which the conversion failed.
+    pub fn as_u64(&self) -> u64 {
+        self.0
+    }
+}
+
 impl Deref for Felt {
     type Target = Goldilocks;
 
