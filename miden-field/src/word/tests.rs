@@ -1,4 +1,5 @@
 use alloc::{collections::BTreeMap, string::String, vec::Vec};
+use core::cmp::Ordering;
 
 use miden_serde_utils::SliceReader;
 use proptest::prelude::*;
@@ -257,5 +258,29 @@ proptest! {
         map.insert(key2, 2);
         prop_assert_eq!(map.len(), 1);
         prop_assert_eq!(map.get(&word), Some(&2));
+    }
+}
+
+#[test]
+fn word_is_ordered_lexicographically() {
+    for (expected, key0, key1) in [
+        (Ordering::Equal, [0, 0, 0, 0u32], [0, 0, 0, 0u32]),
+        (Ordering::Greater, [1, 0, 0, 0u32], [0, 0, 0, 0u32]),
+        (Ordering::Greater, [0, 1, 0, 0u32], [0, 0, 0, 0u32]),
+        (Ordering::Greater, [0, 0, 1, 0u32], [0, 0, 0, 0u32]),
+        (Ordering::Greater, [0, 0, 0, 1u32], [0, 0, 0, 0u32]),
+        (Ordering::Less, [0, 0, 0, 0u32], [1, 0, 0, 0u32]),
+        (Ordering::Less, [0, 0, 0, 0u32], [0, 1, 0, 0u32]),
+        (Ordering::Less, [0, 0, 0, 0u32], [0, 0, 1, 0u32]),
+        (Ordering::Less, [0, 0, 0, 0u32], [0, 0, 0, 1u32]),
+        (Ordering::Greater, [0, 0, 0, 1u32], [1, 1, 1, 0u32]),
+        (Ordering::Greater, [0, 0, 1, 0u32], [1, 1, 0, 0u32]),
+        (Ordering::Less, [1, 1, 1, 0u32], [0, 0, 0, 1u32]),
+        (Ordering::Less, [1, 1, 0, 0u32], [0, 0, 1, 0u32]),
+    ] {
+        assert_eq!(
+            Word::from(key0.map(Felt::from_u32)).cmp(&Word::from(key1.map(Felt::from_u32))),
+            expected
+        );
     }
 }

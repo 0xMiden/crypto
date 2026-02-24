@@ -35,6 +35,9 @@ mod tests;
 // ================================================================================================
 
 /// A unit of data consisting of 4 field elements.
+///
+/// For ordering a word with `Ord` the word's elements are treated as limbs of an integer
+/// in little-endian limb order and thus comparison starts from the most significant element.
 #[derive(Default, Copy, Clone, Eq, PartialEq)]
 #[cfg_attr(
     not(all(target_family = "wasm", miden)),
@@ -306,10 +309,10 @@ impl IndexMut<Range<usize>> for Word {
 
 impl Ord for Word {
     fn cmp(&self, other: &Self) -> Ordering {
-        // Compare the canonical u64 representation of both elements.
+        // Compare the canonical u64 representation of both words.
         //
-        // It will iterate the elements and will return the first computation different than
-        // `Equal`. Otherwise, the ordering is equal.
+        // It will iterate the elements in reverse and will return the first computation different
+        // than `Equal`. Otherwise, the ordering is equal.
         //
         // We use `as_canonical_u64()` to ensure we're comparing the actual field element values
         // in their canonical form (that is, `x in [0,p)`). P3's Goldilocks field uses unreduced
@@ -319,14 +322,19 @@ impl Ord for Word {
         // We must iterate over and compare each element individually. A simple bytestring
         // comparison would be inappropriate because the `Word`s are represented in
         // "lexicographical" order.
-        self.as_elements_array()
+        for (felt0, felt1) in self
             .iter()
+            .rev()
             .map(Felt::as_canonical_u64)
-            .zip(other.as_elements_array().iter().map(Felt::as_canonical_u64))
-            .fold(Ordering::Equal, |ord, (a, b)| match ord {
-                Ordering::Equal => a.cmp(&b),
-                _ => ord,
-            })
+            .zip(other.iter().rev().map(Felt::as_canonical_u64))
+        {
+            let ordering = felt0.cmp(&felt1);
+            if let Ordering::Less | Ordering::Greater = ordering {
+                return ordering;
+            }
+        }
+
+        Ordering::Equal
     }
 }
 
