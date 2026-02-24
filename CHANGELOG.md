@@ -12,6 +12,7 @@
 - Fixed tuple `min_serialized_size()` to exclude alignment padding, fixing `BudgetedReader` rejecting valid data ([#827](https://github.com/0xMiden/crypto/pull/827)).
 - [BREAKING] Added validation to `PartialMmr::from_parts()` and `Deserializable` implementation, added `from_parts_unchecked()` for performance-critical code ([#812](https://github.com/0xMiden/crypto/pull/812)).
 - Added `Signature::from_der()` for ECDSA signatures over secp256k1 ([#842](https://github.com/0xMiden/crypto/pull/842)).
+- Fix possible panic in `XChaCha::decrypt_bytes_with_associated_data` and harden deserialization with fuzzing across 7 new targets ([#836](https://github.com/0xMiden/crypto/pull/836)).
 
 ## 0.22.3 (2026-02-23)
 

@@ -348,8 +348,9 @@ impl AeadScheme for XChaCha {
         ciphertext: &[u8],
         associated_data: &[u8],
     ) -> Result<Vec<u8>, EncryptionError> {
-        let encrypted_data = &EncryptedData::read_from_bytes(ciphertext).unwrap();
-        key.decrypt_bytes_with_associated_data(encrypted_data, associated_data)
+        let encrypted_data = EncryptedData::read_from_bytes(ciphertext)
+            .map_err(|_| EncryptionError::FailedOperation)?;
+        key.decrypt_bytes_with_associated_data(&encrypted_data, associated_data)
             .map_err(|_| EncryptionError::FailedOperation)
     }
 }
