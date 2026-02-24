@@ -35,6 +35,9 @@ mod tests;
 // ================================================================================================
 
 /// A unit of data consisting of 4 field elements.
+///
+/// For ordering a word with `Ord` the word's elements are treated as limbs of an integer
+/// in little-endian limb order and thus comparison starts from the most significant element.
 #[derive(Default, Copy, Clone, Eq, PartialEq)]
 #[cfg_attr(
     not(all(target_family = "wasm", miden)),
@@ -306,7 +309,7 @@ impl IndexMut<Range<usize>> for Word {
 
 impl Ord for Word {
     fn cmp(&self, other: &Self) -> Ordering {
-        // Compare the canonical u64 representation of both elements.
+        // Compare the canonical u64 representation of both words.
         //
         // It will iterate the elements in reverse and will return the first computation different
         // than `Equal`. Otherwise, the ordering is equal.
