@@ -221,6 +221,16 @@ pub fn bytes_to_packed_u32_elements(bytes: &[u8]) -> Vec<Felt> {
 // VECTOR FUNCTIONS (ported from Winterfell's winter-utils)
 // ================================================================================================
 
+/// Returns a vector of the specified length with initialized memory.
+///
+/// For types that are `Copy` and `Default`, this provides a safe alternative to
+/// `uninit_vector`. While slightly slower due to the initialization, the overhead
+/// is negligible when the contents are immediately overwritten (as is the case in
+/// Merkle tree construction).
+pub fn init_vector<T: Copy + Default>(length: usize) -> Vec<T> {
+    vec![T::default(); length]
+}
+
 /// Returns a vector of the specified length with un-initialized memory.
 ///
 /// This is usually faster than requesting a vector with initialized memory and is useful when we

@@ -22,7 +22,7 @@ use common::{
 benchmark_multi!(
     merkle_tree_construction,
     "merkle_tree_construction",
-    &[4, 8, 16, 32, 64, 128, 256],
+    &[4, 8, 16, 32, 64, 128, 256, 1024, 4096, 16384, 65536],
     |b: &mut Bencher<'_>, &num_leaves: &usize| {
         b.iter_batched(
             || generate_words_pattern(num_leaves, WordPattern::Random),
@@ -38,7 +38,7 @@ benchmark_multi!(
 benchmark_multi!(
     balanced_merkle_even,
     "balanced-merkle-even",
-    &[4, 8, 16, 32, 64, 128, 256],
+    &[4, 8, 16, 32, 64, 128, 256, 1024, 4096, 16384, 65536],
     |b: &mut Bencher<'_>, num_leaves: &usize| {
         b.iter_batched(
             || {

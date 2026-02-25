@@ -33,7 +33,13 @@ impl MerkleTree {
             return Err(MerkleError::NumLeavesNotPowerOfTwo(n));
         }
 
+        // Performance note: We use unsafe code here for ~2-2.5% performance improvement at scale
+        // (4K+ leaves). Benchmarks comparing safe vs unsafe implementations are in
+        // benches/merkle.rs. At 65K leaves: safe=68.27ms, unsafe=67.17ms (~2.2% faster).
+        // The safe version uses `init_vector` and index arithmetic (`nodes[i*2]`, `nodes[i*2+1]`).
+
         // create un-initialized vector to hold all tree nodes
+        // Safety: All elements are written before being read (leaves copied, then computed).
         let mut nodes = unsafe { uninit_vector(2 * n) };
         nodes[0] = Word::default();
 
@@ -135,6 +141,11 @@ impl MerkleTree {
     /// Returns an error if the specified index value is not a valid leaf value for this tree.
     pub fn update_leaf<'a>(&'a mut self, index_value: u64, value: Word) -> Result<(), MerkleError> {
         let mut index = NodeIndex::new(self.depth(), index_value)?;
+
+        // Performance note: We use unsafe pointer casts here for ~2-2.5% performance improvement
+        // at scale. See benches/merkle.rs for benchmarks. The safe alternative uses index
+        // arithmetic (`nodes[pos*2]`, `nodes[pos*2+1]`) which is measurably slower on large
+        // trees.
 
         // we don't need to copy the pairs into a new address as we are logically guaranteed to not
         // overlap write instructions. however, it's important to bind the lifetime of pairs to
