@@ -1,3 +1,7 @@
+## 0.19.7 (TBD)
+
+- Expose `StorageError` and `SubtreeUpdate` as prep. to externalize the `LargeSmt` RocksDB backend ([#850](https://github.com/0xMiden/crypto/pull/850)).
+
 ## 0.19.6 (2026-02-24)
 
 - Added `Signature::from_der()` for ECDSA signatures over secp256k1 ([#842](https://github.com/0xMiden/crypto/pull/842)).
