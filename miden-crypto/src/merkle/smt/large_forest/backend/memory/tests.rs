@@ -396,16 +396,6 @@ fn entries() -> Result<()> {
             .contains(&TreeEntry { key: key_1_3, value: value_1_3 }),
     );
 
-    // Importantly, the iterator should also be sorted in two stages. First by leaf index, and then
-    // by key.
-    assert!(backend.entries(lineage_1)?.is_sorted_by(|l, r| {
-        if l.index() == r.index() {
-            l.key < r.key
-        } else {
-            l.index() < r.index()
-        }
-    }));
-
     Ok(())
 }
 

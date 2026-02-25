@@ -20,9 +20,11 @@
 use alloc::boxed::Box;
 use core::iter::Peekable;
 
+use miden_field::Word;
+
 use crate::{
-    EMPTY_WORD,
-    merkle::smt::{LeafIndex, large_forest::root::TreeEntry},
+    Set,
+    merkle::smt::large_forest::{history::HistoryView, root::TreeEntry},
 };
 
 // ENTRIES ITERATOR
@@ -37,6 +39,8 @@ use crate::{
 /// bounds do not allow for this.
 ///
 /// The iterator **must never transition between variants** during the process of iteration.
+///
+/// The order in which the results are yielded is undefined.
 pub(super) enum EntriesIterator<'forest> {
     /// An iterator over a tree in the forest that is formed from a merger of the full tree and a
     /// historical overlay.
@@ -46,17 +50,14 @@ pub(super) enum EntriesIterator<'forest> {
         /// This iterator should never yield any entries where `value == EMPTY_WORD`.
         full_tree_iter: Peekable<Box<dyn Iterator<Item = TreeEntry> + 'forest>>,
 
-        /// The iterator over the entries in the history.
-        ///
-        /// This iterator may yield entries with `value == EMPTY_WORD`. These are explicit
-        /// reversions of entries newly-set in newer versions, and so should be used. While they
-        /// technically should only ever correspond to a case where they _are_ reverting a
-        /// newly-set entry, care must be taken to remove them regardless if they do not match up
-        /// for some reason.
-        history_entries_iter: Peekable<Box<dyn Iterator<Item = TreeEntry> + 'forest>>,
+        /// The view into the history at the correct point.
+        history_view: HistoryView<'forest>,
+
+        /// Tracks the keys in the history that are given values that have already been yielded.
+        yielded_history_keys: Set<Word>,
 
         /// The current state of the iteration state machine.
-        state: EntriesIteratorState,
+        state: EntriesIteratorState<'forest>,
     },
 
     /// An iterator over a tree in the forest that is simply an iterator over the full tree.
@@ -70,23 +71,20 @@ impl<'forest> EntriesIterator<'forest> {
     /// Constructs a new entries iterator pointing to the first item in the designated `tree` in the
     /// `forest`, formed by combining a historical overlay with the current tree.
     ///
-    /// Note that it _does not_ perform checks as to the correctness of the provided iterators. If
-    /// these are not an iterator over the full tree and the historical entries in turn, the results
-    /// the iterator yields will be invalid.
+    /// Note that it _does not_ perform checks as to the correctness of the provided iterators.
     pub(super) fn new_with_history(
         full_tree_iter: impl Iterator<Item = TreeEntry> + 'forest,
-        history_entries_iter: impl Iterator<Item = TreeEntry> + 'forest,
+        history_view: HistoryView<'forest>,
     ) -> Self {
         // This type gymnastics is unfortunately necessary to let us easily store the `Peekable`
         // which we need to avoid carrying additional state in the state machine.
         let full_tree_iter: Box<dyn Iterator<Item = _>> = Box::new(full_tree_iter);
-        let history_entries_iter: Box<dyn Iterator<Item = _>> = Box::new(history_entries_iter);
 
-        // We begin in `NotInLeaf`. This is implicitly `Start -> NotInLeaf`
         Self::WithHistory {
             full_tree_iter: full_tree_iter.peekable(),
-            history_entries_iter: history_entries_iter.peekable(),
-            state: EntriesIteratorState::NotInLeaf,
+            history_view,
+            yielded_history_keys: Set::new(),
+            state: EntriesIteratorState::Initial,
         }
     }
 
@@ -94,7 +92,7 @@ impl<'forest> EntriesIterator<'forest> {
     /// `forest` without any associated history.
     ///
     /// Note that it _does not_ check whether `full_tree_iter` is actually an iterator over the
-    /// full tree. If it is not, the iterator will yield invalid results.
+    /// full tree. If it is not, this iterator will yield invalid results.
     pub(super) fn new_without_history(
         full_tree_iter: impl Iterator<Item = TreeEntry> + 'forest,
     ) -> Self {
@@ -105,11 +103,6 @@ impl<'forest> EntriesIterator<'forest> {
     /// Advances the iterator and returns the next value in the case where it is iterating over a
     /// historical tree version.
     ///
-    /// For the details of the state machine that this implements, please see the documentation for
-    /// the [`EntriesIteratorState`]. It explains the valid state transitions and the conditions
-    /// under which they occur. This implementation does not match them directly in order to
-    /// simplify the logic, but matches the intended semantics.
-    ///
     /// # Panics
     ///
     /// - If the method is called with a `self` that is not in the [`Self::WithHistory`] variant.
@@ -117,7 +110,8 @@ impl<'forest> EntriesIterator<'forest> {
     fn next_with_history(&mut self) -> Option<TreeEntry> {
         let EntriesIterator::WithHistory {
             full_tree_iter,
-            history_entries_iter,
+            history_view,
+            yielded_history_keys,
             state,
         } = self
         else {
@@ -126,183 +120,73 @@ impl<'forest> EntriesIterator<'forest> {
 
         loop {
             match state {
-                EntriesIteratorState::NotInLeaf => {
-                    // Here we are (semantically) not pointing to any specific leaf, so we need to
-                    // work out which of our possible outgoing transitions take
-                    // place. This state does not actually return anything
-                    // except in the `-> End` case.
-                    match (full_tree_iter.peek(), history_entries_iter.peek()) {
-                        (None, None) => {
-                            // No more entries exist in either of the iterators. `NotInLeaf -> End`.
-                            return None;
-                        },
-                        (Some(_), None) => {
-                            // Entries only exist in the full tree iterator. `NotInLeaf -> TreeOnly`
-                            *state = EntriesIteratorState::TreeOnly;
-                            continue;
-                        },
-                        (None, Some(_)) => {
-                            // Entries only exist in the full tree iterator. `NotInLeaf -> HistOnly`
-                            *state = EntriesIteratorState::HistOnly;
-                            continue;
-                        },
-                        (Some(full), Some(hist)) => {
-                            // Entries exist in both, but the exact state transition has not yet
-                            // been determined. We have three other
-                            // possible outgoing edges from `NotInLeaf`.
-                            let full_idx = LeafIndex::from(full.key);
-                            let hist_idx = LeafIndex::from(hist.key);
-
-                            if full_idx == hist_idx {
-                                // We are in the same leaf. `NotInLeaf -> InLeafShared`
-                                *state = EntriesIteratorState::InLeafShared;
-                            } else if full_idx < hist_idx {
-                                // We are in different leaves with full_idx coming first. `NotInLeaf
-                                // -> InLeafTreeOnly`
-                                *state = EntriesIteratorState::InLeafTreeOnly;
-                            } else {
-                                // We are in different leaves with hist_idx coming first. `NotInLeaf
-                                // -> InTreeHistOnly`.
-                                *state = EntriesIteratorState::InLeafHistOnly;
-                            }
-
-                            continue;
-                        },
+                EntriesIteratorState::Initial => {
+                    // In the initial state we need to advance to the appropriate next state.
+                    if full_tree_iter.peek().is_none() {
+                        // If there is nothing left to read from the full-tree iterator, we move
+                        // into the history iteration state.
+                        let iterator = Box::new(
+                            history_view
+                                .changed_keys()
+                                .map(|(key, value)| TreeEntry { key, value }),
+                        );
+                        *state = EntriesIteratorState::ReadingHistory { iterator };
+                    } else {
+                        // Otherwise we proceed with the full tree.
+                        *state = EntriesIteratorState::ReadingFullTree;
                     }
                 },
-                EntriesIteratorState::HistOnly => {
-                    // In this state we simply can continue yielding the history entries iterator
-                    // until it is empty. We just have to check that we're not
-                    // yielding EMPTY_WORD entries directly as these should not
-                    // be seen.
-                    for entry in history_entries_iter.by_ref() {
-                        if entry.value != EMPTY_WORD {
+                EntriesIteratorState::ReadingFullTree => {
+                    // If we are reading the full tree's iterator, we need to keep advancing as long
+                    // as we can, but we have to remove entries using the
+                    // history.
+                    if full_tree_iter.peek().is_none() {
+                        // If we have nothing left to read, we transition into the reading history
+                        // state,
+                        let iterator = Box::new(
+                            history_view
+                                .changed_keys()
+                                .map(|(key, value)| TreeEntry { key, value }),
+                        );
+                        *state = EntriesIteratorState::ReadingHistory { iterator };
+                        return self.next_with_history();
+                    }
+
+                    let Some(entry) = full_tree_iter.next() else {
+                        unreachable!("The iterator is known to have another item available");
+                    };
+
+                    let value = if let Some(v) = history_view.value(&entry.key) {
+                        // If the history has a value for this key, then we need to return that
+                        // instead. We also store the key so we do not return it again by accident.
+                        yielded_history_keys.insert(entry.key);
+
+                        // If it is an empty value we don't want to return it so we continue the
+                        // outer loop.
+                        if v.is_empty() {
+                            continue;
+                        }
+
+                        TreeEntry { key: entry.key, value: v }
+                    } else {
+                        entry
+                    };
+
+                    return Some(value);
+                },
+                EntriesIteratorState::ReadingHistory { iterator } => {
+                    // This is a terminal state. We cannot transition to any other state from here,
+                    // and so the iterator ends when the iterator over the added
+                    // history items does.
+                    for entry in iterator.by_ref() {
+                        if !yielded_history_keys.contains(&entry.key) && !entry.value.is_empty() {
                             return Some(entry);
                         }
+
+                        // Here we have already returned this entry, or it is empty. In both cases
+                        // we want to skip it, so we let the loop continue.
                     }
                     return None;
-                },
-                EntriesIteratorState::TreeOnly => {
-                    // In this state we can simply continue yielding the tree entries iterator until
-                    // it is empty. When it returns `None` we have `TreeOnly ->
-                    // End`
-                    return full_tree_iter.next();
-                },
-                EntriesIteratorState::InLeafHistOnly => {
-                    // Here, we are in a leaf that is only in the history. We technically only want
-                    // to transition out of this state once we have exhausted
-                    // the leaf, but in actuality we can rely on the logic for
-                    // `NotInLeaf` to do the right thing here. We only have to
-                    // skip empty words as these should never be yielded.
-                    let tree_item = full_tree_iter.peek().expect("Entry already checked to exist");
-                    let tree_leaf = LeafIndex::from(tree_item.key);
-
-                    loop {
-                        let Some(hist_item) = history_entries_iter.peek() else {
-                            *state = EntriesIteratorState::NotInLeaf;
-                            break;
-                        };
-
-                        if hist_item.value == EMPTY_WORD {
-                            history_entries_iter.next();
-                            continue;
-                        }
-
-                        let hist_leaf = LeafIndex::from(hist_item.key);
-                        if hist_leaf < tree_leaf {
-                            let hist_item = history_entries_iter
-                                .next()
-                                .expect("Entry already checked to exist");
-                            *state = EntriesIteratorState::NotInLeaf;
-                            return Some(hist_item);
-                        }
-
-                        *state = EntriesIteratorState::NotInLeaf;
-                        break;
-                    }
-                    continue;
-                },
-                EntriesIteratorState::InLeafTreeOnly => {
-                    // Here we are in a leaf that is only in the full tree. We technically only want
-                    // to transition out of this state once we have exhausted
-                    // the leaf, but in actuality we can rely on the logic for
-                    // `NotInleaf` to do the right thing here.
-                    *state = EntriesIteratorState::NotInLeaf;
-                    return full_tree_iter.next();
-                },
-                EntriesIteratorState::InLeafShared => {
-                    // Here we have both iterators in the same LEAF but that does not mean they have
-                    // the same item.
-                    let hist_item =
-                        history_entries_iter.peek().expect("Entry already checked to exist");
-                    let tree_item = full_tree_iter.peek().expect("Entry already checked to exist");
-
-                    if hist_item.key == tree_item.key {
-                        *state = EntriesIteratorState::InLeafBothKeysEq;
-                    } else if hist_item.key < tree_item.key {
-                        *state = EntriesIteratorState::InLeafBothHistPrio;
-                    } else {
-                        *state = EntriesIteratorState::InLeafBothTreePrio;
-                    }
-
-                    continue;
-                },
-                EntriesIteratorState::InLeafBothKeysEq => {
-                    // If the keys are equal we want to pop both entries and only return the
-                    // history's one. We can again rely on `NotInLeaf` to do our
-                    // logic correctly.
-                    *state = EntriesIteratorState::NotInLeaf;
-
-                    // We can discard this entry entirely as it has been overwritten.
-                    full_tree_iter.next();
-
-                    // But this one may or may not need to be returned.
-                    let hist_item =
-                        history_entries_iter.next().expect("Entry already checked to exist");
-                    if hist_item.value == EMPTY_WORD {
-                        // We never want to yield empty items, so we skip them.
-                        continue;
-                    } else {
-                        // Otherwise the item is real and we want to yield it.
-                        return Some(hist_item);
-                    }
-                },
-                EntriesIteratorState::InLeafBothHistPrio => {
-                    // Here we have a history item with a key < the full tree item, so we want to
-                    // return that. We must skip EMPTY_WORD entries, and if
-                    // ordering changes, re-evaluate.
-                    loop {
-                        let Some(hist_item) = history_entries_iter.peek() else {
-                            *state = EntriesIteratorState::NotInLeaf;
-                            break;
-                        };
-
-                        if hist_item.value == EMPTY_WORD {
-                            history_entries_iter.next();
-                            continue;
-                        }
-
-                        let tree_item =
-                            full_tree_iter.peek().expect("Entry already checked to exist");
-                        if hist_item.key < tree_item.key {
-                            let hist_item = history_entries_iter
-                                .next()
-                                .expect("Entry already checked to exist");
-                            *state = EntriesIteratorState::NotInLeaf;
-                            return Some(hist_item);
-                        }
-
-                        *state = EntriesIteratorState::NotInLeaf;
-                        break;
-                    }
-                    continue;
-                },
-                EntriesIteratorState::InLeafBothTreePrio => {
-                    // Here we have a full tree item with a key < the history item, so we want to
-                    // return that. We can again rely on `NotInLeaf` to do our
-                    // logic correctly.
-                    *state = EntriesIteratorState::NotInLeaf;
-                    return full_tree_iter.next();
                 },
             }
         }
@@ -342,172 +226,19 @@ impl Iterator for EntriesIterator<'_> {
 // ================================================================================================
 
 /// The state machine that is the entries iterator for the forest.
-///
-/// We do not represent the ghost states of `Start` and `End`, so [`Self::NotInLeaf`] serves as the
-/// initial state of the machine in practice. A full diagram of the state machine's allowable
-/// transitions can be found below. See the individual variants for the conditions under which these
-/// transitions take place.
-///
-/// ```text
-///                                    ┌─────────┐
-///                                    │  Start  │
-///                                    └─────────┘
-///                                         │
-///                                         │
-///                                         ▼
-///                                   ┌───────────┐
-///        ┌─────────────┬────────────│           │◀──────────────┬──────────────────┐
-///        │             │            │ NotInLeaf │               │                  │
-///        │             │       ┌────│           │────────────┬──┼───────────────┐  │
-///        │             │       │    └───────────┘            │  │               │  │
-///        │             │       │         │  ▲                │  │               │  │
-///        │             │       │         │  │                │  │               │  │
-///        │             │       │         │  │                │  │               │  │
-///        │             │       │         │  │                │  │               │  │
-///        ▼             ▼       │         ▼  │                ▼  │               ▼  │
-///  ┌──────────┐  ┌──────────┐  │  ┌────────────────┐  ┌────────────────┐  ┌──────────────┐
-///  │ TreeOnly │  │ HistOnly │  │  │ InLeafHistOnly │  │ InLeafTreeOnly │  │ InLeafShared │◀─────────────┐
-///  └──────────┘  └──────────┘  │  └────────────────┘  └────────────────┘  └──────────────┘              │
-///        │             │       │                                                  │                     │
-///        │             │       │                                                  │                     │
-///        │             │       │            ┌──────────────────────┬──────────────┴────────┐            │
-///        │             │       │            │                      │                       │            │
-///        │             │       │            ▼                      ▼                       ▼            │
-///        │             │       │  ┌──────────────────┐  ┌────────────────────┐  ┌────────────────────┐  │
-///        └─────────────┴─────┐ │  │ InLeafBothKeysEq │  │ InLeafBothHistPrio │  │ InLeafBothTreePrio │  │
-///                            │ │  └──────────────────┘  └────────────────────┘  └────────────────────┘  │
-///                            │ │            │                      │                       │            │
-///                            │ │            │                      │                       │            │
-///                            │ │            └──────────────────────┴───────────────────────┴────────────┘
-///                            ▼ ▼
-///                        ┌─────────┐
-///                        │   End   │
-///                        └─────────┘
-/// ```
-///
-/// Note that this describes the _semantics_ of the transitions between states, and may not directly
-/// correspond to the implementation in [`EntriesIterator::next_with_history`] for reasons of
-/// performance and maintainability.
-pub(super) enum EntriesIteratorState {
-    /// The iterator is currently not in any leaf.
-    ///
-    /// This state should not advance the underlying iterators directly, and the iterator is not
-    /// intended to return a value for `next` while in this state.
-    ///
-    /// Incoming state transitions:
-    ///
-    /// - `Start -> NotInLeaf`: The state of the state machine.
-    /// - `InLeafHistOnly -> NotInLeaf`: Upon completing the leaf in the history.
-    /// - `InLeafTreeOnly -> NotInLeaf`: Upon completing the leaf in the tree.
-    /// - `InLeafShared -> NotInLeaf`: Upon completing the leaf that exists in both.
-    ///
-    /// Outgoing state transitions:
-    ///
-    /// - `NotInLeaf -> End`: If neither iterator has remaining entries.
-    /// - `NotInLeaf -> HistOnly`: If the tree entries iterator is empty.
-    /// - `NotInLeaf -> TreeOnly`: If the history entries iterator is empty.
-    /// - `NotInLeaf -> InLeafHistOnly`: If the next leaf is only in the history.
-    /// - `NotInLeaf -> InLeafTreeOnly`: If the next leaf is only in the tree.
-    /// - `NotInLeaf -> InLeafShared`: If the leaf exists in both iterators.
-    NotInLeaf,
+pub(super) enum EntriesIteratorState<'forest> {
+    /// The initial state of the iterator, indicating that it has never advanced the underlying
+    /// iterator.
+    Initial,
 
-    /// The iterator over the full tree has no entries, so we can iterate only over the history
-    /// until completion.
-    ///
-    /// Incoming state transitions:
-    ///
-    /// - `NotInLeaf -> HistOnly`: The tree entries iterator is empty.
-    ///
-    /// Outgoing state transitions:
-    ///
-    /// - `HistOnly -> End`: The history entries iterator is empty.
-    HistOnly,
+    /// Indicates that the iterator is currently reading from the full-tree's iterator, and yielding
+    /// results from that.
+    ReadingFullTree,
 
-    /// The iterator over the history has no entries, so we can iterate only over the full tree
-    /// until completion.
-    ///
-    /// Incoming state transitions:
-    ///
-    /// - `NotInLeaf -> TreeOnly`: The history entries iterator is empty.
-    ///
-    /// Outgoing state transitions:
-    ///
-    /// - `TreeOnly -> End`: The tree entries iterator is empty.
-    TreeOnly,
-
-    /// The iterator is operating over a leaf that only exists in the history iterator.
-    ///
-    /// Incoming state transitions:
-    ///
-    /// - `NotInLeaf -> InLeafHistOnly`: The tree entries iterator has items but the latest is not
-    ///   in the same leaf as the history's latest.
-    ///
-    /// Outgoing state transitions:
-    ///
-    /// - `InLeafHistOnly -> NotInLeaf`: Upon completing iteration through the current leaf.
-    InLeafHistOnly,
-
-    /// The iterator is operating over a leaf that only exists in the tree iterator.
-    ///
-    /// Incoming state transitions:
-    ///
-    /// - `NotInLeaf -> InLeafTreeOnly`: The history entries iterator has items but the latest is
-    ///   not in the same leaf as the tree's latest.
-    ///
-    /// Outgoing state transitions:
-    ///
-    /// - `InLeafTreeOnly -> NotInLeaf`: Upon completing iteration through the current leaf.
-    InLeafTreeOnly,
-
-    /// The iterator is operating over a leaf that exists in both iterators.
-    ///
-    /// Incoming state transitions:
-    ///
-    /// - `NotInLeaf -> InLeafShared`: Both iterators have their latest entry in the same leaf.
-    ///
-    /// Outgoing state transitions:
-    ///
-    /// - `InLeafShared -> InLeafBothKeysEq`: If the two keys in the shared leaf are equal.
-    /// - `InLeafShared -> InLeafBothKeysHistPrio`: If the key in the history < the key in the tree.
-    /// - `InLeafShared -> InLeafBothKeysTreePrio`: If the key in the tree < the key in the history.
-    /// - `InLeafShared -> NotInLeaf`: Upon completing iteration through the current leaf.
-    InLeafShared,
-
-    /// The iterator is operating over a leaf that exists in both iterators, and the current keys
-    /// are the same.
-    ///
-    /// Incoming state transitions:
-    ///
-    /// - `InLeafShared -> InLeafBothKeysEq`: If the key in each iterator is the same.
-    ///
-    /// Outgoing state transitions:
-    ///
-    /// - `InLeafBothKeysEq -> InLeafShared`: When needing to check the next element.
-    InLeafBothKeysEq,
-
-    /// The iterator is operating over a leaf that exists in both iterators, and the current key
-    /// in the history is less than the current key in the tree.
-    ///
-    /// Incoming state transitions:
-    ///
-    /// - `InLeafShared -> InLeafBothHistPrio`: If the key in the history iterator < the key in the
-    ///   tree iterator.
-    ///
-    /// Outgoing state transitions:
-    ///
-    /// - `InLeafBothHistPrio -> InLeafShared`: When needing to check the next element.
-    InLeafBothHistPrio,
-
-    /// The iterator is operating over a leaf that exists in both iterators, and the current key in
-    /// the tree is less than the current key in the history.
-    ///
-    /// Incoming state transitions:
-    ///
-    /// - `InLeafShared -> InLeafBothTreePrio`: If the key in the tree iterator < the key in the
-    ///   history iterator.
-    ///
-    /// Outgoing state transitions:
-    ///
-    /// - `InLeafBothTreePrio -> InLeafShared`: When needing to check the next element.
-    InLeafBothTreePrio,
+    /// Indicates that the iterator is currently reading from the additional pairs added by the
+    /// history delta.
+    ReadingHistory {
+        /// The iterator over the entries that are _added_ by the history.
+        iterator: Box<dyn Iterator<Item = TreeEntry> + 'forest>,
+    },
 }
