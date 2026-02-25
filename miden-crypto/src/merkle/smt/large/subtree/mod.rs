@@ -12,7 +12,7 @@ pub use error::SubtreeError;
 #[cfg(test)]
 mod tests;
 
-/// Represents a complete 8-depth subtree that is serialized into a single storage entry.
+/// Represents a complete 8-depth subtree that is serialized into a single RocksDB entry.
 ///
 /// ### What is stored
 /// - `nodes` tracks only **non-empty inner nodes** of this subtree (i.e., nodes for which at least
