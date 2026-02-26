@@ -86,7 +86,8 @@ impl Nonce {
 }
 
 /// A 256-bit secret key
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug)]
+#[cfg_attr(test, derive(PartialEq, Eq))]
 pub struct SecretKey([u8; SK_SIZE_BYTES]);
 
 impl SecretKey {

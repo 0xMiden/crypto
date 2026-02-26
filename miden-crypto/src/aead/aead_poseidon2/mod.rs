@@ -446,6 +446,7 @@ impl Distribution<SecretKey> for StandardUniform {
     }
 }
 
+#[cfg(test)]
 impl PartialEq for SecretKey {
     fn eq(&self, other: &Self) -> bool {
         // Use constant-time comparison to prevent timing attacks
@@ -457,6 +458,7 @@ impl PartialEq for SecretKey {
     }
 }
 
+#[cfg(test)]
 impl Eq for SecretKey {}
 
 impl Zeroize for SecretKey {
