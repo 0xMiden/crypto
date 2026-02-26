@@ -6,7 +6,7 @@ use crate::{Felt, Word};
 // HASH-TO-POINT FUNCTIONS
 // ================================================================================================
 
-/// Returns a polynomial in Z_p[x]/(phi) representing the hash of the provided message and
+/// Returns a polynomial in `Z_p[x]/(phi)` representing the hash of the provided message and
 /// nonce using Poseidon2.
 ///
 /// Note that, in contrast to the SHAKE256-based reference implementation, this implementation
@@ -16,7 +16,7 @@ use crate::{Felt, Word};
 /// the implementation simpler and constant-time at the cost of a higher number of extracted
 /// pseudo-random bits per call to the hash-to-point algorithm.
 ///
-/// [1]: https://falcon-sign.info/falcon.pdf
+/// [1]: <https://falcon-sign.info/falcon.pdf>
 pub fn hash_to_point_poseidon2(message: Word, nonce: &Nonce) -> Polynomial<FalconFelt> {
     let mut state = [ZERO; Poseidon2::STATE_WIDTH];
 
@@ -50,7 +50,7 @@ pub fn hash_to_point_poseidon2(message: Word, nonce: &Nonce) -> Polynomial<Falco
     Polynomial::new(coefficients)
 }
 
-/// Returns a polynomial in Z_p[x]/(phi) representing the hash of the provided message and
+/// Returns a polynomial in `Z_p[x]/(phi)` representing the hash of the provided message and
 /// nonce using SHAKE256. This is the hash-to-point algorithm used in the reference implementation.
 #[cfg(test)]
 pub fn hash_to_point_shake256(message: &[u8], nonce: &Nonce) -> Polynomial<FalconFelt> {

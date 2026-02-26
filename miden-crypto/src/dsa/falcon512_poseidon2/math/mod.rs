@@ -84,7 +84,7 @@ impl Inverse for f64 {
 /// Samples 4 small polynomials f, g, F, G such that f * G - g * F = q mod (X^n + 1).
 /// Algorithm 5 (NTRUgen) of the documentation [1, p.34].
 ///
-/// [1]: https://falcon-sign.info/falcon.pdf
+/// [1]: <https://falcon-sign.info/falcon.pdf>
 pub(crate) fn ntru_gen<R: Rng>(n: usize, rng: &mut R) -> [Polynomial<i16>; 4] {
     loop {
         let f = gen_poly(n, rng);
@@ -130,7 +130,7 @@ pub(crate) fn ntru_gen<R: Rng>(n: usize, rng: &mut R) -> [Polynomial<i16>; 4] {
 ///
 /// Algorithm 6 of the specification [1, p.35].
 ///
-/// [1]: https://falcon-sign.info/falcon.pdf
+/// [1]: <https://falcon-sign.info/falcon.pdf>
 fn ntru_solve(
     f: &Polynomial<BigInt>,
     g: &Polynomial<BigInt>,
@@ -181,7 +181,7 @@ fn gen_poly<R: Rng>(n: usize, rng: &mut R) -> Polynomial<i16> {
 /// Computes the Gram-Schmidt norm of B = [[g, -f], [G, -F]] from f and g.
 /// Corresponds to line 9 in algorithm 5 of the spec [1, p.34]
 ///
-/// [1]: https://falcon-sign.info/falcon.pdf
+/// [1]: <https://falcon-sign.info/falcon.pdf>
 fn gram_schmidt_norm_squared(f: &Polynomial<i16>, g: &Polynomial<i16>) -> f64 {
     let n = f.coefficients.len();
     let norm_f_squared = f.l2_norm_squared();
@@ -213,9 +213,9 @@ fn gram_schmidt_norm_squared(f: &Polynomial<i16>, g: &Polynomial<i16>) -> f64 {
 ///
 /// Algorithm 7 in the spec [2, p.35]
 ///
-/// [1]: https://github.com/tprest/falcon.py
+/// [1]: <https://github.com/tprest/falcon.py>
 ///
-/// [2]: https://falcon-sign.info/falcon.pdf
+/// [2]: <https://falcon-sign.info/falcon.pdf>
 fn babai_reduce(
     f: &Polynomial<BigInt>,
     g: &Polynomial<BigInt>,
@@ -301,7 +301,7 @@ fn babai_reduce(
 ///
 /// Implementation adapted from Wikipedia [1].
 ///
-/// [1]: https://en.wikipedia.org/wiki/Extended_Euclidean_algorithm#Pseudocode
+/// [1]: <https://en.wikipedia.org/wiki/Extended_Euclidean_algorithm#Pseudocode>
 fn xgcd(a: &BigInt, b: &BigInt) -> (BigInt, BigInt, BigInt) {
     let (mut old_r, mut r) = (a.clone(), b.clone());
     let (mut old_s, mut s) = (BigInt::one(), BigInt::zero());

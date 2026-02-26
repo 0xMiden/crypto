@@ -106,7 +106,8 @@ pub struct History {
     /// allocated capacity equal to the small maximum number of items is perfectly sane. This will
     /// avoid costly reallocations in the fast path.
     ///
-    /// We use a [`VecDeque`] instead of a [`Vec`] or [`alloc::collections::LinkedList`] as we
+    /// We use a [`VecDeque`] instead of a [`alloc::vec::Vec`] or
+    /// [`alloc::collections::LinkedList`] as we
     /// estimate that the vast majority of removals will be the oldest entries as new ones are
     /// pushed. This means that we can optimize for those removals along with indexing performance,
     /// rather than optimizing for more rare removals from the middle of the sequence.

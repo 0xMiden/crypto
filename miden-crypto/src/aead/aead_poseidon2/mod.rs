@@ -515,7 +515,7 @@ impl SpongeState {
     /// Duplex interface as described in Algorithm 2 in [1] with `d = 0`
     ///
     ///
-    /// [1]: https://eprint.iacr.org/2023/1668
+    /// [1]: <https://eprint.iacr.org/2023/1668>
     fn duplex_overwrite(&mut self, data: &[Felt]) {
         self.permute();
 
@@ -529,7 +529,7 @@ impl SpongeState {
     /// Duplex interface as described in Algorithm 2 in [1] with `d = 1`
     ///
     ///
-    /// [1]: https://eprint.iacr.org/2023/1668
+    /// [1]: <https://eprint.iacr.org/2023/1668>
     fn duplex_add(&mut self, data: &[Felt]) -> [Felt; RATE_WIDTH] {
         self.permute();
 
