@@ -130,7 +130,7 @@ impl EncryptedData {
 }
 
 /// An authentication tag represented as 4 field elements
-#[derive(Debug, Default, Clone, PartialEq, Eq)]
+#[derive(Debug, Default, Clone)]
 pub struct AuthTag([Felt; AUTH_TAG_SIZE]);
 
 impl AuthTag {
@@ -144,6 +144,19 @@ impl AuthTag {
         self.0
     }
 }
+
+impl PartialEq for AuthTag {
+    fn eq(&self, other: &Self) -> bool {
+        // Use constant-time comparison to prevent timing attacks
+        let mut result = true;
+        for (a, b) in self.0.iter().zip(other.0.iter()) {
+            result &= bool::from(a.as_canonical_u64().ct_eq(&b.as_canonical_u64()));
+        }
+        result
+    }
+}
+
+impl Eq for AuthTag {}
 
 /// A 256-bit secret key represented as 4 field elements
 #[derive(Clone, SilentDebug, SilentDisplay)]
