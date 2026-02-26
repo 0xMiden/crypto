@@ -124,7 +124,7 @@ pub(crate) fn ntru_gen<R: Rng>(n: usize, rng: &mut R) -> [Polynomial<i16>; 4] {
     }
 }
 
-/// Solves the NTRU equation. Given f, g in ZZ[X], find F, G in ZZ[X] such that:
+/// Solves the NTRU equation. Given f, g in `ZZ[X]`, find F, G in `ZZ[X]` such that:
 ///
 ///    f G - g F = q  mod (X^n + 1)
 ///

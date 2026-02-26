@@ -124,6 +124,7 @@ impl ZeroizeOnDrop for LdlTree {}
 
 /// Computes the LDL Tree of G. Corresponds to Algorithm 9 of the specification [1, p.37].
 /// The argument is a 2x2 matrix of polynomials, given in FFT form.
+///
 /// [1]: <https://falcon-sign.info/falcon.pdf>
 pub fn ffldl(gram_matrix: [Polynomial<Complex64>; 4]) -> LdlTree {
     let n = gram_matrix[0].coefficients.len();

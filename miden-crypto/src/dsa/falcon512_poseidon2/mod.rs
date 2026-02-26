@@ -83,6 +83,8 @@ const NONCE_VERSION_BYTE: u8 = 1;
 /// The preversioned portion of the fixed nonce constructed following [1].
 ///
 /// Note that reference [1] uses the term salt instead of nonce.
+///
+/// [1]: <https://github.com/algorand/falcon/blob/main/falcon-det.pdf>
 const PREVERSIONED_NONCE: [u8; PREVERSIONED_NONCE_LEN] = [
     9, 70, 65, 76, 67, 79, 78, 45, 80, 79, 83, 69, 73, 68, 79, 78, 50, 45, 68, 69, 84, 0, 0, 0, 0,
     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
