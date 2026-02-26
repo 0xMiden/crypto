@@ -2,7 +2,7 @@ use alloc::{string::String, vec::Vec};
 use core::{fmt, slice};
 
 use super::{InnerNodeInfo, MerkleError, MerklePath, NodeIndex, Poseidon2, Word};
-use crate::utils::{uninit_vector, word_to_hex};
+use crate::utils::{assume_init_vec, uninit_vector, word_to_hex};
 
 // MERKLE TREE
 // ================================================================================================
@@ -35,12 +35,12 @@ impl MerkleTree {
 
         // create un-initialized vector to hold all tree nodes
         // Safety: All elements are written before being read (leaves copied, then computed).
-        let mut nodes = unsafe { uninit_vector(2 * n) };
-        nodes[0] = Word::default();
+        let mut nodes = uninit_vector::<Word>(2 * n);
+        nodes[0].write(Word::default());
 
         // copy leaves into the second part of the nodes vector
         nodes[n..].iter_mut().zip(leaves).for_each(|(node, leaf)| {
-            *node = *leaf;
+            node.write(*leaf);
         });
 
         // re-interpret nodes as an array of two nodes fused together
@@ -51,8 +51,11 @@ impl MerkleTree {
 
         // calculate all internal tree nodes
         for i in (1..n).rev() {
-            nodes[i] = Poseidon2::merge(&pairs[i]);
+            nodes[i].write(Poseidon2::merge(&pairs[i]));
         }
+
+        // SAFETY: all elements were written above.
+        let nodes = unsafe { assume_init_vec(nodes) };
 
         Ok(Self { nodes })
     }
