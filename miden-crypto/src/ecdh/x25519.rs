@@ -23,7 +23,7 @@ use crate::{
     ecdh::KeyAgreementScheme,
     utils::{
         ByteReader, ByteWriter, Deserializable, DeserializationError, Serializable,
-        zeroize::{Zeroize, ZeroizeOnDrop},
+        zeroize::{Zeroize, ZeroizeOnDrop, Zeroizing},
     },
 };
 
@@ -114,9 +114,9 @@ impl EphemeralSecretKey {
         // needed once `x25519_dalek` gets a new release with a version of the `rand`
         // dependency matching ours
         use k256::elliptic_curve::rand_core::SeedableRng;
-        let mut seed = [0_u8; 32];
-        rand::RngCore::fill_bytes(rng, &mut seed);
-        let rng = rand_hc::Hc128Rng::from_seed(seed);
+        let mut seed = Zeroizing::new([0_u8; 32]);
+        rand::RngCore::fill_bytes(rng, &mut *seed);
+        let rng = rand_hc::Hc128Rng::from_seed(*seed);
 
         let sk = x25519_dalek::EphemeralSecret::random_from_rng(rng);
         Self { inner: sk }
