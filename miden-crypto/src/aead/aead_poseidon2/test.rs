@@ -325,6 +325,16 @@ fn test_auth_tag_tampering_detection() {
 }
 
 #[test]
+fn test_auth_tag_equality() {
+    let tag_a = AuthTag([Felt::new(1), Felt::new(2), Felt::new(3), Felt::new(4)]);
+    let tag_b = AuthTag([Felt::new(1), Felt::new(2), Felt::new(3), Felt::new(4)]);
+    let tag_c = AuthTag([Felt::new(1), Felt::new(2), Felt::new(3), Felt::new(5)]);
+
+    assert_eq!(tag_a, tag_b);
+    assert_ne!(tag_a, tag_c);
+}
+
+#[test]
 fn test_wrong_key_detection() {
     let seed = [0_u8; 32];
     let mut rng = ChaCha20Rng::from_seed(seed);
