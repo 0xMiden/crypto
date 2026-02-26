@@ -313,3 +313,27 @@ fn test_removing_empty_smt_from_forest() {
     // Popping the empty root should be a no-op (no panic or error)
     forest.pop_smts(vec![empty_tree_root]);
 }
+
+#[test]
+fn test_empty_root_never_removed() -> Result<(), MerkleError> {
+    // Verify that the empty tree root is never registered in self.roots and that
+    // popping it does not corrupt the store.
+    let mut forest = SmtForest::new();
+    let empty_root = *EmptySubtreeRoots::entry(SMT_DEPTH, 0);
+    let key = Word::new([ZERO; WORD_SIZE]);
+    let value = Word::new([ONE; WORD_SIZE]);
+
+    // batch_insert with no entries returns the empty root — it must not be registered
+    let root = forest.batch_insert(empty_root, vec![])?;
+    assert_eq!(root, empty_root);
+
+    // Popping the empty root would corrupt the store if it were in self.roots.
+    forest.pop_smts(vec![empty_root]);
+
+    // The forest should still be fully functional
+    let new_root = forest.insert(empty_root, key, value)?;
+    let proof = forest.open(new_root, key)?;
+    assert!(proof.verify_presence(&key, &value, &new_root).is_ok());
+
+    Ok(())
+}
