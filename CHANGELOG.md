@@ -1,6 +1,7 @@
-## 0.19.7 (TBD)
+## 0.19.7 (2026-02-26)
 
-- Expose `StorageError` and `SubtreeUpdate` as prep. to externalize the `LargeSmt` RocksDB backend ([#850](https://github.com/0xMiden/crypto/pull/850)).
+- Exposed `StorageError` and `SubtreeUpdate` as prep. to externalize the `LargeSmt` RocksDB backend ([#850](https://github.com/0xMiden/crypto/pull/850)).
+- Fixed `SmtStore` corruption issue on insertion of empty tree roots ([#853](https://github.com/0xMiden/crypto/pull/853)).
 
 ## 0.19.6 (2026-02-24)
 
