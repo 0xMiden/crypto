@@ -74,6 +74,11 @@ harness           = false
 name              = "sparse_path"
 required-features = ["std"]
 
+[[bench]]
+harness           = false
+name              = "transpose"
+required-features = ["std"]
+
 [features]
 concurrent = ["dep:rayon", "p3-maybe-rayon/parallel", "p3-miden-prover/parallel", "p3-util/parallel", "std"]
 default    = ["concurrent", "std"]

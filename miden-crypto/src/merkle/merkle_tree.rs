@@ -33,11 +33,6 @@ impl MerkleTree {
             return Err(MerkleError::NumLeavesNotPowerOfTwo(n));
         }
 
-        // Performance note: We use unsafe code here for ~2-2.5% performance improvement at scale
-        // (4K+ leaves). Benchmarks comparing safe vs unsafe implementations are in
-        // benches/merkle.rs. At 65K leaves: safe=68.27ms, unsafe=67.17ms (~2.2% faster).
-        // The safe version uses `init_vector` and index arithmetic (`nodes[i*2]`, `nodes[i*2+1]`).
-
         // create un-initialized vector to hold all tree nodes
         // Safety: All elements are written before being read (leaves copied, then computed).
         let mut nodes = unsafe { uninit_vector(2 * n) };

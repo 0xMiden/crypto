@@ -64,10 +64,18 @@ impl<const N: usize> Digest<N> {
     }
 
     /// Converts a slice of digests into a contiguous byte slice.
+    ///
+    /// This is a zero-copy operation that reinterprets the digest slice as bytes.
     pub fn digests_as_bytes(digests: &[Digest<N>]) -> &[u8] {
         let p = digests.as_ptr();
         let len = digests.len() * N;
-        // SAFETY: Digest<N> is repr(transparent) over [u8; N], so this is safe
+        // SAFETY:
+        // - Digest<N> is #[repr(transparent)] over [u8; N], which guarantees identical size,
+        //   alignment, and memory layout to [u8; N].
+        // - A slice of Digest<N> therefore has the same layout as a contiguous array of bytes,
+        //   which can be safely reinterpreted as &[u8].
+        // - The length calculation is correct because each Digest<N> contains exactly N bytes.
+        // - The resulting slice is valid for the lifetime of the input slice.
         unsafe { slice::from_raw_parts(p as *const u8, len) }
     }
 }
