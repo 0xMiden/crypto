@@ -1057,6 +1057,7 @@ dependencies = [
  "rand",
  "rstest",
  "serde",
+ "subtle",
  "thiserror",
 ]
 

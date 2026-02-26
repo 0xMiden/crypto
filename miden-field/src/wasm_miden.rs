@@ -118,6 +118,15 @@ impl Felt {
         unsafe { extern_as_u64(*self) }
     }
 
+    /// Constant-time equivalent of `as_canonical_u64()` for wasm targets.
+    ///
+    /// On wasm, the host implementation is the only source of truth for canonicalization, and we
+    /// cannot reproduce its constant-time behavior locally.
+    #[inline(always)]
+    pub fn as_canonical_u64_ct(&self) -> u64 {
+        self.as_canonical_u64()
+    }
+
     /// Returns true if this felt is odd.
     #[inline(always)]
     pub fn is_odd(&self) -> bool {

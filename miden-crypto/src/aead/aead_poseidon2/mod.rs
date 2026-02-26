@@ -150,7 +150,7 @@ impl PartialEq for AuthTag {
         // Use constant-time comparison to prevent timing attacks
         let mut result = true;
         for (a, b) in self.0.iter().zip(other.0.iter()) {
-            result &= bool::from(a.as_canonical_u64().ct_eq(&b.as_canonical_u64()));
+            result &= bool::from(a.as_canonical_u64_ct().ct_eq(&b.as_canonical_u64_ct()));
         }
         result
     }
@@ -452,7 +452,7 @@ impl PartialEq for SecretKey {
         // Use constant-time comparison to prevent timing attacks
         let mut result = true;
         for (a, b) in self.0.iter().zip(other.0.iter()) {
-            result &= bool::from(a.as_canonical_u64().ct_eq(&b.as_canonical_u64()));
+            result &= bool::from(a.as_canonical_u64_ct().ct_eq(&b.as_canonical_u64_ct()));
         }
         result
     }

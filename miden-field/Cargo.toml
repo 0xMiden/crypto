@@ -30,6 +30,7 @@ paste             = { version = "1.0.15" }
 proptest          = { default-features = false, features = ["alloc", "std"], optional = true, version = "1.7" }
 rand              = { default-features = false, features = ["small_rng"], version = "0.9.0" }
 serde             = { default-features = false, features = ["derive"], version = "1.0" }
+subtle            = { default-features = false, version = "2.6" }
 
 [features]
 default = []
