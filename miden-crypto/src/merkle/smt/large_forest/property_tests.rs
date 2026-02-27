@@ -112,7 +112,8 @@ proptest! {
         // We now create a forest and add the lineage to it using the first set of entries.
         let mut forest = LargeSmtForest::new(ForestInMemoryBackend::new()).map_err(to_fail)?;
         forest.add_lineage(lineage, version, entries_v1.clone()).map_err(to_fail)?;
-        forest.update_tree(lineage, version + 1, entries_v2.clone()).map_err(to_fail)?;
+        let tree_info =
+            forest.update_tree(lineage, version + 1, entries_v2.clone()).map_err(to_fail)?;
 
         // We then create two auxiliary trees to work with, to compare our results against.
         let mut tree_v1 = Smt::new();
@@ -138,7 +139,7 @@ proptest! {
 
         // Iterating over the newest version of the lineage in the forest should provide exactly the
         // same entries as iterating over V2 of our test tree.
-        let current_version = TreeId::new(lineage, version + 1);
+        let current_version = TreeId::new(lineage, tree_info.version());
         let forest_entries = forest.entries(current_version).map_err(to_fail)?.sorted().collect_vec();
         let tree_entries = tree_v2
             .entries()
@@ -160,7 +161,8 @@ proptest! {
         // We now create a forest and add the lineage to it using the first set of entries.
         let mut forest = LargeSmtForest::new(ForestInMemoryBackend::new()).map_err(to_fail)?;
         forest.add_lineage(lineage, version, entries_v1.clone()).map_err(to_fail)?;
-        forest.update_tree(lineage, version + 1, entries_v2.clone()).map_err(to_fail)?;
+        let tree_info =
+            forest.update_tree(lineage, version + 1, entries_v2.clone()).map_err(to_fail)?;
 
         // Iterating over the historical version of the lineage in the forest should produce exactly
         // the same entries as iterating over V1 of our test tree.
@@ -169,7 +171,7 @@ proptest! {
 
         // Iterating over the newest version of the lineage in the forest should provide exactly the
         // same entries as iterating over V2 of our test tree.
-        let current_version = TreeId::new(lineage, version + 1);
+        let current_version = TreeId::new(lineage, tree_info.version());
         assert!(forest.entries(current_version).map_err(to_fail)?.all(|e| e.value != EMPTY_WORD));
     }
 }

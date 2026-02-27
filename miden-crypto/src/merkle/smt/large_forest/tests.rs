@@ -828,6 +828,59 @@ fn entries_never_returns_empty_entry() -> Result<()> {
     Ok(())
 }
 
+#[test]
+fn entries_history_empty_values_do_not_reorder() -> Result<()> {
+    let backend = ForestInMemoryBackend::new();
+    let mut forest = Forest::new(backend)?;
+    let mut rng = ContinuousRng::new([0x55; 32]);
+
+    let lineage: LineageId = rng.value();
+    let version_1: VersionId = rng.value();
+
+    let key_a = Word::from([2u32, 0, 0, 42]);
+    let value_a: Word = rng.value();
+    let key_c = Word::from([3u32, 0, 0, 42]);
+    let value_c_v1: Word = rng.value();
+
+    forest.add_lineage(
+        lineage,
+        version_1,
+        SmtUpdateBatch::new(
+            [
+                ForestOperation::insert(key_a, value_a),
+                ForestOperation::insert(key_c, value_c_v1),
+            ]
+            .into_iter(),
+        ),
+    )?;
+
+    let version_2 = version_1 + 1;
+    let key_b = Word::from([1u32, 0, 0, 42]);
+    let value_b: Word = rng.value();
+    let value_c_v2: Word = rng.value();
+
+    forest.update_tree(
+        lineage,
+        version_2,
+        SmtUpdateBatch::new(
+            [
+                ForestOperation::insert(key_b, value_b),
+                ForestOperation::insert(key_c, value_c_v2),
+            ]
+            .into_iter(),
+        ),
+    )?;
+
+    let historical_tree = TreeId::new(lineage, version_1);
+    let entries: Vec<_> = forest.entries(historical_tree)?.collect();
+    assert_eq!(entries.len(), 2);
+    assert_eq!(entries[0], TreeEntry { key: key_a, value: value_a });
+    assert_eq!(entries[1], TreeEntry { key: key_c, value: value_c_v1 });
+    assert!(entries.iter().all(|e| e.value != EMPTY_WORD));
+
+    Ok(())
+}
+
 // SINGLE-TREE MODIFIER TESTS
 // ================================================================================================
 
