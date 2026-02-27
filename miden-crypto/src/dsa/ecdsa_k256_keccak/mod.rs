@@ -185,7 +185,6 @@ impl PublicKey {
     pub fn from_der(bytes: &[u8]) -> Result<Self, DeserializationError> {
         let verifying_key = VerifyingKey::from_public_key_der(bytes)
             .map_err(|err| DeserializationError::InvalidValue(err.to_string()))?;
-        // Decode the SEC1 encoded point as a Miden public key.
         Ok(PublicKey { inner: verifying_key })
     }
 }
