@@ -182,7 +182,7 @@ impl PublicKey {
     /// Creates a public key from SPKI ASN.1 DER format bytes.
     ///
     /// # Arguments
-    /// * `bytes` - ASN.1 DER format bytes
+    /// * `bytes` - SPKI ASN.1 DER format bytes
     pub fn from_der(bytes: &[u8]) -> Result<Self, DeserializationError> {
         let pub_key = k256::PublicKey::from_public_key_der(bytes)
             .map_err(|err| DeserializationError::InvalidValue(err.to_string()))?;
@@ -287,7 +287,7 @@ impl Signature {
     /// Creates a signature from ASN.1 DER format bytes with a given recovery id.
     ///
     /// # Arguments
-    /// * `bytes` - SPKI ASN.1 DER format bytes
+    /// * `bytes` - ASN.1 DER format bytes
     /// * `recovery_id` - recovery ID (0-3)
     pub fn from_der(bytes: &[u8], mut recovery_id: u8) -> Result<Self, DeserializationError> {
         if recovery_id > 3 {
