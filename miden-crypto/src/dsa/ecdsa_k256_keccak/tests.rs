@@ -209,3 +209,52 @@ fn test_signature_from_der_high_s_normalizes_and_flips_v() {
     assert_eq!(sig.s(), &expected_s_low);
     assert_eq!(sig.v(), v_initial ^ 1);
 }
+
+#[test]
+fn test_public_key_from_der_success() {
+    // Build a valid SPKI DER for the compressed SEC1 point of our generated key.
+    let mut rng = seeded_rng([9u8; 32]);
+    let secret_key = SecretKey::with_rng(&mut rng);
+    let public_key = secret_key.public_key();
+    let public_key_bytes = public_key.to_bytes(); // compressed SEC1 (33 bytes).
+
+    // Algorithm identifier: id-ecPublicKey + secp256k1
+    let algo: [u8; 18] = [
+        0x30, 0x10, // SEQUENCE, length 16
+        0x06, 0x07, 0x2a, 0x86, 0x48, 0xce, 0x3d, 0x02, 0x01, // OID 1.2.840.10045.2.1
+        0x06, 0x05, 0x2b, 0x81, 0x04, 0x00, 0x0a, // OID 1.3.132.0.10 (secp256k1)
+    ];
+
+    // Subject public key BIT STRING: 0 unused bits + compressed SEC1.
+    let mut spk = Vec::with_capacity(2 + 1 + public_key_bytes.len());
+    spk.push(0x03); // BIT STRING
+    spk.push((1 + public_key_bytes.len()) as u8); // length
+    spk.push(0x00); // unused bits = 0
+    spk.extend_from_slice(&public_key_bytes);
+
+    // Outer SEQUENCE.
+    let mut der = Vec::with_capacity(2 + algo.len() + spk.len());
+    der.push(0x30); // SEQUENCE
+    der.push((algo.len() + spk.len()) as u8); // total length
+    der.extend_from_slice(&algo);
+    der.extend_from_slice(&spk);
+
+    let parsed = PublicKey::from_der(&der).expect("should parse valid SPKI DER");
+    assert_eq!(parsed, public_key);
+}
+
+#[test]
+fn test_public_key_from_der_invalid() {
+    // Empty DER.
+    match PublicKey::from_der(&[]) {
+        Err(super::DeserializationError::InvalidValue(_)) => {},
+        other => panic!("expected InvalidValue for empty DER, got {:?}", other),
+    }
+
+    // Malformed: SEQUENCE with zero length (missing fields).
+    let der_bad: [u8; 2] = [0x30, 0x00];
+    match PublicKey::from_der(&der_bad) {
+        Err(super::DeserializationError::InvalidValue(_)) => {},
+        other => panic!("expected InvalidValue for malformed DER, got {:?}", other),
+    }
+}
