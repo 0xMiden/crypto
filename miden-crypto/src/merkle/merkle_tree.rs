@@ -1,5 +1,5 @@
 use alloc::{string::String, vec::Vec};
-use core::{fmt, slice};
+use core::fmt;
 
 use super::{InnerNodeInfo, MerkleError, MerklePath, NodeIndex, Poseidon2, Word};
 use crate::utils::{assume_init_vec, uninit_vector, word_to_hex};
@@ -33,8 +33,10 @@ impl MerkleTree {
             return Err(MerkleError::NumLeavesNotPowerOfTwo(n));
         }
 
-        // create un-initialized vector to hold all tree nodes
-        // Safety: All elements are written before being read (leaves copied, then computed).
+        // Create an uninitialized vector to avoid eagerly zeroing `2 * n` words. This is a
+        // hot path during tree construction; see benches in `miden-crypto/benches/merkle.rs`
+        // (e.g. `merkle_tree_construction`) for performance motivation.
+        // SAFETY: All elements are written before being read (leaves copied, then computed).
         let mut nodes = uninit_vector::<Word>(2 * n);
         nodes[0].write(Word::default());
 
@@ -43,15 +45,13 @@ impl MerkleTree {
             node.write(*leaf);
         });
 
-        // re-interpret nodes as an array of two nodes fused together
-        // Safety: `nodes` will never move here as it is not bound to an external lifetime (i.e.
-        // `self`).
-        let ptr = nodes.as_ptr() as *const [Word; 2];
-        let pairs = unsafe { slice::from_raw_parts(ptr, n) };
-
         // calculate all internal tree nodes
         for i in (1..n).rev() {
-            nodes[i].write(Poseidon2::merge(&pairs[i]));
+            // SAFETY: We fill leaves first, then iterate from the bottom up. At this point,
+            // nodes[2 * i] and nodes[2 * i + 1] have already been written.
+            let left = unsafe { nodes[2 * i].assume_init_ref() };
+            let right = unsafe { nodes[2 * i + 1].assume_init_ref() };
+            nodes[i].write(Poseidon2::merge(&[*left, *right]));
         }
 
         // SAFETY: all elements were written above.
