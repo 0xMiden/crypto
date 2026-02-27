@@ -245,13 +245,12 @@ impl<'forest> EntriesIterator<'forest> {
                 // Here we have a history item with a key < the full tree item, so we want to return
                 // that. We can again rely on `NotInLeaf` to do our logic correctly.
                 *state = EntriesIteratorState::NotInLeaf;
-                history_entries_iter.next().and_then(|e| {
-                    if e.value == EMPTY_WORD {
-                        self.next_with_history()
-                    } else {
-                        Some(e)
+                loop {
+                    match history_entries_iter.next() {
+                        Some(e) if e.value == EMPTY_WORD => continue,
+                        other => break other,
                     }
-                })
+                }
             },
             EntriesIteratorState::InLeafBothTreePrio => {
                 // Here we have a full tree item with a key < the history item, so we want to return

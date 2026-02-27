@@ -1,5 +1,5 @@
 use alloc::{string::String, vec::Vec};
-use core::fmt;
+use core::{fmt, slice};
 
 use super::{InnerNodeInfo, MerkleError, MerklePath, NodeIndex, Poseidon2, Word};
 use crate::utils::{assume_init_vec, uninit_vector, word_to_hex};
@@ -49,9 +49,9 @@ impl MerkleTree {
         for i in (1..n).rev() {
             // SAFETY: We fill leaves first, then iterate from the bottom up. At this point,
             // nodes[2 * i] and nodes[2 * i + 1] have already been written.
-            let left = unsafe { nodes[2 * i].assume_init_ref() };
-            let right = unsafe { nodes[2 * i + 1].assume_init_ref() };
-            nodes[i].write(Poseidon2::merge(&[*left, *right]));
+            let left = unsafe { nodes[2 * i].assume_init_read() };
+            let right = unsafe { nodes[2 * i + 1].assume_init_read() };
+            nodes[i].write(Poseidon2::merge(&[left, right]));
         }
 
         // SAFETY: all elements were written above.
