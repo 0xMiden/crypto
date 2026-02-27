@@ -64,6 +64,35 @@ impl Mmr {
         }
     }
 
+    /// Constructs an MMR from an iterator of leaves.
+    ///
+    /// # Errors
+    /// Returns an error if the maximum forest size is exceeded.
+    pub fn try_from_iter<T: IntoIterator<Item = Word>>(values: T) -> Result<Self, MmrError> {
+        Self::try_from_iter_with_limit(values, Forest::MAX_LEAVES)
+    }
+
+    pub(crate) fn try_from_iter_with_limit<T: IntoIterator<Item = Word>>(
+        values: T,
+        max_leaves: usize,
+    ) -> Result<Self, MmrError> {
+        let mut mmr = Mmr::new();
+        let iter = values.into_iter();
+        let (lower, _) = iter.size_hint();
+        if lower > max_leaves {
+            return Err(MmrError::ForestSizeExceeded { requested: lower, max: max_leaves });
+        }
+        let mut count = 0usize;
+        for v in iter {
+            count += 1;
+            if count > max_leaves {
+                return Err(MmrError::ForestSizeExceeded { requested: count, max: max_leaves });
+            }
+            mmr.add(v)?;
+        }
+        Ok(mmr)
+    }
+
     // ACCESSORS
     // ============================================================================================
 
@@ -121,7 +150,14 @@ impl Mmr {
     }
 
     /// Adds a new element to the MMR.
-    pub fn add(&mut self, el: Word) {
+    ///
+    /// # Errors
+    /// Returns an error if the MMR exceeds the maximum supported forest size.
+    pub fn add(&mut self, el: Word) -> Result<(), MmrError> {
+        // Fail early before mutating nodes.
+        let old_forest = self.forest;
+        let mut new_forest = old_forest;
+        new_forest.append_leaf()?;
         // Note: every node is also a tree of size 1, adding an element to the forest creates a new
         // rooted-tree of size 1. This may temporarily break the invariant that every tree in the
         // forest has different sizes, the loop below will eagerly merge trees of same size and
@@ -131,15 +167,17 @@ impl Mmr {
         let mut left_offset = self.nodes.len().saturating_sub(2);
         let mut right = el;
         let mut left_tree = 1;
-        while !(self.forest & Forest::new(left_tree)).is_empty() {
+        while !(old_forest & Forest::try_new(left_tree).unwrap()).is_empty() {
             right = Poseidon2::merge(&[self.nodes[left_offset], right]);
             self.nodes.push(right);
 
-            left_offset = left_offset.saturating_sub(Forest::new(left_tree).num_nodes());
+            left_offset =
+                left_offset.saturating_sub(Forest::try_new(left_tree).unwrap().num_nodes());
             left_tree <<= 1;
         }
 
-        self.forest.append_leaf();
+        self.forest = new_forest;
+        Ok(())
     }
 
     /// Returns the current peaks of the MMR.
@@ -197,8 +235,8 @@ impl Mmr {
         let mut result = Vec::new();
 
         // Find the largest tree in this [Mmr] which is new to `from_forest`.
-        let candidate_trees = to_forest ^ from_forest;
-        let mut new_high = candidate_trees.largest_tree_unchecked();
+        let candidate_mask = to_forest.num_leaves() ^ from_forest.num_leaves();
+        let mut new_high = super::forest::largest_tree_from_mask(candidate_mask);
 
         // Collect authentication nodes used for tree merges
         // ----------------------------------------------------------------------------------------
@@ -207,7 +245,7 @@ impl Mmr {
         let mut merges = from_forest & new_high.all_smaller_trees_unchecked();
 
         // Find the peaks that are common to `from_forest` and this [Mmr]
-        let common_trees = from_forest ^ merges;
+        let common_trees = from_forest.try_bitxor(merges)?;
 
         if !merges.is_empty() {
             // Skip the smallest trees unknown to `from_forest`.
@@ -221,7 +259,14 @@ impl Mmr {
                 // - target: tree from which to load the sibling. On the first iteration this is a
                 //   value known by the partial mmr, on subsequent iterations this value is to be
                 //   computed from the known peaks and provided authentication nodes.
-                let known = (common_trees | merges | target).num_nodes();
+                let known_mask =
+                    common_trees.num_leaves() | merges.num_leaves() | target.num_leaves();
+                let known = Forest::try_new(known_mask)
+                    .map_err(|_| MmrError::ForestSizeExceeded {
+                        requested: known_mask,
+                        max: Forest::MAX_LEAVES,
+                    })?
+                    .num_nodes();
                 let sibling = target.num_nodes();
                 result.push(self.nodes[known + sibling - 1]);
 
@@ -231,7 +276,7 @@ impl Mmr {
                     target = target.next_larger_tree();
                 }
                 // Remove the merges done so far
-                merges ^= merges & target.all_smaller_trees_unchecked();
+                merges = merges.try_bitxor(merges & target.all_smaller_trees_unchecked())?;
             }
         } else {
             // The new high tree may not be the result of any merges, if it is smaller than all the
@@ -242,14 +287,14 @@ impl Mmr {
         // Collect the new [Mmr] peaks
         // ----------------------------------------------------------------------------------------
 
-        let mut new_peaks = to_forest ^ common_trees ^ new_high;
-        let old_peaks = to_forest ^ new_peaks;
+        let mut new_peaks = to_forest.try_bitxor(common_trees)?.try_bitxor(new_high)?;
+        let old_peaks = to_forest.try_bitxor(new_peaks)?;
         let mut offset = old_peaks.num_nodes();
         while !new_peaks.is_empty() {
             let target = new_peaks.largest_tree_unchecked();
             offset += target.num_nodes();
             result.push(self.nodes[offset - 1]);
-            new_peaks ^= target;
+            new_peaks = new_peaks.try_bitxor(target)?;
         }
 
         Ok(MmrDelta { forest: to_forest, data: result })
@@ -298,7 +343,7 @@ impl Mmr {
 
         // The tree walk below goes from the root to the leaf, compute the root index to start
         let mut forest_target: usize = 1usize << tree_bit;
-        let mut index = Forest::new(forest_target).num_nodes() - 1;
+        let mut index = Forest::try_new(forest_target).unwrap().num_nodes() - 1;
 
         // Loop until the leaf is reached
         while forest_target > 1 {
@@ -307,7 +352,7 @@ impl Mmr {
 
             // compute the indices of the right and left subtrees based on the post-order
             let right_offset = index - 1;
-            let left_offset = right_offset - Forest::new(forest_target).num_nodes();
+            let left_offset = right_offset - Forest::try_new(forest_target).unwrap().num_nodes();
 
             let left_or_right = relative_pos & forest_target;
             let sibling = if left_or_right != 0 {
@@ -337,18 +382,8 @@ impl Mmr {
 // CONVERSIONS
 // ================================================================================================
 
-impl<T> From<T> for Mmr
-where
-    T: IntoIterator<Item = Word>,
-{
-    fn from(values: T) -> Self {
-        let mut mmr = Mmr::new();
-        for v in values {
-            mmr.add(v)
-        }
-        mmr
-    }
-}
+// Note: We intentionally avoid a `TryFrom<T>` impl because it conflicts with the
+// blanket `TryFrom<U> for T where U: Into<T>` implementation in core.
 
 // SERIALIZATION
 // ================================================================================================
@@ -415,7 +450,7 @@ impl Iterator for MmrNodes<'_> {
 
             // compute the number of nodes in the right tree, this is the offset to the
             // previous left parent
-            let right_nodes = Forest::new(self.last_right).num_nodes();
+            let right_nodes = Forest::try_new(self.last_right).unwrap().num_nodes();
             // the next parent position is one above the position of the pair
             let parent = self.last_right << 1;
 
@@ -455,8 +490,8 @@ mod tests {
 
     use crate::{
         Felt, Word, ZERO,
-        merkle::mmr::Mmr,
-        utils::{Deserializable, Serializable},
+        merkle::mmr::{Forest, Mmr},
+        utils::{Deserializable, DeserializationError, Serializable},
     };
 
     #[test]
@@ -465,10 +500,19 @@ mod tests {
             .map(|value| Word::new([ZERO, ZERO, ZERO, Felt::new(value)]))
             .collect::<Vec<_>>();
 
-        let mmr = Mmr::from(nodes);
+        let mmr = Mmr::try_from_iter(nodes).unwrap();
         let serialized = mmr.to_bytes();
         let deserialized = Mmr::read_from_bytes(&serialized).unwrap();
         assert_eq!(mmr.forest, deserialized.forest);
         assert_eq!(mmr.nodes, deserialized.nodes);
+    }
+
+    #[test]
+    fn test_deserialization_rejects_large_forest() {
+        let mut bytes = (Forest::MAX_LEAVES + 1).to_bytes();
+        bytes.extend_from_slice(&0usize.to_bytes()); // empty nodes vector
+
+        let result = Mmr::read_from_bytes(&bytes);
+        assert!(matches!(result, Err(DeserializationError::InvalidValue(_))));
     }
 }
