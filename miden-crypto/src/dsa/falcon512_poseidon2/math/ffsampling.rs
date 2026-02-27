@@ -36,7 +36,7 @@ pub fn gram(b: [Polynomial<Complex64>; 4]) -> [Polynomial<Complex64>; 4] {
 /// G = [g[0]     g[1]  ]
 ///     [g[2]     g[3]  ]
 /// ```
-/// where g[1] = conj(g[2]) (Hermitian) and all elements are polynomials in FFT domain.
+/// where `g[1] = conj(g[2])` (Hermitian) and all elements are polynomials in FFT domain.
 ///
 /// # Output
 /// Returns only the non-trivial elements: (l10, d00, d11) representing:
@@ -48,12 +48,12 @@ pub fn gram(b: [Polynomial<Complex64>; 4]) -> [Polynomial<Complex64>; 4] {
 /// More specifically:
 ///
 /// From the equation L·D·L* = G, we can derive:
-/// 1. From position (0,0): 1·d00·1 = g[0] → **d00 = g[0]**
+/// 1. From position (0,0): 1·d00·1 = `g[0]` → **d00 = `g[0]`**
 ///
-/// 2. From position (1,0): l10·d00·1 = g[2] → **l10 = g[2] / g[0]**
+/// 2. From position (1,0): l10·d00·1 = `g[2]` → **l10 = `g[2]` / `g[0]`**
 ///
-/// 3. From position (1,1): l10·d00·conj(l10) + 1·d11·1 = g[3] → d11 = g[3] - l10·d00·conj(l10) →
-///    **d11 = g[3] - |l10|²·g[0]**
+/// 3. From position (1,1): l10·d00·conj(l10) + 1·d11·1 = `g[3]` → d11 = `g[3]` - l10·d00·conj(l10)
+///    → **d11 = `g[3]` - |l10|²·`g[0]`**
 pub fn ldl(
     g: [Polynomial<Complex64>; 4],
 ) -> (Polynomial<Complex64>, Polynomial<Complex64>, Polynomial<Complex64>) {
@@ -124,7 +124,8 @@ impl ZeroizeOnDrop for LdlTree {}
 
 /// Computes the LDL Tree of G. Corresponds to Algorithm 9 of the specification [1, p.37].
 /// The argument is a 2x2 matrix of polynomials, given in FFT form.
-/// [1]: https://falcon-sign.info/falcon.pdf
+///
+/// [1]: <https://falcon-sign.info/falcon.pdf>
 pub fn ffldl(gram_matrix: [Polynomial<Complex64>; 4]) -> LdlTree {
     let n = gram_matrix[0].coefficients.len();
     let (l10, d00, d11) = ldl(gram_matrix);
@@ -160,7 +161,7 @@ pub fn normalize_tree(tree: &mut LdlTree, sigma: f64) {
 
 /// Samples short polynomials using a Falcon tree. Algorithm 11 from the spec [1, p.40].
 ///
-/// [1]: https://falcon-sign.info/falcon.pdf
+/// [1]: <https://falcon-sign.info/falcon.pdf>
 pub fn ffsampling<R: Rng>(
     t: &(Polynomial<Complex64>, Polynomial<Complex64>),
     tree: &LdlTree,

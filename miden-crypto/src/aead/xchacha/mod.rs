@@ -17,6 +17,8 @@ use chacha20poly1305::{
     aead::{Aead, AeadCore, KeyInit},
 };
 use rand::{CryptoRng, RngCore};
+#[cfg(any(test, feature = "testing"))]
+use subtle::ConstantTimeEq;
 
 use crate::{
     Felt,
@@ -86,8 +88,19 @@ impl Nonce {
 }
 
 /// A 256-bit secret key
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug)]
 pub struct SecretKey([u8; SK_SIZE_BYTES]);
+
+#[cfg(any(test, feature = "testing"))]
+impl PartialEq for SecretKey {
+    fn eq(&self, other: &Self) -> bool {
+        // Constant-time comparison to avoid timing side channels in test builds.
+        bool::from(self.0.ct_eq(&other.0))
+    }
+}
+
+#[cfg(any(test, feature = "testing"))]
+impl Eq for SecretKey {}
 
 impl SecretKey {
     // CONSTRUCTORS

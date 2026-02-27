@@ -18,7 +18,7 @@ mod prng;
 pub(crate) use prng::ChaCha;
 
 /// Tests the Falcon512 implementation using the test vectors in
-/// https://github.com/tprest/falcon.py/blob/88d01ede1d7fa74a8392116bc5149dee57af93f2/scripts/sign_KAT.py#L1131
+/// <https://github.com/tprest/falcon.py/blob/88d01ede1d7fa74a8392116bc5149dee57af93f2/scripts/sign_KAT.py#L1131>
 #[test]
 fn test_signature_gen_reference_impl() {
     // message and initial seed used for generating the test vectors in the reference implementation
@@ -53,7 +53,7 @@ fn test_signature_gen_reference_impl() {
         // we compare the signature as a polynomial
 
         // 1. first we synchronize the `SHAKE256` context with the one in the reference C
-        // implementation as done in https://github.com/tprest/falcon.py/blob/88d01ede1d7fa74a8392116bc5149dee57af93f2/test.py#L256
+        // implementation as done in <https://github.com/tprest/falcon.py/blob/88d01ede1d7fa74a8392116bc5149dee57af93f2/test.py#L256>
         let skip_bytes = SYNC_DATA_FOR_TEST_VECTOR[i].0 * 8;
         let mut dummy = vec![0_u8; skip_bytes];
         rng_shake.fill_bytes(&mut dummy);
@@ -124,7 +124,7 @@ fn check_preversioned_fixed_nonce() {
 ///
 /// Note that [1] uses the term salt instead of nonce.
 ///
-/// [1]: https://github.com/algorand/falcon/blob/main/falcon-det.pdf
+/// [1]: <https://github.com/algorand/falcon/blob/main/falcon-det.pdf>
 fn build_preversioned_fixed_nonce() -> [u8; PREVERSIONED_NONCE_LEN] {
     use crate::dsa::falcon512_poseidon2::LOG_N;
 

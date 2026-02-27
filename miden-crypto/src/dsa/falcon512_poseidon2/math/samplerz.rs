@@ -37,8 +37,8 @@ fn approx_exp(x: f64, ccs: f64) -> u64 {
     // The constants C are used to approximate exp(-x); these
     // constants are taken from FACCT (up to a scaling factor
     // of 2^63):
-    //   https://eprint.iacr.org/2018/1234
-    //   https://github.com/raykzhao/gaussian
+    //   <https://eprint.iacr.org/2018/1234>
+    //   <https://github.com/raykzhao/gaussian>
     const C: [u64; 13] = [
         0x00000004741183a3u64,
         0x00000036548cfc06u64,

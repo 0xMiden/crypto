@@ -118,6 +118,17 @@ jobs:
           tool: cargo-deny
       - run: make cargo-deny
 
+  zeroize-audit:
+    name: zeroize-audit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Rustup
+        run: |
+          rustup update --no-self-update nightly
+      - name: Zeroize audit
+        run: make zeroize-audit
+
   fuzz-check:
     name: check fuzz crate
     runs-on: ubuntu-latest

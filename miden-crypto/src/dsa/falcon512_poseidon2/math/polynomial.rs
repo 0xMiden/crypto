@@ -123,7 +123,7 @@ impl<
     ///
     /// Corresponds to formula 3.25 in the spec [1, p.30].
     ///
-    /// [1]: https://falcon-sign.info/falcon.pdf
+    /// [1]: <https://falcon-sign.info/falcon.pdf>
     pub fn field_norm(&self) -> Self {
         let n = self.coefficients.len();
         let mut f0_coefficients = vec![F::zero(); n / 2];

@@ -114,7 +114,7 @@ where
     }
 
     /// Computes the evaluations of the polynomial on the roots of the polynomial X^n + 1 using a
-    /// fast Fourier transform. Algorithm 1 from https://eprint.iacr.org/2016/504.pdf.
+    /// fast Fourier transform. Algorithm 1 from <https://eprint.iacr.org/2016/504.pdf>.
     ///
     /// Arguments:
     ///
@@ -149,7 +149,7 @@ where
 
     /// Computes the coefficients of the polynomial with the given evaluations on the roots of
     /// X^n + 1 using an inverse fast Fourier transform.
-    /// Algorithm 2 from https://eprint.iacr.org/2016/504.pdf.
+    /// Algorithm 2 from <https://eprint.iacr.org/2016/504.pdf>.
     ///
     /// Arguments:
     ///
