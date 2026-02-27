@@ -129,7 +129,8 @@ fn collect_zeroize_impls(index: &BTreeMap<String, Value>) -> BTreeSet<u64> {
         let trait_path = item
             .pointer("/inner/impl/trait/path")
             .and_then(|v| v.as_str());
-        if !matches!(trait_path, Some("Zeroize" | "ZeroizeOnDrop")) {
+        let trait_name = trait_path.and_then(|path| path.split("::").last());
+        if !matches!(trait_name, Some("Zeroize" | "ZeroizeOnDrop")) {
             continue;
         }
         if let Some(id) = item
