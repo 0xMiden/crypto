@@ -345,7 +345,7 @@ fn test_from_vec_rejects_unused_bitmask_bits() {
     for bit in [510, 511] {
         let mut data = Vec::from(&b"SMT1"[..]);
         data.push(1);
-        data.extend_from_slice(&vec![0u8; Subtree::BITMASK_SIZE]);
+        data.extend_from_slice(&[0u8; Subtree::BITMASK_SIZE]);
         data[5 + (bit / 8)] |= 1 << (bit % 8);
 
         assert!(
@@ -360,7 +360,7 @@ fn test_from_vec_rejects_unused_bitmask_bits() {
     // Bit 509 is the last valid bit (node 254, right child) — should be accepted.
     let mut data = Vec::from(&b"SMT1"[..]);
     data.push(1);
-    data.extend_from_slice(&vec![0u8; Subtree::BITMASK_SIZE]);
+    data.extend_from_slice(&[0u8; Subtree::BITMASK_SIZE]);
     data[5 + (509 / 8)] |= 1 << (509 % 8);
     data.extend_from_slice(&Word::from([99u32; 4]).as_bytes());
 
@@ -374,7 +374,7 @@ fn test_from_vec_rejects_invalid_field_element() {
     // One hash slot with a limb >= the Goldilocks prime.
     let mut data = Vec::from(&b"SMT1"[..]);
     data.push(1);
-    data.extend_from_slice(&vec![0u8; Subtree::BITMASK_SIZE]);
+    data.extend_from_slice(&[0u8; Subtree::BITMASK_SIZE]);
     data[5] |= 1;
     data.extend_from_slice(&u64::MAX.to_le_bytes());
     data.extend_from_slice(&[0u8; 24]);
