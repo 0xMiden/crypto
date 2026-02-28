@@ -398,6 +398,35 @@ fn test_from_vec_accepts_legacy_leading_one() {
 }
 
 #[test]
+fn test_from_vec_rejects_unknown_version() {
+    let root_index = NodeIndex::new(SUBTREE_DEPTH, 0).unwrap();
+
+    let mut data = Vec::from(&b"SMT1"[..]);
+    data.push(Subtree::FORMAT_VERSION + 1);
+    data.extend_from_slice(&[0u8; Subtree::BITMASK_SIZE]);
+
+    assert!(matches!(
+        Subtree::from_vec(root_index, &data),
+        Err(super::SubtreeError::UnsupportedVersion { .. })
+    ));
+}
+
+#[test]
+fn test_from_vec_rejects_unknown_version_with_legacy_length() {
+    let root_index = NodeIndex::new(SUBTREE_DEPTH, 0).unwrap();
+
+    let mut data = Vec::from(&b"SMT1"[..]);
+    data.push(Subtree::FORMAT_VERSION + 1);
+    data.extend_from_slice(&[0u8; Subtree::BITMASK_SIZE]);
+    data.extend_from_slice(&Word::default().as_bytes());
+
+    assert!(matches!(
+        Subtree::from_vec(root_index, &data),
+        Err(super::SubtreeError::UnsupportedVersion { .. })
+    ));
+}
+
+#[test]
 fn test_apply_mutations() {
     let root_index = NodeIndex::new(SUBTREE_DEPTH, 0).unwrap();
     let mut subtree = Subtree::new(root_index);

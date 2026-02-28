@@ -377,16 +377,17 @@ impl Subtree {
     /// - 64 bytes: `child_bits` as little-endian u64s
     /// - Variable: non-empty child hashes (32 bytes each)
     pub fn from_vec(root_index: NodeIndex, data: &[u8]) -> Result<Self, SubtreeError> {
-        let (payload, min_len) = if data.starts_with(&Self::FORMAT_MAGIC) {
-            let header_len = Self::FORMAT_MAGIC.len() + 1 + Self::BITMASK_SIZE;
-            if data.len() >= header_len && data[Self::FORMAT_MAGIC.len()] == Self::FORMAT_VERSION {
-                (&data[Self::FORMAT_MAGIC.len() + 1..], header_len)
-            } else {
-                (data, Self::BITMASK_SIZE)
+        let parse_payload = |payload: &[u8], min_len: usize| -> Result<Self, SubtreeError> {
+            if payload.len() < Self::BITMASK_SIZE {
+                return Err(SubtreeError::TooShort { found: payload.len(), min: min_len });
             }
-        } else {
-            (data, Self::BITMASK_SIZE)
-        };
+
+            let (bits_data, hash_data) = payload.split_at(Self::BITMASK_SIZE);
+
+            let mut child_bits = [0u64; 8];
+            for (i, chunk) in bits_data.chunks_exact(8).enumerate() {
+                child_bits[i] = u64::from_le_bytes(chunk.try_into().unwrap());
+            }
 
             // Bits 510-511 are unused - reject corrupted data where these bits are set.
             const UNUSED_BITS_MASK: u64 = 0b11 << 62;
@@ -402,31 +403,28 @@ impl Subtree {
                 });
             }
 
-        let mut child_bits = [0u64; 8];
-        for (i, chunk) in bits_data.chunks_exact(8).enumerate() {
-            child_bits[i] = u64::from_le_bytes(chunk.try_into().unwrap());
+            let hashes: Vec<Word> = hash_data
+                .chunks_exact(Self::HASH_SIZE)
+                .map(|chunk| Word::try_from(chunk).map_err(|_| SubtreeError::InvalidHashData))
+                .collect::<Result<_, _>>()?;
+
+            Ok(Self { root_index, child_bits, hashes })
+        };
+
+        if data.starts_with(&Self::FORMAT_MAGIC) {
+            let header_len = Self::FORMAT_MAGIC.len() + 1 + Self::BITMASK_SIZE;
+            let min_header = Self::FORMAT_MAGIC.len() + 1;
+            if data.len() < min_header {
+                return Err(SubtreeError::TooShort { found: data.len(), min: min_header });
+            }
+            let version = data[Self::FORMAT_MAGIC.len()];
+            if version == Self::FORMAT_VERSION {
+                return parse_payload(&data[Self::FORMAT_MAGIC.len() + 1..], header_len);
+            }
+            return Err(SubtreeError::UnsupportedVersion { found: version });
         }
 
-        // Bits 510-511 are unused - reject corrupted data where these bits are set.
-        const UNUSED_BITS_MASK: u64 = 0b11 << 62;
-        if child_bits[7] & UNUSED_BITS_MASK != 0 {
-            return Err(SubtreeError::InvalidBitmask);
-        }
-
-        let set_bits: usize = child_bits.iter().map(|w| w.count_ones() as usize).sum();
-        if hash_data.len() != set_bits * Self::HASH_SIZE {
-            return Err(SubtreeError::BadHashLen {
-                expected: set_bits * Self::HASH_SIZE,
-                found: hash_data.len(),
-            });
-        }
-
-        let hashes: Vec<Word> = hash_data
-            .chunks_exact(Self::HASH_SIZE)
-            .map(|chunk| Word::try_from(chunk).map_err(|_| SubtreeError::InvalidHashData))
-            .collect::<Result<_, _>>()?;
-
-        Ok(Self { root_index, child_bits, hashes })
+        parse_payload(data, Self::BITMASK_SIZE)
     }
 
     // PRIVATE HELPERS
