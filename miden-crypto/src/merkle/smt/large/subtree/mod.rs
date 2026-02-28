@@ -4,7 +4,7 @@
 //! The subtree uses a compact bitmask-based representation where the in-memory format matches
 //! the serialized format, eliminating conversion overhead during serialization/deserialization.
 
-use alloc::vec::Vec;
+use alloc::{collections::BTreeSet, vec::Vec};
 
 use super::{EmptySubtreeRoots, InnerNode, InnerNodeInfo, NodeIndex, NodeMutation, SMT_DEPTH};
 use crate::{Word, merkle::smt::full::concurrent::SUBTREE_DEPTH};
@@ -282,6 +282,7 @@ impl Subtree {
     ///
     /// When mutations only update existing nodes (same structure, different hashes),
     /// hashes are patched in-place. Structural changes (additions or removals) trigger a rebuild.
+    /// If multiple mutations target the same node index, the last mutation wins.
     ///
     /// - `NodeMutation::Addition(node)` inserts or updates a node
     /// - `NodeMutation::Removal` removes a node
@@ -438,14 +439,9 @@ impl Subtree {
         mutations: impl IntoIterator<Item = (&'a NodeIndex, &'a NodeMutation)>,
     ) -> Option<(Vec<LocalMutation>, bool)> {
         let mut local_mutations = Vec::new();
-        let mut can_patch_in_place = true;
 
         for (index, mutation) in mutations {
             let local_index = Self::global_to_local(*index, self.root_index);
-            let bit_offset = (local_index as usize) * Self::BITS_PER_NODE;
-            let old_has_left = self.get_bit(bit_offset);
-            let old_has_right = self.get_bit(bit_offset + 1);
-
             let kind = match mutation {
                 NodeMutation::Addition(node) => {
                     let node_depth_in_subtree = Self::local_index_to_depth(local_index);
@@ -453,10 +449,6 @@ impl Subtree {
                     let empty_hash = *EmptySubtreeRoots::entry(SMT_DEPTH, child_depth);
                     let has_left = node.left != empty_hash;
                     let has_right = node.right != empty_hash;
-
-                    if old_has_left != has_left || old_has_right != has_right {
-                        can_patch_in_place = false;
-                    }
 
                     LocalMutationKind::Addition {
                         left: node.left,
@@ -466,9 +458,6 @@ impl Subtree {
                     }
                 },
                 NodeMutation::Removal => {
-                    if old_has_left || old_has_right {
-                        can_patch_in_place = false;
-                    }
                     LocalMutationKind::Removal
                 },
             };
@@ -476,7 +465,40 @@ impl Subtree {
             local_mutations.push(LocalMutation { local_index, kind });
         }
 
-        (!local_mutations.is_empty()).then_some((local_mutations, can_patch_in_place))
+        if local_mutations.is_empty() {
+            return None;
+        }
+
+        let mut seen = BTreeSet::new();
+        let mut deduped = Vec::with_capacity(local_mutations.len());
+        for mutation in local_mutations.into_iter().rev() {
+            if seen.insert(mutation.local_index) {
+                deduped.push(mutation);
+            }
+        }
+        deduped.reverse();
+
+        let mut can_patch_in_place = true;
+        for m in &deduped {
+            let bit_offset = (m.local_index as usize) * Self::BITS_PER_NODE;
+            let old_has_left = self.get_bit(bit_offset);
+            let old_has_right = self.get_bit(bit_offset + 1);
+
+            match m.kind {
+                LocalMutationKind::Addition { has_left, has_right, .. } => {
+                    if old_has_left != has_left || old_has_right != has_right {
+                        can_patch_in_place = false;
+                    }
+                },
+                LocalMutationKind::Removal => {
+                    if old_has_left || old_has_right {
+                        can_patch_in_place = false;
+                    }
+                },
+            }
+        }
+
+        Some((deduped, can_patch_in_place))
     }
 
     /// Patches hashes in-place when the subtree structure is unchanged.
