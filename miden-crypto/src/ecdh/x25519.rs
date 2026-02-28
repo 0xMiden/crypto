@@ -247,7 +247,8 @@ mod tests {
 
     use super::*;
     use crate::{
-        dsa::eddsa_25519_sha512::SecretKey, rand::test_utils::seeded_rng, utils::Deserializable,
+        dsa::eddsa_25519_sha512::SecretKey, ecdh::KeyAgreementError, rand::test_utils::seeded_rng,
+        utils::Deserializable,
     };
 
     #[test]
@@ -287,6 +288,20 @@ mod tests {
         let bytes = find_twist_point_bytes();
         let result = EphemeralPublicKey::read_from_bytes(&bytes);
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn exchange_static_ephemeral_rejects_zero_shared_secret() {
+        let mut rng = seeded_rng([0u8; 32]);
+        let static_sk = SecretKey::with_rng(&mut rng);
+
+        let low_order_bytes = EIGHT_TORSION[0].to_montgomery().to_bytes();
+        let low_order_pk = EphemeralPublicKey {
+            inner: x25519_dalek::PublicKey::from(low_order_bytes),
+        };
+
+        let result = X25519::exchange_static_ephemeral(&static_sk, &low_order_pk);
+        assert!(matches!(result, Err(KeyAgreementError::InvalidSharedSecret)));
     }
 
     fn find_twist_point_bytes() -> [u8; 32] {

@@ -378,15 +378,12 @@ impl Subtree {
     /// - Variable: non-empty child hashes (32 bytes each)
     pub fn from_vec(root_index: NodeIndex, data: &[u8]) -> Result<Self, SubtreeError> {
         let (payload, min_len) = if data.starts_with(&Self::FORMAT_MAGIC) {
-            let min_len = Self::FORMAT_MAGIC.len() + 1 + Self::BITMASK_SIZE;
-            if data.len() < min_len {
-                return Err(SubtreeError::TooShort { found: data.len(), min: min_len });
+            let header_len = Self::FORMAT_MAGIC.len() + 1 + Self::BITMASK_SIZE;
+            if data.len() >= header_len && data[Self::FORMAT_MAGIC.len()] == Self::FORMAT_VERSION {
+                (&data[Self::FORMAT_MAGIC.len() + 1..], header_len)
+            } else {
+                (data, Self::BITMASK_SIZE)
             }
-            let version = data[Self::FORMAT_MAGIC.len()];
-            if version != Self::FORMAT_VERSION {
-                return Err(SubtreeError::UnsupportedVersion { found: version });
-            }
-            (&data[Self::FORMAT_MAGIC.len() + 1..], min_len)
         } else {
             (data, Self::BITMASK_SIZE)
         };

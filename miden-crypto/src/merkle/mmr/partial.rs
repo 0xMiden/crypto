@@ -1,5 +1,6 @@
 use alloc::{
     collections::{BTreeMap, BTreeSet},
+    string::ToString,
     vec::Vec,
 };
 
@@ -25,6 +26,8 @@ type NodeMap = BTreeMap<InOrderIndex, Word>;
 /// authentication paths for a subset of the elements in a full MMR.
 ///
 /// This structure stores both the authentication paths and the leaf values for tracked leaves.
+/// Serialization includes tracked leaf positions; legacy serialized partial MMRs with stored
+/// nodes cannot be deserialized without migration.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PartialMmr {
     /// The version of the MMR.
@@ -81,6 +84,8 @@ impl Default for PartialMmr {
 }
 
 impl PartialMmr {
+    const TRACKED_LEAVES_MARKER: u8 = 0xff;
+
     // CONSTRUCTORS
     // --------------------------------------------------------------------------------------------
 
@@ -245,9 +250,9 @@ impl PartialMmr {
 
         for _ in 0..depth {
             let Some(node) = self.nodes.get(&idx.sibling()) else {
-                // This is expected for partial MMRs that don't track all authentication paths.
-                // The sibling node is simply not available, so we can't construct a full proof.
-                return Ok(None);
+                return Err(MmrError::InconsistentPartialMmr(format!(
+                    "missing sibling for tracked leaf at position {pos}"
+                )));
             };
             nodes.push(*node);
             idx = idx.parent();
@@ -458,6 +463,11 @@ impl PartialMmr {
             return removed;
         }
 
+        let Some(rel_pos) = self.forest.leaf_relative_position(leaf_pos) else {
+            return removed;
+        };
+        let tree_start = leaf_pos - rel_pos;
+
         // Remove the leaf value itself
         if let Some(word) = self.nodes.remove(&idx) {
             removed.push((idx, word));
@@ -465,6 +475,15 @@ impl PartialMmr {
 
         // Remove authentication path nodes that are no longer needed.
         loop {
+            let level = idx.level() as usize;
+            let subtree_size = 1usize << level;
+            let subtree_start_rel = (rel_pos >> level) << level;
+            let subtree_start = tree_start + subtree_start_rel;
+            let subtree_end = subtree_start + subtree_size;
+            if self.tracked_leaves.range(subtree_start..subtree_end).next().is_some() {
+                break;
+            }
+
             let sibling_idx = idx.sibling();
 
             // Try to remove the sibling auth node
@@ -711,6 +730,7 @@ impl Serializable for PartialMmr {
         self.peaks.write_into(target);
         self.nodes.write_into(target);
         // Serialize tracked_leaves as a Vec<usize>
+        target.write_u8(Self::TRACKED_LEAVES_MARKER);
         let tracked: Vec<usize> = self.tracked_leaves.iter().copied().collect();
         tracked.write_into(target);
     }
@@ -724,9 +744,43 @@ impl Deserializable for PartialMmr {
 
         let forest = Forest::new(usize::read_from(source)?);
         let peaks_vec = Vec::<Word>::read_from(source)?;
-        let nodes = NodeMap::read_from(source)?;
-        let tracked: Vec<usize> = Vec::read_from(source)?;
-        let tracked_leaves: BTreeSet<usize> = tracked.into_iter().collect();
+        let mut nodes = NodeMap::read_from(source)?;
+        let tracked_leaves = if !source.has_more_bytes() {
+            return Err(DeserializationError::UnexpectedEOF);
+        } else if source.peek_u8()? == Self::TRACKED_LEAVES_MARKER {
+            source.read_u8()?;
+            let tracked: Vec<usize> = Vec::read_from(source)?;
+            tracked.into_iter().collect()
+        } else if source.check_eor(2).is_err() {
+            if !nodes.is_empty() {
+                return Err(DeserializationError::InvalidValue(
+                    "legacy partial mmr without tracked leaf values is unsupported".to_string(),
+                ));
+            }
+
+            let track_latest = source.read_bool()?;
+            let mut tracked = BTreeSet::new();
+            if track_latest {
+                if !forest.has_single_leaf_tree() {
+                    return Err(DeserializationError::InvalidValue(
+                        "track_latest set without a dangling leaf".to_string(),
+                    ));
+                }
+
+                let leaf_pos = forest.num_leaves().saturating_sub(1);
+                let leaf_idx = InOrderIndex::from_leaf_pos(leaf_pos);
+                let leaf = peaks_vec.last().copied().ok_or_else(|| {
+                    DeserializationError::InvalidValue("missing peak for dangling leaf".to_string())
+                })?;
+                nodes.entry(leaf_idx).or_insert(leaf);
+                tracked.insert(leaf_pos);
+            }
+            tracked
+        } else {
+            return Err(DeserializationError::InvalidValue(
+                "unknown partial mmr serialization format".to_string(),
+            ));
+        };
 
         // Construct MmrPeaks to validate forest/peaks consistency
         let peaks = MmrPeaks::new(forest, peaks_vec).map_err(|e| {
@@ -744,17 +798,20 @@ impl Deserializable for PartialMmr {
 
 #[cfg(test)]
 mod tests {
-    use alloc::{collections::BTreeSet, vec::Vec};
+    use alloc::{
+        collections::{BTreeMap, BTreeSet},
+        vec::Vec,
+    };
 
     use super::{MmrPeaks, PartialMmr};
     use crate::{
         Word,
         merkle::{
             NodeIndex, int_to_node,
-            mmr::{Mmr, forest::Forest},
+            mmr::{InOrderIndex, Mmr, forest::Forest},
             store::MerkleStore,
         },
-        utils::{Deserializable, Serializable},
+        utils::{ByteWriter, Deserializable, Serializable},
     };
 
     const LEAVES: [Word; 7] = [
@@ -1130,6 +1187,62 @@ mod tests {
         assert_eq!(removed1.len(), 3);
         assert_eq!(partial_mmr.nodes().count(), 0);
         assert!(!partial_mmr.is_tracked(1));
+    }
+
+    #[test]
+    fn test_partial_mmr_untrack_preserves_upper_siblings() {
+        let mut mmr = Mmr::default();
+        (0..8).for_each(|i| mmr.add(int_to_node(i)));
+
+        let mut partial_mmr: PartialMmr = mmr.peaks().into();
+        for pos in [0, 2] {
+            let node = mmr.get(pos).unwrap();
+            let proof = mmr.open(pos).unwrap();
+            partial_mmr.track(pos, node, proof.path().merkle_path()).unwrap();
+        }
+
+        partial_mmr.untrack(0);
+
+        let proof_partial = partial_mmr.open(2).unwrap().unwrap();
+        let proof_full = mmr.open(2).unwrap();
+        assert_eq!(proof_partial, proof_full);
+    }
+
+    #[test]
+    fn test_partial_mmr_deserialize_legacy_track_latest() {
+        let mut mmr = Mmr::default();
+        (0..3).for_each(|i| mmr.add(int_to_node(i)));
+        let peaks = mmr.peaks();
+
+        let mut bytes = Vec::new();
+        peaks.num_leaves().write_into(&mut bytes);
+        peaks.peaks().to_vec().write_into(&mut bytes);
+        BTreeMap::<InOrderIndex, Word>::new().write_into(&mut bytes);
+        bytes.write_bool(true);
+
+        let decoded = PartialMmr::read_from_bytes(&bytes).unwrap();
+        assert!(decoded.is_tracked(2));
+        let proof_partial = decoded.open(2).unwrap().unwrap();
+        let proof_full = mmr.open(2).unwrap();
+        assert_eq!(proof_partial, proof_full);
+    }
+
+    #[test]
+    fn test_partial_mmr_rejects_legacy_nodes() {
+        let mut mmr = Mmr::default();
+        (0..3).for_each(|i| mmr.add(int_to_node(i)));
+        let peaks = mmr.peaks();
+
+        let mut nodes = BTreeMap::new();
+        nodes.insert(InOrderIndex::from_leaf_pos(0), int_to_node(0));
+
+        let mut bytes = Vec::new();
+        peaks.num_leaves().write_into(&mut bytes);
+        peaks.peaks().to_vec().write_into(&mut bytes);
+        nodes.write_into(&mut bytes);
+        bytes.write_bool(false);
+
+        assert!(PartialMmr::read_from_bytes(&bytes).is_err());
     }
 
     #[test]
