@@ -486,9 +486,7 @@ impl Subtree {
                         has_right,
                     }
                 },
-                NodeMutation::Removal => {
-                    LocalMutationKind::Removal
-                },
+                NodeMutation::Removal => LocalMutationKind::Removal,
             };
 
             local_mutations.push(LocalMutation { local_index, kind });
