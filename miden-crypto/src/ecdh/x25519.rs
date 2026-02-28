@@ -200,7 +200,7 @@ impl KeyAgreementScheme for X25519 {
         static_pk: &Self::PublicKey,
     ) -> Result<Self::SharedSecret, super::KeyAgreementError> {
         let shared = ephemeral_sk.diffie_hellman(static_pk);
-        if shared.as_ref().iter().all(|byte| *byte == 0) {
+        if is_all_zero(shared.as_ref()) {
             return Err(super::KeyAgreementError::InvalidSharedSecret);
         }
         Ok(shared)
@@ -211,7 +211,7 @@ impl KeyAgreementScheme for X25519 {
         ephemeral_pk: &Self::EphemeralPublicKey,
     ) -> Result<Self::SharedSecret, super::KeyAgreementError> {
         let shared = static_sk.get_shared_secret(ephemeral_pk.clone());
-        if shared.as_ref().iter().all(|byte| *byte == 0) {
+        if is_all_zero(shared.as_ref()) {
             return Err(super::KeyAgreementError::InvalidSharedSecret);
         }
         Ok(shared)
@@ -228,6 +228,14 @@ impl KeyAgreementScheme for X25519 {
             .map_err(|_| super::KeyAgreementError::HkdfExpansionFailed)?;
         Ok(buf)
     }
+}
+
+fn is_all_zero(bytes: &[u8]) -> bool {
+    let mut acc = 0u8;
+    for byte in bytes {
+        acc |= *byte;
+    }
+    acc == 0
 }
 
 // TESTS
