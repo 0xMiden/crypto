@@ -1,6 +1,8 @@
 use alloc::vec;
 
-use super::{InnerNode, NodeIndex, NodeMutation, SUBTREE_DEPTH, Subtree};
+use super::{
+    EmptySubtreeRoots, InnerNode, NodeIndex, NodeMutation, SMT_DEPTH, SUBTREE_DEPTH, Subtree,
+};
 use crate::Word;
 
 #[test]
@@ -443,4 +445,41 @@ fn test_apply_mutations() {
     let serialized = subtree.to_vec();
     let deserialized = Subtree::from_vec(root_index, &serialized).unwrap();
     assert!(deserialized.is_empty());
+}
+
+#[test]
+fn test_apply_mutations_dedupes_duplicate_indices() {
+    let root_index = NodeIndex::new(SUBTREE_DEPTH, 0).unwrap();
+    let mut subtree = Subtree::new(root_index);
+
+    let idx1 = NodeIndex::new(SUBTREE_DEPTH + 1, 0).unwrap();
+    let idx2 = NodeIndex::new(SUBTREE_DEPTH + 1, 1).unwrap();
+    let node1 = InnerNode {
+        left: Word::from([1u32; 4]),
+        right: Word::from([2u32; 4]),
+    };
+    let node2 = InnerNode {
+        left: Word::from([3u32; 4]),
+        right: Word::from([4u32; 4]),
+    };
+    subtree.insert_inner_node(idx1, node1);
+    subtree.insert_inner_node(idx2, node2.clone());
+
+    let empty_hash = *EmptySubtreeRoots::entry(SMT_DEPTH, idx1.depth() + 1);
+    let left_only = InnerNode {
+        left: Word::from([10u32; 4]),
+        right: empty_hash,
+    };
+    let right_only = InnerNode {
+        left: empty_hash,
+        right: Word::from([20u32; 4]),
+    };
+
+    let m1 = NodeMutation::Addition(left_only);
+    let m2 = NodeMutation::Addition(right_only.clone());
+    subtree.apply_mutations([(&idx1, &m1), (&idx1, &m2)]);
+
+    assert_eq!(subtree.get_inner_node(idx1), Some(right_only));
+    assert_eq!(subtree.get_inner_node(idx2), Some(node2));
+    assert_eq!(subtree.len(), 2);
 }
