@@ -94,7 +94,8 @@ impl Smt {
     ///    8 levels up. This continues until reaching the tree's root at depth 0.
     ///
     /// # Errors
-    /// Returns an error if mutations would exceed [`MAX_LEAF_ENTRIES`] (1024 entries) in a leaf.
+    /// Returns an error if mutations would exceed [`crate::merkle::smt::MAX_LEAF_ENTRIES`]
+    /// (1024 entries) in a leaf.
     pub(crate) fn compute_mutations_concurrent(
         &self,
         kv_pairs: impl IntoIterator<Item = (Word, Word)>,

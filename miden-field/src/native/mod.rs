@@ -26,6 +26,7 @@ use rand::{
     Rng,
     distr::{Distribution, StandardUniform},
 };
+use subtle::{ConditionallySelectable, ConstantTimeLess};
 
 #[cfg(test)]
 mod tests;
@@ -102,6 +103,29 @@ impl Felt {
     pub fn as_canonical_u64(&self) -> u64 {
         <Self as PrimeField64>::as_canonical_u64(self)
     }
+
+    /// Constant-time equivalent of `as_canonical_u64()` using the same reduction logic as
+    /// Plonky3's Goldilocks implementation.
+    #[inline]
+    pub fn as_canonical_u64_ct(&self) -> u64 {
+        let raw = raw_felt_u64(self);
+        // Mirrors Goldilocks::as_canonical_u64: conditional subtraction of ORDER.
+        // A single subtraction is sufficient for any u64 value since 2*ORDER > u64::MAX.
+        let reduced = raw.wrapping_sub(Self::ORDER);
+        let reduce = !raw.ct_lt(&Self::ORDER);
+        u64::conditional_select(&raw, &reduced, reduce)
+    }
+}
+
+#[inline]
+fn raw_felt_u64(value: &Felt) -> u64 {
+    const _: () = {
+        assert!(core::mem::size_of::<Felt>() == core::mem::size_of::<u64>());
+        assert!(core::mem::align_of::<Felt>() == core::mem::align_of::<u64>());
+        assert!(2u128 * (Felt::ORDER as u128) > u64::MAX as u128);
+    };
+    // SAFETY: Felt is repr(transparent) over Goldilocks, which is repr(transparent) over u64.
+    unsafe { core::mem::transmute_copy(value) }
 }
 
 impl fmt::Display for Felt {

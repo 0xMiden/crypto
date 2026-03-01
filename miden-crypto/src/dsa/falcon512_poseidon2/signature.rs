@@ -62,8 +62,8 @@ use crate::Word;
 ///
 /// The total size of the signature (including the extended public key) is 1524 bytes.
 ///
-/// [1]: https://github.com/algorand/falcon/blob/main/falcon-det.pdf
-/// [2]: https://datatracker.ietf.org/doc/html/rfc6979#section-3.5
+/// [1]: <https://github.com/algorand/falcon/blob/main/falcon-det.pdf>
+/// [2]: <https://datatracker.ietf.org/doc/html/rfc6979#section-3.5>
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Signature {
     header: SignatureHeader,
@@ -158,7 +158,7 @@ impl Default for SignatureHeader {
     /// the Poseidon2 Falcon variant from the reference variant using SHAKE256, we flip the
     /// first bit in the header. Thus, for Poseidon2 Falcon 512 the header is `10111001`
     ///
-    /// [1]: https://falcon-sign.info/falcon.pdf
+    /// [1]: <https://falcon-sign.info/falcon.pdf>
     fn default() -> Self {
         Self(0b1011_1001)
     }

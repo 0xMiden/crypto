@@ -28,8 +28,8 @@
 //! functions from `std::f64` that have non-deterministic precision mentioned in their
 //! documentation.
 //!
-//! [1]: https://github.com/algorand/falcon/blob/main/falcon-det.pdf
-//! [2]: https://datatracker.ietf.org/doc/html/rfc6979#section-3.5
+//! [1]: <https://github.com/algorand/falcon/blob/main/falcon-det.pdf>
+//! [2]: <https://datatracker.ietf.org/doc/html/rfc6979#section-3.5>
 
 use crate::{
     Felt, ZERO,
@@ -61,7 +61,7 @@ const MODULUS: i16 = 12289;
 const FALCON_ENCODING_BITS: u32 = 14;
 
 // The Falcon parameters for Falcon-512. This is the degree of the polynomial `phi := x^N + 1`
-// defining the ring Z_p[x]/(phi).
+// defining the ring `Z_p[x]/(phi)`.
 const N: usize = 512;
 const LOG_N: u8 = 9;
 
@@ -77,12 +77,14 @@ const PREVERSIONED_NONCE_LEN: usize = 39;
 ///
 /// The usefulness of the notion of versioned fixed nonce is discussed in Section 2.1 in [1].
 ///
-/// [1]: https://github.com/algorand/falcon/blob/main/falcon-det.pdf
+/// [1]: <https://github.com/algorand/falcon/blob/main/falcon-det.pdf>
 const NONCE_VERSION_BYTE: u8 = 1;
 
 /// The preversioned portion of the fixed nonce constructed following [1].
 ///
 /// Note that reference [1] uses the term salt instead of nonce.
+///
+/// [1]: <https://github.com/algorand/falcon/blob/main/falcon-det.pdf>
 const PREVERSIONED_NONCE: [u8; PREVERSIONED_NONCE_LEN] = [
     9, 70, 65, 76, 67, 79, 78, 45, 80, 79, 83, 69, 73, 68, 79, 78, 50, 45, 68, 69, 84, 0, 0, 0, 0,
     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -133,7 +135,7 @@ impl Nonce {
     ///
     /// The usefulness of the notion of versioned fixed nonce is discussed in Section 2.1 in [1].
     ///
-    /// [1]: https://github.com/algorand/falcon/blob/main/falcon-det.pdf
+    /// [1]: <https://github.com/algorand/falcon/blob/main/falcon-det.pdf>
     pub fn deterministic() -> Self {
         let mut nonce_bytes = [0u8; SIG_NONCE_LEN];
         nonce_bytes[0] = NONCE_VERSION_BYTE;

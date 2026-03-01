@@ -54,6 +54,11 @@ workspace-check: ## Runs a check that all packages have `lints.workspace = true`
 cargo-deny: ## Run cargo-deny to check dependencies for security vulnerabilities and license compliance
 	cargo deny check
 
+.PHONY: zeroize-audit
+zeroize-audit: ## Run Zeroize audit using rustdoc JSON
+	cargo +nightly rustdoc -p miden-crypto --all-features -- -Zunstable-options --output-format json --document-private-items
+	cargo run --quiet --manifest-path tools/zeroize-audit/Cargo.toml -- target/doc/miden_crypto.json
+
 .PHONY: lint
 lint: format fix clippy toml typos-check machete cargo-deny ## Run all linting tasks at once (Clippy, fixing, formatting, machete, cargo-deny)
 

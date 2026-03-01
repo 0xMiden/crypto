@@ -77,7 +77,7 @@ type NodeMutations = Map<NodeIndex, NodeMutation>;
 ///
 /// Every key maps to one leaf. If there are as many keys as there are leaves, then
 /// [Self::Leaf] should be the same type as [Self::Value], as is the case with
-/// [crate::merkle::SimpleSmt]. However, if there are more keys than leaves, then [`Self::Leaf`]
+/// [`SimpleSmt`]. However, if there are more keys than leaves, then [`Self::Leaf`]
 /// must accommodate all keys that map to the same leaf.
 ///
 /// [SparseMerkleTree] currently doesn't support optimizations that compress Merkle proofs.
@@ -202,7 +202,8 @@ pub(crate) trait SparseMerkleTree<const DEPTH: u8> {
     /// the Merkle tree, or [`drop()`] to discard them.
     ///
     /// # Errors
-    /// If mutations would exceed [`MAX_LEAF_ENTRIES`] (1024 entries) in a leaf, returns
+    /// If mutations would exceed [`crate::merkle::smt::MAX_LEAF_ENTRIES`] (1024 entries) in a leaf,
+    /// returns
     /// [`MerkleError::TooManyLeafEntries`].
     fn compute_mutations(
         &self,
@@ -318,7 +319,8 @@ pub(crate) trait SparseMerkleTree<const DEPTH: u8> {
     /// [`MerkleError::ConflictingRoots`] with a two-item [`Vec`]. The first item is the root hash
     /// the `mutations` were computed against, and the second item is the actual current root of
     /// this tree.
-    /// If mutations would exceed [`MAX_LEAF_ENTRIES`] (1024 entries) in a leaf, returns
+    /// If mutations would exceed [`crate::merkle::smt::MAX_LEAF_ENTRIES`] (1024 entries) in a leaf,
+    /// returns
     /// [`MerkleError::TooManyLeafEntries`].
     fn apply_mutations(
         &mut self,
@@ -495,7 +497,8 @@ pub(crate) trait SparseMerkleTree<const DEPTH: u8> {
     /// [`SparseMerkleTree::key_to_leaf_index()`]), or the result will be meaningless.
     ///
     /// # Errors
-    /// If inserting the key-value pair would exceed [`MAX_LEAF_ENTRIES`] (1024 entries) in a leaf,
+    /// If inserting the key-value pair would exceed
+    /// [`crate::merkle::smt::MAX_LEAF_ENTRIES`] (1024 entries) in a leaf,
     /// returns [`SmtLeafError::TooManyLeafEntries`].
     fn construct_prospective_leaf(
         &self,

@@ -15,6 +15,7 @@
 - Fix possible panic in `XChaCha::decrypt_bytes_with_associated_data` and harden deserialization with fuzzing across 7 new targets ([#836](https://github.com/0xMiden/crypto/pull/836)).
 - Use read_from_bytes_with_budget instead of read_from_bytes for deserialization from untrusted sources, setting the budget to the actual input byte slice length. ([#846](https://github.com/0xMiden/crypto/pull/846)).
 - [BREAKING] Added info context field to secret box, bind IES HKDF info to a stable context string, scheme identifier, and ephemeral public key bytes. ([#843](https://github.com/0xMiden/crypto/pull/843)).
+- [BREAKING] Removed `PartialEq`/`Eq` for AEAD `SecretKey` in non-test builds, fix various hygiene issues in dealing with secret keys ([#849](https://github.com/0xMiden/crypto/pull/849)).
 - Added `PublicKey::from_der()` for ECDSA public keys over secp256k1 ([#855](https://github.com/0xMiden/crypto/pull/855)).
 
 ## 0.22.3 (2026-02-23)
