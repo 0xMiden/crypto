@@ -264,9 +264,9 @@ fn test_public_key_from_der_rejects_non_canonical_long_form_length() {
     // Build a valid SPKI structure but encode the outer SEQUENCE length using non-canonical
     // long-form (0x81 <len>) even though the length < 128. DER should reject this.
     let mut rng = seeded_rng([10u8; 32]);
-    let sk = SecretKey::with_rng(&mut rng);
-    let pk = sk.public_key();
-    let pk_bytes = pk.to_bytes(); // compressed SEC1 (33 bytes)
+    let secret_key = SecretKey::with_rng(&mut rng);
+    let public_key = secret_key.public_key();
+    let public_key_bytes = public_key.to_bytes(); // compressed SEC1 (33 bytes)
 
     // AlgorithmIdentifier: id-ecPublicKey + secp256k1
     let algo: [u8; 18] = [
@@ -276,11 +276,11 @@ fn test_public_key_from_der_rejects_non_canonical_long_form_length() {
     ];
 
     // subjectPublicKey BIT STRING: 0 unused bits + compressed SEC1
-    let mut spk = Vec::with_capacity(2 + 1 + pk_bytes.len());
+    let mut spk = Vec::with_capacity(2 + 1 + public_key_bytes.len());
     spk.push(0x03); // BIT STRING
-    spk.push((1 + pk_bytes.len()) as u8); // length
+    spk.push((1 + public_key_bytes.len()) as u8); // length
     spk.push(0x00); // unused bits = 0
-    spk.extend_from_slice(&pk_bytes);
+    spk.extend_from_slice(&public_key_bytes);
 
     // Outer SEQUENCE using non-canonical long-form length (0x81)
     let total_len = (algo.len() + spk.len()) as u8; // fits in one byte
@@ -303,9 +303,9 @@ fn test_public_key_from_der_rejects_non_canonical_long_form_length() {
 fn test_public_key_from_der_rejects_trailing_bytes() {
     // Build a valid SPKI DER but append trailing bytes after the sequence; DER should reject.
     let mut rng = seeded_rng([11u8; 32]);
-    let sk = SecretKey::with_rng(&mut rng);
-    let pk = sk.public_key();
-    let pk_bytes = pk.to_bytes(); // compressed SEC1 (33 bytes)
+    let secret_key = SecretKey::with_rng(&mut rng);
+    let public_key = secret_key.public_key();
+    let public_key_bytes = public_key.to_bytes(); // compressed SEC1 (33 bytes)
 
     // AlgorithmIdentifier: id-ecPublicKey + secp256k1.
     let algo: [u8; 18] = [
@@ -315,11 +315,11 @@ fn test_public_key_from_der_rejects_trailing_bytes() {
     ];
 
     // subjectPublicKey BIT STRING: 0 unused bits + compressed SEC1.
-    let mut spk = Vec::with_capacity(2 + 1 + pk_bytes.len());
+    let mut spk = Vec::with_capacity(2 + 1 + public_key_bytes.len());
     spk.push(0x03); // BIT STRING
-    spk.push((1 + pk_bytes.len()) as u8); // length
+    spk.push((1 + public_key_bytes.len()) as u8); // length
     spk.push(0x00); // unused bits = 0
-    spk.extend_from_slice(&pk_bytes);
+    spk.extend_from_slice(&public_key_bytes);
 
     // Outer SEQUENCE with short-form length.
     let total_len = (algo.len() + spk.len()) as u8;
@@ -343,9 +343,9 @@ fn test_public_key_from_der_rejects_trailing_bytes() {
 fn test_public_key_from_der_rejects_wrong_curve_oid() {
     // Same structure but with prime256v1 (P-256) curve OID instead of secp256k1.
     let mut rng = seeded_rng([12u8; 32]);
-    let sk = SecretKey::with_rng(&mut rng);
-    let pk = sk.public_key();
-    let pk_bytes = pk.to_bytes(); // compressed SEC1 (33 bytes)
+    let secret_key = SecretKey::with_rng(&mut rng);
+    let public_key = secret_key.public_key();
+    let public_key_bytes = public_key.to_bytes(); // compressed SEC1 (33 bytes)
 
     // AlgorithmIdentifier: id-ecPublicKey + prime256v1 (1.2.840.10045.3.1.7).
     // Completed prime256v1 OID tail for correctness
@@ -360,11 +360,11 @@ fn test_public_key_from_der_rejects_wrong_curve_oid() {
     ];
 
     // subjectPublicKey BIT STRING.
-    let mut spk = Vec::with_capacity(2 + 1 + pk_bytes.len());
+    let mut spk = Vec::with_capacity(2 + 1 + public_key_bytes.len());
     spk.push(0x03);
-    spk.push((1 + pk_bytes.len()) as u8);
+    spk.push((1 + public_key_bytes.len()) as u8);
     spk.push(0x00);
-    spk.extend_from_slice(&pk_bytes);
+    spk.extend_from_slice(&public_key_bytes);
 
     let mut der = Vec::with_capacity(2 + algo_full.len() + spk.len());
     der.push(0x30);
@@ -382,9 +382,9 @@ fn test_public_key_from_der_rejects_wrong_curve_oid() {
 fn test_public_key_from_der_rejects_wrong_algorithm_oid() {
     // Use rsaEncryption (1.2.840.113549.1.1.1) instead of id-ecPublicKey.
     let mut rng = seeded_rng([13u8; 32]);
-    let sk = SecretKey::with_rng(&mut rng);
-    let pk = sk.public_key();
-    let pk_bytes = pk.to_bytes();
+    let secret_key = SecretKey::with_rng(&mut rng);
+    let public_key = secret_key.public_key();
+    let public_key_bytes = public_key.to_bytes();
 
     // AlgorithmIdentifier: rsaEncryption + NULL parameter.
     // OID bytes for 1.2.840.113549.1.1.1: 06 09 2A 86 48 86 F7 0D 01 01 01.
@@ -396,11 +396,11 @@ fn test_public_key_from_der_rejects_wrong_algorithm_oid() {
     ];
 
     // subjectPublicKey BIT STRING with EC compressed point (intentionally mismatched with algo).
-    let mut spk = Vec::with_capacity(2 + 1 + pk_bytes.len());
+    let mut spk = Vec::with_capacity(2 + 1 + public_key_bytes.len());
     spk.push(0x03);
-    spk.push((1 + pk_bytes.len()) as u8);
+    spk.push((1 + public_key_bytes.len()) as u8);
     spk.push(0x00);
-    spk.extend_from_slice(&pk_bytes);
+    spk.extend_from_slice(&public_key_bytes);
 
     let mut der = Vec::with_capacity(2 + algo_rsa.len() + spk.len());
     der.push(0x30);
