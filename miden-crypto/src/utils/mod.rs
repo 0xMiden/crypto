@@ -3,7 +3,7 @@
 use alloc::{boxed::Box, string::String, vec::Vec};
 use core::{
     fmt::{self, Write},
-    mem::MaybeUninit,
+    mem::{ManuallyDrop, MaybeUninit},
 };
 
 // Re-export serialization traits from miden-serde-utils
@@ -237,7 +237,10 @@ pub fn uninit_vector<T>(length: usize) -> Vec<MaybeUninit<T>> {
 /// # Safety
 /// All elements must be initialized before calling this function.
 pub unsafe fn assume_init_vec<T>(v: Vec<MaybeUninit<T>>) -> Vec<T> {
-    let (ptr, len, cap) = v.into_raw_parts();
+    let mut v = ManuallyDrop::new(v);
+    let ptr = v.as_mut_ptr();
+    let len = v.len();
+    let cap = v.capacity();
     // SAFETY: caller guarantees all elements are initialized.
     unsafe { Vec::from_raw_parts(ptr.cast::<T>(), len, cap) }
 }
