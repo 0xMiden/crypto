@@ -1,7 +1,11 @@
+## 0.22.6 (2026-03-13)
+
+- Added `Signature::from_der()` for ECDSA signatures over secp256k1 ([#842](https://github.com/0xMiden/crypto/pull/842)).
+- Added `PublicKey::from_der()` for ECDSA public keys over secp256k1 ([#855](https://github.com/0xMiden/crypto/pull/855)).
+
 ## 0.22.5 (2026-03-11)
 
 - Expose `StorageError` and `SubtreeUpdate` as prep. to externalize the `LargeSmt` RocksDB backend ([#850](https://github.com/0xMiden/crypto/pull/850)).
-- Added `Signature::from_der()` for ECDSA signatures over secp256k1 ([#842](https://github.com/0xMiden/crypto/pull/842)).
 
 ## 0.22.4 (2026-03-03)
 

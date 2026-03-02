@@ -209,3 +209,207 @@ fn test_signature_from_der_high_s_normalizes_and_flips_v() {
     assert_eq!(sig.s(), &expected_s_low);
     assert_eq!(sig.v(), v_initial ^ 1);
 }
+
+#[test]
+fn test_public_key_from_der_success() {
+    // Build a valid SPKI DER for the compressed SEC1 point of our generated key.
+    let mut rng = seeded_rng([9u8; 32]);
+    let secret_key = SecretKey::with_rng(&mut rng);
+    let public_key = secret_key.public_key();
+    let public_key_bytes = public_key.to_bytes(); // compressed SEC1 (33 bytes).
+
+    // AlgorithmIdentifier: id-ecPublicKey + secp256k1
+    let algo: [u8; 18] = [
+        0x30, 0x10, // SEQUENCE, length 16
+        0x06, 0x07, 0x2a, 0x86, 0x48, 0xce, 0x3d, 0x02, 0x01, // OID 1.2.840.10045.2.1
+        0x06, 0x05, 0x2b, 0x81, 0x04, 0x00, 0x0a, // OID 1.3.132.0.10 (secp256k1)
+    ];
+
+    // subjectPublicKey BIT STRING: 0 unused bits + compressed SEC1.
+    let mut spk = Vec::with_capacity(2 + 1 + public_key_bytes.len());
+    spk.push(0x03); // BIT STRING
+    spk.push((1 + public_key_bytes.len()) as u8); // length
+    spk.push(0x00); // unused bits = 0
+    spk.extend_from_slice(&public_key_bytes);
+
+    // Outer SEQUENCE.
+    let mut der = Vec::with_capacity(2 + algo.len() + spk.len());
+    der.push(0x30); // SEQUENCE
+    der.push((algo.len() + spk.len()) as u8); // total length
+    der.extend_from_slice(&algo);
+    der.extend_from_slice(&spk);
+
+    let parsed = PublicKey::from_der(&der).expect("should parse valid SPKI DER");
+    assert_eq!(parsed, public_key);
+}
+
+#[test]
+fn test_public_key_from_der_invalid() {
+    // Empty DER.
+    match PublicKey::from_der(&[]) {
+        Err(super::DeserializationError::InvalidValue(_)) => {},
+        other => panic!("expected InvalidValue for empty DER, got {:?}", other),
+    }
+
+    // Malformed: SEQUENCE with zero length (missing fields).
+    let der_bad: [u8; 2] = [0x30, 0x00];
+    match PublicKey::from_der(&der_bad) {
+        Err(super::DeserializationError::InvalidValue(_)) => {},
+        other => panic!("expected InvalidValue for malformed DER, got {:?}", other),
+    }
+}
+
+#[test]
+fn test_public_key_from_der_rejects_non_canonical_long_form_length() {
+    // Build a valid SPKI structure but encode the outer SEQUENCE length using non-canonical
+    // long-form (0x81 <len>) even though the length < 128. DER should reject this.
+    let mut rng = seeded_rng([10u8; 32]);
+    let secret_key = SecretKey::with_rng(&mut rng);
+    let public_key = secret_key.public_key();
+    let public_key_bytes = public_key.to_bytes(); // compressed SEC1 (33 bytes)
+
+    // AlgorithmIdentifier: id-ecPublicKey + secp256k1
+    let algo: [u8; 18] = [
+        0x30, 0x10, // SEQUENCE, length 16
+        0x06, 0x07, 0x2a, 0x86, 0x48, 0xce, 0x3d, 0x02, 0x01, // OID 1.2.840.10045.2.1
+        0x06, 0x05, 0x2b, 0x81, 0x04, 0x00, 0x0a, // OID 1.3.132.0.10 (secp256k1)
+    ];
+
+    // subjectPublicKey BIT STRING: 0 unused bits + compressed SEC1
+    let mut spk = Vec::with_capacity(2 + 1 + public_key_bytes.len());
+    spk.push(0x03); // BIT STRING
+    spk.push((1 + public_key_bytes.len()) as u8); // length
+    spk.push(0x00); // unused bits = 0
+    spk.extend_from_slice(&public_key_bytes);
+
+    // Outer SEQUENCE using non-canonical long-form length (0x81)
+    let total_len = (algo.len() + spk.len()) as u8; // fits in one byte
+    let mut der = Vec::with_capacity(3 + algo.len() + spk.len());
+    der.push(0x30); // SEQUENCE
+    der.push(0x81); // long-form length marker with one subsequent length byte
+    der.push(total_len);
+    der.extend_from_slice(&algo);
+    der.extend_from_slice(&spk);
+
+    match PublicKey::from_der(&der) {
+        Err(super::DeserializationError::InvalidValue(_)) => {},
+        other => {
+            panic!("expected InvalidValue for non-canonical long-form length, got {:?}", other)
+        },
+    }
+}
+
+#[test]
+fn test_public_key_from_der_rejects_trailing_bytes() {
+    // Build a valid SPKI DER but append trailing bytes after the sequence; DER should reject.
+    let mut rng = seeded_rng([11u8; 32]);
+    let secret_key = SecretKey::with_rng(&mut rng);
+    let public_key = secret_key.public_key();
+    let public_key_bytes = public_key.to_bytes(); // compressed SEC1 (33 bytes)
+
+    // AlgorithmIdentifier: id-ecPublicKey + secp256k1.
+    let algo: [u8; 18] = [
+        0x30, 0x10, // SEQUENCE, length 16
+        0x06, 0x07, 0x2a, 0x86, 0x48, 0xce, 0x3d, 0x02, 0x01, // OID 1.2.840.10045.2.1
+        0x06, 0x05, 0x2b, 0x81, 0x04, 0x00, 0x0a, // OID 1.3.132.0.10 (secp256k1)
+    ];
+
+    // subjectPublicKey BIT STRING: 0 unused bits + compressed SEC1.
+    let mut spk = Vec::with_capacity(2 + 1 + public_key_bytes.len());
+    spk.push(0x03); // BIT STRING
+    spk.push((1 + public_key_bytes.len()) as u8); // length
+    spk.push(0x00); // unused bits = 0
+    spk.extend_from_slice(&public_key_bytes);
+
+    // Outer SEQUENCE with short-form length.
+    let total_len = (algo.len() + spk.len()) as u8;
+    let mut der = Vec::with_capacity(2 + algo.len() + spk.len() + 2);
+    der.push(0x30); // SEQUENCE
+    der.push(total_len);
+    der.extend_from_slice(&algo);
+    der.extend_from_slice(&spk);
+
+    // Append trailing junk.
+    der.push(0x00);
+    der.push(0x00);
+
+    match PublicKey::from_der(&der) {
+        Err(super::DeserializationError::InvalidValue(_)) => {},
+        other => panic!("expected InvalidValue for DER with trailing bytes, got {:?}", other),
+    }
+}
+
+#[test]
+fn test_public_key_from_der_rejects_wrong_curve_oid() {
+    // Same structure but with prime256v1 (P-256) curve OID instead of secp256k1.
+    let mut rng = seeded_rng([12u8; 32]);
+    let secret_key = SecretKey::with_rng(&mut rng);
+    let public_key = secret_key.public_key();
+    let public_key_bytes = public_key.to_bytes(); // compressed SEC1 (33 bytes)
+
+    // AlgorithmIdentifier: id-ecPublicKey + prime256v1 (1.2.840.10045.3.1.7).
+    // Completed prime256v1 OID tail for correctness
+    // Full DER OID bytes for 1.2.840.10045.3.1.7 are: 06 08 2A 86 48 CE 3D 03 01 07
+    // We'll encode properly below with 8 length, then adjust the outer lengths accordingly.
+
+    // AlgorithmIdentifier with correct OID encoding but wrong curve:
+    let algo_full: [u8; 21] = [
+        0x30, 0x12, // SEQUENCE, length 18
+        0x06, 0x07, 0x2a, 0x86, 0x48, 0xce, 0x3d, 0x02, 0x01, // id-ecPublicKey
+        0x06, 0x08, 0x2a, 0x86, 0x48, 0xce, 0x3d, 0x03, 0x01, 0x07, // prime256v1
+    ];
+
+    // subjectPublicKey BIT STRING.
+    let mut spk = Vec::with_capacity(2 + 1 + public_key_bytes.len());
+    spk.push(0x03);
+    spk.push((1 + public_key_bytes.len()) as u8);
+    spk.push(0x00);
+    spk.extend_from_slice(&public_key_bytes);
+
+    let mut der = Vec::with_capacity(2 + algo_full.len() + spk.len());
+    der.push(0x30);
+    der.push((algo_full.len() + spk.len()) as u8);
+    der.extend_from_slice(&algo_full);
+    der.extend_from_slice(&spk);
+
+    match PublicKey::from_der(&der) {
+        Err(super::DeserializationError::InvalidValue(_)) => {},
+        other => panic!("expected InvalidValue for wrong curve OID, got {:?}", other),
+    }
+}
+
+#[test]
+fn test_public_key_from_der_rejects_wrong_algorithm_oid() {
+    // Use rsaEncryption (1.2.840.113549.1.1.1) instead of id-ecPublicKey.
+    let mut rng = seeded_rng([13u8; 32]);
+    let secret_key = SecretKey::with_rng(&mut rng);
+    let public_key = secret_key.public_key();
+    let public_key_bytes = public_key.to_bytes();
+
+    // AlgorithmIdentifier: rsaEncryption + NULL parameter.
+    // OID bytes for 1.2.840.113549.1.1.1: 06 09 2A 86 48 86 F7 0D 01 01 01.
+    // NULL parameter: 05 00.
+    let algo_rsa: [u8; 15] = [
+        0x30, 0x0d, // SEQUENCE, length 13
+        0x06, 0x09, 0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 0x01, 0x01, 0x01, // rsaEncryption
+        0x05, 0x00, // NULL
+    ];
+
+    // subjectPublicKey BIT STRING with EC compressed point (intentionally mismatched with algo).
+    let mut spk = Vec::with_capacity(2 + 1 + public_key_bytes.len());
+    spk.push(0x03);
+    spk.push((1 + public_key_bytes.len()) as u8);
+    spk.push(0x00);
+    spk.extend_from_slice(&public_key_bytes);
+
+    let mut der = Vec::with_capacity(2 + algo_rsa.len() + spk.len());
+    der.push(0x30);
+    der.push((algo_rsa.len() + spk.len()) as u8);
+    der.extend_from_slice(&algo_rsa);
+    der.extend_from_slice(&spk);
+
+    match PublicKey::from_der(&der) {
+        Err(super::DeserializationError::InvalidValue(_)) => {},
+        other => panic!("expected InvalidValue for wrong algorithm OID, got {:?}", other),
+    }
+}

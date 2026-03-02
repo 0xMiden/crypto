@@ -6,6 +6,7 @@ use alloc::{string::ToString, vec::Vec};
 use k256::{
     ecdh::diffie_hellman,
     ecdsa::{RecoveryId, SigningKey, VerifyingKey, signature::hazmat::PrehashVerifier},
+    pkcs8::DecodePublicKey,
 };
 use miden_crypto_derive::{SilentDebug, SilentDisplay};
 use rand::{CryptoRng, RngCore};
@@ -175,6 +176,16 @@ impl PublicKey {
         .map_err(|_| PublicKeyError::RecoveryFailed)?;
 
         Ok(Self { inner: verifying_key })
+    }
+
+    /// Creates a public key from SPKI ASN.1 DER format bytes.
+    ///
+    /// # Arguments
+    /// * `bytes` - SPKI ASN.1 DER format bytes
+    pub fn from_der(bytes: &[u8]) -> Result<Self, DeserializationError> {
+        let verifying_key = VerifyingKey::from_public_key_der(bytes)
+            .map_err(|err| DeserializationError::InvalidValue(err.to_string()))?;
+        Ok(PublicKey { inner: verifying_key })
     }
 }
 
