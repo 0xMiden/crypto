@@ -250,7 +250,7 @@ impl SmtLeaf {
 
     /// Returns the value associated with `key` in the leaf, or `None` if `key` maps to another
     /// leaf.
-    pub(in crate::merkle::smt) fn get_value(&self, key: &Word) -> Option<Word> {
+    pub fn get_value(&self, key: &Word) -> Option<Word> {
         // Ensure that `key` maps to this leaf
         if self.index() != (*key).into() {
             return None;
