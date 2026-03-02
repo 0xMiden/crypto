@@ -117,11 +117,12 @@ Messages sealed as one type must be unsealed using the corresponding method, oth
 
 ## Pseudo-Random Element Generator
 
-[Pseudo random element generator module](./miden-crypto/src/rand/) provides a set of traits and data structures that facilitate generating pseudo-random elements in the context of Miden protocol. The module currently includes:
+[Pseudo random element generator module](./miden-crypto/src/rand/) provides a set of traits and utilities that facilitate generating pseudo-random elements in the context of Miden protocol. The module currently includes:
 
+- `Randomizable`: a trait for constructing values from random bytes.
 - `FeltRng`: a trait for generating random field elements and random 4 field elements.
-- `RpoRandomCoin`: a struct implementing `FeltRng` as well as the [`RandomCoin`](https://github.com/facebook/winterfell/blob/main/crypto/src/random/mod.rs) trait using RPO hash function.
-- `RpxRandomCoin`: a struct implementing `FeltRng` as well as the [`RandomCoin`](https://github.com/facebook/winterfell/blob/main/crypto/src/random/mod.rs) trait using RPX hash function.
+- `random_felt` and `random_word`: `std`-only helpers for generating random field elements and words.
+- `test_utils`: deterministic and `std`-based helpers for tests and benchmarks.
 
 ## STARK proving system
 
