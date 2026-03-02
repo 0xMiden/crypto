@@ -667,7 +667,7 @@ proptest! {
         let has_real_changes = update_entries.iter().any(|(key, value)| {
             match initial_entries.iter().find(|(init_key, _)| init_key == key) {
                 Some((_, init_value)) => init_value != value,
-                None => true,
+                None => *value != EMPTY_WORD,
             }
         });
 
