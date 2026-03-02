@@ -1,3 +1,7 @@
+## 0.19.8 (2026-03-02)
+
+- Added `PublicKey::from_der()` for ECDSA public keys over secp256k1 ([#855](https://github.com/0xMiden/crypto/pull/855)).
+
 ## 0.19.7 (2026-02-26)
 
 - Exposed `StorageError` and `SubtreeUpdate` as prep. to externalize the `LargeSmt` RocksDB backend ([#850](https://github.com/0xMiden/crypto/pull/850)).
