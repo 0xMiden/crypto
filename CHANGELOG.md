@@ -18,6 +18,10 @@
 - [BREAKING] Removed `PartialEq`/`Eq` for AEAD `SecretKey` in non-test builds, fix various hygiene issues in dealing with secret keys ([#849](https://github.com/0xMiden/crypto/pull/849)).
 - Added `PublicKey::from_der()` for ECDSA public keys over secp256k1 ([#855](https://github.com/0xMiden/crypto/pull/855)).
 
+## 0.22.4 (2026-03-03)
+
+- Make `SmtLeaf::get_value` public ([#872](https://github.com/0xMiden/crypto/pull/872)).
+
 ## 0.22.3 (2026-02-23)
 
 - Refactored to introduce a unified `Felt` type for on-chain and off-chain code ([#819](https://github.com/0xMiden/crypto/pull/819)).
