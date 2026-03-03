@@ -1,4 +1,4 @@
-## 0.22.4 (tbd)
+## 0.22.4 (2026-03-03)
 
 - Make `SmtLeaf::get_value` public ([#872](https://github.com/0xMiden/crypto/pull/872)).
 
