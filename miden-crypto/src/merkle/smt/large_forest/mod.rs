@@ -312,7 +312,7 @@ use crate::{
         smt::{
             LeafIndex, SMT_DEPTH, SmtLeaf, SmtProof,
             large_forest::{
-                history::{CompactLeaf, History, HistoryView},
+                history::{History, HistoryView},
                 iterator::EntriesIterator,
                 lineage::LineageData,
                 root::{RootValue, UniqueRoot},
@@ -597,7 +597,7 @@ impl<B: Backend> LargeSmtForest<B> {
 
         // We compute the new leaf and new path by applying any reversions from the history on
         // top of the current state.
-        let new_leaf = self.merge_leaves(opening.leaf(), &view.leaf_delta(&leaf_index))?;
+        let new_leaf = self.merge_leaves(opening.leaf(), view)?;
         let new_path = self.merge_paths(leaf_index, opening.path(), view)?;
 
         // Finally we can compose our combined opening.
@@ -698,13 +698,7 @@ impl<B: Backend> LargeSmtForest<B> {
 
         // In the general case there is no faster path than doing the iteration to merge the
         // history with the full tree, so we just count the iterator.
-        Ok(
-            EntriesIterator::new_with_history(
-                self.backend.entries(tree.lineage())?,
-                view.entries(),
-            )
-            .count(),
-        )
+        Ok(EntriesIterator::new_with_history(self.backend.entries(tree.lineage())?, view).count())
     }
 
     /// Returns an iterator that yields the entries in the specified `tree`.
@@ -745,10 +739,7 @@ impl<B: Backend> LargeSmtForest<B> {
         };
 
         // If we can serve it from the history we need to instead construct the complex version.
-        Ok(EntriesIterator::new_with_history(
-            self.backend.entries(tree.lineage())?,
-            view.entries(),
-        ))
+        Ok(EntriesIterator::new_with_history(self.backend.entries(tree.lineage())?, view))
     }
 }
 
@@ -995,22 +986,38 @@ impl<B: Backend> LargeSmtForest<B> {
 /// This block contains internal functions that exist to de-duplicate or modularize functionality
 /// within the forest. These should not be exposed.
 impl<B: Backend> LargeSmtForest<B> {
-    /// Applies the provided `historical_delta` on top of the provided `full_tree_leaf` to produce
-    /// the correct leaf for a historical opening.
-    fn merge_leaves(
-        &self,
-        full_tree_leaf: &SmtLeaf,
-        historical_delta: &CompactLeaf,
-    ) -> Result<SmtLeaf> {
+    /// Applies the history delta given by `history_view` on top of the provided `full_tree_leaf` to
+    /// produce the correct leaf for a historical opening.
+    fn merge_leaves(&self, full_tree_leaf: &SmtLeaf, history_view: HistoryView) -> Result<SmtLeaf> {
         // We apply the historical delta on top of the existing entries to perform the reversion
         // back to the previous state.
         let mut leaf_entries = Map::new();
-        leaf_entries.extend(full_tree_leaf.to_entries().map(|(k, v)| (*k, *v)));
-        leaf_entries.extend(historical_delta);
+        for (k, v) in full_tree_leaf.to_entries() {
+            // If the history removes the pair, then we skip adding it to our output leaf entries.
+            if history_view.is_key_removed(k) {
+                continue;
+            }
+
+            leaf_entries.insert(*k, *v);
+        }
+
+        // The delta may have added items that we do not have (due to later removals), so we have to
+        // add those back, but only the ones for the leaf we care about.
+        leaf_entries.extend(
+            history_view
+                .changed_keys()
+                .filter(|(k, v)| LeafIndex::from(*k) == full_tree_leaf.index() && !v.is_empty()),
+        );
+
+        // At this point we should not see any entries with empty values, so in debug builds let's
+        // sanity check this.
+        debug_assert!(
+            leaf_entries.iter().all(|(_, v)| !v.is_empty()),
+            "Leaf entries should not contain entries with "
+        );
 
         // Any entries that are still empty at this point should be removed.
-        let non_empties_only = leaf_entries.into_iter().filter(|(_, v)| *v != EMPTY_WORD).collect();
-        Ok(SmtLeaf::new(non_empties_only, full_tree_leaf.index())?)
+        Ok(SmtLeaf::new(leaf_entries.into_iter().collect(), full_tree_leaf.index())?)
     }
 
     /// Applies any historical changes contained in `history_view` on top of the merkle path

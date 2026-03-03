@@ -116,9 +116,8 @@ where
     /// It is the responsibility of the forest to ensure lineage existence before querying the
     /// backend. The backend must return an error if the lineage does not exist.
     ///
-    /// This iterator must yield entries in an order such that they are sorted by their leaf index,
-    /// and entries that share a leaf index are sorted by key. It must not include key-value pairs
-    /// where the value is the empty word.
+    /// The iterator may yield entries in any arbitrary order, but must not yield entries for which
+    /// the value is the empty word.
     fn entries(&self, lineage: LineageId) -> Result<impl Iterator<Item = TreeEntry>>;
 
     // SINGLE-TREE MODIFIERS

@@ -18,17 +18,16 @@ use crate::{
         EmptySubtreeRoots,
         smt::{
             Backend, ForestInMemoryBackend, ForestOperation, LargeSmtForest, LargeSmtForestError,
-            LeafIndex, RootInfo, Smt, SmtForestUpdateBatch, SmtUpdateBatch, TreeId, VersionId,
+            RootInfo, Smt, SmtForestUpdateBatch, SmtUpdateBatch, TreeId, VersionId,
             large_forest::{
                 LineageData,
-                history::{History, LeafChanges, NodeChanges},
+                history::{ChangedKeys, History, NodeChanges},
                 root::{LineageId, TreeEntry, TreeWithRoot},
             },
         },
     },
     rand::test_utils::{ContinuousRng, rand_value},
 };
-
 // TYPE ALIASES
 // ================================================================================================
 
@@ -742,6 +741,70 @@ fn entries() -> Result<()> {
 }
 
 #[test]
+fn forest_overlays_correctly() -> Result<()> {
+    let backend = ForestInMemoryBackend::new();
+    let mut forest = LargeSmtForest::new(backend)?;
+
+    // We can just make some arbitrary values here for demonstration.
+    let key_1 = Word::parse("0x42").unwrap();
+    let value_1 = Word::parse("0x80").unwrap();
+    let key_2 = Word::parse("0xAB").unwrap();
+    let value_2 = Word::parse("0xCD").unwrap();
+
+    // Operations are most cleanly specified using a builder.
+    let mut operations = SmtUpdateBatch::empty();
+    operations.add_insert(key_1, value_1);
+    operations.add_insert(key_2, value_2);
+
+    // To add a new lineage we also need to give it a lineage ID, and a version.
+    let lineage = LineageId::new([0x42; 32]);
+    let version_1 = 1;
+
+    // Now we can add the lineage to the forest!
+    forest.add_lineage(lineage, version_1, operations)?;
+
+    // Let's make another arbitrary value.
+    let key_3 = Word::parse("0x67").unwrap();
+    let value_3 = Word::parse("0x96").unwrap();
+
+    // And build a batch of operations again.
+    let mut operations = SmtUpdateBatch::empty();
+    operations.add_insert(key_3, value_3);
+    operations.add_remove(key_1);
+
+    // Now we can simply update the tree all in one go with our changes.
+    let version_2 = version_1 + 1;
+    forest.update_tree(lineage, version_2, operations)?;
+
+    // As discussed above, trees are identified by a combination of their lineage and version.
+    let old_tree = TreeId::new(lineage, version_1);
+    let current_tree = TreeId::new(lineage, version_2);
+
+    // The first really useful query is `open`, which gets the opening for the specified key. We can
+    // get openings for the current tree AND the historical trees.
+    assert!(forest.open(old_tree, key_1).is_ok());
+    assert!(forest.open(current_tree, key_3).is_ok());
+
+    // We can also just `get` the value associated with a key, which returns `None` if the key is
+    // not populated.
+    assert_eq!(forest.get(old_tree, key_1)?, Some(value_1));
+    assert_eq!(forest.get(current_tree, key_3)?, Some(value_3));
+    assert!(forest.get(current_tree, key_1)?.is_none());
+
+    // We can also get an iterator over all the entries in the tree.
+    let entries_old: Vec<_> = forest.entries(old_tree)?.collect();
+    let entries_current: Vec<_> = forest.entries(current_tree)?.collect();
+    assert!(entries_old.contains(&TreeEntry { key: key_1, value: value_1 }));
+    assert!(entries_old.contains(&TreeEntry { key: key_2, value: value_2 }));
+    assert!(!entries_old.contains(&TreeEntry { key: key_3, value: value_3 }));
+    assert!(!entries_current.contains(&TreeEntry { key: key_1, value: value_1 }));
+    assert!(entries_current.contains(&TreeEntry { key: key_2, value: value_2 }));
+    assert!(entries_current.contains(&TreeEntry { key: key_3, value: value_3 }));
+
+    Ok(())
+}
+
+#[test]
 fn entries_never_returns_empty_entry() -> Result<()> {
     // We risk yielding empty entries in a few situations, but all of those situations involve
     // iterating over the history on its own. Let's go through them one by one.
@@ -990,9 +1053,9 @@ fn update_tree() -> Result<()> {
     // If we query for each value, we should see the correct reversions.
     let view = history.get_view_at(version_1)?;
 
-    assert_eq!(view.leaf_delta(&LeafIndex::from(key_1)).get(&key_1), Some(&value_1));
-    assert_eq!(view.leaf_delta(&LeafIndex::from(key_2)).get(&key_2), Some(&EMPTY_WORD));
-    assert_eq!(view.leaf_delta(&LeafIndex::from(key_3)).get(&key_3), Some(&EMPTY_WORD));
+    assert_eq!(view.value(&key_1), Some(value_1));
+    assert_eq!(view.value(&key_2), Some(EMPTY_WORD));
+    assert_eq!(view.value(&key_3), Some(EMPTY_WORD));
 
     // We should also now see this lineage listed as having a non-empty history.
     assert!(forest.get_non_empty_histories().contains(&lineage_1));
@@ -1181,8 +1244,8 @@ fn truncate_removes_emptied_lineages_from_non_empty_histories() {
     // Build a lineage with one historical version at version 5, and a latest version of 10.
     let mut history = History::empty(4);
     let nodes = NodeChanges::default();
-    let leaves = LeafChanges::default();
-    history.add_version(rand_value(), 5, nodes, leaves).unwrap();
+    let changed_keys = ChangedKeys::default();
+    history.add_version(rand_value(), 5, nodes, changed_keys).unwrap();
     assert_eq!(history.num_versions(), 1);
 
     let lineage_data = LineageData {
@@ -1225,9 +1288,13 @@ fn truncate_retains_non_empty_lineages_in_non_empty_histories() {
     // Build a lineage with two historical versions (5 and 8), latest version 15.
     let mut history = History::empty(4);
     let nodes = NodeChanges::default();
-    let leaves = LeafChanges::default();
-    history.add_version(rand_value(), 5, nodes.clone(), leaves.clone()).unwrap();
-    history.add_version(rand_value(), 8, nodes, leaves).unwrap();
+    let changed_keys = ChangedKeys::default();
+    history
+        .add_version(rand_value(), 5, nodes.clone(), changed_keys.clone())
+        .unwrap();
+    history
+        .add_version(rand_value(), 8, nodes.clone(), changed_keys.clone())
+        .unwrap();
     assert_eq!(history.num_versions(), 2);
 
     let lineage_data = LineageData {

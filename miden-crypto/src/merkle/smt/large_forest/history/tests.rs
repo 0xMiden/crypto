@@ -2,17 +2,15 @@
 //! The functional tests for the history component.
 
 use alloc::vec::Vec;
-use core::iter::once;
 
-use itertools::Itertools;
 use p3_field::PrimeCharacteristicRing;
 
-use super::{CompactLeaf, History, LeafChanges, NodeChanges, error::Result};
+use super::{ChangedKeys, History, NodeChanges, error::Result};
 use crate::{
     EMPTY_WORD, Felt, Word,
     merkle::{
         NodeIndex,
-        smt::{LeafIndex, Smt, VersionId, large_forest::root::TreeEntry},
+        smt::{LeafIndex, Smt, VersionId},
     },
     rand::test_utils::ContinuousRng,
 };
@@ -33,12 +31,12 @@ fn roots() -> Result<()> {
 
     // Set up our test state
     let nodes = NodeChanges::default();
-    let leaves = LeafChanges::default();
+    let changed_keys = ChangedKeys::default();
     let mut history = History::empty(2);
     let root_1: Word = rng.value();
     let root_2: Word = rng.value();
-    history.add_version(root_1, 0, nodes.clone(), leaves.clone())?;
-    history.add_version(root_2, 1, nodes.clone(), leaves.clone())?;
+    history.add_version(root_1, 0, nodes.clone(), changed_keys.clone())?;
+    history.add_version(root_2, 1, nodes.clone(), changed_keys.clone())?;
 
     // We should be able to get all the roots.
     let roots = history.roots().collect::<Vec<_>>();
@@ -55,7 +53,7 @@ fn find_latest_corresponding_version() -> Result<()> {
 
     // Start by setting up our test data.
     let nodes = NodeChanges::default();
-    let leaves = LeafChanges::default();
+    let changed_keys = ChangedKeys::default();
     let mut history = History::empty(5);
 
     let v1 = 10;
@@ -64,11 +62,11 @@ fn find_latest_corresponding_version() -> Result<()> {
     let v4 = 31;
     let v5 = 45;
 
-    history.add_version(rng.value(), v1, nodes.clone(), leaves.clone())?;
-    history.add_version(rng.value(), v2, nodes.clone(), leaves.clone())?;
-    history.add_version(rng.value(), v3, nodes.clone(), leaves.clone())?;
-    history.add_version(rng.value(), v4, nodes.clone(), leaves.clone())?;
-    history.add_version(rng.value(), v5, nodes.clone(), leaves.clone())?;
+    history.add_version(rng.value(), v1, nodes.clone(), changed_keys.clone())?;
+    history.add_version(rng.value(), v2, nodes.clone(), changed_keys.clone())?;
+    history.add_version(rng.value(), v3, nodes.clone(), changed_keys.clone())?;
+    history.add_version(rng.value(), v4, nodes.clone(), changed_keys.clone())?;
+    history.add_version(rng.value(), v5, nodes.clone(), changed_keys.clone())?;
 
     // When we query for a version that is older than the oldest in the history we should get an
     // error.
@@ -99,7 +97,7 @@ fn find_latest_corresponding_version() -> Result<()> {
 #[test]
 fn add_version() -> Result<()> {
     let nodes = NodeChanges::default();
-    let leaves = LeafChanges::default();
+    let changed_keys = ChangedKeys::default();
     let mut rng = ContinuousRng::new([0x15; 32]);
 
     // We start with an empty state, and we should be able to add deltas up until the limit we
@@ -110,18 +108,18 @@ fn add_version() -> Result<()> {
 
     let root_1: Word = rng.value();
     let id_1 = 0;
-    history.add_version(root_1, id_1, nodes.clone(), leaves.clone())?;
+    history.add_version(root_1, id_1, nodes.clone(), changed_keys.clone())?;
     assert_eq!(history.num_versions(), 1);
 
     let root_2: Word = rng.value();
     let id_2 = 1;
-    history.add_version(root_2, id_2, nodes.clone(), leaves.clone())?;
+    history.add_version(root_2, id_2, nodes.clone(), changed_keys.clone())?;
     assert_eq!(history.num_versions(), 2);
 
     // At this point, adding any version should remove the oldest.
     let root_3: Word = rng.value();
     let id_3 = 2;
-    history.add_version(root_3, id_3, nodes.clone(), leaves.clone())?;
+    history.add_version(root_3, id_3, nodes.clone(), changed_keys.clone())?;
     assert_eq!(history.num_versions(), 2);
 
     // If we then query for that first version it won't be there anymore, but the other two
@@ -131,7 +129,7 @@ fn add_version() -> Result<()> {
     assert!(history.get_view_at(id_3).is_ok());
 
     // If we try and add a version with a non-monotonic version number, we should see an error.
-    assert!(history.add_version(root_3, id_1, nodes, leaves).is_err());
+    assert!(history.add_version(root_3, id_1, nodes, changed_keys.clone()).is_err());
 
     Ok(())
 }
@@ -170,10 +168,10 @@ fn add_version_from_mutation_set() -> Result<()> {
 
     // Now we can check that it did things correctly.
     let view = history.get_view_at(version)?;
-    let expected_leaf_1 = CompactLeaf::from([(l1_k1, l1_v1), (l1_k2, l1_v2)]);
-    assert_eq!(view.leaf_delta(&leaf_1_ix), expected_leaf_1);
-    let expected_leaf_2 = CompactLeaf::from([(l2_k1, l2_v1), (l2_k2, l2_v2)]);
-    assert_eq!(view.leaf_delta(&leaf_2_ix), expected_leaf_2);
+    assert_eq!(view.value(&l1_k1), Some(l1_v1));
+    assert_eq!(view.value(&l1_k2), Some(l1_v2));
+    assert_eq!(view.value(&l2_k1), Some(l2_v1));
+    assert_eq!(view.value(&l2_k2), Some(l2_v2));
 
     Ok(())
 }
@@ -186,23 +184,23 @@ fn truncate() -> Result<()> {
     let mut history = History::empty(4);
 
     let nodes = NodeChanges::default();
-    let leaves = LeafChanges::default();
+    let changed_keys = ChangedKeys::default();
 
     let root_1: Word = rng.value();
     let id_1 = 5;
-    history.add_version(root_1, id_1, nodes.clone(), leaves.clone())?;
+    history.add_version(root_1, id_1, nodes.clone(), changed_keys.clone())?;
 
     let root_2: Word = rng.value();
     let id_2 = 10;
-    history.add_version(root_2, id_2, nodes.clone(), leaves.clone())?;
+    history.add_version(root_2, id_2, nodes.clone(), changed_keys.clone())?;
 
     let root_3: Word = rng.value();
     let id_3 = 15;
-    history.add_version(root_3, id_3, nodes.clone(), leaves.clone())?;
+    history.add_version(root_3, id_3, nodes.clone(), changed_keys.clone())?;
 
     let root_4: Word = rng.value();
     let id_4 = 20;
-    history.add_version(root_4, id_4, nodes.clone(), leaves.clone())?;
+    history.add_version(root_4, id_4, nodes.clone(), changed_keys.clone())?;
 
     assert_eq!(history.num_versions(), 4);
 
@@ -238,15 +236,15 @@ fn clear() -> Result<()> {
     let mut history = History::empty(4);
 
     let nodes = NodeChanges::default();
-    let leaves = LeafChanges::default();
+    let changed_keys = ChangedKeys::default();
 
     let root_1: Word = rng.value();
     let id_1 = 0;
-    history.add_version(root_1, id_1, nodes.clone(), leaves.clone())?;
+    history.add_version(root_1, id_1, nodes.clone(), changed_keys.clone())?;
 
     let root_2: Word = rng.value();
     let id_2 = 1;
-    history.add_version(root_2, id_2, nodes.clone(), leaves.clone())?;
+    history.add_version(root_2, id_2, nodes.clone(), changed_keys.clone())?;
 
     assert_eq!(history.num_versions(), 2);
 
@@ -274,27 +272,22 @@ fn view_at() -> Result<()> {
     nodes_1.insert(NodeIndex::new(2, 1).unwrap(), n1_value);
     nodes_1.insert(NodeIndex::new(8, 128).unwrap(), n2_value);
 
-    let mut leaf_1 = CompactLeaf::new();
+    let mut changed_1 = ChangedKeys::default();
+
     let l1_e1_key: Word = rng.value();
     let l1_e1_value: Word = rng.value();
-    let leaf_1_ix = LeafIndex::from(l1_e1_key);
-    leaf_1.insert(l1_e1_key, l1_e1_value);
+    changed_1.insert(l1_e1_key, l1_e1_value);
 
-    let mut leaf_2 = CompactLeaf::new();
     let l2_e1_key: Word = rng.value();
     let l2_e1_value: Word = rng.value();
     let leaf_2_ix = LeafIndex::from(l2_e1_key);
     let mut l2_e2_key: Word = rng.value();
     l2_e2_key[3] = Felt::from_u64(leaf_2_ix.position());
     let l2_e2_value: Word = rng.value();
-    leaf_2.insert(l2_e1_key, l2_e1_value);
-    leaf_2.insert(l2_e2_key, l2_e2_value);
+    changed_1.insert(l2_e1_key, l2_e1_value);
+    changed_1.insert(l2_e2_key, l2_e2_value);
 
-    let mut leaves_1 = LeafChanges::default();
-    leaves_1.insert(leaf_1_ix, leaf_1.clone());
-    leaves_1.insert(leaf_2_ix, leaf_2.clone());
-
-    history.add_version(root_1, id_1, nodes_1.clone(), leaves_1.clone())?;
+    history.add_version(root_1, id_1, nodes_1.clone(), changed_1.clone())?;
     assert_eq!(history.num_versions(), 1);
 
     // We then add another version that overlaps with the older version.
@@ -307,16 +300,14 @@ fn view_at() -> Result<()> {
     nodes_2.insert(NodeIndex::new(2, 1).unwrap(), n3_value);
     nodes_2.insert(NodeIndex::new(10, 256).unwrap(), n4_value);
 
-    let mut leaf_3 = CompactLeaf::new();
+    let mut changed_2 = ChangedKeys::default();
+
     let leaf_3_ix = leaf_2_ix;
     let mut l3_e1_key: Word = rng.value();
     l3_e1_key[3] = Felt::from_u64(leaf_3_ix.position());
     let l3_e1_value: Word = rng.value();
-    leaf_3.insert(l3_e1_key, l3_e1_value);
-
-    let mut leaves_2 = LeafChanges::default();
-    leaves_2.insert(leaf_3_ix, leaf_3.clone());
-    history.add_version(root_2, id_2, nodes_2.clone(), leaves_2.clone())?;
+    changed_2.insert(l3_e1_key, l3_e1_value);
+    history.add_version(root_2, id_2, nodes_2.clone(), changed_2.clone())?;
     assert_eq!(history.num_versions(), 2);
 
     // And another version for the sake of the test.
@@ -327,22 +318,17 @@ fn view_at() -> Result<()> {
     let n5_value: Word = rng.value();
     nodes_3.insert(NodeIndex::new(30, 1).unwrap(), n5_value);
 
-    let mut leaf_4 = CompactLeaf::new();
+    let mut changed_3 = ChangedKeys::default();
+
     let l4_e1_key: Word = rng.value();
     let l4_e1_value: Word = rng.value();
-    let leaf_4_ix = LeafIndex::from(l4_e1_key);
-    leaf_4.insert(l4_e1_key, l4_e1_value);
+    changed_3.insert(l4_e1_key, l4_e1_value);
 
-    let mut leaf_1n = CompactLeaf::new();
     let l1n_e1_key = l1_e1_key;
     let l1n_e1_value: Word = rng.value();
-    leaf_1n.insert(l1n_e1_key, l1n_e1_value);
+    changed_3.insert(l1n_e1_key, l1n_e1_value);
 
-    let mut leaves_3 = LeafChanges::default();
-    leaves_3.insert(leaf_4_ix, leaf_4.clone());
-    leaves_3.insert(leaf_1_ix, leaf_1n);
-
-    history.add_version(root_3, id_3, nodes_3.clone(), leaves_3.clone())?;
+    history.add_version(root_3, id_3, nodes_3.clone(), changed_3.clone())?;
     assert_eq!(history.num_versions(), 3);
 
     // At this point, we can grab a view into the history. If we grab something older than the
@@ -369,33 +355,25 @@ fn view_at() -> Result<()> {
     // Getting a leaf from the targeted version will compose with other (newer) deltas to yield the
     // correct changes. The first test here checks that a value updated in a newer delta is
     // nevertheless reverted to the correct value.
-    assert_eq!(view.leaf_delta(&leaf_1_ix), leaf_1);
+    assert_eq!(view.value(&l1_e1_key), Some(l1_e1_value));
 
-    // This test checks that the delta for a single leaf correctly combines non-overlapping key
+    // This test checks that the delta for a single value correctly combines non-overlapping key
     // reversions.
-    let leaf_2_delta: CompactLeaf = once((l3_e1_key, l3_e1_value))
-        .chain(leaf_2.iter().map(|(k, v)| (*k, *v)))
-        .collect();
-    assert_eq!(view.leaf_delta(&leaf_2_ix), leaf_2_delta);
+    assert_eq!(view.value(&l2_e1_key), Some(l2_e1_value));
+    assert_eq!(view.value(&l2_e2_key), Some(l2_e2_value));
 
-    // But getting a leaf that is not in the target delta directly should result in the same
+    // But getting a value that is not in the target delta directly should result in the same
     // traversal.
-    assert_eq!(view.leaf_delta(&leaf_4_ix), leaf_4);
+    assert_eq!(view.value(&l4_e1_key), Some(l4_e1_value));
 
-    // And getting a leaf that does not exist in any of the versions should return an empty delta.
-    assert!(view.leaf_delta(&LeafIndex::new(1024).unwrap()).is_empty());
+    // And getting a value that does not exist in any of the versions should return an empty delta.
+    assert!(view.value(&rng.value()).is_none());
 
     // Finally, getting a full value from a compact leaf should yield the value directly from
     // the target version if the target version overlays it AND contains it.
     assert_eq!(view.value(&l1_e1_key), Some(l1_e1_value));
     assert_eq!(view.value(&l2_e1_key), Some(l2_e1_value));
     assert_eq!(view.value(&l2_e2_key), Some(l2_e2_value));
-
-    // However, if the leaf exists but does not contain the provided word, it should return the
-    // sentinel `Some(None)`.
-    let mut ne_key_in_existing_leaf: Word = rng.value();
-    ne_key_in_existing_leaf[3] = Felt::from_u64(leaf_1_ix.position());
-    assert_eq!(view.value(&ne_key_in_existing_leaf), None);
 
     // If the leaf is not overlaid, then the lookup should go up the chain just as in the other
     // cases.
@@ -410,20 +388,6 @@ fn view_at() -> Result<()> {
     let view = history.get_view_at(7)?;
     assert_eq!(view.node_value(&NodeIndex::new_unchecked(30, 1)), Some(&n5_value));
     assert!(view.node_value(&NodeIndex::new_unchecked(30, 2)).is_none());
-
-    // We can also get an iterator over the entries for a given view. This should yield all the
-    // correctly-collapsed key-value pairs in the overlay. We start with the most recent view.
-    let view = history.get_view_at(id_3)?;
-    assert_eq!(view.entries().count(), 2);
-    assert!(view.entries().contains(&TreeEntry { key: l4_e1_key, value: l4_e1_value }));
-    assert!(view.entries().contains(&TreeEntry { key: l1n_e1_key, value: l1n_e1_value }));
-    assert!(view.entries().is_sorted_by(|l, r| {
-        if l.index() == r.index() {
-            l.key < r.key
-        } else {
-            l.index() < r.index()
-        }
-    }));
 
     Ok(())
 }
@@ -478,13 +442,10 @@ fn history_from_smt_non_overlapping() -> Result<()> {
     let view_v0 = history.get_view_at(0)?;
     assert_eq!(view_v0.value(&key_1), Some(EMPTY_WORD));
     assert_eq!(view_v0.value(&key_2), Some(EMPTY_WORD));
-    assert_eq!(view_v0.leaf_delta(&key_1.into()).len(), 1);
-    assert_eq!(view_v0.leaf_delta(&key_2.into()).len(), 1);
 
     // When we query version 1 it should only make revert one change on top of the current tree.
     let view_v1 = history.get_view_at(1)?;
     assert_eq!(view_v0.value(&key_2), Some(EMPTY_WORD));
-    assert_eq!(view_v0.leaf_delta(&key_2.into()).len(), 1);
 
     // Verify querying a non-existent key returns None
     let nonexistent_key: Word = rng.value();

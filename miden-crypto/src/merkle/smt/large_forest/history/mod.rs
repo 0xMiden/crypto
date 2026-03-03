@@ -2,37 +2,29 @@
 //! historical versions of a given merkle tree.
 //!
 //! This history consists of a series of _deltas_ from the current state of the tree, moving
-//! backward in history away from that current state. These deltas are then used to form a "merged
-//! overlay" that represents the changes to be made on top of the current tree to put it _back_ in
-//! that historical state.
+//! backward in history away from that current state. These deltas are then used to form an overlay
+//! that represents the changes to be made on top of the current tree to put it _back_ in that
+//! historical state.
 //!
 //! It provides functionality for adding new states to the history, as well as for querying the
 //! history at a given point in time.
 //!
 //! # Complexity
 //!
-//! Versions in this structure are _cumulative_. To get the entire picture of an arbitrary node or
-//! leaf at version `v` it may be necessary to check for changes in all versions between `v` and the
-//! current tree state. This gives worst-case complexity `O(v)` when querying a node or leaf for the
-//! version `v`.
-//!
-//! This is acceptable overhead as we assert that newer versions are far more likely to be queried
-//! than older versions. Nevertheless, it may be improved in future using a sharing approach, but
-//! that potential improvement is being ignored for now for the sake of simplicity.
+//! Versions in this structure are _complete_. This means that the data stored for any given
+//! historical version is sufficient to apply atop the current tree to return it to the state
+//! corresponding to that historical version.
 //!
 //! # Performance
 //!
 //! This structure operates entirely in memory, and is hence reasonably quick to query. As of the
-//! current time, no detailed benchmarking has taken place for the history, but based on some basic
-//! profiling the major time taken is in chasing pointers throughout memory due to the use of
-//! [`Map`]s, but this is unavoidable in the current structure and may need to be revisited in
-//! the future.
+//! current time, no detailed benchmarking has taken place for the history.
 
 pub mod error;
 
 mod tests;
 
-use alloc::collections::{BTreeMap, BTreeSet, VecDeque};
+use alloc::collections::VecDeque;
 use core::fmt::Debug;
 
 use error::{HistoryError, Result};
@@ -42,9 +34,9 @@ use crate::{
     merkle::{
         EmptySubtreeRoots, NodeIndex,
         smt::{
-            LeafIndex, NodeMutation, SMT_DEPTH,
+            NodeMutation, SMT_DEPTH,
             large_forest::{
-                root::{RootValue, TreeEntry, VersionId},
+                root::{RootValue, VersionId},
                 utils::MutationSet,
             },
         },
@@ -53,12 +45,6 @@ use crate::{
 
 // UTILITY TYPE ALIASES
 // ================================================================================================
-
-/// A compact leaf is a mapping from full word-length keys to word-length values, intended to be
-/// stored in the leaves of an otherwise shallower merkle tree.
-///
-/// We use a BTreeMap as we need a guaranteed iteration order over the keys.
-pub type CompactLeaf = BTreeMap<Word, Word>;
 
 /// A collection of changes to arbitrary non-leaf nodes in a merkle tree.
 ///
@@ -71,16 +57,9 @@ pub type CompactLeaf = BTreeMap<Word, Word>;
 /// history corresponding to version `v`.
 pub type NodeChanges = Map<NodeIndex, Word>;
 
-/// A collection of changes to arbitrary leaf nodes in a merkle tree.
-///
-/// While represented as a single leaf, it only contains the changes to the leaf as part of the
-/// delta, and still needs to be combined with the actual leaf data for querying.
-///
-/// Note that if in the version of the tree represented by these `LeafChanges` had the default value
-/// at the leaf, this default value must be made concrete in the map. Failure to do so will retain a
-/// newer, non-default value for that leaf, and thus result in incorrect query results at this point
-/// in the history.
-pub type LeafChanges = Map<LeafIndex<SMT_DEPTH>, CompactLeaf>;
+/// The type of the keys that need to be changed by the delta to return the target tree to the state
+/// represented by the delta.
+pub type ChangedKeys = Map<Word, Word>;
 
 // HISTORY
 // ================================================================================================
@@ -102,15 +81,9 @@ pub struct History {
     ///
     /// # Implementation Note
     ///
-    /// As we are targeting small numbers of history items (e.g. 30), having a sequence with an
-    /// allocated capacity equal to the small maximum number of items is perfectly sane. This will
-    /// avoid costly reallocations in the fast path.
-    ///
-    /// We use a [`VecDeque`] instead of a [`alloc::vec::Vec`] or
-    /// [`alloc::collections::LinkedList`] as we
-    /// estimate that the vast majority of removals will be the oldest entries as new ones are
-    /// pushed. This means that we can optimize for those removals along with indexing performance,
-    /// rather than optimizing for more rare removals from the middle of the sequence.
+    /// We use a [`VecDeque`] instead of a [`Vec`] so that we can both have efficient access to any
+    /// delta, while also making removals from the end efficient. As [`Self::truncate`] only ever
+    /// removes some oldest `n` entries, this is the exact behavior we want.
     deltas: VecDeque<Delta>,
 }
 
@@ -119,10 +92,7 @@ impl History {
     /// a tree.
     #[must_use]
     pub fn empty(max_count: usize) -> Self {
-        // We allocate one more than we actually need to store to allow us to insert and THEN
-        // remove, rather than the other way around. This leads to negligible increases in memory
-        // usage while allowing for cleaner code.
-        let deltas = VecDeque::with_capacity(max_count + 1);
+        let deltas = VecDeque::new();
         Self { max_count, deltas }
     }
 
@@ -186,24 +156,38 @@ impl History {
         root: RootValue,
         version_id: VersionId,
         nodes: NodeChanges,
-        leaves: LeafChanges,
+        changed_keys: ChangedKeys,
     ) -> Result<()> {
-        if let Some(v) = self.deltas.iter().last() {
-            if v.version_id < version_id {
-                self.deltas.push_back(Delta::new(root, version_id, nodes, leaves));
-                if self.num_versions() > self.max_versions() {
-                    self.deltas.pop_front();
-                }
-
-                Ok(())
-            } else {
-                Err(HistoryError::NonMonotonicVersions(version_id, v.version_id))
-            }
-        } else {
-            self.deltas.push_back(Delta::new(root, version_id, nodes, leaves));
-
-            Ok(())
+        // We need to fail early if the provided new version is not monotonic with respect to the
+        // latest version in the history.
+        if let Some(v) = self.deltas.iter().last()
+            && v.version_id >= version_id
+        {
+            return Err(HistoryError::NonMonotonicVersions(version_id, v.version_id));
         }
+
+        // We then check if we would exceed our version count limit, and remove the oldest if so.
+        if self.num_versions() >= self.max_versions() {
+            self.deltas.pop_front();
+        }
+
+        // We then need to update all the older deltas with the necessary additional changes
+        // represented in this newly-added version.
+        for delta in &mut self.deltas {
+            // The root and the version remain the same, but we may need to change the nodes and
+            // keys.
+            for (ix, value) in &nodes {
+                delta.nodes.entry(*ix).or_insert(*value);
+            }
+            for (key, value) in &changed_keys {
+                // If the delta has removed something, we never want to re-add it over the top.
+                delta.changed_keys.entry(*key).or_insert(*value);
+            }
+        }
+
+        self.deltas.push_back(Delta::new(root, version_id, nodes, changed_keys));
+
+        Ok(())
     }
 
     /// Adds a version to the history and represented by the changes from the current tree given
@@ -231,11 +215,10 @@ impl History {
         version_id: VersionId,
         mutations: MutationSet,
     ) -> Result<()> {
-        // The leaf changes must be grouped by parent leaf when being inserted, so we do that here.
-        let mut leaf_changes = LeafChanges::default();
-        for (key, val) in mutations.new_pairs {
-            leaf_changes.entry(LeafIndex::from(key)).or_default().insert(key, val);
-        }
+        let mut changed_keys = ChangedKeys::default();
+        mutations.new_pairs.into_iter().for_each(|(k, v)| {
+            changed_keys.insert(k, v);
+        });
 
         // The node changes are more complex, as we have to explicitly handle reversions to empty
         // specially.
@@ -249,7 +232,7 @@ impl History {
             .collect();
 
         // Now we can simply delegate to the standard function.
-        self.add_version(mutations.new_root, version_id, node_changes, leaf_changes)
+        self.add_version(mutations.new_root, version_id, node_changes, changed_keys)
     }
 
     /// Returns the index in the sequence of deltas of the version that corresponds to the provided
@@ -281,6 +264,8 @@ impl History {
             return Err(HistoryError::VersionTooOld);
         }
 
+        // As we want the NEWEST delta that satisfies the version, we look for the position at which
+        // the delta cannot be used and move back by one.
         let ix = self
             .deltas
             .iter()
@@ -362,16 +347,10 @@ impl History {
 // ================================================================================================
 
 /// A read-only view of the history overlay on the tree at a specified place in the history.
-#[derive(Debug)]
+#[derive(Copy, Clone, Debug)]
 pub struct HistoryView<'history> {
-    /// The version of the history pointed to by the history view.
-    version: VersionId,
-
-    /// The index of the target version in the history.
-    version_ix: usize,
-
-    /// The history that actually stores the data that will be queried.
-    history: &'history History,
+    /// The delta corresponding to this overlay.
+    delta: &'history Delta,
 }
 
 impl<'history> HistoryView<'history> {
@@ -389,72 +368,33 @@ impl<'history> HistoryView<'history> {
     ///   coherent overlay for the provided `version`.
     fn new_of(version: VersionId, history: &'history History) -> Result<Self> {
         let version_ix = history.find_latest_corresponding_version(version)?;
-        Ok(Self { version, version_ix, history })
+        let delta = &history.deltas[version_ix];
+        Ok(Self { delta })
     }
 
     /// Gets the value of the node in the history at the provided `index`, or returns `None` if the
     /// version does not overlay the current tree at that node.
-    ///
-    /// # Complexity
-    ///
-    /// The computational complexity of this method is linear in the number of versions due to the
-    /// need to traverse to find the correct overlay value.
     #[must_use]
     pub fn node_value(&self, index: &NodeIndex) -> Option<&Word> {
-        self.history
-            .deltas
-            .iter()
-            .skip(self.version_ix)
-            .find_map(|v| v.nodes.get(index))
-    }
-
-    /// Gets a single leaf that represents the delta from the current version of the tree to the
-    /// point in the history at the specified `index`.
-    ///
-    /// If the specified version does not overlay the current tree at that leaf, it will return an
-    /// empty compact leaf.
-    ///
-    /// # Complexity
-    ///
-    /// The computational complexity of this method is linear in the number of versions due to the
-    /// need to traverse to find the correct overlay value.
-    #[must_use]
-    pub fn leaf_delta(&self, index: &LeafIndex<SMT_DEPTH>) -> CompactLeaf {
-        let mut leaf = CompactLeaf::default();
-
-        // We want to keep the _oldest_ change for any particular key in a leaf.
-        for delta in self.history.deltas.iter().skip(self.version_ix) {
-            if let Some(leaf_delta) = delta.leaves.get(index) {
-                for (key, value) in leaf_delta {
-                    leaf.entry(*key).or_insert(*value);
-                }
-            }
-        }
-
-        leaf
+        self.delta.nodes.get(index)
     }
 
     /// Queries the value of a specific `key` in a leaf in the overlay, returning the value for that
     /// `key` if it has been changed, and [`None`] otherwise.
-    ///
-    /// # Complexity
-    ///
-    /// The computational complexity of this method is linear in the number of versions due to the
-    /// need to traverse to find the correct overlay value.
     #[must_use]
     pub fn value(&self, key: &Word) -> Option<Word> {
-        self.leaf_delta(&LeafIndex::from(*key)).get(key).copied()
+        self.delta.changed_keys.get(key).cloned()
     }
 
-    /// Returns an iterator which yields the entries that are changed by this view.
-    ///
-    /// This iterator yields entries in an order such that they are sorted by their leaf index, and
-    /// entries that share a leaf index are sorted by key. It includes key-value pairs where the
-    /// value is the empty word, as these are necessary for merging with entries in the full tree.
-    pub fn entries(&self) -> impl Iterator<Item = TreeEntry> + 'history {
-        // It is safe to call this directly here as the construction of `HistoryView` has ensured
-        // that we have such a version.
-        HistoricalEntriesIterator::new(self.history, self.version)
+    /// Returns `true` if the key is removed by this delta, and `false` otherwise.
+    #[must_use]
+    pub fn is_key_removed(&self, key: &Word) -> bool {
+        self.delta.changed_keys.get(key).map(Word::is_empty).unwrap_or(false)
+    }
+
+    /// Returns an iterator which yields the entries that are added by this view.
+    pub fn changed_keys(&self) -> impl Iterator<Item = (Word, Word)> + 'history {
+        self.delta.changed_keys.iter().map(|(k, v)| (*k, *v))
     }
 }
 
@@ -492,150 +432,22 @@ struct Delta {
     /// Any changes to the non-leaf nodes in the tree for this delta.
     nodes: NodeChanges,
 
-    /// Any changes to the leaf nodes in the tree for this delta.
-    ///
-    /// Note that the leaf state is **not represented compactly**, and describes the entire state
-    /// of the leaf in the corresponding version.
-    leaves: LeafChanges,
+    /// The keys that need to be changed by the delta to return the target tree to the state
+    /// represented by the delta.
+    changed_keys: ChangedKeys,
 }
 
 impl Delta {
-    /// Creates a new delta with the provided `root`, and representing the provided
-    /// changes to `nodes` and `leaves` in the merkle tree.
+    /// Creates a new delta with the provided `root`, representing the provided changes to the
+    /// `nodes` in the merkle tree, and using `added_keys` and `removed_keys` to represent the
+    /// changes to entries in the tree.
     #[must_use]
     fn new(
         root: RootValue,
         version_id: VersionId,
         nodes: NodeChanges,
-        leaves: LeafChanges,
+        changed_keys: ChangedKeys,
     ) -> Self {
-        Self { root, version_id, nodes, leaves }
+        Self { root, version_id, nodes, changed_keys }
     }
-}
-
-// ENTRIES ITERATOR
-// ================================================================================================
-
-/// An iterator over the historical value for each changed entry at a given point in the history.
-///
-/// This iterator yields entries in an order such that they are sorted by their leaf index, and
-/// entries that share a leaf index are sorted by key. It includes key-value pairs where the value
-/// is the empty word, as these are necessary for merging with entries in the full tree.
-#[derive(Debug)]
-pub struct HistoricalEntriesIterator<'history> {
-    /// The history over which the iterator is defined.
-    history: &'history History,
-
-    /// The version in the history to be working from.
-    version: VersionId,
-
-    /// The set of all changed leaves in the deltas that make up this iterator that have not yet
-    /// been visited by the iterator.
-    ///
-    /// We use a BTreeSet specifically as we need sorted iteration behavior.
-    changed_leaves: BTreeSet<LeafIndex<SMT_DEPTH>>,
-
-    /// The current state of the iterator's iteration behavior.
-    position: HistoricalEntriesIteratorState,
-}
-
-impl<'history> HistoricalEntriesIterator<'history> {
-    /// Creates a new historical entries iterator that represents a coherent set of delta entries at
-    /// the position in the history given by `version_ix`.
-    fn new(history: &'history History, version: VersionId) -> Self {
-        let changed_leaves = history
-            .deltas
-            .iter()
-            .skip(
-                history
-                    .find_latest_corresponding_version(version)
-                    .expect("Caller has guaranteed existence of a corresponding version"),
-            )
-            .flat_map(|d| d.leaves.keys())
-            .copied()
-            .collect();
-
-        // We want to start not pointing to any leaf as we can only advance when `next` is called.
-        let current_leaf_index = HistoricalEntriesIteratorState::NotInLeaf;
-
-        Self {
-            history,
-            version,
-            changed_leaves,
-            position: current_leaf_index,
-        }
-    }
-}
-
-impl<'history> Iterator for HistoricalEntriesIterator<'history> {
-    type Item = TreeEntry;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        match &mut self.position {
-            HistoricalEntriesIteratorState::NotInLeaf => {
-                // If we are not inside a leaf we need to see if we can become so.
-                if let Some(ix) = self.changed_leaves.pop_first() {
-                    // If we can move into a new leaf, we transition the state into that leaf and
-                    // return the entry.
-                    let leaf_delta = self
-                        .history
-                        .get_view_at(self.version)
-                        .expect(
-                            "Version was guaranteed to exist before construction of the iterator",
-                        )
-                        .leaf_delta(&ix);
-
-                    // As we are querying based on `changed_leaves`, each of the `leaf_delta`
-                    // results should contain at least one item.
-                    let (key, value) = leaf_delta
-                        .first_key_value()
-                        .expect("At least one item guaranteed by construction");
-                    let item = TreeEntry { key: *key, value: *value };
-
-                    // At this point we now have the item, but we need to set up the state to point
-                    // to this item as we return it.
-                    self.position = HistoricalEntriesIteratorState::InLeaf { value: leaf_delta };
-
-                    Some(item)
-                } else {
-                    // If we cannot move to a new leaf index, the iterator is done.
-                    None
-                }
-            },
-            HistoricalEntriesIteratorState::InLeaf { value } => {
-                // If we are already inside a leaf, there are two cases that can occur when
-                // advancing.
-                value.pop_first().expect("InLeaf implies there is at least one entry in value");
-                if let Some((k, v)) = value.first_key_value() {
-                    // The first (and simplest) case is that we have another entry in the current
-                    // leaf value. In this case, the item is just the front of the leaf value, and
-                    // we re-write the key to point to it while leaving the leaf index the same.
-                    let item = TreeEntry { key: *k, value: *v };
-
-                    Some(item)
-                } else {
-                    // Here, we have no further entries in the current leaf, so we have to check if
-                    // there is another leaf to move to. In other words, we are implicitly in the
-                    // `NotInLeaf` state, so we can just call `next` recursively.
-                    //
-                    // This is not a stack overflow risk as it should only ever recurse once.
-                    self.position = HistoricalEntriesIteratorState::NotInLeaf;
-                    self.next()
-                }
-            },
-        }
-    }
-}
-
-/// The state that tracks where the iterator is in the iteration process.
-#[derive(Debug)]
-enum HistoricalEntriesIteratorState {
-    /// It currently does not point to any underlying leaf index.
-    NotInLeaf,
-
-    /// It is currently pointing to the specified key within the specified index.
-    InLeaf {
-        /// The combined full delta that represents the compact leaf.
-        value: CompactLeaf,
-    },
 }
