@@ -119,7 +119,7 @@ impl<const N: usize> TryFrom<&str> for Digest<N> {
 
     fn try_from(value: &str) -> Result<Self, Self::Error> {
         if N == DIGEST192_BYTES {
-            let short_len = (N * 2) + 2;
+            let short_len = (DIGEST192_BYTES * 2) + 2;
             let long_len = (DIGEST256_BYTES * 2) + 2;
 
             if value.len() == short_len {
@@ -129,7 +129,7 @@ impl<const N: usize> TryFrom<&str> for Digest<N> {
 
             if value.len() == long_len {
                 let bytes = hex_to_bytes::<DIGEST256_BYTES>(value)?;
-                let padding = &bytes[N..];
+                let padding = &bytes[DIGEST192_BYTES..];
                 if padding.iter().all(|byte| *byte == 0) {
                     let mut trimmed = [0u8; N];
                     trimmed.copy_from_slice(&bytes[..N]);

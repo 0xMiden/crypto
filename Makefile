@@ -102,6 +102,11 @@ test: test-default test-no-std test-docs test-large-smt ## Run all tests except 
 check: ## Check all targets and features for errors without code generation
 	cargo check --all-targets --all-features
 
+.PHONY: check-features
+check-features: ## Check miden-crypto feature combinations
+	cargo check -p miden-crypto --all-targets --no-default-features
+	cargo check -p miden-crypto --all-targets --features ${ALL_FEATURES_EXCEPT_ROCKSDB}
+
 .PHONY: check-fuzz
 check-fuzz: ## Check miden-crypto-fuzz compilation
 	cd miden-crypto-fuzz && cargo check
