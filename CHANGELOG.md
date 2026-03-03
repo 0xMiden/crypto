@@ -1,3 +1,7 @@
+## 0.22.4 (tbd)
+
+- Make `SmtLeaf::get_value` public ([#872](https://github.com/0xMiden/crypto/pull/872)).
+
 ## 0.22.3 (2026-02-23)
 
 - Refactored to introduce a unified `Felt` type for on-chain and off-chain code ([#819](https://github.com/0xMiden/crypto/pull/819)).
