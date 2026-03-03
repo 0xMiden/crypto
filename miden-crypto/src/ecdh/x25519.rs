@@ -17,6 +17,7 @@ use alloc::vec::Vec;
 use hkdf::{Hkdf, hmac::SimpleHmac};
 use k256::sha2::Sha256;
 use rand::{CryptoRng, RngCore};
+use subtle::ConstantTimeEq;
 
 use crate::{
     dsa::eddsa_25519_sha512::{PublicKey, SecretKey},
@@ -231,11 +232,11 @@ impl KeyAgreementScheme for X25519 {
 }
 
 fn is_all_zero(bytes: &[u8]) -> bool {
-    let mut acc = 0u8;
-    for byte in bytes {
-        acc |= *byte;
+    if bytes.is_empty() {
+        return false;
     }
-    acc == 0
+    let acc = bytes.iter().fold(0u8, |acc, &byte| acc | byte);
+    acc.ct_eq(&0u8).into()
 }
 
 // TESTS
@@ -302,6 +303,13 @@ mod tests {
 
         let result = X25519::exchange_static_ephemeral(&static_sk, &low_order_pk);
         assert!(matches!(result, Err(KeyAgreementError::InvalidSharedSecret)));
+    }
+
+    #[test]
+    fn is_all_zero_accepts_arbitrary_lengths() {
+        assert!(!is_all_zero(&[]));
+        assert!(is_all_zero(&[0u8; 16]));
+        assert!(!is_all_zero(&[0u8, 1u8, 0u8, 0u8]));
     }
 
     fn find_twist_point_bytes() -> [u8; 32] {
