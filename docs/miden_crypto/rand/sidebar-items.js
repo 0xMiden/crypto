@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"fn":["random_felt","random_word"],"mod":["test_utils"],"struct":["RpoRandomCoin","RpxRandomCoin"],"trait":["FeltRng","Randomizable"]};
+window.SIDEBAR_ITEMS = {"fn":["random_felt","random_word"],"mod":["test_utils"],"struct":["RandomCoin"],"trait":["FeltRng","Randomizable"]};
