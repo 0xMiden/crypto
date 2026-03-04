@@ -17,7 +17,7 @@
 - [BREAKING] Added info context field to secret box, bind IES HKDF info to a stable context string, scheme identifier, and ephemeral public key bytes. ([#843](https://github.com/0xMiden/crypto/pull/843)).
 - [BREAKING] Removed `PartialEq`/`Eq` for AEAD `SecretKey` in non-test builds, fix various hygiene issues in dealing with secret keys ([#849](https://github.com/0xMiden/crypto/pull/849)).
 - Added `PublicKey::from_der()` for ECDSA public keys over secp256k1 ([#855](https://github.com/0xMiden/crypto/pull/855)).
-- [BREAKING] Removed `RpoRandomCoin` and `RpxRandomCoin` ([#871](https://github.com/0xMiden/crypto/pull/871)).
+- [BREAKING] Removed `RpoRandomCoin` and `RpxRandomCoin` and introduced a Poseidon2-based `RandomCoin` ([#871](https://github.com/0xMiden/crypto/pull/871)).
 
 ## 0.22.3 (2026-02-23)
 

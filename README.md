@@ -121,6 +121,7 @@ Messages sealed as one type must be unsealed using the corresponding method, oth
 
 - `Randomizable`: a trait for constructing values from random bytes.
 - `FeltRng`: a trait for generating random field elements and random 4 field elements.
+- `RandomCoin`: a struct implementing `FeltRng` using the Poseidon2 hash function.
 - `random_felt` and `random_word`: `std`-only helpers for generating random field elements and words.
 - `test_utils`: deterministic and `std`-based helpers for tests and benchmarks.
 

@@ -5,6 +5,9 @@ use rand::RngCore;
 
 use crate::{Felt, Word};
 
+mod coin;
+pub use coin::RandomCoin;
+
 // Test utilities for generating random data (used in tests and benchmarks)
 #[cfg(any(test, feature = "std"))]
 pub mod test_utils;
