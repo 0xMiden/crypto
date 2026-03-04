@@ -1,24 +1,24 @@
-use alloc::{string::ToString, vec::Vec};
+use alloc::string::ToString;
 
 use p3_field::ExtensionField;
 use rand_core::impls;
 
-use super::{Felt, FeltRng, RngCore, Word};
+use super::{Felt, FeltRng, RngCore};
 use crate::{
-    ZERO,
-    hash::rpx::Rpx256,
+    Word, ZERO,
+    hash::poseidon2::Poseidon2,
     utils::{ByteReader, ByteWriter, Deserializable, DeserializationError, Serializable},
 };
 
 // CONSTANTS
 // ================================================================================================
 
-const STATE_WIDTH: usize = Rpx256::STATE_WIDTH;
-const RATE_START: usize = Rpx256::RATE_RANGE.start;
-const RATE_END: usize = Rpx256::RATE_RANGE.end;
-const HALF_RATE_WIDTH: usize = (Rpx256::RATE_RANGE.end - Rpx256::RATE_RANGE.start) / 2;
+const STATE_WIDTH: usize = Poseidon2::STATE_WIDTH;
+const RATE_START: usize = Poseidon2::RATE_RANGE.start;
+const RATE_END: usize = Poseidon2::RATE_RANGE.end;
+const HALF_RATE_WIDTH: usize = (Poseidon2::RATE_RANGE.end - Poseidon2::RATE_RANGE.start) / 2;
 
-// RPX RANDOM COIN
+// POSEIDON2 RANDOM COIN
 // ================================================================================================
 /// A simplified version of the `SPONGE_PRG` reseedable pseudo-random number generator algorithm
 /// described in <https://eprint.iacr.org/2011/499.pdf>.
@@ -29,13 +29,13 @@ const HALF_RATE_WIDTH: usize = (Rpx256::RATE_RANGE.end - Rpx256::RATE_RANGE.star
 /// 2. As a result of the previous point, we don't make use of an input buffer to accumulate seed
 ///    material.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct RpxRandomCoin {
+pub struct RandomCoin {
     state: [Felt; STATE_WIDTH],
     current: usize,
 }
 
-impl RpxRandomCoin {
-    /// Returns a new [RpxRandomCoin] initialize with the specified seed.
+impl RandomCoin {
+    /// Returns a new [RandomCoin] initialized with the specified seed.
     pub fn new(seed: Word) -> Self {
         let mut state = [ZERO; STATE_WIDTH];
 
@@ -44,15 +44,15 @@ impl RpxRandomCoin {
         }
 
         // Absorb
-        Rpx256::apply_permutation(&mut state);
+        Poseidon2::apply_permutation(&mut state);
 
-        RpxRandomCoin { state, current: RATE_START }
+        RandomCoin { state, current: RATE_START }
     }
 
-    /// Returns an [RpxRandomCoin] instantiated from the provided components.
+    /// Returns a [RandomCoin] instantiated from the provided components.
     ///
     /// # Panics
-    /// Panics if `current` is smaller than 4 or greater than or equal to 12.
+    /// Panics if `current` is outside of the rate range.
     pub fn from_parts(state: [Felt; STATE_WIDTH], current: usize) -> Self {
         assert!(
             (RATE_START..RATE_END).contains(&current),
@@ -71,9 +71,13 @@ impl RpxRandomCoin {
         <Self as RngCore>::fill_bytes(self, dest)
     }
 
+    /// Draws a random base field element from the random coin.
+    ///
+    /// This method applies the Poseidon2 permutation when the rate portion of the state is
+    /// exhausted, then returns the next element from the rate portion.
     pub fn draw_basefield(&mut self) -> Felt {
         if self.current == RATE_END {
-            Rpx256::apply_permutation(&mut self.state);
+            Poseidon2::apply_permutation(&mut self.state);
             self.current = RATE_START;
         }
 
@@ -88,6 +92,10 @@ impl RpxRandomCoin {
         self.draw_basefield()
     }
 
+    /// Draws a random extension field element.
+    ///
+    /// The extension field element is constructed by drawing `E::DIMENSION` base field elements
+    /// and interpreting them as basis coefficients.
     pub fn draw_ext_field<E: ExtensionField<Felt>>(&mut self) -> E {
         let ext_degree = E::DIMENSION;
         let mut result = vec![ZERO; ext_degree];
@@ -97,85 +105,30 @@ impl RpxRandomCoin {
         E::from_basis_coefficients_slice(&result).expect("failed to draw extension field element")
     }
 
+    /// Reseeds the random coin with additional entropy.
+    ///
+    /// The provided `data` is added to the first half of the rate portion of the state,
+    /// then the Poseidon2 permutation is applied. The buffer pointer is reset to the start
+    /// of the rate portion.
     pub fn reseed(&mut self, data: Word) {
         // Reset buffer
         self.current = RATE_START;
 
-        // Add the new seed material to the first half of the rate portion of the RPX state
-        let data: Word = (*data).into();
-
+        // Add the new seed material to the first half of the rate portion of the Poseidon2 state
         self.state[RATE_START] += data[0];
         self.state[RATE_START + 1] += data[1];
         self.state[RATE_START + 2] += data[2];
         self.state[RATE_START + 3] += data[3];
 
         // Absorb
-        Rpx256::apply_permutation(&mut self.state);
-    }
-
-    pub fn check_leading_zeros(&self, value: u64) -> u32 {
-        let value = Felt::new(value);
-        let mut state_tmp = self.state;
-
-        state_tmp[RATE_START] += value;
-
-        Rpx256::apply_permutation(&mut state_tmp);
-
-        let first_rate_element = state_tmp[RATE_START].as_canonical_u64();
-        first_rate_element.trailing_zeros()
-    }
-
-    pub fn draw_integers(
-        &mut self,
-        num_values: usize,
-        domain_size: usize,
-        nonce: u64,
-    ) -> Vec<usize> {
-        assert!(domain_size.is_power_of_two(), "domain size must be a power of two");
-        assert!(num_values < domain_size, "number of values must be smaller than domain size");
-
-        // absorb the nonce
-        let nonce = Felt::new(nonce);
-        self.state[RATE_START] += nonce;
-        Rpx256::apply_permutation(&mut self.state);
-
-        // reset the buffer
-        self.current = RATE_START;
-
-        // determine how many bits are needed to represent valid values in the domain
-        let v_mask = (domain_size - 1) as u64;
-
-        // draw values from PRNG until we get as many unique values as specified by num_queries
-        let mut values = Vec::new();
-        for _ in 0..1000 {
-            // get the next pseudo-random field element
-            let value = self.draw_basefield().as_canonical_u64();
-
-            // use the mask to get a value within the range
-            let value = (value & v_mask) as usize;
-
-            values.push(value);
-            if values.len() == num_values {
-                break;
-            }
-        }
-
-        assert_eq!(
-            values.len(),
-            num_values,
-            "failed to draw {} integers after 1000 iterations (got {})",
-            num_values,
-            values.len()
-        );
-
-        values
+        Poseidon2::apply_permutation(&mut self.state);
     }
 }
 
 // FELT RNG IMPLEMENTATION
 // ------------------------------------------------------------------------------------------------
 
-impl FeltRng for RpxRandomCoin {
+impl FeltRng for RandomCoin {
     fn draw_element(&mut self) -> Felt {
         self.draw_basefield()
     }
@@ -192,7 +145,7 @@ impl FeltRng for RpxRandomCoin {
 // RNGCORE IMPLEMENTATION
 // ------------------------------------------------------------------------------------------------
 
-impl RngCore for RpxRandomCoin {
+impl RngCore for RandomCoin {
     fn next_u32(&mut self) -> u32 {
         self.draw_basefield().as_canonical_u64() as u32
     }
@@ -209,15 +162,15 @@ impl RngCore for RpxRandomCoin {
 // SERIALIZATION
 // ------------------------------------------------------------------------------------------------
 
-impl Serializable for RpxRandomCoin {
+impl Serializable for RandomCoin {
     fn write_into<W: ByteWriter>(&self, target: &mut W) {
         self.state.iter().for_each(|v| v.write_into(target));
-        // casting to u8 is OK because `current` is always between 4 and 12.
+        // casting to u8 is OK because `current` is always within the rate range.
         target.write_u8(self.current as u8);
     }
 }
 
-impl Deserializable for RpxRandomCoin {
+impl Deserializable for RandomCoin {
     fn read_from<R: ByteReader>(source: &mut R) -> Result<Self, DeserializationError> {
         let state = [
             Felt::read_from(source)?,
@@ -248,29 +201,29 @@ impl Deserializable for RpxRandomCoin {
 
 #[cfg(test)]
 mod tests {
-    use super::{Deserializable, FeltRng, RpxRandomCoin, Serializable, ZERO};
+    use super::{Deserializable, FeltRng, RandomCoin, Serializable, ZERO};
     use crate::{ONE, Word};
 
     #[test]
     fn test_feltrng_felt() {
-        let mut rpxcoin = RpxRandomCoin::new([ZERO; 4].into());
-        let output = rpxcoin.draw_element();
+        let mut coin = RandomCoin::new([ZERO; 4].into());
+        let output = coin.draw_element();
 
-        let mut rpxcoin = RpxRandomCoin::new([ZERO; 4].into());
-        let expected = rpxcoin.draw_basefield();
+        let mut coin = RandomCoin::new([ZERO; 4].into());
+        let expected = coin.draw_basefield();
 
         assert_eq!(output, expected);
     }
 
     #[test]
     fn test_feltrng_word() {
-        let mut rpxcoin = RpxRandomCoin::new([ZERO; 4].into());
-        let output = rpxcoin.draw_word();
+        let mut coin = RandomCoin::new([ZERO; 4].into());
+        let output = coin.draw_word();
 
-        let mut rpocoin = RpxRandomCoin::new([ZERO; 4].into());
+        let mut coin = RandomCoin::new([ZERO; 4].into());
         let mut expected = [ZERO; 4];
         for o in expected.iter_mut() {
-            *o = rpocoin.draw_basefield();
+            *o = coin.draw_basefield();
         }
         let expected = Word::new(expected);
 
@@ -279,10 +232,10 @@ mod tests {
 
     #[test]
     fn test_feltrng_serialization() {
-        let coin1 = RpxRandomCoin::from_parts([ONE; 12], 5);
+        let coin1 = RandomCoin::from_parts([ONE; 12], 5);
 
         let bytes = coin1.to_bytes();
-        let coin2 = RpxRandomCoin::read_from_bytes(&bytes).unwrap();
+        let coin2 = RandomCoin::read_from_bytes(&bytes).unwrap();
         assert_eq!(coin1, coin2);
     }
 }
