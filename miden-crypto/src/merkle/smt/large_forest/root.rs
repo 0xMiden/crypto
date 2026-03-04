@@ -1,8 +1,11 @@
 //! This module contains utility types for working with roots and trees as part of the forest.
 
-use crate::Word;
 #[cfg(test)]
 use crate::rand::Randomizable;
+use crate::{
+    Word,
+    merkle::smt::{LeafIndex, SMT_DEPTH},
+};
 
 // TYPES
 // ================================================================================================
@@ -191,8 +194,13 @@ pub enum RootInfo {
 // ================================================================================================
 
 /// An entry in a given tree.
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd)]
 pub struct TreeEntry {
     pub key: Word,
     pub value: Word,
+}
+impl TreeEntry {
+    pub fn index(&self) -> LeafIndex<SMT_DEPTH> {
+        LeafIndex::from(self.key)
+    }
 }

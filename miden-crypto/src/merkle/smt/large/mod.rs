@@ -176,7 +176,7 @@ use alloc::vec::Vec;
 
 use super::{
     EmptySubtreeRoots, InnerNode, InnerNodeInfo, InnerNodes, LeafIndex, MerkleError, NodeIndex,
-    SMT_DEPTH, SmtLeaf, SmtProof, SparseMerkleTree, Word,
+    NodeMutation, SMT_DEPTH, SmtLeaf, SmtProof, SparseMerkleTree, Word,
 };
 use crate::merkle::smt::{Map, full::concurrent::MutatedSubtreeLeaves};
 
@@ -453,8 +453,8 @@ pub(super) fn is_empty_parent(left: Word, right: Word, child_depth: u8) -> bool 
 /// For a node at index i: left child at 2*i, right child at 2*i+1.
 pub(super) fn to_memory_index(index: &NodeIndex) -> usize {
     debug_assert!(index.depth() < IN_MEMORY_DEPTH);
-    debug_assert!(index.value() < (1 << index.depth()));
-    (1usize << index.depth()) + index.value() as usize
+    debug_assert!(index.position() < (1 << index.depth()));
+    (1usize << index.depth()) + index.position() as usize
 }
 
 impl<S: SmtStorage> PartialEq for LargeSmt<S> {

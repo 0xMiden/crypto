@@ -6,6 +6,7 @@ use rand::{RngCore, SeedableRng};
 use rand_chacha::ChaCha20Rng;
 
 use super::*;
+use crate::aead::AeadScheme;
 
 // PROPERTY-BASED TESTS
 // ================================================================================================
@@ -169,6 +170,14 @@ fn test_secret_key_creation() {
 
     // Keys should be different
     assert_ne!(key1, key2);
+}
+
+#[test]
+fn test_key_from_bytes_rejects_invalid_length() {
+    let mut bytes = vec![0_u8; SK_SIZE_BYTES];
+    bytes.push(0);
+
+    assert!(AeadPoseidon2::key_from_bytes(&bytes).is_err());
 }
 
 #[test]

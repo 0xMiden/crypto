@@ -440,10 +440,8 @@ impl PartialEq<SparseMerklePath> for MerklePath {
 /// depth before the root (depth 1).
 fn path_depth_iter(tree_depth: u8) -> impl ExactSizeIterator<Item = NonZero<u8>> {
     let top_down_iter = (1..=tree_depth).map(|depth| {
-        // SAFETY: `RangeInclusive<1, _>` cannot ever yield 0. Even if `tree_depth` is 0, then the
-        // range is `RangeInclusive<1, 0>` will simply not yield any values, and this block won't
-        // even be reached.
-        unsafe { NonZero::new_unchecked(depth) }
+        // RangeInclusive<1, _> guarantees depth >= 1
+        NonZero::new(depth).expect("range is bounded by 1")
     });
 
     // Reverse the top-down iterator to get a bottom-up iterator.
@@ -1024,7 +1022,7 @@ mod tests {
                 let (merkle_path, leaf) = tree.open(key).into_parts();
                 let sparse_path = SparseMerklePath::from_sized_iter(merkle_path.clone().into_iter()).unwrap();
 
-                let leaf_index = Smt::key_to_leaf_index(key).value();
+                let leaf_index = Smt::key_to_leaf_index(key).position();
                 let actual_value = leaf.hash(); // Use the actual leaf hash
 
                 // Verify both paths have same depth

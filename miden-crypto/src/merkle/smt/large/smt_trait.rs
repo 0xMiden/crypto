@@ -120,7 +120,7 @@ impl<S: SmtStorage> SparseMerkleTree<SMT_DEPTH> for LargeSmt<S> {
         value: Self::Value,
     ) -> Result<Option<Self::Value>, MerkleError> {
         // inserting an `EMPTY_VALUE` is equivalent to removing any value associated with `key`
-        let index = Self::key_to_leaf_index(&key).value();
+        let index = Self::key_to_leaf_index(&key).position();
         if value != Self::EMPTY_VALUE {
             match self.storage.insert_value(index, key, value) {
                 Ok(prev) => Ok(prev),
@@ -138,7 +138,7 @@ impl<S: SmtStorage> SparseMerkleTree<SMT_DEPTH> for LargeSmt<S> {
 
     fn get_value(&self, key: &Self::Key) -> Self::Value {
         let leaf_pos = LeafIndex::<SMT_DEPTH>::from(*key);
-        match self.storage.get_leaf(leaf_pos.value()) {
+        match self.storage.get_leaf(leaf_pos.position()) {
             Ok(Some(leaf)) => leaf.get_value(key).unwrap_or_default(),
             Ok(None) => EMPTY_WORD,
             Err(_) => {
@@ -148,7 +148,7 @@ impl<S: SmtStorage> SparseMerkleTree<SMT_DEPTH> for LargeSmt<S> {
     }
 
     fn get_leaf(&self, key: &Word) -> Self::Leaf {
-        let leaf_pos = LeafIndex::<SMT_DEPTH>::from(*key).value();
+        let leaf_pos = LeafIndex::<SMT_DEPTH>::from(*key).position();
         match self.storage.get_leaf(leaf_pos) {
             Ok(Some(leaf)) => leaf,
             Ok(None) => SmtLeaf::new_empty((*key).into()),
@@ -208,7 +208,7 @@ impl<S: SmtStorage> SparseMerkleTree<SMT_DEPTH> for LargeSmt<S> {
         }
         let mut path = Vec::with_capacity(idx.depth() as usize);
         while idx.depth() > 0 {
-            let is_right = idx.is_value_odd();
+            let is_right = idx.is_position_odd();
             idx = idx.parent();
 
             let sibling_hash = if idx.depth() < IN_MEMORY_DEPTH {

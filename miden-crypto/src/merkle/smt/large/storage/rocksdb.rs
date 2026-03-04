@@ -227,7 +227,7 @@ impl RocksDbStorage {
             56 => 7,
             d => panic!("unsupported depth {d}"),
         };
-        KeyBytes::new(index.value(), keep)
+        KeyBytes::new(index.position(), keep)
     }
 
     /// Retrieves a handle to a RocksDB column family by its name.
@@ -418,7 +418,7 @@ impl SmtStorage for RocksDbStorage {
         let key = Self::index_db_key(index);
         match self.db.get_cf(cf, key)? {
             Some(bytes) => {
-                let leaf = SmtLeaf::read_from_bytes(&bytes)?;
+                let leaf = SmtLeaf::read_from_bytes_with_budget(&bytes, bytes.len())?;
                 Ok(Some(leaf))
             },
             None => Ok(None),
@@ -474,8 +474,10 @@ impl SmtStorage for RocksDbStorage {
         let cf = self.cf_handle(LEAVES_CF)?;
         let old_bytes = self.db.get_cf(cf, key)?;
         self.db.delete_cf(cf, key)?;
-        Ok(old_bytes
-            .map(|bytes| SmtLeaf::read_from_bytes(&bytes).expect("failed to deserialize leaf")))
+        Ok(old_bytes.map(|bytes| {
+            SmtLeaf::read_from_bytes_with_budget(&bytes, bytes.len())
+                .expect("failed to deserialize leaf")
+        }))
     }
 
     /// Retrieves multiple SMT leaf nodes by their logical `indices` using RocksDB's `multi_get_cf`.
@@ -491,7 +493,9 @@ impl SmtStorage for RocksDbStorage {
         results
             .into_iter()
             .map(|result| match result {
-                Ok(Some(bytes)) => Ok(Some(SmtLeaf::read_from_bytes(&bytes)?)),
+                Ok(Some(bytes)) => {
+                    Ok(Some(SmtLeaf::read_from_bytes_with_budget(&bytes, bytes.len())?))
+                },
                 Ok(None) => Ok(None),
                 Err(e) => Err(e.into()),
             })
@@ -642,7 +646,7 @@ impl SmtStorage for RocksDbStorage {
                 .hash();
 
             let depth24_cf = self.cf_handle(DEPTH_24_CF)?;
-            let hash_key = Self::index_db_key(subtree.root_index().value());
+            let hash_key = Self::index_db_key(subtree.root_index().position());
             batch.put_cf(depth24_cf, hash_key, root_hash.to_bytes());
         }
 
@@ -677,7 +681,7 @@ impl SmtStorage for RocksDbStorage {
             if subtree.root_index().depth() == IN_MEMORY_DEPTH
                 && let Some(root_node) = subtree.get_inner_node(subtree.root_index())
             {
-                let hash_key = Self::index_db_key(subtree.root_index().value());
+                let hash_key = Self::index_db_key(subtree.root_index().position());
                 batch.put_cf(depth24_cf, hash_key, root_node.hash().to_bytes());
             }
         }
@@ -701,7 +705,7 @@ impl SmtStorage for RocksDbStorage {
         // Also remove level 24 hash cache if this is a level 24 subtree
         if index.depth() == IN_MEMORY_DEPTH {
             let depth24_cf = self.cf_handle(DEPTH_24_CF)?;
-            let hash_key = Self::index_db_key(index.value());
+            let hash_key = Self::index_db_key(index.position());
             batch.delete_cf(depth24_cf, hash_key);
         }
 
@@ -844,14 +848,14 @@ impl SmtStorage for RocksDbStorage {
                             .then(|| subtree.get_inner_node(index))
                             .flatten()
                             .map(|root_node| {
-                                let hash_key = Self::index_db_key(index.value());
+                                let hash_key = Self::index_db_key(index.position());
                                 (hash_key, Some(root_node.hash().to_bytes()))
                             });
                         (index, Some(bytes), depth24_op)
                     },
                     SubtreeUpdate::Delete { index } => {
                         let depth24_op = is_depth_24(index).then(|| {
-                            let hash_key = Self::index_db_key(index.value());
+                            let hash_key = Self::index_db_key(index.position());
                             (hash_key, None)
                         });
                         (index, None, depth24_op)
@@ -955,7 +959,7 @@ impl SmtStorage for RocksDbStorage {
             let (key_bytes, value_bytes) = item?;
 
             let index = index_from_key_bytes(&key_bytes)?;
-            let hash = Word::read_from_bytes(&value_bytes)?;
+            let hash = Word::read_from_bytes_with_budget(&value_bytes, value_bytes.len())?;
 
             hashes.push((index, hash));
         }
@@ -997,7 +1001,8 @@ impl Iterator for RocksDbDirectLeafIterator<'_> {
         self.iter.find_map(|result| {
             let (key_bytes, value_bytes) = result.ok()?;
             let leaf_idx = index_from_key_bytes(&key_bytes).ok()?;
-            let leaf = SmtLeaf::read_from_bytes(&value_bytes).ok()?;
+            let leaf =
+                SmtLeaf::read_from_bytes_with_budget(&value_bytes, value_bytes.len()).ok()?;
             Some((leaf_idx, leaf))
         })
     }

@@ -55,7 +55,7 @@ pub(crate) const WIDTH_SMALL_POLY_COEFFICIENT: usize = 6;
 /// form, called the LDL tree, and this allows for fast sampling of short vectors in the lattice
 /// using Fast Fourier sampling during signature generation (ffSampling algorithm 11 in [1]).
 ///
-/// [1]: https://falcon-sign.info/falcon.pdf
+/// [1]: <https://falcon-sign.info/falcon.pdf>
 #[derive(Clone, SilentDebug, SilentDisplay)]
 pub struct SecretKey {
     secret_key: ShortLatticeBasis,
@@ -263,7 +263,7 @@ impl SecretKey {
     /// Note that we hash in also a `log_2(N)` where `N = 512` in order to domain separate between
     /// different versions of the Falcon DSA, see [1] Section 3.4.1.
     ///
-    /// [1]: https://github.com/algorand/falcon/blob/main/falcon-det.pdf
+    /// [1]: <https://github.com/algorand/falcon/blob/main/falcon-det.pdf>
     fn generate_seed(&self, message: &Word) -> [u8; 32] {
         let mut buffer = Vec::with_capacity(1 + SK_LEN + Word::SERIALIZED_SIZE);
         buffer.push(LOG_N);

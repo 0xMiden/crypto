@@ -66,27 +66,24 @@ required-features = ["std"]
 
 [[bench]]
 harness           = false
-name              = "rand"
+name              = "sparse_path"
+required-features = ["std"]
+
+[[bench]]
+harness           = false
+name              = "transpose"
 required-features = ["std"]
 
 [features]
-concurrent = [
-  "dep:rayon",
-  "hashbrown?/rayon",
-  "p3-maybe-rayon/parallel",
-  "p3-miden-prover/parallel",
-  "p3-util/parallel",
-  "std",
-]
-default = ["concurrent", "std"]
+concurrent = ["dep:rayon", "p3-maybe-rayon/parallel", "p3-miden-prover/parallel", "p3-util/parallel", "std"]
+default    = ["concurrent", "std"]
 executable = ["concurrent", "dep:clap", "dep:rand-utils"]
-fuzzing = []
-hashmaps = ["dep:hashbrown"]
-internal = ["concurrent"]
-rocksdb = ["concurrent", "dep:rocksdb"]
-serde = ["dep:serde", "serde?/alloc"]
-std = ["blake3/std", "dep:cc", "miden-serde-utils/std", "rand/std", "rand/thread_rng"]
-testing = ["dep:proptest", "miden-field/testing"]
+fuzzing    = []
+internal   = ["concurrent"]
+rocksdb    = ["concurrent", "dep:rocksdb"]
+serde      = ["dep:serde", "serde?/alloc"]
+std        = ["blake3/std", "dep:cc", "miden-serde-utils/std", "rand/std", "rand/thread_rng", "serde?/std"]
+testing    = ["dep:proptest", "miden-field/testing"]
 
 [dependencies]
 # Miden dependencies
@@ -101,9 +98,8 @@ clap             = { features = ["derive"], optional = true, version = "4.5" }
 curve25519-dalek = { default-features = false, version = "4" }
 ed25519-dalek    = { features = ["zeroize"], version = "2" }
 flume            = { version = "0.11.1" }
-hashbrown        = { features = ["serde"], optional = true, version = "0.16" }
 hkdf             = { default-features = false, version = "0.12" }
-k256             = { features = ["ecdh", "ecdsa"], version = "0.13" }
+k256             = { features = ["ecdh", "ecdsa", "pkcs8"], version = "0.13" }
 num              = { default-features = false, features = ["alloc", "libm"], version = "0.4" }
 num-complex      = { default-features = false, version = "0.4" }
 proptest         = { default-features = false, features = ["alloc"], optional = true, version = "1.7" }

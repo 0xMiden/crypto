@@ -88,28 +88,35 @@ impl PartialMerkleTree {
     ///
     /// # Errors
     /// Returns an error if:
-    /// - If the depth is 0 or is greater than 64.
+    /// - Any entry has depth 0 or is greater than 64.
     /// - The number of entries exceeds the maximum tree capacity, that is 2^{depth}.
     /// - The provided entries contain an insufficient set of nodes.
     /// - Any entry is an ancestor of another entry (creates hash ambiguity).
+    ///
+    /// An empty input returns an empty tree.
     pub fn with_leaves<R, I>(entries: R) -> Result<Self, MerkleError>
     where
         R: IntoIterator<IntoIter = I>,
         I: Iterator<Item = (NodeIndex, Word)> + ExactSizeIterator,
     {
+        let entries = entries.into_iter();
+        if entries.len() == 0 {
+            return Ok(PartialMerkleTree::new());
+        }
+
         let mut layers: BTreeMap<u8, Vec<u64>> = BTreeMap::new();
         let mut leaves = BTreeSet::new();
         let mut nodes = BTreeMap::new();
 
         // add data to the leaves and nodes maps and also fill layers map, where the key is the
         // depth of the node and value is its index.
-        for (node_index, hash) in entries.into_iter() {
+        for (node_index, hash) in entries {
             leaves.insert(node_index);
             nodes.insert(node_index, hash);
             layers
                 .entry(node_index.depth())
-                .and_modify(|layer_vec| layer_vec.push(node_index.value()))
-                .or_insert(vec![node_index.value()]);
+                .and_modify(|layer_vec| layer_vec.push(node_index.position()))
+                .or_insert(vec![node_index.position()]);
         }
 
         // make sure the depth of the last layer is 64 or smaller
@@ -143,7 +150,7 @@ impl PartialMerkleTree {
 
                 // If parent already exists, check if it's user-provided (invalid) or computed
                 // (skip)
-                if parent_layer.contains(&parent_node.value()) {
+                if parent_layer.contains(&parent_node.position()) {
                     // If the parent was provided as a leaf, that's invalid - we can't have both
                     // a node and its descendant in the input set.
                     if leaves.contains(&parent_node) {
@@ -165,7 +172,7 @@ impl PartialMerkleTree {
                 let parent = Poseidon2::merge(&index.build_node(*node, *sibling));
 
                 // add index value of the calculated node to the parents layer
-                parent_layer.push(parent_node.value());
+                parent_layer.push(parent_node.position());
                 // add index and hash to the nodes map
                 nodes.insert(parent_node, parent);
             }
@@ -421,7 +428,7 @@ impl PartialMerkleTree {
                 for _ in 0..d {
                     s.push_str(indent);
                 }
-                s.push_str(&format!("({}, {}): ", index.depth(), index.value()));
+                s.push_str(&format!("({}, {}): ", index.depth(), index.position()));
                 s.push_str(&word_to_hex(&node)?);
                 s.push('\n');
             }
@@ -466,20 +473,24 @@ impl Serializable for PartialMerkleTree {
 
 impl Deserializable for PartialMerkleTree {
     fn read_from<R: ByteReader>(source: &mut R) -> Result<Self, DeserializationError> {
-        let leaves_len = source.read_u64()? as usize;
-        let mut leaf_nodes = Vec::with_capacity(leaves_len);
+        let leaves_len_u64 = source.read_u64()?;
+        let leaves_len = usize::try_from(leaves_len_u64).map_err(|_| {
+            DeserializationError::InvalidValue("PartialMerkleTree leaf count too large".into())
+        })?;
 
-        // add leaf nodes to the vector
-        for _ in 0..leaves_len {
-            let index = NodeIndex::read_from(source)?;
-            let hash = Word::read_from(source)?;
-            leaf_nodes.push((index, hash));
-        }
+        // Use read_many_iter to avoid eager allocation and respect BudgetedReader limits
+        let leaf_nodes: Vec<(NodeIndex, Word)> =
+            source.read_many_iter(leaves_len)?.collect::<Result<_, _>>()?;
 
         let pmt = PartialMerkleTree::with_leaves(leaf_nodes).map_err(|_| {
             DeserializationError::InvalidValue("Invalid data for PartialMerkleTree creation".into())
         })?;
 
         Ok(pmt)
+    }
+
+    /// Minimum serialized size: u64 length prefix (0 entries).
+    fn min_serialized_size() -> usize {
+        8
     }
 }

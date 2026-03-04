@@ -43,9 +43,13 @@ pub(crate) trait KeyAgreementScheme {
     ) -> Result<Self::SharedSecret, KeyAgreementError>;
 
     /// Extracts key material from shared secret.
+    ///
+    /// `info` is the HKDF context string for domain separation and binding to the IES scheme and
+    /// ephemeral public key (see `CryptoBox::build_kdf_info`).
     fn extract_key_material(
         shared_secret: &Self::SharedSecret,
         length: usize,
+        info: &[u8],
     ) -> Result<Vec<u8>, KeyAgreementError>;
 }
 

@@ -293,7 +293,7 @@ fn get_leaf_path_simplesmt(c: &mut Criterion) {
             b.iter_batched(
                 || random_index(size_u64, SMT_MAX_DEPTH),
                 |index| {
-                    black_box(smt.open(&LeafIndex::<SMT_MAX_DEPTH>::new(index.value()).unwrap()))
+                    black_box(smt.open(&LeafIndex::<SMT_MAX_DEPTH>::new(index.position()).unwrap()))
                 },
                 BatchSize::SmallInput,
             )

@@ -15,6 +15,9 @@ use crate::utils::{
 // CONSTANTS
 // ================================================================================================
 
+/// Size of a 192-bit digest in bytes.
+pub const DIGEST192_BYTES: usize = 24;
+
 /// Size of a 256-bit digest in bytes.
 pub const DIGEST256_BYTES: usize = 32;
 
@@ -23,6 +26,9 @@ pub const DIGEST512_BYTES: usize = 64;
 
 // TYPE ALIASES
 // ================================================================================================
+
+/// A 192-bit (24-byte) digest. Type alias for `Digest<24>`.
+pub type Digest192 = Digest<DIGEST192_BYTES>;
 
 /// A 256-bit (32-byte) digest. Type alias for `Digest<32>`.
 pub type Digest256 = Digest<DIGEST256_BYTES>;
@@ -58,10 +64,18 @@ impl<const N: usize> Digest<N> {
     }
 
     /// Converts a slice of digests into a contiguous byte slice.
+    ///
+    /// This is a zero-copy operation that reinterprets the digest slice as bytes.
     pub fn digests_as_bytes(digests: &[Digest<N>]) -> &[u8] {
         let p = digests.as_ptr();
         let len = digests.len() * N;
-        // SAFETY: Digest<N> is repr(transparent) over [u8; N], so this is safe
+        // SAFETY:
+        // - Digest<N> is #[repr(transparent)] over [u8; N], which guarantees identical size,
+        //   alignment, and memory layout to [u8; N].
+        // - A slice of Digest<N> therefore has the same layout as a contiguous array of bytes,
+        //   which can be safely reinterpreted as &[u8].
+        // - The length calculation is correct because each Digest<N> contains exactly N bytes.
+        // - The resulting slice is valid for the lifetime of the input slice.
         unsafe { slice::from_raw_parts(p as *const u8, len) }
     }
 }
@@ -137,7 +151,11 @@ mod tests {
         assert_eq!(size_of::<Digest<64>>(), size_of::<[u8; 64]>());
         assert_eq!(align_of::<Digest<64>>(), align_of::<[u8; 64]>());
 
+        assert_eq!(size_of::<Digest<24>>(), size_of::<[u8; 24]>());
+        assert_eq!(align_of::<Digest<24>>(), align_of::<[u8; 24]>());
+
         // Verify type aliases as well
+        assert_eq!(size_of::<Digest192>(), 24);
         assert_eq!(size_of::<Digest256>(), 32);
         assert_eq!(size_of::<Digest512>(), 64);
     }
@@ -195,6 +213,15 @@ mod tests {
         let digest = Digest::<64>::from(bytes);
         let hex: String = digest.into();
         let recovered = Digest::<64>::try_from(hex.as_str()).unwrap();
+        assert_eq!(recovered.as_bytes(), &bytes);
+    }
+
+    #[test]
+    fn test_digest_hex_roundtrip_24() {
+        let bytes = [0xef; 24];
+        let digest = Digest::<24>::from(bytes);
+        let hex: String = digest.into();
+        let recovered = Digest::<24>::try_from(hex.as_str()).unwrap();
         assert_eq!(recovered.as_bytes(), &bytes);
     }
 

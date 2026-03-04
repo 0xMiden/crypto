@@ -207,7 +207,13 @@ impl SmtForest {
                 self.leaves.insert(leaf_hash, leaf);
             }
         }
-        self.roots.insert(new_root);
+        // Never register the empty tree root in self.roots, as it is always implicitly valid
+        // and the empty hash nodes are pre-populated infrastructure in the SmtStore.
+        // Adding it here would let `pop_smts` walk and destroy those nodes,
+        // corrupting the store for all future operations.
+        if new_root != *EmptySubtreeRoots::entry(SMT_DEPTH, 0) {
+            self.roots.insert(new_root);
+        }
 
         Ok(new_root)
     }

@@ -13,9 +13,15 @@ impl EmptySubtreeRoots {
     /// specified depth.
     pub const fn empty_hashes(tree_depth: u8) -> &'static [Word] {
         let ptr = &EMPTY_SUBTREES[255 - tree_depth as usize] as *const Word;
-        // Safety: this is a static/constant array, so it will never be outlived. If we attempt to
-        // use regular slices, this wouldn't be a `const` function, meaning we won't be able to use
-        // the returned value for static/constant definitions.
+        // SAFETY:
+        // 1. Lifetime: EMPTY_SUBTREES is a static array with 256 elements, so it outlives any
+        //    returned reference.
+        // 2. Bounds: tree_depth is a u8 (0-255). The starting index is 255 - tree_depth, which is
+        //    always in [0, 255]. The slice length is tree_depth + 1, so the end index is (255 -
+        //    tree_depth) + (tree_depth + 1) = 256, which is exactly the array length.
+        // 3. Alignment: ptr points to a valid Word in the array, satisfying slice::from_raw_parts
+        //    requirements.
+        // This would not be possible as a const fn with safe slice indexing, which is not stable.
         unsafe { slice::from_raw_parts(ptr, tree_depth as usize + 1) }
     }
 
