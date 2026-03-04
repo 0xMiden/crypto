@@ -124,6 +124,35 @@ impl SmtLeaf {
     // PUBLIC ACCESSORS
     // ---------------------------------------------------------------------------------------------
 
+    /// Returns the value associated with `key` in the leaf, or `None` if `key` maps to another
+    /// leaf.
+    pub fn get_value(&self, key: &Word) -> Option<Word> {
+        // Ensure that `key` maps to this leaf
+        if self.index() != (*key).into() {
+            return None;
+        }
+
+        match self {
+            SmtLeaf::Empty(_) => Some(EMPTY_WORD),
+            SmtLeaf::Single((key_in_leaf, value_in_leaf)) => {
+                if key == key_in_leaf {
+                    Some(*value_in_leaf)
+                } else {
+                    Some(EMPTY_WORD)
+                }
+            },
+            SmtLeaf::Multiple(kv_pairs) => {
+                for (key_in_leaf, value_in_leaf) in kv_pairs {
+                    if key == key_in_leaf {
+                        return Some(*value_in_leaf);
+                    }
+                }
+
+                Some(EMPTY_WORD)
+            },
+        }
+    }
+
     /// Returns true if the leaf is empty
     pub fn is_empty(&self) -> bool {
         matches!(self, Self::Empty(_))
@@ -253,35 +282,6 @@ impl SmtLeaf {
 
     // HELPERS
     // ---------------------------------------------------------------------------------------------
-
-    /// Returns the value associated with `key` in the leaf, or `None` if `key` maps to another
-    /// leaf.
-    pub(in crate::merkle::smt) fn get_value(&self, key: &Word) -> Option<Word> {
-        // Ensure that `key` maps to this leaf
-        if self.index() != (*key).into() {
-            return None;
-        }
-
-        match self {
-            SmtLeaf::Empty(_) => Some(EMPTY_WORD),
-            SmtLeaf::Single((key_in_leaf, value_in_leaf)) => {
-                if key == key_in_leaf {
-                    Some(*value_in_leaf)
-                } else {
-                    Some(EMPTY_WORD)
-                }
-            },
-            SmtLeaf::Multiple(kv_pairs) => {
-                for (key_in_leaf, value_in_leaf) in kv_pairs {
-                    if key == key_in_leaf {
-                        return Some(*value_in_leaf);
-                    }
-                }
-
-                Some(EMPTY_WORD)
-            },
-        }
-    }
 
     /// Inserts key-value pair into the leaf; returns the previous value associated with `key`, if
     /// any.
