@@ -38,6 +38,13 @@ test  = false
 [[bin]]
 bench = false
 doc   = false
+name  = "merkle_store"
+path  = "fuzz_targets/merkle_store.rs"
+test  = false
+
+[[bin]]
+bench = false
+doc   = false
 name  = "smt_serde"
 path  = "fuzz_targets/smt_serde.rs"
 test  = false
