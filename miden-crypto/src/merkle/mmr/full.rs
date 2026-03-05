@@ -166,14 +166,23 @@ impl Mmr {
 
         let mut left_offset = self.nodes.len().saturating_sub(2);
         let mut right = el;
-        let mut left_tree = 1;
-        while !(old_forest & Forest::try_new(left_tree).unwrap()).is_empty() {
+        let mut left_tree = 1usize;
+        while left_tree <= Forest::MAX_LEAVES && (old_forest.num_leaves() & left_tree) != 0 {
             right = Poseidon2::merge(&[self.nodes[left_offset], right]);
             self.nodes.push(right);
 
-            left_offset =
-                left_offset.saturating_sub(Forest::try_new(left_tree).unwrap().num_nodes());
-            left_tree <<= 1;
+            let left_nodes = (left_tree as u128).saturating_mul(2).saturating_sub(1);
+            let left_nodes =
+                usize::try_from(left_nodes).map_err(|_| MmrError::ForestSizeExceeded {
+                    requested: left_tree,
+                    max: Forest::MAX_LEAVES,
+                })?;
+            left_offset = left_offset.saturating_sub(left_nodes);
+
+            match left_tree.checked_shl(1) {
+                Some(next) => left_tree = next,
+                None => break,
+            }
         }
 
         self.forest = new_forest;
@@ -261,19 +270,14 @@ impl Mmr {
                 //   computed from the known peaks and provided authentication nodes.
                 let known_mask =
                     common_trees.num_leaves() | merges.num_leaves() | target.num_leaves();
-                let known = Forest::try_new(known_mask)
-                    .map_err(|_| MmrError::ForestSizeExceeded {
-                        requested: known_mask,
-                        max: Forest::MAX_LEAVES,
-                    })?
-                    .num_nodes();
+                let known = nodes_from_mask(known_mask)?;
                 let sibling = target.num_nodes();
                 result.push(self.nodes[known + sibling - 1]);
 
                 // Update the target and account for tree merges
-                target = target.next_larger_tree();
+                target = target.next_larger_tree()?;
                 while !(merges & target).is_empty() {
-                    target = target.next_larger_tree();
+                    target = target.next_larger_tree()?;
                 }
                 // Remove the merges done so far
                 merges = merges.try_bitxor(merges & target.all_smaller_trees_unchecked())?;
@@ -343,7 +347,7 @@ impl Mmr {
 
         // The tree walk below goes from the root to the leaf, compute the root index to start
         let mut forest_target: usize = 1usize << tree_bit;
-        let mut index = Forest::try_new(forest_target).unwrap().num_nodes() - 1;
+        let mut index = Forest::new(forest_target).unwrap().num_nodes() - 1;
 
         // Loop until the leaf is reached
         while forest_target > 1 {
@@ -352,7 +356,7 @@ impl Mmr {
 
             // compute the indices of the right and left subtrees based on the post-order
             let right_offset = index - 1;
-            let left_offset = right_offset - Forest::try_new(forest_target).unwrap().num_nodes();
+            let left_offset = right_offset - Forest::new(forest_target).unwrap().num_nodes();
 
             let left_or_right = relative_pos & forest_target;
             let sibling = if left_or_right != 0 {
@@ -379,11 +383,18 @@ impl Mmr {
     }
 }
 
+fn nodes_from_mask(mask: usize) -> Result<usize, MmrError> {
+    let leaves = mask as u128;
+    let trees = mask.count_ones() as u128;
+    let nodes = leaves.saturating_mul(2).saturating_sub(trees);
+    usize::try_from(nodes)
+        .map_err(|_| MmrError::ForestSizeExceeded { requested: mask, max: Forest::MAX_LEAVES })
+}
+
 // CONVERSIONS
 // ================================================================================================
 
-// Note: We intentionally avoid a `TryFrom<T>` impl because it conflicts with the
-// blanket `TryFrom<U> for T where U: Into<T>` implementation in core.
+// No TryFrom<T> impl: it conflicts with core’s blanket TryFrom<U> where U: Into<T>.
 
 // SERIALIZATION
 // ================================================================================================
@@ -450,7 +461,7 @@ impl Iterator for MmrNodes<'_> {
 
             // compute the number of nodes in the right tree, this is the offset to the
             // previous left parent
-            let right_nodes = Forest::try_new(self.last_right).unwrap().num_nodes();
+            let right_nodes = Forest::new(self.last_right).unwrap().num_nodes();
             // the next parent position is one above the position of the pair
             let parent = self.last_right << 1;
 
@@ -488,6 +499,7 @@ impl Iterator for MmrNodes<'_> {
 mod tests {
     use alloc::vec::Vec;
 
+    use super::nodes_from_mask;
     use crate::{
         Felt, Word, ZERO,
         merkle::mmr::{Forest, Mmr},
@@ -514,5 +526,64 @@ mod tests {
 
         let result = Mmr::read_from_bytes(&bytes);
         assert!(matches!(result, Err(DeserializationError::InvalidValue(_))));
+    }
+
+    #[cfg(target_pointer_width = "64")]
+    #[test]
+    fn test_nodes_from_mask_over_max_leaves() {
+        let mask = Forest::MAX_LEAVES + 1;
+        let expected = {
+            let leaves = mask as u128;
+            let trees = mask.count_ones() as u128;
+            let nodes = leaves.saturating_mul(2).saturating_sub(trees);
+            nodes as usize
+        };
+
+        assert_eq!(nodes_from_mask(mask).unwrap(), expected);
+    }
+
+    #[cfg(target_pointer_width = "32")]
+    #[test]
+    fn test_nodes_from_mask_overflow_32bit() {
+        let mask = Forest::MAX_LEAVES.saturating_add(1);
+        if mask == Forest::MAX_LEAVES {
+            let expected = {
+                let leaves = Forest::MAX_LEAVES as u128;
+                let trees = Forest::MAX_LEAVES.count_ones() as u128;
+                leaves.saturating_mul(2).saturating_sub(trees)
+            };
+            assert!(expected > usize::MAX as u128);
+            assert_matches!(
+                nodes_from_mask(Forest::MAX_LEAVES),
+                Err(MmrError::ForestSizeExceeded { requested, max }) if
+                    requested == Forest::MAX_LEAVES && max == Forest::MAX_LEAVES
+            );
+        } else {
+            assert_matches!(
+                nodes_from_mask(mask),
+                Err(MmrError::ForestSizeExceeded { requested, max }) if
+                    requested == mask && max == Forest::MAX_LEAVES
+            );
+        }
+    }
+
+    #[cfg(target_pointer_width = "32")]
+    #[test]
+    fn test_nodes_from_mask_at_max_leaves_32bit() {
+        let expected = {
+            let leaves = Forest::MAX_LEAVES as u128;
+            let trees = Forest::MAX_LEAVES.count_ones() as u128;
+            leaves.saturating_mul(2).saturating_sub(trees)
+        };
+
+        if expected > usize::MAX as u128 {
+            assert_matches!(
+                nodes_from_mask(Forest::MAX_LEAVES),
+                Err(MmrError::ForestSizeExceeded { requested, max }) if
+                    requested == Forest::MAX_LEAVES && max == Forest::MAX_LEAVES
+            );
+        } else {
+            assert_eq!(nodes_from_mask(Forest::MAX_LEAVES).unwrap(), expected as usize);
+        }
     }
 }

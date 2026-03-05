@@ -401,7 +401,7 @@ impl PartialMmr {
     ) -> Result<(), MmrError> {
         // Checks there is a tree with same depth as the authentication path, if not the path is
         // invalid.
-        let tree = Forest::try_new(1 << path.depth()).expect("forest size exceeds maximum");
+        let tree = Forest::new(1 << path.depth()).expect("forest size exceeds maximum");
         if (tree & self.forest).is_empty() {
             return Err(MmrError::UnknownPeak(path.depth()));
         };
@@ -530,7 +530,7 @@ impl PartialMmr {
 
             (merge_count, new_peaks)
         } else {
-            let new_peaks = Forest::try_new(changes).map_err(|_| MmrError::ForestSizeExceeded {
+            let new_peaks = Forest::new(changes).map_err(|_| MmrError::ForestSizeExceeded {
                 requested: changes,
                 max: Forest::MAX_LEAVES,
             })?;
@@ -599,7 +599,7 @@ impl PartialMmr {
 
                 peak_idx = peak_idx.parent();
                 new = Poseidon2::merge(&[left, right]);
-                target = target.next_larger_tree();
+                target = target.next_larger_tree()?;
             }
 
             debug_assert!(peak_count == trees_to_merge.num_trees());
@@ -733,7 +733,7 @@ impl Deserializable for PartialMmr {
     ) -> Result<Self, crate::utils::DeserializationError> {
         use crate::utils::DeserializationError;
 
-        let forest = Forest::try_new(usize::read_from(source)?)?;
+        let forest = Forest::new(usize::read_from(source)?)?;
         let peaks_vec = Vec::<Word>::read_from(source)?;
         let nodes = NodeMap::read_from(source)?;
         let tracked: Vec<usize> = Vec::read_from(source)?;

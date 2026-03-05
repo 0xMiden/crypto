@@ -30,7 +30,7 @@ use crate::{
 ///   (3 nodes).
 /// - `Forest(0b1000)` is a forest with one tree, which has 8 leaves (15 nodes).
 ///
-/// Forest sizes are capped at [`Forest::MAX_LEAVES`]. Use [`Forest::try_new`] or
+/// Forest sizes are capped at [`Forest::MAX_LEAVES`]. Use [`Forest::new`] or
 /// [`Forest::append_leaf`] to enforce the limit.
 #[derive(Debug, Copy, Clone, Default, PartialEq, Eq, PartialOrd, Ord)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
@@ -38,20 +38,22 @@ pub struct Forest(usize);
 
 impl Forest {
     /// Maximum number of leaves supported by the forest.
-    pub const MAX_LEAVES: usize = usize::MAX / 2 + 1;
+    ///
+    /// The protocol assumes the number of leaves fits in `u32`, but we also cap the value so
+    /// `num_nodes()` can return `usize` without overflow on 32-bit targets.
+    pub const MAX_LEAVES: usize = if (u32::MAX as usize) < (usize::MAX / 2 + 1) {
+        u32::MAX as usize
+    } else {
+        usize::MAX / 2 + 1
+    };
 
     /// Creates an empty forest (no trees).
     pub const fn empty() -> Self {
         Self(0)
     }
 
-    /// Returns true if `num_leaves` is within the supported bounds.
-    pub const fn is_valid_size(num_leaves: usize) -> bool {
-        num_leaves <= Self::MAX_LEAVES
-    }
-
     /// Creates a forest with `num_leaves` leaves, returning an error if the value is too large.
-    pub fn try_new(num_leaves: usize) -> Result<Self, DeserializationError> {
+    pub fn new(num_leaves: usize) -> Result<Self, DeserializationError> {
         if !Self::is_valid_size(num_leaves) {
             return Err(DeserializationError::InvalidValue(format!(
                 "forest size {} exceeds maximum {}",
@@ -71,7 +73,12 @@ impl Forest {
     /// This will panic if `height` is greater than `usize::BITS - 1`.
     pub fn with_height(height: usize) -> Self {
         assert!(height < usize::BITS as usize);
-        Self::try_new(1 << height).expect("forest height exceeds maximum")
+        Self::new(1 << height).expect("forest height exceeds maximum")
+    }
+
+    /// Returns true if `num_leaves` is within the supported bounds.
+    pub const fn is_valid_size(num_leaves: usize) -> bool {
+        num_leaves <= Self::MAX_LEAVES
     }
 
     /// Returns true if there are no trees in the forest.
@@ -102,7 +109,7 @@ impl Forest {
     ///
     /// # Panics
     ///
-    /// This will panic if the forest has size greater than `usize::MAX / 2 + 1`.
+    /// This will panic if the forest has size greater than [`Forest::MAX_LEAVES`].
     pub const fn num_nodes(self) -> usize {
         assert!(self.0 <= Self::MAX_LEAVES);
         if self.0 <= usize::MAX / 2 {
@@ -222,12 +229,12 @@ impl Forest {
     ///
     /// ```
     /// # use miden_crypto::merkle::mmr::Forest;
-    /// let range = Forest::try_new(0b0101_0110).unwrap();
-    /// assert_eq!(range.trees_larger_than(1), Forest::try_new(0b0101_0100).unwrap());
+    /// let range = Forest::new(0b0101_0110).unwrap();
+    /// assert_eq!(range.trees_larger_than(1), Forest::new(0b0101_0100).unwrap());
     /// ```
     pub fn trees_larger_than(self, tree_idx: u32) -> Self {
         let mask = high_bitmask(tree_idx + 1);
-        Self::try_new(self.0 & mask).expect("forest size exceeds maximum")
+        Self::new(self.0 & mask).expect("forest size exceeds maximum")
     }
 
     /// Creates a new forest with all possible trees smaller than the smallest tree in this
@@ -242,7 +249,7 @@ impl Forest {
     /// For a non-panicking version of this function, see [`Forest::all_smaller_trees()`].
     pub fn all_smaller_trees_unchecked(self) -> Self {
         debug_assert_eq!(self.num_trees(), 1);
-        Self::try_new(self.0 - 1).expect("forest size exceeds maximum")
+        Self::new(self.0 - 1).expect("forest size exceeds maximum")
     }
 
     /// Creates a new forest with all possible trees smaller than the smallest tree in this
@@ -258,9 +265,16 @@ impl Forest {
     }
 
     /// Returns a forest with exactly one tree, one size (depth) larger than the current one.
-    pub fn next_larger_tree(self) -> Self {
+    ///
+    /// # Errors
+    /// Returns an error if the resulting forest would exceed [`Forest::MAX_LEAVES`].
+    pub(crate) fn next_larger_tree(self) -> Result<Self, MmrError> {
         debug_assert_eq!(self.num_trees(), 1);
-        Forest(self.0 << 1)
+        let value = self.0.saturating_mul(2);
+        if value > Self::MAX_LEAVES {
+            return Err(MmrError::ForestSizeExceeded { requested: value, max: Self::MAX_LEAVES });
+        }
+        Ok(Forest(value))
     }
 
     /// Returns true if the forest contains a single-node tree.
@@ -282,13 +296,13 @@ impl Forest {
 
     /// Remove the single-node tree if present in the forest.
     pub fn without_single_leaf(self) -> Self {
-        // Clearing the lowest bit cannot increase the size.
+        // Clearing the lowest bit does not add leaves.
         Self(self.0 & (usize::MAX - 1))
     }
 
     /// Returns a new forest that does not have the trees that `other` has.
     pub fn without_trees(self, other: Forest) -> Self {
-        // Clearing bits cannot increase the size.
+        // Clearing bits does not add leaves.
         Self(self.0 & !other.0)
     }
 
@@ -298,7 +312,7 @@ impl Forest {
             .leaf_to_corresponding_tree(leaf_idx)
             .expect("position must be part of the forest");
         let smaller_tree_mask =
-            Self::try_new(2_usize.pow(root) - 1).expect("forest size exceeds maximum");
+            Self::new(2_usize.pow(root) - 1).expect("forest size exceeds maximum");
         let num_smaller_trees = (*self & smaller_tree_mask).num_trees();
         self.num_trees() - num_smaller_trees - 1
     }
@@ -386,8 +400,7 @@ impl Forest {
     /// Given a leaf index in the current forest, return the tree number responsible for the
     /// leaf.
     ///
-    /// Note:
-    /// The result is a tree position `p`, it has the following interpretations:
+    /// The result is a tree position `p`:
     /// - `p+1` is the depth of the tree.
     /// - Because the root element is not part of the proof, `p` is the length of the authentication
     ///   path.
@@ -437,7 +450,8 @@ impl Forest {
     }
 
     /// Bitwise OR between two forests, returning an error if it exceeds the size limit.
-    pub fn try_bitor(self, rhs: Self) -> Result<Self, MmrError> {
+    #[cfg(test)]
+    pub(crate) fn try_bitor(self, rhs: Self) -> Result<Self, MmrError> {
         let value = self.0 | rhs.0;
         if value > Self::MAX_LEAVES {
             return Err(MmrError::ForestSizeExceeded { requested: value, max: Self::MAX_LEAVES });
@@ -446,7 +460,7 @@ impl Forest {
     }
 
     /// Bitwise XOR between two forests, returning an error if it exceeds the size limit.
-    pub fn try_bitxor(self, rhs: Self) -> Result<Self, MmrError> {
+    pub(crate) fn try_bitxor(self, rhs: Self) -> Result<Self, MmrError> {
         let value = self.0 ^ rhs.0;
         if value > Self::MAX_LEAVES {
             return Err(MmrError::ForestSizeExceeded { requested: value, max: Self::MAX_LEAVES });
@@ -471,7 +485,7 @@ impl BitAnd<Forest> for Forest {
     type Output = Self;
 
     fn bitand(self, rhs: Self) -> Self::Output {
-        Self::try_new(self.0 & rhs.0).expect("forest size exceeds maximum")
+        Self::new(self.0 & rhs.0).expect("forest size exceeds maximum")
     }
 }
 
@@ -497,7 +511,7 @@ pub(crate) fn largest_tree_from_mask(mask: usize) -> Forest {
         Forest::empty()
     } else {
         let bit = mask.ilog2();
-        Forest::try_new(1usize << bit).expect("forest size exceeds maximum")
+        Forest::new(1usize << bit).expect("forest size exceeds maximum")
     }
 }
 
@@ -524,7 +538,7 @@ impl Serializable for Forest {
 impl Deserializable for Forest {
     fn read_from<R: ByteReader>(source: &mut R) -> Result<Self, DeserializationError> {
         let value = source.read_usize()?;
-        Self::try_new(value)
+        Self::new(value)
     }
 }
 
@@ -535,7 +549,7 @@ impl<'de> serde::Deserialize<'de> for Forest {
         D: serde::Deserializer<'de>,
     {
         let value = usize::deserialize(deserializer)?;
-        Self::try_new(value).map_err(serde::de::Error::custom)
+        Self::new(value).map_err(serde::de::Error::custom)
     }
 }
 
