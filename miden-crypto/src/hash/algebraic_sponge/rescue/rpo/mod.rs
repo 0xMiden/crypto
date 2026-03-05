@@ -135,6 +135,19 @@ impl Rpo256 {
         <Self as AlgebraicSponge>::hash_elements(elements)
     }
 
+    /// Returns a hash of field elements provided via an iterator.
+    ///
+    /// This is functionally equivalent to [hash_elements()](Self::hash_elements) but avoids
+    /// requiring a contiguous slice, which can eliminate intermediate allocations.
+    #[inline(always)]
+    pub fn hash_iter<I>(iter: I) -> Word
+    where
+        I: IntoIterator<Item = Felt>,
+        I::IntoIter: ExactSizeIterator,
+    {
+        <Self as AlgebraicSponge>::hash_iter(iter)
+    }
+
     /// Returns a hash of two digests. This method is intended for use in construction of
     /// Merkle trees and verification of Merkle paths.
     #[inline(always)]
