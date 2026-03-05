@@ -180,7 +180,7 @@ mod tests {
     #[test]
     fn test_peak_index() {
         // --- single peak forest ---------------------------------------------
-        let forest = Forest::try_new(11).unwrap();
+        let forest = Forest::new(11).unwrap();
 
         // the first 4 leaves belong to peak 0
         for position in 0..8 {
@@ -189,7 +189,7 @@ mod tests {
         }
 
         // --- forest with non-consecutive peaks ------------------------------
-        let forest = Forest::try_new(11).unwrap();
+        let forest = Forest::new(11).unwrap();
 
         // the first 8 leaves belong to peak 0
         for position in 0..8 {
@@ -208,7 +208,7 @@ mod tests {
         assert_eq!(proof.peak_index(), 2);
 
         // --- forest with consecutive peaks ----------------------------------
-        let forest = Forest::try_new(7).unwrap();
+        let forest = Forest::new(7).unwrap();
 
         // the first 4 leaves belong to peak 0
         for position in 0..4 {
@@ -279,11 +279,11 @@ mod tests {
         let path = proof.path();
 
         // Error: target forest doesn't include position
-        let small_forest = Forest::try_new(2).unwrap();
+        let small_forest = Forest::new(2).unwrap();
         assert!(path.with_forest(small_forest).is_err());
 
         // Error: target forest is larger than current
-        let large_forest = Forest::try_new(15).unwrap();
+        let large_forest = Forest::new(15).unwrap();
         assert!(path.with_forest(large_forest).is_err());
 
         // Same forest should work

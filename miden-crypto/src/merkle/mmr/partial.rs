@@ -406,7 +406,7 @@ impl PartialMmr {
     ) -> Result<(), MmrError> {
         // Checks there is a tree with same depth as the authentication path, if not the path is
         // invalid.
-        let tree = Forest::try_new(1 << path.depth()).expect("forest size exceeds maximum");
+        let tree = Forest::new(1 << path.depth()).expect("forest size exceeds maximum");
         if (tree & self.forest).is_empty() {
             return Err(MmrError::UnknownPeak(path.depth()));
         };
@@ -553,7 +553,7 @@ impl PartialMmr {
 
             (merge_count, new_peaks)
         } else {
-            let new_peaks = Forest::try_new(changes).map_err(|_| MmrError::ForestSizeExceeded {
+            let new_peaks = Forest::new(changes).map_err(|_| MmrError::ForestSizeExceeded {
                 requested: changes,
                 max: Forest::MAX_LEAVES,
             })?;
@@ -622,7 +622,7 @@ impl PartialMmr {
 
                 peak_idx = peak_idx.parent();
                 new = Poseidon2::merge(&[left, right]);
-                target = target.next_larger_tree();
+                target = target.next_larger_tree()?;
             }
 
             debug_assert!(peak_count == trees_to_merge.num_trees());
@@ -757,7 +757,7 @@ impl Deserializable for PartialMmr {
     ) -> Result<Self, crate::utils::DeserializationError> {
         use crate::utils::DeserializationError;
 
-        let forest = Forest::try_new(usize::read_from(source)?)?;
+        let forest = Forest::new(usize::read_from(source)?)?;
         let peaks_vec = Vec::<Word>::read_from(source)?;
         let nodes = NodeMap::read_from(source)?;
         if !source.has_more_bytes() {
@@ -1193,7 +1193,7 @@ mod tests {
     #[test]
     fn test_partial_mmr_untrack_preserves_upper_siblings() {
         let mut mmr = Mmr::default();
-        (0..8).for_each(|i| mmr.add(int_to_node(i)));
+        (0..8).for_each(|i| mmr.add(int_to_node(i)).unwrap());
 
         let mut partial_mmr: PartialMmr = mmr.peaks().into();
         for pos in [0, 2] {
@@ -1212,7 +1212,7 @@ mod tests {
     #[test]
     fn test_partial_mmr_deserialize_missing_marker_fails() {
         let mut mmr = Mmr::default();
-        (0..3).for_each(|i| mmr.add(int_to_node(i)));
+        (0..3).for_each(|i| mmr.add(int_to_node(i)).unwrap());
         let peaks = mmr.peaks();
 
         let mut bytes = Vec::new();
@@ -1225,7 +1225,7 @@ mod tests {
     #[test]
     fn test_partial_mmr_deserialize_invalid_marker_fails() {
         let mut mmr = Mmr::default();
-        (0..3).for_each(|i| mmr.add(int_to_node(i)));
+        (0..3).for_each(|i| mmr.add(int_to_node(i)).unwrap());
         let peaks = mmr.peaks();
 
         let mut bytes = Vec::new();
