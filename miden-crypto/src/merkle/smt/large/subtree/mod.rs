@@ -130,8 +130,9 @@ impl Iterator for SubtreeNodeIter<'_> {
 /// Represents a complete 8-depth subtree that is serialized into a single RocksDB entry.
 ///
 /// ### What is stored
-/// - `child_bits` is a 512-bit bitmask (2 bits per node) marking non-empty left/right children.
-/// - `hashes` stores only non-empty child hashes in bit order.
+/// - `nodes` tracks only **non-empty inner nodes** of this subtree (i.e., nodes for which at least
+///   one child differs from the canonical empty hash). Each entry stores an `InnerNode` (hash
+///   pair).
 ///
 /// ### Local index layout (how indices are computed)
 /// - Indices are **subtree-local** and follow binary-heap (level-order) layout: `root = 0`;
@@ -591,6 +592,23 @@ impl Subtree {
             new_bits[word_idx] |= 1u64 << (bit_idx + 1);
             new_hashes.push(*right);
         }
+    }
+    /// Converts the provided `local` index in the subtree into a global index in the broader tree.
+    ///
+    /// # Panics
+    ///
+    /// - If the provided `local` index does not exist within the subtree.
+    pub fn local_to_global(&self, local: NodeIndex) -> NodeIndex {
+        assert!(
+            local.depth() < SUBTREE_DEPTH && local.position() < 128,
+            "Local index {local} does not exist within the subtree"
+        );
+
+        let global_depth = self.root_index.depth() + local.depth();
+        let global_position =
+            self.root_index.position() * 2_u64.pow(local.depth() as u32) + local.position();
+
+        NodeIndex::new_unchecked(global_depth, global_position)
     }
 
     /// Splits a bit offset into `(word_idx, bit_idx)` for indexing into `child_bits`.

@@ -36,6 +36,8 @@ pub use large_forest::{
     MIN_HISTORY_VERSIONS as FOREST_MIN_HISTORY_VERSIONS, RootInfo, SmtForestUpdateBatch,
     SmtUpdateBatch, TreeEntry, TreeId, TreeWithRoot, VersionId,
 };
+#[cfg(feature = "persistent-forest")]
+pub use large_forest::{PersistentBackend as ForestPersistentBackend, PersistentBackendConfig};
 
 mod simple;
 pub use simple::{SimpleSmt, SimpleSmtProof};
