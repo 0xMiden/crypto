@@ -2,7 +2,7 @@
 
 use libfuzzer_sys::fuzz_target;
 use miden_crypto::{
-    merkle::MerkleStore,
+    merkle::store::MerkleStore,
     utils::Deserializable,
 };
 
