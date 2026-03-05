@@ -10,4 +10,6 @@ pub enum SubtreeError {
     InvalidBitmask,
     #[error("subtree data too short: found {found} bytes, need at least {min} bytes")]
     TooShort { found: usize, min: usize },
+    #[error("unsupported subtree format version: {found}")]
+    UnsupportedVersion { found: u8 },
 }

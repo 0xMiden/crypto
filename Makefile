@@ -57,7 +57,9 @@ cargo-deny: ## Run cargo-deny to check dependencies for security vulnerabilities
 .PHONY: zeroize-audit
 zeroize-audit: ## Run Zeroize audit using rustdoc JSON
 	cargo +nightly rustdoc -p miden-crypto --all-features -- -Zunstable-options --output-format json --document-private-items
-	cargo run --quiet --manifest-path tools/zeroize-audit/Cargo.toml -- target/doc/miden_crypto.json
+	@target_dir="$${CARGO_TARGET_DIR:-target}"; \
+	if [ "$$target_dir" = "/" ]; then target_dir=target; fi; \
+	cargo run --quiet --manifest-path tools/zeroize-audit/Cargo.toml -- "$$target_dir/doc/miden_crypto.json"
 
 .PHONY: lint
 lint: format fix clippy toml typos-check machete cargo-deny ## Run all linting tasks at once (Clippy, fixing, formatting, machete, cargo-deny)
@@ -99,6 +101,11 @@ test: test-default test-no-std test-docs test-large-smt ## Run all tests except 
 .PHONY: check
 check: ## Check all targets and features for errors without code generation
 	cargo check --all-targets --all-features
+
+.PHONY: check-features
+check-features: ## Check miden-crypto feature combinations
+	cargo check -p miden-crypto --all-targets --no-default-features
+	cargo check -p miden-crypto --all-targets --features ${ALL_FEATURES_EXCEPT_ROCKSDB}
 
 .PHONY: check-fuzz
 check-fuzz: ## Check miden-crypto-fuzz compilation
