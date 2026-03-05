@@ -3,8 +3,9 @@ use assert_matches::assert_matches;
 use seq_macro::seq;
 #[cfg(feature = "std")]
 use {
-    super::{Deserializable, Serializable},
+    super::{Deserializable, DeserializationError, Serializable},
     alloc::boxed::Box,
+    alloc::vec::Vec,
     std::error::Error,
 };
 
@@ -957,4 +958,22 @@ fn test_serialization() -> Result<(), Box<dyn Error>> {
     let decoded = MerkleStore::read_from_bytes(&store.to_bytes()).expect("deserialization failed");
     assert_eq!(store, decoded);
     Ok(())
+}
+
+#[test]
+fn deserialize_rejects_oversized_length() {
+    let mut bytes = Vec::new();
+    u64::MAX.write_into(&mut bytes);
+
+    let result = MerkleStore::read_from_bytes_with_budget(&bytes, bytes.len());
+    assert!(matches!(result, Err(DeserializationError::InvalidValue(_))));
+}
+
+#[test]
+fn deserialize_rejects_truncated_payload() {
+    let mut bytes = Vec::new();
+    1u64.write_into(&mut bytes);
+
+    let result = MerkleStore::read_from_bytes(&bytes);
+    assert!(matches!(result, Err(DeserializationError::UnexpectedEOF)));
 }
