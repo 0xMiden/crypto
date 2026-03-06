@@ -306,7 +306,7 @@ impl<const DEPTH: u8> SimpleSmt<DEPTH> {
         let subtree_root_index =
             NodeIndex::new(subtree_root_insertion_depth, subtree_insertion_index)?;
 
-        // add leaves
+        // remove existing leaves and inner nodes in the insertion region
         // --------------
 
         // The subtree's leaf indices live in their own context - i.e. a subtree of depth `d`. If we
@@ -317,6 +317,28 @@ impl<const DEPTH: u8> SimpleSmt<DEPTH> {
         // `subtree_insertion_index = i`, there are `i` subtrees sitting before the subtree we want
         // to insert, so we need to adjust all its leaves by `i * 2^d`.
         let leaf_index_shift: u64 = subtree_insertion_index * 2_u64.pow(SUBTREE_DEPTH.into());
+        let num_leaves_in_subtree = 2_u64.pow(SUBTREE_DEPTH.into());
+
+        // Remove existing leaves in the insertion region to prevent stale data.
+        for leaf_idx in leaf_index_shift..(leaf_index_shift + num_leaves_in_subtree) {
+            self.leaves.remove(&leaf_idx);
+        }
+
+        // Remove existing inner nodes in the insertion region (nodes below subtree root).
+        for node_depth in (subtree_root_insertion_depth + 1)..=DEPTH {
+            let depth_offset = node_depth - subtree_root_insertion_depth;
+            let num_nodes_at_depth = 2_u64.pow(depth_offset.into());
+            let node_value_offset = subtree_insertion_index * num_nodes_at_depth;
+
+            for node_value in node_value_offset..(node_value_offset + num_nodes_at_depth) {
+                if let Ok(node_index) = NodeIndex::new(node_depth, node_value) {
+                    self.inner_nodes.remove(&node_index);
+                }
+            }
+        }
+
+        // add leaves from subtree
+        // --------------
         for (subtree_leaf_idx, leaf_value) in subtree.leaves() {
             let new_leaf_idx = leaf_index_shift + subtree_leaf_idx;
             debug_assert!(new_leaf_idx < 2_u64.pow(DEPTH.into()));
