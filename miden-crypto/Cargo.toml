@@ -75,7 +75,7 @@ name              = "transpose"
 required-features = ["std"]
 
 [features]
-concurrent = ["dep:rayon", "p3-maybe-rayon/parallel", "p3-miden-prover/parallel", "p3-util/parallel", "std"]
+concurrent = ["dep:rayon", "p3-maybe-rayon/parallel", "p3-util/parallel", "std"]
 default    = ["concurrent", "std"]
 executable = ["concurrent", "dep:clap", "dep:rand-utils"]
 fuzzing    = []
@@ -117,25 +117,26 @@ subtle           = { default-features = false, version = "2.6" }
 thiserror        = { default-features = false, version = "2.0" }
 x25519-dalek     = { default-features = false, features = ["static_secrets"], version = "2.0" }
 
-# Upstream Plonky3 dependencies
-p3-air         = { default-features = false, version = "0.4.2" }
-p3-blake3      = { default-features = false, version = "0.4.2" }
-p3-challenger  = { default-features = false, version = "0.4.2" }
-p3-commit      = { default-features = false, version = "0.4.2" }
-p3-dft         = { default-features = false, version = "0.4.2" }
-p3-field       = { default-features = false, version = "0.4.2" }
-p3-goldilocks  = { default-features = false, version = "0.4.2" }
-p3-keccak      = { default-features = false, version = "0.4.2" }
-p3-matrix      = { default-features = false, version = "0.4.2" }
-p3-maybe-rayon = { default-features = false, version = "0.4.2" }
-p3-merkle-tree = { default-features = false, version = "0.4.2" }
-p3-symmetric   = { default-features = false, version = "0.4.2" }
-p3-util        = { default-features = false, version = "0.4.2" }
+# Upstream Plonky3 dependencies — pinned to the revision used by p3-miden PR #34
+p3-air         = { default-features = false, git = "https://github.com/Plonky3/Plonky3", rev = "637f6239" }
+p3-blake3      = { default-features = false, git = "https://github.com/Plonky3/Plonky3", rev = "637f6239" }
+p3-challenger  = { default-features = false, git = "https://github.com/Plonky3/Plonky3", rev = "637f6239" }
+p3-dft         = { default-features = false, git = "https://github.com/Plonky3/Plonky3", rev = "637f6239" }
+p3-field       = { default-features = false, git = "https://github.com/Plonky3/Plonky3", rev = "637f6239" }
+p3-goldilocks  = { default-features = false, git = "https://github.com/Plonky3/Plonky3", rev = "637f6239" }
+p3-keccak      = { default-features = false, git = "https://github.com/Plonky3/Plonky3", rev = "637f6239" }
+p3-matrix      = { default-features = false, git = "https://github.com/Plonky3/Plonky3", rev = "637f6239" }
+p3-maybe-rayon = { default-features = false, git = "https://github.com/Plonky3/Plonky3", rev = "637f6239" }
+p3-symmetric   = { default-features = false, git = "https://github.com/Plonky3/Plonky3", rev = "637f6239" }
+p3-util        = { default-features = false, git = "https://github.com/Plonky3/Plonky3", rev = "637f6239" }
 
-# Miden-specific Plonky3 crates (tracking p3-miden main for PeriodicVal fix)
-p3-miden-air    = { default-features = false, git = "https://github.com/0xMiden/p3-miden", branch = "main" }
-p3-miden-fri    = { default-features = false, git = "https://github.com/0xMiden/p3-miden", branch = "main" }
-p3-miden-prover = { default-features = false, git = "https://github.com/0xMiden/p3-miden", branch = "main" }
+# Miden-specific Plonky3 crates — tracking p3-miden PR #34
+p3-miden-lifted-air      = { branch = "robin/miden_upstream_update", default-features = false, git = "https://github.com/Nashtare/p3-miden" }
+p3-miden-lifted-fri      = { branch = "robin/miden_upstream_update", default-features = false, git = "https://github.com/Nashtare/p3-miden" }
+p3-miden-lifted-stark    = { branch = "robin/miden_upstream_update", default-features = false, git = "https://github.com/Nashtare/p3-miden" }
+p3-miden-lmcs            = { branch = "robin/miden_upstream_update", default-features = false, git = "https://github.com/Nashtare/p3-miden" }
+p3-miden-stateful-hasher = { branch = "robin/miden_upstream_update", default-features = false, git = "https://github.com/Nashtare/p3-miden" }
+p3-miden-transcript      = { branch = "robin/miden_upstream_update", default-features = false, git = "https://github.com/Nashtare/p3-miden" }
 
 [dev-dependencies]
 assert_matches = { default-features = false, version = "1.5" }
