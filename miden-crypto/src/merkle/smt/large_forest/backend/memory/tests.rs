@@ -353,9 +353,15 @@ fn entries() -> Result<()> {
 
     // It should yield an error for a lineage that doesn't exist.
     let ne_lineage: LineageId = rng.value();
-    let result = backend.entry_count(ne_lineage);
+    let result = backend.entries(ne_lineage);
     assert!(result.is_err());
-    assert_matches!(result.unwrap_err(), BackendError::UnknownLineage(l) if l == ne_lineage);
+    match result {
+        Err(BackendError::UnknownLineage(l)) => {
+            assert_eq!(l, ne_lineage);
+        },
+        _ => panic!("Incorrect result encountered"),
+    }
+    drop(result); // Forget the borrow.
 
     let version: VersionId = rng.value();
 

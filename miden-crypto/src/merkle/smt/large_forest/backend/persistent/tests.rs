@@ -62,11 +62,30 @@ fn load_extant() -> Result<()> {
     let (path, mut backend) = default_backend()?;
     let mut rng = ContinuousRng::new([0x42; 32]);
     let version: VersionId = rng.value();
-    let lineage_1: LineageId = rng.value();
-    let lineage_2: LineageId = rng.value();
 
-    let root_1 = backend.add_lineage(lineage_1, version, SmtUpdateBatch::default())?;
-    let root_2 = backend.add_lineage(lineage_2, version, SmtUpdateBatch::default())?;
+    let lineage_1: LineageId = rng.value();
+    let l1_k1: Word = rng.value();
+    let l1_v1: Word = rng.value();
+    let l1_k2: Word = rng.value();
+    let l1_v2: Word = rng.value();
+    let l1_batch = SmtUpdateBatch::from([(l1_k1, l1_v1), (l1_k2, l1_v2)].into_iter());
+
+    let lineage_2: LineageId = rng.value();
+    let l2_k1: Word = rng.value();
+    let l2_v1: Word = rng.value();
+    let l2_k2: Word = rng.value();
+    let l2_v2: Word = rng.value();
+    let l2_batch = SmtUpdateBatch::from([(l2_k1, l2_v1), (l2_k2, l2_v2)].into_iter());
+
+    let root_1 = backend.add_lineage(lineage_1, version, l1_batch)?;
+    let root_2 = backend.add_lineage(lineage_2, version, l2_batch)?;
+
+    // We check the values against reference SMTs.
+    let tree_1 = Smt::with_entries([(l1_k1, l1_v1), (l1_k2, l1_v2)].into_iter())?;
+    let tree_2 = Smt::with_entries([(l2_k1, l2_v1), (l2_k2, l2_v2)].into_iter())?;
+
+    assert_eq!(root_1.root(), tree_1.root());
+    assert_eq!(root_2.root(), tree_2.root());
 
     // We can check that certain things are true now.
     assert_eq!(backend.lineages()?.count(), 2);
@@ -87,6 +106,41 @@ fn load_extant() -> Result<()> {
     assert_eq!(backend.version(lineage_2)?, version);
     assert!(backend.trees()?.contains(&root_1));
     assert!(backend.trees()?.contains(&root_2));
+
+    // And we should be able to perform openings on it...
+    let l1_opening = backend.open(lineage_1, l1_k1)?;
+    let t1_opening = tree_1.open(&l1_k1);
+    assert_eq!(l1_opening, t1_opening);
+
+    let l2_opening = backend.open(lineage_2, l2_k1)?;
+    let t2_opening = tree_2.open(&l2_k1);
+    assert_eq!(l2_opening, t2_opening);
+
+    // ...as well as get...
+    let l1_value = backend.get(lineage_1, l1_k2)?;
+    let t1_value = tree_1.get_value(&l1_k2);
+    assert_eq!(l1_value, Some(t1_value));
+
+    let l2_value = backend.get(lineage_2, l2_k1)?;
+    let t2_value = tree_2.get_value(&l2_k1);
+    assert_eq!(l2_value, Some(t2_value));
+
+    // ...and entries.
+    let l1_entries = backend.entries(lineage_1)?.sorted().collect_vec();
+    let t1_entries = tree_1
+        .entries()
+        .sorted()
+        .map(|(k, v)| TreeEntry { key: *k, value: *v })
+        .collect_vec();
+    assert_eq!(l1_entries, t1_entries);
+
+    let l2_entries = backend.entries(lineage_2)?.sorted().collect_vec();
+    let t2_entries = tree_2
+        .entries()
+        .sorted()
+        .map(|(k, v)| TreeEntry { key: *k, value: *v })
+        .collect_vec();
+    assert_eq!(l2_entries, t2_entries);
 
     Ok(())
 }
@@ -407,9 +461,15 @@ fn entries() -> Result<()> {
 
     // It should yield an error for a lineage that doesn't exist.
     let ne_lineage: LineageId = rng.value();
-    let result = backend.entry_count(ne_lineage);
+    let result = backend.entries(ne_lineage);
     assert!(result.is_err());
-    assert_matches!(result.unwrap_err(), BackendError::UnknownLineage(l) if l == ne_lineage);
+    match result {
+        Err(BackendError::UnknownLineage(l)) => {
+            assert_eq!(l, ne_lineage);
+        },
+        _ => panic!("Incorrect result encountered"),
+    }
+    drop(result); // Forget the borrow.
 
     let version: VersionId = rng.value();
 

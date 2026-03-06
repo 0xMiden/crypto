@@ -433,7 +433,8 @@ struct Delta {
     nodes: NodeChanges,
 
     /// The keys that need to be changed by the delta to return the target tree to the state
-    /// represented by the delta.
+    /// represented by the delta. This includes pairs that either add or mutate a value under a
+    /// key, and pairs where the value is the `EMPTY_WORD` and hence represent removals.
     changed_keys: ChangedKeys,
 }
 

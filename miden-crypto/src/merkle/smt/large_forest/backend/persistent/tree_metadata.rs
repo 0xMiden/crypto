@@ -17,7 +17,7 @@ pub struct TreeMetadata {
     pub root_value: Word,
 
     /// The number of entries that are populated on disk.
-    pub entry_count: usize,
+    pub entry_count: u64,
 }
 
 impl Serializable for TreeMetadata {
@@ -28,7 +28,7 @@ impl Serializable for TreeMetadata {
     }
 
     fn get_size_hint(&self) -> usize {
-        size_of::<VersionId>() + size_of::<Word>() + size_of::<usize>()
+        size_of::<VersionId>() + size_of::<Word>() + size_of::<u64>()
     }
 }
 
@@ -36,7 +36,7 @@ impl Deserializable for TreeMetadata {
     fn read_from<R: ByteReader>(source: &mut R) -> Result<Self, DeserializationError> {
         let version = source.read::<VersionId>()?;
         let root_value = source.read::<Word>()?;
-        let entry_count = source.read_usize()?;
+        let entry_count = source.read_u64()?;
 
         Ok(Self { version, root_value, entry_count })
     }

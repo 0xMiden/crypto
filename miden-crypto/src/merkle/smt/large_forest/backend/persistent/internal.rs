@@ -1,5 +1,5 @@
-//! Contains internal functionality for interacting with RocksDB that is not exposed in the default
-//! RocksDB crate or the RocksDB C wrapper.
+//! Contains internal functionality for interacting with RocksDB that is not exposed in the RocksDB
+//! crate or the RocksDB C wrapper.
 
 use crate::merkle::smt::large_forest::backend::persistent::WriteBatch;
 

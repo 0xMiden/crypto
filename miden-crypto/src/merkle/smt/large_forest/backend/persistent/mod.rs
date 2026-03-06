@@ -1,12 +1,11 @@
-//! This module contains a persistent backend for the SMT forest built on top of the existing
-//! persistent backend for the Large SMT.
+//! A persistent backend for the SMT forest built with inspiration from LargeSMT's existing
+//! persistent backend.
 //!
 //! # Performance Considerations
 //!
-//! The vast majority of operations in the persistent backend are performed in conjunction with the
-//! need to read from (and potentially write to) the backing database on disk. While every effort is
-//! taken to mask this latency through parallelism, some methods (e.g. [`PersistentBackend::open`])
-//! inherently do not have work that can be parallelized.
+//! Most operations in this backend need to perform disk I/O to the backing database. The
+//! implementation does its best to mask this latency through parallelism, but some methods (e.g.
+//! [`PersistentBackend::open`]) don't have work that can be parallelized in this way.
 //!
 //! To take advantage of data locality on disk, batches built using keys that share high-order bits
 //! (e.g. from within the same lineage) are going to exhibit better read and write performance. Such
@@ -15,7 +14,7 @@
 //! ## Memory Residency
 //!
 //! As this backend does not store much data permanently in memory, the memory usage behavior is
-//! quite peaky. Peak memory usage will be achieved during a query or update operation, but all the
+//! quite spiky. Peak memory usage will be seen during a query or update operation, but all the
 //! memory of that peak is released back to the system by the time the query has completed.
 //!
 //! Peak memory usage is proportional to:
@@ -38,7 +37,7 @@ mod tree_metadata;
 
 use alloc::{string::ToString, sync::Arc, vec::Vec};
 use core::ffi::c_int;
-use std::{collections::HashMap, mem};
+use std::{collections::HashMap, iter::once, mem};
 
 use miden_serde_utils::{Deserializable, DeserializationError, Serializable};
 use num::Integer;
@@ -73,6 +72,7 @@ use crate::{
         },
     },
 };
+
 // TYPE ALIASES
 // ================================================================================================
 
@@ -85,17 +85,17 @@ type WriteBatch = db::WriteBatch;
 // CONSTANTS / COLUMN FAMILY NAMES
 // ================================================================================================
 
-const LEAVES_CF: &str = "leaves";
-const METADATA_CF: &str = "metadata";
+const LEAVES_CF: &str = "v1/leaves";
+const METADATA_CF: &str = "v1/metadata";
 
-const SUBTREE_00_CF: &str = "st00";
-const SUBTREE_08_CF: &str = "st08";
-const SUBTREE_16_CF: &str = "st16";
-const SUBTREE_24_CF: &str = "st24";
-const SUBTREE_32_CF: &str = "st32";
-const SUBTREE_40_CF: &str = "st40";
-const SUBTREE_48_CF: &str = "st48";
-const SUBTREE_56_CF: &str = "st56";
+const SUBTREE_00_CF: &str = "v1/st00";
+const SUBTREE_08_CF: &str = "v1/st08";
+const SUBTREE_16_CF: &str = "v1/st16";
+const SUBTREE_24_CF: &str = "v1/st24";
+const SUBTREE_32_CF: &str = "v1/st32";
+const SUBTREE_40_CF: &str = "v1/st40";
+const SUBTREE_48_CF: &str = "v1/st48";
+const SUBTREE_56_CF: &str = "v1/st56";
 
 const SUBTREE_CFS: [&str; 8] = [
     SUBTREE_00_CF,
@@ -230,6 +230,9 @@ impl Backend for PersistentBackend {
             })
             .collect::<Vec<_>>();
 
+        // Doing this as a separate step exhibits better performance than loading these subtrees
+        // inline in the path creation. This appears to be due to better pipelining and
+        // branch-predictor behavior.
         let mut subtree_cache = HashMap::<NodeIndex, Subtree>::new();
         for root in subtree_roots {
             let maybe_tree = self.load_subtree(SubtreeKey { lineage, index: root })?;
@@ -324,7 +327,7 @@ impl Backend for PersistentBackend {
     /// - [`BackendError::UnknownLineage`] if the provided `lineage` is not known by the backend.
     fn entry_count(&self, lineage: LineageId) -> Result<usize> {
         let metadata = self.lineages.get(&lineage).ok_or(BackendError::UnknownLineage(lineage))?;
-        Ok(metadata.entry_count)
+        Ok(metadata.entry_count.try_into().expect("Count of entries should fit into usize"))
     }
 
     /// Returns an iterator that yields the populated (key-value) entries for the specified
@@ -391,7 +394,7 @@ impl Backend for PersistentBackend {
 
         // We perform the update. If this fails due to an error, the batch will get dropped at the
         // end of the scope, and any staged mutations will be forgotten without being applied.
-        let (batch, _, tree_metadata) = self.update_tree_in_write_batch(
+        let (batch, reversion_set, tree_metadata) = self.update_tree_in_write_batch(
             batch,
             lineage,
             new_lineage_meta,
@@ -405,9 +408,8 @@ impl Backend for PersistentBackend {
 
         // Only when the batch has been successfully written to disk do we write to the in-memory
         // metadata, ensuring that the state remains consistent.
-        self.write(batch)?;
         let new_root = tree_metadata.root_value;
-        self.lineages.insert(lineage, tree_metadata);
+        self.finalize_update(batch, once((lineage, tree_metadata, reversion_set)))?;
 
         // Finally we just return the necessary metadata.
         Ok(TreeWithRoot::new(lineage, version, new_root))
@@ -457,8 +459,10 @@ impl Backend for PersistentBackend {
 
         // Writing the batch may fail, so we only write to the in-memory metadata once it is
         // successful to ensure the in-memory state cache remains consistent with the database.
-        self.write(batch)?;
-        self.lineages.insert(lineage, tree_metadata);
+        let mut res = self.finalize_update(batch, once((lineage, tree_metadata, reversion_set)))?;
+        let Some((_, reversion_set)) = res.pop() else {
+            unreachable!("finalize_update did not return the same number of output elements")
+        };
 
         // We then just return the reversion set for the operations in question.
         Ok(reversion_set)
@@ -536,17 +540,10 @@ impl Backend for PersistentBackend {
         } else {
             batches.into_iter().fold(WriteBatch::new(), |l, r| merge_batches(l, &r))
         };
-        self.write(final_batch)?;
 
         // Only at this point do we write to the in-memory metadata, ensuring that the state remains
         // consistent.
-        let result = mutation_sets
-            .into_iter()
-            .map(|(lineage, tree_data, reversion)| {
-                self.lineages.insert(lineage, tree_data);
-                (lineage, reversion)
-            })
-            .collect();
+        let result = self.finalize_update(final_batch, mutation_sets.into_iter())?;
 
         Ok(result)
     }
@@ -697,8 +694,9 @@ impl PersistentBackend {
 
         // We then write the node metadata into a copy
         let root_before_modification = tree_metadata.root_value;
-        tree_metadata.entry_count =
-            tree_metadata.entry_count.saturating_add_signed(entry_count_delta);
+        tree_metadata.entry_count = tree_metadata.entry_count.saturating_add_signed(
+            entry_count_delta.try_into().expect("Delta should always fit into i64"),
+        );
         tree_metadata.root_value = root_after_modification;
         tree_metadata.version = new_version;
 
@@ -1052,23 +1050,6 @@ impl PersistentBackend {
         }
     }
 
-    /// Gets the leaf from disk in the provided `lineage` that would contain `key`.
-    fn load_leaf_for(&self, lineage: LineageId, key: Word) -> Result<Option<SmtLeaf>> {
-        let col = self.cf(LEAVES_CF)?;
-        let key_bytes = LeafKey {
-            lineage,
-            index: LeafIndex::from(key).position(),
-        }
-        .to_bytes();
-        let leaf_bytes = self.db.get_cf(col, key_bytes)?;
-        let leaf = match leaf_bytes {
-            Some(bytes) => Some(SmtLeaf::read_from_bytes(&bytes)?),
-            None => None,
-        };
-
-        Ok(leaf)
-    }
-
     /// Gets the leaves from disk in the provided `lineage` that contain all the provided `keys`.
     ///
     /// # Errors
@@ -1115,6 +1096,23 @@ impl PersistentBackend {
                 Err(e) => Err(e.into()),
             })
             .collect()
+    }
+
+    /// Gets the leaf from disk in the provided `lineage` that would contain `key`.
+    fn load_leaf_for(&self, lineage: LineageId, key: Word) -> Result<Option<SmtLeaf>> {
+        let col = self.cf(LEAVES_CF)?;
+        let key_bytes = LeafKey {
+            lineage,
+            index: LeafIndex::from(key).position(),
+        }
+        .to_bytes();
+        let leaf_bytes = self.db.get_cf(col, key_bytes)?;
+        let leaf = match leaf_bytes {
+            Some(bytes) => Some(SmtLeaf::read_from_bytes_with_budget(&bytes, bytes.len())?),
+            None => None,
+        };
+
+        Ok(leaf)
     }
 
     /// Gets the column family corresponding to the subtree with root index `index`.
@@ -1210,43 +1208,32 @@ impl PersistentBackend {
 
         // From this, we can set up the configuration for each of our column families. We start with
         // the one for metadata.
-        let mut metadata_cf_opts = db::Options::default();
-        metadata_cf_opts.set_block_based_table_factory(&cf_opts);
-        metadata_cf_opts.set_write_buffer_size(MAX_METADATA_CF_WRITE_BUFFER_SIZE_BYTES);
-        metadata_cf_opts.set_max_write_buffer_number(MAX_WRITE_BUFFER_COUNT);
-        metadata_cf_opts.set_min_write_buffer_number_to_merge(MIN_WRITE_BUFFERS_TO_MERGE);
-        metadata_cf_opts.set_max_write_buffer_size_to_maintain(MAX_WRITE_BUFFERS_TO_RETAIN);
-        metadata_cf_opts.set_compaction_style(db::DBCompactionStyle::Level);
-        metadata_cf_opts.set_target_file_size_base(config.target_file_size);
-        metadata_cf_opts.set_compression_type(db::DBCompressionType::None);
-        metadata_cf_opts.set_level_zero_file_num_compaction_trigger(L0_FILE_COMPACTION_TRIGGER);
+        let metadata_cf_opts = Self::build_cf_opts(
+            config,
+            &cf_opts,
+            MAX_METADATA_CF_WRITE_BUFFER_SIZE_BYTES,
+            db::DBCompressionType::None,
+        );
 
         // We can also create the configuration for our leaves column family.
-        let mut leaves_cf_opts = db::Options::default();
-        leaves_cf_opts.set_block_based_table_factory(&cf_opts);
-        leaves_cf_opts.set_write_buffer_size(MAX_LEAVES_CF_WRITE_BUFFER_SIZE_BYTES);
-        leaves_cf_opts.set_max_write_buffer_number(MAX_WRITE_BUFFER_COUNT);
-        leaves_cf_opts.set_min_write_buffer_number_to_merge(MIN_WRITE_BUFFERS_TO_MERGE);
-        leaves_cf_opts.set_max_write_buffer_size_to_maintain(MAX_WRITE_BUFFERS_TO_RETAIN);
-        leaves_cf_opts.set_compaction_style(db::DBCompactionStyle::Level);
-        leaves_cf_opts.set_target_file_size_base(config.target_file_size);
-        leaves_cf_opts.set_compression_type(COMPRESSION_MODE);
-        leaves_cf_opts.set_level_zero_file_num_compaction_trigger(L0_FILE_COMPACTION_TRIGGER);
+        let leaves_cf_opts = Self::build_cf_opts(
+            config,
+            &cf_opts,
+            MAX_LEAVES_CF_WRITE_BUFFER_SIZE_BYTES,
+            COMPRESSION_MODE,
+        );
 
         // Finally we create them for each of our subtree CFs.
         let subtree_cfs = SUBTREE_CFS.into_iter().map(|name| {
-            let mut subtree_cf_opts = db::Options::default();
-            subtree_cf_opts.set_block_based_table_factory(&cf_opts);
-            subtree_cf_opts.set_write_buffer_size(MAX_SUBTREE_CF_WRITE_BUFFER_SIZE_BYTES);
-            subtree_cf_opts.set_max_write_buffer_number(MAX_WRITE_BUFFER_COUNT);
-            subtree_cf_opts.set_min_write_buffer_number_to_merge(MIN_WRITE_BUFFERS_TO_MERGE);
-            subtree_cf_opts.set_max_write_buffer_size_to_maintain(MAX_WRITE_BUFFERS_TO_RETAIN);
-            subtree_cf_opts.set_compaction_style(db::DBCompactionStyle::Level);
-            subtree_cf_opts.set_target_file_size_base(config.target_file_size);
-            subtree_cf_opts.set_compression_type(COMPRESSION_MODE);
-            subtree_cf_opts.set_level_zero_file_num_compaction_trigger(L0_FILE_COMPACTION_TRIGGER);
-
-            db::ColumnFamilyDescriptor::new(name, subtree_cf_opts)
+            db::ColumnFamilyDescriptor::new(
+                name,
+                Self::build_cf_opts(
+                    config,
+                    &cf_opts,
+                    MAX_SUBTREE_CF_WRITE_BUFFER_SIZE_BYTES,
+                    COMPRESSION_MODE,
+                ),
+            )
         });
 
         // With the column-specific configuration made, we can then simply create our database
@@ -1258,6 +1245,28 @@ impl PersistentBackend {
         columns.extend(subtree_cfs);
 
         Ok(DB::open_cf_descriptors(&db_opts, config.path.clone(), columns)?)
+    }
+
+    /// Unifies the building of options for column families where most parameters are shared,
+    /// customizing only the `max_write_buffer_size` and `compression_mode`.
+    fn build_cf_opts(
+        config: &Config,
+        base: &db::BlockBasedOptions,
+        max_write_buffer_size: usize,
+        compression_mode: db::DBCompressionType,
+    ) -> db::Options {
+        let mut cf_opts = db::Options::default();
+        cf_opts.set_block_based_table_factory(base);
+        cf_opts.set_write_buffer_size(max_write_buffer_size);
+        cf_opts.set_max_write_buffer_number(MAX_WRITE_BUFFER_COUNT);
+        cf_opts.set_min_write_buffer_number_to_merge(MIN_WRITE_BUFFERS_TO_MERGE);
+        cf_opts.set_max_write_buffer_size_to_maintain(MAX_WRITE_BUFFERS_TO_RETAIN);
+        cf_opts.set_compaction_style(db::DBCompactionStyle::Level);
+        cf_opts.set_target_file_size_base(config.target_file_size);
+        cf_opts.set_compression_type(compression_mode);
+        cf_opts.set_level_zero_file_num_compaction_trigger(L0_FILE_COMPACTION_TRIGGER);
+
+        cf_opts
     }
 
     /// Stages the provided `metadata` to be written to the provided `lineage` on disk within the
@@ -1280,6 +1289,29 @@ impl PersistentBackend {
         let metadata_value = tree_metadata.to_bytes();
         batch.put_cf(metadata, &metadata_key, &metadata_value);
         Ok(batch)
+    }
+
+    /// Finalizes the update by committing the provided `batch` to disk and updating the in-memory
+    /// cache with the provided `metadata`.
+    ///
+    /// # Errors
+    ///
+    /// - [`BackendError::Internal`] if the underlying database cannot be written to.
+    fn finalize_update(
+        &mut self,
+        batch: WriteBatch,
+        metadata: impl Iterator<Item = (LineageId, TreeMetadata, MutationSet)>,
+    ) -> Result<Vec<(LineageId, MutationSet)>> {
+        // We first write the full atomic update to disk. If it errors, we bail.
+        self.write(batch)?;
+
+        // If it hasn't errored, we can now safely update the in-memory metadata cache.
+        Ok(metadata
+            .map(|(l, d, r)| {
+                self.lineages.insert(l, d);
+                (l, r)
+            })
+            .collect())
     }
 
     /// Reads all the lineages and their corresponding metadata out of the on-disk storage as part

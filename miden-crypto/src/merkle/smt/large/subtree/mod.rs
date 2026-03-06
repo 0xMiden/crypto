@@ -593,23 +593,6 @@ impl Subtree {
             new_hashes.push(*right);
         }
     }
-    /// Converts the provided `local` index in the subtree into a global index in the broader tree.
-    ///
-    /// # Panics
-    ///
-    /// - If the provided `local` index does not exist within the subtree.
-    pub fn local_to_global(&self, local: NodeIndex) -> NodeIndex {
-        assert!(
-            local.depth() < SUBTREE_DEPTH && local.position() < 128,
-            "Local index {local} does not exist within the subtree"
-        );
-
-        let global_depth = self.root_index.depth() + local.depth();
-        let global_position =
-            self.root_index.position() * 2_u64.pow(local.depth() as u32) + local.position();
-
-        NodeIndex::new_unchecked(global_depth, global_position)
-    }
 
     /// Splits a bit offset into `(word_idx, bit_idx)` for indexing into `child_bits`.
     #[inline]

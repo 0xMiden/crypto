@@ -82,6 +82,9 @@ impl Config {
     /// Constructs a new configuration object with the provided database `path` and default
     /// settings.
     ///
+    /// The provided `path` must be in a location writable by the backend, and will be created by
+    /// the database if it does not exist.
+    ///
     /// The defaults are as follows:
     ///
     /// - `cache_size_bytes`: 2 GiB
@@ -95,17 +98,17 @@ impl Config {
     pub fn new(path: impl Into<PathBuf>) -> Result<Self> {
         let path = path.into();
 
-        // The provided path must be a directory or a symlink to one, and it must be RW-accessible
-        // by us if it does exist.
-        if path.exists() {
-            if !path.is_dir() {
+        if fs::exists(&path)? {
+            // The provided path must be a directory or a symlink to one, and it must be
+            // RW-accessible by us if it does exist.
+            let path_data = fs::metadata(&path)?;
+            if !path_data.is_dir() {
                 return Err(BackendError::internal_from_message(format!(
                     "The path {} exists and is not a folder",
                     path.to_string_lossy()
                 )));
             }
-
-            if fs::metadata(&path)?.permissions().readonly() {
+            if path_data.permissions().readonly() {
                 return Err(BackendError::internal_from_message(format!(
                     "The path {} is not writable",
                     path.to_string_lossy()
