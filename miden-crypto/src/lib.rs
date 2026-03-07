@@ -74,7 +74,7 @@ pub mod stark {
         pub use p3_miden_lifted_air::{AirInstance as LiftedAirInstance, validate_instances};
         // Miden lifted AIR traits and types
         pub use p3_miden_lifted_air::{
-            AirValidationError, AirWithPeriodicColumns, AuxBuilder, LiftedAir, LiftedAirBuilder,
+            AirValidationError, AuxBuilder, LiftedAir, LiftedAirBuilder,
             ReducedAuxValues, ReductionError, TracePart, VarLenPublicInputs,
         };
     }
