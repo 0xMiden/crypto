@@ -75,7 +75,7 @@ name              = "transpose"
 required-features = ["std"]
 
 [features]
-concurrent = ["dep:rayon", "p3-maybe-rayon/parallel", "p3-miden-prover/parallel", "p3-util/parallel", "std"]
+concurrent = ["dep:rayon", "p3-maybe-rayon/parallel", "p3-util/parallel", "std"]
 default    = ["concurrent", "std"]
 executable = ["concurrent", "dep:clap", "dep:rand-utils"]
 fuzzing    = []
@@ -117,25 +117,26 @@ subtle           = { default-features = false, version = "2.6" }
 thiserror        = { default-features = false, version = "2.0" }
 x25519-dalek     = { default-features = false, features = ["static_secrets"], version = "2.0" }
 
-# Upstream Plonky3 dependencies
-p3-air         = { default-features = false, version = "0.4.2" }
-p3-blake3      = { default-features = false, version = "0.4.2" }
-p3-challenger  = { default-features = false, version = "0.4.2" }
-p3-commit      = { default-features = false, version = "0.4.2" }
-p3-dft         = { default-features = false, version = "0.4.2" }
-p3-field       = { default-features = false, version = "0.4.2" }
-p3-goldilocks  = { default-features = false, version = "0.4.2" }
-p3-keccak      = { default-features = false, version = "0.4.2" }
-p3-matrix      = { default-features = false, version = "0.4.2" }
-p3-maybe-rayon = { default-features = false, version = "0.4.2" }
-p3-merkle-tree = { default-features = false, version = "0.4.2" }
-p3-symmetric   = { default-features = false, version = "0.4.2" }
-p3-util        = { default-features = false, version = "0.4.2" }
+# Upstream Plonky3 dependencies — pinned to the revision used by p3-miden PR #34
+p3-air         = { default-features = false, git = "https://github.com/Plonky3/Plonky3", rev = "7ca1cdff" }
+p3-blake3      = { default-features = false, git = "https://github.com/Plonky3/Plonky3", rev = "7ca1cdff" }
+p3-challenger  = { default-features = false, git = "https://github.com/Plonky3/Plonky3", rev = "7ca1cdff" }
+p3-dft         = { default-features = false, git = "https://github.com/Plonky3/Plonky3", rev = "7ca1cdff" }
+p3-field       = { default-features = false, git = "https://github.com/Plonky3/Plonky3", rev = "7ca1cdff" }
+p3-goldilocks  = { default-features = false, git = "https://github.com/Plonky3/Plonky3", rev = "7ca1cdff" }
+p3-keccak      = { default-features = false, git = "https://github.com/Plonky3/Plonky3", rev = "7ca1cdff" }
+p3-matrix      = { default-features = false, git = "https://github.com/Plonky3/Plonky3", rev = "7ca1cdff" }
+p3-maybe-rayon = { default-features = false, git = "https://github.com/Plonky3/Plonky3", rev = "7ca1cdff" }
+p3-symmetric   = { default-features = false, git = "https://github.com/Plonky3/Plonky3", rev = "7ca1cdff" }
+p3-util        = { default-features = false, git = "https://github.com/Plonky3/Plonky3", rev = "7ca1cdff" }
 
-# Miden-specific Plonky3 crates
-p3-miden-air    = { default-features = false, version = "0.4.2" }
-p3-miden-fri    = { default-features = false, version = "0.4.2" }
-p3-miden-prover = { default-features = false, version = "0.4.2" }
+# Miden-specific Plonky3 crates — tracking p3-miden PR #34
+p3-miden-lifted-air      = { default-features = false, git = "https://github.com/Nashtare/p3-miden", rev = "5d0201f6" }
+p3-miden-lifted-fri      = { default-features = false, git = "https://github.com/Nashtare/p3-miden", rev = "5d0201f6" }
+p3-miden-lifted-stark    = { default-features = false, git = "https://github.com/Nashtare/p3-miden", rev = "5d0201f6" }
+p3-miden-lmcs            = { default-features = false, git = "https://github.com/Nashtare/p3-miden", rev = "5d0201f6" }
+p3-miden-stateful-hasher = { default-features = false, git = "https://github.com/Nashtare/p3-miden", rev = "5d0201f6" }
+p3-miden-transcript      = { default-features = false, git = "https://github.com/Nashtare/p3-miden", rev = "5d0201f6" }
 
 [dev-dependencies]
 assert_matches = { default-features = false, version = "1.5" }

@@ -48,50 +48,86 @@ pub mod stark {
     //! Algebraic Intermediate Representation (AIR) for the Miden VM and other components.
     //! It primarily consists of re-exports from the Plonky3 project with some Miden-specific
     //! adaptations.
-    pub use p3_miden_prover::{
-        Commitments, Domain, Entry, OpenedValues, PackedChallenge, PackedVal, PcsError, Proof,
-        ProverConstraintFolder, StarkConfig, StarkGenericConfig, SymbolicAirBuilder,
-        SymbolicExpression, SymbolicVariable, Val, VerificationError, VerifierConstraintFolder,
-        generate_logup_trace, get_log_quotient_degree, get_max_constraint_degree,
-        get_symbolic_constraints, prove, quotient_values, recompose_quotient_from_chunks, verify,
-        verify_constraints,
+
+    // Re-export lifted STARK prover/verifier.
+    pub use p3_miden_lifted_stark::{
+        AirInstance, AirWitness, DeepParams, FriFold, FriParams, GenericStarkConfig, Lmcs,
+        LmcsConfig, PcsParams, PcsTranscript, ProverChannel, ProverError, ProverTranscript,
+        StarkConfig, StarkTranscript, TranscriptData, VerifierChannel, VerifierError,
+        VerifierTranscript, prove_multi, prove_single, verify_multi, verify_single,
     };
 
     pub mod air {
+        // Upstream Plonky3 AIR traits
         pub use p3_air::{
-            Air, AirBuilder, AirBuilderWithPublicValues, BaseAir, BaseAirWithPublicValues,
-            ExtensionBuilder, FilteredAirBuilder, PairBuilder, PairCol, PermutationAirBuilder,
-            VirtualPairCol,
+            Air, AirBuilder, AirBuilderWithContext, BaseAir, ExtensionBuilder, FilteredAirBuilder,
+            PairCol, PeriodicAirBuilder, PermutationAirBuilder, RowWindow, VirtualPairCol,
+            WindowAccess,
+            symbolic::{
+                AirLayout, BaseEntry, ConstraintLayout, ExtEntry, SymbolicAirBuilder,
+                SymbolicExpression, SymbolicExpressionExt, SymbolicVariable, SymbolicVariableExt,
+                get_all_symbolic_constraints, get_constraint_layout, get_max_constraint_degree,
+                get_max_constraint_degree_extension, get_symbolic_constraints,
+                get_symbolic_constraints_extension,
+            },
         };
-        pub use p3_miden_air::{
-            BaseAirWithAuxTrace, FilteredMidenAirBuilder, MidenAir, MidenAirBuilder,
+        pub use p3_miden_lifted_air::{AirInstance as LiftedAirInstance, validate_instances};
+        // Miden lifted AIR traits and types
+        pub use p3_miden_lifted_air::{
+            AirValidationError, AuxBuilder, LiftedAir, LiftedAirBuilder,
+            ReducedAuxValues, ReductionError, TracePart, VarLenPublicInputs,
         };
     }
 
     pub mod challenger {
-        pub use p3_challenger::{HashChallenger, SerializingChallenger64};
+        pub use p3_challenger::{
+            CanObserve, DuplexChallenger, HashChallenger, SerializingChallenger64,
+        };
     }
 
-    pub mod commit {
-        pub use p3_commit::ExtensionMmcs;
-        pub use p3_merkle_tree::MerkleTreeMmcs;
+    pub mod crypto {
+        pub use p3_blake3;
+        pub use p3_keccak;
+        pub use p3_miden_stateful_hasher::{self, Alignable, StatefulHasher, StatefulSponge};
+        pub use p3_symmetric::{
+            CompressionFunctionFromHasher, PaddingFreeSponge, SerializingHasher,
+            TruncatedPermutation,
+        };
     }
 
     pub mod dft {
-        pub use p3_dft::Radix2DitParallel;
+        pub use p3_dft::{NaiveDft, Radix2DitParallel, TwoAdicSubgroupDft};
+    }
+
+    pub mod field {
+        pub use p3_field::{
+            Algebra, ExtensionField, Field, Packable, PrimeCharacteristicRing, TwoAdicField,
+        };
+    }
+
+    pub mod fri {
+        pub use p3_miden_lifted_fri::{
+            OpenedValues, PcsError, PcsParams, PcsTranscript,
+            deep::DeepParams,
+            fri::{FriFold, FriParams},
+        };
+    }
+
+    pub mod lmcs {
+        pub use p3_miden_lmcs::{
+            BatchProof, HidingLmcsConfig, LeafOpening, LiftedMerkleTree, Lmcs, LmcsConfig,
+            LmcsError, LmcsTree, OpenedRows, Proof, RowList,
+        };
     }
 
     pub mod matrix {
         pub use p3_matrix::{Matrix, dense::RowMajorMatrix};
     }
 
-    pub mod pcs {
-        pub use p3_miden_fri::{FriParameters, TwoAdicFriPcs};
-    }
-
-    pub mod symmetric {
-        pub use p3_symmetric::{
-            CompressionFunctionFromHasher, PaddingFreeSponge, SerializingHasher,
+    pub mod transcript {
+        pub use p3_miden_transcript::{
+            Channel, ProverChannel, ProverTranscript, TranscriptChallenger, TranscriptData,
+            TranscriptError, VerifierChannel, VerifierTranscript,
         };
     }
 }
