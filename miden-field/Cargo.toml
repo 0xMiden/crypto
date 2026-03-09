@@ -23,9 +23,9 @@ thiserror = { default-features = false, version = "2.0" }
 [target.'cfg(not(all(target_family = "wasm", miden)))'.dependencies]
 miden-serde-utils = { workspace = true }
 num-bigint        = { default-features = false, version = "0.4" }
-p3-challenger     = { default-features = false, git = "https://github.com/Plonky3/Plonky3", rev = "7ca1cdff" }
-p3-field          = { default-features = false, git = "https://github.com/Plonky3/Plonky3", rev = "7ca1cdff" }
-p3-goldilocks     = { default-features = false, git = "https://github.com/Plonky3/Plonky3", rev = "7ca1cdff" }
+p3-challenger     = { default-features = false, git = "https://github.com/Plonky3/Plonky3", rev = "4341702be337f95d1f8f7f7e9188199b98726d92" }
+p3-field          = { default-features = false, git = "https://github.com/Plonky3/Plonky3", rev = "4341702be337f95d1f8f7f7e9188199b98726d92" }
+p3-goldilocks     = { default-features = false, git = "https://github.com/Plonky3/Plonky3", rev = "4341702be337f95d1f8f7f7e9188199b98726d92" }
 paste             = { version = "1.0.15" }
 proptest          = { default-features = false, features = ["alloc", "std"], optional = true, version = "1.7" }
 rand              = { default-features = false, version = "0.10" }

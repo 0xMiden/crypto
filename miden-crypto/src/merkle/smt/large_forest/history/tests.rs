@@ -3,11 +3,10 @@
 
 use alloc::vec::Vec;
 
-use p3_field::PrimeCharacteristicRing;
-
 use super::{ChangedKeys, History, NodeChanges, error::Result};
 use crate::{
     EMPTY_WORD, Felt, Word,
+    field::PrimeCharacteristicRing,
     merkle::{
         NodeIndex,
         smt::{LeafIndex, Smt, VersionId},

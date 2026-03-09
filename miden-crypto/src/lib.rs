@@ -23,10 +23,11 @@ pub mod field {
     //! [Felt](super::Felt)).
 
     pub use miden_field::{
-        BasedVectorSpace, BinomialExtensionField, BinomiallyExtendable,
-        BinomiallyExtendableAlgebra, ExtensionField, Field, HasTwoAdicBinomialExtension,
-        InjectiveMonomial, Packable, PermutationMonomial, PrimeCharacteristicRing, PrimeField,
-        PrimeField64, QuotientMap, RawDataSerializable, TwoAdicField, batch_multiplicative_inverse,
+        Algebra, BasedVectorSpace, BinomialExtensionField, BinomiallyExtendable,
+        BinomiallyExtendableAlgebra, BoundedPowers, ExtensionField, Field,
+        HasTwoAdicBinomialExtension, InjectiveMonomial, Packable, PermutationMonomial, Powers,
+        PrimeCharacteristicRing, PrimeField, PrimeField64, QuotientMap, RawDataSerializable,
+        TwoAdicField, batch_multiplicative_inverse,
     };
 
     pub use super::batch_inversion::batch_inversion_allow_zeros;
@@ -42,92 +43,52 @@ pub mod parallel {
 }
 
 pub mod stark {
-    //! Foundational components for the STARK proving system based on Plonky3.
+    //! Lifted STARK proving system based on Plonky3.
     //!
-    //! This module contains components needed to build a STARK prover/verifier and define
-    //! Algebraic Intermediate Representation (AIR) for the Miden VM and other components.
-    //! It primarily consists of re-exports from the Plonky3 project with some Miden-specific
-    //! adaptations.
+    //! Sub-modules from `p3-miden-lifted-stark`:
+    //! - [`air`] — AIR traits, builders, symbolic types (includes all of `p3-air`)
+    //! - [`fri`] — PCS parameters, DEEP + FRI types
+    //! - [`lmcs`] — Lifted Merkle commitment scheme
+    //! - [`transcript`] — Fiat-Shamir channels and transcript data
+    //! - [`hasher`] — Stateful hasher primitives
+    //! - [`prover`] — `prove_single` / `prove_multi`
+    //! - [`verifier`] — `verify_single` / `verify_multi`
+    //! - [`coset`] — Domain/coset operations
+    //!
+    //! Sub-modules from upstream Plonky3:
+    //! - [`challenger`] — Challenge generation (Fiat-Shamir)
+    //! - [`dft`] — DFT implementations
+    //! - [`matrix`] — Dense matrix types
+    //! - [`symmetric`] — Symmetric cryptographic primitives
 
-    // Re-export lifted STARK prover/verifier.
-    pub use p3_miden_lifted_stark::{
-        AirInstance, AirWitness, DeepParams, FriFold, FriParams, GenericStarkConfig, Lmcs,
-        LmcsConfig, PcsParams, PcsTranscript, ProverChannel, ProverError, ProverTranscript,
-        StarkConfig, StarkTranscript, TranscriptData, VerifierChannel, VerifierError,
-        VerifierTranscript, prove_multi, prove_single, verify_multi, verify_single,
-    };
+    // Top-level types from lifted-stark
+    pub use p3_miden_lifted_stark::{GenericStarkConfig, StarkConfig, Transcript};
+    // Lifted-stark sub-modules (re-exported as-is)
+    pub use p3_miden_lifted_stark::{air, coset, fri, hasher, lmcs, prover, transcript, verifier};
 
-    pub mod air {
-        // Upstream Plonky3 AIR traits
-        pub use p3_air::{
-            Air, AirBuilder, AirBuilderWithContext, BaseAir, ExtensionBuilder, FilteredAirBuilder,
-            PairCol, PeriodicAirBuilder, PermutationAirBuilder, RowWindow, VirtualPairCol,
-            WindowAccess,
-            symbolic::{
-                AirLayout, BaseEntry, ConstraintLayout, ExtEntry, SymbolicAirBuilder,
-                SymbolicExpression, SymbolicExpressionExt, SymbolicVariable, SymbolicVariableExt,
-                get_all_symbolic_constraints, get_constraint_layout, get_max_constraint_degree,
-                get_max_constraint_degree_extension, get_symbolic_constraints,
-                get_symbolic_constraints_extension,
-            },
-        };
-        pub use p3_miden_lifted_air::{AirInstance as LiftedAirInstance, validate_instances};
-        // Miden lifted AIR traits and types
-        pub use p3_miden_lifted_air::{
-            AirValidationError, AuxBuilder, LiftedAir, LiftedAirBuilder,
-            ReducedAuxValues, ReductionError, TracePart, VarLenPublicInputs,
-        };
-    }
-
+    // Upstream Plonky3: challenger
     pub mod challenger {
         pub use p3_challenger::{
-            CanObserve, DuplexChallenger, HashChallenger, SerializingChallenger64,
+            CanObserve, DuplexChallenger, FieldChallenger, GrindingChallenger, HashChallenger,
+            SerializingChallenger64,
         };
     }
 
-    pub mod crypto {
-        pub use p3_blake3;
-        pub use p3_keccak;
-        pub use p3_miden_stateful_hasher::{self, Alignable, StatefulHasher, StatefulSponge};
-        pub use p3_symmetric::{
-            CompressionFunctionFromHasher, PaddingFreeSponge, SerializingHasher,
-            TruncatedPermutation,
-        };
-    }
-
+    // Upstream Plonky3: dft
     pub mod dft {
         pub use p3_dft::{NaiveDft, Radix2DitParallel, TwoAdicSubgroupDft};
     }
 
-    pub mod field {
-        pub use p3_field::{
-            Algebra, ExtensionField, Field, Packable, PrimeCharacteristicRing, TwoAdicField,
-        };
-    }
-
-    pub mod fri {
-        pub use p3_miden_lifted_fri::{
-            OpenedValues, PcsError, PcsParams, PcsTranscript,
-            deep::DeepParams,
-            fri::{FriFold, FriParams},
-        };
-    }
-
-    pub mod lmcs {
-        pub use p3_miden_lmcs::{
-            BatchProof, HidingLmcsConfig, LeafOpening, LiftedMerkleTree, Lmcs, LmcsConfig,
-            LmcsError, LmcsTree, OpenedRows, Proof, RowList,
-        };
-    }
-
+    // Upstream Plonky3: matrix
     pub mod matrix {
         pub use p3_matrix::{Matrix, dense::RowMajorMatrix};
     }
 
-    pub mod transcript {
-        pub use p3_miden_transcript::{
-            Channel, ProverChannel, ProverTranscript, TranscriptChallenger, TranscriptData,
-            TranscriptError, VerifierChannel, VerifierTranscript,
+    // Upstream Plonky3: symmetric
+    pub mod symmetric {
+        pub use p3_symmetric::{
+            CompressionFunctionFromHasher, CryptographicPermutation, PaddingFreeSponge,
+            Permutation, SerializingHasher, TruncatedPermutation,
         };
     }
 }

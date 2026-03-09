@@ -37,17 +37,17 @@ multiple-versions = "deny"
 skip = [
   # Allow duplicate spin versions - transitively pulled by p3-dft and flume
   { name = "spin" },
+  # Allow rand/rand_core/getrandom duplicates — miden-crypto uses rand 0.9 while Plonky3 uses 0.10
+  { name = "getrandom" },
+  { name = "rand", version = "=0.9.2" },
+  { name = "rand_core" },
 ]
-skip-tree = [
-  # Allow getrandom v0.2.x for now - legacy dependency
-  { name = "getrandom", version = "=0.2.16" },
-  # Allow rand_core v0.6.x for now - legacy dependency
-  { name = "rand_core", version = "=0.6.4" },
-]
+skip-tree = []
 wildcards = "allow"
 
 # Sources configuration
 [sources]
+allow-git        = ["https://github.com/Nashtare/p3-miden", "https://github.com/Plonky3/Plonky3"]
 allow-registry   = ["https://github.com/rust-lang/crates.io-index"]
 unknown-git      = "deny"
 unknown-registry = "deny"
