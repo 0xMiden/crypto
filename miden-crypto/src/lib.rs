@@ -46,6 +46,7 @@ pub mod stark {
     //! Lifted STARK proving system based on Plonky3.
     //!
     //! Sub-modules from `p3-miden-lifted-stark`:
+    //! - [`proof`] — [`proof::StarkProof`], [`proof::StarkDigest`], [`proof::StarkOutput`], [`proof::StarkTranscript`]
     //! - [`air`] — AIR traits, builders, symbolic types (includes all of `p3-air`)
     //! - [`fri`] — PCS parameters, DEEP + FRI types
     //! - [`lmcs`] — Lifted Merkle commitment scheme
@@ -53,7 +54,6 @@ pub mod stark {
     //! - [`hasher`] — Stateful hasher primitives
     //! - [`prover`] — `prove_single` / `prove_multi`
     //! - [`verifier`] — `verify_single` / `verify_multi`
-    //! - [`coset`] — Domain/coset operations
     //! - [`debug`] — Debug constraint checker for lifted AIRs
     //!
     //! Sub-modules from upstream Plonky3:
@@ -63,17 +63,17 @@ pub mod stark {
     //! - [`symmetric`] — Symmetric cryptographic primitives
 
     // Top-level types from lifted-stark
-    pub use p3_miden_lifted_stark::{GenericStarkConfig, StarkConfig, Transcript};
+    pub use p3_miden_lifted_stark::{GenericStarkConfig, StarkConfig};
     // Lifted-stark sub-modules (re-exported as-is)
     pub use p3_miden_lifted_stark::{
-        air, coset, debug, fri, hasher, lmcs, prover, transcript, verifier,
+        air, debug, fri, hasher, lmcs, proof, prover, transcript, verifier,
     };
 
     // Upstream Plonky3: challenger
     pub mod challenger {
         pub use p3_challenger::{
-            CanObserve, DuplexChallenger, FieldChallenger, GrindingChallenger, HashChallenger,
-            SerializingChallenger64,
+            CanFinalizeDigest, CanObserve, DuplexChallenger, FieldChallenger, GrindingChallenger,
+            HashChallenger, SerializingChallenger64,
         };
     }
 
