@@ -600,16 +600,27 @@ impl Serializable for MerkleStore {
 
 impl Deserializable for MerkleStore {
     fn read_from<R: ByteReader>(source: &mut R) -> Result<Self, DeserializationError> {
-        let len = source.read_u64()?;
-        let mut nodes: Vec<(Word, StoreNode)> = Vec::with_capacity(len as usize);
+        let len_u64 = source.read_u64()?;
+        let len = usize::try_from(len_u64).map_err(|_| {
+            DeserializationError::InvalidValue("MerkleStore node count too large".into())
+        })?;
 
-        for _ in 0..len {
-            let key = Word::read_from(source)?;
-            let value = StoreNode::read_from(source)?;
-            nodes.push((key, value));
-        }
+        let element_size = <(Word, StoreNode) as Deserializable>::min_serialized_size();
+        let required_bytes = len.checked_mul(element_size).ok_or_else(|| {
+            DeserializationError::InvalidValue("MerkleStore node count too large".into())
+        })?;
+        source.check_eor(required_bytes)?;
+
+        // Use read_many_iter to avoid eager allocation and respect BudgetedReader limits
+        let nodes: Vec<(Word, StoreNode)> =
+            source.read_many_iter(len)?.collect::<Result<_, _>>()?;
 
         Ok(nodes.into_iter().collect())
+    }
+
+    /// Minimum serialized size: u64 length prefix (0 entries).
+    fn min_serialized_size() -> usize {
+        8
     }
 }
 

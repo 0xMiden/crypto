@@ -166,6 +166,10 @@ fuzz-word: ## Run fuzzing for Word serialization
 fuzz-merkle: ## Run fuzzing for Merkle tree serialization
 	cargo +nightly fuzz run merkle --release --fuzz-dir miden-crypto-fuzz
 
+.PHONY: fuzz-merkle-store
+fuzz-merkle-store: ## Run fuzzing for MerkleStore deserialization
+	cargo +nightly fuzz run merkle_store --release --fuzz-dir miden-crypto-fuzz
+
 .PHONY: fuzz-smt-serde
 fuzz-smt-serde: ## Run fuzzing for SMT serialization
 	cargo +nightly fuzz run smt_serde --release --fuzz-dir miden-crypto-fuzz
