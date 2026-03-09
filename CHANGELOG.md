@@ -18,6 +18,7 @@
 - [BREAKING] Removed `PartialEq`/`Eq` for AEAD `SecretKey` in non-test builds, fix various hygiene issues in dealing with secret keys ([#849](https://github.com/0xMiden/crypto/pull/849)).
 - Added `PublicKey::from_der()` for ECDSA public keys over secp256k1 ([#855](https://github.com/0xMiden/crypto/pull/855)).
 - [BREAKING] Removed `RpoRandomCoin` and `RpxRandomCoin` and introduced a Poseidon2-based `RandomCoin` ([#871](https://github.com/0xMiden/crypto/pull/871)).
+- Harden MerkleStore deserialization and fuzz coverage ([#878](https://github.com/0xMiden/crypto/pull/878)).
 
 ## 0.22.4 (2026-03-03)
 
