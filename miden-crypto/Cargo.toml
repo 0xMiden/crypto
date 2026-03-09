@@ -129,7 +129,7 @@ p3-symmetric   = { default-features = false, git = "https://github.com/Plonky3/P
 p3-util        = { default-features = false, git = "https://github.com/Plonky3/Plonky3", rev = "4341702be337f95d1f8f7f7e9188199b98726d92" }
 
 # Miden-specific Plonky3 crates
-p3-miden-lifted-stark = { default-features = false, git = "https://github.com/Nashtare/p3-miden", rev = "0cf9192" }
+p3-miden-lifted-stark = { default-features = false, git = "https://github.com/Nashtare/p3-miden", rev = "0aa070611806a97532b45195c45af7dcdb808384" }
 
 [dev-dependencies]
 assert_matches = { default-features = false, version = "1.5" }

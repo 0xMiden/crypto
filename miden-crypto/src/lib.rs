@@ -54,6 +54,7 @@ pub mod stark {
     //! - [`prover`] — `prove_single` / `prove_multi`
     //! - [`verifier`] — `verify_single` / `verify_multi`
     //! - [`coset`] — Domain/coset operations
+    //! - [`debug`] — Debug constraint checker for lifted AIRs
     //!
     //! Sub-modules from upstream Plonky3:
     //! - [`challenger`] — Challenge generation (Fiat-Shamir)
@@ -64,7 +65,9 @@ pub mod stark {
     // Top-level types from lifted-stark
     pub use p3_miden_lifted_stark::{GenericStarkConfig, StarkConfig, Transcript};
     // Lifted-stark sub-modules (re-exported as-is)
-    pub use p3_miden_lifted_stark::{air, coset, fri, hasher, lmcs, prover, transcript, verifier};
+    pub use p3_miden_lifted_stark::{
+        air, coset, debug, fri, hasher, lmcs, prover, transcript, verifier,
+    };
 
     // Upstream Plonky3: challenger
     pub mod challenger {

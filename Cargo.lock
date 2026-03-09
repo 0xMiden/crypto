@@ -895,9 +895,9 @@ checksum = "09edd9e8b54e49e587e4f6295a7d29c3ea94d469cb40ab8ca70b288248a81db2"
 
 [[package]]
 name = "libc"
-version = "0.2.182"
+version = "0.2.183"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6800badb6cb2082ffd7b6a67e6125bb39f18782f793520caee8cb8846be06112"
+checksum = "b5b646652bf6661599e1da8901b3b9522896f01e736bad5f723fe7a3a27f899d"
 
 [[package]]
 name = "libloading"
@@ -1326,7 +1326,7 @@ dependencies = [
 [[package]]
 name = "p3-miden-lifted-air"
 version = "0.5.0"
-source = "git+https://github.com/Nashtare/p3-miden?rev=0cf9192#0cf919228f6a050af37da53b1fb99afde1f62da2"
+source = "git+https://github.com/Nashtare/p3-miden?rev=0aa070611806a97532b45195c45af7dcdb808384#0aa070611806a97532b45195c45af7dcdb808384"
 dependencies = [
  "p3-air",
  "p3-field",
@@ -1338,7 +1338,7 @@ dependencies = [
 [[package]]
 name = "p3-miden-lifted-fri"
 version = "0.5.0"
-source = "git+https://github.com/Nashtare/p3-miden?rev=0cf9192#0cf919228f6a050af37da53b1fb99afde1f62da2"
+source = "git+https://github.com/Nashtare/p3-miden?rev=0aa070611806a97532b45195c45af7dcdb808384#0aa070611806a97532b45195c45af7dcdb808384"
 dependencies = [
  "p3-challenger",
  "p3-commit",
@@ -1357,7 +1357,7 @@ dependencies = [
 [[package]]
 name = "p3-miden-lifted-stark"
 version = "0.5.0"
-source = "git+https://github.com/Nashtare/p3-miden?rev=0cf9192#0cf919228f6a050af37da53b1fb99afde1f62da2"
+source = "git+https://github.com/Nashtare/p3-miden?rev=0aa070611806a97532b45195c45af7dcdb808384#0aa070611806a97532b45195c45af7dcdb808384"
 dependencies = [
  "p3-challenger",
  "p3-dft",
@@ -1377,7 +1377,7 @@ dependencies = [
 [[package]]
 name = "p3-miden-lmcs"
 version = "0.5.0"
-source = "git+https://github.com/Nashtare/p3-miden?rev=0cf9192#0cf919228f6a050af37da53b1fb99afde1f62da2"
+source = "git+https://github.com/Nashtare/p3-miden?rev=0aa070611806a97532b45195c45af7dcdb808384#0aa070611806a97532b45195c45af7dcdb808384"
 dependencies = [
  "p3-commit",
  "p3-field",
@@ -1396,7 +1396,7 @@ dependencies = [
 [[package]]
 name = "p3-miden-stateful-hasher"
 version = "0.5.0"
-source = "git+https://github.com/Nashtare/p3-miden?rev=0cf9192#0cf919228f6a050af37da53b1fb99afde1f62da2"
+source = "git+https://github.com/Nashtare/p3-miden?rev=0aa070611806a97532b45195c45af7dcdb808384#0aa070611806a97532b45195c45af7dcdb808384"
 dependencies = [
  "p3-field",
  "p3-symmetric",
@@ -1405,7 +1405,7 @@ dependencies = [
 [[package]]
 name = "p3-miden-transcript"
 version = "0.5.0"
-source = "git+https://github.com/Nashtare/p3-miden?rev=0cf9192#0cf919228f6a050af37da53b1fb99afde1f62da2"
+source = "git+https://github.com/Nashtare/p3-miden?rev=0aa070611806a97532b45195c45af7dcdb808384#0aa070611806a97532b45195c45af7dcdb808384"
 dependencies = [
  "p3-challenger",
  "p3-field",
@@ -1567,9 +1567,9 @@ dependencies = [
 
 [[package]]
 name = "proc-macro-crate"
-version = "3.4.0"
+version = "3.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "219cb19e96be00ab2e37d6e299658a0cfa83e52429179969b0f0121b4ac46983"
+checksum = "e67ba7e9b2b56446f1d419b1d807906278ffa1a658a8a5d8a39dcb1f5a78614f"
 dependencies = [
  "toml_edit",
 ]
@@ -2066,18 +2066,18 @@ dependencies = [
 
 [[package]]
 name = "toml_datetime"
-version = "0.7.5+spec-1.1.0"
+version = "1.0.0+spec-1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "92e1cfed4a3038bc5a127e35a2d360f145e1f4b971b551a2ba5fd7aedf7e1347"
+checksum = "32c2555c699578a4f59f0cc68e5116c8d7cabbd45e1409b989d4be085b53f13e"
 dependencies = [
  "serde_core",
 ]
 
 [[package]]
 name = "toml_edit"
-version = "0.23.10+spec-1.0.0"
+version = "0.25.4+spec-1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "84c8b9f757e028cee9fa244aea147aab2a9ec09d5325a9b01e0a49730c2b5269"
+checksum = "7193cbd0ce53dc966037f54351dbbcf0d5a642c7f0038c382ef9e677ce8c13f2"
 dependencies = [
  "indexmap",
  "toml_datetime",
@@ -2333,9 +2333,9 @@ dependencies = [
 
 [[package]]
 name = "winnow"
-version = "0.7.14"
+version = "0.7.15"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5a5364e9d77fcdeeaa6062ced926ee3381faa2ee02d3eb83a5c27a8825540829"
+checksum = "df79d97927682d2fd8adb29682d1140b343be4ac0f08fd68b7765d9c059d3945"
 dependencies = [
  "memchr",
 ]
@@ -2456,18 +2456,18 @@ dependencies = [
 
 [[package]]
 name = "zerocopy"
-version = "0.8.40"
+version = "0.8.41"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a789c6e490b576db9f7e6b6d661bcc9799f7c0ac8352f56ea20193b2681532e5"
+checksum = "96e13bc581734df6250836c59a5f44f3c57db9f9acb9dc8e3eaabdaf6170254d"
 dependencies = [
  "zerocopy-derive",
 ]
 
 [[package]]
 name = "zerocopy-derive"
-version = "0.8.40"
+version = "0.8.41"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f65c489a7071a749c849713807783f70672b28094011623e200cb86dcb835953"
+checksum = "3545ea9e86d12ab9bba9fcd99b54c1556fd3199007def5a03c375623d05fac1c"
 dependencies = [
  "proc-macro2",
  "quote",
