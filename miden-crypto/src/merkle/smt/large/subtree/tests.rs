@@ -386,15 +386,18 @@ fn test_from_vec_rejects_invalid_field_element() {
 }
 
 #[test]
-fn test_from_vec_accepts_legacy_leading_one() {
+fn test_from_vec_rejects_missing_magic() {
     let root_index = NodeIndex::new(SUBTREE_DEPTH, 0).unwrap();
 
-    // Legacy payload without magic/version can start with 0x01 in the bitmask.
+    // Missing magic/version prefix should always be rejected.
     let mut data = vec![0u8; Subtree::BITMASK_SIZE];
     data[0] |= 1;
     data.extend_from_slice(&Word::from([42u32; 4]).as_bytes());
 
-    assert!(Subtree::from_vec(root_index, &data).is_ok());
+    assert!(matches!(
+        Subtree::from_vec(root_index, &data),
+        Err(super::SubtreeError::MissingFormatMagic)
+    ));
 }
 
 #[test]
@@ -412,7 +415,7 @@ fn test_from_vec_rejects_unknown_version() {
 }
 
 #[test]
-fn test_from_vec_rejects_unknown_version_with_legacy_length() {
+fn test_from_vec_rejects_unknown_version_with_extra_payload() {
     let root_index = NodeIndex::new(SUBTREE_DEPTH, 0).unwrap();
 
     let mut data = Vec::from(&b"SMT1"[..]);

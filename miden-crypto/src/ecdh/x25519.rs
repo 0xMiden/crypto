@@ -232,6 +232,7 @@ impl KeyAgreementScheme for X25519 {
 }
 
 fn is_all_zero(bytes: &[u8]) -> bool {
+    // Empty input is treated as invalid caller input rather than "all zero".
     if bytes.is_empty() {
         return false;
     }

@@ -377,9 +377,26 @@ impl Subtree {
     /// - 64 bytes: `child_bits` as little-endian u64s
     /// - Variable: non-empty child hashes (32 bytes each)
     pub fn from_vec(root_index: NodeIndex, data: &[u8]) -> Result<Self, SubtreeError> {
-        let parse_payload = |payload: &[u8], min_len: usize| -> Result<Self, SubtreeError> {
+        let min_header = Self::FORMAT_MAGIC.len() + 1;
+        if data.len() < min_header {
+            return Err(SubtreeError::TooShort { found: data.len(), min: min_header });
+        }
+        if !data.starts_with(&Self::FORMAT_MAGIC) {
+            return Err(SubtreeError::MissingFormatMagic);
+        }
+
+        let version = data[Self::FORMAT_MAGIC.len()];
+        if version != Self::FORMAT_VERSION {
+            return Err(SubtreeError::UnsupportedVersion { found: version });
+        }
+
+        let parse_payload = |payload: &[u8]| -> Result<Self, SubtreeError> {
+            let min_len = Self::FORMAT_MAGIC.len() + 1 + Self::BITMASK_SIZE;
             if payload.len() < Self::BITMASK_SIZE {
-                return Err(SubtreeError::TooShort { found: payload.len(), min: min_len });
+                return Err(SubtreeError::TooShort {
+                    found: payload.len() + min_header,
+                    min: min_len,
+                });
             }
 
             let (bits_data, hash_data) = payload.split_at(Self::BITMASK_SIZE);
@@ -411,20 +428,7 @@ impl Subtree {
             Ok(Self { root_index, child_bits, hashes })
         };
 
-        if data.starts_with(&Self::FORMAT_MAGIC) {
-            let header_len = Self::FORMAT_MAGIC.len() + 1 + Self::BITMASK_SIZE;
-            let min_header = Self::FORMAT_MAGIC.len() + 1;
-            if data.len() < min_header {
-                return Err(SubtreeError::TooShort { found: data.len(), min: min_header });
-            }
-            let version = data[Self::FORMAT_MAGIC.len()];
-            if version == Self::FORMAT_VERSION {
-                return parse_payload(&data[Self::FORMAT_MAGIC.len() + 1..], header_len);
-            }
-            return Err(SubtreeError::UnsupportedVersion { found: version });
-        }
-
-        parse_payload(data, Self::BITMASK_SIZE)
+        parse_payload(&data[min_header..])
     }
 
     // PRIVATE HELPERS
@@ -493,6 +497,8 @@ impl Subtree {
 
         let mut seen = BTreeSet::new();
         let mut deduped = Vec::with_capacity(local_mutations.len());
+        // Keep only the most recent mutation per local index: iterate in reverse to retain the
+        // last mutation, then reverse again to restore the original execution order.
         for mutation in local_mutations.into_iter().rev() {
             if seen.insert(mutation.local_index) {
                 deduped.push(mutation);
