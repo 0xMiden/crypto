@@ -17,8 +17,8 @@ default = ["std"]
 std     = []
 
 [dependencies]
-p3-field      = { default-features = false, git = "https://github.com/Plonky3/Plonky3", rev = "69270b5053e6d84e032597cd56071b965ea77b57" }
-p3-goldilocks = { default-features = false, git = "https://github.com/Plonky3/Plonky3", rev = "69270b5053e6d84e032597cd56071b965ea77b57" }
+p3-field      = { default-features = false, version = "0.5.0" }
+p3-goldilocks = { default-features = false, version = "0.5.0" }
 
 [lints]
 workspace = true

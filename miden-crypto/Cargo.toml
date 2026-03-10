@@ -117,19 +117,19 @@ subtle           = { default-features = false, version = "2.6" }
 thiserror        = { default-features = false, version = "2.0" }
 x25519-dalek     = { default-features = false, features = ["static_secrets"], version = "2.0" }
 
-# Upstream Plonky3 dependencies — pinned to the revision used by p3-miden
-p3-blake3      = { default-features = false, git = "https://github.com/Plonky3/Plonky3", rev = "69270b5053e6d84e032597cd56071b965ea77b57" }
-p3-challenger  = { default-features = false, git = "https://github.com/Plonky3/Plonky3", rev = "69270b5053e6d84e032597cd56071b965ea77b57" }
-p3-dft         = { default-features = false, git = "https://github.com/Plonky3/Plonky3", rev = "69270b5053e6d84e032597cd56071b965ea77b57" }
-p3-goldilocks  = { default-features = false, git = "https://github.com/Plonky3/Plonky3", rev = "69270b5053e6d84e032597cd56071b965ea77b57" }
-p3-keccak      = { default-features = false, git = "https://github.com/Plonky3/Plonky3", rev = "69270b5053e6d84e032597cd56071b965ea77b57" }
-p3-matrix      = { default-features = false, git = "https://github.com/Plonky3/Plonky3", rev = "69270b5053e6d84e032597cd56071b965ea77b57" }
-p3-maybe-rayon = { default-features = false, git = "https://github.com/Plonky3/Plonky3", rev = "69270b5053e6d84e032597cd56071b965ea77b57" }
-p3-symmetric   = { default-features = false, git = "https://github.com/Plonky3/Plonky3", rev = "69270b5053e6d84e032597cd56071b965ea77b57" }
-p3-util        = { default-features = false, git = "https://github.com/Plonky3/Plonky3", rev = "69270b5053e6d84e032597cd56071b965ea77b57" }
+# Upstream Plonky3 dependencies (matching p3-miden's published 0.5.0)
+p3-blake3      = { default-features = false, version = "0.5.0" }
+p3-challenger  = { default-features = false, version = "0.5.0" }
+p3-dft         = { default-features = false, version = "0.5.0" }
+p3-goldilocks  = { default-features = false, version = "0.5.0" }
+p3-keccak      = { default-features = false, version = "0.5.0" }
+p3-matrix      = { default-features = false, version = "0.5.0" }
+p3-maybe-rayon = { default-features = false, version = "0.5.0" }
+p3-symmetric   = { default-features = false, version = "0.5.0" }
+p3-util        = { default-features = false, version = "0.5.0" }
 
 # Miden-specific Plonky3 crates
-p3-miden-lifted-stark = { default-features = false, git = "https://github.com/Nashtare/p3-miden", rev = "d6a9360668fb14adc9212029233bd9ca6749ed88" }
+p3-miden-lifted-stark = { branch = "main", default-features = false, git = "https://github.com/0xMiden/p3-miden" }
 
 [dev-dependencies]
 assert_matches = { default-features = false, version = "1.5" }

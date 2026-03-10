@@ -46,7 +46,8 @@ pub mod stark {
     //! Lifted STARK proving system based on Plonky3.
     //!
     //! Sub-modules from `p3-miden-lifted-stark`:
-    //! - [`proof`] — [`proof::StarkProof`], [`proof::StarkDigest`], [`proof::StarkOutput`], [`proof::StarkTranscript`]
+    //! - [`proof`] — [`proof::StarkProof`], [`proof::StarkDigest`], [`proof::StarkOutput`],
+    //!   [`proof::StarkTranscript`]
     //! - [`air`] — AIR traits, builders, symbolic types (includes all of `p3-air`)
     //! - [`fri`] — PCS parameters, DEEP + FRI types
     //! - [`lmcs`] — Lifted Merkle commitment scheme
