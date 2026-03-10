@@ -135,6 +135,7 @@ impl<'forest> EntriesIterator<'forest> {
                         // Otherwise we proceed with the full tree.
                         *state = EntriesIteratorState::ReadingFullTree;
                     }
+                    continue;
                 },
                 EntriesIteratorState::ReadingFullTree => {
                     // If we are reading the full tree's iterator, we need to keep advancing as long
@@ -149,7 +150,7 @@ impl<'forest> EntriesIterator<'forest> {
                                 .map(|(key, value)| TreeEntry { key, value }),
                         );
                         *state = EntriesIteratorState::ReadingHistory { iterator };
-                        return self.next_with_history();
+                        continue;
                     }
 
                     let Some(entry) = full_tree_iter.next() else {
