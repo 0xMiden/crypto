@@ -147,7 +147,8 @@ impl AuthTag {
 
 impl PartialEq for AuthTag {
     fn eq(&self, other: &Self) -> bool {
-        // Use constant-time comparison to prevent timing attacks
+        // Use constant-time comparison on non-wasm targets to reduce timing leaks. On wasm, the
+        // canonicalization helper is a host call and not guaranteed constant-time.
         let mut result = true;
         for (a, b) in self.0.iter().zip(other.0.iter()) {
             result &= bool::from(a.as_canonical_u64_ct().ct_eq(&b.as_canonical_u64_ct()));

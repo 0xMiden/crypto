@@ -125,7 +125,7 @@ impl Blake3_192 {
 
     /// Returns a hash of the provided field elements.
     #[inline(always)]
-    pub fn hash_elements<E: BasedVectorSpace<Felt>>(elements: &[E]) -> Digest256 {
+    pub fn hash_elements<E: BasedVectorSpace<Felt>>(elements: &[E]) -> Digest192 {
         Digest::new(hash_elements(elements))
     }
 

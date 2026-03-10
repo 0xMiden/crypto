@@ -4,7 +4,7 @@
 //! The subtree uses a compact bitmask-based representation where the in-memory format matches
 //! the serialized format, eliminating conversion overhead during serialization/deserialization.
 
-use alloc::vec::Vec;
+use alloc::{collections::BTreeSet, vec::Vec};
 
 use super::{EmptySubtreeRoots, InnerNode, InnerNodeInfo, NodeIndex, NodeMutation, SMT_DEPTH};
 use crate::{Word, merkle::smt::full::concurrent::SUBTREE_DEPTH};
@@ -156,6 +156,8 @@ pub struct Subtree {
 }
 
 impl Subtree {
+    const FORMAT_MAGIC: [u8; 4] = *b"SMT1";
+    const FORMAT_VERSION: u8 = 1;
     // CONSTANTS
     // --------------------------------------------------------------------------------------------
 
@@ -282,6 +284,7 @@ impl Subtree {
     ///
     /// When mutations only update existing nodes (same structure, different hashes),
     /// hashes are patched in-place. Structural changes (additions or removals) trigger a rebuild.
+    /// If multiple mutations target the same node index, the last mutation wins.
     ///
     /// - `NodeMutation::Addition(node)` inserts or updates a node
     /// - `NodeMutation::Removal` removes a node
@@ -343,11 +346,17 @@ impl Subtree {
     /// Serializes this subtree into a compact byte representation.
     ///
     /// The format is trivial since in-memory layout matches serialization:
+    /// - 4 bytes: format magic
+    /// - 1 byte: format version
     /// - 64 bytes: `child_bits` as little-endian u64s
     /// - Variable: non-empty child hashes (32 bytes each)
     pub fn to_vec(&self) -> Vec<u8> {
-        let mut result =
-            Vec::with_capacity(Self::BITMASK_SIZE + self.hashes.len() * Self::HASH_SIZE);
+        let mut result = Vec::with_capacity(
+            Self::FORMAT_MAGIC.len() + 1 + Self::BITMASK_SIZE + self.hashes.len() * Self::HASH_SIZE,
+        );
+
+        result.extend_from_slice(&Self::FORMAT_MAGIC);
+        result.push(Self::FORMAT_VERSION);
 
         for word in &self.child_bits {
             result.extend_from_slice(&word.to_le_bytes());
@@ -363,43 +372,63 @@ impl Subtree {
     /// Deserializes a subtree from its compact byte representation.
     ///
     /// The format is trivial since in-memory layout matches serialization:
+    /// - 4 bytes: format magic
+    /// - 1 byte: format version
     /// - 64 bytes: `child_bits` as little-endian u64s
     /// - Variable: non-empty child hashes (32 bytes each)
     pub fn from_vec(root_index: NodeIndex, data: &[u8]) -> Result<Self, SubtreeError> {
-        if data.len() < Self::BITMASK_SIZE {
-            return Err(SubtreeError::TooShort {
-                found: data.len(),
-                min: Self::BITMASK_SIZE,
-            });
+        let min_header = Self::FORMAT_MAGIC.len() + 1;
+        if data.len() < min_header {
+            return Err(SubtreeError::TooShort { found: data.len(), min: min_header });
+        }
+        if !data.starts_with(&Self::FORMAT_MAGIC) {
+            return Err(SubtreeError::MissingFormatMagic);
         }
 
-        let (bits_data, hash_data) = data.split_at(Self::BITMASK_SIZE);
-
-        let mut child_bits = [0u64; 8];
-        for (i, chunk) in bits_data.chunks_exact(8).enumerate() {
-            child_bits[i] = u64::from_le_bytes(chunk.try_into().unwrap());
+        let version = data[Self::FORMAT_MAGIC.len()];
+        if version != Self::FORMAT_VERSION {
+            return Err(SubtreeError::UnsupportedVersion { found: version });
         }
 
-        // Bits 510-511 are unused - reject corrupted data where these bits are set.
-        const UNUSED_BITS_MASK: u64 = 0b11 << 62;
-        if child_bits[7] & UNUSED_BITS_MASK != 0 {
-            return Err(SubtreeError::InvalidBitmask);
-        }
+        let parse_payload = |payload: &[u8]| -> Result<Self, SubtreeError> {
+            let min_len = Self::FORMAT_MAGIC.len() + 1 + Self::BITMASK_SIZE;
+            if payload.len() < Self::BITMASK_SIZE {
+                return Err(SubtreeError::TooShort {
+                    found: payload.len() + min_header,
+                    min: min_len,
+                });
+            }
 
-        let set_bits: usize = child_bits.iter().map(|w| w.count_ones() as usize).sum();
-        if hash_data.len() != set_bits * Self::HASH_SIZE {
-            return Err(SubtreeError::BadHashLen {
-                expected: set_bits * Self::HASH_SIZE,
-                found: hash_data.len(),
-            });
-        }
+            let (bits_data, hash_data) = payload.split_at(Self::BITMASK_SIZE);
 
-        let hashes: Vec<Word> = hash_data
-            .chunks_exact(Self::HASH_SIZE)
-            .map(|chunk| Word::try_from(chunk).map_err(|_| SubtreeError::InvalidHashData))
-            .collect::<Result<_, _>>()?;
+            let mut child_bits = [0u64; 8];
+            for (i, chunk) in bits_data.chunks_exact(8).enumerate() {
+                child_bits[i] = u64::from_le_bytes(chunk.try_into().unwrap());
+            }
 
-        Ok(Self { root_index, child_bits, hashes })
+            // Bits 510-511 are unused - reject corrupted data where these bits are set.
+            const UNUSED_BITS_MASK: u64 = 0b11 << 62;
+            if child_bits[7] & UNUSED_BITS_MASK != 0 {
+                return Err(SubtreeError::InvalidBitmask);
+            }
+
+            let set_bits: usize = child_bits.iter().map(|w| w.count_ones() as usize).sum();
+            if hash_data.len() != set_bits * Self::HASH_SIZE {
+                return Err(SubtreeError::BadHashLen {
+                    expected: set_bits * Self::HASH_SIZE,
+                    found: hash_data.len(),
+                });
+            }
+
+            let hashes: Vec<Word> = hash_data
+                .chunks_exact(Self::HASH_SIZE)
+                .map(|chunk| Word::try_from(chunk).map_err(|_| SubtreeError::InvalidHashData))
+                .collect::<Result<_, _>>()?;
+
+            Ok(Self { root_index, child_bits, hashes })
+        };
+
+        parse_payload(&data[min_header..])
     }
 
     // PRIVATE HELPERS
@@ -438,14 +467,9 @@ impl Subtree {
         mutations: impl IntoIterator<Item = (&'a NodeIndex, &'a NodeMutation)>,
     ) -> Option<(Vec<LocalMutation>, bool)> {
         let mut local_mutations = Vec::new();
-        let mut can_patch_in_place = true;
 
         for (index, mutation) in mutations {
             let local_index = Self::global_to_local(*index, self.root_index);
-            let bit_offset = (local_index as usize) * Self::BITS_PER_NODE;
-            let old_has_left = self.get_bit(bit_offset);
-            let old_has_right = self.get_bit(bit_offset + 1);
-
             let kind = match mutation {
                 NodeMutation::Addition(node) => {
                     let node_depth_in_subtree = Self::local_index_to_depth(local_index);
@@ -454,10 +478,6 @@ impl Subtree {
                     let has_left = node.left != empty_hash;
                     let has_right = node.right != empty_hash;
 
-                    if old_has_left != has_left || old_has_right != has_right {
-                        can_patch_in_place = false;
-                    }
-
                     LocalMutationKind::Addition {
                         left: node.left,
                         right: node.right,
@@ -465,18 +485,48 @@ impl Subtree {
                         has_right,
                     }
                 },
-                NodeMutation::Removal => {
-                    if old_has_left || old_has_right {
-                        can_patch_in_place = false;
-                    }
-                    LocalMutationKind::Removal
-                },
+                NodeMutation::Removal => LocalMutationKind::Removal,
             };
 
             local_mutations.push(LocalMutation { local_index, kind });
         }
 
-        (!local_mutations.is_empty()).then_some((local_mutations, can_patch_in_place))
+        if local_mutations.is_empty() {
+            return None;
+        }
+
+        let mut seen = BTreeSet::new();
+        let mut deduped = Vec::with_capacity(local_mutations.len());
+        // Keep only the most recent mutation per local index: iterate in reverse to retain the
+        // last mutation, then reverse again to restore the original execution order.
+        for mutation in local_mutations.into_iter().rev() {
+            if seen.insert(mutation.local_index) {
+                deduped.push(mutation);
+            }
+        }
+        deduped.reverse();
+
+        let mut can_patch_in_place = true;
+        for m in &deduped {
+            let bit_offset = (m.local_index as usize) * Self::BITS_PER_NODE;
+            let old_has_left = self.get_bit(bit_offset);
+            let old_has_right = self.get_bit(bit_offset + 1);
+
+            match m.kind {
+                LocalMutationKind::Addition { has_left, has_right, .. } => {
+                    if old_has_left != has_left || old_has_right != has_right {
+                        can_patch_in_place = false;
+                    }
+                },
+                LocalMutationKind::Removal => {
+                    if old_has_left || old_has_right {
+                        can_patch_in_place = false;
+                    }
+                },
+            }
+        }
+
+        Some((deduped, can_patch_in_place))
     }
 
     /// Patches hashes in-place when the subtree structure is unchanged.
