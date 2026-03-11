@@ -1,3 +1,5 @@
+## 0.24.0 (TBD)
+
 ## 0.23.0 (2026-03-11)
 
 - Replaced `Subtree` internal storage with bitmask layout ([#784](https://github.com/0xMiden/crypto/pull/784)).
