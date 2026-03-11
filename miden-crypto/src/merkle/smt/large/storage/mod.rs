@@ -142,6 +142,33 @@ pub trait SmtStorage: 'static + fmt::Debug + Send + Sync {
     /// will be `Some(Subtree)` if found, or `None` if not found.
     fn get_subtrees(&self, indices: &[NodeIndex]) -> Result<Vec<Option<Subtree>>, StorageError>;
 
+    /// Retrieves a single leaf and multiple subtrees in one call.
+    ///
+    /// The default implementation delegates to [`Self::get_leaf`] and [`Self::get_subtree`].
+    /// Backends can override this with a more-optimized implementation if one is available. This
+    /// default implementation does not employ parallelism, and hence may be slower than separately
+    /// issuing [`Self::get_leaf`] and [`Self::get_subtrees`] for large numbers of subtrees.
+    ///
+    /// # Errors
+    ///
+    /// - [`StorageError::Backend`] if the backing storage cannot be accessed during the query.
+    fn get_leaf_and_subtrees(
+        &self,
+        leaf_index: u64,
+        subtree_indices: &[NodeIndex],
+    ) -> Result<(Option<SmtLeaf>, Vec<Option<Subtree>>), StorageError> {
+        let leaf = self.get_leaf(leaf_index)?;
+
+        // We explicitly do NOT want to delegate to `get_subtrees` here as it can be a very heavy
+        // hammer. We instead use the simplest solution that has no potential for unpredictable
+        // performance, even if it is slower for large numbers of subtrees.
+        let subtrees = subtree_indices
+            .iter()
+            .map(|&idx| self.get_subtree(idx))
+            .collect::<Result<Vec<_>, _>>()?;
+        Ok((leaf, subtrees))
+    }
+
     /// Sets or updates a single SMT Subtree in storage, identified by its root `NodeIndex`.
     ///
     /// If a subtree with the same root `NodeIndex` already exists, it is overwritten.
@@ -271,6 +298,15 @@ impl<T: SmtStorage + ?Sized> SmtStorage for Box<T> {
     #[inline]
     fn get_subtrees(&self, indices: &[NodeIndex]) -> Result<Vec<Option<Subtree>>, StorageError> {
         self.deref().get_subtrees(indices)
+    }
+
+    #[inline]
+    fn get_leaf_and_subtrees(
+        &self,
+        leaf_index: u64,
+        subtree_indices: &[NodeIndex],
+    ) -> Result<(Option<SmtLeaf>, Vec<Option<Subtree>>), StorageError> {
+        self.deref().get_leaf_and_subtrees(leaf_index, subtree_indices)
     }
 
     #[inline]
