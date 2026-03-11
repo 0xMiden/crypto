@@ -551,10 +551,8 @@ impl PartialMmr {
 
             (merge_count, new_peaks)
         } else {
-            let new_peaks = Forest::new(changes).map_err(|_| MmrError::ForestSizeExceeded {
-                requested: changes,
-                max: Forest::MAX_LEAVES,
-            })?;
+            let new_peaks = Forest::new(changes)
+                .expect("changes must be a valid forest under apply invariants");
             (0, new_peaks)
         };
 
