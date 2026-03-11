@@ -1,4 +1,4 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `miden-crypto/src/merkle/smt/large_forest/history/mod.rs`."><title>mod.rs - source</title><script>if(window.location.protocol!=="file:")document.head.insertAdjacentHTML("beforeend","SourceSerif4-Regular-6b053e98.ttf.woff2,FiraSans-Italic-81dc35de.woff2,FiraSans-Regular-0fe48ade.woff2,FiraSans-MediumItalic-ccf7e434.woff2,FiraSans-Medium-e1aa3f0a.woff2,SourceCodePro-Regular-8badfe75.ttf.woff2,SourceCodePro-Semibold-aa29a496.ttf.woff2".split(",").map(f=>`<link rel="preload" as="font" type="font/woff2"href="../../../../../../static.files/${f}">`).join(""))</script><link rel="stylesheet" href="../../../../../../static.files/normalize-9960930a.css"><link rel="stylesheet" href="../../../../../../static.files/rustdoc-b7b9f40b.css"><meta name="rustdoc-vars" data-root-path="../../../../../../" data-static-root-path="../../../../../../static.files/" data-current-crate="miden_crypto" data-themes="" data-resource-suffix="" data-rustdoc-version="1.96.0-nightly (2d76d9bc7 2026-03-09)" data-channel="nightly" data-search-js="search-63369b7b.js" data-stringdex-js="stringdex-b897f86f.js" data-settings-js="settings-170eb4bf.js" ><script src="../../../../../../static.files/storage-41dd4d93.js"></script><script defer src="../../../../../../static.files/src-script-813739b1.js"></script><script defer src="../../../../../../src-files.js"></script><script defer src="../../../../../../static.files/main-5013f961.js"></script><noscript><link rel="stylesheet" href="../../../../../../static.files/noscript-f7c3ffd8.css"></noscript><link rel="alternate icon" type="image/png" href="../../../../../../static.files/favicon-32x32-eab170b8.png"><link rel="icon" type="image/svg+xml" href="../../../../../../static.files/favicon-044be391.svg"></head><body class="rustdoc src"><a class="skip-main-content" href="#main-content">Skip to main content</a><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="src-sidebar-title"><h2>Files</h2></div></nav><div class="sidebar-resizer" title="Drag to resize sidebar"></div><main><section id="main-content" class="content" tabindex="-1"><div class="main-heading"><h1><div class="sub-heading">miden_crypto/merkle/smt/large_forest/history/</div>mod.rs</h1><rustdoc-toolbar></rustdoc-toolbar></div><div class="example-wrap digits-3"><pre class="rust"><code><a href=#1 id=1 data-nosnippet>1</a><span class="doccomment">//! This module contains the definition of [`History`], a simple container for some number of
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `miden-crypto/src/merkle/smt/large_forest/history/mod.rs`."><title>mod.rs - source</title><script>if(window.location.protocol!=="file:")document.head.insertAdjacentHTML("beforeend","SourceSerif4-Regular-6b053e98.ttf.woff2,FiraSans-Italic-81dc35de.woff2,FiraSans-Regular-0fe48ade.woff2,FiraSans-MediumItalic-ccf7e434.woff2,FiraSans-Medium-e1aa3f0a.woff2,SourceCodePro-Regular-8badfe75.ttf.woff2,SourceCodePro-Semibold-aa29a496.ttf.woff2".split(",").map(f=>`<link rel="preload" as="font" type="font/woff2"href="../../../../../../static.files/${f}">`).join(""))</script><link rel="stylesheet" href="../../../../../../static.files/normalize-9960930a.css"><link rel="stylesheet" href="../../../../../../static.files/rustdoc-17e0aaed.css"><meta name="rustdoc-vars" data-root-path="../../../../../../" data-static-root-path="../../../../../../static.files/" data-current-crate="miden_crypto" data-themes="" data-resource-suffix="" data-rustdoc-version="1.96.0-nightly (0c68443b0 2026-03-10)" data-channel="nightly" data-search-js="search-63369b7b.js" data-stringdex-js="stringdex-b897f86f.js" data-settings-js="settings-170eb4bf.js" ><script src="../../../../../../static.files/storage-41dd4d93.js"></script><script defer src="../../../../../../static.files/src-script-813739b1.js"></script><script defer src="../../../../../../src-files.js"></script><script defer src="../../../../../../static.files/main-5013f961.js"></script><noscript><link rel="stylesheet" href="../../../../../../static.files/noscript-f7c3ffd8.css"></noscript><link rel="alternate icon" type="image/png" href="../../../../../../static.files/favicon-32x32-eab170b8.png"><link rel="icon" type="image/svg+xml" href="../../../../../../static.files/favicon-044be391.svg"></head><body class="rustdoc src"><a class="skip-main-content" href="#main-content">Skip to main content</a><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="src-sidebar-title"><h2>Files</h2></div></nav><div class="sidebar-resizer" title="Drag to resize sidebar"></div><main><section id="main-content" class="content" tabindex="-1"><div class="main-heading"><h1><div class="sub-heading">miden_crypto/merkle/smt/large_forest/history/</div>mod.rs</h1><rustdoc-toolbar></rustdoc-toolbar></div><div class="example-wrap digits-3"><pre class="rust"><code><a href=#1 id=1 data-nosnippet>1</a><span class="doccomment">//! This module contains the definition of [`History`], a simple container for some number of
 <a href=#2 id=2 data-nosnippet>2</a>//! historical versions of a given merkle tree.
 <a href=#3 id=3 data-nosnippet>3</a>//!
 <a href=#4 id=4 data-nosnippet>4</a>//! This history consists of a series of _deltas_ from the current state of the tree, moving
@@ -160,7 +160,7 @@
 <a href=#160 id=160 data-nosnippet>160</a>    ) -&gt; <span class="prelude-ty">Result</span>&lt;()&gt; {
 <a href=#161 id=161 data-nosnippet>161</a>        <span class="comment">// We need to fail early if the provided new version is not monotonic with respect to the
 <a href=#162 id=162 data-nosnippet>162</a>        // latest version in the history.
-<a href=#163 id=163 data-nosnippet>163</a>        </span><span class="kw">if let </span><span class="prelude-val">Some</span>(v) = <span class="self">self</span>.deltas.iter().last()
+<a href=#163 id=163 data-nosnippet>163</a>        </span><span class="kw">if let </span><span class="prelude-val">Some</span>(v) = <span class="self">self</span>.deltas.back()
 <a href=#164 id=164 data-nosnippet>164</a>            &amp;&amp; v.version_id &gt;= version_id
 <a href=#165 id=165 data-nosnippet>165</a>        {
 <a href=#166 id=166 data-nosnippet>166</a>            <span class="kw">return </span><span class="prelude-val">Err</span>(HistoryError::NonMonotonicVersions(version_id, v.version_id));
@@ -261,7 +261,7 @@
 <a href=#261 id=261 data-nosnippet>261</a>                <span class="kw">return </span><span class="prelude-val">Err</span>(HistoryError::VersionTooOld);
 <a href=#262 id=262 data-nosnippet>262</a>            }
 <a href=#263 id=263 data-nosnippet>263</a>        } <span class="kw">else </span>{
-<a href=#264 id=264 data-nosnippet>264</a>            <span class="kw">return </span><span class="prelude-val">Err</span>(HistoryError::VersionTooOld);
+<a href=#264 id=264 data-nosnippet>264</a>            <span class="kw">return </span><span class="prelude-val">Err</span>(HistoryError::HistoryEmpty);
 <a href=#265 id=265 data-nosnippet>265</a>        }
 <a href=#266 id=266 data-nosnippet>266</a>
 <a href=#267 id=267 data-nosnippet>267</a>        <span class="comment">// As we want the NEWEST delta that satisfies the version, we look for the position at which
@@ -433,22 +433,23 @@
 <a href=#433 id=433 data-nosnippet>433</a>    </span>nodes: NodeChanges,
 <a href=#434 id=434 data-nosnippet>434</a>
 <a href=#435 id=435 data-nosnippet>435</a>    <span class="doccomment">/// The keys that need to be changed by the delta to return the target tree to the state
-<a href=#436 id=436 data-nosnippet>436</a>    /// represented by the delta.
-<a href=#437 id=437 data-nosnippet>437</a>    </span>changed_keys: ChangedKeys,
-<a href=#438 id=438 data-nosnippet>438</a>}
-<a href=#439 id=439 data-nosnippet>439</a>
-<a href=#440 id=440 data-nosnippet>440</a><span class="kw">impl </span>Delta {
-<a href=#441 id=441 data-nosnippet>441</a>    <span class="doccomment">/// Creates a new delta with the provided `root`, representing the provided changes to the
-<a href=#442 id=442 data-nosnippet>442</a>    /// `nodes` in the merkle tree, and using `added_keys` and `removed_keys` to represent the
-<a href=#443 id=443 data-nosnippet>443</a>    /// changes to entries in the tree.
-<a href=#444 id=444 data-nosnippet>444</a>    </span><span class="attr">#[must_use]
-<a href=#445 id=445 data-nosnippet>445</a>    </span><span class="kw">fn </span>new(
-<a href=#446 id=446 data-nosnippet>446</a>        root: RootValue,
-<a href=#447 id=447 data-nosnippet>447</a>        version_id: VersionId,
-<a href=#448 id=448 data-nosnippet>448</a>        nodes: NodeChanges,
-<a href=#449 id=449 data-nosnippet>449</a>        changed_keys: ChangedKeys,
-<a href=#450 id=450 data-nosnippet>450</a>    ) -&gt; <span class="self">Self </span>{
-<a href=#451 id=451 data-nosnippet>451</a>        <span class="self">Self </span>{ root, version_id, nodes, changed_keys }
-<a href=#452 id=452 data-nosnippet>452</a>    }
-<a href=#453 id=453 data-nosnippet>453</a>}
+<a href=#436 id=436 data-nosnippet>436</a>    /// represented by the delta. This includes pairs that either add or mutate a value under a
+<a href=#437 id=437 data-nosnippet>437</a>    /// key, and pairs where the value is the `EMPTY_WORD` and hence represent removals.
+<a href=#438 id=438 data-nosnippet>438</a>    </span>changed_keys: ChangedKeys,
+<a href=#439 id=439 data-nosnippet>439</a>}
+<a href=#440 id=440 data-nosnippet>440</a>
+<a href=#441 id=441 data-nosnippet>441</a><span class="kw">impl </span>Delta {
+<a href=#442 id=442 data-nosnippet>442</a>    <span class="doccomment">/// Creates a new delta with the provided `root`, representing the provided changes to the
+<a href=#443 id=443 data-nosnippet>443</a>    /// `nodes` in the merkle tree, and using `added_keys` and `removed_keys` to represent the
+<a href=#444 id=444 data-nosnippet>444</a>    /// changes to entries in the tree.
+<a href=#445 id=445 data-nosnippet>445</a>    </span><span class="attr">#[must_use]
+<a href=#446 id=446 data-nosnippet>446</a>    </span><span class="kw">fn </span>new(
+<a href=#447 id=447 data-nosnippet>447</a>        root: RootValue,
+<a href=#448 id=448 data-nosnippet>448</a>        version_id: VersionId,
+<a href=#449 id=449 data-nosnippet>449</a>        nodes: NodeChanges,
+<a href=#450 id=450 data-nosnippet>450</a>        changed_keys: ChangedKeys,
+<a href=#451 id=451 data-nosnippet>451</a>    ) -&gt; <span class="self">Self </span>{
+<a href=#452 id=452 data-nosnippet>452</a>        <span class="self">Self </span>{ root, version_id, nodes, changed_keys }
+<a href=#453 id=453 data-nosnippet>453</a>    }
+<a href=#454 id=454 data-nosnippet>454</a>}
 </code></pre></div></section></main></body></html>
