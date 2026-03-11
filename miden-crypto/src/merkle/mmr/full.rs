@@ -156,8 +156,7 @@ impl Mmr {
     pub fn add(&mut self, el: Word) -> Result<(), MmrError> {
         // Fail early before mutating nodes.
         let old_forest = self.forest;
-        let mut new_forest = old_forest;
-        new_forest.append_leaf()?;
+        self.forest.append_leaf()?;
         // Note: every node is also a tree of size 1, adding an element to the forest creates a new
         // rooted-tree of size 1. This may temporarily break the invariant that every tree in the
         // forest has different sizes, the loop below will eagerly merge trees of same size and
@@ -185,7 +184,6 @@ impl Mmr {
             }
         }
 
-        self.forest = new_forest;
         Ok(())
     }
 

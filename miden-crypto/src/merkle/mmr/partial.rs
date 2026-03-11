@@ -305,9 +305,7 @@ impl PartialMmr {
     /// Returns an error if the MMR exceeds the maximum supported forest size.
     pub fn add(&mut self, leaf: Word, track: bool) -> Result<Vec<(InOrderIndex, Word)>, MmrError> {
         // Fail early before mutating nodes.
-        let mut new_forest = self.forest;
-        new_forest.append_leaf()?;
-        self.forest = new_forest;
+        self.forest.append_leaf()?;
         // The smallest tree height equals the number of merges because adding a leaf is like
         // adding 1 in binary: each carry corresponds to a merge. For example, forest 3 (0b11)
         // + 1 = 4 (0b100) requires 2 carries/merges to form a tree of height 2.

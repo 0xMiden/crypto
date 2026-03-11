@@ -107,9 +107,9 @@ impl Forest {
 
     /// Return the total number of nodes of a given forest.
     ///
-    /// # Panics
-    ///
-    /// This will panic if the forest has size greater than [`Forest::MAX_LEAVES`].
+    /// This relies on the `Forest` invariant that `num_leaves() <= Forest::MAX_LEAVES`.
+    /// The internal assertion is a defensive check and should be unreachable for values created
+    /// through validated constructors/deserializers.
     pub const fn num_nodes(self) -> usize {
         assert!(self.0 <= Self::MAX_LEAVES);
         if self.0 <= usize::MAX / 2 {

@@ -126,13 +126,14 @@ fn test_nodes_in_forest_single_bit() {
         if leaves > Forest::MAX_LEAVES {
             break;
         }
-        if let Some(double) = leaves.checked_shl(1) {
-            let size = double - 1;
-            assert_eq!(nodes_in_forest(leaves), size);
-            bit += 1;
-        } else {
+
+        if leaves > usize::MAX / 2 {
             break;
         }
+
+        let size = leaves * 2 - 1;
+        assert_eq!(nodes_in_forest(leaves), size);
+        bit += 1;
     }
 
     if Forest::MAX_LEAVES.is_power_of_two() {
@@ -200,6 +201,7 @@ fn test_forest_with_single_leaf_limit() {
     }
 }
 
+#[cfg(not(target_pointer_width = "32"))]
 #[test]
 fn test_forest_bitxor_within_limit() {
     let high = Forest::new(Forest::MAX_LEAVES).unwrap();
@@ -226,6 +228,7 @@ fn test_forest_try_bitxor_limit_32bit() {
     }
 }
 
+#[cfg(not(target_pointer_width = "32"))]
 #[test]
 fn test_forest_bitor_within_limit() {
     let high = Forest::new(Forest::MAX_LEAVES).unwrap();
