@@ -9,30 +9,38 @@ readme.workspace = true
 homepage.workspace = true
 
 [dependencies]
-p3-challenger.workspace = true
-p3-commit.workspace = true
+# Internal
+p3-miden-lmcs.workspace = true
+p3-miden-transcript.workspace = true
+
+# Plonky3
 p3-dft.workspace = true
 p3-field.workspace = true
 p3-matrix.workspace = true
-p3-miden-lmcs.workspace = true
-p3-miden-transcript.workspace = true
 p3-maybe-rayon.workspace = true
 p3-util.workspace = true
 
-rand.workspace = true
+# Third-party
 thiserror.workspace = true
 tracing.workspace = true
 
 [dev-dependencies]
+# Internal
+p3-miden-dev-utils.workspace = true
+
+# Plonky3
 p3-baby-bear.workspace = true
-p3-dft.workspace = true
+p3-challenger.workspace = true
+p3-commit.workspace = true
 p3-fri.workspace = true
 p3-goldilocks.workspace = true
 p3-interpolation.workspace = true
 p3-keccak.workspace = true
 p3-merkle-tree.workspace = true
-p3-miden-dev-utils.workspace = true
+
+# Third-party
 criterion.workspace = true
+rand.workspace = true
 tracing-subscriber.workspace = true
 
 [features]

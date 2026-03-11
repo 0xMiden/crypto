@@ -757,7 +757,6 @@ name = "p3-miden-lifted-air"
 version = "0.5.0"
 dependencies = [
  "p3-air",
- "p3-baby-bear",
  "p3-field",
  "p3-matrix",
  "p3-util",
