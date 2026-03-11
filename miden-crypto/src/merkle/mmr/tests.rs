@@ -189,7 +189,7 @@ fn test_forest_serde_rejects_large_value() {
 #[test]
 fn test_forest_with_single_leaf_limit() {
     let forest = Forest::new(Forest::MAX_LEAVES).unwrap();
-    let result = forest.with_single_leaf().unwrap();
+    let result = forest.with_single_leaf();
     assert_eq!(result.num_leaves(), Forest::MAX_LEAVES);
 }
 
@@ -207,6 +207,14 @@ fn test_forest_bitor_within_limit() {
     let low = Forest::new(1).unwrap();
     let result = high | low;
     assert!(result.num_leaves() <= Forest::MAX_LEAVES);
+}
+
+#[test]
+fn test_forest_without_trees_does_not_add_bits() {
+    let forest = Forest::new(0b1000).unwrap();
+    let other = Forest::new(0b0001).unwrap();
+    let result = forest.without_trees(other);
+    assert_eq!(result, forest);
 }
 
 #[test]
@@ -1380,6 +1388,46 @@ fn test_mmr_add_invalid_odd_leaf() {
 
     let result = partial.track(LEAVES.len() - 1, LEAVES[6], &empty);
     assert!(result.is_ok());
+}
+
+#[test]
+fn test_partial_track_rejects_path_depth_too_large() {
+    let leaf = int_to_node(1);
+    let mut full = Mmr::new();
+    full.add(leaf).unwrap();
+    let mut partial: PartialMmr = full.peaks().into();
+
+    let deep_path = MerklePath::new(vec![Word::empty(); u8::MAX as usize]);
+    let result = partial.track(0, leaf, &deep_path);
+    assert_matches!(result, Err(MmrError::UnknownPeak(depth)) if depth == u8::MAX);
+}
+
+#[test]
+fn test_get_delta_and_apply_never_return_forest_size_exceeded_for_valid_forests() {
+    let mut full = Mmr::new();
+    full.add(int_to_node(0)).unwrap();
+    let mut partial: PartialMmr = full.peaks().into();
+
+    for i in 1..256 {
+        full.add(int_to_node(i as u64)).unwrap();
+
+        let delta = match full.get_delta(partial.forest(), full.forest()) {
+            Ok(delta) => delta,
+            Err(MmrError::ForestSizeExceeded { .. }) => {
+                panic!("valid get_delta range should not exceed forest bounds")
+            },
+            Err(err) => panic!("unexpected get_delta error: {err}"),
+        };
+
+        if let Err(err) = partial.apply(delta) {
+            match err {
+                MmrError::ForestSizeExceeded { .. } => {
+                    panic!("applying a valid delta should not exceed forest bounds")
+                },
+                _ => panic!("unexpected apply error: {err}"),
+            }
+        }
+    }
 }
 
 /// Tests that a proof whose peak count exceeds the peak count of the MMR returns an error.

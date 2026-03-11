@@ -166,16 +166,12 @@ impl Mmr {
         let mut left_offset = self.nodes.len().saturating_sub(2);
         let mut right = el;
         let mut left_tree = 1usize;
-        while left_tree <= Forest::MAX_LEAVES && (old_forest.num_leaves() & left_tree) != 0 {
+        while (old_forest.num_leaves() & left_tree) != 0 {
             right = Poseidon2::merge(&[self.nodes[left_offset], right]);
             self.nodes.push(right);
 
-            let left_nodes = (left_tree as u128).saturating_mul(2).saturating_sub(1);
-            let left_nodes =
-                usize::try_from(left_nodes).map_err(|_| MmrError::ForestSizeExceeded {
-                    requested: left_tree,
-                    max: Forest::MAX_LEAVES,
-                })?;
+            debug_assert!(left_tree <= Forest::MAX_LEAVES);
+            let left_nodes = left_tree * 2 - 1;
             left_offset = left_offset.saturating_sub(left_nodes);
 
             match left_tree.checked_shl(1) {
@@ -268,7 +264,7 @@ impl Mmr {
                 //   computed from the known peaks and provided authentication nodes.
                 let known_mask =
                     common_trees.num_leaves() | merges.num_leaves() | target.num_leaves();
-                let known = nodes_from_mask(known_mask)?;
+                let known = nodes_from_mask(known_mask);
                 let sibling = target.num_nodes();
                 result.push(self.nodes[known + sibling - 1]);
 
@@ -381,12 +377,15 @@ impl Mmr {
     }
 }
 
-fn nodes_from_mask(mask: usize) -> Result<usize, MmrError> {
-    let leaves = mask as u128;
-    let trees = mask.count_ones() as u128;
-    let nodes = leaves.saturating_mul(2).saturating_sub(trees);
-    usize::try_from(nodes)
-        .map_err(|_| MmrError::ForestSizeExceeded { requested: mask, max: Forest::MAX_LEAVES })
+/// Returns the number of nodes represented by a forest bitmask.
+///
+/// Here `mask` is a forest-leaf mask (same encoding as [`Forest::num_leaves()`]): each set bit
+/// denotes one peak/tree with leaf count `2^bit_position`.
+///
+/// This is equivalent to `Forest::new(mask).unwrap().num_nodes()`, and we intentionally keep that
+/// form here for consistency with other MMR code paths.
+fn nodes_from_mask(mask: usize) -> usize {
+    Forest::new(mask).expect("mask must encode a valid forest").num_nodes()
 }
 
 // CONVERSIONS
@@ -526,62 +525,12 @@ mod tests {
         assert!(matches!(result, Err(DeserializationError::InvalidValue(_))));
     }
 
-    #[cfg(target_pointer_width = "64")]
     #[test]
-    fn test_nodes_from_mask_over_max_leaves() {
-        let mask = Forest::MAX_LEAVES + 1;
-        let expected = {
-            let leaves = mask as u128;
-            let trees = mask.count_ones() as u128;
-            let nodes = leaves.saturating_mul(2).saturating_sub(trees);
-            nodes as usize
-        };
-
-        assert_eq!(nodes_from_mask(mask).unwrap(), expected);
-    }
-
-    #[cfg(target_pointer_width = "32")]
-    #[test]
-    fn test_nodes_from_mask_overflow_32bit() {
-        let mask = Forest::MAX_LEAVES.saturating_add(1);
-        if mask == Forest::MAX_LEAVES {
-            let expected = {
-                let leaves = Forest::MAX_LEAVES as u128;
-                let trees = Forest::MAX_LEAVES.count_ones() as u128;
-                leaves.saturating_mul(2).saturating_sub(trees)
-            };
-            assert!(expected > usize::MAX as u128);
-            assert_matches!(
-                nodes_from_mask(Forest::MAX_LEAVES),
-                Err(MmrError::ForestSizeExceeded { requested, max }) if
-                    requested == Forest::MAX_LEAVES && max == Forest::MAX_LEAVES
-            );
-        } else {
-            assert_matches!(
-                nodes_from_mask(mask),
-                Err(MmrError::ForestSizeExceeded { requested, max }) if
-                    requested == mask && max == Forest::MAX_LEAVES
-            );
-        }
-    }
-
-    #[cfg(target_pointer_width = "32")]
-    #[test]
-    fn test_nodes_from_mask_at_max_leaves_32bit() {
-        let expected = {
-            let leaves = Forest::MAX_LEAVES as u128;
-            let trees = Forest::MAX_LEAVES.count_ones() as u128;
-            leaves.saturating_mul(2).saturating_sub(trees)
-        };
-
-        if expected > usize::MAX as u128 {
-            assert_matches!(
-                nodes_from_mask(Forest::MAX_LEAVES),
-                Err(MmrError::ForestSizeExceeded { requested, max }) if
-                    requested == Forest::MAX_LEAVES && max == Forest::MAX_LEAVES
-            );
-        } else {
-            assert_eq!(nodes_from_mask(Forest::MAX_LEAVES).unwrap(), expected as usize);
-        }
+    fn test_nodes_from_mask_at_max_leaves() {
+        let expected = (Forest::MAX_LEAVES as u128)
+            .saturating_mul(2)
+            .saturating_sub(Forest::MAX_LEAVES.count_ones() as u128);
+        assert!(expected <= usize::MAX as u128);
+        assert_eq!(nodes_from_mask(Forest::MAX_LEAVES), expected as usize);
     }
 }

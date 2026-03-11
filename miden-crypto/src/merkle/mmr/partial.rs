@@ -404,9 +404,12 @@ impl PartialMmr {
     ) -> Result<(), MmrError> {
         // Checks there is a tree with same depth as the authentication path, if not the path is
         // invalid.
-        let tree = Forest::new(1 << path.depth()).expect("forest size exceeds maximum");
+        let path_depth = path.depth();
+        let tree_leaves =
+            1usize.checked_shl(path_depth as u32).ok_or(MmrError::UnknownPeak(path_depth))?;
+        let tree = Forest::new(tree_leaves).map_err(|_| MmrError::UnknownPeak(path_depth))?;
         if (tree & self.forest).is_empty() {
-            return Err(MmrError::UnknownPeak(path.depth()));
+            return Err(MmrError::UnknownPeak(path_depth));
         };
 
         // ignore the trees smaller than the target (these elements are position after the current

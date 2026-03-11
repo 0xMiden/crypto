@@ -288,15 +288,9 @@ impl Forest {
     }
 
     /// Add a single-node tree if not already present in the forest.
-    ///
-    /// # Errors
-    /// Returns an error if the resulting forest would exceed [`Forest::MAX_LEAVES`].
-    pub fn with_single_leaf(self) -> Result<Self, MmrError> {
-        let value = self.0 | 1;
-        if value > Self::MAX_LEAVES {
-            return Err(MmrError::ForestSizeExceeded { requested: value, max: Self::MAX_LEAVES });
-        }
-        Ok(Self(value))
+    pub fn with_single_leaf(self) -> Self {
+        // Setting the lowest bit cannot exceed MAX_LEAVES when MAX_LEAVES is 2^k - 1.
+        Self(self.0 | 1)
     }
 
     /// Remove the single-node tree if present in the forest.
