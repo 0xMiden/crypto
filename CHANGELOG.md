@@ -20,6 +20,7 @@
 - [BREAKING] Removed `RpoRandomCoin` and `RpxRandomCoin` and introduced a Poseidon2-based `RandomCoin` ([#871](https://github.com/0xMiden/crypto/pull/871)).
 - Harden MerkleStore deserialization and fuzz coverage ([#878](https://github.com/0xMiden/crypto/pull/878)).
 - [BREAKING] Fixed `NodeIndex::to_scalar_index()` overflow at depth 64 by returning `Result<u64, MerkleError>` ([#865](https://github.com/0xMiden/crypto/issues/865)).
+- [BREAKING] Removed `AlgebraicSponge::merge_with_int()` method ([#894](https://github.com/0xMiden/crypto/pull/894)).
 
 ## 0.22.4 (2026-03-03)
 
