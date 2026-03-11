@@ -46,8 +46,13 @@ required-features = ["std"]
 
 [[bench]]
 harness           = false
-name              = "large-smt"
+name              = "large_smt"
 required-features = ["rocksdb"]
+
+[[bench]]
+harness           = false
+name              = "large_smt_forest"
+required-features = ["persistent-forest"]
 
 [[bench]]
 harness           = false
@@ -75,15 +80,16 @@ name              = "transpose"
 required-features = ["std"]
 
 [features]
-concurrent = ["dep:rayon", "p3-maybe-rayon/parallel", "p3-util/parallel", "std"]
-default    = ["concurrent", "std"]
-executable = ["concurrent", "dep:clap", "dep:rand-utils"]
-fuzzing    = []
-internal   = ["concurrent"]
-rocksdb    = ["concurrent", "dep:rocksdb"]
-serde      = ["dep:serde", "serde?/alloc"]
-std        = ["blake3/std", "dep:cc", "miden-serde-utils/std", "rand/std", "rand/thread_rng", "serde?/std"]
-testing    = ["dep:proptest", "miden-field/testing"]
+concurrent        = ["dep:rayon", "p3-maybe-rayon/parallel", "p3-util/parallel", "std"]
+default           = ["concurrent", "std"]
+executable        = ["concurrent", "dep:clap", "dep:rand-utils"]
+fuzzing           = []
+internal          = ["concurrent"]
+persistent-forest = ["rocksdb", "serde"]
+rocksdb           = ["concurrent", "dep:rocksdb"]
+serde             = ["dep:serde", "serde?/alloc"]
+std               = ["blake3/std", "dep:cc", "miden-serde-utils/std", "rand/std", "rand/thread_rng", "serde?/std"]
+testing           = ["dep:proptest", "miden-field/testing"]
 
 [dependencies]
 # Miden dependencies
