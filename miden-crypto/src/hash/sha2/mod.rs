@@ -2,13 +2,13 @@
 
 use core::mem::size_of;
 
-use p3_field::BasedVectorSpace;
 use sha2::Digest as Sha2Digest;
 
 use super::{
     Felt, HasherExt,
     digest::{DIGEST256_BYTES, DIGEST512_BYTES, Digest256, Digest512},
 };
+use crate::field::BasedVectorSpace;
 
 #[cfg(test)]
 mod tests;
@@ -162,25 +162,12 @@ where
         const { assert!(FELT_BYTES == 8, "buffer arithmetic assumes 8-byte field elements") };
 
         let mut hasher = sha2::Sha256::new();
-        // SHA-256 block size: 64 bytes
-        let mut buf = [0_u8; 64];
-        let mut buf_offset = 0;
 
         for elem in elements.iter() {
             for &felt in E::as_basis_coefficients_slice(elem) {
-                buf[buf_offset..buf_offset + FELT_BYTES]
-                    .copy_from_slice(&felt.as_canonical_u64().to_le_bytes());
-                buf_offset += FELT_BYTES;
-
-                if buf_offset == 64 {
-                    hasher.update(buf);
-                    buf_offset = 0;
-                }
+                let felt_bytes = felt.as_canonical_u64().to_le_bytes();
+                hasher.update(felt_bytes);
             }
-        }
-
-        if buf_offset > 0 {
-            hasher.update(&buf[..buf_offset]);
         }
 
         hasher.finalize()
@@ -198,25 +185,12 @@ where
         const { assert!(FELT_BYTES == 8, "buffer arithmetic assumes 8-byte field elements") };
 
         let mut hasher = sha2::Sha512::new();
-        // SHA-512 block size: 128 bytes
-        let mut buf = [0_u8; 128];
-        let mut buf_offset = 0;
 
         for elem in elements.iter() {
             for &felt in E::as_basis_coefficients_slice(elem) {
-                buf[buf_offset..buf_offset + FELT_BYTES]
-                    .copy_from_slice(&felt.as_canonical_u64().to_le_bytes());
-                buf_offset += FELT_BYTES;
-
-                if buf_offset == 128 {
-                    hasher.update(buf);
-                    buf_offset = 0;
-                }
+                let felt_bytes = felt.as_canonical_u64().to_le_bytes();
+                hasher.update(felt_bytes);
             }
-        }
-
-        if buf_offset > 0 {
-            hasher.update(&buf[..buf_offset]);
         }
 
         hasher.finalize()

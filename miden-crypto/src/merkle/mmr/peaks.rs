@@ -162,15 +162,7 @@ impl MmrPeaks {
         };
 
         let mut elements = Vec::with_capacity(len);
-        elements.extend_from_slice(
-            &self
-                .peaks
-                .as_slice()
-                .iter()
-                .map(|digest| digest.as_slice())
-                .collect::<Vec<_>>()
-                .concat(),
-        );
+        elements.extend_from_slice(Word::words_as_elements(&self.peaks));
         elements.resize(len, ZERO);
         elements
     }

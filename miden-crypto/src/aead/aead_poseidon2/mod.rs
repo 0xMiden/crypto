@@ -130,7 +130,7 @@ impl EncryptedData {
 }
 
 /// An authentication tag represented as 4 field elements
-#[derive(Debug, Default, Clone, PartialEq, Eq)]
+#[derive(Debug, Default, Clone)]
 pub struct AuthTag([Felt; AUTH_TAG_SIZE]);
 
 impl AuthTag {
@@ -144,6 +144,20 @@ impl AuthTag {
         self.0
     }
 }
+
+impl PartialEq for AuthTag {
+    fn eq(&self, other: &Self) -> bool {
+        // Use constant-time comparison on non-wasm targets to reduce timing leaks. On wasm, the
+        // canonicalization helper is a host call and not guaranteed constant-time.
+        let mut result = true;
+        for (a, b) in self.0.iter().zip(other.0.iter()) {
+            result &= bool::from(a.as_canonical_u64_ct().ct_eq(&b.as_canonical_u64_ct()));
+        }
+        result
+    }
+}
+
+impl Eq for AuthTag {}
 
 /// A 256-bit secret key represented as 4 field elements
 #[derive(Clone, SilentDebug, SilentDisplay)]
@@ -433,17 +447,19 @@ impl Distribution<SecretKey> for StandardUniform {
     }
 }
 
+#[cfg(any(test, feature = "testing"))]
 impl PartialEq for SecretKey {
     fn eq(&self, other: &Self) -> bool {
         // Use constant-time comparison to prevent timing attacks
         let mut result = true;
         for (a, b) in self.0.iter().zip(other.0.iter()) {
-            result &= bool::from(a.as_canonical_u64().ct_eq(&b.as_canonical_u64()));
+            result &= bool::from(a.as_canonical_u64_ct().ct_eq(&b.as_canonical_u64_ct()));
         }
         result
     }
 }
 
+#[cfg(any(test, feature = "testing"))]
 impl Eq for SecretKey {}
 
 impl Zeroize for SecretKey {
@@ -500,7 +516,7 @@ impl SpongeState {
     /// Duplex interface as described in Algorithm 2 in [1] with `d = 0`
     ///
     ///
-    /// [1]: https://eprint.iacr.org/2023/1668
+    /// [1]: <https://eprint.iacr.org/2023/1668>
     fn duplex_overwrite(&mut self, data: &[Felt]) {
         self.permute();
 
@@ -514,7 +530,7 @@ impl SpongeState {
     /// Duplex interface as described in Algorithm 2 in [1] with `d = 1`
     ///
     ///
-    /// [1]: https://eprint.iacr.org/2023/1668
+    /// [1]: <https://eprint.iacr.org/2023/1668>
     fn duplex_add(&mut self, data: &[Felt]) -> [Felt; RATE_WIDTH] {
         self.permute();
 
@@ -748,7 +764,12 @@ impl AeadScheme for AeadPoseidon2 {
     type Key = SecretKey;
 
     fn key_from_bytes(bytes: &[u8]) -> Result<Self::Key, EncryptionError> {
-        SecretKey::read_from_bytes(bytes).map_err(|_| EncryptionError::FailedOperation)
+        if bytes.len() != SK_SIZE_BYTES {
+            return Err(EncryptionError::FailedOperation);
+        }
+
+        SecretKey::read_from_bytes_with_budget(bytes, SK_SIZE_BYTES)
+            .map_err(|_| EncryptionError::FailedOperation)
     }
 
     fn encrypt_bytes<R: rand::CryptoRng + rand::RngCore>(
@@ -770,8 +791,9 @@ impl AeadScheme for AeadPoseidon2 {
         ciphertext: &[u8],
         associated_data: &[u8],
     ) -> Result<Vec<u8>, EncryptionError> {
-        let encrypted_data = EncryptedData::read_from_bytes(ciphertext)
-            .map_err(|_| EncryptionError::FailedOperation)?;
+        let encrypted_data =
+            EncryptedData::read_from_bytes_with_budget(ciphertext, ciphertext.len())
+                .map_err(|_| EncryptionError::FailedOperation)?;
 
         key.decrypt_bytes_with_associated_data(&encrypted_data, associated_data)
     }
@@ -798,8 +820,9 @@ impl AeadScheme for AeadPoseidon2 {
         ciphertext: &[u8],
         associated_data: &[Felt],
     ) -> Result<Vec<Felt>, EncryptionError> {
-        let encrypted_data = EncryptedData::read_from_bytes(ciphertext)
-            .map_err(|_| EncryptionError::FailedOperation)?;
+        let encrypted_data =
+            EncryptedData::read_from_bytes_with_budget(ciphertext, ciphertext.len())
+                .map_err(|_| EncryptionError::FailedOperation)?;
 
         key.decrypt_elements_with_associated_data(&encrypted_data, associated_data)
     }

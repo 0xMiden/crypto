@@ -1,4 +1,8 @@
-use super::{InnerNode, NodeIndex, SUBTREE_DEPTH, Subtree};
+use alloc::vec::Vec;
+
+use super::{
+    EmptySubtreeRoots, InnerNode, NodeIndex, NodeMutation, SMT_DEPTH, SUBTREE_DEPTH, Subtree,
+};
 use crate::Word;
 
 #[test]
@@ -105,15 +109,17 @@ fn test_serialize_deserialize_empty_subtree() {
 
     let serialized = subtree.to_vec();
 
-    // Should only contain the bitmask (all zeros) and no node data
+    // Should only contain magic + version + bitmask (all zeros) and no node data
     assert_eq!(
         serialized.len(),
-        Subtree::BITMASK_SIZE,
+        5 + Subtree::BITMASK_SIZE,
         "Empty subtree serialization should only contain bitmask"
     );
     assert!(
-        serialized.iter().all(|&byte| byte == 0),
-        "All bytes in empty subtree serialization should be zero"
+        serialized[..4] == *b"SMT1"
+            && serialized[4] == 1
+            && serialized[5..].iter().all(|&byte| byte == 0),
+        "Magic + version should be set and all bitmask bytes should be zero"
     );
 
     let deserialized = Subtree::from_vec(root_index, &serialized)
@@ -156,7 +162,7 @@ fn test_serialize_deserialize_subtree_with_nodes() {
 
     // Test serialization
     let serialized = subtree.to_vec();
-    let expected_size = Subtree::BITMASK_SIZE + 6 * Subtree::HASH_SIZE;
+    let expected_size = 5 + Subtree::BITMASK_SIZE + 6 * Subtree::HASH_SIZE;
     assert_eq!(serialized.len(), expected_size, "Serialized size should be bitmask + 3 nodes");
 
     // Test deserialization
@@ -185,7 +191,7 @@ fn test_serialize_deserialize_subtree_with_nodes() {
     );
 
     // Verify bitmask correctness
-    let (bitmask_bytes, _node_data) = serialized.split_at(Subtree::BITMASK_SIZE);
+    let (bitmask_bytes, _node_data) = serialized[5..].split_at(Subtree::BITMASK_SIZE);
 
     // byte 0: bits 0-3 must be set
     assert_eq!(bitmask_bytes[0], 0x0f, "byte 0 must have bits 0-3 set");
@@ -288,7 +294,7 @@ fn find_subtree_root_for_various_nodes() {
             subtree_0_root,
             "Node at depth {}, value {} should belong to subtree rooted at depth {}, value 0",
             node_idx.depth(),
-            node_idx.value(),
+            node_idx.position(),
             SUBTREE_DEPTH
         );
     }
@@ -307,7 +313,7 @@ fn find_subtree_root_for_various_nodes() {
             subtree_1_root,
             "Node at depth {}, value {} should belong to subtree rooted at depth {}, value 1",
             node_idx.depth(),
-            node_idx.value(),
+            node_idx.position(),
             SUBTREE_DEPTH
         );
     }
@@ -325,7 +331,207 @@ fn find_subtree_root_for_various_nodes() {
             deep_subtree_root,
             "Node at depth {}, value {} should belong to deep subtree",
             node_idx.depth(),
-            node_idx.value()
+            node_idx.position()
         );
     }
+}
+
+#[test]
+fn test_from_vec_rejects_unused_bitmask_bits() {
+    let root_index = NodeIndex::new(SUBTREE_DEPTH, 0).unwrap();
+
+    // Bits 510 and 511 are unused (only 255 nodes x 2 bits = 510 bits). Corrupted storage
+    // could set these; from_vec should reject them.
+    for bit in [510, 511] {
+        let mut data = Vec::from(&b"SMT1"[..]);
+        data.push(1);
+        data.extend_from_slice(&[0u8; Subtree::BITMASK_SIZE]);
+        data[5 + (bit / 8)] |= 1 << (bit % 8);
+
+        assert!(
+            matches!(
+                Subtree::from_vec(root_index, &data),
+                Err(super::SubtreeError::InvalidBitmask)
+            ),
+            "bit {bit} should be rejected"
+        );
+    }
+
+    // Bit 509 is the last valid bit (node 254, right child) — should be accepted.
+    let mut data = Vec::from(&b"SMT1"[..]);
+    data.push(1);
+    data.extend_from_slice(&[0u8; Subtree::BITMASK_SIZE]);
+    data[5 + (509 / 8)] |= 1 << (509 % 8);
+    data.extend_from_slice(&Word::from([99u32; 4]).as_bytes());
+
+    assert!(Subtree::from_vec(root_index, &data).is_ok(), "bit 509 is valid");
+}
+
+#[test]
+fn test_from_vec_rejects_invalid_field_element() {
+    let root_index = NodeIndex::new(SUBTREE_DEPTH, 0).unwrap();
+
+    // One hash slot with a limb >= the Goldilocks prime.
+    let mut data = Vec::from(&b"SMT1"[..]);
+    data.push(1);
+    data.extend_from_slice(&[0u8; Subtree::BITMASK_SIZE]);
+    data[5] |= 1;
+    data.extend_from_slice(&u64::MAX.to_le_bytes());
+    data.extend_from_slice(&[0u8; 24]);
+
+    assert!(matches!(
+        Subtree::from_vec(root_index, &data),
+        Err(super::SubtreeError::InvalidHashData)
+    ));
+}
+
+#[test]
+fn test_from_vec_rejects_missing_magic() {
+    let root_index = NodeIndex::new(SUBTREE_DEPTH, 0).unwrap();
+
+    // Missing magic/version prefix should always be rejected.
+    let mut data = vec![0u8; Subtree::BITMASK_SIZE];
+    data[0] |= 1;
+    data.extend_from_slice(&Word::from([42u32; 4]).as_bytes());
+
+    assert!(matches!(
+        Subtree::from_vec(root_index, &data),
+        Err(super::SubtreeError::MissingFormatMagic)
+    ));
+}
+
+#[test]
+fn test_from_vec_rejects_unknown_version() {
+    let root_index = NodeIndex::new(SUBTREE_DEPTH, 0).unwrap();
+
+    let mut data = Vec::from(&b"SMT1"[..]);
+    data.push(Subtree::FORMAT_VERSION + 1);
+    data.extend_from_slice(&[0u8; Subtree::BITMASK_SIZE]);
+
+    assert!(matches!(
+        Subtree::from_vec(root_index, &data),
+        Err(super::SubtreeError::UnsupportedVersion { .. })
+    ));
+}
+
+#[test]
+fn test_from_vec_rejects_unknown_version_with_extra_payload() {
+    let root_index = NodeIndex::new(SUBTREE_DEPTH, 0).unwrap();
+
+    let mut data = Vec::from(&b"SMT1"[..]);
+    data.push(Subtree::FORMAT_VERSION + 1);
+    data.extend_from_slice(&[0u8; Subtree::BITMASK_SIZE]);
+    data.extend_from_slice(&Word::default().as_bytes());
+
+    assert!(matches!(
+        Subtree::from_vec(root_index, &data),
+        Err(super::SubtreeError::UnsupportedVersion { .. })
+    ));
+}
+
+#[test]
+fn test_apply_mutations() {
+    let root_index = NodeIndex::new(SUBTREE_DEPTH, 0).unwrap();
+    let mut subtree = Subtree::new(root_index);
+
+    let idx1 = NodeIndex::new(SUBTREE_DEPTH + 1, 0).unwrap();
+    let idx2 = NodeIndex::new(SUBTREE_DEPTH + 1, 1).unwrap();
+    let node1 = InnerNode {
+        left: Word::from([1u32; 4]),
+        right: Word::from([2u32; 4]),
+    };
+    let node2 = InnerNode {
+        left: Word::from([3u32; 4]),
+        right: Word::from([4u32; 4]),
+    };
+    subtree.insert_inner_node(idx1, node1);
+    subtree.insert_inner_node(idx2, node2.clone());
+    assert_eq!(subtree.len(), 2);
+
+    // Empty batch should be a no-op
+    let empty: [(&NodeIndex, &NodeMutation); 0] = [];
+    assert_eq!(subtree.would_patch_in_place(empty), None);
+    subtree.apply_mutations(empty);
+    assert_eq!(subtree.len(), 2);
+
+    // Update node1 with different hashes but same structure (both children still non-empty).
+    // This should take the patch-in-place path.
+    let node1_updated = InnerNode {
+        left: Word::from([10u32; 4]),
+        right: Word::from([20u32; 4]),
+    };
+    let mutation = NodeMutation::Addition(node1_updated.clone());
+    assert_eq!(subtree.would_patch_in_place([(&idx1, &mutation)]), Some(true));
+    subtree.apply_mutations([(&idx1, &mutation)]);
+
+    assert_eq!(subtree.len(), 2);
+    assert_eq!(subtree.get_inner_node(idx1), Some(node1_updated));
+    assert_eq!(subtree.get_inner_node(idx2), Some(node2.clone()));
+
+    // Mixed batch: remove node1, add node3. This changes structure, triggering a rebuild.
+    let idx3 = NodeIndex::new(SUBTREE_DEPTH + 2, 2).unwrap();
+    let node3 = InnerNode {
+        left: Word::from([5u32; 4]),
+        right: Word::from([6u32; 4]),
+    };
+    let removal = NodeMutation::Removal;
+    let addition = NodeMutation::Addition(node3.clone());
+    assert_eq!(
+        subtree.would_patch_in_place([(&idx1, &removal), (&idx3, &addition)]),
+        Some(false)
+    );
+    subtree.apply_mutations([(&idx1, &removal), (&idx3, &addition)]);
+
+    assert!(subtree.get_inner_node(idx1).is_none(), "node1 should be removed");
+    assert_eq!(subtree.get_inner_node(idx2), Some(node2), "node2 should be unchanged");
+    assert_eq!(subtree.get_inner_node(idx3), Some(node3));
+    assert_eq!(subtree.len(), 2);
+
+    // Remove remaining nodes to verify we get back to empty
+    let r1 = NodeMutation::Removal;
+    let r2 = NodeMutation::Removal;
+    subtree.apply_mutations([(&idx2, &r1), (&idx3, &r2)]);
+    assert!(subtree.is_empty());
+
+    // Verify round-trip serialization on the emptied subtree
+    let serialized = subtree.to_vec();
+    let deserialized = Subtree::from_vec(root_index, &serialized).unwrap();
+    assert!(deserialized.is_empty());
+}
+
+#[test]
+fn test_apply_mutations_dedupes_duplicate_indices() {
+    let root_index = NodeIndex::new(SUBTREE_DEPTH, 0).unwrap();
+    let mut subtree = Subtree::new(root_index);
+
+    let idx1 = NodeIndex::new(SUBTREE_DEPTH + 1, 0).unwrap();
+    let idx2 = NodeIndex::new(SUBTREE_DEPTH + 1, 1).unwrap();
+    let node1 = InnerNode {
+        left: Word::from([1u32; 4]),
+        right: Word::from([2u32; 4]),
+    };
+    let node2 = InnerNode {
+        left: Word::from([3u32; 4]),
+        right: Word::from([4u32; 4]),
+    };
+    subtree.insert_inner_node(idx1, node1);
+    subtree.insert_inner_node(idx2, node2.clone());
+
+    let empty_hash = *EmptySubtreeRoots::entry(SMT_DEPTH, idx1.depth() + 1);
+    let left_only = InnerNode {
+        left: Word::from([10u32; 4]),
+        right: empty_hash,
+    };
+    let right_only = InnerNode {
+        left: empty_hash,
+        right: Word::from([20u32; 4]),
+    };
+
+    let m1 = NodeMutation::Addition(left_only);
+    let m2 = NodeMutation::Addition(right_only.clone());
+    subtree.apply_mutations([(&idx1, &m1), (&idx1, &m2)]);
+
+    assert_eq!(subtree.get_inner_node(idx1), Some(right_only));
+    assert_eq!(subtree.get_inner_node(idx2), Some(node2));
+    assert_eq!(subtree.len(), 2);
 }

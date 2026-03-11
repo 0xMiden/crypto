@@ -69,6 +69,8 @@ pub struct Word {
 // Compile-time assertions to ensure `Word` has the same layout as `[Felt; 4]`. This is relied upon
 // in `as_elements_array`/`as_elements_array_mut`.
 const _: () = {
+    assert!(WORD_SIZE_FELTS == 4, "WORD_SIZE_FELTS is assumed to be 4");
+    assert!(WORD_SIZE_BYTES == 32, "WORD_SIZE_BYTES is assumed to be 32");
     assert!(core::mem::size_of::<Word>() == WORD_SIZE_FELTS * core::mem::size_of::<Felt>());
     assert!(core::mem::offset_of!(Word, a) == 0);
     assert!(core::mem::offset_of!(Word, b) == core::mem::size_of::<Felt>());
@@ -727,6 +729,10 @@ impl Deserializable for Word {
         }
 
         Ok(Self::new(inner))
+    }
+
+    fn min_serialized_size() -> usize {
+        Self::SERIALIZED_SIZE
     }
 }
 

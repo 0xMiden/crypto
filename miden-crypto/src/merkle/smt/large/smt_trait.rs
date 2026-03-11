@@ -120,7 +120,7 @@ impl<S: SmtStorage> SparseMerkleTree<SMT_DEPTH> for LargeSmt<S> {
         value: Self::Value,
     ) -> Result<Option<Self::Value>, MerkleError> {
         // inserting an `EMPTY_VALUE` is equivalent to removing any value associated with `key`
-        let index = Self::key_to_leaf_index(&key).value();
+        let index = Self::key_to_leaf_index(&key).position();
         if value != Self::EMPTY_VALUE {
             match self.storage.insert_value(index, key, value) {
                 Ok(prev) => Ok(prev),
@@ -138,7 +138,7 @@ impl<S: SmtStorage> SparseMerkleTree<SMT_DEPTH> for LargeSmt<S> {
 
     fn get_value(&self, key: &Self::Key) -> Self::Value {
         let leaf_pos = LeafIndex::<SMT_DEPTH>::from(*key);
-        match self.storage.get_leaf(leaf_pos.value()) {
+        match self.storage.get_leaf(leaf_pos.position()) {
             Ok(Some(leaf)) => leaf.get_value(key).unwrap_or_default(),
             Ok(None) => EMPTY_WORD,
             Err(_) => {
@@ -148,7 +148,7 @@ impl<S: SmtStorage> SparseMerkleTree<SMT_DEPTH> for LargeSmt<S> {
     }
 
     fn get_leaf(&self, key: &Word) -> Self::Leaf {
-        let leaf_pos = LeafIndex::<SMT_DEPTH>::from(*key).value();
+        let leaf_pos = LeafIndex::<SMT_DEPTH>::from(*key).position();
         match self.storage.get_leaf(leaf_pos) {
             Ok(Some(leaf)) => leaf,
             Ok(None) => SmtLeaf::new_empty((*key).into()),
@@ -185,9 +185,9 @@ impl<S: SmtStorage> SparseMerkleTree<SMT_DEPTH> for LargeSmt<S> {
     }
 
     fn open(&self, key: &Self::Key) -> Self::Opening {
-        let leaf = self.get_leaf(key);
+        let leaf_pos = LeafIndex::<SMT_DEPTH>::from(*key);
 
-        let mut idx: NodeIndex = LeafIndex::from(*key).into();
+        let mut idx: NodeIndex = leaf_pos.into();
 
         let subtree_roots: Vec<NodeIndex> = (0..NUM_SUBTREE_LEVELS)
             .scan(idx.parent(), |cursor, _| {
@@ -196,19 +196,24 @@ impl<S: SmtStorage> SparseMerkleTree<SMT_DEPTH> for LargeSmt<S> {
                 Some(subtree_root)
             })
             .collect();
-        // cache subtrees in memory
+
+        // Fetch leaf and all subtrees in a single batched call. This method can be overridden to
+        // be more efficient by the storage, but defaults to a simple sequential set of calls.
+        let (leaf_opt, subtree_opts) = self
+            .storage
+            .get_leaf_and_subtrees(leaf_pos.position(), &subtree_roots)
+            .expect("Fetching leaf and subtrees succeeds");
+
+        let leaf = leaf_opt.unwrap_or_else(|| SmtLeaf::new_empty((*key).into()));
+
         let mut cache = Map::<NodeIndex, Subtree>::new();
-        for &root in &subtree_roots {
-            let subtree =
-                match self.storage.get_subtree(root).expect("storage error fetching subtree") {
-                    Some(st) => st,
-                    None => Subtree::new(root),
-                };
+        for (&root, subtree_opt) in subtree_roots.iter().zip(subtree_opts) {
+            let subtree = subtree_opt.unwrap_or_else(|| Subtree::new(root));
             cache.insert(root, subtree);
         }
         let mut path = Vec::with_capacity(idx.depth() as usize);
         while idx.depth() > 0 {
-            let is_right = idx.is_value_odd();
+            let is_right = idx.is_position_odd();
             idx = idx.parent();
 
             let sibling_hash = if idx.depth() < IN_MEMORY_DEPTH {

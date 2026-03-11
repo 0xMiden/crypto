@@ -117,15 +117,25 @@ Messages sealed as one type must be unsealed using the corresponding method, oth
 
 ## Pseudo-Random Element Generator
 
-[Pseudo random element generator module](./miden-crypto/src/rand/) provides a set of traits and data structures that facilitate generating pseudo-random elements in the context of Miden protocol. The module currently includes:
+[Pseudo random element generator module](./miden-crypto/src/rand/) provides a set of traits and utilities that facilitate generating pseudo-random elements in the context of Miden protocol. The module currently includes:
 
+- `Randomizable`: a trait for constructing values from random bytes.
 - `FeltRng`: a trait for generating random field elements and random 4 field elements.
-- `RpoRandomCoin`: a struct implementing `FeltRng` as well as the [`RandomCoin`](https://github.com/facebook/winterfell/blob/main/crypto/src/random/mod.rs) trait using RPO hash function.
-- `RpxRandomCoin`: a struct implementing `FeltRng` as well as the [`RandomCoin`](https://github.com/facebook/winterfell/blob/main/crypto/src/random/mod.rs) trait using RPX hash function.
+- `RandomCoin`: a struct implementing `FeltRng` using the Poseidon2 hash function.
+- `random_felt` and `random_word`: `std`-only helpers for generating random field elements and words.
+- `test_utils`: deterministic and `std`-based helpers for tests and benchmarks.
 
 ## STARK proving system
 
-The STARK module exports foundational components for the STARK proving system. It primarily consists of re-exports from the [Plonky3](https://github.com/Plonky3/Plonky3) project with some Miden-specific [adaptations](https://github.com/0xMiden/p3-miden).
+[STARK module](./miden-crypto/src/lib.rs) provides the Lifted STARK proving system, implemented in [p3-miden](https://github.com/0xMiden/p3-miden) and built on top of the [Plonky3](https://github.com/Plonky3/Plonky3) framework. It includes:
+
+- AIR traits and builders for defining algebraic constraints.
+- A Lifted Merkle commitment scheme and FRI-based polynomial commitments.
+- Prover and verifier for single and multi-trace STARKs (`prove_single`/`prove_multi`, `verify_single`/`verify_multi`).
+- Fiat-Shamir transcript and challenge generation.
+- A debug constraint checker for development.
+
+The module also re-exports foundational Plonky3 primitives such as challengers, DFT, matrix types, and symmetric cryptography.
 
 ## Make commands
 
@@ -142,7 +152,6 @@ This crate can be compiled with the following features:
 - `concurrent`- enabled by default; enables multi-threaded implementation of `Smt::with_entries()` which significantly improves performance on multi-core CPUs.
 - `std` - enabled by default and relies on the Rust standard library.
 - `no_std` does not rely on the Rust standard library and enables compilation to WebAssembly.
-- `hashmaps` - uses hashbrown hashmaps in SMT and Merkle Store implementation which significantly improves performance of updates. Keys ordering in iterators is not guaranteed when this feature is enabled.
 - `rocksdb` - enables the RocksDB-backed storage for `LargeSmt` and related utilities. Implies `concurrent`.
 All of these features imply the use of [alloc](https://doc.rust-lang.org/alloc/) to support heap-allocated collections.
 

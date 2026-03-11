@@ -17,13 +17,14 @@ use alloc::vec::Vec;
 use hkdf::{Hkdf, hmac::SimpleHmac};
 use k256::sha2::Sha256;
 use rand::{CryptoRng, RngCore};
+use subtle::ConstantTimeEq;
 
 use crate::{
     dsa::eddsa_25519_sha512::{PublicKey, SecretKey},
     ecdh::KeyAgreementScheme,
     utils::{
         ByteReader, ByteWriter, Deserializable, DeserializationError, Serializable,
-        zeroize::{Zeroize, ZeroizeOnDrop},
+        zeroize::{Zeroize, ZeroizeOnDrop, Zeroizing},
     },
 };
 
@@ -114,9 +115,9 @@ impl EphemeralSecretKey {
         // needed once `x25519_dalek` gets a new release with a version of the `rand`
         // dependency matching ours
         use k256::elliptic_curve::rand_core::SeedableRng;
-        let mut seed = [0_u8; 32];
-        rand::RngCore::fill_bytes(rng, &mut seed);
-        let rng = rand_hc::Hc128Rng::from_seed(seed);
+        let mut seed = Zeroizing::new([0_u8; 32]);
+        rand::RngCore::fill_bytes(rng, &mut *seed);
+        let rng = rand_hc::Hc128Rng::from_seed(*seed);
 
         let sk = x25519_dalek::EphemeralSecret::random_from_rng(rng);
         Self { inner: sk }
@@ -155,6 +156,17 @@ impl Serializable for EphemeralPublicKey {
 impl Deserializable for EphemeralPublicKey {
     fn read_from<R: ByteReader>(source: &mut R) -> Result<Self, DeserializationError> {
         let bytes: [u8; 32] = source.read_array()?;
+        // Reject twist points and low-order points. We intentionally avoid the more expensive
+        // torsion-free check; small-order rejection mitigates the most dangerous malleability
+        // issues, even though it does not guarantee torsion-freeness.
+        let mont = curve25519_dalek::montgomery::MontgomeryPoint(bytes);
+        let edwards = mont.to_edwards(0).ok_or_else(|| {
+            DeserializationError::InvalidValue("Invalid X25519 public key".into())
+        })?;
+        if edwards.is_small_order() {
+            return Err(DeserializationError::InvalidValue("Invalid X25519 public key".into()));
+        }
+
         Ok(Self {
             inner: x25519_dalek::PublicKey::from(bytes),
         })
@@ -188,26 +200,44 @@ impl KeyAgreementScheme for X25519 {
         ephemeral_sk: Self::EphemeralSecretKey,
         static_pk: &Self::PublicKey,
     ) -> Result<Self::SharedSecret, super::KeyAgreementError> {
-        Ok(ephemeral_sk.diffie_hellman(static_pk))
+        let shared = ephemeral_sk.diffie_hellman(static_pk);
+        if is_all_zero(shared.as_ref()) {
+            return Err(super::KeyAgreementError::InvalidSharedSecret);
+        }
+        Ok(shared)
     }
 
     fn exchange_static_ephemeral(
         static_sk: &Self::SecretKey,
         ephemeral_pk: &Self::EphemeralPublicKey,
     ) -> Result<Self::SharedSecret, super::KeyAgreementError> {
-        Ok(static_sk.get_shared_secret(ephemeral_pk.clone()))
+        let shared = static_sk.get_shared_secret(ephemeral_pk.clone());
+        if is_all_zero(shared.as_ref()) {
+            return Err(super::KeyAgreementError::InvalidSharedSecret);
+        }
+        Ok(shared)
     }
 
     fn extract_key_material(
         shared_secret: &Self::SharedSecret,
         length: usize,
+        info: &[u8],
     ) -> Result<Vec<u8>, super::KeyAgreementError> {
         let hkdf = shared_secret.extract(None);
         let mut buf = vec![0_u8; length];
-        hkdf.expand(&[], &mut buf)
+        hkdf.expand(info, &mut buf)
             .map_err(|_| super::KeyAgreementError::HkdfExpansionFailed)?;
         Ok(buf)
     }
+}
+
+fn is_all_zero(bytes: &[u8]) -> bool {
+    // Empty input is treated as invalid caller input rather than "all zero".
+    if bytes.is_empty() {
+        return false;
+    }
+    let acc = bytes.iter().fold(0u8, |acc, &byte| acc | byte);
+    acc.ct_eq(&0u8).into()
 }
 
 // TESTS
@@ -215,8 +245,13 @@ impl KeyAgreementScheme for X25519 {
 
 #[cfg(test)]
 mod tests {
+    use curve25519_dalek::{constants::EIGHT_TORSION, montgomery::MontgomeryPoint};
+
     use super::*;
-    use crate::{dsa::eddsa_25519_sha512::SecretKey, rand::test_utils::seeded_rng};
+    use crate::{
+        dsa::eddsa_25519_sha512::SecretKey, ecdh::KeyAgreementError, rand::test_utils::seeded_rng,
+        utils::Deserializable,
+    };
 
     #[test]
     fn key_agreement() {
@@ -241,5 +276,52 @@ mod tests {
 
         // Check that the computed shared secret keys are equal
         assert_eq!(shared_secret_key_1.inner.to_bytes(), shared_secret_key_2.inner.to_bytes());
+    }
+
+    #[test]
+    fn ephemeral_public_key_rejects_small_order() {
+        let bytes = EIGHT_TORSION[1].to_montgomery().to_bytes();
+        let result = EphemeralPublicKey::read_from_bytes(&bytes);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn ephemeral_public_key_rejects_twist_point() {
+        let bytes = find_twist_point_bytes();
+        let result = EphemeralPublicKey::read_from_bytes(&bytes);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn exchange_static_ephemeral_rejects_zero_shared_secret() {
+        let mut rng = seeded_rng([0u8; 32]);
+        let static_sk = SecretKey::with_rng(&mut rng);
+
+        let low_order_bytes = EIGHT_TORSION[0].to_montgomery().to_bytes();
+        let low_order_pk = EphemeralPublicKey {
+            inner: x25519_dalek::PublicKey::from(low_order_bytes),
+        };
+
+        let result = X25519::exchange_static_ephemeral(&static_sk, &low_order_pk);
+        assert!(matches!(result, Err(KeyAgreementError::InvalidSharedSecret)));
+    }
+
+    #[test]
+    fn is_all_zero_accepts_arbitrary_lengths() {
+        assert!(!is_all_zero(&[]));
+        assert!(is_all_zero(&[0u8; 16]));
+        assert!(!is_all_zero(&[0u8, 1u8, 0u8, 0u8]));
+    }
+
+    fn find_twist_point_bytes() -> [u8; 32] {
+        let mut bytes = [0u8; 32];
+        for i in 0u16..=u16::MAX {
+            bytes[0] = (i & 0xff) as u8;
+            bytes[1] = (i >> 8) as u8;
+            if MontgomeryPoint(bytes).to_edwards(0).is_none() {
+                return bytes;
+            }
+        }
+        panic!("no twist point found in 16-bit search space");
     }
 }

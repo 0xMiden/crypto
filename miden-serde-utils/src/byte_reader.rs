@@ -1351,4 +1351,42 @@ mod tests {
         let collect_result: Result<Vec<Vec<u64>>, _> = result.unwrap().collect();
         assert!(collect_result.is_err());
     }
+
+    /// Tuples should use sum of element min_serialized_size, not size_of (which includes padding).
+    ///
+    /// This test verifies that (u8, u64) has min_serialized_size = 9 (1 + 8) not 16 (in-memory size
+    /// with 7 bytes of alignment padding).
+    #[test]
+    fn tuple_min_serialized_size_excludes_padding() {
+        // Serialized: 1 byte for u8 + 8 bytes for u64 = 9 bytes
+        // In-memory: 8 bytes for u8 (with 7 bytes padding) + 8 bytes for u64 = 16 bytes
+        assert_eq!(<(u8, u64)>::min_serialized_size(), 9);
+        assert_eq!(core::mem::size_of::<(u8, u64)>(), 16);
+
+        // Verify budget calculation uses 9, not 16
+        let mut data = Vec::new();
+        data.push(0); // 9-byte vint64 marker
+        data.extend_from_slice(&4u64.to_le_bytes()); // claim 4 tuples
+        // Provide exactly 4 tuples worth of data: 4 * 9 = 36 bytes
+        for i in 0u8..4 {
+            data.push(i); // u8
+            data.extend_from_slice(&(i as u64).to_le_bytes()); // u64
+        }
+
+        let inner = SliceReader::new(&data);
+        // Budget: 9 (length prefix) + 36 (data) = 45 bytes
+        let mut reader = BudgetedReader::new(inner, 45);
+
+        let _len = reader.read_usize().unwrap();
+        // With min_serialized_size = 9: remaining = 45 - 9 = 36, max_elements = 36 / 9 = 4
+        // This should succeed (4 <= 4)
+        let result = reader.read_many_iter::<(u8, u64)>(4);
+        assert!(result.is_ok());
+
+        // With min_serialized_size = 16 (wrong): max_elements = 36 / 16 = 2
+        // This would fail (4 > 2)
+        let collect_result: Result<Vec<(u8, u64)>, _> = result.unwrap().collect();
+        assert!(collect_result.is_ok());
+        assert_eq!(collect_result.unwrap().len(), 4);
+    }
 }

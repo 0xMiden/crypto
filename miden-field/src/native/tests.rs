@@ -39,6 +39,12 @@ impl Hasher for U64Hasher {
     }
 }
 
+#[inline]
+unsafe fn felt_from_raw_u64(raw: u64) -> Felt {
+    // SAFETY: Felt is repr(transparent) over Goldilocks, which is repr(transparent) over u64.
+    unsafe { core::mem::transmute_copy(&raw) }
+}
+
 proptest! {
     /// `Felt::new` matches `Goldilocks::new` for the same input.
     #[test]
@@ -99,6 +105,19 @@ proptest! {
         prop_assert_eq!(fa.mul_2exp_u64(shift as u64), ga.mul_2exp_u64(shift as u64));
         prop_assert_eq!(fa.div_2exp_u64(shift as u64), ga.div_2exp_u64(shift as u64));
         prop_assert_eq!(fa.exp_u64(exp), ga.exp_u64(exp));
+    }
+
+    /// Constant-time canonicalization matches `as_canonical_u64()` for all sampled values.
+    #[test]
+    fn felt_canonical_u64_ct_matches(a in any::<Felt>()) {
+        prop_assert_eq!(a.as_canonical_u64_ct(), a.as_canonical_u64());
+    }
+
+    /// Constant-time canonicalization matches `as_canonical_u64()` for non-canonical values.
+    #[test]
+    fn felt_canonical_u64_ct_matches_non_canonical(raw in (Felt::ORDER..=u64::MAX)) {
+        let a = unsafe { felt_from_raw_u64(raw) };
+        prop_assert_eq!(a.as_canonical_u64_ct(), a.as_canonical_u64());
     }
 
     /// Formatting, ordering, and hashing match `Goldilocks`.

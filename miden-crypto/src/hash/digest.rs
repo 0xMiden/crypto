@@ -15,6 +15,9 @@ use crate::utils::{
 // CONSTANTS
 // ================================================================================================
 
+/// Size of a 192-bit digest in bytes.
+pub const DIGEST192_BYTES: usize = 24;
+
 /// Size of a 256-bit digest in bytes.
 pub const DIGEST256_BYTES: usize = 32;
 
@@ -23,6 +26,11 @@ pub const DIGEST512_BYTES: usize = 64;
 
 // TYPE ALIASES
 // ================================================================================================
+
+/// A 192-bit (24-byte) digest. Type alias for `Digest<24>`.
+///
+/// Hex parsing also accepts zero-padded 32-byte encodings for backward compatibility.
+pub type Digest192 = Digest<DIGEST192_BYTES>;
 
 /// A 256-bit (32-byte) digest. Type alias for `Digest<32>`.
 pub type Digest256 = Digest<DIGEST256_BYTES>;
@@ -58,10 +66,18 @@ impl<const N: usize> Digest<N> {
     }
 
     /// Converts a slice of digests into a contiguous byte slice.
+    ///
+    /// This is a zero-copy operation that reinterprets the digest slice as bytes.
     pub fn digests_as_bytes(digests: &[Digest<N>]) -> &[u8] {
         let p = digests.as_ptr();
         let len = digests.len() * N;
-        // SAFETY: Digest<N> is repr(transparent) over [u8; N], so this is safe
+        // SAFETY:
+        // - Digest<N> is #[repr(transparent)] over [u8; N], which guarantees identical size,
+        //   alignment, and memory layout to [u8; N].
+        // - A slice of Digest<N> therefore has the same layout as a contiguous array of bytes,
+        //   which can be safely reinterpreted as &[u8].
+        // - The length calculation is correct because each Digest<N> contains exactly N bytes.
+        // - The resulting slice is valid for the lifetime of the input slice.
         unsafe { slice::from_raw_parts(p as *const u8, len) }
     }
 }
@@ -102,6 +118,28 @@ impl<const N: usize> TryFrom<&str> for Digest<N> {
     type Error = HexParseError;
 
     fn try_from(value: &str) -> Result<Self, Self::Error> {
+        if N == DIGEST192_BYTES {
+            let short_len = (DIGEST192_BYTES * 2) + 2;
+            let long_len = (DIGEST256_BYTES * 2) + 2;
+
+            if value.len() == short_len {
+                let bytes = hex_to_bytes::<N>(value)?;
+                return Ok(Self(bytes));
+            }
+
+            if value.len() == long_len {
+                let bytes = hex_to_bytes::<DIGEST256_BYTES>(value)?;
+                let padding = &bytes[DIGEST192_BYTES..];
+                if padding.iter().all(|byte| *byte == 0) {
+                    let mut trimmed = [0u8; N];
+                    trimmed.copy_from_slice(&bytes[..N]);
+                    return Ok(Self(trimmed));
+                }
+            }
+
+            return Err(HexParseError::InvalidLength { expected: short_len, actual: value.len() });
+        }
+
         hex_to_bytes(value).map(Self)
     }
 }
@@ -137,7 +175,11 @@ mod tests {
         assert_eq!(size_of::<Digest<64>>(), size_of::<[u8; 64]>());
         assert_eq!(align_of::<Digest<64>>(), align_of::<[u8; 64]>());
 
+        assert_eq!(size_of::<Digest<24>>(), size_of::<[u8; 24]>());
+        assert_eq!(align_of::<Digest<24>>(), align_of::<[u8; 24]>());
+
         // Verify type aliases as well
+        assert_eq!(size_of::<Digest192>(), 24);
         assert_eq!(size_of::<Digest256>(), 32);
         assert_eq!(size_of::<Digest512>(), 64);
     }
@@ -181,6 +223,20 @@ mod tests {
     }
 
     #[test]
+    fn test_digest192_accepts_zero_padded_hex() {
+        let mut bytes = [0u8; DIGEST192_BYTES];
+        bytes[0] = 1;
+        bytes[23] = 255;
+
+        let mut padded = [0u8; DIGEST256_BYTES];
+        padded[..DIGEST192_BYTES].copy_from_slice(&bytes);
+
+        let hex = bytes_to_hex_string(padded);
+        let parsed = Digest192::try_from(hex.as_str()).expect("digest192 should accept padding");
+        assert_eq!(parsed.as_bytes(), &bytes);
+    }
+
+    #[test]
     fn test_digest_hex_roundtrip_32() {
         let bytes = [0xab; 32];
         let digest = Digest::<32>::from(bytes);
@@ -195,6 +251,15 @@ mod tests {
         let digest = Digest::<64>::from(bytes);
         let hex: String = digest.into();
         let recovered = Digest::<64>::try_from(hex.as_str()).unwrap();
+        assert_eq!(recovered.as_bytes(), &bytes);
+    }
+
+    #[test]
+    fn test_digest_hex_roundtrip_24() {
+        let bytes = [0xef; 24];
+        let digest = Digest::<24>::from(bytes);
+        let hex: String = digest.into();
+        let recovered = Digest::<24>::try_from(hex.as_str()).unwrap();
         assert_eq!(recovered.as_bytes(), &bytes);
     }
 

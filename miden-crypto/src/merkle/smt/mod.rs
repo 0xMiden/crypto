@@ -22,17 +22,22 @@ mod large;
 pub use full::concurrent::{SubtreeLeaf, build_subtree_for_bench};
 #[cfg(feature = "concurrent")]
 pub use large::{
-    LargeSmt, LargeSmtError, MemoryStorage, SmtStorage, StorageUpdateParts, StorageUpdates,
-    Subtree, SubtreeError,
+    LargeSmt, LargeSmtError, MemoryStorage, SmtStorage, StorageError, StorageUpdateParts,
+    StorageUpdates, Subtree, SubtreeError, SubtreeUpdate,
 };
 #[cfg(feature = "rocksdb")]
 pub use large::{RocksDbConfig, RocksDbStorage};
 
 mod large_forest;
 pub use large_forest::{
-    Backend, BackendError, ForestOperation, LargeSmtForest, LargeSmtForestError, RootInfo,
-    SmtForestUpdateBatch, SmtUpdateBatch, TreeId, VersionId,
+    Backend, BackendError, Config as ForestConfig,
+    DEFAULT_MAX_HISTORY_VERSIONS as FOREST_DEFAULT_MAX_HISTORY_VERSIONS, ForestOperation,
+    InMemoryBackend as ForestInMemoryBackend, LargeSmtForest, LargeSmtForestError, LineageId,
+    MIN_HISTORY_VERSIONS as FOREST_MIN_HISTORY_VERSIONS, RootInfo, SmtForestUpdateBatch,
+    SmtUpdateBatch, TreeEntry, TreeId, TreeWithRoot, VersionId,
 };
+#[cfg(feature = "persistent-forest")]
+pub use large_forest::{PersistentBackend as ForestPersistentBackend, PersistentBackendConfig};
 
 mod simple;
 pub use simple::{SimpleSmt, SimpleSmtProof};
@@ -74,7 +79,7 @@ type NodeMutations = Map<NodeIndex, NodeMutation>;
 ///
 /// Every key maps to one leaf. If there are as many keys as there are leaves, then
 /// [Self::Leaf] should be the same type as [Self::Value], as is the case with
-/// [crate::merkle::SimpleSmt]. However, if there are more keys than leaves, then [`Self::Leaf`]
+/// [`SimpleSmt`]. However, if there are more keys than leaves, then [`Self::Leaf`]
 /// must accommodate all keys that map to the same leaf.
 ///
 /// [SparseMerkleTree] currently doesn't support optimizations that compress Merkle proofs.
@@ -121,7 +126,7 @@ pub(crate) trait SparseMerkleTree<const DEPTH: u8> {
 
         let InnerNode { left, right } = self.get_inner_node(index.parent());
 
-        let index_is_right = index.is_value_odd();
+        let index_is_right = index.is_position_odd();
         if index_is_right { right } else { left }
     }
 
@@ -168,7 +173,7 @@ pub(crate) trait SparseMerkleTree<const DEPTH: u8> {
     ) {
         let mut node_hash = node_hash_at_index;
         for node_depth in (0..index.depth()).rev() {
-            let is_right = index.is_value_odd();
+            let is_right = index.is_position_odd();
             index.move_up();
             let InnerNode { left, right } = self.get_inner_node(index);
             let (left, right) = if is_right {
@@ -199,7 +204,8 @@ pub(crate) trait SparseMerkleTree<const DEPTH: u8> {
     /// the Merkle tree, or [`drop()`] to discard them.
     ///
     /// # Errors
-    /// If mutations would exceed [`MAX_LEAF_ENTRIES`] (1024 entries) in a leaf, returns
+    /// If mutations would exceed [`crate::merkle::smt::MAX_LEAF_ENTRIES`] (1024 entries) in a leaf,
+    /// returns
     /// [`MerkleError::TooManyLeafEntries`].
     fn compute_mutations(
         &self,
@@ -261,7 +267,7 @@ pub(crate) trait SparseMerkleTree<const DEPTH: u8> {
 
             for node_depth in (0..node_index.depth()).rev() {
                 // Whether the node we're replacing is the right child or the left child.
-                let is_right = node_index.is_value_odd();
+                let is_right = node_index.is_position_odd();
                 node_index.move_up();
 
                 let old_node = node_mutations
@@ -315,7 +321,8 @@ pub(crate) trait SparseMerkleTree<const DEPTH: u8> {
     /// [`MerkleError::ConflictingRoots`] with a two-item [`Vec`]. The first item is the root hash
     /// the `mutations` were computed against, and the second item is the actual current root of
     /// this tree.
-    /// If mutations would exceed [`MAX_LEAF_ENTRIES`] (1024 entries) in a leaf, returns
+    /// If mutations would exceed [`crate::merkle::smt::MAX_LEAF_ENTRIES`] (1024 entries) in a leaf,
+    /// returns
     /// [`MerkleError::TooManyLeafEntries`].
     fn apply_mutations(
         &mut self,
@@ -492,7 +499,8 @@ pub(crate) trait SparseMerkleTree<const DEPTH: u8> {
     /// [`SparseMerkleTree::key_to_leaf_index()`]), or the result will be meaningless.
     ///
     /// # Errors
-    /// If inserting the key-value pair would exceed [`MAX_LEAF_ENTRIES`] (1024 entries) in a leaf,
+    /// If inserting the key-value pair would exceed
+    /// [`crate::merkle::smt::MAX_LEAF_ENTRIES`] (1024 entries) in a leaf,
     /// returns [`SmtLeafError::TooManyLeafEntries`].
     fn construct_prospective_leaf(
         &self,
@@ -553,9 +561,9 @@ impl<const DEPTH: u8> LeafIndex<DEPTH> {
         Ok(LeafIndex { index: NodeIndex::new(DEPTH, value)? })
     }
 
-    /// Returns the numeric value of this leaf index.
-    pub fn value(&self) -> u64 {
-        self.index.value()
+    /// Returns the position of this leaf index within its depth layer.
+    pub fn position(&self) -> u64 {
+        self.index.position()
     }
 }
 
@@ -585,7 +593,7 @@ impl<const DEPTH: u8> TryFrom<NodeIndex> for LeafIndex<DEPTH> {
             });
         }
 
-        Self::new(node_index.value())
+        Self::new(node_index.position())
     }
 }
 
@@ -603,7 +611,7 @@ impl<const DEPTH: u8> Deserializable for LeafIndex<DEPTH> {
 
 impl<const DEPTH: u8> Display for LeafIndex<DEPTH> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "DEPTH={}, value={}", DEPTH, self.value())
+        write!(f, "DEPTH={}, position={}", DEPTH, self.position())
     }
 }
 
@@ -667,6 +675,13 @@ impl<const DEPTH: u8, K: Eq + Hash, V> MutationSet<DEPTH, K, V> {
     /// (i.e. set to `EMPTY_WORD`).
     pub fn new_pairs(&self) -> &Map<K, V> {
         &self.new_pairs
+    }
+
+    /// Returns `true` if the mutation set represents no changes to the tree, and `false` otherwise.
+    pub fn is_empty(&self) -> bool {
+        self.node_mutations.is_empty()
+            && self.new_pairs.is_empty()
+            && self.old_root == self.new_root
     }
 }
 

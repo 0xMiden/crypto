@@ -78,16 +78,8 @@ impl<S: SmtStorage> LargeSmt<S> {
             // Storage nodes: apply mutations to loaded subtree and determine storage action
             let modified = !mutations.is_empty();
             if let Some(subtree) = subtree_opt.as_mut() {
-                for (index, mutation) in mutations {
-                    match mutation {
-                        NodeMutation::Removal => {
-                            subtree.remove_inner_node(index);
-                        },
-                        NodeMutation::Addition(node) => {
-                            subtree.insert_inner_node(index, node);
-                        },
-                    }
-                }
+                // Apply all mutations in a single batch for efficiency
+                subtree.apply_mutations(mutations.iter());
             }
 
             let update = if !modified {
@@ -115,7 +107,7 @@ impl<S: SmtStorage> LargeSmt<S> {
         // Collect the unique leaf indices
         let mut leaf_indices: Vec<u64> = sorted_kv_pairs
             .iter()
-            .map(|(key, _)| Self::key_to_leaf_index(key).value())
+            .map(|(key, _)| Self::key_to_leaf_index(key).position())
             .collect();
         leaf_indices.dedup();
         leaf_indices.par_sort_unstable();
@@ -149,7 +141,7 @@ impl<S: SmtStorage> LargeSmt<S> {
 
         let accumulator = process_sorted_pairs_to_leaves(pairs, |leaf_pairs| {
             let leaf_index = LeafIndex::<SMT_DEPTH>::from(leaf_pairs[0].0);
-            let old_leaf_opt = leaf_map.get(&leaf_index.value()).and_then(|opt| opt.as_ref());
+            let old_leaf_opt = leaf_map.get(&leaf_index.position()).and_then(|opt| opt.as_ref());
             let old_entry_count = old_leaf_opt.map(|leaf| leaf.entries().len()).unwrap_or(0);
 
             let mut leaf = old_leaf_opt
@@ -265,7 +257,7 @@ impl<S: SmtStorage> LargeSmt<S> {
 
                 // Add the parent node even if it is empty for proper upward updates
                 next_leaves.push(SubtreeLeaf {
-                    col: parent_index.value(),
+                    col: parent_index.position(),
                     hash: combined_hash,
                 });
 
@@ -345,7 +337,7 @@ impl<S: SmtStorage> LargeSmt<S> {
     {
         // Sort key-value pairs by leaf index
         let mut sorted_kv_pairs: Vec<_> = kv_pairs.into_iter().collect();
-        sorted_kv_pairs.par_sort_by_key(|(key, _)| Self::key_to_leaf_index(key).value());
+        sorted_kv_pairs.par_sort_by_key(|(key, _)| Self::key_to_leaf_index(key).position());
 
         // Load leaves from storage
         let (_leaf_indices, leaf_map) = self.load_leaves_for_pairs(&sorted_kv_pairs)?;
@@ -509,12 +501,13 @@ impl<S: SmtStorage> LargeSmt<S> {
 
         // Collect and sort key-value pairs by their corresponding leaf index
         let mut sorted_kv_pairs: Vec<_> = new_pairs.iter().map(|(k, v)| (*k, *v)).collect();
-        sorted_kv_pairs.par_sort_by_key(|(key, _)| LargeSmt::<S>::key_to_leaf_index(key).value());
+        sorted_kv_pairs
+            .par_sort_by_key(|(key, _)| LargeSmt::<S>::key_to_leaf_index(key).position());
 
         // Collect the unique leaf indices
         let mut leaf_indices: Vec<u64> = sorted_kv_pairs
             .iter()
-            .map(|(key, _)| LargeSmt::<S>::key_to_leaf_index(key).value())
+            .map(|(key, _)| LargeSmt::<S>::key_to_leaf_index(key).position())
             .collect();
         leaf_indices.par_sort_unstable();
         leaf_indices.dedup();
@@ -557,9 +550,14 @@ impl<S: SmtStorage> LargeSmt<S> {
         // Update the root in memory
         self.in_memory_nodes[ROOT_MEMORY_INDEX] = new_root;
 
-        // Process node mutations
+        // Process node mutations - group by subtree and apply in batch
+        // Since mutations are sorted by subtree root, we can process them in groups
+        let mut current_subtree_root: Option<NodeIndex> = None;
+        let mut current_batch: Vec<(NodeIndex, NodeMutation)> = Vec::new();
+
         for (index, mutation) in sorted_node_mutations {
             if index.depth() < IN_MEMORY_DEPTH {
+                // In-memory mutations are applied directly
                 match mutation {
                     Removal => {
                         SparseMerkleTree::<SMT_DEPTH>::remove_inner_node(self, index);
@@ -570,21 +568,33 @@ impl<S: SmtStorage> LargeSmt<S> {
                 };
             } else {
                 let subtree_root_index = Subtree::find_subtree_root(index);
-                let subtree = loaded_subtrees
-                    .get_mut(&subtree_root_index)
-                    .expect("Subtree map entry must exist")
-                    .as_mut()
-                    .expect("Subtree must exist as it was either fetched or created");
 
-                match mutation {
-                    Removal => {
-                        subtree.remove_inner_node(index);
-                    },
-                    Addition(node) => {
-                        subtree.insert_inner_node(index, node);
-                    },
-                };
+                // If we've moved to a new subtree, flush the previous batch
+                if current_subtree_root != Some(subtree_root_index) {
+                    if let Some(prev_root) = current_subtree_root {
+                        let subtree = loaded_subtrees
+                            .get_mut(&prev_root)
+                            .expect("Subtree map entry must exist")
+                            .as_mut()
+                            .expect("Subtree must exist");
+                        subtree.apply_mutations(current_batch.iter().map(|(idx, m)| (idx, m)));
+                        current_batch.clear();
+                    }
+                    current_subtree_root = Some(subtree_root_index);
+                }
+
+                current_batch.push((index, mutation));
             }
+        }
+
+        // Flush the final batch
+        if let Some(subtree_root) = current_subtree_root {
+            let subtree = loaded_subtrees
+                .get_mut(&subtree_root)
+                .expect("Subtree map entry must exist")
+                .as_mut()
+                .expect("Subtree must exist");
+            subtree.apply_mutations(current_batch.iter().map(|(idx, m)| (idx, m)));
         }
 
         // Go through subtrees, see if any are empty, and if so remove them
@@ -599,7 +609,7 @@ impl<S: SmtStorage> LargeSmt<S> {
         let mut entry_count_delta = 0isize;
 
         for (key, value) in new_pairs {
-            let idx = LargeSmt::<S>::key_to_leaf_index(&key).value();
+            let idx = LargeSmt::<S>::key_to_leaf_index(&key).position();
             let entry = leaf_map.entry(idx).or_insert(None);
 
             // New value is empty, handle deletion
@@ -686,7 +696,7 @@ impl<S: SmtStorage> LargeSmt<S> {
         // Collect and sort key-value pairs by their corresponding leaf index
         let mut sorted_kv_pairs: Vec<_> = kv_pairs.into_iter().collect();
         sorted_kv_pairs
-            .par_sort_unstable_by_key(|(key, _)| LargeSmt::<S>::key_to_leaf_index(key).value());
+            .par_sort_unstable_by_key(|(key, _)| LargeSmt::<S>::key_to_leaf_index(key).position());
 
         // Load leaves from storage using helper
         let (_leaf_indices, leaf_map) = self.load_leaves_for_pairs(&sorted_kv_pairs)?;
@@ -835,7 +845,7 @@ impl<S: SmtStorage> LargeSmt<S> {
             .new_pairs
             .keys()
             .map(|key| {
-                let leaf_idx = LargeSmt::<S>::key_to_leaf_index(key).value();
+                let leaf_idx = LargeSmt::<S>::key_to_leaf_index(key).position();
                 let old_value = prepared
                     .leaf_map
                     .get(&leaf_idx)

@@ -2,7 +2,7 @@ use alloc::{string::String, vec::Vec};
 use core::{fmt, slice};
 
 use super::{InnerNodeInfo, MerkleError, MerklePath, NodeIndex, Poseidon2, Word};
-use crate::utils::{uninit_vector, word_to_hex};
+use crate::utils::{assume_init_vec, uninit_vector, word_to_hex};
 
 // MERKLE TREE
 // ================================================================================================
@@ -33,25 +33,29 @@ impl MerkleTree {
             return Err(MerkleError::NumLeavesNotPowerOfTwo(n));
         }
 
-        // create un-initialized vector to hold all tree nodes
-        let mut nodes = unsafe { uninit_vector(2 * n) };
-        nodes[0] = Word::default();
+        // Create an uninitialized vector to avoid eagerly zeroing `2 * n` words. This is a
+        // hot path during tree construction; see benches in `miden-crypto/benches/merkle.rs`
+        // (e.g. `merkle_tree_construction`) for performance motivation.
+        // SAFETY: All elements are written before being read (leaves copied, then computed).
+        let mut nodes = uninit_vector::<Word>(2 * n);
+        nodes[0].write(Word::default());
 
         // copy leaves into the second part of the nodes vector
         nodes[n..].iter_mut().zip(leaves).for_each(|(node, leaf)| {
-            *node = *leaf;
+            node.write(*leaf);
         });
-
-        // re-interpret nodes as an array of two nodes fused together
-        // Safety: `nodes` will never move here as it is not bound to an external lifetime (i.e.
-        // `self`).
-        let ptr = nodes.as_ptr() as *const [Word; 2];
-        let pairs = unsafe { slice::from_raw_parts(ptr, n) };
 
         // calculate all internal tree nodes
         for i in (1..n).rev() {
-            nodes[i] = Poseidon2::merge(&pairs[i]);
+            // SAFETY: We fill leaves first, then iterate from the bottom up. At this point,
+            // nodes[2 * i] and nodes[2 * i + 1] have already been written.
+            let left = unsafe { nodes[2 * i].assume_init_read() };
+            let right = unsafe { nodes[2 * i + 1].assume_init_read() };
+            nodes[i].write(Poseidon2::merge(&[left, right]));
         }
+
+        // SAFETY: all elements were written above.
+        let nodes = unsafe { assume_init_vec(nodes) };
 
         Ok(Self { nodes })
     }
@@ -84,7 +88,7 @@ impl MerkleTree {
             return Err(MerkleError::DepthTooBig(index.depth() as u64));
         }
 
-        let pos = index.to_scalar_index() as usize;
+        let pos = index.to_scalar_index()? as usize;
         Ok(self.nodes[pos])
     }
 
@@ -136,6 +140,11 @@ impl MerkleTree {
     pub fn update_leaf<'a>(&'a mut self, index_value: u64, value: Word) -> Result<(), MerkleError> {
         let mut index = NodeIndex::new(self.depth(), index_value)?;
 
+        // Performance note: We use unsafe pointer casts here for ~2-2.5% performance improvement
+        // at scale. See benches/merkle.rs for benchmarks. The safe alternative uses index
+        // arithmetic (`nodes[pos*2]`, `nodes[pos*2+1]`) which is measurably slower on large
+        // trees.
+
         // we don't need to copy the pairs into a new address as we are logically guaranteed to not
         // overlap write instructions. however, it's important to bind the lifetime of pairs to
         // `self.nodes` so the compiler will never move one without moving the other.
@@ -151,13 +160,13 @@ impl MerkleTree {
         let pairs: &'a [[Word; 2]] = unsafe { slice::from_raw_parts(ptr, n) };
 
         // update the current node
-        let pos = index.to_scalar_index() as usize;
+        let pos = index.to_scalar_index()? as usize;
         self.nodes[pos] = value;
 
         // traverse to the root, updating each node with the merged values of its parents
         for _ in 0..index.depth() {
             index.move_up();
-            let pos = index.to_scalar_index() as usize;
+            let pos = index.to_scalar_index()? as usize;
             let value = Poseidon2::merge(&pairs[pos]);
             self.nodes[pos] = value;
         }

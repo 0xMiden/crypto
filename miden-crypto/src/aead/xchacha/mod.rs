@@ -17,6 +17,8 @@ use chacha20poly1305::{
     aead::{Aead, AeadCore, KeyInit},
 };
 use rand::{CryptoRng, RngCore};
+#[cfg(any(test, feature = "testing"))]
+use subtle::ConstantTimeEq;
 
 use crate::{
     Felt,
@@ -86,8 +88,19 @@ impl Nonce {
 }
 
 /// A 256-bit secret key
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug)]
 pub struct SecretKey([u8; SK_SIZE_BYTES]);
+
+#[cfg(any(test, feature = "testing"))]
+impl PartialEq for SecretKey {
+    fn eq(&self, other: &Self) -> bool {
+        // Constant-time comparison to avoid timing side channels in test builds.
+        bool::from(self.0.ct_eq(&other.0))
+    }
+}
+
+#[cfg(any(test, feature = "testing"))]
+impl Eq for SecretKey {}
 
 impl SecretKey {
     // CONSTRUCTORS
@@ -327,7 +340,12 @@ impl AeadScheme for XChaCha {
     type Key = SecretKey;
 
     fn key_from_bytes(bytes: &[u8]) -> Result<Self::Key, EncryptionError> {
-        SecretKey::read_from_bytes(bytes).map_err(|_| EncryptionError::FailedOperation)
+        if bytes.len() != SK_SIZE_BYTES {
+            return Err(EncryptionError::FailedOperation);
+        }
+
+        SecretKey::read_from_bytes_with_budget(bytes, SK_SIZE_BYTES)
+            .map_err(|_| EncryptionError::FailedOperation)
     }
 
     fn encrypt_bytes<R: rand::CryptoRng + rand::RngCore>(
@@ -348,8 +366,11 @@ impl AeadScheme for XChaCha {
         ciphertext: &[u8],
         associated_data: &[u8],
     ) -> Result<Vec<u8>, EncryptionError> {
-        let encrypted_data = &EncryptedData::read_from_bytes(ciphertext).unwrap();
-        key.decrypt_bytes_with_associated_data(encrypted_data, associated_data)
+        let encrypted_data =
+            EncryptedData::read_from_bytes_with_budget(ciphertext, ciphertext.len())
+                .map_err(|_| EncryptionError::FailedOperation)?;
+
+        key.decrypt_bytes_with_associated_data(&encrypted_data, associated_data)
             .map_err(|_| EncryptionError::FailedOperation)
     }
 }
