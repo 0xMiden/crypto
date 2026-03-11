@@ -252,7 +252,7 @@ impl Mmr {
         let mut merges = from_forest & new_high.all_smaller_trees_unchecked();
 
         // Find the peaks that are common to `from_forest` and this [Mmr]
-        let common_trees = from_forest.try_bitxor(merges)?;
+        let common_trees = from_forest ^ merges;
 
         if !merges.is_empty() {
             // Skip the smallest trees unknown to `from_forest`.
@@ -278,7 +278,7 @@ impl Mmr {
                     target = target.next_larger_tree()?;
                 }
                 // Remove the merges done so far
-                merges = merges.try_bitxor(merges & target.all_smaller_trees_unchecked())?;
+                merges ^= merges & target.all_smaller_trees_unchecked();
             }
         } else {
             // The new high tree may not be the result of any merges, if it is smaller than all the
@@ -289,14 +289,14 @@ impl Mmr {
         // Collect the new [Mmr] peaks
         // ----------------------------------------------------------------------------------------
 
-        let mut new_peaks = to_forest.try_bitxor(common_trees)?.try_bitxor(new_high)?;
-        let old_peaks = to_forest.try_bitxor(new_peaks)?;
+        let mut new_peaks = to_forest ^ common_trees ^ new_high;
+        let old_peaks = to_forest ^ new_peaks;
         let mut offset = old_peaks.num_nodes();
         while !new_peaks.is_empty() {
             let target = new_peaks.largest_tree_unchecked();
             offset += target.num_nodes();
             result.push(self.nodes[offset - 1]);
-            new_peaks = new_peaks.try_bitxor(target)?;
+            new_peaks ^= target;
         }
 
         Ok(MmrDelta { forest: to_forest, data: result })

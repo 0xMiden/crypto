@@ -1,6 +1,6 @@
 use core::{
     fmt::{Binary, Display},
-    ops::BitAnd,
+    ops::{BitAnd, BitOr, BitXor, BitXorAssign},
 };
 
 use super::{InOrderIndex, MmrError};
@@ -39,12 +39,17 @@ pub struct Forest(usize);
 impl Forest {
     /// Maximum number of leaves supported by the forest.
     ///
-    /// The protocol assumes the number of leaves fits in `u32`, but we also cap the value so
-    /// `num_nodes()` can return `usize` without overflow on 32-bit targets.
-    pub const MAX_LEAVES: usize = if (u32::MAX as usize) < (usize::MAX / 2 + 1) {
+    /// Rationale:
+    /// - We require `MAX_LEAVES <= usize::MAX / 2 + 1` so `num_nodes()` stays indexable via
+    ///   `usize`.
+    /// - We choose `usize::MAX / 2` (hard cutoff) rather than `usize::MAX / 2 + 1` so the cap is
+    ///   always of the form `2^k - 1` on all targets.
+    /// - With that shape, bitwise OR/XOR of valid forest values remains within bounds, so OR/XOR
+    ///   does not need additional overflow protection.
+    pub const MAX_LEAVES: usize = if (u32::MAX as usize) < (usize::MAX / 2) {
         u32::MAX as usize
     } else {
-        usize::MAX / 2 + 1
+        usize::MAX / 2
     };
 
     /// Creates an empty forest (no trees).
@@ -448,25 +453,6 @@ impl Forest {
         let mask = high_bitmask(tree_idx + 1);
         Some(leaf_idx - (self.0 & mask))
     }
-
-    /// Bitwise OR between two forests, returning an error if it exceeds the size limit.
-    #[cfg(test)]
-    pub(crate) fn try_bitor(self, rhs: Self) -> Result<Self, MmrError> {
-        let value = self.0 | rhs.0;
-        if value > Self::MAX_LEAVES {
-            return Err(MmrError::ForestSizeExceeded { requested: value, max: Self::MAX_LEAVES });
-        }
-        Ok(Self(value))
-    }
-
-    /// Bitwise XOR between two forests, returning an error if it exceeds the size limit.
-    pub(crate) fn try_bitxor(self, rhs: Self) -> Result<Self, MmrError> {
-        let value = self.0 ^ rhs.0;
-        if value > Self::MAX_LEAVES {
-            return Err(MmrError::ForestSizeExceeded { requested: value, max: Self::MAX_LEAVES });
-        }
-        Ok(Self(value))
-    }
 }
 
 impl Display for Forest {
@@ -486,6 +472,32 @@ impl BitAnd<Forest> for Forest {
 
     fn bitand(self, rhs: Self) -> Self::Output {
         Self::new(self.0 & rhs.0).expect("forest size exceeds maximum")
+    }
+}
+
+// Compile-time invariant: MAX_LEAVES must be exactly 2^k - 1.
+const _: () =
+    assert!(Forest::MAX_LEAVES != 0 && (Forest::MAX_LEAVES & (Forest::MAX_LEAVES + 1)) == 0);
+
+impl BitOr<Forest> for Forest {
+    type Output = Self;
+
+    fn bitor(self, rhs: Self) -> Self::Output {
+        Self(self.0 | rhs.0)
+    }
+}
+
+impl BitXor<Forest> for Forest {
+    type Output = Self;
+
+    fn bitxor(self, rhs: Self) -> Self::Output {
+        Self(self.0 ^ rhs.0)
+    }
+}
+
+impl BitXorAssign<Forest> for Forest {
+    fn bitxor_assign(&mut self, rhs: Self) {
+        self.0 ^= rhs.0;
     }
 }
 

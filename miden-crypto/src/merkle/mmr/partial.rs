@@ -411,12 +411,11 @@ impl PartialMmr {
 
         // ignore the trees smaller than the target (these elements are position after the current
         // target and don't affect the target leaf_pos)
-        let target_forest =
-            self.forest.try_bitxor(self.forest & tree.all_smaller_trees_unchecked())?;
+        let target_forest = self.forest ^ (self.forest & tree.all_smaller_trees_unchecked());
         let peak_pos = target_forest.num_trees() - 1;
 
         // translate from mmr leaf_pos to merkle path
-        let path_idx = leaf_pos - target_forest.try_bitxor(tree)?.num_leaves();
+        let path_idx = leaf_pos - (target_forest ^ tree).num_leaves();
 
         // Compute the root of the authentication path, and check it matches the current version of
         // the PartialMmr.

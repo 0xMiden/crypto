@@ -189,70 +189,24 @@ fn test_forest_serde_rejects_large_value() {
 #[test]
 fn test_forest_with_single_leaf_limit() {
     let forest = Forest::new(Forest::MAX_LEAVES).unwrap();
-    if Forest::MAX_LEAVES.is_multiple_of(2) {
-        assert_matches!(
-            forest.with_single_leaf(),
-            Err(MmrError::ForestSizeExceeded { requested, max }) if
-                requested == Forest::MAX_LEAVES + 1 && max == Forest::MAX_LEAVES
-        );
-    } else {
-        let result = forest.with_single_leaf().unwrap();
-        assert_eq!(result.num_leaves(), Forest::MAX_LEAVES);
-    }
+    let result = forest.with_single_leaf().unwrap();
+    assert_eq!(result.num_leaves(), Forest::MAX_LEAVES);
 }
 
-#[cfg(not(target_pointer_width = "32"))]
 #[test]
 fn test_forest_bitxor_within_limit() {
     let high = Forest::new(Forest::MAX_LEAVES).unwrap();
     let low = Forest::new(Forest::MAX_LEAVES - 1).unwrap();
-    let result = high.try_bitxor(low).unwrap();
+    let result = high ^ low;
     assert!(result.num_leaves() <= Forest::MAX_LEAVES);
 }
 
-#[cfg(target_pointer_width = "32")]
-#[test]
-fn test_forest_try_bitxor_limit_32bit() {
-    let high = Forest::new(Forest::MAX_LEAVES).unwrap();
-    let low = Forest::new(1).unwrap();
-    let expected = Forest::MAX_LEAVES ^ 1;
-    if expected > Forest::MAX_LEAVES {
-        assert_matches!(
-            high.try_bitxor(low),
-            Err(MmrError::ForestSizeExceeded { requested, max }) if
-                requested == expected && max == Forest::MAX_LEAVES
-        );
-    } else {
-        let result = high.try_bitxor(low).unwrap();
-        assert_eq!(result.num_leaves(), expected);
-    }
-}
-
-#[cfg(not(target_pointer_width = "32"))]
 #[test]
 fn test_forest_bitor_within_limit() {
     let high = Forest::new(Forest::MAX_LEAVES).unwrap();
     let low = Forest::new(1).unwrap();
-    let result = high.try_bitor(low).unwrap();
+    let result = high | low;
     assert!(result.num_leaves() <= Forest::MAX_LEAVES);
-}
-
-#[cfg(target_pointer_width = "32")]
-#[test]
-fn test_forest_try_bitor_limit_32bit() {
-    let high = Forest::new(Forest::MAX_LEAVES).unwrap();
-    let low = Forest::new(1).unwrap();
-    let expected = Forest::MAX_LEAVES | 1;
-    if expected > Forest::MAX_LEAVES {
-        assert_matches!(
-            high.try_bitor(low),
-            Err(MmrError::ForestSizeExceeded { requested, max }) if
-                requested == expected && max == Forest::MAX_LEAVES
-        );
-    } else {
-        let result = high.try_bitor(low).unwrap();
-        assert_eq!(result.num_leaves(), expected);
-    }
 }
 
 #[test]
