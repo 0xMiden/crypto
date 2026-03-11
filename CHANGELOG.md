@@ -1,25 +1,25 @@
-## 0.23.0 (TBD)
+## 0.23.0 (2026-03-11)
 
 - Replaced `Subtree` internal storage with bitmask layout ([#784](https://github.com/0xMiden/crypto/pull/784)).
 - [BREAKING] `PartialMmr::open()` now returns `Option<MmrProof>` instead of `Option<MmrPath>` ([#787](https://github.com/0xMiden/crypto/pull/787)).
 - [BREAKING] Refactored BLAKE3 to use `Digest<N>` struct, added `Digest192` type alias ([#811](https://github.com/0xMiden/crypto/pull/811)).
+- [BREAKING] Added validation to `PartialMmr::from_parts()` and `Deserializable` implementation, added `from_parts_unchecked()` for performance-critical code ([#812](https://github.com/0xMiden/crypto/pull/812)).
 - [BREAKING] Removed `hashbrown` dependency and `hashmaps` feature; `Map`/`Set` type aliases are now tied to the `std` feature ([#813](https://github.com/0xMiden/crypto/pull/813)).
-- Fixed `LargeSmtForest::truncate` to remove emptied lineages from `non_empty_histories` ([#818](https://github.com/0xMiden/crypto/pull/818)).
 - [BREAKING] Renamed `NodeIndex::value()` to `NodeIndex::position()`, `NodeIndex::is_value_odd()` to `NodeIndex::is_position_odd()`, and `LeafIndex::value()` to `LeafIndex::position()` ([#814](https://github.com/0xMiden/crypto/pull/814)).
-- [BREAKING] Fix OOMs in Merkle/SMT deserialization ([#820](https://github.com/0xMiden/crypto/pull/820)).
+- Fixed `LargeSmtForest::truncate` to remove emptied lineages from `non_empty_histories` ([#818](https://github.com/0xMiden/crypto/pull/818)).
+- [BREAKING] Fixed OOMs in Merkle/SMT deserialization ([#820](https://github.com/0xMiden/crypto/pull/820)).
 - Fixed `SmtForest` to remove nodes with zero reference count from store ([#821](https://github.com/0xMiden/crypto/pull/821)).
 - Cross-checked RPO test vectors against the Python reference implementation after state layout change ([#822](https://github.com/0xMiden/crypto/pull/822)).
 - Fixed tuple `min_serialized_size()` to exclude alignment padding, fixing `BudgetedReader` rejecting valid data ([#827](https://github.com/0xMiden/crypto/pull/827)).
-- [BREAKING] Added validation to `PartialMmr::from_parts()` and `Deserializable` implementation, added `from_parts_unchecked()` for performance-critical code ([#812](https://github.com/0xMiden/crypto/pull/812)).
+- Fixed possible panic in `XChaCha::decrypt_bytes_with_associated_data` and harden deserialization with fuzzing across 7 new targets ([#836](https://github.com/0xMiden/crypto/pull/836)).
 - Added `Signature::from_der()` for ECDSA signatures over secp256k1 ([#842](https://github.com/0xMiden/crypto/pull/842)).
-- Fix possible panic in `XChaCha::decrypt_bytes_with_associated_data` and harden deserialization with fuzzing across 7 new targets ([#836](https://github.com/0xMiden/crypto/pull/836)).
-- Use read_from_bytes_with_budget instead of read_from_bytes for deserialization from untrusted sources, setting the budget to the actual input byte slice length. ([#846](https://github.com/0xMiden/crypto/pull/846)).
 - [BREAKING] Added info context field to secret box, bind IES HKDF info to a stable context string, scheme identifier, and ephemeral public key bytes. ([#843](https://github.com/0xMiden/crypto/pull/843)).
+- Use `read_from_bytes_with_budget()` instead of read_from_bytes for deserialization from untrusted sources, setting the budget to the actual input byte slice length. ([#846](https://github.com/0xMiden/crypto/pull/846)).
 - [BREAKING] Removed `PartialEq`/`Eq` for AEAD `SecretKey` in non-test builds, fix various hygiene issues in dealing with secret keys ([#849](https://github.com/0xMiden/crypto/pull/849)).
 - Added `PublicKey::from_der()` for ECDSA public keys over secp256k1 ([#855](https://github.com/0xMiden/crypto/pull/855)).
+- [BREAKING] Fixed `NodeIndex::to_scalar_index()` overflow at depth 64 by returning `Result<u64, MerkleError>` ([#865](https://github.com/0xMiden/crypto/issues/865)).
 - [BREAKING] Removed `RpoRandomCoin` and `RpxRandomCoin` and introduced a Poseidon2-based `RandomCoin` ([#871](https://github.com/0xMiden/crypto/pull/871)).
 - Harden MerkleStore deserialization and fuzz coverage ([#878](https://github.com/0xMiden/crypto/pull/878)).
-- [BREAKING] Fixed `NodeIndex::to_scalar_index()` overflow at depth 64 by returning `Result<u64, MerkleError>` ([#865](https://github.com/0xMiden/crypto/issues/865)).
 - [BREAKING] Upgraded Plonky3 from 0.4.2 to 0.5.0 and replaced `p3-miden-air`, `p3-miden-fri`, and `p3-miden-prover` with the unified `p3-miden-lifted-stark` crate. The `stark` module now re-exports the Lifted STARK proving system from [p3-miden](https://github.com/0xMiden/p3-miden).
 
 ## 0.22.4 (2026-03-03)
