@@ -149,12 +149,6 @@ impl Rpx256 {
         <Self as AlgebraicSponge>::merge_many(values)
     }
 
-    /// Returns a hash of a digest and a u64 value.
-    #[inline(always)]
-    pub fn merge_with_int(seed: Word, value: u64) -> Word {
-        <Self as AlgebraicSponge>::merge_with_int(seed, value)
-    }
-
     /// Returns a hash of two digests and a domain identifier.
     #[inline(always)]
     pub fn merge_in_domain(values: &[Word; 2], domain: Felt) -> Word {
