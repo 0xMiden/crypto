@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"enum":["VerifierError"],"fn":["verify_multi","verify_single"]};

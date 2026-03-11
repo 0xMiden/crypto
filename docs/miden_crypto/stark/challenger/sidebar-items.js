@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"struct":["HashChallenger","SerializingChallenger64"]};
+window.SIDEBAR_ITEMS = {"struct":["DuplexChallenger","HashChallenger","SerializingChallenger64"],"trait":["CanFinalizeDigest","CanObserve","FieldChallenger","GrindingChallenger"]};

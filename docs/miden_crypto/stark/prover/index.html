@@ -1,0 +1,103 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Lifted STARK prover."><title>miden_crypto::stark::prover - Rust</title><script>if(window.location.protocol!=="file:")document.head.insertAdjacentHTML("beforeend","SourceSerif4-Regular-6b053e98.ttf.woff2,FiraSans-Italic-81dc35de.woff2,FiraSans-Regular-0fe48ade.woff2,FiraSans-MediumItalic-ccf7e434.woff2,FiraSans-Medium-e1aa3f0a.woff2,SourceCodePro-Regular-8badfe75.ttf.woff2,SourceCodePro-Semibold-aa29a496.ttf.woff2".split(",").map(f=>`<link rel="preload" as="font" type="font/woff2"href="../../../static.files/${f}">`).join(""))</script><link rel="stylesheet" href="../../../static.files/normalize-9960930a.css"><link rel="stylesheet" href="../../../static.files/rustdoc-17e0aaed.css"><meta name="rustdoc-vars" data-root-path="../../../" data-static-root-path="../../../static.files/" data-current-crate="miden_crypto" data-themes="" data-resource-suffix="" data-rustdoc-version="1.96.0-nightly (0c68443b0 2026-03-10)" data-channel="nightly" data-search-js="search-63369b7b.js" data-stringdex-js="stringdex-b897f86f.js" data-settings-js="settings-170eb4bf.js" ><script src="../../../static.files/storage-41dd4d93.js"></script><script defer src="../sidebar-items.js"></script><script defer src="../../../static.files/main-5013f961.js"></script><noscript><link rel="stylesheet" href="../../../static.files/noscript-f7c3ffd8.css"></noscript><link rel="alternate icon" type="image/png" href="../../../static.files/favicon-32x32-eab170b8.png"><link rel="icon" type="image/svg+xml" href="../../../static.files/favicon-044be391.svg"></head><body class="rustdoc mod"><a class="skip-main-content" href="#main-content">Skip to main content</a><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><rustdoc-topbar><h2><a href="#">Module prover</a></h2></rustdoc-topbar><nav class="sidebar"><div class="sidebar-crate"><h2><a href="../../../miden_crypto/index.html">miden_<wbr>crypto</a><span class="version">0.23.0</span></h2></div><div class="sidebar-elems"><section id="rustdoc-toc"><h2 class="location"><a href="#">Module prover</a></h2><h3><a href="#">Sections</a></h3><ul class="block top-toc"><li><a href="#fiat-shamir--transcript-binding-initial-challenger-state" title="Fiat-Shamir / transcript binding (initial challenger state)">Fiat-Shamir / transcript binding (initial challenger state)</a><ul><li><a href="#recommended-pattern-pre-seed-the-challenger-no-proof-bloat" title="Recommended pattern: pre-seed the challenger (no proof bloat)">Recommended pattern: pre-seed the challenger (no proof bloat)</a></li><li><a href="#alternative-write-statement-data-into-the-transcript" title="Alternative: write statement data into the transcript">Alternative: write statement data into the transcript</a></li></ul></li><li><a href="#multi-trace-ordering" title="Multi-trace ordering">Multi-trace ordering</a></li></ul><h3><a href="#modules">Module Items</a></h3><ul class="block"><li><a href="#modules" title="Modules">Modules</a></li><li><a href="#enums" title="Enums">Enums</a></li><li><a href="#functions" title="Functions">Functions</a></li></ul></section><div id="rustdoc-modnav"><h2><a href="../index.html">In miden_<wbr>crypto::<wbr>stark</a></h2></div></div></nav><div class="sidebar-resizer" title="Drag to resize sidebar"></div><main><div class="width-limiter"><section id="main-content" class="content" tabindex="-1"><div class="main-heading"><div class="rustdoc-breadcrumbs"><a href="../../index.html">miden_crypto</a>::<wbr><a href="../index.html">stark</a></div><h1>Module <span>prover</span>&nbsp;<button id="copy-path" title="Copy item path to clipboard">Copy item path</button></h1><rustdoc-toolbar></rustdoc-toolbar><span class="sub-heading"></span></div><details class="toggle top-doc" open><summary class="hideme"><span>Expand description</span></summary><div class="docblock"><p>Lifted STARK prover.</p>
+<p>This module provides:</p>
+<ul>
+<li><a href="fn.prove_single.html" title="fn miden_crypto::stark::prover::prove_single"><code>prove_single</code></a>: Prove a single AIR instance.</li>
+<li><a href="fn.prove_multi.html" title="fn miden_crypto::stark::prover::prove_multi"><code>prove_multi</code></a>: Prove multiple AIR instances with traces of different heights.</li>
+</ul>
+<p>These functions write the proof into a [<code>p3_miden_transcript::ProverChannel</code>]
+(commitments, grinding witnesses, and openings).</p>
+<h2 id="fiat-shamir--transcript-binding-initial-challenger-state"><a class="doc-anchor" href="#fiat-shamir--transcript-binding-initial-challenger-state">§</a>Fiat-Shamir / transcript binding (initial challenger state)</h2>
+<p>This crate intentionally does <strong>not</strong> prescribe the <em>initial</em> transcript state.
+Different applications may transport some statement data out-of-band (e.g. public
+inputs shipped alongside a proof) and do not want it duplicated inside the proof.</p>
+<p>The flip side is that the caller must ensure the Fiat-Shamir challenger inside
+<code>channel</code> is initialized and bound to the statement in whatever way is appropriate
+for their use case.</p>
+<p>The protocol implementation assumes that <em>all inputs that may vary</em> (including
+<code>public_values</code> and <code>var_len_public_inputs</code>) have been observed by the challenger.
+This is required so callers can avoid including public inputs in the proof when
+they are available out-of-band.</p>
+<p>In particular, the caller <strong>MUST</strong> bind both <code>public_values</code> and
+<code>var_len_public_inputs</code> to the challenger state. Otherwise, Fiat-Shamir
+challenges sampled during proving/verification are independent of the public
+inputs.</p>
+<p>Because the <code>air</code> is a concrete Rust type, you often do not need to explicitly
+observe it into the challenger <em>if your application has a single fixed AIR version
+compiled in</em>. If you support multiple AIRs/versions/protocol configurations, you
+should also bind some <code>air_id</code> / version tag / domain separator to prevent
+cross-protocol replay.</p>
+<h3 id="recommended-pattern-pre-seed-the-challenger-no-proof-bloat"><a class="doc-anchor" href="#recommended-pattern-pre-seed-the-challenger-no-proof-bloat">§</a>Recommended pattern: pre-seed the challenger (no proof bloat)</h3>
+<p>The transcript channel traits do not currently expose an “observe-only” operation
+(observe into the challenger without recording into the proof). If you want to
+bind public inputs without bloating the proof, the most ergonomic pattern is to
+pre-seed the challenger and then construct the transcript.</p>
+
+<div class="example-wrap ignore"><a href="#" class="tooltip" title="This example is not tested">ⓘ</a><pre class="rust rust-example-rendered"><code><span class="kw">use </span>p3_baby_bear::{BabyBear, Poseidon2BabyBear};
+<span class="kw">use </span>p3_challenger::{CanObserve, DuplexChallenger};
+<span class="kw">use </span>p3_dft::Radix2DitParallel;
+<span class="kw">use </span>p3_field::extension::BinomialExtensionField;
+<span class="kw">use </span>crate::{StarkConfig, prove_multi};
+<span class="kw">use </span>p3_miden_lifted_air::{AirWitness, AirInstance};
+<span class="kw">use </span>p3_miden_lmcs::LmcsConfig;
+<span class="kw">use </span>p3_miden_stateful_hasher::StatefulSponge;
+<span class="kw">use </span>p3_miden_transcript::{ProverTranscript, VerifierTranscript};
+<span class="kw">use </span>p3_symmetric::TruncatedPermutation;
+<span class="kw">use </span>rand::rngs::SmallRng;
+<span class="kw">use </span>rand::SeedableRng;
+
+<span class="comment">// Concrete instantiation matching the repository's BabyBear+Poseidon2 defaults.
+</span><span class="kw">const </span>WIDTH: usize = <span class="number">16</span>;
+<span class="kw">const </span>RATE: usize = <span class="number">8</span>;
+<span class="kw">const </span>DIGEST: usize = <span class="number">8</span>;
+
+<span class="kw">type </span>F = BabyBear;
+<span class="kw">type </span>EF = BinomialExtensionField&lt;F, <span class="number">4</span>&gt;;
+<span class="kw">type </span>P = &lt;F <span class="kw">as </span>p3_field::Field&gt;::Packing;
+<span class="kw">type </span>Perm = Poseidon2BabyBear&lt;WIDTH&gt;;
+<span class="kw">type </span>Challenger = DuplexChallenger&lt;F, Perm, WIDTH, RATE&gt;;
+<span class="kw">type </span>Sponge = StatefulSponge&lt;Perm, WIDTH, RATE, DIGEST&gt;;
+<span class="kw">type </span>Compress = TruncatedPermutation&lt;Perm, <span class="number">2</span>, DIGEST, WIDTH&gt;;
+<span class="kw">type </span>Lmcs = LmcsConfig&lt;P, P, Sponge, Compress, WIDTH, DIGEST&gt;;
+<span class="kw">type </span>Dft = Radix2DitParallel&lt;F&gt;;
+
+<span class="comment">// --- Build config ---
+</span><span class="kw">let </span><span class="kw-2">mut </span>rng = SmallRng::seed_from_u64(<span class="number">0</span>);
+<span class="kw">let </span>perm = Perm::new_from_rng_128(<span class="kw-2">&amp;mut </span>rng);
+<span class="kw">let </span>sponge = Sponge::new(perm.clone());
+<span class="kw">let </span>compress = Compress::new(perm.clone());
+<span class="kw">let </span>config = StarkConfig { pcs: <span class="comment">/* ... */</span>, lmcs: Lmcs::new(sponge, compress), dft: Dft::default() };
+
+<span class="comment">// --- Statement (out-of-band) ---
+</span><span class="kw">let </span>public_values: Vec&lt;F&gt; = <span class="comment">/* ... */</span>;
+<span class="kw">let </span>log_trace_height: usize = <span class="comment">/* ... */</span>;
+
+<span class="comment">// --- Prover: bind statement into Fiat-Shamir ---
+</span><span class="kw">let </span><span class="kw-2">mut </span>ch = Challenger::new(perm.clone());
+<span class="comment">// Domain separator: one BabyBear element per ASCII byte.
+</span>ch.observe_slice(<span class="kw-2">&amp;</span><span class="string">b"LSTARK0"</span>.map(|b| F::from_u8(b)));
+ch.observe_slice(<span class="kw-2">&amp;</span>public_values);
+<span class="comment">// If your app supports multiple AIRs/versions, also observe an application-level air_id here.
+// --- Prover ---
+</span><span class="kw">let </span>witness = AirWitness::new(<span class="kw-2">&amp;</span>trace, <span class="kw-2">&amp;</span>public_values, <span class="kw-2">&amp;</span>[]);
+<span class="kw">let </span>output = prove_multi(<span class="kw-2">&amp;</span>config, <span class="kw-2">&amp;</span>[(<span class="kw-2">&amp;</span>air, witness, <span class="kw-2">&amp;</span>aux_builder)], ch)<span class="question-mark">?</span>;
+
+<span class="comment">// --- Verifier: same binding, then verify ---
+</span><span class="kw">let </span><span class="kw-2">mut </span>ch = Challenger::new(perm);
+ch.observe_slice(<span class="kw-2">&amp;</span><span class="string">b"LSTARK0"</span>.map(|b| F::from_u8(b)));
+ch.observe_slice(<span class="kw-2">&amp;</span>public_values);
+
+<span class="kw">let </span>instance = AirInstance { log_trace_height, public_values: <span class="kw-2">&amp;</span>public_values, var_len_public_inputs: <span class="kw-2">&amp;</span>[] };
+<span class="kw">let </span>verifier_digest = <span class="kw">crate</span>::verify_multi(<span class="kw-2">&amp;</span>config, <span class="kw-2">&amp;</span>[(<span class="kw-2">&amp;</span>air, instance)], <span class="kw-2">&amp;</span>output.proof, ch)<span class="question-mark">?</span>;
+<span class="macro">assert_eq!</span>(output.digest, verifier_digest);</code></pre></div><h3 id="alternative-write-statement-data-into-the-transcript"><a class="doc-anchor" href="#alternative-write-statement-data-into-the-transcript">§</a>Alternative: write statement data into the transcript</h3>
+<p>If you do want the proof to be self-contained, you can <code>send_field_slice</code> the
+statement data into the transcript before calling <a href="fn.prove_single.html" title="fn miden_crypto::stark::prover::prove_single"><code>prove_single</code></a> / <a href="fn.prove_multi.html" title="fn miden_crypto::stark::prover::prove_multi"><code>prove_multi</code></a>.
+In that case, the verifier must <em>first</em> read and validate those values from the
+transcript, and only then call <a href="../verifier/fn.verify_multi.html" title="fn miden_crypto::stark::verifier::verify_multi"><code>crate::verifier::verify_multi</code></a>.</p>
+<p>More generally, you can choose to obtain some parameters from the channel. If you
+do, you are responsible for validating them before use.</p>
+<h2 id="multi-trace-ordering"><a class="doc-anchor" href="#multi-trace-ordering">§</a>Multi-trace ordering</h2>
+<p>For <a href="fn.prove_multi.html" title="fn miden_crypto::stark::prover::prove_multi"><code>prove_multi</code></a>, <code>instances</code> must be provided in ascending trace height order
+(smallest first). This is a protocol-level requirement.</p>
+<p>Internally, quotient numerators are accumulated using cyclic extension before a
+single vanishing division on the largest quotient domain.</p>
+</div></details><h2 id="modules" class="section-header">Modules<a href="#modules" class="anchor">§</a></h2><dl class="item-table"><dt><a class="mod" href="quotient/index.html" title="mod miden_crypto::stark::prover::quotient">quotient</a></dt><dd>Quotient polynomial helpers: accumulation, vanishing division, decomposition.</dd></dl><h2 id="enums" class="section-header">Enums<a href="#enums" class="anchor">§</a></h2><dl class="item-table"><dt><a class="enum" href="enum.ProverError.html" title="enum miden_crypto::stark::prover::ProverError">Prover<wbr>Error</a></dt><dd>Errors that can occur during proving.</dd></dl><h2 id="functions" class="section-header">Functions<a href="#functions" class="anchor">§</a></h2><dl class="item-table"><dt><a class="fn" href="fn.prove_multi.html" title="fn miden_crypto::stark::prover::prove_multi">prove_<wbr>multi</a></dt><dd>Prove multiple AIRs with traces of different heights.</dd><dt><a class="fn" href="fn.prove_single.html" title="fn miden_crypto::stark::prover::prove_single">prove_<wbr>single</a></dt><dd>Prove a single AIR.</dd></dl></section></div></main></body></html>

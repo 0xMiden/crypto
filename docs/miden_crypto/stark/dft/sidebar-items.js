@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"struct":["Radix2DitParallel"]};
+window.SIDEBAR_ITEMS = {"struct":["NaiveDft","Radix2DitParallel"],"trait":["TwoAdicSubgroupDft"]};

@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"struct":["CompressionFunctionFromHasher","PaddingFreeSponge","SerializingHasher"]};
+window.SIDEBAR_ITEMS = {"struct":["CompressionFunctionFromHasher","PaddingFreeSponge","SerializingHasher","TruncatedPermutation"],"trait":["CryptographicPermutation","Permutation"]};
