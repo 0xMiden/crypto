@@ -88,7 +88,7 @@ impl MerkleTree {
             return Err(MerkleError::DepthTooBig(index.depth() as u64));
         }
 
-        let pos = index.to_scalar_index() as usize;
+        let pos = index.to_scalar_index()? as usize;
         Ok(self.nodes[pos])
     }
 
@@ -160,13 +160,13 @@ impl MerkleTree {
         let pairs: &'a [[Word; 2]] = unsafe { slice::from_raw_parts(ptr, n) };
 
         // update the current node
-        let pos = index.to_scalar_index() as usize;
+        let pos = index.to_scalar_index()? as usize;
         self.nodes[pos] = value;
 
         // traverse to the root, updating each node with the merged values of its parents
         for _ in 0..index.depth() {
             index.move_up();
-            let pos = index.to_scalar_index() as usize;
+            let pos = index.to_scalar_index()? as usize;
             let value = Poseidon2::merge(&pairs[pos]);
             self.nodes[pos] = value;
         }
