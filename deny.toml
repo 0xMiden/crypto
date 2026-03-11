@@ -49,7 +49,6 @@ wildcards = "allow"
 
 # Sources configuration
 [sources]
-allow-git        = ["https://github.com/0xMiden/p3-miden"]
 allow-registry   = ["https://github.com/rust-lang/crates.io-index"]
 unknown-git      = "deny"
 unknown-registry = "deny"

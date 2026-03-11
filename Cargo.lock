@@ -1337,7 +1337,8 @@ dependencies = [
 [[package]]
 name = "p3-miden-lifted-air"
 version = "0.5.0"
-source = "git+https://github.com/0xMiden/p3-miden?branch=main#9a2393a692c1cd8ac62854240f5e19cb327af461"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c5c31c65fdc88952d7b301546add9670676e5b878aa0066dd929f107c203b006"
 dependencies = [
  "p3-air",
  "p3-field",
@@ -1349,7 +1350,8 @@ dependencies = [
 [[package]]
 name = "p3-miden-lifted-fri"
 version = "0.5.0"
-source = "git+https://github.com/0xMiden/p3-miden?branch=main#9a2393a692c1cd8ac62854240f5e19cb327af461"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ab9932f1b0a16609a45cd4ee10a4d35412728bc4b38837c7979d7c85d8dcc9fc"
 dependencies = [
  "p3-challenger",
  "p3-commit",
@@ -1368,7 +1370,8 @@ dependencies = [
 [[package]]
 name = "p3-miden-lifted-stark"
 version = "0.5.0"
-source = "git+https://github.com/0xMiden/p3-miden?branch=main#9a2393a692c1cd8ac62854240f5e19cb327af461"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8c3956ab7270c3cdd53ca9796d39ae1821984eb977415b0672110f9666bff5d8"
 dependencies = [
  "p3-challenger",
  "p3-dft",
@@ -1388,7 +1391,8 @@ dependencies = [
 [[package]]
 name = "p3-miden-lmcs"
 version = "0.5.0"
-source = "git+https://github.com/0xMiden/p3-miden?branch=main#9a2393a692c1cd8ac62854240f5e19cb327af461"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "48c46791c983e772136db3d48f102431457451447abb9087deb6c8ce3c1efc86"
 dependencies = [
  "p3-commit",
  "p3-field",
@@ -1407,7 +1411,8 @@ dependencies = [
 [[package]]
 name = "p3-miden-stateful-hasher"
 version = "0.5.0"
-source = "git+https://github.com/0xMiden/p3-miden?branch=main#9a2393a692c1cd8ac62854240f5e19cb327af461"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ec47a9d9615eb3d9d2a59b00d19751d9ad85384b55886827913d680d912eac6a"
 dependencies = [
  "p3-field",
  "p3-symmetric",
@@ -1416,7 +1421,8 @@ dependencies = [
 [[package]]
 name = "p3-miden-transcript"
 version = "0.5.0"
-source = "git+https://github.com/0xMiden/p3-miden?branch=main#9a2393a692c1cd8ac62854240f5e19cb327af461"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "40c565647487e4a949f67e6f115b0391d6cb82ac8e561165789939bab23d0ae7"
 dependencies = [
  "p3-challenger",
  "p3-field",
