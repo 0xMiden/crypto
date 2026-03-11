@@ -130,8 +130,9 @@ impl Iterator for SubtreeNodeIter<'_> {
 /// Represents a complete 8-depth subtree that is serialized into a single RocksDB entry.
 ///
 /// ### What is stored
-/// - `child_bits` is a 512-bit bitmask (2 bits per node) marking non-empty left/right children.
-/// - `hashes` stores only non-empty child hashes in bit order.
+/// - `nodes` tracks only **non-empty inner nodes** of this subtree (i.e., nodes for which at least
+///   one child differs from the canonical empty hash). Each entry stores an `InnerNode` (hash
+///   pair).
 ///
 /// ### Local index layout (how indices are computed)
 /// - Indices are **subtree-local** and follow binary-heap (level-order) layout: `root = 0`;
