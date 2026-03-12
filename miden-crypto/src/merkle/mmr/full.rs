@@ -16,6 +16,7 @@ use super::{
     super::{InnerNodeInfo, MerklePath},
     MmrDelta, MmrError, MmrPath, MmrPeaks, MmrProof,
     forest::{Forest, TreeSizeIterator},
+    nodes_from_mask,
 };
 use crate::{
     Word,
@@ -341,7 +342,7 @@ impl Mmr {
 
         // The tree walk below goes from the root to the leaf, compute the root index to start
         let mut forest_target: usize = 1usize << tree_bit;
-        let mut index = Forest::new(forest_target).unwrap().num_nodes() - 1;
+        let mut index = nodes_from_mask(forest_target) - 1;
 
         // Loop until the leaf is reached
         while forest_target > 1 {
@@ -350,7 +351,7 @@ impl Mmr {
 
             // compute the indices of the right and left subtrees based on the post-order
             let right_offset = index - 1;
-            let left_offset = right_offset - Forest::new(forest_target).unwrap().num_nodes();
+            let left_offset = right_offset - nodes_from_mask(forest_target);
 
             let left_or_right = relative_pos & forest_target;
             let sibling = if left_or_right != 0 {
@@ -375,17 +376,6 @@ impl Mmr {
         let value = self.nodes[index_offset + index];
         Ok((value, path))
     }
-}
-
-/// Returns the number of nodes represented by a forest bitmask.
-///
-/// Here `mask` is a forest-leaf mask (same encoding as [`Forest::num_leaves()`]): each set bit
-/// denotes one peak/tree with leaf count `2^bit_position`.
-///
-/// This is equivalent to `Forest::new(mask).unwrap().num_nodes()`, and we intentionally keep that
-/// form here for consistency with other MMR code paths.
-fn nodes_from_mask(mask: usize) -> usize {
-    Forest::new(mask).expect("mask must encode a valid forest").num_nodes()
 }
 
 // CONVERSIONS
@@ -496,7 +486,7 @@ impl Iterator for MmrNodes<'_> {
 mod tests {
     use alloc::vec::Vec;
 
-    use super::nodes_from_mask;
+    use super::super::nodes_from_mask;
     use crate::{
         Felt, Word, ZERO,
         merkle::mmr::{Forest, Mmr},

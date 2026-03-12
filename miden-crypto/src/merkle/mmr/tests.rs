@@ -4,7 +4,7 @@ use assert_matches::assert_matches;
 
 use super::{
     super::{InnerNodeInfo, Poseidon2, Word},
-    Mmr, MmrError, MmrPeaks, PartialMmr,
+    Mmr, MmrError, MmrPeaks, PartialMmr, nodes_from_mask,
 };
 use crate::{
     Felt,
@@ -1523,5 +1523,5 @@ fn leaf_to_corresponding_tree(leaf_idx: usize, forest: usize) -> Option<u32> {
 
 /// Return the total number of nodes of a given forest
 fn nodes_in_forest(forest: usize) -> usize {
-    Forest::new(forest).unwrap().num_nodes()
+    nodes_from_mask(forest)
 }
