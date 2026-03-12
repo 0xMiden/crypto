@@ -108,6 +108,9 @@ impl Smt {
         sorted_kv_pairs
             .par_sort_unstable_by_key(|(key, _)| Self::key_to_leaf_index(key).position());
 
+        // After sorting, check for duplicate keys which are adjacent after the sort.
+        Self::check_for_duplicate_keys(&sorted_kv_pairs)?;
+
         // Convert sorted pairs into mutated leaves and capture any new pairs
         let (mut subtree_leaves, new_pairs) =
             self.sorted_pairs_to_mutated_subtree_leaves(sorted_kv_pairs)?;
@@ -278,11 +281,7 @@ impl Smt {
         if pairs.len() > 1 {
             pairs.sort_by(|(key_1, _), (key_2, _)| leaf::cmp_keys(*key_1, *key_2));
             // Check for duplicates in a sorted list by comparing adjacent pairs
-            if let Some(window) = pairs.windows(2).find(|window| window[0].0 == window[1].0) {
-                // If we find a duplicate, return an error
-                let col = Self::key_to_leaf_index(&window[0].0).index.position();
-                return Err(MerkleError::DuplicateValuesForIndex(col));
-            }
+            Self::check_for_duplicate_keys(&pairs)?;
             Ok(Some(SmtLeaf::new_multiple(pairs).unwrap()))
         } else {
             let (key, value) = pairs.pop().unwrap();

@@ -26,6 +26,7 @@
 - [BREAKING] Removed `RpoRandomCoin` and `RpxRandomCoin` and introduced a Poseidon2-based `RandomCoin` ([#871](https://github.com/0xMiden/crypto/pull/871)).
 - Harden MerkleStore deserialization and fuzz coverage ([#878](https://github.com/0xMiden/crypto/pull/878)).
 - [BREAKING] Upgraded Plonky3 from 0.4.2 to 0.5.0 and replaced `p3-miden-air`, `p3-miden-fri`, and `p3-miden-prover` with the unified `p3-miden-lifted-stark` crate. The `stark` module now re-exports the Lifted STARK proving system from [p3-miden](https://github.com/0xMiden/p3-miden).
+- [BREAKING] Updated `SparseMerkleTree` and its implementations to reject batches of key-value pairs that contain more than one instance of any given key. This may cause previously successful operations to now fail if your input batch is not de-duplicated.
 
 ## 0.22.4 (2026-03-03)
 

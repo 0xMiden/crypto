@@ -336,7 +336,14 @@ impl Smt {
     /// [`Smt::apply_mutations()`] can be called in order to commit these changes to the Merkle
     /// tree, or [`drop()`] to discard them.
     ///
+    /// # Errors
+    ///
+    /// - [`MerkleError::DuplicateValuesForIndex`] if `kv_pairs` contains the same key more than
+    ///   once.
+    /// - [`MerkleError::TooManyLeafEntries`] if mutations would exceed 1024 entries in a leaf.
+    ///
     /// # Example
+    ///
     /// ```
     /// # use miden_crypto::{Felt, Word};
     /// # use miden_crypto::merkle::{EmptySubtreeRoots, smt::{Smt, SMT_DEPTH}};
@@ -351,6 +358,8 @@ impl Smt {
         &self,
         kv_pairs: impl IntoIterator<Item = (Word, Word)>,
     ) -> Result<MutationSet<SMT_DEPTH, Word, Word>, MerkleError> {
+        let kv_pairs: Vec<(Word, Word)> = kv_pairs.into_iter().collect();
+
         #[cfg(feature = "concurrent")]
         {
             self.compute_mutations_concurrent(kv_pairs)

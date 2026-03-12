@@ -257,6 +257,36 @@ fn test_duplicate_key_insertion() {
 }
 
 #[test]
+fn test_compute_mutations_rejects_duplicate_keys() {
+    let storage = MemoryStorage::new();
+    let smt = LargeSmt::<_>::with_entries(storage, vec![]).unwrap();
+
+    let key = Word::from([ONE, ONE, ONE, ONE]);
+    let value = Word::new([ONE; WORD_SIZE]);
+
+    let entries = vec![(key, value), (key, value)];
+    let result = smt.compute_mutations(entries);
+    assert!(
+        result.is_err(),
+        "Expected an error when computing mutations with duplicate keys"
+    );
+}
+
+#[test]
+fn test_insert_batch_rejects_duplicate_keys() {
+    let storage = MemoryStorage::new();
+    let mut smt = LargeSmt::<_>::with_entries(storage, vec![]).unwrap();
+
+    let key = Word::from([ONE, ONE, ONE, ONE]);
+    let value1 = Word::new([ONE; WORD_SIZE]);
+    let value2 = Word::new([Felt::from_u32(2_u32); WORD_SIZE]);
+
+    let entries = vec![(key, value1), (key, value2)];
+    let result = smt.insert_batch(entries);
+    assert!(result.is_err(), "Expected an error when inserting batch with duplicate keys");
+}
+
+#[test]
 fn test_delete_entry() {
     let storage = MemoryStorage::new();
     let key1 = Word::new([ONE, ONE, ONE, ONE]);
