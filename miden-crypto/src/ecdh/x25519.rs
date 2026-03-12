@@ -17,6 +17,7 @@ use alloc::vec::Vec;
 use hkdf::{Hkdf, hmac::SimpleHmac};
 use k256::sha2::Sha256;
 use rand::{CryptoRng, RngCore};
+use subtle::ConstantTimeEq;
 
 use crate::{
     dsa::eddsa_25519_sha512::{PublicKey, SecretKey},
@@ -200,7 +201,9 @@ impl KeyAgreementScheme for X25519 {
         static_pk: &Self::PublicKey,
     ) -> Result<Self::SharedSecret, super::KeyAgreementError> {
         let shared = ephemeral_sk.diffie_hellman(static_pk);
-        debug_assert!(!shared.as_ref().iter().all(|byte| *byte == 0), "all-zero shared secret");
+        if is_all_zero(shared.as_ref()) {
+            return Err(super::KeyAgreementError::InvalidSharedSecret);
+        }
         Ok(shared)
     }
 
@@ -209,7 +212,9 @@ impl KeyAgreementScheme for X25519 {
         ephemeral_pk: &Self::EphemeralPublicKey,
     ) -> Result<Self::SharedSecret, super::KeyAgreementError> {
         let shared = static_sk.get_shared_secret(ephemeral_pk.clone());
-        debug_assert!(!shared.as_ref().iter().all(|byte| *byte == 0), "all-zero shared secret");
+        if is_all_zero(shared.as_ref()) {
+            return Err(super::KeyAgreementError::InvalidSharedSecret);
+        }
         Ok(shared)
     }
 
@@ -226,6 +231,15 @@ impl KeyAgreementScheme for X25519 {
     }
 }
 
+fn is_all_zero(bytes: &[u8]) -> bool {
+    // Empty input is treated as invalid caller input rather than "all zero".
+    if bytes.is_empty() {
+        return false;
+    }
+    let acc = bytes.iter().fold(0u8, |acc, &byte| acc | byte);
+    acc.ct_eq(&0u8).into()
+}
+
 // TESTS
 // ================================================================================================
 
@@ -235,7 +249,8 @@ mod tests {
 
     use super::*;
     use crate::{
-        dsa::eddsa_25519_sha512::SecretKey, rand::test_utils::seeded_rng, utils::Deserializable,
+        dsa::eddsa_25519_sha512::SecretKey, ecdh::KeyAgreementError, rand::test_utils::seeded_rng,
+        utils::Deserializable,
     };
 
     #[test]
@@ -275,6 +290,27 @@ mod tests {
         let bytes = find_twist_point_bytes();
         let result = EphemeralPublicKey::read_from_bytes(&bytes);
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn exchange_static_ephemeral_rejects_zero_shared_secret() {
+        let mut rng = seeded_rng([0u8; 32]);
+        let static_sk = SecretKey::with_rng(&mut rng);
+
+        let low_order_bytes = EIGHT_TORSION[0].to_montgomery().to_bytes();
+        let low_order_pk = EphemeralPublicKey {
+            inner: x25519_dalek::PublicKey::from(low_order_bytes),
+        };
+
+        let result = X25519::exchange_static_ephemeral(&static_sk, &low_order_pk);
+        assert!(matches!(result, Err(KeyAgreementError::InvalidSharedSecret)));
+    }
+
+    #[test]
+    fn is_all_zero_accepts_arbitrary_lengths() {
+        assert!(!is_all_zero(&[]));
+        assert!(is_all_zero(&[0u8; 16]));
+        assert!(!is_all_zero(&[0u8, 1u8, 0u8, 0u8]));
     }
 
     fn find_twist_point_bytes() -> [u8; 32] {

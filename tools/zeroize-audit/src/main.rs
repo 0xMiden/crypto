@@ -129,7 +129,8 @@ fn collect_zeroize_impls(index: &BTreeMap<String, Value>) -> BTreeSet<u64> {
         let trait_path = item
             .pointer("/inner/impl/trait/path")
             .and_then(|v| v.as_str());
-        if !matches!(trait_path, Some("Zeroize" | "ZeroizeOnDrop")) {
+        let trait_name = trait_path.and_then(|path| path.split("::").last());
+        if !matches!(trait_name, Some("Zeroize" | "ZeroizeOnDrop")) {
             continue;
         }
         if let Some(id) = item
@@ -193,6 +194,33 @@ fn type_is_zeroized(ty: &Value, zeroize_impls: &BTreeSet<u64>) -> bool {
         if let Some(id) = resolved.get("id").and_then(|v| v.as_u64()) {
             return zeroize_impls.contains(&id);
         }
+        if let Some(container) = path.split("::").last() {
+            if matches!(
+                container,
+                "Option"
+                    | "Result"
+                    | "Vec"
+                    | "VecDeque"
+                    | "LinkedList"
+                    | "BinaryHeap"
+                    | "Box"
+                    | "Rc"
+                    | "Arc"
+                    | "Cow"
+                    | "BTreeMap"
+                    | "BTreeSet"
+                    | "HashMap"
+                    | "HashSet"
+            ) {
+                let args = resolved.get("args");
+                let type_args = collect_type_args(args);
+                if !type_args.is_empty() {
+                    return type_args
+                        .into_iter()
+                        .all(|arg| type_is_zeroized(arg, zeroize_impls));
+                }
+            }
+        }
         return false;
     }
 
@@ -226,4 +254,32 @@ fn type_is_zeroized(ty: &Value, zeroize_impls: &BTreeSet<u64>) -> bool {
     }
 
     false
+}
+
+fn collect_type_args(args: Option<&Value>) -> Vec<&Value> {
+    let mut out = Vec::new();
+    let Some(args) = args else {
+        return out;
+    };
+
+    if let Some(angle) = args.get("angle_bracketed") {
+        if let Some(values) = angle.get("args").and_then(|v| v.as_array()) {
+            for value in values {
+                if let Some(ty) = value.get("type") {
+                    out.push(ty);
+                }
+            }
+        }
+    }
+
+    if let Some(parenthesized) = args.get("parenthesized") {
+        if let Some(inputs) = parenthesized.get("inputs").and_then(|v| v.as_array()) {
+            out.extend(inputs.iter());
+        }
+        if let Some(output) = parenthesized.get("output") {
+            out.push(output);
+        }
+    }
+
+    out
 }

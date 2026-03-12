@@ -1,6 +1,8 @@
 #![cfg(test)]
 //! This module contains the handwritten tests of the functionality for the SMT forest. These tests
-//! are for the basic functionality, and rely on the
+//! are for the basic functionality, and are intended to test the portion of the logic that is
+//! backend-independent and lives purely in the forest. To that end, it uses
+//! [`ForestInMemoryBackend`] to do so.
 //!
 //! Wherever possible, these tests rely on the correctness of the existing [`Smt`] implementation.
 //! It is used as a point of comparison to avoid the need to hard-code specific values and scenarios
@@ -28,6 +30,7 @@ use crate::{
     },
     rand::test_utils::{ContinuousRng, rand_value},
 };
+
 // TYPE ALIASES
 // ================================================================================================
 

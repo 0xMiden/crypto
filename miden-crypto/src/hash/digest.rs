@@ -28,6 +28,8 @@ pub const DIGEST512_BYTES: usize = 64;
 // ================================================================================================
 
 /// A 192-bit (24-byte) digest. Type alias for `Digest<24>`.
+///
+/// Hex parsing also accepts zero-padded 32-byte encodings for backward compatibility.
 pub type Digest192 = Digest<DIGEST192_BYTES>;
 
 /// A 256-bit (32-byte) digest. Type alias for `Digest<32>`.
@@ -116,6 +118,28 @@ impl<const N: usize> TryFrom<&str> for Digest<N> {
     type Error = HexParseError;
 
     fn try_from(value: &str) -> Result<Self, Self::Error> {
+        if N == DIGEST192_BYTES {
+            let short_len = (DIGEST192_BYTES * 2) + 2;
+            let long_len = (DIGEST256_BYTES * 2) + 2;
+
+            if value.len() == short_len {
+                let bytes = hex_to_bytes::<N>(value)?;
+                return Ok(Self(bytes));
+            }
+
+            if value.len() == long_len {
+                let bytes = hex_to_bytes::<DIGEST256_BYTES>(value)?;
+                let padding = &bytes[DIGEST192_BYTES..];
+                if padding.iter().all(|byte| *byte == 0) {
+                    let mut trimmed = [0u8; N];
+                    trimmed.copy_from_slice(&bytes[..N]);
+                    return Ok(Self(trimmed));
+                }
+            }
+
+            return Err(HexParseError::InvalidLength { expected: short_len, actual: value.len() });
+        }
+
         hex_to_bytes(value).map(Self)
     }
 }
@@ -196,6 +220,20 @@ mod tests {
         let bytes = [1u8; 64];
         let digest = Digest::<64>::from(bytes);
         assert_eq!(digest.as_bytes(), &bytes);
+    }
+
+    #[test]
+    fn test_digest192_accepts_zero_padded_hex() {
+        let mut bytes = [0u8; DIGEST192_BYTES];
+        bytes[0] = 1;
+        bytes[23] = 255;
+
+        let mut padded = [0u8; DIGEST256_BYTES];
+        padded[..DIGEST192_BYTES].copy_from_slice(&bytes);
+
+        let hex = bytes_to_hex_string(padded);
+        let parsed = Digest192::try_from(hex.as_str()).expect("digest192 should accept padding");
+        assert_eq!(parsed.as_bytes(), &bytes);
     }
 
     #[test]

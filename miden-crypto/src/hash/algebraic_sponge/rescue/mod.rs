@@ -1,9 +1,8 @@
-use p3_field::Field;
-
 use super::{
     AlgebraicSponge, CAPACITY_RANGE, DIGEST_RANGE, Felt, RATE_RANGE, RATE0_RANGE, RATE1_RANGE,
     Range, STATE_WIDTH, Word, ZERO,
 };
+use crate::field::Field;
 
 mod arch;
 pub use arch::optimized::{

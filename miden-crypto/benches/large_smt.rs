@@ -1,6 +1,6 @@
-use std::hint;
+use std::{hint, iter::empty};
 
-use criterion::{Criterion, criterion_group, criterion_main};
+use criterion::{BatchSize, Criterion, criterion_group, criterion_main};
 use miden_crypto::{
     Felt, Word,
     merkle::{
@@ -13,11 +13,10 @@ use miden_crypto::{
 };
 
 mod common;
-use common::*;
 
-use crate::{
-    common::data::{generate_smt_entries_sequential, generate_test_keys_sequential},
+use crate::common::{
     config::{DEFAULT_MEASUREMENT_TIME, DEFAULT_SAMPLE_SIZE},
+    data::{generate_smt_entries_sequential, generate_test_keys_sequential},
 };
 
 // SUBTREE SERIALIZATION BENCHMARKS
@@ -139,6 +138,28 @@ benchmark_with_setup_data! {
 }
 
 benchmark_with_setup_data! {
+    large_smt_open_in_large_tree,
+    DEFAULT_MEASUREMENT_TIME,
+    DEFAULT_SAMPLE_SIZE,
+    "rocksdb_smt_open_in_large_tree",
+    || {
+        let entries = generate_smt_entries_sequential(10_000);
+        let keys = generate_test_keys_sequential(10);
+        let temp_dir = tempfile::TempDir::new().unwrap();
+        let storage = RocksDbStorage::open(RocksDbConfig::new(temp_dir.path())).unwrap();
+        let smt = LargeSmt::with_entries(storage, entries).unwrap();
+        (smt, keys, temp_dir)
+    },
+    |b: &mut criterion::Bencher, (smt, keys, _temp_dir): &(LargeSmt<RocksDbStorage>, Vec<Word>, tempfile::TempDir)| {
+        b.iter(|| {
+            for key in keys {
+                hint::black_box(smt.open(key));
+            }
+        })
+    },
+}
+
+benchmark_with_setup_data! {
     large_smt_compute_mutations,
     DEFAULT_MEASUREMENT_TIME,
     DEFAULT_SAMPLE_SIZE,
@@ -241,6 +262,52 @@ benchmark_batch! {
     |size| Some(criterion::Throughput::Elements(size as u64))
 }
 
+benchmark_batch! {
+    large_smt_insert_batch_to_empty_tree,
+    &[100, 1_000, 10_000],
+    |b: &mut criterion::Bencher, insert_count: usize| {
+        b.iter_batched(
+            || {
+                let temp_dir = tempfile::TempDir::new().unwrap();
+                let storage = RocksDbStorage::open(RocksDbConfig::new(temp_dir.path())).unwrap();
+                let smt = LargeSmt::with_entries(storage, empty()).unwrap();
+                let batch = generate_smt_entries_sequential(insert_count);
+
+                (temp_dir, smt, batch)
+            },
+            |(_temp_dir, mut smt, batch)| {
+                smt.insert_batch(batch).unwrap();
+            },
+            BatchSize::LargeInput
+        )
+    },
+    |size| Some(criterion::Throughput::Elements(size as u64))
+}
+
+benchmark_batch! {
+    large_smt_insert_batch_to_populated_tree,
+    &[100, 1_000, 10_000],
+    |b: &mut criterion::Bencher, insert_count: usize| {
+        let initial_entries = generate_smt_entries_sequential(10_000);
+
+        b.iter_batched(
+            || {
+                let temp_dir = tempfile::TempDir::new().unwrap();
+                let storage = RocksDbStorage::open(RocksDbConfig::new(temp_dir.path())).unwrap();
+                let smt = LargeSmt::with_entries(storage, initial_entries.clone()).unwrap();
+                let batch = generate_smt_entries_sequential(insert_count);
+
+                (temp_dir, smt, batch)
+            },
+            |(_temp_dir, mut smt, batch)| {
+                smt.insert_batch(batch).unwrap();
+            },
+            BatchSize::LargeInput
+        )
+    },
+    |size| Some(criterion::Throughput::Elements(size as u64))
+}
+
 // MEMORY STORAGE BENCHMARKS
 // ================================================================================================
 
@@ -333,10 +400,13 @@ benchmark_batch! {
 criterion_group!(
     large_smt_benchmark_group,
     large_smt_open,
+    large_smt_open_in_large_tree,
     large_smt_compute_mutations,
     large_smt_apply_mutations,
     large_smt_apply_mutations_with_reversion,
     large_smt_insert_batch,
+    large_smt_insert_batch_to_empty_tree,
+    large_smt_insert_batch_to_populated_tree,
 );
 
 criterion_group!(

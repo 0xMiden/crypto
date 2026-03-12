@@ -160,7 +160,7 @@ impl History {
     ) -> Result<()> {
         // We need to fail early if the provided new version is not monotonic with respect to the
         // latest version in the history.
-        if let Some(v) = self.deltas.iter().last()
+        if let Some(v) = self.deltas.back()
             && v.version_id >= version_id
         {
             return Err(HistoryError::NonMonotonicVersions(version_id, v.version_id));
@@ -261,7 +261,7 @@ impl History {
                 return Err(HistoryError::VersionTooOld);
             }
         } else {
-            return Err(HistoryError::VersionTooOld);
+            return Err(HistoryError::HistoryEmpty);
         }
 
         // As we want the NEWEST delta that satisfies the version, we look for the position at which
@@ -433,7 +433,8 @@ struct Delta {
     nodes: NodeChanges,
 
     /// The keys that need to be changed by the delta to return the target tree to the state
-    /// represented by the delta.
+    /// represented by the delta. This includes pairs that either add or mutate a value under a
+    /// key, and pairs where the value is the `EMPTY_WORD` and hence represent removals.
     changed_keys: ChangedKeys,
 }
 

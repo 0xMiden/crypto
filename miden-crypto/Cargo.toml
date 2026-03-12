@@ -46,8 +46,13 @@ required-features = ["std"]
 
 [[bench]]
 harness           = false
-name              = "large-smt"
+name              = "large_smt"
 required-features = ["rocksdb"]
+
+[[bench]]
+harness           = false
+name              = "large_smt_forest"
+required-features = ["persistent-forest"]
 
 [[bench]]
 harness           = false
@@ -75,15 +80,16 @@ name              = "transpose"
 required-features = ["std"]
 
 [features]
-concurrent = ["dep:rayon", "p3-maybe-rayon/parallel", "p3-miden-prover/parallel", "p3-util/parallel", "std"]
-default    = ["concurrent", "std"]
-executable = ["concurrent", "dep:clap", "dep:rand-utils"]
-fuzzing    = []
-internal   = ["concurrent"]
-rocksdb    = ["concurrent", "dep:rocksdb"]
-serde      = ["dep:serde", "serde?/alloc"]
-std        = ["blake3/std", "dep:cc", "miden-serde-utils/std", "rand/std", "rand/thread_rng", "serde?/std"]
-testing    = ["dep:proptest", "miden-field/testing"]
+concurrent        = ["dep:rayon", "p3-maybe-rayon/parallel", "p3-miden-lifted-stark/parallel", "p3-util/parallel", "std"]
+default           = ["concurrent", "std"]
+executable        = ["concurrent", "dep:clap", "dep:rand-utils"]
+fuzzing           = []
+internal          = ["concurrent"]
+persistent-forest = ["rocksdb", "serde"]
+rocksdb           = ["concurrent", "dep:rocksdb"]
+serde             = ["dep:serde", "serde?/alloc"]
+std               = ["blake3/std", "dep:cc", "miden-serde-utils/std", "rand/std", "rand/thread_rng", "serde?/std"]
+testing           = ["dep:proptest", "miden-field/testing"]
 
 [dependencies]
 # Miden dependencies
@@ -117,25 +123,19 @@ subtle           = { default-features = false, version = "2.6" }
 thiserror        = { default-features = false, version = "2.0" }
 x25519-dalek     = { default-features = false, features = ["static_secrets"], version = "2.0" }
 
-# Upstream Plonky3 dependencies
-p3-air         = { default-features = false, version = "0.4.2" }
-p3-blake3      = { default-features = false, version = "0.4.2" }
-p3-challenger  = { default-features = false, version = "0.4.2" }
-p3-commit      = { default-features = false, version = "0.4.2" }
-p3-dft         = { default-features = false, version = "0.4.2" }
-p3-field       = { default-features = false, version = "0.4.2" }
-p3-goldilocks  = { default-features = false, version = "0.4.2" }
-p3-keccak      = { default-features = false, version = "0.4.2" }
-p3-matrix      = { default-features = false, version = "0.4.2" }
-p3-maybe-rayon = { default-features = false, version = "0.4.2" }
-p3-merkle-tree = { default-features = false, version = "0.4.2" }
-p3-symmetric   = { default-features = false, version = "0.4.2" }
-p3-util        = { default-features = false, version = "0.4.2" }
+# Upstream Plonky3 dependencies (matching p3-miden's published 0.5.0)
+p3-blake3      = { default-features = false, version = "0.5" }
+p3-challenger  = { default-features = false, version = "0.5" }
+p3-dft         = { default-features = false, version = "0.5" }
+p3-goldilocks  = { default-features = false, version = "0.5" }
+p3-keccak      = { default-features = false, version = "0.5" }
+p3-matrix      = { default-features = false, version = "0.5" }
+p3-maybe-rayon = { default-features = false, version = "0.5" }
+p3-symmetric   = { default-features = false, version = "0.5" }
+p3-util        = { default-features = false, version = "0.5" }
 
 # Miden-specific Plonky3 crates
-p3-miden-air    = { default-features = false, version = "0.4.2" }
-p3-miden-fri    = { default-features = false, version = "0.4.2" }
-p3-miden-prover = { default-features = false, version = "0.4.2" }
+p3-miden-lifted-stark = { default-features = false, version = "0.5" }
 
 [dev-dependencies]
 assert_matches = { default-features = false, version = "1.5" }

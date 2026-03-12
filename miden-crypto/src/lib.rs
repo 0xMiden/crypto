@@ -23,10 +23,11 @@ pub mod field {
     //! [Felt](super::Felt)).
 
     pub use miden_field::{
-        BasedVectorSpace, BinomialExtensionField, BinomiallyExtendable,
-        BinomiallyExtendableAlgebra, ExtensionField, Field, HasTwoAdicBinomialExtension,
-        InjectiveMonomial, Packable, PermutationMonomial, PrimeCharacteristicRing, PrimeField,
-        PrimeField64, QuotientMap, RawDataSerializable, TwoAdicField, batch_multiplicative_inverse,
+        Algebra, BasedVectorSpace, BinomialExtensionField, BinomiallyExtendable,
+        BinomiallyExtendableAlgebra, BoundedPowers, ExtensionField, Field,
+        HasTwoAdicBinomialExtension, InjectiveMonomial, Packable, PermutationMonomial, Powers,
+        PrimeCharacteristicRing, PrimeField, PrimeField64, QuotientMap, RawDataSerializable,
+        TwoAdicField, batch_multiplicative_inverse,
     };
 
     pub use super::batch_inversion::batch_inversion_allow_zeros;
@@ -42,56 +43,56 @@ pub mod parallel {
 }
 
 pub mod stark {
-    //! Foundational components for the STARK proving system based on Plonky3.
+    //! Lifted STARK proving system based on Plonky3.
     //!
-    //! This module contains components needed to build a STARK prover/verifier and define
-    //! Algebraic Intermediate Representation (AIR) for the Miden VM and other components.
-    //! It primarily consists of re-exports from the Plonky3 project with some Miden-specific
-    //! adaptations.
-    pub use p3_miden_prover::{
-        Commitments, Domain, Entry, OpenedValues, PackedChallenge, PackedVal, PcsError, Proof,
-        ProverConstraintFolder, StarkConfig, StarkGenericConfig, SymbolicAirBuilder,
-        SymbolicExpression, SymbolicVariable, Val, VerificationError, VerifierConstraintFolder,
-        generate_logup_trace, get_log_quotient_degree, get_max_constraint_degree,
-        get_symbolic_constraints, prove, quotient_values, recompose_quotient_from_chunks, verify,
-        verify_constraints,
+    //! Sub-modules from `p3-miden-lifted-stark`:
+    //! - [`proof`] — [`proof::StarkProof`], [`proof::StarkDigest`], [`proof::StarkOutput`],
+    //!   [`proof::StarkTranscript`]
+    //! - [`air`] — AIR traits, builders, symbolic types (includes all of `p3-air`)
+    //! - [`fri`] — PCS parameters, DEEP + FRI types
+    //! - [`lmcs`] — Lifted Merkle commitment scheme
+    //! - [`transcript`] — Fiat-Shamir channels and transcript data
+    //! - [`hasher`] — Stateful hasher primitives
+    //! - [`prover`] — `prove_single` / `prove_multi`
+    //! - [`verifier`] — `verify_single` / `verify_multi`
+    //! - [`debug`] — Debug constraint checker for lifted AIRs
+    //!
+    //! Sub-modules from upstream Plonky3:
+    //! - [`challenger`] — Challenge generation (Fiat-Shamir)
+    //! - [`dft`] — DFT implementations
+    //! - [`matrix`] — Dense matrix types
+    //! - [`symmetric`] — Symmetric cryptographic primitives
+
+    // Top-level types from lifted-stark
+    pub use p3_miden_lifted_stark::{GenericStarkConfig, StarkConfig};
+    // Lifted-stark sub-modules (re-exported as-is)
+    pub use p3_miden_lifted_stark::{
+        air, debug, fri, hasher, lmcs, proof, prover, transcript, verifier,
     };
 
-    pub mod air {
-        pub use p3_air::{
-            Air, AirBuilder, AirBuilderWithPublicValues, BaseAir, BaseAirWithPublicValues,
-            ExtensionBuilder, FilteredAirBuilder, PairBuilder, PairCol, PermutationAirBuilder,
-            VirtualPairCol,
-        };
-        pub use p3_miden_air::{
-            BaseAirWithAuxTrace, FilteredMidenAirBuilder, MidenAir, MidenAirBuilder,
-        };
-    }
-
+    // Upstream Plonky3: challenger
     pub mod challenger {
-        pub use p3_challenger::{HashChallenger, SerializingChallenger64};
+        pub use p3_challenger::{
+            CanFinalizeDigest, CanObserve, DuplexChallenger, FieldChallenger, GrindingChallenger,
+            HashChallenger, SerializingChallenger64,
+        };
     }
 
-    pub mod commit {
-        pub use p3_commit::ExtensionMmcs;
-        pub use p3_merkle_tree::MerkleTreeMmcs;
-    }
-
+    // Upstream Plonky3: dft
     pub mod dft {
-        pub use p3_dft::Radix2DitParallel;
+        pub use p3_dft::{NaiveDft, Radix2DitParallel, TwoAdicSubgroupDft};
     }
 
+    // Upstream Plonky3: matrix
     pub mod matrix {
         pub use p3_matrix::{Matrix, dense::RowMajorMatrix};
     }
 
-    pub mod pcs {
-        pub use p3_miden_fri::{FriParameters, TwoAdicFriPcs};
-    }
-
+    // Upstream Plonky3: symmetric
     pub mod symmetric {
         pub use p3_symmetric::{
-            CompressionFunctionFromHasher, PaddingFreeSponge, SerializingHasher,
+            CompressionFunctionFromHasher, CryptographicPermutation, PaddingFreeSponge,
+            Permutation, SerializingHasher, TruncatedPermutation,
         };
     }
 }

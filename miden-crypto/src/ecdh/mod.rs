@@ -61,4 +61,6 @@ pub(crate) trait KeyAgreementScheme {
 pub(crate) enum KeyAgreementError {
     #[error("hkdf expansion failed")]
     HkdfExpansionFailed,
+    #[error("shared secret is invalid")]
+    InvalidSharedSecret,
 }

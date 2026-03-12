@@ -53,7 +53,8 @@ pub(super) enum EntriesIterator<'forest> {
         /// The view into the history at the correct point.
         history_view: HistoryView<'forest>,
 
-        /// Tracks the keys in the history that are given values that have already been yielded.
+        /// Tracks the keys in the history that have already been "used" by the iterator, either to
+        /// skip an entry (a removal), or to change the value of an entry.
         yielded_history_keys: Set<Word>,
 
         /// The current state of the iteration state machine.

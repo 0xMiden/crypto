@@ -21,6 +21,18 @@ fn blake3_hash_elements() {
     assert_eq!(&expected, &actual);
 }
 
+#[test]
+fn blake3_256_hash_elements_matches_hash() {
+    let elements = rand_vector::<Felt>(17);
+    let expected = Blake3_256::hash_elements(&elements);
+    let mut bytes = Vec::new();
+    for element in elements.iter() {
+        bytes.extend_from_slice(&((*element).as_canonical_u64()).to_le_bytes());
+    }
+    let actual = Blake3_256::hash(&bytes);
+    assert_eq!(expected, actual);
+}
+
 proptest! {
     #[test]
     fn blake192_wont_panic_with_arbitrary_input(ref vec in any::<Vec<u8>>()) {

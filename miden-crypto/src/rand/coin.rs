@@ -1,11 +1,11 @@
 use alloc::string::ToString;
 
-use p3_field::ExtensionField;
 use rand_core::impls;
 
 use super::{Felt, FeltRng, RngCore};
 use crate::{
     Word, ZERO,
+    field::ExtensionField,
     hash::poseidon2::Poseidon2,
     utils::{ByteReader, ByteWriter, Deserializable, DeserializationError, Serializable},
 };

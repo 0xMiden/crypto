@@ -779,17 +779,17 @@ macro_rules! benchmark_rand_draw_integers {
 macro_rules! benchmark_rand_check_leading_zeros {
     ($func_name:ident, $coin_type:ty, $seed:expr) => {
         fn $func_name(c: &mut Criterion) {
-            let mut group = c.benchmark_group("rand-check-leading-zeros");
+            let mut group = c.benchmark_group("rand-check-trailing-zeros");
             group.measurement_time($crate::common::config::DEFAULT_MEASUREMENT_TIME);
             group.sample_size($crate::common::config::DEFAULT_SAMPLE_SIZE);
 
             let coin = <$coin_type>::new($seed);
             let test_values: Vec<u64> = (0u64..100).collect();
 
-            group.bench_function("check_leading_zeros", |b| {
+            group.bench_function("check_trailing_zeros", |b| {
                 b.iter(|| {
                     for &value in &test_values {
-                        let _zeros = coin.check_leading_zeros(black_box(value));
+                        let _zeros = coin.check_trailing_zeros(black_box(value));
                     }
                 });
             });

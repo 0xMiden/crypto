@@ -100,8 +100,11 @@ pub fn bytes_to_elements_with_padding(bytes: &[u8]) -> Vec<Felt> {
 
 /// Converts a sequence of padded field elements back to the original bytes.
 ///
-/// Reconstructs the original byte sequence by removing the padding added by `bytes_to_felts`.
+/// Reconstructs the original byte sequence by removing the padding added by
+/// `bytes_to_elements_with_padding`.
 /// The padding consists of a `1` bit followed by zeros in the final field element.
+/// Any bytes after the last `1` marker in the final field element are ignored and are not
+/// validated to be zero.
 ///
 /// Note that by the endianness of the conversion as well as the fact that we are packing at most
 /// `56 = 7 * 8` bits in each field element, the padding above with `1` should never overflow the

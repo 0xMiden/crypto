@@ -127,7 +127,15 @@ Messages sealed as one type must be unsealed using the corresponding method, oth
 
 ## STARK proving system
 
-The STARK module exports foundational components for the STARK proving system. It primarily consists of re-exports from the [Plonky3](https://github.com/Plonky3/Plonky3) project with some Miden-specific [adaptations](https://github.com/0xMiden/p3-miden).
+[STARK module](./miden-crypto/src/lib.rs) provides the Lifted STARK proving system, implemented in [p3-miden](https://github.com/0xMiden/p3-miden) and built on top of the [Plonky3](https://github.com/Plonky3/Plonky3) framework. It includes:
+
+- AIR traits and builders for defining algebraic constraints.
+- A Lifted Merkle commitment scheme and FRI-based polynomial commitments.
+- Prover and verifier for single and multi-trace STARKs (`prove_single`/`prove_multi`, `verify_single`/`verify_multi`).
+- Fiat-Shamir transcript and challenge generation.
+- A debug constraint checker for development.
+
+The module also re-exports foundational Plonky3 primitives such as challengers, DFT, matrix types, and symmetric cryptography.
 
 ## Make commands
 

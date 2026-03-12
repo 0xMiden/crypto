@@ -61,14 +61,12 @@ pub struct SmtUpdateBatch {
     operations: Vec<ForestOperation>,
 }
 impl SmtUpdateBatch {
-    /// Creates an empty batch of operations that, when applied, will produce a tree with the
-    /// provided `version` when applied.
+    /// Creates an empty batch of operations.
     pub fn empty() -> Self {
         Self { operations: vec![] }
     }
 
-    /// Creates a batch containing the provided `operations` that will produce a tree with the
-    /// provided `version` when applied.
+    /// Creates a batch containing the provided `operations`.
     pub fn new(operations: impl Iterator<Item = ForestOperation>) -> Self {
         Self {
             operations: operations.collect::<Vec<_>>(),
@@ -138,18 +136,16 @@ impl From<SmtUpdateBatch> for Vec<(Word, Word)> {
 
 impl<I> From<I> for SmtUpdateBatch
 where
-    I: Iterator<Item = ForestOperation>,
+    I: Iterator<Item = (Word, Word)>,
 {
     fn from(value: I) -> Self {
-        Self::new(value)
-    }
-}
-
-impl From<SmtUpdateBatch> for Vec<ForestOperation> {
-    /// The vector is guaranteed to be sorted by the key on which an operation is performed, and to
-    /// only contain the _last_ operation to be performed on any given key.
-    fn from(value: SmtUpdateBatch) -> Self {
-        value.consume()
+        Self::new(value.map(|(k, v)| {
+            if v.is_empty() {
+                ForestOperation::Remove { key: k }
+            } else {
+                ForestOperation::Insert { key: k, value: v }
+            }
+        }))
     }
 }
 
