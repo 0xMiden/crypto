@@ -1,5 +1,7 @@
 ## 0.24.0 (TBD)
 
+- [BREAKING] Removed `AlgebraicSponge::merge_with_int()` method ([#894](https://github.com/0xMiden/crypto/pull/894)).
+
 ## 0.23.0 (2026-03-11)
 
 - Replaced `Subtree` internal storage with bitmask layout ([#784](https://github.com/0xMiden/crypto/pull/784)).
