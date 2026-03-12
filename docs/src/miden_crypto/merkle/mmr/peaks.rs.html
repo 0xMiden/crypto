@@ -57,120 +57,127 @@
 <a href=#57 id=57 data-nosnippet>57</a>    /// leaves in the underlying MMR.
 <a href=#58 id=58 data-nosnippet>58</a>    ///
 <a href=#59 id=59 data-nosnippet>59</a>    /// # Errors
-<a href=#60 id=60 data-nosnippet>60</a>    /// Returns an error if the number of leaves and the number of peaks are inconsistent.
-<a href=#61 id=61 data-nosnippet>61</a>    </span><span class="kw">pub fn </span>new(forest: Forest, peaks: Vec&lt;Word&gt;) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="self">Self</span>, MmrError&gt; {
-<a href=#62 id=62 data-nosnippet>62</a>        <span class="kw">if </span>forest.num_trees() != peaks.len() {
-<a href=#63 id=63 data-nosnippet>63</a>            <span class="kw">return </span><span class="prelude-val">Err</span>(MmrError::InvalidPeaks(<span class="macro">format!</span>(
-<a href=#64 id=64 data-nosnippet>64</a>                <span class="string">"number of one bits in leaves is {} which does not equal peak length {}"</span>,
-<a href=#65 id=65 data-nosnippet>65</a>                forest.num_trees(),
-<a href=#66 id=66 data-nosnippet>66</a>                peaks.len()
-<a href=#67 id=67 data-nosnippet>67</a>            )));
+<a href=#60 id=60 data-nosnippet>60</a>    /// Returns an error if the number of leaves and the number of peaks are inconsistent, or if
+<a href=#61 id=61 data-nosnippet>61</a>    /// the forest exceeds the maximum supported size.
+<a href=#62 id=62 data-nosnippet>62</a>    </span><span class="kw">pub fn </span>new(forest: Forest, peaks: Vec&lt;Word&gt;) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="self">Self</span>, MmrError&gt; {
+<a href=#63 id=63 data-nosnippet>63</a>        <span class="kw">if </span>!Forest::is_valid_size(forest.num_leaves()) {
+<a href=#64 id=64 data-nosnippet>64</a>            <span class="kw">return </span><span class="prelude-val">Err</span>(MmrError::ForestSizeExceeded {
+<a href=#65 id=65 data-nosnippet>65</a>                requested: forest.num_leaves(),
+<a href=#66 id=66 data-nosnippet>66</a>                max: Forest::MAX_LEAVES,
+<a href=#67 id=67 data-nosnippet>67</a>            });
 <a href=#68 id=68 data-nosnippet>68</a>        }
-<a href=#69 id=69 data-nosnippet>69</a>
-<a href=#70 id=70 data-nosnippet>70</a>        <span class="prelude-val">Ok</span>(<span class="self">Self </span>{ forest, peaks })
-<a href=#71 id=71 data-nosnippet>71</a>    }
-<a href=#72 id=72 data-nosnippet>72</a>
-<a href=#73 id=73 data-nosnippet>73</a>    <span class="comment">// ACCESSORS
-<a href=#74 id=74 data-nosnippet>74</a>    // --------------------------------------------------------------------------------------------
-<a href=#75 id=75 data-nosnippet>75</a>
-<a href=#76 id=76 data-nosnippet>76</a>    </span><span class="doccomment">/// Returns the underlying forest (a set of mountain range peaks).
-<a href=#77 id=77 data-nosnippet>77</a>    </span><span class="kw">pub fn </span>forest(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; Forest {
-<a href=#78 id=78 data-nosnippet>78</a>        <span class="self">self</span>.forest
-<a href=#79 id=79 data-nosnippet>79</a>    }
-<a href=#80 id=80 data-nosnippet>80</a>
-<a href=#81 id=81 data-nosnippet>81</a>    <span class="doccomment">/// Returns a count of leaves in the underlying MMR.
-<a href=#82 id=82 data-nosnippet>82</a>    </span><span class="kw">pub fn </span>num_leaves(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; usize {
-<a href=#83 id=83 data-nosnippet>83</a>        <span class="self">self</span>.forest.num_leaves()
-<a href=#84 id=84 data-nosnippet>84</a>    }
-<a href=#85 id=85 data-nosnippet>85</a>
-<a href=#86 id=86 data-nosnippet>86</a>    <span class="doccomment">/// Returns the number of peaks of the underlying MMR.
-<a href=#87 id=87 data-nosnippet>87</a>    </span><span class="kw">pub fn </span>num_peaks(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; usize {
-<a href=#88 id=88 data-nosnippet>88</a>        <span class="self">self</span>.peaks.len()
-<a href=#89 id=89 data-nosnippet>89</a>    }
-<a href=#90 id=90 data-nosnippet>90</a>
-<a href=#91 id=91 data-nosnippet>91</a>    <span class="doccomment">/// Returns the list of peaks of the underlying MMR.
-<a href=#92 id=92 data-nosnippet>92</a>    </span><span class="kw">pub fn </span>peaks(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span>[Word] {
-<a href=#93 id=93 data-nosnippet>93</a>        <span class="kw-2">&amp;</span><span class="self">self</span>.peaks
-<a href=#94 id=94 data-nosnippet>94</a>    }
-<a href=#95 id=95 data-nosnippet>95</a>
-<a href=#96 id=96 data-nosnippet>96</a>    <span class="doccomment">/// Returns the peak by the provided index.
-<a href=#97 id=97 data-nosnippet>97</a>    ///
-<a href=#98 id=98 data-nosnippet>98</a>    /// # Errors
-<a href=#99 id=99 data-nosnippet>99</a>    /// Returns an error if the provided peak index is greater or equal to the current number of
-<a href=#100 id=100 data-nosnippet>100</a>    /// peaks in the Mmr.
-<a href=#101 id=101 data-nosnippet>101</a>    </span><span class="kw">pub fn </span>get_peak(<span class="kw-2">&amp;</span><span class="self">self</span>, peak_idx: usize) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="kw-2">&amp;</span>Word, MmrError&gt; {
-<a href=#102 id=102 data-nosnippet>102</a>        <span class="self">self</span>.peaks
-<a href=#103 id=103 data-nosnippet>103</a>            .get(peak_idx)
-<a href=#104 id=104 data-nosnippet>104</a>            .ok_or(MmrError::PeakOutOfBounds { peak_idx, peaks_len: <span class="self">self</span>.peaks.len() })
-<a href=#105 id=105 data-nosnippet>105</a>    }
-<a href=#106 id=106 data-nosnippet>106</a>
-<a href=#107 id=107 data-nosnippet>107</a>    <span class="doccomment">/// Converts this [MmrPeaks] into its components: number of leaves (represented as a [`Forest`])
-<a href=#108 id=108 data-nosnippet>108</a>    /// and a vector of peaks of the underlying MMR.
-<a href=#109 id=109 data-nosnippet>109</a>    </span><span class="kw">pub fn </span>into_parts(<span class="self">self</span>) -&gt; (Forest, Vec&lt;Word&gt;) {
-<a href=#110 id=110 data-nosnippet>110</a>        (<span class="self">self</span>.forest, <span class="self">self</span>.peaks)
-<a href=#111 id=111 data-nosnippet>111</a>    }
-<a href=#112 id=112 data-nosnippet>112</a>
-<a href=#113 id=113 data-nosnippet>113</a>    <span class="doccomment">/// Hashes the peaks.
-<a href=#114 id=114 data-nosnippet>114</a>    ///
-<a href=#115 id=115 data-nosnippet>115</a>    /// The procedure will:
-<a href=#116 id=116 data-nosnippet>116</a>    /// - Flatten and pad the peaks to a vector of Felts.
-<a href=#117 id=117 data-nosnippet>117</a>    /// - Hash the vector of Felts.
-<a href=#118 id=118 data-nosnippet>118</a>    </span><span class="kw">pub fn </span>hash_peaks(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; Word {
-<a href=#119 id=119 data-nosnippet>119</a>        Poseidon2::hash_elements(<span class="kw-2">&amp;</span><span class="self">self</span>.flatten_and_pad_peaks())
-<a href=#120 id=120 data-nosnippet>120</a>    }
-<a href=#121 id=121 data-nosnippet>121</a>
-<a href=#122 id=122 data-nosnippet>122</a>    <span class="doccomment">/// Verifies the Merkle opening proof.
-<a href=#123 id=123 data-nosnippet>123</a>    ///
-<a href=#124 id=124 data-nosnippet>124</a>    /// # Errors
-<a href=#125 id=125 data-nosnippet>125</a>    /// Returns an error if:
-<a href=#126 id=126 data-nosnippet>126</a>    /// - provided opening proof is invalid.
-<a href=#127 id=127 data-nosnippet>127</a>    /// - Mmr root value computed using the provided leaf value differs from the actual one.
-<a href=#128 id=128 data-nosnippet>128</a>    </span><span class="kw">pub fn </span>verify(<span class="kw-2">&amp;</span><span class="self">self</span>, value: Word, opening: MmrProof) -&gt; <span class="prelude-ty">Result</span>&lt;(), MmrError&gt; {
-<a href=#129 id=129 data-nosnippet>129</a>        <span class="kw">let </span>root = <span class="self">self</span>.get_peak(opening.peak_index())<span class="question-mark">?</span>;
-<a href=#130 id=130 data-nosnippet>130</a>        opening
-<a href=#131 id=131 data-nosnippet>131</a>            .path()
-<a href=#132 id=132 data-nosnippet>132</a>            .merkle_path()
-<a href=#133 id=133 data-nosnippet>133</a>            .verify(opening.relative_pos() <span class="kw">as </span>u64, value, root)
-<a href=#134 id=134 data-nosnippet>134</a>            .map_err(MmrError::InvalidMerklePath)
-<a href=#135 id=135 data-nosnippet>135</a>    }
-<a href=#136 id=136 data-nosnippet>136</a>
-<a href=#137 id=137 data-nosnippet>137</a>    <span class="doccomment">/// Flattens and pads the peaks to make hashing inside of the Miden VM easier.
-<a href=#138 id=138 data-nosnippet>138</a>    ///
-<a href=#139 id=139 data-nosnippet>139</a>    /// The procedure will:
-<a href=#140 id=140 data-nosnippet>140</a>    /// - Flatten the vector of Words into a vector of Felts.
-<a href=#141 id=141 data-nosnippet>141</a>    /// - Pad the peaks with ZERO to an even number of words, this removes the need to handle
-<a href=#142 id=142 data-nosnippet>142</a>    ///   Poseidon2 padding.
-<a href=#143 id=143 data-nosnippet>143</a>    /// - Pad the peaks to a minimum length of 16 words, which reduces the constant cost of hashing.
-<a href=#144 id=144 data-nosnippet>144</a>    </span><span class="kw">pub fn </span>flatten_and_pad_peaks(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; Vec&lt;Felt&gt; {
-<a href=#145 id=145 data-nosnippet>145</a>        <span class="kw">let </span>num_peaks = <span class="self">self</span>.peaks.len();
-<a href=#146 id=146 data-nosnippet>146</a>
-<a href=#147 id=147 data-nosnippet>147</a>        <span class="comment">// To achieve the padding rules above we calculate the length of the final vector.
-<a href=#148 id=148 data-nosnippet>148</a>        // This is calculated as the number of field elements. Each peak is 4 field elements.
-<a href=#149 id=149 data-nosnippet>149</a>        // The length is calculated as follows:
-<a href=#150 id=150 data-nosnippet>150</a>        // - If there are less than 16 peaks, the data is padded to 16 peaks and as such requires 64
-<a href=#151 id=151 data-nosnippet>151</a>        //   field elements.
-<a href=#152 id=152 data-nosnippet>152</a>        // - If there are more than 16 peaks and the number of peaks is odd, the data is padded to
-<a href=#153 id=153 data-nosnippet>153</a>        //   an even number of peaks and as such requires `(num_peaks + 1) * 4` field elements.
-<a href=#154 id=154 data-nosnippet>154</a>        // - If there are more than 16 peaks and the number of peaks is even, the data is not padded
-<a href=#155 id=155 data-nosnippet>155</a>        //   and as such requires `num_peaks * 4` field elements.
-<a href=#156 id=156 data-nosnippet>156</a>        </span><span class="kw">let </span>len = <span class="kw">if </span>num_peaks &lt; <span class="number">16 </span>{
-<a href=#157 id=157 data-nosnippet>157</a>            <span class="number">64
-<a href=#158 id=158 data-nosnippet>158</a>        </span>} <span class="kw">else if </span>num_peaks % <span class="number">2 </span>== <span class="number">1 </span>{
-<a href=#159 id=159 data-nosnippet>159</a>            (num_peaks + <span class="number">1</span>) * <span class="number">4
-<a href=#160 id=160 data-nosnippet>160</a>        </span>} <span class="kw">else </span>{
-<a href=#161 id=161 data-nosnippet>161</a>            num_peaks * <span class="number">4
-<a href=#162 id=162 data-nosnippet>162</a>        </span>};
-<a href=#163 id=163 data-nosnippet>163</a>
-<a href=#164 id=164 data-nosnippet>164</a>        <span class="kw">let </span><span class="kw-2">mut </span>elements = Vec::with_capacity(len);
-<a href=#165 id=165 data-nosnippet>165</a>        elements.extend_from_slice(Word::words_as_elements(<span class="kw-2">&amp;</span><span class="self">self</span>.peaks));
-<a href=#166 id=166 data-nosnippet>166</a>        elements.resize(len, ZERO);
-<a href=#167 id=167 data-nosnippet>167</a>        elements
-<a href=#168 id=168 data-nosnippet>168</a>    }
-<a href=#169 id=169 data-nosnippet>169</a>}
+<a href=#69 id=69 data-nosnippet>69</a>        <span class="kw">if </span>forest.num_trees() != peaks.len() {
+<a href=#70 id=70 data-nosnippet>70</a>            <span class="kw">return </span><span class="prelude-val">Err</span>(MmrError::InvalidPeaks(<span class="macro">format!</span>(
+<a href=#71 id=71 data-nosnippet>71</a>                <span class="string">"number of one bits in leaves is {} which does not equal peak length {}"</span>,
+<a href=#72 id=72 data-nosnippet>72</a>                forest.num_trees(),
+<a href=#73 id=73 data-nosnippet>73</a>                peaks.len()
+<a href=#74 id=74 data-nosnippet>74</a>            )));
+<a href=#75 id=75 data-nosnippet>75</a>        }
+<a href=#76 id=76 data-nosnippet>76</a>
+<a href=#77 id=77 data-nosnippet>77</a>        <span class="prelude-val">Ok</span>(<span class="self">Self </span>{ forest, peaks })
+<a href=#78 id=78 data-nosnippet>78</a>    }
+<a href=#79 id=79 data-nosnippet>79</a>
+<a href=#80 id=80 data-nosnippet>80</a>    <span class="comment">// ACCESSORS
+<a href=#81 id=81 data-nosnippet>81</a>    // --------------------------------------------------------------------------------------------
+<a href=#82 id=82 data-nosnippet>82</a>
+<a href=#83 id=83 data-nosnippet>83</a>    </span><span class="doccomment">/// Returns the underlying forest (a set of mountain range peaks).
+<a href=#84 id=84 data-nosnippet>84</a>    </span><span class="kw">pub fn </span>forest(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; Forest {
+<a href=#85 id=85 data-nosnippet>85</a>        <span class="self">self</span>.forest
+<a href=#86 id=86 data-nosnippet>86</a>    }
+<a href=#87 id=87 data-nosnippet>87</a>
+<a href=#88 id=88 data-nosnippet>88</a>    <span class="doccomment">/// Returns a count of leaves in the underlying MMR.
+<a href=#89 id=89 data-nosnippet>89</a>    </span><span class="kw">pub fn </span>num_leaves(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; usize {
+<a href=#90 id=90 data-nosnippet>90</a>        <span class="self">self</span>.forest.num_leaves()
+<a href=#91 id=91 data-nosnippet>91</a>    }
+<a href=#92 id=92 data-nosnippet>92</a>
+<a href=#93 id=93 data-nosnippet>93</a>    <span class="doccomment">/// Returns the number of peaks of the underlying MMR.
+<a href=#94 id=94 data-nosnippet>94</a>    </span><span class="kw">pub fn </span>num_peaks(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; usize {
+<a href=#95 id=95 data-nosnippet>95</a>        <span class="self">self</span>.peaks.len()
+<a href=#96 id=96 data-nosnippet>96</a>    }
+<a href=#97 id=97 data-nosnippet>97</a>
+<a href=#98 id=98 data-nosnippet>98</a>    <span class="doccomment">/// Returns the list of peaks of the underlying MMR.
+<a href=#99 id=99 data-nosnippet>99</a>    </span><span class="kw">pub fn </span>peaks(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span>[Word] {
+<a href=#100 id=100 data-nosnippet>100</a>        <span class="kw-2">&amp;</span><span class="self">self</span>.peaks
+<a href=#101 id=101 data-nosnippet>101</a>    }
+<a href=#102 id=102 data-nosnippet>102</a>
+<a href=#103 id=103 data-nosnippet>103</a>    <span class="doccomment">/// Returns the peak by the provided index.
+<a href=#104 id=104 data-nosnippet>104</a>    ///
+<a href=#105 id=105 data-nosnippet>105</a>    /// # Errors
+<a href=#106 id=106 data-nosnippet>106</a>    /// Returns an error if the provided peak index is greater or equal to the current number of
+<a href=#107 id=107 data-nosnippet>107</a>    /// peaks in the Mmr.
+<a href=#108 id=108 data-nosnippet>108</a>    </span><span class="kw">pub fn </span>get_peak(<span class="kw-2">&amp;</span><span class="self">self</span>, peak_idx: usize) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="kw-2">&amp;</span>Word, MmrError&gt; {
+<a href=#109 id=109 data-nosnippet>109</a>        <span class="self">self</span>.peaks
+<a href=#110 id=110 data-nosnippet>110</a>            .get(peak_idx)
+<a href=#111 id=111 data-nosnippet>111</a>            .ok_or(MmrError::PeakOutOfBounds { peak_idx, peaks_len: <span class="self">self</span>.peaks.len() })
+<a href=#112 id=112 data-nosnippet>112</a>    }
+<a href=#113 id=113 data-nosnippet>113</a>
+<a href=#114 id=114 data-nosnippet>114</a>    <span class="doccomment">/// Converts this [MmrPeaks] into its components: number of leaves (represented as a [`Forest`])
+<a href=#115 id=115 data-nosnippet>115</a>    /// and a vector of peaks of the underlying MMR.
+<a href=#116 id=116 data-nosnippet>116</a>    </span><span class="kw">pub fn </span>into_parts(<span class="self">self</span>) -&gt; (Forest, Vec&lt;Word&gt;) {
+<a href=#117 id=117 data-nosnippet>117</a>        (<span class="self">self</span>.forest, <span class="self">self</span>.peaks)
+<a href=#118 id=118 data-nosnippet>118</a>    }
+<a href=#119 id=119 data-nosnippet>119</a>
+<a href=#120 id=120 data-nosnippet>120</a>    <span class="doccomment">/// Hashes the peaks.
+<a href=#121 id=121 data-nosnippet>121</a>    ///
+<a href=#122 id=122 data-nosnippet>122</a>    /// The procedure will:
+<a href=#123 id=123 data-nosnippet>123</a>    /// - Flatten and pad the peaks to a vector of Felts.
+<a href=#124 id=124 data-nosnippet>124</a>    /// - Hash the vector of Felts.
+<a href=#125 id=125 data-nosnippet>125</a>    </span><span class="kw">pub fn </span>hash_peaks(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; Word {
+<a href=#126 id=126 data-nosnippet>126</a>        Poseidon2::hash_elements(<span class="kw-2">&amp;</span><span class="self">self</span>.flatten_and_pad_peaks())
+<a href=#127 id=127 data-nosnippet>127</a>    }
+<a href=#128 id=128 data-nosnippet>128</a>
+<a href=#129 id=129 data-nosnippet>129</a>    <span class="doccomment">/// Verifies the Merkle opening proof.
+<a href=#130 id=130 data-nosnippet>130</a>    ///
+<a href=#131 id=131 data-nosnippet>131</a>    /// # Errors
+<a href=#132 id=132 data-nosnippet>132</a>    /// Returns an error if:
+<a href=#133 id=133 data-nosnippet>133</a>    /// - provided opening proof is invalid.
+<a href=#134 id=134 data-nosnippet>134</a>    /// - Mmr root value computed using the provided leaf value differs from the actual one.
+<a href=#135 id=135 data-nosnippet>135</a>    </span><span class="kw">pub fn </span>verify(<span class="kw-2">&amp;</span><span class="self">self</span>, value: Word, opening: MmrProof) -&gt; <span class="prelude-ty">Result</span>&lt;(), MmrError&gt; {
+<a href=#136 id=136 data-nosnippet>136</a>        <span class="kw">let </span>root = <span class="self">self</span>.get_peak(opening.peak_index())<span class="question-mark">?</span>;
+<a href=#137 id=137 data-nosnippet>137</a>        opening
+<a href=#138 id=138 data-nosnippet>138</a>            .path()
+<a href=#139 id=139 data-nosnippet>139</a>            .merkle_path()
+<a href=#140 id=140 data-nosnippet>140</a>            .verify(opening.relative_pos() <span class="kw">as </span>u64, value, root)
+<a href=#141 id=141 data-nosnippet>141</a>            .map_err(MmrError::InvalidMerklePath)
+<a href=#142 id=142 data-nosnippet>142</a>    }
+<a href=#143 id=143 data-nosnippet>143</a>
+<a href=#144 id=144 data-nosnippet>144</a>    <span class="doccomment">/// Flattens and pads the peaks to make hashing inside of the Miden VM easier.
+<a href=#145 id=145 data-nosnippet>145</a>    ///
+<a href=#146 id=146 data-nosnippet>146</a>    /// The procedure will:
+<a href=#147 id=147 data-nosnippet>147</a>    /// - Flatten the vector of Words into a vector of Felts.
+<a href=#148 id=148 data-nosnippet>148</a>    /// - Pad the peaks with ZERO to an even number of words, this removes the need to handle
+<a href=#149 id=149 data-nosnippet>149</a>    ///   Poseidon2 padding.
+<a href=#150 id=150 data-nosnippet>150</a>    /// - Pad the peaks to a minimum length of 16 words, which reduces the constant cost of hashing.
+<a href=#151 id=151 data-nosnippet>151</a>    </span><span class="kw">pub fn </span>flatten_and_pad_peaks(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; Vec&lt;Felt&gt; {
+<a href=#152 id=152 data-nosnippet>152</a>        <span class="kw">let </span>num_peaks = <span class="self">self</span>.peaks.len();
+<a href=#153 id=153 data-nosnippet>153</a>
+<a href=#154 id=154 data-nosnippet>154</a>        <span class="comment">// To achieve the padding rules above we calculate the length of the final vector.
+<a href=#155 id=155 data-nosnippet>155</a>        // This is calculated as the number of field elements. Each peak is 4 field elements.
+<a href=#156 id=156 data-nosnippet>156</a>        // The length is calculated as follows:
+<a href=#157 id=157 data-nosnippet>157</a>        // - If there are less than 16 peaks, the data is padded to 16 peaks and as such requires 64
+<a href=#158 id=158 data-nosnippet>158</a>        //   field elements.
+<a href=#159 id=159 data-nosnippet>159</a>        // - If there are more than 16 peaks and the number of peaks is odd, the data is padded to
+<a href=#160 id=160 data-nosnippet>160</a>        //   an even number of peaks and as such requires `(num_peaks + 1) * 4` field elements.
+<a href=#161 id=161 data-nosnippet>161</a>        // - If there are more than 16 peaks and the number of peaks is even, the data is not padded
+<a href=#162 id=162 data-nosnippet>162</a>        //   and as such requires `num_peaks * 4` field elements.
+<a href=#163 id=163 data-nosnippet>163</a>        </span><span class="kw">let </span>len = <span class="kw">if </span>num_peaks &lt; <span class="number">16 </span>{
+<a href=#164 id=164 data-nosnippet>164</a>            <span class="number">64
+<a href=#165 id=165 data-nosnippet>165</a>        </span>} <span class="kw">else if </span>num_peaks % <span class="number">2 </span>== <span class="number">1 </span>{
+<a href=#166 id=166 data-nosnippet>166</a>            (num_peaks + <span class="number">1</span>) * <span class="number">4
+<a href=#167 id=167 data-nosnippet>167</a>        </span>} <span class="kw">else </span>{
+<a href=#168 id=168 data-nosnippet>168</a>            num_peaks * <span class="number">4
+<a href=#169 id=169 data-nosnippet>169</a>        </span>};
 <a href=#170 id=170 data-nosnippet>170</a>
-<a href=#171 id=171 data-nosnippet>171</a><span class="kw">impl </span>From&lt;MmrPeaks&gt; <span class="kw">for </span>Vec&lt;Word&gt; {
-<a href=#172 id=172 data-nosnippet>172</a>    <span class="kw">fn </span>from(peaks: MmrPeaks) -&gt; <span class="self">Self </span>{
-<a href=#173 id=173 data-nosnippet>173</a>        peaks.peaks
-<a href=#174 id=174 data-nosnippet>174</a>    }
-<a href=#175 id=175 data-nosnippet>175</a>}
+<a href=#171 id=171 data-nosnippet>171</a>        <span class="kw">let </span><span class="kw-2">mut </span>elements = Vec::with_capacity(len);
+<a href=#172 id=172 data-nosnippet>172</a>        elements.extend_from_slice(Word::words_as_elements(<span class="kw-2">&amp;</span><span class="self">self</span>.peaks));
+<a href=#173 id=173 data-nosnippet>173</a>        elements.resize(len, ZERO);
+<a href=#174 id=174 data-nosnippet>174</a>        elements
+<a href=#175 id=175 data-nosnippet>175</a>    }
+<a href=#176 id=176 data-nosnippet>176</a>}
+<a href=#177 id=177 data-nosnippet>177</a>
+<a href=#178 id=178 data-nosnippet>178</a><span class="kw">impl </span>From&lt;MmrPeaks&gt; <span class="kw">for </span>Vec&lt;Word&gt; {
+<a href=#179 id=179 data-nosnippet>179</a>    <span class="kw">fn </span>from(peaks: MmrPeaks) -&gt; <span class="self">Self </span>{
+<a href=#180 id=180 data-nosnippet>180</a>        peaks.peaks
+<a href=#181 id=181 data-nosnippet>181</a>    }
+<a href=#182 id=182 data-nosnippet>182</a>}
 </code></pre></div></section></main></body></html>
