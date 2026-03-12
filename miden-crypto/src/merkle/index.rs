@@ -127,8 +127,16 @@ impl NodeIndex {
     /// Returns the scalar representation of the depth/position pair.
     ///
     /// It is computed as `2^depth + position`.
-    pub const fn to_scalar_index(&self) -> u64 {
-        (1 << self.depth as u64) + self.position
+    ///
+    /// # Errors
+    ///
+    /// - [`MerkleError::DepthTooBig`] if the depth is 64 or greater, as the resulting index would
+    ///   overflow.
+    pub const fn to_scalar_index(&self) -> Result<u64, MerkleError> {
+        if self.depth >= 64 {
+            return Err(MerkleError::DepthTooBig(self.depth as u64));
+        }
+        Ok((1u64 << self.depth as u64) + self.position)
     }
 
     /// Returns the depth of the current instance.
@@ -300,5 +308,55 @@ mod tests {
                 index.move_up();
             }
         }
+
+        #[test]
+        fn to_scalar_index_succeeds_for_depth_lt_64(depth in 0u8..64, position_bits in 0u64..u64::MAX) {
+            let position = if depth == 0 { 0 } else { position_bits % (1u64 << depth) };
+            let index = NodeIndex::new(depth, position).unwrap();
+            assert!(index.to_scalar_index().is_ok());
+        }
+    }
+
+    #[test]
+    fn test_to_scalar_index_depth_64_returns_error() {
+        let index = NodeIndex::new(64, 0).unwrap();
+        assert_matches!(index.to_scalar_index(), Err(MerkleError::DepthTooBig(64)));
+
+        let index = NodeIndex::new(64, u64::MAX).unwrap();
+        assert_matches!(index.to_scalar_index(), Err(MerkleError::DepthTooBig(64)));
+    }
+
+    #[test]
+    fn test_to_scalar_index_known_values() {
+        // Root's children: depth=1, pos=0 → scalar 2; depth=1, pos=1 → scalar 3
+        assert_eq!(NodeIndex::make(1, 0).to_scalar_index().unwrap(), 2);
+        assert_eq!(NodeIndex::make(1, 1).to_scalar_index().unwrap(), 3);
+
+        // depth=2: scalars 4,5,6,7
+        assert_eq!(NodeIndex::make(2, 0).to_scalar_index().unwrap(), 4);
+        assert_eq!(NodeIndex::make(2, 3).to_scalar_index().unwrap(), 7);
+
+        // depth=3: scalars 8..15
+        assert_eq!(NodeIndex::make(3, 0).to_scalar_index().unwrap(), 8);
+        assert_eq!(NodeIndex::make(3, 7).to_scalar_index().unwrap(), 15);
+    }
+
+    #[test]
+    fn test_to_scalar_index_depth_63_max_position() {
+        // 2^63 + (2^63 - 1) = 2^64 - 1 = u64::MAX
+        let index = NodeIndex::new(63, (1u64 << 63) - 1).unwrap();
+        assert_eq!(index.to_scalar_index().unwrap(), u64::MAX);
+    }
+
+    #[test]
+    fn test_to_scalar_index_boundary_depths() {
+        // depth 0 (root): scalar = 1 + 0 = 1
+        assert_eq!(NodeIndex::make(0, 0).to_scalar_index().unwrap(), 1);
+
+        // depth 62, position 0: scalar = 2^62
+        assert_eq!(NodeIndex::make(62, 0).to_scalar_index().unwrap(), 1u64 << 62);
+
+        // depth 63, position 0: scalar = 2^63
+        assert_eq!(NodeIndex::make(63, 0).to_scalar_index().unwrap(), 1u64 << 63);
     }
 }

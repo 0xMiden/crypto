@@ -21,6 +21,10 @@
 //! is _primarily_ intended to be used for testing purposes, but should nevertheless be correct and
 //! functional for production use-cases if no persistence is required.
 //!
+//! The [`PersistentBackend`] provides persistent on-disk storage for the full trees in the forest,
+//! and is intended to maintain good performance in scenarios where persistence is key or where the
+//! forest would grow too large to fit into memory.
+//!
 //! While any given [`Backend`] may choose to share data between lineages, this behavior is not
 //! guaranteed, and must not be relied upon.
 //!
@@ -29,6 +33,16 @@
 //! Each [`Backend`] provides the same set of functionality to the forest, but may exhibit
 //! significant variance in their performance characteristics. As a result, **any performance
 //! analysis of the forest should be done in conjunction with a specific backend**.
+//!
+//! Nevertheless, we can provide some basic guidelines for getting good performance from this
+//! structure:
+//!
+//! 1. **Batch Operations:** Wherever possible, perform queries and/or updates using batching
+//!    operations on the forest. These provide scope for taking advantage of parallelism as much as
+//!    possible, and can mask potential I/O latency.
+//! 2. **Grouping:** If you have lots of data to apply to the tree, batching operations so that they
+//!    share prefixes in the trees in question will yield improved performance by requiring fewer
+//!    subtrees to be accessed.
 //!
 //! Take care to read the documentation of the specific [`Backend`] that you are planning to use in
 //! order to understand its performance, potential gotchas, and other such details.
@@ -293,6 +307,7 @@ mod lineage;
 mod operation;
 mod property_tests;
 mod root;
+mod test_utils;
 mod tests;
 mod utils;
 
@@ -300,6 +315,10 @@ use alloc::vec::Vec;
 use core::num::NonZeroU8;
 
 pub use backend::{Backend, BackendError, memory::InMemoryBackend};
+#[cfg(feature = "persistent-forest")]
+pub use backend::{
+    persistent::PersistentBackend, persistent::config::Config as PersistentBackendConfig,
+};
 pub use config::{Config, DEFAULT_MAX_HISTORY_VERSIONS, MIN_HISTORY_VERSIONS};
 pub use error::{LargeSmtForestError, Result};
 pub use operation::{ForestOperation, SmtForestUpdateBatch, SmtUpdateBatch};
@@ -343,8 +362,8 @@ pub struct LargeSmtForest<B: Backend> {
     /// It must contain an entry for every tree lineage in the forest.
     lineage_data: Map<LineageId, LineageData>,
 
-    /// A set tracking which lineage which lineages have histories containing actual deltas in
-    /// order to speed up querying.
+    /// A set tracking which lineages have histories containing actual deltas in order to speed up
+    /// querying.
     ///
     /// It must always be maintained as a strict subset of `lineage_data.keys()`.
     non_empty_histories: Set<LineageId>,
@@ -1013,7 +1032,7 @@ impl<B: Backend> LargeSmtForest<B> {
         // sanity check this.
         debug_assert!(
             leaf_entries.iter().all(|(_, v)| !v.is_empty()),
-            "Leaf entries should not contain entries with "
+            "Leaf entries should not contain entries with empty values"
         );
 
         // Any entries that are still empty at this point should be removed.
