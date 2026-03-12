@@ -1,3 +1,7 @@
+## 0.22.5 (2026-03-11)
+
+- Expose `StorageError` and `SubtreeUpdate` as prep. to externalize the `LargeSmt` RocksDB backend ([#850](https://github.com/0xMiden/crypto/pull/850)).
+
 ## 0.22.4 (2026-03-03)
 
 - Make `SmtLeaf::get_value` public ([#872](https://github.com/0xMiden/crypto/pull/872)).
