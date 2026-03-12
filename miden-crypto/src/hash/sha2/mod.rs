@@ -2,13 +2,13 @@
 
 use core::mem::size_of;
 
-use p3_field::BasedVectorSpace;
 use sha2::Digest as Sha2Digest;
 
 use super::{
     Felt, HasherExt,
     digest::{DIGEST256_BYTES, DIGEST512_BYTES, Digest256, Digest512},
 };
+use crate::field::BasedVectorSpace;
 
 #[cfg(test)]
 mod tests;
