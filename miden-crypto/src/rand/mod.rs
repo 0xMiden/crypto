@@ -128,7 +128,6 @@ impl<const N: usize> Randomizable for [u8; N] {
     }
 }
 
-
 /// Pseudo-random element generator.
 ///
 /// An instance can be used to draw, uniformly at random, base field elements as well as [Word]s.

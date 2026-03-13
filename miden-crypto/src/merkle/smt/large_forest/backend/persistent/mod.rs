@@ -1062,8 +1062,7 @@ impl PersistentBackend {
     ) -> Result<Map<u64, Option<SmtLeaf>>> {
         // We have to get all the leaf indices, accounting for the fact that multiple keys may map
         // to any given leaf.
-        let mut leaf_indices =
-            keys.iter().map(|k| LeafIndex::from(*k).value()).collect::<Vec<_>>();
+        let mut leaf_indices = keys.iter().map(|k| LeafIndex::from(*k).value()).collect::<Vec<_>>();
         leaf_indices.par_sort_unstable();
         leaf_indices.dedup();
 
