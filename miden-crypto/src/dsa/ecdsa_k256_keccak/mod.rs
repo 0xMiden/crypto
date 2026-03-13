@@ -6,6 +6,7 @@ use alloc::{string::ToString, vec::Vec};
 use k256::{
     ecdh::diffie_hellman,
     ecdsa::{RecoveryId, SigningKey, VerifyingKey, signature::hazmat::PrehashVerifier},
+    pkcs8::DecodePublicKey,
 };
 use miden_crypto_derive::{SilentDebug, SilentDisplay};
 use rand::{CryptoRng, RngCore};
@@ -176,6 +177,16 @@ impl PublicKey {
 
         Ok(Self { inner: verifying_key })
     }
+
+    /// Creates a public key from SPKI ASN.1 DER format bytes.
+    ///
+    /// # Arguments
+    /// * `bytes` - SPKI ASN.1 DER format bytes
+    pub fn from_der(bytes: &[u8]) -> Result<Self, DeserializationError> {
+        let verifying_key = VerifyingKey::from_public_key_der(bytes)
+            .map_err(|err| DeserializationError::InvalidValue(err.to_string()))?;
+        Ok(PublicKey { inner: verifying_key })
+    }
 }
 
 impl SequentialCommit for PublicKey {
@@ -255,18 +266,53 @@ impl Signature {
     /// * `recovery_id` - recovery ID (0-3)
     pub fn from_sec1_bytes_and_recovery_id(
         bytes: [u8; SIGNATURE_STANDARD_BYTES],
-        v: u8,
+        recovery_id: u8,
     ) -> Result<Self, DeserializationError> {
         let mut r = [0u8; SCALARS_SIZE_BYTES];
         let mut s = [0u8; SCALARS_SIZE_BYTES];
         r.copy_from_slice(&bytes[0..SCALARS_SIZE_BYTES]);
         s.copy_from_slice(&bytes[SCALARS_SIZE_BYTES..2 * SCALARS_SIZE_BYTES]);
 
-        if v > 3 {
+        if recovery_id > 3 {
             return Err(DeserializationError::InvalidValue(r#"Invalid recovery ID"#.to_string()));
         }
 
-        Ok(Signature { r, s, v })
+        Ok(Signature { r, s, v: recovery_id })
+    }
+
+    /// Creates a signature from ASN.1 DER format bytes with a given recovery id.
+    ///
+    /// # Arguments
+    /// * `bytes` - ASN.1 DER format bytes
+    /// * `recovery_id` - recovery ID (0-3)
+    pub fn from_der(bytes: &[u8], mut recovery_id: u8) -> Result<Self, DeserializationError> {
+        if recovery_id > 3 {
+            return Err(DeserializationError::InvalidValue(r#"Invalid recovery ID"#.to_string()));
+        }
+
+        let sig = k256::ecdsa::Signature::from_der(bytes)
+            .map_err(|err| DeserializationError::InvalidValue(err.to_string()))?;
+
+        // Normalize signature into "low s" form.
+        // See https://github.com/bitcoin/bips/blob/master/bip-0062.mediawiki.
+        let sig = if let Some(norm) = sig.normalize_s() {
+            // Replacing s with (n - s) corresponds to negating the ephemeral point R
+            // (i.e. R -> -R), which flips the y-parity of R. A recoverable signature's
+            // `v` encodes that y-parity in its LSB, so we must toggle only that bit to
+            // preserve recoverability.
+            recovery_id ^= 1;
+            norm
+        } else {
+            sig
+        };
+
+        let (r, s) = sig.split_scalars();
+
+        Ok(Signature {
+            r: r.to_bytes().into(),
+            s: s.to_bytes().into(),
+            v: recovery_id,
+        })
     }
 }
 
@@ -331,7 +377,11 @@ impl Deserializable for Signature {
         let s: [u8; SCALARS_SIZE_BYTES] = source.read_array()?;
         let v: u8 = source.read_u8()?;
 
-        Ok(Signature { r, s, v })
+        if v > 3 {
+            Err(DeserializationError::InvalidValue(r#"Invalid recovery ID"#.to_string()))
+        } else {
+            Ok(Signature { r, s, v })
+        }
     }
 }
 
