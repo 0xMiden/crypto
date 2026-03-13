@@ -15,20 +15,25 @@ use itertools::Itertools;
 
 use super::{Config, Result};
 use crate::{
-    EMPTY_WORD, Map, Set, Word,
+    EMPTY_WORD, Word,
     merkle::{
         EmptySubtreeRoots,
         smt::{
             Backend, ForestInMemoryBackend, ForestOperation, LargeSmtForest, LargeSmtForestError,
             RootInfo, Smt, SmtForestUpdateBatch, SmtUpdateBatch, TreeId, VersionId,
-            large_forest::{
-                LineageData,
-                history::{ChangedKeys, History, NodeChanges},
-                root::{LineageId, TreeEntry, TreeWithRoot},
-            },
+            large_forest::root::{LineageId, TreeEntry, TreeWithRoot},
         },
     },
-    rand::test_utils::{ContinuousRng, rand_value},
+    rand::test_utils::ContinuousRng,
+};
+#[cfg(feature = "std")]
+use crate::{
+    Map, Set,
+    merkle::smt::large_forest::{
+        LineageData,
+        history::{ChangedKeys, History, NodeChanges},
+    },
+    rand::test_utils::rand_value,
 };
 
 // TYPE ALIASES
