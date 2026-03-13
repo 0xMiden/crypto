@@ -17,8 +17,8 @@ default = ["std"]
 std     = []
 
 [dependencies]
-p3-field      = { default-features = false, version = "0.5.0" }
-p3-goldilocks = { default-features = false, version = "0.5.0" }
+p3-field      = { default-features = false, version = "0.5" }
+p3-goldilocks = { default-features = false, version = "0.5" }
 
 [lints]
 workspace = true
