@@ -105,8 +105,8 @@ impl Smt {
     {
         // Collect and sort key-value pairs by their corresponding leaf index
         let mut sorted_kv_pairs: Vec<_> = kv_pairs.into_iter().collect();
-        sorted_kv_pairs
-            .par_sort_unstable_by_key(|(key, _)| Self::key_to_leaf_index(key).position());
+        // Keep ordering deterministic for duplicate keys by using a stable sort.
+        sorted_kv_pairs.par_sort_by_key(|(key, _)| Self::key_to_leaf_index(key).position());
 
         // Convert sorted pairs into mutated leaves and capture any new pairs
         let (mut subtree_leaves, new_pairs) =

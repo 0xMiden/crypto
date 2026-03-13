@@ -473,6 +473,24 @@ fn test_compute_mutations_parallel() {
 }
 
 #[test]
+fn test_compute_mutations_parallel_duplicate_key_order_matches_sequential() {
+    let key = Word::new([ONE, ONE, ONE, Felt::new(16)]);
+    let initial_value = Word::new([ONE, ONE, ONE, Felt::new(1)]);
+    let tree = Smt::with_entries([(key, initial_value)]).unwrap();
+
+    let first = Word::new([ONE, ONE, ONE, Felt::new(10)]);
+    let second = Word::new([ONE, ONE, ONE, Felt::new(20)]);
+    let updates = vec![(key, first), (key, second)];
+
+    let sequential = tree.compute_mutations_sequential(updates.clone()).unwrap();
+    let concurrent = tree.compute_mutations(updates).unwrap();
+
+    assert_eq!(concurrent.new_pairs().get(&key), Some(&second));
+    assert_eq!(concurrent.new_pairs(), sequential.new_pairs());
+    assert_eq!(concurrent.root(), sequential.root());
+}
+
+#[test]
 fn test_smt_construction_with_entries_unsorted() {
     let entries = [
         ([ONE, ONE, Felt::new(2_u64), ONE].into(), [ONE; 4].into()),
