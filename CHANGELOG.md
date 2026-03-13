@@ -1,6 +1,11 @@
+## 0.24.0 (TBD)
+
+- [BREAKING] Removed `AlgebraicSponge::merge_with_int()` method ([#894](https://github.com/0xMiden/crypto/pull/894)).
+
 ## 0.23.0 (2026-03-11)
 
 - Replaced `Subtree` internal storage with bitmask layout ([#784](https://github.com/0xMiden/crypto/pull/784)).
+- [BREAKING] Enforced a maximum MMR forest size and made MMR/forest constructors and appends fallible to reject oversized inputs ([#857](https://github.com/0xMiden/crypto/pull/857)).
 - [BREAKING] `PartialMmr::open()` now returns `Option<MmrProof>` instead of `Option<MmrPath>` ([#787](https://github.com/0xMiden/crypto/pull/787)).
 - [BREAKING] Refactored BLAKE3 to use `Digest<N>` struct, added `Digest192` type alias ([#811](https://github.com/0xMiden/crypto/pull/811)).
 - [BREAKING] Added validation to `PartialMmr::from_parts()` and `Deserializable` implementation, added `from_parts_unchecked()` for performance-critical code ([#812](https://github.com/0xMiden/crypto/pull/812)).
