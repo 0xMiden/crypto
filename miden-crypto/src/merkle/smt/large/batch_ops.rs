@@ -339,6 +339,9 @@ impl<S: SmtStorage> LargeSmt<S> {
         let mut sorted_kv_pairs: Vec<_> = kv_pairs.into_iter().collect();
         sorted_kv_pairs.par_sort_by_key(|(key, _)| Self::key_to_leaf_index(key).position());
 
+        // After sorting, check for duplicate keys which are adjacent after the sort.
+        Self::check_for_duplicate_keys(&sorted_kv_pairs)?;
+
         // Load leaves from storage
         let (_leaf_indices, leaf_map) = self.load_leaves_for_pairs(&sorted_kv_pairs)?;
 
@@ -697,6 +700,9 @@ impl<S: SmtStorage> LargeSmt<S> {
         let mut sorted_kv_pairs: Vec<_> = kv_pairs.into_iter().collect();
         sorted_kv_pairs
             .par_sort_unstable_by_key(|(key, _)| LargeSmt::<S>::key_to_leaf_index(key).position());
+
+        // After sorting, check for duplicate keys which are adjacent after the sort.
+        Self::check_for_duplicate_keys(&sorted_kv_pairs)?;
 
         // Load leaves from storage using helper
         let (_leaf_indices, leaf_map) = self.load_leaves_for_pairs(&sorted_kv_pairs)?;
