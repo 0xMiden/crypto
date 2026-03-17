@@ -7,62 +7,71 @@ license.workspace = true
 repository.workspace = true
 readme.workspace = true
 homepage.workspace = true
+publish = false
 
 [dependencies]
-p3-air.workspace = true
-p3-field.workspace = true
-p3-blake3-air.workspace = true
-p3-keccak-air.workspace = true
-p3-poseidon2-air.workspace = true
-p3-matrix.workspace = true
+# Internal
 p3-miden-lifted-air.workspace = true
 
-# Bin-only dependencies (not needed by the library).
+# Plonky3
 p3-baby-bear.workspace = true
-p3-batch-stark.workspace = true
+p3-blake3-air = { version = "0.5.0", default-features = false }
+p3-field.workspace = true
+p3-keccak-air = { version = "0.5.0", default-features = false }
+p3-matrix.workspace = true
+p3-poseidon2-air = { version = "0.5.0", default-features = false }
+
+# Third-party
+rand.workspace = true
+serde.workspace = true
+tracing.workspace = true
+tracing-forest = { version = "0.1.6", features = ["ansi", "smallvec"] }
+tracing-subscriber.workspace = true
+
+[dev-dependencies]
+# Internal
+p3-miden-dev-utils.workspace = true
+p3-miden-lifted-stark.workspace = true
+
+# Plonky3
+p3-air.workspace = true
+p3-batch-stark = { version = "0.5.0", default-features = false }
 p3-challenger.workspace = true
 p3-commit.workspace = true
 p3-dft.workspace = true
 p3-fri.workspace = true
 p3-goldilocks.workspace = true
-p3-lookup.workspace = true
+p3-lookup = { version = "0.5.0", default-features = false }
 p3-merkle-tree.workspace = true
-p3-miden-dev-utils.workspace = true
-p3-miden-lifted-stark.workspace = true
 p3-symmetric.workspace = true
-p3-uni-stark.workspace = true
+p3-uni-stark = { version = "0.5.0", default-features = false }
 p3-util.workspace = true
-rand.workspace = true
-serde.workspace = true
-tracing.workspace = true
-tracing-forest.workspace = true
-tracing-subscriber.workspace = true
 
 [features]
 default = ["std"]
 std = []
 parallel = ["p3-miden-dev-utils/parallel", "p3-miden-lifted-stark/parallel"]
 
-[[bin]]
+[[example]]
 name = "lifted_keccak"
 required-features = ["std"]
 
-[[bin]]
+[[example]]
 name = "lifted_3_hashes"
 required-features = ["std"]
 
-[[bin]]
+[[example]]
 name = "batch_stark_keccak"
 required-features = ["std"]
 
-[[bin]]
+[[example]]
 name = "batch_stark_3_hashes"
 required-features = ["std"]
 
-[[bin]]
+[[example]]
 name = "lifted_miden"
 required-features = ["std"]
 
-[[bin]]
+[[example]]
 name = "batch_miden"
 required-features = ["std"]
