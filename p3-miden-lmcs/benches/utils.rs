@@ -1,10 +1,9 @@
 //! Shared utilities for LMCS benchmarks.
 
-use p3_keccak::{KeccakF, VECTOR_LEN};
+use p3_keccak::KeccakF;
 use p3_merkle_tree::MerkleTreeMmcs;
 use p3_miden_dev_utils::configs::{goldilocks_keccak as gl_keccak, goldilocks_poseidon2 as gl};
-use p3_miden_lmcs::LmcsConfig;
-use p3_miden_stateful_hasher::{SerializingStatefulSponge, StatefulSponge};
+use p3_miden_lmcs::testing::goldilocks_keccak as gl_keccak_lmcs;
 use p3_symmetric::{PaddingFreeSponge, SerializingHasher};
 
 // =============================================================================
@@ -26,23 +25,12 @@ pub fn gl_poseidon2_mmcs() -> GoldilocksMmcs {
 }
 
 // =============================================================================
-// Keccak LMCS types
+// Keccak LMCS (from testing module)
 // =============================================================================
 
-type KeccakStatefulSponge = StatefulSponge<KeccakF, 25, 17, 4>;
-
-/// Keccak LMCS for Goldilocks field.
-///
-/// Uses `[F; VECTOR_LEN]` for field elements and `[u64; VECTOR_LEN]` for digest elements,
-/// enabling SIMD parallelization where `VECTOR_LEN` is platform-specific (1, 2, 4, or 8).
-pub type GoldilocksKeccakLmcs = LmcsConfig<
-    [gl_keccak::F; VECTOR_LEN],
-    [u64; VECTOR_LEN],
-    SerializingStatefulSponge<KeccakStatefulSponge>,
-    gl_keccak::KeccakCompress,
-    25,
-    4,
->;
+pub fn gl_keccak_lmcs() -> gl_keccak_lmcs::Lmcs {
+    gl_keccak_lmcs::test_lmcs()
+}
 
 // =============================================================================
 // Keccak MMCS types (for comparison benchmarks)
@@ -52,30 +40,16 @@ type GoldilocksKeccakMmcs = MerkleTreeMmcs<
     gl_keccak::F,
     u64,
     SerializingHasher<gl_keccak::KeccakMmcsSponge>,
-    gl_keccak::KeccakCompress,
+    gl_keccak::Compress,
     2,
     { gl_keccak::DIGEST },
 >;
 
-// =============================================================================
-// Keccak constructors
-// =============================================================================
-
-fn keccak_sponge() -> SerializingStatefulSponge<KeccakStatefulSponge> {
-    SerializingStatefulSponge::new(StatefulSponge::new(KeccakF {}))
-}
-
-pub fn gl_keccak_lmcs() -> GoldilocksKeccakLmcs {
-    let inner = gl_keccak::KeccakMmcsSponge::new(KeccakF {});
-    let compress = gl_keccak::KeccakCompress::new(inner);
-    LmcsConfig::new(keccak_sponge(), compress)
-}
-
 pub fn gl_keccak_mmcs() -> GoldilocksKeccakMmcs {
-    let inner = gl_keccak::KeccakMmcsSponge::new(KeccakF {});
+    let inner = gl_keccak::KeccakMmcsSponge::new(KeccakF);
     GoldilocksKeccakMmcs::new(
         SerializingHasher::new(inner),
-        gl_keccak::KeccakCompress::new(inner),
+        gl_keccak::Compress::new(inner),
         0,
     )
 }

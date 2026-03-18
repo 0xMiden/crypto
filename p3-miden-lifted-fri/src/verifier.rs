@@ -12,13 +12,12 @@
 //! Callers should use [`VerifierTranscript::finalize`](p3_miden_transcript::VerifierTranscript::finalize)
 //! after verification to check that the transcript is fully consumed.
 
-use alloc::{collections::BTreeSet, vec::Vec};
+use alloc::vec::Vec;
 
 use p3_field::{ExtensionField, TwoAdicField};
 use p3_matrix::{Matrix, horizontally_truncated::HorizontallyTruncated};
-use p3_miden_lmcs::{Lmcs, utils::aligned_widths};
+use p3_miden_lmcs::{Lmcs, TreeIndices, utils::aligned_widths};
 use p3_miden_transcript::{TranscriptError, VerifierChannel};
-use p3_util::reverse_bits_len;
 use thiserror::Error;
 
 use crate::{
@@ -82,21 +81,18 @@ where
     // Check query PoW witness and sample query indices
     channel.grind(params.query_pow_bits())?;
 
-    // Sample exponents and convert to tree indices immediately.
-    // Tree indices are bit-reversed exponents (LMCS stores in bit-reversed order).
-    let tree_indices: BTreeSet<usize> = (0..params.num_queries())
-        .map(|_| {
-            let exp = channel.sample_bits(log_lde_height as usize);
-            reverse_bits_len(exp, log_lde_height as usize)
-        })
-        .collect();
+    // Sample query indices (domain indices). The LMCS tree is indexed by domain order.
+    let sampled_indices_iter =
+        (0..params.num_queries()).map(|_| channel.sample_bits(log_lde_height as usize));
+    let tree_indices = TreeIndices::new(sampled_indices_iter, log_lde_height)
+        .expect("sampled indices are in range");
 
     // Verify DEEP openings for all queries at once
     // tree_indices are bit-reversed positions; deep_evals is keyed by tree index
     let deep_evals = deep_oracle.open_batch(lmcs, &tree_indices, channel)?;
 
     // Test low-degree proximity for all queries at once
-    fri_oracle.test_low_degree(lmcs, &params.fri, deep_evals, channel)?;
+    fri_oracle.test_low_degree(lmcs, &params.fri, deep_evals, tree_indices, channel)?;
 
     Ok(evals)
 }

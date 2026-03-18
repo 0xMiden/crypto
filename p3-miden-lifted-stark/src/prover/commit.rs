@@ -1,8 +1,8 @@
-//! Trace commitment (LDE + bit-reverse + LMCS).
+//! Trace commitment (LDE + LMCS).
 //!
 //! This module provides types and functions for committing traces with lifting support:
 //!
-//! - [`commit_traces`]: Commit traces with lifting support (LDE → bit-reverse → LMCS)
+//! - [`commit_traces`]: Commit traces with lifting support (LDE → LMCS)
 //! - [`Committed`]: Wrapper around LMCS tree with domain metadata
 
 use alloc::vec::Vec;
@@ -121,12 +121,9 @@ where
     ///
     /// This returns evaluations over the quotient coset `gJ ⊆ gK`.
     ///
-    /// The tree commits to LDE evaluations on `gK` (size `N·B`). Constraint numerators are
-    /// evaluated point-wise on the smaller quotient domain `gJ` (size `N·D`), and for the
-    /// protocol we only need those `N·D` points as long as `B ≥ D`.
-    ///
-    /// In bit-reversed row order, `gJ` appears as the first `N·D` rows, so this is a
-    /// zero-copy prefix view followed by `bit_reverse_rows()` to expose natural order.
+    /// The tree commits to LDE evaluations on `gK` (size `N·B`). The `RowMajorMatrix`
+    /// stores bit-reversed evaluations; `gJ` appears as the first `N·D` rows, so this is
+    /// a zero-copy prefix view followed by `bit_reverse_rows()` to expose natural order.
     ///
     /// # Panics
     ///
@@ -148,10 +145,13 @@ where
 // commit_traces
 // ============================================================================
 
-/// Commit multiple trace matrices with lifting: LDE → bit-reverse → LMCS tree.
+/// Commit multiple trace matrices with lifting: LDE → LMCS tree.
 ///
 /// Traces must be sorted by height in ascending order. Each trace is lifted to
 /// the max LDE domain using the appropriate nested coset shift.
+///
+/// The DFT output is wrapped in `BitReversedMatrixView` (zero-cost view) and
+/// passed directly to the LMCS — no materialization needed.
 ///
 /// Returns a [`Committed`] wrapper providing:
 /// - Commitment root via [`Committed::root()`]
@@ -213,12 +213,18 @@ where
             let coset = LiftedCoset::new(log_trace_height, log_blowup, log_max_trace_height);
             let coset_shift = coset.lde_shift::<F>();
 
-            // Compute coset LDE and bit-reverse rows
+            // Compute coset LDE, materialize to bit-reversed RowMajorMatrix, and
+            // wrap in BitReversedMatrixView to present domain order to the LMCS.
+            // The double bit_reverse_rows() call is needed because the DFT's Evaluations
+            // type may be either RowMajorMatrix or BitReversedMatrixView depending on the
+            // backend. Once upstream adds BitReversibleMatrix impls for all DFT output
+            // types, this can be simplified to pass the DFT output directly.
             config
                 .dft()
                 .coset_lde_batch(trace, log_blowup.into(), coset_shift)
                 .bit_reverse_rows()
                 .to_row_major_matrix()
+                .bit_reverse_rows()
         })
         .collect();
 

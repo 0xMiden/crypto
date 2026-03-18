@@ -1,24 +1,22 @@
 //! Integration tests for FRI protocol commit/verify cycles.
 
-use alloc::{
-    collections::{BTreeMap, BTreeSet},
-    vec,
-    vec::Vec,
-};
+use alloc::{collections::BTreeMap, vec, vec::Vec};
 
 use p3_challenger::CanObserve;
 use p3_dft::{Radix2DFTSmallBatch, TwoAdicSubgroupDft};
 use p3_field::PrimeCharacteristicRing;
 use p3_matrix::{Matrix, bitrev::BitReversibleMatrix, dense::RowMajorMatrix};
-use p3_miden_lmcs::log2_strict_u8;
+use p3_miden_lmcs::{TreeIndices, log2_strict_u8};
 use p3_miden_transcript::VerifierTranscript;
-use p3_util::reverse_bits_len;
 use rand::{RngExt, SeedableRng, distr::StandardUniform, prelude::SmallRng};
 
 use super::{prover::FriPolys, verifier::FriOracle, *};
-use crate::tests::{
-    BaseLmcs, Challenger, EF, F, TestDigest, TestTranscriptData, prover_channel, random_lde_matrix,
-    sample_indices, test_challenger, test_lmcs, verifier_channel,
+use crate::testing::{
+    goldilocks_poseidon2::{
+        Challenger, EF, F, Lmcs as BaseLmcs, TestDigest, TestTranscriptData, prover_channel,
+        sample_indices, test_challenger, test_lmcs, verifier_channel,
+    },
+    random_lde_matrix,
 };
 
 // ============================================================================
@@ -74,15 +72,19 @@ const FRI_ROUNDTRIP_CASES: &[FriRoundtripCase] = &[
     },
 ];
 
-/// Build initial_evals map from tree indices and bit-reversed evaluation array.
+/// Build initial_evals map from domain indices and bit-reversed evaluation array.
 ///
-/// `evals` is in bit-reversed order: `evals[tree_idx]` = f(g·ω^{bitrev(tree_idx)}).
-/// `tree_indices` are the bit-reversed tree positions.
-/// Returns a map keyed by tree index.
-fn build_initial_evals(evals: &[EF], tree_indices: &BTreeSet<usize>) -> BTreeMap<usize, EF> {
+/// `evals` is in bit-reversed order: `evals[bitrev(d)]` = f(g·ω^d).
+/// `tree_indices` are domain indices.
+/// Returns a map keyed by domain index.
+fn build_initial_evals(evals: &[EF], tree_indices: &TreeIndices) -> BTreeMap<usize, EF> {
+    let log_n = log2_strict_u8(evals.len()) as usize;
     tree_indices
         .iter()
-        .map(|&tree_idx| (tree_idx, evals[tree_idx]))
+        .map(|&domain_idx| {
+            let bitrev_idx = p3_util::reverse_bits_len(domain_idx, log_n);
+            (domain_idx, evals[bitrev_idx])
+        })
         .collect()
 }
 
@@ -90,7 +92,7 @@ fn prove_queries(
     params: &FriParams,
     lmcs: &BaseLmcs,
     evals: Vec<EF>,
-    tree_indices: &BTreeSet<usize>,
+    tree_indices: TreeIndices,
 ) -> (TestDigest, TestTranscriptData) {
     let mut prover_channel = prover_channel();
     let fri_polys = FriPolys::<F, EF, _>::new(params, lmcs, evals, &mut prover_channel);
@@ -104,6 +106,7 @@ fn verify_queries(
     transcript: &TestTranscriptData,
     lde_size: usize,
     initial_evals: &BTreeMap<usize, EF>,
+    tree_indices: TreeIndices,
     challenger: Option<Challenger>,
 ) -> Result<TestDigest, FriError> {
     let mut channel = match challenger {
@@ -112,7 +115,13 @@ fn verify_queries(
     };
     let log_domain_size = log2_strict_u8(lde_size);
     let oracle = FriOracle::new(params, log_domain_size, &mut channel)?;
-    oracle.test_low_degree(lmcs, params, initial_evals.clone(), &mut channel)?;
+    oracle.test_low_degree(
+        lmcs,
+        params,
+        initial_evals.clone(),
+        tree_indices,
+        &mut channel,
+    )?;
     let digest = channel
         .finalize()
         .expect("transcript should finalize cleanly");
@@ -135,16 +144,24 @@ fn run_roundtrip_case(case: &FriRoundtripCase, seed: u64) -> Result<(), FriError
             .values;
     let lde_size = evals.len();
     let log_domain_size = log2_strict_u8(lde_size);
-    // Sample exponents and convert to tree indices (bit-reversed)
-    let tree_indices: BTreeSet<usize> = sample_indices(&mut rng, lde_size, case.num_queries)
-        .into_iter()
-        .map(|exp| reverse_bits_len(exp, log_domain_size as usize))
-        .collect();
+    // Sample domain indices (no bit-reversal needed — tree is in domain order)
+    let tree_indices = TreeIndices::new(
+        sample_indices(&mut rng, lde_size, case.num_queries),
+        log_domain_size,
+    )
+    .expect("indices are in range");
     let initial_evals = build_initial_evals(&evals, &tree_indices);
 
-    let (prover_digest, transcript) = prove_queries(&params, &lmcs, evals, &tree_indices);
-    let verifier_digest =
-        verify_queries(&params, &lmcs, &transcript, lde_size, &initial_evals, None)?;
+    let (prover_digest, transcript) = prove_queries(&params, &lmcs, evals, tree_indices.clone());
+    let verifier_digest = verify_queries(
+        &params,
+        &lmcs,
+        &transcript,
+        lde_size,
+        &initial_evals,
+        tree_indices,
+        None,
+    )?;
     assert_eq!(prover_digest, verifier_digest);
 
     // Re-parse FriTranscript (commit phase only) from a fresh channel.
@@ -194,14 +211,12 @@ fn test_fri_verify_wrong_eval() {
     let evals = random_lde_matrix::<F, EF>(&mut rng, log_poly_degree, log_blowup, 1, F::ONE).values;
     let lde_size = evals.len();
     let log_domain_size = log2_strict_u8(lde_size);
-    let tree_indices: BTreeSet<usize> = sample_indices(&mut rng, lde_size, 2)
-        .into_iter()
-        .map(|exp| reverse_bits_len(exp, log_domain_size as usize))
-        .collect();
+    let tree_indices = TreeIndices::new(sample_indices(&mut rng, lde_size, 2), log_domain_size)
+        .expect("indices are in range");
     let mut initial_evals = build_initial_evals(&evals, &tree_indices);
 
     // Tamper with the first evaluation
-    let first_idx = *tree_indices.first().unwrap();
+    let first_idx = *tree_indices.iter().next().unwrap();
     let correct_eval = initial_evals[&first_idx];
     let mut wrong_eval: EF = rng.sample(StandardUniform);
     while wrong_eval == correct_eval {
@@ -209,8 +224,16 @@ fn test_fri_verify_wrong_eval() {
     }
     initial_evals.insert(first_idx, wrong_eval);
 
-    let (_prover_digest, transcript) = prove_queries(&params, &lmcs, evals, &tree_indices);
-    let result = verify_queries(&params, &lmcs, &transcript, lde_size, &initial_evals, None);
+    let (_prover_digest, transcript) = prove_queries(&params, &lmcs, evals, tree_indices.clone());
+    let result = verify_queries(
+        &params,
+        &lmcs,
+        &transcript,
+        lde_size,
+        &initial_evals,
+        tree_indices,
+        None,
+    );
 
     assert!(
         matches!(result, Err(FriError::EvaluationMismatch { .. })),
@@ -249,12 +272,10 @@ fn test_fri_verify_wrong_beta() {
     let log_domain_size = log2_strict_u8(lde_size);
 
     // Prover 1: generate FRI transcript (grinds per-round internally).
-    let tree_indices: BTreeSet<usize> = sample_indices(&mut rng, lde_size, 2)
-        .into_iter()
-        .map(|exp| reverse_bits_len(exp, log_domain_size as usize))
-        .collect();
+    let tree_indices = TreeIndices::new(sample_indices(&mut rng, lde_size, 2), log_domain_size)
+        .expect("indices are in range");
     let initial_evals = build_initial_evals(&evals1, &tree_indices);
-    let (_prover_digest, transcript) = prove_queries(&params, &lmcs, evals1, &tree_indices);
+    let (_prover_digest, transcript) = prove_queries(&params, &lmcs, evals1, tree_indices.clone());
 
     // Prover 2: generate different transcript (different commitments = different betas).
     let mut prover2_channel = prover_channel();
@@ -275,6 +296,7 @@ fn test_fri_verify_wrong_beta() {
         &transcript,
         lde_size,
         &initial_evals,
+        tree_indices,
         Some(wrong_challenger),
     );
 
@@ -309,12 +331,10 @@ fn test_fri_zero_rounds_final_poly_only() {
     let evals = random_lde_matrix::<F, EF>(&mut rng, log_poly_degree, log_blowup, 1, F::ONE).values;
     let lde_size = evals.len();
     let log_domain_size = log2_strict_u8(lde_size);
-    let tree_indices: BTreeSet<usize> = sample_indices(&mut rng, lde_size, 2)
-        .into_iter()
-        .map(|exp| reverse_bits_len(exp, log_domain_size as usize))
-        .collect();
+    let tree_indices = TreeIndices::new(sample_indices(&mut rng, lde_size, 2), log_domain_size)
+        .expect("indices are in range");
     let initial_evals = build_initial_evals(&evals, &tree_indices);
-    let (prover_digest, transcript) = prove_queries(&params, &lmcs, evals, &tree_indices);
+    let (prover_digest, transcript) = prove_queries(&params, &lmcs, evals, tree_indices.clone());
 
     let mut channel = verifier_channel(&transcript);
     let fri_transcript: FriTranscript<F, EF, _> =
@@ -331,9 +351,16 @@ fn test_fri_zero_rounds_final_poly_only() {
         "final polynomial should match domain size"
     );
 
-    let verifier_digest =
-        verify_queries(&params, &lmcs, &transcript, lde_size, &initial_evals, None)
-            .expect("zero-round FRI should verify");
+    let verifier_digest = verify_queries(
+        &params,
+        &lmcs,
+        &transcript,
+        lde_size,
+        &initial_evals,
+        tree_indices,
+        None,
+    )
+    .expect("zero-round FRI should verify");
     assert_eq!(prover_digest, verifier_digest);
 }
 

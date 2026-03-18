@@ -228,9 +228,15 @@ where
     let lde = config.dft().dft_batch(coeffs_padded);
 
     // ═══════════════════════════════════════════════════════════════════════
-    // Step 5: Bit-reverse rows for commitment
+    // Step 5: Wrap for commitment
     // ═══════════════════════════════════════════════════════════════════════
-    let quotient_matrix = lde.bit_reverse_rows().to_row_major_matrix();
+    // The double bit_reverse_rows() materializes bit-reversed data and wraps it
+    // for the LMCS. Once upstream adds BitReversibleMatrix impls for all DFT
+    // output types, this can be simplified.
+    let quotient_matrix = lde
+        .bit_reverse_rows()
+        .to_row_major_matrix()
+        .bit_reverse_rows();
 
     let tree = config.lmcs().build_aligned_tree(vec![quotient_matrix]);
 

@@ -4,28 +4,22 @@
 //!
 //! # Domain Structure
 //!
-//! The prover commits to evaluations on domain D of size 2^log_domain_size in bit-reversed order.
-//! Each folding round groups `arity` consecutive evaluations into cosets and folds them.
-//!
-//! For arity = 2:
-//!   - Row i contains evaluations at coset {s, −s} where s = g^{bitrev(i)}
-//!   - g is the generator of D (has order n)
-//!
-//! For arity = 4:
-//!   - Row i contains evaluations at coset {s, −s, ωs, −ωs} where ω = √−1
+//! The prover commits to evaluations on domain D of size 2^log_domain_size. The LMCS tree
+//! is indexed by domain order (natural index). Internally, evaluations are in bit-reversed
+//! order within the committed matrix (wrapped in `BitReversedMatrixView`).
 //!
 //! # Index Semantics
 //!
-//! The query `index` has two parts:
-//!   - High bits: which row (coset) in the committed matrix
-//!   - Low bits: which position within the coset
+//! The query `index` is a domain index. For each folding round:
+//!   - Low bits (`index & (folded_size - 1)`): which row (coset) in the committed matrix
+//!   - High bits (`index >> (log_domain_size - log_arity)`): position within the coset
 //!
-//! After each fold, we shift off `log_arity` bits, moving to the parent coset.
+//! After each fold, we mask to the new folded domain size.
 
 use alloc::{collections::BTreeMap, vec::Vec};
 
 use p3_field::{ExtensionField, TwoAdicField};
-use p3_miden_lmcs::{Lmcs, LmcsError};
+use p3_miden_lmcs::{Lmcs, LmcsError, TreeIndices};
 use p3_miden_transcript::{TranscriptError, VerifierChannel};
 use p3_util::reverse_bits_len;
 use thiserror::Error;
@@ -101,8 +95,8 @@ where
 
     /// Test low-degree proximity by reading openings from a verifier channel.
     ///
-    /// `evals` maps tree indices to DEEP evaluations.
-    /// Tree index = bitrev(exp, log_domain_size) where domain point = `g·ω^{exp}`.
+    /// `evals` maps domain indices to DEEP evaluations.
+    /// Domain point for index `d` = `g·ω^d`.
     ///
     /// Empty `evals` will fail at the first round's LMCS `open_batch` call,
     /// which rejects empty indices.
@@ -115,6 +109,7 @@ where
         lmcs: &L,
         params: &FriParams,
         mut evals: BTreeMap<usize, EF>,
+        mut tree_indices: TreeIndices,
         channel: &mut Ch,
     ) -> Result<(), FriError>
     where
@@ -132,17 +127,11 @@ where
         for (round_idx, round) in self.rounds.iter().enumerate() {
             let log_folded_domain_size = log_domain_size - log_arity;
 
-            // Compute row indices: shift off position-within-coset bits
-            let row_indices = evals.keys().map(|&idx| idx >> log_arity as usize);
+            // Shrink indices by log_arity to get this round's row indices.
+            tree_indices.shrink_depth(log_arity);
 
             let opened_rows = lmcs
-                .open_batch(
-                    &round.commitment,
-                    &widths,
-                    log_folded_domain_size,
-                    row_indices,
-                    channel,
-                )
+                .open_batch(&round.commitment, &widths, &tree_indices, channel)
                 .map_err(|source| FriError::LmcsError {
                     source,
                     round: round_idx,
@@ -151,7 +140,7 @@ where
             // Drain, verify, fold, and rebuild with new keys.
             //
             // SOUNDNESS NOTE: Multiple indices can map to the same row_idx after folding
-            // (they differ only in their low log_arity bits). This is safe because:
+            // (they share the same coset). This is safe because:
             //
             // 1. Each closure verifies its specific position: `row[position] == eval`.
             //    All closures execute (Rust's collect drives the full iterator).
@@ -162,12 +151,17 @@ where
             //
             // 3. The prover cannot provide different row data for the same row_idx.
             //    LMCS opens each row exactly once via `opened_rows[&row_idx]`.
+            let folded_size = 1usize << log_folded_domain_size;
             evals = evals
                 .into_iter()
                 .map(|(idx, eval)| {
-                    // Decompose tree index: high bits = row (coset), low bits = position within coset
-                    let row_idx = idx >> log_arity;
-                    let position = idx & (arity - 1);
+                    // Decompose domain index: low bits = row (coset), high bits = position.
+                    // The position bits must be bit-reversed within `log_arity` bits
+                    // because the physical matrix rows store coset evaluations in
+                    // bit-reversed order within each row.
+                    let row_idx = idx & (folded_size - 1);
+                    let position =
+                        reverse_bits_len(idx >> log_folded_domain_size, log_arity as usize);
 
                     // FRI commits one matrix per round; iter_rows().next() yields it safely.
                     let flat_row = opened_rows
@@ -188,9 +182,9 @@ where
                         });
                     }
 
-                    // s⁻¹ = (g^{bitrev(row_idx)})⁻¹, needed for iFFT over <s>.
-                    let s_pow = reverse_bits_len(row_idx, log_folded_domain_size as usize);
-                    let s_inv = g_inv.exp_u64(s_pow as u64);
+                    // s⁻¹ = ω_N^{-row_idx}, needed for iFFT over <s>.
+                    // In domain order, row_idx is the domain index directly.
+                    let s_inv = g_inv.exp_u64(row_idx as u64);
                     let folded = params.fold.fold_evals(&row, s_inv, round.beta);
                     Ok((row_idx, folded))
                 })
@@ -210,8 +204,8 @@ where
         // the native order for Horner evaluation.
         let generator = F::two_adic_generator(log_domain_size as usize);
         for (idx, eval) in evals {
-            let exp = reverse_bits_len(idx, log_domain_size as usize);
-            let x = generator.exp_u64(exp as u64);
+            // Domain index directly gives the exponent (no bit-reversal needed).
+            let x = generator.exp_u64(idx as u64);
             let final_eval: EF = horner(x, self.final_poly.iter().copied());
 
             if final_eval != eval {

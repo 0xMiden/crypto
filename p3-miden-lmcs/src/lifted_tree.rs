@@ -7,14 +7,10 @@ use p3_maybe_rayon::prelude::*;
 use p3_miden_stateful_hasher::StatefulHasher;
 use p3_miden_transcript::ProverChannel;
 use p3_symmetric::{Hash, PseudoCompressionFunction};
-use p3_util::log2_strict_usize;
-use serde::{Deserialize, Serialize};
+use p3_util::{log2_strict_usize, reverse_bits_len};
 use tracing::{debug_span, info_span};
 
-use crate::{
-    LmcsTree, Proof,
-    utils::{PackedValueExt, RowList, aligned_widths, pad_row_to_alignment},
-};
+use crate::{LeafOpening, LmcsTree, TreeIndices, row_list::RowList, utils::PackedValueExt};
 
 /// A uniform binary Merkle tree whose leaves are constructed from matrices with power-of-two heights.
 ///
@@ -33,9 +29,14 @@ use crate::{
 ///
 /// The per-leaf row composition uses nearest-neighbor upsampling: each matrix Mᵢ is virtually
 /// extended to height N (width unchanged) by repeating each row rᵢ = N/nᵢ times
-/// contiguously. For leaf index `j`, the sponge absorbs the `j`-th row from each lifted matrix
-/// in sequence. The sponge applies its own padding semantics during absorption; LMCS alignment
-/// only affects transcript hints.
+/// contiguously. For physical row index `j`, the sponge absorbs the `j`-th row from each
+/// lifted matrix in sequence. The sponge applies its own padding semantics during absorption;
+/// LMCS alignment only affects transcript hints.
+///
+/// Leaf digests are squeezed directly into domain order (digest `i` comes from
+/// state `bitrev(i)`) so the Merkle tree is indexed by **domain order** (natural index).
+/// External callers address leaves by domain index; the internal row access maps
+/// `domain_index → bitrev(domain_index)` to reach the same physical row that was hashed.
 ///
 /// Note: alignment padding is a convention for transcript openings and does not affect the
 /// commitment. It is independent of the sponge's absorption alignment. LMCS does not enforce
@@ -69,7 +70,7 @@ use crate::{
 ///
 /// This generally shouldn't be used directly. If you're using a Merkle tree as an MMCS,
 /// see the MMCS wrapper types.
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug)]
 pub struct LiftedMerkleTree<F, D, M, const DIGEST_ELEMS: usize, const SALT_ELEMS: usize = 0> {
     /// All leaf matrices in insertion order.
     ///
@@ -81,15 +82,12 @@ pub struct LiftedMerkleTree<F, D, M, const DIGEST_ELEMS: usize, const SALT_ELEMS
     /// after construction time.
     pub(crate) leaves: Vec<M>,
 
-    /// All intermediate hash layers (digest arrays), index 0 being the leaf hash layer
-    /// and the last layer containing exactly one root hash.
+    /// All hash layers (digest arrays) in top-down order: index 0 is the root
+    /// (one hash) and the last layer contains the leaf hashes.
     ///
-    /// Every inner vector holds contiguous hashes. Higher layers are built by
-    /// compressing pairs from the previous layer.
-    #[serde(bound(
-        serialize = "[D; DIGEST_ELEMS]: Serialize",
-        deserialize = "[D; DIGEST_ELEMS]: Deserialize<'de>"
-    ))]
+    /// This matches the top-down depth convention of [`NodeId`](crate::NodeId):
+    /// `digest_layers[d]` has `2^d` entries, so `digest_layers[node.depth()][node.position()]`
+    /// gives direct access.
     pub(crate) digest_layers: Vec<Vec<[D; DIGEST_ELEMS]>>,
 
     /// Salt matrix for hiding commitment. Each row contains `SALT_ELEMS` random field elements.
@@ -107,7 +105,7 @@ where
     M: Matrix<F>,
 {
     fn root(&self) -> Hash<F, D, DIGEST_ELEMS> {
-        Hash::from(self.digest_layers.last().unwrap()[0])
+        Hash::from(self.digest_layers[0][0])
     }
 
     fn height(&self) -> usize {
@@ -118,23 +116,21 @@ where
         &self.leaves
     }
 
-    /// Return the upsampled rows for `index`, padded to `alignment`.
+    /// Return the upsampled rows for `index` with original matrix widths (no padding).
+    ///
+    /// Panics if `index` is out of range for the tree height.
+    fn rows(&self, index: usize) -> RowList<F> {
+        self.collect_rows(index, self.widths())
+    }
+
+    /// Return the upsampled rows for `index`, padded to the tree's alignment.
     ///
     /// Padding uses `Default::default()` and is not enforced by verification; callers
     /// that require zero padding must check these columns explicitly.
     ///
     /// Panics if `index` is out of range for the tree height.
-    fn rows(&self, index: usize) -> RowList<F> {
-        let max_height = self.height();
-        let rows_iter = self.leaves.iter().map(|m| {
-            // Lifting: a matrix of height h maps leaf index i to row i >> log₂(max_height/h).
-            let log_scaling = log2_strict_usize(max_height / m.height());
-            let row_index = index >> log_scaling;
-            m.row_slice(row_index)
-                .expect("row_index must be valid after upsampling")
-                .to_vec()
-        });
-        RowList::from_rows_aligned(rows_iter, self.alignment)
+    fn aligned_rows(&self, index: usize) -> RowList<F> {
+        self.collect_rows(index, self.aligned_widths())
     }
 
     fn alignment(&self) -> usize {
@@ -142,9 +138,7 @@ where
     }
 
     fn widths(&self) -> Vec<usize> {
-        let alignment = self.alignment;
-        let widths = self.leaves.iter().map(|m| m.width()).collect();
-        aligned_widths(widths, alignment)
+        self.leaves.iter().map(|m| m.width()).collect()
     }
 
     /// Prove a batch opening and stream it into a transcript channel.
@@ -154,72 +148,23 @@ where
     /// padding must check the opened rows explicitly.
     ///
     /// Leaf openings are written in **sorted tree index order** (ascending, deduplicated).
-    fn prove_batch<Ch>(&self, indices: impl IntoIterator<Item = usize>, channel: &mut Ch)
+    fn prove_batch<Ch>(&self, indices: &TreeIndices, channel: &mut Ch)
     where
         Ch: ProverChannel<F = F, Commitment = Hash<F, D, DIGEST_ELEMS>>,
     {
-        use alloc::collections::BTreeSet;
-
-        let final_height = self.leaves.last().unwrap().height();
-        let depth = log2_strict_usize(final_height);
-        let alignment = self.alignment;
-
-        // Collect and deduplicate indices. BTreeSet iteration yields sorted order,
-        // which is critical for transcript determinism: both prover and verifier
-        // must process indices in the same order.
-        let unique_indices: BTreeSet<usize> = indices.into_iter().collect();
-
         // Stream leaf openings in sorted tree index order.
-        for &index in &unique_indices {
-            assert!(
-                index < final_height,
-                "index {index} out of range {final_height}"
-            );
-            for m in self.leaves.iter() {
-                let height = m.height();
-                let log_scaling_factor = log2_strict_usize(final_height / height);
-                let row_index = index >> log_scaling_factor;
-                let row = m
-                    .row_slice(row_index)
-                    .expect("row_index must be valid after upsampling")
-                    .to_vec();
-                let row = pad_row_to_alignment(row, alignment);
-                channel.hint_field_slice(&row);
-            }
-            if SALT_ELEMS > 0 {
-                let salt = self.salt(index);
-                channel.hint_field_slice(&salt);
-            }
+        for &index in indices.iter() {
+            let opening = LeafOpening {
+                rows: self.aligned_rows(index),
+                salt: self.salt(index),
+            };
+            opening.write_to_channel(channel);
         }
 
-        // Use the same sorted set for sibling traversal
-        let mut known = unique_indices;
-
-        // Walk up the tree level by level using the deduplicated set.
-        for layer_idx in 0..depth {
-            let mut parents = BTreeSet::new();
-
-            // BTreeSet iterates in sorted order (left-to-right)
-            for &pos in &known {
-                let parent_pos = pos / 2;
-                if !parents.insert(parent_pos) {
-                    continue; // Already processed this pair
-                }
-
-                let left_pos = parent_pos * 2;
-                let right_pos = left_pos + 1;
-                let have_left = known.contains(&left_pos);
-                let have_right = known.contains(&right_pos);
-
-                // Add sibling hash if exactly one child is known
-                if have_left && !have_right {
-                    channel.hint_commitment(Hash::from(self.digest_layers[layer_idx][right_pos]));
-                } else if !have_left && have_right {
-                    channel.hint_commitment(Hash::from(self.digest_layers[layer_idx][left_pos]));
-                }
-            }
-
-            known = parents;
+        // Emit missing sibling hashes left-to-right, bottom-to-top.
+        for sibling in indices.missing_siblings() {
+            let hash = self.digest_layers[sibling.depth()][sibling.position()];
+            channel.hint_commitment(Hash::from(hash));
         }
     }
 }
@@ -279,14 +224,21 @@ where
                     );
                 }
 
-                // Squeeze the final hashes from the states
-                leaf_states
+                // Squeeze leaf hashes and bit-reverse in one pass: digest[i] = squeeze(state[bitrev(i)]).
+                // This places digests in domain order so the Merkle tree is indexed naturally.
+                let n = leaf_states.len();
+                let log_n = log2_strict_usize(n);
+                (0..n)
                     .into_par_iter()
-                    .map(|state| h.squeeze(&state))
+                    .map(|i| {
+                        let src = reverse_bits_len(i, log_n);
+                        h.squeeze(&leaf_states[src])
+                    })
                     .collect()
             });
 
-        // Build digest layers by repeatedly compressing until we reach the root
+        // Build digest layers by repeatedly compressing until we reach the root,
+        // then reverse so index 0 = root, matching the top-down NodeId convention.
         let digest_layers = debug_span!("compress tree layers").in_scope(|| {
             let mut digest_layers = vec![leaf_digests];
             loop {
@@ -298,6 +250,7 @@ where
                 let next_layer = compress_uniform::<PD, C, DIGEST_ELEMS>(prev_layer, c);
                 digest_layers.push(next_layer);
             }
+            digest_layers.reverse();
             digest_layers
         });
 
@@ -309,44 +262,28 @@ where
         }
     }
 
-    /// Build a full opening proof for a single leaf index.
-    ///
-    /// Rows are padded to `alignment` and LMCS does not enforce that padding is zero.
-    /// Panics if `index` is out of range for the tree height.
-    pub fn single_proof(&self, index: usize) -> Proof<F, Hash<F, D, DIGEST_ELEMS>, SALT_ELEMS> {
-        let mut siblings = Vec::with_capacity(self.digest_layers.len().saturating_sub(1));
-        let mut layer_index = index;
-        for layer in &self.digest_layers {
-            if layer.len() == 1 {
-                break;
-            }
-            let sibling = layer[layer_index ^ 1];
-            siblings.push(Hash::from(sibling));
-            layer_index >>= 1;
-        }
-
-        Proof {
-            rows: self.rows(index),
-            salt: self.salt(index),
-            siblings,
-        }
-    }
-
     /// Column alignment used when streaming openings.
     pub fn alignment(&self) -> usize {
         self.alignment
     }
 
-    /// Extract the salt for the given leaf index.
+    /// Extract the salt for the given domain index.
+    ///
+    /// Maps `domain_index` to the physical salt row via `bitrev(domain_index)`, matching
+    /// the row that was absorbed during tree construction.
     ///
     /// # Panics
     ///
-    /// Panics if `index` is out of range, or if `SALT_ELEMS > 0` but the tree was
+    /// Panics if `domain_index` is out of range, or if `SALT_ELEMS > 0` but the tree was
     /// constructed without salt.
-    pub fn salt(&self, index: usize) -> [F; SALT_ELEMS] {
+    pub fn salt(&self, domain_index: usize) -> [F; SALT_ELEMS] {
         match &self.salt {
             Some(salt_matrix) => {
-                let row = salt_matrix.row_slice(index).expect("index must be valid");
+                let physical_index =
+                    reverse_bits_len(domain_index, log2_strict_usize(salt_matrix.height()));
+                let row = salt_matrix
+                    .row_slice(physical_index)
+                    .expect("index must be valid");
                 // Tree construction guarantees salt width == SALT_ELEMS
                 array::from_fn(|i| row[i])
             }
@@ -360,6 +297,31 @@ where
                 [F::default(); SALT_ELEMS]
             }
         }
+    }
+
+    /// Collect upsampled rows for `domain_index` into a flat `RowList` with the given widths.
+    ///
+    /// Maps the domain index to a bit-reversed row index: `bitrev(domain_index) >> k`.
+    /// This returns the same values that were hashed into Merkle leaf `domain_index`
+    /// (the tree is indexed by domain order after leaf digest permutation).
+    ///
+    /// Uses `Matrix::row()` to extend directly into a single pre-allocated buffer
+    /// without per-row allocations.
+    fn collect_rows(&self, domain_index: usize, widths: Vec<usize>) -> RowList<F> {
+        let max_height = self.leaves.last().unwrap().height();
+        let log_max_height = log2_strict_usize(max_height);
+        let bit_reversed = reverse_bits_len(domain_index, log_max_height);
+        let mut elems = Vec::with_capacity(widths.iter().sum());
+        for (m, &padded_len) in self.leaves.iter().zip(&widths) {
+            // Map domain index to bit-reversed row: bitrev(domain_index) >> log₂(max_height/h).
+            let log_scaling = log2_strict_usize(max_height / m.height());
+            elems.extend(
+                m.row(bit_reversed >> log_scaling)
+                    .expect("row_index must be valid after upsampling"),
+            );
+            elems.resize(elems.len() + padded_len - m.width(), F::default());
+        }
+        RowList::new(elems, widths)
     }
 }
 
@@ -574,8 +536,12 @@ mod tests {
     use rand::{SeedableRng, rngs::SmallRng};
 
     use crate::{
-        testing::goldilocks_poseidon2 as gl,
-        tests::{DIGEST, F, P, RATE, Sponge, build_leaves_single, concatenate_matrices},
+        testing::{
+            concatenate_matrices,
+            goldilocks_poseidon2::{self as gl, DIGEST, F, P, RATE, Sponge},
+            matrix_scenarios,
+        },
+        tests::build_leaves_single,
         utils::upsample_matrix,
     };
 
@@ -592,7 +558,7 @@ mod tests {
         let (_, sponge, _compressor) = gl::test_components();
         let mut rng = SmallRng::seed_from_u64(42);
 
-        for scenario in crate::testing::matrix_scenarios::<P>(RATE) {
+        for scenario in matrix_scenarios::<P>(RATE) {
             let matrices: Vec<RowMajorMatrix<F>> = scenario
                 .into_iter()
                 .map(|(h, w)| RowMajorMatrix::rand(&mut rng, h, w))

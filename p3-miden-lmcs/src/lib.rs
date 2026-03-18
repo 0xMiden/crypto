@@ -1,7 +1,9 @@
 //! Lifted Matrix Commitment Scheme (LMCS) for matrices with power-of-two heights.
 //!
-//! This crate provides a Merkle tree commitment scheme optimized for matrices that store
-//! polynomial evaluations in **bit-reversed order** over multiplicative cosets.
+//! This crate provides a Merkle tree commitment scheme for matrices that store
+//! polynomial evaluations over multiplicative cosets. The tree is indexed by
+//! **domain order** (natural index): callers address leaves by domain index,
+//! and bit-reversal concerns are encapsulated inside the LMCS.
 //!
 //! # Main Types
 //!
@@ -11,7 +13,7 @@
 //! - [`LmcsTree`]: Trait for built LMCS trees, providing opening operations.
 //! - [`LiftedMerkleTree`]: The underlying Merkle tree data structure.
 //! - [`Proof`]: Single-opening proof with rows, optional salt, and authentication path.
-//! - [`BatchProof`]: Parsed batch opening from transcript hints.
+//! - [`BatchProof`]: Batch opening data with Merkle witness for path extraction.
 //!
 //! # API Overview
 //!
@@ -70,10 +72,8 @@
 //! `LmcsConfig::open_batch` consumes only the hints it needs to reconstruct the root;
 //! extra hint data is left unread. It expects `widths` and `log_max_height` to match the
 //! committed tree and treats empty `indices` as invalid. Use
-//! [`BatchProof::read_from_channel`](crate::BatchProof::read_from_channel) if you need to
-//! parse hints without hashing; then call [`BatchProof::single_proofs`](crate::BatchProof::single_proofs)
-//! with an LMCS config to reconstruct per-index proofs (keyed by index) without verifying against a
-//! commitment.
+//! [`Lmcs::read_batch_proof`] to parse hints into a [`BatchProof`]
+//! without verifying against a commitment.
 //!
 //! # Mathematical Foundation
 //!
@@ -98,28 +98,21 @@
 //! - Original rows: `[row0, row1, row2, row3]`
 //! - Upsampled: `[row0, row0, row1, row1, row2, row2, row3, row3]` (blocks of 2)
 //!
-//! # Why Upsampling for Bit-Reversed Data
+//! # Why Upsampling Works
 //!
-//! Given bit-reversed evaluations of `f(X)` over a coset `gK` where `|K| = n`, upsampling to
-//! height `N = n · r` (where `r = 2^k`) produces the bit-reversed evaluations of `f'(X) = f(Xʳ)`
-//! over the coset `gK'` where `|K'| = N`.
+//! Given evaluations of `f(X)` over a coset, upsampling to height `N = n · r` (where `r = 2^k`)
+//! produces evaluations of the lifted polynomial `f'(X) = f(Xʳ)` over the larger coset.
 //!
-//! Mathematically, if the input contains `f(g·(ω_n)^{bitrev_n(j)})` at index `j`, then after
-//! upsampling, each index `i` in `[0, N)` maps to the original index `j = i >> k`, giving:
-//!
-//! ```text
-//! upsampled[i] = f(g·(ω_n)^{bitrev_n(i >> k)}) = f'(g·(ω_N)^{bitrev_N(i)})
-//! ```
-//!
-//! where `f'(X) = f(Xʳ)`. This is exactly the bit-reversed evaluation of `f'` over `gK'`.
+//! The internal hashing uses matrices whose rows are in bit-reversed order (as produced by
+//! `BitReversedMatrixView`). For such data, upsampling by nearest-neighbor repetition
+//! (`i >> k`) produces the correct lifted evaluations. The LMCS then bit-reverses the
+//! leaf digest array so the Merkle tree is indexed by domain order.
 //!
 //! # Opening Semantics
 //!
-//! When opening at index `i`, we retrieve the value at position `i` in the bit-reversed list.
-//! For the lifted polynomial `f'(X) = f(Xʳ)`, this gives `f'(g·(ω_N)^{bitrev_N(i)})`.
-//!
-//! Equivalently, this is `f'(g·ξ^i)` where `ξ = (ω_N)^{bitrev_N(i)}` is the `i`-th element
-//! when iterating over `K'` in the order induced by bit-reversed indices.
+//! When opening at domain index `d`, the LMCS maps `d` to bit-reversed row index
+//! `bitrev(d) >> k` for each matrix. This returns the same values that were hashed
+//! into Merkle leaf `d`.
 //!
 //! # Equivalence to Cyclic Lifting
 //!
@@ -138,15 +131,19 @@
 
 extern crate alloc;
 
+pub mod bitrev;
 mod hiding_lmcs;
 mod lifted_tree;
 mod lmcs;
-pub mod mmcs;
+pub mod merkle_witness;
+mod node_id;
 pub mod proof;
+pub mod row_list;
 #[cfg(any(test, feature = "testing"))]
 pub mod testing;
 #[cfg(test)]
 mod tests;
+mod tree_indices;
 pub mod utils;
 
 use alloc::{collections::BTreeMap, vec::Vec};
@@ -154,14 +151,19 @@ use alloc::{collections::BTreeMap, vec::Vec};
 // ============================================================================
 // Public Re-exports
 // ============================================================================
+pub use bitrev::BitReversibleMatrix;
 pub use hiding_lmcs::HidingLmcsConfig;
 pub use lifted_tree::LiftedMerkleTree;
 pub use lmcs::LmcsConfig;
+pub use merkle_witness::MerkleWitness;
+pub use node_id::NodeId;
 use p3_matrix::Matrix;
 use p3_miden_transcript::{ProverChannel, TranscriptError, VerifierChannel};
 pub use proof::{BatchProof, LeafOpening, Proof};
+pub use row_list::RowList;
 use thiserror::Error;
-pub use utils::{RowList, log2_strict_u8};
+pub use tree_indices::{MissingSiblingsIter, TreeIndices};
+pub use utils::log2_strict_u8;
 
 // ============================================================================
 // Type Aliases
@@ -182,21 +184,29 @@ pub trait Lmcs: Clone {
     type F: Clone + Send + Sync;
     /// Commitment type (root hash).
     type Commitment: Clone;
-    /// Parsed batch opening type.
+    /// Tree type (prover data), parameterized by stored matrix type.
+    type Tree<Stored: Matrix<Self::F>>: LmcsTree<Self::F, Self::Commitment, Stored>;
+    /// Batch witness type returned by [`read_batch_proof`](Self::read_batch_proof).
     type BatchProof;
-    /// Tree type (prover data), parameterized by matrix type.
-    type Tree<M: Matrix<Self::F>>: LmcsTree<Self::F, Self::Commitment, M>;
 
-    /// Build a tree from matrices with no transcript padding (alignment = 1).
+    /// Build a tree from domain-ordered matrices with no transcript padding (alignment = 1).
+    ///
+    /// The LMCS extracts the inner bit-reversed matrices via
+    /// [`BitReversibleMatrix::bit_reverse_rows`] and stores them. The tree is indexed
+    /// by domain order; [`LmcsTree::leaves`] returns the stored bit-reversed matrices.
     ///
     /// This affects only transcript hint formatting; the commitment root is unchanged.
-    fn build_tree<M: Matrix<Self::F>>(&self, leaves: Vec<M>) -> Self::Tree<M>;
+    fn build_tree<M: BitReversibleMatrix<Self::F>>(&self, leaves: Vec<M>) -> Self::Tree<M::BitRev>;
 
-    /// Build a tree from matrices using the hasher alignment for transcript padding.
+    /// Build a tree from domain-ordered matrices using the hasher alignment for transcript
+    /// padding.
     ///
     /// Rows are padded to the hasher's alignment when streaming hints.
     /// When the alignment is 1, this is identical to [`Self::build_tree`].
-    fn build_aligned_tree<M: Matrix<Self::F>>(&self, leaves: Vec<M>) -> Self::Tree<M>;
+    fn build_aligned_tree<M: BitReversibleMatrix<Self::F>>(
+        &self,
+        leaves: Vec<M>,
+    ) -> Self::Tree<M::BitRev>;
 
     /// Hash a sequence of field slices into a leaf hash.
     ///
@@ -214,39 +224,37 @@ pub trait Lmcs: Clone {
     ///
     /// The hint format is implementation-defined; callers must use the matching
     /// `LmcsTree::prove_batch` implementation to produce compatible hints.
-    /// `widths` and `log_max_height` must match the committed tree (including any
-    /// alignment padding if `build_aligned_tree` was used).
+    /// `widths` must match the committed tree (including any alignment padding
+    /// if `build_aligned_tree` was used).
     ///
     /// # Preconditions
-    /// - `indices` must be non-empty and in `0..2^log_max_height`.
+    /// - `indices` must be non-empty and have depth matching `log₂(tree height)`.
     ///
     /// # Postconditions
-    /// On success, the returned map contains exactly one entry per unique index from
-    /// the input. Each entry's `RowList<F>` has one row per width in `widths`,
-    /// with that row's length matching the corresponding width. Duplicate indices
-    /// are coalesced into a single entry.
+    /// On success, the returned map contains exactly one entry per unique index.
+    /// Each entry's `RowList<F>` has one row per width in `widths`, with that
+    /// row's length matching the corresponding width.
     fn open_batch<Ch>(
         &self,
         commitment: &Self::Commitment,
         widths: &[usize],
-        log_max_height: u8,
-        indices: impl IntoIterator<Item = usize>,
+        indices: &TreeIndices,
         channel: &mut Ch,
     ) -> Result<OpenedRows<Self::F>, LmcsError>
     where
         Ch: VerifierChannel<F = Self::F, Commitment = Self::Commitment>;
 
-    /// Parse a batch opening from a transcript channel without validation.
+    /// Parse a batch opening from transcript hints without verification.
     ///
-    /// This is a parse-only function: it reads hints according to the implementation's
-    /// transcript layout but does not hash leaves or verify against a commitment.
-    /// The returned proof may be invalid if the inputs are themselves invalid;
+    /// Reads leaf openings and sibling hashes from the channel, hashes leaves,
+    /// and reconstructs the Merkle witness. Does not verify against a commitment;
     /// validation happens in [`open_batch`](Lmcs::open_batch).
-    fn read_batch_proof_from_channel<Ch>(
+    ///
+    /// Use [`MerkleWitness::path`] on the returned witness to extract authentication paths.
+    fn read_batch_proof<Ch>(
         &self,
         widths: &[usize],
-        log_max_height: u8,
-        indices: &[usize],
+        indices: &TreeIndices,
         channel: &mut Ch,
     ) -> Result<Self::BatchProof, LmcsError>
     where
@@ -270,19 +278,31 @@ pub trait LmcsTree<F, Commitment, M> {
 
     /// Get references to the committed matrices.
     ///
-    /// Matrix widths are not padded; use [`Self::widths`] for aligned widths.
+    /// Matrix widths are not padded; use [`Self::aligned_widths`] for aligned widths.
     fn leaves(&self) -> &[M];
 
-    /// Get the opened rows for a given leaf index.
-    ///
-    /// Rows are padded to the tree's alignment (1 for unaligned trees).
+    /// Get the opened rows for a given leaf index (original matrix widths, no padding).
     fn rows(&self, index: usize) -> RowList<F>;
+
+    /// Get the opened rows for a given leaf index, padded to the tree's alignment.
+    ///
+    /// Padding uses `Default::default()` and is not enforced by verification.
+    fn aligned_rows(&self, index: usize) -> RowList<F>;
 
     /// Column alignment used when streaming openings.
     fn alignment(&self) -> usize;
 
-    /// Get aligned widths for each committed matrix.
+    /// Get widths for each committed matrix (original, no padding).
     fn widths(&self) -> Vec<usize>;
+
+    /// Get aligned widths for each committed matrix (padded to alignment).
+    fn aligned_widths(&self) -> Vec<usize> {
+        let alignment = self.alignment();
+        self.widths()
+            .into_iter()
+            .map(|w| utils::aligned_len(w, alignment))
+            .collect()
+    }
 
     /// Prove a batch opening and stream it into a transcript channel.
     ///
@@ -291,7 +311,7 @@ pub trait LmcsTree<F, Commitment, M> {
     /// tree's alignment before being written to the channel.
     ///
     /// Leaf openings are written in **sorted tree index order** (ascending, deduplicated).
-    fn prove_batch<Ch>(&self, indices: impl IntoIterator<Item = usize>, channel: &mut Ch)
+    fn prove_batch<Ch>(&self, indices: &TreeIndices, channel: &mut Ch)
     where
         Ch: ProverChannel<F = F, Commitment = Commitment>;
 }

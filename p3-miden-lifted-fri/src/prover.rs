@@ -2,13 +2,10 @@
 //!
 //! Opens committed matrices at out-of-domain evaluation points.
 
-use alloc::collections::BTreeSet;
-
 use p3_field::{ExtensionField, TwoAdicField};
 use p3_matrix::Matrix;
-use p3_miden_lmcs::{Lmcs, LmcsTree};
+use p3_miden_lmcs::{Lmcs, LmcsTree, TreeIndices};
 use p3_miden_transcript::ProverChannel;
-use p3_util::reverse_bits_len;
 use tracing::{info_span, instrument};
 
 use crate::{PcsParams, deep::prover::DeepPoly, fri::prover::FriPolys};
@@ -85,17 +82,14 @@ pub fn open_with_channel<F, EF, L, M, Ch, const N: usize>(
     let _query_pow_witness = channel.grind(params.query_pow_bits());
 
     // ─────────────────────────────────────────────────────────────────────────
-    // Sample query exponents and convert to tree indices
+    // Sample query indices (domain indices)
     // ─────────────────────────────────────────────────────────────────────────
-    // Exponents are domain point indices: domain point = g·ω^{exp}.
-    // Tree indices are bit-reversed exponents (LMCS stores in bit-reversed order).
-    // Collecting into BTreeSet ensures deduplication and sorted order.
-    let tree_indices: BTreeSet<usize> = (0..params.num_queries())
-        .map(|_| {
-            let exp = channel.sample_bits(log_lde_height as usize);
-            reverse_bits_len(exp, log_lde_height as usize)
-        })
-        .collect();
+    // Sampled indices are domain indices: domain point = g·ω^{index}.
+    // The LMCS tree is indexed by domain order (no bit-reversal needed).
+    let sampled_indices_iter =
+        (0..params.num_queries()).map(|_| channel.sample_bits(log_lde_height as usize));
+    let tree_indices = TreeIndices::new(sampled_indices_iter, log_lde_height)
+        .expect("sampled indices are in range");
 
     // ─────────────────────────────────────────────────────────────────────────
     // Generate query proofs
@@ -104,13 +98,13 @@ pub fn open_with_channel<F, EF, L, M, Ch, const N: usize>(
         // Open input trees at all query indices at once (one proof per tree)
         info_span!("open input trees", n_trees = trace_trees.len()).in_scope(|| {
             for tree in trace_trees {
-                tree.prove_batch(tree_indices.iter().copied(), channel);
+                tree.prove_batch(&tree_indices, channel);
             }
         });
 
         // Open all FRI rounds at all query indices at once (one proof per round)
         info_span!("open FRI trees").in_scope(|| {
-            fri_polys.prove_queries(&params.fri, &tree_indices, channel);
+            fri_polys.prove_queries(&params.fri, tree_indices, channel);
         });
     });
 }
