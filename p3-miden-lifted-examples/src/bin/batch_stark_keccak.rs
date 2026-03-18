@@ -11,23 +11,18 @@
 //! ```
 
 use p3_air::{Air, AirBuilder, BaseAir, BaseLeaf, SymbolicExpression};
-use p3_baby_bear::BabyBear;
 use p3_batch_stark::{ProverData, StarkInstance, prove_batch, verify_batch};
-use p3_challenger::DuplexChallenger;
-use p3_commit::ExtensionMmcs;
-use p3_dft::Radix2DitParallel;
-use p3_field::{Field, extension::BinomialExtensionField};
-use p3_fri::{FriParameters, TwoAdicFriPcs};
+use p3_field::Field;
 use p3_keccak_air::{KeccakAir, generate_trace_rows};
 use p3_lookup::{
     LookupAir,
     lookup_traits::{Direction, Kind, Lookup},
 };
 use p3_matrix::{Matrix, dense::RowMajorMatrix};
-use p3_merkle_tree::MerkleTreeMmcs;
-use p3_miden_dev_utils::configs::baby_bear_poseidon2 as bb;
-use p3_miden_lifted_examples::stats;
-use p3_symmetric::PaddingFreeSponge;
+use p3_miden_lifted_examples::{
+    bench_configs::{self, Val},
+    stats,
+};
 use p3_util::log2_strict_usize;
 use rand::{RngExt, SeedableRng, rngs::SmallRng};
 use tracing::info_span;
@@ -38,9 +33,6 @@ const NUM_HASHES_S: usize = 1365;
 const NUM_HASHES_A: usize = 10922;
 // Trace B: 2^19 rows -> floor(524288/24) = 21845 hashes.
 const NUM_HASHES_B: usize = 21845;
-
-type Val = BabyBear;
-type Challenge = BinomialExtensionField<Val, 4>;
 
 const LOG_BLOWUP: usize = 1;
 const NUM_QUERIES: usize = 100;
@@ -100,43 +92,11 @@ impl<F: Field> LookupAir<F> for KeccakWithLookup {
     }
 }
 
-// ─── Config ──────────────────────────────────────────────────────────────────
-
-type Perm = bb::Perm;
-type MmcsSponge = PaddingFreeSponge<Perm, { bb::WIDTH }, { bb::RATE }, { bb::DIGEST }>;
-type Compress = bb::Compress;
-type ValMmcs = MerkleTreeMmcs<bb::P, bb::P, MmcsSponge, Compress, 2, { bb::DIGEST }>;
-type ChallengeMmcs = ExtensionMmcs<Val, Challenge, ValMmcs>;
-type Dft = Radix2DitParallel<Val>;
-type BatchPcs = TwoAdicFriPcs<Val, Dft, ValMmcs, ChallengeMmcs>;
-type BatchChallenger = DuplexChallenger<Val, Perm, { bb::WIDTH }, { bb::RATE }>;
-type BatchConfig = p3_uni_stark::StarkConfig<BatchPcs, Challenge, BatchChallenger>;
-
-fn batch_config() -> BatchConfig {
-    let (perm, _, compress) = bb::test_components();
-    let mmcs_sponge = MmcsSponge::new(perm.clone());
-    let mmcs = ValMmcs::new(mmcs_sponge, compress, 0);
-    let challenge_mmcs = ChallengeMmcs::new(mmcs.clone());
-    let fri_params = FriParameters {
-        log_blowup: LOG_BLOWUP,
-        log_final_poly_len: 0,
-        max_log_arity: 1,
-        num_queries: NUM_QUERIES,
-        commit_proof_of_work_bits: POW_BITS,
-        query_proof_of_work_bits: 0,
-        mmcs: challenge_mmcs,
-    };
-    let dft = Dft::default();
-    let pcs = BatchPcs::new(dft, mmcs, fri_params);
-    let challenger = BatchChallenger::new(perm);
-    BatchConfig::new(pcs, challenger)
-}
-
 fn main() {
     let stats_handle = stats::init_tracing();
     let bench_iters = stats::bench_iters();
 
-    let config = batch_config();
+    let config = bench_configs::batch_config(LOG_BLOWUP, NUM_QUERIES, POW_BITS);
 
     let mut rng = SmallRng::seed_from_u64(1);
     let inputs_s: Vec<[u64; 25]> = (0..NUM_HASHES_S).map(|_| rng.random()).collect();

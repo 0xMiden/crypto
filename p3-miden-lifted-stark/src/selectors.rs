@@ -47,14 +47,14 @@ mod tests {
 
     use std::vec::Vec;
 
-    use p3_baby_bear::BabyBear;
     use p3_field::{PrimeCharacteristicRing, extension::BinomialExtensionField};
+    use p3_goldilocks::Goldilocks;
 
     use super::*;
     use crate::coset::LiftedCoset;
 
-    type F = BabyBear;
-    type EF = BinomialExtensionField<F, 4>;
+    type F = Goldilocks;
+    type EF = BinomialExtensionField<F, 2>;
 
     #[test]
     fn test_selectors_at_point() {

@@ -31,7 +31,6 @@ p3-miden-dev-utils.workspace = true
 p3-miden-lmcs = { workspace = true, features = ["testing"] }
 
 # Plonky3
-p3-baby-bear.workspace = true
 p3-challenger.workspace = true
 p3-commit.workspace = true
 p3-fri.workspace = true
@@ -39,10 +38,10 @@ p3-goldilocks.workspace = true
 p3-interpolation.workspace = true
 p3-keccak.workspace = true
 p3-merkle-tree.workspace = true
+p3-symmetric.workspace = true
 
 # Third-party
 criterion.workspace = true
-rand.workspace = true
 tracing-subscriber.workspace = true
 
 [features]
@@ -52,19 +51,24 @@ testing = ["p3-miden-lmcs/testing"]
 [[bench]]
 name = "fri_fold"
 harness = false
+required-features = ["testing"]
 
 [[bench]]
 name = "deep_quotient"
 harness = false
+required-features = ["testing"]
 
 [[bench]]
 name = "pcs"
 harness = false
+required-features = ["testing"]
 
 [[bench]]
 name = "fri_comparison"
 harness = false
+required-features = ["testing"]
 
 [[bench]]
 name = "pcs_trace"
 harness = false
+required-features = ["testing"]

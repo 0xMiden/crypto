@@ -570,11 +570,11 @@ mod tests {
     use alloc::vec::Vec;
 
     use p3_matrix::{Matrix, dense::RowMajorMatrix};
-    use p3_miden_dev_utils::configs::baby_bear_poseidon2 as bb;
     use p3_miden_stateful_hasher::StatefulHasher;
     use rand::{SeedableRng, rngs::SmallRng};
 
     use crate::{
+        testing::goldilocks_poseidon2 as gl,
         tests::{DIGEST, F, P, RATE, Sponge, build_leaves_single, concatenate_matrices},
         utils::upsample_matrix,
     };
@@ -589,10 +589,10 @@ mod tests {
     /// 2. Explicit lifting equals single-matrix concatenation baseline
     #[test]
     fn upsampled_equivalence() {
-        let (_, sponge, _compressor) = bb::test_components();
+        let (_, sponge, _compressor) = gl::test_components();
         let mut rng = SmallRng::seed_from_u64(42);
 
-        for scenario in p3_miden_dev_utils::fixtures::matrix_scenarios::<P>(RATE) {
+        for scenario in crate::testing::matrix_scenarios::<P>(RATE) {
             let matrices: Vec<RowMajorMatrix<F>> = scenario
                 .into_iter()
                 .map(|(h, w)| RowMajorMatrix::rand(&mut rng, h, w))

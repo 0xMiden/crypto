@@ -3,13 +3,13 @@
 //! This module contains:
 //! - `BenchScenario` and `PcsScenario` traits for generic benchmarking
 //! - Macros for generating config-specific modules
-//! - Config implementations (baby_bear_poseidon2, goldilocks_poseidon2, etc.)
+//! - Config implementations (goldilocks_poseidon2, goldilocks_keccak)
 //!
 //! # Usage
 //!
 //! ## For tests (import specific config module)
 //! ```ignore
-//! use p3_miden_dev_utils::configs::baby_bear_poseidon2::*;
+//! use p3_miden_dev_utils::configs::goldilocks_poseidon2::*;
 //!
 //! #[test]
 //! fn test_example() {
@@ -19,10 +19,10 @@
 //!
 //! ## For benchmarks (use trait-based dispatch)
 //! ```ignore
-//! use p3_miden_dev_utils::{BenchScenario, BabyBearPoseidon2};
+//! use p3_miden_dev_utils::{BenchScenario, GoldilocksPoseidon2};
 //!
 //! fn bench<S: BenchScenario>() {
-//!     let mmcs = S::packed_mmcs();
+//!     let mmcs = S::mmcs();
 //! }
 //! ```
 
@@ -37,7 +37,7 @@ use p3_field::{ExtensionField, Field, TwoAdicField};
 /// Trait for benchmark scenarios defining field + hash configuration.
 ///
 /// Each implementor represents a specific combination from the matrix:
-/// - Fields: BabyBear, Goldilocks
+/// - Fields: Goldilocks
 /// - Hashes: Poseidon2, Keccak
 ///
 /// # Example
@@ -46,13 +46,13 @@ use p3_field::{ExtensionField, Field, TwoAdicField};
 /// fn bench_generic<S: BenchScenario>(c: &mut Criterion) {
 ///     for &log_height in LOG_HEIGHTS {
 ///         let group_name = format!("MyBench/{}/{}", S::FIELD_NAME, S::HASH_NAME);
-///         let mmcs = S::packed_mmcs();
+///         let mmcs = S::mmcs();
 ///         // ...
 ///     }
 /// }
 /// ```
 pub trait BenchScenario {
-    /// Base field type (e.g., BabyBear, Goldilocks)
+    /// Base field type (e.g., Goldilocks)
     type F: Field + TwoAdicField + Ord;
 
     /// Extension field type
@@ -95,26 +95,13 @@ pub trait PcsScenario: BenchScenario {
 
 /// Helper trait for creating permutations from RNG.
 ///
-/// This is needed because BabyBear and Goldilocks permutations have
+/// This is needed because Goldilocks permutations have
 /// the same method but it's not defined in a common trait.
 pub trait PermFromRng: Sized {
     fn new_from_rng_128(rng: &mut SmallRng) -> Self;
 }
 
 use rand::rngs::SmallRng;
-
-// BabyBear Poseidon2 implementations (only 16 and 24 are supported)
-impl PermFromRng for p3_baby_bear::Poseidon2BabyBear<16> {
-    fn new_from_rng_128(rng: &mut SmallRng) -> Self {
-        p3_baby_bear::Poseidon2BabyBear::new_from_rng_128(rng)
-    }
-}
-
-impl PermFromRng for p3_baby_bear::Poseidon2BabyBear<24> {
-    fn new_from_rng_128(rng: &mut SmallRng) -> Self {
-        p3_baby_bear::Poseidon2BabyBear::new_from_rng_128(rng)
-    }
-}
 
 // Goldilocks Poseidon2 implementations (8 and 12 are common)
 impl PermFromRng for p3_goldilocks::Poseidon2Goldilocks<8> {
@@ -350,34 +337,6 @@ macro_rules! impl_keccak_config {
 // Config modules
 // =============================================================================
 
-/// BabyBear + Keccak configuration.
-pub mod baby_bear_keccak {
-    use p3_baby_bear::BabyBear;
-
-    crate::impl_keccak_config!(
-        scenario: BabyBearKeccak,
-        field: BabyBear,
-        ext_degree: 4,
-        field_name: "babybear"
-    );
-}
-
-/// BabyBear + Poseidon2 configuration.
-pub mod baby_bear_poseidon2 {
-    use p3_baby_bear::{BabyBear, Poseidon2BabyBear};
-
-    crate::impl_poseidon2_config!(
-        scenario: BabyBearPoseidon2,
-        field: BabyBear,
-        ext_degree: 4,
-        perm: Poseidon2BabyBear,
-        width: 16,
-        rate: 8,
-        digest: 8,
-        field_name: "babybear"
-    );
-}
-
 /// Goldilocks + Keccak configuration.
 pub mod goldilocks_keccak {
     use p3_goldilocks::Goldilocks;
@@ -407,7 +366,5 @@ pub mod goldilocks_poseidon2 {
 }
 
 // Re-export scenario structs at module level
-pub use baby_bear_keccak::BabyBearKeccak;
-pub use baby_bear_poseidon2::BabyBearPoseidon2;
 pub use goldilocks_keccak::GoldilocksKeccak;
 pub use goldilocks_poseidon2::GoldilocksPoseidon2;

@@ -11,32 +11,22 @@
 
 use p3_air::{Air, AirBuilder, AirLayout, BaseAir, BaseLeaf, SymbolicExpression, WindowAccess};
 use p3_batch_stark::{ProverData, StarkInstance, prove_batch, verify_batch};
-use p3_challenger::DuplexChallenger;
-use p3_commit::ExtensionMmcs;
-use p3_dft::Radix2DitParallel;
-use p3_field::{Field, PrimeCharacteristicRing, extension::BinomialExtensionField};
-use p3_fri::{FriParameters, TwoAdicFriPcs};
-use p3_goldilocks::Goldilocks;
+use p3_field::{Field, PrimeCharacteristicRing};
 use p3_lookup::{
     LookupAir,
     lookup_traits::{Direction, Kind, Lookup},
 };
 use p3_matrix::{Matrix, dense::RowMajorMatrix};
-use p3_merkle_tree::MerkleTreeMmcs;
-use p3_miden_dev_utils::configs::goldilocks_poseidon2 as gl;
 use p3_miden_lifted_examples::{
+    bench_configs::{self, Val},
     miden::{
         TRACE1_LOG_HEIGHT, TRACE1_WIDTH, TRACE2_LOG_HEIGHT, TRACE2_WIDTH, generate_dummy_trace,
     },
     stats,
     stats::{bench_iters, init_tracing},
 };
-use p3_symmetric::PaddingFreeSponge;
 use p3_uni_stark::SymbolicAirBuilder;
 use tracing::info_span;
-
-type Val = Goldilocks;
-type Challenge = BinomialExtensionField<Val, 2>;
 
 const LOG_BLOWUP: usize = 3;
 const NUM_QUERIES: usize = 100;
@@ -112,45 +102,11 @@ impl<F: Field> LookupAir<F> for MidenWithLookups {
     }
 }
 
-// ---------------------------------------------------------------------------
-// Config
-// ---------------------------------------------------------------------------
-
-type Perm = gl::Perm;
-type MmcsSponge = PaddingFreeSponge<Perm, { gl::WIDTH }, { gl::RATE }, { gl::DIGEST }>;
-type Compress = gl::Compress;
-type ValMmcs = MerkleTreeMmcs<gl::P, gl::P, MmcsSponge, Compress, 2, { gl::DIGEST }>;
-type ChallengeMmcs = ExtensionMmcs<Val, Challenge, ValMmcs>;
-type Dft = Radix2DitParallel<Val>;
-type BatchPcs = TwoAdicFriPcs<Val, Dft, ValMmcs, ChallengeMmcs>;
-type BatchChallenger = DuplexChallenger<Val, Perm, { gl::WIDTH }, { gl::RATE }>;
-type BatchConfig = p3_uni_stark::StarkConfig<BatchPcs, Challenge, BatchChallenger>;
-
-fn batch_config() -> BatchConfig {
-    let (perm, _, compress) = gl::test_components();
-    let mmcs_sponge = MmcsSponge::new(perm.clone());
-    let mmcs = ValMmcs::new(mmcs_sponge, compress, 0);
-    let challenge_mmcs = ChallengeMmcs::new(mmcs.clone());
-    let fri_params = FriParameters {
-        log_blowup: LOG_BLOWUP,
-        log_final_poly_len: 0,
-        max_log_arity: 1,
-        num_queries: NUM_QUERIES,
-        commit_proof_of_work_bits: POW_BITS,
-        query_proof_of_work_bits: 0,
-        mmcs: challenge_mmcs,
-    };
-    let dft = Dft::default();
-    let pcs = BatchPcs::new(dft, mmcs, fri_params);
-    let challenger = BatchChallenger::new(perm);
-    BatchConfig::new(pcs, challenger)
-}
-
 fn main() {
     let stats_handle = init_tracing();
     let bench_iters = bench_iters();
 
-    let config = batch_config();
+    let config = bench_configs::batch_config(LOG_BLOWUP, NUM_QUERIES, POW_BITS);
 
     // --- Generate traces ---
     let trace1: RowMajorMatrix<Val> = info_span!(

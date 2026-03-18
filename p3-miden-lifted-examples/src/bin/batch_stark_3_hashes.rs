@@ -10,20 +10,15 @@
 //! ```
 
 use p3_air::{Air, AirBuilder, BaseAir};
-use p3_baby_bear::{BabyBear, GenericPoseidon2LinearLayersBabyBear};
 use p3_batch_stark::{ProverData, StarkInstance, prove_batch, verify_batch};
 use p3_blake3_air::{Blake3Air, NUM_BLAKE3_COLS};
-use p3_challenger::DuplexChallenger;
-use p3_commit::ExtensionMmcs;
-use p3_dft::Radix2DitParallel;
-use p3_field::{Field, extension::BinomialExtensionField};
-use p3_fri::{FriParameters, TwoAdicFriPcs};
+use p3_field::Field;
+use p3_goldilocks::GenericPoseidon2LinearLayersGoldilocks;
 use p3_keccak_air::{KeccakAir, NUM_KECCAK_COLS};
 use p3_lookup::{Lookup, LookupAir};
 use p3_matrix::{Matrix, dense::RowMajorMatrix};
-use p3_merkle_tree::MerkleTreeMmcs;
-use p3_miden_dev_utils::configs::baby_bear_poseidon2 as bb;
 use p3_miden_lifted_examples::{
+    bench_configs::{self, Val},
     blake3::generate_blake3_trace,
     keccak::generate_keccak_trace,
     poseidon2::{
@@ -31,16 +26,10 @@ use p3_miden_lifted_examples::{
         generate_poseidon2_trace,
     },
     stats,
-    stats::StatsLayer,
 };
 use p3_poseidon2_air::{Poseidon2Air, RoundConstants};
-use p3_symmetric::PaddingFreeSponge;
 use rand::{RngExt, SeedableRng, rngs::SmallRng};
 use tracing::info_span;
-use tracing_forest::ForestLayer;
-use tracing_subscriber::{
-    EnvFilter, Layer as _, Registry, layer::SubscriberExt, util::SubscriberInitExt,
-};
 
 // Blake3: 2^15 rows, 1 row/hash → 32768 hashes (widest, shortest).
 const NUM_BLAKE3_HASHES: usize = 32768;
@@ -48,9 +37,6 @@ const NUM_BLAKE3_HASHES: usize = 32768;
 const NUM_KECCAK_HASHES: usize = 10922;
 // Poseidon2: 2^19 rows, 1 row/hash → 524288 hashes (narrowest, tallest).
 const NUM_POSEIDON2_HASHES: usize = 524288;
-
-type Val = BabyBear;
-type Challenge = BinomialExtensionField<Val, 4>;
 
 const LOG_BLOWUP: usize = 1;
 const NUM_QUERIES: usize = 100;
@@ -60,7 +46,7 @@ const POW_BITS: usize = 16;
 
 type InnerPoseidon2Air = Poseidon2Air<
     Val,
-    GenericPoseidon2LinearLayersBabyBear,
+    GenericPoseidon2LinearLayersGoldilocks,
     WIDTH,
     SBOX_DEGREE,
     SBOX_REGISTERS,
@@ -116,62 +102,17 @@ impl<F: Field> LookupAir<F> for HashAir {
 
 // ─── Config ──────────────────────────────────────────────────────────────────
 
-type Perm = bb::Perm;
-type MmcsSponge = PaddingFreeSponge<Perm, { bb::WIDTH }, { bb::RATE }, { bb::DIGEST }>;
-type Compress = bb::Compress;
-type ValMmcs = MerkleTreeMmcs<bb::P, bb::P, MmcsSponge, Compress, 2, { bb::DIGEST }>;
-type ChallengeMmcs = ExtensionMmcs<Val, Challenge, ValMmcs>;
-type Dft = Radix2DitParallel<Val>;
-type BatchPcs = TwoAdicFriPcs<Val, Dft, ValMmcs, ChallengeMmcs>;
-type BatchChallenger = DuplexChallenger<Val, Perm, { bb::WIDTH }, { bb::RATE }>;
-type BatchConfig = p3_uni_stark::StarkConfig<BatchPcs, Challenge, BatchChallenger>;
-
-fn batch_config() -> BatchConfig {
-    let (perm, _, compress) = bb::test_components();
-    let mmcs_sponge = MmcsSponge::new(perm.clone());
-    let mmcs = ValMmcs::new(mmcs_sponge, compress, 0);
-    let challenge_mmcs = ChallengeMmcs::new(mmcs.clone());
-    let fri_params = FriParameters {
-        log_blowup: LOG_BLOWUP,
-        log_final_poly_len: 0,
-        max_log_arity: 1,
-        num_queries: NUM_QUERIES,
-        commit_proof_of_work_bits: POW_BITS,
-        query_proof_of_work_bits: 0,
-        mmcs: challenge_mmcs,
-    };
-    let dft = Dft::default();
-    let pcs = BatchPcs::new(dft, mmcs, fri_params);
-    let challenger = BatchChallenger::new(perm);
-    BatchConfig::new(pcs, challenger)
-}
-
 fn main() {
-    let env_filter = EnvFilter::builder()
-        .with_default_directive(tracing_forest::util::LevelFilter::DEBUG.into())
-        .from_env_lossy();
+    let stats_handle = stats::init_tracing();
+    let bench_iters = stats::bench_iters();
 
-    let stats = StatsLayer::new();
-    let stats_handle = stats.handle();
-
-    // Apply env filter only to ForestLayer so StatsLayer always sees all spans.
-    Registry::default()
-        .with(ForestLayer::default().with_filter(env_filter))
-        .with(stats)
-        .init();
-
-    let bench_iters: usize = std::env::var("BENCH_ITERS")
-        .ok()
-        .and_then(|v| v.parse().ok())
-        .unwrap_or(5);
-
-    let config = batch_config();
+    let config = bench_configs::batch_config(LOG_BLOWUP, NUM_QUERIES, POW_BITS);
 
     let mut rng = SmallRng::seed_from_u64(1);
 
     // --- Poseidon2 trace (2^19) ---
     let poseidon2_constants = RoundConstants::from_rng(&mut rng);
-    let poseidon2_inputs: Vec<[Val; 16]> =
+    let poseidon2_inputs: Vec<[Val; 12]> =
         (0..NUM_POSEIDON2_HASHES).map(|_| rng.random()).collect();
     let trace_poseidon2: RowMajorMatrix<Val> =
         info_span!("generate Poseidon2 trace", hashes = NUM_POSEIDON2_HASHES)

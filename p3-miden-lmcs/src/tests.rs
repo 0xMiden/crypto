@@ -5,32 +5,30 @@ use alloc::{collections::BTreeMap, vec, vec::Vec};
 // ============================================================================
 // Test Helpers and Re-exports
 // ============================================================================
-pub use bb::{Compress, DIGEST, F, P, RATE, Sponge, WIDTH};
+pub use gl::{Compress, DIGEST, F, P, RATE, Sponge, WIDTH};
 use p3_field::PrimeCharacteristicRing;
 use p3_matrix::{Matrix, dense::RowMajorMatrix};
-use p3_miden_dev_utils::configs::baby_bear_poseidon2 as bb;
-pub use p3_miden_dev_utils::matrix::concatenate_matrices;
+pub use crate::testing::concatenate_matrices;
 use p3_miden_stateful_hasher::{Alignable, StatefulHasher};
-use p3_miden_transcript::{ProverTranscript, TranscriptData, VerifierTranscript};
 use rand::{RngExt, SeedableRng, rngs::SmallRng};
 
 use crate::{
     BatchProof, HidingLmcsConfig, LiftedMerkleTree, Lmcs, LmcsConfig, LmcsError, LmcsTree, Proof,
     log2_strict_u8,
+    testing::goldilocks_poseidon2 as gl,
     utils::{RowList, aligned_len},
 };
 
 /// Type alias for local LMCS config.
 pub type BaseLmcs = LmcsConfig<P, P, Sponge, Compress, WIDTH, DIGEST>;
 type Commitment = <BaseLmcs as Lmcs>::Commitment;
-type TestDigest = <bb::Challenger as p3_challenger::CanFinalizeDigest>::Digest;
-type TestTranscriptData = TranscriptData<F, Commitment>;
+type TestDigest = gl::TestDigest;
+type TestTranscriptData = gl::TestTranscriptData;
 type OpenedRows = BTreeMap<usize, RowList<F>>;
 
 /// Create a local LMCS config.
 pub fn lmcs() -> BaseLmcs {
-    let (_, sponge, compress) = bb::test_components();
-    LmcsConfig::new(sponge, compress)
+    gl::test_lmcs()
 }
 
 /// Build leaf hashes for a single matrix (used for equivalence testing).
@@ -57,7 +55,7 @@ fn verify_open_batch<C>(
 where
     C: Lmcs<F = F, Commitment = Commitment>,
 {
-    let mut verifier_channel = VerifierTranscript::from_data(bb::test_challenger(), transcript);
+    let mut verifier_channel = gl::verifier_channel(transcript);
     let result = lmcs.open_batch(
         commitment,
         widths,
@@ -87,7 +85,7 @@ where
     let log_max_height = log2_strict_u8(tree.height());
 
     let (prover_digest, transcript) = {
-        let mut prover_channel = ProverTranscript::new(bb::test_challenger());
+        let mut prover_channel = gl::prover_channel();
         tree.prove_batch(indices.iter().copied(), &mut prover_channel);
         prover_channel.finalize()
     };
@@ -112,7 +110,7 @@ type HidingTree<M> = LiftedMerkleTree<F, F, M, DIGEST, SALT>;
 type HidingConfig = HidingLmcsConfig<P, P, Sponge, Compress, SmallRng, WIDTH, DIGEST, SALT>;
 
 fn hiding_lmcs(rng: SmallRng) -> HidingConfig {
-    let (_, sponge, compress) = bb::test_components();
+    let (_, sponge, compress) = gl::test_components();
     HidingLmcsConfig::new(sponge, compress, rng)
 }
 
@@ -174,7 +172,7 @@ fn lmcs_duplicate_indices_roundtrip() {
         assert_eq!(*rows, tree.rows(index), "row mismatch for index {index}");
     }
 
-    let mut verifier_channel = VerifierTranscript::from_data(bb::test_challenger(), &transcript);
+    let mut verifier_channel = gl::verifier_channel(&transcript);
     let batch = BatchProof::<F, Commitment>::read_from_channel(
         &widths,
         log_max_height,
@@ -247,7 +245,7 @@ fn open_batch_handles_empty_or_oob() {
     let log_max_height = log2_strict_u8(tree.height());
     let commitment = tree.root();
 
-    let (prover_digest, transcript) = ProverTranscript::new(bb::test_challenger()).finalize();
+    let (prover_digest, transcript) = gl::prover_channel().finalize();
 
     assert_eq!(
         verify_open_batch(
@@ -329,11 +327,11 @@ fn batch_proof_handles_empty_or_oob() {
     let widths = tree.widths();
     let log_max_height = log2_strict_u8(tree.height());
 
-    let mut prover_channel = ProverTranscript::new(bb::test_challenger());
+    let mut prover_channel = gl::prover_channel();
     tree.prove_batch([0], &mut prover_channel);
     let (_, transcript) = prover_channel.finalize();
 
-    let mut verifier_channel = VerifierTranscript::from_data(bb::test_challenger(), &transcript);
+    let mut verifier_channel = gl::verifier_channel(&transcript);
     let batch = BatchProof::<F, Commitment>::read_from_channel(
         &widths,
         log_max_height,
@@ -346,7 +344,7 @@ fn batch_proof_handles_empty_or_oob() {
     let proofs = batch.single_proofs(&lmcs, &widths, log_max_height).unwrap();
     assert!(proofs.is_empty());
 
-    let mut verifier_channel = VerifierTranscript::from_data(bb::test_challenger(), &transcript);
+    let mut verifier_channel = gl::verifier_channel(&transcript);
     let batch = BatchProof::<F, Commitment>::read_from_channel(
         &[],
         log_max_height,
@@ -368,7 +366,7 @@ fn batch_proof_handles_empty_or_oob() {
 
     // Out-of-range indices are not rejected at parse time; they produce proofs that
     // fail verification. Here we just confirm parsing succeeds (verification tested elsewhere).
-    let mut verifier_channel = VerifierTranscript::from_data(bb::test_challenger(), &transcript);
+    let mut verifier_channel = gl::verifier_channel(&transcript);
     let _ = BatchProof::<F, Commitment>::read_from_channel(
         &widths,
         log_max_height,

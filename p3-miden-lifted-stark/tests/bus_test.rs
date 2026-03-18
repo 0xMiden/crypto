@@ -4,10 +4,10 @@ mod common;
 
 use alloc::{vec, vec::Vec};
 
-use common::test_config;
+use common::{generate_pow4_trace, test_config};
 use p3_field::{Field, PrimeCharacteristicRing};
 use p3_matrix::{Matrix, dense::RowMajorMatrix};
-use p3_miden_dev_utils::configs::baby_bear_poseidon2 as bb;
+use p3_miden_dev_utils::configs::goldilocks_poseidon2::{EF, F, test_challenger};
 use p3_miden_lifted_stark::{
     air::{
         AirBuilder, AirInstance, AuxBuilder, BaseAir, ExtensionBuilder, LiftedAir,
@@ -42,7 +42,7 @@ use p3_miden_lifted_stark::{
 #[derive(Clone, Debug)]
 struct BusTestAir;
 
-impl BaseAir<bb::F> for BusTestAir {
+impl BaseAir<F> for BusTestAir {
     fn width(&self) -> usize {
         1
     }
@@ -52,7 +52,7 @@ impl BaseAir<bb::F> for BusTestAir {
     }
 }
 
-impl LiftedAir<bb::F, bb::EF> for BusTestAir {
+impl LiftedAir<F, EF> for BusTestAir {
     fn num_randomness(&self) -> usize {
         2
     }
@@ -71,25 +71,25 @@ impl LiftedAir<bb::F, bb::EF> for BusTestAir {
 
     fn reduced_aux_values(
         &self,
-        aux_values: &[bb::EF],
-        challenges: &[bb::EF],
-        _public_values: &[bb::F],
-        var_len_public_inputs: VarLenPublicInputs<'_, bb::F>,
-    ) -> Result<ReducedAuxValues<bb::EF>, p3_miden_lifted_air::ReductionError> {
+        aux_values: &[EF],
+        challenges: &[EF],
+        _public_values: &[F],
+        var_len_public_inputs: VarLenPublicInputs<'_, F>,
+    ) -> Result<ReducedAuxValues<EF>, p3_miden_lifted_air::ReductionError> {
         // Bus 0 (multiset): prod = aux_values[0] * (challenges[0] + pi_0)
         // aux_values[0] = 1/(pi_0 + c0), so prod == 1 when pi_0 matches.
-        let pi_0 = bb::EF::from(var_len_public_inputs[0][0]);
+        let pi_0 = EF::from(var_len_public_inputs[0][0]);
         let prod = aux_values[0] * (challenges[0] + pi_0);
 
         // Bus 1 (logup): sum = (aux_values[1] - challenges[1]) - pi_1
         // aux_values[1] = pi_1 + c1, so sum == 0 when pi_1 matches.
-        let pi_1 = bb::EF::from(var_len_public_inputs[1][0]);
+        let pi_1 = EF::from(var_len_public_inputs[1][0]);
         let sum = (aux_values[1] - challenges[1]) - pi_1;
 
         Ok(ReducedAuxValues { prod, sum })
     }
 
-    fn eval<AB: LiftedAirBuilder<F = bb::F>>(&self, builder: &mut AB) {
+    fn eval<AB: LiftedAirBuilder<F = F>>(&self, builder: &mut AB) {
         // Copy public values upfront (PublicVar: Copy) to release borrow.
         let pv0 = builder.public_values()[0];
         let pv1 = builder.public_values()[1];
@@ -152,23 +152,23 @@ impl LiftedAir<bb::F, bb::EF> for BusTestAir {
 // ---------------------------------------------------------------------------
 
 struct BusTestAuxBuilder {
-    pi_0: bb::F,
-    pi_1: bb::F,
+    pi_0: F,
+    pi_1: F,
 }
 
-impl AuxBuilder<bb::F, bb::EF> for BusTestAuxBuilder {
+impl AuxBuilder<F, EF> for BusTestAuxBuilder {
     fn build_aux_trace(
         &self,
-        main: &RowMajorMatrix<bb::F>,
-        challenges: &[bb::EF],
-    ) -> (RowMajorMatrix<bb::EF>, Vec<bb::EF>) {
+        main: &RowMajorMatrix<F>,
+        challenges: &[EF],
+    ) -> (RowMajorMatrix<EF>, Vec<EF>) {
         let height = main.height();
         let c0 = challenges[0];
         let c1 = challenges[1];
 
         // col 0: 1/(pi_0 + c0), col 1: pi_1 + c1
-        let col0_val = (bb::EF::from(self.pi_0) + c0).inverse();
-        let col1_val = bb::EF::from(self.pi_1) + c1;
+        let col0_val = (EF::from(self.pi_0) + c0).inverse();
+        let col1_val = EF::from(self.pi_1) + c1;
 
         let mut values = Vec::with_capacity(height * 2);
         for _ in 0..height {
@@ -186,16 +186,6 @@ impl AuxBuilder<bb::F, bb::EF> for BusTestAuxBuilder {
 // Trace generation (same power-of-4 chain as TinyAir)
 // ---------------------------------------------------------------------------
 
-fn generate_trace(start: bb::F, height: usize) -> RowMajorMatrix<bb::F> {
-    let mut values = Vec::with_capacity(height);
-    let mut current = start;
-    for _ in 0..height {
-        values.push(current);
-        current = current.exp_power_of_2(2);
-    }
-    RowMajorMatrix::new(values, 1)
-}
-
 // ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
@@ -204,20 +194,20 @@ fn generate_trace(start: bb::F, height: usize) -> RowMajorMatrix<bb::F> {
 fn bus_identity_check() {
     let config = test_config();
 
-    let pi_0 = bb::F::from_u64(42);
-    let pi_1 = bb::F::from_u64(67);
-    let start = bb::F::from_u64(2);
+    let pi_0 = F::from_u64(42);
+    let pi_1 = F::from_u64(67);
+    let start = F::from_u64(2);
     let height = 8;
 
     let air = BusTestAir;
     let aux_builder = BusTestAuxBuilder { pi_0, pi_1 };
-    let trace = generate_trace(start, height);
+    let trace = generate_pow4_trace(start, height);
     let public_values = vec![start, pi_0, pi_1];
 
     // Build var_len_public_inputs (one reducible input per bus)
     let input_0 = [pi_0];
     let input_1 = [pi_1];
-    let var_len_pi: [&[bb::F]; 2] = [&input_0, &input_1];
+    let var_len_pi: [&[F]; 2] = [&input_0, &input_1];
 
     // Prove
     let prover_instances = [(
@@ -225,8 +215,8 @@ fn bus_identity_check() {
         p3_miden_lifted_air::AirWitness::new(&trace, &public_values, &var_len_pi),
         &aux_builder,
     )];
-    let output = prove_multi(&config, &prover_instances, bb::test_challenger())
-        .expect("proving should succeed");
+    let output =
+        prove_multi(&config, &prover_instances, test_challenger()).expect("proving should succeed");
 
     let instance = AirInstance {
         log_trace_height: log2_strict_u8(height),
@@ -239,7 +229,7 @@ fn bus_identity_check() {
         &config,
         &[(&air, instance)],
         &output.proof,
-        bb::test_challenger(),
+        test_challenger(),
     )
     .expect("verification should succeed");
     assert_eq!(output.digest, verifier_digest);
@@ -249,33 +239,33 @@ fn bus_identity_check() {
 fn bus_wrong_var_len_pi_fails() {
     let config = test_config();
 
-    let pi_0 = bb::F::from_u64(42);
-    let pi_1 = bb::F::from_u64(67);
-    let start = bb::F::from_u64(2);
+    let pi_0 = F::from_u64(42);
+    let pi_1 = F::from_u64(67);
+    let start = F::from_u64(2);
     let height = 8;
 
     let air = BusTestAir;
     let aux_builder = BusTestAuxBuilder { pi_0, pi_1 };
-    let trace = generate_trace(start, height);
+    let trace = generate_pow4_trace(start, height);
     let public_values = vec![start, pi_0, pi_1];
 
     // Prove with correct values
     let input_0 = [pi_0];
     let input_1 = [pi_1];
-    let var_len_pi: [&[bb::F]; 2] = [&input_0, &input_1];
+    let var_len_pi: [&[F]; 2] = [&input_0, &input_1];
 
     let prover_instances = [(
         &air,
         p3_miden_lifted_air::AirWitness::new(&trace, &public_values, &var_len_pi),
         &aux_builder,
     )];
-    let output = prove_multi(&config, &prover_instances, bb::test_challenger())
-        .expect("proving should succeed");
+    let output =
+        prove_multi(&config, &prover_instances, test_challenger()).expect("proving should succeed");
 
     // Verify with WRONG var_len_public_inputs (99 instead of 42)
-    let wrong_pi_0 = bb::F::from_u64(99);
+    let wrong_pi_0 = F::from_u64(99);
     let wrong_input_0 = [wrong_pi_0];
-    let wrong_var_len_pi: [&[bb::F]; 2] = [&wrong_input_0, &input_1];
+    let wrong_var_len_pi: [&[F]; 2] = [&wrong_input_0, &input_1];
 
     let instance = AirInstance {
         log_trace_height: log2_strict_u8(height),
@@ -287,7 +277,7 @@ fn bus_wrong_var_len_pi_fails() {
         &config,
         &[(&air, instance)],
         &output.proof,
-        bb::test_challenger(),
+        test_challenger(),
     )
     .expect_err("wrong var_len_pi should fail verification");
 
@@ -304,31 +294,31 @@ fn bus_wrong_var_len_pi_fails() {
 fn bus_wrong_input_count_fails() {
     let config = test_config();
 
-    let pi_0 = bb::F::from_u64(42);
-    let pi_1 = bb::F::from_u64(67);
-    let start = bb::F::from_u64(2);
+    let pi_0 = F::from_u64(42);
+    let pi_1 = F::from_u64(67);
+    let start = F::from_u64(2);
     let height = 8;
 
     let air = BusTestAir;
     let aux_builder = BusTestAuxBuilder { pi_0, pi_1 };
-    let trace = generate_trace(start, height);
+    let trace = generate_pow4_trace(start, height);
     let public_values = vec![start, pi_0, pi_1];
 
     // Prove with correct values
     let input_0 = [pi_0];
     let input_1 = [pi_1];
-    let var_len_pi: [&[bb::F]; 2] = [&input_0, &input_1];
+    let var_len_pi: [&[F]; 2] = [&input_0, &input_1];
 
     let prover_instances = [(
         &air,
         p3_miden_lifted_air::AirWitness::new(&trace, &public_values, &var_len_pi),
         &aux_builder,
     )];
-    let output = prove_multi(&config, &prover_instances, bb::test_challenger())
-        .expect("proving should succeed");
+    let output =
+        prove_multi(&config, &prover_instances, test_challenger()).expect("proving should succeed");
 
     // Verify with WRONG input count (1 instead of 2)
-    let only_one: [&[bb::F]; 1] = [&input_0];
+    let only_one: [&[F]; 1] = [&input_0];
     let instance = AirInstance {
         log_trace_height: log2_strict_u8(height),
         public_values: &public_values,
@@ -339,7 +329,7 @@ fn bus_wrong_input_count_fails() {
         &config,
         &[(&air, instance)],
         &output.proof,
-        bb::test_challenger(),
+        test_challenger(),
     )
     .expect_err("wrong input count should fail verification");
 

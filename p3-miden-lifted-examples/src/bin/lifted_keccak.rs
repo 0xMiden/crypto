@@ -5,20 +5,16 @@
 //! cargo run -p p3-miden-lifted-examples --release --bin lifted_keccak
 //! ```
 
-use p3_baby_bear::BabyBear;
-use p3_dft::Radix2DitParallel;
-use p3_field::extension::BinomialExtensionField;
 use p3_matrix::{Matrix, dense::RowMajorMatrix};
-use p3_miden_dev_utils::configs::baby_bear_poseidon2 as bb;
 use p3_miden_lifted_air::{AirInstance, AirWitness};
 use p3_miden_lifted_examples::{
     DummyAuxBuilder,
+    bench_configs::{self, Val},
     keccak::{LiftedKeccakAir, generate_keccak_trace},
     stats,
 };
-use p3_miden_lifted_stark::{
-    GenericStarkConfig, air::log2_strict_u8, fri::PcsParams, lmcs::LmcsConfig, prover::prove_multi,
-};
+use p3_miden_lifted_stark::{air::log2_strict_u8, prover::prove_multi};
+use p3_miden_lmcs::testing::goldilocks_poseidon2 as gl;
 use rand::{RngExt, SeedableRng, rngs::SmallRng};
 use tracing::info_span;
 
@@ -29,9 +25,6 @@ const NUM_HASHES_A: usize = 10922;
 // Trace B: 2^19 rows → floor(524288/24) = 21845 hashes.
 const NUM_HASHES_B: usize = 21845;
 
-type Val = BabyBear;
-type Challenge = BinomialExtensionField<Val, 4>;
-
 const LOG_BLOWUP: u8 = 1;
 const NUM_QUERIES: usize = 100;
 const POW_BITS: usize = 16;
@@ -40,25 +33,7 @@ fn main() {
     let stats_handle = stats::init_tracing();
     let bench_iters = stats::bench_iters();
 
-    type Lmcs = LmcsConfig<bb::P, bb::P, bb::Sponge, bb::Compress, { bb::WIDTH }, { bb::DIGEST }>;
-    type Dft = Radix2DitParallel<Val>;
-    type Config = GenericStarkConfig<Val, Challenge, Lmcs, Dft, bb::Challenger>;
-
-    let pcs = PcsParams::new(
-        LOG_BLOWUP,  // log_blowup
-        1,           // log_folding_arity
-        0,           // log_final_degree
-        POW_BITS,    // folding_pow_bits
-        0,           // deep_pow_bits
-        NUM_QUERIES, // num_queries
-        0,           // query_pow_bits
-    )
-    .unwrap();
-
-    let (_, sponge, compress) = bb::test_components();
-    let lmcs: Lmcs = LmcsConfig::new(sponge, compress);
-    let dft = Dft::default();
-    let config = Config::new(pcs, lmcs, dft, bb::test_challenger());
+    let config = bench_configs::lifted_config(LOG_BLOWUP, NUM_QUERIES, POW_BITS);
     let air = LiftedKeccakAir;
 
     let mut rng = SmallRng::seed_from_u64(1);
@@ -101,7 +76,7 @@ fn main() {
         ];
 
         let output = info_span!("prove").in_scope(|| {
-            prove_multi(&config, &instances, bb::test_challenger()).expect("proving failed")
+            prove_multi(&config, &instances, gl::test_challenger()).expect("proving failed")
         });
 
         if i == 1 {
@@ -145,7 +120,7 @@ fn main() {
                 &config,
                 &verifier_instances,
                 &output.proof,
-                bb::test_challenger(),
+                gl::test_challenger(),
             )
             .expect("verification failed");
             assert_eq!(output.digest, digest);
