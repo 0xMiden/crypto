@@ -21,12 +21,14 @@ p3-maybe-rayon.workspace = true
 p3-util.workspace = true
 
 # Third-party
+rand.workspace = true
 thiserror.workspace = true
 tracing.workspace = true
 
 [dev-dependencies]
 # Internal
 p3-miden-dev-utils.workspace = true
+p3-miden-lmcs = { workspace = true, features = ["testing"] }
 
 # Plonky3
 p3-baby-bear.workspace = true
@@ -45,6 +47,7 @@ tracing-subscriber.workspace = true
 
 [features]
 parallel = ["p3-maybe-rayon/parallel"]
+testing = ["p3-miden-lmcs/testing"]
 
 [[bench]]
 name = "fri_fold"

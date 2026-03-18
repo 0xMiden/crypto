@@ -14,10 +14,12 @@ p3-miden-stateful-hasher.workspace = true
 p3-miden-transcript.workspace = true
 
 # Plonky3
+p3-challenger = { workspace = true, optional = true }
 p3-commit.workspace = true
 p3-field.workspace = true
 p3-matrix.workspace = true
 p3-maybe-rayon.workspace = true
+p3-miden-dev-utils = { workspace = true, optional = true }
 p3-symmetric.workspace = true
 p3-util.workspace = true
 
@@ -44,6 +46,7 @@ criterion.workspace = true
 
 [features]
 parallel = ["p3-maybe-rayon/parallel"]
+testing = ["dep:p3-challenger", "dep:p3-miden-dev-utils"]
 
 [[bench]]
 name = "merkle_commit"
