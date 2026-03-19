@@ -30,7 +30,6 @@ tracing-subscriber.workspace = true
 
 # Bin-only dependencies (not needed by the library)
 # Internal
-p3-miden-dev-utils.workspace = true
 p3-miden-lmcs = { workspace = true, features = ["testing"] }
 p3-miden-lifted-stark.workspace = true
 
@@ -50,7 +49,7 @@ p3-util.workspace = true
 [features]
 default = ["std"]
 std = []
-parallel = ["p3-miden-dev-utils/parallel", "p3-miden-lifted-stark/parallel"]
+parallel = ["p3-miden-lifted-stark/parallel"]
 
 [[bin]]
 name = "lifted_keccak"

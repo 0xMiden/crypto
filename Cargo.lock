@@ -723,7 +723,6 @@ version = "0.5.0"
 dependencies = [
  "p3-challenger",
  "p3-commit",
- "p3-dft",
  "p3-field",
  "p3-goldilocks",
  "p3-keccak",
@@ -763,7 +762,6 @@ dependencies = [
  "p3-lookup",
  "p3-matrix",
  "p3-merkle-tree",
- "p3-miden-dev-utils",
  "p3-miden-lifted-air",
  "p3-miden-lifted-stark",
  "p3-miden-lmcs",

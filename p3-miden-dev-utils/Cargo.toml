@@ -15,7 +15,6 @@ p3-miden-stateful-hasher.workspace = true
 # Plonky3
 p3-challenger.workspace = true
 p3-commit.workspace = true
-p3-dft.workspace = true
 p3-field.workspace = true
 p3-goldilocks.workspace = true
 p3-keccak.workspace = true
