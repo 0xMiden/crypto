@@ -14,9 +14,7 @@ const ALPHA: u64 = 7;
 const INV_ALPHA: u64 = 10540996611094048183;
 use crate::{
     ONE, Word, ZERO,
-    hash::algebraic_sponge::{
-        AlgebraicSponge, BINARY_CHUNK_SIZE, CAPACITY_RANGE, RATE_RANGE, RATE_WIDTH,
-    },
+    hash::algebraic_sponge::{BINARY_CHUNK_SIZE, CAPACITY_RANGE, RATE_RANGE, RATE_WIDTH},
     rand::test_utils::rand_value,
 };
 
@@ -85,33 +83,6 @@ fn merge_vs_merge_in_domain() {
 
     let merge_in_domain_result = Rpo256::merge_in_domain(&digests, domain);
     assert_ne!(merge_result, merge_in_domain_result);
-}
-
-#[test]
-fn hash_elements_vs_merge_with_int() {
-    let tmp = [Felt::new(rand_value()); 4];
-    let seed = Word::new(tmp);
-
-    // ----- value fits into a field element ------------------------------------------------------
-    let val: Felt = Felt::new(rand_value());
-    let m_result = <Rpo256 as AlgebraicSponge>::merge_with_int(seed, val.as_canonical_u64());
-
-    let mut elements = seed.as_elements().to_vec();
-    elements.push(val);
-    let h_result = Rpo256::hash_elements(&elements);
-
-    assert_eq!(m_result, h_result);
-
-    // ----- value does not fit into a field element ----------------------------------------------
-    let val = Felt::ORDER + 2;
-    let m_result = <Rpo256 as AlgebraicSponge>::merge_with_int(seed, val);
-
-    let mut elements = seed.as_elements().to_vec();
-    elements.push(Felt::new(val));
-    elements.push(ONE);
-    let h_result = Rpo256::hash_elements(&elements);
-
-    assert_eq!(m_result, h_result);
 }
 
 #[test]

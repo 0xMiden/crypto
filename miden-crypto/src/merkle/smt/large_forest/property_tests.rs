@@ -1,7 +1,7 @@
 #![cfg(test)]
 //! This module contains the property tests for the SMT forest.
 
-use alloc::{string::ToString, vec::Vec};
+use alloc::vec::Vec;
 
 use itertools::Itertools;
 use proptest::prelude::*;
@@ -9,8 +9,9 @@ use proptest::prelude::*;
 use crate::{
     EMPTY_WORD, Word,
     merkle::smt::{
-        Backend, ForestConfig, ForestInMemoryBackend, ForestOperation, LargeSmtForest, LineageId,
-        RootInfo, Smt, SmtForestUpdateBatch, SmtUpdateBatch, TreeEntry, TreeId, VersionId,
+        Backend, ForestConfig, ForestInMemoryBackend, ForestOperation, LargeSmtForest,
+        LargeSmtForestError, LineageId, RootInfo, Smt, SmtForestUpdateBatch, SmtUpdateBatch,
+        TreeEntry, TreeId, VersionId,
         large_forest::test_utils::{
             arbitrary_batch, arbitrary_lineage, arbitrary_version, arbitrary_word, to_fail,
         },
@@ -38,25 +39,19 @@ fn build_tree(initial: SmtUpdateBatch) -> core::result::Result<Smt, TestCaseErro
 }
 
 fn apply_batch(tree: &mut Smt, batch: SmtUpdateBatch) -> core::result::Result<(), TestCaseError> {
-    let mutations =
-        tree.compute_mutations(Vec::<(Word, Word)>::from(batch).into_iter()).map_err(to_fail)?;
+    let mutations = tree
+        .compute_mutations(Vec::<(Word, Word)>::from(batch).into_iter())
+        .map_err(to_fail)?;
     tree.apply_mutations(mutations).map_err(to_fail)
 }
 
 fn word_to_option(value: Word) -> Option<Word> {
-    if value == EMPTY_WORD {
-        None
-    } else {
-        Some(value)
-    }
+    if value == EMPTY_WORD { None } else { Some(value) }
 }
 
 fn sorted_tree_entries(tree: &Smt) -> Vec<TreeEntry> {
     tree.entries()
-        .map(|(key, value)| TreeEntry {
-            key: *key,
-            value: *value,
-        })
+        .map(|(key, value)| TreeEntry { key: *key, value: *value })
         .sorted()
         .collect_vec()
 }
@@ -65,14 +60,18 @@ fn sorted_forest_entries(
     forest: &LargeSmtForest<ForestInMemoryBackend>,
     tree: TreeId,
 ) -> core::result::Result<Vec<TreeEntry>, TestCaseError> {
-    Ok(forest.entries(tree).map_err(to_fail)?.sorted().collect_vec())
+    Ok(forest
+        .entries(tree)
+        .map_err(to_fail)?
+        .collect::<crate::merkle::smt::large_forest::Result<Vec<_>>>()
+        .map_err(to_fail)?
+        .into_iter()
+        .sorted()
+        .collect_vec())
 }
 
 fn batch_keys(batch: &SmtUpdateBatch) -> Vec<Word> {
-    batch.clone()
-        .into_iter()
-        .map(|operation| operation.key())
-        .collect()
+    batch.clone().into_iter().map(|operation| operation.key()).collect()
 }
 
 fn assert_tree_queries_match(
@@ -112,10 +111,7 @@ fn assert_lineage_metadata(
     prop_assert_eq!(forest.latest_version(lineage), Some(latest_version));
     prop_assert_eq!(forest.latest_root(lineage), Some(latest_root));
     prop_assert_eq!(
-        forest
-            .lineage_roots(lineage)
-            .expect("lineage must be present")
-            .collect_vec(),
+        forest.lineage_roots(lineage).expect("lineage must be present").collect_vec(),
         versions.iter().rev().map(|(_, root)| *root).collect_vec()
     );
 
@@ -183,10 +179,20 @@ proptest! {
         let tree_info = forest.update_tree(lineage, version + 1, entries_v2).map_err(to_fail)?;
 
         let old_version = TreeId::new(lineage, version);
-        prop_assert!(forest.entries(old_version).map_err(to_fail)?.all(|entry| entry.value != EMPTY_WORD));
+        let old_entries = forest
+            .entries(old_version)
+            .map_err(to_fail)?
+            .collect::<crate::merkle::smt::large_forest::Result<Vec<_>>>()
+            .map_err(to_fail)?;
+        prop_assert!(old_entries.iter().all(|entry| entry.value != EMPTY_WORD));
 
         let current_version = TreeId::new(lineage, tree_info.version());
-        prop_assert!(forest.entries(current_version).map_err(to_fail)?.all(|entry| entry.value != EMPTY_WORD));
+        let current_entries = forest
+            .entries(current_version)
+            .map_err(to_fail)?
+            .collect::<crate::merkle::smt::large_forest::Result<Vec<_>>>()
+            .map_err(to_fail)?;
+        prop_assert!(current_entries.iter().all(|entry| entry.value != EMPTY_WORD));
     }
 
     /// This test cross-checks the core query APIs (`get`, `open`, `entries`, `entry_count`) and the
@@ -274,11 +280,11 @@ proptest! {
         sample_keys.dedup();
 
         let duplicate = forest.add_lineage(lineage, version + 1, extra_entries.clone());
-        prop_assert!(duplicate.is_err());
-        prop_assert_eq!(
-            duplicate.unwrap_err().to_string(),
-            format!("Duplicate lineage ID {lineage} provided")
+        let is_duplicate = matches!(
+            duplicate,
+            Err(LargeSmtForestError::DuplicateLineage(l)) if l == lineage
         );
+        prop_assert!(is_duplicate);
         assert_tree_queries_match(
             &forest,
             TreeId::new(lineage, version),
@@ -290,11 +296,11 @@ proptest! {
         prop_assert_eq!(forest.tree_count(), 1);
 
         let bad_version = forest.update_tree(lineage, version, extra_entries);
-        prop_assert!(bad_version.is_err());
-        prop_assert_eq!(
-            bad_version.unwrap_err().to_string(),
-            format!("Version {version} is not newer than latest-known {version}")
+        let is_bad_version = matches!(
+            bad_version,
+            Err(LargeSmtForestError::BadVersion { provided, latest }) if provided == version && latest == version
         );
+        prop_assert!(is_bad_version);
         assert_tree_queries_match(
             &forest,
             TreeId::new(lineage, version),
@@ -426,6 +432,18 @@ proptest! {
             &sample_keys,
             true,
         )?;
+        assert_lineage_metadata(&forest, lineage_1, &versions_1)?;
+        assert_lineage_metadata(&forest, lineage_2, &versions_2)?;
+        prop_assert_eq!(forest.lineage_count(), 2);
+        prop_assert_eq!(forest.tree_count(), versions_1.len() + versions_2.len());
+        prop_assert_eq!(
+            forest.root_info(TreeId::new(lineage_1, version + 2)),
+            RootInfo::Missing
+        );
+        prop_assert_eq!(
+            forest.root_info(TreeId::new(lineage_2, version + 2)),
+            RootInfo::Missing
+        );
     }
 
     /// This test validates constructor behavior when loading from a pre-populated backend. The
