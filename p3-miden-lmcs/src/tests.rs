@@ -8,10 +8,10 @@ use alloc::{collections::BTreeMap, vec, vec::Vec};
 pub use gl::{Compress, DIGEST, F, P, RATE, Sponge, WIDTH};
 use p3_field::PrimeCharacteristicRing;
 use p3_matrix::{Matrix, dense::RowMajorMatrix};
-pub use crate::testing::concatenate_matrices;
 use p3_miden_stateful_hasher::{Alignable, StatefulHasher};
 use rand::{RngExt, SeedableRng, rngs::SmallRng};
 
+pub use crate::testing::concatenate_matrices;
 use crate::{
     BatchProof, HidingLmcsConfig, LiftedMerkleTree, Lmcs, LmcsConfig, LmcsError, LmcsTree, Proof,
     log2_strict_u8,

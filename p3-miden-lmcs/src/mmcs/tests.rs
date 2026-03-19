@@ -265,7 +265,10 @@ fn mmcs_verify_rejects_invalid_openings() {
             seed: 23,
             aligned: false,
             mutate: |_height, _alignment, _unaligned, _dims, _index, opened_values, _proof| {
-                if let Some(cell) = opened_values.first_mut().and_then(|row: &mut Vec<F>| row.first_mut()) {
+                if let Some(cell) = opened_values
+                    .first_mut()
+                    .and_then(|row: &mut Vec<F>| row.first_mut())
+                {
                     *cell += F::ONE;
                 }
                 Err(LmcsError::RootMismatch)
@@ -286,8 +289,7 @@ fn mmcs_verify_rejects_invalid_openings() {
             .collect();
         let height = tree.height();
         let alignment = tree.alignment();
-        let batch_opening: BatchOpening<F, BaseMmcs> =
-            Mmcs::open_batch(&mmcs, index, &tree);
+        let batch_opening: BatchOpening<F, BaseMmcs> = Mmcs::open_batch(&mmcs, index, &tree);
 
         Mmcs::verify_batch(
             &mmcs,

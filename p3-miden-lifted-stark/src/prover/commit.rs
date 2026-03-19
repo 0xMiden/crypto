@@ -235,8 +235,8 @@ where
 mod tests {
     use alloc::{vec, vec::Vec};
 
-    use p3_goldilocks::Goldilocks;
     use p3_field::PrimeCharacteristicRing;
+    use p3_goldilocks::Goldilocks;
     use p3_matrix::{Matrix, bitrev::BitReversibleMatrix, dense::RowMajorMatrix};
     use p3_util::reverse_bits_len;
 

@@ -8,11 +8,11 @@ use p3_challenger::CanObserve;
 use p3_field::Field;
 use p3_matrix::{Matrix, dense::RowMajorMatrix};
 pub use p3_miden_dev_utils::configs::goldilocks_poseidon2::*;
-pub use crate::testing::random_lde_matrix;
 use p3_miden_lmcs::{Lmcs, LmcsConfig, LmcsTree, log2_strict_u8, utils::aligned_widths};
 use p3_miden_transcript::{ProverTranscript, TranscriptData, VerifierTranscript};
 use rand::{Rng, RngExt, SeedableRng, distr::StandardUniform, prelude::SmallRng};
 
+pub use crate::testing::random_lde_matrix;
 use crate::{PcsParams, PcsTranscript, prover::open_with_channel, verifier::verify_aligned};
 
 pub type BaseLmcs = LmcsConfig<P, P, Sponge, Compress, WIDTH, DIGEST>;

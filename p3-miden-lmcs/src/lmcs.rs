@@ -330,8 +330,7 @@ mod tests {
     use p3_miden_transcript::TranscriptData;
 
     use crate::{
-        Lmcs, LmcsConfig, LmcsError, LmcsTree, log2_strict_u8,
-        testing::goldilocks_poseidon2 as gl,
+        Lmcs, LmcsConfig, LmcsError, LmcsTree, log2_strict_u8, testing::goldilocks_poseidon2 as gl,
     };
 
     type TestLmcs = gl::Lmcs;
