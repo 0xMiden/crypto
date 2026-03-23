@@ -78,11 +78,9 @@ impl TreeIndices {
     /// Unlike the bit-reversed right-shift, masking can reorder indices,
     /// so `sort_unstable()` is needed before `dedup()`.
     ///
-    /// # Panics
-    /// Panics if `shift > self.depth`.
+    /// Shrinking a root-only set (depth 0) has no effect.
     pub fn shrink_depth(&mut self, shift: u8) {
-        debug_assert!(shift <= self.depth);
-        let new_depth = self.depth - shift;
+        let new_depth = self.depth.saturating_sub(shift);
         let mask = (1usize << new_depth as usize) - 1;
         for idx in &mut self.indices {
             *idx &= mask;

@@ -273,7 +273,7 @@ pub trait LmcsTree<F, Commitment, M> {
     /// Get the tree root (commitment).
     fn root(&self) -> Commitment;
 
-    /// Get the tree height (number of leaves).
+    /// Get the height of the largest matrix (i.e. the number of leaves of the Merkle tree).
     fn height(&self) -> usize;
 
     /// Get references to the committed matrices.
