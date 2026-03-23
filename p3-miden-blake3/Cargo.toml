@@ -1,0 +1,21 @@
+[package]
+name = "p3-miden-blake3"
+description = "BLAKE3 wrappers for Miden (including 192-bit / 24-byte digests for ~96-bit security STARKs)"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+readme.workspace = true
+homepage.workspace = true
+
+[dependencies]
+p3-symmetric.workspace = true
+p3-util.workspace = true
+
+# Match p3-blake3's blake3 version (see Plonky3 p3-blake3 crate).
+blake3 = { version = "1.8", default-features = false }
+
+[features]
+default = []
+neon = ["blake3/neon"]
+parallel = ["blake3/rayon"]

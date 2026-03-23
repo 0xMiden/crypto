@@ -60,6 +60,8 @@
 
 extern crate alloc;
 
+/// BLAKE3-192 (24-byte digest) LMCS + Fiat–Shamir for ~96-bit hash security.
+pub mod blake3_192;
 mod config;
 /// Domain/coset operations for lifted traces.
 pub mod coset;

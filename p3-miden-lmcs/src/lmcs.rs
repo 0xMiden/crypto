@@ -538,4 +538,61 @@ mod tests {
             .expect("transcript should finalize cleanly");
         assert_eq!(prover_digest, verifier_digest);
     }
+
+    /// Same as [`goldilocks_blake3_roundtrip`] but with a 24-byte BLAKE3 digest (BLAKE3-192).
+    #[test]
+    fn goldilocks_blake3_192_roundtrip() {
+        use alloc::{vec, vec::Vec};
+
+        use p3_challenger::{HashChallenger, SerializingChallenger64};
+        use p3_goldilocks::Goldilocks;
+        use p3_miden_blake3::Blake3_192;
+        use p3_miden_stateful_hasher::ChainingHasher;
+        use p3_symmetric::CompressionFunctionFromHasher;
+
+        type F = Goldilocks;
+        type Sponge = ChainingHasher<Blake3_192>;
+        type Compress = CompressionFunctionFromHasher<Blake3_192, 2, 24>;
+        const WIDTH: usize = 24;
+        const DIGEST: usize = 24;
+        type Blake3Lmcs = LmcsConfig<F, u8, Sponge, Compress, WIDTH, DIGEST>;
+        type Challenger = SerializingChallenger64<F, HashChallenger<u8, Blake3_192, DIGEST>>;
+
+        fn challenger() -> Challenger {
+            SerializingChallenger64::new(HashChallenger::new(Vec::new(), Blake3_192))
+        }
+
+        let sponge = ChainingHasher::new(Blake3_192);
+        let compress = CompressionFunctionFromHasher::new(Blake3_192);
+        let lmcs: Blake3Lmcs = LmcsConfig::new(sponge, compress);
+
+        let values: Vec<F> = (0..4 * 2).map(|i| F::from_u64(i as u64)).collect();
+        let matrix = RowMajorMatrix::new(values, 2);
+
+        let tree = lmcs.build_tree(vec![matrix]);
+        let widths = tree.widths();
+        let log_max_height = log2_strict_u8(tree.height());
+        let commitment = tree.root();
+
+        let mut prover_channel = ProverTranscript::new(challenger());
+        tree.prove_batch([0usize], &mut prover_channel);
+        let (prover_digest, transcript) = prover_channel.finalize();
+
+        let mut verifier_channel = VerifierTranscript::from_data(challenger(), &transcript);
+        let opened = lmcs
+            .open_batch(
+                &commitment,
+                &widths,
+                log_max_height,
+                [0usize],
+                &mut verifier_channel,
+            )
+            .expect("Goldilocks+Blake3-192 LMCS roundtrip should verify");
+
+        assert_eq!(opened[&0], tree.rows(0));
+        let verifier_digest = verifier_channel
+            .finalize()
+            .expect("transcript should finalize cleanly");
+        assert_eq!(prover_digest, verifier_digest);
+    }
 }

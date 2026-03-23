@@ -29,6 +29,7 @@ tracing.workspace = true
 
 [dev-dependencies]
 # Internal
+p3-miden-blake3.workspace = true
 p3-miden-dev-utils.workspace = true
 
 # Plonky3

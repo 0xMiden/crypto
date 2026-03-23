@@ -25,7 +25,7 @@
 //!
 //! ```ignore
 //! use p3_miden_dev_utils::{
-//!     BenchScenario, BabyBearPoseidon2, GoldilocksPoseidon2,
+//!     BenchScenario, BabyBearPoseidon2, GoldilocksBlake3_192, GoldilocksPoseidon2,
 //!     bench::criterion_config, fixtures::LOG_HEIGHTS,
 //! };
 //!
@@ -57,7 +57,10 @@ pub mod matrix;
 #[cfg(not(target_arch = "wasm32"))]
 pub use bench::{PARALLEL_STR, criterion_config, criterion_config_long};
 // Scenario structs
-pub use configs::{BabyBearKeccak, BabyBearPoseidon2, GoldilocksKeccak, GoldilocksPoseidon2};
+pub use configs::{
+    BabyBearBlake3_192, BabyBearKeccak, BabyBearPoseidon2, GoldilocksBlake3_192, GoldilocksKeccak,
+    GoldilocksPoseidon2,
+};
 pub use configs::{BenchScenario, PcsScenario};
 // Common fixtures
 pub use fixtures::{BENCH_SEED, LOG_HEIGHTS, RELATIVE_SPECS, TEST_SEED};

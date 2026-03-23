@@ -346,6 +346,84 @@ macro_rules! impl_keccak_config {
     };
 }
 
+/// Macro to generate a BLAKE3-192 (24-byte digest) byte-LMCS config for benchmarks.
+#[macro_export]
+macro_rules! impl_blake3_192_config {
+    (
+        scenario: $scenario:ident,
+        field: $field:ty,
+        ext_degree: $ext_deg:literal,
+        field_name: $field_name:literal
+    ) => {
+        use alloc::vec::Vec;
+
+        use p3_challenger::{HashChallenger, SerializingChallenger64};
+        use p3_field::{Field, extension::BinomialExtensionField};
+        use p3_merkle_tree::MerkleTreeMmcs;
+        use p3_miden_blake3::Blake3_192;
+        use p3_symmetric::{CompressionFunctionFromHasher, SerializingHasher};
+        use $crate::configs::BenchScenario;
+
+        /// Chaining state / digest width in bytes (matches digest size).
+        pub const WIDTH: usize = 24;
+
+        /// Digest size in bytes.
+        pub const DIGEST: usize = 24;
+
+        /// Base field.
+        pub type F = $field;
+
+        /// Packed base field for SIMD (not used by byte LMCS, but kept for parity with Poseidon2 configs).
+        pub type P = <F as Field>::Packing;
+
+        /// Extension field.
+        pub type EF = BinomialExtensionField<F, $ext_deg>;
+
+        /// Leaf hasher: serializes `F` to bytes, then BLAKE3-192 (same pattern as Keccak MMCS).
+        pub type Sponge = SerializingHasher<Blake3_192>;
+
+        /// 2-to-1 compression via BLAKE3-192.
+        pub type Compress = CompressionFunctionFromHasher<Blake3_192, 2, DIGEST>;
+
+        /// Single-matrix Merkle MMCS (benchmarks / uni-STARK style).
+        pub type BaseMmcs = MerkleTreeMmcs<F, u8, Sponge, Compress, 2, DIGEST>;
+
+        /// Fiat–Shamir challenger over serialized field elements.
+        pub type Challenger = SerializingChallenger64<F, HashChallenger<u8, Blake3_192, DIGEST>>;
+
+        /// Sponge + compressor for Merkle construction.
+        pub fn test_components() -> (Sponge, Compress) {
+            let h = Blake3_192;
+            (
+                SerializingHasher::new(h),
+                CompressionFunctionFromHasher::new(h),
+            )
+        }
+
+        /// Fresh hash challenger (empty initial state).
+        pub fn test_challenger() -> Challenger {
+            SerializingChallenger64::new(HashChallenger::new(Vec::new(), Blake3_192))
+        }
+
+        #[doc = concat!(stringify!($field), " field with BLAKE3-192 (24-byte digest).")]
+        pub struct $scenario;
+
+        impl BenchScenario for $scenario {
+            type F = F;
+            type EF = EF;
+            type Mmcs = BaseMmcs;
+
+            const FIELD_NAME: &'static str = $field_name;
+            const HASH_NAME: &'static str = "blake3-192";
+
+            fn mmcs() -> Self::Mmcs {
+                let (sponge, compress) = test_components();
+                Self::Mmcs::new(sponge, compress, 0)
+            }
+        }
+    };
+}
+
 // =============================================================================
 // Config modules
 // =============================================================================
@@ -406,8 +484,34 @@ pub mod goldilocks_poseidon2 {
     );
 }
 
+/// BabyBear + BLAKE3-192 (24-byte digest).
+pub mod baby_bear_blake3_192 {
+    use p3_baby_bear::BabyBear;
+
+    crate::impl_blake3_192_config!(
+        scenario: BabyBearBlake3_192,
+        field: BabyBear,
+        ext_degree: 4,
+        field_name: "babybear"
+    );
+}
+
+/// Goldilocks + BLAKE3-192 (24-byte digest).
+pub mod goldilocks_blake3_192 {
+    use p3_goldilocks::Goldilocks;
+
+    crate::impl_blake3_192_config!(
+        scenario: GoldilocksBlake3_192,
+        field: Goldilocks,
+        ext_degree: 2,
+        field_name: "goldilocks"
+    );
+}
+
 // Re-export scenario structs at module level
+pub use baby_bear_blake3_192::BabyBearBlake3_192;
 pub use baby_bear_keccak::BabyBearKeccak;
 pub use baby_bear_poseidon2::BabyBearPoseidon2;
+pub use goldilocks_blake3_192::GoldilocksBlake3_192;
 pub use goldilocks_keccak::GoldilocksKeccak;
 pub use goldilocks_poseidon2::GoldilocksPoseidon2;
