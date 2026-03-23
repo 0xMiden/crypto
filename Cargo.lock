@@ -77,6 +77,7 @@ dependencies = [
  "cfg-if",
  "constant_time_eq",
  "cpufeatures",
+ "rayon-core",
 ]
 
 [[package]]
@@ -470,21 +471,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "p3-blake3-air"
-version = "0.5.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3801b37870c2f47b9c9289951ae21376607175a19b3ca42e95c2ea9498790752"
-dependencies = [
- "itertools 0.14.0",
- "p3-air",
- "p3-field",
- "p3-matrix",
- "p3-maybe-rayon",
- "rand",
- "tracing",
-]
-
-[[package]]
 name = "p3-bn254"
 version = "0.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -734,6 +720,28 @@ dependencies = [
 ]
 
 [[package]]
+name = "p3-miden-blake3"
+version = "0.5.0"
+dependencies = [
+ "blake3",
+ "p3-symmetric",
+ "p3-util",
+]
+
+[[package]]
+name = "p3-miden-blake3-air"
+version = "0.5.0"
+dependencies = [
+ "itertools 0.14.0",
+ "p3-air",
+ "p3-field",
+ "p3-matrix",
+ "p3-maybe-rayon",
+ "rand",
+ "tracing",
+]
+
+[[package]]
 name = "p3-miden-dev-utils"
 version = "0.5.0"
 dependencies = [
@@ -747,6 +755,7 @@ dependencies = [
  "p3-keccak",
  "p3-matrix",
  "p3-merkle-tree",
+ "p3-miden-blake3",
  "p3-miden-stateful-hasher",
  "p3-symmetric",
  "rand",
@@ -770,7 +779,6 @@ dependencies = [
  "p3-air",
  "p3-baby-bear",
  "p3-batch-stark",
- "p3-blake3-air",
  "p3-challenger",
  "p3-commit",
  "p3-dft",
@@ -781,6 +789,7 @@ dependencies = [
  "p3-lookup",
  "p3-matrix",
  "p3-merkle-tree",
+ "p3-miden-blake3-air",
  "p3-miden-dev-utils",
  "p3-miden-lifted-air",
  "p3-miden-lifted-stark",
@@ -833,9 +842,11 @@ dependencies = [
  "p3-dft",
  "p3-field",
  "p3-fri",
+ "p3-goldilocks",
  "p3-matrix",
  "p3-maybe-rayon",
  "p3-merkle-tree",
+ "p3-miden-blake3",
  "p3-miden-dev-utils",
  "p3-miden-lifted-air",
  "p3-miden-lifted-fri",
@@ -864,6 +875,7 @@ dependencies = [
  "p3-matrix",
  "p3-maybe-rayon",
  "p3-merkle-tree",
+ "p3-miden-blake3",
  "p3-miden-dev-utils",
  "p3-miden-stateful-hasher",
  "p3-miden-transcript",

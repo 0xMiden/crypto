@@ -11,11 +11,11 @@ publish = false
 
 [dependencies]
 # Internal
+p3-miden-blake3-air.workspace = true
 p3-miden-lifted-air.workspace = true
 
 # Plonky3
 p3-baby-bear.workspace = true
-p3-blake3-air = { version = "0.5.0", default-features = false }
 p3-field.workspace = true
 p3-keccak-air = { version = "0.5.0", default-features = false }
 p3-matrix.workspace = true
@@ -70,6 +70,10 @@ required-features = ["std"]
 
 [[example]]
 name = "lifted_miden"
+required-features = ["std"]
+
+[[example]]
+name = "lifted_miden_blake3_192"
 required-features = ["std"]
 
 [[example]]

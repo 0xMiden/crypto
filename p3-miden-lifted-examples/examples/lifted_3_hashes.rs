@@ -1,4 +1,4 @@
-//! Lifted STARK benchmark with three different hash AIRs (Poseidon2, Keccak, Blake3)
+//! Lifted STARK benchmark with three different hash AIRs (Poseidon2, Keccak, Blake3-192)
 //! at different heights (2^15, 2^18, 2^19). Exercises the multi-trace architecture with
 //! heterogeneous AIRs of different widths.
 //!
@@ -38,7 +38,7 @@ use tracing_subscriber::{
 
 extern crate alloc;
 
-// Blake3: 2^15 rows, 1 row/hash → 32768 hashes (widest, shortest).
+// Blake3-192: 2^15 rows, 1 row/hash → 32768 hashes (widest, shortest).
 const NUM_BLAKE3_HASHES: usize = 32768;
 // Keccak: 2^18 rows, 24 rows/hash → floor(262144/24) = 10922 hashes.
 const NUM_KECCAK_HASHES: usize = 10922;
