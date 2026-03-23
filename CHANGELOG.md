@@ -1,3 +1,7 @@
+## Unreleased
+
+- feat: add support for Blake3-192 ([#59](https://github.com/0xMiden/p3-miden/pull/59))
+
 ## 0.5.0 (2026-03-10)
 
 - Fixed periodic column evaluation on LDE/quotient domains.
