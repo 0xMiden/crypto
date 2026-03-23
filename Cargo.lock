@@ -471,6 +471,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "p3-blake3-air"
+version = "0.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3801b37870c2f47b9c9289951ae21376607175a19b3ca42e95c2ea9498790752"
+dependencies = [
+ "itertools 0.14.0",
+ "p3-air",
+ "p3-field",
+ "p3-matrix",
+ "p3-maybe-rayon",
+ "rand",
+ "tracing",
+]
+
+[[package]]
 name = "p3-bn254"
 version = "0.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -779,6 +794,7 @@ dependencies = [
  "p3-air",
  "p3-baby-bear",
  "p3-batch-stark",
+ "p3-blake3-air",
  "p3-challenger",
  "p3-commit",
  "p3-dft",
@@ -837,6 +853,7 @@ version = "0.5.0"
 dependencies = [
  "criterion",
  "p3-baby-bear",
+ "p3-blake3",
  "p3-challenger",
  "p3-commit",
  "p3-dft",

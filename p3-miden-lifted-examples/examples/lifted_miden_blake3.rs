@@ -1,19 +1,19 @@
-//! Same as `lifted_miden`, but with **BLAKE3-192** (24-byte digests) for LMCS + Fiat–Shamir.
+//! Same as `lifted_miden`, but with **BLAKE3** (32-byte digests) for LMCS + Fiat–Shamir.
 //!
-//! For the same benchmark with **32-byte** Plonky3 [`p3_blake3::Blake3`] commitments, run the
-//! `lifted_miden_blake3` example.
+//! For the same benchmark with **24-byte** Miden [`p3_miden_blake3::Blake3_192`] commitments, run the
+//! `lifted_miden_blake3_192` example.
 //!
 //! ```bash
-//! cargo run -p p3-miden-lifted-examples --release --features parallel --example lifted_miden_blake3_192
+//! cargo run -p p3-miden-lifted-examples --release --features parallel --example lifted_miden_blake3
 //! ```
 
 use p3_dft::Radix2DitParallel;
 use p3_field::extension::BinomialExtensionField;
 use p3_goldilocks::Goldilocks;
 use p3_matrix::Matrix;
-use p3_miden_blake3_air::NUM_BLAKE3_192_COLS;
 use p3_miden_lifted_air::{AirInstance, AirWitness, LiftedAir};
 use p3_miden_lifted_examples::{
+    blake3_plonky3::NUM_BLAKE3_COLS,
     miden::{
         DummyMidenAir, DummyMidenAuxBuilder, NUM_AUX_COLS, TRACE1_LOG_HEIGHT, TRACE1_WIDTH,
         TRACE2_LOG_HEIGHT, TRACE2_WIDTH, generate_dummy_trace,
@@ -22,7 +22,7 @@ use p3_miden_lifted_examples::{
     stats::{bench_iters, init_tracing},
 };
 use p3_miden_lifted_stark::{
-    GenericStarkConfig, blake3_192::goldilocks as bl, fri::PcsParams, prover::prove_multi,
+    GenericStarkConfig, blake3::goldilocks as bl, fri::PcsParams, prover::prove_multi,
 };
 use tracing::info_span;
 
@@ -72,7 +72,7 @@ fn main() {
         log_quotient_degree =
             <DummyMidenAir as LiftedAir<Val, Challenge>>::log_quotient_degree(&air1),
         lmcs_digest_bytes = bl::DIGEST,
-        plonky3_blake3_192_air_columns = NUM_BLAKE3_192_COLS,
+        plonky3_blake3_256_air_columns = NUM_BLAKE3_COLS,
     );
 
     let log1 = TRACE1_LOG_HEIGHT;
@@ -103,7 +103,7 @@ fn main() {
         if i == 1 {
             let size = stats::serialized_size(&output.proof);
             println!(
-                "proof size (BLAKE3-192): {} ({} field elems, {} commitments)",
+                "proof size (BLAKE3 32-byte / p3_blake3): {} ({} field elems, {} commitments)",
                 stats::format_bytes(size),
                 output.proof.fields().len(),
                 output.proof.commitments().len(),
