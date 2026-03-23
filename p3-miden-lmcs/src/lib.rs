@@ -151,7 +151,7 @@ use alloc::{collections::BTreeMap, vec::Vec};
 // ============================================================================
 // Public Re-exports
 // ============================================================================
-pub use bitrev::BitReversibleMatrix;
+pub use bitrev::{BitReversibleMatrix, materialize_bitrev};
 pub use hiding_lmcs::HidingLmcsConfig;
 pub use lifted_tree::LiftedMerkleTree;
 pub use lmcs::LmcsConfig;

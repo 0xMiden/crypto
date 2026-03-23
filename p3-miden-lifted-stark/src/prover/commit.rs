@@ -15,7 +15,7 @@ use p3_matrix::{
     dense::{RowMajorMatrix, RowMajorMatrixView},
 };
 use p3_miden_lifted_air::log2_strict_u8;
-use p3_miden_lmcs::{Lmcs, LmcsTree};
+use p3_miden_lmcs::{Lmcs, LmcsTree, materialize_bitrev};
 
 use crate::{StarkConfig, coset::LiftedCoset};
 
@@ -213,18 +213,11 @@ where
             let coset = LiftedCoset::new(log_trace_height, log_blowup, log_max_trace_height);
             let coset_shift = coset.lde_shift::<F>();
 
-            // Compute coset LDE, materialize to bit-reversed RowMajorMatrix, and
-            // wrap in BitReversedMatrixView to present domain order to the LMCS.
-            // The double bit_reverse_rows() call is needed because the DFT's Evaluations
-            // type may be either RowMajorMatrix or BitReversedMatrixView depending on the
-            // backend. Once upstream adds BitReversibleMatrix impls for all DFT output
-            // types, this can be simplified to pass the DFT output directly.
-            config
-                .dft()
-                .coset_lde_batch(trace, log_blowup.into(), coset_shift)
-                .bit_reverse_rows()
-                .to_row_major_matrix()
-                .bit_reverse_rows()
+            materialize_bitrev(
+                config
+                    .dft()
+                    .coset_lde_batch(trace, log_blowup.into(), coset_shift),
+            )
         })
         .collect();
 

@@ -10,7 +10,10 @@ use p3_symmetric::{Hash, PseudoCompressionFunction};
 use p3_util::{log2_strict_usize, reverse_bits_len};
 use tracing::{debug_span, info_span};
 
-use crate::{LeafOpening, LmcsTree, TreeIndices, row_list::RowList, utils::PackedValueExt};
+use crate::{
+    BitReversibleMatrix, LeafOpening, LmcsTree, TreeIndices, row_list::RowList,
+    utils::PackedValueExt,
+};
 
 /// A uniform binary Merkle tree whose leaves are constructed from matrices with power-of-two heights.
 ///
@@ -176,7 +179,9 @@ where
     D: Copy + Default + PartialEq + Send + Sync,
     M: Matrix<F>,
 {
-    /// Builder for creating trees with optional salt and explicit alignment.
+    /// Build a tree from domain-ordered matrices with optional salt and explicit alignment.
+    ///
+    /// Matrices are bit-reversed internally before storage and hashing.
     ///
     /// Preconditions:
     /// - `leaves` is non-empty and heights are powers of two.
@@ -186,14 +191,15 @@ where
     /// LMCS does not enforce that padded columns are zero.
     ///
     /// Panics if `leaves` is empty.
-    pub(crate) fn build_with_alignment<PF, PD, H, C, const WIDTH: usize>(
+    pub(crate) fn build_with_alignment<DomainM, PF, PD, H, C, const WIDTH: usize>(
         h: &H,
         c: &C,
-        leaves: Vec<M>,
+        leaves: Vec<DomainM>,
         salt: Option<RowMajorMatrix<F>>,
         alignment: usize,
     ) -> Self
     where
+        DomainM: BitReversibleMatrix<F, BitRev = M>,
         PF: PackedValue<Value = F>,
         PD: PackedValue<Value = D>,
         H: StatefulHasher<F, [D; DIGEST_ELEMS], State = [D; WIDTH]>
@@ -206,6 +212,8 @@ where
         const { assert!(PF::WIDTH == PD::WIDTH) }
         assert!(!leaves.is_empty(), "cannot commit empty batch");
         debug_assert!(alignment > 0, "alignment must be non-zero");
+
+        let leaves: Vec<M> = leaves.into_iter().map(|m| m.bit_reverse_rows()).collect();
 
         // Build leaf hashes: absorb all matrix rows into sponge states, then squeeze.
         let leaf_digests: Vec<[PD::Value; DIGEST_ELEMS]> =

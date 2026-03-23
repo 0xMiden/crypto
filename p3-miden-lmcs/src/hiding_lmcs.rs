@@ -119,13 +119,10 @@ where
     fn build_tree<M: BitReversibleMatrix<Self::F>>(&self, leaves: Vec<M>) -> Self::Tree<M::BitRev> {
         let tree_height = leaves.last().map(|m| m.height()).unwrap_or(0);
         let salt = RowMajorMatrix::rand(&mut *self.rng.borrow_mut(), tree_height, SALT);
-        let inner_leaves: Vec<M::BitRev> =
-            leaves.into_iter().map(|m| m.bit_reverse_rows()).collect();
-
-        LiftedMerkleTree::build_with_alignment::<PF, PD, H, C, WIDTH>(
+        LiftedMerkleTree::build_with_alignment::<M, PF, PD, H, C, WIDTH>(
             &self.inner.sponge,
             &self.inner.compress,
-            inner_leaves,
+            leaves,
             Some(salt),
             1,
         )
@@ -140,13 +137,10 @@ where
     ) -> Self::Tree<M::BitRev> {
         let tree_height = leaves.last().map(|m| m.height()).unwrap_or(0);
         let salt = RowMajorMatrix::rand(&mut *self.rng.borrow_mut(), tree_height, SALT);
-        let inner_leaves: Vec<M::BitRev> =
-            leaves.into_iter().map(|m| m.bit_reverse_rows()).collect();
-
-        LiftedMerkleTree::build_with_alignment::<PF, PD, H, C, WIDTH>(
+        LiftedMerkleTree::build_with_alignment::<M, PF, PD, H, C, WIDTH>(
             &self.inner.sponge,
             &self.inner.compress,
-            inner_leaves,
+            leaves,
             Some(salt),
             <H as Alignable<PF::Value, PD::Value>>::ALIGNMENT,
         )

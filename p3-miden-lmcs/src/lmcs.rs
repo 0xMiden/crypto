@@ -101,12 +101,10 @@ where
     /// lifted matrix than intended.
     fn build_tree<M: BitReversibleMatrix<Self::F>>(&self, leaves: Vec<M>) -> Self::Tree<M::BitRev> {
         const { assert!(SALT_ELEMS == 0) }
-        let inner_leaves: Vec<M::BitRev> =
-            leaves.into_iter().map(|m| m.bit_reverse_rows()).collect();
-        LiftedMerkleTree::build_with_alignment::<PF, PD, H, C, WIDTH>(
+        LiftedMerkleTree::build_with_alignment::<M, PF, PD, H, C, WIDTH>(
             &self.sponge,
             &self.compress,
-            inner_leaves,
+            leaves,
             None,
             1,
         )
@@ -128,12 +126,10 @@ where
         leaves: Vec<M>,
     ) -> Self::Tree<M::BitRev> {
         const { assert!(SALT_ELEMS == 0) }
-        let inner_leaves: Vec<M::BitRev> =
-            leaves.into_iter().map(|m| m.bit_reverse_rows()).collect();
-        LiftedMerkleTree::build_with_alignment::<PF, PD, H, C, WIDTH>(
+        LiftedMerkleTree::build_with_alignment::<M, PF, PD, H, C, WIDTH>(
             &self.sponge,
             &self.compress,
-            inner_leaves,
+            leaves,
             None,
             <H as Alignable<PF::Value, PD::Value>>::ALIGNMENT,
         )
