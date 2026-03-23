@@ -8,10 +8,11 @@
 # NOTE: for the `make lint` command to work well, this must contain the same
 # list of lints as the xclippy-fix command below.
 xclippy = [
-  "--",
-  "--all-features",
-  "--all-targets",
+  "clippy",
   "--workspace",
+  "--all-targets",
+  "--all-features",
+  "--",
   "-Dwarnings",
   "-Wclippy::all",
   "-Wclippy::await_holding_lock",
@@ -60,7 +61,6 @@ xclippy = [
   "-Wclippy::useless_transmute",
   "-Wclippy::verbose_file_reads",
   "-Wclippy::zero_sized_map_values",
-  "clippy",
   # The following lints are disabled because they still trigger warnings:
   # -Wclippy::derive_partial_eq_without_eq (4 warnings)
   # -Wclippy::doc_markdown                 (826 warnings)
@@ -92,13 +92,14 @@ xclippy = [
 # NOTE: for the `make lint` command to work well, this must contain the same
 # list of lints as the xclippy setting above.
 xclippy-fix = [
-  "--",
-  "--all-features",
-  "--all-targets",
-  "--allow-dirty",
-  "--allow-staged",
+  "clippy",
   "--fix",
+  "--allow-staged",
+  "--allow-dirty",
   "--workspace",
+  "--all-targets",
+  "--all-features",
+  "--",
   "-Dwarnings",
   "-Wclippy::all",
   "-Wclippy::await_holding_lock",
@@ -147,5 +148,4 @@ xclippy-fix = [
   "-Wclippy::useless_transmute",
   "-Wclippy::verbose_file_reads",
   "-Wclippy::zero_sized_map_values",
-  "clippy",
 ]
