@@ -159,7 +159,7 @@ pub use merkle_witness::MerkleWitness;
 pub use node_id::NodeId;
 use p3_matrix::Matrix;
 use p3_miden_transcript::{ProverChannel, TranscriptError, VerifierChannel};
-pub use proof::{BatchProof, LeafOpening, Proof};
+pub use proof::{BatchProof, BatchProofView, LeafOpening, Proof};
 pub use row_list::RowList;
 use thiserror::Error;
 pub use tree_indices::{MissingSiblingsIter, TreeIndices};
@@ -183,11 +183,11 @@ pub trait Lmcs: Clone {
     /// `Send + Sync` bounds required by [`Matrix<F>`].
     type F: Clone + Send + Sync;
     /// Commitment type (root hash).
-    type Commitment: Clone;
+    type Commitment: Clone + Eq;
     /// Tree type (prover data), parameterized by stored matrix type.
     type Tree<Stored: Matrix<Self::F>>: LmcsTree<Self::F, Self::Commitment, Stored>;
     /// Batch witness type returned by [`read_batch_proof`](Self::read_batch_proof).
-    type BatchProof;
+    type BatchProof: BatchProofView<Self::F, Self::Commitment>;
 
     /// Build a tree from domain-ordered matrices with no transcript padding (alignment = 1).
     ///

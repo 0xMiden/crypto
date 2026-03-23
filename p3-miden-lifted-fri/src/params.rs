@@ -104,4 +104,28 @@ impl PcsParams {
     pub fn query_pow_bits(&self) -> usize {
         self.query_pow_bits
     }
+
+    /// Grinding bits before DEEP challenge sampling.
+    #[inline]
+    pub fn deep_pow_bits(&self) -> usize {
+        self.deep.deep_pow_bits
+    }
+
+    /// Grinding bits before each FRI folding round.
+    #[inline]
+    pub fn folding_pow_bits(&self) -> usize {
+        self.fri.folding_pow_bits
+    }
+
+    /// Log₂ of the FRI folding arity.
+    #[inline]
+    pub fn log_folding_arity(&self) -> u8 {
+        self.fri.fold.log_arity()
+    }
+
+    /// Log₂ of the final polynomial degree bound.
+    #[inline]
+    pub fn log_final_degree(&self) -> u8 {
+        self.fri.log_final_degree
+    }
 }

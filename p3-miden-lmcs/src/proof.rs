@@ -38,6 +38,45 @@ pub struct BatchProof<F, C, const SALT_ELEMS: usize = 0> {
     pub witness: MerkleWitness<C>,
 }
 
+/// Accessor trait for batch proof data.
+///
+/// Provides read access to individual openings, authentication paths, and query indices.
+/// This allows consumers (e.g. the Miden VM recursive verifier) to work with batch proofs
+/// through the opaque `Lmcs::BatchProof` associated type.
+pub trait BatchProofView<F, C> {
+    /// Get the opened rows for a given leaf index.
+    fn opening(&self, index: usize) -> Option<&RowList<F>>;
+
+    /// Get the salt for a given leaf index.
+    ///
+    /// Returns an empty slice for non-hiding configurations.
+    fn salt(&self, index: usize) -> Option<&[F]>;
+
+    /// Get the authentication path (bottom-to-top sibling hashes) for a given leaf index.
+    fn path(&self, index: usize) -> Option<Vec<C>>;
+
+    /// Iterate over the unique query indices (in sorted order).
+    fn indices(&self) -> impl Iterator<Item = usize> + '_;
+}
+
+impl<F, C: Clone, const SALT_ELEMS: usize> BatchProofView<F, C> for BatchProof<F, C, SALT_ELEMS> {
+    fn opening(&self, index: usize) -> Option<&RowList<F>> {
+        self.openings.get(&index).map(|o| &o.rows)
+    }
+
+    fn salt(&self, index: usize) -> Option<&[F]> {
+        self.openings.get(&index).map(|o| o.salt.as_slice())
+    }
+
+    fn path(&self, index: usize) -> Option<Vec<C>> {
+        self.witness.path(index)
+    }
+
+    fn indices(&self) -> impl Iterator<Item = usize> + '_ {
+        self.openings.keys().copied()
+    }
+}
+
 /// Opened rows and optional salt for a single leaf.
 pub struct LeafOpening<F, const SALT_ELEMS: usize = 0> {
     /// Opened rows for this query.
