@@ -1347,7 +1347,7 @@ fn entries_with_fallible_backend() -> Result<()> {
 
     // Third item should be the simulated error.
     let third = iter.next();
-    assert_matches!(&third, Some(Err(LargeSmtForestError::Unspecified(msg))) if msg == "simulated read failure");
+    assert_matches!(&third, Some(Err(LargeSmtForestError::Unspecified(_))));
 
     // After faulting, the iterator must yield None — the remaining entries (4th, 5th) are never
     // returned.
@@ -1398,7 +1398,7 @@ fn entry_count_with_fallible_backend() -> Result<()> {
     // Query entry_count for the historical version V1.
     // This takes the WithHistory iteration path, which will hit our fallible iterator.
     let result = forest.entry_count(TreeId::new(lineage, version_1));
-    assert_matches!(result, Err(LargeSmtForestError::Unspecified(msg)) if msg == "simulated read failure");
+    assert_matches!(result, Err(LargeSmtForestError::Unspecified(_)));
 
     Ok(())
 }

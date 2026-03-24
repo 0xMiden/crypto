@@ -325,7 +325,7 @@ pub use operation::{ForestOperation, SmtForestUpdateBatch, SmtUpdateBatch};
 pub use root::{LineageId, RootInfo, TreeEntry, TreeId, TreeWithRoot, VersionId};
 
 use crate::{
-    EMPTY_WORD, Map, Set, Word,
+    EMPTY_WORD, Felt, Map, Set, Word,
     merkle::{
         NodeIndex, SparseMerklePath,
         smt::{
@@ -617,7 +617,7 @@ impl<B: Backend> LargeSmtForest<B> {
         // We compute the new leaf and new path by applying any reversions from the history on
         // top of the current state.
         let new_leaf = self.merge_leaves(opening.leaf(), view)?;
-        let new_path = self.merge_paths(leaf_index, opening.path(), view)?;
+        let new_path = self.merge_paths(tree.lineage(), leaf_index, opening.path(), view)?;
 
         // Finally we can compose our combined opening.
         Ok(SmtProof::new(new_path, new_leaf)?)
@@ -1052,13 +1052,16 @@ impl<B: Backend> LargeSmtForest<B> {
         );
 
         // Any entries that are still empty at this point should be removed.
-        Ok(SmtLeaf::new(leaf_entries.into_iter().collect(), full_tree_leaf.index())?)
+        let mut entries = leaf_entries.into_iter().collect::<Vec<_>>();
+        entries.sort_by_key(|(key, value)| (*key, *value));
+        Ok(SmtLeaf::new(entries, full_tree_leaf.index())?)
     }
 
     /// Applies any historical changes contained in `history_view` on top of the merkle path
     /// obtained from the full tree to produce the correct path for a historical opening.
     fn merge_paths(
         &self,
+        lineage: LineageId,
         leaf_index: LeafIndex<SMT_DEPTH>,
         full_tree_path: &SparseMerklePath,
         history_view: HistoryView,
@@ -1074,6 +1077,26 @@ impl<B: Backend> LargeSmtForest<B> {
                 // If there is a historical value we need to use it, and so we write it to the
                 // correct slot in the path elements array.
                 path_elems[depth as usize - 1] = *historical_value;
+            } else if path_node_ix.depth() == SMT_DEPTH {
+                let sibling_leaf_index = LeafIndex::new_max_depth(path_node_ix.position());
+                let sibling_leaf_changed = history_view
+                    .changed_keys()
+                    .any(|(key, _)| LeafIndex::from(key) == sibling_leaf_index);
+
+                if sibling_leaf_changed {
+                    let sibling_key = Word::new([
+                        Felt::new(0),
+                        Felt::new(0),
+                        Felt::new(0),
+                        Felt::new(sibling_leaf_index.position()),
+                    ]);
+                    let sibling_opening = self.backend.open(lineage, sibling_key)?;
+                    let sibling_leaf = self.merge_leaves(sibling_opening.leaf(), history_view)?;
+                    path_elems[depth as usize - 1] = sibling_leaf.hash();
+                } else {
+                    let bounded_depth = NonZeroU8::new(depth).expect("depth ∈ 1 ..= SMT_DEPTH]");
+                    path_elems[depth as usize - 1] = full_tree_path.at_depth(bounded_depth)?;
+                }
             } else {
                 // If there isn't a historical value, we should delegate to the corresponding
                 // element in the path from the full-tree opening.
