@@ -11,9 +11,9 @@ use proptest::prelude::*;
 use crate::{
     EMPTY_WORD, Map, ONE, ZERO,
     merkle::smt::{
-        Backend, ForestInMemoryBackend, ForestOperation, LeafIndex, LineageId, LargeSmtForest,
-        MAX_LEAF_ENTRIES, RootInfo, SMT_DEPTH, Smt, SmtForestUpdateBatch, SmtProof,
-        SmtUpdateBatch, TreeId, VersionId,
+        Backend, ForestInMemoryBackend, ForestOperation, LargeSmtForest, LeafIndex, LineageId,
+        MAX_LEAF_ENTRIES, RootInfo, SMT_DEPTH, Smt, SmtForestUpdateBatch, SmtProof, SmtUpdateBatch,
+        TreeId, VersionId,
         large_forest::{
             backend::{BackendError, Result as BackendResult},
             root::{TreeEntry, TreeWithRoot},
@@ -131,7 +131,10 @@ pub fn build_tree(initial: SmtUpdateBatch) -> core::result::Result<Smt, TestCase
 }
 
 /// Applies a batch to the provided reference [`Smt`].
-pub fn apply_batch(tree: &mut Smt, batch: SmtUpdateBatch) -> core::result::Result<(), TestCaseError> {
+pub fn apply_batch(
+    tree: &mut Smt,
+    batch: SmtUpdateBatch,
+) -> core::result::Result<(), TestCaseError> {
     let mutations = tree
         .compute_mutations(batch.consume().into_iter().map(Into::<(Word, Word)>::into))
         .map_err(to_fail)?;

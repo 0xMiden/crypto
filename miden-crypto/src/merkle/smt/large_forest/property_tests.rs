@@ -14,9 +14,9 @@ use crate::{
         TreeId,
         large_forest::test_utils::{
             apply_batch, arbitrary_batch, arbitrary_distinct_lineages, arbitrary_lineage,
-            arbitrary_non_empty_word, arbitrary_version, arbitrary_word,
-            assert_lineage_metadata, assert_tree_queries_match, batch_keys, build_tree,
-            sorted_forest_entries, sorted_tree_entries, to_fail,
+            arbitrary_non_empty_word, arbitrary_version, arbitrary_word, assert_lineage_metadata,
+            assert_tree_queries_match, batch_keys, build_tree, sorted_forest_entries,
+            sorted_tree_entries, to_fail,
         },
     },
 };
