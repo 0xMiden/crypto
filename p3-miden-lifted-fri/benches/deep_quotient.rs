@@ -5,13 +5,13 @@
 //!
 //! Run with:
 //! ```bash
-//! RUSTFLAGS="-Ctarget-cpu=native" cargo bench --bench deep_quotient
+//! RUSTFLAGS="-Ctarget-cpu=native" cargo bench --bench deep_quotient --features testing
 //!
 //! # With parallelism
-//! RUSTFLAGS="-Ctarget-cpu=native" cargo bench --bench deep_quotient --features parallel
+//! RUSTFLAGS="-Ctarget-cpu=native" cargo bench --bench deep_quotient --features testing,parallel
 //!
 //! # Filter by field
-//! cargo bench --bench deep_quotient -- goldilocks
+//! cargo bench --bench deep_quotient --features testing -- goldilocks
 //! ```
 
 use std::hint::black_box;

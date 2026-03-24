@@ -5,13 +5,13 @@
 //!
 //! Run with:
 //! ```bash
-//! RUSTFLAGS="-Ctarget-cpu=native" cargo bench --bench merkle_commit
+//! RUSTFLAGS="-Ctarget-cpu=native" cargo bench --bench merkle_commit --features testing
 //!
 //! # With parallelism
-//! RUSTFLAGS="-Ctarget-cpu=native" cargo bench --bench merkle_commit --features parallel
+//! RUSTFLAGS="-Ctarget-cpu=native" cargo bench --bench merkle_commit --features testing,parallel
 //!
 //! # Filter by field
-//! cargo bench --bench merkle_commit -- goldilocks
+//! cargo bench --bench merkle_commit --features testing -- goldilocks
 //! ```
 
 use std::hint::black_box;

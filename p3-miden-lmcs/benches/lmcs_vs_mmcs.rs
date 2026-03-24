@@ -7,14 +7,14 @@
 //!
 //! Run with:
 //! ```bash
-//! RUSTFLAGS="-Ctarget-cpu=native" cargo bench --bench lmcs_vs_mmcs
+//! RUSTFLAGS="-Ctarget-cpu=native" cargo bench --bench lmcs_vs_mmcs --features testing
 //!
 //! # With parallelism
-//! RUSTFLAGS="-Ctarget-cpu=native" cargo bench --bench lmcs_vs_mmcs --features parallel
+//! RUSTFLAGS="-Ctarget-cpu=native" cargo bench --bench lmcs_vs_mmcs --features testing,parallel
 //!
 //! # Filter by field/hash
-//! cargo bench --bench lmcs_vs_mmcs -- goldilocks/poseidon2
-//! cargo bench --bench lmcs_vs_mmcs -- keccak
+//! cargo bench --bench lmcs_vs_mmcs --features testing -- goldilocks/poseidon2
+//! cargo bench --bench lmcs_vs_mmcs --features testing -- keccak
 //! ```
 
 mod utils;

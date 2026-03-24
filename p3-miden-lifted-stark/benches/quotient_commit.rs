@@ -6,7 +6,7 @@
 //!
 //! Run with:
 //! ```bash
-//! RUSTFLAGS="-Ctarget-cpu=native" cargo bench -p p3-miden-lifted-stark --bench quotient_commit
+//! RUSTFLAGS="-Ctarget-cpu=native" cargo bench -p p3-miden-lifted-stark --bench quotient_commit --features testing
 //! ```
 
 use std::hint::black_box;

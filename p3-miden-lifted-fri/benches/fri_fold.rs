@@ -5,13 +5,13 @@
 //!
 //! Run with:
 //! ```bash
-//! RUSTFLAGS="-Ctarget-cpu=native" cargo bench --bench fri_fold
+//! RUSTFLAGS="-Ctarget-cpu=native" cargo bench --bench fri_fold --features testing
 //!
 //! # With parallelism
-//! RUSTFLAGS="-Ctarget-cpu=native" cargo bench --bench fri_fold --features parallel
+//! RUSTFLAGS="-Ctarget-cpu=native" cargo bench --bench fri_fold --features testing,parallel
 //!
 //! # Filter by field
-//! cargo bench --bench fri_fold -- goldilocks
+//! cargo bench --bench fri_fold --features testing -- goldilocks
 //! ```
 
 use std::hint::black_box;

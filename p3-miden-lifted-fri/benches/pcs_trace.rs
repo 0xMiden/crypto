@@ -5,7 +5,7 @@
 //!
 //! Run with:
 //! ```bash
-//! RUSTFLAGS="-Ctarget-cpu=native" cargo bench -p p3-miden-lifted-fri --bench pcs_trace --features parallel
+//! RUSTFLAGS="-Ctarget-cpu=native" cargo bench -p p3-miden-lifted-fri --bench pcs_trace --features testing,parallel
 //! ```
 
 use std::time::Instant;

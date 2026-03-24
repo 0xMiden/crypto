@@ -6,13 +6,13 @@
 //!
 //! Run with:
 //! ```bash
-//! RUSTFLAGS="-Ctarget-cpu=native" cargo bench --bench fri_comparison
+//! RUSTFLAGS="-Ctarget-cpu=native" cargo bench --bench fri_comparison --features testing
 //!
 //! # With parallelism
-//! RUSTFLAGS="-Ctarget-cpu=native" cargo bench --bench fri_comparison --features parallel
+//! RUSTFLAGS="-Ctarget-cpu=native" cargo bench --bench fri_comparison --features testing,parallel
 //!
 //! # Filter by field
-//! cargo bench --bench fri_comparison -- goldilocks
+//! cargo bench --bench fri_comparison --features testing -- goldilocks
 //! ```
 
 use core::marker::PhantomData;
