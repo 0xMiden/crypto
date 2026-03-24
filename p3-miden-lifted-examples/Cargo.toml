@@ -28,7 +28,6 @@ tracing.workspace = true
 tracing-forest = { version = "0.1.6", features = ["ansi", "smallvec"] }
 tracing-subscriber.workspace = true
 
-# Bin-only dependencies (not needed by the library)
 # Internal
 p3-miden-lmcs = { workspace = true, features = ["testing"] }
 p3-miden-lifted-stark.workspace = true
