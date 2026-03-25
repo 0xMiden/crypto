@@ -1,3 +1,7 @@
+## Unreleased
+
+- perf: faster constraint evaluation for wide matrices ([#57](https://github.com/0xMiden/p3-miden/57)).
+
 ## 0.5.0 (2026-03-10)
 
 - Fixed periodic column evaluation on LDE/quotient domains.
