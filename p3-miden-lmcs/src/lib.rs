@@ -143,6 +143,8 @@ mod lifted_tree;
 mod lmcs;
 pub mod mmcs;
 pub mod proof;
+#[cfg(any(test, feature = "testing"))]
+pub mod testing;
 #[cfg(test)]
 mod tests;
 pub mod utils;

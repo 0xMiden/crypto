@@ -4,10 +4,10 @@ mod common;
 
 use alloc::vec::Vec;
 
-use common::{prove_and_verify, test_config};
+use common::{generate_pow4_trace, prove_and_verify, test_config};
 use p3_field::PrimeCharacteristicRing;
 use p3_matrix::{Matrix, dense::RowMajorMatrix};
-use p3_miden_dev_utils::configs::baby_bear_poseidon2 as bb;
+use p3_miden_dev_utils::configs::goldilocks_poseidon2::{EF, F, test_challenger};
 use p3_miden_lifted_stark::{
     air::{
         AirBuilder, AuxBuilder, BaseAir, ExtensionBuilder, LiftedAir, LiftedAirBuilder,
@@ -26,7 +26,7 @@ use p3_miden_lifted_stark::{
 #[derive(Clone, Debug)]
 struct TinyAir {
     /// Pre-computed periodic column data.
-    periodic_cols: Vec<Vec<bb::F>>,
+    periodic_cols: Vec<Vec<F>>,
 }
 
 impl TinyAir {
@@ -34,9 +34,9 @@ impl TinyAir {
         let periodic_cols = periods
             .iter()
             .map(|&p| {
-                let mut col = vec![bb::F::ZERO; p];
-                col[0] = bb::F::ONE;
-                col[p - 1] = bb::F::ONE;
+                let mut col = vec![F::ZERO; p];
+                col[0] = F::ONE;
+                col[p - 1] = F::ONE;
                 col
             })
             .collect();
@@ -44,7 +44,7 @@ impl TinyAir {
     }
 }
 
-impl BaseAir<bb::F> for TinyAir {
+impl BaseAir<F> for TinyAir {
     fn width(&self) -> usize {
         1
     }
@@ -54,8 +54,8 @@ impl BaseAir<bb::F> for TinyAir {
     }
 }
 
-impl LiftedAir<bb::F, bb::EF> for TinyAir {
-    fn periodic_columns(&self) -> Vec<Vec<bb::F>> {
+impl LiftedAir<F, EF> for TinyAir {
+    fn periodic_columns(&self) -> Vec<Vec<F>> {
         self.periodic_cols.clone()
     }
 
@@ -75,7 +75,7 @@ impl LiftedAir<bb::F, bb::EF> for TinyAir {
         0
     }
 
-    fn eval<AB: LiftedAirBuilder<F = bb::F>>(&self, builder: &mut AB) {
+    fn eval<AB: LiftedAirBuilder<F = F>>(&self, builder: &mut AB) {
         let main = builder.main();
         let start = builder.public_values()[0];
         let periodic = builder.periodic_values().to_vec();
@@ -116,12 +116,12 @@ impl LiftedAir<bb::F, bb::EF> for TinyAir {
 /// AuxBuilder for TinyAir: aux column = challenge^{4^row}.
 struct TinyAuxBuilder;
 
-impl AuxBuilder<bb::F, bb::EF> for TinyAuxBuilder {
+impl AuxBuilder<F, EF> for TinyAuxBuilder {
     fn build_aux_trace(
         &self,
-        main: &RowMajorMatrix<bb::F>,
-        challenges: &[bb::EF],
-    ) -> (RowMajorMatrix<bb::EF>, Vec<bb::EF>) {
+        main: &RowMajorMatrix<F>,
+        challenges: &[EF],
+    ) -> (RowMajorMatrix<EF>, Vec<EF>) {
         let height = main.height();
         let challenge = challenges[0];
 
@@ -138,21 +138,10 @@ impl AuxBuilder<bb::F, bb::EF> for TinyAuxBuilder {
     }
 }
 
-/// Generate a trace: [start, start^4, start^16, start^64, ...]
-fn generate_trace(start: bb::F, height: usize) -> RowMajorMatrix<bb::F> {
-    let mut values = Vec::with_capacity(height);
-    let mut current = start;
-    for _ in 0..height {
-        values.push(current);
-        current = current.exp_power_of_2(2);
-    }
-    RowMajorMatrix::new(values, 1)
-}
-
 /// Build a (trace, public_values) pair for instance `idx`.
-fn instance(idx: usize, height: usize) -> (RowMajorMatrix<bb::F>, Vec<bb::F>) {
-    let start = bb::F::from_u64((idx + 2) as u64);
-    (generate_trace(start, height), vec![start])
+fn instance(idx: usize, height: usize) -> (RowMajorMatrix<F>, Vec<F>) {
+    let start = F::from_u64((idx + 2) as u64);
+    (generate_pow4_trace(start, height), vec![start])
 }
 
 // ---------------------------------------------------------------------------
@@ -179,7 +168,7 @@ fn malformed_transcript_is_rejected() {
         &public_values,
         &[],
         &TinyAuxBuilder,
-        bb::test_challenger(),
+        test_challenger(),
     )
     .expect("proving should succeed");
 
@@ -191,13 +180,13 @@ fn malformed_transcript_is_rejected() {
         &public_values,
         &[],
         &output.proof,
-        bb::test_challenger(),
+        test_challenger(),
     )
     .expect("baseline proof should verify");
 
     // Extra field element should cause rejection
     let (mut fields, commitments) = output.proof.clone().into_parts();
-    fields.push(bb::F::ONE);
+    fields.push(F::ONE);
     let bad_transcript = TranscriptData::new(fields, commitments);
 
     let err = verify_single(
@@ -207,7 +196,7 @@ fn malformed_transcript_is_rejected() {
         &public_values,
         &[],
         &bad_transcript,
-        bb::test_challenger(),
+        test_challenger(),
     )
     .expect_err("extra transcript data should fail verification");
     assert!(matches!(

@@ -71,7 +71,7 @@ fn batched_base_linear_combination<P: PackedField>(coeffs: &[P::Scalar], values:
 /// Packed constraint folder for SIMD-optimized prover evaluation.
 ///
 /// Uses packed types to evaluate constraints on multiple domain points simultaneously:
-/// - `P`: Packed base field (e.g., `PackedBabyBear`)
+/// - `P`: Packed base field (e.g., `PackedGoldilocks`)
 /// - `PE`: Packed extension field - must be `Algebra<EF> + Algebra<P> + BasedVectorSpace<P>`
 ///
 /// Collects constraints during `air.eval()` into separate base/ext vectors, then

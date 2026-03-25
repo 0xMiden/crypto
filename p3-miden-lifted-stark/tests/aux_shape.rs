@@ -7,7 +7,7 @@ use alloc::vec::Vec;
 use common::test_config;
 use p3_field::PrimeCharacteristicRing;
 use p3_matrix::{Matrix, dense::RowMajorMatrix};
-use p3_miden_dev_utils::configs::baby_bear_poseidon2 as bb;
+use p3_miden_dev_utils::configs::goldilocks_poseidon2::{EF, F, test_challenger};
 use p3_miden_lifted_stark::{
     air::{AuxBuilder, BaseAir, LiftedAir, LiftedAirBuilder},
     prover::prove_single,
@@ -16,13 +16,13 @@ use p3_miden_lifted_stark::{
 #[derive(Clone, Copy, Debug)]
 struct BadAuxWidthAir;
 
-impl BaseAir<bb::F> for BadAuxWidthAir {
+impl BaseAir<F> for BadAuxWidthAir {
     fn width(&self) -> usize {
         1
     }
 }
 
-impl LiftedAir<bb::F, bb::EF> for BadAuxWidthAir {
+impl LiftedAir<F, EF> for BadAuxWidthAir {
     fn num_randomness(&self) -> usize {
         1
     }
@@ -39,22 +39,22 @@ impl LiftedAir<bb::F, bb::EF> for BadAuxWidthAir {
         0
     }
 
-    fn eval<AB: LiftedAirBuilder<F = bb::F>>(&self, _builder: &mut AB) {}
+    fn eval<AB: LiftedAirBuilder<F = F>>(&self, _builder: &mut AB) {}
 }
 
 /// AuxBuilder that returns 2 EF columns when BadAuxWidthAir declares 1.
 struct BadAuxBuilder;
 
-impl AuxBuilder<bb::F, bb::EF> for BadAuxBuilder {
+impl AuxBuilder<F, EF> for BadAuxBuilder {
     fn build_aux_trace(
         &self,
-        main: &RowMajorMatrix<bb::F>,
-        _challenges: &[bb::EF],
-    ) -> (RowMajorMatrix<bb::EF>, Vec<bb::EF>) {
+        main: &RowMajorMatrix<F>,
+        _challenges: &[EF],
+    ) -> (RowMajorMatrix<EF>, Vec<EF>) {
         let height = main.height();
         // Return 2 EF columns when aux_width() declares 1
-        let aux = RowMajorMatrix::new(vec![bb::EF::ZERO; height * 2], 2);
-        (aux, vec![bb::EF::ZERO, bb::EF::ZERO])
+        let aux = RowMajorMatrix::new(vec![EF::ZERO; height * 2], 2);
+        (aux, vec![EF::ZERO, EF::ZERO])
     }
 }
 
@@ -64,7 +64,7 @@ fn aux_width_mismatch_panics() {
     let config = test_config();
     let air = BadAuxWidthAir;
 
-    let trace = RowMajorMatrix::new(vec![bb::F::ZERO, bb::F::ONE, bb::F::ONE, bb::F::ZERO], 1);
+    let trace = RowMajorMatrix::new(vec![F::ZERO, F::ONE, F::ONE, F::ZERO], 1);
     let public_values = vec![];
 
     let _result = prove_single(
@@ -74,6 +74,6 @@ fn aux_width_mismatch_panics() {
         &public_values,
         &[],
         &BadAuxBuilder,
-        bb::test_challenger(),
+        test_challenger(),
     );
 }

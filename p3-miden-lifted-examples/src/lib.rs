@@ -18,6 +18,8 @@ pub mod miden;
 pub mod poseidon2;
 
 #[cfg(feature = "std")]
+pub mod bench_configs;
+#[cfg(feature = "std")]
 pub mod stats;
 
 use p3_field::{ExtensionField, Field};

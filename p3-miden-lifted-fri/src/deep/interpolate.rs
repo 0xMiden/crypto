@@ -214,7 +214,7 @@ mod tests {
 
     use super::PointQuotients;
     use crate::{
-        tests::{EF, F},
+        testing::goldilocks_poseidon2::{EF, F},
         utils::bit_reversed_coset_points,
     };
 

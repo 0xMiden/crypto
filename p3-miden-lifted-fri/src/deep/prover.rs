@@ -371,7 +371,7 @@ mod tests {
     use p3_miden_lmcs::{RowList, utils::aligned_widths};
 
     use crate::{
-        tests::{EF, F},
+        testing::goldilocks_poseidon2::{EF, F},
         utils::horner,
     };
 

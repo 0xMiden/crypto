@@ -1,32 +1,32 @@
 //! Wraps Plonky3's [`Poseidon2Air`] as a [`LiftedAir`].
 //!
-//! Uses the standard BabyBear configuration: WIDTH=16, SBOX_DEGREE=7, SBOX_REGISTERS=1,
-//! HALF_FULL_ROUNDS=4, PARTIAL_ROUNDS=20.
+//! Uses the standard Goldilocks configuration: WIDTH=12, SBOX_DEGREE=7, SBOX_REGISTERS=1,
+//! HALF_FULL_ROUNDS=4, PARTIAL_ROUNDS=22.
 
 use alloc::vec::Vec;
 
-use p3_baby_bear::{BabyBear, GenericPoseidon2LinearLayersBabyBear};
 use p3_field::Field;
+use p3_goldilocks::{GenericPoseidon2LinearLayersGoldilocks, Goldilocks};
 use p3_matrix::dense::RowMajorMatrix;
 use p3_miden_lifted_air::{Air, BaseAir, LiftedAir, LiftedAirBuilder};
 use p3_poseidon2_air::{Poseidon2Air, RoundConstants, num_cols};
 
-/// BabyBear Poseidon2 configuration constants.
-pub const WIDTH: usize = 16;
+/// Goldilocks Poseidon2 configuration constants.
+pub const WIDTH: usize = 12;
 pub const SBOX_DEGREE: u64 = 7;
 pub const SBOX_REGISTERS: usize = 1;
 pub const HALF_FULL_ROUNDS: usize = 4;
-pub const PARTIAL_ROUNDS: usize = 20;
+pub const PARTIAL_ROUNDS: usize = 22;
 
-/// Number of trace columns for the BabyBear Poseidon2 AIR.
+/// Number of trace columns for the Goldilocks Poseidon2 AIR.
 pub const NUM_POSEIDON2_COLS: usize =
     num_cols::<WIDTH, SBOX_DEGREE, SBOX_REGISTERS, HALF_FULL_ROUNDS, PARTIAL_ROUNDS>();
 
-type BabyBearRoundConstants = RoundConstants<BabyBear, WIDTH, HALF_FULL_ROUNDS, PARTIAL_ROUNDS>;
+type GoldilocksRoundConstants = RoundConstants<Goldilocks, WIDTH, HALF_FULL_ROUNDS, PARTIAL_ROUNDS>;
 
 type InnerAir = Poseidon2Air<
-    BabyBear,
-    GenericPoseidon2LinearLayersBabyBear,
+    Goldilocks,
+    GenericPoseidon2LinearLayersGoldilocks,
     WIDTH,
     SBOX_DEGREE,
     SBOX_REGISTERS,
@@ -43,7 +43,7 @@ pub struct LiftedPoseidon2Air {
 }
 
 impl LiftedPoseidon2Air {
-    pub fn new(constants: BabyBearRoundConstants) -> Self {
+    pub fn new(constants: GoldilocksRoundConstants) -> Self {
         Self {
             inner: InnerAir::new(constants),
         }
@@ -56,7 +56,7 @@ impl<F> BaseAir<F> for LiftedPoseidon2Air {
     }
 }
 
-impl<EF: Field> LiftedAir<BabyBear, EF> for LiftedPoseidon2Air {
+impl<EF: Field> LiftedAir<Goldilocks, EF> for LiftedPoseidon2Air {
     fn num_randomness(&self) -> usize {
         1
     }
@@ -73,23 +73,23 @@ impl<EF: Field> LiftedAir<BabyBear, EF> for LiftedPoseidon2Air {
         0
     }
 
-    fn eval<AB: LiftedAirBuilder<F = BabyBear>>(&self, builder: &mut AB) {
+    fn eval<AB: LiftedAirBuilder<F = Goldilocks>>(&self, builder: &mut AB) {
         Air::eval(&self.inner, builder);
     }
 }
 
 /// Generate a Poseidon2 trace for the given inputs.
 ///
-/// Each input is a WIDTH=16 element BabyBear array. The number of inputs must
+/// Each input is a WIDTH=12 element Goldilocks array. The number of inputs must
 /// be a power of two. The trace has `inputs.len()` rows and
 /// [`NUM_POSEIDON2_COLS`] columns.
 pub fn generate_poseidon2_trace(
-    inputs: Vec<[BabyBear; WIDTH]>,
-    constants: &BabyBearRoundConstants,
-) -> RowMajorMatrix<BabyBear> {
+    inputs: Vec<[Goldilocks; WIDTH]>,
+    constants: &GoldilocksRoundConstants,
+) -> RowMajorMatrix<Goldilocks> {
     p3_poseidon2_air::generate_trace_rows::<
-        BabyBear,
-        GenericPoseidon2LinearLayersBabyBear,
+        Goldilocks,
+        GenericPoseidon2LinearLayersGoldilocks,
         WIDTH,
         SBOX_DEGREE,
         SBOX_REGISTERS,

@@ -14,7 +14,7 @@ publish = false
 p3-miden-lifted-air.workspace = true
 
 # Plonky3
-p3-baby-bear.workspace = true
+p3-air.workspace = true
 p3-blake3-air = { version = "0.5.0", default-features = false }
 p3-field.workspace = true
 p3-keccak-air = { version = "0.5.0", default-features = false }
@@ -28,13 +28,11 @@ tracing.workspace = true
 tracing-forest = { version = "0.1.6", features = ["ansi", "smallvec"] }
 tracing-subscriber.workspace = true
 
-[dev-dependencies]
 # Internal
-p3-miden-dev-utils.workspace = true
+p3-miden-lmcs = { workspace = true, features = ["testing"] }
 p3-miden-lifted-stark.workspace = true
 
 # Plonky3
-p3-air.workspace = true
 p3-batch-stark = { version = "0.5.0", default-features = false }
 p3-challenger.workspace = true
 p3-commit.workspace = true
@@ -50,28 +48,28 @@ p3-util.workspace = true
 [features]
 default = ["std"]
 std = []
-parallel = ["p3-miden-dev-utils/parallel", "p3-miden-lifted-stark/parallel"]
+parallel = ["p3-miden-lifted-stark/parallel"]
 
-[[example]]
+[[bin]]
 name = "lifted_keccak"
 required-features = ["std"]
 
-[[example]]
+[[bin]]
 name = "lifted_3_hashes"
 required-features = ["std"]
 
-[[example]]
+[[bin]]
 name = "batch_stark_keccak"
 required-features = ["std"]
 
-[[example]]
+[[bin]]
 name = "batch_stark_3_hashes"
 required-features = ["std"]
 
-[[example]]
+[[bin]]
 name = "lifted_miden"
 required-features = ["std"]
 
-[[example]]
+[[bin]]
 name = "batch_miden"
 required-features = ["std"]
