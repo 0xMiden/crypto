@@ -1,8 +1,8 @@
-//! Trace commitment (LDE + bit-reverse + LMCS).
+//! Trace commitment (LDE + LMCS).
 //!
 //! This module provides types and functions for committing traces with lifting support:
 //!
-//! - [`commit_traces`]: Commit traces with lifting support (LDE → bit-reverse → LMCS)
+//! - [`commit_traces`]: Commit traces with lifting support (LDE → LMCS)
 //! - [`Committed`]: Wrapper around LMCS tree with domain metadata
 
 use alloc::vec::Vec;
@@ -15,7 +15,7 @@ use p3_matrix::{
     dense::{RowMajorMatrix, RowMajorMatrixView},
 };
 use p3_miden_lifted_air::log2_strict_u8;
-use p3_miden_lmcs::{Lmcs, LmcsTree};
+use p3_miden_lmcs::{Lmcs, LmcsTree, materialize_bitrev};
 
 use crate::{StarkConfig, coset::LiftedCoset};
 
@@ -121,12 +121,9 @@ where
     ///
     /// This returns evaluations over the quotient coset `gJ ⊆ gK`.
     ///
-    /// The tree commits to LDE evaluations on `gK` (size `N·B`). Constraint numerators are
-    /// evaluated point-wise on the smaller quotient domain `gJ` (size `N·D`), and for the
-    /// protocol we only need those `N·D` points as long as `B ≥ D`.
-    ///
-    /// In bit-reversed row order, `gJ` appears as the first `N·D` rows, so this is a
-    /// zero-copy prefix view followed by `bit_reverse_rows()` to expose natural order.
+    /// The tree commits to LDE evaluations on `gK` (size `N·B`). The `RowMajorMatrix`
+    /// stores bit-reversed evaluations; `gJ` appears as the first `N·D` rows, so this is
+    /// a zero-copy prefix view followed by `bit_reverse_rows()` to expose natural order.
     ///
     /// # Panics
     ///
@@ -148,10 +145,13 @@ where
 // commit_traces
 // ============================================================================
 
-/// Commit multiple trace matrices with lifting: LDE → bit-reverse → LMCS tree.
+/// Commit multiple trace matrices with lifting: LDE → LMCS tree.
 ///
 /// Traces must be sorted by height in ascending order. Each trace is lifted to
 /// the max LDE domain using the appropriate nested coset shift.
+///
+/// The DFT output is wrapped in `BitReversedMatrixView` (zero-cost view) and
+/// passed directly to the LMCS — no materialization needed.
 ///
 /// Returns a [`Committed`] wrapper providing:
 /// - Commitment root via [`Committed::root()`]
@@ -213,12 +213,11 @@ where
             let coset = LiftedCoset::new(log_trace_height, log_blowup, log_max_trace_height);
             let coset_shift = coset.lde_shift::<F>();
 
-            // Compute coset LDE and bit-reverse rows
-            config
-                .dft()
-                .coset_lde_batch(trace, log_blowup.into(), coset_shift)
-                .bit_reverse_rows()
-                .to_row_major_matrix()
+            materialize_bitrev(
+                config
+                    .dft()
+                    .coset_lde_batch(trace, log_blowup.into(), coset_shift),
+            )
         })
         .collect();
 

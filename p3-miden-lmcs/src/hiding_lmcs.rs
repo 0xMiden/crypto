@@ -13,7 +13,10 @@ use rand::{
     distr::{Distribution, StandardUniform},
 };
 
-use crate::{BatchProof, LiftedMerkleTree, Lmcs, LmcsConfig, LmcsError, OpenedRows};
+use crate::{
+    BatchProof, BitReversibleMatrix, LiftedMerkleTree, Lmcs, LmcsConfig, LmcsError, OpenedRows,
+    TreeIndices,
+};
 
 /// Configuration for hiding LMCS with random salt.
 ///
@@ -107,17 +110,16 @@ where
 {
     type F = PF::Value;
     type Commitment = Hash<PF::Value, PD::Value, DIGEST>;
-    type BatchProof = BatchProof<PF::Value, Self::Commitment, SALT>;
     type Tree<M: Matrix<PF::Value>> = LiftedMerkleTree<PF::Value, PD::Value, M, DIGEST, SALT>;
+    type BatchProof = BatchProof<PF::Value, Self::Commitment, SALT>;
 
     /// Build a tree with per-leaf salt sampled from the RNG.
     ///
     /// Preconditions match `LmcsConfig::build_tree`; panics if `leaves` is empty.
-    fn build_tree<M: Matrix<Self::F>>(&self, leaves: Vec<M>) -> Self::Tree<M> {
+    fn build_tree<M: BitReversibleMatrix<Self::F>>(&self, leaves: Vec<M>) -> Self::Tree<M::BitRev> {
         let tree_height = leaves.last().map(|m| m.height()).unwrap_or(0);
         let salt = RowMajorMatrix::rand(&mut *self.rng.borrow_mut(), tree_height, SALT);
-
-        LiftedMerkleTree::build_with_alignment::<PF, PD, H, C, WIDTH>(
+        LiftedMerkleTree::build_with_alignment::<M, PF, PD, H, C, WIDTH>(
             &self.inner.sponge,
             &self.inner.compress,
             leaves,
@@ -129,11 +131,13 @@ where
     /// Build a tree with per-leaf salt sampled from the RNG and hasher alignment padding.
     ///
     /// Preconditions match `LmcsConfig::build_tree`; panics if `leaves` is empty.
-    fn build_aligned_tree<M: Matrix<Self::F>>(&self, leaves: Vec<M>) -> Self::Tree<M> {
+    fn build_aligned_tree<M: BitReversibleMatrix<Self::F>>(
+        &self,
+        leaves: Vec<M>,
+    ) -> Self::Tree<M::BitRev> {
         let tree_height = leaves.last().map(|m| m.height()).unwrap_or(0);
         let salt = RowMajorMatrix::rand(&mut *self.rng.borrow_mut(), tree_height, SALT);
-
-        LiftedMerkleTree::build_with_alignment::<PF, PD, H, C, WIDTH>(
+        LiftedMerkleTree::build_with_alignment::<M, PF, PD, H, C, WIDTH>(
             &self.inner.sponge,
             &self.inner.compress,
             leaves,
@@ -158,29 +162,25 @@ where
         &self,
         commitment: &Self::Commitment,
         widths: &[usize],
-        log_max_height: u8,
-        indices: impl IntoIterator<Item = usize>,
+        indices: &TreeIndices,
         channel: &mut Ch,
     ) -> Result<OpenedRows<Self::F>, LmcsError>
     where
         Ch: VerifierChannel<F = Self::F, Commitment = Self::Commitment>,
     {
-        self.inner
-            .open_batch(commitment, widths, log_max_height, indices, channel)
+        self.inner.open_batch(commitment, widths, indices, channel)
     }
 
-    fn read_batch_proof_from_channel<Ch>(
+    fn read_batch_proof<Ch>(
         &self,
         widths: &[usize],
-        log_max_height: u8,
-        indices: &[usize],
+        indices: &TreeIndices,
         channel: &mut Ch,
     ) -> Result<Self::BatchProof, LmcsError>
     where
         Ch: VerifierChannel<F = Self::F, Commitment = Self::Commitment>,
     {
-        self.inner
-            .read_batch_proof_from_channel(widths, log_max_height, indices, channel)
+        self.inner.read_batch_proof(widths, indices, channel)
     }
 
     fn alignment(&self) -> usize {

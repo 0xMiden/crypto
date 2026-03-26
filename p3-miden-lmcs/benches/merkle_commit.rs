@@ -17,7 +17,7 @@
 use std::hint::black_box;
 
 use criterion::{BenchmarkId, Criterion, Throughput, criterion_group, criterion_main};
-use p3_matrix::{dense::RowMajorMatrix, extension::FlatMatrixView};
+use p3_matrix::{bitrev::BitReversalPerm, dense::RowMajorMatrix, extension::FlatMatrixView};
 use p3_miden_dev_utils::{
     LOG_HEIGHTS, RELATIVE_SPECS,
     configs::goldilocks_poseidon2::{EF, F},
@@ -82,7 +82,7 @@ fn bench_merkle_commit(c: &mut Criterion) {
                 |b, matrix| {
                     b.iter(|| {
                         let flat = FlatMatrixView::new(matrix.clone());
-                        let tree = lmcs.build_tree(vec![flat]);
+                        let tree = lmcs.build_tree(vec![BitReversalPerm::new_view(flat)]);
                         black_box(tree.root())
                     });
                 },
@@ -100,7 +100,7 @@ fn bench_merkle_commit(c: &mut Criterion) {
                 |b, matrix| {
                     b.iter(|| {
                         let flat = FlatMatrixView::new(matrix.clone());
-                        let tree = lmcs.build_tree(vec![flat]);
+                        let tree = lmcs.build_tree(vec![BitReversalPerm::new_view(flat)]);
                         black_box(tree.root())
                     });
                 },

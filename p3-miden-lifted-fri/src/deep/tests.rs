@@ -1,15 +1,15 @@
 //! End-to-end tests for DEEP quotient prover/verifier agreement.
 
-use alloc::{collections::BTreeSet, vec, vec::Vec};
+use alloc::{vec, vec::Vec};
 
 use p3_matrix::dense::RowMajorMatrix;
-use p3_miden_lmcs::{Lmcs, LmcsTree};
-use p3_util::reverse_bits_len;
+use p3_miden_lmcs::{Lmcs, LmcsTree, TreeIndices};
 use rand::{RngExt, SeedableRng, distr::StandardUniform, prelude::SmallRng};
 
 use super::{DeepParams, DeepTranscript, prover::DeepPoly, verifier::DeepOracle};
-use crate::tests::{
-    EF, F, prover_channel_with_commitment, test_lmcs, verifier_channel_with_commitment,
+use crate::testing::goldilocks_poseidon2::{
+    EF, F, Lmcs as BaseLmcs, prover_channel_with_commitment, test_lmcs,
+    verifier_channel_with_commitment,
 };
 
 /// End-to-end: prover's `DeepPoly.open()` must match verifier's channel-based openings.
@@ -42,24 +42,25 @@ fn deep_quotient_end_to_end() {
     // Step 1: Commit matrices via LMCS (aligned for trace commitments)
     let tree = lmcs.build_aligned_tree(matrices);
     let commitment = tree.root();
-    let widths = tree.widths();
+    let widths = tree.aligned_widths();
 
     // Step 3: Prover constructs DeepPoly (handles observe, grind, sample internally)
     let mut prover_channel = prover_channel_with_commitment(&commitment);
     let trace_trees: &[&_] = &[&tree];
-    let deep_poly = DeepPoly::from_trees::<crate::tests::BaseLmcs, _, 2, _>(
+    let deep_poly = DeepPoly::from_trees::<BaseLmcs, _, 2, _>(
         &params,
         trace_trees,
         [z1, z2],
         log_blowup,
         &mut prover_channel,
     );
-    // Sample tree indices (bit-reversed exponents). Tree stores in bit-reversed order.
-    let tree_indices: BTreeSet<usize> = [0, 1, lde_height / 4, lde_height / 2, lde_height - 1]
-        .into_iter()
-        .map(|exp| reverse_bits_len(exp, log_lde_height as usize))
-        .collect();
-    tree.prove_batch(tree_indices.iter().copied(), &mut prover_channel);
+    // Sample domain indices. The LMCS tree is indexed by domain order.
+    let tree_indices = TreeIndices::new(
+        [0, 1, lde_height / 4, lde_height / 2, lde_height - 1],
+        log_lde_height,
+    )
+    .expect("indices are in range");
+    tree.prove_batch(&tree_indices, &mut prover_channel);
     let (prover_digest, transcript) = prover_channel.finalize();
 
     // Create commitments slice for multi-commitment API (single commitment in this case)
@@ -81,9 +82,11 @@ fn deep_quotient_end_to_end() {
         .open_batch(&lmcs, &tree_indices, &mut verifier_channel)
         .expect("Merkle verification should pass");
 
-    for &tree_idx in &tree_indices {
-        // Prover's deep_evals are in bit-reversed order: deep_evals[tree_idx] = Q(g·ω^{bitrev(tree_idx)})
-        let prover_eval = deep_poly.deep_evals[tree_idx];
+    for &tree_idx in tree_indices.iter() {
+        // Prover's deep_evals are in bit-reversed order internally:
+        // deep_evals[bitrev(d)] = Q(g·ω^d). For domain index d, access bitrev(d).
+        let bitrev_idx = p3_util::reverse_bits_len(tree_idx, log_lde_height as usize);
+        let prover_eval = deep_poly.deep_evals[bitrev_idx];
         let verifier_eval = verifier_evals[&tree_idx];
         assert_eq!(
             prover_eval, verifier_eval,
@@ -97,7 +100,7 @@ fn deep_quotient_end_to_end() {
     assert_eq!(prover_digest, verifier_digest);
 
     // Re-parse DeepTranscript (DEEP phase only) from a fresh channel.
-    let reparse_commitments = vec![(commitment, tree.widths())];
+    let reparse_commitments = vec![(commitment, tree.aligned_widths())];
     let mut reparse_channel = verifier_channel_with_commitment(&transcript, &commitment);
     DeepTranscript::<F, EF>::from_verifier_channel(
         &params,
