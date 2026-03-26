@@ -8,7 +8,7 @@ use p3_miden_stateful_hasher::StatefulHasher;
 use p3_miden_transcript::ProverChannel;
 use p3_symmetric::{Hash, PseudoCompressionFunction};
 use p3_util::{log2_strict_usize, reverse_bits_len};
-use tracing::{debug_span, info_span};
+use tracing::info_span;
 
 use crate::{
     BitReversibleMatrix, LeafOpening, LmcsTree, TreeIndices, row_list::RowList,
@@ -247,7 +247,7 @@ where
 
         // Build digest layers by repeatedly compressing until we reach the root,
         // then reverse so index 0 = root, matching the top-down NodeId convention.
-        let digest_layers = debug_span!("compress tree layers").in_scope(|| {
+        let digest_layers = info_span!("compress tree layers").in_scope(|| {
             let mut digest_layers = vec![leaf_digests];
             loop {
                 let prev_layer = digest_layers.last().unwrap();

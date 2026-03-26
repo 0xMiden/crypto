@@ -16,6 +16,7 @@ use p3_matrix::{
 };
 use p3_miden_lifted_air::log2_strict_u8;
 use p3_miden_lmcs::{Lmcs, LmcsTree, materialize_bitrev};
+use tracing::info_span;
 
 use crate::{StarkConfig, coset::LiftedCoset};
 
@@ -200,6 +201,7 @@ where
         .enumerate()
         .map(|(idx, trace)| {
             let trace_height = trace.height();
+            let width = trace.width();
 
             // Validate height is power of two
             assert!(
@@ -213,11 +215,12 @@ where
             let coset = LiftedCoset::new(log_trace_height, log_blowup, log_max_trace_height);
             let coset_shift = coset.lde_shift::<F>();
 
-            materialize_bitrev(
-                config
+            info_span!("LDE", trace = idx, log_height = log_trace_height, width).in_scope(|| {
+                let lde = config
                     .dft()
-                    .coset_lde_batch(trace, log_blowup.into(), coset_shift),
-            )
+                    .coset_lde_batch(trace, log_blowup.into(), coset_shift);
+                materialize_bitrev(lde)
+            })
         })
         .collect();
 

@@ -299,7 +299,7 @@ where
 
     // Build aux traces via AuxBuilder
     let (aux_traces_ef, all_aux_values): (Vec<RowMajorMatrix<EF>>, Vec<Vec<EF>>) =
-        tracing::debug_span!("build aux traces").in_scope(|| {
+        info_span!("build aux traces").in_scope(|| {
             let mut traces = Vec::with_capacity(instances.len());
             let mut values = Vec::with_capacity(instances.len());
             for (air, w, aux_builder) in instances {
@@ -401,8 +401,8 @@ where
             let aux_values_i = &all_aux_values[i];
 
             // Add constraint evaluations in-place: accumulator[i] += eval(i)
-            tracing::debug_span!("eval_instance", instance = i, height = this_quotient_height)
-                .in_scope(|| {
+            info_span!("eval_instance", instance = i, height = this_quotient_height).in_scope(
+                || {
                     evaluate_constraints_into::<F, EF, A>(
                         &mut accumulator,
                         *air,
@@ -416,7 +416,8 @@ where
                         &layouts[i],
                         aux_values_i,
                     );
-                });
+                },
+            );
         }
     });
 
