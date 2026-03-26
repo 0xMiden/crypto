@@ -275,12 +275,13 @@ mod tests {
     use alloc::vec::Vec;
 
     use p3_matrix::dense::RowMajorMatrix;
-    use p3_miden_transcript::{VerifierChannel, VerifierTranscript};
+    use p3_miden_transcript::VerifierChannel;
     use p3_symmetric::Hash;
     use rand::{SeedableRng, rngs::SmallRng};
 
     use crate::{
         BatchProof, Lmcs, LmcsTree, log2_strict_u8,
+        testing::goldilocks_poseidon2 as gl,
         tests::{DIGEST, F, lmcs, roundtrip_open_batch},
     };
 
@@ -303,10 +304,7 @@ mod tests {
                 roundtrip_open_batch(&lmcs, &tree, indices).expect("open_batch should verify");
 
             // Path B: BatchProof::read_from_channel (parse-only)
-            let mut verifier_channel = VerifierTranscript::from_data(
-                p3_miden_dev_utils::configs::baby_bear_poseidon2::test_challenger(),
-                &transcript,
-            );
+            let mut verifier_channel = gl::verifier_channel(&transcript);
             let batch = BatchProof::<F, Hash<F, F, DIGEST>>::read_from_channel(
                 &widths,
                 log_max_height,

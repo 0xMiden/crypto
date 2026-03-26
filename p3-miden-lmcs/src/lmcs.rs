@@ -327,25 +327,25 @@ mod tests {
 
     use p3_field::PrimeCharacteristicRing;
     use p3_matrix::dense::RowMajorMatrix;
-    use p3_miden_dev_utils::configs::baby_bear_poseidon2 as bb;
     use p3_miden_transcript::{ProverTranscript, TranscriptData, VerifierTranscript};
 
-    use crate::{Lmcs, LmcsConfig, LmcsError, LmcsTree, log2_strict_u8};
+    use crate::{
+        Lmcs, LmcsConfig, LmcsError, LmcsTree, log2_strict_u8, testing::goldilocks_poseidon2 as gl,
+    };
 
-    type TestLmcs =
-        LmcsConfig<bb::P, bb::P, bb::Sponge, bb::Compress, { bb::WIDTH }, { bb::DIGEST }>;
+    type TestLmcs = gl::Lmcs;
+    type F = gl::F;
 
-    fn small_matrix(height: usize, width: usize, seed: u64) -> RowMajorMatrix<bb::F> {
+    fn small_matrix(height: usize, width: usize, seed: u64) -> RowMajorMatrix<F> {
         let values = (0..height * width)
-            .map(|i| bb::F::from_u64(seed + i as u64))
+            .map(|i| F::from_u64(seed + i as u64))
             .collect();
         RowMajorMatrix::new(values, width)
     }
 
     #[test]
     fn open_batch_cases() {
-        let (_, sponge, compress) = bb::test_components();
-        let lmcs: TestLmcs = LmcsConfig::new(sponge, compress);
+        let lmcs: TestLmcs = gl::test_lmcs();
         let matrices = vec![small_matrix(4, 2, 0), small_matrix(4, 3, 100)];
         let tree = lmcs.build_tree(matrices);
         let widths = tree.widths();
@@ -353,15 +353,14 @@ mod tests {
         let commitment = tree.root();
 
         let make_transcript = |indices: &[usize]| {
-            let mut prover_channel = ProverTranscript::new(bb::test_challenger());
+            let mut prover_channel = gl::prover_channel();
             tree.prove_batch(indices.iter().copied(), &mut prover_channel);
             prover_channel.finalize()
         };
 
         let assert_open = |indices: &[usize]| {
             let (prover_digest, transcript) = make_transcript(indices);
-            let mut verifier_channel =
-                VerifierTranscript::from_data(bb::test_challenger(), &transcript);
+            let mut verifier_channel = gl::verifier_channel(&transcript);
             let opened = lmcs
                 .open_batch(
                     &commitment,
@@ -389,11 +388,10 @@ mod tests {
         let tiny_tree = lmcs.build_tree(vec![small_matrix(1, 1, 7)]);
         let widths_tiny = tiny_tree.widths();
         let log_tiny = log2_strict_u8(tiny_tree.height());
-        let mut prover_channel = ProverTranscript::new(bb::test_challenger());
+        let mut prover_channel = gl::prover_channel();
         tiny_tree.prove_batch([0], &mut prover_channel);
         let (prover_digest, transcript) = prover_channel.finalize();
-        let mut verifier_channel =
-            VerifierTranscript::from_data(bb::test_challenger(), &transcript);
+        let mut verifier_channel = gl::verifier_channel(&transcript);
         let opened = lmcs
             .open_batch(
                 &tiny_tree.root(),
@@ -410,9 +408,8 @@ mod tests {
         assert_eq!(prover_digest, verifier_digest);
 
         // oob index
-        let (_, transcript) = ProverTranscript::new(bb::test_challenger()).finalize();
-        let mut verifier_channel =
-            VerifierTranscript::from_data(bb::test_challenger(), &transcript);
+        let (_, transcript) = gl::prover_channel().finalize();
+        let mut verifier_channel = gl::verifier_channel(&transcript);
         assert_eq!(
             lmcs.open_batch(
                 &commitment,
@@ -426,8 +423,7 @@ mod tests {
 
         // wrong tree
         let (_, transcript) = make_transcript(&[0]);
-        let mut verifier_channel =
-            VerifierTranscript::from_data(bb::test_challenger(), &transcript);
+        let mut verifier_channel = gl::verifier_channel(&transcript);
         let wrong_tree = lmcs.build_tree(vec![small_matrix(4, 2, 999)]);
         assert_eq!(
             lmcs.open_batch(
@@ -446,7 +442,7 @@ mod tests {
         let (fields, mut commitments) = transcript.into_parts();
         commitments.pop();
         let truncated = TranscriptData::new(fields, commitments);
-        let mut verifier_channel = VerifierTranscript::from_data(bb::test_challenger(), &truncated);
+        let mut verifier_channel = gl::verifier_channel(&truncated);
         assert_eq!(
             lmcs.open_batch(
                 &commitment,
@@ -461,9 +457,8 @@ mod tests {
         );
 
         // empty indices
-        let (_, transcript) = ProverTranscript::new(bb::test_challenger()).finalize();
-        let mut verifier_channel =
-            VerifierTranscript::from_data(bb::test_challenger(), &transcript);
+        let (_, transcript) = gl::prover_channel().finalize();
+        let mut verifier_channel = gl::verifier_channel(&transcript);
         assert_eq!(
             lmcs.open_batch(
                 &commitment,
@@ -489,6 +484,7 @@ mod tests {
         use p3_challenger::{HashChallenger, SerializingChallenger64};
         use p3_goldilocks::Goldilocks;
         use p3_miden_stateful_hasher::ChainingHasher;
+        use p3_miden_transcript::{ProverTranscript, VerifierTranscript};
         use p3_symmetric::CompressionFunctionFromHasher;
 
         type F = Goldilocks;

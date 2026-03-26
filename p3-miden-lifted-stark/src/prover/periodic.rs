@@ -106,11 +106,11 @@ mod tests {
 
     use p3_dft::TwoAdicSubgroupDft;
     use p3_field::{Field, PackedValue, PrimeCharacteristicRing};
-    use p3_miden_dev_utils::configs::baby_bear_poseidon2 as bb;
+    use p3_miden_dev_utils::configs::goldilocks_poseidon2 as gl;
 
     use super::*;
 
-    type F = bb::F;
+    type F = gl::F;
 
     /// Verify that periodic LDE values match the full LDE computation.
     fn assert_periodic_lde_matches_full(columns: &[Vec<F>], log_trace_height: u8, log_blowup: u8) {
@@ -164,7 +164,7 @@ mod tests {
         }
 
         // Verify packed_values_at returns correct packed values
-        type P = bb::P;
+        type P = gl::P;
         let pack_width = P::WIDTH;
         for start in (0..lde_height).step_by(pack_width) {
             let packed: Vec<P> = periodic_lde.packed_values_at(start).collect();

@@ -17,7 +17,6 @@ p3-miden-stateful-hasher.workspace = true
 p3-baby-bear.workspace = true
 p3-challenger.workspace = true
 p3-commit.workspace = true
-p3-dft.workspace = true
 p3-field.workspace = true
 p3-goldilocks.workspace = true
 p3-keccak.workspace = true
@@ -27,10 +26,6 @@ p3-symmetric.workspace = true
 
 # Third-party
 rand.workspace = true
-
-# Criterion only for std targets (not wasm32)
-[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
-criterion.workspace = true
 
 [features]
 parallel = []

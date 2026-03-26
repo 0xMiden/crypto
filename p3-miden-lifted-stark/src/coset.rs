@@ -348,12 +348,12 @@ impl LiftedCoset {
 
 #[cfg(test)]
 mod tests {
-    use p3_baby_bear::BabyBear;
     use p3_field::{Field, PrimeCharacteristicRing};
+    use p3_goldilocks::Goldilocks;
 
     use super::*;
 
-    type F = BabyBear;
+    type F = Goldilocks;
 
     #[test]
     fn domain_info_basic() {

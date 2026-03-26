@@ -6,25 +6,25 @@
 //!
 //! Run with:
 //! ```bash
-//! RUSTFLAGS="-Ctarget-cpu=native" cargo bench -p p3-miden-lifted-stark --bench quotient_commit
+//! RUSTFLAGS="-Ctarget-cpu=native" cargo bench -p p3-miden-lifted-stark --bench quotient_commit --features testing
 //! ```
 
 use std::hint::black_box;
 
 use criterion::{BenchmarkId, Criterion, criterion_group, criterion_main};
-use p3_baby_bear::BabyBear;
-use p3_challenger::DuplexChallenger;
 use p3_commit::{ExtensionMmcs, Pcs};
 use p3_dft::Radix2DitParallel;
-use p3_field::{Field, coset::TwoAdicMultiplicativeCoset, extension::BinomialExtensionField};
+use p3_field::{Field, coset::TwoAdicMultiplicativeCoset};
 use p3_matrix::dense::RowMajorMatrix;
 use p3_merkle_tree::MerkleTreeMmcs;
-use p3_miden_dev_utils::{configs::baby_bear_poseidon2 as bb, criterion_config_long};
+use p3_miden_dev_utils::configs::goldilocks_poseidon2::{
+    Challenger, Compress, DIGEST, EF, F, P, Perm, RATE, WIDTH, test_challenger, test_components,
+};
 use p3_miden_lifted_fri::PcsParams;
 use p3_miden_lifted_stark::{
     air::log2_strict_u8, coset::LiftedCoset, prover::quotient::commit_quotient,
 };
-use p3_miden_lmcs::LmcsConfig;
+use p3_miden_lmcs::testing::goldilocks_poseidon2 as gl_lmcs;
 use p3_symmetric::PaddingFreeSponge;
 use rand::{RngExt, SeedableRng, rngs::SmallRng};
 
@@ -32,23 +32,17 @@ use rand::{RngExt, SeedableRng, rngs::SmallRng};
 // Types
 // =============================================================================
 
-type Val = BabyBear;
-type Challenge = BinomialExtensionField<Val, 4>;
-type Dft = Radix2DitParallel<Val>;
+type Dft = Radix2DitParallel<F>;
 
 // Plonky3 PCS types (baseline)
-type Perm = bb::Perm;
-type MmcsSponge = PaddingFreeSponge<Perm, { bb::WIDTH }, { bb::RATE }, { bb::DIGEST }>;
-type Compress = bb::Compress;
-type ValMmcs = MerkleTreeMmcs<bb::P, bb::P, MmcsSponge, Compress, 2, { bb::DIGEST }>;
-type ChallengeMmcs = ExtensionMmcs<Val, Challenge, ValMmcs>;
-type WorkspacePcs = p3_fri::TwoAdicFriPcs<Val, Dft, ValMmcs, ChallengeMmcs>;
-type Challenger = DuplexChallenger<Val, Perm, { bb::WIDTH }, { bb::RATE }>;
+type MmcsSponge = PaddingFreeSponge<Perm, WIDTH, RATE, DIGEST>;
+type ValMmcs = MerkleTreeMmcs<P, P, MmcsSponge, Compress, 2, DIGEST>;
+type ChallengeMmcs = ExtensionMmcs<F, EF, ValMmcs>;
+type WorkspacePcs = p3_fri::TwoAdicFriPcs<F, Dft, ValMmcs, ChallengeMmcs>;
 
 // Lifted types
-type LiftedLmcs = LmcsConfig<bb::P, bb::P, bb::Sponge, bb::Compress, { bb::WIDTH }, { bb::DIGEST }>;
-type LiftedConfig =
-    p3_miden_lifted_stark::GenericStarkConfig<Val, Challenge, LiftedLmcs, Dft, Challenger>;
+type LiftedLmcs = gl_lmcs::Lmcs;
+type LiftedConfig = p3_miden_lifted_stark::GenericStarkConfig<F, EF, LiftedLmcs, Dft, Challenger>;
 
 // =============================================================================
 // Constants
@@ -72,13 +66,12 @@ fn lifted_config() -> LiftedConfig {
         0,          // query_pow_bits
     )
     .expect("valid PCS params");
-    let (_, sponge, compress) = bb::test_components();
-    let lmcs: LiftedLmcs = LmcsConfig::new(sponge, compress);
-    LiftedConfig::new(pcs, lmcs, Dft::default(), bb::test_challenger())
+    let lmcs: LiftedLmcs = gl_lmcs::test_lmcs();
+    LiftedConfig::new(pcs, lmcs, Dft::default(), test_challenger())
 }
 
 fn workspace_pcs() -> WorkspacePcs {
-    let (perm, _, compress) = bb::test_components();
+    let (perm, _, compress) = test_components();
     let mmcs_sponge = MmcsSponge::new(perm);
     let mmcs = ValMmcs::new(mmcs_sponge, compress, 0);
     let challenge_mmcs = ChallengeMmcs::new(mmcs.clone());
@@ -94,7 +87,7 @@ fn workspace_pcs() -> WorkspacePcs {
     WorkspacePcs::new(Dft::default(), mmcs, fri_params)
 }
 
-fn random_quotient_evals(n: usize, d: usize, seed: u64) -> Vec<Challenge> {
+fn random_quotient_evals(n: usize, d: usize, seed: u64) -> Vec<EF> {
     let mut rng = SmallRng::seed_from_u64(seed);
     (0..n * d).map(|_| rng.random()).collect()
 }
@@ -131,19 +124,18 @@ fn bench_quotient_commit(c: &mut Criterion) {
         {
             let pcs = workspace_pcs();
             let quotient_domain =
-                TwoAdicMultiplicativeCoset::new(Val::GENERATOR, (log_n + log_d) as usize).unwrap();
+                TwoAdicMultiplicativeCoset::new(F::GENERATOR, (log_n + log_d) as usize).unwrap();
 
             group.bench_function(BenchmarkId::new("plonky3_pcs", &label), |bench| {
                 bench.iter(|| {
                     let q_evals = random_quotient_evals(n, D, 42);
                     let q_flat = RowMajorMatrix::new_col(q_evals).flatten_to_base();
-                    let (commitment, data) =
-                        <WorkspacePcs as Pcs<Challenge, Challenger>>::commit_quotient(
-                            &pcs,
-                            quotient_domain,
-                            q_flat,
-                            D,
-                        );
+                    let (commitment, data) = <WorkspacePcs as Pcs<EF, Challenger>>::commit_quotient(
+                        &pcs,
+                        quotient_domain,
+                        q_flat,
+                        D,
+                    );
                     black_box((commitment, data))
                 });
             });
@@ -155,7 +147,10 @@ fn bench_quotient_commit(c: &mut Criterion) {
 
 criterion_group! {
     name = benches;
-    config = criterion_config_long();
+    config = Criterion::default()
+        .sample_size(10)
+        .measurement_time(std::time::Duration::from_secs(30))
+        .warm_up_time(std::time::Duration::from_secs(3));
     targets = bench_quotient_commit
 }
 criterion_main!(benches);

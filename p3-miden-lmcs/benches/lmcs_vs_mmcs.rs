@@ -2,21 +2,19 @@
 //!
 //! Compares the lifted LMCS implementation against the workspace MerkleTreeMmcs
 //! using identical hash configurations. Runs benchmarks for:
-//! - BabyBear + Poseidon2
 //! - Goldilocks + Poseidon2
-//! - BabyBear + Keccak
 //! - Goldilocks + Keccak
 //!
 //! Run with:
 //! ```bash
-//! RUSTFLAGS="-Ctarget-cpu=native" cargo bench --bench lmcs_vs_mmcs
+//! RUSTFLAGS="-Ctarget-cpu=native" cargo bench --bench lmcs_vs_mmcs --features testing
 //!
 //! # With parallelism
-//! RUSTFLAGS="-Ctarget-cpu=native" cargo bench --bench lmcs_vs_mmcs --features parallel
+//! RUSTFLAGS="-Ctarget-cpu=native" cargo bench --bench lmcs_vs_mmcs --features testing,parallel
 //!
 //! # Filter by field/hash
-//! cargo bench --bench lmcs_vs_mmcs -- babybear/poseidon2
-//! cargo bench --bench lmcs_vs_mmcs -- keccak
+//! cargo bench --bench lmcs_vs_mmcs --features testing -- goldilocks/poseidon2
+//! cargo bench --bench lmcs_vs_mmcs --features testing -- keccak
 //! ```
 
 mod utils;
@@ -27,42 +25,39 @@ use criterion::{BenchmarkId, Criterion, Throughput, criterion_group, criterion_m
 use p3_commit::Mmcs;
 use p3_matrix::dense::RowMajorMatrix;
 use p3_miden_dev_utils::{
-    LOG_HEIGHTS, PARALLEL_STR, RELATIVE_SPECS, criterion_config, generate_matrices_from_specs,
+    LOG_HEIGHTS, RELATIVE_SPECS, configs::goldilocks_poseidon2::F, generate_matrices_from_specs,
     total_elements,
 };
 use p3_miden_lmcs::{Lmcs, LmcsTree};
-use rand::distr::{Distribution, StandardUniform};
-use utils::LmcsScenario;
+
+const PARALLEL_STR: &str = if cfg!(feature = "parallel") {
+    "parallel"
+} else {
+    "single"
+};
 
 // =============================================================================
 // Benchmark implementation
 // =============================================================================
 
-/// Run benchmark for a specific scenario.
-fn bench_scenario<S: LmcsScenario>(c: &mut Criterion)
-where
-    StandardUniform: Distribution<S::F>,
-{
+/// Run benchmark for a specific hash configuration.
+fn bench_hash<L: Lmcs<F = F>, M: Mmcs<F>>(c: &mut Criterion, lmcs: &L, mmcs: &M, hash_name: &str) {
     for &log_max_height in LOG_HEIGHTS {
         let n_leaves = 1usize << log_max_height;
         let group_name = format!(
-            "LMCS_vs_MMCS/{}/{}/{}/{}",
-            n_leaves,
-            S::FIELD_NAME,
-            S::HASH_NAME,
-            PARALLEL_STR
+            "LMCS_vs_MMCS/{}/goldilocks/{}/{}",
+            n_leaves, hash_name, PARALLEL_STR
         );
         let mut group = c.benchmark_group(&group_name);
         group.throughput(Throughput::Elements(total_elements(
-            &generate_matrices_from_specs::<S::F>(RELATIVE_SPECS, log_max_height),
+            &generate_matrices_from_specs::<F>(RELATIVE_SPECS, log_max_height),
         )));
 
         // Generate matrices using canonical specs
-        let matrix_groups: Vec<Vec<RowMajorMatrix<S::F>>> =
+        let matrix_groups: Vec<Vec<RowMajorMatrix<F>>> =
             generate_matrices_from_specs(RELATIVE_SPECS, log_max_height);
 
         // LMCS (using Lmcs trait API)
-        let lmcs = S::lmcs();
         group.bench_with_input(
             BenchmarkId::from_parameter("lmcs"),
             &matrix_groups,
@@ -77,7 +72,6 @@ where
         );
 
         // MMCS
-        let mmcs = S::mmcs();
         group.bench_with_input(
             BenchmarkId::from_parameter("mmcs"),
             &matrix_groups,
@@ -95,22 +89,22 @@ where
 }
 
 fn bench_lmcs_vs_mmcs(c: &mut Criterion) {
-    use p3_miden_dev_utils::{
-        BabyBearKeccak, BabyBearPoseidon2, GoldilocksKeccak, GoldilocksPoseidon2,
-    };
+    use p3_miden_lmcs::testing::goldilocks_poseidon2::test_lmcs;
+    use utils::*;
 
-    // Poseidon2 scenarios
-    bench_scenario::<BabyBearPoseidon2>(c);
-    bench_scenario::<GoldilocksPoseidon2>(c);
+    // Poseidon2 scenario
+    bench_hash(c, &test_lmcs(), &gl_poseidon2_mmcs(), "poseidon2");
 
-    // Keccak scenarios
-    bench_scenario::<BabyBearKeccak>(c);
-    bench_scenario::<GoldilocksKeccak>(c);
+    // Keccak scenario
+    bench_hash(c, &gl_keccak_lmcs(), &gl_keccak_mmcs(), "keccak");
 }
 
 criterion_group! {
     name = benches;
-    config = criterion_config();
+    config = Criterion::default()
+        .sample_size(10)
+        .measurement_time(std::time::Duration::from_secs(12))
+        .warm_up_time(std::time::Duration::from_secs(3));
     targets = bench_lmcs_vs_mmcs
 }
 criterion_main!(benches);

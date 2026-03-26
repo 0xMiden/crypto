@@ -747,11 +747,9 @@ dependencies = [
 name = "p3-miden-dev-utils"
 version = "0.5.0"
 dependencies = [
- "criterion",
  "p3-baby-bear",
  "p3-challenger",
  "p3-commit",
- "p3-dft",
  "p3-field",
  "p3-goldilocks",
  "p3-keccak",
@@ -769,6 +767,7 @@ version = "0.5.0"
 dependencies = [
  "p3-air",
  "p3-field",
+ "p3-goldilocks",
  "p3-matrix",
  "p3-util",
  "thiserror 2.0.18",
@@ -779,7 +778,6 @@ name = "p3-miden-lifted-examples"
 version = "0.5.0"
 dependencies = [
  "p3-air",
- "p3-baby-bear",
  "p3-batch-stark",
  "p3-blake3-air",
  "p3-challenger",
@@ -792,9 +790,9 @@ dependencies = [
  "p3-lookup",
  "p3-matrix",
  "p3-merkle-tree",
- "p3-miden-dev-utils",
  "p3-miden-lifted-air",
  "p3-miden-lifted-stark",
+ "p3-miden-lmcs",
  "p3-poseidon2-air",
  "p3-symmetric",
  "p3-uni-stark",
@@ -811,7 +809,6 @@ name = "p3-miden-lifted-fri"
 version = "0.5.0"
 dependencies = [
  "criterion",
- "p3-baby-bear",
  "p3-challenger",
  "p3-commit",
  "p3-dft",
@@ -826,6 +823,7 @@ dependencies = [
  "p3-miden-dev-utils",
  "p3-miden-lmcs",
  "p3-miden-transcript",
+ "p3-symmetric",
  "p3-util",
  "rand",
  "thiserror 2.0.18",
@@ -868,7 +866,6 @@ name = "p3-miden-lmcs"
 version = "0.5.0"
 dependencies = [
  "criterion",
- "p3-baby-bear",
  "p3-blake3",
  "p3-challenger",
  "p3-commit",

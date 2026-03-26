@@ -1,5 +1,8 @@
 ## Unreleased
 
+- Dropped BabyBear support; simplified tests, benchmarks, and dev-utils to Goldilocks-only ([#52](https://github.com/0xMiden/p3-miden/pull/52)).
+- Added crate-local `testing` modules to `p3-miden-lmcs` and `p3-miden-lifted-fri` behind a `testing` feature flag ([#52](https://github.com/0xMiden/p3-miden/pull/52)).
+- Moved `p3-miden-lifted-examples` from `[[example]]` to `[[bin]]` entries ([#52](https://github.com/0xMiden/p3-miden/pull/52)).
 - feat: add support for Blake3-192 ([#59](https://github.com/0xMiden/p3-miden/pull/59))
 
 ## 0.5.0 (2026-03-10)
