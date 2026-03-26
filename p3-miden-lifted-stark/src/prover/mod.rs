@@ -403,7 +403,7 @@ where
             // Add constraint evaluations in-place: accumulator[i] += eval(i)
             tracing::debug_span!("eval_instance", instance = i, height = this_quotient_height)
                 .in_scope(|| {
-                    evaluate_constraints_into::<F, EF, A, _>(
+                    evaluate_constraints_into::<F, EF, A>(
                         &mut accumulator,
                         *air,
                         &main_on_gj,

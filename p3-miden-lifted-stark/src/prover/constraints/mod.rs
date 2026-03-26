@@ -6,6 +6,7 @@
 
 mod folder;
 mod layout;
+mod packed_row_bitrev;
 
 use alloc::vec::Vec;
 use core::marker::PhantomData;
@@ -16,12 +17,16 @@ use p3_field::{
     Algebra, BasedVectorSpace, ExtensionField, Field, PackedFieldExtension, PackedValue,
     TwoAdicField,
 };
-use p3_matrix::{Matrix, dense::RowMajorMatrix};
+use p3_matrix::{Matrix, bitrev::BitReversedMatrixView, dense::RowMajorMatrixView};
 use p3_maybe_rayon::prelude::*;
 use p3_miden_lifted_air::{LiftedAir, RowWindow};
+use packed_row_bitrev::RowMajorMatrixBitrevPackedExt;
 
 use super::periodic::PeriodicLde;
 use crate::coset::LiftedCoset;
+
+/// Row-blocks (`i_start = r * packing_width`) processed per rayon task.
+const ROW_BLOCKS_PER_PARALLEL_TASK: usize = 32;
 
 /// Type alias for packed base field from F.
 type PackedVal<F> = <F as Field>::Packing;
@@ -40,7 +45,8 @@ type PackedExt<F, EF> = <EF as ExtensionField<F>>::ExtensionPacking;
 ///
 /// The caller is responsible for preparing `output` before calling this function
 /// (e.g. cyclically extending and scaling by beta for multi-trace accumulation).
-/// Input matrices must be in natural order on gJ.
+/// Trace views must be [`BitReversedMatrixView`] over dense row-major storage (as returned by
+/// [`crate::prover::commit::Committed::evals_on_quotient_domain`]), in natural order on gJ.
 ///
 /// Uses SIMD-packed parallel iteration via rayon for optimal performance:
 /// - Processes `WIDTH` points simultaneously using packed field types
@@ -60,11 +66,11 @@ type PackedExt<F, EF> = <EF as ExtensionField<F>>::ExtensionPacking;
 /// the quotient-degree bounds used by the protocol; division by the vanishing polynomial
 /// happens later.
 #[allow(clippy::too_many_arguments)]
-pub(crate) fn evaluate_constraints_into<F, EF, A, M>(
+pub(crate) fn evaluate_constraints_into<F, EF, A>(
     output: &mut [EF],
     air: &A,
-    main_on_gj: &M,
-    aux_on_gj: &M,
+    main_on_gj: &BitReversedMatrixView<RowMajorMatrixView<'_, F>>,
+    aux_on_gj: &BitReversedMatrixView<RowMajorMatrixView<'_, F>>,
     coset: &LiftedCoset,
     alpha: EF,
     randomness: &[EF],
@@ -77,7 +83,6 @@ pub(crate) fn evaluate_constraints_into<F, EF, A, M>(
     EF: ExtensionField<F>,
     PackedExt<F, EF>: Algebra<EF> + Algebra<PackedVal<F>> + BasedVectorSpace<PackedVal<F>>,
     A: LiftedAir<F, EF>,
-    M: Matrix<F> + Sync,
 {
     type P<F> = PackedVal<F>;
     type PE<F, EF> = PackedExt<F, EF>;
@@ -112,36 +117,51 @@ pub(crate) fn evaluate_constraints_into<F, EF, A, M>(
     let packed_perm_values: Vec<PE<F, EF>> =
         permutation_values.iter().copied().map(Into::into).collect();
 
-    // Parallel iteration over quotient domain points, step by WIDTH.
-    // Write directly into output slice via par_chunks_mut.
-    output
-        .par_chunks_mut(width)
-        .enumerate()
-        .for_each(|(r, chunk)| {
+    let main_vals = main_on_gj.inner.values;
+    let aux_vals = aux_on_gj.inner.values;
+    let aux_scalar_width = aux_on_gj.width();
+    let main_trace_view = RowMajorMatrixView::new(main_vals, main_width);
+    let aux_trace_view = RowMajorMatrixView::new(aux_vals, aux_scalar_width);
+
+    let points_per_task = width * ROW_BLOCKS_PER_PARALLEL_TASK;
+
+    let eval_big_slice = |main_buf: &mut Vec<P<F>>,
+                          aux_base_buf: &mut Vec<P<F>>,
+                          aux_pe_buf: &mut Vec<PE<F, EF>>,
+                          g: usize,
+                          big_slice: &mut [EF]| {
+        for (sub_r, chunk) in big_slice.chunks_exact_mut(width).enumerate() {
+            let r = g * ROW_BLOCKS_PER_PARALLEL_TASK + sub_r;
             let i_start = r * width;
 
             // Extract packed selectors from precomputed vectors
             let selectors = sels.packed_at::<P<F>>(i_start);
 
             // Get main trace as packed row pair (stays in base field)
-            let main_packed: Vec<P<F>> =
-                main_on_gj.vertically_packed_row_pair(i_start, constraint_degree);
-            let main = RowMajorMatrix::new(main_packed, main_width);
+            main_trace_view.collect_vertically_packed_row_pair_bitrev_into(
+                i_start,
+                constraint_degree,
+                main_buf,
+            );
+            let main_mat = RowMajorMatrixView::new(main_buf.as_slice(), main_width);
 
             // Get aux trace as packed row pair and convert to packed extension field
-            let aux_base_packed: Vec<P<F>> =
-                aux_on_gj.vertically_packed_row_pair(i_start, constraint_degree);
+            aux_trace_view.collect_vertically_packed_row_pair_bitrev_into(
+                i_start,
+                constraint_degree,
+                aux_base_buf,
+            );
 
             // Convert from packed base field to packed extension field
             // Each EF element is formed from DIMENSION consecutive base field elements
-            let aux_packed: Vec<PE<F, EF>> = (0..aux_ef_width * 2)
-                .map(|i| {
-                    PE::<F, EF>::from_basis_coefficients_fn(|j| {
-                        aux_base_packed[i * EF::DIMENSION + j]
-                    })
-                })
-                .collect();
-            let aux = RowMajorMatrix::new(aux_packed, aux_ef_width);
+            aux_pe_buf.clear();
+            aux_pe_buf.reserve(aux_ef_width * 2);
+            for i in 0..aux_ef_width * 2 {
+                aux_pe_buf.push(PE::<F, EF>::from_basis_coefficients_fn(|j| {
+                    aux_base_buf[i * EF::DIMENSION + j]
+                }));
+            }
+            let aux_mat = RowMajorMatrixView::new(aux_pe_buf.as_slice(), aux_ef_width);
 
             // Get packed periodic values
             let periodic_values: Vec<P<F>> = periodic_lde.packed_values_at(i_start).collect();
@@ -149,8 +169,8 @@ pub(crate) fn evaluate_constraints_into<F, EF, A, M>(
             // Build packed folder and evaluate constraints
             let mut folder: ProverConstraintFolder<'_, F, EF, P<F>, PE<F, EF>> =
                 ProverConstraintFolder {
-                    main: RowWindow::from_view(&main.as_view()),
-                    aux: RowWindow::from_view(&aux.as_view()),
+                    main: RowWindow::from_view(&main_mat),
+                    aux: RowWindow::from_view(&aux_mat),
                     packed_randomness: &packed_randomness,
                     public_values,
                     periodic_values: &periodic_values,
@@ -175,5 +195,42 @@ pub(crate) fn evaluate_constraints_into<F, EF, A, M>(
             for (slot, val) in chunk.iter_mut().zip(PE::<F, EF>::to_ext_iter([folded])) {
                 *slot += val;
             }
-        });
+        }
+    };
+
+    #[cfg(feature = "parallel")]
+    output
+        .par_chunks_mut(points_per_task)
+        .enumerate()
+        .for_each_init(
+            || {
+                (
+                    Vec::<P<F>>::new(),
+                    Vec::<P<F>>::new(),
+                    Vec::<PE<F, EF>>::new(),
+                )
+            },
+            |(main_buf, aux_base_buf, aux_pe_buf), (g, big_slice)| {
+                eval_big_slice(main_buf, aux_base_buf, aux_pe_buf, g, big_slice);
+            },
+        );
+
+    #[cfg(not(feature = "parallel"))]
+    {
+        let mut main_buf = Vec::<P<F>>::new();
+        let mut aux_base_buf = Vec::<P<F>>::new();
+        let mut aux_pe_buf = Vec::<PE<F, EF>>::new();
+        output
+            .par_chunks_mut(points_per_task)
+            .enumerate()
+            .for_each(|(g, big_slice)| {
+                eval_big_slice(
+                    &mut main_buf,
+                    &mut aux_base_buf,
+                    &mut aux_pe_buf,
+                    g,
+                    big_slice,
+                );
+            });
+    }
 }
