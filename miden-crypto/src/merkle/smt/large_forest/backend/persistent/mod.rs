@@ -46,7 +46,7 @@ use rocksdb as db;
 
 use super::{BackendError, Result};
 use crate::{
-    EMPTY_WORD, Map, Word,
+    EMPTY_WORD, Felt, Map, Word,
     merkle::{
         EmptySubtreeRoots, MerkleError, NodeIndex, SparseMerklePath,
         smt::{
@@ -266,8 +266,12 @@ impl Backend for PersistentBackend {
             return Err(BackendError::UnknownLineage(lineage));
         }
 
-        let key =
-            Word::new([EMPTY_WORD[0], EMPTY_WORD[1], EMPTY_WORD[2], leaf_index.position().into()]);
+        let key = Word::new([
+            EMPTY_WORD[0],
+            EMPTY_WORD[1],
+            EMPTY_WORD[2],
+            Felt::new(leaf_index.position()),
+        ]);
 
         Ok(self
             .load_leaf_for(lineage, key)?
