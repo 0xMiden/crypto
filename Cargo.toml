@@ -1,7 +1,6 @@
 [workspace]
 members = [
   "p3-miden-blake3",
-  "p3-miden-blake3-air",
   "p3-miden-dev-utils",
   "p3-miden-lifted-air",
   "p3-miden-lifted-examples",
@@ -26,7 +25,6 @@ homepage = "https://github.com/0xMiden/p3-miden"
 
 # Internal
 p3-miden-blake3 = { path = "p3-miden-blake3", version = "0.5.0" }
-p3-miden-blake3-air = { path = "p3-miden-blake3-air", version = "0.5.0" }
 p3-miden-dev-utils = { path = "p3-miden-dev-utils", version = "0.5.0" }
 p3-miden-lifted-air = { path = "p3-miden-lifted-air", version = "0.5.0" }
 p3-miden-lifted-examples = { path = "p3-miden-lifted-examples", version = "0.5.0" }

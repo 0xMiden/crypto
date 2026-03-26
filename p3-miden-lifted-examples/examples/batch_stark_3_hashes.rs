@@ -1,4 +1,4 @@
-//! Batch-STARK benchmark: three different hash AIRs (Poseidon2, Keccak, Blake3-192)
+//! Batch-STARK benchmark: three different hash AIRs (Poseidon2, Keccak, Blake3)
 //! at heights 2^19, 2^18, and 2^15 respectively — no lookups.
 //! Prints a tracing span tree for comparison against the lifted prover.
 //!
@@ -12,6 +12,7 @@
 use p3_air::{Air, AirBuilder, BaseAir};
 use p3_baby_bear::{BabyBear, GenericPoseidon2LinearLayersBabyBear};
 use p3_batch_stark::{ProverData, StarkInstance, prove_batch, verify_batch};
+use p3_blake3_air::{Blake3Air, NUM_BLAKE3_COLS};
 use p3_challenger::DuplexChallenger;
 use p3_commit::ExtensionMmcs;
 use p3_dft::Radix2DitParallel;
@@ -21,7 +22,6 @@ use p3_keccak_air::{KeccakAir, NUM_KECCAK_COLS};
 use p3_lookup::{Lookup, LookupAir};
 use p3_matrix::{Matrix, dense::RowMajorMatrix};
 use p3_merkle_tree::MerkleTreeMmcs;
-use p3_miden_blake3_air::{Blake3_192Air, NUM_BLAKE3_192_COLS};
 use p3_miden_dev_utils::configs::baby_bear_poseidon2 as bb;
 use p3_miden_lifted_examples::{
     blake3::generate_blake3_trace,
@@ -42,7 +42,7 @@ use tracing_subscriber::{
     EnvFilter, Layer as _, Registry, layer::SubscriberExt, util::SubscriberInitExt,
 };
 
-// Blake3-192: 2^15 rows, 1 row/hash → 32768 hashes (widest, shortest).
+// Blake3: 2^15 rows, 1 row/hash → 32768 hashes (widest, shortest).
 const NUM_BLAKE3_HASHES: usize = 32768;
 // Keccak: 2^18 rows, 24 rows/hash → floor(262144/24) = 10922 hashes.
 const NUM_KECCAK_HASHES: usize = 10922;
@@ -80,7 +80,7 @@ impl<F> BaseAir<F> for HashAir {
         match self {
             Self::Poseidon2(_) => NUM_POSEIDON2_COLS,
             Self::Keccak => NUM_KECCAK_COLS,
-            Self::Blake3 => NUM_BLAKE3_192_COLS,
+            Self::Blake3 => NUM_BLAKE3_COLS,
         }
     }
 }
@@ -90,7 +90,7 @@ impl<AB: AirBuilder<F = Val>> Air<AB> for HashAir {
         match self {
             Self::Poseidon2(inner) => Air::eval(inner.as_ref(), builder),
             Self::Keccak => Air::eval(&KeccakAir {}, builder),
-            Self::Blake3 => Air::eval(&Blake3_192Air {}, builder),
+            Self::Blake3 => Air::eval(&Blake3Air {}, builder),
         }
     }
 }
