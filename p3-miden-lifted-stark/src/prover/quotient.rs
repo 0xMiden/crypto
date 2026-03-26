@@ -13,9 +13,9 @@ use p3_dft::TwoAdicSubgroupDft;
 use p3_field::{
     BasedVectorSpace, ExtensionField, Field, TwoAdicField, batch_multiplicative_inverse,
 };
-use p3_matrix::{Matrix, bitrev::BitReversibleMatrix, dense::RowMajorMatrix};
+use p3_matrix::dense::RowMajorMatrix;
 use p3_maybe_rayon::prelude::*;
-use p3_miden_lmcs::Lmcs;
+use p3_miden_lmcs::{Lmcs, materialize_bitrev};
 use p3_util::log2_strict_usize;
 
 use super::commit::Committed;
@@ -228,9 +228,9 @@ where
     let lde = config.dft().dft_batch(coeffs_padded);
 
     // ═══════════════════════════════════════════════════════════════════════
-    // Step 5: Bit-reverse rows for commitment
+    // Step 5: Wrap for commitment
     // ═══════════════════════════════════════════════════════════════════════
-    let quotient_matrix = lde.bit_reverse_rows().to_row_major_matrix();
+    let quotient_matrix = materialize_bitrev(lde);
 
     let tree = config.lmcs().build_aligned_tree(vec![quotient_matrix]);
 

@@ -2,34 +2,22 @@
 
 use alloc::{collections::BTreeMap, vec, vec::Vec};
 
-// ============================================================================
-// Test Helpers and Re-exports
-// ============================================================================
-pub use gl::{Compress, DIGEST, F, P, RATE, Sponge, WIDTH};
+use gl::{Compress, DIGEST, F, P, Sponge, TestCommitment, TestDigest, TestTranscriptData, WIDTH};
 use p3_field::PrimeCharacteristicRing;
 use p3_matrix::{Matrix, dense::RowMajorMatrix};
 use p3_miden_stateful_hasher::{Alignable, StatefulHasher};
 use rand::{RngExt, SeedableRng, rngs::SmallRng};
 
-pub use crate::testing::concatenate_matrices;
+// ============================================================================
+// Test Helpers and Re-exports
+// ============================================================================
+use crate::testing::goldilocks_poseidon2 as gl;
 use crate::{
-    BatchProof, HidingLmcsConfig, LiftedMerkleTree, Lmcs, LmcsConfig, LmcsError, LmcsTree, Proof,
-    log2_strict_u8,
-    testing::goldilocks_poseidon2 as gl,
-    utils::{RowList, aligned_len},
+    HidingLmcsConfig, LiftedMerkleTree, Lmcs, LmcsError, LmcsTree, RowList, TreeIndices,
+    log2_strict_u8, utils::aligned_len,
 };
 
-/// Type alias for local LMCS config.
-pub type BaseLmcs = LmcsConfig<P, P, Sponge, Compress, WIDTH, DIGEST>;
-type Commitment = <BaseLmcs as Lmcs>::Commitment;
-type TestDigest = gl::TestDigest;
-type TestTranscriptData = gl::TestTranscriptData;
 type OpenedRows = BTreeMap<usize, RowList<F>>;
-
-/// Create a local LMCS config.
-pub fn lmcs() -> BaseLmcs {
-    gl::test_lmcs()
-}
 
 /// Build leaf hashes for a single matrix (used for equivalence testing).
 pub fn build_leaves_single(matrix: &RowMajorMatrix<F>, sponge: &Sponge) -> Vec<[F; DIGEST]> {
@@ -45,24 +33,17 @@ pub fn build_leaves_single(matrix: &RowMajorMatrix<F>, sponge: &Sponge) -> Vec<[
 
 fn verify_open_batch<C>(
     lmcs: &C,
-    commitment: &Commitment,
+    commitment: &TestCommitment,
     widths: &[usize],
-    log_max_height: u8,
-    indices: &[usize],
+    indices: &TreeIndices,
     transcript: &TestTranscriptData,
     prover_digest: &TestDigest,
 ) -> Result<OpenedRows, LmcsError>
 where
-    C: Lmcs<F = F, Commitment = Commitment>,
+    C: Lmcs<F = F, Commitment = TestCommitment>,
 {
     let mut verifier_channel = gl::verifier_channel(transcript);
-    let result = lmcs.open_batch(
-        commitment,
-        widths,
-        log_max_height,
-        indices.iter().copied(),
-        &mut verifier_channel,
-    );
+    let result = lmcs.open_batch(commitment, widths, indices, &mut verifier_channel);
     if result.is_ok() {
         let verifier_digest = verifier_channel
             .finalize()
@@ -78,23 +59,23 @@ pub fn roundtrip_open_batch<C, M>(
     indices: &[usize],
 ) -> Result<(TestTranscriptData, OpenedRows), LmcsError>
 where
-    C: Lmcs<F = F, Commitment = Commitment>,
+    C: Lmcs<F = F, Commitment = TestCommitment>,
     M: Matrix<F>,
 {
-    let widths = tree.widths();
+    let widths = tree.aligned_widths();
     let log_max_height = log2_strict_u8(tree.height());
+    let tree_indices = TreeIndices::new(indices.iter().copied(), log_max_height).unwrap();
 
     let (prover_digest, transcript) = {
         let mut prover_channel = gl::prover_channel();
-        tree.prove_batch(indices.iter().copied(), &mut prover_channel);
+        tree.prove_batch(&tree_indices, &mut prover_channel);
         prover_channel.finalize()
     };
     let opened_rows = verify_open_batch(
         lmcs,
         &tree.root(),
         &widths,
-        log_max_height,
-        indices,
+        &tree_indices,
         &transcript,
         &prover_digest,
     )?;
@@ -122,14 +103,14 @@ fn hiding_lmcs(rng: SmallRng) -> HidingConfig {
 fn lmcs_roundtrip() {
     let test = |seed: u64, matrices: &[(usize, usize)], num_queries: usize| {
         let mut rng = SmallRng::seed_from_u64(seed);
-        let lmcs = lmcs();
+        let lmcs = gl::test_lmcs();
         let matrices: Vec<_> = matrices
             .iter()
             .map(|&(h, w)| RowMajorMatrix::rand(&mut rng, h, w))
             .collect();
 
         let tree = lmcs.build_tree(matrices);
-        let widths = tree.widths();
+        let widths = tree.aligned_widths();
         let max_height = tree.height();
         let indices: Vec<usize> = (0..num_queries)
             .map(|_| rng.random_range(0..max_height))
@@ -139,7 +120,7 @@ fn lmcs_roundtrip() {
 
         for (&leaf_idx, rows_for_query) in &opened_rows {
             assert_eq!(rows_for_query.num_rows(), widths.len());
-            assert_eq!(*rows_for_query, tree.rows(leaf_idx));
+            assert_eq!(*rows_for_query, tree.aligned_rows(leaf_idx));
         }
     };
 
@@ -151,14 +132,14 @@ fn lmcs_roundtrip() {
 #[test]
 fn lmcs_duplicate_indices_roundtrip() {
     let mut rng = SmallRng::seed_from_u64(123);
-    let lmcs = lmcs();
+    let lmcs = gl::test_lmcs();
     let matrices = vec![
         RowMajorMatrix::rand(&mut rng, 4, 5),
         RowMajorMatrix::rand(&mut rng, 8, 3),
     ];
 
     let tree = lmcs.build_tree(matrices);
-    let widths = tree.widths();
+    let widths = tree.aligned_widths();
     let log_max_height = log2_strict_u8(tree.height());
     let indices = [3usize, 1, 3, 0, 1];
 
@@ -169,32 +150,28 @@ fn lmcs_duplicate_indices_roundtrip() {
     assert_eq!(opened_rows.len(), 3);
 
     for (&index, rows) in &opened_rows {
-        assert_eq!(*rows, tree.rows(index), "row mismatch for index {index}");
+        assert_eq!(
+            *rows,
+            tree.aligned_rows(index),
+            "row mismatch for index {index}"
+        );
     }
 
+    let tree_indices = TreeIndices::new(indices.iter().copied(), log_max_height).unwrap();
     let mut verifier_channel = gl::verifier_channel(&transcript);
-    let batch = BatchProof::<F, Commitment>::read_from_channel(
-        &widths,
-        log_max_height,
-        &indices,
-        &mut verifier_channel,
-    )
-    .expect("batch proof should parse from transcript");
+    let batch = lmcs
+        .read_batch_proof(&widths, &tree_indices, &mut verifier_channel)
+        .expect("batch witness should parse from transcript");
 
     assert_eq!(batch.openings.len(), 3);
     for &index in &[0usize, 1, 3] {
         let opening = batch.openings.get(&index).expect("opening for index");
         assert_eq!(
             opening.rows,
-            tree.rows(index),
-            "batch opening rows mismatch for index {index}"
+            tree.aligned_rows(index),
+            "batch witness rows mismatch for index {index}"
         );
     }
-
-    let proofs = batch
-        .single_proofs(&lmcs, &widths, log_max_height)
-        .expect("batch proof should reconstruct proofs");
-    assert_eq!(proofs.len(), 3);
 }
 
 #[test]
@@ -212,7 +189,7 @@ fn hiding_roundtrip() {
             roundtrip_open_batch(&config, &tree, indices).expect("batch opening should verify");
 
         for (&leaf_idx, rows) in &opened_rows {
-            assert_eq!(*rows, tree.rows(leaf_idx));
+            assert_eq!(*rows, tree.aligned_rows(leaf_idx));
         }
     };
 
@@ -238,38 +215,32 @@ fn hiding_roundtrip() {
 #[test]
 fn open_batch_handles_empty_or_oob() {
     let mut rng = SmallRng::seed_from_u64(7);
-    let lmcs = lmcs();
-    let matrices = vec![RowMajorMatrix::rand(&mut rng, 4, 3)];
-    let tree = lmcs.build_tree(matrices);
-    let widths = tree.widths();
+    let lmcs = gl::test_lmcs();
+    let matrix = RowMajorMatrix::rand(&mut rng, 4, 3);
+    let tree = lmcs.build_tree(vec![matrix]);
+    let widths = tree.aligned_widths();
     let log_max_height = log2_strict_u8(tree.height());
     let commitment = tree.root();
 
     let (prover_digest, transcript) = gl::prover_channel().finalize();
 
+    // Empty indices → open_batch returns InvalidProof.
+    let empty = TreeIndices::new([], log_max_height).unwrap();
     assert_eq!(
         verify_open_batch(
             &lmcs,
             &commitment,
             &widths,
-            log_max_height,
-            &[],
+            &empty,
             &transcript,
-            &prover_digest,
+            &prover_digest
         ),
         Err(LmcsError::InvalidProof)
     );
 
+    // Out-of-range index → TreeIndices construction returns InvalidProof.
     assert_eq!(
-        verify_open_batch(
-            &lmcs,
-            &commitment,
-            &widths,
-            log_max_height,
-            &[tree.height()],
-            &transcript,
-            &prover_digest,
-        ),
+        TreeIndices::new([tree.height()], log_max_height),
         Err(LmcsError::InvalidProof)
     );
 }
@@ -277,14 +248,12 @@ fn open_batch_handles_empty_or_oob() {
 #[test]
 fn build_tree_alignment_modes() {
     let mut rng = SmallRng::seed_from_u64(123);
-    let lmcs = lmcs();
-    let matrices = vec![
-        RowMajorMatrix::rand(&mut rng, 4, 3),
-        RowMajorMatrix::rand(&mut rng, 8, 5),
-    ];
+    let lmcs = gl::test_lmcs();
+    let m1 = RowMajorMatrix::rand(&mut rng, 4, 3);
+    let m2 = RowMajorMatrix::rand(&mut rng, 8, 5);
 
-    let tree_unaligned = lmcs.build_tree(matrices.clone());
-    let tree_aligned = lmcs.build_aligned_tree(matrices);
+    let tree_unaligned = lmcs.build_tree(vec![m1.clone(), m2.clone()]);
+    let tree_aligned = lmcs.build_aligned_tree(vec![m1, m2]);
     let alignment = tree_aligned.alignment();
     let expected_alignment = <Sponge as Alignable<F, F>>::ALIGNMENT;
 
@@ -292,7 +261,7 @@ fn build_tree_alignment_modes() {
     assert_eq!(alignment, expected_alignment);
     assert_eq!(tree_unaligned.root(), tree_aligned.root());
 
-    let widths_aligned = tree_aligned.widths();
+    let widths_aligned = tree_aligned.aligned_widths();
     assert_eq!(widths_aligned[0], aligned_len(3, expected_alignment));
     assert_eq!(widths_aligned[1], aligned_len(5, expected_alignment));
 
@@ -302,7 +271,7 @@ fn build_tree_alignment_modes() {
         assert_ne!(widths_unaligned, widths_aligned);
     }
 
-    let rows_aligned = tree_aligned.rows(0);
+    let rows_aligned = tree_aligned.aligned_rows(0);
     let widths_a: Vec<usize> = rows_aligned.iter_rows().map(|r| r.len()).collect();
     assert_eq!(widths_a, widths_aligned);
 
@@ -314,64 +283,40 @@ fn build_tree_alignment_modes() {
     let (_transcript, opened_rows) = roundtrip_open_batch(&lmcs, &tree_aligned, &indices)
         .expect("aligned opening should verify");
     for (&idx, rows) in &opened_rows {
-        assert_eq!(*rows, tree_aligned.rows(idx));
+        assert_eq!(*rows, tree_aligned.aligned_rows(idx));
     }
 }
 
 #[test]
 fn batch_proof_handles_empty_or_oob() {
     let mut rng = SmallRng::seed_from_u64(9);
-    let lmcs = lmcs();
-    let matrices = vec![RowMajorMatrix::rand(&mut rng, 4, 3)];
-    let tree = lmcs.build_tree(matrices);
-    let widths = tree.widths();
+    let lmcs = gl::test_lmcs();
+    let matrix = RowMajorMatrix::rand(&mut rng, 4, 3);
+    let tree = lmcs.build_tree(vec![matrix]);
+    let widths = tree.aligned_widths();
     let log_max_height = log2_strict_u8(tree.height());
 
+    let idx0 = TreeIndices::new([0], log_max_height).unwrap();
     let mut prover_channel = gl::prover_channel();
-    tree.prove_batch([0], &mut prover_channel);
+    tree.prove_batch(&idx0, &mut prover_channel);
     let (_, transcript) = prover_channel.finalize();
 
+    // Empty indices → no openings parsed.
+    let empty = TreeIndices::new([], log_max_height).unwrap();
     let mut verifier_channel = gl::verifier_channel(&transcript);
-    let batch = BatchProof::<F, Commitment>::read_from_channel(
-        &widths,
-        log_max_height,
-        &[],
-        &mut verifier_channel,
-    )
-    .unwrap();
+    let batch = lmcs
+        .read_batch_proof(&widths, &empty, &mut verifier_channel)
+        .unwrap();
     assert!(batch.openings.is_empty());
-    assert!(batch.siblings.is_empty());
-    let proofs = batch.single_proofs(&lmcs, &widths, log_max_height).unwrap();
-    assert!(proofs.is_empty());
 
+    // Zero-width openings with a valid index.
     let mut verifier_channel = gl::verifier_channel(&transcript);
-    let batch = BatchProof::<F, Commitment>::read_from_channel(
-        &[],
-        log_max_height,
-        &[0],
-        &mut verifier_channel,
-    )
-    .unwrap();
-    let proofs = batch.single_proofs(&lmcs, &[], log_max_height).unwrap();
-    assert_eq!(proofs.len(), 1);
-    let proof = proofs.get(&0).expect("proof for index 0");
-    let Proof {
-        rows,
-        salt,
-        siblings,
-    } = proof;
-    assert_eq!(rows.num_rows(), 0);
-    assert!(salt.is_empty());
-    assert_eq!(siblings.len(), 2);
-
-    // Out-of-range indices are not rejected at parse time; they produce proofs that
-    // fail verification. Here we just confirm parsing succeeds (verification tested elsewhere).
-    let mut verifier_channel = gl::verifier_channel(&transcript);
-    let _ = BatchProof::<F, Commitment>::read_from_channel(
-        &widths,
-        log_max_height,
-        &[tree.height()],
-        &mut verifier_channel,
-    )
-    .unwrap();
+    let batch = lmcs
+        .read_batch_proof(&[], &idx0, &mut verifier_channel)
+        .unwrap();
+    assert_eq!(batch.openings.len(), 1);
+    let opening = batch.openings.get(&0).expect("opening for index 0");
+    assert_eq!(opening.rows.num_rows(), 0);
+    assert!(opening.salt.is_empty());
+    assert_eq!(batch.witness.path(0).unwrap().len(), 2);
 }

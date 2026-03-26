@@ -14,6 +14,8 @@ p3-miden-lmcs.workspace = true
 p3-miden-transcript.workspace = true
 
 # Plonky3
+p3-challenger.workspace = true
+p3-commit.workspace = true
 p3-dft.workspace = true
 p3-field.workspace = true
 p3-matrix.workspace = true
@@ -31,8 +33,7 @@ p3-miden-dev-utils.workspace = true
 p3-miden-lmcs = { workspace = true, features = ["testing"] }
 
 # Plonky3
-p3-challenger.workspace = true
-p3-commit.workspace = true
+p3-dft.workspace = true
 p3-fri.workspace = true
 p3-goldilocks.workspace = true
 p3-interpolation.workspace = true

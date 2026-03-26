@@ -15,7 +15,6 @@ p3-miden-transcript.workspace = true
 
 # Plonky3
 p3-challenger = { workspace = true, optional = true }
-p3-commit.workspace = true
 p3-field.workspace = true
 p3-matrix.workspace = true
 p3-maybe-rayon.workspace = true
@@ -23,11 +22,11 @@ p3-symmetric.workspace = true
 p3-util.workspace = true
 
 # Optional (for testing feature)
+p3-keccak = { workspace = true, optional = true }
 p3-miden-dev-utils = { workspace = true, optional = true }
 
 # Third-party
 rand.workspace = true
-serde = { workspace = true, features = ["alloc"] }
 thiserror.workspace = true
 tracing.workspace = true
 
@@ -38,6 +37,7 @@ p3-miden-dev-utils.workspace = true
 # Plonky3
 p3-blake3.workspace = true
 p3-challenger.workspace = true
+p3-commit.workspace = true
 p3-goldilocks.workspace = true
 p3-keccak.workspace = true
 p3-merkle-tree.workspace = true
@@ -47,7 +47,7 @@ criterion.workspace = true
 
 [features]
 parallel = ["p3-maybe-rayon/parallel"]
-testing = ["dep:p3-challenger", "dep:p3-miden-dev-utils"]
+testing = ["dep:p3-challenger", "dep:p3-keccak", "dep:p3-miden-dev-utils"]
 
 [[bench]]
 name = "merkle_commit"

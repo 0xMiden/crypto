@@ -722,12 +722,10 @@ name = "p3-miden-dev-utils"
 version = "0.5.0"
 dependencies = [
  "p3-challenger",
- "p3-commit",
  "p3-field",
  "p3-goldilocks",
  "p3-keccak",
  "p3-matrix",
- "p3-merkle-tree",
  "p3-miden-stateful-hasher",
  "p3-symmetric",
  "rand",
@@ -850,7 +848,6 @@ dependencies = [
  "p3-symmetric",
  "p3-util",
  "rand",
- "serde",
  "thiserror 2.0.18",
  "tracing",
 ]

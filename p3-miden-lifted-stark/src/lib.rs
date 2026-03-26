@@ -140,8 +140,8 @@ pub mod fri {
 pub mod lmcs {
     pub use p3_miden_lmcs::{
         HidingLmcsConfig, LiftedMerkleTree, Lmcs, LmcsConfig, LmcsError, LmcsTree, OpenedRows,
-        proof::{BatchProof, LeafOpening, Proof},
-        utils::RowList,
+        RowList,
+        proof::{LeafOpening, Proof},
     };
 }
 

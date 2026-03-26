@@ -1,11 +1,11 @@
-use alloc::{collections::BTreeSet, vec::Vec};
+use alloc::vec::Vec;
 use core::ops::Deref;
 
 use p3_dft::{Radix2DFTSmallBatch, TwoAdicSubgroupDft};
 use p3_field::{ExtensionField, TwoAdicField};
-use p3_matrix::{dense::RowMajorMatrix, extension::FlatMatrixView};
+use p3_matrix::{bitrev::BitReversalPerm, dense::RowMajorMatrix, extension::FlatMatrixView};
 use p3_maybe_rayon::prelude::*;
-use p3_miden_lmcs::{Lmcs, LmcsTree, log2_strict_u8};
+use p3_miden_lmcs::{Lmcs, LmcsTree, TreeIndices, log2_strict_u8};
 use p3_miden_transcript::ProverChannel;
 use p3_util::reverse_slice_index_bits;
 use tracing::{debug_span, info_span};
@@ -15,6 +15,7 @@ use crate::fri::FriParams;
 /// Tree type for FRI folding rounds.
 ///
 /// Stores extension field evaluations flattened to base field via `FlatMatrixView`.
+/// The LMCS internally bit-reverses leaf digests so the tree is indexed by domain order.
 type FoldedTree<F, EF, L> = <L as Lmcs>::Tree<FlatMatrixView<F, EF, RowMajorMatrix<EF>>>;
 
 // ============================================================================
@@ -144,8 +145,11 @@ where
             // `build_aligned_tree` because each round commits a single matrix, so there
             // is no multi-matrix row interleaving that would require padding to the hash
             // rate boundary.
+            // Wrap in BitReversedMatrixView to present domain order to the LMCS.
+            // The LMCS extracts the inner FlatMatrixView and stores it.
+            let natural_view = BitReversalPerm::new_view(flat_view);
             let tree = info_span!("FRI round commit", round, domain_size)
-                .in_scope(|| lmcs.build_tree(alloc::vec![flat_view]));
+                .in_scope(|| lmcs.build_tree(alloc::vec![natural_view]));
             let commitment = tree.root();
             channel.send_commitment(commitment.clone());
 
@@ -235,23 +239,17 @@ where
     pub fn prove_queries<Ch>(
         &self,
         params: &FriParams,
-        tree_indices: &BTreeSet<usize>,
+        mut tree_indices: TreeIndices,
         channel: &mut Ch,
     ) where
         Ch: ProverChannel<F = F, Commitment = L::Commitment>,
     {
-        let log_arity = params.fold.log_arity() as usize; // usize for shift arithmetic
+        let log_arity = params.fold.log_arity();
 
-        // For each round, compute row indices from current indices
-        for (round, tree) in self.folded_trees.iter().enumerate() {
-            // After (round + 1) folds, indices shift by log_arity * (round + 1)
-            let shift = log_arity * (round + 1);
-
-            // Compute folded row indices. prove_batch skips duplicates.
-            let row_indices = tree_indices.iter().map(|&idx| idx >> shift);
-
-            // Prove in sorted order (BTreeSet iterates in ascending order)
-            tree.prove_batch(row_indices, channel);
+        // Shrink indices by log_arity per round, reusing the allocation.
+        for tree in &self.folded_trees {
+            tree_indices.shrink_depth(log_arity);
+            tree.prove_batch(&tree_indices, channel);
         }
     }
 }
