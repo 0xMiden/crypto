@@ -31,6 +31,9 @@ const MIN_BATCH_ENTRIES: usize = 0;
 /// The maximum number of entries that can be included in a batch.
 const MAX_BATCH_ENTRIES: usize = 300;
 
+/// The message used by [`FallibleEntriesBackend`] to simulate an iteration failure.
+pub const FALLIBLE_READ_FAILURE_MESSAGE: &str = "simulated read failure";
+
 // UTILS
 // ================================================================================================
 
@@ -267,7 +270,7 @@ impl<I: Iterator<Item = BackendResult<TreeEntry>>> Iterator for FallibleIter<I> 
         if self.count <= 2 {
             self.inner.next()
         } else {
-            Some(Err(BackendError::Unspecified("simulated read failure".into())))
+            Some(Err(BackendError::Unspecified(FALLIBLE_READ_FAILURE_MESSAGE.into())))
         }
     }
 }
@@ -275,6 +278,14 @@ impl<I: Iterator<Item = BackendResult<TreeEntry>>> Iterator for FallibleIter<I> 
 impl Backend for FallibleEntriesBackend {
     fn open(&self, lineage: LineageId, key: Word) -> BackendResult<SmtProof> {
         self.inner.open(lineage, key)
+    }
+
+    fn get_leaf(
+        &self,
+        lineage: LineageId,
+        leaf_index: LeafIndex<SMT_DEPTH>,
+    ) -> BackendResult<crate::merkle::smt::SmtLeaf> {
+        self.inner.get_leaf(lineage, leaf_index)
     }
 
     fn get(&self, lineage: LineageId, key: Word) -> BackendResult<Option<Word>> {
@@ -321,6 +332,14 @@ impl Backend for FallibleEntriesBackend {
         updates: SmtUpdateBatch,
     ) -> BackendResult<MutationSet> {
         self.inner.update_tree(lineage, new_version, updates)
+    }
+
+    fn add_lineages(
+        &mut self,
+        version: VersionId,
+        lineages: SmtForestUpdateBatch,
+    ) -> BackendResult<Vec<(LineageId, TreeWithRoot)>> {
+        self.inner.add_lineages(version, lineages)
     }
 
     fn update_forest(

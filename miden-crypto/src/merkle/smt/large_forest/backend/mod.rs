@@ -15,7 +15,7 @@ use crate::{
     merkle::{
         MerkleError,
         smt::{
-            SmtProof,
+            LeafIndex, SMT_DEPTH, SmtLeaf, SmtProof,
             large_forest::{
                 operation::{SmtForestUpdateBatch, SmtUpdateBatch},
                 root::{LineageId, TreeEntry, TreeWithRoot, VersionId},
@@ -82,6 +82,13 @@ where
     /// It is the responsibility of the forest to ensure lineage existence before querying the
     /// backend. The backend must return an error if the lineage does not exist.
     fn open(&self, lineage: LineageId, key: Word) -> Result<SmtProof>;
+
+    /// Returns the leaf stored at the provided `leaf_index` in the SMT with the specified
+    /// `lineage`.
+    ///
+    /// It is the responsibility of the forest to ensure lineage existence before querying the
+    /// backend. The backend must return an error if the lineage does not exist.
+    fn get_leaf(&self, lineage: LineageId, leaf_index: LeafIndex<SMT_DEPTH>) -> Result<SmtLeaf>;
 
     /// Returns the value associated with the provided `key` in the SMT with the specified
     /// `lineage`, or [`None`] if no such value exists.
@@ -172,6 +179,22 @@ where
 
     // MULTI-TREE MODIFIERS
     // ============================================================================================
+
+    /// Adds multiple new `lineages` to the backend with the provided `version` and sets the
+    /// associated SMTs to have the value created by applying the provided updates to the empty
+    /// tree, returning the new root of that tree.
+    ///
+    /// # Expected Behavior
+    ///
+    /// Implementations must guarantee the following behavior in addition to the global invariants:
+    ///
+    /// - If any provided lineage conflicts with an already-existing lineage in the backend, it must
+    ///   return [`BackendError::DuplicateLineage`].
+    fn add_lineages(
+        &mut self,
+        version: VersionId,
+        lineages: SmtForestUpdateBatch,
+    ) -> Result<Vec<(LineageId, TreeWithRoot)>>;
 
     /// Performs the provided `updates` on the forest, setting all new tree states to have the
     /// provided `new_version` and returning a vector of the mutation sets that reverse the changes

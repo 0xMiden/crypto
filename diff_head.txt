@@ -1,0 +1,412 @@
+diff --git a/miden-crypto/src/merkle/smt/large_forest/mod.rs b/miden-crypto/src/merkle/smt/large_forest/mod.rs
+index 9ff0a5e3f..c1fbc51a2 100644
+--- a/miden-crypto/src/merkle/smt/large_forest/mod.rs
++++ b/miden-crypto/src/merkle/smt/large_forest/mod.rs
+@@ -325,7 +325,7 @@ pub use operation::{ForestOperation, SmtForestUpdateBatch, SmtUpdateBatch};
+ pub use root::{LineageId, RootInfo, TreeEntry, TreeId, TreeWithRoot, VersionId};
+ 
+ use crate::{
+-    EMPTY_WORD, Felt, Map, Set, Word,
++    EMPTY_WORD, Map, Set, Word,
+     merkle::{
+         NodeIndex, SparseMerklePath,
+         smt::{
+@@ -572,7 +572,7 @@ impl<B: Backend> LargeSmtForest<B> {
+     /// # Errors
+     ///
+     /// - [`LargeSmtForestError::Fatal`] if the backend fails to operate properly during the query.
+-    /// - [`LargeSmtForestError::UnknownLineage`] If the provided `tree` specifies a lineage that is
++    /// - [`LargeSmtForestError::UnknownLineage`] if the provided `tree` specifies a lineage that is
+     ///   not one known by the forest.
+     /// - [`LargeSmtForestError::UnknownTree`] if the provided `tree` refers to a tree that is not a
+     ///   member of the forest.
+@@ -616,7 +616,7 @@ impl<B: Backend> LargeSmtForest<B> {
+ 
+         // We compute the new leaf and new path by applying any reversions from the history on
+         // top of the current state.
+-        let new_leaf = self.merge_leaves(opening.leaf(), view)?;
++        let new_leaf = Self::merge_leaves(opening.leaf(), view)?;
+         let new_path = self.merge_paths(tree.lineage(), leaf_index, opening.path(), view)?;
+ 
+         // Finally we can compose our combined opening.
+@@ -921,6 +921,61 @@ impl<B: Backend> LargeSmtForest<B> {
+ /// Where anything more specific can be said about performance, the method documentation will
+ /// contain more detail.
+ impl<B: Backend> LargeSmtForest<B> {
++    /// Adds multiple new `lineages` to the tree, creating an empty tree for each and applying the
++    /// provided modifications to it, with the result being given the specified `version`.
++    ///
++    /// If the provide batch of modifications is empty for any given lineage, then the **empty tree
++    /// will be added** as the first version in that lineage.
++    ///
++    /// # Performance
++    ///
++    /// This method is intended to be a reliable choice if the caller needs to add more than one
++    /// new lineage at once. At _worst_, its performance should be no slower than repeating
++    /// [`Self::add_lineage`] in a loop, but in some cases it may be significantly more performant.
++    ///
++    /// The exact scope of any speed-up is determined by the backend in use, so it is worth reading
++    /// the documentation for the Backend's `add_lineages` method.
++    ///
++    /// # Errors
++    ///
++    /// - [`LargeSmtForestError::DuplicateLineage`] if any of the provided lineages share an ID with
++    ///   an already-known lineage.
++    /// - [`LargeSmtForestError::Fatal`] if the backend fails while being accessed.
++    /// - [`BackendError::Merkle`] if the provided `updates` cannot be applied to the empty tree.
++    pub fn add_lineages(
++        &mut self,
++        version: VersionId,
++        lineages: SmtForestUpdateBatch,
++    ) -> Result<Vec<TreeWithRoot>> {
++        // We start by performing our precondition checks: none of the lineages in the batch should
++        // already exist in the forest.
++        for lineage in lineages.lineages() {
++            if self.lineage_data.contains_key(lineage) {
++                return Err(LargeSmtForestError::DuplicateLineage(*lineage));
++            }
++        }
++
++        // With the preconditions checked we can call into the backend to perform the additions, and
++        // we forward all errors as this will be correct for conformant backend implementations.
++        let results = self.backend.add_lineages(version, lineages)?;
++
++        // Now we have to update the lineage data for each newly-added lineage. New lineages have
++        // empty histories, so we do not need to insert into `non_empty_histories`.
++        results
++            .into_iter()
++            .map(|(lineage, tree_info)| {
++                let lineage_data = LineageData {
++                    history: History::empty(self.config.max_history_versions()),
++                    latest_version: tree_info.version(),
++                    latest_root: tree_info.root(),
++                };
++                self.lineage_data.insert(lineage, lineage_data);
++
++                Ok(tree_info)
++            })
++            .collect()
++    }
++
+     /// Performs the provided `updates` on the forest, adding at most one new root with version
+     /// `new_version` to the forest for each target root in `updates` and returning a mapping
+     /// from old root to the new root data.
+@@ -1023,7 +1078,11 @@ impl<B: Backend> LargeSmtForest<B> {
+ impl<B: Backend> LargeSmtForest<B> {
+     /// Applies the history delta given by `history_view` on top of the provided `full_tree_leaf` to
+     /// produce the correct leaf for a historical opening.
+-    fn merge_leaves(&self, full_tree_leaf: &SmtLeaf, history_view: HistoryView) -> Result<SmtLeaf> {
++    ///
++    /// # Errors
++    ///
++    /// - [`LargeSmtForestError::SmtLeafError`] if the combined leaf cannot be computed correctly
++    fn merge_leaves(full_tree_leaf: &SmtLeaf, history_view: HistoryView) -> Result<SmtLeaf> {
+         // We apply the historical delta on top of the existing entries to perform the reversion
+         // back to the previous state.
+         let mut leaf_entries = Map::new();
+@@ -1051,14 +1110,19 @@ impl<B: Backend> LargeSmtForest<B> {
+             "Leaf entries should not contain entries with empty values"
+         );
+ 
+-        // Any entries that are still empty at this point should be removed.
+-        let mut entries = leaf_entries.into_iter().collect::<Vec<_>>();
+-        entries.sort_by_key(|(key, value)| (*key, *value));
++        // We sort the entries to ensure a consistent ordering, as the map above is a HashMap
++        // which does not guarantee iteration order.
++        let mut entries: Vec<_> = leaf_entries.into_iter().collect();
++    entries.sort_by_key(|(key, value)| (*key, *value));
+         Ok(SmtLeaf::new(entries, full_tree_leaf.index())?)
+     }
+ 
+     /// Applies any historical changes contained in `history_view` on top of the merkle path
+     /// obtained from the full tree to produce the correct path for a historical opening.
++    ///
++    /// # Errors
++    ///
++    /// - [`LargeSmtForestError::Merkle`] if the merkle path cannot be created properly.
+     fn merge_paths(
+         &self,
+         lineage: LineageId,
+@@ -1084,14 +1148,8 @@ impl<B: Backend> LargeSmtForest<B> {
+                     .any(|(key, _)| LeafIndex::from(key) == sibling_leaf_index);
+ 
+                 if sibling_leaf_changed {
+-                    let sibling_key = Word::new([
+-                        Felt::new(0),
+-                        Felt::new(0),
+-                        Felt::new(0),
+-                        Felt::new(sibling_leaf_index.position()),
+-                    ]);
+-                    let sibling_opening = self.backend.open(lineage, sibling_key)?;
+-                    let sibling_leaf = self.merge_leaves(sibling_opening.leaf(), history_view)?;
++                    let sibling_leaf = self.backend.get_leaf(lineage, sibling_leaf_index)?;
++                    let sibling_leaf = Self::merge_leaves(&sibling_leaf, history_view)?;
+                     path_elems[depth as usize - 1] = sibling_leaf.hash();
+                 } else {
+                     let bounded_depth = NonZeroU8::new(depth).expect("depth ∈ 1 ..= SMT_DEPTH]");
+diff --git a/miden-crypto/src/merkle/smt/large_forest/property_tests.rs b/miden-crypto/src/merkle/smt/large_forest/property_tests.rs
+index 2da969de9..145be4fd5 100644
+--- a/miden-crypto/src/merkle/smt/large_forest/property_tests.rs
++++ b/miden-crypto/src/merkle/smt/large_forest/property_tests.rs
+@@ -297,6 +297,9 @@ proptest! {
+         prop_assert_eq!(forest.root_info(TreeId::new(unknown_lineage, version)), RootInfo::Missing);
+     }
+ 
++    // ENTRIES
++    // ============================================================================================
++
+     /// This test ensures that the `entries` iterator for the forest always returns the exact same
+     /// values as the `entries` iterator over a basic SMT with the same state.
+     #[test]
+@@ -565,4 +568,62 @@ proptest! {
+         );
+     }
+ 
++    // ADD LINEAGES
++    // ============================================================================================
++
++    /// This test ensures that `add_lineages` produces the same results as adding each lineage
++    /// individually via `add_lineage`.
++    #[test]
++    fn add_lineages_matches_repeated_add_lineage(
++        lineages in prop::collection::vec(arbitrary_lineage(), 0..10)
++            .prop_map(|v| v.into_iter().unique().collect::<Vec<_>>()),
++        version in arbitrary_version(),
++        entries in prop::collection::vec(arbitrary_batch(), 0..10),
++    ) {
++        // Build a forest update batch containing all lineages with their respective entries.
++        let mut batch = crate::merkle::smt::SmtForestUpdateBatch::empty();
++        for (i, lineage) in lineages.iter().enumerate() {
++            if let Some(entry_batch) = entries.get(i) {
++                *batch.operations(*lineage) = entry_batch.clone();
++            } else {
++                batch.operations(*lineage);
++            }
++        }
++
++        // Add all lineages at once via add_lineages.
++        let mut forest_batch = LargeSmtForest::new(ForestInMemoryBackend::new()).map_err(to_fail)?;
++        let batch_results = forest_batch.add_lineages(version, batch).map_err(to_fail)?;
++
++        // Add each lineage individually via add_lineage.
++        let mut forest_individual = LargeSmtForest::new(ForestInMemoryBackend::new()).map_err(to_fail)?;
++        let mut individual_results = Vec::new();
++        for (i, lineage) in lineages.iter().enumerate() {
++            let entry_batch = entries.get(i).cloned().unwrap_or_default();
++            let result = forest_individual.add_lineage(*lineage, version, entry_batch).map_err(to_fail)?;
++            individual_results.push(result);
++        }
++
++        // Both should yield the same number of results.
++        prop_assert_eq!(batch_results.len(), individual_results.len());
++
++        // For each lineage, verify the roots match and get returns the same values.
++        for (i, lineage) in lineages.iter().enumerate() {
++            let batch_root = batch_results.iter().find(|r| r.lineage() == *lineage);
++            let individual_root = &individual_results[i];
++
++            let batch_root = batch_root.unwrap();
++            prop_assert_eq!(batch_root.root(), individual_root.root());
++            prop_assert_eq!(batch_root.version(), individual_root.version());
++
++            // Verify get returns the same values for all keys in the entries.
++            let tree = TreeId::new(*lineage, version);
++            if let Some(entry_batch) = entries.get(i) {
++                for op in entry_batch.clone().into_iter() {
++                    let batch_val = forest_batch.get(tree, op.key()).map_err(to_fail)?;
++                    let individual_val = forest_individual.get(tree, op.key()).map_err(to_fail)?;
++                    prop_assert_eq!(batch_val, individual_val);
++                }
++            }
++        }
++    }
+ }
+diff --git a/miden-crypto/src/merkle/smt/large_forest/test_utils.rs b/miden-crypto/src/merkle/smt/large_forest/test_utils.rs
+index 89cf06531..58a3fa3fc 100644
+--- a/miden-crypto/src/merkle/smt/large_forest/test_utils.rs
++++ b/miden-crypto/src/merkle/smt/large_forest/test_utils.rs
+@@ -31,6 +31,9 @@ const MIN_BATCH_ENTRIES: usize = 0;
+ /// The maximum number of entries that can be included in a batch.
+ const MAX_BATCH_ENTRIES: usize = 300;
+ 
++/// The message used by [`FallibleEntriesBackend`] to simulate an iteration failure.
++pub const FALLIBLE_READ_FAILURE_MESSAGE: &str = "simulated read failure";
++
+ // UTILS
+ // ================================================================================================
+ 
+@@ -267,7 +270,7 @@ impl<I: Iterator<Item = BackendResult<TreeEntry>>> Iterator for FallibleIter<I>
+         if self.count <= 2 {
+             self.inner.next()
+         } else {
+-            Some(Err(BackendError::Unspecified("simulated read failure".into())))
++            Some(Err(BackendError::Unspecified(FALLIBLE_READ_FAILURE_MESSAGE.into())))
+         }
+     }
+ }
+@@ -277,6 +280,14 @@ impl Backend for FallibleEntriesBackend {
+         self.inner.open(lineage, key)
+     }
+ 
++    fn get_leaf(
++        &self,
++        lineage: LineageId,
++        leaf_index: LeafIndex<SMT_DEPTH>,
++    ) -> BackendResult<crate::merkle::smt::SmtLeaf> {
++        self.inner.get_leaf(lineage, leaf_index)
++    }
++
+     fn get(&self, lineage: LineageId, key: Word) -> BackendResult<Option<Word>> {
+         self.inner.get(lineage, key)
+     }
+@@ -323,6 +334,14 @@ impl Backend for FallibleEntriesBackend {
+         self.inner.update_tree(lineage, new_version, updates)
+     }
+ 
++    fn add_lineages(
++        &mut self,
++        version: VersionId,
++        lineages: SmtForestUpdateBatch,
++    ) -> BackendResult<Vec<(LineageId, TreeWithRoot)>> {
++        self.inner.add_lineages(version, lineages)
++    }
++
+     fn update_forest(
+         &mut self,
+         new_version: VersionId,
+diff --git a/miden-crypto/src/merkle/smt/large_forest/tests.rs b/miden-crypto/src/merkle/smt/large_forest/tests.rs
+index 9859bed66..43b8d8015 100644
+--- a/miden-crypto/src/merkle/smt/large_forest/tests.rs
++++ b/miden-crypto/src/merkle/smt/large_forest/tests.rs
+@@ -24,7 +24,7 @@ use crate::{
+                 LineageData,
+                 history::{ChangedKeys, History, NodeChanges},
+                 root::{LineageId, TreeEntry, TreeWithRoot},
+-                test_utils::FallibleEntriesBackend,
++                test_utils::{FALLIBLE_READ_FAILURE_MESSAGE, FallibleEntriesBackend},
+             },
+         },
+     },
+@@ -1051,6 +1051,97 @@ fn update_tree() -> Result<()> {
+ // MULTI-TREE MODIFIER TESTS
+ // ================================================================================================
+ 
++#[test]
++fn add_lineages() -> Result<()> {
++    let backend = ForestInMemoryBackend::new();
++    let mut forest = Forest::new(backend)?;
++    let mut rng = ContinuousRng::new([0xa1; 32]);
++
++    // An empty batch should return an empty result and leave the forest unchanged.
++    let version: VersionId = rng.value();
++    let empty_batch = SmtForestUpdateBatch::empty();
++    let results = forest.add_lineages(version, empty_batch)?;
++    assert!(results.is_empty());
++
++    // We can add multiple distinct lineages at once, each with their own data.
++    let lineage_1: LineageId = rng.value();
++    let lineage_2: LineageId = rng.value();
++    let lineage_3: LineageId = rng.value();
++
++    let l1_key: Word = rng.value();
++    let l1_value: Word = rng.value();
++    let l2_key: Word = rng.value();
++    let l2_value: Word = rng.value();
++
++    let mut batch = SmtForestUpdateBatch::empty();
++    batch.operations(lineage_1).add_insert(l1_key, l1_value);
++    batch.operations(lineage_2).add_insert(l2_key, l2_value);
++    batch.operations(lineage_3); // empty lineage — should still be added
++
++    let results = forest.add_lineages(version, batch)?;
++    assert_eq!(results.len(), 3);
++
++    // Verify roots match reference Smt trees.
++    let mut tree_1 = Smt::new();
++    tree_1.insert(l1_key, l1_value)?;
++    let mut tree_2 = Smt::new();
++    tree_2.insert(l2_key, l2_value)?;
++    let tree_3 = Smt::new();
++
++    assert!(
++        results.iter().any(|r| r.lineage() == lineage_1
++            && r.root() == tree_1.root()
++            && r.version() == version)
++    );
++    assert!(
++        results.iter().any(|r| r.lineage() == lineage_2
++            && r.root() == tree_2.root()
++            && r.version() == version)
++    );
++    assert!(
++        results.iter().any(|r| r.lineage() == lineage_3
++            && r.root() == tree_3.root()
++            && r.version() == version)
++    );
++
++    // Verify lineage_data is populated via root_info.
++    assert_eq!(
++        forest.root_info(TreeId::new(lineage_1, version)),
++        RootInfo::LatestVersion(tree_1.root())
++    );
++    assert_eq!(
++        forest.root_info(TreeId::new(lineage_2, version)),
++        RootInfo::LatestVersion(tree_2.root())
++    );
++    assert_eq!(
++        forest.root_info(TreeId::new(lineage_3, version)),
++        RootInfo::LatestVersion(tree_3.root())
++    );
++
++    // New lineages should have empty histories.
++    assert!(!forest.get_non_empty_histories().contains(&lineage_1));
++    assert!(!forest.get_non_empty_histories().contains(&lineage_2));
++    assert!(!forest.get_non_empty_histories().contains(&lineage_3));
++
++    // Adding a batch that contains an already-known lineage should fail with DuplicateLineage.
++    let lineage_4: LineageId = rng.value();
++    let mut dup_batch = SmtForestUpdateBatch::empty();
++    dup_batch.operations(lineage_1); // already exists
++    dup_batch.operations(lineage_4); // new
++
++    let result = forest.add_lineages(version, dup_batch);
++    assert!(result.is_err());
++    assert_matches!(
++        result.unwrap_err(),
++        LargeSmtForestError::DuplicateLineage(l) if l == lineage_1
++    );
++
++    // The failed batch should not have added lineage_4.
++    assert_eq!(forest.root_info(TreeId::new(lineage_4, version)), RootInfo::Missing);
++
++    Ok(())
++}
++
+ #[test]
+ fn update_forest() -> Result<()> {
+     let backend = ForestInMemoryBackend::new();
+@@ -1347,7 +1438,11 @@ fn entries_with_fallible_backend() -> Result<()> {
+ 
+     // Third item should be the simulated error.
+     let third = iter.next();
+-    assert_matches!(&third, Some(Err(LargeSmtForestError::Unspecified(_))));
++    assert_matches!(
++        &third,
++        Some(Err(LargeSmtForestError::Unspecified(message)))
++            if message == FALLIBLE_READ_FAILURE_MESSAGE
++    );
+ 
+     // After faulting, the iterator must yield None — the remaining entries (4th, 5th) are never
+     // returned.
+@@ -1398,7 +1493,10 @@ fn entry_count_with_fallible_backend() -> Result<()> {
+     // Query entry_count for the historical version V1.
+     // This takes the WithHistory iteration path, which will hit our fallible iterator.
+     let result = forest.entry_count(TreeId::new(lineage, version_1));
+-    assert_matches!(result, Err(LargeSmtForestError::Unspecified(_)));
++    assert_matches!(
++        result,
++        Err(LargeSmtForestError::Unspecified(message)) if message == FALLIBLE_READ_FAILURE_MESSAGE
++    );
+ 
+     Ok(())
+ }
