@@ -424,22 +424,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "p3-baby-bear"
-version = "0.5.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8ad0a46c04d1bf23b532d21e35b21d7d8f4c9655ab7728a8db461fb762a158f5"
-dependencies = [
- "p3-challenger",
- "p3-field",
- "p3-mds",
- "p3-monty-31",
- "p3-poseidon1",
- "p3-poseidon2",
- "p3-symmetric",
- "rand",
-]
-
-[[package]]
 name = "p3-batch-stark"
 version = "0.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -747,7 +731,6 @@ dependencies = [
 name = "p3-miden-dev-utils"
 version = "0.5.0"
 dependencies = [
- "p3-baby-bear",
  "p3-challenger",
  "p3-commit",
  "p3-field",
@@ -836,8 +819,6 @@ name = "p3-miden-lifted-stark"
 version = "0.5.0"
 dependencies = [
  "criterion",
- "p3-baby-bear",
- "p3-blake3",
  "p3-challenger",
  "p3-commit",
  "p3-dft",

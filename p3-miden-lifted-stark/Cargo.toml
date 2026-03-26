@@ -18,8 +18,6 @@ p3-miden-stateful-hasher.workspace = true
 p3-miden-transcript.workspace = true
 
 # Plonky3
-p3-baby-bear.workspace = true
-p3-blake3.workspace = true
 p3-challenger.workspace = true
 p3-dft.workspace = true
 p3-field.workspace = true

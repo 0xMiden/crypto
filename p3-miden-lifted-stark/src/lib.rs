@@ -60,8 +60,6 @@
 
 extern crate alloc;
 
-/// BLAKE3 (32-byte digest) LMCS + Fiat–Shamir via [`p3_blake3::Blake3`].
-pub mod blake3;
 /// BLAKE3-192 (24-byte digest) LMCS + Fiat–Shamir for ~96-bit hash security.
 pub mod blake3_192;
 mod config;

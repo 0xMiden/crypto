@@ -14,7 +14,6 @@ p3-miden-blake3.workspace = true
 p3-miden-stateful-hasher.workspace = true
 
 # Plonky3
-p3-baby-bear.workspace = true
 p3-challenger.workspace = true
 p3-commit.workspace = true
 p3-field.workspace = true
