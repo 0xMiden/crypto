@@ -2,45 +2,50 @@
 
 use alloc::vec::Vec;
 
-use p3_commit::{BatchOpeningRef, Mmcs};
+use p3_commit::{BatchOpening, BatchOpeningRef, Mmcs};
 use p3_field::PrimeCharacteristicRing;
 use p3_matrix::{Dimensions, Matrix, dense::RowMajorMatrix};
-use p3_miden_dev_utils::configs::baby_bear_poseidon2::{
-    Compress, DIGEST, F, P, Sponge, WIDTH, test_challenger, test_components,
-};
-use p3_miden_transcript::{ProverTranscript, VerifierTranscript};
 use p3_symmetric::{Hash, MerkleCap};
 use rand::{SeedableRng, rngs::SmallRng};
 
-use crate::{BatchProof, HidingLmcsConfig, Lmcs, LmcsConfig, LmcsError, LmcsTree, log2_strict_u8};
+use crate::{
+    BatchProof, HidingLmcsConfig, Lmcs, LmcsConfig, LmcsError, LmcsTree, log2_strict_u8,
+    testing::goldilocks_poseidon2 as gl,
+};
 
-type BaseMmcs = LmcsConfig<P, P, Sponge, Compress, WIDTH, DIGEST>;
+type F = gl::F;
+type P = gl::P;
+type Sponge = gl::Sponge;
+type Compress = gl::Compress;
+const WIDTH: usize = gl::WIDTH;
+const DIGEST: usize = gl::DIGEST;
+
+type BaseMmcs = LmcsConfig<P, P, Sponge, Compress, { WIDTH }, { DIGEST }>;
 type RowMatrix = RowMajorMatrix<F>;
 const SALT: usize = 4;
-type HidingMmcs = HidingLmcsConfig<P, P, Sponge, Compress, SmallRng, WIDTH, DIGEST, SALT>;
+type HidingMmcs = HidingLmcsConfig<P, P, Sponge, Compress, SmallRng, { WIDTH }, { DIGEST }, SALT>;
 const BASE_SHAPES: &[(usize, usize)] = &[(4, 5), (8, 3)];
 type OpeningProof = <BaseMmcs as Mmcs<F>>::Proof;
 
 fn mmcs() -> BaseMmcs {
-    let (_, sponge, compress) = test_components();
-    LmcsConfig::new(sponge, compress)
+    gl::test_lmcs()
 }
 
 fn hiding_mmcs(rng: SmallRng) -> HidingMmcs {
-    let (_, sponge, compress) = test_components();
+    let (_, sponge, compress) = gl::test_components();
     HidingLmcsConfig::new(sponge, compress, rng)
 }
 
 fn tree_context_cap<T>(tree: &T) -> (MerkleCap<F, [F; DIGEST]>, Vec<Dimensions>, usize)
 where
-    T: LmcsTree<F, Hash<F, F, DIGEST>, RowMatrix>,
+    T: LmcsTree<F, Hash<F, F, { DIGEST }>, RowMatrix>,
 {
     let commitment = MerkleCap::from(tree.root());
     let dimensions = tree
         .leaves()
         .iter()
         .zip(tree.widths())
-        .map(|(m, width)| Dimensions {
+        .map(|(m, width): (&RowMatrix, usize)| Dimensions {
             width,
             height: m.height(),
         })
@@ -81,12 +86,12 @@ fn extract_proofs_roundtrip() {
         let log_max_height = log2_strict_u8(tree.height());
         let (commitment, dimensions, _) = tree_context_cap(&tree);
 
-        let mut prover_channel = ProverTranscript::new(test_challenger());
+        let mut prover_channel = gl::prover_channel();
         tree.prove_batch(indices.iter().copied(), &mut prover_channel);
         let (_, transcript) = prover_channel.finalize();
 
-        let mut verifier_channel = VerifierTranscript::from_data(test_challenger(), &transcript);
-        let batch = BatchProof::<F, Hash<F, F, DIGEST>>::read_from_channel(
+        let mut verifier_channel = gl::verifier_channel(&transcript);
+        let batch = BatchProof::<F, Hash<F, F, { DIGEST }>>::read_from_channel(
             &widths,
             log_max_height,
             indices,
@@ -113,7 +118,7 @@ fn extract_proofs_roundtrip() {
                 .map(MerkleCap::from)
                 .collect();
             let opening_proof = (proof.salt, siblings_cap);
-            let rows_vec: Vec<Vec<F>> = proof.rows.iter_rows().map(|r| r.to_vec()).collect();
+            let rows_vec: Vec<Vec<F>> = proof.rows.iter_rows().map(|r: &[F]| r.to_vec()).collect();
             let batch_opening = BatchOpeningRef {
                 opened_values: &rows_vec,
                 opening_proof: &opening_proof,
@@ -135,7 +140,7 @@ fn mmcs_roundtrip_non_hiding() {
     let tree = build_tree_with_alignment(&mmcs, 10, BASE_SHAPES, false);
     let (commitment, dimensions, index) = tree_context_cap(&tree);
 
-    let batch_opening = Mmcs::open_batch(&mmcs, index, &tree);
+    let batch_opening: BatchOpening<F, BaseMmcs> = Mmcs::open_batch(&mmcs, index, &tree);
     Mmcs::verify_batch(
         &mmcs,
         &commitment,
@@ -260,7 +265,10 @@ fn mmcs_verify_rejects_invalid_openings() {
             seed: 23,
             aligned: false,
             mutate: |_height, _alignment, _unaligned, _dims, _index, opened_values, _proof| {
-                if let Some(cell) = opened_values.first_mut().and_then(|row| row.first_mut()) {
+                if let Some(cell) = opened_values
+                    .first_mut()
+                    .and_then(|row: &mut Vec<F>| row.first_mut())
+                {
                     *cell += F::ONE;
                 }
                 Err(LmcsError::RootMismatch)
@@ -274,14 +282,14 @@ fn mmcs_verify_rejects_invalid_openings() {
         let unaligned_dimensions: Vec<Dimensions> = tree
             .leaves()
             .iter()
-            .map(|m| Dimensions {
+            .map(|m: &RowMatrix| Dimensions {
                 width: m.width(),
                 height: m.height(),
             })
             .collect();
         let height = tree.height();
         let alignment = tree.alignment();
-        let batch_opening = Mmcs::open_batch(&mmcs, index, &tree);
+        let batch_opening: BatchOpening<F, BaseMmcs> = Mmcs::open_batch(&mmcs, index, &tree);
 
         Mmcs::verify_batch(
             &mmcs,

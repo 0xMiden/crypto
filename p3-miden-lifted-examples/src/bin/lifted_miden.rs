@@ -9,13 +9,10 @@
 //!   cargo run -p p3-miden-lifted-examples --release --features parallel --bin lifted_miden
 //! ```
 
-use p3_dft::Radix2DitParallel;
-use p3_field::extension::BinomialExtensionField;
-use p3_goldilocks::Goldilocks;
 use p3_matrix::Matrix;
-use p3_miden_dev_utils::configs::goldilocks_poseidon2 as gl;
 use p3_miden_lifted_air::{AirInstance, AirWitness, LiftedAir};
 use p3_miden_lifted_examples::{
+    bench_configs::{self, Challenge, Val},
     miden::{
         DummyMidenAir, DummyMidenAuxBuilder, NUM_AUX_COLS, TRACE1_LOG_HEIGHT, TRACE1_WIDTH,
         TRACE2_LOG_HEIGHT, TRACE2_WIDTH, generate_dummy_trace,
@@ -23,13 +20,9 @@ use p3_miden_lifted_examples::{
     stats,
     stats::{bench_iters, init_tracing},
 };
-use p3_miden_lifted_stark::{
-    GenericStarkConfig, fri::PcsParams, lmcs::LmcsConfig, prover::prove_multi,
-};
+use p3_miden_lifted_stark::prover::prove_multi;
+use p3_miden_lmcs::testing::goldilocks_poseidon2 as gl;
 use tracing::info_span;
-
-type Val = Goldilocks;
-type Challenge = BinomialExtensionField<Val, 2>;
 
 const LOG_BLOWUP: u8 = 3;
 const NUM_QUERIES: usize = 100;
@@ -39,25 +32,7 @@ fn main() {
     let stats_handle = init_tracing();
     let bench_iters = bench_iters();
 
-    type Lmcs = LmcsConfig<gl::P, gl::P, gl::Sponge, gl::Compress, { gl::WIDTH }, { gl::DIGEST }>;
-    type Dft = Radix2DitParallel<Val>;
-    type Config = GenericStarkConfig<Val, Challenge, Lmcs, Dft, gl::Challenger>;
-
-    let pcs = PcsParams::new(
-        LOG_BLOWUP,  // log_blowup
-        1,           // log_folding_arity
-        0,           // log_final_degree
-        POW_BITS,    // folding_pow_bits
-        0,           // deep_pow_bits
-        NUM_QUERIES, // num_queries
-        0,           // query_pow_bits
-    )
-    .unwrap();
-
-    let (_, sponge, compress) = gl::test_components();
-    let lmcs: Lmcs = LmcsConfig::new(sponge, compress);
-    let dft = Dft::default();
-    let config = Config::new(pcs, lmcs, dft, gl::test_challenger());
+    let config = bench_configs::lifted_config(LOG_BLOWUP, NUM_QUERIES, POW_BITS);
 
     // --- Generate traces ---
     let air1 = DummyMidenAir::new(TRACE1_WIDTH, NUM_AUX_COLS);

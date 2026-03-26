@@ -49,5 +49,7 @@ pub use params::{MAX_LOG_DOMAIN_SIZE, PcsParams, PcsParamsError};
 pub use proof::PcsTranscript;
 pub use verifier::PcsError;
 
+#[cfg(any(test, feature = "testing"))]
+pub mod testing;
 #[cfg(test)]
 mod tests;

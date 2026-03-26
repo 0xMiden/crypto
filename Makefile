@@ -96,7 +96,7 @@ build-avx512: ## Build with avx512 support
 
 .PHONY: bench
 bench: ## Run benchmarks
-	cargo bench
+	cargo bench --workspace --features testing
 
 # --- installing ----------------------------------------------------------------------------------
 

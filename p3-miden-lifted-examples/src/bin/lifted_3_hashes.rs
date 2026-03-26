@@ -11,30 +11,22 @@
 
 use alloc::{vec, vec::Vec};
 
-use p3_baby_bear::BabyBear;
-use p3_dft::Radix2DitParallel;
-use p3_field::{Field, extension::BinomialExtensionField};
+use p3_field::Field;
 use p3_matrix::{Matrix, dense::RowMajorMatrix};
-use p3_miden_dev_utils::configs::baby_bear_poseidon2 as bb;
 use p3_miden_lifted_air::{AirInstance, AirWitness, BaseAir, LiftedAir, LiftedAirBuilder};
 use p3_miden_lifted_examples::{
     DummyAuxBuilder,
+    bench_configs::{self, Val},
     blake3::{LiftedBlake3Air, generate_blake3_trace},
     keccak::{LiftedKeccakAir, generate_keccak_trace},
     poseidon2::{LiftedPoseidon2Air, generate_poseidon2_trace},
     stats,
-    stats::StatsLayer,
 };
-use p3_miden_lifted_stark::{
-    GenericStarkConfig, air::log2_strict_u8, fri::PcsParams, lmcs::LmcsConfig, prover::prove_multi,
-};
+use p3_miden_lifted_stark::{air::log2_strict_u8, prover::prove_multi};
+use p3_miden_lmcs::testing::goldilocks_poseidon2 as gl;
 use p3_poseidon2_air::RoundConstants;
 use rand::{RngExt, SeedableRng, rngs::SmallRng};
 use tracing::info_span;
-use tracing_forest::ForestLayer;
-use tracing_subscriber::{
-    EnvFilter, Layer as _, Registry, layer::SubscriberExt, util::SubscriberInitExt,
-};
 
 extern crate alloc;
 
@@ -44,9 +36,6 @@ const NUM_BLAKE3_HASHES: usize = 32768;
 const NUM_KECCAK_HASHES: usize = 10922;
 // Poseidon2: 2^19 rows, 1 row/hash → 524288 hashes (narrowest, tallest).
 const NUM_POSEIDON2_HASHES: usize = 524288;
-
-type Val = BabyBear;
-type Challenge = BinomialExtensionField<Val, 4>;
 
 const LOG_BLOWUP: u8 = 1;
 const NUM_QUERIES: usize = 100;
@@ -99,49 +88,16 @@ impl<EF: Field> LiftedAir<Val, EF> for HashAir {
 }
 
 fn main() {
-    let env_filter = EnvFilter::builder()
-        .with_default_directive(tracing_forest::util::LevelFilter::DEBUG.into())
-        .from_env_lossy();
+    let stats_handle = stats::init_tracing();
+    let bench_iters = stats::bench_iters();
 
-    let stats = StatsLayer::new();
-    let stats_handle = stats.handle();
-
-    // Apply env filter only to ForestLayer so StatsLayer always sees all spans.
-    Registry::default()
-        .with(ForestLayer::default().with_filter(env_filter))
-        .with(stats)
-        .init();
-
-    let bench_iters: usize = std::env::var("BENCH_ITERS")
-        .ok()
-        .and_then(|v| v.parse().ok())
-        .unwrap_or(5);
-
-    type Lmcs = LmcsConfig<bb::P, bb::P, bb::Sponge, bb::Compress, { bb::WIDTH }, { bb::DIGEST }>;
-    type Dft = Radix2DitParallel<Val>;
-    type Config = GenericStarkConfig<Val, Challenge, Lmcs, Dft, bb::Challenger>;
-
-    let pcs = PcsParams::new(
-        LOG_BLOWUP,  // log_blowup
-        1,           // log_folding_arity
-        0,           // log_final_degree
-        POW_BITS,    // folding_pow_bits
-        0,           // deep_pow_bits
-        NUM_QUERIES, // num_queries
-        0,           // query_pow_bits
-    )
-    .unwrap();
-
-    let (_, sponge, compress) = bb::test_components();
-    let lmcs: Lmcs = LmcsConfig::new(sponge, compress);
-    let dft = Dft::default();
-    let config = Config::new(pcs, lmcs, dft, bb::test_challenger());
+    let config = bench_configs::lifted_config(LOG_BLOWUP, NUM_QUERIES, POW_BITS);
 
     let mut rng = SmallRng::seed_from_u64(1);
 
     // --- Poseidon2 trace (2^19) ---
     let poseidon2_constants = RoundConstants::from_rng(&mut rng);
-    let poseidon2_inputs: Vec<[Val; 16]> =
+    let poseidon2_inputs: Vec<[Val; 12]> =
         (0..NUM_POSEIDON2_HASHES).map(|_| rng.random()).collect();
     let trace_poseidon2: RowMajorMatrix<Val> =
         info_span!("generate Poseidon2 trace", hashes = NUM_POSEIDON2_HASHES)
@@ -206,7 +162,7 @@ fn main() {
         ];
 
         let output = info_span!("prove").in_scope(|| {
-            prove_multi(&config, &instances, bb::test_challenger()).expect("proving failed")
+            prove_multi(&config, &instances, gl::test_challenger()).expect("proving failed")
         });
 
         if i == 1 {
@@ -250,7 +206,7 @@ fn main() {
                 &config,
                 &verifier_instances,
                 &output.proof,
-                bb::test_challenger(),
+                gl::test_challenger(),
             )
             .expect("verification failed");
             assert_eq!(output.digest, digest);

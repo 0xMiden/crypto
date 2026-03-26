@@ -1,68 +1,61 @@
 //! Merkle tree commit benchmarks for LMCS.
 //!
 //! Benchmarks LMCS commit operations including ExtensionMmcs for FRI.
-//! Runs benchmarks for BabyBear and Goldilocks fields with Poseidon2.
+//! Runs benchmarks for Goldilocks with Poseidon2.
 //!
 //! Run with:
 //! ```bash
-//! RUSTFLAGS="-Ctarget-cpu=native" cargo bench --bench merkle_commit
+//! RUSTFLAGS="-Ctarget-cpu=native" cargo bench --bench merkle_commit --features testing
 //!
 //! # With parallelism
-//! RUSTFLAGS="-Ctarget-cpu=native" cargo bench --bench merkle_commit --features parallel
+//! RUSTFLAGS="-Ctarget-cpu=native" cargo bench --bench merkle_commit --features testing,parallel
 //!
 //! # Filter by field
-//! cargo bench --bench merkle_commit -- babybear
-//! cargo bench --bench merkle_commit -- goldilocks
+//! cargo bench --bench merkle_commit --features testing -- goldilocks
 //! ```
-
-mod utils;
 
 use std::hint::black_box;
 
 use criterion::{BenchmarkId, Criterion, Throughput, criterion_group, criterion_main};
 use p3_matrix::{dense::RowMajorMatrix, extension::FlatMatrixView};
 use p3_miden_dev_utils::{
-    LOG_HEIGHTS, PARALLEL_STR, RELATIVE_SPECS, criterion_config, generate_matrices_from_specs,
-    total_elements,
+    LOG_HEIGHTS, RELATIVE_SPECS,
+    configs::goldilocks_poseidon2::{EF, F},
+    generate_matrices_from_specs, total_elements,
 };
-use p3_miden_lmcs::{Lmcs, LmcsTree};
-use rand::{
-    SeedableRng,
-    distr::{Distribution, StandardUniform},
-    rngs::SmallRng,
+use p3_miden_lmcs::{Lmcs, LmcsTree, testing::goldilocks_poseidon2::test_lmcs};
+use rand::{SeedableRng, rngs::SmallRng};
+
+const PARALLEL_STR: &str = if cfg!(feature = "parallel") {
+    "parallel"
+} else {
+    "single"
 };
-use utils::LmcsScenario;
 
 // =============================================================================
 // Benchmark implementation
 // =============================================================================
 
-/// Run benchmark for a specific scenario.
-fn bench_scenario<S: LmcsScenario>(c: &mut Criterion)
-where
-    StandardUniform: Distribution<S::F> + Distribution<S::EF>,
-{
+fn bench_merkle_commit(c: &mut Criterion) {
+    let lmcs = test_lmcs();
+
     for &log_max_height in LOG_HEIGHTS {
         let n_leaves = 1usize << log_max_height;
         let group_name = format!(
-            "MerkleCommit/{}/{}/{}/{}",
-            n_leaves,
-            S::FIELD_NAME,
-            S::HASH_NAME,
-            PARALLEL_STR
+            "MerkleCommit/{}/goldilocks/poseidon2/{}",
+            n_leaves, PARALLEL_STR
         );
         let mut group = c.benchmark_group(&group_name);
         group.throughput(Throughput::Elements(total_elements(
-            &generate_matrices_from_specs::<S::F>(RELATIVE_SPECS, log_max_height),
+            &generate_matrices_from_specs::<F>(RELATIVE_SPECS, log_max_height),
         )));
 
         // Generate matrices using canonical specs
-        let matrix_groups: Vec<Vec<RowMajorMatrix<S::F>>> =
+        let matrix_groups: Vec<Vec<RowMajorMatrix<F>>> =
             generate_matrices_from_specs(RELATIVE_SPECS, log_max_height);
 
         // LMCS commit
         {
-            let lmcs = S::lmcs();
             group.bench_with_input(
                 BenchmarkId::from_parameter("lmcs"),
                 &matrix_groups,
@@ -80,10 +73,8 @@ where
         // Extension field matrix with width-2 (simulates FRI arity-2 commit)
         // Uses FlatMatrixView to convert EF matrix to base field view
         {
-            let lmcs = S::lmcs();
-
             let rng = &mut SmallRng::seed_from_u64(p3_miden_dev_utils::BENCH_SEED);
-            let ext_matrix = RowMajorMatrix::<S::EF>::rand(rng, n_leaves, 2);
+            let ext_matrix = RowMajorMatrix::<EF>::rand(rng, n_leaves, 2);
 
             group.bench_with_input(
                 BenchmarkId::from_parameter("ext/arity2"),
@@ -100,10 +91,8 @@ where
 
         // Extension field matrix with width-4 (simulates FRI arity-4 commit)
         {
-            let lmcs = S::lmcs();
-
             let rng = &mut SmallRng::seed_from_u64(p3_miden_dev_utils::BENCH_SEED);
-            let ext_matrix = RowMajorMatrix::<S::EF>::rand(rng, n_leaves, 4);
+            let ext_matrix = RowMajorMatrix::<EF>::rand(rng, n_leaves, 4);
 
             group.bench_with_input(
                 BenchmarkId::from_parameter("ext/arity4"),
@@ -122,16 +111,12 @@ where
     }
 }
 
-fn bench_merkle_commit(c: &mut Criterion) {
-    use p3_miden_dev_utils::{BabyBearPoseidon2, GoldilocksPoseidon2};
-
-    bench_scenario::<BabyBearPoseidon2>(c);
-    bench_scenario::<GoldilocksPoseidon2>(c);
-}
-
 criterion_group! {
     name = benches;
-    config = criterion_config();
+    config = Criterion::default()
+        .sample_size(10)
+        .measurement_time(std::time::Duration::from_secs(12))
+        .warm_up_time(std::time::Duration::from_secs(3));
     targets = bench_merkle_commit
 }
 criterion_main!(benches);

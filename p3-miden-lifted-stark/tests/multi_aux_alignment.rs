@@ -4,17 +4,16 @@ mod common;
 
 use alloc::vec::Vec;
 
-use common::test_config;
+use common::{prove_and_verify_instances, test_config};
 use p3_field::PrimeCharacteristicRing;
 use p3_matrix::{Matrix, dense::RowMajorMatrix};
-use p3_miden_dev_utils::configs::baby_bear_poseidon2 as bb;
+use p3_miden_dev_utils::configs::goldilocks_poseidon2::{EF, F, test_challenger};
 use p3_miden_lifted_stark::{
     air::{
         AirBuilder, AirWitness, AuxBuilder, BaseAir, ExtensionBuilder, LiftedAir, LiftedAirBuilder,
         WindowAccess,
     },
     lmcs::Lmcs,
-    proof::StarkTranscript,
     transcript::TranscriptData,
     verifier::{VerifierError, verify_multi},
 };
@@ -31,7 +30,7 @@ impl PaddingAir {
     }
 }
 
-impl BaseAir<bb::F> for PaddingAir {
+impl BaseAir<F> for PaddingAir {
     fn width(&self) -> usize {
         self.width
     }
@@ -41,7 +40,7 @@ impl BaseAir<bb::F> for PaddingAir {
     }
 }
 
-impl LiftedAir<bb::F, bb::EF> for PaddingAir {
+impl LiftedAir<F, EF> for PaddingAir {
     fn num_randomness(&self) -> usize {
         1
     }
@@ -58,7 +57,7 @@ impl LiftedAir<bb::F, bb::EF> for PaddingAir {
         0
     }
 
-    fn eval<AB: LiftedAirBuilder<F = bb::F>>(&self, builder: &mut AB) {
+    fn eval<AB: LiftedAirBuilder<F = F>>(&self, builder: &mut AB) {
         let main = builder.main();
         let start = builder.public_values()[0];
         let (local, next) = (main.current_slice(), main.next_slice());
@@ -83,35 +82,35 @@ struct PaddingAuxBuilder {
     aux_width: usize,
 }
 
-impl AuxBuilder<bb::F, bb::EF> for PaddingAuxBuilder {
+impl AuxBuilder<F, EF> for PaddingAuxBuilder {
     fn build_aux_trace(
         &self,
-        main: &RowMajorMatrix<bb::F>,
-        challenges: &[bb::EF],
-    ) -> (RowMajorMatrix<bb::EF>, Vec<bb::EF>) {
+        main: &RowMajorMatrix<F>,
+        challenges: &[EF],
+    ) -> (RowMajorMatrix<EF>, Vec<EF>) {
         let height = main.height();
         let mut values = Vec::with_capacity(height * self.aux_width);
         let challenge = challenges[0];
         for _ in 0..height {
             values.push(challenge);
-            values.extend(std::iter::repeat_n(bb::EF::ZERO, self.aux_width - 1));
+            values.extend(std::iter::repeat_n(EF::ZERO, self.aux_width - 1));
         }
         let aux_trace = RowMajorMatrix::new(values, self.aux_width);
         (aux_trace, vec![])
     }
 }
 
-fn generate_trace(start: bb::F, height: usize, width: usize) -> RowMajorMatrix<bb::F> {
+fn generate_trace(start: F, height: usize, width: usize) -> RowMajorMatrix<F> {
     let mut values = Vec::with_capacity(height * width);
     for _ in 0..height {
         values.push(start);
-        values.extend(std::iter::repeat_n(bb::F::ZERO, width - 1));
+        values.extend(std::iter::repeat_n(F::ZERO, width - 1));
     }
     RowMajorMatrix::new(values, width)
 }
 
-fn instance(idx: usize, height: usize, width: usize) -> (RowMajorMatrix<bb::F>, Vec<bb::F>) {
-    let start = bb::F::from_u64((idx + 2) as u64);
+fn instance(idx: usize, height: usize, width: usize) -> (RowMajorMatrix<F>, Vec<F>) {
+    let start = F::from_u64((idx + 2) as u64);
     (generate_trace(start, height, width), vec![start])
 }
 
@@ -131,36 +130,7 @@ fn multi_trace_with_aux_padding() {
         .map(|(t, pv)| (&air, AirWitness::new(t, pv, &[]), &aux_builder))
         .collect();
 
-    let output = p3_miden_lifted_stark::prover::prove_multi(
-        &config,
-        &prover_instances,
-        bb::test_challenger(),
-    )
-    .expect("proving should succeed");
-
-    let verifier_instances: Vec<_> = prover_instances
-        .iter()
-        .map(|(a, w, _)| (*a, w.to_instance().unwrap()))
-        .collect();
-
-    let verifier_digest = verify_multi(
-        &config,
-        &verifier_instances,
-        &output.proof,
-        bb::test_challenger(),
-    )
-    .expect("verification should succeed");
-    assert_eq!(output.digest, verifier_digest);
-
-    // Re-parse transcript from a fresh challenger and verify digest agreement.
-    let (_, reparse_digest) = StarkTranscript::from_proof(
-        &config,
-        &verifier_instances,
-        &output.proof,
-        bb::test_challenger(),
-    )
-    .expect("transcript re-parse should succeed");
-    assert_eq!(output.digest, reparse_digest);
+    prove_and_verify_instances(&prover_instances);
 }
 
 #[test]
@@ -179,15 +149,12 @@ fn multi_trace_rejects_trailing_transcript_data() {
         .map(|(t, pv)| (&air, AirWitness::new(t, pv, &[]), &aux_builder))
         .collect();
 
-    let output = p3_miden_lifted_stark::prover::prove_multi(
-        &config,
-        &prover_instances,
-        bb::test_challenger(),
-    )
-    .expect("proving should succeed");
+    let output =
+        p3_miden_lifted_stark::prover::prove_multi(&config, &prover_instances, test_challenger())
+            .expect("proving should succeed");
 
     let (mut fields, commitments) = output.proof.clone().into_parts();
-    fields.push(bb::F::ONE);
+    fields.push(F::ONE);
     let bad_transcript = TranscriptData::new(fields, commitments);
 
     let verifier_instances: Vec<_> = prover_instances
@@ -199,7 +166,7 @@ fn multi_trace_rejects_trailing_transcript_data() {
         &config,
         &verifier_instances,
         &bad_transcript,
-        bb::test_challenger(),
+        test_challenger(),
     )
     .expect_err("extra transcript data should fail verification");
     assert!(matches!(

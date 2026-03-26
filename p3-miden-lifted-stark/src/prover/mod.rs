@@ -42,7 +42,7 @@
 //!
 //!
 //! ```ignore
-//! use p3_baby_bear::{BabyBear, Poseidon2BabyBear};
+//! use p3_goldilocks::{Goldilocks, Poseidon2Goldilocks};
 //! use p3_challenger::{CanObserve, DuplexChallenger};
 //! use p3_dft::Radix2DitParallel;
 //! use p3_field::extension::BinomialExtensionField;
@@ -55,15 +55,15 @@
 //! use rand::rngs::SmallRng;
 //! use rand::SeedableRng;
 //!
-//! // Concrete instantiation matching the repository's BabyBear+Poseidon2 defaults.
-//! const WIDTH: usize = 16;
+//! // Concrete instantiation matching the repository's Goldilocks+Poseidon2 defaults.
+//! const WIDTH: usize = 12;
 //! const RATE: usize = 8;
-//! const DIGEST: usize = 8;
+//! const DIGEST: usize = 4;
 //!
-//! type F = BabyBear;
-//! type EF = BinomialExtensionField<F, 4>;
+//! type F = Goldilocks;
+//! type EF = BinomialExtensionField<F, 2>;
 //! type P = <F as p3_field::Field>::Packing;
-//! type Perm = Poseidon2BabyBear<WIDTH>;
+//! type Perm = Poseidon2Goldilocks<WIDTH>;
 //! type Challenger = DuplexChallenger<F, Perm, WIDTH, RATE>;
 //! type Sponge = StatefulSponge<Perm, WIDTH, RATE, DIGEST>;
 //! type Compress = TruncatedPermutation<Perm, 2, DIGEST, WIDTH>;
@@ -83,7 +83,7 @@
 //!
 //! // --- Prover: bind statement into Fiat-Shamir ---
 //! let mut ch = Challenger::new(perm.clone());
-//! // Domain separator: one BabyBear element per ASCII byte.
+//! // Domain separator: one Goldilocks element per ASCII byte.
 //! ch.observe_slice(&b"LSTARK0".map(|b| F::from_u8(b)));
 //! ch.observe_slice(&public_values);
 //! // If your app supports multiple AIRs/versions, also observe an application-level air_id here.

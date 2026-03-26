@@ -44,7 +44,6 @@ p3-symmetric = { version = "0.5.0", default-features = false }
 p3-util = { version = "0.5.0", default-features = false }
 
 # Plonky3 (concrete implementations — dev/test/bench only in core crates)
-p3-baby-bear = { version = "0.5.0", default-features = false }
 p3-blake3 = { version = "0.5.0", default-features = false }
 p3-bn254 = { version = "0.5.0", default-features = false }
 p3-fri = { version = "0.5.0", default-features = false }

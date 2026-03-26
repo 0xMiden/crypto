@@ -3,10 +3,6 @@
 //! This module contains constants and helper functions that define
 //! reproducible test/benchmark scenarios.
 
-use alloc::{vec, vec::Vec};
-
-use p3_field::PackedValue;
-
 // =============================================================================
 // Seeds
 // =============================================================================
@@ -38,44 +34,3 @@ pub const RELATIVE_SPECS: &[&[(usize, usize)]] = &[
     &[(4, 8), (2, 20), (0, 20)],
     &[(0, 16)],
 ];
-
-// =============================================================================
-// Matrix scenarios
-// =============================================================================
-
-/// Common matrix group scenarios for testing lifting with varying heights.
-///
-/// Each scenario is a list of (height, width) pairs, sorted by ascending height.
-/// The `rate` parameter controls the RATE-based width scenarios.
-///
-/// # Parameters
-/// - `pack_width`: The SIMD packing width (e.g., `P::WIDTH` for packed field)
-/// - `rate`: The sponge rate for width alignment scenarios
-pub fn matrix_scenarios<P: PackedValue>(rate: usize) -> Vec<Vec<(usize, usize)>> {
-    let pack_width = P::WIDTH.max(2);
-    vec![
-        // Single matrices
-        vec![(1, 1)],
-        vec![(1, rate - 1)],
-        // Multiple heights (must be ascending)
-        vec![(2, 3), (4, 5), (8, rate)],
-        vec![(1, 5), (1, 3), (2, 7), (4, 1), (8, rate + 1)],
-        // Packing boundary tests
-        vec![
-            (pack_width / 2, rate - 1),
-            (pack_width, rate),
-            (pack_width * 2, rate + 3),
-        ],
-        vec![(pack_width, rate + 5), (pack_width * 2, 25)],
-        vec![
-            (1, rate * 2),
-            (pack_width / 2, rate * 2 - 1),
-            (pack_width, rate * 2),
-            (pack_width * 2, rate * 3 - 2),
-        ],
-        // Same-height matrices
-        vec![(4, rate - 1), (4, rate), (8, rate + 3), (8, rate * 2)],
-        // Single tall matrix
-        vec![(pack_width * 2, rate - 1)],
-    ]
-}

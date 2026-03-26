@@ -199,7 +199,7 @@ pub mod tests {
     };
 
     use super::*;
-    pub(super) use crate::tests::{EF, F};
+    pub(super) use crate::testing::goldilocks_poseidon2::{EF, F};
     use crate::utils::horner;
 
     // Type alias for tests using packed fields
