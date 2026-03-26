@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"constant":["WORD_SIZE_BYTES","WORD_SIZE_FELTS"],"enum":["WordError"],"struct":["LexicographicWord","Word"]};
+window.SIDEBAR_ITEMS = {"constant":["WORD_SIZE_BYTES","WORD_SIZE_FELTS"],"enum":["WordError"],"struct":["Word"]};
