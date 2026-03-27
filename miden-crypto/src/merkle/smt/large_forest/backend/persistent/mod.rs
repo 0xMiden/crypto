@@ -46,7 +46,7 @@ use rocksdb as db;
 
 use super::{BackendError, Result};
 use crate::{
-    EMPTY_WORD, Felt, Map, Word,
+    EMPTY_WORD, Map, Word,
     merkle::{
         EmptySubtreeRoots, MerkleError, NodeIndex, SparseMerklePath,
         smt::{
