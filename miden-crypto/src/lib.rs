@@ -249,6 +249,7 @@ mod batch_inversion {
 #[cfg(test)]
 mod tests {
 
+    #[cfg(debug_assertions)]
     #[test]
     #[should_panic]
     fn debug_assert_is_checked() {
@@ -262,6 +263,7 @@ mod tests {
         debug_assert!(false);
     }
 
+    #[cfg(debug_assertions)]
     #[test]
     #[should_panic]
     #[allow(arithmetic_overflow)]

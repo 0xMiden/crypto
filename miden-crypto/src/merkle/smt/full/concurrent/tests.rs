@@ -547,6 +547,7 @@ fn arb_felt() -> impl Strategy<Value = Felt> {
 }
 
 /// Test that the debug assertion panics on unsorted entries.
+#[cfg(debug_assertions)]
 #[test]
 #[should_panic = "is_sorted_by_key"]
 fn smt_with_sorted_entries_panics_on_unsorted_entries() {
