@@ -156,7 +156,9 @@ where
             // ─────────────────────────────────────────────────────────────────────
             // Grind and sample folding challenge beta
             // ─────────────────────────────────────────────────────────────────────
-            let _pow_witness = channel.grind(params.folding_pow_bits);
+            let _pow_witness =
+                info_span!("FRI folding grind", round, bits = params.folding_pow_bits)
+                    .in_scope(|| channel.grind(params.folding_pow_bits));
             let beta: EF = channel.sample_algebra_element();
 
             // ─────────────────────────────────────────────────────────────────────

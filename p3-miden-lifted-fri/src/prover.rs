@@ -79,7 +79,8 @@ pub fn open_with_channel<F, EF, L, M, Ch, const N: usize>(
     // ─────────────────────────────────────────────────────────────────────────
     // Grind for query sampling
     // ─────────────────────────────────────────────────────────────────────────
-    let _query_pow_witness = channel.grind(params.query_pow_bits());
+    let _query_pow_witness = info_span!("query grind", bits = params.query_pow_bits())
+        .in_scope(|| channel.grind(params.query_pow_bits()));
 
     // ─────────────────────────────────────────────────────────────────────────
     // Sample query indices (domain indices)

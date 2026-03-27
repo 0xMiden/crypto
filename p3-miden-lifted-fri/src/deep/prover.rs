@@ -153,7 +153,8 @@ impl<EF> DeepPoly<EF> {
         }
 
         // 2. Grind for proof-of-work witness
-        let _pow_witness = channel.grind(params.deep_pow_bits);
+        let _pow_witness = info_span!("DEEP grind", bits = params.deep_pow_bits)
+            .in_scope(|| channel.grind(params.deep_pow_bits));
 
         // 3. Sample DEEP challenges
         let challenge_columns: EF = channel.sample_algebra_element();

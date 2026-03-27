@@ -7,7 +7,7 @@
 //! - `divide_by_vanishing_in_place`: Divide by Z_H on the quotient evaluation domain
 //! - [`commit_quotient`]: Decompose Q(gJ) into chunks and commit on gK
 
-use alloc::{vec, vec::Vec};
+use alloc::{format, vec, vec::Vec};
 
 use p3_dft::TwoAdicSubgroupDft;
 use p3_field::{
@@ -17,6 +17,7 @@ use p3_matrix::dense::RowMajorMatrix;
 use p3_maybe_rayon::prelude::*;
 use p3_miden_lmcs::{Lmcs, materialize_bitrev};
 use p3_util::log2_strict_usize;
+use tracing::info_span;
 
 use super::commit::Committed;
 use crate::{StarkConfig, coset::LiftedCoset};
@@ -166,27 +167,30 @@ where
     // g·ω_Jᵗ·H), producing shifted coefficients:
     //   c_hat[t, k] = a[t, k]·(g·ω_Jᵗ)ᵏ
     // where a[t, k] are the true coefficients of qₜ.
-    let mut coeffs = config.dft().idft_algebra_batch(m);
+    let mut coeffs = info_span!("quotient iDFT", dims = %format!("{n}x{d}"))
+        .in_scope(|| config.dft().idft_algebra_batch(m));
 
     // ═══════════════════════════════════════════════════════════════════════
     // Step 2: Fused coefficient scaling
     // ═══════════════════════════════════════════════════════════════════════
     // Multiply c_hat[t, k] by (ω_Jᵗ)⁻ᵏ → a[t, k]·gᵏ.
     // This removes the per-coset shift ω_Jᵗ while keeping gᵏ baked in.
-    let omega_j_inv = F::two_adic_generator(coset.log_trace_height as usize + log_d).inverse();
+    info_span!("quotient scaling", n).in_scope(|| {
+        let omega_j_inv = F::two_adic_generator(coset.log_trace_height as usize + log_d).inverse();
 
-    // Precompute ω_J⁻ᵏ for k = 0..N with sequential multiplications
-    let row_bases: Vec<F> = omega_j_inv.powers().take(n).collect();
+        // Precompute ω_J⁻ᵏ for k = 0..N with sequential multiplications
+        let row_bases: Vec<F> = omega_j_inv.powers().take(n).collect();
 
-    // Row k, column t: multiply by (ω_J⁻ᵏ)ᵗ
-    coeffs
-        .par_rows_mut()
-        .zip(row_bases.par_iter())
-        .for_each(|(row, &row_base)| {
-            for (val, scale) in row.iter_mut().zip(row_base.powers()) {
-                *val *= scale;
-            }
-        });
+        // Row k, column t: multiply by (ω_J⁻ᵏ)ᵗ
+        coeffs
+            .par_rows_mut()
+            .zip(row_bases.par_iter())
+            .for_each(|(row, &row_base)| {
+                for (val, scale) in row.iter_mut().zip(row_base.powers()) {
+                    *val *= scale;
+                }
+            });
+    });
 
     // ═══════════════════════════════════════════════════════════════════════
     // Step 3: Flatten EF → F, zero-pad to N·B rows
@@ -225,12 +229,15 @@ where
     // ═══════════════════════════════════════════════════════════════════════
     // Because gᵏ is baked into the coefficients, the plain DFT evaluates
     // on gK directly: entry (i, t) gives qₜ(g·ω_Kⁱ).
-    let lde = config.dft().dft_batch(coeffs_padded);
+    let quotient_matrix = info_span!("quotient DFT", dims = %format!("{}x{base_width}", n * b))
+        .in_scope(|| {
+            let lde = config.dft().dft_batch(coeffs_padded);
 
-    // ═══════════════════════════════════════════════════════════════════════
-    // Step 5: Wrap for commitment
-    // ═══════════════════════════════════════════════════════════════════════
-    let quotient_matrix = materialize_bitrev(lde);
+            // ═══════════════════════════════════════════════════════════════
+            // Step 5: Wrap for commitment
+            // ═══════════════════════════════════════════════════════════════
+            materialize_bitrev(lde)
+        });
 
     let tree = config.lmcs().build_aligned_tree(vec![quotient_matrix]);
 
