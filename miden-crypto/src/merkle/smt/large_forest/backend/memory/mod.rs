@@ -54,7 +54,8 @@ impl Backend for InMemoryBackend {
         Ok(tree.tree.open(&key))
     }
 
-    /// Returns the leaf stored at `leaf_index` in the SMT with the specified `lineage`.
+    /// Returns the leaf stored at `leaf_index` in the SMT with the specified `lineage`. If no
+    /// leaf is explicitly stored at the given index, an empty leaf for that index is returned.
     ///
     /// # Errors
     ///

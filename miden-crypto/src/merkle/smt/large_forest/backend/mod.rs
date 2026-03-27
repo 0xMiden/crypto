@@ -84,7 +84,8 @@ where
     fn open(&self, lineage: LineageId, key: Word) -> Result<SmtProof>;
 
     /// Returns the leaf stored at the provided `leaf_index` in the SMT with the specified
-    /// `lineage`.
+    /// `lineage`. If no leaf is explicitly stored at the given index, the backend must return
+    /// an empty leaf for that index.
     ///
     /// It is the responsibility of the forest to ensure lineage existence before querying the
     /// backend. The backend must return an error if the lineage does not exist.

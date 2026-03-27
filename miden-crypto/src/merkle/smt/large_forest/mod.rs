@@ -617,7 +617,8 @@ impl<B: Backend> LargeSmtForest<B> {
         // We compute the new leaf and new path by applying any reversions from the history on
         // top of the current state.
         let new_leaf = Self::merge_leaves(opening.leaf(), view)?;
-        let new_path = self.merge_paths(tree.lineage(), leaf_index, opening.path(), view)?;
+        let new_path =
+            Self::merge_paths(&self.backend, tree.lineage(), leaf_index, opening.path(), view)?;
 
         // Finally we can compose our combined opening.
         Ok(SmtProof::new(new_path, new_leaf)?)
@@ -1112,7 +1113,7 @@ impl<B: Backend> LargeSmtForest<B> {
 
         // We sort the entries to ensure a consistent ordering, as the map above is a HashMap
         // which does not guarantee iteration order.
-        let mut entries: Vec<_> = leaf_entries.into_iter().collect();
+        let mut entries = leaf_entries.into_iter().collect::<Vec<_>>();
         entries.sort_by_key(|(key, value)| (*key, *value));
         Ok(SmtLeaf::new(entries, full_tree_leaf.index())?)
     }
@@ -1124,7 +1125,7 @@ impl<B: Backend> LargeSmtForest<B> {
     ///
     /// - [`LargeSmtForestError::Merkle`] if the merkle path cannot be created properly.
     fn merge_paths(
-        &self,
+        backend: &B,
         lineage: LineageId,
         leaf_index: LeafIndex<SMT_DEPTH>,
         full_tree_path: &SparseMerklePath,
@@ -1148,7 +1149,7 @@ impl<B: Backend> LargeSmtForest<B> {
                     .any(|(key, _)| LeafIndex::from(key) == sibling_leaf_index);
 
                 if sibling_leaf_changed {
-                    let sibling_leaf = self.backend.get_leaf(lineage, sibling_leaf_index)?;
+                    let sibling_leaf = backend.get_leaf(lineage, sibling_leaf_index)?;
                     let sibling_leaf = Self::merge_leaves(&sibling_leaf, history_view)?;
                     path_elems[depth as usize - 1] = sibling_leaf.hash();
                 } else {
