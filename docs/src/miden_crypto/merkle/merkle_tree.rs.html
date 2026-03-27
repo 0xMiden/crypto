@@ -276,11 +276,11 @@
 <a href=#276 id=276 data-nosnippet>276</a>
 <a href=#277 id=277 data-nosnippet>277</a>    <span class="kw">use </span>super::<span class="kw-2">*</span>;
 <a href=#278 id=278 data-nosnippet>278</a>    <span class="kw">use </span>crate::{
-<a href=#279 id=279 data-nosnippet>279</a>        Felt, WORD_SIZE,
+<a href=#279 id=279 data-nosnippet>279</a>        Felt,
 <a href=#280 id=280 data-nosnippet>280</a>        merkle::{int_to_leaf, int_to_node},
 <a href=#281 id=281 data-nosnippet>281</a>    };
 <a href=#282 id=282 data-nosnippet>282</a>
-<a href=#283 id=283 data-nosnippet>283</a>    <span class="kw">const </span>LEAVES4: [Word; WORD_SIZE] =
+<a href=#283 id=283 data-nosnippet>283</a>    <span class="kw">const </span>LEAVES4: [Word; Word::NUM_ELEMENTS] =
 <a href=#284 id=284 data-nosnippet>284</a>        [int_to_node(<span class="number">1</span>), int_to_node(<span class="number">2</span>), int_to_node(<span class="number">3</span>), int_to_node(<span class="number">4</span>)];
 <a href=#285 id=285 data-nosnippet>285</a>
 <a href=#286 id=286 data-nosnippet>286</a>    <span class="kw">const </span>LEAVES8: [Word; <span class="number">8</span>] = [

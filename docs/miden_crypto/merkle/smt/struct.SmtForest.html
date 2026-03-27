@@ -5,7 +5,7 @@ in the forest, as well as all Merkle paths required to prove membership of any l
 <p>Example usage:</p>
 
 <div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">use </span>miden_crypto::{
-    Felt, ONE, WORD_SIZE, Word, ZERO,
+    Felt, ONE, Word, ZERO,
     merkle::{
         EmptySubtreeRoots,
         smt::{MAX_LEAF_ENTRIES, SMT_DEPTH, SmtForest},
@@ -17,15 +17,15 @@ in the forest, as well as all Merkle paths required to prove membership of any l
 
 <span class="comment">// Insert a key-value pair into an SMT with an empty root
 </span><span class="kw">let </span>empty_tree_root = <span class="kw-2">*</span>EmptySubtreeRoots::entry(SMT_DEPTH, <span class="number">0</span>);
-<span class="kw">let </span>key = Word::new([ZERO; WORD_SIZE]);
-<span class="kw">let </span>value = Word::new([ONE; WORD_SIZE]);
+<span class="kw">let </span>key = Word::new([ZERO; Word::NUM_ELEMENTS]);
+<span class="kw">let </span>value = Word::new([ONE; Word::NUM_ELEMENTS]);
 <span class="kw">let </span>new_root = forest.insert(empty_tree_root, key, value).unwrap();
 
 <span class="comment">// Insert multiple key-value pairs
 </span><span class="kw">let </span><span class="kw-2">mut </span>entries = Vec::new();
 <span class="kw">for </span>i <span class="kw">in </span><span class="number">0</span>..MAX_LEAF_ENTRIES {
-    <span class="kw">let </span>key = Word::new([Felt::new(i <span class="kw">as </span>u64); WORD_SIZE]);
-    <span class="kw">let </span>value = Word::new([Felt::new((i + <span class="number">1</span>) <span class="kw">as </span>u64); WORD_SIZE]);
+    <span class="kw">let </span>key = Word::new([Felt::new(i <span class="kw">as </span>u64); Word::NUM_ELEMENTS]);
+    <span class="kw">let </span>value = Word::new([Felt::new((i + <span class="number">1</span>) <span class="kw">as </span>u64); Word::NUM_ELEMENTS]);
     entries.push((key, value));
 }
 <span class="kw">let </span>new_root = forest.batch_insert(new_root, entries.into_iter()).unwrap();
