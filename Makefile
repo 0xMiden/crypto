@@ -74,6 +74,13 @@ test-all: test test-parallel ## Run all test variants
 check: ## Check all targets and features for errors without code generation
 	cargo check --all-targets --all-features
 
+.PHONY: check-features
+check-features: ## Check the supported non-default feature combinations
+	cargo check --workspace --all-targets --no-default-features
+	cargo check --workspace --all-targets --features parallel
+	cargo check -p p3-miden-lmcs --all-targets --features testing
+	cargo check -p p3-miden-lifted-fri --all-targets --features testing
+
 # --- building ------------------------------------------------------------------------------------
 
 .PHONY: build

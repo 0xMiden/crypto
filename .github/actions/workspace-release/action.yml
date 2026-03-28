@@ -37,15 +37,19 @@ runs:
     - name: Install Rust toolchain
       uses: dtolnay/rust-toolchain@stable
 
+    # Keep the release dry-run cache tightly scoped to the exact manifest set.
+    #
+    # This job is meant to answer "would this workspace publish cleanly now?".
+    # Broad restore keys or a key derived only from Cargo.lock can hide or
+    # retain resolution state across release lines, which makes failures harder
+    # to attribute when internal crates change without a version bump.
     - name: Cache cargo registry and git index
       uses: actions/cache@v4
       with:
         path: |
           ~/.cargo/registry
           ~/.cargo/git
-        key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-        restore-keys: |
-          ${{ runner.os }}-cargo-
+        key: ${{ runner.os }}-cargo-release-${{ hashFiles('Cargo.toml', '**/Cargo.toml', 'rust-toolchain', 'rust-toolchain.toml') }}
 
     - name: Cleanup large tools for build space
       uses: ./.github/actions/cleanup-runner
@@ -57,6 +61,14 @@ runs:
         echo "Cleaning target/package directory to ensure fresh state"
         rm -rf target/package
 
+    # Note: `cargo publish --workspace --dry-run` verifies each crate as it
+    # would be published. If a releasable internal crate changes incompatibly
+    # while keeping the same version, downstream crates can resolve against the
+    # already-published registry copy instead of the just-updated source and the
+    # dry-run should fail until the version line is advanced.
+    #
+    # That is desirable: it catches release skew before a real publish does.
+    #
     # Dry-run vs real publish
     - name: Dry-run workspace publish
       if: ${{ inputs.mode == 'dry-run' }}

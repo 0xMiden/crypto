@@ -15,7 +15,7 @@ p3-miden-transcript.workspace = true
 
 # Plonky3
 p3-challenger.workspace = true
-p3-commit.workspace = true
+p3-commit = { workspace = true, optional = true }
 p3-dft.workspace = true
 p3-field.workspace = true
 p3-matrix.workspace = true
@@ -47,7 +47,7 @@ tracing-subscriber.workspace = true
 
 [features]
 parallel = ["p3-maybe-rayon/parallel"]
-testing = ["p3-miden-lmcs/testing"]
+testing = ["p3-miden-lmcs/testing", "p3-commit"]
 
 [[bench]]
 name = "fri_fold"
