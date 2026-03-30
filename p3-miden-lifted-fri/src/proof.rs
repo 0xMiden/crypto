@@ -3,9 +3,8 @@
 use alloc::vec::Vec;
 
 use p3_field::{ExtensionField, Field, TwoAdicField};
-use p3_miden_lmcs::Lmcs;
+use p3_miden_lmcs::{Lmcs, TreeIndices};
 use p3_miden_transcript::{TranscriptError, VerifierChannel};
-use p3_util::reverse_bits_len;
 
 use crate::{PcsParams, deep::DeepTranscript, fri::FriTranscript};
 
@@ -24,12 +23,12 @@ where
     pub fri_transcript: FriTranscript<L::F, EF, L::Commitment>,
     /// Proof-of-work witness for query sampling.
     pub query_pow_witness: L::F,
-    /// Query tree indices (bit-reversed exponents) sampled for openings.
-    pub tree_indices: Vec<usize>,
-    /// Batch openings per trace tree, aligned with `tree_indices`.
-    pub deep_openings: Vec<L::BatchProof>,
-    /// Batch openings per FRI round, aligned with per-round indices.
-    pub fri_openings: Vec<L::BatchProof>,
+    /// Query indices in sampling order (domain indices, may contain duplicates).
+    pub query_indices: Vec<usize>,
+    /// Batch witness per trace tree (leaf data + Merkle witness).
+    pub deep_witnesses: Vec<L::BatchProof>,
+    /// Batch witness per FRI round (leaf data + Merkle witness).
+    pub fri_witnesses: Vec<L::BatchProof>,
 }
 
 impl<EF, L> PcsTranscript<EF, L>
@@ -76,19 +75,17 @@ where
 
         let query_pow_witness = channel.grind(params.query_pow_bits())?;
 
-        // Sample exponents and convert to tree indices (bit-reversed),
-        // matching the prover/verifier convention.
-        let tree_indices: Vec<usize> = (0..params.num_queries())
-            .map(|_| {
-                let exp = channel.sample_bits(log_lde_height as usize);
-                reverse_bits_len(exp, log_lde_height as usize)
-            })
+        // Sample query indices (domain indices), matching the prover/verifier convention.
+        let query_indices: Vec<usize> = (0..params.num_queries())
+            .map(|_| channel.sample_bits(log_lde_height as usize))
             .collect();
+        let tree_indices = TreeIndices::new(query_indices.iter().copied(), log_lde_height)
+            .expect("sampled indices are in range");
 
-        let deep_openings: Vec<_> = commitments
+        let deep_witnesses: Vec<_> = commitments
             .iter()
             .map(|(_commitment, widths)| {
-                lmcs.read_batch_proof_from_channel(widths, log_lde_height, &tree_indices, channel)
+                lmcs.read_batch_proof(widths, &tree_indices, channel)
                     .map_err(|e| match e {
                         p3_miden_lmcs::LmcsError::TranscriptError(te) => te,
                         _ => TranscriptError::NoMoreFields,
@@ -96,37 +93,33 @@ where
             })
             .collect::<Result<Vec<_>, _>>()?;
 
-        let log_arity = params.fri.fold.log_arity() as usize; // usize for shift arithmetic
+        let log_arity = params.fri.fold.log_arity();
         let arity = params.fri.fold.arity();
         let num_rounds = params.fri.num_rounds(log_lde_height);
 
-        let mut fri_openings = Vec::with_capacity(num_rounds);
-        for round in 0..num_rounds {
-            let log_num_rows =
-                (log_lde_height as usize).saturating_sub(log_arity * (round + 1)) as u8;
-            let round_indices: Vec<usize> = tree_indices
-                .iter()
-                .map(|&idx| idx >> (log_arity * (round + 1)))
-                .collect();
+        let mut fri_witnesses = Vec::with_capacity(num_rounds);
+        let mut round_indices = tree_indices.clone();
+        for _round in 0..num_rounds {
+            round_indices.shrink_depth(log_arity);
             let base_width = arity * EF::DIMENSION;
             // FRI round openings are unaligned, so use the base width directly.
             let round_widths = [base_width];
             let batch = lmcs
-                .read_batch_proof_from_channel(&round_widths, log_num_rows, &round_indices, channel)
+                .read_batch_proof(&round_widths, &round_indices, channel)
                 .map_err(|e| match e {
                     p3_miden_lmcs::LmcsError::TranscriptError(te) => te,
                     _ => TranscriptError::NoMoreFields,
                 })?;
-            fri_openings.push(batch);
+            fri_witnesses.push(batch);
         }
 
         Ok(Self {
             deep_transcript,
             fri_transcript,
             query_pow_witness,
-            tree_indices,
-            deep_openings,
-            fri_openings,
+            query_indices,
+            deep_witnesses,
+            fri_witnesses,
         })
     }
 }

@@ -134,7 +134,7 @@ If these invariants do not hold, verification should fail via parse error,
 |------|---------|
 | `p3-miden-lmcs/src/lmcs.rs` | `LmcsConfig` implementation; `open_batch` |
 | `p3-miden-lmcs/src/lifted_tree.rs` | Tree construction + proving |
-| `p3-miden-lmcs/src/proof.rs` | `BatchProof` / `Proof` parsing helpers |
+| `p3-miden-lmcs/src/proof.rs` | `BatchProof` / `Proof` types |
 | `p3-miden-lmcs/src/utils.rs` | Row hashing + width/alignment helpers |
 
 ## Security

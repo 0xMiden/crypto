@@ -13,7 +13,7 @@ members = [
 resolver = "3"
 
 [workspace.package]
-version = "0.5.0"
+version = "0.5.1"
 edition = "2024"
 license = "MIT OR Apache-2.0"
 rust-version = "1.85"
@@ -24,36 +24,42 @@ homepage = "https://github.com/0xMiden/p3-miden"
 [workspace.dependencies]
 
 # Internal
-p3-miden-blake3 = { path = "p3-miden-blake3", version = "0.5.0" }
-p3-miden-dev-utils = { path = "p3-miden-dev-utils", version = "0.5.0" }
-p3-miden-lifted-air = { path = "p3-miden-lifted-air", version = "0.5.0" }
-p3-miden-lifted-examples = { path = "p3-miden-lifted-examples", version = "0.5.0" }
-p3-miden-lifted-fri = { path = "p3-miden-lifted-fri", version = "0.5.0" }
-p3-miden-lifted-stark = { path = "p3-miden-lifted-stark", version = "0.5.0" }
-p3-miden-lmcs = { path = "p3-miden-lmcs", version = "0.5.0" }
-p3-miden-stateful-hasher = { path = "p3-miden-stateful-hasher", version = "0.5.0" }
-p3-miden-transcript = { path = "p3-miden-transcript", version = "0.5.0" }
+p3-miden-blake3 = { path = "p3-miden-blake3", version = "0.5" }
+p3-miden-dev-utils = { path = "p3-miden-dev-utils", version = "0.5" }
+p3-miden-lifted-air = { path = "p3-miden-lifted-air", version = "0.5" }
+p3-miden-lifted-examples = { path = "p3-miden-lifted-examples", version = "0.5" }
+p3-miden-lifted-fri = { path = "p3-miden-lifted-fri", version = "0.5" }
+p3-miden-lifted-stark = { path = "p3-miden-lifted-stark", version = "0.5" }
+p3-miden-lmcs = { path = "p3-miden-lmcs", version = "0.5" }
+p3-miden-stateful-hasher = { path = "p3-miden-stateful-hasher", version = "0.5" }
+p3-miden-transcript = { path = "p3-miden-transcript", version = "0.5" }
 
 # Plonky3 (trait crates)
-p3-air = { version = "0.5.0", default-features = false }
-p3-challenger = { version = "0.5.0", default-features = false }
-p3-commit = { version = "0.5.0", default-features = false }
-p3-dft = { version = "0.5.0", default-features = false }
-p3-field = { version = "0.5.0", default-features = false }
-p3-matrix = { version = "0.5.0", default-features = false }
-p3-maybe-rayon = { version = "0.5.0", default-features = false }
-p3-symmetric = { version = "0.5.0", default-features = false }
-p3-util = { version = "0.5.0", default-features = false }
+p3-air = { version = "0.5", default-features = false }
+p3-challenger = { version = "0.5", default-features = false }
+p3-commit = { version = "0.5", default-features = false }
+p3-dft = { version = "0.5", default-features = false }
+p3-field = { version = "0.5", default-features = false }
+p3-matrix = { version = "0.5", default-features = false }
+p3-maybe-rayon = { version = "0.5", default-features = false }
+p3-symmetric = { version = "0.5", default-features = false }
+p3-util = { version = "0.5", default-features = false }
 
 # Plonky3 (concrete implementations — dev/test/bench only in core crates)
-p3-blake3 = { version = "0.5.0", default-features = false }
-p3-bn254 = { version = "0.5.0", default-features = false }
-p3-fri = { version = "0.5.0", default-features = false }
-p3-goldilocks = { version = "0.5.0", default-features = false }
-p3-interpolation = { version = "0.5.0", default-features = false }
-p3-keccak = { version = "0.5.0", default-features = false }
-p3-merkle-tree = { version = "0.5.0", default-features = false }
-p3-mersenne-31 = { version = "0.5.0", default-features = false }
+p3-batch-stark = { version = "0.5", default-features = false }
+p3-blake3 = { version = "0.5", default-features = false }
+p3-blake3-air = { version = "0.5", default-features = false }
+p3-bn254 = { version = "0.5", default-features = false }
+p3-fri = { version = "0.5", default-features = false }
+p3-goldilocks = { version = "0.5", default-features = false }
+p3-interpolation = { version = "0.5", default-features = false }
+p3-keccak = { version = "0.5", default-features = false }
+p3-keccak-air = { version = "0.5", default-features = false }
+p3-lookup = { version = "0.5", default-features = false }
+p3-merkle-tree = { version = "0.5", default-features = false }
+p3-mersenne-31 = { version = "0.5", default-features = false }
+p3-poseidon2-air = { version = "0.5", default-features = false }
+p3-uni-stark = { version = "0.5", default-features = false }
 
 # Third-party
 criterion = { version = "0.8", features = ["html_reports"] }
@@ -71,3 +77,4 @@ tracing-subscriber = { version = "0.3.17", features = [
   "fmt",
   "env-filter",
 ] }
+tracing-forest = "0.1.6"

@@ -1,14 +1,10 @@
-use alloc::{
-    collections::{BTreeMap, BTreeSet},
-    vec::Vec,
-};
+use alloc::{collections::BTreeMap, vec::Vec};
 use core::{iter::zip, marker::PhantomData};
 
 use p3_field::{ExtensionField, TwoAdicField};
 use p3_matrix::Matrix;
-use p3_miden_lmcs::{Lmcs, LmcsError};
+use p3_miden_lmcs::{Lmcs, LmcsError, TreeIndices};
 use p3_miden_transcript::{TranscriptError, VerifierChannel};
-use p3_util::reverse_bits_len;
 use thiserror::Error;
 
 use super::{DeepParams, read_eval_matrices};
@@ -124,8 +120,8 @@ impl<F: TwoAdicField, EF: ExtensionField<F>, L: Lmcs<F = F>> DeepOracle<F, EF, L
 
     /// Open the oracle at given tree indices by reading proofs from a verifier channel.
     ///
-    /// `tree_indices` are bit-reversed positions (sorted, deduplicated).
-    /// Returns a map from tree index to DEEP evaluation at that point.
+    /// `tree_indices` are domain indices (sorted, deduplicated).
+    /// Returns a map from domain index to DEEP evaluation at that point.
     ///
     /// The reduction to `f_red` must match the prover's exactly.
     ///
@@ -136,7 +132,7 @@ impl<F: TwoAdicField, EF: ExtensionField<F>, L: Lmcs<F = F>> DeepOracle<F, EF, L
     pub fn open_batch<Ch>(
         &self,
         lmcs: &L,
-        tree_indices: &BTreeSet<usize>,
+        tree_indices: &TreeIndices,
         channel: &mut Ch,
     ) -> Result<BTreeMap<usize, EF>, DeepError>
     where
@@ -147,13 +143,7 @@ impl<F: TwoAdicField, EF: ExtensionField<F>, L: Lmcs<F = F>> DeepOracle<F, EF, L
 
         for (group_idx, (commit, widths)) in self.commitments.iter().enumerate() {
             let opened_rows = lmcs
-                .open_batch(
-                    commit,
-                    widths,
-                    self.log_lde_height,
-                    tree_indices.iter().copied(),
-                    channel,
-                )
+                .open_batch(commit, widths, tree_indices, channel)
                 .map_err(|source| DeepError::LmcsError {
                     source,
                     tree: group_idx,
@@ -185,9 +175,8 @@ impl<F: TwoAdicField, EF: ExtensionField<F>, L: Lmcs<F = F>> DeepOracle<F, EF, L
         let evals: BTreeMap<usize, EF> = reduced_rows
             .into_iter()
             .map(|(tree_idx, reduced_row)| {
-                // Recover domain point X = g·ω^{exp} from tree index (bit-reversed position)
-                let exp = reverse_bits_len(tree_idx, self.log_lde_height as usize);
-                let row_point = shift * generator.exp_u64(exp as u64);
+                // Recover domain point X = g·ω^{tree_idx} (tree index = domain index)
+                let row_point = shift * generator.exp_u64(tree_idx as u64);
 
                 // DEEP quotient: Q(X) = Σⱼ βʲ · (f_reduced(zⱼ) - f_reduced(X)) / (zⱼ - X)
                 // Precondition: eval points lie outside the LDE domain.

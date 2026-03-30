@@ -65,8 +65,8 @@ fn bench_deep_quotient(c: &mut Criterion) {
         // Precompute coset points (LDE domain matches max matrix height)
         let coset_points = bit_reversed_coset_points::<F>(log_lde_height);
 
-        // Get matrix references from trees
-        let matrices_refs: Vec<Vec<&RowMajorMatrix<F>>> = trees
+        // Get matrix references from trees (stored as BitReversedMatrixView after build_tree)
+        let matrices_refs: Vec<Vec<_>> = trees
             .iter()
             .map(|tree| tree.leaves().iter().collect())
             .collect();

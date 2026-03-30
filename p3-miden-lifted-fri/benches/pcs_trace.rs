@@ -60,15 +60,17 @@ fn main() {
         let lmcs = test_lmcs();
 
         // Compute LDE matrices and build LMCS tree
-        let mut all_lde_matrices: Vec<RowMajorMatrix<F>> = matrix_groups
+        let mut all_lde_matrices: Vec<_> = matrix_groups
             .iter()
             .flat_map(|matrices| {
                 matrices.iter().map(|m| {
-                    let lde = dft.coset_lde_batch(m.clone(), 2, shift);
-                    lde.bit_reverse_rows().to_row_major_matrix()
+                    dft.coset_lde_batch(m.clone(), 2, shift)
+                        .bit_reverse_rows()
+                        .to_row_major_matrix()
+                        .bit_reverse_rows()
                 })
             })
-            .collect();
+            .collect::<Vec<_>>();
         all_lde_matrices.sort_by_key(|m| m.height());
 
         let tree = lmcs.build_aligned_tree(all_lde_matrices);

@@ -34,11 +34,6 @@ pub mod matrix;
 // Re-exports at crate root for convenience
 // =============================================================================
 
-// Traits
-// Scenario structs
-pub use configs::{
-    BenchScenario, GoldilocksBlake3_192, GoldilocksKeccak, GoldilocksPoseidon2, PcsScenario,
-};
 // Common fixtures
 pub use fixtures::{BENCH_SEED, LOG_HEIGHTS, RELATIVE_SPECS, TEST_SEED};
 // Matrix utilities

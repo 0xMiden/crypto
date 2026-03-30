@@ -29,7 +29,7 @@ use p3_commit::{ExtensionMmcs, Pcs};
 use p3_dft::{Radix2DitParallel, TwoAdicSubgroupDft};
 use p3_field::Field;
 use p3_fri::{FriParameters, TwoAdicFriPcs};
-use p3_matrix::{Matrix, bitrev::BitReversibleMatrix, dense::RowMajorMatrix};
+use p3_matrix::{Matrix, dense::RowMajorMatrix};
 use p3_merkle_tree::MerkleTreeMmcs;
 use p3_miden_dev_utils::{
     LOG_HEIGHTS, RELATIVE_SPECS,
@@ -178,10 +178,9 @@ fn bench_pcs(c: &mut Criterion) {
             let mut all_lde_matrices: Vec<_> = matrix_groups
                 .iter()
                 .flat_map(|matrices| {
-                    matrices.iter().map(|m| {
-                        let lde = dft.coset_lde_batch(m.clone(), LOG_BLOWUP, shift);
-                        lde.bit_reverse_rows().to_row_major_matrix()
-                    })
+                    matrices
+                        .iter()
+                        .map(|m| dft.coset_lde_batch(m.clone(), LOG_BLOWUP, shift))
                 })
                 .collect();
             // Sort by height (ascending) as required by LMCS
