@@ -14,62 +14,6 @@
 //! }
 //! ```
 
-/// Macro to generate a BLAKE3-192 (24-byte digest) byte-LMCS config for benchmarks.
-#[macro_export]
-macro_rules! impl_blake3_192_config {
-    (
-        scenario: $scenario:ident,
-        field: $field:ty,
-        ext_degree: $ext_deg:literal,
-        field_name: $field_name:literal
-    ) => {
-        use alloc::vec::Vec;
-
-        use p3_challenger::{HashChallenger, SerializingChallenger64};
-        use p3_field::{Field, extension::BinomialExtensionField};
-        use p3_miden_blake3::Blake3_192;
-        use p3_symmetric::{CompressionFunctionFromHasher, SerializingHasher};
-
-        /// Chaining state / digest width in bytes (matches digest size).
-        pub const WIDTH: usize = 24;
-
-        /// Digest size in bytes.
-        pub const DIGEST: usize = 24;
-
-        /// Base field.
-        pub type F = $field;
-
-        /// Packed base field for SIMD (not used by byte LMCS, but kept for parity with Poseidon2 configs).
-        pub type P = <F as Field>::Packing;
-
-        /// Extension field.
-        pub type EF = BinomialExtensionField<F, $ext_deg>;
-
-        /// Leaf hasher: serializes `F` to bytes, then BLAKE3-192 (same pattern as Keccak MMCS).
-        pub type Sponge = SerializingHasher<Blake3_192>;
-
-        /// 2-to-1 compression via BLAKE3-192.
-        pub type Compress = CompressionFunctionFromHasher<Blake3_192, 2, DIGEST>;
-
-        /// Fiat–Shamir challenger over serialized field elements.
-        pub type Challenger = SerializingChallenger64<F, HashChallenger<u8, Blake3_192, DIGEST>>;
-
-        /// Sponge + compressor for Merkle construction.
-        pub fn test_components() -> (Sponge, Compress) {
-            let h = Blake3_192;
-            (
-                SerializingHasher::new(h),
-                CompressionFunctionFromHasher::new(h),
-            )
-        }
-
-        /// Fresh hash challenger (empty initial state).
-        pub fn test_challenger() -> Challenger {
-            SerializingChallenger64::new(HashChallenger::new(Vec::new(), Blake3_192))
-        }
-    };
-}
-
 // =============================================================================
 // Config modules
 // =============================================================================
@@ -202,12 +146,81 @@ pub mod goldilocks_poseidon2 {
 
 /// Goldilocks + BLAKE3-192 (24-byte digest).
 pub mod goldilocks_blake3_192 {
-    use p3_goldilocks::Goldilocks;
+    use alloc::vec;
 
-    crate::impl_blake3_192_config!(
-        scenario: GoldilocksBlake3_192,
-        field: Goldilocks,
-        ext_degree: 2,
-        field_name: "goldilocks"
-    );
+    use p3_blake3::Blake3;
+    use p3_challenger::{HashChallenger, SerializingChallenger64};
+    use p3_field::{Field, extension::BinomialExtensionField};
+    use p3_goldilocks::Goldilocks;
+    use p3_miden_stateful_hasher::{ChainingHasher, TruncatingHasher};
+    use p3_symmetric::CompressionFunctionFromHasher;
+
+    pub type Blake3_192 = TruncatingHasher<Blake3, 32, 24>;
+
+    /// Chaining state / digest width in bytes (matches digest size).
+    pub const WIDTH: usize = 24;
+
+    /// Digest size in bytes.
+    pub const DIGEST: usize = 24;
+
+    /// Base field.
+    pub type F = Goldilocks;
+
+    /// Packed base field for SIMD (not used by byte LMCS, but kept for parity with Poseidon2 configs).
+    pub type P = <F as Field>::Packing;
+
+    /// Extension field.
+    pub type EF = BinomialExtensionField<F, 2>;
+
+    /// Chaining sponge over BLAKE3-192 on serialized field elements (LMCS `StatefulHasher`).
+    pub type Sponge = ChainingHasher<Blake3_192>;
+
+    /// 2-to-1 compression via BLAKE3-192.
+    pub type Compress = CompressionFunctionFromHasher<Blake3_192, 2, DIGEST>;
+
+    /// Fiat–Shamir challenger over serialized field elements.
+    pub type Challenger = SerializingChallenger64<F, HashChallenger<u8, Blake3_192, DIGEST>>;
+
+    /// Sponge + compressor for Merkle construction.
+    pub fn test_components() -> (Sponge, Compress) {
+        let h = Blake3_192::new(Blake3);
+        (
+            ChainingHasher::new(h),
+            CompressionFunctionFromHasher::new(h),
+        )
+    }
+
+    /// Fresh hash challenger (empty initial state).
+    pub fn test_challenger() -> Challenger {
+        SerializingChallenger64::new(HashChallenger::<u8, Blake3_192, DIGEST>::new(
+            vec![],
+            Blake3_192::new(Blake3),
+        ))
+    }
+}
+
+#[cfg(test)]
+mod blake3_tests {
+    use p3_blake3::Blake3;
+    use p3_symmetric::CryptographicHasher;
+
+    use super::goldilocks_blake3_192::Blake3_192;
+
+    #[test]
+    fn digest_is_first_24_bytes_of_blake3_256() {
+        let data: [u8; 133] = core::array::from_fn(|i| i as u8);
+        let full: [u8; 32] = Blake3.hash_iter(data);
+        let digest_192 = Blake3_192::new(Blake3).hash_iter(data);
+        assert_eq!(digest_192, core::array::from_fn(|i| full[i]));
+    }
+
+    #[test]
+    fn hash_iter_slices_matches_flat_byte_stream() {
+        let a = [1u8, 2, 3];
+        let b = [4u8, 5, 6, 7];
+        let h = Blake3_192::new(Blake3);
+        let via_slices = h.hash_iter_slices([&a[..], &b[..]]);
+        let via_iter = h.hash_iter(a.iter().chain(b.iter()).copied());
+        assert_eq!(via_slices, via_iter);
+    }
 }

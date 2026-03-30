@@ -10,7 +10,6 @@ homepage.workspace = true
 
 [dependencies]
 # Internal
-p3-miden-blake3.workspace = true
 p3-miden-lifted-air.workspace = true
 p3-miden-lifted-fri.workspace = true
 p3-miden-lmcs.workspace = true

@@ -450,11 +450,13 @@ mod tests {
     fn goldilocks_blake3_192_roundtrip() {
         use alloc::{vec, vec::Vec};
 
+        use p3_blake3::Blake3;
         use p3_challenger::{HashChallenger, SerializingChallenger64};
         use p3_goldilocks::Goldilocks;
-        use p3_miden_blake3::Blake3_192;
-        use p3_miden_stateful_hasher::ChainingHasher;
+        use p3_miden_stateful_hasher::{ChainingHasher, TruncatingHasher};
         use p3_symmetric::CompressionFunctionFromHasher;
+
+        pub type Blake3_192 = TruncatingHasher<Blake3, 32, 24>;
 
         type F = Goldilocks;
         type Sponge = ChainingHasher<Blake3_192>;
@@ -465,11 +467,11 @@ mod tests {
         type Challenger = SerializingChallenger64<F, HashChallenger<u8, Blake3_192, DIGEST>>;
 
         fn challenger() -> Challenger {
-            SerializingChallenger64::new(HashChallenger::new(Vec::new(), Blake3_192))
+            SerializingChallenger64::new(HashChallenger::new(Vec::new(), Blake3_192::new(Blake3)))
         }
 
-        let sponge = ChainingHasher::new(Blake3_192);
-        let compress = CompressionFunctionFromHasher::new(Blake3_192);
+        let sponge = ChainingHasher::new(Blake3_192::new(Blake3));
+        let compress = CompressionFunctionFromHasher::new(Blake3_192::new(Blake3));
         let lmcs: Blake3Lmcs = LmcsConfig::new(sponge, compress);
 
         let values: Vec<F> = (0..4 * 2).map(|i| F::from_u64(i as u64)).collect();
