@@ -22,6 +22,7 @@ p3-symmetric.workspace = true
 p3-util.workspace = true
 
 # Optional (for testing feature)
+p3-blake3 = { workspace = true, optional = true }
 p3-keccak = { workspace = true, optional = true }
 p3-miden-dev-utils = { workspace = true, optional = true }
 

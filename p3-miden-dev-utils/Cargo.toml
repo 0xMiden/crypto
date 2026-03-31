@@ -13,6 +13,7 @@ homepage.workspace = true
 p3-miden-stateful-hasher.workspace = true
 
 # Plonky3
+p3-blake3.workspace = true
 p3-challenger.workspace = true
 p3-field.workspace = true
 p3-goldilocks.workspace = true

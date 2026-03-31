@@ -97,6 +97,14 @@ fn bench_lmcs_vs_mmcs(c: &mut Criterion) {
 
     // Keccak scenario
     bench_hash(c, &gl_keccak_lmcs(), &gl_keccak_mmcs(), "keccak");
+
+    // Blake3-192 scenario
+    bench_hash(
+        c,
+        &gl_blake3_192_lmcs(),
+        &gl_blake3_192_mmcs(),
+        "blake3-192",
+    );
 }
 
 criterion_group! {

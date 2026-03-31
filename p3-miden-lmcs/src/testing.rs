@@ -132,6 +132,66 @@ pub mod goldilocks_keccak {
     }
 }
 
+// Goldilocks + Blake3-192 LMCS configuration and test fixtures.
+pub mod goldilocks_blake3_192 {
+    use alloc::vec::Vec;
+
+    use p3_challenger::CanObserve;
+    use p3_matrix::dense::RowMajorMatrix;
+    pub use p3_miden_dev_utils::configs::goldilocks_blake3_192::*;
+    use p3_miden_transcript::{ProverTranscript, TranscriptData, VerifierTranscript};
+    use rand::{Rng, RngExt};
+
+    use crate::Lmcs as LmcsTrait;
+
+    /// LMCS configured with Goldilocks + Blake3-192.
+    pub type Lmcs = crate::LmcsConfig<F, u8, Sponge, Compress, WIDTH, DIGEST>;
+
+    pub type TestTree = <Lmcs as LmcsTrait>::Tree<RowMajorMatrix<F>>;
+    pub type TestCommitment = <Lmcs as LmcsTrait>::Commitment;
+    pub type TestTranscriptData = TranscriptData<F, TestCommitment>;
+    pub type TestDigest = <Challenger as p3_challenger::CanFinalizeDigest>::Digest;
+    pub type TestProverChannel = ProverTranscript<F, TestCommitment, Challenger>;
+    pub type TestVerifierChannel<'a> = VerifierTranscript<'a, F, TestCommitment, Challenger>;
+
+    /// Create a test LMCS instance.
+    pub fn test_lmcs() -> Lmcs {
+        let (sponge, compress) = test_components();
+        crate::LmcsConfig::new(sponge, compress)
+    }
+
+    pub fn prover_channel() -> TestProverChannel {
+        ProverTranscript::<F, TestCommitment, Challenger>::new(test_challenger())
+    }
+
+    pub fn prover_channel_with_commitment(commitment: &TestCommitment) -> TestProverChannel {
+        let mut challenger = test_challenger();
+        challenger.observe(*commitment);
+        ProverTranscript::<F, TestCommitment, Challenger>::new(challenger)
+    }
+
+    pub fn verifier_channel(data: &TestTranscriptData) -> TestVerifierChannel<'_> {
+        VerifierTranscript::<'_, F, TestCommitment, Challenger>::from_data(test_challenger(), data)
+    }
+
+    pub fn verifier_channel_with_commitment<'a>(
+        data: &'a TestTranscriptData,
+        commitment: &TestCommitment,
+    ) -> TestVerifierChannel<'a> {
+        let mut challenger = test_challenger();
+        challenger.observe(*commitment);
+        VerifierTranscript::<'a, F, TestCommitment, Challenger>::from_data(challenger, data)
+    }
+
+    pub fn sample_indices<R: Rng>(rng: &mut R, upper: usize, count: usize) -> Vec<usize> {
+        let mut indices = Vec::with_capacity(count);
+        for _ in 0..count {
+            indices.push(rng.random_range(0..upper));
+        }
+        indices
+    }
+}
+
 /// Common matrix group scenarios for testing lifting with varying heights.
 ///
 /// Each scenario is a list of (height, width) pairs, sorted by ascending height.

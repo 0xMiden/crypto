@@ -9,6 +9,7 @@
 //! - [`StatefulSponge`]: Wraps a permutation with proper sponge semantics
 //! - [`SerializingStatefulSponge`]: Serializes field elements to binary before absorbing
 //! - [`ChainingHasher`]: Uses chaining mode `H(state || input)` with a regular hasher
+//! - [`TruncatingHasher`]: Wraps a hasher and returns a shorter fixed digest (prefix)
 
 #![no_std]
 
@@ -18,6 +19,7 @@ extern crate alloc;
 mod chaining;
 mod field_sponge;
 mod serializing_sponge;
+mod truncating;
 
 #[cfg(test)]
 pub mod testing;
@@ -25,6 +27,7 @@ pub mod testing;
 pub use chaining::*;
 pub use field_sponge::*;
 pub use serializing_sponge::*;
+pub use truncating::*;
 
 /// Trait for stateful sponge-like hashers.
 ///

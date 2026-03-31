@@ -263,10 +263,11 @@ mod tests {
 
     use p3_field::PrimeCharacteristicRing;
     use p3_matrix::dense::RowMajorMatrix;
-    use p3_miden_transcript::TranscriptData;
+    use p3_miden_transcript::{ProverTranscript, TranscriptData, VerifierTranscript};
 
     use crate::{
-        Lmcs, LmcsError, LmcsTree, TreeIndices, log2_strict_u8, testing::goldilocks_poseidon2 as gl,
+        Lmcs, LmcsConfig, LmcsError, LmcsTree, TreeIndices, log2_strict_u8,
+        testing::goldilocks_poseidon2 as gl,
     };
 
     fn small_matrix(height: usize, width: usize, seed: u64) -> RowMajorMatrix<gl::F> {
@@ -438,6 +439,60 @@ mod tests {
             .expect("Goldilocks+Blake3 LMCS roundtrip should verify");
 
         assert_eq!(opened[&0], tree.aligned_rows(0));
+        let verifier_digest = verifier_channel
+            .finalize()
+            .expect("transcript should finalize cleanly");
+        assert_eq!(prover_digest, verifier_digest);
+    }
+
+    /// Same as [`goldilocks_blake3_roundtrip`] but with a 24-byte BLAKE3 digest (BLAKE3-192).
+    #[test]
+    fn goldilocks_blake3_192_roundtrip() {
+        use alloc::{vec, vec::Vec};
+
+        use p3_blake3::Blake3;
+        use p3_challenger::{HashChallenger, SerializingChallenger64};
+        use p3_goldilocks::Goldilocks;
+        use p3_miden_stateful_hasher::{ChainingHasher, TruncatingHasher};
+        use p3_symmetric::CompressionFunctionFromHasher;
+
+        pub type Blake3_192 = TruncatingHasher<Blake3, 32, 24>;
+
+        type F = Goldilocks;
+        type Sponge = ChainingHasher<Blake3_192>;
+        type Compress = CompressionFunctionFromHasher<Blake3_192, 2, 24>;
+        const WIDTH: usize = 24;
+        const DIGEST: usize = 24;
+        type Blake3Lmcs = LmcsConfig<F, u8, Sponge, Compress, WIDTH, DIGEST>;
+        type Challenger = SerializingChallenger64<F, HashChallenger<u8, Blake3_192, DIGEST>>;
+
+        fn challenger() -> Challenger {
+            SerializingChallenger64::new(HashChallenger::new(Vec::new(), Blake3_192::new(Blake3)))
+        }
+
+        let sponge = ChainingHasher::new(Blake3_192::new(Blake3));
+        let compress = CompressionFunctionFromHasher::new(Blake3_192::new(Blake3));
+        let lmcs: Blake3Lmcs = LmcsConfig::new(sponge, compress);
+
+        let values: Vec<F> = (0..4 * 2).map(|i| F::from_u64(i as u64)).collect();
+        let matrix = RowMajorMatrix::new(values, 2);
+
+        let tree = lmcs.build_tree(vec![matrix]);
+        let widths = tree.widths();
+        let log_max_height = log2_strict_u8(tree.height());
+        let commitment = tree.root();
+
+        let mut prover_channel = ProverTranscript::new(challenger());
+        let indices = TreeIndices::new([0usize], log_max_height).unwrap();
+        tree.prove_batch(&indices, &mut prover_channel);
+        let (prover_digest, transcript) = prover_channel.finalize();
+
+        let mut verifier_channel = VerifierTranscript::from_data(challenger(), &transcript);
+        let opened = lmcs
+            .open_batch(&commitment, &widths, &indices, &mut verifier_channel)
+            .expect("Goldilocks+Blake3-192 LMCS roundtrip should verify");
+
+        assert_eq!(opened[&0], tree.rows(0));
         let verifier_digest = verifier_channel
             .finalize()
             .expect("transcript should finalize cleanly");

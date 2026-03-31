@@ -2,7 +2,7 @@
 
 use alloc::vec::Vec;
 
-use p3_blake3_air::{Blake3Air, NUM_BLAKE3_COLS};
+pub use p3_blake3_air::{Blake3Air, NUM_BLAKE3_COLS};
 use p3_field::{Field, PrimeField64};
 use p3_matrix::dense::RowMajorMatrix;
 use p3_miden_lifted_air::{Air, BaseAir, LiftedAir, LiftedAirBuilder};
