@@ -1,4 +1,4 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `miden-crypto/src/merkle/smt/large_forest/history/mod.rs`."><title>mod.rs - source</title><script>if(window.location.protocol!=="file:")document.head.insertAdjacentHTML("beforeend","SourceSerif4-Regular-6b053e98.ttf.woff2,FiraSans-Italic-81dc35de.woff2,FiraSans-Regular-0fe48ade.woff2,FiraSans-MediumItalic-ccf7e434.woff2,FiraSans-Medium-e1aa3f0a.woff2,SourceCodePro-Regular-8badfe75.ttf.woff2,SourceCodePro-Semibold-aa29a496.ttf.woff2".split(",").map(f=>`<link rel="preload" as="font" type="font/woff2"href="../../../../../../static.files/${f}">`).join(""))</script><link rel="stylesheet" href="../../../../../../static.files/normalize-9960930a.css"><link rel="stylesheet" href="../../../../../../static.files/rustdoc-17e0aaed.css"><meta name="rustdoc-vars" data-root-path="../../../../../../" data-static-root-path="../../../../../../static.files/" data-current-crate="miden_crypto" data-themes="" data-resource-suffix="" data-rustdoc-version="1.96.0-nightly (23903d01c 2026-03-26)" data-channel="nightly" data-search-js="search-63369b7b.js" data-stringdex-js="stringdex-2da4960a.js" data-settings-js="settings-170eb4bf.js" ><script src="../../../../../../static.files/storage-41dd4d93.js"></script><script defer src="../../../../../../static.files/src-script-813739b1.js"></script><script defer src="../../../../../../src-files.js"></script><script defer src="../../../../../../static.files/main-5013f961.js"></script><noscript><link rel="stylesheet" href="../../../../../../static.files/noscript-f7c3ffd8.css"></noscript><link rel="alternate icon" type="image/png" href="../../../../../../static.files/favicon-32x32-eab170b8.png"><link rel="icon" type="image/svg+xml" href="../../../../../../static.files/favicon-044be391.svg"></head><body class="rustdoc src"><a class="skip-main-content" href="#main-content">Skip to main content</a><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="src-sidebar-title"><h2>Files</h2></div></nav><div class="sidebar-resizer" title="Drag to resize sidebar"></div><main><section id="main-content" class="content" tabindex="-1"><div class="main-heading"><h1><div class="sub-heading">miden_crypto/merkle/smt/large_forest/history/</div>mod.rs</h1><rustdoc-toolbar></rustdoc-toolbar></div><div class="example-wrap digits-3"><pre class="rust"><code><a href=#1 id=1 data-nosnippet>1</a><span class="doccomment">//! This module contains the definition of [`History`], a simple container for some number of
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `miden-crypto/src/merkle/smt/large_forest/history/mod.rs`."><title>mod.rs - source</title><script>if(window.location.protocol!=="file:")document.head.insertAdjacentHTML("beforeend","SourceSerif4-Regular-6b053e98.ttf.woff2,FiraSans-Italic-81dc35de.woff2,FiraSans-Regular-0fe48ade.woff2,FiraSans-MediumItalic-ccf7e434.woff2,FiraSans-Medium-e1aa3f0a.woff2,SourceCodePro-Regular-8badfe75.ttf.woff2,SourceCodePro-Semibold-aa29a496.ttf.woff2".split(",").map(f=>`<link rel="preload" as="font" type="font/woff2"href="../../../../../../static.files/${f}">`).join(""))</script><link rel="stylesheet" href="../../../../../../static.files/normalize-9960930a.css"><link rel="stylesheet" href="../../../../../../static.files/rustdoc-17e0aaed.css"><meta name="rustdoc-vars" data-root-path="../../../../../../" data-static-root-path="../../../../../../static.files/" data-current-crate="miden_crypto" data-themes="" data-resource-suffix="" data-rustdoc-version="1.96.0-nightly (48cc71ee8 2026-03-31)" data-channel="nightly" data-search-js="search-63369b7b.js" data-stringdex-js="stringdex-2da4960a.js" data-settings-js="settings-170eb4bf.js" ><script src="../../../../../../static.files/storage-41dd4d93.js"></script><script defer src="../../../../../../static.files/src-script-813739b1.js"></script><script defer src="../../../../../../src-files.js"></script><script defer src="../../../../../../static.files/main-5013f961.js"></script><noscript><link rel="stylesheet" href="../../../../../../static.files/noscript-f7c3ffd8.css"></noscript><link rel="alternate icon" type="image/png" href="../../../../../../static.files/favicon-32x32-eab170b8.png"><link rel="icon" type="image/svg+xml" href="../../../../../../static.files/favicon-044be391.svg"></head><body class="rustdoc src"><a class="skip-main-content" href="#main-content">Skip to main content</a><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="src-sidebar-title"><h2>Files</h2></div></nav><div class="sidebar-resizer" title="Drag to resize sidebar"></div><main><section id="main-content" class="content" tabindex="-1"><div class="main-heading"><h1><div class="sub-heading">miden_crypto/merkle/smt/large_forest/history/</div>mod.rs</h1><rustdoc-toolbar></rustdoc-toolbar></div><div class="example-wrap digits-3"><pre class="rust"><code><a href=#1 id=1 data-nosnippet>1</a><span class="doccomment">//! This module contains the definition of [`History`], a simple container for some number of
 <a href=#2 id=2 data-nosnippet>2</a>//! historical versions of a given merkle tree.
 <a href=#3 id=3 data-nosnippet>3</a>//!
 <a href=#4 id=4 data-nosnippet>4</a>//! This history consists of a series of _deltas_ from the current state of the tree, moving
@@ -131,325 +131,347 @@
 <a href=#131 id=131 data-nosnippet>131</a>    }
 <a href=#132 id=132 data-nosnippet>132</a>
 <a href=#133 id=133 data-nosnippet>133</a>    <span class="doccomment">/// Adds a version to the history with the provided `root` and represented by the changes from
-<a href=#134 id=134 data-nosnippet>134</a>    /// the current tree given in `nodes` and `leaves`.
-<a href=#135 id=135 data-nosnippet>135</a>    ///
-<a href=#136 id=136 data-nosnippet>136</a>    /// If adding this version would result in exceeding `self.max_count` historical versions, then
-<a href=#137 id=137 data-nosnippet>137</a>    /// the oldest of the versions is automatically removed.
-<a href=#138 id=138 data-nosnippet>138</a>    ///
-<a href=#139 id=139 data-nosnippet>139</a>    /// # Gotchas
-<a href=#140 id=140 data-nosnippet>140</a>    ///
-<a href=#141 id=141 data-nosnippet>141</a>    /// When constructing the `nodes` and `leaves`, keep in mind that those collections must contain
-<a href=#142 id=142 data-nosnippet>142</a>    /// entries for the **default value of a node or leaf** at any position where the tree was
-<a href=#143 id=143 data-nosnippet>143</a>    /// sparse in the state represented by `root`. If this is not done, incorrect values may be
-<a href=#144 id=144 data-nosnippet>144</a>    /// returned.
-<a href=#145 id=145 data-nosnippet>145</a>    ///
-<a href=#146 id=146 data-nosnippet>146</a>    /// This is necessary because the changes are the _reverse_ from what one might expect. Namely,
-<a href=#147 id=147 data-nosnippet>147</a>    /// the changes in a given version `v` must "_revert_" the changes made in the transition from
-<a href=#148 id=148 data-nosnippet>148</a>    /// version `v` to version `v + 1`.
-<a href=#149 id=149 data-nosnippet>149</a>    ///
-<a href=#150 id=150 data-nosnippet>150</a>    /// # Errors
-<a href=#151 id=151 data-nosnippet>151</a>    ///
-<a href=#152 id=152 data-nosnippet>152</a>    /// - [`HistoryError::NonMonotonicVersions`] if the provided version is not greater than the
-<a href=#153 id=153 data-nosnippet>153</a>    ///   previously added version.
-<a href=#154 id=154 data-nosnippet>154</a>    </span><span class="kw">pub fn </span>add_version(
-<a href=#155 id=155 data-nosnippet>155</a>        <span class="kw-2">&amp;mut </span><span class="self">self</span>,
-<a href=#156 id=156 data-nosnippet>156</a>        root: RootValue,
-<a href=#157 id=157 data-nosnippet>157</a>        version_id: VersionId,
-<a href=#158 id=158 data-nosnippet>158</a>        nodes: NodeChanges,
-<a href=#159 id=159 data-nosnippet>159</a>        changed_keys: ChangedKeys,
-<a href=#160 id=160 data-nosnippet>160</a>    ) -&gt; <span class="prelude-ty">Result</span>&lt;()&gt; {
-<a href=#161 id=161 data-nosnippet>161</a>        <span class="comment">// We need to fail early if the provided new version is not monotonic with respect to the
-<a href=#162 id=162 data-nosnippet>162</a>        // latest version in the history.
-<a href=#163 id=163 data-nosnippet>163</a>        </span><span class="kw">if let </span><span class="prelude-val">Some</span>(v) = <span class="self">self</span>.deltas.back()
-<a href=#164 id=164 data-nosnippet>164</a>            &amp;&amp; v.version_id &gt;= version_id
-<a href=#165 id=165 data-nosnippet>165</a>        {
-<a href=#166 id=166 data-nosnippet>166</a>            <span class="kw">return </span><span class="prelude-val">Err</span>(HistoryError::NonMonotonicVersions(version_id, v.version_id));
-<a href=#167 id=167 data-nosnippet>167</a>        }
-<a href=#168 id=168 data-nosnippet>168</a>
-<a href=#169 id=169 data-nosnippet>169</a>        <span class="comment">// We then check if we would exceed our version count limit, and remove the oldest if so.
-<a href=#170 id=170 data-nosnippet>170</a>        </span><span class="kw">if </span><span class="self">self</span>.num_versions() &gt;= <span class="self">self</span>.max_versions() {
-<a href=#171 id=171 data-nosnippet>171</a>            <span class="self">self</span>.deltas.pop_front();
-<a href=#172 id=172 data-nosnippet>172</a>        }
-<a href=#173 id=173 data-nosnippet>173</a>
-<a href=#174 id=174 data-nosnippet>174</a>        <span class="comment">// We then need to update all the older deltas with the necessary additional changes
-<a href=#175 id=175 data-nosnippet>175</a>        // represented in this newly-added version.
-<a href=#176 id=176 data-nosnippet>176</a>        </span><span class="kw">for </span>delta <span class="kw">in </span><span class="kw-2">&amp;mut </span><span class="self">self</span>.deltas {
-<a href=#177 id=177 data-nosnippet>177</a>            <span class="comment">// The root and the version remain the same, but we may need to change the nodes and
-<a href=#178 id=178 data-nosnippet>178</a>            // keys.
-<a href=#179 id=179 data-nosnippet>179</a>            </span><span class="kw">for </span>(ix, value) <span class="kw">in </span><span class="kw-2">&amp;</span>nodes {
-<a href=#180 id=180 data-nosnippet>180</a>                delta.nodes.entry(<span class="kw-2">*</span>ix).or_insert(<span class="kw-2">*</span>value);
-<a href=#181 id=181 data-nosnippet>181</a>            }
-<a href=#182 id=182 data-nosnippet>182</a>            <span class="kw">for </span>(key, value) <span class="kw">in </span><span class="kw-2">&amp;</span>changed_keys {
-<a href=#183 id=183 data-nosnippet>183</a>                <span class="comment">// If the delta has removed something, we never want to re-add it over the top.
-<a href=#184 id=184 data-nosnippet>184</a>                </span>delta.changed_keys.entry(<span class="kw-2">*</span>key).or_insert(<span class="kw-2">*</span>value);
-<a href=#185 id=185 data-nosnippet>185</a>            }
-<a href=#186 id=186 data-nosnippet>186</a>        }
-<a href=#187 id=187 data-nosnippet>187</a>
-<a href=#188 id=188 data-nosnippet>188</a>        <span class="self">self</span>.deltas.push_back(Delta::new(root, version_id, nodes, changed_keys));
+<a href=#134 id=134 data-nosnippet>134</a>    /// the current tree given in `nodes` and `changed_keys`, with `entry_count` as the total
+<a href=#135 id=135 data-nosnippet>135</a>    /// number of entries for the tree that corresponds to this version.
+<a href=#136 id=136 data-nosnippet>136</a>    ///
+<a href=#137 id=137 data-nosnippet>137</a>    /// If adding this version would result in exceeding `self.max_count` historical versions, then
+<a href=#138 id=138 data-nosnippet>138</a>    /// the oldest of the versions is automatically removed.
+<a href=#139 id=139 data-nosnippet>139</a>    ///
+<a href=#140 id=140 data-nosnippet>140</a>    /// # Gotchas
+<a href=#141 id=141 data-nosnippet>141</a>    ///
+<a href=#142 id=142 data-nosnippet>142</a>    /// When constructing the `nodes` and `leaves`, keep in mind that those collections must contain
+<a href=#143 id=143 data-nosnippet>143</a>    /// entries for the **default value of a node or leaf** at any position where the tree was
+<a href=#144 id=144 data-nosnippet>144</a>    /// sparse in the state represented by `root`. If this is not done, incorrect values may be
+<a href=#145 id=145 data-nosnippet>145</a>    /// returned.
+<a href=#146 id=146 data-nosnippet>146</a>    ///
+<a href=#147 id=147 data-nosnippet>147</a>    /// This is necessary because the changes are the _reverse_ from what one might expect. Namely,
+<a href=#148 id=148 data-nosnippet>148</a>    /// the changes in a given version `v` must "_revert_" the changes made in the transition from
+<a href=#149 id=149 data-nosnippet>149</a>    /// version `v` to version `v + 1`.
+<a href=#150 id=150 data-nosnippet>150</a>    ///
+<a href=#151 id=151 data-nosnippet>151</a>    /// # Errors
+<a href=#152 id=152 data-nosnippet>152</a>    ///
+<a href=#153 id=153 data-nosnippet>153</a>    /// - [`HistoryError::NonMonotonicVersions`] if the provided version is not greater than the
+<a href=#154 id=154 data-nosnippet>154</a>    ///   previously added version.
+<a href=#155 id=155 data-nosnippet>155</a>    </span><span class="kw">pub fn </span>add_version(
+<a href=#156 id=156 data-nosnippet>156</a>        <span class="kw-2">&amp;mut </span><span class="self">self</span>,
+<a href=#157 id=157 data-nosnippet>157</a>        root: RootValue,
+<a href=#158 id=158 data-nosnippet>158</a>        version_id: VersionId,
+<a href=#159 id=159 data-nosnippet>159</a>        nodes: NodeChanges,
+<a href=#160 id=160 data-nosnippet>160</a>        changed_keys: ChangedKeys,
+<a href=#161 id=161 data-nosnippet>161</a>        entry_count: usize,
+<a href=#162 id=162 data-nosnippet>162</a>    ) -&gt; <span class="prelude-ty">Result</span>&lt;()&gt; {
+<a href=#163 id=163 data-nosnippet>163</a>        <span class="comment">// We need to fail early if the provided new version is not monotonic with respect to the
+<a href=#164 id=164 data-nosnippet>164</a>        // latest version in the history.
+<a href=#165 id=165 data-nosnippet>165</a>        </span><span class="kw">if let </span><span class="prelude-val">Some</span>(v) = <span class="self">self</span>.deltas.back()
+<a href=#166 id=166 data-nosnippet>166</a>            &amp;&amp; v.version_id &gt;= version_id
+<a href=#167 id=167 data-nosnippet>167</a>        {
+<a href=#168 id=168 data-nosnippet>168</a>            <span class="kw">return </span><span class="prelude-val">Err</span>(HistoryError::NonMonotonicVersions(version_id, v.version_id));
+<a href=#169 id=169 data-nosnippet>169</a>        }
+<a href=#170 id=170 data-nosnippet>170</a>
+<a href=#171 id=171 data-nosnippet>171</a>        <span class="comment">// We then check if we would exceed our version count limit, and remove the oldest if so.
+<a href=#172 id=172 data-nosnippet>172</a>        </span><span class="kw">if </span><span class="self">self</span>.num_versions() &gt;= <span class="self">self</span>.max_versions() {
+<a href=#173 id=173 data-nosnippet>173</a>            <span class="self">self</span>.deltas.pop_front();
+<a href=#174 id=174 data-nosnippet>174</a>        }
+<a href=#175 id=175 data-nosnippet>175</a>
+<a href=#176 id=176 data-nosnippet>176</a>        <span class="comment">// We then need to update all the older deltas with the necessary additional changes
+<a href=#177 id=177 data-nosnippet>177</a>        // represented in this newly-added version.
+<a href=#178 id=178 data-nosnippet>178</a>        </span><span class="kw">for </span>delta <span class="kw">in </span><span class="kw-2">&amp;mut </span><span class="self">self</span>.deltas {
+<a href=#179 id=179 data-nosnippet>179</a>            <span class="comment">// The root and the version remain the same, but we may need to change the nodes and
+<a href=#180 id=180 data-nosnippet>180</a>            // keys.
+<a href=#181 id=181 data-nosnippet>181</a>            </span><span class="kw">for </span>(ix, value) <span class="kw">in </span><span class="kw-2">&amp;</span>nodes {
+<a href=#182 id=182 data-nosnippet>182</a>                delta.nodes.entry(<span class="kw-2">*</span>ix).or_insert(<span class="kw-2">*</span>value);
+<a href=#183 id=183 data-nosnippet>183</a>            }
+<a href=#184 id=184 data-nosnippet>184</a>            <span class="kw">for </span>(key, value) <span class="kw">in </span><span class="kw-2">&amp;</span>changed_keys {
+<a href=#185 id=185 data-nosnippet>185</a>                <span class="comment">// If the delta has removed something, we never want to re-add it over the top.
+<a href=#186 id=186 data-nosnippet>186</a>                </span>delta.changed_keys.entry(<span class="kw-2">*</span>key).or_insert(<span class="kw-2">*</span>value);
+<a href=#187 id=187 data-nosnippet>187</a>            }
+<a href=#188 id=188 data-nosnippet>188</a>        }
 <a href=#189 id=189 data-nosnippet>189</a>
-<a href=#190 id=190 data-nosnippet>190</a>        <span class="prelude-val">Ok</span>(())
-<a href=#191 id=191 data-nosnippet>191</a>    }
+<a href=#190 id=190 data-nosnippet>190</a>        <span class="self">self</span>.deltas
+<a href=#191 id=191 data-nosnippet>191</a>            .push_back(Delta::new(root, version_id, nodes, changed_keys, entry_count));
 <a href=#192 id=192 data-nosnippet>192</a>
-<a href=#193 id=193 data-nosnippet>193</a>    <span class="doccomment">/// Adds a version to the history and represented by the changes from the current tree given
-<a href=#194 id=194 data-nosnippet>194</a>    /// `mutations`.
-<a href=#195 id=195 data-nosnippet>195</a>    ///
-<a href=#196 id=196 data-nosnippet>196</a>    /// If adding this version would result in exceeding `self.max_count` historical versions, then
-<a href=#197 id=197 data-nosnippet>197</a>    /// the oldest of the versions is automatically removed.
-<a href=#198 id=198 data-nosnippet>198</a>    ///
-<a href=#199 id=199 data-nosnippet>199</a>    /// # Gotchas
-<a href=#200 id=200 data-nosnippet>200</a>    ///
-<a href=#201 id=201 data-nosnippet>201</a>    /// When constructing the `mutations`, keep in mind that the set must contain entries for the
-<a href=#202 id=202 data-nosnippet>202</a>    /// **default value of a node or leaf** at any position where the tree was sparse in the state
-<a href=#203 id=203 data-nosnippet>203</a>    /// represented by `root`. If this is not done, incorrect values may be returned.
+<a href=#193 id=193 data-nosnippet>193</a>        <span class="prelude-val">Ok</span>(())
+<a href=#194 id=194 data-nosnippet>194</a>    }
+<a href=#195 id=195 data-nosnippet>195</a>
+<a href=#196 id=196 data-nosnippet>196</a>    <span class="doccomment">/// Adds a version to the history, represented by the changes from the current tree given
+<a href=#197 id=197 data-nosnippet>197</a>    /// `mutations`, with `entry_count` corresponding to the number of entries in the full tree
+<a href=#198 id=198 data-nosnippet>198</a>    /// corresponding to this version.
+<a href=#199 id=199 data-nosnippet>199</a>    ///
+<a href=#200 id=200 data-nosnippet>200</a>    /// If adding this version would result in exceeding `self.max_count` historical versions, then
+<a href=#201 id=201 data-nosnippet>201</a>    /// the oldest of the versions is automatically removed.
+<a href=#202 id=202 data-nosnippet>202</a>    ///
+<a href=#203 id=203 data-nosnippet>203</a>    /// # Gotchas
 <a href=#204 id=204 data-nosnippet>204</a>    ///
-<a href=#205 id=205 data-nosnippet>205</a>    /// This is necessary because the changes are the _reverse_ from what one might expect. Namely,
-<a href=#206 id=206 data-nosnippet>206</a>    /// the changes in a given version `v` must "_revert_" the changes made in the transition from
-<a href=#207 id=207 data-nosnippet>207</a>    /// version `v` to version `v + 1`.
+<a href=#205 id=205 data-nosnippet>205</a>    /// When constructing the `mutations`, keep in mind that the set must contain entries for the
+<a href=#206 id=206 data-nosnippet>206</a>    /// **default value of a node or leaf** at any position where the tree was sparse in the state
+<a href=#207 id=207 data-nosnippet>207</a>    /// represented by `root`. If this is not done, incorrect values may be returned.
 <a href=#208 id=208 data-nosnippet>208</a>    ///
-<a href=#209 id=209 data-nosnippet>209</a>    /// # Errors
-<a href=#210 id=210 data-nosnippet>210</a>    ///
-<a href=#211 id=211 data-nosnippet>211</a>    /// - [`HistoryError::NonMonotonicVersions`] if the provided version is not greater than the
-<a href=#212 id=212 data-nosnippet>212</a>    ///   previously added version.
-<a href=#213 id=213 data-nosnippet>213</a>    </span><span class="kw">pub fn </span>add_version_from_mutation_set(
-<a href=#214 id=214 data-nosnippet>214</a>        <span class="kw-2">&amp;mut </span><span class="self">self</span>,
-<a href=#215 id=215 data-nosnippet>215</a>        version_id: VersionId,
-<a href=#216 id=216 data-nosnippet>216</a>        mutations: MutationSet,
-<a href=#217 id=217 data-nosnippet>217</a>    ) -&gt; <span class="prelude-ty">Result</span>&lt;()&gt; {
-<a href=#218 id=218 data-nosnippet>218</a>        <span class="kw">let </span><span class="kw-2">mut </span>changed_keys = ChangedKeys::default();
-<a href=#219 id=219 data-nosnippet>219</a>        mutations.new_pairs.into_iter().for_each(|(k, v)| {
-<a href=#220 id=220 data-nosnippet>220</a>            changed_keys.insert(k, v);
-<a href=#221 id=221 data-nosnippet>221</a>        });
-<a href=#222 id=222 data-nosnippet>222</a>
-<a href=#223 id=223 data-nosnippet>223</a>        <span class="comment">// The node changes are more complex, as we have to explicitly handle reversions to empty
-<a href=#224 id=224 data-nosnippet>224</a>        // specially.
-<a href=#225 id=225 data-nosnippet>225</a>        </span><span class="kw">let </span>node_changes: NodeChanges = mutations
-<a href=#226 id=226 data-nosnippet>226</a>            .node_mutations
-<a href=#227 id=227 data-nosnippet>227</a>            .into_iter()
-<a href=#228 id=228 data-nosnippet>228</a>            .map(|(ix, m)| <span class="kw">match </span>m {
-<a href=#229 id=229 data-nosnippet>229</a>                NodeMutation::Removal =&gt; (ix, <span class="kw-2">*</span>EmptySubtreeRoots::entry(SMT_DEPTH, ix.depth())),
-<a href=#230 id=230 data-nosnippet>230</a>                NodeMutation::Addition(n) =&gt; (ix, n.hash()),
-<a href=#231 id=231 data-nosnippet>231</a>            })
-<a href=#232 id=232 data-nosnippet>232</a>            .collect();
-<a href=#233 id=233 data-nosnippet>233</a>
-<a href=#234 id=234 data-nosnippet>234</a>        <span class="comment">// Now we can simply delegate to the standard function.
-<a href=#235 id=235 data-nosnippet>235</a>        </span><span class="self">self</span>.add_version(mutations.new_root, version_id, node_changes, changed_keys)
-<a href=#236 id=236 data-nosnippet>236</a>    }
-<a href=#237 id=237 data-nosnippet>237</a>
-<a href=#238 id=238 data-nosnippet>238</a>    <span class="doccomment">/// Returns the index in the sequence of deltas of the version that corresponds to the provided
-<a href=#239 id=239 data-nosnippet>239</a>    /// `version_id`.
-<a href=#240 id=240 data-nosnippet>240</a>    ///
-<a href=#241 id=241 data-nosnippet>241</a>    /// To "correspond" means that it either has the provided `version_id`, or is the newest version
-<a href=#242 id=242 data-nosnippet>242</a>    /// with a `version_id` less than the provided id. In either case, it is the correct version to
-<a href=#243 id=243 data-nosnippet>243</a>    /// be used to query the tree state in the provided `version_id`.
-<a href=#244 id=244 data-nosnippet>244</a>    ///
-<a href=#245 id=245 data-nosnippet>245</a>    /// # Complexity
-<a href=#246 id=246 data-nosnippet>246</a>    ///
-<a href=#247 id=247 data-nosnippet>247</a>    /// Finding the latest corresponding version in the history requires a linear traversal of the
-<a href=#248 id=248 data-nosnippet>248</a>    /// history entries, and hence has complexity `O(n)` in the number of versions.
+<a href=#209 id=209 data-nosnippet>209</a>    /// This is necessary because the changes are the _reverse_ from what one might expect. Namely,
+<a href=#210 id=210 data-nosnippet>210</a>    /// the changes in a given version `v` must "_revert_" the changes made in the transition from
+<a href=#211 id=211 data-nosnippet>211</a>    /// version `v` to version `v + 1`.
+<a href=#212 id=212 data-nosnippet>212</a>    ///
+<a href=#213 id=213 data-nosnippet>213</a>    /// # Errors
+<a href=#214 id=214 data-nosnippet>214</a>    ///
+<a href=#215 id=215 data-nosnippet>215</a>    /// - [`HistoryError::NonMonotonicVersions`] if the provided version is not greater than the
+<a href=#216 id=216 data-nosnippet>216</a>    ///   previously added version.
+<a href=#217 id=217 data-nosnippet>217</a>    </span><span class="kw">pub fn </span>add_version_from_mutation_set(
+<a href=#218 id=218 data-nosnippet>218</a>        <span class="kw-2">&amp;mut </span><span class="self">self</span>,
+<a href=#219 id=219 data-nosnippet>219</a>        version_id: VersionId,
+<a href=#220 id=220 data-nosnippet>220</a>        mutations: MutationSet,
+<a href=#221 id=221 data-nosnippet>221</a>        entry_count: usize,
+<a href=#222 id=222 data-nosnippet>222</a>    ) -&gt; <span class="prelude-ty">Result</span>&lt;()&gt; {
+<a href=#223 id=223 data-nosnippet>223</a>        <span class="kw">let </span><span class="kw-2">mut </span>changed_keys = ChangedKeys::default();
+<a href=#224 id=224 data-nosnippet>224</a>        mutations.new_pairs.into_iter().for_each(|(k, v)| {
+<a href=#225 id=225 data-nosnippet>225</a>            changed_keys.insert(k, v);
+<a href=#226 id=226 data-nosnippet>226</a>        });
+<a href=#227 id=227 data-nosnippet>227</a>
+<a href=#228 id=228 data-nosnippet>228</a>        <span class="comment">// The node changes are more complex, as we have to explicitly handle reversions to empty
+<a href=#229 id=229 data-nosnippet>229</a>        // specially.
+<a href=#230 id=230 data-nosnippet>230</a>        </span><span class="kw">let </span>node_changes: NodeChanges = mutations
+<a href=#231 id=231 data-nosnippet>231</a>            .node_mutations
+<a href=#232 id=232 data-nosnippet>232</a>            .into_iter()
+<a href=#233 id=233 data-nosnippet>233</a>            .map(|(ix, m)| <span class="kw">match </span>m {
+<a href=#234 id=234 data-nosnippet>234</a>                NodeMutation::Removal =&gt; (ix, <span class="kw-2">*</span>EmptySubtreeRoots::entry(SMT_DEPTH, ix.depth())),
+<a href=#235 id=235 data-nosnippet>235</a>                NodeMutation::Addition(n) =&gt; (ix, n.hash()),
+<a href=#236 id=236 data-nosnippet>236</a>            })
+<a href=#237 id=237 data-nosnippet>237</a>            .collect();
+<a href=#238 id=238 data-nosnippet>238</a>
+<a href=#239 id=239 data-nosnippet>239</a>        <span class="comment">// Now we can simply delegate to the standard function.
+<a href=#240 id=240 data-nosnippet>240</a>        </span><span class="self">self</span>.add_version(mutations.new_root, version_id, node_changes, changed_keys, entry_count)
+<a href=#241 id=241 data-nosnippet>241</a>    }
+<a href=#242 id=242 data-nosnippet>242</a>
+<a href=#243 id=243 data-nosnippet>243</a>    <span class="doccomment">/// Returns the index in the sequence of deltas of the version that corresponds to the provided
+<a href=#244 id=244 data-nosnippet>244</a>    /// `version_id`.
+<a href=#245 id=245 data-nosnippet>245</a>    ///
+<a href=#246 id=246 data-nosnippet>246</a>    /// To "correspond" means that it either has the provided `version_id`, or is the newest version
+<a href=#247 id=247 data-nosnippet>247</a>    /// with a `version_id` less than the provided id. In either case, it is the correct version to
+<a href=#248 id=248 data-nosnippet>248</a>    /// be used to query the tree state in the provided `version_id`.
 <a href=#249 id=249 data-nosnippet>249</a>    ///
-<a href=#250 id=250 data-nosnippet>250</a>    /// # Errors
+<a href=#250 id=250 data-nosnippet>250</a>    /// # Complexity
 <a href=#251 id=251 data-nosnippet>251</a>    ///
-<a href=#252 id=252 data-nosnippet>252</a>    /// - [`HistoryError::HistoryEmpty`] if the history is empty and hence there is no version to
-<a href=#253 id=253 data-nosnippet>253</a>    ///   find.
-<a href=#254 id=254 data-nosnippet>254</a>    /// - [`HistoryError::VersionTooOld`] if the history does not contain the data to provide a
-<a href=#255 id=255 data-nosnippet>255</a>    ///   coherent overlay for the provided `version_id` due to `version_id` being older than the
-<a href=#256 id=256 data-nosnippet>256</a>    ///   oldest version stored.
-<a href=#257 id=257 data-nosnippet>257</a>    </span><span class="kw">fn </span>find_latest_corresponding_version(<span class="kw-2">&amp;</span><span class="self">self</span>, version_id: VersionId) -&gt; <span class="prelude-ty">Result</span>&lt;usize&gt; {
-<a href=#258 id=258 data-nosnippet>258</a>        <span class="comment">// If the version is older than the oldest, we error.
-<a href=#259 id=259 data-nosnippet>259</a>        </span><span class="kw">if let </span><span class="prelude-val">Some</span>(oldest_version) = <span class="self">self</span>.deltas.front() {
-<a href=#260 id=260 data-nosnippet>260</a>            <span class="kw">if </span>oldest_version.version_id &gt; version_id {
-<a href=#261 id=261 data-nosnippet>261</a>                <span class="kw">return </span><span class="prelude-val">Err</span>(HistoryError::VersionTooOld);
-<a href=#262 id=262 data-nosnippet>262</a>            }
-<a href=#263 id=263 data-nosnippet>263</a>        } <span class="kw">else </span>{
-<a href=#264 id=264 data-nosnippet>264</a>            <span class="kw">return </span><span class="prelude-val">Err</span>(HistoryError::HistoryEmpty);
-<a href=#265 id=265 data-nosnippet>265</a>        }
-<a href=#266 id=266 data-nosnippet>266</a>
-<a href=#267 id=267 data-nosnippet>267</a>        <span class="comment">// As we want the NEWEST delta that satisfies the version, we look for the position at which
-<a href=#268 id=268 data-nosnippet>268</a>        // the delta cannot be used and move back by one.
-<a href=#269 id=269 data-nosnippet>269</a>        </span><span class="kw">let </span>ix = <span class="self">self
-<a href=#270 id=270 data-nosnippet>270</a>            </span>.deltas
-<a href=#271 id=271 data-nosnippet>271</a>            .iter()
-<a href=#272 id=272 data-nosnippet>272</a>            .position(|d| d.version_id &gt; version_id)
-<a href=#273 id=273 data-nosnippet>273</a>            .unwrap_or_else(|| <span class="self">self</span>.num_versions())
-<a href=#274 id=274 data-nosnippet>274</a>            .checked_sub(<span class="number">1</span>)
-<a href=#275 id=275 data-nosnippet>275</a>            .expect(
-<a href=#276 id=276 data-nosnippet>276</a>                <span class="string">"Subtraction should not overflow as we have ruled out the no-version \
-<a href=#277 id=277 data-nosnippet>277</a>                case, and in the other cases the left operand will be &gt;= 1"</span>,
-<a href=#278 id=278 data-nosnippet>278</a>            );
-<a href=#279 id=279 data-nosnippet>279</a>
-<a href=#280 id=280 data-nosnippet>280</a>        <span class="prelude-val">Ok</span>(ix)
-<a href=#281 id=281 data-nosnippet>281</a>    }
-<a href=#282 id=282 data-nosnippet>282</a>
-<a href=#283 id=283 data-nosnippet>283</a>    <span class="doccomment">/// Returns a view of the history that allows querying as a single unified overlay on the
-<a href=#284 id=284 data-nosnippet>284</a>    /// current state of the merkle tree as if the overlay was reverting the tree to the state
-<a href=#285 id=285 data-nosnippet>285</a>    /// corresponding to the specified `version_id`.
-<a href=#286 id=286 data-nosnippet>286</a>    ///
-<a href=#287 id=287 data-nosnippet>287</a>    /// Note that the history may not contain a version that directly corresponds to `version_id`.
-<a href=#288 id=288 data-nosnippet>288</a>    /// In such a case, the view will instead use the newest version coherent with the provided
-<a href=#289 id=289 data-nosnippet>289</a>    /// `version_id`, as this is the correct version for the provided id. Note that this will be
-<a href=#290 id=290 data-nosnippet>290</a>    /// incorrect if the versions stored in the history do not represent contiguous changes from the
-<a href=#291 id=291 data-nosnippet>291</a>    /// current tree.
-<a href=#292 id=292 data-nosnippet>292</a>    ///
-<a href=#293 id=293 data-nosnippet>293</a>    /// # Complexity
-<a href=#294 id=294 data-nosnippet>294</a>    ///
-<a href=#295 id=295 data-nosnippet>295</a>    /// The computational complexity of this method is linear in the number of versions stored in
-<a href=#296 id=296 data-nosnippet>296</a>    /// the history.
+<a href=#252 id=252 data-nosnippet>252</a>    /// Finding the latest corresponding version in the history requires a linear traversal of the
+<a href=#253 id=253 data-nosnippet>253</a>    /// history entries, and hence has complexity `O(n)` in the number of versions.
+<a href=#254 id=254 data-nosnippet>254</a>    ///
+<a href=#255 id=255 data-nosnippet>255</a>    /// # Errors
+<a href=#256 id=256 data-nosnippet>256</a>    ///
+<a href=#257 id=257 data-nosnippet>257</a>    /// - [`HistoryError::HistoryEmpty`] if the history is empty and hence there is no version to
+<a href=#258 id=258 data-nosnippet>258</a>    ///   find.
+<a href=#259 id=259 data-nosnippet>259</a>    /// - [`HistoryError::VersionTooOld`] if the history does not contain the data to provide a
+<a href=#260 id=260 data-nosnippet>260</a>    ///   coherent overlay for the provided `version_id` due to `version_id` being older than the
+<a href=#261 id=261 data-nosnippet>261</a>    ///   oldest version stored.
+<a href=#262 id=262 data-nosnippet>262</a>    </span><span class="kw">fn </span>find_latest_corresponding_version(<span class="kw-2">&amp;</span><span class="self">self</span>, version_id: VersionId) -&gt; <span class="prelude-ty">Result</span>&lt;usize&gt; {
+<a href=#263 id=263 data-nosnippet>263</a>        <span class="comment">// If the version is older than the oldest, we error.
+<a href=#264 id=264 data-nosnippet>264</a>        </span><span class="kw">if let </span><span class="prelude-val">Some</span>(oldest_version) = <span class="self">self</span>.deltas.front() {
+<a href=#265 id=265 data-nosnippet>265</a>            <span class="kw">if </span>oldest_version.version_id &gt; version_id {
+<a href=#266 id=266 data-nosnippet>266</a>                <span class="kw">return </span><span class="prelude-val">Err</span>(HistoryError::VersionTooOld);
+<a href=#267 id=267 data-nosnippet>267</a>            }
+<a href=#268 id=268 data-nosnippet>268</a>        } <span class="kw">else </span>{
+<a href=#269 id=269 data-nosnippet>269</a>            <span class="kw">return </span><span class="prelude-val">Err</span>(HistoryError::HistoryEmpty);
+<a href=#270 id=270 data-nosnippet>270</a>        }
+<a href=#271 id=271 data-nosnippet>271</a>
+<a href=#272 id=272 data-nosnippet>272</a>        <span class="comment">// As we want the NEWEST delta that satisfies the version, we look for the position at which
+<a href=#273 id=273 data-nosnippet>273</a>        // the delta cannot be used and move back by one.
+<a href=#274 id=274 data-nosnippet>274</a>        </span><span class="kw">let </span>ix = <span class="self">self
+<a href=#275 id=275 data-nosnippet>275</a>            </span>.deltas
+<a href=#276 id=276 data-nosnippet>276</a>            .iter()
+<a href=#277 id=277 data-nosnippet>277</a>            .position(|d| d.version_id &gt; version_id)
+<a href=#278 id=278 data-nosnippet>278</a>            .unwrap_or_else(|| <span class="self">self</span>.num_versions())
+<a href=#279 id=279 data-nosnippet>279</a>            .checked_sub(<span class="number">1</span>)
+<a href=#280 id=280 data-nosnippet>280</a>            .expect(
+<a href=#281 id=281 data-nosnippet>281</a>                <span class="string">"Subtraction should not overflow as we have ruled out the no-version \
+<a href=#282 id=282 data-nosnippet>282</a>                case, and in the other cases the left operand will be &gt;= 1"</span>,
+<a href=#283 id=283 data-nosnippet>283</a>            );
+<a href=#284 id=284 data-nosnippet>284</a>
+<a href=#285 id=285 data-nosnippet>285</a>        <span class="prelude-val">Ok</span>(ix)
+<a href=#286 id=286 data-nosnippet>286</a>    }
+<a href=#287 id=287 data-nosnippet>287</a>
+<a href=#288 id=288 data-nosnippet>288</a>    <span class="doccomment">/// Returns a view of the history that allows querying as a single unified overlay on the
+<a href=#289 id=289 data-nosnippet>289</a>    /// current state of the merkle tree as if the overlay was reverting the tree to the state
+<a href=#290 id=290 data-nosnippet>290</a>    /// corresponding to the specified `version_id`.
+<a href=#291 id=291 data-nosnippet>291</a>    ///
+<a href=#292 id=292 data-nosnippet>292</a>    /// Note that the history may not contain a version that directly corresponds to `version_id`.
+<a href=#293 id=293 data-nosnippet>293</a>    /// In such a case, the view will instead use the newest version coherent with the provided
+<a href=#294 id=294 data-nosnippet>294</a>    /// `version_id`, as this is the correct version for the provided id. Note that this will be
+<a href=#295 id=295 data-nosnippet>295</a>    /// incorrect if the versions stored in the history do not represent contiguous changes from the
+<a href=#296 id=296 data-nosnippet>296</a>    /// current tree.
 <a href=#297 id=297 data-nosnippet>297</a>    ///
-<a href=#298 id=298 data-nosnippet>298</a>    /// # Errors
+<a href=#298 id=298 data-nosnippet>298</a>    /// # Complexity
 <a href=#299 id=299 data-nosnippet>299</a>    ///
-<a href=#300 id=300 data-nosnippet>300</a>    /// - [`HistoryError::VersionTooOld`] if the history does not contain the data to provide a
-<a href=#301 id=301 data-nosnippet>301</a>    ///   coherent overlay for the provided `version_id` due to `version_id` being older than the
-<a href=#302 id=302 data-nosnippet>302</a>    ///   oldest version stored.
-<a href=#303 id=303 data-nosnippet>303</a>    </span><span class="kw">pub fn </span>get_view_at(<span class="kw-2">&amp;</span><span class="self">self</span>, version_id: VersionId) -&gt; <span class="prelude-ty">Result</span>&lt;HistoryView&lt;<span class="lifetime">'_</span>&gt;&gt; {
-<a href=#304 id=304 data-nosnippet>304</a>        HistoryView::new_of(version_id, <span class="self">self</span>)
-<a href=#305 id=305 data-nosnippet>305</a>    }
-<a href=#306 id=306 data-nosnippet>306</a>
-<a href=#307 id=307 data-nosnippet>307</a>    <span class="doccomment">/// Removes all versions in the history that are older than the version denoted by the provided
-<a href=#308 id=308 data-nosnippet>308</a>    /// `version_id`.
-<a href=#309 id=309 data-nosnippet>309</a>    ///
-<a href=#310 id=310 data-nosnippet>310</a>    /// If `version_id` is not a version known by the history, it will keep the newest version that
-<a href=#311 id=311 data-nosnippet>311</a>    /// is capable of serving as that version in queries.
-<a href=#312 id=312 data-nosnippet>312</a>    ///
-<a href=#313 id=313 data-nosnippet>313</a>    /// # Complexity
+<a href=#300 id=300 data-nosnippet>300</a>    /// The computational complexity of this method is linear in the number of versions stored in
+<a href=#301 id=301 data-nosnippet>301</a>    /// the history.
+<a href=#302 id=302 data-nosnippet>302</a>    ///
+<a href=#303 id=303 data-nosnippet>303</a>    /// # Errors
+<a href=#304 id=304 data-nosnippet>304</a>    ///
+<a href=#305 id=305 data-nosnippet>305</a>    /// - [`HistoryError::VersionTooOld`] if the history does not contain the data to provide a
+<a href=#306 id=306 data-nosnippet>306</a>    ///   coherent overlay for the provided `version_id` due to `version_id` being older than the
+<a href=#307 id=307 data-nosnippet>307</a>    ///   oldest version stored.
+<a href=#308 id=308 data-nosnippet>308</a>    </span><span class="kw">pub fn </span>get_view_at(<span class="kw-2">&amp;</span><span class="self">self</span>, version_id: VersionId) -&gt; <span class="prelude-ty">Result</span>&lt;HistoryView&lt;<span class="lifetime">'_</span>&gt;&gt; {
+<a href=#309 id=309 data-nosnippet>309</a>        HistoryView::new_of(version_id, <span class="self">self</span>)
+<a href=#310 id=310 data-nosnippet>310</a>    }
+<a href=#311 id=311 data-nosnippet>311</a>
+<a href=#312 id=312 data-nosnippet>312</a>    <span class="doccomment">/// Removes all versions in the history that are older than the version denoted by the provided
+<a href=#313 id=313 data-nosnippet>313</a>    /// `version_id`.
 <a href=#314 id=314 data-nosnippet>314</a>    ///
-<a href=#315 id=315 data-nosnippet>315</a>    /// The computational complexity of this method is linear in the number of versions stored in
-<a href=#316 id=316 data-nosnippet>316</a>    /// the history prior to any removals.
-<a href=#317 id=317 data-nosnippet>317</a>    </span><span class="kw">pub fn </span>truncate(<span class="kw-2">&amp;mut </span><span class="self">self</span>, version_id: VersionId) -&gt; usize {
-<a href=#318 id=318 data-nosnippet>318</a>        <span class="comment">// We start by getting the index to truncate to, though it is not an error to remove
-<a href=#319 id=319 data-nosnippet>319</a>        // something too old.
-<a href=#320 id=320 data-nosnippet>320</a>        </span><span class="kw">let </span>truncate_ix = <span class="self">self</span>.find_latest_corresponding_version(version_id).unwrap_or(<span class="number">0</span>);
-<a href=#321 id=321 data-nosnippet>321</a>
-<a href=#322 id=322 data-nosnippet>322</a>        <span class="kw">for _ in </span><span class="number">0</span>..truncate_ix {
-<a href=#323 id=323 data-nosnippet>323</a>            <span class="self">self</span>.deltas.pop_front();
-<a href=#324 id=324 data-nosnippet>324</a>        }
-<a href=#325 id=325 data-nosnippet>325</a>
-<a href=#326 id=326 data-nosnippet>326</a>        truncate_ix
-<a href=#327 id=327 data-nosnippet>327</a>    }
-<a href=#328 id=328 data-nosnippet>328</a>
-<a href=#329 id=329 data-nosnippet>329</a>    <span class="doccomment">/// Removes all versions from the history.
-<a href=#330 id=330 data-nosnippet>330</a>    </span><span class="kw">pub fn </span>clear(<span class="kw-2">&amp;mut </span><span class="self">self</span>) {
-<a href=#331 id=331 data-nosnippet>331</a>        <span class="self">self</span>.deltas.clear();
+<a href=#315 id=315 data-nosnippet>315</a>    /// If `version_id` is not a version known by the history, it will keep the newest version that
+<a href=#316 id=316 data-nosnippet>316</a>    /// is capable of serving as that version in queries.
+<a href=#317 id=317 data-nosnippet>317</a>    ///
+<a href=#318 id=318 data-nosnippet>318</a>    /// # Complexity
+<a href=#319 id=319 data-nosnippet>319</a>    ///
+<a href=#320 id=320 data-nosnippet>320</a>    /// The computational complexity of this method is linear in the number of versions stored in
+<a href=#321 id=321 data-nosnippet>321</a>    /// the history prior to any removals.
+<a href=#322 id=322 data-nosnippet>322</a>    </span><span class="kw">pub fn </span>truncate(<span class="kw-2">&amp;mut </span><span class="self">self</span>, version_id: VersionId) -&gt; usize {
+<a href=#323 id=323 data-nosnippet>323</a>        <span class="comment">// We start by getting the index to truncate to, though it is not an error to remove
+<a href=#324 id=324 data-nosnippet>324</a>        // something too old.
+<a href=#325 id=325 data-nosnippet>325</a>        </span><span class="kw">let </span>truncate_ix = <span class="self">self</span>.find_latest_corresponding_version(version_id).unwrap_or(<span class="number">0</span>);
+<a href=#326 id=326 data-nosnippet>326</a>
+<a href=#327 id=327 data-nosnippet>327</a>        <span class="kw">for _ in </span><span class="number">0</span>..truncate_ix {
+<a href=#328 id=328 data-nosnippet>328</a>            <span class="self">self</span>.deltas.pop_front();
+<a href=#329 id=329 data-nosnippet>329</a>        }
+<a href=#330 id=330 data-nosnippet>330</a>
+<a href=#331 id=331 data-nosnippet>331</a>        truncate_ix
 <a href=#332 id=332 data-nosnippet>332</a>    }
-<a href=#333 id=333 data-nosnippet>333</a>}
-<a href=#334 id=334 data-nosnippet>334</a>
-<a href=#335 id=335 data-nosnippet>335</a><span class="doccomment">/// The functions in this impl block are specifically used for testing and are not available for
-<a href=#336 id=336 data-nosnippet>336</a>/// general API usage.
-<a href=#337 id=337 data-nosnippet>337</a></span><span class="attr">#[cfg(test)]
-<a href=#338 id=338 data-nosnippet>338</a></span><span class="kw">impl </span>History {
-<a href=#339 id=339 data-nosnippet>339</a>    <span class="doccomment">/// Returns `true` if `root` is in the history and `false` otherwise.
-<a href=#340 id=340 data-nosnippet>340</a>    </span><span class="attr">#[must_use]
-<a href=#341 id=341 data-nosnippet>341</a>    </span><span class="kw">pub fn </span>is_known_root(<span class="kw-2">&amp;</span><span class="self">self</span>, root: RootValue) -&gt; bool {
-<a href=#342 id=342 data-nosnippet>342</a>        <span class="self">self</span>.deltas.iter().any(|r| r.root == root)
-<a href=#343 id=343 data-nosnippet>343</a>    }
-<a href=#344 id=344 data-nosnippet>344</a>}
-<a href=#345 id=345 data-nosnippet>345</a>
-<a href=#346 id=346 data-nosnippet>346</a><span class="comment">// HISTORY VIEW
-<a href=#347 id=347 data-nosnippet>347</a>// ================================================================================================
-<a href=#348 id=348 data-nosnippet>348</a>
-<a href=#349 id=349 data-nosnippet>349</a></span><span class="doccomment">/// A read-only view of the history overlay on the tree at a specified place in the history.
-<a href=#350 id=350 data-nosnippet>350</a></span><span class="attr">#[derive(Copy, Clone, Debug)]
-<a href=#351 id=351 data-nosnippet>351</a></span><span class="kw">pub struct </span>HistoryView&lt;<span class="lifetime">'history</span>&gt; {
-<a href=#352 id=352 data-nosnippet>352</a>    <span class="doccomment">/// The delta corresponding to this overlay.
-<a href=#353 id=353 data-nosnippet>353</a>    </span>delta: <span class="kw-2">&amp;</span><span class="lifetime">'history </span>Delta,
-<a href=#354 id=354 data-nosnippet>354</a>}
-<a href=#355 id=355 data-nosnippet>355</a>
-<a href=#356 id=356 data-nosnippet>356</a><span class="kw">impl</span>&lt;<span class="lifetime">'history</span>&gt; HistoryView&lt;<span class="lifetime">'history</span>&gt; {
-<a href=#357 id=357 data-nosnippet>357</a>    <span class="doccomment">/// Constructs a new history view that acts as a single overlay of the state represented by the
-<a href=#358 id=358 data-nosnippet>358</a>    /// history at the provided `version`.
-<a href=#359 id=359 data-nosnippet>359</a>    ///
-<a href=#360 id=360 data-nosnippet>360</a>    /// # Complexity
-<a href=#361 id=361 data-nosnippet>361</a>    ///
-<a href=#362 id=362 data-nosnippet>362</a>    /// The computational complexity of this method is linear in the number of versions stored in
-<a href=#363 id=363 data-nosnippet>363</a>    /// the history.
+<a href=#333 id=333 data-nosnippet>333</a>
+<a href=#334 id=334 data-nosnippet>334</a>    <span class="doccomment">/// Removes all versions from the history.
+<a href=#335 id=335 data-nosnippet>335</a>    </span><span class="kw">pub fn </span>clear(<span class="kw-2">&amp;mut </span><span class="self">self</span>) {
+<a href=#336 id=336 data-nosnippet>336</a>        <span class="self">self</span>.deltas.clear();
+<a href=#337 id=337 data-nosnippet>337</a>    }
+<a href=#338 id=338 data-nosnippet>338</a>}
+<a href=#339 id=339 data-nosnippet>339</a>
+<a href=#340 id=340 data-nosnippet>340</a><span class="doccomment">/// The functions in this impl block are specifically used for testing and are not available for
+<a href=#341 id=341 data-nosnippet>341</a>/// general API usage.
+<a href=#342 id=342 data-nosnippet>342</a></span><span class="attr">#[cfg(test)]
+<a href=#343 id=343 data-nosnippet>343</a></span><span class="kw">impl </span>History {
+<a href=#344 id=344 data-nosnippet>344</a>    <span class="doccomment">/// Returns `true` if `root` is in the history and `false` otherwise.
+<a href=#345 id=345 data-nosnippet>345</a>    </span><span class="attr">#[must_use]
+<a href=#346 id=346 data-nosnippet>346</a>    </span><span class="kw">pub fn </span>is_known_root(<span class="kw-2">&amp;</span><span class="self">self</span>, root: RootValue) -&gt; bool {
+<a href=#347 id=347 data-nosnippet>347</a>        <span class="self">self</span>.deltas.iter().any(|r| r.root == root)
+<a href=#348 id=348 data-nosnippet>348</a>    }
+<a href=#349 id=349 data-nosnippet>349</a>}
+<a href=#350 id=350 data-nosnippet>350</a>
+<a href=#351 id=351 data-nosnippet>351</a><span class="comment">// HISTORY VIEW
+<a href=#352 id=352 data-nosnippet>352</a>// ================================================================================================
+<a href=#353 id=353 data-nosnippet>353</a>
+<a href=#354 id=354 data-nosnippet>354</a></span><span class="doccomment">/// A read-only view of the history overlay on the tree at a specified place in the history.
+<a href=#355 id=355 data-nosnippet>355</a></span><span class="attr">#[derive(Copy, Clone, Debug)]
+<a href=#356 id=356 data-nosnippet>356</a></span><span class="kw">pub struct </span>HistoryView&lt;<span class="lifetime">'history</span>&gt; {
+<a href=#357 id=357 data-nosnippet>357</a>    <span class="doccomment">/// The delta corresponding to this overlay.
+<a href=#358 id=358 data-nosnippet>358</a>    </span>delta: <span class="kw-2">&amp;</span><span class="lifetime">'history </span>Delta,
+<a href=#359 id=359 data-nosnippet>359</a>}
+<a href=#360 id=360 data-nosnippet>360</a>
+<a href=#361 id=361 data-nosnippet>361</a><span class="kw">impl</span>&lt;<span class="lifetime">'history</span>&gt; HistoryView&lt;<span class="lifetime">'history</span>&gt; {
+<a href=#362 id=362 data-nosnippet>362</a>    <span class="doccomment">/// Constructs a new history view that acts as a single overlay of the state represented by the
+<a href=#363 id=363 data-nosnippet>363</a>    /// history at the provided `version`.
 <a href=#364 id=364 data-nosnippet>364</a>    ///
-<a href=#365 id=365 data-nosnippet>365</a>    /// # Errors
+<a href=#365 id=365 data-nosnippet>365</a>    /// # Complexity
 <a href=#366 id=366 data-nosnippet>366</a>    ///
-<a href=#367 id=367 data-nosnippet>367</a>    /// - [`HistoryError::VersionTooOld`] if the history does not contain the data to provide a
-<a href=#368 id=368 data-nosnippet>368</a>    ///   coherent overlay for the provided `version`.
-<a href=#369 id=369 data-nosnippet>369</a>    </span><span class="kw">fn </span>new_of(version: VersionId, history: <span class="kw-2">&amp;</span><span class="lifetime">'history </span>History) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="self">Self</span>&gt; {
-<a href=#370 id=370 data-nosnippet>370</a>        <span class="kw">let </span>version_ix = history.find_latest_corresponding_version(version)<span class="question-mark">?</span>;
-<a href=#371 id=371 data-nosnippet>371</a>        <span class="kw">let </span>delta = <span class="kw-2">&amp;</span>history.deltas[version_ix];
-<a href=#372 id=372 data-nosnippet>372</a>        <span class="prelude-val">Ok</span>(<span class="self">Self </span>{ delta })
-<a href=#373 id=373 data-nosnippet>373</a>    }
-<a href=#374 id=374 data-nosnippet>374</a>
-<a href=#375 id=375 data-nosnippet>375</a>    <span class="doccomment">/// Gets the value of the node in the history at the provided `index`, or returns `None` if the
-<a href=#376 id=376 data-nosnippet>376</a>    /// version does not overlay the current tree at that node.
-<a href=#377 id=377 data-nosnippet>377</a>    </span><span class="attr">#[must_use]
-<a href=#378 id=378 data-nosnippet>378</a>    </span><span class="kw">pub fn </span>node_value(<span class="kw-2">&amp;</span><span class="self">self</span>, index: <span class="kw-2">&amp;</span>NodeIndex) -&gt; <span class="prelude-ty">Option</span>&lt;<span class="kw-2">&amp;</span>Word&gt; {
-<a href=#379 id=379 data-nosnippet>379</a>        <span class="self">self</span>.delta.nodes.get(index)
-<a href=#380 id=380 data-nosnippet>380</a>    }
-<a href=#381 id=381 data-nosnippet>381</a>
-<a href=#382 id=382 data-nosnippet>382</a>    <span class="doccomment">/// Queries the value of a specific `key` in a leaf in the overlay, returning the value for that
-<a href=#383 id=383 data-nosnippet>383</a>    /// `key` if it has been changed, and [`None`] otherwise.
-<a href=#384 id=384 data-nosnippet>384</a>    </span><span class="attr">#[must_use]
-<a href=#385 id=385 data-nosnippet>385</a>    </span><span class="kw">pub fn </span>value(<span class="kw-2">&amp;</span><span class="self">self</span>, key: <span class="kw-2">&amp;</span>Word) -&gt; <span class="prelude-ty">Option</span>&lt;Word&gt; {
-<a href=#386 id=386 data-nosnippet>386</a>        <span class="self">self</span>.delta.changed_keys.get(key).cloned()
-<a href=#387 id=387 data-nosnippet>387</a>    }
-<a href=#388 id=388 data-nosnippet>388</a>
-<a href=#389 id=389 data-nosnippet>389</a>    <span class="doccomment">/// Returns `true` if the key is removed by this delta, and `false` otherwise.
-<a href=#390 id=390 data-nosnippet>390</a>    </span><span class="attr">#[must_use]
-<a href=#391 id=391 data-nosnippet>391</a>    </span><span class="kw">pub fn </span>is_key_removed(<span class="kw-2">&amp;</span><span class="self">self</span>, key: <span class="kw-2">&amp;</span>Word) -&gt; bool {
-<a href=#392 id=392 data-nosnippet>392</a>        <span class="self">self</span>.delta.changed_keys.get(key).map(Word::is_empty).unwrap_or(<span class="bool-val">false</span>)
-<a href=#393 id=393 data-nosnippet>393</a>    }
-<a href=#394 id=394 data-nosnippet>394</a>
-<a href=#395 id=395 data-nosnippet>395</a>    <span class="doccomment">/// Returns an iterator which yields the entries that are added by this view.
-<a href=#396 id=396 data-nosnippet>396</a>    </span><span class="kw">pub fn </span>changed_keys(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw">impl </span>Iterator&lt;Item = (Word, Word)&gt; + <span class="lifetime">'history </span>{
-<a href=#397 id=397 data-nosnippet>397</a>        <span class="self">self</span>.delta.changed_keys.iter().map(|(k, v)| (<span class="kw-2">*</span>k, <span class="kw-2">*</span>v))
+<a href=#367 id=367 data-nosnippet>367</a>    /// The computational complexity of this method is linear in the number of versions stored in
+<a href=#368 id=368 data-nosnippet>368</a>    /// the history.
+<a href=#369 id=369 data-nosnippet>369</a>    ///
+<a href=#370 id=370 data-nosnippet>370</a>    /// # Errors
+<a href=#371 id=371 data-nosnippet>371</a>    ///
+<a href=#372 id=372 data-nosnippet>372</a>    /// - [`HistoryError::VersionTooOld`] if the history does not contain the data to provide a
+<a href=#373 id=373 data-nosnippet>373</a>    ///   coherent overlay for the provided `version`.
+<a href=#374 id=374 data-nosnippet>374</a>    </span><span class="kw">fn </span>new_of(version: VersionId, history: <span class="kw-2">&amp;</span><span class="lifetime">'history </span>History) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="self">Self</span>&gt; {
+<a href=#375 id=375 data-nosnippet>375</a>        <span class="kw">let </span>version_ix = history.find_latest_corresponding_version(version)<span class="question-mark">?</span>;
+<a href=#376 id=376 data-nosnippet>376</a>        <span class="kw">let </span>delta = <span class="kw-2">&amp;</span>history.deltas[version_ix];
+<a href=#377 id=377 data-nosnippet>377</a>        <span class="prelude-val">Ok</span>(<span class="self">Self </span>{ delta })
+<a href=#378 id=378 data-nosnippet>378</a>    }
+<a href=#379 id=379 data-nosnippet>379</a>
+<a href=#380 id=380 data-nosnippet>380</a>    <span class="doccomment">/// Gets the value of the node in the history at the provided `index`, or returns `None` if the
+<a href=#381 id=381 data-nosnippet>381</a>    /// version does not overlay the current tree at that node.
+<a href=#382 id=382 data-nosnippet>382</a>    </span><span class="attr">#[must_use]
+<a href=#383 id=383 data-nosnippet>383</a>    </span><span class="kw">pub fn </span>node_value(<span class="kw-2">&amp;</span><span class="self">self</span>, index: <span class="kw-2">&amp;</span>NodeIndex) -&gt; <span class="prelude-ty">Option</span>&lt;<span class="kw-2">&amp;</span>Word&gt; {
+<a href=#384 id=384 data-nosnippet>384</a>        <span class="self">self</span>.delta.nodes.get(index)
+<a href=#385 id=385 data-nosnippet>385</a>    }
+<a href=#386 id=386 data-nosnippet>386</a>
+<a href=#387 id=387 data-nosnippet>387</a>    <span class="doccomment">/// Queries the value of a specific `key` in a leaf in the overlay, returning the value for that
+<a href=#388 id=388 data-nosnippet>388</a>    /// `key` if it has been changed, and [`None`] otherwise.
+<a href=#389 id=389 data-nosnippet>389</a>    </span><span class="attr">#[must_use]
+<a href=#390 id=390 data-nosnippet>390</a>    </span><span class="kw">pub fn </span>value(<span class="kw-2">&amp;</span><span class="self">self</span>, key: <span class="kw-2">&amp;</span>Word) -&gt; <span class="prelude-ty">Option</span>&lt;Word&gt; {
+<a href=#391 id=391 data-nosnippet>391</a>        <span class="self">self</span>.delta.changed_keys.get(key).cloned()
+<a href=#392 id=392 data-nosnippet>392</a>    }
+<a href=#393 id=393 data-nosnippet>393</a>
+<a href=#394 id=394 data-nosnippet>394</a>    <span class="doccomment">/// Returns `true` if the key is removed by this delta, and `false` otherwise.
+<a href=#395 id=395 data-nosnippet>395</a>    </span><span class="attr">#[must_use]
+<a href=#396 id=396 data-nosnippet>396</a>    </span><span class="kw">pub fn </span>is_key_removed(<span class="kw-2">&amp;</span><span class="self">self</span>, key: <span class="kw-2">&amp;</span>Word) -&gt; bool {
+<a href=#397 id=397 data-nosnippet>397</a>        <span class="self">self</span>.delta.changed_keys.get(key).map(Word::is_empty).unwrap_or(<span class="bool-val">false</span>)
 <a href=#398 id=398 data-nosnippet>398</a>    }
-<a href=#399 id=399 data-nosnippet>399</a>}
-<a href=#400 id=400 data-nosnippet>400</a>
-<a href=#401 id=401 data-nosnippet>401</a><span class="comment">// DELTA
-<a href=#402 id=402 data-nosnippet>402</a>// ================================================================================================
-<a href=#403 id=403 data-nosnippet>403</a>
-<a href=#404 id=404 data-nosnippet>404</a></span><span class="doccomment">/// A delta for a state `n` represents the changes (to both nodes and leaves) that need to be
-<a href=#405 id=405 data-nosnippet>405</a>/// applied on top of the state `n + 1` to yield the correct tree for state `n`.
-<a href=#406 id=406 data-nosnippet>406</a>///
-<a href=#407 id=407 data-nosnippet>407</a>/// # Cumulative Deltas and Temporal Ordering
-<a href=#408 id=408 data-nosnippet>408</a>///
-<a href=#409 id=409 data-nosnippet>409</a>/// In order to best represent the history of a merkle tree, these deltas are constructed to take
-<a href=#410 id=410 data-nosnippet>410</a>/// advantage of two main properties:
-<a href=#411 id=411 data-nosnippet>411</a>///
-<a href=#412 id=412 data-nosnippet>412</a>/// - They are _cumulative_, which reduces their practical memory usage. This does, however, mean
-<a href=#413 id=413 data-nosnippet>413</a>///   that querying the state of older blocks is more expensive than querying newer ones.
-<a href=#414 id=414 data-nosnippet>414</a>/// - Deltas are applied in **temporally reversed order** from what one might expect. Most
-<a href=#415 id=415 data-nosnippet>415</a>///   conventional applications of deltas bring something from the past into the future through
-<a href=#416 id=416 data-nosnippet>416</a>///   application. In our case, the application of one or more deltas moves the tree into a **past
-<a href=#417 id=417 data-nosnippet>417</a>///   state**.
-<a href=#418 id=418 data-nosnippet>418</a>///
-<a href=#419 id=419 data-nosnippet>419</a>/// # Construction
-<a href=#420 id=420 data-nosnippet>420</a>///
-<a href=#421 id=421 data-nosnippet>421</a>/// While the [`Delta`] type is visible in the interface of the history, it is only intended to be
-<a href=#422 id=422 data-nosnippet>422</a>/// constructed by the history. Users should not be allowed to construct it directly.
-<a href=#423 id=423 data-nosnippet>423</a></span><span class="attr">#[derive(Clone, Debug, PartialEq)]
-<a href=#424 id=424 data-nosnippet>424</a></span><span class="kw">struct </span>Delta {
-<a href=#425 id=425 data-nosnippet>425</a>    <span class="doccomment">/// The root of the tree in the `version` corresponding to the application of the reversions in
-<a href=#426 id=426 data-nosnippet>426</a>    /// this delta to the previous tree state.
-<a href=#427 id=427 data-nosnippet>427</a>    </span>root: RootValue,
-<a href=#428 id=428 data-nosnippet>428</a>
-<a href=#429 id=429 data-nosnippet>429</a>    <span class="doccomment">/// The version of the tree represented by the delta.
-<a href=#430 id=430 data-nosnippet>430</a>    </span>version_id: VersionId,
-<a href=#431 id=431 data-nosnippet>431</a>
-<a href=#432 id=432 data-nosnippet>432</a>    <span class="doccomment">/// Any changes to the non-leaf nodes in the tree for this delta.
-<a href=#433 id=433 data-nosnippet>433</a>    </span>nodes: NodeChanges,
-<a href=#434 id=434 data-nosnippet>434</a>
-<a href=#435 id=435 data-nosnippet>435</a>    <span class="doccomment">/// The keys that need to be changed by the delta to return the target tree to the state
-<a href=#436 id=436 data-nosnippet>436</a>    /// represented by the delta. This includes pairs that either add or mutate a value under a
-<a href=#437 id=437 data-nosnippet>437</a>    /// key, and pairs where the value is the `EMPTY_WORD` and hence represent removals.
-<a href=#438 id=438 data-nosnippet>438</a>    </span>changed_keys: ChangedKeys,
-<a href=#439 id=439 data-nosnippet>439</a>}
-<a href=#440 id=440 data-nosnippet>440</a>
-<a href=#441 id=441 data-nosnippet>441</a><span class="kw">impl </span>Delta {
-<a href=#442 id=442 data-nosnippet>442</a>    <span class="doccomment">/// Creates a new delta with the provided `root`, representing the provided changes to the
-<a href=#443 id=443 data-nosnippet>443</a>    /// `nodes` in the merkle tree, and using `added_keys` and `removed_keys` to represent the
-<a href=#444 id=444 data-nosnippet>444</a>    /// changes to entries in the tree.
-<a href=#445 id=445 data-nosnippet>445</a>    </span><span class="attr">#[must_use]
-<a href=#446 id=446 data-nosnippet>446</a>    </span><span class="kw">fn </span>new(
-<a href=#447 id=447 data-nosnippet>447</a>        root: RootValue,
-<a href=#448 id=448 data-nosnippet>448</a>        version_id: VersionId,
-<a href=#449 id=449 data-nosnippet>449</a>        nodes: NodeChanges,
-<a href=#450 id=450 data-nosnippet>450</a>        changed_keys: ChangedKeys,
-<a href=#451 id=451 data-nosnippet>451</a>    ) -&gt; <span class="self">Self </span>{
-<a href=#452 id=452 data-nosnippet>452</a>        <span class="self">Self </span>{ root, version_id, nodes, changed_keys }
-<a href=#453 id=453 data-nosnippet>453</a>    }
+<a href=#399 id=399 data-nosnippet>399</a>
+<a href=#400 id=400 data-nosnippet>400</a>    <span class="doccomment">/// Returns an iterator which yields the entries that are added by this view.
+<a href=#401 id=401 data-nosnippet>401</a>    </span><span class="kw">pub fn </span>changed_keys(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw">impl </span>Iterator&lt;Item = (Word, Word)&gt; + <span class="lifetime">'history </span>{
+<a href=#402 id=402 data-nosnippet>402</a>        <span class="self">self</span>.delta.changed_keys.iter().map(|(k, v)| (<span class="kw-2">*</span>k, <span class="kw-2">*</span>v))
+<a href=#403 id=403 data-nosnippet>403</a>    }
+<a href=#404 id=404 data-nosnippet>404</a>
+<a href=#405 id=405 data-nosnippet>405</a>    <span class="doccomment">/// Returns the total number of entries in the tree at this historical version.
+<a href=#406 id=406 data-nosnippet>406</a>    </span><span class="attr">#[must_use]
+<a href=#407 id=407 data-nosnippet>407</a>    </span><span class="kw">pub fn </span>entry_count(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; usize {
+<a href=#408 id=408 data-nosnippet>408</a>        <span class="self">self</span>.delta.entry_count
+<a href=#409 id=409 data-nosnippet>409</a>    }
+<a href=#410 id=410 data-nosnippet>410</a>}
+<a href=#411 id=411 data-nosnippet>411</a>
+<a href=#412 id=412 data-nosnippet>412</a><span class="comment">// DELTA
+<a href=#413 id=413 data-nosnippet>413</a>// ================================================================================================
+<a href=#414 id=414 data-nosnippet>414</a>
+<a href=#415 id=415 data-nosnippet>415</a></span><span class="doccomment">/// A delta for a state `n` represents the changes (to both nodes and leaves) that need to be
+<a href=#416 id=416 data-nosnippet>416</a>/// applied on top of the state `n + 1` to yield the correct tree for state `n`.
+<a href=#417 id=417 data-nosnippet>417</a>///
+<a href=#418 id=418 data-nosnippet>418</a>/// # Cumulative Deltas and Temporal Ordering
+<a href=#419 id=419 data-nosnippet>419</a>///
+<a href=#420 id=420 data-nosnippet>420</a>/// In order to best represent the history of a merkle tree, these deltas are constructed to take
+<a href=#421 id=421 data-nosnippet>421</a>/// advantage of two main properties:
+<a href=#422 id=422 data-nosnippet>422</a>///
+<a href=#423 id=423 data-nosnippet>423</a>/// - They are _cumulative_, which reduces their practical memory usage. This does, however, mean
+<a href=#424 id=424 data-nosnippet>424</a>///   that querying the state of older blocks is more expensive than querying newer ones.
+<a href=#425 id=425 data-nosnippet>425</a>/// - Deltas are applied in **temporally reversed order** from what one might expect. Most
+<a href=#426 id=426 data-nosnippet>426</a>///   conventional applications of deltas bring something from the past into the future through
+<a href=#427 id=427 data-nosnippet>427</a>///   application. In our case, the application of one or more deltas moves the tree into a **past
+<a href=#428 id=428 data-nosnippet>428</a>///   state**.
+<a href=#429 id=429 data-nosnippet>429</a>///
+<a href=#430 id=430 data-nosnippet>430</a>/// # Construction
+<a href=#431 id=431 data-nosnippet>431</a>///
+<a href=#432 id=432 data-nosnippet>432</a>/// While the [`Delta`] type is visible in the interface of the history, it is only intended to be
+<a href=#433 id=433 data-nosnippet>433</a>/// constructed by the history. Users should not be allowed to construct it directly.
+<a href=#434 id=434 data-nosnippet>434</a></span><span class="attr">#[derive(Clone, Debug, PartialEq)]
+<a href=#435 id=435 data-nosnippet>435</a></span><span class="kw">struct </span>Delta {
+<a href=#436 id=436 data-nosnippet>436</a>    <span class="doccomment">/// The root of the tree in the `version` corresponding to the application of the reversions in
+<a href=#437 id=437 data-nosnippet>437</a>    /// this delta to the previous tree state.
+<a href=#438 id=438 data-nosnippet>438</a>    </span>root: RootValue,
+<a href=#439 id=439 data-nosnippet>439</a>
+<a href=#440 id=440 data-nosnippet>440</a>    <span class="doccomment">/// The version of the tree represented by the delta.
+<a href=#441 id=441 data-nosnippet>441</a>    </span>version_id: VersionId,
+<a href=#442 id=442 data-nosnippet>442</a>
+<a href=#443 id=443 data-nosnippet>443</a>    <span class="doccomment">/// Any changes to the non-leaf nodes in the tree for this delta.
+<a href=#444 id=444 data-nosnippet>444</a>    </span>nodes: NodeChanges,
+<a href=#445 id=445 data-nosnippet>445</a>
+<a href=#446 id=446 data-nosnippet>446</a>    <span class="doccomment">/// The keys that need to be changed by the delta to return the target tree to the state
+<a href=#447 id=447 data-nosnippet>447</a>    /// represented by the delta. This includes pairs that either add or mutate a value under a
+<a href=#448 id=448 data-nosnippet>448</a>    /// key, and pairs where the value is the `EMPTY_WORD` and hence represent removals.
+<a href=#449 id=449 data-nosnippet>449</a>    </span>changed_keys: ChangedKeys,
+<a href=#450 id=450 data-nosnippet>450</a>
+<a href=#451 id=451 data-nosnippet>451</a>    <span class="doccomment">/// The total number of entries that existed in the tree at the version represented by this
+<a href=#452 id=452 data-nosnippet>452</a>    /// delta, stored eagerly to avoid recomputation.
+<a href=#453 id=453 data-nosnippet>453</a>    </span>entry_count: usize,
 <a href=#454 id=454 data-nosnippet>454</a>}
+<a href=#455 id=455 data-nosnippet>455</a>
+<a href=#456 id=456 data-nosnippet>456</a><span class="kw">impl </span>Delta {
+<a href=#457 id=457 data-nosnippet>457</a>    <span class="doccomment">/// Creates a new delta with the provided `root`, representing the provided changes to the
+<a href=#458 id=458 data-nosnippet>458</a>    /// `nodes` in the merkle tree, using `changed_keys` to represent the changes to entries in
+<a href=#459 id=459 data-nosnippet>459</a>    /// the tree, and storing `entry_count` as the total number of entries at this version.
+<a href=#460 id=460 data-nosnippet>460</a>    </span><span class="attr">#[must_use]
+<a href=#461 id=461 data-nosnippet>461</a>    </span><span class="kw">fn </span>new(
+<a href=#462 id=462 data-nosnippet>462</a>        root: RootValue,
+<a href=#463 id=463 data-nosnippet>463</a>        version_id: VersionId,
+<a href=#464 id=464 data-nosnippet>464</a>        nodes: NodeChanges,
+<a href=#465 id=465 data-nosnippet>465</a>        changed_keys: ChangedKeys,
+<a href=#466 id=466 data-nosnippet>466</a>        entry_count: usize,
+<a href=#467 id=467 data-nosnippet>467</a>    ) -&gt; <span class="self">Self </span>{
+<a href=#468 id=468 data-nosnippet>468</a>        <span class="self">Self </span>{
+<a href=#469 id=469 data-nosnippet>469</a>            root,
+<a href=#470 id=470 data-nosnippet>470</a>            version_id,
+<a href=#471 id=471 data-nosnippet>471</a>            nodes,
+<a href=#472 id=472 data-nosnippet>472</a>            changed_keys,
+<a href=#473 id=473 data-nosnippet>473</a>            entry_count,
+<a href=#474 id=474 data-nosnippet>474</a>        }
+<a href=#475 id=475 data-nosnippet>475</a>    }
+<a href=#476 id=476 data-nosnippet>476</a>}
 </code></pre></div></section></main></body></html>
