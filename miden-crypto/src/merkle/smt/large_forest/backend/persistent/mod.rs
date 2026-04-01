@@ -255,8 +255,9 @@ impl Backend for PersistentBackend {
         Ok(SmtProof::new_unchecked(merkle_path, leaf))
     }
 
-    /// Returns the leaf stored at `leaf_index` in the SMT with the specified `lineage`. If no
-    /// leaf is explicitly stored at the given index, an empty leaf for that index is returned.
+    /// Returns the leaf stored at `leaf_index` in the SMT with the specified `lineage`.
+    ///
+    /// If no leaf is explicitly stored at the given index, an empty leaf for that index is returned.
     ///
     /// # Errors
     ///
