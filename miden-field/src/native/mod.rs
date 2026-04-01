@@ -1,6 +1,6 @@
 //! Off-chain implementation of [`crate::Felt`].
 
-use alloc::format;
+use alloc::{format, vec, vec::Vec};
 use core::{
     array, fmt,
     hash::{Hash, Hasher},
@@ -22,6 +22,7 @@ use p3_field::{
     quotient_map_large_iint, quotient_map_large_uint, quotient_map_small_int,
 };
 use p3_goldilocks::Goldilocks;
+use p3_util::flatten_to_base;
 use rand::{
     Rng,
     distr::{Distribution, StandardUniform},
@@ -137,6 +138,17 @@ fn raw_felt_u64(value: &Felt) -> u64 {
     unsafe { core::mem::transmute_copy(value) }
 }
 
+/// Reinterprets a `Felt` slice as `Goldilocks`.
+///
+/// # Safety
+///
+/// `Felt` is `#[repr(transparent)]` over `Goldilocks`, so the element layout matches.
+#[inline]
+fn felt_as_goldilock_slice(s: &[Felt]) -> &[Goldilocks] {
+    // SAFETY: `Felt` is `#[repr(transparent)]` over `Goldilocks`, so the element layout matches.
+    unsafe { core::slice::from_raw_parts(s.as_ptr().cast::<Goldilocks>(), s.len()) }
+}
+
 impl fmt::Display for Felt {
     #[inline]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -162,6 +174,8 @@ impl Hash for Felt {
 // ================================================================================================
 
 impl Field for Felt {
+    // TODO: This should only be the case for WASM targets.
+    // Native targets should be able to leverage AVX2 / NEON optimizations from Plonky3.
     type Packing = Self;
 
     const GENERATOR: Self = Self(Goldilocks::GENERATOR);
@@ -220,6 +234,29 @@ impl PrimeCharacteristicRing for Felt {
     #[inline]
     fn exp_u64(&self, power: u64) -> Self {
         self.0.exp_u64(power).into()
+    }
+
+    #[inline]
+    fn sum_array<const N: usize>(input: &[Self]) -> Self {
+        assert_eq!(N, input.len());
+        let g = felt_as_goldilock_slice(input);
+        Self(Goldilocks::sum_array::<N>(g))
+    }
+
+    #[inline]
+    fn dot_product<const N: usize>(lhs: &[Self; N], rhs: &[Self; N]) -> Self {
+        let lhs_g: [Goldilocks; N] = core::array::from_fn(|i| lhs[i].0);
+        let rhs_g: [Goldilocks; N] = core::array::from_fn(|i| rhs[i].0);
+        Self(Goldilocks::dot_product(&lhs_g, &rhs_g))
+    }
+
+    #[inline]
+    fn zero_vec(len: usize) -> Vec<Self> {
+        // SAFETY:
+        // Due to `#[repr(transparent)]`, Felt, Goldilocks and u64 have the same size,
+        // alignment and memory layout making `flatten_to_base` safe.
+        // This will create a vector of Felt elements with value set to 0.
+        unsafe { flatten_to_base(vec![0u64; len]) }
     }
 }
 
