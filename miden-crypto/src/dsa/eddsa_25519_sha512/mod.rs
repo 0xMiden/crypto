@@ -5,7 +5,7 @@ use alloc::{string::ToString, vec::Vec};
 
 use ed25519_dalek::{Signer, Verifier};
 use miden_crypto_derive::{SilentDebug, SilentDisplay};
-use rand::{CryptoRng, RngCore};
+use rand::{CryptoRng, Rng};
 use thiserror::Error;
 
 use crate::{
@@ -51,9 +51,9 @@ impl SecretKey {
     }
 
     /// Generates a new secret key using RNG.
-    pub fn with_rng<R: CryptoRng + RngCore>(rng: &mut R) -> Self {
+    pub fn with_rng<R: CryptoRng + Rng>(rng: &mut R) -> Self {
         let mut seed = [0u8; SECRET_KEY_BYTES];
-        rand::RngCore::fill_bytes(rng, &mut seed);
+        Rng::fill_bytes(rng, &mut seed);
 
         let inner = ed25519_dalek::SigningKey::from_bytes(&seed);
 

@@ -9,7 +9,7 @@ use k256::{
     pkcs8::DecodePublicKey,
 };
 use miden_crypto_derive::{SilentDebug, SilentDisplay};
-use rand::{CryptoRng, RngCore};
+use rand::{CryptoRng, Rng};
 use thiserror::Error;
 
 use crate::{
@@ -59,14 +59,14 @@ impl SecretKey {
     }
 
     /// Generates a new secret key using the provided random number generator.
-    pub fn with_rng<R: CryptoRng + RngCore>(rng: &mut R) -> Self {
+    pub fn with_rng<R: CryptoRng + Rng>(rng: &mut R) -> Self {
         // we use a seedable CSPRNG and seed it with `rng`
         // this is a work around the fact that the version of the `rand` dependency in our crate
         // is different than the one used in the `k256` one. This solution will no longer be needed
         // once `k256` gets a new release with a version of the `rand` dependency matching ours
         use k256::elliptic_curve::rand_core::SeedableRng;
         let mut seed = [0_u8; 32];
-        rand::RngCore::fill_bytes(rng, &mut seed);
+        Rng::fill_bytes(rng, &mut seed);
         let mut rng = rand_hc::Hc128Rng::from_seed(seed);
 
         let signing_key = SigningKey::random(&mut rng);

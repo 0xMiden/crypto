@@ -16,7 +16,7 @@ use alloc::vec::Vec;
 
 use hkdf::{Hkdf, hmac::SimpleHmac};
 use k256::sha2::Sha256;
-use rand::{CryptoRng, RngCore};
+use rand::{CryptoRng, Rng};
 use subtle::ConstantTimeEq;
 
 use crate::{
@@ -108,7 +108,7 @@ impl EphemeralSecretKey {
     }
 
     /// Generates a new random ephemeral secret key using the provided RNG.
-    pub fn with_rng<R: CryptoRng + RngCore>(rng: &mut R) -> Self {
+    pub fn with_rng<R: CryptoRng + Rng>(rng: &mut R) -> Self {
         // we use a seedable CSPRNG and seed it with `rng`
         // this is a work around the fact that the version of the `rand` dependency in our crate
         // is different than the one used in the `x25519_dalek` one. This solution will no longer be
@@ -116,7 +116,7 @@ impl EphemeralSecretKey {
         // dependency matching ours
         use k256::elliptic_curve::rand_core::SeedableRng;
         let mut seed = Zeroizing::new([0_u8; 32]);
-        rand::RngCore::fill_bytes(rng, &mut *seed);
+        Rng::fill_bytes(rng, &mut *seed);
         let rng = rand_hc::Hc128Rng::from_seed(*seed);
 
         let sk = x25519_dalek::EphemeralSecret::random_from_rng(rng);
@@ -187,7 +187,7 @@ impl KeyAgreementScheme for X25519 {
 
     type SharedSecret = SharedSecret;
 
-    fn generate_ephemeral_keypair<R: CryptoRng + RngCore>(
+    fn generate_ephemeral_keypair<R: CryptoRng + Rng>(
         rng: &mut R,
     ) -> (Self::EphemeralSecretKey, Self::EphemeralPublicKey) {
         let sk = EphemeralSecretKey::with_rng(rng);

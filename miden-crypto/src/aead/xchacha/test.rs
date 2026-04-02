@@ -2,7 +2,7 @@ use proptest::{
     prelude::{any, prop},
     prop_assert_eq, prop_assert_ne, proptest,
 };
-use rand::{Rng, SeedableRng};
+use rand::{Rng, RngExt, SeedableRng};
 use rand_chacha::ChaCha20Rng;
 
 use super::*;
@@ -67,7 +67,7 @@ proptest! {
 
         // Generate random bytes
         let mut data = vec![0_u8; data_len];
-        rng.fill(&mut data[..]);
+        rng.fill_bytes(&mut data[..]);
 
         let encrypted = key.encrypt_bytes_with_nonce(&data, &[], nonce).unwrap();
         let decrypted = key.decrypt_bytes(&encrypted).unwrap();
@@ -87,10 +87,10 @@ proptest! {
 
         // Generate random bytes
         let mut associated_data = vec![0_u8; associated_data_len];
-        rng.fill(&mut associated_data[..]);
+        rng.fill_bytes(&mut associated_data[..]);
 
         let mut data = vec![0_u8; data_len];
-        rng.fill(&mut data[..]);
+        rng.fill_bytes(&mut data[..]);
 
 
         let encrypted = key.encrypt_bytes_with_nonce(&data, &associated_data, nonce).unwrap();
@@ -112,7 +112,7 @@ proptest! {
         let key1 = SecretKey::with_rng(&mut rng1);
         let key2 = SecretKey::with_rng(&mut rng2);
         let mut nonce_bytes = [0_u8; 24];
-        rng2.fill(&mut nonce_bytes[..]);
+        rng2.fill_bytes(&mut nonce_bytes[..]);
         let nonce1 = Nonce::from_slice(&nonce_bytes);
         let nonce2 = Nonce::from_slice(&nonce_bytes);
 
@@ -134,9 +134,9 @@ proptest! {
         let mut rng = ChaCha20Rng::seed_from_u64(seed);
         let key = SecretKey::with_rng(&mut rng);
         let mut nonce_bytes = [0_u8; 24];
-        rng.fill(&mut nonce_bytes[..]);
+        rng.fill_bytes(&mut nonce_bytes[..]);
         let nonce1 = Nonce::from_slice(&nonce_bytes);
-        rng.fill(&mut nonce_bytes[..]);
+        rng.fill_bytes(&mut nonce_bytes[..]);
         let nonce2 = Nonce::from_slice(&nonce_bytes);
 
         let encrypted1 = key.encrypt_bytes_with_nonce(&data, &associated_data, nonce1).unwrap();

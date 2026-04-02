@@ -1,7 +1,8 @@
 use alloc::vec::Vec;
+use core::convert::Infallible;
 
-use rand::{Rng, RngCore};
-use rand_core::impls;
+use rand::Rng;
+use rand_core::{TryRng, utils};
 use sha3::{
     Shake256, Shake256ReaderCore,
     digest::{ExtendableOutput, Update, XofReader, core_api::XofReaderCoreWrapper},
@@ -28,8 +29,8 @@ impl Shake256Testing {
         Self(result)
     }
 
-    fn fill_bytes(&mut self, des: &mut [u8]) {
-        self.0.read(des)
+    fn read_bytes(&mut self, dest: &mut [u8]) {
+        self.0.read(dest)
     }
 
     /// A function to help with "syncing" the SHAKE256 PRNG so that it can be used with the test
@@ -37,29 +38,32 @@ impl Shake256Testing {
     pub(crate) fn sync_rng(&mut self) {
         for (bytes, num_seed_sampled) in SYNC_DATA.iter() {
             let mut dummy = vec![0_u8; bytes * 8];
-            self.fill_bytes(&mut dummy);
+            self.read_bytes(&mut dummy);
             let mut nonce_bytes = [0u8; SIG_NONCE_LEN];
-            self.fill_bytes(&mut nonce_bytes);
+            self.read_bytes(&mut nonce_bytes);
 
             for _ in 0..*num_seed_sampled {
                 let mut chacha_seed = [0_u8; CHACHA_SEED_LEN];
-                self.fill_bytes(&mut chacha_seed);
+                self.read_bytes(&mut chacha_seed);
             }
         }
     }
 }
 
-impl RngCore for Shake256Testing {
-    fn next_u32(&mut self) -> u32 {
-        impls::next_u32_via_fill(self)
+impl TryRng for Shake256Testing {
+    type Error = Infallible;
+
+    fn try_next_u32(&mut self) -> Result<u32, Infallible> {
+        utils::next_word_via_fill(self)
     }
 
-    fn next_u64(&mut self) -> u64 {
-        impls::next_u64_via_u32(self)
+    fn try_next_u64(&mut self) -> Result<u64, Infallible> {
+        utils::next_u64_via_u32(self)
     }
 
-    fn fill_bytes(&mut self, dest: &mut [u8]) {
-        self.fill_bytes(dest)
+    fn try_fill_bytes(&mut self, dest: &mut [u8]) -> Result<(), Infallible> {
+        self.read_bytes(dest);
+        Ok(())
     }
 }
 
@@ -176,18 +180,21 @@ impl ChaCha {
     }
 }
 
-impl RngCore for ChaCha {
-    fn next_u32(&mut self) -> u32 {
-        impls::next_u32_via_fill(self)
+impl TryRng for ChaCha {
+    type Error = Infallible;
+
+    fn try_next_u32(&mut self) -> Result<u32, Infallible> {
+        utils::next_word_via_fill(self)
     }
 
-    fn next_u64(&mut self) -> u64 {
-        impls::next_u64_via_u32(self)
+    fn try_next_u64(&mut self) -> Result<u64, Infallible> {
+        utils::next_u64_via_u32(self)
     }
 
-    fn fill_bytes(&mut self, dest: &mut [u8]) {
+    fn try_fill_bytes(&mut self, dest: &mut [u8]) -> Result<(), Infallible> {
         let len = dest.len();
         let buffer = self.random_bytes(len);
-        dest.iter_mut().enumerate().for_each(|(i, d)| *d = buffer[i])
+        dest.iter_mut().enumerate().for_each(|(i, d)| *d = buffer[i]);
+        Ok(())
     }
 }

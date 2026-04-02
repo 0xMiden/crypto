@@ -16,7 +16,7 @@ use chacha20poly1305::{
     XChaCha20Poly1305,
     aead::{Aead, AeadCore, KeyInit},
 };
-use rand::{CryptoRng, RngCore};
+use rand::{CryptoRng, Rng};
 #[cfg(any(test, feature = "testing"))]
 use subtle::ConstantTimeEq;
 
@@ -65,7 +65,7 @@ pub struct Nonce {
 
 impl Nonce {
     /// Creates a new random nonce using the provided random number generator
-    pub fn with_rng<R: RngCore + CryptoRng>(rng: &mut R) -> Self {
+    pub fn with_rng<R: Rng + CryptoRng>(rng: &mut R) -> Self {
         // we use a seedable CSPRNG and seed it with `rng`
         // this is a work around the fact that the version of the `rand` dependency in our crate
         // is different than the one used in the `chacha20poly1305`. This solution will
@@ -73,7 +73,7 @@ impl Nonce {
         // the `rand` dependency matching ours
         use chacha20poly1305::aead::rand_core::SeedableRng;
         let mut seed = [0_u8; 32];
-        rand::RngCore::fill_bytes(rng, &mut seed);
+        Rng::fill_bytes(rng, &mut seed);
         let rng = rand_hc::Hc128Rng::from_seed(seed);
 
         Nonce {
@@ -115,7 +115,7 @@ impl SecretKey {
     }
 
     /// Creates a new random secret key using the provided random number generator
-    pub fn with_rng<R: RngCore + CryptoRng>(rng: &mut R) -> Self {
+    pub fn with_rng<R: Rng + CryptoRng>(rng: &mut R) -> Self {
         // we use a seedable CSPRNG and seed it with `rng`
         // this is a work around the fact that the version of the `rand` dependency in our crate
         // is different than the one used in the `chacha20poly1305`. This solution will
@@ -123,7 +123,7 @@ impl SecretKey {
         // the `rand` dependency matching ours
         use chacha20poly1305::aead::rand_core::SeedableRng;
         let mut seed = [0_u8; 32];
-        rand::RngCore::fill_bytes(rng, &mut seed);
+        Rng::fill_bytes(rng, &mut seed);
         let rng = rand_hc::Hc128Rng::from_seed(seed);
 
         let key = XChaCha20Poly1305::generate_key(rng);
@@ -348,7 +348,7 @@ impl AeadScheme for XChaCha {
             .map_err(|_| EncryptionError::FailedOperation)
     }
 
-    fn encrypt_bytes<R: rand::CryptoRng + rand::RngCore>(
+    fn encrypt_bytes<R: rand::CryptoRng + rand::Rng>(
         key: &Self::Key,
         rng: &mut R,
         plaintext: &[u8],

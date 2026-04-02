@@ -39,8 +39,8 @@ skip = [
   { name = "spin" },
 ]
 skip-tree = [
-  # miden-crypto uses rand 0.9 while Plonky3 0.5 uses rand 0.10,
-  # causing duplicate rand / rand_core / getrandom trees
+  # proptest still pulls rand 0.9 while miden-crypto and Plonky3 use rand 0.10,
+  # and crypto deps like k256/chacha20poly1305/rand_hc still pull rand_core/getrandom 0.6/0.2
   { name = "getrandom", version = "=0.2.17" },
   { name = "rand", version = "=0.9.2" },
   { name = "rand_core", version = "=0.6.4" },

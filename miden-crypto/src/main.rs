@@ -9,7 +9,7 @@ use miden_crypto::{
     merkle::smt::{LargeSmt, LargeSmtError, MemoryStorage, SmtStorage},
     rand::test_utils::rand_value,
 };
-use rand::{Rng, prelude::IteratorRandom, rng};
+use rand::{RngExt, prelude::IteratorRandom, rng};
 
 type Storage = Box<dyn SmtStorage>;
 

@@ -32,7 +32,7 @@ use crate::rand::Randomizable;
 /// ```
 /// # use miden_crypto::rand::test_utils::seeded_rng;
 /// let mut rng = seeded_rng([0u8; 32]);
-/// // Use rng with any function that accepts impl RngCore
+/// // Use rng with any function that accepts impl Rng
 /// ```
 pub fn seeded_rng(seed: [u8; 32]) -> ChaCha20Rng {
     ChaCha20Rng::from_seed(seed)
@@ -41,7 +41,7 @@ pub fn seeded_rng(seed: [u8; 32]) -> ChaCha20Rng {
 /// Generates a random value of type T from an RNG.
 fn rng_value<T: Randomizable>(rng: &mut impl Rng) -> T {
     let mut bytes = vec![0u8; T::VALUE_SIZE];
-    rng.fill(&mut bytes[..]);
+    rng.fill_bytes(&mut bytes[..]);
     T::from_random_bytes(&bytes).expect("failed to generate random value")
 }
 

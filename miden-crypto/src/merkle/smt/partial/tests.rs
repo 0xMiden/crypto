@@ -2,7 +2,7 @@ use alloc::collections::{BTreeMap, BTreeSet};
 
 use assert_matches::assert_matches;
 use proptest::prelude::*;
-use rand::{Rng, SeedableRng};
+use rand::{Rng, RngExt, SeedableRng};
 use rand_chacha::ChaCha20Rng;
 
 use super::{PartialSmt, SMT_DEPTH};

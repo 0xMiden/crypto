@@ -82,7 +82,7 @@ required-features = ["std"]
 [features]
 concurrent        = ["dep:rayon", "p3-maybe-rayon/parallel", "p3-miden-lifted-stark/parallel", "p3-util/parallel", "std"]
 default           = ["concurrent", "std"]
-executable        = ["concurrent", "dep:clap", "dep:rand-utils"]
+executable        = ["concurrent", "dep:clap"]
 fuzzing           = []
 internal          = ["concurrent"]
 persistent-forest = ["rocksdb", "serde"]
@@ -110,10 +110,9 @@ num              = { default-features = false, features = ["alloc", "libm"], ver
 num-complex      = { default-features = false, version = "0.4" }
 once_cell        = { default-features = false, features = ["alloc", "critical-section"], version = "1.21" }
 proptest         = { default-features = false, features = ["alloc"], optional = true, version = "1.7" }
-rand             = { default-features = false, version = "0.9" }
-rand-utils       = { optional = true, package = "winter-rand-utils", version = "0.13" }
-rand_chacha      = { default-features = false, version = "0.9" }
-rand_core        = { default-features = false, version = "0.9" }
+rand             = { default-features = false, version = "0.10" }
+rand_chacha      = { default-features = false, version = "0.10" }
+rand_core        = { default-features = false, version = "0.10" }
 rand_hc          = { version = "0.3" }
 rayon            = { optional = true, version = "1.10" }
 rocksdb          = { default-features = false, features = ["bindgen-runtime", "lz4"], optional = true, version = "0.24" }
@@ -145,7 +144,6 @@ hex            = { default-features = false, features = ["alloc"], version = "0.
 itertools      = { version = "0.14" }
 miden-field    = { features = ["testing"], workspace = true }
 proptest       = { default-features = false, features = ["alloc"], version = "1.7" }
-rand-utils     = { package = "winter-rand-utils", version = "0.13" }
 rstest         = { version = "0.26" }
 seq-macro      = { version = "0.3" }
 tempfile       = { version = "3.20" }
@@ -158,7 +156,7 @@ glob = "0.3"
 workspace = true
 
 [package.metadata.cargo-machete]
-ignored = ["getrandom", "rand-utils"]
+ignored = ["getrandom"]
 
 [[test]]
 name              = "rocksdb_large_smt"
