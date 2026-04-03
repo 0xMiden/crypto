@@ -149,6 +149,17 @@ fn felt_as_goldilock_slice(s: &[Felt]) -> &[Goldilocks] {
     unsafe { core::slice::from_raw_parts(s.as_ptr().cast::<Goldilocks>(), s.len()) }
 }
 
+/// Reinterprets a `Felt` array as `Goldilocks`.
+///
+/// # Safety
+///
+/// `Felt` is `#[repr(transparent)]` over `Goldilocks`, so `[Felt; N]` matches `[Goldilocks; N]`.
+#[inline]
+fn felt_as_goldilocks_array<const N: usize>(a: &[Felt; N]) -> &[Goldilocks; N] {
+    // SAFETY: same layout as `felt_as_goldilock_slice`, for a fixed `N`.
+    unsafe { &*(a as *const [Felt; N] as *const [Goldilocks; N]) }
+}
+
 impl fmt::Display for Felt {
     #[inline]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -245,9 +256,9 @@ impl PrimeCharacteristicRing for Felt {
 
     #[inline]
     fn dot_product<const N: usize>(lhs: &[Self; N], rhs: &[Self; N]) -> Self {
-        let lhs_g: [Goldilocks; N] = core::array::from_fn(|i| lhs[i].0);
-        let rhs_g: [Goldilocks; N] = core::array::from_fn(|i| rhs[i].0);
-        Self(Goldilocks::dot_product(&lhs_g, &rhs_g))
+        let lhs_g = felt_as_goldilocks_array(lhs);
+        let rhs_g = felt_as_goldilocks_array(rhs);
+        Self(Goldilocks::dot_product(lhs_g, rhs_g))
     }
 
     #[inline]
