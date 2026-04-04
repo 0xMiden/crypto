@@ -202,16 +202,15 @@ pub fn batched_update(
     let size = tree.num_leaves();
     let mut rng = rng();
 
-    let new_pairs =
-        entries.iter().choose_multiple(&mut rng, updates).into_iter().map(|&(key, _)| {
-            let value = if rng.random_bool(REMOVAL_PROBABILITY) {
-                EMPTY_WORD
-            } else {
-                Word::new([ONE, ONE, ONE, Felt::new(rng.random())])
-            };
+    let new_pairs = entries.iter().sample(&mut rng, updates).into_iter().map(|&(key, _)| {
+        let value = if rng.random_bool(REMOVAL_PROBABILITY) {
+            EMPTY_WORD
+        } else {
+            Word::new([ONE, ONE, ONE, Felt::new(rng.random())])
+        };
 
-            (key, value)
-        });
+        (key, value)
+    });
 
     assert_eq!(new_pairs.len(), updates);
 
