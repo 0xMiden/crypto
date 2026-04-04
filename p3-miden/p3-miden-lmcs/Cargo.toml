@@ -1,46 +1,47 @@
 [package]
-name = "p3-miden-lmcs"
-description = "Lifted Matrix Commitment Scheme (LMCS) for matrices with power-of-two heights."
-version.workspace = true
-edition.workspace = true
-license.workspace = true
-repository.workspace = true
-readme.workspace = true
-homepage.workspace = true
+description  = "Lifted Matrix Commitment Scheme (LMCS) for matrices with power-of-two heights."
+edition      = "2024"
+homepage     = "https://github.com/0xMiden/p3-miden"
+license      = "MIT OR Apache-2.0"
+name         = "p3-miden-lmcs"
+readme       = "../README.md"
+repository   = "https://github.com/0xMiden/p3-miden"
+rust-version = "1.90"
+version      = "0.5.1"
 
 [dependencies]
 # Internal
 p3-miden-stateful-hasher.workspace = true
-p3-miden-transcript.workspace = true
+p3-miden-transcript.workspace      = true
 
 # Plonky3
-p3-challenger = { workspace = true, optional = true }
-p3-field.workspace = true
-p3-matrix.workspace = true
+p3-challenger            = { optional = true, workspace = true }
+p3-field.workspace       = true
+p3-matrix.workspace      = true
 p3-maybe-rayon.workspace = true
-p3-symmetric.workspace = true
-p3-util.workspace = true
+p3-symmetric.workspace   = true
+p3-util.workspace        = true
 
 # Optional (for testing feature)
-p3-blake3 = { workspace = true, optional = true }
-p3-keccak = { workspace = true, optional = true }
-p3-miden-dev-utils = { workspace = true, optional = true }
+p3-blake3          = { optional = true, workspace = true }
+p3-keccak          = { optional = true, workspace = true }
+p3-miden-dev-utils = { optional = true, workspace = true }
 
 # Third-party
-rand.workspace = true
+rand.workspace      = true
 thiserror.workspace = true
-tracing.workspace = true
+tracing.workspace   = true
 
 [dev-dependencies]
 # Internal
 p3-miden-dev-utils.workspace = true
 
 # Plonky3
-p3-blake3.workspace = true
-p3-challenger.workspace = true
-p3-commit.workspace = true
-p3-goldilocks.workspace = true
-p3-keccak.workspace = true
+p3-blake3.workspace      = true
+p3-challenger.workspace  = true
+p3-commit.workspace      = true
+p3-goldilocks.workspace  = true
+p3-keccak.workspace      = true
 p3-merkle-tree.workspace = true
 
 # Third-party
@@ -48,14 +49,17 @@ criterion.workspace = true
 
 [features]
 parallel = ["p3-maybe-rayon/parallel"]
-testing = ["dep:p3-challenger", "dep:p3-keccak", "dep:p3-miden-dev-utils"]
+testing  = ["dep:p3-challenger", "dep:p3-keccak", "dep:p3-miden-dev-utils"]
 
 [[bench]]
-name = "merkle_commit"
-harness = false
+harness           = false
+name              = "merkle_commit"
 required-features = ["testing"]
 
 [[bench]]
-name = "lmcs_vs_mmcs"
-harness = false
+harness           = false
+name              = "lmcs_vs_mmcs"
 required-features = ["testing"]
+
+[lints]
+workspace = true

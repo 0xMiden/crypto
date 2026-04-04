@@ -25,7 +25,7 @@ jobs:
       matrix:
         toolchain: [stable, nightly]
         os: [ubuntu]
-        args: [default, no-std, large-smt]
+        args: [default, no-std, p3-parallel, p3-testing, large-smt]
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@main
@@ -103,3 +103,18 @@ jobs:
           rustup update --no-self-update nightly
           rustup default nightly
           make doc
+
+  test-avx2:
+    name: test-avx2
+    runs-on: ubuntu-latest
+    if: ${{ github.event_name == 'pull_request' && (github.base_ref == 'main' || github.base_ref == 'next') }}
+    steps:
+      - uses: actions/checkout@main
+      - name: Cleanup large tools for build space
+        uses: ./.github/actions/cleanup-runner
+      - uses: taiki-e/install-action@nextest
+      - name: Perform AVX2 tests
+        run: |
+          rustup update --no-self-update stable
+          rustup default stable
+          RUSTFLAGS="$RUSTFLAGS -C target-feature=+avx2" cargo test --workspace

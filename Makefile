@@ -6,7 +6,10 @@ help:
 
 # -- variables --------------------------------------------------------------------------------------
 
-ALL_FEATURES_EXCEPT_ROCKSDB="concurrent executable internal serde std"
+MIDDEN_CRYPTO_ALL_FEATURES_EXCEPT_ROCKSDB="miden-crypto/concurrent miden-crypto/executable miden-crypto/internal miden-crypto/serde miden-crypto/std"
+P3_PACKAGES=-p p3-miden-dev-utils -p p3-miden-lifted-air -p p3-miden-lifted-examples -p p3-miden-lifted-fri -p p3-miden-lifted-stark -p p3-miden-lmcs -p p3-miden-stateful-hasher -p p3-miden-transcript
+P3_PARALLEL_FEATURES="p3-miden-lifted-examples/parallel p3-miden-lifted-fri/parallel p3-miden-lifted-stark/parallel p3-miden-lmcs/parallel"
+P3_TESTING_FEATURES="p3-miden-lifted-fri/testing p3-miden-lmcs/testing"
 WARNINGS=RUSTDOCFLAGS="-D warnings"
 
 # -- linting --------------------------------------------------------------------------------------
@@ -14,6 +17,7 @@ WARNINGS=RUSTDOCFLAGS="-D warnings"
 .PHONY: clippy
 clippy: ## Run Clippy with configs (alias for xclippy)
 	cargo xclippy
+	cargo clippy $(P3_PACKAGES) --all-targets --all-features -- -D warnings
 
 .PHONY: xclippy
 xclippy: ## Run Clippy with the curated workspace lint set
@@ -82,37 +86,48 @@ doc: ## Generate and check documentation for workspace crates only
 
 .PHONY: test-default
 test-default: ## Run tests with default features
-	cargo nextest run --profile default --cargo-profile test-release --features ${ALL_FEATURES_EXCEPT_ROCKSDB}
+	cargo nextest run --workspace --profile default --cargo-profile test-release --features ${MIDDEN_CRYPTO_ALL_FEATURES_EXCEPT_ROCKSDB}
 
 .PHONY: test-no-std
 test-no-std: ## Run tests with `no-default-features` (std)
-	cargo nextest run --profile default --cargo-profile test-release --no-default-features
+	cargo nextest run --workspace --profile default --cargo-profile test-release --no-default-features
+
+.PHONY: test-p3-parallel
+test-p3-parallel: ## Run workspace tests with p3 parallel support enabled
+	cargo nextest run --workspace --profile default --cargo-profile test-release --features ${P3_PARALLEL_FEATURES}
+
+.PHONY: test-p3-testing
+test-p3-testing: ## Run p3 crates that require their `testing` feature
+	cargo nextest run --workspace --profile default --cargo-profile test-release --features ${P3_TESTING_FEATURES}
 
 .PHONY: test-smt-concurrent
 test-smt-concurrent: ## Run only concurrent SMT tests
-	cargo nextest run --profile smt-concurrent --cargo-profile test-release
+	cargo nextest run --workspace --profile smt-concurrent --cargo-profile test-release
 
 .PHONY: test-docs
 test-docs:
-	cargo test --doc --all-features --profile test-release
+	cargo test --workspace --doc --all-features --profile test-release
 
 .PHONY: test-large-smt
 test-large-smt: ## Run only large SMT tests
-	cargo nextest run --success-output immediate --profile large-smt --cargo-profile test-release --features rocksdb
+	cargo nextest run --workspace --success-output immediate --profile large-smt --cargo-profile test-release --features miden-crypto/rocksdb
 
 .PHONY: test
-test: test-default test-no-std test-docs test-large-smt ## Run all tests except concurrent SMT tests
+test: test-default test-no-std test-p3-parallel test-p3-testing test-docs test-large-smt ## Run all tests except concurrent SMT tests
 
 # --- checking ------------------------------------------------------------------------------------
 
 .PHONY: check
 check: ## Check all targets and features for errors without code generation
-	cargo check --all-targets --all-features
+	cargo check --workspace --all-targets --all-features
 
 .PHONY: check-features
-check-features: ## Check miden-crypto feature combinations
-	cargo check -p miden-crypto --all-targets --no-default-features
-	cargo check -p miden-crypto --all-targets --features ${ALL_FEATURES_EXCEPT_ROCKSDB}
+check-features: ## Check workspace feature combinations
+	cargo check --workspace --all-targets --no-default-features
+	cargo check --workspace --all-targets --features ${MIDDEN_CRYPTO_ALL_FEATURES_EXCEPT_ROCKSDB}
+	cargo check --workspace --all-targets --features ${P3_PARALLEL_FEATURES}
+	cargo check -p p3-miden-lmcs --all-targets --features testing
+	cargo check -p p3-miden-lifted-fri --all-targets --features testing
 
 .PHONY: check-fuzz
 check-fuzz: ## Check miden-crypto-fuzz compilation
@@ -122,11 +137,11 @@ check-fuzz: ## Check miden-crypto-fuzz compilation
 
 .PHONY: build
 build: ## Build with default features enabled
-	cargo build --release
+	cargo build --workspace --release
 
 .PHONY: build-no-std
 build-no-std: ## Build without the standard library
-	cargo build --release --no-default-features --target wasm32-unknown-unknown
+	cargo build --workspace --release --no-default-features --target wasm32-unknown-unknown
 
 .PHONY: build-target-miden
 build-target-miden: ## Build `miden-field` for wasm32-wasip2 with `--cfg miden`
@@ -134,15 +149,15 @@ build-target-miden: ## Build `miden-field` for wasm32-wasip2 with `--cfg miden`
 
 .PHONY: build-avx2
 build-avx2: ## Build with avx2 support
-	RUSTFLAGS="-C target-feature=+avx2" cargo build --release
+	RUSTFLAGS="-C target-feature=+avx2" cargo build --workspace --release
 
 .PHONY: build-avx512
 build-avx512: ## Build with avx512 support
-	RUSTFLAGS="-C target-feature=+avx512f,+avx512dq" cargo build --release
+	RUSTFLAGS="-C target-feature=+avx512f,+avx512dq" cargo build --workspace --release
 
 .PHONY: build-sve
 build-sve: ## Build with sve support
-	RUSTFLAGS="-C target-feature=+sve" cargo build --release
+	RUSTFLAGS="-C target-feature=+sve" cargo build --workspace --release
 
 # --- benchmarking --------------------------------------------------------------------------------
 

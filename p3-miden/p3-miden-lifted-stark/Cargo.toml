@@ -1,56 +1,60 @@
 [package]
-name = "p3-miden-lifted-stark"
-description = "Lifted STARK prover and verifier (LMCS-based)."
-version.workspace = true
-edition.workspace = true
-license.workspace = true
-repository.workspace = true
-readme.workspace = true
-homepage.workspace = true
+description  = "Lifted STARK prover and verifier (LMCS-based)."
+edition      = "2024"
+homepage     = "https://github.com/0xMiden/p3-miden"
+license      = "MIT OR Apache-2.0"
+name         = "p3-miden-lifted-stark"
+readme       = "../README.md"
+repository   = "https://github.com/0xMiden/p3-miden"
+rust-version = "1.90"
+version      = "0.5.1"
 
 [dependencies]
 # Internal
-p3-miden-lifted-air.workspace = true
-p3-miden-lifted-fri.workspace = true
-p3-miden-lmcs.workspace = true
+p3-miden-lifted-air.workspace      = true
+p3-miden-lifted-fri.workspace      = true
+p3-miden-lmcs.workspace            = true
 p3-miden-stateful-hasher.workspace = true
-p3-miden-transcript.workspace = true
+p3-miden-transcript.workspace      = true
 
 # Plonky3
-p3-challenger.workspace = true
-p3-dft.workspace = true
-p3-field.workspace = true
-p3-goldilocks.workspace = true
-p3-matrix.workspace = true
+p3-challenger.workspace  = true
+p3-dft.workspace         = true
+p3-field.workspace       = true
+p3-goldilocks.workspace  = true
+p3-matrix.workspace      = true
 p3-maybe-rayon.workspace = true
-p3-symmetric.workspace = true
-p3-util.workspace = true
+p3-symmetric.workspace   = true
+p3-util.workspace        = true
 
 # Third-party
 thiserror.workspace = true
-tracing.workspace = true
+tracing.workspace   = true
 
 [dev-dependencies]
 # Internal
 p3-miden-dev-utils.workspace = true
-p3-miden-lmcs = { workspace = true, features = ["testing"] }
+p3-miden-lmcs                = { features = ["testing"], workspace = true }
 
 # Plonky3
-p3-challenger.workspace = true
-p3-commit.workspace = true
-p3-fri.workspace = true
-p3-goldilocks.workspace = true
+p3-challenger.workspace  = true
+p3-commit.workspace      = true
+p3-fri.workspace         = true
+p3-goldilocks.workspace  = true
 p3-merkle-tree.workspace = true
-p3-symmetric.workspace = true
+p3-symmetric.workspace   = true
 
 # Third-party
 criterion.workspace = true
-rand.workspace = true
+rand.workspace      = true
 
 [features]
-default = []
+default  = []
 parallel = ["p3-maybe-rayon/parallel"]
 
 [[bench]]
-name = "quotient_commit"
 harness = false
+name    = "quotient_commit"
+
+[lints]
+workspace = true

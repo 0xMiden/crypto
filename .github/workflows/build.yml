@@ -17,6 +17,23 @@ permissions:
   contents: read
 
 jobs:
+  release:
+    name: Build release workspace
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@main
+      - name: Cleanup large tools for build space
+        uses: ./.github/actions/cleanup-runner
+      - name: Install LLVM/Clang
+        uses: ./.github/actions/install-llvm
+        with:
+          version: "17"
+      - name: Build release workspace
+        run: |
+          rustup update --no-self-update stable
+          rustup default stable
+          make build
+
   no-std:
     name: Build for no-std
     runs-on: ubuntu-latest

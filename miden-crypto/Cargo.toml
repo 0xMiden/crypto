@@ -124,31 +124,31 @@ subtle           = { default-features = false, version = "2.6" }
 thiserror        = { default-features = false, version = "2.0" }
 x25519-dalek     = { default-features = false, features = ["static_secrets"], version = "2.0" }
 
-# Upstream Plonky3 dependencies (matching p3-miden's published 0.5.0)
-p3-blake3      = { default-features = false, version = "0.5" }
-p3-challenger  = { default-features = false, version = "0.5" }
-p3-dft         = { default-features = false, version = "0.5" }
-p3-goldilocks  = { default-features = false, version = "0.5" }
-p3-keccak      = { default-features = false, version = "0.5" }
-p3-matrix      = { default-features = false, version = "0.5" }
-p3-maybe-rayon = { default-features = false, version = "0.5" }
-p3-symmetric   = { default-features = false, version = "0.5" }
-p3-util        = { default-features = false, version = "0.5" }
+# Shared Plonky3 dependencies
+p3-blake3.workspace      = true
+p3-challenger.workspace  = true
+p3-dft.workspace         = true
+p3-goldilocks.workspace  = true
+p3-keccak.workspace      = true
+p3-matrix.workspace      = true
+p3-maybe-rayon.workspace = true
+p3-symmetric.workspace   = true
+p3-util.workspace        = true
 
 # Miden-specific Plonky3 crates
-p3-miden-lifted-stark = { default-features = false, version = "0.5" }
+p3-miden-lifted-stark = { default-features = false, workspace = true }
 
 [dev-dependencies]
-assert_matches = { default-features = false, version = "1.5" }
-criterion      = { features = ["html_reports"], version = "0.7" }
-hex            = { default-features = false, features = ["alloc"], version = "0.4" }
-itertools      = { version = "0.14" }
-miden-field    = { features = ["testing"], workspace = true }
-proptest       = { default-features = false, features = ["alloc"], version = "1.7" }
-rand-utils     = { package = "winter-rand-utils", version = "0.13" }
-rstest         = { version = "0.26" }
-seq-macro      = { version = "0.3" }
-tempfile       = { version = "3.20" }
+assert_matches      = { default-features = false, version = "1.5" }
+criterion.workspace = true
+hex                 = { default-features = false, features = ["alloc"], version = "0.4" }
+itertools           = { version = "0.14" }
+miden-field         = { features = ["testing"], workspace = true }
+proptest            = { default-features = false, features = ["alloc"], version = "1.7" }
+rand-utils          = { package = "winter-rand-utils", version = "0.13" }
+rstest              = { version = "0.26" }
+seq-macro           = { version = "0.3" }
+tempfile            = { version = "3.20" }
 
 [build-dependencies]
 cc   = { features = ["parallel"], optional = true, version = "1.2" }
