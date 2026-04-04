@@ -43,15 +43,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4b46cbb362ab8752921c97e041f5e366ee6297bd428a31275b9fcf1e380f7299"
 
 [[package]]
-name = "ansi_term"
-version = "0.12.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d52a9bb7ec0cf484c551830a7ce27bd20d67eac647e1befb56b0be4ee39a55d2"
-dependencies = [
- "winapi",
-]
-
-[[package]]
 name = "anstream"
 version = "0.6.21"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1083,7 +1074,7 @@ dependencies = [
  "sha3",
  "subtle",
  "tempfile",
- "thiserror 2.0.18",
+ "thiserror",
  "winter-rand-utils",
  "x25519-dalek",
 ]
@@ -1111,7 +1102,7 @@ dependencies = [
  "rstest",
  "serde",
  "subtle",
- "thiserror 2.0.18",
+ "thiserror",
 ]
 
 [[package]]
@@ -1409,7 +1400,7 @@ dependencies = [
  "rand 0.10.0",
  "serde",
  "spin 0.10.0",
- "thiserror 2.0.18",
+ "thiserror",
  "tracing",
 ]
 
@@ -1539,7 +1530,7 @@ dependencies = [
  "p3-util",
  "rand 0.10.0",
  "serde",
- "thiserror 2.0.18",
+ "thiserror",
  "tracing",
 ]
 
@@ -1588,7 +1579,7 @@ dependencies = [
  "p3-goldilocks",
  "p3-matrix",
  "p3-util",
- "thiserror 2.0.18",
+ "thiserror",
 ]
 
 [[package]]
@@ -1644,7 +1635,7 @@ dependencies = [
  "p3-symmetric",
  "p3-util",
  "rand 0.10.0",
- "thiserror 2.0.18",
+ "thiserror",
  "tracing",
  "tracing-subscriber",
 ]
@@ -1672,7 +1663,7 @@ dependencies = [
  "p3-symmetric",
  "p3-util",
  "rand 0.10.0",
- "thiserror 2.0.18",
+ "thiserror",
  "tracing",
 ]
 
@@ -1696,7 +1687,7 @@ dependencies = [
  "p3-symmetric",
  "p3-util",
  "rand 0.10.0",
- "thiserror 2.0.18",
+ "thiserror",
  "tracing",
 ]
 
@@ -1718,7 +1709,7 @@ dependencies = [
  "p3-challenger",
  "p3-field",
  "serde",
- "thiserror 2.0.18",
+ "thiserror",
 ]
 
 [[package]]
@@ -1811,7 +1802,7 @@ dependencies = [
  "p3-maybe-rayon",
  "p3-util",
  "serde",
- "thiserror 2.0.18",
+ "thiserror",
  "tracing",
 ]
 
@@ -2405,31 +2396,11 @@ dependencies = [
 
 [[package]]
 name = "thiserror"
-version = "1.0.69"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b6aaf5339b578ea85b50e080feb250a3e8ae8cfcdff9a461c9ec2904bc923f52"
-dependencies = [
- "thiserror-impl 1.0.69",
-]
-
-[[package]]
-name = "thiserror"
 version = "2.0.18"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4288b5bcbc7920c07a1149a35cf9590a2aa808e0bc1eafaade0b80947865fbc4"
 dependencies = [
- "thiserror-impl 2.0.18",
-]
-
-[[package]]
-name = "thiserror-impl"
-version = "1.0.69"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4fee6c4efc90059e10f81e6d42c60a18f76588c3d74cb83a0b242a2b6c7504c1"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn",
+ "thiserror-impl",
 ]
 
 [[package]]
@@ -2535,13 +2506,12 @@ dependencies = [
 
 [[package]]
 name = "tracing-forest"
-version = "0.1.6"
+version = "0.3.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ee40835db14ddd1e3ba414292272eddde9dad04d3d4b65509656414d1c42592f"
+checksum = "f09cb459317a3811f76644334473239d696cd8efc606963ae7d1c308cead3b74"
 dependencies = [
- "ansi_term",
  "smallvec",
- "thiserror 1.0.69",
+ "thiserror",
  "tracing",
  "tracing-subscriber",
 ]
