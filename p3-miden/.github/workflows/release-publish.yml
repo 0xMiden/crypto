@@ -1,0 +1,33 @@
+name: release-publish
+
+on:
+  release:
+    types: [ published ]
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+  CARGO_INCREMENTAL: 0
+  RUSTFLAGS: -C debuginfo=0
+
+jobs:
+  publish:
+    name: Publish workspace to crates.io
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    environment:
+      name: crates.io
+      url: https://crates.io/crates/p3-miden-air
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.release.tag_name }}
+
+      - name: Publish workspace crates
+        uses: ./.github/actions/workspace-release
+        with:
+          mode: publish
+          verify-main-head: "true"
+          cargo-registry-token: ${{ secrets.CARGO_REGISTRY_TOKEN }}

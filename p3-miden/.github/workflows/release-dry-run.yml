@@ -1,0 +1,27 @@
+name: release-dry-run
+
+on:
+  push:
+    branches: [ main ]
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+  CARGO_INCREMENTAL: 0
+  RUSTFLAGS: -C debuginfo=0
+
+jobs:
+  dry-run:
+    name: Verify workspace release (dry-run)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Verify workspace can be released
+        uses: ./.github/actions/workspace-release
+        with:
+          mode: dry-run
+          verify-main-head: "false"

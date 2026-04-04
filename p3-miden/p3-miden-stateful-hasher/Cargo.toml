@@ -1,0 +1,18 @@
+[package]
+name = "p3-miden-stateful-hasher"
+description = "Stateful sponge-like hashers for cryptographic hashing"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+readme.workspace = true
+homepage.workspace = true
+
+[dependencies]
+p3-field.workspace = true
+p3-symmetric.workspace = true
+
+[dev-dependencies]
+p3-bn254.workspace = true
+p3-goldilocks.workspace = true
+p3-mersenne-31.workspace = true
