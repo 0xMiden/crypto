@@ -100,13 +100,16 @@ jobs:
       - name: Build docs
         run: make doc
 
-  unused_deps:
-    name: check for unused dependencies
+  machete:
+    name: cargo-machete
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: machete
-        uses: bnjbvr/cargo-machete@main
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-machete
+      - name: Check Cargo manifests for unused dependencies
+        run: make machete
 
   cargo-deny:
     name: check dependencies with cargo-deny
