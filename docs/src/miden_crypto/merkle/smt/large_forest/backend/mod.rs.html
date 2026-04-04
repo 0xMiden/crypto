@@ -1,4 +1,4 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `miden-crypto/src/merkle/smt/large_forest/backend/mod.rs`."><title>mod.rs - source</title><script>if(window.location.protocol!=="file:")document.head.insertAdjacentHTML("beforeend","SourceSerif4-Regular-6b053e98.ttf.woff2,FiraSans-Italic-81dc35de.woff2,FiraSans-Regular-0fe48ade.woff2,FiraSans-MediumItalic-ccf7e434.woff2,FiraSans-Medium-e1aa3f0a.woff2,SourceCodePro-Regular-8badfe75.ttf.woff2,SourceCodePro-Semibold-aa29a496.ttf.woff2".split(",").map(f=>`<link rel="preload" as="font" type="font/woff2"href="../../../../../../static.files/${f}">`).join(""))</script><link rel="stylesheet" href="../../../../../../static.files/normalize-9960930a.css"><link rel="stylesheet" href="../../../../../../static.files/rustdoc-17e0aaed.css"><meta name="rustdoc-vars" data-root-path="../../../../../../" data-static-root-path="../../../../../../static.files/" data-current-crate="miden_crypto" data-themes="" data-resource-suffix="" data-rustdoc-version="1.96.0-nightly (48cc71ee8 2026-03-31)" data-channel="nightly" data-search-js="search-63369b7b.js" data-stringdex-js="stringdex-2da4960a.js" data-settings-js="settings-170eb4bf.js" ><script src="../../../../../../static.files/storage-41dd4d93.js"></script><script defer src="../../../../../../static.files/src-script-813739b1.js"></script><script defer src="../../../../../../src-files.js"></script><script defer src="../../../../../../static.files/main-5013f961.js"></script><noscript><link rel="stylesheet" href="../../../../../../static.files/noscript-f7c3ffd8.css"></noscript><link rel="alternate icon" type="image/png" href="../../../../../../static.files/favicon-32x32-eab170b8.png"><link rel="icon" type="image/svg+xml" href="../../../../../../static.files/favicon-044be391.svg"></head><body class="rustdoc src"><a class="skip-main-content" href="#main-content">Skip to main content</a><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="src-sidebar-title"><h2>Files</h2></div></nav><div class="sidebar-resizer" title="Drag to resize sidebar"></div><main><section id="main-content" class="content" tabindex="-1"><div class="main-heading"><h1><div class="sub-heading">miden_crypto/merkle/smt/large_forest/backend/</div>mod.rs</h1><rustdoc-toolbar></rustdoc-toolbar></div><div class="example-wrap digits-3"><pre class="rust"><code><a href=#1 id=1 data-nosnippet>1</a><span class="doccomment">//! This file contains the [`Backend`] trait for the SMT forest implementation and the supporting
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `miden-crypto/src/merkle/smt/large_forest/backend/mod.rs`."><title>mod.rs - source</title><script>if(window.location.protocol!=="file:")document.head.insertAdjacentHTML("beforeend","SourceSerif4-Regular-6b053e98.ttf.woff2,FiraSans-Italic-81dc35de.woff2,FiraSans-Regular-0fe48ade.woff2,FiraSans-MediumItalic-ccf7e434.woff2,FiraSans-Medium-e1aa3f0a.woff2,SourceCodePro-Regular-8badfe75.ttf.woff2,SourceCodePro-Semibold-aa29a496.ttf.woff2".split(",").map(f=>`<link rel="preload" as="font" type="font/woff2"href="../../../../../../static.files/${f}">`).join(""))</script><link rel="stylesheet" href="../../../../../../static.files/normalize-9960930a.css"><link rel="stylesheet" href="../../../../../../static.files/rustdoc-17e0aaed.css"><meta name="rustdoc-vars" data-root-path="../../../../../../" data-static-root-path="../../../../../../static.files/" data-current-crate="miden_crypto" data-themes="" data-resource-suffix="" data-rustdoc-version="1.96.0-nightly (2972b5e59 2026-04-03)" data-channel="nightly" data-search-js="search-06294f92.js" data-stringdex-js="stringdex-2da4960a.js" data-settings-js="settings-170eb4bf.js" ><script src="../../../../../../static.files/storage-41dd4d93.js"></script><script defer src="../../../../../../static.files/src-script-813739b1.js"></script><script defer src="../../../../../../src-files.js"></script><script defer src="../../../../../../static.files/main-5013f961.js"></script><noscript><link rel="stylesheet" href="../../../../../../static.files/noscript-f7c3ffd8.css"></noscript><link rel="alternate icon" type="image/png" href="../../../../../../static.files/favicon-32x32-eab170b8.png"><link rel="icon" type="image/svg+xml" href="../../../../../../static.files/favicon-044be391.svg"></head><body class="rustdoc src"><a class="skip-main-content" href="#main-content">Skip to main content</a><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="src-sidebar-title"><h2>Files</h2></div></nav><div class="sidebar-resizer" title="Drag to resize sidebar"></div><main><section id="main-content" class="content" tabindex="-1"><div class="main-heading"><h1><div class="sub-heading">miden_crypto/merkle/smt/large_forest/backend/</div>mod.rs</h1><rustdoc-toolbar></rustdoc-toolbar></div><div class="example-wrap digits-3"><pre class="rust"><code><a href=#1 id=1 data-nosnippet>1</a><span class="doccomment">//! This file contains the [`Backend`] trait for the SMT forest implementation and the supporting
 <a href=#2 id=2 data-nosnippet>2</a>//! types it needs.
 <a href=#3 id=3 data-nosnippet>3</a>
 <a href=#4 id=4 data-nosnippet>4</a></span><span class="kw">pub mod </span>memory;
@@ -15,7 +15,7 @@
 <a href=#15 id=15 data-nosnippet>15</a>    merkle::{
 <a href=#16 id=16 data-nosnippet>16</a>        MerkleError,
 <a href=#17 id=17 data-nosnippet>17</a>        smt::{
-<a href=#18 id=18 data-nosnippet>18</a>            SmtProof,
+<a href=#18 id=18 data-nosnippet>18</a>            LeafIndex, SMT_DEPTH, SmtLeaf, SmtProof,
 <a href=#19 id=19 data-nosnippet>19</a>            large_forest::{
 <a href=#20 id=20 data-nosnippet>20</a>                operation::{SmtForestUpdateBatch, SmtUpdateBatch},
 <a href=#21 id=21 data-nosnippet>21</a>                root::{LineageId, TreeEntry, TreeWithRoot, VersionId},
@@ -83,193 +83,201 @@
 <a href=#83 id=83 data-nosnippet>83</a>    /// backend. The backend must return an error if the lineage does not exist.
 <a href=#84 id=84 data-nosnippet>84</a>    </span><span class="kw">fn </span>open(<span class="kw-2">&amp;</span><span class="self">self</span>, lineage: LineageId, key: Word) -&gt; <span class="prelude-ty">Result</span>&lt;SmtProof&gt;;
 <a href=#85 id=85 data-nosnippet>85</a>
-<a href=#86 id=86 data-nosnippet>86</a>    <span class="doccomment">/// Returns the value associated with the provided `key` in the SMT with the specified
-<a href=#87 id=87 data-nosnippet>87</a>    /// `lineage`, or [`None`] if no such value exists.
-<a href=#88 id=88 data-nosnippet>88</a>    ///
-<a href=#89 id=89 data-nosnippet>89</a>    /// It is the responsibility of the forest to ensure lineage existence before querying the
-<a href=#90 id=90 data-nosnippet>90</a>    /// backend. The backend must return an error if the lineage does not exist.
-<a href=#91 id=91 data-nosnippet>91</a>    </span><span class="kw">fn </span>get(<span class="kw-2">&amp;</span><span class="self">self</span>, lineage: LineageId, key: Word) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="prelude-ty">Option</span>&lt;Word&gt;&gt;;
-<a href=#92 id=92 data-nosnippet>92</a>
-<a href=#93 id=93 data-nosnippet>93</a>    <span class="doccomment">/// Returns the version of the tree with the specified `lineage`.
-<a href=#94 id=94 data-nosnippet>94</a>    ///
-<a href=#95 id=95 data-nosnippet>95</a>    /// It is the responsibility of the forest to ensure lineage existence before querying the
-<a href=#96 id=96 data-nosnippet>96</a>    /// backend. The backend must return an error if the lineage does not exist.
-<a href=#97 id=97 data-nosnippet>97</a>    </span><span class="kw">fn </span>version(<span class="kw-2">&amp;</span><span class="self">self</span>, lineage: LineageId) -&gt; <span class="prelude-ty">Result</span>&lt;VersionId&gt;;
-<a href=#98 id=98 data-nosnippet>98</a>
-<a href=#99 id=99 data-nosnippet>99</a>    <span class="doccomment">/// Returns an iterator over all the lineages that the backend knows about.
-<a href=#100 id=100 data-nosnippet>100</a>    ///
-<a href=#101 id=101 data-nosnippet>101</a>    /// The iteration order is unspecified.
-<a href=#102 id=102 data-nosnippet>102</a>    </span><span class="kw">fn </span>lineages(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="kw">impl </span>Iterator&lt;Item = LineageId&gt;&gt;;
-<a href=#103 id=103 data-nosnippet>103</a>
-<a href=#104 id=104 data-nosnippet>104</a>    <span class="doccomment">/// Returns an iterator over all the trees (and their corresponding roots) that the backend
-<a href=#105 id=105 data-nosnippet>105</a>    /// knows about.
-<a href=#106 id=106 data-nosnippet>106</a>    ///
-<a href=#107 id=107 data-nosnippet>107</a>    /// The iteration order is unspecified.
-<a href=#108 id=108 data-nosnippet>108</a>    </span><span class="kw">fn </span>trees(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="kw">impl </span>Iterator&lt;Item = TreeWithRoot&gt;&gt;;
-<a href=#109 id=109 data-nosnippet>109</a>
-<a href=#110 id=110 data-nosnippet>110</a>    <span class="doccomment">/// Returns the total number of (key-value) entries in the specified `lineage`.
-<a href=#111 id=111 data-nosnippet>111</a>    ///
-<a href=#112 id=112 data-nosnippet>112</a>    /// It is the responsibility of the forest to ensure lineage existence before querying the
-<a href=#113 id=113 data-nosnippet>113</a>    /// backend. The backend must return an error if the lineage does not exist.
+<a href=#86 id=86 data-nosnippet>86</a>    <span class="doccomment">/// Returns the leaf stored at the provided `leaf_index` in the SMT with the specified
+<a href=#87 id=87 data-nosnippet>87</a>    /// `lineage`. If no leaf is explicitly stored at the given index, the backend must return
+<a href=#88 id=88 data-nosnippet>88</a>    /// an empty leaf for that index.
+<a href=#89 id=89 data-nosnippet>89</a>    ///
+<a href=#90 id=90 data-nosnippet>90</a>    /// It is the responsibility of the forest to ensure lineage existence before querying the
+<a href=#91 id=91 data-nosnippet>91</a>    /// backend. The backend must return an error if the lineage does not exist.
+<a href=#92 id=92 data-nosnippet>92</a>    </span><span class="kw">fn </span>get_leaf(<span class="kw-2">&amp;</span><span class="self">self</span>, lineage: LineageId, leaf_index: LeafIndex&lt;SMT_DEPTH&gt;) -&gt; <span class="prelude-ty">Result</span>&lt;SmtLeaf&gt;;
+<a href=#93 id=93 data-nosnippet>93</a>
+<a href=#94 id=94 data-nosnippet>94</a>    <span class="doccomment">/// Returns the value associated with the provided `key` in the SMT with the specified
+<a href=#95 id=95 data-nosnippet>95</a>    /// `lineage`, or [`None`] if no such value exists.
+<a href=#96 id=96 data-nosnippet>96</a>    ///
+<a href=#97 id=97 data-nosnippet>97</a>    /// It is the responsibility of the forest to ensure lineage existence before querying the
+<a href=#98 id=98 data-nosnippet>98</a>    /// backend. The backend must return an error if the lineage does not exist.
+<a href=#99 id=99 data-nosnippet>99</a>    </span><span class="kw">fn </span>get(<span class="kw-2">&amp;</span><span class="self">self</span>, lineage: LineageId, key: Word) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="prelude-ty">Option</span>&lt;Word&gt;&gt;;
+<a href=#100 id=100 data-nosnippet>100</a>
+<a href=#101 id=101 data-nosnippet>101</a>    <span class="doccomment">/// Returns the version of the tree with the specified `lineage`.
+<a href=#102 id=102 data-nosnippet>102</a>    ///
+<a href=#103 id=103 data-nosnippet>103</a>    /// It is the responsibility of the forest to ensure lineage existence before querying the
+<a href=#104 id=104 data-nosnippet>104</a>    /// backend. The backend must return an error if the lineage does not exist.
+<a href=#105 id=105 data-nosnippet>105</a>    </span><span class="kw">fn </span>version(<span class="kw-2">&amp;</span><span class="self">self</span>, lineage: LineageId) -&gt; <span class="prelude-ty">Result</span>&lt;VersionId&gt;;
+<a href=#106 id=106 data-nosnippet>106</a>
+<a href=#107 id=107 data-nosnippet>107</a>    <span class="doccomment">/// Returns an iterator over all the lineages that the backend knows about.
+<a href=#108 id=108 data-nosnippet>108</a>    ///
+<a href=#109 id=109 data-nosnippet>109</a>    /// The iteration order is unspecified.
+<a href=#110 id=110 data-nosnippet>110</a>    </span><span class="kw">fn </span>lineages(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="kw">impl </span>Iterator&lt;Item = LineageId&gt;&gt;;
+<a href=#111 id=111 data-nosnippet>111</a>
+<a href=#112 id=112 data-nosnippet>112</a>    <span class="doccomment">/// Returns an iterator over all the trees (and their corresponding roots) that the backend
+<a href=#113 id=113 data-nosnippet>113</a>    /// knows about.
 <a href=#114 id=114 data-nosnippet>114</a>    ///
-<a href=#115 id=115 data-nosnippet>115</a>    /// # Expected Behavior
-<a href=#116 id=116 data-nosnippet>116</a>    ///
-<a href=#117 id=117 data-nosnippet>117</a>    /// Implementations must guarantee the following behavior in addition to the global invariants:
-<a href=#118 id=118 data-nosnippet>118</a>    ///
-<a href=#119 id=119 data-nosnippet>119</a>    /// - This method must be **cheap** to call, not requiring network or disk I/O to service the
-<a href=#120 id=120 data-nosnippet>120</a>    ///   result. This usually implies in-memory caching of the data.
-<a href=#121 id=121 data-nosnippet>121</a>    /// - This method must not return errors other than if the lineage does not exist.
-<a href=#122 id=122 data-nosnippet>122</a>    </span><span class="kw">fn </span>entry_count(<span class="kw-2">&amp;</span><span class="self">self</span>, lineage: LineageId) -&gt; <span class="prelude-ty">Result</span>&lt;usize&gt;;
-<a href=#123 id=123 data-nosnippet>123</a>
-<a href=#124 id=124 data-nosnippet>124</a>    <span class="doccomment">/// Returns an iterator that yields the populated (key-value) entries for the specified
-<a href=#125 id=125 data-nosnippet>125</a>    /// `lineage`.
+<a href=#115 id=115 data-nosnippet>115</a>    /// The iteration order is unspecified.
+<a href=#116 id=116 data-nosnippet>116</a>    </span><span class="kw">fn </span>trees(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="kw">impl </span>Iterator&lt;Item = TreeWithRoot&gt;&gt;;
+<a href=#117 id=117 data-nosnippet>117</a>
+<a href=#118 id=118 data-nosnippet>118</a>    <span class="doccomment">/// Returns the total number of (key-value) entries in the specified `lineage`.
+<a href=#119 id=119 data-nosnippet>119</a>    ///
+<a href=#120 id=120 data-nosnippet>120</a>    /// It is the responsibility of the forest to ensure lineage existence before querying the
+<a href=#121 id=121 data-nosnippet>121</a>    /// backend. The backend must return an error if the lineage does not exist.
+<a href=#122 id=122 data-nosnippet>122</a>    ///
+<a href=#123 id=123 data-nosnippet>123</a>    /// # Expected Behavior
+<a href=#124 id=124 data-nosnippet>124</a>    ///
+<a href=#125 id=125 data-nosnippet>125</a>    /// Implementations must guarantee the following behavior in addition to the global invariants:
 <a href=#126 id=126 data-nosnippet>126</a>    ///
-<a href=#127 id=127 data-nosnippet>127</a>    /// It is the responsibility of the forest to ensure lineage existence before querying the
-<a href=#128 id=128 data-nosnippet>128</a>    /// backend. The backend must return an error if the lineage does not exist.
-<a href=#129 id=129 data-nosnippet>129</a>    ///
-<a href=#130 id=130 data-nosnippet>130</a>    /// The iterator may yield entries in any arbitrary order, but must not yield entries for which
-<a href=#131 id=131 data-nosnippet>131</a>    /// the value is the empty word.
-<a href=#132 id=132 data-nosnippet>132</a>    ///
-<a href=#133 id=133 data-nosnippet>133</a>    /// # Expected Behavior
+<a href=#127 id=127 data-nosnippet>127</a>    /// - This method must be **cheap** to call, not requiring network or disk I/O to service the
+<a href=#128 id=128 data-nosnippet>128</a>    ///   result. This usually implies in-memory caching of the data.
+<a href=#129 id=129 data-nosnippet>129</a>    /// - This method must not return errors other than if the lineage does not exist.
+<a href=#130 id=130 data-nosnippet>130</a>    </span><span class="kw">fn </span>entry_count(<span class="kw-2">&amp;</span><span class="self">self</span>, lineage: LineageId) -&gt; <span class="prelude-ty">Result</span>&lt;usize&gt;;
+<a href=#131 id=131 data-nosnippet>131</a>
+<a href=#132 id=132 data-nosnippet>132</a>    <span class="doccomment">/// Returns an iterator that yields the populated (key-value) entries for the specified
+<a href=#133 id=133 data-nosnippet>133</a>    /// `lineage`.
 <a href=#134 id=134 data-nosnippet>134</a>    ///
-<a href=#135 id=135 data-nosnippet>135</a>    /// Implementations must guarantee the following behavior in addition to the global invariants:
-<a href=#136 id=136 data-nosnippet>136</a>    ///
-<a href=#137 id=137 data-nosnippet>137</a>    /// - If any kind of error occurs during iteration that should be signaled to the user, the
-<a href=#138 id=138 data-nosnippet>138</a>    ///   iterator must return `Some(Err(...))`. The caller should stop iteration after receiving an
-<a href=#139 id=139 data-nosnippet>139</a>    ///   error as the iterator state is no longer valid.
-<a href=#140 id=140 data-nosnippet>140</a>    /// - `None` will be returned upon successful completion, or at any time after an error has been
-<a href=#141 id=141 data-nosnippet>141</a>    ///   returned.
-<a href=#142 id=142 data-nosnippet>142</a>    </span><span class="kw">fn </span>entries(<span class="kw-2">&amp;</span><span class="self">self</span>, lineage: LineageId) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="kw">impl </span>Iterator&lt;Item = <span class="prelude-ty">Result</span>&lt;TreeEntry&gt;&gt;&gt;;
-<a href=#143 id=143 data-nosnippet>143</a>
-<a href=#144 id=144 data-nosnippet>144</a>    <span class="comment">// SINGLE-TREE MODIFIERS
-<a href=#145 id=145 data-nosnippet>145</a>    // ============================================================================================
-<a href=#146 id=146 data-nosnippet>146</a>
-<a href=#147 id=147 data-nosnippet>147</a>    </span><span class="doccomment">/// Adds a new `lineage` to the forest with the provided `version` and sets the associated SMT
-<a href=#148 id=148 data-nosnippet>148</a>    /// to have the value created by applying `updates` to the empty tree, returning the new root of
-<a href=#149 id=149 data-nosnippet>149</a>    /// that tree.
-<a href=#150 id=150 data-nosnippet>150</a>    ///
-<a href=#151 id=151 data-nosnippet>151</a>    /// # Expected Behavior
-<a href=#152 id=152 data-nosnippet>152</a>    ///
-<a href=#153 id=153 data-nosnippet>153</a>    /// Implementations must guarantee the following behavior in addition to the global invariants:
-<a href=#154 id=154 data-nosnippet>154</a>    ///
-<a href=#155 id=155 data-nosnippet>155</a>    /// - If the provided `lineage` conflicts with an already-existing lineage in the backend, it
-<a href=#156 id=156 data-nosnippet>156</a>    ///   must return [`BackendError::DuplicateLineage`].
-<a href=#157 id=157 data-nosnippet>157</a>    </span><span class="kw">fn </span>add_lineage(
-<a href=#158 id=158 data-nosnippet>158</a>        <span class="kw-2">&amp;mut </span><span class="self">self</span>,
-<a href=#159 id=159 data-nosnippet>159</a>        lineage: LineageId,
-<a href=#160 id=160 data-nosnippet>160</a>        version: VersionId,
-<a href=#161 id=161 data-nosnippet>161</a>        updates: SmtUpdateBatch,
-<a href=#162 id=162 data-nosnippet>162</a>    ) -&gt; <span class="prelude-ty">Result</span>&lt;TreeWithRoot&gt;;
-<a href=#163 id=163 data-nosnippet>163</a>
-<a href=#164 id=164 data-nosnippet>164</a>    <span class="doccomment">/// Performs the provided `updates` on the tree with the specified `lineage`, returning the
-<a href=#165 id=165 data-nosnippet>165</a>    /// mutation set that will revert the changes made to the tree.
-<a href=#166 id=166 data-nosnippet>166</a>    ///
-<a href=#167 id=167 data-nosnippet>167</a>    /// # Expected Behavior
-<a href=#168 id=168 data-nosnippet>168</a>    ///
-<a href=#169 id=169 data-nosnippet>169</a>    /// Implementations must guarantee the following behavior in addition to the global invariants:
-<a href=#170 id=170 data-nosnippet>170</a>    ///
-<a href=#171 id=171 data-nosnippet>171</a>    /// - At most one new root must be added to the forest for the entire batch.
-<a href=#172 id=172 data-nosnippet>172</a>    /// - If applying the provided `updates` results in no changes to the tree, no new tree must be
-<a href=#173 id=173 data-nosnippet>173</a>    ///   allocated.
-<a href=#174 id=174 data-nosnippet>174</a>    </span><span class="kw">fn </span>update_tree(
-<a href=#175 id=175 data-nosnippet>175</a>        <span class="kw-2">&amp;mut </span><span class="self">self</span>,
-<a href=#176 id=176 data-nosnippet>176</a>        lineage: LineageId,
-<a href=#177 id=177 data-nosnippet>177</a>        new_version: VersionId,
-<a href=#178 id=178 data-nosnippet>178</a>        updates: SmtUpdateBatch,
-<a href=#179 id=179 data-nosnippet>179</a>    ) -&gt; <span class="prelude-ty">Result</span>&lt;MutationSet&gt;;
-<a href=#180 id=180 data-nosnippet>180</a>
-<a href=#181 id=181 data-nosnippet>181</a>    <span class="comment">// MULTI-TREE MODIFIERS
-<a href=#182 id=182 data-nosnippet>182</a>    // ============================================================================================
-<a href=#183 id=183 data-nosnippet>183</a>
-<a href=#184 id=184 data-nosnippet>184</a>    </span><span class="doccomment">/// Adds multiple new `lineages` to the backend with the provided `version` and sets the
-<a href=#185 id=185 data-nosnippet>185</a>    /// associated SMTs to have the value created by applying the provided updates to the empty
-<a href=#186 id=186 data-nosnippet>186</a>    /// tree, returning the new root of that tree.
-<a href=#187 id=187 data-nosnippet>187</a>    ///
-<a href=#188 id=188 data-nosnippet>188</a>    /// # Expected Behavior
-<a href=#189 id=189 data-nosnippet>189</a>    ///
-<a href=#190 id=190 data-nosnippet>190</a>    /// Implementations must guarantee the following behavior in addition to the global invariants:
-<a href=#191 id=191 data-nosnippet>191</a>    ///
-<a href=#192 id=192 data-nosnippet>192</a>    /// - If any provided lineage conflicts with an already-existing lineage in the backend, it must
-<a href=#193 id=193 data-nosnippet>193</a>    ///   return [`BackendError::DuplicateLineage`].
-<a href=#194 id=194 data-nosnippet>194</a>    </span><span class="kw">fn </span>add_lineages(
-<a href=#195 id=195 data-nosnippet>195</a>        <span class="kw-2">&amp;mut </span><span class="self">self</span>,
-<a href=#196 id=196 data-nosnippet>196</a>        version: VersionId,
-<a href=#197 id=197 data-nosnippet>197</a>        lineages: SmtForestUpdateBatch,
-<a href=#198 id=198 data-nosnippet>198</a>    ) -&gt; <span class="prelude-ty">Result</span>&lt;Vec&lt;(LineageId, TreeWithRoot)&gt;&gt;;
-<a href=#199 id=199 data-nosnippet>199</a>
-<a href=#200 id=200 data-nosnippet>200</a>    <span class="doccomment">/// Performs the provided `updates` on the forest, setting all new tree states to have the
-<a href=#201 id=201 data-nosnippet>201</a>    /// provided `new_version` and returning a vector of the mutation sets that reverse the changes
-<a href=#202 id=202 data-nosnippet>202</a>    /// to each changed tree.
-<a href=#203 id=203 data-nosnippet>203</a>    ///
-<a href=#204 id=204 data-nosnippet>204</a>    /// # Expected Behavior
-<a href=#205 id=205 data-nosnippet>205</a>    ///
-<a href=#206 id=206 data-nosnippet>206</a>    /// Implementations must guarantee the following behavior in addition to the global invariants:
-<a href=#207 id=207 data-nosnippet>207</a>    ///
-<a href=#208 id=208 data-nosnippet>208</a>    /// - At most one new root must be added to the forest for each target root in the provided
-<a href=#209 id=209 data-nosnippet>209</a>    ///   `updates`.
-<a href=#210 id=210 data-nosnippet>210</a>    /// - If applying the provided `updates` results in no changes to a given lineage of trees in
-<a href=#211 id=211 data-nosnippet>211</a>    ///   the forest, then no new tree must be allocated in that lineage.
-<a href=#212 id=212 data-nosnippet>212</a>    </span><span class="kw">fn </span>update_forest(
-<a href=#213 id=213 data-nosnippet>213</a>        <span class="kw-2">&amp;mut </span><span class="self">self</span>,
-<a href=#214 id=214 data-nosnippet>214</a>        new_version: VersionId,
-<a href=#215 id=215 data-nosnippet>215</a>        updates: SmtForestUpdateBatch,
-<a href=#216 id=216 data-nosnippet>216</a>    ) -&gt; <span class="prelude-ty">Result</span>&lt;Vec&lt;(LineageId, MutationSet)&gt;&gt;;
-<a href=#217 id=217 data-nosnippet>217</a>}
-<a href=#218 id=218 data-nosnippet>218</a>
-<a href=#219 id=219 data-nosnippet>219</a><span class="comment">// BACKEND ERROR
-<a href=#220 id=220 data-nosnippet>220</a>// ================================================================================================
-<a href=#221 id=221 data-nosnippet>221</a>
-<a href=#222 id=222 data-nosnippet>222</a></span><span class="doccomment">/// The error type for use within Backends.
-<a href=#223 id=223 data-nosnippet>223</a></span><span class="attr">#[derive(Debug, Error)]
-<a href=#224 id=224 data-nosnippet>224</a></span><span class="kw">pub enum </span>BackendError {
-<a href=#225 id=225 data-nosnippet>225</a>    <span class="doccomment">/// Raised when corrupted data is encountered in the backend.
-<a href=#226 id=226 data-nosnippet>226</a>    ///
-<a href=#227 id=227 data-nosnippet>227</a>    /// It exists as a separate error variant to allow the forest itself to handle it better if
-<a href=#228 id=228 data-nosnippet>228</a>    /// possible, but should be considered a fatal error.
-<a href=#229 id=229 data-nosnippet>229</a>    </span><span class="attr">#[error(<span class="string">"Backend data corruption encountered: {0}"</span>)]
-<a href=#230 id=230 data-nosnippet>230</a>    </span>CorruptedData(String),
-<a href=#231 id=231 data-nosnippet>231</a>
-<a href=#232 id=232 data-nosnippet>232</a>    <span class="doccomment">/// Raised when there is a conflict between an existing lineage ID and one already in the
-<a href=#233 id=233 data-nosnippet>233</a>    /// forest.
-<a href=#234 id=234 data-nosnippet>234</a>    </span><span class="attr">#[error(<span class="string">"Duplicate lineage ID {0} provided"</span>)]
-<a href=#235 id=235 data-nosnippet>235</a>    </span>DuplicateLineage(LineageId),
-<a href=#236 id=236 data-nosnippet>236</a>
-<a href=#237 id=237 data-nosnippet>237</a>    <span class="doccomment">/// Raised for arbitrary errors that are not derived from user-input. These should be considered
-<a href=#238 id=238 data-nosnippet>238</a>    /// fatal by callers, but exist to forward the termination decision up to an appropriate level.
-<a href=#239 id=239 data-nosnippet>239</a>    </span><span class="attr">#[error(transparent)]
-<a href=#240 id=240 data-nosnippet>240</a>    </span>Internal(Box&lt;<span class="kw">dyn </span>core::error::Error + Sync + Send&gt;),
-<a href=#241 id=241 data-nosnippet>241</a>
-<a href=#242 id=242 data-nosnippet>242</a>    <span class="doccomment">/// Raised when there is an error with the merkle tree semantics within the backend.
-<a href=#243 id=243 data-nosnippet>243</a>    </span><span class="attr">#[error(transparent)]
-<a href=#244 id=244 data-nosnippet>244</a>    </span>Merkle(<span class="attr">#[from] </span>MerkleError),
-<a href=#245 id=245 data-nosnippet>245</a>
-<a href=#246 id=246 data-nosnippet>246</a>    <span class="doccomment">/// Raised for arbitrary other errors within the backend that are derived from user-input and
-<a href=#247 id=247 data-nosnippet>247</a>    /// hence non-fatal.
-<a href=#248 id=248 data-nosnippet>248</a>    </span><span class="attr">#[error(transparent)]
-<a href=#249 id=249 data-nosnippet>249</a>    </span>Other(Box&lt;<span class="kw">dyn </span>core::error::Error + Sync + Send&gt;),
-<a href=#250 id=250 data-nosnippet>250</a>
-<a href=#251 id=251 data-nosnippet>251</a>    <span class="doccomment">/// Raised when the backend is queried for a lineage it doesn't know about.
-<a href=#252 id=252 data-nosnippet>252</a>    </span><span class="attr">#[error(<span class="string">"Lineage {0} is not known by the backend"</span>)]
-<a href=#253 id=253 data-nosnippet>253</a>    </span>UnknownLineage(LineageId),
-<a href=#254 id=254 data-nosnippet>254</a>
-<a href=#255 id=255 data-nosnippet>255</a>    <span class="doccomment">/// Raised for other errors in the backend that are user-specified.
-<a href=#256 id=256 data-nosnippet>256</a>    </span><span class="attr">#[error(<span class="string">"Unspecified error: {0}"</span>)]
-<a href=#257 id=257 data-nosnippet>257</a>    </span>Unspecified(String),
-<a href=#258 id=258 data-nosnippet>258</a>}
-<a href=#259 id=259 data-nosnippet>259</a>
-<a href=#260 id=260 data-nosnippet>260</a><span class="kw">impl </span>BackendError {
-<a href=#261 id=261 data-nosnippet>261</a>    <span class="doccomment">/// Constructs an internal error variant from the provided concrete error `e`.
-<a href=#262 id=262 data-nosnippet>262</a>    </span><span class="kw">fn </span>internal_from&lt;E: core::error::Error + Sync + Send + <span class="lifetime">'static</span>&gt;(e: E) -&gt; <span class="self">Self </span>{
-<a href=#263 id=263 data-nosnippet>263</a>        <span class="self">Self</span>::Internal(Box::new(e))
-<a href=#264 id=264 data-nosnippet>264</a>    }
-<a href=#265 id=265 data-nosnippet>265</a>
-<a href=#266 id=266 data-nosnippet>266</a>    <span class="doccomment">/// Constructs an internal error variant from the provided `message`.
-<a href=#267 id=267 data-nosnippet>267</a>    </span><span class="attr">#[cfg(feature = <span class="string">"persistent-forest"</span>)]
-<a href=#268 id=268 data-nosnippet>268</a>    </span><span class="kw">fn </span>internal_from_message(message: <span class="kw">impl </span>Into&lt;String&gt;) -&gt; <span class="self">Self </span>{
-<a href=#269 id=269 data-nosnippet>269</a>        <span class="self">Self</span>::internal_from(<span class="self">Self</span>::Unspecified(message.into()))
-<a href=#270 id=270 data-nosnippet>270</a>    }
-<a href=#271 id=271 data-nosnippet>271</a>}
-<a href=#272 id=272 data-nosnippet>272</a>
-<a href=#273 id=273 data-nosnippet>273</a><span class="doccomment">/// The result type for use with backends.
-<a href=#274 id=274 data-nosnippet>274</a></span><span class="kw">pub type </span><span class="prelude-ty">Result</span>&lt;T&gt; = core::result::Result&lt;T, BackendError&gt;;
+<a href=#135 id=135 data-nosnippet>135</a>    /// It is the responsibility of the forest to ensure lineage existence before querying the
+<a href=#136 id=136 data-nosnippet>136</a>    /// backend. The backend must return an error if the lineage does not exist.
+<a href=#137 id=137 data-nosnippet>137</a>    ///
+<a href=#138 id=138 data-nosnippet>138</a>    /// The iterator may yield entries in any arbitrary order, but must not yield entries for which
+<a href=#139 id=139 data-nosnippet>139</a>    /// the value is the empty word.
+<a href=#140 id=140 data-nosnippet>140</a>    ///
+<a href=#141 id=141 data-nosnippet>141</a>    /// # Expected Behavior
+<a href=#142 id=142 data-nosnippet>142</a>    ///
+<a href=#143 id=143 data-nosnippet>143</a>    /// Implementations must guarantee the following behavior in addition to the global invariants:
+<a href=#144 id=144 data-nosnippet>144</a>    ///
+<a href=#145 id=145 data-nosnippet>145</a>    /// - If any kind of error occurs during iteration that should be signaled to the user, the
+<a href=#146 id=146 data-nosnippet>146</a>    ///   iterator must return `Some(Err(...))`. The caller should stop iteration after receiving an
+<a href=#147 id=147 data-nosnippet>147</a>    ///   error as the iterator state is no longer valid.
+<a href=#148 id=148 data-nosnippet>148</a>    /// - `None` will be returned upon successful completion, or at any time after an error has been
+<a href=#149 id=149 data-nosnippet>149</a>    ///   returned.
+<a href=#150 id=150 data-nosnippet>150</a>    </span><span class="kw">fn </span>entries(<span class="kw-2">&amp;</span><span class="self">self</span>, lineage: LineageId) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="kw">impl </span>Iterator&lt;Item = <span class="prelude-ty">Result</span>&lt;TreeEntry&gt;&gt;&gt;;
+<a href=#151 id=151 data-nosnippet>151</a>
+<a href=#152 id=152 data-nosnippet>152</a>    <span class="comment">// SINGLE-TREE MODIFIERS
+<a href=#153 id=153 data-nosnippet>153</a>    // ============================================================================================
+<a href=#154 id=154 data-nosnippet>154</a>
+<a href=#155 id=155 data-nosnippet>155</a>    </span><span class="doccomment">/// Adds a new `lineage` to the forest with the provided `version` and sets the associated SMT
+<a href=#156 id=156 data-nosnippet>156</a>    /// to have the value created by applying `updates` to the empty tree, returning the new root of
+<a href=#157 id=157 data-nosnippet>157</a>    /// that tree.
+<a href=#158 id=158 data-nosnippet>158</a>    ///
+<a href=#159 id=159 data-nosnippet>159</a>    /// # Expected Behavior
+<a href=#160 id=160 data-nosnippet>160</a>    ///
+<a href=#161 id=161 data-nosnippet>161</a>    /// Implementations must guarantee the following behavior in addition to the global invariants:
+<a href=#162 id=162 data-nosnippet>162</a>    ///
+<a href=#163 id=163 data-nosnippet>163</a>    /// - If the provided `lineage` conflicts with an already-existing lineage in the backend, it
+<a href=#164 id=164 data-nosnippet>164</a>    ///   must return [`BackendError::DuplicateLineage`].
+<a href=#165 id=165 data-nosnippet>165</a>    </span><span class="kw">fn </span>add_lineage(
+<a href=#166 id=166 data-nosnippet>166</a>        <span class="kw-2">&amp;mut </span><span class="self">self</span>,
+<a href=#167 id=167 data-nosnippet>167</a>        lineage: LineageId,
+<a href=#168 id=168 data-nosnippet>168</a>        version: VersionId,
+<a href=#169 id=169 data-nosnippet>169</a>        updates: SmtUpdateBatch,
+<a href=#170 id=170 data-nosnippet>170</a>    ) -&gt; <span class="prelude-ty">Result</span>&lt;TreeWithRoot&gt;;
+<a href=#171 id=171 data-nosnippet>171</a>
+<a href=#172 id=172 data-nosnippet>172</a>    <span class="doccomment">/// Performs the provided `updates` on the tree with the specified `lineage`, returning the
+<a href=#173 id=173 data-nosnippet>173</a>    /// mutation set that will revert the changes made to the tree.
+<a href=#174 id=174 data-nosnippet>174</a>    ///
+<a href=#175 id=175 data-nosnippet>175</a>    /// # Expected Behavior
+<a href=#176 id=176 data-nosnippet>176</a>    ///
+<a href=#177 id=177 data-nosnippet>177</a>    /// Implementations must guarantee the following behavior in addition to the global invariants:
+<a href=#178 id=178 data-nosnippet>178</a>    ///
+<a href=#179 id=179 data-nosnippet>179</a>    /// - At most one new root must be added to the forest for the entire batch.
+<a href=#180 id=180 data-nosnippet>180</a>    /// - If applying the provided `updates` results in no changes to the tree, no new tree must be
+<a href=#181 id=181 data-nosnippet>181</a>    ///   allocated.
+<a href=#182 id=182 data-nosnippet>182</a>    </span><span class="kw">fn </span>update_tree(
+<a href=#183 id=183 data-nosnippet>183</a>        <span class="kw-2">&amp;mut </span><span class="self">self</span>,
+<a href=#184 id=184 data-nosnippet>184</a>        lineage: LineageId,
+<a href=#185 id=185 data-nosnippet>185</a>        new_version: VersionId,
+<a href=#186 id=186 data-nosnippet>186</a>        updates: SmtUpdateBatch,
+<a href=#187 id=187 data-nosnippet>187</a>    ) -&gt; <span class="prelude-ty">Result</span>&lt;MutationSet&gt;;
+<a href=#188 id=188 data-nosnippet>188</a>
+<a href=#189 id=189 data-nosnippet>189</a>    <span class="comment">// MULTI-TREE MODIFIERS
+<a href=#190 id=190 data-nosnippet>190</a>    // ============================================================================================
+<a href=#191 id=191 data-nosnippet>191</a>
+<a href=#192 id=192 data-nosnippet>192</a>    </span><span class="doccomment">/// Adds multiple new `lineages` to the backend with the provided `version` and sets the
+<a href=#193 id=193 data-nosnippet>193</a>    /// associated SMTs to have the value created by applying the provided updates to the empty
+<a href=#194 id=194 data-nosnippet>194</a>    /// tree, returning the new root of that tree.
+<a href=#195 id=195 data-nosnippet>195</a>    ///
+<a href=#196 id=196 data-nosnippet>196</a>    /// # Expected Behavior
+<a href=#197 id=197 data-nosnippet>197</a>    ///
+<a href=#198 id=198 data-nosnippet>198</a>    /// Implementations must guarantee the following behavior in addition to the global invariants:
+<a href=#199 id=199 data-nosnippet>199</a>    ///
+<a href=#200 id=200 data-nosnippet>200</a>    /// - If any provided lineage conflicts with an already-existing lineage in the backend, it must
+<a href=#201 id=201 data-nosnippet>201</a>    ///   return [`BackendError::DuplicateLineage`].
+<a href=#202 id=202 data-nosnippet>202</a>    </span><span class="kw">fn </span>add_lineages(
+<a href=#203 id=203 data-nosnippet>203</a>        <span class="kw-2">&amp;mut </span><span class="self">self</span>,
+<a href=#204 id=204 data-nosnippet>204</a>        version: VersionId,
+<a href=#205 id=205 data-nosnippet>205</a>        lineages: SmtForestUpdateBatch,
+<a href=#206 id=206 data-nosnippet>206</a>    ) -&gt; <span class="prelude-ty">Result</span>&lt;Vec&lt;(LineageId, TreeWithRoot)&gt;&gt;;
+<a href=#207 id=207 data-nosnippet>207</a>
+<a href=#208 id=208 data-nosnippet>208</a>    <span class="doccomment">/// Performs the provided `updates` on the forest, setting all new tree states to have the
+<a href=#209 id=209 data-nosnippet>209</a>    /// provided `new_version` and returning a vector of the mutation sets that reverse the changes
+<a href=#210 id=210 data-nosnippet>210</a>    /// to each changed tree.
+<a href=#211 id=211 data-nosnippet>211</a>    ///
+<a href=#212 id=212 data-nosnippet>212</a>    /// # Expected Behavior
+<a href=#213 id=213 data-nosnippet>213</a>    ///
+<a href=#214 id=214 data-nosnippet>214</a>    /// Implementations must guarantee the following behavior in addition to the global invariants:
+<a href=#215 id=215 data-nosnippet>215</a>    ///
+<a href=#216 id=216 data-nosnippet>216</a>    /// - At most one new root must be added to the forest for each target root in the provided
+<a href=#217 id=217 data-nosnippet>217</a>    ///   `updates`.
+<a href=#218 id=218 data-nosnippet>218</a>    /// - If applying the provided `updates` results in no changes to a given lineage of trees in
+<a href=#219 id=219 data-nosnippet>219</a>    ///   the forest, then no new tree must be allocated in that lineage.
+<a href=#220 id=220 data-nosnippet>220</a>    </span><span class="kw">fn </span>update_forest(
+<a href=#221 id=221 data-nosnippet>221</a>        <span class="kw-2">&amp;mut </span><span class="self">self</span>,
+<a href=#222 id=222 data-nosnippet>222</a>        new_version: VersionId,
+<a href=#223 id=223 data-nosnippet>223</a>        updates: SmtForestUpdateBatch,
+<a href=#224 id=224 data-nosnippet>224</a>    ) -&gt; <span class="prelude-ty">Result</span>&lt;Vec&lt;(LineageId, MutationSet)&gt;&gt;;
+<a href=#225 id=225 data-nosnippet>225</a>}
+<a href=#226 id=226 data-nosnippet>226</a>
+<a href=#227 id=227 data-nosnippet>227</a><span class="comment">// BACKEND ERROR
+<a href=#228 id=228 data-nosnippet>228</a>// ================================================================================================
+<a href=#229 id=229 data-nosnippet>229</a>
+<a href=#230 id=230 data-nosnippet>230</a></span><span class="doccomment">/// The error type for use within Backends.
+<a href=#231 id=231 data-nosnippet>231</a></span><span class="attr">#[derive(Debug, Error)]
+<a href=#232 id=232 data-nosnippet>232</a></span><span class="kw">pub enum </span>BackendError {
+<a href=#233 id=233 data-nosnippet>233</a>    <span class="doccomment">/// Raised when corrupted data is encountered in the backend.
+<a href=#234 id=234 data-nosnippet>234</a>    ///
+<a href=#235 id=235 data-nosnippet>235</a>    /// It exists as a separate error variant to allow the forest itself to handle it better if
+<a href=#236 id=236 data-nosnippet>236</a>    /// possible, but should be considered a fatal error.
+<a href=#237 id=237 data-nosnippet>237</a>    </span><span class="attr">#[error(<span class="string">"Backend data corruption encountered: {0}"</span>)]
+<a href=#238 id=238 data-nosnippet>238</a>    </span>CorruptedData(String),
+<a href=#239 id=239 data-nosnippet>239</a>
+<a href=#240 id=240 data-nosnippet>240</a>    <span class="doccomment">/// Raised when there is a conflict between an existing lineage ID and one already in the
+<a href=#241 id=241 data-nosnippet>241</a>    /// forest.
+<a href=#242 id=242 data-nosnippet>242</a>    </span><span class="attr">#[error(<span class="string">"Duplicate lineage ID {0} provided"</span>)]
+<a href=#243 id=243 data-nosnippet>243</a>    </span>DuplicateLineage(LineageId),
+<a href=#244 id=244 data-nosnippet>244</a>
+<a href=#245 id=245 data-nosnippet>245</a>    <span class="doccomment">/// Raised for arbitrary errors that are not derived from user-input. These should be considered
+<a href=#246 id=246 data-nosnippet>246</a>    /// fatal by callers, but exist to forward the termination decision up to an appropriate level.
+<a href=#247 id=247 data-nosnippet>247</a>    </span><span class="attr">#[error(transparent)]
+<a href=#248 id=248 data-nosnippet>248</a>    </span>Internal(Box&lt;<span class="kw">dyn </span>core::error::Error + Sync + Send&gt;),
+<a href=#249 id=249 data-nosnippet>249</a>
+<a href=#250 id=250 data-nosnippet>250</a>    <span class="doccomment">/// Raised when there is an error with the merkle tree semantics within the backend.
+<a href=#251 id=251 data-nosnippet>251</a>    </span><span class="attr">#[error(transparent)]
+<a href=#252 id=252 data-nosnippet>252</a>    </span>Merkle(<span class="attr">#[from] </span>MerkleError),
+<a href=#253 id=253 data-nosnippet>253</a>
+<a href=#254 id=254 data-nosnippet>254</a>    <span class="doccomment">/// Raised for arbitrary other errors within the backend that are derived from user-input and
+<a href=#255 id=255 data-nosnippet>255</a>    /// hence non-fatal.
+<a href=#256 id=256 data-nosnippet>256</a>    </span><span class="attr">#[error(transparent)]
+<a href=#257 id=257 data-nosnippet>257</a>    </span>Other(Box&lt;<span class="kw">dyn </span>core::error::Error + Sync + Send&gt;),
+<a href=#258 id=258 data-nosnippet>258</a>
+<a href=#259 id=259 data-nosnippet>259</a>    <span class="doccomment">/// Raised when the backend is queried for a lineage it doesn't know about.
+<a href=#260 id=260 data-nosnippet>260</a>    </span><span class="attr">#[error(<span class="string">"Lineage {0} is not known by the backend"</span>)]
+<a href=#261 id=261 data-nosnippet>261</a>    </span>UnknownLineage(LineageId),
+<a href=#262 id=262 data-nosnippet>262</a>
+<a href=#263 id=263 data-nosnippet>263</a>    <span class="doccomment">/// Raised for other errors in the backend that are user-specified.
+<a href=#264 id=264 data-nosnippet>264</a>    </span><span class="attr">#[error(<span class="string">"Unspecified error: {0}"</span>)]
+<a href=#265 id=265 data-nosnippet>265</a>    </span>Unspecified(String),
+<a href=#266 id=266 data-nosnippet>266</a>}
+<a href=#267 id=267 data-nosnippet>267</a>
+<a href=#268 id=268 data-nosnippet>268</a><span class="kw">impl </span>BackendError {
+<a href=#269 id=269 data-nosnippet>269</a>    <span class="doccomment">/// Constructs an internal error variant from the provided concrete error `e`.
+<a href=#270 id=270 data-nosnippet>270</a>    </span><span class="kw">fn </span>internal_from&lt;E: core::error::Error + Sync + Send + <span class="lifetime">'static</span>&gt;(e: E) -&gt; <span class="self">Self </span>{
+<a href=#271 id=271 data-nosnippet>271</a>        <span class="self">Self</span>::Internal(Box::new(e))
+<a href=#272 id=272 data-nosnippet>272</a>    }
+<a href=#273 id=273 data-nosnippet>273</a>
+<a href=#274 id=274 data-nosnippet>274</a>    <span class="doccomment">/// Constructs an internal error variant from the provided `message`.
+<a href=#275 id=275 data-nosnippet>275</a>    </span><span class="attr">#[cfg(feature = <span class="string">"persistent-forest"</span>)]
+<a href=#276 id=276 data-nosnippet>276</a>    </span><span class="kw">fn </span>internal_from_message(message: <span class="kw">impl </span>Into&lt;String&gt;) -&gt; <span class="self">Self </span>{
+<a href=#277 id=277 data-nosnippet>277</a>        <span class="self">Self</span>::internal_from(<span class="self">Self</span>::Unspecified(message.into()))
+<a href=#278 id=278 data-nosnippet>278</a>    }
+<a href=#279 id=279 data-nosnippet>279</a>}
+<a href=#280 id=280 data-nosnippet>280</a>
+<a href=#281 id=281 data-nosnippet>281</a><span class="doccomment">/// The result type for use with backends.
+<a href=#282 id=282 data-nosnippet>282</a></span><span class="kw">pub type </span><span class="prelude-ty">Result</span>&lt;T&gt; = core::result::Result&lt;T, BackendError&gt;;
 </code></pre></div></section></main></body></html>
