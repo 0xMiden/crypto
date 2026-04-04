@@ -1,5 +1,4 @@
 use alloc::vec::Vec;
-use core::ops::Deref;
 
 use p3_dft::{Radix2DFTSmallBatch, TwoAdicSubgroupDft};
 use p3_field::{ExtensionField, TwoAdicField};
@@ -164,9 +163,9 @@ where
             // ─────────────────────────────────────────────────────────────────────
             // Fold all rows: interpolate coset evaluations and evaluate at β
             // ─────────────────────────────────────────────────────────────────────
-            // Get the underlying EF matrix from the FlatMatrixView via Deref for folding.
+            // Get the underlying EF matrix from the FlatMatrixView for folding.
             let flat_view_ref = &tree.leaves()[0];
-            let ef_matrix: &RowMajorMatrix<EF> = flat_view_ref.deref();
+            let ef_matrix: &RowMajorMatrix<EF> = flat_view_ref;
             folded_evals = info_span!("FRI fold", round, domain_size)
                 .in_scope(|| params.fold.fold_matrix(ef_matrix.as_view(), &s_invs, beta));
             // No bit-reversal needed: folded evals maintain bit-reversed order

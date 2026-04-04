@@ -304,7 +304,7 @@ fn test_fri_verify_wrong_beta() {
     assert!(
         matches!(
             result,
-            Err(FriError::EvaluationMismatch { .. }) | Err(FriError::FinalPolyMismatch { .. })
+            Err(FriError::EvaluationMismatch { .. } | FriError::FinalPolyMismatch { .. })
         ),
         "expected EvaluationMismatch or FinalPolyMismatch error, got {:?}",
         result

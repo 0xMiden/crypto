@@ -7,7 +7,6 @@ help:
 # -- variables --------------------------------------------------------------------------------------
 
 MIDDEN_CRYPTO_ALL_FEATURES_EXCEPT_ROCKSDB="miden-crypto/concurrent miden-crypto/executable miden-crypto/internal miden-crypto/serde miden-crypto/std"
-P3_PACKAGES=-p p3-miden-dev-utils -p p3-miden-lifted-air -p p3-miden-lifted-examples -p p3-miden-lifted-fri -p p3-miden-lifted-stark -p p3-miden-lmcs -p p3-miden-stateful-hasher -p p3-miden-transcript
 P3_PARALLEL_FEATURES="p3-miden-lifted-examples/parallel p3-miden-lifted-fri/parallel p3-miden-lifted-stark/parallel p3-miden-lmcs/parallel"
 P3_TESTING_FEATURES="p3-miden-lifted-fri/testing p3-miden-lmcs/testing"
 WARNINGS=RUSTDOCFLAGS="-D warnings"
@@ -17,7 +16,6 @@ WARNINGS=RUSTDOCFLAGS="-D warnings"
 .PHONY: clippy
 clippy: ## Run Clippy with configs (alias for xclippy)
 	cargo xclippy
-	cargo clippy $(P3_PACKAGES) --all-targets --all-features -- -D warnings
 
 .PHONY: xclippy
 xclippy: ## Run Clippy with the curated workspace lint set
