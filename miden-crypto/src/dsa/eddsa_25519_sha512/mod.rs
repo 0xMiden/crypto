@@ -365,6 +365,114 @@ impl Signature {
     pub fn verify(&self, message: Word, pub_key: &PublicKey) -> bool {
         pub_key.verify(message, self)
     }
+
+    /// Creates a signature from ASN.1 DER format bytes.
+    ///
+    /// The expected DER encoding is `SEQUENCE { INTEGER R, INTEGER S }`, where R and S
+    /// are the big-endian unsigned integer representations of the Ed25519 signature
+    /// components. Since Ed25519 natively uses little-endian encoding (per RFC 8032),
+    /// this method handles the byte-order conversion.
+    pub fn from_der(bytes: &[u8]) -> Result<Self, DeserializationError> {
+        // Parse outer SEQUENCE
+        let (tag, seq_body, trailing) = parse_der_tlv(bytes)?;
+        if tag != 0x30 {
+            return Err(DeserializationError::InvalidValue(
+                alloc::format!("expected DER SEQUENCE (0x30), got 0x{tag:02x}"),
+            ));
+        }
+        if !trailing.is_empty() {
+            return Err(DeserializationError::InvalidValue(
+                "trailing data after DER SEQUENCE".into(),
+            ));
+        }
+
+        // Parse R INTEGER
+        let (tag, r_content, remaining) = parse_der_tlv(seq_body)?;
+        if tag != 0x02 {
+            return Err(DeserializationError::InvalidValue(
+                alloc::format!("expected DER INTEGER (0x02) for R, got 0x{tag:02x}"),
+            ));
+        }
+        let r = der_integer_to_le_32(r_content)?;
+
+        // Parse S INTEGER
+        let (tag, s_content, remaining) = parse_der_tlv(remaining)?;
+        if tag != 0x02 {
+            return Err(DeserializationError::InvalidValue(
+                alloc::format!("expected DER INTEGER (0x02) for S, got 0x{tag:02x}"),
+            ));
+        }
+        if !remaining.is_empty() {
+            return Err(DeserializationError::InvalidValue(
+                "trailing data inside DER SEQUENCE".into(),
+            ));
+        }
+        let s = der_integer_to_le_32(s_content)?;
+
+        // Reconstruct 64-byte Ed25519 signature: R || S (little-endian)
+        let mut sig_bytes = [0u8; SIGNATURE_BYTES];
+        sig_bytes[..32].copy_from_slice(&r);
+        sig_bytes[32..].copy_from_slice(&s);
+
+        let inner = ed25519_dalek::Signature::from_bytes(&sig_bytes);
+        Ok(Self { inner })
+    }
+}
+
+// DER HELPERS
+// ================================================================================================
+
+/// Parses a single DER tag-length-value element, returning `(tag, content, rest)`.
+fn parse_der_tlv(bytes: &[u8]) -> Result<(u8, &[u8], &[u8]), DeserializationError> {
+    if bytes.is_empty() {
+        return Err(DeserializationError::InvalidValue("empty DER input".into()));
+    }
+    let tag = bytes[0];
+    let (len, header_size) = parse_der_length(&bytes[1..])?;
+    let start = 1 + header_size;
+    let end = start + len;
+    if end > bytes.len() {
+        return Err(DeserializationError::InvalidValue("DER length exceeds input".into()));
+    }
+    Ok((tag, &bytes[start..end], &bytes[end..]))
+}
+
+/// Decodes a DER definite-form length, returning `(length_value, bytes_consumed)`.
+fn parse_der_length(bytes: &[u8]) -> Result<(usize, usize), DeserializationError> {
+    match bytes.first() {
+        None => Err(DeserializationError::InvalidValue("truncated DER length".into())),
+        Some(&b) if b < 0x80 => Ok((b as usize, 1)),
+        Some(&0x81) => {
+            let len = *bytes
+                .get(1)
+                .ok_or_else(|| DeserializationError::InvalidValue("truncated DER length".into()))?;
+            Ok((len as usize, 2))
+        },
+        _ => Err(DeserializationError::InvalidValue(
+            "unsupported DER length encoding".into(),
+        )),
+    }
+}
+
+/// Converts a DER INTEGER (big-endian, possibly sign-padded) into a 32-byte little-endian array
+/// for Ed25519.
+fn der_integer_to_le_32(int_bytes: &[u8]) -> Result<[u8; 32], DeserializationError> {
+    // Strip leading 0x00 sign-padding byte if present.
+    let stripped = match int_bytes {
+        [0x00, rest @ ..] if !rest.is_empty() => rest,
+        other => other,
+    };
+    if stripped.len() > 32 {
+        return Err(DeserializationError::InvalidValue(
+            "DER integer too large for Ed25519 component".into(),
+        ));
+    }
+    // Left-pad to 32 bytes (big-endian).
+    let mut be = [0u8; 32];
+    be[32 - stripped.len()..].copy_from_slice(stripped);
+    // Convert to little-endian.
+    be.reverse();
+    Ok(be)
 }
 
 // SERIALIZATION / DESERIALIZATION

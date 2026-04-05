@@ -88,3 +88,84 @@ fn test_compute_challenge_k_equivalence() {
         assert!(!pk.verify(wrong_message, &signature), "verify with wrong message should fail");
     }
 }
+
+// DER tests
+// ================================================================================================
+
+/// Encode R and S (little-endian 32-byte arrays) into DER SEQUENCE { INTEGER, INTEGER }.
+fn encode_der(r_le: &[u8; 32], s_le: &[u8; 32]) -> Vec<u8> {
+    fn le_to_der_integer(le: &[u8; 32]) -> Vec<u8> {
+        let mut be = *le;
+        be.reverse();
+        // Strip leading zeros (but keep at least one byte).
+        let start = be.iter().position(|&b| b != 0).unwrap_or(31);
+        let stripped = &be[start..];
+        let needs_pad = stripped[0] & 0x80 != 0;
+        let len = stripped.len() + usize::from(needs_pad);
+        let mut out = Vec::with_capacity(2 + len);
+        out.push(0x02); // INTEGER tag
+        out.push(len as u8);
+        if needs_pad {
+            out.push(0x00);
+        }
+        out.extend_from_slice(stripped);
+        out
+    }
+    let r_der = le_to_der_integer(r_le);
+    let s_der = le_to_der_integer(s_le);
+    let seq_len = r_der.len() + s_der.len();
+    let mut out = Vec::with_capacity(2 + seq_len);
+    out.push(0x30); // SEQUENCE tag
+    out.push(seq_len as u8);
+    out.extend_from_slice(&r_der);
+    out.extend_from_slice(&s_der);
+    out
+}
+
+#[test]
+fn from_der_roundtrip() {
+    let mut rng = seeded_rng([10u8; 32]);
+    let sk = SecretKey::with_rng(&mut rng);
+    let pk = sk.public_key();
+
+    let msg = Word::from([Felt::new(1), Felt::new(2), Felt::new(3), Felt::new(4)]);
+    let sig = sk.sign(msg);
+
+    // Encode signature to DER
+    let sig_bytes = sig.inner.to_bytes();
+    let r: [u8; 32] = sig_bytes[..32].try_into().unwrap();
+    let s: [u8; 32] = sig_bytes[32..].try_into().unwrap();
+    let der = encode_der(&r, &s);
+
+    // Decode and verify
+    let recovered = Signature::from_der(&der).expect("valid DER should parse");
+    assert_eq!(recovered, sig);
+    assert!(pk.verify(msg, &recovered));
+}
+
+#[test]
+fn from_der_rejects_bad_sequence_tag() {
+    // A valid-length blob but with wrong outer tag (0x31 instead of 0x30)
+    let mut der = encode_der(&[0u8; 32], &[0u8; 32]);
+    der[0] = 0x31;
+    assert!(Signature::from_der(&der).is_err());
+}
+
+#[test]
+fn from_der_rejects_trailing_data() {
+    let mut der = encode_der(&[0u8; 32], &[0u8; 32]);
+    der.push(0x00); // extra byte after SEQUENCE
+    assert!(Signature::from_der(&der).is_err());
+}
+
+#[test]
+fn from_der_rejects_empty_input() {
+    assert!(Signature::from_der(&[]).is_err());
+}
+
+#[test]
+fn from_der_rejects_truncated_integer() {
+    // Craft a SEQUENCE whose declared length extends beyond the actual data.
+    let der = [0x30, 0x06, 0x02, 0x01, 0x01, 0x02, 0x01]; // S integer body missing
+    assert!(Signature::from_der(&der).is_err());
+}
