@@ -144,6 +144,7 @@ hex            = { default-features = false, features = ["alloc"], version = "0.
 itertools      = { version = "0.14" }
 miden-field    = { features = ["testing"], workspace = true }
 proptest       = { default-features = false, features = ["alloc"], version = "1.7" }
+rand           = { default-features = false, features = ["std", "thread_rng"], version = "0.10" }
 rstest         = { version = "0.26" }
 seq-macro      = { version = "0.3" }
 tempfile       = { version = "3.20" }

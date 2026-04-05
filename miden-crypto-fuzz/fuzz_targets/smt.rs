@@ -2,7 +2,6 @@
 
 use libfuzzer_sys::fuzz_target;
 use miden_crypto::{Felt, ONE, Word, merkle::smt::Smt};
-use rand::Rng; // Needed for randomizing the split percentage
 
 struct FuzzInput {
     entries: Vec<(Word, Word)>,
@@ -11,8 +10,7 @@ struct FuzzInput {
 
 impl FuzzInput {
     fn from_bytes(data: &[u8]) -> Self {
-        let mut rng = rand::rng();
-        let split_percentage = rng.random_range(20..80); // Randomly choose between 20% and 80%
+        let split_percentage = Self::split_percentage(data);
 
         let split_index = (data.len() * split_percentage) / 100;
         let (construction_data, update_data) = data.split_at(split_index);
@@ -21,6 +19,10 @@ impl FuzzInput {
         let updates = Self::parse_entries(update_data);
 
         Self { entries, updates }
+    }
+
+    fn split_percentage(data: &[u8]) -> usize {
+        20 + usize::from(data.first().copied().unwrap_or(0)) % 60
     }
 
     fn parse_entries(data: &[u8]) -> Vec<(Word, Word)> {
