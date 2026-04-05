@@ -136,7 +136,7 @@ p3-symmetric   = { default-features = false, version = "0.5" }
 p3-util        = { default-features = false, version = "0.5" }
 
 # Miden-specific Plonky3 crates
-p3-miden-lifted-stark = { default-features = false, version = "0.5" }
+p3-miden-lifted-stark = { branch = "adr1anh/move-into-stark", default-features = false, git = "https://github.com/0xMiden/p3-miden.git" }
 
 [dev-dependencies]
 assert_matches = { default-features = false, version = "1.5" }

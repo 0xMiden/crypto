@@ -64,11 +64,45 @@ pub mod stark {
     //! - [`symmetric`] — Symmetric cryptographic primitives
 
     // Top-level types from lifted-stark
-    pub use p3_miden_lifted_stark::{GenericStarkConfig, StarkConfig};
-    // Lifted-stark sub-modules (re-exported as-is)
-    pub use p3_miden_lifted_stark::{
-        air, debug, fri, hasher, lmcs, proof, prover, transcript, verifier,
-    };
+    pub use p3_miden_lifted_stark::{GenericStarkConfig, StarkConfig, air, hasher, transcript};
+
+    // Compatibility shims over the consolidated `p3-miden-lifted-stark` public surface.
+    pub mod debug {
+        pub use p3_miden_lifted_stark::{check_constraints, check_constraints_multi};
+    }
+
+    pub mod fri {
+        pub use p3_miden_lifted_stark::{
+            DeepError, DeepTranscript, FriError, FriRoundTranscript, FriTranscript, PcsError,
+            PcsOpenedValues as OpenedValues, PcsParams, PcsParamsError, PcsTranscript,
+        };
+    }
+
+    pub mod lmcs {
+        pub use p3_miden_lifted_stark::{
+            HidingLmcsConfig, LiftedMerkleTree, Lmcs, LmcsConfig, LmcsError, LmcsTree, OpenedRows,
+            RowList,
+        };
+
+        pub mod proof {
+            pub use p3_miden_lifted_stark::{
+                LmcsBatchProof as BatchProof, LmcsBatchProofView as BatchProofView,
+                LmcsLeafOpening as LeafOpening, LmcsProof as Proof,
+            };
+        }
+    }
+
+    pub mod proof {
+        pub use p3_miden_lifted_stark::{StarkDigest, StarkOutput, StarkProof, StarkTranscript};
+    }
+
+    pub mod prover {
+        pub use p3_miden_lifted_stark::{ProverError, prove_multi, prove_single};
+    }
+
+    pub mod verifier {
+        pub use p3_miden_lifted_stark::{VerifierError, verify_multi, verify_single};
+    }
 
     // Upstream Plonky3: challenger
     pub mod challenger {
