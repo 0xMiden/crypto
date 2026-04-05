@@ -253,7 +253,7 @@ impl PartialMerkleTree {
                 self.nodes.get(&sibling_index).cloned().expect("Sibling node not in the map");
             path.push(sibling);
         }
-        Ok(MerklePath::new(path))
+        MerklePath::new(path)
     }
 
     // ITERATORS

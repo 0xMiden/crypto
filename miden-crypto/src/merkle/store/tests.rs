@@ -584,7 +584,7 @@ fn store_path_opens_from_leaf() {
     let store = MerkleStore::from(&mtree);
     let path = store.get_path(root, NodeIndex::make(3, 1)).unwrap().path;
 
-    let expected = MerklePath::new([a, j, n].to_vec());
+    let expected = MerklePath::new([a, j, n].to_vec()).unwrap();
     assert_eq!(path, expected);
 }
 

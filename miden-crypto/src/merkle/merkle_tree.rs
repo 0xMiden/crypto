@@ -106,9 +106,9 @@ impl MerkleTree {
             return Err(MerkleError::DepthTooBig(index.depth() as u64));
         }
 
-        Ok(MerklePath::from(Vec::from_iter(
+        Ok(MerklePath::new(Vec::from_iter(
             index.proof_indices().map(|index| self.get_node(index).unwrap()),
-        )))
+        ))?)
     }
 
     // ITERATORS

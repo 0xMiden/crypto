@@ -134,7 +134,7 @@ impl Mmr {
         }
         let (leaf, path) = self.collect_merkle_path_and_value(pos, forest)?;
 
-        let path = MmrPath::new(forest, pos, MerklePath::new(path));
+        let path = MmrPath::new(forest, pos, MerklePath::new(path).map_err(MmrError::InvalidMerklePath)?);
 
         Ok(MmrProof::new(path, leaf))
     }

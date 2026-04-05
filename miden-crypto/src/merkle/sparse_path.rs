@@ -641,7 +641,7 @@ mod tests {
 
         fn arbitrary_with(_args: Self::Parameters) -> Self::Strategy {
             prop::collection::vec(any::<Word>(), 0..=SMT_MAX_DEPTH as usize)
-                .prop_map(MerklePath::new)
+                .prop_map(|v| MerklePath::new(v).expect("depth <= SMT_MAX_DEPTH"))
                 .boxed()
         }
     }
@@ -853,7 +853,7 @@ mod tests {
         // This test documents API differences between MerklePath and SparseMerklePath
 
         // 1. MerklePath has Deref/DerefMut to Vec<Word> - SparseMerklePath does not
-        let merkle = MerklePath::new(vec![Word::default(); 3]);
+        let merkle = MerklePath::new(vec![Word::default(); 3]).unwrap();
         let _vec_ref: &Vec<Word> = &merkle; // This works due to Deref
         let _vec_mut: &mut Vec<Word> = &mut merkle.clone(); // This works due to DerefMut
 

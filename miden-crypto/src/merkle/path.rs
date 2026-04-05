@@ -27,9 +27,14 @@ impl MerklePath {
     /// Creates a new Merkle path from a list of nodes.
     ///
     /// The list must be in order of deepest to shallowest.
-    pub fn new(nodes: Vec<Word>) -> Self {
-        assert!(nodes.len() <= u8::MAX.into(), "MerklePath may have at most 256 items");
-        Self { nodes }
+    ///
+    /// # Errors
+    /// Returns an error if `nodes` contains more than [`u8::MAX`] elements.
+    pub fn new(nodes: Vec<Word>) -> Result<Self, MerkleError> {
+        if nodes.len() > u8::MAX as usize {
+            return Err(MerkleError::PathTooLong(nodes.len()));
+        }
+        Ok(Self { nodes })
     }
 
     // PROVIDERS
@@ -123,14 +128,18 @@ impl From<MerklePath> for Vec<Word> {
     }
 }
 
-impl From<Vec<Word>> for MerklePath {
-    fn from(path: Vec<Word>) -> Self {
+impl TryFrom<Vec<Word>> for MerklePath {
+    type Error = MerkleError;
+
+    fn try_from(path: Vec<Word>) -> Result<Self, Self::Error> {
         Self::new(path)
     }
 }
 
-impl From<&[Word]> for MerklePath {
-    fn from(path: &[Word]) -> Self {
+impl TryFrom<&[Word]> for MerklePath {
+    type Error = MerkleError;
+
+    fn try_from(path: &[Word]) -> Result<Self, Self::Error> {
         Self::new(path.to_vec())
     }
 }
@@ -156,7 +165,7 @@ impl DerefMut for MerklePath {
 
 impl FromIterator<Word> for MerklePath {
     fn from_iter<T: IntoIterator<Item = Word>>(iter: T) -> Self {
-        Self::new(iter.into_iter().collect())
+        Self::new(iter.into_iter().collect()).expect("MerklePath may have at most 255 items")
     }
 }
 
@@ -294,7 +303,7 @@ mod tests {
     #[test]
     fn test_inner_nodes() {
         let nodes = vec![int_to_node(1), int_to_node(2), int_to_node(3), int_to_node(4)];
-        let merkle_path = MerklePath::new(nodes);
+        let merkle_path = MerklePath::new(nodes).unwrap();
 
         let index = 6;
         let node = int_to_node(5);

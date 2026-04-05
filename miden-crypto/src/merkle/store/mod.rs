@@ -182,7 +182,7 @@ impl MerkleStore {
         // the path is computed from root to leaf, so it must be reversed
         path.reverse();
 
-        Ok(MerkleProof::new(hash, MerklePath::new(path)))
+        Ok(MerkleProof::new(hash, MerklePath::new(path)?))
     }
 
     /// Returns `true` if a valid path exists from `root` to the specified `index`, `false`

@@ -88,7 +88,7 @@ impl MmrPath {
         // Trim the merkle path to the target length
         let trimmed_nodes: Vec<_> =
             self.merkle_path.nodes().iter().take(target_path_len).copied().collect();
-        let trimmed_path = MerklePath::new(trimmed_nodes);
+        let trimmed_path = MerklePath::new(trimmed_nodes).map_err(MmrError::InvalidMerklePath)?;
 
         Ok(MmrPath::new(target_forest, self.position, trimmed_path))
     }

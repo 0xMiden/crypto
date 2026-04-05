@@ -34,6 +34,8 @@ pub enum MerkleError {
     NodeIndexNotFoundInStore(Word, NodeIndex),
     #[error("number of provided merkle tree leaves {0} is not a power of two")]
     NumLeavesNotPowerOfTwo(usize),
+    #[error("merkle path length {0} exceeds the maximum of 255")]
+    PathTooLong(usize),
     #[error("root {0:?} is not in the store")]
     RootNotInStore(Word),
     #[error("partial smt does not track the merkle path for key {0}")]

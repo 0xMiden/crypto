@@ -670,7 +670,7 @@ fn test_mmr_open() {
     assert!(mmr.open(7).is_err(), "Element 7 is not in the tree, result should be None");
 
     // node at pos 6 is the root
-    let empty: MerklePath = MerklePath::new(vec![]);
+    let empty: MerklePath = MerklePath::new(vec![]).unwrap();
     let opening = mmr
         .open(6)
         .expect("Element 6 is contained in the tree, expected an opening result.");
@@ -680,7 +680,7 @@ fn test_mmr_open() {
     mmr.peaks().verify(LEAVES[6], opening).unwrap();
 
     // nodes 4,5 are depth 1
-    let root_to_path = MerklePath::new(vec![LEAVES[4]]);
+    let root_to_path = MerklePath::new(vec![LEAVES[4]]).unwrap();
     let opening = mmr
         .open(5)
         .expect("Element 5 is contained in the tree, expected an opening result.");
@@ -689,7 +689,7 @@ fn test_mmr_open() {
     assert_eq!(opening.path().position(), 5);
     mmr.peaks().verify(LEAVES[5], opening).unwrap();
 
-    let root_to_path = MerklePath::new(vec![LEAVES[5]]);
+    let root_to_path = MerklePath::new(vec![LEAVES[5]]).unwrap();
     let opening = mmr
         .open(4)
         .expect("Element 4 is contained in the tree, expected an opening result.");
@@ -699,7 +699,7 @@ fn test_mmr_open() {
     mmr.peaks().verify(LEAVES[4], opening).unwrap();
 
     // nodes 0,1,2,3 are detph 2
-    let root_to_path = MerklePath::new(vec![LEAVES[2], h01]);
+    let root_to_path = MerklePath::new(vec![LEAVES[2], h01]).unwrap();
     let opening = mmr
         .open(3)
         .expect("Element 3 is contained in the tree, expected an opening result.");
@@ -708,7 +708,7 @@ fn test_mmr_open() {
     assert_eq!(opening.path().position(), 3);
     mmr.peaks().verify(LEAVES[3], opening).unwrap();
 
-    let root_to_path = MerklePath::new(vec![LEAVES[3], h01]);
+    let root_to_path = MerklePath::new(vec![LEAVES[3], h01]).unwrap();
     let opening = mmr
         .open(2)
         .expect("Element 2 is contained in the tree, expected an opening result.");
@@ -717,7 +717,7 @@ fn test_mmr_open() {
     assert_eq!(opening.path().position(), 2);
     mmr.peaks().verify(LEAVES[2], opening).unwrap();
 
-    let root_to_path = MerklePath::new(vec![LEAVES[0], h23]);
+    let root_to_path = MerklePath::new(vec![LEAVES[0], h23]).unwrap();
     let opening = mmr
         .open(1)
         .expect("Element 1 is contained in the tree, expected an opening result.");
@@ -726,7 +726,7 @@ fn test_mmr_open() {
     assert_eq!(opening.path().position(), 1);
     mmr.peaks().verify(LEAVES[1], opening).unwrap();
 
-    let root_to_path = MerklePath::new(vec![LEAVES[1], h23]);
+    let root_to_path = MerklePath::new(vec![LEAVES[1], h23]).unwrap();
     let opening = mmr
         .open(0)
         .expect("Element 0 is contained in the tree, expected an opening result.");
@@ -995,7 +995,7 @@ fn test_mmr_open_seven() {
 
     let position = 6;
     let proof = mmr.open(position).unwrap();
-    let merkle_path: MerklePath = [].as_ref().into();
+    let merkle_path: MerklePath = MerklePath::new(vec![]).unwrap();
     assert_eq!(
         proof,
         MmrProof::new(MmrPath::new(forest, position, merkle_path), LEAVES[position])
@@ -1378,7 +1378,7 @@ fn test_mmr_add_invalid_odd_leaf() {
     let acc = mmr.peaks();
     let mut partial: PartialMmr = acc.clone().into();
 
-    let empty = MerklePath::new(Vec::new());
+    let empty = MerklePath::new(Vec::new()).unwrap();
 
     // None of the other leaves should work
     for node in LEAVES.iter().cloned().rev().skip(1) {
@@ -1397,7 +1397,7 @@ fn test_partial_track_rejects_path_depth_too_large() {
     full.add(leaf).unwrap();
     let mut partial: PartialMmr = full.peaks().into();
 
-    let deep_path = MerklePath::new(vec![Word::empty(); u8::MAX as usize]);
+    let deep_path = MerklePath::new(vec![Word::empty(); u8::MAX as usize]).unwrap();
     let result = partial.track(0, leaf, &deep_path);
     assert_matches!(result, Err(MmrError::UnknownPeak(depth)) if depth == u8::MAX);
 }

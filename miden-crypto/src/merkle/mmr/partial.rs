@@ -258,7 +258,7 @@ impl PartialMmr {
             idx = idx.parent();
         }
 
-        let path = MmrPath::new(self.forest, pos, MerklePath::new(nodes));
+        let path = MmrPath::new(self.forest, pos, MerklePath::new(nodes).map_err(MmrError::InvalidMerklePath)?);
         Ok(Some(MmrProof::new(path, leaf)))
     }
 
