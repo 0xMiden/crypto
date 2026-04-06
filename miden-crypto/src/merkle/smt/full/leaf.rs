@@ -11,6 +11,9 @@ use crate::{
 /// The number of field elements in a key-value pair (two Words, 4 Felts each).
 const DOUBLE_WORD_LEN: usize = 8;
 
+/// Domain used when hashing single-entry SMT leaves to keep them distinct from internal nodes.
+const SINGLE_LEAF_DOMAIN: Felt = Felt::new(1);
+
 /// Represents a leaf node in the Sparse Merkle Tree.
 ///
 /// A leaf can be empty, hold a single key-value pair, or multiple key-value pairs.
@@ -183,7 +186,11 @@ impl SmtLeaf {
     pub fn hash(&self) -> Word {
         match self {
             SmtLeaf::Empty(_) => EMPTY_WORD,
-            SmtLeaf::Single((key, value)) => Poseidon2::merge(&[*key, *value]),
+            // Domain-separate single-entry leaves from internal branch nodes to avoid
+            // collisions between `(key, value)` leaf contents and `(left, right)` branch inputs.
+            SmtLeaf::Single((key, value)) => {
+                Poseidon2::merge_in_domain(&[*key, *value], SINGLE_LEAF_DOMAIN)
+            },
             SmtLeaf::Multiple(kvs) => {
                 let elements: Vec<Felt> = kvs.iter().copied().flat_map(kv_to_elements).collect();
                 Poseidon2::hash_elements(&elements)

@@ -629,6 +629,19 @@ fn test_smt_path_to_keys_in_same_leaf_are_equal() {
     assert_eq!(smt.open(&key_1), smt.open(&key_2));
 }
 
+#[test]
+fn test_single_leaf_hash_is_domain_separated_from_inner_nodes() {
+    let key = Word::from([ONE, Felt::new(2), Felt::new(3), Felt::new(4)]);
+    let value = Word::new([Felt::new(5), Felt::new(6), Felt::new(7), Felt::new(8)]);
+
+    let leaf_hash = SmtLeaf::new_single(key, value).hash();
+    let branch_hash = Poseidon2::merge(&[key, value]);
+    let domain_separated_leaf_hash = Poseidon2::merge_in_domain(&[key, value], Felt::new(1));
+
+    assert_eq!(leaf_hash, domain_separated_leaf_hash);
+    assert_ne!(leaf_hash, branch_hash);
+}
+
 /// Tests that an empty leaf hashes to the empty word
 #[test]
 fn test_empty_leaf_hash() {
