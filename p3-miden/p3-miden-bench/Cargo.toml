@@ -1,14 +1,14 @@
 [package]
-description  = "Profiling binary for lifted STARK and batch STARK provers."
-edition      = "2024"
-homepage     = "https://github.com/0xMiden/crypto/tree/main/p3-miden"
-license      = "MIT OR Apache-2.0"
-name         = "p3-miden-bench"
-publish      = false
-readme       = "../README.md"
-repository   = "https://github.com/0xMiden/crypto"
+description            = "Profiling binary for lifted STARK and batch STARK provers."
+edition                = "2024"
+homepage               = "https://github.com/0xMiden/crypto/tree/main/p3-miden"
+license                = "MIT OR Apache-2.0"
+name                   = "p3-miden-bench"
+publish                = false
+readme                 = "../README.md"
+repository             = "https://github.com/0xMiden/crypto"
 rust-version.workspace = true
-version      = "0.5.1"
+version                = "0.5.1"
 
 [dependencies]
 # Internal
