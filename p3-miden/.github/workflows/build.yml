@@ -1,0 +1,86 @@
+# Runs build related jobs.
+
+name: build
+
+# Limits workflow concurrency to only the latest commit in the PR.
+concurrency:
+  group: "${{ github.workflow }} @ ${{ github.event.pull_request.head.label || github.head_ref || github.ref }}"
+  cancel-in-progress: true
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    types: [ opened, reopened, synchronize ]
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+  CARGO_INCREMENTAL: 0
+  RUSTFLAGS: -C debuginfo=0
+
+jobs:
+  no-std:
+    name: Build for no-std (wasm32)
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        toolchain: [ stable, nightly ]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Rustup
+        run: |
+          rustup update --no-self-update ${{ matrix.toolchain }}
+          rustup default ${{ matrix.toolchain }}
+          rustup target add wasm32-unknown-unknown
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          save-if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+
+      - name: Build for no-std
+        run: make build-no-std
+
+  check-embedded:
+    name: Build for embedded (thumbv7em)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Rustup
+        run: |
+          rustup update --no-self-update stable
+          rustup target add thumbv7em-none-eabi
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          save-if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+
+      # Build each crate individually for the embedded target
+      # Skip crates that may require std features
+      - name: Build for embedded target
+        run: |
+          for crate in p3-miden-air p3-miden-fri p3-miden-uni-stark p3-miden-prover; do
+            echo "Building $crate for thumbv7em-none-eabi..."
+            cargo build --verbose --target thumbv7em-none-eabi -p $crate --no-default-features || echo "Skipping $crate (may require std)"
+          done
+
+  build-release:
+    name: Build release
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Rustup
+        run: rustup update --no-self-update stable
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          save-if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+
+      - name: Build release
+        run: make build

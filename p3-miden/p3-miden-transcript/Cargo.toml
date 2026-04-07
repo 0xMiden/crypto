@@ -1,0 +1,15 @@
+[package]
+name = "p3-miden-transcript"
+description = "Transcript channels for Fiat-Shamir protocols with raw field/commitment storage"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+readme.workspace = true
+homepage.workspace = true
+
+[dependencies]
+p3-challenger.workspace = true
+p3-field.workspace = true
+serde.workspace = true
+thiserror.workspace = true
