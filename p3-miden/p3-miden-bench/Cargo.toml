@@ -7,7 +7,7 @@ name         = "p3-miden-bench"
 publish      = false
 readme       = "../README.md"
 repository   = "https://github.com/0xMiden/crypto"
-rust-version = "1.86"
+rust-version.workspace = true
 version      = "0.5.1"
 
 [dependencies]

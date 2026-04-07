@@ -6,7 +6,7 @@ license      = "MIT OR Apache-2.0"
 name         = "p3-miden-lifted-air"
 readme       = "../README.md"
 repository   = "https://github.com/0xMiden/crypto"
-rust-version = "1.86"
+rust-version.workspace = true
 version      = "0.5.1"
 
 [dependencies]
