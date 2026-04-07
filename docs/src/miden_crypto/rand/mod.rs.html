@@ -1,4 +1,4 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `miden-crypto/src/rand/mod.rs`."><title>mod.rs - source</title><script>if(window.location.protocol!=="file:")document.head.insertAdjacentHTML("beforeend","SourceSerif4-Regular-6b053e98.ttf.woff2,FiraSans-Italic-81dc35de.woff2,FiraSans-Regular-0fe48ade.woff2,FiraSans-MediumItalic-ccf7e434.woff2,FiraSans-Medium-e1aa3f0a.woff2,SourceCodePro-Regular-8badfe75.ttf.woff2,SourceCodePro-Semibold-aa29a496.ttf.woff2".split(",").map(f=>`<link rel="preload" as="font" type="font/woff2"href="../../../static.files/${f}">`).join(""))</script><link rel="stylesheet" href="../../../static.files/normalize-9960930a.css"><link rel="stylesheet" href="../../../static.files/rustdoc-17e0aaed.css"><meta name="rustdoc-vars" data-root-path="../../../" data-static-root-path="../../../static.files/" data-current-crate="miden_crypto" data-themes="" data-resource-suffix="" data-rustdoc-version="1.96.0-nightly (9602bda1d 2026-04-05)" data-channel="nightly" data-search-js="search-1c5d44ff.js" data-stringdex-js="stringdex-2da4960a.js" data-settings-js="settings-170eb4bf.js" ><script src="../../../static.files/storage-41dd4d93.js"></script><script defer src="../../../static.files/src-script-813739b1.js"></script><script defer src="../../../src-files.js"></script><script defer src="../../../static.files/main-5013f961.js"></script><noscript><link rel="stylesheet" href="../../../static.files/noscript-f7c3ffd8.css"></noscript><link rel="alternate icon" type="image/png" href="../../../static.files/favicon-32x32-eab170b8.png"><link rel="icon" type="image/svg+xml" href="../../../static.files/favicon-044be391.svg"></head><body class="rustdoc src"><a class="skip-main-content" href="#main-content">Skip to main content</a><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="src-sidebar-title"><h2>Files</h2></div></nav><div class="sidebar-resizer" title="Drag to resize sidebar"></div><main><section id="main-content" class="content" tabindex="-1"><div class="main-heading"><h1><div class="sub-heading">miden_crypto/rand/</div>mod.rs</h1><rustdoc-toolbar></rustdoc-toolbar></div><div class="example-wrap digits-3"><pre class="rust"><code><a href=#1 id=1 data-nosnippet>1</a><span class="doccomment">//! Pseudo-random element generation.
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `miden-crypto/src/rand/mod.rs`."><title>mod.rs - source</title><script>if(window.location.protocol!=="file:")document.head.insertAdjacentHTML("beforeend","SourceSerif4-Regular-6b053e98.ttf.woff2,FiraSans-Italic-81dc35de.woff2,FiraSans-Regular-0fe48ade.woff2,FiraSans-MediumItalic-ccf7e434.woff2,FiraSans-Medium-e1aa3f0a.woff2,SourceCodePro-Regular-8badfe75.ttf.woff2,SourceCodePro-Semibold-aa29a496.ttf.woff2".split(",").map(f=>`<link rel="preload" as="font" type="font/woff2"href="../../../static.files/${f}">`).join(""))</script><link rel="stylesheet" href="../../../static.files/normalize-9960930a.css"><link rel="stylesheet" href="../../../static.files/rustdoc-17e0aaed.css"><meta name="rustdoc-vars" data-root-path="../../../" data-static-root-path="../../../static.files/" data-current-crate="miden_crypto" data-themes="" data-resource-suffix="" data-rustdoc-version="1.96.0-nightly (bcded3316 2026-04-06)" data-channel="nightly" data-search-js="search-1c5d44ff.js" data-stringdex-js="stringdex-2da4960a.js" data-settings-js="settings-170eb4bf.js" ><script src="../../../static.files/storage-41dd4d93.js"></script><script defer src="../../../static.files/src-script-813739b1.js"></script><script defer src="../../../src-files.js"></script><script defer src="../../../static.files/main-5013f961.js"></script><noscript><link rel="stylesheet" href="../../../static.files/noscript-f7c3ffd8.css"></noscript><link rel="alternate icon" type="image/png" href="../../../static.files/favicon-32x32-eab170b8.png"><link rel="icon" type="image/svg+xml" href="../../../static.files/favicon-044be391.svg"></head><body class="rustdoc src"><a class="skip-main-content" href="#main-content">Skip to main content</a><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="src-sidebar-title"><h2>Files</h2></div></nav><div class="sidebar-resizer" title="Drag to resize sidebar"></div><main><section id="main-content" class="content" tabindex="-1"><div class="main-heading"><h1><div class="sub-heading">miden_crypto/rand/</div>mod.rs</h1><rustdoc-toolbar></rustdoc-toolbar></div><div class="example-wrap digits-3"><pre class="rust"><code><a href=#1 id=1 data-nosnippet>1</a><span class="doccomment">//! Pseudo-random element generation.
 <a href=#2 id=2 data-nosnippet>2</a>
 <a href=#3 id=3 data-nosnippet>3</a></span><span class="kw">use </span>rand::RngCore;
 <a href=#4 id=4 data-nosnippet>4</a>
@@ -90,7 +90,7 @@
 <a href=#90 id=90 data-nosnippet>90</a>            <span class="kw">let </span>value = u64::from_le_bytes(bytes);
 <a href=#91 id=91 data-nosnippet>91</a>            <span class="comment">// Ensure the value is within the field modulus
 <a href=#92 id=92 data-nosnippet>92</a>            </span><span class="kw">if </span>value &lt; Felt::ORDER {
-<a href=#93 id=93 data-nosnippet>93</a>                <span class="prelude-val">Some</span>(Felt::new(value))
+<a href=#93 id=93 data-nosnippet>93</a>                <span class="prelude-val">Some</span>(Felt::new_unchecked(value))
 <a href=#94 id=94 data-nosnippet>94</a>            } <span class="kw">else </span>{
 <a href=#95 id=95 data-nosnippet>95</a>                <span class="prelude-val">None
 <a href=#96 id=96 data-nosnippet>96</a>            </span>}
@@ -145,16 +145,20 @@
 <a href=#145 id=145 data-nosnippet>145</a></span><span class="kw">pub fn </span>random_felt() -&gt; Felt {
 <a href=#146 id=146 data-nosnippet>146</a>    <span class="kw">use </span>rand::Rng;
 <a href=#147 id=147 data-nosnippet>147</a>    <span class="kw">let </span><span class="kw-2">mut </span>rng = rand::rng();
-<a href=#148 id=148 data-nosnippet>148</a>    <span class="comment">// Goldilocks field order is 2^64 - 2^32 + 1
-<a href=#149 id=149 data-nosnippet>149</a>    // Generate a random u64 and reduce modulo the field order
-<a href=#150 id=150 data-nosnippet>150</a>    </span>Felt::new(rng.random::&lt;u64&gt;())
-<a href=#151 id=151 data-nosnippet>151</a>}
-<a href=#152 id=152 data-nosnippet>152</a>
-<a href=#153 id=153 data-nosnippet>153</a><span class="doccomment">/// Generates a random word (4 field elements) for testing purposes.
-<a href=#154 id=154 data-nosnippet>154</a>///
-<a href=#155 id=155 data-nosnippet>155</a>/// This function is only available with the `std` feature.
-<a href=#156 id=156 data-nosnippet>156</a></span><span class="attr">#[cfg(feature = <span class="string">"std"</span>)]
-<a href=#157 id=157 data-nosnippet>157</a></span><span class="kw">pub fn </span>random_word() -&gt; Word {
-<a href=#158 id=158 data-nosnippet>158</a>    Word::new([random_felt(), random_felt(), random_felt(), random_felt()])
-<a href=#159 id=159 data-nosnippet>159</a>}
+<a href=#148 id=148 data-nosnippet>148</a>    <span class="comment">// We use the `Felt::new` constructor to do rejection sampling here. It should effectively
+<a href=#149 id=149 data-nosnippet>149</a>    // never repeat, but nevertheless gives us the correct distribution.
+<a href=#150 id=150 data-nosnippet>150</a>    </span><span class="kw">loop </span>{
+<a href=#151 id=151 data-nosnippet>151</a>        <span class="kw">if let </span><span class="prelude-val">Ok</span>(felt) = Felt::new(rng.random::&lt;u64&gt;()) {
+<a href=#152 id=152 data-nosnippet>152</a>            <span class="kw">return </span>felt;
+<a href=#153 id=153 data-nosnippet>153</a>        }
+<a href=#154 id=154 data-nosnippet>154</a>    }
+<a href=#155 id=155 data-nosnippet>155</a>}
+<a href=#156 id=156 data-nosnippet>156</a>
+<a href=#157 id=157 data-nosnippet>157</a><span class="doccomment">/// Generates a random word (4 field elements) for testing purposes.
+<a href=#158 id=158 data-nosnippet>158</a>///
+<a href=#159 id=159 data-nosnippet>159</a>/// This function is only available with the `std` feature.
+<a href=#160 id=160 data-nosnippet>160</a></span><span class="attr">#[cfg(feature = <span class="string">"std"</span>)]
+<a href=#161 id=161 data-nosnippet>161</a></span><span class="kw">pub fn </span>random_word() -&gt; Word {
+<a href=#162 id=162 data-nosnippet>162</a>    Word::new([random_felt(), random_felt(), random_felt(), random_felt()])
+<a href=#163 id=163 data-nosnippet>163</a>}
 </code></pre></div></section></main></body></html>

@@ -1,4 +1,4 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `miden-crypto/src/merkle/smt/full/mod.rs`."><title>mod.rs - source</title><script>if(window.location.protocol!=="file:")document.head.insertAdjacentHTML("beforeend","SourceSerif4-Regular-6b053e98.ttf.woff2,FiraSans-Italic-81dc35de.woff2,FiraSans-Regular-0fe48ade.woff2,FiraSans-MediumItalic-ccf7e434.woff2,FiraSans-Medium-e1aa3f0a.woff2,SourceCodePro-Regular-8badfe75.ttf.woff2,SourceCodePro-Semibold-aa29a496.ttf.woff2".split(",").map(f=>`<link rel="preload" as="font" type="font/woff2"href="../../../../../static.files/${f}">`).join(""))</script><link rel="stylesheet" href="../../../../../static.files/normalize-9960930a.css"><link rel="stylesheet" href="../../../../../static.files/rustdoc-17e0aaed.css"><meta name="rustdoc-vars" data-root-path="../../../../../" data-static-root-path="../../../../../static.files/" data-current-crate="miden_crypto" data-themes="" data-resource-suffix="" data-rustdoc-version="1.96.0-nightly (9602bda1d 2026-04-05)" data-channel="nightly" data-search-js="search-1c5d44ff.js" data-stringdex-js="stringdex-2da4960a.js" data-settings-js="settings-170eb4bf.js" ><script src="../../../../../static.files/storage-41dd4d93.js"></script><script defer src="../../../../../static.files/src-script-813739b1.js"></script><script defer src="../../../../../src-files.js"></script><script defer src="../../../../../static.files/main-5013f961.js"></script><noscript><link rel="stylesheet" href="../../../../../static.files/noscript-f7c3ffd8.css"></noscript><link rel="alternate icon" type="image/png" href="../../../../../static.files/favicon-32x32-eab170b8.png"><link rel="icon" type="image/svg+xml" href="../../../../../static.files/favicon-044be391.svg"></head><body class="rustdoc src"><a class="skip-main-content" href="#main-content">Skip to main content</a><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="src-sidebar-title"><h2>Files</h2></div></nav><div class="sidebar-resizer" title="Drag to resize sidebar"></div><main><section id="main-content" class="content" tabindex="-1"><div class="main-heading"><h1><div class="sub-heading">miden_crypto/merkle/smt/full/</div>mod.rs</h1><rustdoc-toolbar></rustdoc-toolbar></div><div class="example-wrap digits-3"><pre class="rust"><code><a href=#1 id=1 data-nosnippet>1</a><span class="kw">use </span>alloc::{string::ToString, vec::Vec};
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `miden-crypto/src/merkle/smt/full/mod.rs`."><title>mod.rs - source</title><script>if(window.location.protocol!=="file:")document.head.insertAdjacentHTML("beforeend","SourceSerif4-Regular-6b053e98.ttf.woff2,FiraSans-Italic-81dc35de.woff2,FiraSans-Regular-0fe48ade.woff2,FiraSans-MediumItalic-ccf7e434.woff2,FiraSans-Medium-e1aa3f0a.woff2,SourceCodePro-Regular-8badfe75.ttf.woff2,SourceCodePro-Semibold-aa29a496.ttf.woff2".split(",").map(f=>`<link rel="preload" as="font" type="font/woff2"href="../../../../../static.files/${f}">`).join(""))</script><link rel="stylesheet" href="../../../../../static.files/normalize-9960930a.css"><link rel="stylesheet" href="../../../../../static.files/rustdoc-17e0aaed.css"><meta name="rustdoc-vars" data-root-path="../../../../../" data-static-root-path="../../../../../static.files/" data-current-crate="miden_crypto" data-themes="" data-resource-suffix="" data-rustdoc-version="1.96.0-nightly (bcded3316 2026-04-06)" data-channel="nightly" data-search-js="search-1c5d44ff.js" data-stringdex-js="stringdex-2da4960a.js" data-settings-js="settings-170eb4bf.js" ><script src="../../../../../static.files/storage-41dd4d93.js"></script><script defer src="../../../../../static.files/src-script-813739b1.js"></script><script defer src="../../../../../src-files.js"></script><script defer src="../../../../../static.files/main-5013f961.js"></script><noscript><link rel="stylesheet" href="../../../../../static.files/noscript-f7c3ffd8.css"></noscript><link rel="alternate icon" type="image/png" href="../../../../../static.files/favicon-32x32-eab170b8.png"><link rel="icon" type="image/svg+xml" href="../../../../../static.files/favicon-044be391.svg"></head><body class="rustdoc src"><a class="skip-main-content" href="#main-content">Skip to main content</a><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="src-sidebar-title"><h2>Files</h2></div></nav><div class="sidebar-resizer" title="Drag to resize sidebar"></div><main><section id="main-content" class="content" tabindex="-1"><div class="main-heading"><h1><div class="sub-heading">miden_crypto/merkle/smt/full/</div>mod.rs</h1><rustdoc-toolbar></rustdoc-toolbar></div><div class="example-wrap digits-3"><pre class="rust"><code><a href=#1 id=1 data-nosnippet>1</a><span class="kw">use </span>alloc::{string::ToString, vec::Vec};
 <a href=#2 id=2 data-nosnippet>2</a>
 <a href=#3 id=3 data-nosnippet>3</a><span class="kw">use </span>super::{
 <a href=#4 id=4 data-nosnippet>4</a>    EMPTY_WORD, EmptySubtreeRoots, InnerNode, InnerNodeInfo, InnerNodes, LeafIndex, MerkleError,
@@ -670,38 +670,82 @@
 <a href=#670 id=670 data-nosnippet>670</a>    <span class="comment">// Smt with values
 <a href=#671 id=671 data-nosnippet>671</a>    </span><span class="kw">let </span>smt_leaves_2: [(Word, Word); <span class="number">2</span>] = [
 <a href=#672 id=672 data-nosnippet>672</a>        (
-<a href=#673 id=673 data-nosnippet>673</a>            Word::new([Felt::new(<span class="number">105</span>), Felt::new(<span class="number">106</span>), Felt::new(<span class="number">107</span>), Felt::new(<span class="number">108</span>)]),
-<a href=#674 id=674 data-nosnippet>674</a>            [Felt::new(<span class="number">5_u64</span>), Felt::new(<span class="number">6_u64</span>), Felt::new(<span class="number">7_u64</span>), Felt::new(<span class="number">8_u64</span>)].into(),
-<a href=#675 id=675 data-nosnippet>675</a>        ),
-<a href=#676 id=676 data-nosnippet>676</a>        (
-<a href=#677 id=677 data-nosnippet>677</a>            Word::new([Felt::new(<span class="number">101</span>), Felt::new(<span class="number">102</span>), Felt::new(<span class="number">103</span>), Felt::new(<span class="number">104</span>)]),
-<a href=#678 id=678 data-nosnippet>678</a>            [Felt::new(<span class="number">1_u64</span>), Felt::new(<span class="number">2_u64</span>), Felt::new(<span class="number">3_u64</span>), Felt::new(<span class="number">4_u64</span>)].into(),
-<a href=#679 id=679 data-nosnippet>679</a>        ),
-<a href=#680 id=680 data-nosnippet>680</a>    ];
-<a href=#681 id=681 data-nosnippet>681</a>    <span class="kw">let </span>smt = Smt::with_entries(smt_leaves_2).unwrap();
-<a href=#682 id=682 data-nosnippet>682</a>
-<a href=#683 id=683 data-nosnippet>683</a>    <span class="kw">let </span>bytes = smt.to_bytes();
-<a href=#684 id=684 data-nosnippet>684</a>    <span class="macro">assert_eq!</span>(smt, Smt::read_from_bytes(<span class="kw-2">&amp;</span>bytes).unwrap());
-<a href=#685 id=685 data-nosnippet>685</a>    <span class="macro">assert_eq!</span>(bytes.len(), smt.get_size_hint());
-<a href=#686 id=686 data-nosnippet>686</a>}
-<a href=#687 id=687 data-nosnippet>687</a>
-<a href=#688 id=688 data-nosnippet>688</a><span class="attr">#[test]
-<a href=#689 id=689 data-nosnippet>689</a></span><span class="kw">fn </span>smt_with_sorted_entries() {
-<a href=#690 id=690 data-nosnippet>690</a>    <span class="comment">// Smt with sorted values
-<a href=#691 id=691 data-nosnippet>691</a>    </span><span class="kw">let </span>smt_leaves_2: [(Word, Word); <span class="number">2</span>] = [
-<a href=#692 id=692 data-nosnippet>692</a>        (
-<a href=#693 id=693 data-nosnippet>693</a>            Word::new([Felt::new(<span class="number">101</span>), Felt::new(<span class="number">102</span>), Felt::new(<span class="number">103</span>), Felt::new(<span class="number">104</span>)]),
-<a href=#694 id=694 data-nosnippet>694</a>            [Felt::new(<span class="number">1_u64</span>), Felt::new(<span class="number">2_u64</span>), Felt::new(<span class="number">3_u64</span>), Felt::new(<span class="number">4_u64</span>)].into(),
-<a href=#695 id=695 data-nosnippet>695</a>        ),
-<a href=#696 id=696 data-nosnippet>696</a>        (
-<a href=#697 id=697 data-nosnippet>697</a>            Word::new([Felt::new(<span class="number">105</span>), Felt::new(<span class="number">106</span>), Felt::new(<span class="number">107</span>), Felt::new(<span class="number">108</span>)]),
-<a href=#698 id=698 data-nosnippet>698</a>            [Felt::new(<span class="number">5_u64</span>), Felt::new(<span class="number">6_u64</span>), Felt::new(<span class="number">7_u64</span>), Felt::new(<span class="number">8_u64</span>)].into(),
-<a href=#699 id=699 data-nosnippet>699</a>        ),
-<a href=#700 id=700 data-nosnippet>700</a>    ];
-<a href=#701 id=701 data-nosnippet>701</a>
-<a href=#702 id=702 data-nosnippet>702</a>    <span class="kw">let </span>smt = Smt::with_sorted_entries(smt_leaves_2).unwrap();
-<a href=#703 id=703 data-nosnippet>703</a>    <span class="kw">let </span>expected_smt = Smt::with_entries(smt_leaves_2).unwrap();
+<a href=#673 id=673 data-nosnippet>673</a>            Word::new([
+<a href=#674 id=674 data-nosnippet>674</a>                Felt::new_unchecked(<span class="number">105</span>),
+<a href=#675 id=675 data-nosnippet>675</a>                Felt::new_unchecked(<span class="number">106</span>),
+<a href=#676 id=676 data-nosnippet>676</a>                Felt::new_unchecked(<span class="number">107</span>),
+<a href=#677 id=677 data-nosnippet>677</a>                Felt::new_unchecked(<span class="number">108</span>),
+<a href=#678 id=678 data-nosnippet>678</a>            ]),
+<a href=#679 id=679 data-nosnippet>679</a>            [
+<a href=#680 id=680 data-nosnippet>680</a>                Felt::new_unchecked(<span class="number">5_u64</span>),
+<a href=#681 id=681 data-nosnippet>681</a>                Felt::new_unchecked(<span class="number">6_u64</span>),
+<a href=#682 id=682 data-nosnippet>682</a>                Felt::new_unchecked(<span class="number">7_u64</span>),
+<a href=#683 id=683 data-nosnippet>683</a>                Felt::new_unchecked(<span class="number">8_u64</span>),
+<a href=#684 id=684 data-nosnippet>684</a>            ]
+<a href=#685 id=685 data-nosnippet>685</a>            .into(),
+<a href=#686 id=686 data-nosnippet>686</a>        ),
+<a href=#687 id=687 data-nosnippet>687</a>        (
+<a href=#688 id=688 data-nosnippet>688</a>            Word::new([
+<a href=#689 id=689 data-nosnippet>689</a>                Felt::new_unchecked(<span class="number">101</span>),
+<a href=#690 id=690 data-nosnippet>690</a>                Felt::new_unchecked(<span class="number">102</span>),
+<a href=#691 id=691 data-nosnippet>691</a>                Felt::new_unchecked(<span class="number">103</span>),
+<a href=#692 id=692 data-nosnippet>692</a>                Felt::new_unchecked(<span class="number">104</span>),
+<a href=#693 id=693 data-nosnippet>693</a>            ]),
+<a href=#694 id=694 data-nosnippet>694</a>            [
+<a href=#695 id=695 data-nosnippet>695</a>                Felt::new_unchecked(<span class="number">1_u64</span>),
+<a href=#696 id=696 data-nosnippet>696</a>                Felt::new_unchecked(<span class="number">2_u64</span>),
+<a href=#697 id=697 data-nosnippet>697</a>                Felt::new_unchecked(<span class="number">3_u64</span>),
+<a href=#698 id=698 data-nosnippet>698</a>                Felt::new_unchecked(<span class="number">4_u64</span>),
+<a href=#699 id=699 data-nosnippet>699</a>            ]
+<a href=#700 id=700 data-nosnippet>700</a>            .into(),
+<a href=#701 id=701 data-nosnippet>701</a>        ),
+<a href=#702 id=702 data-nosnippet>702</a>    ];
+<a href=#703 id=703 data-nosnippet>703</a>    <span class="kw">let </span>smt = Smt::with_entries(smt_leaves_2).unwrap();
 <a href=#704 id=704 data-nosnippet>704</a>
-<a href=#705 id=705 data-nosnippet>705</a>    <span class="macro">assert_eq!</span>(smt, expected_smt);
-<a href=#706 id=706 data-nosnippet>706</a>}
+<a href=#705 id=705 data-nosnippet>705</a>    <span class="kw">let </span>bytes = smt.to_bytes();
+<a href=#706 id=706 data-nosnippet>706</a>    <span class="macro">assert_eq!</span>(smt, Smt::read_from_bytes(<span class="kw-2">&amp;</span>bytes).unwrap());
+<a href=#707 id=707 data-nosnippet>707</a>    <span class="macro">assert_eq!</span>(bytes.len(), smt.get_size_hint());
+<a href=#708 id=708 data-nosnippet>708</a>}
+<a href=#709 id=709 data-nosnippet>709</a>
+<a href=#710 id=710 data-nosnippet>710</a><span class="attr">#[test]
+<a href=#711 id=711 data-nosnippet>711</a></span><span class="kw">fn </span>smt_with_sorted_entries() {
+<a href=#712 id=712 data-nosnippet>712</a>    <span class="comment">// Smt with sorted values
+<a href=#713 id=713 data-nosnippet>713</a>    </span><span class="kw">let </span>smt_leaves_2: [(Word, Word); <span class="number">2</span>] = [
+<a href=#714 id=714 data-nosnippet>714</a>        (
+<a href=#715 id=715 data-nosnippet>715</a>            Word::new([
+<a href=#716 id=716 data-nosnippet>716</a>                Felt::new_unchecked(<span class="number">101</span>),
+<a href=#717 id=717 data-nosnippet>717</a>                Felt::new_unchecked(<span class="number">102</span>),
+<a href=#718 id=718 data-nosnippet>718</a>                Felt::new_unchecked(<span class="number">103</span>),
+<a href=#719 id=719 data-nosnippet>719</a>                Felt::new_unchecked(<span class="number">104</span>),
+<a href=#720 id=720 data-nosnippet>720</a>            ]),
+<a href=#721 id=721 data-nosnippet>721</a>            [
+<a href=#722 id=722 data-nosnippet>722</a>                Felt::new_unchecked(<span class="number">1_u64</span>),
+<a href=#723 id=723 data-nosnippet>723</a>                Felt::new_unchecked(<span class="number">2_u64</span>),
+<a href=#724 id=724 data-nosnippet>724</a>                Felt::new_unchecked(<span class="number">3_u64</span>),
+<a href=#725 id=725 data-nosnippet>725</a>                Felt::new_unchecked(<span class="number">4_u64</span>),
+<a href=#726 id=726 data-nosnippet>726</a>            ]
+<a href=#727 id=727 data-nosnippet>727</a>            .into(),
+<a href=#728 id=728 data-nosnippet>728</a>        ),
+<a href=#729 id=729 data-nosnippet>729</a>        (
+<a href=#730 id=730 data-nosnippet>730</a>            Word::new([
+<a href=#731 id=731 data-nosnippet>731</a>                Felt::new_unchecked(<span class="number">105</span>),
+<a href=#732 id=732 data-nosnippet>732</a>                Felt::new_unchecked(<span class="number">106</span>),
+<a href=#733 id=733 data-nosnippet>733</a>                Felt::new_unchecked(<span class="number">107</span>),
+<a href=#734 id=734 data-nosnippet>734</a>                Felt::new_unchecked(<span class="number">108</span>),
+<a href=#735 id=735 data-nosnippet>735</a>            ]),
+<a href=#736 id=736 data-nosnippet>736</a>            [
+<a href=#737 id=737 data-nosnippet>737</a>                Felt::new_unchecked(<span class="number">5_u64</span>),
+<a href=#738 id=738 data-nosnippet>738</a>                Felt::new_unchecked(<span class="number">6_u64</span>),
+<a href=#739 id=739 data-nosnippet>739</a>                Felt::new_unchecked(<span class="number">7_u64</span>),
+<a href=#740 id=740 data-nosnippet>740</a>                Felt::new_unchecked(<span class="number">8_u64</span>),
+<a href=#741 id=741 data-nosnippet>741</a>            ]
+<a href=#742 id=742 data-nosnippet>742</a>            .into(),
+<a href=#743 id=743 data-nosnippet>743</a>        ),
+<a href=#744 id=744 data-nosnippet>744</a>    ];
+<a href=#745 id=745 data-nosnippet>745</a>
+<a href=#746 id=746 data-nosnippet>746</a>    <span class="kw">let </span>smt = Smt::with_sorted_entries(smt_leaves_2).unwrap();
+<a href=#747 id=747 data-nosnippet>747</a>    <span class="kw">let </span>expected_smt = Smt::with_entries(smt_leaves_2).unwrap();
+<a href=#748 id=748 data-nosnippet>748</a>
+<a href=#749 id=749 data-nosnippet>749</a>    <span class="macro">assert_eq!</span>(smt, expected_smt);
+<a href=#750 id=750 data-nosnippet>750</a>}
 </code></pre></div></section></main></body></html>
