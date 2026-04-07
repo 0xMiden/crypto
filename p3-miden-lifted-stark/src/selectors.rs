@@ -47,14 +47,13 @@ mod tests {
 
     use std::vec::Vec;
 
-    use p3_field::{PrimeCharacteristicRing, extension::BinomialExtensionField};
-    use p3_goldilocks::Goldilocks;
+    use p3_field::PrimeCharacteristicRing;
 
     use super::*;
-    use crate::coset::LiftedCoset;
-
-    type F = Goldilocks;
-    type EF = BinomialExtensionField<F, 2>;
+    use crate::{
+        coset::LiftedCoset,
+        testing::configs::goldilocks_poseidon2::{Felt, QuadFelt},
+    };
 
     #[test]
     fn test_selectors_at_point() {
@@ -62,14 +61,14 @@ mod tests {
         let coset = LiftedCoset::unlifted(log_n, 0);
 
         // Sample a point outside the domain
-        let z = EF::from(F::from_u32(12345));
+        let z = QuadFelt::from(Felt::from_u32(12345));
 
-        let _sels = coset.selectors_at::<F, _>(z);
+        let _sels = coset.selectors_at::<Felt, _>(z);
 
         // Verify vanishing_at matches manual computation
-        let vanishing = coset.vanishing_at::<F, _>(z);
+        let vanishing = coset.vanishing_at::<Felt, _>(z);
         let n = 1usize << log_n;
-        let expected = z.exp_u64(n as u64) - EF::ONE;
+        let expected = z.exp_u64(n as u64) - QuadFelt::ONE;
         assert_eq!(vanishing, expected);
     }
 
@@ -79,7 +78,7 @@ mod tests {
         let log_blowup = 2; // 4x blowup
         let coset = LiftedCoset::unlifted(log_trace, log_blowup);
 
-        let sels: Selectors<Vec<F>> = coset.selectors();
+        let sels: Selectors<Vec<Felt>> = coset.selectors();
 
         // Check lengths
         let coset_size = 1 << (log_trace + log_blowup);

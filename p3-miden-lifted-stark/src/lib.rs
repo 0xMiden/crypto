@@ -1,18 +1,7 @@
 //! Lifted STARK prover and verifier (LMCS-based).
 //!
-//! This crate is the main facade for the lifted STARK protocol. It re-exports types from
-//! sub-crates under namespaced modules so consumers can depend on just this crate.
-//!
-//! # Modules
-//!
-//! - [`proof`]: [`proof::StarkProof`], [`proof::StarkDigest`], [`proof::StarkOutput`], [`proof::StarkTranscript`]
-//! - [`air`]: AIR traits, instance/witness types, and upstream `p3-air` re-exports
-//! - [`prover`]: [`prover::prove_single`] / [`prover::prove_multi`] entry points
-//! - [`verifier`]: [`verifier::verify_single`] / [`verifier::verify_multi`] entry points
-//! - [`fri`]: PCS parameters, transcript types, and error types (DEEP + FRI)
-//! - [`lmcs`]: LMCS configuration, proof types, and MMCS compatibility
-//! - [`transcript`]: Fiat-Shamir channels and transcript data
-//! - [`hasher`]: Stateful hasher primitives for LMCS construction
+//! This crate implements the lifted STARK protocol combining LMCS (Lifted Matrix
+//! Commitment Scheme), DEEP quotient construction, and FRI for low-degree testing.
 //!
 //! # AIR Trust Model
 //!
@@ -60,21 +49,58 @@
 
 extern crate alloc;
 
+// ============================================================================
+// Private implementation modules
+// ============================================================================
+
 mod config;
-/// Domain/coset operations for lifted traces.
-pub mod coset;
-/// Debug constraint checker for lifted AIRs.
-pub mod debug;
-pub(crate) mod selectors;
+mod coset;
+mod debug;
+mod lmcs;
+mod pcs;
+mod proof;
+mod prover;
+mod selectors;
+mod verifier;
 
-pub use config::*;
-
-pub mod proof;
-pub mod prover;
-pub mod verifier;
+pub use config::{GenericStarkConfig, StarkConfig};
+pub use coset::LiftedCoset;
+pub use debug::{check_constraints, check_constraints_multi};
+pub use lmcs::{
+    Lmcs, LmcsError, LmcsTree, OpenedRows,
+    bitrev::{BitReversibleMatrix, materialize_bitrev},
+    config::LmcsConfig,
+    hiding_config::HidingLmcsConfig,
+    lifted_tree::LiftedMerkleTree,
+    merkle_witness::MerkleWitness,
+    node_id::NodeId,
+    proof::{
+        BatchProof as LmcsBatchProof, BatchProofView as LmcsBatchProofView,
+        LeafOpening as LmcsLeafOpening, Proof as LmcsProof,
+    },
+    row_list::RowList,
+    tree_indices::{MissingSiblingsIter, TreeIndices},
+    utils::log2_strict_u8,
+};
+pub use pcs::{
+    deep::{
+        proof::{DeepTranscript, OpenedValues as PcsOpenedValues},
+        verifier::DeepError,
+    },
+    fri::{
+        proof::{FriRoundTranscript, FriTranscript},
+        verifier::FriError,
+    },
+    params::{PcsParams, PcsParamsError},
+    proof::PcsTranscript,
+    verifier::PcsError,
+};
+pub use proof::{StarkDigest, StarkOutput, StarkProof, StarkTranscript};
+pub use prover::{ProverError, prove_multi, prove_single};
+pub use verifier::{VerifierError, verify_multi, verify_single};
 
 // ============================================================================
-// Namespaced re-exports from sub-crates
+// Namespaced re-exports from upstream crates
 // ============================================================================
 
 /// AIR traits, instance/witness types, and upstream `p3-air` re-exports.
@@ -127,24 +153,6 @@ pub mod air {
     }
 }
 
-/// PCS parameter types, transcript views, and error types for DEEP + FRI.
-pub mod fri {
-    pub use p3_miden_lifted_fri::{
-        OpenedValues, PcsError, PcsParams, PcsParamsError, PcsTranscript,
-        deep::{DeepError, DeepTranscript},
-        fri::{FriError, FriRoundTranscript, FriTranscript},
-    };
-}
-
-/// LMCS configuration, tree types, and proof structures.
-pub mod lmcs {
-    pub use p3_miden_lmcs::{
-        HidingLmcsConfig, LiftedMerkleTree, Lmcs, LmcsConfig, LmcsError, LmcsTree, OpenedRows,
-        RowList,
-        proof::{LeafOpening, Proof},
-    };
-}
-
 /// Fiat-Shamir transcript channels and data types.
 pub mod transcript {
     pub use p3_miden_transcript::{TranscriptChallenger, TranscriptData, TranscriptError};
@@ -156,3 +164,10 @@ pub mod hasher {
         Alignable, ChainingHasher, SerializingStatefulSponge, StatefulHasher, StatefulSponge,
     };
 }
+
+/// Testing infrastructure: configurations, fixtures, and example AIRs.
+///
+/// Available when the `testing` feature is enabled or during `cargo test`.
+/// Integration tests should use `cargo test --features testing`.
+#[cfg(any(test, feature = "testing"))]
+pub mod testing;

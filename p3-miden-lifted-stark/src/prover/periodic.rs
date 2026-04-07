@@ -106,14 +106,16 @@ mod tests {
 
     use p3_dft::TwoAdicSubgroupDft;
     use p3_field::{Field, PackedValue, PrimeCharacteristicRing};
-    use p3_miden_dev_utils::configs::goldilocks_poseidon2 as gl;
 
     use super::*;
-
-    type F = gl::F;
+    use crate::testing::configs::goldilocks_poseidon2 as gl;
 
     /// Verify that periodic LDE values match the full LDE computation.
-    fn assert_periodic_lde_matches_full(columns: &[Vec<F>], log_trace_height: u8, log_blowup: u8) {
+    fn assert_periodic_lde_matches_full(
+        columns: &[Vec<gl::Felt>],
+        log_trace_height: u8,
+        log_blowup: u8,
+    ) {
         let trace_height = 1 << log_trace_height as usize;
         let lde_height = trace_height << log_blowup as usize;
 
@@ -134,13 +136,13 @@ mod tests {
         let periodic_lde = PeriodicLde::build(&coset, Some(repeated_matrix));
 
         // Compute expected LDE for each column via full expansion (natural order)
-        let expected: Vec<Vec<F>> = columns
+        let expected: Vec<Vec<gl::Felt>> = columns
             .iter()
             .map(|col| {
-                let full: Vec<F> = (0..trace_height).map(|i| col[i % col.len()]).collect();
+                let full: Vec<gl::Felt> = (0..trace_height).map(|i| col[i % col.len()]).collect();
                 let matrix = RowMajorMatrix::new(full, 1);
                 NaiveDft
-                    .coset_lde_batch(matrix, log_blowup.into(), F::GENERATOR)
+                    .coset_lde_batch(matrix, log_blowup.into(), gl::Felt::GENERATOR)
                     .to_row_major_matrix()
                     .values
             })
@@ -154,7 +156,7 @@ mod tests {
         let height = ldes.height();
         for i in 0..lde_height {
             let row = i % height;
-            let actual: Vec<F> = ldes.row_slice(row).unwrap().to_vec();
+            let actual: Vec<gl::Felt> = ldes.row_slice(row).unwrap().to_vec();
             for (col_idx, (&actual_val, expected_col)) in actual.iter().zip(&expected).enumerate() {
                 assert_eq!(
                     actual_val, expected_col[i],
@@ -164,7 +166,7 @@ mod tests {
         }
 
         // Verify packed_values_at returns correct packed values
-        type P = gl::P;
+        type P = gl::PackedFelt;
         let pack_width = P::WIDTH;
         for start in (0..lde_height).step_by(pack_width) {
             let packed: Vec<P> = periodic_lde.packed_values_at(start).collect();
@@ -174,7 +176,7 @@ mod tests {
             for k in 0..pack_width {
                 let idx = start + k;
                 let row = idx % height;
-                let scalar: Vec<F> = ldes.row_slice(row).unwrap().to_vec();
+                let scalar: Vec<gl::Felt> = ldes.row_slice(row).unwrap().to_vec();
                 for (col_idx, (&packed_val, &scalar_val)) in packed.iter().zip(&scalar).enumerate()
                 {
                     assert_eq!(
@@ -190,19 +192,22 @@ mod tests {
     #[test]
     fn test_periodic_lde_matches_full_lde() {
         // Period 2, blowup 2
-        assert_periodic_lde_matches_full(&[vec![F::ZERO, F::ONE]], 3, 1);
+        assert_periodic_lde_matches_full(&[vec![gl::Felt::ZERO, gl::Felt::ONE]], 3, 1);
 
         // Period 4, blowup 2
-        let col4: Vec<F> = [1, 2, 3, 4].into_iter().map(F::from_u64).collect();
+        let col4: Vec<gl::Felt> = [1, 2, 3, 4].into_iter().map(gl::Felt::from_u64).collect();
         assert_periodic_lde_matches_full(&[col4], 3, 1);
 
         // Period 2, blowup 8 (higher blowup)
-        let col2: Vec<F> = [5, 7].into_iter().map(F::from_u64).collect();
+        let col2: Vec<gl::Felt> = [5, 7].into_iter().map(gl::Felt::from_u64).collect();
         assert_periodic_lde_matches_full(&[col2], 4, 3);
 
         // Multiple columns with different periods
-        let col_p2: Vec<F> = [1, 2].into_iter().map(F::from_u64).collect();
-        let col_p4: Vec<F> = [10, 20, 30, 40].into_iter().map(F::from_u64).collect();
+        let col_p2: Vec<gl::Felt> = [1, 2].into_iter().map(gl::Felt::from_u64).collect();
+        let col_p4: Vec<gl::Felt> = [10, 20, 30, 40]
+            .into_iter()
+            .map(gl::Felt::from_u64)
+            .collect();
         assert_periodic_lde_matches_full(&[col_p2, col_p4], 3, 2);
     }
 }

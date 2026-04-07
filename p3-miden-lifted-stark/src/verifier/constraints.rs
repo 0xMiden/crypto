@@ -14,8 +14,7 @@ use p3_miden_lifted_air::{
 };
 use p3_util::log2_strict_usize;
 
-use super::VerifierError;
-use crate::{coset::LiftedCoset, selectors::Selectors};
+use crate::{coset::LiftedCoset, selectors::Selectors, verifier::VerifierError};
 
 // ============================================================================
 // ConstraintFolder
@@ -35,7 +34,7 @@ use crate::{coset::LiftedCoset, selectors::Selectors};
 /// `Σₖ α^{K−1−k}·Cₖ(z)`, but is cheaper for a single-point evaluation.
 /// The prover computes an equivalent fold over the whole quotient domain, optimized
 /// with base-field SIMD where possible.
-pub(crate) struct ConstraintFolder<'a, F, EF>
+pub struct ConstraintFolder<'a, F, EF>
 where
     F: Field,
     EF: ExtensionField<F>,

@@ -11,12 +11,10 @@ homepage.workspace = true
 [dependencies]
 # Internal
 p3-miden-lifted-air.workspace = true
-p3-miden-lifted-fri.workspace = true
-p3-miden-lmcs.workspace = true
 p3-miden-stateful-hasher.workspace = true
 p3-miden-transcript.workspace = true
 
-# Plonky3
+# Plonky3 (always needed)
 p3-challenger.workspace = true
 p3-dft.workspace = true
 p3-field.workspace = true
@@ -26,31 +24,76 @@ p3-maybe-rayon.workspace = true
 p3-symmetric.workspace = true
 p3-util.workspace = true
 
+# Optional (for testing/examples features)
+p3-blake3 = { workspace = true, optional = true }
+p3-blake3-air = { workspace = true, optional = true }
+p3-keccak = { workspace = true, optional = true }
+p3-keccak-air = { workspace = true, optional = true }
+p3-poseidon2-air = { workspace = true, optional = true }
+
 # Third-party
+rand.workspace = true
 thiserror.workspace = true
 tracing.workspace = true
 
 [dev-dependencies]
-# Internal
-p3-miden-dev-utils.workspace = true
-p3-miden-lmcs = { workspace = true, features = ["testing"] }
-
 # Plonky3
+p3-blake3.workspace = true
 p3-challenger.workspace = true
 p3-commit.workspace = true
 p3-fri.workspace = true
 p3-goldilocks.workspace = true
+p3-interpolation.workspace = true
+p3-keccak.workspace = true
 p3-merkle-tree.workspace = true
 p3-symmetric.workspace = true
 
 # Third-party
 criterion.workspace = true
-rand.workspace = true
+tracing-subscriber.workspace = true
 
 [features]
 default = []
 parallel = ["p3-maybe-rayon/parallel"]
+testing = [
+  "dep:p3-blake3",
+  "dep:p3-blake3-air",
+  "dep:p3-keccak",
+  "dep:p3-keccak-air",
+  "dep:p3-poseidon2-air",
+]
 
 [[bench]]
 name = "quotient_commit"
 harness = false
+required-features = ["testing"]
+
+[[bench]]
+name = "merkle_commit"
+harness = false
+required-features = ["testing"]
+
+[[bench]]
+name = "fri_fold"
+harness = false
+required-features = ["testing"]
+
+[[bench]]
+name = "deep_quotient"
+harness = false
+required-features = ["testing"]
+
+[[bench]]
+name = "pcs"
+harness = false
+required-features = ["testing"]
+
+[[bench]]
+name = "pcs_trace"
+harness = false
+required-features = ["testing"]
+
+[[bench]]
+name = "plonky3"
+harness = false
+required-features = ["testing"]

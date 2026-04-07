@@ -5,25 +5,23 @@
 //! - `layout`: Constraint layout discovery (base vs extension) and alpha decomposition
 
 mod folder;
-mod layout;
+pub(crate) mod layout;
 mod packed_row_bitrev;
 
 use alloc::vec::Vec;
 use core::marker::PhantomData;
 
-pub(crate) use folder::ProverConstraintFolder;
-pub(crate) use layout::{ConstraintLayout, get_constraint_layout};
+use folder::ProverConstraintFolder;
 use p3_field::{
     Algebra, BasedVectorSpace, ExtensionField, Field, PackedFieldExtension, PackedValue,
     TwoAdicField,
 };
 use p3_matrix::{Matrix, bitrev::BitReversedMatrixView, dense::RowMajorMatrixView};
 use p3_maybe_rayon::prelude::*;
-use p3_miden_lifted_air::{LiftedAir, RowWindow};
+use p3_miden_lifted_air::{LiftedAir, RowWindow, symbolic::ConstraintLayout};
 use packed_row_bitrev::RowMajorMatrixBitrevPackedExt;
 
-use super::periodic::PeriodicLde;
-use crate::coset::LiftedCoset;
+use crate::{coset::LiftedCoset, prover::periodic::PeriodicLde};
 
 /// Row-blocks (`i_start = r * packing_width`) processed per rayon task.
 const ROW_BLOCKS_PER_PARALLEL_TASK: usize = 32;
@@ -66,7 +64,7 @@ type PackedExt<F, EF> = <EF as ExtensionField<F>>::ExtensionPacking;
 /// the quotient-degree bounds used by the protocol; division by the vanishing polynomial
 /// happens later.
 #[allow(clippy::too_many_arguments)]
-pub(crate) fn evaluate_constraints_into<F, EF, A>(
+pub fn evaluate_constraints_into<F, EF, A>(
     output: &mut [EF],
     air: &A,
     main_on_gj: &BitReversedMatrixView<RowMajorMatrixView<'_, F>>,

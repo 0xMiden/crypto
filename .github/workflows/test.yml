@@ -66,3 +66,23 @@ jobs:
       - name: Run tests with AVX2
         run: |
           RUSTFLAGS="$RUSTFLAGS -C target-feature=+avx2" cargo test --workspace
+
+  check-features:
+    name: check all feature combinations
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Cleanup large tools for build space
+        uses: ./.github/actions/cleanup-runner
+
+      - name: Rustup
+        run: rustup update --no-self-update stable
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          save-if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+
+      - name: Check supported feature combinations
+        run: make check-features

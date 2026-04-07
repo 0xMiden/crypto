@@ -13,9 +13,9 @@ use core::marker::PhantomData;
 
 use p3_dft::TwoAdicSubgroupDft;
 use p3_field::{ExtensionField, TwoAdicField};
-use p3_miden_lifted_fri::PcsParams;
-use p3_miden_lmcs::Lmcs;
 use p3_miden_transcript::TranscriptChallenger;
+
+use crate::{lmcs::Lmcs, pcs::params::PcsParams};
 
 /// Lifted STARK configuration.
 ///

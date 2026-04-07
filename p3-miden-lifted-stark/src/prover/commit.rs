@@ -15,10 +15,13 @@ use p3_matrix::{
     dense::{RowMajorMatrix, RowMajorMatrixView},
 };
 use p3_miden_lifted_air::log2_strict_u8;
-use p3_miden_lmcs::{Lmcs, LmcsTree, materialize_bitrev};
 use tracing::info_span;
 
-use crate::{StarkConfig, coset::LiftedCoset};
+use crate::{
+    StarkConfig,
+    coset::LiftedCoset,
+    lmcs::{Lmcs, LmcsTree, bitrev::materialize_bitrev},
+};
 
 // ============================================================================
 // Committed
@@ -235,19 +238,18 @@ where
 
 #[cfg(test)]
 mod tests {
-    use alloc::{vec, vec::Vec};
+    use alloc::vec;
 
     use p3_field::PrimeCharacteristicRing;
-    use p3_goldilocks::Goldilocks;
-    use p3_matrix::{Matrix, bitrev::BitReversibleMatrix, dense::RowMajorMatrix};
     use p3_util::reverse_bits_len;
 
-    type F = Goldilocks;
+    use super::*;
+    use crate::testing::configs::goldilocks_poseidon2::Felt;
 
     #[test]
     fn split_rows_truncates_correctly() {
         // Create a 16x4 matrix (LDE height = 16, width = 4)
-        let data: Vec<F> = (0u64..64).map(F::from_u64).collect();
+        let data: Vec<Felt> = (0u64..64).map(Felt::from_u64).collect();
         let matrix = RowMajorMatrix::new(data, 4);
 
         // Truncate to 8 rows via split_rows
@@ -256,14 +258,14 @@ mod tests {
         assert_eq!(truncated.width(), 4);
 
         // Verify first row is unchanged
-        let row: Vec<F> = truncated.row(0).unwrap().into_iter().collect();
+        let row: Vec<Felt> = truncated.row(0).unwrap().into_iter().collect();
         assert_eq!(
             row,
             vec![
-                F::from_u64(0),
-                F::from_u64(1),
-                F::from_u64(2),
-                F::from_u64(3)
+                Felt::from_u64(0),
+                Felt::from_u64(1),
+                Felt::from_u64(2),
+                Felt::from_u64(3)
             ]
         );
     }
@@ -272,7 +274,7 @@ mod tests {
     fn bit_reverse_rows_gives_natural_order() {
         // Create an 8x2 matrix with values that let us verify bit-reversal
         // Row i (bit-reversed) contains [2*i, 2*i+1]
-        let data: Vec<F> = (0u64..16).map(F::from_u64).collect();
+        let data: Vec<Felt> = (0u64..16).map(Felt::from_u64).collect();
         let matrix = RowMajorMatrix::new(data, 2);
 
         let natural = matrix.as_view().bit_reverse_rows();
@@ -282,10 +284,10 @@ mod tests {
         // General verification: natural row i should have values from bit-reversed row bitrev(i)
         for i in 0..8 {
             let br_i = reverse_bits_len(i, 3);
-            let natural_row: Vec<F> = natural.row(i).unwrap().into_iter().collect();
-            let expected: Vec<F> = vec![
-                F::from_u64((br_i * 2) as u64),
-                F::from_u64((br_i * 2 + 1) as u64),
+            let natural_row: Vec<Felt> = natural.row(i).unwrap().into_iter().collect();
+            let expected: Vec<Felt> = vec![
+                Felt::from_u64((br_i * 2) as u64),
+                Felt::from_u64((br_i * 2 + 1) as u64),
             ];
             assert_eq!(natural_row, expected, "mismatch at natural row {i}");
         }
@@ -294,7 +296,7 @@ mod tests {
     #[test]
     fn truncate_then_bit_reverse() {
         // Create a 16x2 matrix
-        let data: Vec<F> = (0u64..32).map(F::from_u64).collect();
+        let data: Vec<Felt> = (0u64..32).map(Felt::from_u64).collect();
         let matrix = RowMajorMatrix::new(data, 2);
 
         // Truncate to 8 rows and convert to natural order
@@ -303,7 +305,7 @@ mod tests {
         assert_eq!(truncated_natural.width(), 2);
 
         for i in 0..8 {
-            let row: Vec<F> = truncated_natural.row(i).unwrap().into_iter().collect();
+            let row: Vec<Felt> = truncated_natural.row(i).unwrap().into_iter().collect();
             assert_eq!(row.len(), 2, "row {i} should have 2 elements");
         }
     }

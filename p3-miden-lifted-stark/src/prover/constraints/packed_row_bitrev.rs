@@ -11,7 +11,7 @@ use p3_util::{log2_strict_usize, reverse_bits_len};
 /// Collect logical vertically packed rows from bit-reversed row-major storage into a reusable buffer.
 pub trait RowMajorMatrixBitrevPackedExt<F: Copy> {
     /// One logical row block starting at logical row index `i_start` (a multiple of `P::WIDTH`).
-    #[allow(dead_code)]
+    #[expect(dead_code)]
     fn collect_vertically_packed_row_bitrev_into<P: PackedValue<Value = F>>(
         &self,
         i_start: usize,

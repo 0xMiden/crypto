@@ -76,10 +76,7 @@ check: ## Check all targets and features for errors without code generation
 
 .PHONY: check-features
 check-features: ## Check the supported non-default feature combinations
-	cargo check --workspace --all-targets --no-default-features
-	cargo check --workspace --all-targets --features parallel
-	cargo check -p p3-miden-lmcs --all-targets --features testing
-	cargo check -p p3-miden-lifted-fri --all-targets --features testing
+	bash ./scripts/check-features.sh
 
 # --- building ------------------------------------------------------------------------------------
 

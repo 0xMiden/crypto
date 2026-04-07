@@ -48,7 +48,7 @@
 //! use p3_field::extension::BinomialExtensionField;
 //! use crate::{StarkConfig, prove_multi};
 //! use p3_miden_lifted_air::{AirWitness, AirInstance};
-//! use p3_miden_lmcs::LmcsConfig;
+//! use crate::lmcs::LmcsConfig;
 //! use p3_miden_stateful_hasher::StatefulSponge;
 //! use p3_miden_transcript::{ProverTranscript, VerifierTranscript};
 //! use p3_symmetric::TruncatedPermutation;
@@ -121,28 +121,27 @@
 
 extern crate alloc;
 
-pub(crate) mod commit;
-pub(crate) mod constraints;
-pub(crate) mod periodic;
+pub mod commit;
+pub mod constraints;
+pub mod periodic;
 pub mod quotient;
 
 use alloc::{vec, vec::Vec};
 
 use commit::commit_traces;
-use constraints::{evaluate_constraints_into, get_constraint_layout};
+use constraints::{evaluate_constraints_into, layout::get_constraint_layout};
 use p3_field::{BasedVectorSpace, ExtensionField, TwoAdicField};
 use p3_matrix::{Matrix, dense::RowMajorMatrix};
 use p3_miden_lifted_air::{
     AirValidationError, AirWitness, AuxBuilder, LiftedAir, VarLenPublicInputs, log2_strict_u8,
     validate_instances,
 };
-use p3_miden_lifted_fri::prover::open_with_channel;
 use p3_miden_transcript::{Channel, ProverChannel, ProverTranscript};
 use periodic::PeriodicLde;
 use thiserror::Error;
 use tracing::{info_span, instrument};
 
-use crate::{StarkConfig, coset::LiftedCoset, proof::StarkOutput};
+use crate::{StarkConfig, coset::LiftedCoset, pcs::prover::open_with_channel, proof::StarkOutput};
 
 /// Errors that can occur during proving.
 #[derive(Debug, Error)]

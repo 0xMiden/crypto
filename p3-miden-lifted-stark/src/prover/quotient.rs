@@ -15,12 +15,15 @@ use p3_field::{
 };
 use p3_matrix::dense::RowMajorMatrix;
 use p3_maybe_rayon::prelude::*;
-use p3_miden_lmcs::{Lmcs, materialize_bitrev};
 use p3_util::log2_strict_usize;
 use tracing::info_span;
 
-use super::commit::Committed;
-use crate::{StarkConfig, coset::LiftedCoset};
+use crate::{
+    StarkConfig,
+    coset::LiftedCoset,
+    lmcs::{Lmcs, bitrev::materialize_bitrev},
+    prover::commit::Committed,
+};
 
 // ============================================================================
 // Accumulation
@@ -38,11 +41,7 @@ use crate::{StarkConfig, coset::LiftedCoset};
 /// Cyclic extension is valid because H_small is a subgroup of H_big, so
 /// evaluations repeat cyclically. The β scaling implements Horner folding for
 /// multi-trace accumulation: `acc = acc·β + Nⱼ`.
-pub(crate) fn cyclic_extend_and_scale<EF: Field>(
-    accumulator: &mut Vec<EF>,
-    target_len: usize,
-    beta: EF,
-) {
+pub fn cyclic_extend_and_scale<EF: Field>(accumulator: &mut Vec<EF>, target_len: usize, beta: EF) {
     if accumulator.is_empty() {
         accumulator.resize(target_len, EF::ZERO);
     } else {
@@ -70,7 +69,7 @@ pub(crate) fn cyclic_extend_and_scale<EF: Field>(
 ///
 /// Note that here `coset.log_blowup()` is `log2(D)` because `coset` is the *quotient*
 /// domain (blowup = constraint degree), not the PCS/FRI blowup `B`.
-pub(crate) fn divide_by_vanishing_in_place<F, EF>(numerator: &mut [EF], coset: &LiftedCoset)
+pub fn divide_by_vanishing_in_place<F, EF>(numerator: &mut [EF], coset: &LiftedCoset)
 where
     F: TwoAdicField,
     EF: ExtensionField<F>,

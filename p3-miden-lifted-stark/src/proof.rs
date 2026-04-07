@@ -8,7 +8,7 @@
 //!
 //! [`StarkTranscript`] has a [`from_proof`](StarkTranscript::from_proof) constructor
 //! that parses it from proof data and a challenger, following the same pattern as
-//! [`PcsTranscript`] alongside [`verify`](p3_miden_lifted_fri::verifier::verify).
+//! [`PcsTranscript`] alongside the PCS verifier.
 
 extern crate alloc;
 
@@ -17,11 +17,15 @@ use alloc::{vec, vec::Vec};
 use p3_challenger::CanFinalizeDigest;
 use p3_field::{ExtensionField, Field, TwoAdicField};
 use p3_miden_lifted_air::{AirInstance, LiftedAir, validate_instances};
-use p3_miden_lifted_fri::PcsTranscript;
-use p3_miden_lmcs::{Lmcs, utils::aligned_len};
 use p3_miden_transcript::{Channel, TranscriptData, VerifierChannel, VerifierTranscript};
 
-use crate::{StarkConfig, coset::LiftedCoset, verifier::VerifierError};
+use crate::{
+    StarkConfig,
+    coset::LiftedCoset,
+    lmcs::{Lmcs, utils::aligned_len},
+    pcs::proof::PcsTranscript,
+    verifier::VerifierError,
+};
 
 /// STARK proof: raw transcript data (field elements and commitments) produced by
 /// the prover and consumed by the verifier.

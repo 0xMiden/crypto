@@ -1,0 +1,45 @@
+[package]
+name = "p3-miden-bench"
+description = "Profiling binary for lifted STARK and batch STARK provers."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+readme.workspace = true
+homepage.workspace = true
+publish = false
+
+[dependencies]
+# Internal
+p3-miden-lifted-stark = { workspace = true, features = ["testing"] }
+
+# Plonky3
+p3-air.workspace = true
+p3-batch-stark.workspace = true
+p3-blake3.workspace = true
+p3-blake3-air.workspace = true
+p3-commit.workspace = true
+p3-dft.workspace = true
+p3-field.workspace = true
+p3-fri.workspace = true
+p3-goldilocks.workspace = true
+p3-keccak.workspace = true
+p3-keccak-air.workspace = true
+p3-lookup.workspace = true
+p3-matrix.workspace = true
+p3-merkle-tree.workspace = true
+p3-poseidon2-air.workspace = true
+p3-symmetric.workspace = true
+p3-uni-stark.workspace = true
+
+# Third-party
+clap.workspace = true
+postcard.workspace = true
+rand.workspace = true
+tracing.workspace = true
+tracing-forest = { workspace = true, features = ["ansi", "smallvec"] }
+tracing-subscriber.workspace = true
+
+[features]
+default = []
+parallel = ["p3-miden-lifted-stark/parallel"]
