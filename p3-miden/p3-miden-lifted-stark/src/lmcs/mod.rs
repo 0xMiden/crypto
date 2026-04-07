@@ -7,14 +7,14 @@
 //!
 //! # Main Types
 //!
-//! - [`LmcsConfig`]: Configuration holding cryptographic primitives (sponge + compression) with
-//!   packed types for SIMD parallelization.
+//! - [`config::LmcsConfig`]: Configuration holding cryptographic primitives (sponge + compression)
+//!   with packed types for SIMD parallelization.
 //! - [`Lmcs`]: Trait for LMCS configurations, providing type-erased access to commitment
 //!   operations.
 //! - [`LmcsTree`]: Trait for built LMCS trees, providing opening operations.
-//! - [`LiftedMerkleTree`]: The underlying Merkle tree data structure.
-//! - [`Proof`]: Single-opening proof with rows, optional salt, and authentication path.
-//! - [`BatchProof`]: Batch opening data with Merkle witness for path extraction.
+//! - [`lifted_tree::LiftedMerkleTree`]: The underlying Merkle tree data structure.
+//! - [`proof::Proof`]: Single-opening proof with rows, optional salt, and authentication path.
+//! - [`proof::BatchProof`]: Batch opening data with Merkle witness for path extraction.
 //!
 //! # Mathematical Foundation
 //!
