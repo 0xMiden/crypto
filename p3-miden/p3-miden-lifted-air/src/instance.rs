@@ -134,17 +134,9 @@ impl<'a, F> AirInstance<'a, F> {
             return Err(AirValidationError::VarLenPublicInputsMismatch { expected, actual });
         }
         let trace_height = 1 << self.log_trace_height as usize;
-        let max_period = air
-            .periodic_columns()
-            .iter()
-            .map(|c| c.len())
-            .max()
-            .unwrap_or(0);
+        let max_period = air.periodic_columns().iter().map(|c| c.len()).max().unwrap_or(0);
         if trace_height < max_period {
-            return Err(AirValidationError::TraceHeightBelowPeriod {
-                trace_height,
-                max_period,
-            });
+            return Err(AirValidationError::TraceHeightBelowPeriod { trace_height, max_period });
         }
         Ok(())
     }

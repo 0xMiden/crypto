@@ -15,18 +15,17 @@ use crate::{
 /// Open committed matrices at N evaluation points, writing to a prover channel.
 ///
 /// # Preconditions
-/// - `eval_points` must lie outside both the trace-domain subgroup `H` and the
-///   LDE evaluation coset `gK` used by the PCS. If a point lies in either set,
-///   denominators `(zⱼ − X)` in the DEEP quotient become zero for some domain element,
-///   making the quotient undefined.
-/// - All trace trees must be built at the same LDE height `2^log_lde_height`.
-///   Multiple LDE heights are not supported yet and will panic.
+/// - `eval_points` must lie outside both the trace-domain subgroup `H` and the LDE evaluation coset
+///   `gK` used by the PCS. If a point lies in either set, denominators `(zⱼ − X)` in the DEEP
+///   quotient become zero for some domain element, making the quotient undefined.
+/// - All trace trees must be built at the same LDE height `2^log_lde_height`. Multiple LDE heights
+///   are not supported yet and will panic.
 ///
 /// `log_lde_height` is the log₂ of the LDE evaluation domain height (i.e. the height of
 /// the committed LDE matrices). When a trace degree is known, it is typically
 /// `log_trace_height + params.fri.log_blowup` (plus any extension used by the caller).
-/// In that common case, the trace subgroup `H` has size `2^(log_lde_height - params.fri.log_blowup)`,
-/// while the LDE coset `gK` has size `2^log_lde_height`.
+/// In that common case, the trace subgroup `H` has size `2^(log_lde_height -
+/// params.fri.log_blowup)`, while the LDE coset `gK` has size `2^log_lde_height`.
 ///
 /// Alignment is derived from the trace trees to pad DEEP evaluations consistently.
 /// Trace trees must be built with `build_aligned_tree` to match this padding.
@@ -52,9 +51,7 @@ pub fn open_with_channel<F, EF, L, M, Ch, const N: usize>(
     assert!(!trace_trees.is_empty(), "at least one trace tree required");
     let expected_height = 1 << log_lde_height as usize;
     assert!(
-        trace_trees
-            .iter()
-            .all(|tree| tree.height() == expected_height),
+        trace_trees.iter().all(|tree| tree.height() == expected_height),
         "mixed LDE heights are not supported yet",
     );
     // ─────────────────────────────────────────────────────────────────────────

@@ -22,7 +22,8 @@ use p3_matrix::{
 /// Temporary adapter for types that implement the upstream
 /// [`p3_matrix::bitrev::BitReversibleMatrix`] but not this crate's local copy.
 /// The returned type implements both traits and can be passed directly to
-/// [`Lmcs::build_tree`](crate::lmcs::Lmcs::build_tree) / [`Lmcs::build_aligned_tree`](crate::lmcs::Lmcs::build_aligned_tree).
+/// [`Lmcs::build_tree`](crate::lmcs::Lmcs::build_tree) /
+/// [`Lmcs::build_aligned_tree`](crate::lmcs::Lmcs::build_aligned_tree).
 ///
 /// Remove alongside this module when upstream impls cover all DFT output types.
 pub fn materialize_bitrev<T: Clone + Send + Sync>(

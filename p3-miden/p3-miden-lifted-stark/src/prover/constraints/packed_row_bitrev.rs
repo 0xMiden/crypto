@@ -8,7 +8,8 @@ use p3_field::PackedValue;
 use p3_matrix::dense::RowMajorMatrixView;
 use p3_util::{log2_strict_usize, reverse_bits_len};
 
-/// Collect logical vertically packed rows from bit-reversed row-major storage into a reusable buffer.
+/// Collect logical vertically packed rows from bit-reversed row-major storage into a reusable
+/// buffer.
 pub trait RowMajorMatrixBitrevPackedExt<F: Copy> {
     /// One logical row block starting at logical row index `i_start` (a multiple of `P::WIDTH`).
     #[expect(dead_code)]

@@ -28,10 +28,7 @@ fn bench_pcs(c: &mut Criterion) {
 
     for &log_lde_height in LOG_HEIGHTS {
         let max_lde_size = 1usize << log_lde_height;
-        let group_name = format!(
-            "PCS_Open/{}/goldilocks/poseidon2/{}",
-            max_lde_size, PARALLEL_STR
-        );
+        let group_name = format!("PCS_Open/{}/goldilocks/poseidon2/{}", max_lde_size, PARALLEL_STR);
         let mut group = c.benchmark_group(&group_name);
 
         let matrix_groups: Vec<Vec<RowMajorMatrix<Felt>>> =

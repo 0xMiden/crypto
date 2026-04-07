@@ -90,10 +90,7 @@ pub fn evaluate_constraints_into<F, EF, A>(
     let constraint_degree = coset.blowup();
     let width = P::<F>::WIDTH;
 
-    assert!(
-        gj_height.is_multiple_of(width),
-        "quotient height must be divisible by packing width"
-    );
+    assert_eq!(gj_height % width, 0, "quotient height must be divisible by packing width");
 
     // Precompute selectors via coset method
     let sels = coset.selectors::<F>();
@@ -184,8 +181,7 @@ pub fn evaluate_constraints_into<F, EF, A>(
                 };
 
             #[cfg(debug_assertions)]
-            air.is_valid_builder(&folder)
-                .expect("builder dimensions must match AIR");
+            air.is_valid_builder(&folder).expect("builder dimensions must match AIR");
             air.eval(&mut folder);
             let folded = folder.finalize_constraints();
 
@@ -197,38 +193,20 @@ pub fn evaluate_constraints_into<F, EF, A>(
     };
 
     #[cfg(feature = "parallel")]
-    output
-        .par_chunks_mut(points_per_task)
-        .enumerate()
-        .for_each_init(
-            || {
-                (
-                    Vec::<P<F>>::new(),
-                    Vec::<P<F>>::new(),
-                    Vec::<PE<F, EF>>::new(),
-                )
-            },
-            |(main_buf, aux_base_buf, aux_pe_buf), (g, big_slice)| {
-                eval_big_slice(main_buf, aux_base_buf, aux_pe_buf, g, big_slice);
-            },
-        );
+    output.par_chunks_mut(points_per_task).enumerate().for_each_init(
+        || (Vec::<P<F>>::new(), Vec::<P<F>>::new(), Vec::<PE<F, EF>>::new()),
+        |(main_buf, aux_base_buf, aux_pe_buf), (g, big_slice)| {
+            eval_big_slice(main_buf, aux_base_buf, aux_pe_buf, g, big_slice);
+        },
+    );
 
     #[cfg(not(feature = "parallel"))]
     {
         let mut main_buf = Vec::<P<F>>::new();
         let mut aux_base_buf = Vec::<P<F>>::new();
         let mut aux_pe_buf = Vec::<PE<F, EF>>::new();
-        output
-            .par_chunks_mut(points_per_task)
-            .enumerate()
-            .for_each(|(g, big_slice)| {
-                eval_big_slice(
-                    &mut main_buf,
-                    &mut aux_base_buf,
-                    &mut aux_pe_buf,
-                    g,
-                    big_slice,
-                );
-            });
+        output.par_chunks_mut(points_per_task).enumerate().for_each(|(g, big_slice)| {
+            eval_big_slice(&mut main_buf, &mut aux_base_buf, &mut aux_pe_buf, g, big_slice);
+        });
     }
 }

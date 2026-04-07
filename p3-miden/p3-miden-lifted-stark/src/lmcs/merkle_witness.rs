@@ -26,10 +26,7 @@ pub struct MerkleWitness<T> {
 impl<T: Clone> MerkleWitness<T> {
     /// Look up a node by its ID.
     fn get(&self, id: NodeId) -> Option<&T> {
-        self.nodes
-            .binary_search_by_key(&id, |(k, _)| *k)
-            .ok()
-            .map(|i| &self.nodes[i].1)
+        self.nodes.binary_search_by_key(&id, |(k, _)| *k).ok().map(|i| &self.nodes[i].1)
     }
 
     /// Build a witness from sorted leaf hashes.
@@ -48,10 +45,7 @@ impl<T: Clone> MerkleWitness<T> {
             .into_iter()
             .map(|(pos, val)| (NodeId::new(tree_depth, pos), val))
             .collect();
-        debug_assert!(
-            current.windows(2).all(|w| w[0].0 < w[1].0),
-            "leaves must be sorted"
-        );
+        debug_assert!(current.windows(2).all(|w| w[0].0 < w[1].0), "leaves must be sorted");
 
         let mut nodes: Vec<(NodeId, T)> = Vec::new();
         // Each level has at most ceil(n/2) parents; pre-allocate to avoid

@@ -157,10 +157,8 @@ mod tests {
 
         let test = |seed: u64, shapes: &[(usize, usize)], indices: &[usize]| {
             let mut rng = SmallRng::seed_from_u64(seed);
-            let matrices: Vec<_> = shapes
-                .iter()
-                .map(|&(h, w)| RowMajorMatrix::rand(&mut rng, h, w))
-                .collect();
+            let matrices: Vec<_> =
+                shapes.iter().map(|&(h, w)| RowMajorMatrix::rand(&mut rng, h, w)).collect();
             let tree = lmcs.build_tree(matrices);
             let widths = tree.aligned_widths();
             let log_max_height = log2_strict_u8(tree.height());
@@ -175,10 +173,7 @@ mod tests {
             let witness = lmcs
                 .read_batch_proof(&widths, &tree_indices, &mut verifier_channel)
                 .expect("batch witness should parse");
-            assert!(
-                verifier_channel.is_empty(),
-                "parse path should fully consume transcript"
-            );
+            assert!(verifier_channel.is_empty(), "parse path should fully consume transcript");
 
             // Same number of unique openings
             assert_eq!(opened_rows.len(), witness.openings.len());

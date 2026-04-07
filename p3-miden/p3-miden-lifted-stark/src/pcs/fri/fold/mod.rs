@@ -95,13 +95,13 @@ impl FriFold {
         match self.log_arity {
             1 => {
                 arity2::fold_evals::<F, F::Packing, EF::ExtensionPacking>(evals, s_inv, beta_packed)
-            }
+            },
             2 => {
                 arity4::fold_evals::<F, F::Packing, EF::ExtensionPacking>(evals, s_inv, beta_packed)
-            }
+            },
             3 => {
                 arity8::fold_evals::<F, F::Packing, EF::ExtensionPacking>(evals, s_inv, beta_packed)
-            }
+            },
             _ => unreachable!("unsupported arity"),
         }
     }
@@ -150,9 +150,14 @@ impl FriFold {
         EF: ExtensionField<F>,
     {
         assert_eq!(input.width, ARITY);
-        let (evals, _) = input.values.as_chunks::<ARITY>();
+        assert_eq!(input.values.len() % ARITY, 0);
+        let evals: &[[EF; ARITY]] = unsafe {
+            // SAFETY: the slice length is checked above to be a multiple of `ARITY`, and
+            // `[EF; ARITY]` is laid out contiguously like `ARITY` adjacent `EF` values.
+            core::slice::from_raw_parts(input.values.as_ptr().cast(), input.values.len() / ARITY)
+        };
         let width = F::Packing::WIDTH;
-        assert!(evals.len().is_multiple_of(width));
+        assert_eq!(evals.len() % width, 0);
 
         let mut new_evals = EF::zero_vec(evals.len());
 
@@ -259,20 +264,16 @@ pub mod tests {
         let poly: Vec<Ext> = (0..arity).map(|_| rng.sample(StandardUniform)).collect();
 
         // Compute roots of unity in bit-reversed order for this arity
-        let mut roots: Vec<Base> = Base::two_adic_generator(log_arity)
-            .powers()
-            .take(arity)
-            .collect();
+        let mut roots: Vec<Base> =
+            Base::two_adic_generator(log_arity).powers().take(arity).collect();
         reverse_slice_index_bits(&mut roots);
 
         let s: Base = rng.sample(StandardUniform);
         let s_inv = s.inverse();
 
         // Evaluate polynomial at coset points: [f(s·root) for root in roots]
-        let evals: Vec<Ext> = roots
-            .iter()
-            .map(|&root| horner(root * s, poly.iter().rev().copied()))
-            .collect();
+        let evals: Vec<Ext> =
+            roots.iter().map(|&root| horner(root * s, poly.iter().rev().copied())).collect();
 
         // Expected: f(beta)
         let expected = horner(beta, poly.iter().rev().copied());
@@ -292,15 +293,13 @@ pub mod tests {
 
         // Create input matrix with height = multiple of packing width (triggers packed path)
         let height = Pf::WIDTH * 4;
-        let values: Vec<QuadFelt> = (0..height * arity)
-            .map(|_| rng.sample(StandardUniform))
-            .collect();
+        let values: Vec<QuadFelt> =
+            (0..height * arity).map(|_| rng.sample(StandardUniform)).collect();
         let input = RowMajorMatrix::new(values.clone(), arity);
 
         // Generate random coset generators and their inverses
-        let s_values: Vec<Felt> = (0..height)
-            .map(|_| rng.sample::<Felt, _>(StandardUniform))
-            .collect();
+        let s_values: Vec<Felt> =
+            (0..height).map(|_| rng.sample::<Felt, _>(StandardUniform)).collect();
         let s_invs: Vec<Felt> = s_values.iter().map(|s| s.inverse()).collect();
 
         let beta: QuadFelt = rng.sample(StandardUniform);
@@ -315,10 +314,7 @@ pub mod tests {
         // Packed path: call fold_matrix (uses packed impl for large matrices)
         let packed_result = fold.fold_matrix(input.as_view(), &s_invs, beta);
 
-        assert_eq!(
-            scalar_result, packed_result,
-            "Scalar vs packed mismatch for arity {arity}"
-        );
+        assert_eq!(scalar_result, packed_result, "Scalar vs packed mismatch for arity {arity}");
     }
 
     /// Test that folding preserves low-degree structure.
@@ -337,9 +333,7 @@ pub mod tests {
         let lde_size = 1 << log_lde_size;
 
         // Generate random low-degree polynomial
-        let coeffs: Vec<QuadFelt> = (0..poly_degree)
-            .map(|_| rng.sample(StandardUniform))
-            .collect();
+        let coeffs: Vec<QuadFelt> = (0..poly_degree).map(|_| rng.sample(StandardUniform)).collect();
 
         // Compute LDE in bit-reversed order
         let mut full_coeffs = coeffs;

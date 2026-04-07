@@ -23,12 +23,11 @@ pub trait AuxBuilder<F: Field, EF: ExtensionField<F>> {
     /// # Returns
     /// `(aux_trace, aux_values)` where:
     /// - `aux_trace`: The auxiliary trace matrix (EF columns)
-    /// - `aux_values`: Extension-field scalars committed to the Fiat-Shamir transcript.
-    ///   Their meaning is AIR-defined — typically the aux trace's last row, but the
-    ///   protocol does not require this. The AIR's [`eval`](crate::LiftedAir::eval)
-    ///   should constrain how they relate to the committed trace, and
-    ///   [`reduced_aux_values`](crate::LiftedAir::reduced_aux_values) uses them for
-    ///   cross-AIR bus identity checking.
+    /// - `aux_values`: Extension-field scalars committed to the Fiat-Shamir transcript. Their
+    ///   meaning is AIR-defined — typically the aux trace's last row, but the protocol does not
+    ///   require this. The AIR's [`eval`](crate::LiftedAir::eval) should constrain how they relate
+    ///   to the committed trace, and [`reduced_aux_values`](crate::LiftedAir::reduced_aux_values)
+    ///   uses them for cross-AIR bus identity checking.
     fn build_aux_trace(
         &self,
         main: &RowMajorMatrix<F>,

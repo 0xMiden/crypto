@@ -7,14 +7,14 @@
 //!
 //! This module provides:
 //!
-//! - **[`deep`]**: DEEP (Domain Extension for Eliminating Pretenders) quotient construction
-//!   for batching polynomial evaluation claims into a single low-degree polynomial.
+//! - **[`deep`]**: DEEP (Domain Extension for Eliminating Pretenders) quotient construction for
+//!   batching polynomial evaluation claims into a single low-degree polynomial.
 //!
-//! - **[`fri`]**: FRI (Fast Reed-Solomon IOP) protocol for low-degree testing, with
-//!   configurable folding arities and final polynomial degree.
+//! - **[`fri`]**: FRI (Fast Reed-Solomon IOP) protocol for low-degree testing, with configurable
+//!   folding arities and final polynomial degree.
 //!
-//! - **PCS API (module root)**: complete PCS implementation combining DEEP quotient and
-//!   FRI via `prover::open_with_channel` and `verifier::verify`, plus `PcsParams`.
+//! - **PCS API (module root)**: complete PCS implementation combining DEEP quotient and FRI via
+//!   `prover::open_with_channel` and `verifier::verify`, plus `PcsParams`.
 //!
 //! ## Alignment Padding
 //!

@@ -117,12 +117,12 @@ where
 /// coset-DFT pairs (one per chunk). The "fused scaling" trick below collapses all of
 /// them into a single plain iDFT, a diagonal scaling pass, and one plain DFT:
 ///
-/// - a plain iDFT on each column yields coefficients multiplied by `(g·ω_Jᵗ)ᵏ`
-///   (the inverse coset shift is absorbed into the coefficients),
-/// - multiplying by `(ω_J⁻ᵏ)ᵗ` removes the per-chunk shift ω_Jᵗ while keeping the
-///   common factor gᵏ baked in,
-/// - a plain (unshifted) forward DFT then evaluates directly on the shifted coset `gK`,
-///   because gᵏ already accounts for the coset offset.
+/// - a plain iDFT on each column yields coefficients multiplied by `(g·ω_Jᵗ)ᵏ` (the inverse coset
+///   shift is absorbed into the coefficients),
+/// - multiplying by `(ω_J⁻ᵏ)ᵗ` removes the per-chunk shift ω_Jᵗ while keeping the common factor gᵏ
+///   baked in,
+/// - a plain (unshifted) forward DFT then evaluates directly on the shifted coset `gK`, because gᵏ
+///   already accounts for the coset offset.
 ///
 /// `q_evals` is consumed and flattened to the base field for commitment.
 ///
@@ -146,10 +146,7 @@ where
     let log_blowup = config.pcs().log_blowup();
     let b = 1usize << log_blowup;
 
-    debug_assert!(
-        q_evals.len().is_multiple_of(n),
-        "q_evals length must be divisible by N"
-    );
+    debug_assert_eq!(q_evals.len() % n, 0, "q_evals length must be divisible by N");
     debug_assert!(b >= d, "blowup B must be >= constraint degree D");
 
     // ═══════════════════════════════════════════════════════════════════════
@@ -181,14 +178,11 @@ where
         let row_bases: Vec<F> = omega_j_inv.powers().take(n).collect();
 
         // Row k, column t: multiply by (ω_J⁻ᵏ)ᵗ
-        coeffs
-            .par_rows_mut()
-            .zip(row_bases.par_iter())
-            .for_each(|(row, &row_base)| {
-                for (val, scale) in row.iter_mut().zip(row_base.powers()) {
-                    *val *= scale;
-                }
-            });
+        coeffs.par_rows_mut().zip(row_bases.par_iter()).for_each(|(row, &row_base)| {
+            for (val, scale) in row.iter_mut().zip(row_base.powers()) {
+                *val *= scale;
+            }
+        });
     });
 
     // ═══════════════════════════════════════════════════════════════════════

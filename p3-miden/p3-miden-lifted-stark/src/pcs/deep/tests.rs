@@ -59,11 +59,9 @@ fn deep_quotient_end_to_end() {
         &mut prover_channel,
     );
     // Sample domain indices. The LMCS tree is indexed by domain order.
-    let tree_indices = TreeIndices::new(
-        [0, 1, lde_height / 4, lde_height / 2, lde_height - 1],
-        log_lde_height,
-    )
-    .expect("indices are in range");
+    let tree_indices =
+        TreeIndices::new([0, 1, lde_height / 4, lde_height / 2, lde_height - 1], log_lde_height)
+            .expect("indices are in range");
     tree.prove_batch(&tree_indices, &mut prover_channel);
     let (prover_digest, transcript) = prover_channel.finalize();
 
@@ -72,14 +70,9 @@ fn deep_quotient_end_to_end() {
 
     // Step 4: Verifier constructs DeepOracle with same transcript state
     let mut verifier_channel = verifier_channel_with_commitment(&transcript, &commitment);
-    let (deep_oracle, _evals) = DeepOracle::new(
-        &params,
-        &[z1, z2],
-        commitments,
-        log_lde_height,
-        &mut verifier_channel,
-    )
-    .expect("DeepOracle construction should succeed");
+    let (deep_oracle, _evals) =
+        DeepOracle::new(&params, &[z1, z2], commitments, log_lde_height, &mut verifier_channel)
+            .expect("DeepOracle construction should succeed");
 
     // Step 5: Verify at multiple query tree indices (proofs are read from transcript)
     let verifier_evals = deep_oracle
@@ -98,9 +91,7 @@ fn deep_quotient_end_to_end() {
         );
     }
 
-    let verifier_digest = verifier_channel
-        .finalize()
-        .expect("transcript should finalize cleanly");
+    let verifier_digest = verifier_channel.finalize().expect("transcript should finalize cleanly");
     assert_eq!(prover_digest, verifier_digest);
 
     // Re-parse DeepTranscript (DEEP phase only) from a fresh channel.

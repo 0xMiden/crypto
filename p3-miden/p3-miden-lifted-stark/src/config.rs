@@ -22,7 +22,6 @@ use crate::{lmcs::Lmcs, pcs::params::PcsParams};
 /// `F` and `EF` are generic parameters rather than associated types so that
 /// functions bounded by `SC: StarkConfig<F, EF>` can refer to them directly.
 /// Bounds on `F` and `EF` are declared once here and inherited by every user.
-///
 pub trait StarkConfig<F: TwoAdicField, EF: ExtensionField<F>>: Clone {
     /// LMCS (Merkle commitment scheme).
     type Lmcs: Lmcs<F = F>;

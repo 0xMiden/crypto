@@ -9,7 +9,8 @@
 //! | [`verify`]        | caller    |
 //! | [`verify_aligned`]| automatic |
 //!
-//! Callers should use [`VerifierTranscript::finalize`](p3_miden_transcript::VerifierTranscript::finalize)
+//! Callers should use
+//! [`VerifierTranscript::finalize`](p3_miden_transcript::VerifierTranscript::finalize)
 //! after verification to check that the transcript is fully consumed.
 
 use alloc::vec::Vec;
@@ -39,13 +40,13 @@ use crate::{
 /// See [`verify_aligned`] for automatic alignment handling.
 ///
 /// Does **not** check that the channel is fully consumed after verification.
-/// Callers should use [`VerifierTranscript::finalize`](p3_miden_transcript::VerifierTranscript::finalize)
-/// to enforce transcript exhaustion.
+/// Callers should use
+/// [`VerifierTranscript::finalize`](p3_miden_transcript::VerifierTranscript::finalize) to enforce
+/// transcript exhaustion.
 ///
 /// # Preconditions
-/// - `eval_points` must lie outside both the trace-domain subgroup `H` and the
-///   LDE evaluation coset `gK`. Otherwise denominators `(zⱼ − X)` in the DEEP
-///   quotient become zero, making it undefined.
+/// - `eval_points` must lie outside both the trace-domain subgroup `H` and the LDE evaluation coset
+///   `gK`. Otherwise denominators `(zⱼ − X)` in the DEEP quotient become zero, making it undefined.
 /// - All commitments must be lifted to the same LDE height `2^log_lde_height`.
 ///
 /// # Returns
@@ -128,14 +129,7 @@ where
         .map(|(c, widths)| (c.clone(), aligned_widths(widths.clone(), alignment)))
         .collect();
 
-    let evals = verify(
-        params,
-        lmcs,
-        &aligned_commitments,
-        log_lde_height,
-        eval_points,
-        channel,
-    )?;
+    let evals = verify(params, lmcs, &aligned_commitments, log_lde_height, eval_points, channel)?;
 
     // Truncate each matrix back to original widths, removing alignment padding.
     let truncated = evals

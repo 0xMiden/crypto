@@ -166,9 +166,7 @@ impl FromStr for TraceSpec {
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let parts: Vec<&str> = s.split(':').collect();
         if parts.len() < 2 {
-            return Err(format!(
-                "expected <air>:<log_height>[:<width>[:<aux_cols>]], got '{s}'"
-            ));
+            return Err(format!("expected <air>:<log_height>[:<width>[:<aux_cols>]], got '{s}'"));
         }
 
         let air_type = match parts[0] {
@@ -179,22 +177,17 @@ impl FromStr for TraceSpec {
             other => return Err(format!("unknown AIR type '{other}'")),
         };
 
-        let log_height: u8 = parts[1]
-            .parse()
-            .map_err(|_| format!("invalid log_height '{}'", parts[1]))?;
+        let log_height: u8 =
+            parts[1].parse().map_err(|_| format!("invalid log_height '{}'", parts[1]))?;
 
         let width = if parts.len() > 2 {
-            parts[2]
-                .parse()
-                .map_err(|_| format!("invalid width '{}'", parts[2]))?
+            parts[2].parse().map_err(|_| format!("invalid width '{}'", parts[2]))?
         } else {
             DEFAULT_MIDEN_WIDTH
         };
 
         let num_aux_cols = if parts.len() > 3 {
-            parts[3]
-                .parse()
-                .map_err(|_| format!("invalid aux_cols '{}'", parts[3]))?
+            parts[3].parse().map_err(|_| format!("invalid aux_cols '{}'", parts[3]))?
         } else {
             DEFAULT_MIDEN_AUX_COLS
         };

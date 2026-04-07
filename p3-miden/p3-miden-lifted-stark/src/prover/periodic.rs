@@ -41,8 +41,8 @@ impl<F: TwoAdicField> PeriodicLde<F> {
     ///
     /// # Arguments
     /// - `coset`: The lifted coset providing domain information
-    /// - `repeated_matrix`: Periodic columns extended to a common height (max period),
-    ///   or `None` if there are no periodic columns
+    /// - `repeated_matrix`: Periodic columns extended to a common height (max period), or `None` if
+    ///   there are no periodic columns
     ///
     /// # Panics
     /// Panics if the matrix height exceeds the trace height or is not a power of two.
@@ -149,19 +149,13 @@ mod tests {
             .collect();
 
         // Verify all LDE rows match (natural indices)
-        let ldes = periodic_lde
-            .ldes
-            .as_ref()
-            .expect("expected Some for non-empty columns");
+        let ldes = periodic_lde.ldes.as_ref().expect("expected Some for non-empty columns");
         let height = ldes.height();
         for i in 0..lde_height {
             let row = i % height;
             let actual: Vec<gl::Felt> = ldes.row_slice(row).unwrap().to_vec();
             for (col_idx, (&actual_val, expected_col)) in actual.iter().zip(&expected).enumerate() {
-                assert_eq!(
-                    actual_val, expected_col[i],
-                    "col {col_idx} mismatch at row {i}"
-                );
+                assert_eq!(actual_val, expected_col[i], "col {col_idx} mismatch at row {i}");
             }
         }
 
@@ -204,10 +198,7 @@ mod tests {
 
         // Multiple columns with different periods
         let col_p2: Vec<gl::Felt> = [1, 2].into_iter().map(gl::Felt::from_u64).collect();
-        let col_p4: Vec<gl::Felt> = [10, 20, 30, 40]
-            .into_iter()
-            .map(gl::Felt::from_u64)
-            .collect();
+        let col_p4: Vec<gl::Felt> = [10, 20, 30, 40].into_iter().map(gl::Felt::from_u64).collect();
         assert_periodic_lde_matches_full(&[col_p2, col_p4], 3, 2);
     }
 }

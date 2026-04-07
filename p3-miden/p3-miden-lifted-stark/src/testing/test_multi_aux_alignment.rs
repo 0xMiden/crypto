@@ -70,12 +70,8 @@ impl LiftedAir<Felt, QuadFelt> for PaddingAir {
         let aux_local = aux.current_slice();
         let aux_next = aux.next_slice();
         let challenge: AB::ExprEF = builder.permutation_randomness()[0].into();
-        builder
-            .when_first_row()
-            .assert_eq_ext(aux_local[0].into(), challenge);
-        builder
-            .when_transition()
-            .assert_eq_ext(aux_next[0].into(), aux_local[0].into());
+        builder.when_first_row().assert_eq_ext(aux_local[0].into(), challenge);
+        builder.when_transition().assert_eq_ext(aux_next[0].into(), aux_local[0].into());
     }
 }
 
@@ -162,13 +158,8 @@ fn multi_trace_rejects_trailing_transcript_data() {
         .map(|(a, w, _)| (*a, w.to_instance().unwrap()))
         .collect();
 
-    let err = verify_multi(
-        &config,
-        &verifier_instances,
-        &bad_transcript,
-        test_challenger(),
-    )
-    .expect_err("extra transcript data should fail verification");
+    let err = verify_multi(&config, &verifier_instances, &bad_transcript, test_challenger())
+        .expect_err("extra transcript data should fail verification");
     assert!(matches!(
         err,
         VerifierError::Transcript(crate::transcript::TranscriptError::TrailingData)

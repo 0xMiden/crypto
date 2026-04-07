@@ -54,11 +54,7 @@ where
             let pow_witness = channel.grind(params.folding_pow_bits)?;
 
             let beta: EF = channel.sample_algebra_element();
-            rounds.push(FriRoundTranscript {
-                commitment,
-                pow_witness,
-                beta,
-            });
+            rounds.push(FriRoundTranscript { commitment, pow_witness, beta });
         }
 
         let final_degree = params.final_poly_degree(log_domain_size);

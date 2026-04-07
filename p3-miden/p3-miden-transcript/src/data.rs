@@ -16,10 +16,7 @@ pub struct TranscriptData<F, C> {
 impl<F, C> TranscriptData<F, C> {
     /// Create transcript data from field and commitment streams.
     pub fn new(fields: Vec<F>, commitments: Vec<C>) -> Self {
-        Self {
-            fields,
-            commitments,
-        }
+        Self { fields, commitments }
     }
 
     /// Returns the recorded field elements.

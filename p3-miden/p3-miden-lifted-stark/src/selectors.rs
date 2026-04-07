@@ -3,7 +3,8 @@
 //! The [`Selectors`] struct is a plain container holding selector values.
 //! Computation is done via [`LiftedCoset`](crate::coset::LiftedCoset) methods:
 //! - [`LiftedCoset::selectors`](crate::coset::LiftedCoset::selectors) for coset evaluation (prover)
-//! - [`LiftedCoset::selectors_at`](crate::coset::LiftedCoset::selectors_at) for lifted OOD point evaluation (verifier)
+//! - [`LiftedCoset::selectors_at`](crate::coset::LiftedCoset::selectors_at) for lifted OOD point
+//!   evaluation (verifier)
 
 use alloc::vec::Vec;
 

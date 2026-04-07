@@ -1,7 +1,8 @@
 //! Lifted coset domain abstraction with selector and vanishing computation.
 //!
-//! This module provides [`LiftedCoset`](crate::coset::LiftedCoset), the central abstraction for domain operations
-//! in lifted STARKs where traces of different heights share a common evaluation domain.
+//! This module provides [`LiftedCoset`](crate::coset::LiftedCoset), the central abstraction for
+//! domain operations in lifted STARKs where traces of different heights share a common evaluation
+//! domain.
 
 use alloc::vec::Vec;
 
@@ -175,10 +176,7 @@ impl LiftedCoset {
     /// sub-coset `gJ` of size `N * D` (with `D <= B`).
     pub fn quotient_domain(&self, log_constraint_degree: u8) -> Self {
         let log_blowup = self.log_lde_height - self.log_trace_height;
-        assert!(
-            log_constraint_degree <= log_blowup,
-            "constraint degree cannot exceed blowup"
-        );
+        assert!(log_constraint_degree <= log_blowup, "constraint degree cannot exceed blowup");
         let log_max_trace_height = self.log_max_lde_height - log_blowup;
         Self {
             log_trace_height: self.log_trace_height,

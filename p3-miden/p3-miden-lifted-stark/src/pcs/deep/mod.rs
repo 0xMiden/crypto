@@ -46,8 +46,8 @@
 //! - Prover OOD reduction (`horner` over aligned batched evals)
 //! - Verifier OOD reduction (inline in `verifier::DeepOracle::new` via `horner_acc`)
 //! - Verifier query-time row reduction (`verifier::DeepOracle::open_batch` via `horner_acc`)
-//! - Prover LDE evaluation (`prover::DeepPoly::from_trees` via explicit dot-product
-//!   with reversed negated coefficients — see comments there)
+//! - Prover LDE evaluation (`prover::DeepPoly::from_trees` via explicit dot-product with reversed
+//!   negated coefficients — see comments there)
 
 pub mod interpolate;
 pub mod proof;
@@ -86,16 +86,11 @@ where
     EF: ExtensionField<F>,
     Ch: VerifierChannel<F = F>,
 {
-    let all_widths: Vec<usize> = group_widths
-        .iter()
-        .flat_map(|gw| gw.iter().copied())
-        .collect();
+    let all_widths: Vec<usize> = group_widths.iter().flat_map(|gw| gw.iter().copied()).collect();
     let total_width: usize = all_widths.iter().sum();
 
-    let mut values: Vec<Vec<EF>> = all_widths
-        .iter()
-        .map(|&w| Vec::with_capacity(w * num_eval_points))
-        .collect();
+    let mut values: Vec<Vec<EF>> =
+        all_widths.iter().map(|&w| Vec::with_capacity(w * num_eval_points)).collect();
 
     for _ in 0..num_eval_points {
         let flat = channel.receive_algebra_slice::<EF>(total_width)?;

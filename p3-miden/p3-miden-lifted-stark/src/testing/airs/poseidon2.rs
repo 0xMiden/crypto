@@ -44,9 +44,7 @@ pub struct LiftedPoseidon2Air {
 
 impl LiftedPoseidon2Air {
     pub fn new(constants: GoldilocksRoundConstants) -> Self {
-        Self {
-            inner: InnerAir::new(constants),
-        }
+        Self { inner: InnerAir::new(constants) }
     }
 }
 

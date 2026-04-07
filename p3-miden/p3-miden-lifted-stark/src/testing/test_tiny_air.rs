@@ -104,14 +104,10 @@ impl LiftedAir<Felt, QuadFelt> for TinyAir {
         let challenge: AB::ExprEF = builder.permutation_randomness()[0].into();
 
         let aux_local_ef: AB::ExprEF = aux_local[0].into();
-        builder
-            .when_first_row()
-            .assert_eq_ext(aux_local_ef.clone(), challenge);
+        builder.when_first_row().assert_eq_ext(aux_local_ef.clone(), challenge);
 
         let aux_pow4: AB::ExprEF = aux_local_ef.exp_power_of_2(2);
-        builder
-            .when_transition()
-            .assert_eq_ext(aux_next[0].into(), aux_pow4);
+        builder.when_transition().assert_eq_ext(aux_next[0].into(), aux_pow4);
     }
 }
 
@@ -213,20 +209,12 @@ fn malformed_transcript_is_rejected() {
 
 #[test]
 fn two_traces_same_height() {
-    prove_and_verify(
-        &TinyAir::new(vec![]),
-        &TinyAuxBuilder,
-        &[instance(0, 8), instance(1, 8)],
-    );
+    prove_and_verify(&TinyAir::new(vec![]), &TinyAuxBuilder, &[instance(0, 8), instance(1, 8)]);
 }
 
 #[test]
 fn two_traces_different_heights() {
-    prove_and_verify(
-        &TinyAir::new(vec![]),
-        &TinyAuxBuilder,
-        &[instance(0, 4), instance(1, 8)],
-    );
+    prove_and_verify(&TinyAir::new(vec![]), &TinyAuxBuilder, &[instance(0, 4), instance(1, 8)]);
 }
 
 #[test]
@@ -254,29 +242,17 @@ fn periodic_column_period_4() {
 
 #[test]
 fn multiple_periodic_columns() {
-    prove_and_verify(
-        &TinyAir::new(vec![2, 4]),
-        &TinyAuxBuilder,
-        &[instance(0, 8)],
-    );
+    prove_and_verify(&TinyAir::new(vec![2, 4]), &TinyAuxBuilder, &[instance(0, 8)]);
 }
 
 #[test]
 fn periodic_columns_multi_trace_same_height() {
-    prove_and_verify(
-        &TinyAir::new(vec![2]),
-        &TinyAuxBuilder,
-        &[instance(0, 8), instance(1, 8)],
-    );
+    prove_and_verify(&TinyAir::new(vec![2]), &TinyAuxBuilder, &[instance(0, 8), instance(1, 8)]);
 }
 
 #[test]
 fn periodic_columns_multi_trace_different_heights() {
-    prove_and_verify(
-        &TinyAir::new(vec![2, 4]),
-        &TinyAuxBuilder,
-        &[instance(0, 4), instance(1, 8)],
-    );
+    prove_and_verify(&TinyAir::new(vec![2, 4]), &TinyAuxBuilder, &[instance(0, 4), instance(1, 8)]);
 }
 
 #[test]

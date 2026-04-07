@@ -30,9 +30,9 @@ impl<F, C, Ch> ProverTranscript<F, C, Ch> {
 
     /// Finalize the transcript, producing a binding digest and returning the proof data.
     ///
-    /// Delegates to [`CanFinalizeDigest::finalize`](p3_challenger::CanFinalizeDigest::finalize) on the inner challenger, which
-    /// unconditionally applies a final state transition before extracting the digest.
-    /// The digest commits to the entire transcript interaction.
+    /// Delegates to [`CanFinalizeDigest::finalize`](p3_challenger::CanFinalizeDigest::finalize) on
+    /// the inner challenger, which unconditionally applies a final state transition before
+    /// extracting the digest. The digest commits to the entire transcript interaction.
     pub fn finalize(self) -> (Ch::Digest, TranscriptData<F, C>)
     where
         F: Field,

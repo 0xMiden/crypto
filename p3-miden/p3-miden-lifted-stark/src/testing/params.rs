@@ -41,11 +41,8 @@ pub const LOG_HEIGHTS: &[u8] = &[16, 18, 20];
 /// - Group 0: Main trace columns at various heights
 /// - Group 1: Auxiliary/permutation columns
 /// - Group 2: Quotient polynomial chunks
-pub const RELATIVE_SPECS: &[&[(usize, usize)]] = &[
-    &[(4, 10), (2, 100), (0, 50)],
-    &[(4, 8), (2, 20), (0, 20)],
-    &[(0, 16)],
-];
+pub const RELATIVE_SPECS: &[&[(usize, usize)]] =
+    &[&[(4, 10), (2, 100), (0, 50)], &[(4, 8), (2, 20), (0, 20)], &[(0, 16)]];
 
 /// Label for benchmark group names indicating parallelism mode.
 pub const PARALLEL_STR: &str = if cfg!(feature = "parallel") {

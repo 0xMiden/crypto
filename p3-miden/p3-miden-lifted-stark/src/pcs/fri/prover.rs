@@ -1,5 +1,4 @@
 use alloc::vec::Vec;
-use core::ops::Deref;
 
 use p3_dft::{Radix2DFTSmallBatch, TwoAdicSubgroupDft};
 use p3_field::{ExtensionField, TwoAdicField};
@@ -55,8 +54,8 @@ where
 // Given polynomial f of degree d with evaluations on domain D of size n = d·blowup:
 //
 // 1. Reshape evaluations into matrix M with `arity` columns
-//    - Row i contains the coset {f(s·ωʲ) : j ∈ [0, arity)} where s = g^{bitrev(i)}
-//      and ω is a primitive `arity`-th root of unity
+//    - Row i contains the coset {f(s·ωʲ) : j ∈ [0, arity)} where s = g^{bitrev(i)} and ω is a
+//      primitive `arity`-th root of unity
 //
 // 2. Commit to M via Merkle tree
 //
@@ -73,8 +72,8 @@ where
 // ## Coset Structure in Bit-Reversed Order
 //
 // For domain D = g·H where H = ⟨ω⟩ has order n:
-//   - Row i contains evaluations at s·⟨ω_arity⟩ where s = g·ω^{bitrev(i)}
-//     and ω_arity is a primitive `arity`-th root of unity (ω_arity = ω^{n/arity})
+//   - Row i contains evaluations at s·⟨ω_arity⟩ where s = g·ω^{bitrev(i)} and ω_arity is a
+//     primitive `arity`-th root of unity (ω_arity = ω^{n/arity})
 //   - Adjacent rows have s values that are negatives (for arity=2)
 //   - After folding, row i maps to row i in the halved domain
 
@@ -115,9 +114,8 @@ where
         // Row k contains [evals[k*arity], evals[k*arity+1], ...] which correspond
         // to evaluations at points forming a coset s·⟨ω⟩ where:
         //   - s = g^{bitrev(k*arity, log_domain_size)} = g^{bitrev(k, log_folded_domain_size)}
-        //     where log_folded_domain_size = log_domain_size - log_arity
-        //     (because bitrev(k*arity, log_domain_size) = bitrev(k, log_folded_domain_size)
-        //      when arity = 2^log_arity)
+        //     where log_folded_domain_size = log_domain_size - log_arity (because bitrev(k*arity,
+        //     log_domain_size) = bitrev(k, log_folded_domain_size) when arity = 2^log_arity)
         //   - ω is a primitive arity-th root of unity
         //
         // We compute s_inv for each row k, where s = g^{bitrev(k, log_folded_domain_size)}
@@ -126,10 +124,7 @@ where
         // We generate sequential powers of g_inv and bit-reverse to get s_inv values
         // in the correct order for each row.
         let g_inv = F::two_adic_generator(log_domain_size as usize).inverse();
-        let mut s_invs: Vec<F> = g_inv
-            .powers()
-            .take(domain_size >> log_arity as usize)
-            .collect();
+        let mut s_invs: Vec<F> = g_inv.powers().take(domain_size >> log_arity as usize).collect();
         reverse_slice_index_bits(&mut s_invs);
 
         let mut folded_evals = evals;
@@ -168,7 +163,7 @@ where
             // ─────────────────────────────────────────────────────────────────────
             // Get the underlying EF matrix from the FlatMatrixView via Deref for folding.
             let flat_view_ref = &tree.leaves()[0];
-            let ef_matrix: &RowMajorMatrix<EF> = flat_view_ref.deref();
+            let ef_matrix: &RowMajorMatrix<EF> = flat_view_ref;
             folded_evals = info_span!("FRI fold", round, domain_size)
                 .in_scope(|| params.fold.fold_matrix(ef_matrix.as_view(), &s_invs, beta));
             // No bit-reversal needed: folded evals maintain bit-reversed order

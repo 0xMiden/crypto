@@ -88,11 +88,7 @@ where
         let final_degree = params.final_poly_degree(log_domain_size);
         let final_poly = channel.receive_algebra_slice(final_degree)?;
 
-        Ok(Self {
-            log_domain_size,
-            rounds,
-            final_poly,
-        })
+        Ok(Self { log_domain_size, rounds, final_poly })
     }
 
     /// Test low-degree proximity by reading openings from a verifier channel.
@@ -134,25 +130,22 @@ where
 
             let opened_rows = lmcs
                 .open_batch(&round.commitment, &widths, &tree_indices, channel)
-                .map_err(|source| FriError::LmcsError {
-                    source,
-                    round: round_idx,
-                })?;
+                .map_err(|source| FriError::LmcsError { source, round: round_idx })?;
 
             // Drain, verify, fold, and rebuild with new keys.
             //
             // SOUNDNESS NOTE: Multiple indices can map to the same row_idx after folding
             // (they share the same coset). This is safe because:
             //
-            // 1. Each closure verifies its specific position: `row[position] == eval`.
-            //    All closures execute (Rust's collect drives the full iterator).
+            // 1. Each closure verifies its specific position: `row[position] == eval`. All closures
+            //    execute (Rust's collect drives the full iterator).
             //
-            // 2. The folded value depends only on (row, s_inv, beta), not on position.
-            //    Indices in the same coset share the same row and s_inv, so they fold
-            //    to identical values. Keeping any one in the BTreeMap is correct.
+            // 2. The folded value depends only on (row, s_inv, beta), not on position. Indices in
+            //    the same coset share the same row and s_inv, so they fold to identical values.
+            //    Keeping any one in the BTreeMap is correct.
             //
-            // 3. The prover cannot provide different row data for the same row_idx.
-            //    LMCS opens each row exactly once via `opened_rows[&row_idx]`.
+            // 3. The prover cannot provide different row data for the same row_idx. LMCS opens each
+            //    row exactly once via `opened_rows[&row_idx]`.
             let folded_size = 1usize << log_folded_domain_size;
             evals = evals
                 .into_iter()
@@ -166,13 +159,10 @@ where
                         reverse_bits_len(idx >> log_folded_domain_size, log_arity as usize);
 
                     // FRI commits one matrix per round; iter_rows().next() yields it safely.
-                    let flat_row = opened_rows
-                        .get(&row_idx)
-                        .and_then(|rows| rows.iter_rows().next())
-                        .ok_or(FriError::InvalidOpening {
-                            tree_index: row_idx,
-                            round: round_idx,
-                        })?;
+                    let flat_row =
+                        opened_rows.get(&row_idx).and_then(|rows| rows.iter_rows().next()).ok_or(
+                            FriError::InvalidOpening { tree_index: row_idx, round: round_idx },
+                        )?;
                     // Reinterpret base-field elements as extension field for folding.
                     let row: Vec<EF> = EF::reconstitute_from_base(flat_row.to_vec());
 

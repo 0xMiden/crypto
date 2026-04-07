@@ -7,17 +7,15 @@
 //!
 //! The lifted STARK has three trust domains:
 //!
-//! 1. **AIR = trusted** — [`air::LiftedAir`] implementations are
-//!    correct application code. It is the AIR implementer's responsibility to satisfy the
-//!    contract below. [`air::LiftedAir::validate`]
-//!    checks the statically-verifiable subset.
+//! 1. **AIR = trusted** — [`air::LiftedAir`] implementations are correct application code. It is
+//!    the AIR implementer's responsibility to satisfy the contract below.
+//!    [`air::LiftedAir::validate`] checks the statically-verifiable subset.
 //!
-//! 2. **Instance = validated** — The prover validates that its witness matches the AIR spec.
-//!    The verifier validates instance metadata.
-//!    Both return structured errors.
+//! 2. **Instance = validated** — The prover validates that its witness matches the AIR spec. The
+//!    verifier validates instance metadata. Both return structured errors.
 //!
-//! 3. **Proof = untrusted** — Transcript data is verified cryptographically (PCS errors,
-//!    constraint mismatch, etc.).
+//! 3. **Proof = untrusted** — Transcript data is verified cryptographically (PCS errors, constraint
+//!    mismatch, etc.).
 //!
 //! ## Validated properties
 //!
@@ -29,20 +27,19 @@
 //! - **Positive aux width** — every AIR must have an auxiliary trace.
 //! - **Periodic columns** — each has positive, power-of-two length ≤ trace height.
 //! - **Constraint degree** — `log_quotient_degree() ≤ log_blowup`.
-//! - **Instance dimensions** — trace width, public values length, var-len public
-//!   inputs count, and trace height (power of two) all match the AIR specification.
+//! - **Instance dimensions** — trace width, public values length, var-len public inputs count, and
+//!   trace height (power of two) all match the AIR specification.
 //!
 //! ## Unchecked trust assumptions
 //!
 //! These cannot be verified statically and are the AIR implementer's responsibility:
 //!
 //! 1. **Window size** — Only transition window size 2.
-//! 2. **Deterministic constraints** — `eval()` emits the same number and types of
-//!    constraints regardless of builder implementation.
-//! 3. **Consistent aux builder** — `AuxBuilder::build_aux_trace` returns
-//!    width = `aux_width()`, height = main trace height, and exactly
-//!    `num_aux_values()` values. (The prover asserts these at runtime as a
-//!    defense-in-depth sanity check.)
+//! 2. **Deterministic constraints** — `eval()` emits the same number and types of constraints
+//!    regardless of builder implementation.
+//! 3. **Consistent aux builder** — `AuxBuilder::build_aux_trace` returns width = `aux_width()`,
+//!    height = main trace height, and exactly `num_aux_values()` values. (The prover asserts these
+//!    at runtime as a defense-in-depth sanity check.)
 //! 4. **Sound `reduced_aux_values`** — Returns correct bus contributions for valid inputs.
 
 #![no_std]
@@ -55,13 +52,13 @@ extern crate alloc;
 
 mod config;
 mod coset;
-mod debug;
-mod lmcs;
+pub mod debug;
+pub mod lmcs;
 mod pcs;
-mod proof;
-mod prover;
+pub mod proof;
+pub mod prover;
 mod selectors;
-mod verifier;
+pub mod verifier;
 
 pub use config::{GenericStarkConfig, StarkConfig};
 pub use coset::LiftedCoset;
@@ -98,6 +95,46 @@ pub use pcs::{
 pub use proof::{StarkDigest, StarkOutput, StarkProof, StarkTranscript};
 pub use prover::{ProverError, prove_multi, prove_single};
 pub use verifier::{VerifierError, verify_multi, verify_single};
+
+/// Backward-compatible PCS namespace.
+///
+/// Older consumers accessed DEEP/FRI/PCS types through `p3_miden_lifted_stark::fri`.
+/// The current implementation organizes them under an internal `pcs` module, so this
+/// public facade preserves the earlier module path.
+pub mod fri {
+    pub use crate::{
+        DeepError, DeepTranscript, FriError, FriRoundTranscript, FriTranscript, PcsError,
+        PcsOpenedValues, PcsParams, PcsParamsError, PcsTranscript,
+    };
+
+    pub mod deep {
+        pub use crate::{DeepError, DeepTranscript, PcsOpenedValues};
+
+        pub mod proof {
+            pub use crate::{DeepTranscript, PcsOpenedValues};
+        }
+
+        pub mod verifier {
+            pub use crate::DeepError;
+        }
+    }
+
+    pub mod params {
+        pub use crate::{PcsParams, PcsParamsError};
+    }
+
+    pub mod proof {
+        pub use crate::PcsTranscript;
+    }
+
+    pub mod round_proof {
+        pub use crate::{FriRoundTranscript, FriTranscript};
+    }
+
+    pub mod verifier {
+        pub use crate::{FriError, PcsError};
+    }
+}
 
 // ============================================================================
 // Namespaced re-exports from upstream crates

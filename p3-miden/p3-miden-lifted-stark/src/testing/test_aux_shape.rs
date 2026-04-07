@@ -65,13 +65,6 @@ fn aux_width_mismatch_panics() {
     let trace = RowMajorMatrix::new(vec![Felt::ZERO, Felt::ONE, Felt::ONE, Felt::ZERO], 1);
     let public_values = vec![];
 
-    let _result = prove_single(
-        &config,
-        &air,
-        &trace,
-        &public_values,
-        &[],
-        &BadAuxBuilder,
-        test_challenger(),
-    );
+    let _result =
+        prove_single(&config, &air, &trace, &public_values, &[], &BadAuxBuilder, test_challenger());
 }

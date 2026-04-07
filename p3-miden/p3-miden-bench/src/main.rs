@@ -93,11 +93,7 @@ impl fmt::Display for RunResult {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "proof size: {}", format_bytes(self.proof_size_bytes))?;
         if self.field_elems > 0 || self.commitments > 0 {
-            write!(
-                f,
-                " ({} field elems, {} commitments)",
-                self.field_elems, self.commitments,
-            )?;
+            write!(f, " ({} field elems, {} commitments)", self.field_elems, self.commitments,)?;
         }
         Ok(())
     }
@@ -155,7 +151,7 @@ fn generate_traces(
                         let n = (1usize << spec.log_height) / KECCAK_ROWS_PER_HASH;
                         let inputs: Vec<[u64; 25]> = (0..n).map(|_| rng.random()).collect();
                         generate_keccak_trace(inputs)
-                    }
+                    },
                     AirType::Poseidon2 => {
                         let n = 1usize << spec.log_height;
                         let inputs: Vec<[Felt; 12]> = (0..n).map(|_| rng.random()).collect();
@@ -163,12 +159,12 @@ fn generate_traces(
                             inputs,
                             constants.expect("poseidon2 constants required"),
                         )
-                    }
+                    },
                     AirType::Blake3 => {
                         let n = 1usize << spec.log_height;
                         let inputs: Vec<[u32; 24]> = (0..n).map(|_| rng.random()).collect();
                         generate_blake3_trace(inputs)
-                    }
+                    },
                     AirType::Miden => generate_dummy_trace(spec.width, spec.log_height, rng),
                 })
         })
@@ -258,7 +254,7 @@ fn main() {
                     gl::test_challenger(),
                 );
                 lifted::run_lifted(&config, &specs, &traces, &poseidon2_constants, &cli)
-            }
+            },
             HashFn::Keccak => {
                 let config = GenericStarkConfig::new(
                     pcs,
@@ -267,7 +263,7 @@ fn main() {
                     keccak::test_challenger(),
                 );
                 lifted::run_lifted(&config, &specs, &traces, &poseidon2_constants, &cli)
-            }
+            },
             HashFn::Blake3 => {
                 let config = GenericStarkConfig::new(
                     pcs,
@@ -276,7 +272,7 @@ fn main() {
                     blake3::test_challenger(),
                 );
                 lifted::run_lifted(&config, &specs, &traces, &poseidon2_constants, &cli)
-            }
+            },
             HashFn::Blake3_192 => {
                 let config = GenericStarkConfig::new(
                     pcs,
@@ -285,21 +281,21 @@ fn main() {
                     blake3_192::test_challenger(),
                 );
                 lifted::run_lifted(&config, &specs, &traces, &poseidon2_constants, &cli)
-            }
+            },
         },
         Mode::Batch => match cli.hash {
             HashFn::Poseidon2 => {
                 batch::run_batch_poseidon2(&specs, &traces, &poseidon2_constants, log_blowup, &cli)
-            }
+            },
             HashFn::Keccak => {
                 batch::run_batch_keccak(&specs, &traces, &poseidon2_constants, log_blowup, &cli)
-            }
+            },
             HashFn::Blake3 => {
                 batch::run_batch_blake3(&specs, &traces, &poseidon2_constants, log_blowup, &cli)
-            }
+            },
             HashFn::Blake3_192 => {
                 batch::run_batch_blake3_192(&specs, &traces, &poseidon2_constants, log_blowup, &cli)
-            }
+            },
         },
     };
     let elapsed = start.elapsed();

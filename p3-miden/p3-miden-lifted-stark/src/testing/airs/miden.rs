@@ -38,14 +38,8 @@ pub struct DummyMidenAir {
 
 impl DummyMidenAir {
     pub fn new(width: usize, num_aux_cols: usize) -> Self {
-        assert!(
-            width >= 9,
-            "DummyMidenAir needs at least 9 columns for the degree-9 constraint"
-        );
-        Self {
-            width,
-            num_aux_cols,
-        }
+        assert!(width >= 9, "DummyMidenAir needs at least 9 columns for the degree-9 constraint");
+        Self { width, num_aux_cols }
     }
 }
 

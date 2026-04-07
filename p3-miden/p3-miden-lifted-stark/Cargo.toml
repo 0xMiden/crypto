@@ -1,99 +1,97 @@
 [package]
-name = "p3-miden-lifted-stark"
-description = "Lifted STARK prover and verifier (LMCS-based)."
-version.workspace = true
-edition.workspace = true
-license.workspace = true
-repository.workspace = true
-readme.workspace = true
-homepage.workspace = true
+description  = "Lifted STARK prover and verifier (LMCS-based)."
+edition      = "2024"
+homepage     = "https://github.com/0xMiden/crypto/tree/main/p3-miden"
+license      = "MIT OR Apache-2.0"
+name         = "p3-miden-lifted-stark"
+readme       = "../README.md"
+repository   = "https://github.com/0xMiden/crypto"
+rust-version = "1.86"
+version      = "0.5.1"
 
 [dependencies]
 # Internal
-p3-miden-lifted-air.workspace = true
+p3-miden-lifted-air.workspace      = true
 p3-miden-stateful-hasher.workspace = true
-p3-miden-transcript.workspace = true
+p3-miden-transcript.workspace      = true
 
 # Plonky3 (always needed)
-p3-challenger.workspace = true
-p3-dft.workspace = true
-p3-field.workspace = true
-p3-goldilocks.workspace = true
-p3-matrix.workspace = true
+p3-challenger.workspace  = true
+p3-dft.workspace         = true
+p3-field.workspace       = true
+p3-goldilocks.workspace  = true
+p3-matrix.workspace      = true
 p3-maybe-rayon.workspace = true
-p3-symmetric.workspace = true
-p3-util.workspace = true
+p3-symmetric.workspace   = true
+p3-util.workspace        = true
 
 # Optional (for testing/examples features)
-p3-blake3 = { workspace = true, optional = true }
-p3-blake3-air = { workspace = true, optional = true }
-p3-keccak = { workspace = true, optional = true }
-p3-keccak-air = { workspace = true, optional = true }
-p3-poseidon2-air = { workspace = true, optional = true }
+p3-blake3        = { optional = true, workspace = true }
+p3-blake3-air    = { optional = true, workspace = true }
+p3-keccak        = { optional = true, workspace = true }
+p3-keccak-air    = { optional = true, workspace = true }
+p3-poseidon2-air = { optional = true, workspace = true }
 
 # Third-party
-rand.workspace = true
+rand.workspace      = true
 thiserror.workspace = true
-tracing.workspace = true
+tracing.workspace   = true
 
 [dev-dependencies]
 # Plonky3
-p3-blake3.workspace = true
-p3-challenger.workspace = true
-p3-commit.workspace = true
-p3-fri.workspace = true
-p3-goldilocks.workspace = true
+p3-blake3.workspace        = true
+p3-challenger.workspace    = true
+p3-commit.workspace        = true
+p3-fri.workspace           = true
+p3-goldilocks.workspace    = true
 p3-interpolation.workspace = true
-p3-keccak.workspace = true
-p3-merkle-tree.workspace = true
-p3-symmetric.workspace = true
+p3-keccak.workspace        = true
+p3-merkle-tree.workspace   = true
+p3-symmetric.workspace     = true
 
 # Third-party
-criterion.workspace = true
+criterion.workspace          = true
 tracing-subscriber.workspace = true
 
 [features]
-default = []
+default  = []
 parallel = ["p3-maybe-rayon/parallel"]
-testing = [
-  "dep:p3-blake3",
-  "dep:p3-blake3-air",
-  "dep:p3-keccak",
-  "dep:p3-keccak-air",
-  "dep:p3-poseidon2-air",
-]
+testing  = ["dep:p3-blake3", "dep:p3-blake3-air", "dep:p3-keccak", "dep:p3-keccak-air", "dep:p3-poseidon2-air"]
 
 [[bench]]
-name = "quotient_commit"
-harness = false
+harness           = false
+name              = "quotient_commit"
 required-features = ["testing"]
 
 [[bench]]
-name = "merkle_commit"
-harness = false
+harness           = false
+name              = "merkle_commit"
 required-features = ["testing"]
 
 [[bench]]
-name = "fri_fold"
-harness = false
+harness           = false
+name              = "fri_fold"
 required-features = ["testing"]
 
 [[bench]]
-name = "deep_quotient"
-harness = false
+harness           = false
+name              = "deep_quotient"
 required-features = ["testing"]
 
 [[bench]]
-name = "pcs"
-harness = false
+harness           = false
+name              = "pcs"
 required-features = ["testing"]
 
 [[bench]]
-name = "pcs_trace"
-harness = false
+harness           = false
+name              = "pcs_trace"
 required-features = ["testing"]
 
 [[bench]]
-name = "plonky3"
-harness = false
+harness           = false
+name              = "plonky3"
 required-features = ["testing"]
+
+[lints]
+workspace = true

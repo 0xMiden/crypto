@@ -7,9 +7,10 @@
 //!
 //! # Main Types
 //!
-//! - [`LmcsConfig`]: Configuration holding cryptographic primitives (sponge + compression)
-//!   with packed types for SIMD parallelization.
-//! - [`Lmcs`]: Trait for LMCS configurations, providing type-erased access to commitment operations.
+//! - [`LmcsConfig`]: Configuration holding cryptographic primitives (sponge + compression) with
+//!   packed types for SIMD parallelization.
+//! - [`Lmcs`]: Trait for LMCS configurations, providing type-erased access to commitment
+//!   operations.
 //! - [`LmcsTree`]: Trait for built LMCS trees, providing opening operations.
 //! - [`LiftedMerkleTree`]: The underlying Merkle tree data structure.
 //! - [`Proof`]: Single-opening proof with rows, optional salt, and authentication path.
@@ -62,7 +63,8 @@
 //! Upsample(BitReverse(data)) = BitReverse(Cyclic(data))
 //! ```
 //!
-//! where cyclic repetition tiles the original `n` rows periodically: `[row0, row1, ..., row_{n-1}, row0, ...]`.
+//! where cyclic repetition tiles the original `n` rows periodically: `[row0, row1, ..., row_{n-1},
+//! row0, ...]`.
 //!
 //! This equivalence follows from the bit-reversal identity: for `r = N/n = 2^k`,
 //! `bitrev_N(i) mod n = bitrev_n(i >> k)`.
@@ -176,7 +178,8 @@ pub trait Lmcs: Clone {
     /// and reconstructs the Merkle witness. Does not verify against a commitment;
     /// validation happens in [`open_batch`](Lmcs::open_batch).
     ///
-    /// Use [`merkle_witness::MerkleWitness::path`] on the returned witness to extract authentication paths.
+    /// Use [`merkle_witness::MerkleWitness::path`] on the returned witness to extract
+    /// authentication paths.
     fn read_batch_proof<Ch>(
         &self,
         widths: &[usize],
@@ -224,10 +227,7 @@ pub trait LmcsTree<F, Commitment, M> {
     /// Get aligned widths for each committed matrix (padded to alignment).
     fn aligned_widths(&self) -> Vec<usize> {
         let alignment = self.alignment();
-        self.widths()
-            .into_iter()
-            .map(|w| utils::aligned_len(w, alignment))
-            .collect()
+        self.widths().into_iter().map(|w| utils::aligned_len(w, alignment)).collect()
     }
 
     /// Prove a batch opening and stream it into a transcript channel.

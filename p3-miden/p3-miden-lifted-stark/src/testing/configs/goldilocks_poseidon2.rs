@@ -148,10 +148,8 @@ where
     let output = crate::prover::prove_multi(&config, instances, test_challenger())
         .expect("proving should succeed");
 
-    let verifier_instances: Vec<_> = instances
-        .iter()
-        .map(|(a, w, _)| (*a, w.to_instance().unwrap()))
-        .collect();
+    let verifier_instances: Vec<_> =
+        instances.iter().map(|(a, w, _)| (*a, w.to_instance().unwrap())).collect();
 
     let verifier_digest = crate::verifier::verify_multi(
         &config,

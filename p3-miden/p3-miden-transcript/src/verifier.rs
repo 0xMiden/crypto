@@ -22,11 +22,7 @@ pub struct VerifierTranscript<'a, F, C, Ch> {
 impl<'a, F, C, Ch> VerifierTranscript<'a, F, C, Ch> {
     /// Creates a new verifier transcript backed by the provided challenger.
     pub fn new(challenger: Ch, fields: &'a [F], commitments: &'a [C]) -> Self {
-        Self {
-            challenger,
-            fields,
-            commitments,
-        }
+        Self { challenger, fields, commitments }
     }
 
     /// Creates a verifier transcript backed by a `TranscriptData` container.
@@ -38,7 +34,8 @@ impl<'a, F, C, Ch> VerifierTranscript<'a, F, C, Ch> {
     /// Finalize the transcript, checking emptiness and producing a binding digest.
     ///
     /// Returns [`TranscriptError::TrailingData`] if any unread fields or commitments
-    /// remain. On success, delegates to [`CanFinalizeDigest::finalize`](p3_challenger::CanFinalizeDigest::finalize) on the inner
+    /// remain. On success, delegates to
+    /// [`CanFinalizeDigest::finalize`](p3_challenger::CanFinalizeDigest::finalize) on the inner
     /// challenger — the digest must match the prover's digest for the proof to be valid.
     pub fn finalize(self) -> Result<Ch::Digest, TranscriptError>
     where
@@ -68,8 +65,7 @@ pub trait VerifierChannel: Channel {
     ) -> Result<&[Self::Commitment], TranscriptError>;
 
     fn receive_field(&mut self) -> Result<&Self::F, TranscriptError> {
-        self.receive_field_slice(1)
-            .map(|values| values.first().unwrap())
+        self.receive_field_slice(1).map(|values| values.first().unwrap())
     }
 
     fn receive_algebra_element<A>(&mut self) -> Result<A, TranscriptError>
@@ -95,8 +91,7 @@ pub trait VerifierChannel: Channel {
     }
 
     fn receive_commitment(&mut self) -> Result<&Self::Commitment, TranscriptError> {
-        self.receive_commitment_slice(1)
-            .map(|values| values.first().unwrap())
+        self.receive_commitment_slice(1).map(|values| values.first().unwrap())
     }
 
     fn receive_hint_field_slice(&mut self, count: usize) -> Result<&[Self::F], TranscriptError>;
@@ -107,8 +102,7 @@ pub trait VerifierChannel: Channel {
     ) -> Result<&[Self::Commitment], TranscriptError>;
 
     fn receive_hint_field(&mut self) -> Result<&Self::F, TranscriptError> {
-        self.receive_hint_field_slice(1)
-            .map(|values| values.first().unwrap())
+        self.receive_hint_field_slice(1).map(|values| values.first().unwrap())
     }
 
     /// Read exactly `N` hint field elements as a fixed-size array.
@@ -122,8 +116,7 @@ pub trait VerifierChannel: Channel {
     }
 
     fn receive_hint_commitment(&mut self) -> Result<&Self::Commitment, TranscriptError> {
-        self.receive_hint_commitment_slice(1)
-            .map(|values| values.first().unwrap())
+        self.receive_hint_commitment_slice(1).map(|values| values.first().unwrap())
     }
 
     fn grind(&mut self, bits: usize) -> Result<Self::F, TranscriptError>;
@@ -185,10 +178,7 @@ where
     }
 
     fn grind(&mut self, bits: usize) -> Result<Self::F, TranscriptError> {
-        let (witness, rest) = self
-            .fields
-            .split_first()
-            .ok_or(TranscriptError::NoMoreFields)?;
+        let (witness, rest) = self.fields.split_first().ok_or(TranscriptError::NoMoreFields)?;
         self.fields = rest;
         if self.challenger.check_witness(bits, *witness) {
             Ok(*witness)

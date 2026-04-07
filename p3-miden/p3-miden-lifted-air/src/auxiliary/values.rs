@@ -24,10 +24,7 @@ pub struct ReducedAuxValues<EF> {
 impl<EF: PrimeCharacteristicRing> ReducedAuxValues<EF> {
     /// The identity contribution (no buses): prod=1, sum=0.
     pub fn identity() -> Self {
-        Self {
-            prod: EF::ONE,
-            sum: EF::ZERO,
-        }
+        Self { prod: EF::ONE, sum: EF::ZERO }
     }
 
     /// Combine another contribution into this one.

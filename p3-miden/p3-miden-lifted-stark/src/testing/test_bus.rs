@@ -122,9 +122,7 @@ impl LiftedAir<Felt, QuadFelt> for BusTestAir {
 
         // First row: aux[0] * (pi_0 + c0) == 1
         let a0: AB::ExprEF = aux_local[0].into();
-        builder
-            .when_first_row()
-            .assert_eq_ext(a0 * (pi_0 + c0), AB::ExprEF::ONE);
+        builder.when_first_row().assert_eq_ext(a0 * (pi_0 + c0), AB::ExprEF::ONE);
 
         // First row: aux[1] == pi_1 + c1
         let a1: AB::ExprEF = aux_local[1].into();
@@ -222,13 +220,9 @@ fn bus_identity_check() {
     };
 
     // Verify
-    let verifier_digest = verify_multi(
-        &config,
-        &[(&air, instance)],
-        &output.proof,
-        test_challenger(),
-    )
-    .expect("verification should succeed");
+    let verifier_digest =
+        verify_multi(&config, &[(&air, instance)], &output.proof, test_challenger())
+            .expect("verification should succeed");
     assert_eq!(output.digest, verifier_digest);
 }
 
@@ -270,13 +264,8 @@ fn bus_wrong_var_len_pi_fails() {
         var_len_public_inputs: &wrong_var_len_pi,
     };
 
-    let err = verify_multi(
-        &config,
-        &[(&air, instance)],
-        &output.proof,
-        test_challenger(),
-    )
-    .expect_err("wrong var_len_pi should fail verification");
+    let err = verify_multi(&config, &[(&air, instance)], &output.proof, test_challenger())
+        .expect_err("wrong var_len_pi should fail verification");
 
     assert!(
         matches!(err, crate::VerifierError::InvalidReducedAux),
@@ -319,13 +308,8 @@ fn bus_wrong_input_count_fails() {
         var_len_public_inputs: &only_one,
     };
 
-    let err = verify_multi(
-        &config,
-        &[(&air, instance)],
-        &output.proof,
-        test_challenger(),
-    )
-    .expect_err("wrong input count should fail verification");
+    let err = verify_multi(&config, &[(&air, instance)], &output.proof, test_challenger())
+        .expect_err("wrong input count should fail verification");
 
     assert!(
         matches!(

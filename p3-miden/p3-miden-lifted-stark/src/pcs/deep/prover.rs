@@ -66,10 +66,7 @@ impl<EF> DeepPoly<EF> {
         M: Matrix<L::F>,
         Ch: ProverChannel<F = L::F, Commitment = L::Commitment>,
     {
-        let lde_height = trace_trees
-            .first()
-            .expect("at least one trace tree required")
-            .height();
+        let lde_height = trace_trees.first().expect("at least one trace tree required").height();
         assert!(
             trace_trees.iter().all(|tree| tree.height() == lde_height),
             "mixed trace tree heights are not supported"
@@ -78,10 +75,8 @@ impl<EF> DeepPoly<EF> {
         let log_lde_height = log2_strict_u8(lde_height);
         let coset_points = bit_reversed_coset_points::<L::F>(log_lde_height);
 
-        let matrices_groups: Vec<Vec<&M>> = trace_trees
-            .iter()
-            .map(|tree| tree.leaves().iter().collect())
-            .collect();
+        let matrices_groups: Vec<Vec<&M>> =
+            trace_trees.iter().map(|tree| tree.leaves().iter().collect()).collect();
 
         let quotient = PointQuotients::new(FieldArray::from(eval_points), &coset_points);
         let batched_evals = info_span!("evaluate at OOD points")
@@ -98,8 +93,8 @@ impl<EF> DeepPoly<EF> {
     /// - `trace_trees`: Trace trees used to derive alignment and matrix groups. All trees must
     ///   share the same alignment; mixed alignments are not supported.
     /// - `batched_evals`: One row per matrix, each row holding `FieldArray<EF, N>` per column.
-    ///   Widths match the unpadded matrices; alignment padding is applied lazily during
-    ///   channel writes and Horner reduction.
+    ///   Widths match the unpadded matrices; alignment padding is applied lazily during channel
+    ///   writes and Horner reduction.
     /// - `quotient`: Precomputed `1/(zⱼ − xᵢ)` for all opening points zⱼ and domain points xᵢ.
     ///
     /// Returns the constructed `DeepPoly` and the (unaligned) `batched_evals` for test inspection.
@@ -129,10 +124,8 @@ impl<EF> DeepPoly<EF> {
         // inserted while hashing the rows of the matrices. The prover pads the opened rows of each
         // matrix with zeros, so that the length of the row is a multiple of the alignment.
         // The alignment is tied to the underlying cryptographic permutation's rate.
-        let alignment = trace_trees
-            .first()
-            .expect("at least one tree must be provided")
-            .alignment();
+        let alignment =
+            trace_trees.first().expect("at least one tree must be provided").alignment();
         assert!(
             trace_trees.iter().all(|tree| tree.alignment() == alignment),
             "mixed trace tree alignments are not supported"
@@ -141,22 +134,17 @@ impl<EF> DeepPoly<EF> {
         // Collect the LDE matrices from each committed tree, grouped by commitment.
         // matrices_groups[group_idx][matrix_idx] is a reference to the LDE matrix
         // whose rows are bit-reversed coset evaluations at height `lde_height`.
-        let matrices_groups: Vec<Vec<&M>> = trace_trees
-            .iter()
-            .map(|tree| tree.leaves().iter().collect())
-            .collect();
+        let matrices_groups: Vec<Vec<&M>> =
+            trace_trees.iter().map(|tree| tree.leaves().iter().collect()).collect();
 
-        // 1. Bind the prover's OOD evaluation claims into the Fiat-Shamir transcript.
-        //    The DEEP challenges (alpha, beta) are derived after this, so a cheating prover
-        //    cannot adapt its claims to the challenges.
-        //    Each matrix row is zero-padded to the tree alignment, matching the
-        //    virtual zero columns the LMCS inserts when hashing rows.
-        //    All matrices are concatenated into a single flat slice per eval point.
+        // 1. Bind the prover's OOD evaluation claims into the Fiat-Shamir transcript. The DEEP
+        //    challenges (alpha, beta) are derived after this, so a cheating prover cannot adapt its
+        //    claims to the challenges. Each matrix row is zero-padded to the tree alignment,
+        //    matching the virtual zero columns the LMCS inserts when hashing rows. All matrices are
+        //    concatenated into a single flat slice per eval point.
         for point_idx in 0..N {
-            let flat: Vec<EF> = batched_evals
-                .iter_aligned(alignment)
-                .map(|fa| fa[point_idx])
-                .collect();
+            let flat: Vec<EF> =
+                batched_evals.iter_aligned(alignment).map(|fa| fa[point_idx]).collect();
             channel.send_algebra_slice(&flat);
         }
 
@@ -178,10 +166,8 @@ impl<EF> DeepPoly<EF> {
         let n = point_quotient.len();
 
         let group_sizes: Vec<usize> = matrices_groups.iter().map(|g| g.len()).collect();
-        let widths: Vec<usize> = matrices_groups
-            .iter()
-            .flat_map(|g| g.iter().map(|m| m.width()))
-            .collect();
+        let widths: Vec<usize> =
+            matrices_groups.iter().flat_map(|g| g.iter().map(|m| m.width())).collect();
 
         // Align each matrix width so padding is explicit in the transcript.
         let aligned_widths = aligned_widths(widths, alignment);
@@ -268,7 +254,8 @@ impl<EF> DeepPoly<EF> {
                     .for_each(|(neg_chunk, q_chunk)| {
                         let neg_p = EF::ExtensionPacking::from_ext_slice(neg_chunk);
 
-                        // Transpose quotients: q_chunk[lane][point] -> q_packed[point] packs all lanes
+                        // Transpose quotients: q_chunk[lane][point] -> q_packed[point] packs all
+                        // lanes
                         let q_packed: [EF::ExtensionPacking; N] =
                             EF::ExtensionPacking::pack_ext_columns(FieldArray::as_raw_slice(
                                 q_chunk,
@@ -320,10 +307,7 @@ fn accumulate_matrices<F: Field, EF: ExtensionField<F>, M: Matrix<F>, C: AsRef<[
     for (&matrix, coeffs) in zip(matrices, coeffs) {
         let coeffs = coeffs.as_ref();
         let height = matrix.height();
-        debug_assert!(
-            height.is_power_of_two(),
-            "matrix height must be a power of two"
-        );
+        debug_assert!(height.is_power_of_two(), "matrix height must be a power of two");
         debug_assert!(
             matrix.width() <= coeffs.len(),
             "matrix width {} exceeds coeffs length {}",

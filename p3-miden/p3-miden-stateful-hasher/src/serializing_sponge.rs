@@ -101,8 +101,7 @@ where
     type State = Inner::State;
 
     fn absorb_into(&self, state: &mut Self::State, input: impl IntoIterator<Item = [F; M]>) {
-        self.inner
-            .absorb_into(state, F::into_parallel_byte_streams(input));
+        self.inner.absorb_into(state, F::into_parallel_byte_streams(input));
     }
 
     fn squeeze(&self, state: &Self::State) -> [[u8; M]; OUT] {
@@ -120,8 +119,7 @@ where
     type State = Inner::State;
 
     fn absorb_into(&self, state: &mut Self::State, input: impl IntoIterator<Item = [F; M]>) {
-        self.inner
-            .absorb_into(state, F::into_parallel_u32_streams(input));
+        self.inner.absorb_into(state, F::into_parallel_u32_streams(input));
     }
 
     fn squeeze(&self, state: &Self::State) -> [[u32; M]; OUT] {
@@ -139,8 +137,7 @@ where
     type State = Inner::State;
 
     fn absorb_into(&self, state: &mut Self::State, input: impl IntoIterator<Item = [F; M]>) {
-        self.inner
-            .absorb_into(state, F::into_parallel_u64_streams(input));
+        self.inner.absorb_into(state, F::into_parallel_u64_streams(input));
     }
 
     fn squeeze(&self, state: &Self::State) -> [[u64; M]; OUT] {
@@ -244,11 +241,7 @@ mod tests {
                 StatefulHasher::<F, [u64; OUT]>::squeeze(&hasher, &state_unpadded);
 
             let remainder = input_len % alignment;
-            let zeros_needed = if remainder == 0 {
-                0
-            } else {
-                alignment - remainder
-            };
+            let zeros_needed = if remainder == 0 { 0 } else { alignment - remainder };
             let mut padded_input = input.clone();
             padded_input.extend(core::iter::repeat_n(F::ZERO, zeros_needed));
 

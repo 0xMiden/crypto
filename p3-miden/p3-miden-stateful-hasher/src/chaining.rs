@@ -42,9 +42,7 @@ where
 
     fn absorb_into(&self, state: &mut Self::State, input: impl IntoIterator<Item = F>) {
         let prev = *state;
-        *state = self
-            .inner
-            .hash_iter(prev.into_iter().chain(F::into_byte_stream(input)));
+        *state = self.inner.hash_iter(prev.into_iter().chain(F::into_byte_stream(input)));
     }
 
     fn squeeze(&self, state: &Self::State) -> [u8; N] {
@@ -63,9 +61,7 @@ where
 
     fn absorb_into(&self, state: &mut Self::State, input: impl IntoIterator<Item = F>) {
         let prev = *state;
-        *state = self
-            .inner
-            .hash_iter(prev.into_iter().chain(F::into_u32_stream(input)));
+        *state = self.inner.hash_iter(prev.into_iter().chain(F::into_u32_stream(input)));
     }
 
     fn squeeze(&self, state: &Self::State) -> [u32; N] {
@@ -84,9 +80,7 @@ where
 
     fn absorb_into(&self, state: &mut Self::State, input: impl IntoIterator<Item = F>) {
         let prev = *state;
-        *state = self
-            .inner
-            .hash_iter(prev.into_iter().chain(F::into_u64_stream(input)));
+        *state = self.inner.hash_iter(prev.into_iter().chain(F::into_u64_stream(input)));
     }
 
     fn squeeze(&self, state: &Self::State) -> [u64; N] {

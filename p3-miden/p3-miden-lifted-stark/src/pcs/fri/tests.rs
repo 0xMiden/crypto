@@ -128,16 +128,8 @@ fn verify_queries(
     };
     let log_domain_size = log2_strict_u8(lde_size);
     let oracle = FriOracle::new(params, log_domain_size, &mut channel)?;
-    oracle.test_low_degree(
-        lmcs,
-        params,
-        initial_evals.clone(),
-        tree_indices,
-        &mut channel,
-    )?;
-    let digest = channel
-        .finalize()
-        .expect("transcript should finalize cleanly");
+    oracle.test_low_degree(lmcs, params, initial_evals.clone(), tree_indices, &mut channel)?;
+    let digest = channel.finalize().expect("transcript should finalize cleanly");
     Ok(digest)
 }
 
@@ -163,23 +155,14 @@ fn run_roundtrip_case(case: &FriRoundtripCase, seed: u64) -> Result<(), FriError
     let lde_size = evals.len();
     let log_domain_size = log2_strict_u8(lde_size);
     // Sample domain indices (no bit-reversal needed — tree is in domain order)
-    let tree_indices = TreeIndices::new(
-        sample_indices(&mut rng, lde_size, case.num_queries),
-        log_domain_size,
-    )
-    .expect("indices are in range");
+    let tree_indices =
+        TreeIndices::new(sample_indices(&mut rng, lde_size, case.num_queries), log_domain_size)
+            .expect("indices are in range");
     let initial_evals = build_initial_evals(&evals, &tree_indices);
 
     let (prover_digest, transcript) = prove_queries(&params, &lmcs, evals, tree_indices.clone());
-    let verifier_digest = verify_queries(
-        &params,
-        &lmcs,
-        &transcript,
-        lde_size,
-        &initial_evals,
-        tree_indices,
-        None,
-    )?;
+    let verifier_digest =
+        verify_queries(&params, &lmcs, &transcript, lde_size, &initial_evals, tree_indices, None)?;
     assert_eq!(prover_digest, verifier_digest);
 
     // Re-parse FriTranscript (commit phase only) from a fresh channel.
@@ -200,12 +183,7 @@ fn test_fri_roundtrip_cases() {
     for (case_idx, case) in FRI_ROUNDTRIP_CASES.iter().enumerate() {
         let seed = 42 + case_idx as u64;
         let result = run_roundtrip_case(case, seed);
-        assert!(
-            result.is_ok(),
-            "case {} failed with {:?}",
-            case.name,
-            result
-        );
+        assert!(result.is_ok(), "case {} failed with {:?}", case.name, result);
     }
 }
 
@@ -244,15 +222,8 @@ fn test_fri_verify_wrong_eval() {
     initial_evals.insert(first_idx, wrong_eval);
 
     let (_prover_digest, transcript) = prove_queries(&params, &lmcs, evals, tree_indices.clone());
-    let result = verify_queries(
-        &params,
-        &lmcs,
-        &transcript,
-        lde_size,
-        &initial_evals,
-        tree_indices,
-        None,
-    );
+    let result =
+        verify_queries(&params, &lmcs, &transcript, lde_size, &initial_evals, tree_indices, None);
 
     assert!(
         matches!(result, Err(FriError::EvaluationMismatch { .. })),
@@ -323,7 +294,7 @@ fn test_fri_verify_wrong_beta() {
     assert!(
         matches!(
             result,
-            Err(FriError::EvaluationMismatch { .. }) | Err(FriError::FinalPolyMismatch { .. })
+            Err(FriError::EvaluationMismatch { .. } | FriError::FinalPolyMismatch { .. })
         ),
         "expected EvaluationMismatch or FinalPolyMismatch error, got {:?}",
         result
@@ -361,26 +332,16 @@ fn test_fri_zero_rounds_final_poly_only() {
         FriTranscript::from_verifier_channel(&params, log_domain_size, &mut channel)
             .expect("transcript parsing should succeed");
 
-    assert!(
-        fri_transcript.rounds.is_empty(),
-        "expected zero folding rounds"
-    );
+    assert!(fri_transcript.rounds.is_empty(), "expected zero folding rounds");
     assert_eq!(
         fri_transcript.final_poly.len(),
         lde_size,
         "final polynomial should match domain size"
     );
 
-    let verifier_digest = verify_queries(
-        &params,
-        &lmcs,
-        &transcript,
-        lde_size,
-        &initial_evals,
-        tree_indices,
-        None,
-    )
-    .expect("zero-round FRI should verify");
+    let verifier_digest =
+        verify_queries(&params, &lmcs, &transcript, lde_size, &initial_evals, tree_indices, None)
+            .expect("zero-round FRI should verify");
     assert_eq!(prover_digest, verifier_digest);
 }
 
@@ -407,9 +368,7 @@ fn test_final_polynomial_correctness() {
     let rounds = log_poly_degree - log_final_degree;
     let stride = 1usize << rounds;
 
-    let g_coeffs: Vec<QuadFelt> = (0..final_degree)
-        .map(|_| rng.sample(StandardUniform))
-        .collect();
+    let g_coeffs: Vec<QuadFelt> = (0..final_degree).map(|_| rng.sample(StandardUniform)).collect();
     let mut f_coeffs = vec![QuadFelt::ZERO; poly_degree];
     for (i, coeff) in g_coeffs.iter().enumerate() {
         f_coeffs[i * stride] = *coeff;

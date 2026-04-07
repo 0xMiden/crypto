@@ -24,8 +24,8 @@ use crate::lmcs::{
 /// This implementation defines the transcript hint layout used by
 /// [`LmcsTree::prove_batch`](crate::lmcs::LmcsTree::prove_batch) and consumed by
 /// `open_batch` and [`Lmcs::read_batch_proof`]:
-/// - For each *distinct* query index (in caller order, skipping duplicates): one row per
-///   matrix (in leaf order), then `SALT_ELEMS` field elements of salt.
+/// - For each *distinct* query index (in caller order, skipping duplicates): one row per matrix (in
+///   leaf order), then `SALT_ELEMS` field elements of salt.
 /// - After all indices: missing sibling hashes, level-by-level, left-to-right, bottom-to-top.
 ///
 /// Hints are not observed into the Fiat-Shamir challenger.
@@ -40,11 +40,12 @@ use crate::lmcs::{
 /// out-of-range indices return `InvalidProof`.
 ///
 /// Padding note:
-/// - LMCS does not enforce that aligned padding values are zero. Verifiers cannot
-///   distinguish zero padding from arbitrary values unless they check those columns
-///   in the opened rows or constrain them elsewhere.
+/// - LMCS does not enforce that aligned padding values are zero. Verifiers cannot distinguish zero
+///   padding from arbitrary values unless they check those columns in the opened rows or constrain
+///   them elsewhere.
 ///
-/// For hiding commitments with salt, use [`HidingLmcsConfig`](crate::lmcs::hiding_config::HidingLmcsConfig) instead.
+/// For hiding commitments with salt, use
+/// [`HidingLmcsConfig`](crate::lmcs::hiding_config::HidingLmcsConfig) instead.
 #[derive(Clone, Debug)]
 pub struct LmcsConfig<
     PF,
@@ -68,11 +69,7 @@ impl<PF, PD, H, C, const WIDTH: usize, const DIGEST: usize, const SALT_ELEMS: us
     /// Create a new LMCS configuration.
     #[inline]
     pub const fn new(sponge: H, compress: C) -> Self {
-        Self {
-            sponge,
-            compress,
-            _phantom: PhantomData,
-        }
+        Self { sponge, compress, _phantom: PhantomData }
     }
 }
 
@@ -163,10 +160,10 @@ where
     ///
     /// Security notes:
     /// - `widths` and `log_max_height` must describe the committed tree; they are not checked.
-    /// - `widths` must match the committed row lengths (including any alignment padding
-    ///   if `build_aligned_tree` was used); LMCS does not enforce that padded values are
-    ///   zero. Verifiers cannot distinguish zero padding from arbitrary values unless
-    ///   they check the opened rows or constrain them elsewhere.
+    /// - `widths` must match the committed row lengths (including any alignment padding if
+    ///   `build_aligned_tree` was used); LMCS does not enforce that padded values are zero.
+    ///   Verifiers cannot distinguish zero padding from arbitrary values unless they check the
+    ///   opened rows or constrain them elsewhere.
     /// - Empty `indices` returns `InvalidProof`.
     /// - Duplicate indices are coalesced in the returned map (unique keys only).
     /// - Out-of-range indices (>= 2^log_max_height) return `InvalidProof`.
@@ -222,8 +219,8 @@ where
     /// authentication paths. Salt is stored as `Vec<F>` in the output.
     ///
     /// Notes:
-    /// - `widths` must match the committed row lengths (including any alignment padding
-    ///   if `build_aligned_tree` was used).
+    /// - `widths` must match the committed row lengths (including any alignment padding if
+    ///   `build_aligned_tree` was used).
     fn read_batch_proof<Ch>(
         &self,
         widths: &[usize],
@@ -277,9 +274,7 @@ mod tests {
     };
 
     fn small_matrix(height: usize, width: usize, seed: u64) -> RowMajorMatrix<gl::Felt> {
-        let values = (0..height * width)
-            .map(|i| gl::Felt::from_u64(seed + i as u64))
-            .collect();
+        let values = (0..height * width).map(|i| gl::Felt::from_u64(seed + i as u64)).collect();
         RowMajorMatrix::new(values, width)
     }
 
@@ -312,9 +307,8 @@ mod tests {
             for &idx in indices {
                 assert_eq!(opened[&idx], tree.aligned_rows(idx));
             }
-            let verifier_digest = verifier_channel
-                .finalize()
-                .expect("transcript should finalize cleanly");
+            let verifier_digest =
+                verifier_channel.finalize().expect("transcript should finalize cleanly");
             assert_eq!(prover_digest, verifier_digest);
         };
 
@@ -333,24 +327,15 @@ mod tests {
         let (prover_digest, transcript) = prover_channel.finalize();
         let mut verifier_channel = gl::verifier_channel(&transcript);
         let opened = lmcs
-            .open_batch(
-                &tiny_tree.root(),
-                &widths_tiny,
-                &tiny_indices,
-                &mut verifier_channel,
-            )
+            .open_batch(&tiny_tree.root(), &widths_tiny, &tiny_indices, &mut verifier_channel)
             .unwrap();
         assert_eq!(opened[&0], tiny_tree.aligned_rows(0));
-        let verifier_digest = verifier_channel
-            .finalize()
-            .expect("transcript should finalize cleanly");
+        let verifier_digest =
+            verifier_channel.finalize().expect("transcript should finalize cleanly");
         assert_eq!(prover_digest, verifier_digest);
 
         // oob index
-        assert_eq!(
-            TreeIndices::new([tree.height()], log_max_height),
-            Err(LmcsError::InvalidProof)
-        );
+        assert_eq!(TreeIndices::new([tree.height()], log_max_height), Err(LmcsError::InvalidProof));
 
         // wrong tree
         let tree_indices_0 = ti(&[0], log_max_height);
@@ -358,12 +343,7 @@ mod tests {
         let mut verifier_channel = gl::verifier_channel(&transcript);
         let wrong_tree = lmcs.build_tree(vec![small_matrix(4, 2, 999)]);
         assert_eq!(
-            lmcs.open_batch(
-                &wrong_tree.root(),
-                &widths,
-                &tree_indices_0,
-                &mut verifier_channel,
-            ),
+            lmcs.open_batch(&wrong_tree.root(), &widths, &tree_indices_0, &mut verifier_channel,),
             Err(LmcsError::RootMismatch)
         );
 
@@ -443,9 +423,8 @@ mod tests {
             .expect("Goldilocks+Blake3 LMCS roundtrip should verify");
 
         assert_eq!(opened[&0], tree.aligned_rows(0));
-        let verifier_digest = verifier_channel
-            .finalize()
-            .expect("transcript should finalize cleanly");
+        let verifier_digest =
+            verifier_channel.finalize().expect("transcript should finalize cleanly");
         assert_eq!(prover_digest, verifier_digest);
     }
 
@@ -497,9 +476,8 @@ mod tests {
             .expect("Goldilocks+Blake3-192 LMCS roundtrip should verify");
 
         assert_eq!(opened[&0], tree.rows(0));
-        let verifier_digest = verifier_channel
-            .finalize()
-            .expect("transcript should finalize cleanly");
+        let verifier_digest =
+            verifier_channel.finalize().expect("transcript should finalize cleanly");
         assert_eq!(prover_digest, verifier_digest);
     }
 }

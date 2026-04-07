@@ -87,9 +87,8 @@ fn run_pcs_case(params: &PcsParams, trees: Vec<TestTree>, seed: u64) -> Result<(
     );
 
     if result.is_ok() {
-        let verifier_digest = verifier_channel
-            .finalize()
-            .expect("transcript should finalize cleanly");
+        let verifier_digest =
+            verifier_channel.finalize().expect("transcript should finalize cleanly");
         assert_eq!(prover_digest, verifier_digest);
 
         // Re-parse PcsTranscript from a fresh channel and verify digest agreement.

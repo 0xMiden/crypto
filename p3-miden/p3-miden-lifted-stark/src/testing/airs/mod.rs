@@ -34,10 +34,7 @@ impl ZeroAuxBuilder {
     ///
     /// Suitable for AIRs where `num_aux_values() == 0`.
     pub fn dummy() -> Self {
-        Self {
-            num_aux_cols: 1,
-            num_aux_values: 0,
-        }
+        Self { num_aux_cols: 1, num_aux_values: 0 }
     }
 }
 

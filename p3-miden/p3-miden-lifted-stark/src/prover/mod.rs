@@ -152,10 +152,7 @@ pub enum ProverError {
         "constraint degree exceeds blowup: \
          log_quotient_degree {log_quotient_degree} > log_blowup {log_blowup}"
     )]
-    ConstraintDegreeTooHigh {
-        log_quotient_degree: u8,
-        log_blowup: u8,
-    },
+    ConstraintDegreeTooHigh { log_quotient_degree: u8, log_blowup: u8 },
 }
 
 /// Prove a single AIR.
@@ -249,11 +246,8 @@ where
     let log_blowup = config.pcs().log_blowup();
 
     // Infer constraint degree from symbolic AIR analysis (max across all AIRs)
-    let log_constraint_degree = instances
-        .iter()
-        .map(|(air, _, _)| air.log_quotient_degree())
-        .max()
-        .unwrap_or(1) as u8;
+    let log_constraint_degree =
+        instances.iter().map(|(air, ..)| air.log_quotient_degree()).max().unwrap_or(1) as u8;
 
     if log_constraint_degree > log_blowup {
         return Err(ProverError::ConstraintDegreeTooHigh {
@@ -286,11 +280,8 @@ where
     channel.send_commitment(main_committed.root());
 
     // 2. Sample randomness and build aux traces for all AIRs
-    let max_num_randomness = instances
-        .iter()
-        .map(|(air, _, _)| air.num_randomness())
-        .max()
-        .unwrap_or(0);
+    let max_num_randomness =
+        instances.iter().map(|(air, ..)| air.num_randomness()).max().unwrap_or(0);
 
     let randomness: Vec<EF> = (0..max_num_randomness)
         .map(|_| channel.sample_algebra_element::<EF>())
@@ -361,7 +352,7 @@ where
     // Pre-compute constraint layouts for each AIR (base/ext index mapping)
     let layouts: Vec<_> = instances
         .iter()
-        .map(|(air, _, _)| get_constraint_layout::<F, EF, A>(*air))
+        .map(|(air, ..)| get_constraint_layout::<F, EF, A>(*air))
         .collect();
 
     info_span!("evaluate constraints").in_scope(|| {
@@ -439,11 +430,7 @@ where
     let z_next = z * h;
 
     // 9. Open via PCS
-    let trees = vec![
-        main_committed.tree(),
-        aux_committed.tree(),
-        quotient_committed.tree(),
-    ];
+    let trees = vec![main_committed.tree(), aux_committed.tree(), quotient_committed.tree()];
 
     info_span!("open").in_scope(|| {
         open_with_channel::<F, EF, SC::Lmcs, RowMajorMatrix<F>, _, 2>(

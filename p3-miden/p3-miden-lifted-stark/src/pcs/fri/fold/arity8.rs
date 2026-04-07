@@ -24,8 +24,8 @@ use p3_field::{Algebra, TwoAdicField};
 ///
 /// ## Inputs
 ///
-/// - `evals`: slice of 8 evaluations `[f(s), f(ω⁴s), f(ω²s), f(ω⁶s), f(ωs), f(ω⁵s), f(ω³s), f(ω⁷s)]`
-///   in bit-reversed order, where `ω` is the primitive 8th root of unity.
+/// - `evals`: slice of 8 evaluations `[f(s), f(ω⁴s), f(ω²s), f(ω⁶s), f(ωs), f(ω⁵s), f(ω³s),
+///   f(ω⁷s)]` in bit-reversed order, where `ω` is the primitive 8th root of unity.
 /// - `s_inv`: the inverse of the coset generator `s`.
 /// - `beta`: the FRI folding challenge `β`.
 #[inline(always)]

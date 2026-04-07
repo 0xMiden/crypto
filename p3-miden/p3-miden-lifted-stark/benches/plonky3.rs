@@ -59,11 +59,7 @@ type WorkspacePcs =
 
 fn gl_poseidon2_mmcs() -> Poseidon2ValMmcs {
     let perm = gl::create_perm();
-    Poseidon2ValMmcs::new(
-        Poseidon2MmcsSponge::new(perm.clone()),
-        gl::Compress::new(perm),
-        0,
-    )
+    Poseidon2ValMmcs::new(Poseidon2MmcsSponge::new(perm.clone()), gl::Compress::new(perm), 0)
 }
 
 fn workspace_pcs(
@@ -103,11 +99,7 @@ type KeccakMmcs = MerkleTreeMmcs<
 
 fn gl_keccak_mmcs() -> KeccakMmcs {
     let inner = gl_keccak::KeccakMmcsSponge::new(KeccakF);
-    KeccakMmcs::new(
-        SerializingHasher::new(inner),
-        gl_keccak::Compress::new(inner),
-        0,
-    )
+    KeccakMmcs::new(SerializingHasher::new(inner), gl_keccak::Compress::new(inner), 0)
 }
 
 type Blake3_192Mmcs = MerkleTreeMmcs<
@@ -121,11 +113,7 @@ type Blake3_192Mmcs = MerkleTreeMmcs<
 
 fn gl_blake3_192_mmcs() -> Blake3_192Mmcs {
     let inner = gl_blake3_192::Blake3_192::new(Blake3);
-    Blake3_192Mmcs::new(
-        SerializingHasher::new(inner),
-        gl_blake3_192::Compress::new(inner),
-        0,
-    )
+    Blake3_192Mmcs::new(SerializingHasher::new(inner), gl_blake3_192::Compress::new(inner), 0)
 }
 
 // =============================================================================
@@ -140,42 +128,34 @@ fn bench_hash<L: Lmcs<F = gl::Felt>, M: Mmcs<gl::Felt>>(
 ) {
     for &log_max_height in LOG_HEIGHTS {
         let n_leaves = 1usize << log_max_height;
-        let group_name = format!(
-            "LMCS_vs_MMCS/{}/goldilocks/{}/{}",
-            n_leaves, hash_name, PARALLEL_STR
-        );
+        let group_name =
+            format!("LMCS_vs_MMCS/{}/goldilocks/{}/{}", n_leaves, hash_name, PARALLEL_STR);
         let mut group = c.benchmark_group(&group_name);
-        group.throughput(Throughput::Elements(total_elements(
-            &generate_matrices_from_specs::<gl::Felt>(RELATIVE_SPECS, log_max_height),
-        )));
+        group.throughput(Throughput::Elements(total_elements(&generate_matrices_from_specs::<
+            gl::Felt,
+        >(
+            RELATIVE_SPECS, log_max_height
+        ))));
 
         let matrix_groups: Vec<Vec<RowMajorMatrix<gl::Felt>>> =
             generate_matrices_from_specs(RELATIVE_SPECS, log_max_height);
 
-        group.bench_with_input(
-            BenchmarkId::from_parameter("lmcs"),
-            &matrix_groups,
-            |b, groups| {
-                b.iter(|| {
-                    for matrices in groups {
-                        let tree = lmcs.build_tree(matrices.clone());
-                        black_box(tree.root());
-                    }
-                });
-            },
-        );
+        group.bench_with_input(BenchmarkId::from_parameter("lmcs"), &matrix_groups, |b, groups| {
+            b.iter(|| {
+                for matrices in groups {
+                    let tree = lmcs.build_tree(matrices.clone());
+                    black_box(tree.root());
+                }
+            });
+        });
 
-        group.bench_with_input(
-            BenchmarkId::from_parameter("mmcs"),
-            &matrix_groups,
-            |b, groups| {
-                b.iter(|| {
-                    for matrices in groups {
-                        black_box(mmcs.commit(matrices.clone()));
-                    }
-                });
-            },
-        );
+        group.bench_with_input(BenchmarkId::from_parameter("mmcs"), &matrix_groups, |b, groups| {
+            b.iter(|| {
+                for matrices in groups {
+                    black_box(mmcs.commit(matrices.clone()));
+                }
+            });
+        });
 
         group.finish();
     }
@@ -184,12 +164,7 @@ fn bench_hash<L: Lmcs<F = gl::Felt>, M: Mmcs<gl::Felt>>(
 fn bench_lmcs_vs_mmcs(c: &mut Criterion) {
     bench_hash(c, &gl::test_lmcs(), &gl_poseidon2_mmcs(), "poseidon2");
     bench_hash(c, &gl_keccak::test_lmcs(), &gl_keccak_mmcs(), "keccak");
-    bench_hash(
-        c,
-        &gl_blake3_192::test_lmcs(),
-        &gl_blake3_192_mmcs(),
-        "blake3-192",
-    );
+    bench_hash(c, &gl_blake3_192::test_lmcs(), &gl_blake3_192_mmcs(), "blake3-192");
 }
 
 // =============================================================================
@@ -202,10 +177,7 @@ fn bench_pcs_open(c: &mut Criterion) {
 
     for &log_lde_height in LOG_HEIGHTS {
         let max_lde_size = 1usize << log_lde_height;
-        let group_name = format!(
-            "PCS_Open/{}/goldilocks/poseidon2/{}",
-            max_lde_size, PARALLEL_STR
-        );
+        let group_name = format!("PCS_Open/{}/goldilocks/poseidon2/{}", max_lde_size, PARALLEL_STR);
         let mut group = c.benchmark_group(&group_name);
 
         let matrix_groups: Vec<Vec<RowMajorMatrix<gl::Felt>>> =
@@ -339,12 +311,7 @@ type LiftedConfig = p3_miden_lifted_stark::GenericStarkConfig<
 >;
 
 fn lifted_config() -> LiftedConfig {
-    LiftedConfig::new(
-        QC_PCS_PARAMS,
-        gl::test_lmcs(),
-        Dft::default(),
-        gl::test_challenger(),
-    )
+    LiftedConfig::new(QC_PCS_PARAMS, gl::test_lmcs(), Dft::default(), gl::test_challenger())
 }
 
 fn random_quotient_evals(n: usize, d: usize, seed: u64) -> Vec<gl::QuadFelt> {

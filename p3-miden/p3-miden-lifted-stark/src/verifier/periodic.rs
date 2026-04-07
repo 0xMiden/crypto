@@ -27,7 +27,8 @@ impl<F: TwoAdicField> PeriodicPolys<F> {
     ///
     /// # Panics
     /// Panics if any column length is zero or not a power of two.
-    /// This is a trusted path — the AIR should pass [`LiftedAir::validate`](p3_miden_lifted_air::LiftedAir::validate).
+    /// This is a trusted path — the AIR should pass
+    /// [`LiftedAir::validate`](p3_miden_lifted_air::LiftedAir::validate).
     pub fn new(column_evals: &[Vec<F>]) -> Self {
         let dft = NaiveDft;
         let mut polys = Vec::with_capacity(column_evals.len());

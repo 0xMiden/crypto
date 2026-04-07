@@ -138,10 +138,7 @@ where
         constraint_degree: usize,
     ) -> BitReversedMatrixView<RowMajorMatrixView<'_, F>> {
         let quotient_height = self.lifted_coset(m).trace_height() * constraint_degree;
-        self.tree.leaves()[m]
-            .split_rows(quotient_height)
-            .0
-            .bit_reverse_rows()
+        self.tree.leaves()[m].split_rows(quotient_height).0.bit_reverse_rows()
     }
 }
 
@@ -219,9 +216,7 @@ where
             let coset_shift = coset.lde_shift::<F>();
 
             info_span!("LDE", trace = idx, log_height = log_trace_height, width).in_scope(|| {
-                let lde = config
-                    .dft()
-                    .coset_lde_batch(trace, log_blowup.into(), coset_shift);
+                let lde = config.dft().coset_lde_batch(trace, log_blowup.into(), coset_shift);
                 materialize_bitrev(lde)
             })
         })
@@ -261,12 +256,7 @@ mod tests {
         let row: Vec<Felt> = truncated.row(0).unwrap().into_iter().collect();
         assert_eq!(
             row,
-            vec![
-                Felt::from_u64(0),
-                Felt::from_u64(1),
-                Felt::from_u64(2),
-                Felt::from_u64(3)
-            ]
+            vec![Felt::from_u64(0), Felt::from_u64(1), Felt::from_u64(2), Felt::from_u64(3)]
         );
     }
 
@@ -285,10 +275,8 @@ mod tests {
         for i in 0..8 {
             let br_i = reverse_bits_len(i, 3);
             let natural_row: Vec<Felt> = natural.row(i).unwrap().into_iter().collect();
-            let expected: Vec<Felt> = vec![
-                Felt::from_u64((br_i * 2) as u64),
-                Felt::from_u64((br_i * 2 + 1) as u64),
-            ];
+            let expected: Vec<Felt> =
+                vec![Felt::from_u64((br_i * 2) as u64), Felt::from_u64((br_i * 2 + 1) as u64)];
             assert_eq!(natural_row, expected, "mismatch at natural row {i}");
         }
     }

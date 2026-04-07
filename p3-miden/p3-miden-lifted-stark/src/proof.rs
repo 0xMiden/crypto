@@ -119,11 +119,8 @@ where
         let alignment = config.lmcs().alignment();
 
         // Infer constraint degree from symbolic AIR analysis (max across all AIRs)
-        let constraint_degree = instances
-            .iter()
-            .map(|(air, _)| air.constraint_degree())
-            .max()
-            .unwrap_or(2);
+        let constraint_degree =
+            instances.iter().map(|(air, _)| air.constraint_degree()).max().unwrap_or(2);
         let log_lde_height = log_max_trace_height + log_blowup;
 
         // Max LDE coset (for the largest trace, no lifting)
@@ -133,11 +130,8 @@ where
         let main_commit = channel.receive_commitment()?.clone();
 
         // 2. Sample randomness for aux traces
-        let max_num_randomness = instances
-            .iter()
-            .map(|(air, _)| air.num_randomness())
-            .max()
-            .unwrap_or(0);
+        let max_num_randomness =
+            instances.iter().map(|(air, _)| air.num_randomness()).max().unwrap_or(0);
 
         let randomness: Vec<EF> = (0..max_num_randomness)
             .map(|_| channel.sample_algebra_element::<EF>())
@@ -176,10 +170,8 @@ where
         // aligned widths here to parse the transcript correctly.
         // (The verifier's `verify_aligned` does the same alignment internally, then
         // truncates the returned evals back to original widths for constraint checking.)
-        let main_widths: Vec<usize> = instances
-            .iter()
-            .map(|(air, _)| aligned_len(air.width(), alignment))
-            .collect();
+        let main_widths: Vec<usize> =
+            instances.iter().map(|(air, _)| aligned_len(air.width(), alignment)).collect();
         let quotient_width = aligned_len(constraint_degree * EF::DIMENSION, alignment);
 
         let aux_widths: Vec<usize> = instances

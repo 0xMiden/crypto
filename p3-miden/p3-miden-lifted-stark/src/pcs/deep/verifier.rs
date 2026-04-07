@@ -95,17 +95,14 @@ impl<F: TwoAdicField, EF: ExtensionField<F>, L: Lmcs<F = F>> DeepOracle<F, EF, L
             .iter()
             .enumerate()
             .map(|(p, &point)| {
-                let val = evals
-                    .iter()
-                    .flat_map(|g| g.iter())
-                    .fold(EF::ZERO, |acc, mat| {
-                        // mat has num_eval_points rows (one per z), p < num_eval_points.
-                        horner_acc(
-                            acc,
-                            challenge_columns,
-                            mat.row(p).expect("eval point index in range"),
-                        )
-                    });
+                let val = evals.iter().flat_map(|g| g.iter()).fold(EF::ZERO, |acc, mat| {
+                    // mat has num_eval_points rows (one per z), p < num_eval_points.
+                    horner_acc(
+                        acc,
+                        challenge_columns,
+                        mat.row(p).expect("eval point index in range"),
+                    )
+                });
                 (point, val)
             })
             .collect();
@@ -148,10 +145,7 @@ impl<F: TwoAdicField, EF: ExtensionField<F>, L: Lmcs<F = F>> DeepOracle<F, EF, L
         for (group_idx, (commit, widths)) in self.commitments.iter().enumerate() {
             let opened_rows = lmcs
                 .open_batch(commit, widths, tree_indices, channel)
-                .map_err(|source| DeepError::LmcsError {
-                    source,
-                    tree: group_idx,
-                })?;
+                .map_err(|source| DeepError::LmcsError { source, tree: group_idx })?;
 
             // Reduce opened rows via Horner: f_reduced(X) = Σᵢ αᵂ⁻¹⁻ⁱ · fᵢ(X).
             //
@@ -161,11 +155,9 @@ impl<F: TwoAdicField, EF: ExtensionField<F>, L: Lmcs<F = F>> DeepOracle<F, EF, L
             // otherwise the reconstructed DEEP quotient diverges from the FRI-committed
             // codeword, causing verification failure.
             for (tree_idx, acc) in reduced_rows.iter_mut() {
-                let rows_for_query =
-                    opened_rows.get(tree_idx).ok_or(DeepError::InvalidOpening {
-                        tree: group_idx,
-                        tree_index: *tree_idx,
-                    })?;
+                let rows_for_query = opened_rows
+                    .get(tree_idx)
+                    .ok_or(DeepError::InvalidOpening { tree: group_idx, tree_index: *tree_idx })?;
                 *acc = horner_acc(*acc, self.challenge_columns, rows_for_query.iter_values());
             }
         }
@@ -188,12 +180,9 @@ impl<F: TwoAdicField, EF: ExtensionField<F>, L: Lmcs<F = F>> DeepOracle<F, EF, L
                 for ((point, reduced_eval), coeff_point) in
                     zip(&self.reduced_openings, self.challenge_points.powers())
                 {
-                    let denom_inv =
-                        (*point - row_point)
-                            .try_inverse()
-                            .ok_or(DeepError::EvalPointOnDomain {
-                                tree_index: tree_idx,
-                            })?;
+                    let denom_inv = (*point - row_point)
+                        .try_inverse()
+                        .ok_or(DeepError::EvalPointOnDomain { tree_index: tree_idx })?;
                     deep_eval += coeff_point * (*reduced_eval - reduced_row) * denom_inv;
                 }
                 Ok((tree_idx, deep_eval))

@@ -84,20 +84,18 @@ impl<F: TwoAdicField, EF: ExtensionField<F>, const N: usize> PointQuotients<F, E
         let n_points = coset_points.len();
 
         // Compute differences in parallel: for each domain point x, compute [z₀ - x, z₁ - x, ...]
-        let diffs: Vec<FieldArray<EF, N>> = coset_points
-            .par_iter()
-            .map(|&x| points.map(|z| z - x))
-            .collect();
+        let diffs: Vec<FieldArray<EF, N>> =
+            coset_points.par_iter().map(|&x| points.map(|z| z - x)).collect();
 
         // Flatten FieldArray slice for batch inversion (zero-copy), then reconstitute.
         let diffs_flat = FieldArray::as_raw_slice(&diffs).as_flattened();
         let invs_flat = batch_multiplicative_inverse(diffs_flat);
         debug_assert_eq!(invs_flat.len(), N * n_points);
         // SAFETY: `reconstitute_from_base` requires:
-        // - Same alignment: `FieldArray<EF, N>` is `#[repr(transparent)]` over
-        //   `[EF; N]`, so it has the same alignment as `EF`.
-        // - Length is a multiple of N: `invs_flat` has length `N * n_points`
-        //   (one inverse per OOD point per domain element).
+        // - Same alignment: `FieldArray<EF, N>` is `#[repr(transparent)]` over `[EF; N]`, so it has
+        //   the same alignment as `EF`.
+        // - Length is a multiple of N: `invs_flat` has length `N * n_points` (one inverse per OOD
+        //   point per domain element).
         let point_quotient: Vec<FieldArray<EF, N>> = unsafe { reconstitute_from_base(invs_flat) };
 
         debug_assert_eq!(point_quotient.len(), n_points);
@@ -342,10 +340,8 @@ mod tests {
         let our_evals: Vec<QuadFelt> = result.as_slice().iter().map(|arr| arr[0]).collect();
 
         // Convert our diff_invs from bit-reversed to standard order for precomputation
-        let mut diff_invs_std: Vec<QuadFelt> = quotient.point_quotient[..lde_height]
-            .iter()
-            .map(|arr| arr[0])
-            .collect();
+        let mut diff_invs_std: Vec<QuadFelt> =
+            quotient.point_quotient[..lde_height].iter().map(|arr| arr[0]).collect();
         reverse_slice_index_bits(&mut diff_invs_std);
 
         // Interpolation with precomputation (both in standard order)
@@ -363,7 +359,8 @@ mod tests {
         }
     }
 
-    /// Verify `PointQuotients<2>` produces consistent results with separate `PointQuotients<1>` calls.
+    /// Verify `PointQuotients<2>` produces consistent results with separate `PointQuotients<1>`
+    /// calls.
     #[test]
     fn point_quotients_matches_single_point() {
         use alloc::vec::Vec;
@@ -416,11 +413,8 @@ mod tests {
         let multi_evals = mq.batch_eval_lifted(&matrices_groups, &coset_points_br, log_blowup);
 
         // Verify point_quotient matches
-        for (i, (sq1_q, sq2_q)) in sq1
-            .point_quotient
-            .iter()
-            .zip(sq2.point_quotient.iter())
-            .enumerate()
+        for (i, (sq1_q, sq2_q)) in
+            sq1.point_quotient.iter().zip(sq2.point_quotient.iter()).enumerate()
         {
             let mq_q = &mq.point_quotient[i];
             assert_eq!(sq1_q[0], mq_q[0], "point_quotient mismatch at {i} for z1");
@@ -499,9 +493,8 @@ mod tests {
         assert_eq!(rows.len(), 2, "expected 2 matrix rows");
 
         // Verify each point against reference
-        for (point_idx, (label, z)) in [(0, "z1", z1), (1, "z2", z2)]
-            .into_iter()
-            .map(|(i, l, z)| (i, (l, z)))
+        for (point_idx, (label, z)) in
+            [(0, "z1", z1), (1, "z2", z2)].into_iter().map(|(i, l, z)| (i, (l, z)))
         {
             // Matrix 1 (no lifting): evaluate at z directly
             let expected1 = interpolate_coset(&evals1_std, lifted_shift_1, z);

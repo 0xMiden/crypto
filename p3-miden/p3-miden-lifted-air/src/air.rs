@@ -87,9 +87,10 @@ pub trait LiftedAir<F: Field, EF>: Sync + BaseAir<F> {
 
     /// Number of extension-field aux values committed to the Fiat-Shamir transcript.
     ///
-    /// These are the values returned by [`AuxBuilder::build_aux_trace`](crate::AuxBuilder::build_aux_trace)
-    /// alongside the aux trace matrix. Their count may differ from [`aux_width`](Self::aux_width)
-    /// (the number of aux trace columns).
+    /// These are the values returned by
+    /// [`AuxBuilder::build_aux_trace`](crate::AuxBuilder::build_aux_trace) alongside the aux
+    /// trace matrix. Their count may differ from [`aux_width`](Self::aux_width) (the number of
+    /// aux trace columns).
     ///
     /// These values are exposed to AIR constraints as *permutation values* via
     /// [`PermutationAirBuilder::permutation_values`](crate::PermutationAirBuilder::permutation_values).
@@ -168,12 +169,12 @@ pub trait LiftedAir<F: Field, EF>: Sync + BaseAir<F> {
     ///
     /// # Checked properties
     ///
-    /// - **No preprocessed trace** — the lifted STARK protocol does not support
-    ///   preprocessed (fixed) columns; their presence is an error.
-    /// - **Positive auxiliary width** — every lifted AIR must declare at least one
-    ///   auxiliary column (`aux_width() > 0`).
-    /// - **Well-formed periodic columns** — each periodic column must be non-empty
-    ///   and have a power-of-two length.
+    /// - **No preprocessed trace** — the lifted STARK protocol does not support preprocessed
+    ///   (fixed) columns; their presence is an error.
+    /// - **Positive auxiliary width** — every lifted AIR must declare at least one auxiliary column
+    ///   (`aux_width() > 0`).
+    /// - **Well-formed periodic columns** — each periodic column must be non-empty and have a
+    ///   power-of-two length.
     fn validate(&self) -> Result<(), AirValidationError> {
         if self.preprocessed_trace().is_some() {
             return Err(AirValidationError::PreprocessedTrace);
@@ -197,8 +198,9 @@ pub trait LiftedAir<F: Field, EF>: Sync + BaseAir<F> {
 
     /// Log₂ of the number of quotient chunks, inferred from symbolic constraint analysis.
     ///
-    /// Evaluates the AIR on a [`SymbolicAirBuilder`](crate::symbolic::SymbolicAirBuilder) to determine
-    /// the maximum constraint degree M, then returns `log2_ceil(M - 1)` (padded so M ≥ 2).
+    /// Evaluates the AIR on a [`SymbolicAirBuilder`](crate::symbolic::SymbolicAirBuilder) to
+    /// determine the maximum constraint degree M, then returns `log2_ceil(M - 1)` (padded so M
+    /// ≥ 2).
     ///
     /// Uses `SymbolicAirBuilder<F>` (i.e. `EF = F`) which is sufficient for degree
     /// computation since extension-field operations have the same degree structure.
@@ -271,11 +273,7 @@ pub trait LiftedAir<F: Field, EF>: Sync + BaseAir<F> {
         let check =
             |part: TracePart, expected: usize, actual: usize| -> Result<(), AirValidationError> {
                 if actual != expected {
-                    return Err(AirValidationError::BuilderMismatch {
-                        part,
-                        expected,
-                        actual,
-                    });
+                    return Err(AirValidationError::BuilderMismatch { part, expected, actual });
                 }
                 Ok(())
             };
@@ -290,21 +288,13 @@ pub trait LiftedAir<F: Field, EF>: Sync + BaseAir<F> {
         check(TracePart::Aux, self.aux_width(), perm.current_slice().len())?;
         check(TracePart::Aux, self.aux_width(), perm.next_slice().len())?;
 
-        check(
-            TracePart::PublicValues,
-            self.num_public_values(),
-            builder.public_values().len(),
-        )?;
+        check(TracePart::PublicValues, self.num_public_values(), builder.public_values().len())?;
         check(
             TracePart::Randomness,
             self.num_randomness(),
             builder.permutation_randomness().len(),
         )?;
-        check(
-            TracePart::AuxValues,
-            self.num_aux_values(),
-            builder.permutation_values().len(),
-        )?;
+        check(TracePart::AuxValues, self.num_aux_values(), builder.permutation_values().len())?;
         check(
             TracePart::PeriodicValues,
             self.periodic_columns().len(),
@@ -358,8 +348,5 @@ pub enum AirValidationError {
     #[error("var-len public inputs count mismatch: expected {expected}, got {actual}")]
     VarLenPublicInputsMismatch { expected: usize, actual: usize },
     #[error("trace height {trace_height} is less than max periodic column length {max_period}")]
-    TraceHeightBelowPeriod {
-        trace_height: usize,
-        max_period: usize,
-    },
+    TraceHeightBelowPeriod { trace_height: usize, max_period: usize },
 }

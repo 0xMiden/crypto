@@ -111,9 +111,7 @@ impl<T: Copy + Default> RowList<T> {
     pub fn iter_aligned(&self, alignment: usize) -> impl Iterator<Item = T> + '_ {
         self.iter_rows().flat_map(move |row| {
             let padding = aligned_len(row.len(), alignment) - row.len();
-            row.iter()
-                .copied()
-                .chain(core::iter::repeat_n(T::default(), padding))
+            row.iter().copied().chain(core::iter::repeat_n(T::default(), padding))
         })
     }
 }

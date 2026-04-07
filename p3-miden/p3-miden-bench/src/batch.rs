@@ -64,11 +64,7 @@ impl<F: Field> LookupAir<F> for KeccakWithLookup {
             (vec![col0.clone()], one.clone(), Direction::Send),
             (vec![col0], one, Direction::Receive),
         ];
-        vec![LookupAir::register_lookup(
-            self,
-            Kind::Local,
-            &lookup_inputs,
-        )]
+        vec![LookupAir::register_lookup(self, Kind::Local, &lookup_inputs)]
     }
 }
 
@@ -189,7 +185,16 @@ impl<F: Field> LookupAir<F> for BatchBenchAir {
 /// Parameterized over packed field/digest types and digest size, since these
 /// differ per hash function and cannot be inferred from the constructor.
 macro_rules! batch_config {
-    ($P:ty, $PD:ty, $DIGEST:expr, $leaf:expr, $compress:expr, $challenger:expr, $log_blowup:expr, $cli:expr) => {{
+    (
+        $P:ty,
+        $PD:ty,
+        $DIGEST:expr,
+        $leaf:expr,
+        $compress:expr,
+        $challenger:expr,
+        $log_blowup:expr,
+        $cli:expr
+    ) => {{
         type Dft = p3_dft::Radix2DitParallel<Felt>;
         let mmcs: MerkleTreeMmcs<$P, $PD, _, _, 2, $DIGEST> =
             MerkleTreeMmcs::new($leaf, $compress, 0);
@@ -231,7 +236,7 @@ where
             AirType::Poseidon2 => {
                 let c = constants.as_ref().expect("poseidon2 constants required");
                 BatchBenchAir::Poseidon2(Box::new(BatchPoseidon2Air::new(c.clone())))
-            }
+            },
             AirType::Blake3 => BatchBenchAir::Blake3,
             AirType::Miden => BatchBenchAir::Miden(MidenWithLookups {
                 width: spec.width,
@@ -241,10 +246,8 @@ where
         })
         .collect();
 
-    let degree_bits: Vec<usize> = traces
-        .iter()
-        .map(|t| log2_strict_u8(t.height()) as usize)
-        .collect();
+    let degree_bits: Vec<usize> =
+        traces.iter().map(|t| log2_strict_u8(t.height()) as usize).collect();
     let prover_data = ProverData::from_airs_and_degrees(config, &mut airs, &degree_bits);
     let common = &prover_data.common;
 
@@ -256,9 +259,7 @@ where
     let proof = info_span!("prove").in_scope(|| prove_batch(config, &instances, &prover_data));
 
     let result = RunResult {
-        proof_size_bytes: postcard::to_allocvec(&proof)
-            .expect("serialization failed")
-            .len(),
+        proof_size_bytes: postcard::to_allocvec(&proof).expect("serialization failed").len(),
         field_elems: 0,
         commitments: 0,
     };

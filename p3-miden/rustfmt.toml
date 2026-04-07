@@ -1,4 +1,0 @@
-imports_granularity = "Crate"
-group_imports = "StdExternalCrate"
-reorder_imports = true
-reorder_modules = true

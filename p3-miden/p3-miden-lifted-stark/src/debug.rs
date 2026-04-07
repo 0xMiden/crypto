@@ -197,9 +197,7 @@ fn check_single_trace<F, EF, A>(
         let aux_next = aux_trace.row_slice(next_row).unwrap();
 
         // Periodic values for this row via modulo indexing into the periodic table.
-        let periodic_row = periodic_matrix
-            .as_ref()
-            .map(|m| m.row_slice(row % m.height()).unwrap());
+        let periodic_row = periodic_matrix.as_ref().map(|m| m.row_slice(row % m.height()).unwrap());
         let periodic_values: &[F] = periodic_row.as_deref().unwrap_or(&[]);
 
         let mut builder = DebugConstraintBuilder {

@@ -79,9 +79,9 @@ pub trait StatefulHasher<Item, Out>: Clone {
 /// # Type Parameters
 ///
 /// - `Input`: The type being absorbed (e.g., field element `F`)
-/// - `Target`: The type underlying the hasher's state. For a field-native sponge this
-///   equals `Input` (e.g., `Alignable<F, F>`); for a serializing sponge it is the binary
-///   word type of the inner hasher (e.g., `u32`, `u64`)
+/// - `Target`: The type underlying the hasher's state. For a field-native sponge this equals
+///   `Input` (e.g., `Alignable<F, F>`); for a serializing sponge it is the binary word type of the
+///   inner hasher (e.g., `u32`, `u64`)
 ///
 /// The two type parameters allow distinguishing between different serialization
 /// targets. For example, `SerializingStatefulSponge` can implement both
@@ -91,8 +91,8 @@ pub trait StatefulHasher<Item, Out>: Clone {
 ///
 /// - A field-native sponge with rate `R` implements `Alignable<T, T>` with `ALIGNMENT = R`
 /// - A chaining hasher implements `Alignable<F, Target>` with `ALIGNMENT = 1` (no padding)
-/// - A serializing wrapper implements `Alignable<F, u32>` and `Alignable<F, u64>` with
-///   alignment derived from field size and inner hasher's alignment
+/// - A serializing wrapper implements `Alignable<F, u32>` and `Alignable<F, u64>` with alignment
+///   derived from field size and inner hasher's alignment
 pub trait Alignable<Input, Target> {
     /// The alignment width in units of `Input`.
     ///

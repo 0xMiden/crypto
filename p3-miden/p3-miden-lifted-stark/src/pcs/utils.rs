@@ -90,8 +90,8 @@ impl<
 ///
 /// Bit-reversal gives two properties essential for lifting:
 /// - **Adjacent negation**: `gK[2i+1] = -gK[2i]`, so both square to the same value
-/// - **Squaring gives prefix**: `(gK[2i])² = (gK)²[i]` — the even-indexed elements,
-///   when squared, form the half-size sub-coset. Generalizes to r-th powers.
+/// - **Squaring gives prefix**: `(gK[2i])² = (gK)²[i]` — the even-indexed elements, when squared,
+///   form the half-size sub-coset. Generalizes to r-th powers.
 ///
 /// Together these enable iterative weight folding in barycentric evaluation.
 ///

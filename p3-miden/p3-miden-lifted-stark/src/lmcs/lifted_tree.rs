@@ -15,7 +15,8 @@ use crate::lmcs::{
     tree_indices::TreeIndices, utils::PackedValueExt,
 };
 
-/// A uniform binary Merkle tree whose leaves are constructed from matrices with power-of-two heights.
+/// A uniform binary Merkle tree whose leaves are constructed from matrices with power-of-two
+/// heights.
 ///
 /// # Type Parameters
 ///
@@ -62,11 +63,11 @@ use crate::lmcs::{
 ///
 /// `prove_batch` streams transcript hints in the format expected by
 /// [`Lmcs::open_batch`](crate::lmcs::Lmcs::open_batch):
-/// - For each unique query index **in sorted tree index order** (ascending, deduplicated): one
-///   row per matrix (in leaf order), then `SALT_ELEMS` field elements of salt.
-/// - Each row is padded with explicit zeros to the LMCS alignment.
-///   This allows verifiers to absorb fixed-size chunks without special-casing
-///   the final partial chunk; padding is not enforced to be zero.
+/// - For each unique query index **in sorted tree index order** (ascending, deduplicated): one row
+///   per matrix (in leaf order), then `SALT_ELEMS` field elements of salt.
+/// - Each row is padded with explicit zeros to the LMCS alignment. This allows verifiers to absorb
+///   fixed-size chunks without special-casing the final partial chunk; padding is not enforced to
+///   be zero.
 /// - After all indices: missing sibling hashes, level-by-level, left-to-right, bottom-to-top.
 ///
 /// Hints are not observed into the Fiat-Shamir challenger.
@@ -225,22 +226,19 @@ where
                 if let Some(ref salt_matrix) = salt {
                     debug_assert_eq!(salt_matrix.height(), leaf_states.len());
                     debug_assert_eq!(salt_matrix.width(), SALT_ELEMS);
-                    info_span!(
-                        "absorb salt",
-                        height = salt_matrix.height(),
-                        width = SALT_ELEMS
-                    )
-                    .in_scope(|| {
-                        absorb_matrix::<PF, PD, _, _, WIDTH, DIGEST_ELEMS>(
-                            &mut leaf_states,
-                            salt_matrix,
-                            h,
-                        );
-                    });
+                    info_span!("absorb salt", height = salt_matrix.height(), width = SALT_ELEMS)
+                        .in_scope(|| {
+                            absorb_matrix::<PF, PD, _, _, WIDTH, DIGEST_ELEMS>(
+                                &mut leaf_states,
+                                salt_matrix,
+                                h,
+                            );
+                        });
                 }
 
-                // Squeeze leaf hashes and bit-reverse in one pass: digest[i] = squeeze(state[bitrev(i)]).
-                // This places digests in domain order so the Merkle tree is indexed naturally.
+                // Squeeze leaf hashes and bit-reverse in one pass: digest[i] =
+                // squeeze(state[bitrev(i)]). This places digests in domain order so
+                // the Merkle tree is indexed naturally.
                 let n = leaf_states.len();
                 let log_n = log2_strict_usize(n);
                 (0..n)
@@ -296,21 +294,16 @@ where
             Some(salt_matrix) => {
                 let physical_index =
                     reverse_bits_len(domain_index, log2_strict_usize(salt_matrix.height()));
-                let row = salt_matrix
-                    .row_slice(physical_index)
-                    .expect("index must be valid");
+                let row = salt_matrix.row_slice(physical_index).expect("index must be valid");
                 // Tree construction guarantees salt width == SALT_ELEMS
                 array::from_fn(|i| row[i])
-            }
+            },
             None => {
                 // For SALT_ELEMS == 0, this returns an empty array.
                 // For SALT_ELEMS > 0, this should never be reached if using safe constructors.
-                debug_assert!(
-                    SALT_ELEMS == 0,
-                    "tree constructed without salt but SALT_ELEMS > 0"
-                );
+                debug_assert!(SALT_ELEMS == 0, "tree constructed without salt but SALT_ELEMS > 0");
                 [F::default(); SALT_ELEMS]
-            }
+            },
         }
     }
 
@@ -348,8 +341,8 @@ where
 /// Conceptually, each matrix is virtually extended to height `H` by repeating each row
 /// `L = H / h` times (width unchanged), and the leaf `r` absorbs the `r`-th row from each
 /// extended matrix in order. Each absorbed row is virtually padded with zeros to a multiple of the
-/// hasher's padding width for absorption; see [`LiftedMerkleTree`](crate::lmcs::LiftedMerkleTree) docs
-/// for the equivalent single-matrix view.
+/// hasher's padding width for absorption; see [`LiftedMerkleTree`](crate::lmcs::LiftedMerkleTree)
+/// docs for the equivalent single-matrix view.
 ///
 /// Padding is implicit and not checked; callers that require zero padding must enforce
 /// it elsewhere.
@@ -440,12 +433,9 @@ fn absorb_matrix<PF, PD, M, H, const WIDTH: usize, const DIGEST_ELEMS: usize>(
 
     if height < PF::WIDTH || PF::WIDTH == 1 {
         // Scalar path: walk every final leaf state and absorb the wrapped row for this matrix.
-        states
-            .par_iter_mut()
-            .zip(matrix.par_rows())
-            .for_each(|(state, row)| {
-                sponge.absorb_into(state, row);
-            });
+        states.par_iter_mut().zip(matrix.par_rows()).for_each(|(state, row)| {
+            sponge.absorb_into(state, row);
+        });
     } else {
         // SIMD path: gather → absorb wrapped packed row → scatter per chunk.
         states
@@ -480,10 +470,7 @@ fn compress_uniform<
     prev_layer: &[[P::Value; DIGEST_ELEMS]],
     c: &C,
 ) -> Vec<[P::Value; DIGEST_ELEMS]> {
-    assert!(
-        prev_layer.len().is_power_of_two(),
-        "previous layer length must be a power of 2"
-    );
+    assert!(prev_layer.len().is_power_of_two(), "previous layer length must be a power of 2");
 
     let next_len = prev_layer.len() / 2;
     let default_digest = [P::Value::default(); DIGEST_ELEMS];
@@ -491,20 +478,16 @@ fn compress_uniform<
 
     // Use scalar path when output is too small for packing
     if next_len < P::WIDTH || P::WIDTH == 1 {
-        let (prev_layer_pairs, _) = prev_layer.as_chunks::<2>();
-        next_digests
-            .par_iter_mut()
-            .zip(prev_layer_pairs.par_iter())
-            .for_each(|(next_digest, prev_layer_pair)| {
-                *next_digest = c.compress(*prev_layer_pair);
-            });
+        next_digests.par_iter_mut().zip(prev_layer.par_chunks_exact(2)).for_each(
+            |(next_digest, prev_layer_pair)| {
+                *next_digest = c.compress([prev_layer_pair[0], prev_layer_pair[1]]);
+            },
+        );
     } else {
         // Packed path: since next_len and P::WIDTH are both powers of 2,
         // next_len is a multiple of P::WIDTH, so no remainder handling needed.
-        next_digests
-            .par_chunks_exact_mut(P::WIDTH)
-            .enumerate()
-            .for_each(|(packed_chunk_idx, digests_chunk)| {
+        next_digests.par_chunks_exact_mut(P::WIDTH).enumerate().for_each(
+            |(packed_chunk_idx, digests_chunk)| {
                 let chunk_idx = packed_chunk_idx * P::WIDTH;
                 let left: [P; DIGEST_ELEMS] =
                     array::from_fn(|j| P::from_fn(|k| prev_layer[2 * (chunk_idx + k)][j]));
@@ -512,7 +495,8 @@ fn compress_uniform<
                     array::from_fn(|j| P::from_fn(|k| prev_layer[2 * (chunk_idx + k) + 1][j]));
                 let packed_digest = c.compress([left, right]);
                 P::unpack_into(&packed_digest, digests_chunk);
-            });
+            },
+        );
     }
     next_digests
 }
@@ -522,8 +506,8 @@ fn compress_uniform<
 /// Requirements enforced:
 /// - Non-empty sequence (at least one matrix).
 /// - Every height is a power of two and non-zero.
-/// - Heights are in non-decreasing order (sorted by height), so the last height is the maximum
-///   `H` used by lifting.
+/// - Heights are in non-decreasing order (sorted by height), so the last height is the maximum `H`
+///   used by lifting.
 ///
 /// # Panics
 /// Panics if any requirement is violated.
@@ -532,10 +516,7 @@ fn validate_heights(heights: impl IntoIterator<Item = usize>) -> usize {
 
     for (matrix, height) in heights.into_iter().enumerate() {
         assert_ne!(height, 0, "zero height at matrix {matrix}");
-        assert!(
-            height.is_power_of_two(),
-            "non-power-of-two height at matrix {matrix}"
-        );
+        assert!(height.is_power_of_two(), "non-power-of-two height at matrix {matrix}");
         assert!(height >= active_height, "matrices must be sorted by height");
         active_height = height;
     }
@@ -570,11 +551,7 @@ mod tests {
             vec![(2, 3), (4, 5), (8, rate)],
             vec![(1, 5), (1, 3), (2, 7), (4, 1), (8, rate + 1)],
             // Packing boundary tests
-            vec![
-                (pack_width / 2, rate - 1),
-                (pack_width, rate),
-                (pack_width * 2, rate + 3),
-            ],
+            vec![(pack_width / 2, rate - 1), (pack_width, rate), (pack_width * 2, rate + 3)],
             vec![(pack_width, rate + 5), (pack_width * 2, 25)],
             vec![
                 (1, rate * 2),

@@ -18,10 +18,7 @@ pub enum PcsParamsError {
     #[error("log_blowup must be > 0")]
     ZeroBlowup,
     #[error("log_final_degree ({log_final_degree}) + log_blowup ({log_blowup}) exceeds 64")]
-    FinalDomainTooLarge {
-        log_final_degree: u8,
-        log_blowup: u8,
-    },
+    FinalDomainTooLarge { log_final_degree: u8, log_blowup: u8 },
     #[error("num_queries must be > 0")]
     ZeroQueries,
 }
@@ -66,10 +63,7 @@ impl PcsParams {
             return Err(PcsParamsError::ZeroBlowup);
         }
         if log_final_degree as u16 + log_blowup as u16 > MAX_LOG_DOMAIN_SIZE as u16 {
-            return Err(PcsParamsError::FinalDomainTooLarge {
-                log_final_degree,
-                log_blowup,
-            });
+            return Err(PcsParamsError::FinalDomainTooLarge { log_final_degree, log_blowup });
         }
         if num_queries == 0 {
             return Err(PcsParamsError::ZeroQueries);

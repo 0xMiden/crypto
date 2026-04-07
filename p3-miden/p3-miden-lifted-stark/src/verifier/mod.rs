@@ -87,10 +87,7 @@ pub enum VerifierError {
         "constraint degree exceeds blowup: \
          log_quotient_degree {log_quotient_degree} > log_blowup {log_blowup}"
     )]
-    ConstraintDegreeTooHigh {
-        log_quotient_degree: u8,
-        log_blowup: u8,
-    },
+    ConstraintDegreeTooHigh { log_quotient_degree: u8, log_blowup: u8 },
     #[error("global reduced aux identity check failed")]
     InvalidReducedAux,
     #[error("aux value reduction failed: {0}")]
@@ -188,11 +185,8 @@ where
     // Infer constraint degree from symbolic AIR analysis (max across all AIRs).
     // NOTE: `log_quotient_degree()` runs symbolic eval and may panic if the AIR is
     // invalid. Callers must ensure `validate_instances` (above) passes first.
-    let log_constraint_degree = instances
-        .iter()
-        .map(|(air, _)| air.log_quotient_degree())
-        .max()
-        .unwrap_or(1) as u8;
+    let log_constraint_degree =
+        instances.iter().map(|(air, _)| air.log_quotient_degree()).max().unwrap_or(1) as u8;
 
     if log_constraint_degree > log_blowup {
         return Err(VerifierError::ConstraintDegreeTooHigh {
@@ -213,11 +207,8 @@ where
     let main_commit = channel.receive_commitment()?.clone();
 
     // 2. Sample randomness for aux traces
-    let max_num_randomness = instances
-        .iter()
-        .map(|(air, _)| air.num_randomness())
-        .max()
-        .unwrap_or(0);
+    let max_num_randomness =
+        instances.iter().map(|(air, _)| air.num_randomness()).max().unwrap_or(0);
 
     let randomness: Vec<EF> = (0..max_num_randomness)
         .map(|_| channel.sample_algebra_element::<EF>())
@@ -252,10 +243,8 @@ where
 
     // 7. Widths per commitment group (unpadded data widths).
     let main_widths: Vec<usize> = instances.iter().map(|(air, _)| air.width()).collect();
-    let aux_widths: Vec<usize> = instances
-        .iter()
-        .map(|(air, _)| air.aux_width() * EF::DIMENSION)
-        .collect();
+    let aux_widths: Vec<usize> =
+        instances.iter().map(|(air, _)| air.aux_width() * EF::DIMENSION).collect();
     let quotient_widths: Vec<usize> = vec![constraint_degree * EF::DIMENSION];
 
     // Build commitments with original (unpadded) widths.

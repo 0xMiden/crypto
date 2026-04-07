@@ -101,11 +101,11 @@ where
             AirType::Poseidon2 => {
                 let c = constants.as_ref().expect("poseidon2 constants required");
                 LiftedBenchAir::Poseidon2(Box::new(LiftedPoseidon2Air::new(c.clone())))
-            }
+            },
             AirType::Blake3 => LiftedBenchAir::Blake3(LiftedBlake3Air),
             AirType::Miden => {
                 LiftedBenchAir::Miden(DummyMidenAir::new(spec.width, spec.num_aux_cols))
-            }
+            },
         })
         .collect();
 
@@ -152,13 +152,9 @@ where
                     )
                 })
                 .collect();
-            let digest = verify_multi(
-                config,
-                &verifier_instances,
-                &output.proof,
-                config.challenger(),
-            )
-            .expect("verification failed");
+            let digest =
+                verify_multi(config, &verifier_instances, &output.proof, config.challenger())
+                    .expect("verification failed");
             assert_eq!(output.digest, digest);
         });
     }

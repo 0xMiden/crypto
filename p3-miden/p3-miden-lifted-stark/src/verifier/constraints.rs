@@ -217,7 +217,7 @@ where
     F: TwoAdicField,
     EF: ExtensionField<F>,
 {
-    if !row.len().is_multiple_of(EF::DIMENSION) {
+    if row.len() % EF::DIMENSION != 0 {
         return Err(VerifierError::InvalidAuxShape);
     }
     let num_elements = row.len() / EF::DIMENSION;

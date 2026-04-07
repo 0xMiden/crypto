@@ -139,10 +139,7 @@ impl MissingSiblingsIter {
         let tree_depth = tree_depth as usize;
         let len = if tree_depth > 0 { positions.len() } else { 0 };
         Self {
-            nodes: positions
-                .iter()
-                .map(|&p| NodeId::new(tree_depth, p))
-                .collect(),
+            nodes: positions.iter().map(|&p| NodeId::new(tree_depth, p)).collect(),
             current: 0..len,
             next_len: 0,
         }
@@ -248,10 +245,7 @@ mod tests {
     }
 
     fn missing_siblings(indices: impl IntoIterator<Item = usize>, depth: u8) -> Vec<NodeId> {
-        TreeIndices::new(indices, depth)
-            .unwrap()
-            .missing_siblings()
-            .collect()
+        TreeIndices::new(indices, depth).unwrap().missing_siblings().collect()
     }
 
     #[test]
@@ -283,10 +277,7 @@ mod tests {
     #[test]
     fn missing_siblings_various_patterns() {
         // Single leaf at depth 2: sibling + uncle.
-        assert_eq!(
-            missing_siblings([2], 2),
-            vec![NodeId::new(2, 3), NodeId::new(1, 0)]
-        );
+        assert_eq!(missing_siblings([2], 2), vec![NodeId::new(2, 3), NodeId::new(1, 0)]);
 
         // Sibling pair: only the parent's sibling is missing.
         assert_eq!(missing_siblings([2, 3], 2), vec![NodeId::new(1, 0)]);

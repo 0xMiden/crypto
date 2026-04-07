@@ -48,9 +48,8 @@ where
     let mut verifier_channel = gl::verifier_channel(transcript);
     let result = lmcs.open_batch(commitment, widths, indices, &mut verifier_channel);
     if result.is_ok() {
-        let verifier_digest = verifier_channel
-            .finalize()
-            .expect("transcript should finalize cleanly");
+        let verifier_digest =
+            verifier_channel.finalize().expect("transcript should finalize cleanly");
         assert_eq!(verifier_digest, *prover_digest);
     }
     result
@@ -74,14 +73,8 @@ where
         tree.prove_batch(&tree_indices, &mut prover_channel);
         prover_channel.finalize()
     };
-    let opened_rows = verify_open_batch(
-        lmcs,
-        &tree.root(),
-        &widths,
-        &tree_indices,
-        &transcript,
-        &prover_digest,
-    )?;
+    let opened_rows =
+        verify_open_batch(lmcs, &tree.root(), &widths, &tree_indices, &transcript, &prover_digest)?;
     Ok((transcript, opened_rows))
 }
 
@@ -108,17 +101,14 @@ fn lmcs_roundtrip() {
     let test = |seed: u64, matrices: &[(usize, usize)], num_queries: usize| {
         let mut rng = SmallRng::seed_from_u64(seed);
         let lmcs = gl::test_lmcs();
-        let matrices: Vec<_> = matrices
-            .iter()
-            .map(|&(h, w)| RowMajorMatrix::rand(&mut rng, h, w))
-            .collect();
+        let matrices: Vec<_> =
+            matrices.iter().map(|&(h, w)| RowMajorMatrix::rand(&mut rng, h, w)).collect();
 
         let tree = lmcs.build_tree(matrices);
         let widths = tree.aligned_widths();
         let max_height = tree.height();
-        let indices: Vec<usize> = (0..num_queries)
-            .map(|_| rng.random_range(0..max_height))
-            .collect();
+        let indices: Vec<usize> =
+            (0..num_queries).map(|_| rng.random_range(0..max_height)).collect();
         let (_transcript, opened_rows) =
             roundtrip_open_batch(&lmcs, &tree, &indices).expect("batch opening should verify");
 
@@ -137,10 +127,7 @@ fn lmcs_roundtrip() {
 fn lmcs_duplicate_indices_roundtrip() {
     let mut rng = SmallRng::seed_from_u64(123);
     let lmcs = gl::test_lmcs();
-    let matrices = vec![
-        RowMajorMatrix::rand(&mut rng, 4, 5),
-        RowMajorMatrix::rand(&mut rng, 8, 3),
-    ];
+    let matrices = vec![RowMajorMatrix::rand(&mut rng, 4, 5), RowMajorMatrix::rand(&mut rng, 8, 3)];
 
     let tree = lmcs.build_tree(matrices);
     let widths = tree.aligned_widths();
@@ -154,11 +141,7 @@ fn lmcs_duplicate_indices_roundtrip() {
     assert_eq!(opened_rows.len(), 3);
 
     for (&index, rows) in &opened_rows {
-        assert_eq!(
-            *rows,
-            tree.aligned_rows(index),
-            "row mismatch for index {index}"
-        );
+        assert_eq!(*rows, tree.aligned_rows(index), "row mismatch for index {index}");
     }
 
     let tree_indices = TreeIndices::new(indices.iter().copied(), log_max_height).unwrap();
@@ -182,10 +165,8 @@ fn lmcs_duplicate_indices_roundtrip() {
 fn hiding_roundtrip() {
     let test = |seed: u64, matrices: &[(usize, usize)], indices: &[usize]| {
         let mut rng = SmallRng::seed_from_u64(seed);
-        let matrices: Vec<_> = matrices
-            .iter()
-            .map(|&(h, w)| RowMajorMatrix::rand(&mut rng, h, w))
-            .collect();
+        let matrices: Vec<_> =
+            matrices.iter().map(|&(h, w)| RowMajorMatrix::rand(&mut rng, h, w)).collect();
 
         let config = hiding_lmcs(rng);
         let tree: HidingTree<_> = config.build_tree(matrices);
@@ -200,11 +181,7 @@ fn hiding_roundtrip() {
     test(99, &[(4, 3), (8, 5)], &[1, 3, 5]);
 
     // Different salts should produce different commitments
-    let matrices1 = vec![RowMajorMatrix::rand(
-        &mut SmallRng::seed_from_u64(100),
-        4,
-        3,
-    )];
+    let matrices1 = vec![RowMajorMatrix::rand(&mut SmallRng::seed_from_u64(100), 4, 3)];
     let matrices2 = matrices1.clone();
 
     let config1 = hiding_lmcs(SmallRng::seed_from_u64(1));
@@ -231,22 +208,12 @@ fn open_batch_handles_empty_or_oob() {
     // Empty indices → open_batch returns InvalidProof.
     let empty = TreeIndices::new([], log_max_height).unwrap();
     assert_eq!(
-        verify_open_batch(
-            &lmcs,
-            &commitment,
-            &widths,
-            &empty,
-            &transcript,
-            &prover_digest
-        ),
+        verify_open_batch(&lmcs, &commitment, &widths, &empty, &transcript, &prover_digest),
         Err(LmcsError::InvalidProof)
     );
 
     // Out-of-range index → TreeIndices construction returns InvalidProof.
-    assert_eq!(
-        TreeIndices::new([tree.height()], log_max_height),
-        Err(LmcsError::InvalidProof)
-    );
+    assert_eq!(TreeIndices::new([tree.height()], log_max_height), Err(LmcsError::InvalidProof));
 }
 
 #[test]
@@ -308,16 +275,12 @@ fn batch_proof_handles_empty_or_oob() {
     // Empty indices → no openings parsed.
     let empty = TreeIndices::new([], log_max_height).unwrap();
     let mut verifier_channel = gl::verifier_channel(&transcript);
-    let batch = lmcs
-        .read_batch_proof(&widths, &empty, &mut verifier_channel)
-        .unwrap();
+    let batch = lmcs.read_batch_proof(&widths, &empty, &mut verifier_channel).unwrap();
     assert!(batch.openings.is_empty());
 
     // Zero-width openings with a valid index.
     let mut verifier_channel = gl::verifier_channel(&transcript);
-    let batch = lmcs
-        .read_batch_proof(&[], &idx0, &mut verifier_channel)
-        .unwrap();
+    let batch = lmcs.read_batch_proof(&[], &idx0, &mut verifier_channel).unwrap();
     assert_eq!(batch.openings.len(), 1);
     let opening = batch.openings.get(&0).expect("opening for index 0");
     assert_eq!(opening.rows.num_rows(), 0);
