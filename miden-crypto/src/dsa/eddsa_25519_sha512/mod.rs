@@ -376,9 +376,9 @@ impl Signature {
         // Parse outer SEQUENCE
         let (tag, seq_body, trailing) = parse_der_tlv(bytes)?;
         if tag != 0x30 {
-            return Err(DeserializationError::InvalidValue(
-                alloc::format!("expected DER SEQUENCE (0x30), got 0x{tag:02x}"),
-            ));
+            return Err(DeserializationError::InvalidValue(alloc::format!(
+                "expected DER SEQUENCE (0x30), got 0x{tag:02x}"
+            )));
         }
         if !trailing.is_empty() {
             return Err(DeserializationError::InvalidValue(
@@ -389,18 +389,18 @@ impl Signature {
         // Parse R INTEGER
         let (tag, r_content, remaining) = parse_der_tlv(seq_body)?;
         if tag != 0x02 {
-            return Err(DeserializationError::InvalidValue(
-                alloc::format!("expected DER INTEGER (0x02) for R, got 0x{tag:02x}"),
-            ));
+            return Err(DeserializationError::InvalidValue(alloc::format!(
+                "expected DER INTEGER (0x02) for R, got 0x{tag:02x}"
+            )));
         }
         let r = der_integer_to_le_32(r_content)?;
 
         // Parse S INTEGER
         let (tag, s_content, remaining) = parse_der_tlv(remaining)?;
         if tag != 0x02 {
-            return Err(DeserializationError::InvalidValue(
-                alloc::format!("expected DER INTEGER (0x02) for S, got 0x{tag:02x}"),
-            ));
+            return Err(DeserializationError::InvalidValue(alloc::format!(
+                "expected DER INTEGER (0x02) for S, got 0x{tag:02x}"
+            )));
         }
         if !remaining.is_empty() {
             return Err(DeserializationError::InvalidValue(
@@ -448,9 +448,7 @@ fn parse_der_length(bytes: &[u8]) -> Result<(usize, usize), DeserializationError
                 .ok_or_else(|| DeserializationError::InvalidValue("truncated DER length".into()))?;
             Ok((len as usize, 2))
         },
-        _ => Err(DeserializationError::InvalidValue(
-            "unsupported DER length encoding".into(),
-        )),
+        _ => Err(DeserializationError::InvalidValue("unsupported DER length encoding".into())),
     }
 }
 
