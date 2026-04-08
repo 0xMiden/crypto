@@ -271,7 +271,7 @@ type MutatedLeaves = (MutatedSubtreeLeaves, Map<u64, SmtLeaf>, Map<Word, Word>, 
 /// in-memory nodes while continuing to share the storage backend, which is misleading. If you need
 /// to share an instance between threads or components, wrap it in an
 /// [`Arc`](alloc::sync::Arc) explicitly so the ownership semantics are clear.
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct LargeSmt<S: SmtStorage> {
     storage: S,
     /// Flat vector representation of in-memory nodes.

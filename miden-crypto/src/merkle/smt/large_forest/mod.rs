@@ -346,7 +346,7 @@ use crate::{
 /// A high-performance forest of sparse merkle trees with pluggable storage backends.
 ///
 /// See the module documentation for more information.
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct LargeSmtForest<B: Backend> {
     /// The configuration for how the forest functions.
     config: Config,
