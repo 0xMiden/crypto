@@ -7,7 +7,7 @@
 - [BREAKING] Restructured LMCS: removed `mmcs/` module and `serde` dependency, added `TreeIndices`, `MerkleWitness`, `NodeId`, `RowList` proof types ([#52](https://github.com/0xMiden/p3-miden/pull/52)).
 - [BREAKING] LMCS tree now indexed by domain order; `Lmcs::build_tree`/`build_aligned_tree` require `BitReversibleMatrix` inputs and store `M::BitRev` ([#52](https://github.com/0xMiden/p3-miden/pull/52)).
 - Removed `reverse_bits_len` from PCS query sampling, DEEP verifier, and FRI verifier ([#52](https://github.com/0xMiden/p3-miden/pull/52)).
-- perf: faster constraint evaluation for wide matrices ([#57](https://github.com/0xMiden/p3-miden/57)).
+- perf: faster constraint evaluation for wide matrices ([#57](https://github.com/0xMiden/p3-miden/pull/57)).
 - Added info-level tracing spans to prover path: per-trace LDE, quotient iDFT/scaling/DFT; promoted `eval_instance`, `compress tree layers`, and `build aux traces` from debug to info ([#61](https://github.com/0xMiden/p3-miden/pull/61)).
 - feat: add support for Blake3-192 ([#59](https://github.com/0xMiden/p3-miden/pull/59))
 
@@ -16,7 +16,7 @@
 - Fixed periodic column evaluation on LDE/quotient domains.
 - [BREAKING] Removed forced conversion of periodic values from F to EF.
 - Added Lifted STARK implementation ([#17](https://github.com/0xMiden/p3-miden/pull/17)).
-- Fixed length issue in boundary data length check ([#21](https://github.com/0xMiden/p3-miden/pull/21).
+- Fixed length issue in boundary data length check ([#21](https://github.com/0xMiden/p3-miden/pull/21)).
 - [BREAKING] Decoupled aux trace building from `LiftedAir` into standalone `AuxBuilder` trait and made auxiliary trace mandatory ([#35](https://github.com/0xMiden/p3-miden/pull/35)).
 - [BREAKING] Incremented Plonky3 dependencies to v0.5.0 ([#34](https://github.com/0xMiden/p3-miden/pull/34)).
 

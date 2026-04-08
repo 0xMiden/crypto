@@ -11,7 +11,7 @@ db-urls = ["https://github.com/rustsec/advisory-db"]
 ignore = [
   # paste crate is unmaintained but still functional; transitively used by Plonky3
   "RUSTSEC-2024-0436",
-  # tracing-forest is only used by the non-published p3-miden bench utility crate
+  # tracing-forest is only used by the non-published miden-bench utility crate
   "RUSTSEC-2021-0139",
 ]
 yanked = "warn"

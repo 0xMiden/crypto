@@ -11,9 +11,9 @@ This code has not been independently audited.
 ## High-Risk Items (Read These First)
 
 - Transcript "observed vs unobserved" split: `miden-stark-transcript/src/prover.rs` and `miden-stark-transcript/src/verifier.rs`
-- LMCS batch opening verification and sibling order: `p3-miden-lmcs/src/lmcs.rs`
-- DEEP reduction and domain-point reconstruction: `p3-miden-lifted-fri/src/deep/verifier.rs`
-- FRI round loop (index shifting, `s_inv` computation, final poly check): `p3-miden-lifted-fri/src/fri/verifier.rs`
+- LMCS batch opening verification and sibling order: `miden-lifted-stark/src/lmcs/mod.rs`
+- DEEP reduction and domain-point reconstruction: `miden-lifted-stark/src/pcs/deep/verifier.rs`
+- FRI round loop (index shifting, `s_inv` computation, final poly check): `miden-lifted-stark/src/pcs/fri/verifier.rs`
 - STARK boundary canonicality and OOD identity check: `miden-lifted-stark/src/verifier/mod.rs`
 
 ## Protocol Hierarchy (This Workspace)
@@ -22,14 +22,14 @@ This code has not been independently audited.
 LMCS  ->  DEEP + FRI  ->  PCS (lifted-fri)  ->  Lifted STARK (lifted-stark)
 ```
 
-- **LMCS** (`p3-miden-lmcs`): Merkle commitments + batch openings for multiple
+- **LMCS** (`miden-lifted-stark/src/lmcs`): Merkle commitments + batch openings for multiple
   matrices, presented as a uniform-height view via virtual upsampling.
-- **DEEP** (`p3-miden-lifted-fri/src/deep`): batches OOD evaluation claims into a
+- **DEEP** (`miden-lifted-stark/src/pcs/deep`): batches OOD evaluation claims into a
   single quotient polynomial.
-- **FRI** (`p3-miden-lifted-fri/src/fri`): low-degree testing of that quotient.
-- **PCS** (`p3-miden-lifted-fri`): wires DEEP + FRI together and drives query
+- **FRI** (`miden-lifted-stark/src/pcs/fri`): low-degree testing of that quotient.
+- **PCS** (`miden-lifted-stark/src/pcs`): wires DEEP + FRI together and drives query
   sampling/opening.
-- **Lifted STARK** (`p3-miden-lifted-{prover,verifier}`): commits traces/aux/Q,
+- **Lifted STARK** (`miden-lifted-stark/src/{prover,verifier}`): commits traces/aux/Q,
   samples STARK challenges, evaluates constraints OOD, and checks the quotient
   identity.
 
@@ -97,7 +97,7 @@ challenger state.
 The lifted STARK verifier (`miden-lifted-stark`) rejects trailing
 transcript data.
 
-The PCS verifier (`p3-miden-lifted-fri`) provides both:
+The PCS verifier (`miden-lifted-stark/src/pcs`) provides both:
 
 - `verify` (does not require transcript exhaustion; intended for composition),
 - `verify_strict` (rejects trailing data), and
@@ -116,10 +116,10 @@ at the outer protocol layer.
 ## What To Review First (Suggested Order)
 
 1. `miden-lifted-stark/src/verifier/mod.rs` (`verify_multi`)
-2. `p3-miden-lifted-fri/src/verifier.rs` (`verify`)
-3. `p3-miden-lmcs/src/lmcs.rs` (`LmcsConfig::open_batch`)
-4. `p3-miden-lifted-fri/src/deep/verifier.rs` (DEEP reduction + quotient eval)
-5. `p3-miden-lifted-fri/src/fri/verifier.rs` (FRI round loop)
+2. `miden-lifted-stark/src/pcs/verifier.rs` (`verify`)
+3. `miden-lifted-stark/src/lmcs/mod.rs` (`Lmcs::open_batch`)
+4. `miden-lifted-stark/src/pcs/deep/verifier.rs` (DEEP reduction + quotient eval)
+5. `miden-lifted-stark/src/pcs/fri/verifier.rs` (FRI round loop)
 
 ## Security-Critical Invariants (Checklist)
 
@@ -130,7 +130,7 @@ at the outer protocol layer.
       the verifier replays before checking the PoW witness.
 - [ ] Hints are never used as a source of entropy.
 
-### LMCS (`p3-miden-lmcs`)
+### LMCS (`miden-lifted-stark/src/lmcs`)
 
 - [ ] Leaf hashing absorption order is fixed and matches verifier recomputation.
 - [ ] Batch proof sibling consumption is canonical (left-to-right, bottom-to-top).
@@ -140,7 +140,7 @@ at the outer protocol layer.
       the committed tree, verification must fail by root mismatch or parse error
       (never by accepting an incorrect opening).
 
-### DEEP (`p3-miden-lifted-fri/src/deep`)
+### DEEP (`miden-lifted-stark/src/pcs/deep`)
 
 - [ ] OOD evaluations are observed *before* sampling `alpha`/`beta`.
 - [ ] Column batching uses the same Horner convention everywhere
@@ -150,7 +150,7 @@ at the outer protocol layer.
 - [ ] Evaluation points are distinct and lie outside the LDE domain (division
       by zero must be rejected).
 
-### FRI (`p3-miden-lifted-fri/src/fri`)
+### FRI (`miden-lifted-stark/src/pcs/fri`)
 
 - [ ] For each round: commitment observed -> PoW verified -> folding challenge
       sampled.
@@ -159,7 +159,7 @@ at the outer protocol layer.
 - [ ] Final polynomial coefficients are read in the intended order and evaluated
       at the intended points.
 
-### Lifted STARK (`p3-miden-lifted-{prover,verifier}`)
+### Lifted STARK (`miden-lifted-stark/src/{prover,verifier}`)
 
 - [ ] Instances are provided in ascending height order; heights are powers of two.
 - [ ] The verifier's OOD evaluation point projection `y_j = z^{r_j}` matches
@@ -234,11 +234,11 @@ production-grade security.
 
 Soundness is primarily controlled by:
 
-- `p3-miden-lifted-fri/src/fri/mod.rs::FriParams`:
+- `miden-lifted-stark/src/pcs/fri/mod.rs::FriParams`:
   - `log_blowup`
   - `fold` (arity)
   - `log_final_degree`
-- `p3-miden-lifted-fri/src/params.rs::PcsParams`:
+- `miden-lifted-stark/src/pcs/params.rs::PcsParams`:
   - `num_queries`
 - grinding parameters:
   - `DeepParams::deep_pow_bits`
@@ -266,8 +266,8 @@ proof sizes and/or cap transcript lengths before constructing verifier channels.
 
 ## Tests and Reference Points
 
-- LMCS lifting equivalence: `p3-miden-lmcs/src/lifted_tree.rs` (tests)
-- LMCS batch openings: `p3-miden-lmcs/src/tests.rs`
-- PCS end-to-end: `p3-miden-lifted-fri/src/tests.rs`
-- DEEP tests: `p3-miden-lifted-fri/src/deep/tests.rs`
-- FRI tests: `p3-miden-lifted-fri/src/fri/tests.rs`
+- LMCS lifting equivalence: `miden-lifted-stark/src/lmcs/lifted_tree.rs` (tests)
+- LMCS batch openings: `miden-lifted-stark/src/lmcs/tests.rs`
+- PCS end-to-end: `miden-lifted-stark/src/pcs/tests.rs`
+- DEEP tests: `miden-lifted-stark/src/pcs/deep/tests.rs`
+- FRI tests: `miden-lifted-stark/src/pcs/fri/tests.rs`

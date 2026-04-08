@@ -98,7 +98,7 @@ test-docs:
 	cargo test --doc --all-features --profile test-release
 
 .PHONY: test-p3-parallel
-test-p3-parallel: ## Run p3-miden tests with the parallel feature enabled
+test-p3-parallel: ## Run Miden STARK crate tests with the parallel feature enabled
 	cargo test $(MIDEN_STARK_TEST_PACKAGES) -F miden-lifted-stark/parallel
 
 .PHONY: test-large-smt

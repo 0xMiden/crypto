@@ -16,8 +16,8 @@ prover, and verifier.
 miden-lifted-stark              ← this crate
 ├── src/prover/                    ← Proving: trace commitment, constraint evaluation, quotient construction
 ├── src/verifier/                  ← Verification: OOD check, quotient reconstruction, transcript canonicality
-├── p3-miden-lifted-fri            ← PCS (DEEP + FRI)
-│   └── p3-miden-lmcs              ← Merkle commitments with lifting
+├── src/pcs/                       ← PCS (DEEP + FRI)
+├── src/lmcs/                      ← Merkle commitments with lifting
 └── miden-lifted-air            ← AIR traits (aux columns, periodic columns)
 ```
 
@@ -71,7 +71,7 @@ See `docs/lifting.md` for a deeper discussion and sufficient conditions.
    scaling + flatten + DFT pipeline. Commit via LMCS.
 8. **Sample OOD point z** — Rejection-sampled to lie outside H and the LDE
    coset.
-9. **Open via PCS** — Delegate to `p3-miden-lifted-fri`.
+9. **Open via PCS** — Delegate to the internal `pcs` modules.
 
 ### Verifier (`verify_multi`)
 

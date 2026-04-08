@@ -1,7 +1,7 @@
 [package]
 description            = "Stateful sponge-like hashers for cryptographic hashing"
 edition                = "2024"
-homepage               = "https://github.com/0xMiden/crypto/tree/main/p3-miden"
+homepage               = "https://github.com/0xMiden/crypto/tree/main/crates"
 license                = "MIT OR Apache-2.0"
 name                   = "miden-stateful-hasher"
 readme                 = "../README.md"

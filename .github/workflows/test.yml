@@ -105,7 +105,7 @@ jobs:
           make doc
 
   test-p3-parallel:
-    name: test p3-miden parallel ${{ matrix.toolchain }}
+    name: test Miden STARK crates parallel ${{ matrix.toolchain }}
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -116,7 +116,7 @@ jobs:
       - uses: actions/checkout@main
       - name: Cleanup large tools for build space
         uses: ./.github/actions/cleanup-runner
-      - name: Run p3-miden parallel tests
+      - name: Run Miden STARK crate parallel tests
         run: |
           rustup update --no-self-update ${{ matrix.toolchain }}
           rustup default ${{ matrix.toolchain }}

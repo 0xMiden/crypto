@@ -9,25 +9,22 @@ and verifier as a single uniform-height object via virtual lifting.
 ## Lifted STARK Stack
 
 ```text
-miden-lifted-stark                (prover, verifier, shared types)
-├── p3-miden-lifted-fri              (PCS: DEEP + FRI)
-│   └── p3-miden-lmcs                (Merkle commitments with lifting)
-├── miden-lifted-air              (AIR traits + symbolic analysis)
-├── miden-stark-transcript              (Fiat-Shamir channels)
-└── miden-stateful-hasher         (stateful hashers for LMCS)
+miden-lifted-stark               (prover, verifier, PCS, LMCS, shared types)
+├── miden-lifted-air             (AIR traits + symbolic analysis)
+├── miden-stark-transcript       (Fiat-Shamir channels)
+├── miden-stateful-hasher        (stateful hashers for LMCS)
+└── miden-bench                  (profiling binary)
 ```
 
 ## Workspace Crates
 
 | Crate | Purpose |
 |------|---------|
-| `miden-lifted-stark` | Lifted STARK prover, verifier, and shared types (facade crate) |
+| `miden-lifted-stark` | Lifted STARK prover, verifier, PCS, LMCS, and shared types |
 | `miden-lifted-air` | Lifted AIR traits and symbolic constraint analysis |
-| `p3-miden-lifted-fri` | PCS: DEEP quotient + FRI over LMCS commitments |
-| `p3-miden-lmcs` | Lifted Matrix Commitment Scheme (uniform-height view) |
 | `miden-stark-transcript` | Transcript channels (`ProverTranscript`, `VerifierTranscript`) |
 | `miden-stateful-hasher` | Stateful hashers used by LMCS |
-| `p3-miden-lifted-examples` | Example AIRs + benchmark binaries |
+| `miden-bench` | Profiling binary for lifted and batch STARK runs |
 
 ## Docs
 
@@ -38,8 +35,8 @@ miden-lifted-stark                (prover, verifier, shared types)
 ## Where To Start (Code)
 
 - Protocol flow: `miden-lifted-stark/src/prover/mod.rs` and `miden-lifted-stark/src/verifier/mod.rs`
-- PCS layer: `p3-miden-lifted-fri/src/prover.rs` and `p3-miden-lifted-fri/src/verifier.rs`
-- Commitment layer: `p3-miden-lmcs/src/lmcs.rs` and `p3-miden-lmcs/src/lifted_tree.rs`
+- PCS layer: `miden-lifted-stark/src/pcs/prover.rs` and `miden-lifted-stark/src/pcs/verifier.rs`
+- Commitment layer: `miden-lifted-stark/src/lmcs/mod.rs` and `miden-lifted-stark/src/lmcs/lifted_tree.rs`
 - Math background: `docs/lifting.md`
 
 ## Build / Test
@@ -55,7 +52,7 @@ make doc
 ## Run An Example
 
 ```bash
-cargo run -p p3-miden-lifted-examples --release --bin lifted_keccak
+cargo run -p miden-bench --features parallel --release -- keccak:15
 ```
 
 ## Security Disclaimer
