@@ -80,7 +80,7 @@ name              = "transpose"
 required-features = ["std"]
 
 [features]
-concurrent        = ["dep:rayon", "p3-maybe-rayon/parallel", "p3-miden-lifted-stark/parallel", "p3-util/parallel", "std"]
+concurrent        = ["dep:rayon", "miden-lifted-stark/parallel", "p3-maybe-rayon/parallel", "p3-util/parallel", "std"]
 default           = ["concurrent", "std"]
 executable        = ["concurrent", "dep:clap", "dep:rand-utils"]
 fuzzing           = []
@@ -136,7 +136,7 @@ p3-symmetric.workspace   = true
 p3-util.workspace        = true
 
 # Miden-specific Plonky3 crates
-p3-miden-lifted-stark = { default-features = false, workspace = true }
+miden-lifted-stark = { default-features = false, workspace = true }
 
 [dev-dependencies]
 assert_matches = { workspace = true }

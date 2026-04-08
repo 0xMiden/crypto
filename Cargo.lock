@@ -1057,6 +1057,36 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f8ca58f447f06ed17d5fc4043ce1b10dd205e060fb3ce5b979b8ed8e59ff3f79"
 
 [[package]]
+name = "miden-bench"
+version = "0.24.0"
+dependencies = [
+ "clap",
+ "miden-lifted-stark",
+ "p3-air",
+ "p3-batch-stark",
+ "p3-blake3",
+ "p3-blake3-air",
+ "p3-commit",
+ "p3-dft",
+ "p3-field",
+ "p3-fri",
+ "p3-goldilocks",
+ "p3-keccak",
+ "p3-keccak-air",
+ "p3-lookup",
+ "p3-matrix",
+ "p3-merkle-tree",
+ "p3-poseidon2-air",
+ "p3-symmetric",
+ "p3-uni-stark",
+ "postcard",
+ "rand 0.10.0",
+ "tracing",
+ "tracing-forest",
+ "tracing-subscriber",
+]
+
+[[package]]
 name = "miden-crypto"
 version = "0.24.0"
 dependencies = [
@@ -1076,6 +1106,7 @@ dependencies = [
  "k256",
  "miden-crypto-derive",
  "miden-field",
+ "miden-lifted-stark",
  "miden-serde-utils",
  "num",
  "num-complex",
@@ -1087,7 +1118,6 @@ dependencies = [
  "p3-keccak",
  "p3-matrix",
  "p3-maybe-rayon",
- "p3-miden-lifted-stark",
  "p3-symmetric",
  "p3-util",
  "proptest",
@@ -1136,11 +1166,75 @@ dependencies = [
 ]
 
 [[package]]
+name = "miden-lifted-air"
+version = "0.24.0"
+dependencies = [
+ "p3-air",
+ "p3-field",
+ "p3-goldilocks",
+ "p3-matrix",
+ "p3-util",
+ "thiserror 2.0.18",
+]
+
+[[package]]
+name = "miden-lifted-stark"
+version = "0.24.0"
+dependencies = [
+ "criterion",
+ "miden-lifted-air",
+ "miden-stark-transcript",
+ "miden-stateful-hasher",
+ "p3-blake3",
+ "p3-blake3-air",
+ "p3-challenger",
+ "p3-commit",
+ "p3-dft",
+ "p3-field",
+ "p3-fri",
+ "p3-goldilocks",
+ "p3-interpolation",
+ "p3-keccak",
+ "p3-keccak-air",
+ "p3-matrix",
+ "p3-maybe-rayon",
+ "p3-merkle-tree",
+ "p3-poseidon2-air",
+ "p3-symmetric",
+ "p3-util",
+ "rand 0.10.0",
+ "thiserror 2.0.18",
+ "tracing",
+ "tracing-subscriber",
+]
+
+[[package]]
 name = "miden-serde-utils"
 version = "0.24.0"
 dependencies = [
  "p3-field",
  "p3-goldilocks",
+]
+
+[[package]]
+name = "miden-stark-transcript"
+version = "0.24.0"
+dependencies = [
+ "p3-challenger",
+ "p3-field",
+ "serde",
+ "thiserror 2.0.18",
+]
+
+[[package]]
+name = "miden-stateful-hasher"
+version = "0.24.0"
+dependencies = [
+ "p3-bn254",
+ "p3-field",
+ "p3-goldilocks",
+ "p3-mersenne-31",
+ "p3-symmetric",
 ]
 
 [[package]]
@@ -1583,100 +1677,6 @@ dependencies = [
  "paste",
  "rand 0.10.0",
  "serde",
-]
-
-[[package]]
-name = "p3-miden-bench"
-version = "0.5.1"
-dependencies = [
- "clap",
- "p3-air",
- "p3-batch-stark",
- "p3-blake3",
- "p3-blake3-air",
- "p3-commit",
- "p3-dft",
- "p3-field",
- "p3-fri",
- "p3-goldilocks",
- "p3-keccak",
- "p3-keccak-air",
- "p3-lookup",
- "p3-matrix",
- "p3-merkle-tree",
- "p3-miden-lifted-stark",
- "p3-poseidon2-air",
- "p3-symmetric",
- "p3-uni-stark",
- "postcard",
- "rand 0.10.0",
- "tracing",
- "tracing-forest",
- "tracing-subscriber",
-]
-
-[[package]]
-name = "p3-miden-lifted-air"
-version = "0.5.1"
-dependencies = [
- "p3-air",
- "p3-field",
- "p3-goldilocks",
- "p3-matrix",
- "p3-util",
- "thiserror 2.0.18",
-]
-
-[[package]]
-name = "p3-miden-lifted-stark"
-version = "0.5.1"
-dependencies = [
- "criterion",
- "p3-blake3",
- "p3-blake3-air",
- "p3-challenger",
- "p3-commit",
- "p3-dft",
- "p3-field",
- "p3-fri",
- "p3-goldilocks",
- "p3-interpolation",
- "p3-keccak",
- "p3-keccak-air",
- "p3-matrix",
- "p3-maybe-rayon",
- "p3-merkle-tree",
- "p3-miden-lifted-air",
- "p3-miden-stateful-hasher",
- "p3-miden-transcript",
- "p3-poseidon2-air",
- "p3-symmetric",
- "p3-util",
- "rand 0.10.0",
- "thiserror 2.0.18",
- "tracing",
- "tracing-subscriber",
-]
-
-[[package]]
-name = "p3-miden-stateful-hasher"
-version = "0.5.1"
-dependencies = [
- "p3-bn254",
- "p3-field",
- "p3-goldilocks",
- "p3-mersenne-31",
- "p3-symmetric",
-]
-
-[[package]]
-name = "p3-miden-transcript"
-version = "0.5.1"
-dependencies = [
- "p3-challenger",
- "p3-field",
- "serde",
- "thiserror 2.0.18",
 ]
 
 [[package]]

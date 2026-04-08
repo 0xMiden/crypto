@@ -7,7 +7,7 @@ help:
 # -- variables --------------------------------------------------------------------------------------
 
 ALL_FEATURES_EXCEPT_ROCKSDB="concurrent executable internal serde std"
-P3_MIDEN_TEST_PACKAGES=-p p3-miden-lifted-air -p p3-miden-lifted-stark -p p3-miden-stateful-hasher -p p3-miden-transcript
+MIDEN_STARK_TEST_PACKAGES=-p miden-lifted-air -p miden-lifted-stark -p miden-stateful-hasher -p miden-stark-transcript
 WARNINGS=RUSTDOCFLAGS="-D warnings"
 
 # -- linting --------------------------------------------------------------------------------------
@@ -99,7 +99,7 @@ test-docs:
 
 .PHONY: test-p3-parallel
 test-p3-parallel: ## Run p3-miden tests with the parallel feature enabled
-	cargo test $(P3_MIDEN_TEST_PACKAGES) -F p3-miden-lifted-stark/parallel
+	cargo test $(MIDEN_STARK_TEST_PACKAGES) -F miden-lifted-stark/parallel
 
 .PHONY: test-large-smt
 test-large-smt: ## Run only large SMT tests

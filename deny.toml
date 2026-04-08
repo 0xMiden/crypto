@@ -39,7 +39,7 @@ multiple-versions = "deny"
 skip = [
   # Allow duplicate spin versions - transitively pulled by p3-dft and flume
   { name = "spin" },
-  # tracing-forest in p3-miden-bench still depends on thiserror 1.x
+  # tracing-forest in miden-bench still depends on thiserror 1.x
   { name = "thiserror" },
   { name = "thiserror-impl" },
 ]

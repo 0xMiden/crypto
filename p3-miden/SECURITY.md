@@ -10,11 +10,11 @@ This code has not been independently audited.
 
 ## High-Risk Items (Read These First)
 
-- Transcript "observed vs unobserved" split: `p3-miden-transcript/src/prover.rs` and `p3-miden-transcript/src/verifier.rs`
+- Transcript "observed vs unobserved" split: `miden-stark-transcript/src/prover.rs` and `miden-stark-transcript/src/verifier.rs`
 - LMCS batch opening verification and sibling order: `p3-miden-lmcs/src/lmcs.rs`
 - DEEP reduction and domain-point reconstruction: `p3-miden-lifted-fri/src/deep/verifier.rs`
 - FRI round loop (index shifting, `s_inv` computation, final poly check): `p3-miden-lifted-fri/src/fri/verifier.rs`
-- STARK boundary canonicality and OOD identity check: `p3-miden-lifted-stark/src/verifier/mod.rs`
+- STARK boundary canonicality and OOD identity check: `miden-lifted-stark/src/verifier/mod.rs`
 
 ## Protocol Hierarchy (This Workspace)
 
@@ -74,7 +74,7 @@ Concrete examples of statement data that the application must treat explicitly:
 
 ## Transcript Model (Observed vs Hinted)
 
-`p3-miden-transcript` stores two streams (fields and commitments) and provides
+`miden-stark-transcript` stores two streams (fields and commitments) and provides
 two kinds of writes/reads:
 
 - **Observed** (`send_*` / `receive_*`): data is appended/consumed and fed into
@@ -94,7 +94,7 @@ challenger state.
 
 ## Canonicality / Proof Malleability
 
-The lifted STARK verifier (`p3-miden-lifted-stark`) rejects trailing
+The lifted STARK verifier (`miden-lifted-stark`) rejects trailing
 transcript data.
 
 The PCS verifier (`p3-miden-lifted-fri`) provides both:
@@ -115,7 +115,7 @@ at the outer protocol layer.
 
 ## What To Review First (Suggested Order)
 
-1. `p3-miden-lifted-stark/src/verifier/mod.rs` (`verify_multi`)
+1. `miden-lifted-stark/src/verifier/mod.rs` (`verify_multi`)
 2. `p3-miden-lifted-fri/src/verifier.rs` (`verify`)
 3. `p3-miden-lmcs/src/lmcs.rs` (`LmcsConfig::open_batch`)
 4. `p3-miden-lifted-fri/src/deep/verifier.rs` (DEEP reduction + quotient eval)
