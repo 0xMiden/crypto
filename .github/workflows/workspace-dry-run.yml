@@ -17,16 +17,7 @@ concurrency:
 jobs:
   release-dry-run:
     if: ${{ github.repository_owner == '0xMiden' }}
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: Dry-run workspace release
-        uses: ./.github/actions/workspace-release
-        with:
-          mode: "dry-run"
-          verify-main-head: "false"
+    uses: 0xMiden/.github/.github/workflows/workspace-release.yml@ci/reusable-workspace-release
+    with:
+      mode: dry-run
+      msrv_script_path: scripts/check-msrv.sh
