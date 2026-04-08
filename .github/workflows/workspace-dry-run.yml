@@ -21,3 +21,4 @@ jobs:
     with:
       mode: dry-run
       msrv_script_path: scripts/check-msrv.sh
+      cargo_msrv_toolchain: 1.91
