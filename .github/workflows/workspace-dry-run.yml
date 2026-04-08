@@ -17,7 +17,7 @@ concurrency:
 jobs:
   release-dry-run:
     if: ${{ github.repository_owner == '0xMiden' }}
-    uses: 0xMiden/.github/.github/workflows/workspace-release.yml@ci/reusable-workspace-release
+    uses: 0xMiden/.github/.github/workflows/workspace-release.yml@8f70a02010391e1014558779845a11f1981cc57f
     with:
       mode: dry-run
       msrv_script_path: scripts/check-msrv.sh
