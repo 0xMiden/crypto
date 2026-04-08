@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"constant":["DEFAULT_MIDEN_AUX_COLS","DEFAULT_MIDEN_WIDTH","DEFAULT_NUM_QUERIES","DEFAULT_POW_BITS"],"enum":["AirType","HashFn","Mode"],"struct":["Cli","TraceSpec"]};

@@ -1,0 +1,211 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `crates/miden-lifted-stark/src/lib.rs`."><title>lib.rs - source</title><script>if(window.location.protocol!=="file:")document.head.insertAdjacentHTML("beforeend","SourceSerif4-Regular-6b053e98.ttf.woff2,FiraSans-Italic-81dc35de.woff2,FiraSans-Regular-0fe48ade.woff2,FiraSans-MediumItalic-ccf7e434.woff2,FiraSans-Medium-e1aa3f0a.woff2,SourceCodePro-Regular-8badfe75.ttf.woff2,SourceCodePro-Semibold-aa29a496.ttf.woff2".split(",").map(f=>`<link rel="preload" as="font" type="font/woff2"href="../../static.files/${f}">`).join(""))</script><link rel="stylesheet" href="../../static.files/normalize-9960930a.css"><link rel="stylesheet" href="../../static.files/rustdoc-17e0aaed.css"><meta name="rustdoc-vars" data-root-path="../../" data-static-root-path="../../static.files/" data-current-crate="miden_lifted_stark" data-themes="" data-resource-suffix="" data-rustdoc-version="1.96.0-nightly (c75612477 2026-04-07)" data-channel="nightly" data-search-js="search-b5634cc7.js" data-stringdex-js="stringdex-2da4960a.js" data-settings-js="settings-170eb4bf.js" ><script src="../../static.files/storage-41dd4d93.js"></script><script defer src="../../static.files/src-script-813739b1.js"></script><script defer src="../../src-files.js"></script><script defer src="../../static.files/main-5013f961.js"></script><noscript><link rel="stylesheet" href="../../static.files/noscript-f7c3ffd8.css"></noscript><link rel="alternate icon" type="image/png" href="../../static.files/favicon-32x32-eab170b8.png"><link rel="icon" type="image/svg+xml" href="../../static.files/favicon-044be391.svg"></head><body class="rustdoc src"><a class="skip-main-content" href="#main-content">Skip to main content</a><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="src-sidebar-title"><h2>Files</h2></div></nav><div class="sidebar-resizer" title="Drag to resize sidebar"></div><main><section id="main-content" class="content" tabindex="-1"><div class="main-heading"><h1><div class="sub-heading">miden_lifted_stark/</div>lib.rs</h1><rustdoc-toolbar></rustdoc-toolbar></div><div class="example-wrap digits-3"><pre class="rust"><code><a href=#1 id=1 data-nosnippet>1</a><span class="doccomment">//! Lifted STARK prover and verifier (LMCS-based).
+<a href=#2 id=2 data-nosnippet>2</a>//!
+<a href=#3 id=3 data-nosnippet>3</a>//! This crate implements the lifted STARK protocol combining LMCS (Lifted Matrix
+<a href=#4 id=4 data-nosnippet>4</a>//! Commitment Scheme), DEEP quotient construction, and FRI for low-degree testing.
+<a href=#5 id=5 data-nosnippet>5</a>//!
+<a href=#6 id=6 data-nosnippet>6</a>//! # AIR Trust Model
+<a href=#7 id=7 data-nosnippet>7</a>//!
+<a href=#8 id=8 data-nosnippet>8</a>//! The lifted STARK has three trust domains:
+<a href=#9 id=9 data-nosnippet>9</a>//!
+<a href=#10 id=10 data-nosnippet>10</a>//! 1. **AIR = trusted** — [`air::LiftedAir`] implementations are correct application code. It is
+<a href=#11 id=11 data-nosnippet>11</a>//!    the AIR implementer's responsibility to satisfy the contract below.
+<a href=#12 id=12 data-nosnippet>12</a>//!    [`air::LiftedAir::validate`] checks the statically-verifiable subset.
+<a href=#13 id=13 data-nosnippet>13</a>//!
+<a href=#14 id=14 data-nosnippet>14</a>//! 2. **Instance = validated** — The prover validates that its witness matches the AIR spec. The
+<a href=#15 id=15 data-nosnippet>15</a>//!    verifier validates instance metadata. Both return structured errors.
+<a href=#16 id=16 data-nosnippet>16</a>//!
+<a href=#17 id=17 data-nosnippet>17</a>//! 3. **Proof = untrusted** — Transcript data is verified cryptographically (PCS errors, constraint
+<a href=#18 id=18 data-nosnippet>18</a>//!    mismatch, etc.).
+<a href=#19 id=19 data-nosnippet>19</a>//!
+<a href=#20 id=20 data-nosnippet>20</a>//! ## Validated properties
+<a href=#21 id=21 data-nosnippet>21</a>//!
+<a href=#22 id=22 data-nosnippet>22</a>//! These are checked by [`air::LiftedAir::validate`]
+<a href=#23 id=23 data-nosnippet>23</a>//! and [`air::AirInstance::validate`], and enforced
+<a href=#24 id=24 data-nosnippet>24</a>//! by both prover and verifier before proceeding:
+<a href=#25 id=25 data-nosnippet>25</a>//!
+<a href=#26 id=26 data-nosnippet>26</a>//! - **No preprocessed trace** — the lifted protocol does not support them.
+<a href=#27 id=27 data-nosnippet>27</a>//! - **Positive aux width** — every AIR must have an auxiliary trace.
+<a href=#28 id=28 data-nosnippet>28</a>//! - **Periodic columns** — each has positive, power-of-two length ≤ trace height.
+<a href=#29 id=29 data-nosnippet>29</a>//! - **Constraint degree** — `log_quotient_degree() ≤ log_blowup`.
+<a href=#30 id=30 data-nosnippet>30</a>//! - **Instance dimensions** — trace width, public values length, var-len public inputs count, and
+<a href=#31 id=31 data-nosnippet>31</a>//!   trace height (power of two) all match the AIR specification.
+<a href=#32 id=32 data-nosnippet>32</a>//!
+<a href=#33 id=33 data-nosnippet>33</a>//! ## Unchecked trust assumptions
+<a href=#34 id=34 data-nosnippet>34</a>//!
+<a href=#35 id=35 data-nosnippet>35</a>//! These cannot be verified statically and are the AIR implementer's responsibility:
+<a href=#36 id=36 data-nosnippet>36</a>//!
+<a href=#37 id=37 data-nosnippet>37</a>//! 1. **Window size** — Only transition window size 2.
+<a href=#38 id=38 data-nosnippet>38</a>//! 2. **Deterministic constraints** — `eval()` emits the same number and types of constraints
+<a href=#39 id=39 data-nosnippet>39</a>//!    regardless of builder implementation.
+<a href=#40 id=40 data-nosnippet>40</a>//! 3. **Consistent aux builder** — `AuxBuilder::build_aux_trace` returns width = `aux_width()`,
+<a href=#41 id=41 data-nosnippet>41</a>//!    height = main trace height, and exactly `num_aux_values()` values. (The prover asserts these
+<a href=#42 id=42 data-nosnippet>42</a>//!    at runtime as a defense-in-depth sanity check.)
+<a href=#43 id=43 data-nosnippet>43</a>//! 4. **Sound `reduced_aux_values`** — Returns correct bus contributions for valid inputs.
+<a href=#44 id=44 data-nosnippet>44</a>
+<a href=#45 id=45 data-nosnippet>45</a></span><span class="attr">#![no_std]
+<a href=#46 id=46 data-nosnippet>46</a>
+<a href=#47 id=47 data-nosnippet>47</a></span><span class="kw">extern crate </span>alloc;
+<a href=#48 id=48 data-nosnippet>48</a>
+<a href=#49 id=49 data-nosnippet>49</a><span class="comment">// ============================================================================
+<a href=#50 id=50 data-nosnippet>50</a>// Private implementation modules
+<a href=#51 id=51 data-nosnippet>51</a>// ============================================================================
+<a href=#52 id=52 data-nosnippet>52</a>
+<a href=#53 id=53 data-nosnippet>53</a></span><span class="kw">mod </span>config;
+<a href=#54 id=54 data-nosnippet>54</a><span class="kw">mod </span>coset;
+<a href=#55 id=55 data-nosnippet>55</a><span class="kw">pub mod </span>debug;
+<a href=#56 id=56 data-nosnippet>56</a><span class="kw">pub mod </span>lmcs;
+<a href=#57 id=57 data-nosnippet>57</a><span class="kw">mod </span>pcs;
+<a href=#58 id=58 data-nosnippet>58</a><span class="kw">pub mod </span>proof;
+<a href=#59 id=59 data-nosnippet>59</a><span class="kw">pub mod </span>prover;
+<a href=#60 id=60 data-nosnippet>60</a><span class="kw">mod </span>selectors;
+<a href=#61 id=61 data-nosnippet>61</a><span class="kw">pub mod </span>verifier;
+<a href=#62 id=62 data-nosnippet>62</a>
+<a href=#63 id=63 data-nosnippet>63</a><span class="kw">pub use </span>config::{GenericStarkConfig, StarkConfig};
+<a href=#64 id=64 data-nosnippet>64</a><span class="kw">pub use </span>coset::LiftedCoset;
+<a href=#65 id=65 data-nosnippet>65</a><span class="kw">pub use </span>debug::{check_constraints, check_constraints_multi};
+<a href=#66 id=66 data-nosnippet>66</a><span class="kw">pub use </span>lmcs::{
+<a href=#67 id=67 data-nosnippet>67</a>    Lmcs, LmcsError, LmcsTree, OpenedRows,
+<a href=#68 id=68 data-nosnippet>68</a>    bitrev::{BitReversibleMatrix, materialize_bitrev},
+<a href=#69 id=69 data-nosnippet>69</a>    config::LmcsConfig,
+<a href=#70 id=70 data-nosnippet>70</a>    hiding_config::HidingLmcsConfig,
+<a href=#71 id=71 data-nosnippet>71</a>    lifted_tree::LiftedMerkleTree,
+<a href=#72 id=72 data-nosnippet>72</a>    merkle_witness::MerkleWitness,
+<a href=#73 id=73 data-nosnippet>73</a>    node_id::NodeId,
+<a href=#74 id=74 data-nosnippet>74</a>    proof::{
+<a href=#75 id=75 data-nosnippet>75</a>        BatchProof <span class="kw">as </span>LmcsBatchProof, BatchProofView <span class="kw">as </span>LmcsBatchProofView,
+<a href=#76 id=76 data-nosnippet>76</a>        LeafOpening <span class="kw">as </span>LmcsLeafOpening, Proof <span class="kw">as </span>LmcsProof,
+<a href=#77 id=77 data-nosnippet>77</a>    },
+<a href=#78 id=78 data-nosnippet>78</a>    row_list::RowList,
+<a href=#79 id=79 data-nosnippet>79</a>    tree_indices::{MissingSiblingsIter, TreeIndices},
+<a href=#80 id=80 data-nosnippet>80</a>    utils::log2_strict_u8,
+<a href=#81 id=81 data-nosnippet>81</a>};
+<a href=#82 id=82 data-nosnippet>82</a><span class="kw">pub use </span>pcs::{
+<a href=#83 id=83 data-nosnippet>83</a>    deep::{
+<a href=#84 id=84 data-nosnippet>84</a>        proof::{DeepTranscript, OpenedValues <span class="kw">as </span>PcsOpenedValues},
+<a href=#85 id=85 data-nosnippet>85</a>        verifier::DeepError,
+<a href=#86 id=86 data-nosnippet>86</a>    },
+<a href=#87 id=87 data-nosnippet>87</a>    fri::{
+<a href=#88 id=88 data-nosnippet>88</a>        proof::{FriRoundTranscript, FriTranscript},
+<a href=#89 id=89 data-nosnippet>89</a>        verifier::FriError,
+<a href=#90 id=90 data-nosnippet>90</a>    },
+<a href=#91 id=91 data-nosnippet>91</a>    params::{PcsParams, PcsParamsError},
+<a href=#92 id=92 data-nosnippet>92</a>    proof::PcsTranscript,
+<a href=#93 id=93 data-nosnippet>93</a>    verifier::PcsError,
+<a href=#94 id=94 data-nosnippet>94</a>};
+<a href=#95 id=95 data-nosnippet>95</a><span class="kw">pub use </span>proof::{StarkDigest, StarkOutput, StarkProof, StarkTranscript};
+<a href=#96 id=96 data-nosnippet>96</a><span class="kw">pub use </span>prover::{ProverError, prove_multi, prove_single};
+<a href=#97 id=97 data-nosnippet>97</a><span class="kw">pub use </span>verifier::{VerifierError, verify_multi, verify_single};
+<a href=#98 id=98 data-nosnippet>98</a>
+<a href=#99 id=99 data-nosnippet>99</a><span class="doccomment">/// Backward-compatible PCS namespace.
+<a href=#100 id=100 data-nosnippet>100</a>///
+<a href=#101 id=101 data-nosnippet>101</a>/// Older consumers accessed DEEP/FRI/PCS types through `miden_lifted_stark::fri`.
+<a href=#102 id=102 data-nosnippet>102</a>/// The current implementation organizes them under an internal `pcs` module, so this
+<a href=#103 id=103 data-nosnippet>103</a>/// public facade preserves the earlier module path.
+<a href=#104 id=104 data-nosnippet>104</a></span><span class="kw">pub mod </span>fri {
+<a href=#105 id=105 data-nosnippet>105</a>    <span class="kw">pub use </span>crate::{
+<a href=#106 id=106 data-nosnippet>106</a>        DeepError, DeepTranscript, FriError, FriRoundTranscript, FriTranscript, PcsError,
+<a href=#107 id=107 data-nosnippet>107</a>        PcsOpenedValues, PcsParams, PcsParamsError, PcsTranscript,
+<a href=#108 id=108 data-nosnippet>108</a>    };
+<a href=#109 id=109 data-nosnippet>109</a>
+<a href=#110 id=110 data-nosnippet>110</a>    <span class="kw">pub mod </span>deep {
+<a href=#111 id=111 data-nosnippet>111</a>        <span class="kw">pub use </span>crate::{DeepError, DeepTranscript, PcsOpenedValues};
+<a href=#112 id=112 data-nosnippet>112</a>
+<a href=#113 id=113 data-nosnippet>113</a>        <span class="kw">pub mod </span>proof {
+<a href=#114 id=114 data-nosnippet>114</a>            <span class="kw">pub use </span>crate::{DeepTranscript, PcsOpenedValues};
+<a href=#115 id=115 data-nosnippet>115</a>        }
+<a href=#116 id=116 data-nosnippet>116</a>
+<a href=#117 id=117 data-nosnippet>117</a>        <span class="kw">pub mod </span>verifier {
+<a href=#118 id=118 data-nosnippet>118</a>            <span class="kw">pub use </span><span class="kw">crate</span>::DeepError;
+<a href=#119 id=119 data-nosnippet>119</a>        }
+<a href=#120 id=120 data-nosnippet>120</a>    }
+<a href=#121 id=121 data-nosnippet>121</a>
+<a href=#122 id=122 data-nosnippet>122</a>    <span class="kw">pub mod </span>params {
+<a href=#123 id=123 data-nosnippet>123</a>        <span class="kw">pub use </span>crate::{PcsParams, PcsParamsError};
+<a href=#124 id=124 data-nosnippet>124</a>    }
+<a href=#125 id=125 data-nosnippet>125</a>
+<a href=#126 id=126 data-nosnippet>126</a>    <span class="kw">pub mod </span>proof {
+<a href=#127 id=127 data-nosnippet>127</a>        <span class="kw">pub use </span><span class="kw">crate</span>::PcsTranscript;
+<a href=#128 id=128 data-nosnippet>128</a>    }
+<a href=#129 id=129 data-nosnippet>129</a>
+<a href=#130 id=130 data-nosnippet>130</a>    <span class="kw">pub mod </span>round_proof {
+<a href=#131 id=131 data-nosnippet>131</a>        <span class="kw">pub use </span>crate::{FriRoundTranscript, FriTranscript};
+<a href=#132 id=132 data-nosnippet>132</a>    }
+<a href=#133 id=133 data-nosnippet>133</a>
+<a href=#134 id=134 data-nosnippet>134</a>    <span class="kw">pub mod </span>verifier {
+<a href=#135 id=135 data-nosnippet>135</a>        <span class="kw">pub use </span>crate::{FriError, PcsError};
+<a href=#136 id=136 data-nosnippet>136</a>    }
+<a href=#137 id=137 data-nosnippet>137</a>}
+<a href=#138 id=138 data-nosnippet>138</a>
+<a href=#139 id=139 data-nosnippet>139</a><span class="comment">// ============================================================================
+<a href=#140 id=140 data-nosnippet>140</a>// Namespaced re-exports from upstream crates
+<a href=#141 id=141 data-nosnippet>141</a>// ============================================================================
+<a href=#142 id=142 data-nosnippet>142</a>
+<a href=#143 id=143 data-nosnippet>143</a></span><span class="doccomment">/// AIR traits, instance/witness types, and upstream `p3-air` re-exports.
+<a href=#144 id=144 data-nosnippet>144</a>///
+<a href=#145 id=145 data-nosnippet>145</a>/// This module re-exports items from [`miden_lifted_air`], which in turn
+<a href=#146 id=146 data-nosnippet>146</a>/// re-exports `p3-air` types. Consumers should never need to depend on `p3-air`
+<a href=#147 id=147 data-nosnippet>147</a>/// directly.
+<a href=#148 id=148 data-nosnippet>148</a></span><span class="kw">pub mod </span>air {
+<a href=#149 id=149 data-nosnippet>149</a>    <span class="kw">pub use </span>miden_lifted_air::{
+<a href=#150 id=150 data-nosnippet>150</a>        <span class="comment">// Upstream p3-air re-exports
+<a href=#151 id=151 data-nosnippet>151</a>        </span>Air,
+<a href=#152 id=152 data-nosnippet>152</a>        AirBuilder,
+<a href=#153 id=153 data-nosnippet>153</a>        AirBuilderWithContext,
+<a href=#154 id=154 data-nosnippet>154</a>        <span class="comment">// Lifted AIR types
+<a href=#155 id=155 data-nosnippet>155</a>        </span>AirInstance,
+<a href=#156 id=156 data-nosnippet>156</a>        AirValidationError,
+<a href=#157 id=157 data-nosnippet>157</a>        AirWitness,
+<a href=#158 id=158 data-nosnippet>158</a>        AuxBuilder,
+<a href=#159 id=159 data-nosnippet>159</a>        BaseAir,
+<a href=#160 id=160 data-nosnippet>160</a>        EmptyWindow,
+<a href=#161 id=161 data-nosnippet>161</a>        ExtensionBuilder,
+<a href=#162 id=162 data-nosnippet>162</a>        FilteredAirBuilder,
+<a href=#163 id=163 data-nosnippet>163</a>        LiftedAir,
+<a href=#164 id=164 data-nosnippet>164</a>        LiftedAirBuilder,
+<a href=#165 id=165 data-nosnippet>165</a>        PeriodicAirBuilder,
+<a href=#166 id=166 data-nosnippet>166</a>        PermutationAirBuilder,
+<a href=#167 id=167 data-nosnippet>167</a>        ReducedAuxValues,
+<a href=#168 id=168 data-nosnippet>168</a>        ReductionError,
+<a href=#169 id=169 data-nosnippet>169</a>        RowWindow,
+<a href=#170 id=170 data-nosnippet>170</a>        TracePart,
+<a href=#171 id=171 data-nosnippet>171</a>        VarLenPublicInputs,
+<a href=#172 id=172 data-nosnippet>172</a>        WindowAccess,
+<a href=#173 id=173 data-nosnippet>173</a>        log2_strict_u8,
+<a href=#174 id=174 data-nosnippet>174</a>        validate_instances,
+<a href=#175 id=175 data-nosnippet>175</a>    };
+<a href=#176 id=176 data-nosnippet>176</a>
+<a href=#177 id=177 data-nosnippet>177</a>    <span class="doccomment">/// Symbolic constraint analysis types from upstream p3-air.
+<a href=#178 id=178 data-nosnippet>178</a>    </span><span class="kw">pub mod </span>symbolic {
+<a href=#179 id=179 data-nosnippet>179</a>        <span class="kw">pub use </span>miden_lifted_air::symbolic::<span class="kw-2">*</span>;
+<a href=#180 id=180 data-nosnippet>180</a>    }
+<a href=#181 id=181 data-nosnippet>181</a>
+<a href=#182 id=182 data-nosnippet>182</a>    <span class="doccomment">/// Auxiliary trace types (builder, cross-AIR identity checking).
+<a href=#183 id=183 data-nosnippet>183</a>    </span><span class="kw">pub mod </span>auxiliary {
+<a href=#184 id=184 data-nosnippet>184</a>        <span class="kw">pub use </span>miden_lifted_air::auxiliary::<span class="kw-2">*</span>;
+<a href=#185 id=185 data-nosnippet>185</a>    }
+<a href=#186 id=186 data-nosnippet>186</a>
+<a href=#187 id=187 data-nosnippet>187</a>    <span class="doccomment">/// AIR constraint utility functions from upstream p3-air.
+<a href=#188 id=188 data-nosnippet>188</a>    </span><span class="kw">pub mod </span>utils {
+<a href=#189 id=189 data-nosnippet>189</a>        <span class="kw">pub use </span>miden_lifted_air::utils::<span class="kw-2">*</span>;
+<a href=#190 id=190 data-nosnippet>190</a>    }
+<a href=#191 id=191 data-nosnippet>191</a>}
+<a href=#192 id=192 data-nosnippet>192</a>
+<a href=#193 id=193 data-nosnippet>193</a><span class="doccomment">/// Fiat-Shamir transcript channels and data types.
+<a href=#194 id=194 data-nosnippet>194</a></span><span class="kw">pub mod </span>transcript {
+<a href=#195 id=195 data-nosnippet>195</a>    <span class="kw">pub use </span>miden_stark_transcript::{TranscriptChallenger, TranscriptData, TranscriptError};
+<a href=#196 id=196 data-nosnippet>196</a>}
+<a href=#197 id=197 data-nosnippet>197</a>
+<a href=#198 id=198 data-nosnippet>198</a><span class="doccomment">/// Stateful hasher primitives for LMCS construction.
+<a href=#199 id=199 data-nosnippet>199</a></span><span class="kw">pub mod </span>hasher {
+<a href=#200 id=200 data-nosnippet>200</a>    <span class="kw">pub use </span>miden_stateful_hasher::{
+<a href=#201 id=201 data-nosnippet>201</a>        Alignable, ChainingHasher, SerializingStatefulSponge, StatefulHasher, StatefulSponge,
+<a href=#202 id=202 data-nosnippet>202</a>    };
+<a href=#203 id=203 data-nosnippet>203</a>}
+<a href=#204 id=204 data-nosnippet>204</a>
+<a href=#205 id=205 data-nosnippet>205</a><span class="doccomment">/// Testing infrastructure: configurations, fixtures, and example AIRs.
+<a href=#206 id=206 data-nosnippet>206</a>///
+<a href=#207 id=207 data-nosnippet>207</a>/// Available when the `testing` feature is enabled or during `cargo test`.
+<a href=#208 id=208 data-nosnippet>208</a>/// Integration tests should use `cargo test --features testing`.
+<a href=#209 id=209 data-nosnippet>209</a></span><span class="attr">#[cfg(any(test, feature = <span class="string">"testing"</span>))]
+<a href=#210 id=210 data-nosnippet>210</a></span><span class="kw">pub mod </span>testing;
+</code></pre></div></section></main></body></html>

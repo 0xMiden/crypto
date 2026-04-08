@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"constant":["NUM_AUX_COLS","TRACE1_LOG_HEIGHT","TRACE1_WIDTH","TRACE2_LOG_HEIGHT","TRACE2_WIDTH"],"fn":["generate_dummy_trace"],"struct":["DummyMidenAir"]};

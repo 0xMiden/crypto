@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"struct":["BatchProof","LeafOpening","Proof"],"trait":["BatchProofView"]};

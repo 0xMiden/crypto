@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"constant":["HALF_FULL_ROUNDS","NUM_POSEIDON2_COLS","PARTIAL_ROUNDS","SBOX_DEGREE","SBOX_REGISTERS","WIDTH"],"fn":["generate_poseidon2_trace"],"struct":["LiftedPoseidon2Air"]};

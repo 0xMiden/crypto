@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"enum":["TranscriptError"],"struct":["ProverTranscript","TranscriptData","VerifierTranscript"],"trait":["Channel","ProverChannel","TranscriptChallenger","VerifierChannel"]};

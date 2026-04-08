@@ -1,2 +1,2 @@
-window.ALL_CRATES = ["miden_crypto","miden_crypto_derive","miden_field","miden_serde_utils"];
-//{"start":21,"fragment_lengths":[14,22,14,20]}
+window.ALL_CRATES = ["miden_bench","miden_crypto","miden_crypto_derive","miden_field","miden_lifted_air","miden_lifted_stark","miden_serde_utils","miden_stark_transcript","miden_stateful_hasher"];
+//{"start":21,"fragment_lengths":[13,15,22,14,19,21,20,25,24]}
