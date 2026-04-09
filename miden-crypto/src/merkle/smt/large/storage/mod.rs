@@ -26,16 +26,15 @@ pub use memory::MemoryStorage;
 mod updates;
 pub use updates::{StorageUpdateParts, StorageUpdates, SubtreeUpdate};
 
-/// Sparse Merkle Tree storage backend.
+/// Read-only operations for the Sparse Merkle Tree storage backend.
 ///
-/// This trait outlines the fundamental operations required to persist and retrieve
-/// the components of an SMT: leaves and deeper subtrees.
-/// Implementations of this trait can provide various storage solutions, like in-memory
-/// maps or persistent databases (e.g., RocksDB).
+/// This trait outlines the operations required to retrieve the components of an SMT: leaves and
+/// deeper subtrees. Implementations of this trait can provide various storage solutions, like
+/// in-memory maps or persistent databases (e.g., RocksDB).
 ///
 /// All methods are expected to handle potential storage errors by returning a
 /// `Result<_, StorageError>`.
-pub trait SmtStorage: 'static + fmt::Debug + Send + Sync {
+pub trait SmtStorageReader: 'static + fmt::Debug + Send + Sync {
     /// Retrieves the total number of leaf nodes currently stored.
     ///
     /// # Errors
@@ -48,73 +47,9 @@ pub trait SmtStorage: 'static + fmt::Debug + Send + Sync {
     /// Returns `StorageError` if the storage read operation fails.
     fn entry_count(&self) -> Result<usize, StorageError>;
 
-    /// Inserts a key-value pair into the SMT leaf at the specified logical `index`.
-    ///
-    /// - If the leaf at `index` does not exist, it may be created.
-    /// - If the `key` already exists in the leaf at `index`, its `value` is updated.
-    /// - Returns the previous `Word` value associated with the `key` at `index`, if any.
-    ///
-    /// Implementations are responsible for updating overall leaf and entry counts if necessary.
-    ///
-    /// Note: This only updates the leaf. Callers are responsible for recomputing and
-    /// persisting the corresponding inner nodes.
-    ///
-    /// # Errors
-    /// Returns `StorageError` if the storage operation fails (e.g., backend database error,
-    /// insufficient space, serialization failures).
-    fn insert_value(
-        &mut self,
-        index: u64,
-        key: Word,
-        value: Word,
-    ) -> Result<Option<Word>, StorageError>;
-
-    /// Removes a key-value pair from the SMT leaf at the specified logical `index`.
-    ///
-    /// - If the `key` is found in the leaf at `index`, it is removed, and the old `Word` value is
-    ///   returned.
-    /// - If the leaf at `index` does not exist, or if the `key` is not found within it, `Ok(None)`
-    ///   is returned.
-    /// - If removing the entry causes the leaf to become empty, the behavior regarding the leaf
-    ///   node itself (e.g., whether it's removed from storage) is implementation-dependent, but
-    ///   counts should be updated.
-    ///
-    /// Implementations are responsible for updating overall leaf and entry counts if necessary.
-    ///
-    /// Note: This only updates the leaf. Callers are responsible for recomputing and
-    /// persisting the corresponding inner nodes.
-    ///
-    /// # Errors
-    /// Returns `StorageError` if the storage operation fails (e.g., backend database error,
-    /// write permission issues, serialization failures).
-    fn remove_value(&mut self, index: u64, key: Word) -> Result<Option<Word>, StorageError>;
-
     /// Retrieves a single SMT leaf node by its logical `index`.
     /// Returns `Ok(None)` if no leaf exists at the given `index`.
     fn get_leaf(&self, index: u64) -> Result<Option<SmtLeaf>, StorageError>;
-
-    /// Sets or updates multiple SMT leaf nodes in storage.
-    ///
-    /// For each entry in the `leaves` map, if a leaf at the given index already exists,
-    /// it should be overwritten with the new `SmtLeaf` data.
-    /// If it does not exist, a new leaf is stored.
-    ///
-    /// Note: This only updates the leaves. Callers are responsible for recomputing and
-    /// persisting the corresponding inner nodes.
-    ///
-    /// # Errors
-    /// Returns `StorageError` if any storage operation fails during the batch update.
-    fn set_leaves(&mut self, leaves: Map<u64, SmtLeaf>) -> Result<(), StorageError>;
-
-    /// Removes a single SMT leaf node entirely from storage by its logical `index`.
-    ///
-    /// Note: This only removes the leaf. Callers are responsible for recomputing and
-    /// persisting the corresponding inner nodes.
-    ///
-    /// Returns the `SmtLeaf` that was removed, or `Ok(None)` if no leaf existed at `index`.
-    /// Implementations should ensure that removing a leaf also correctly updates
-    /// the overall leaf and entry counts.
-    fn remove_leaf(&mut self, index: u64) -> Result<Option<SmtLeaf>, StorageError>;
 
     /// Retrieves multiple SMT leaf nodes by their logical `indices`.
     ///
@@ -169,6 +104,106 @@ pub trait SmtStorage: 'static + fmt::Debug + Send + Sync {
         Ok((leaf, subtrees))
     }
 
+    /// Retrieves a single inner node from within a Subtree.
+    ///
+    /// This method is intended for accessing nodes at depths greater than the in-memory horizon.
+    /// Returns `Ok(None)` if the containing Subtree or the specific inner node is not found.
+    fn get_inner_node(&self, index: NodeIndex) -> Result<Option<InnerNode>, StorageError>;
+
+    /// Returns an iterator over all (logical_index, SmtLeaf) pairs currently in storage.
+    ///
+    /// The order of iteration is not guaranteed unless specified by the implementation.
+    fn iter_leaves(&self) -> Result<Box<dyn Iterator<Item = (u64, SmtLeaf)> + '_>, StorageError>;
+
+    /// Returns an iterator over all `Subtree` instances currently in storage.
+    ///
+    /// The order of iteration is not guaranteed unless specified by the implementation.
+    fn iter_subtrees(&self) -> Result<Box<dyn Iterator<Item = Subtree> + '_>, StorageError>;
+
+    /// Retrieves all depth 24 hashes from storage for efficient startup reconstruction.
+    ///
+    /// Returns a vector of `(node_index_value, InnerNode)` tuples representing
+    /// the cached roots of nodes at depth 24 (the in-memory/storage boundary).
+    /// These roots enable fast reconstruction of the upper tree without loading
+    /// entire subtrees.
+    ///
+    /// The hash cache is automatically maintained by subtree operations - no manual
+    /// cache management is required.
+    fn get_depth24(&self) -> Result<Vec<(u64, Word)>, StorageError>;
+}
+
+/// Write operations for the Sparse Merkle Tree storage backend.
+///
+/// This trait extends [`SmtStorageReader`] with mutation operations required to persist changes
+/// to the SMT.
+///
+/// All methods are expected to handle potential storage errors by returning a
+/// `Result<_, StorageError>`.
+pub trait SmtStorageWriter: SmtStorageReader {
+    /// Inserts a key-value pair into the SMT leaf at the specified logical `index`.
+    ///
+    /// - If the leaf at `index` does not exist, it may be created.
+    /// - If the `key` already exists in the leaf at `index`, its `value` is updated.
+    /// - Returns the previous `Word` value associated with the `key` at `index`, if any.
+    ///
+    /// Implementations are responsible for updating overall leaf and entry counts if necessary.
+    ///
+    /// Note: This only updates the leaf. Callers are responsible for recomputing and
+    /// persisting the corresponding inner nodes.
+    ///
+    /// # Errors
+    /// Returns `StorageError` if the storage operation fails (e.g., backend database error,
+    /// insufficient space, serialization failures).
+    fn insert_value(
+        &mut self,
+        index: u64,
+        key: Word,
+        value: Word,
+    ) -> Result<Option<Word>, StorageError>;
+
+    /// Removes a key-value pair from the SMT leaf at the specified logical `index`.
+    ///
+    /// - If the `key` is found in the leaf at `index`, it is removed, and the old `Word` value is
+    ///   returned.
+    /// - If the leaf at `index` does not exist, or if the `key` is not found within it, `Ok(None)`
+    ///   is returned.
+    /// - If removing the entry causes the leaf to become empty, the behavior regarding the leaf
+    ///   node itself (e.g., whether it's removed from storage) is implementation-dependent, but
+    ///   counts should be updated.
+    ///
+    /// Implementations are responsible for updating overall leaf and entry counts if necessary.
+    ///
+    /// Note: This only updates the leaf. Callers are responsible for recomputing and
+    /// persisting the corresponding inner nodes.
+    ///
+    /// # Errors
+    /// Returns `StorageError` if the storage operation fails (e.g., backend database error,
+    /// write permission issues, serialization failures).
+    fn remove_value(&mut self, index: u64, key: Word) -> Result<Option<Word>, StorageError>;
+
+    /// Sets or updates multiple SMT leaf nodes in storage.
+    ///
+    /// For each entry in the `leaves` map, if a leaf at the given index already exists,
+    /// it should be overwritten with the new `SmtLeaf` data.
+    /// If it does not exist, a new leaf is stored.
+    ///
+    /// Note: This only updates the leaves. Callers are responsible for recomputing and
+    /// persisting the corresponding inner nodes.
+    ///
+    /// # Errors
+    /// Returns `StorageError` if any storage operation fails during the batch update.
+    fn set_leaves(&mut self, leaves: Map<u64, SmtLeaf>) -> Result<(), StorageError>;
+
+    /// Removes a single SMT leaf node entirely from storage by its logical `index`.
+    ///
+    /// Note: This only removes the leaf. Callers are responsible for recomputing and
+    /// persisting the corresponding inner nodes.
+    ///
+    /// Returns the `SmtLeaf` that was removed, or `Ok(None)` if no leaf existed at `index`.
+    /// Implementations should ensure that removing a leaf also correctly updates
+    /// the overall leaf and entry counts.
+    fn remove_leaf(&mut self, index: u64) -> Result<Option<SmtLeaf>, StorageError>;
+
     /// Sets or updates a single SMT Subtree in storage, identified by its root `NodeIndex`.
     ///
     /// If a subtree with the same root `NodeIndex` already exists, it is overwritten.
@@ -184,12 +219,6 @@ pub trait SmtStorage: 'static + fmt::Debug + Send + Sync {
     ///
     /// Returns `Ok(())` on successful removal or if the subtree did not exist.
     fn remove_subtree(&mut self, index: NodeIndex) -> Result<(), StorageError>;
-
-    /// Retrieves a single inner node from within a Subtree.
-    ///
-    /// This method is intended for accessing nodes at depths greater than the in-memory horizon.
-    /// Returns `Ok(None)` if the containing Subtree or the specific inner node is not found.
-    fn get_inner_node(&self, index: NodeIndex) -> Result<Option<InnerNode>, StorageError>;
 
     /// Sets or updates a single inner node (non-leaf node) within a Subtree.
     ///
@@ -216,30 +245,16 @@ pub trait SmtStorage: 'static + fmt::Debug + Send + Sync {
     /// If any part of the update fails, the entire transaction should be rolled back, leaving
     /// the storage in its previous state.
     fn apply(&mut self, updates: StorageUpdates) -> Result<(), StorageError>;
-
-    /// Returns an iterator over all (logical_index, SmtLeaf) pairs currently in storage.
-    ///
-    /// The order of iteration is not guaranteed unless specified by the implementation.
-    fn iter_leaves(&self) -> Result<Box<dyn Iterator<Item = (u64, SmtLeaf)> + '_>, StorageError>;
-
-    /// Returns an iterator over all `Subtree` instances currently in storage.
-    ///
-    /// The order of iteration is not guaranteed unless specified by the implementation.
-    fn iter_subtrees(&self) -> Result<Box<dyn Iterator<Item = Subtree> + '_>, StorageError>;
-
-    /// Retrieves all depth 24 hashes from storage for efficient startup reconstruction.
-    ///
-    /// Returns a vector of `(node_index_value, InnerNode)` tuples representing
-    /// the cached roots of nodes at depth 24 (the in-memory/storage boundary).
-    /// These roots enable fast reconstruction of the upper tree without loading
-    /// entire subtrees.
-    ///
-    /// The hash cache is automatically maintained by subtree operations - no manual
-    /// cache management is required.
-    fn get_depth24(&self) -> Result<Vec<(u64, Word)>, StorageError>;
 }
 
-impl<T: SmtStorage + ?Sized> SmtStorage for Box<T> {
+/// Sparse Merkle Tree storage backend.
+///
+/// This trait combines [`SmtStorageReader`] and [`SmtStorageWriter`] into a single bound for
+/// convenience. It is automatically implemented for any type that implements both traits.
+pub trait SmtStorage: SmtStorageWriter {}
+impl<T: SmtStorageWriter> SmtStorage for T {}
+
+impl<T: SmtStorageReader + ?Sized> SmtStorageReader for Box<T> {
     #[inline]
     fn leaf_count(&self) -> Result<usize, StorageError> {
         self.deref().leaf_count()
@@ -251,33 +266,8 @@ impl<T: SmtStorage + ?Sized> SmtStorage for Box<T> {
     }
 
     #[inline]
-    fn insert_value(
-        &mut self,
-        index: u64,
-        key: Word,
-        value: Word,
-    ) -> Result<Option<Word>, StorageError> {
-        self.deref_mut().insert_value(index, key, value)
-    }
-
-    #[inline]
-    fn remove_value(&mut self, index: u64, key: Word) -> Result<Option<Word>, StorageError> {
-        self.deref_mut().remove_value(index, key)
-    }
-
-    #[inline]
     fn get_leaf(&self, index: u64) -> Result<Option<SmtLeaf>, StorageError> {
         self.deref().get_leaf(index)
-    }
-
-    #[inline]
-    fn set_leaves(&mut self, leaves: Map<u64, SmtLeaf>) -> Result<(), StorageError> {
-        self.deref_mut().set_leaves(leaves)
-    }
-
-    #[inline]
-    fn remove_leaf(&mut self, index: u64) -> Result<Option<SmtLeaf>, StorageError> {
-        self.deref_mut().remove_leaf(index)
     }
 
     #[inline]
@@ -310,6 +300,53 @@ impl<T: SmtStorage + ?Sized> SmtStorage for Box<T> {
     }
 
     #[inline]
+    fn get_inner_node(&self, index: NodeIndex) -> Result<Option<InnerNode>, StorageError> {
+        self.deref().get_inner_node(index)
+    }
+
+    #[inline]
+    fn iter_leaves(&self) -> Result<Box<dyn Iterator<Item = (u64, SmtLeaf)> + '_>, StorageError> {
+        self.deref().iter_leaves()
+    }
+
+    #[inline]
+    fn iter_subtrees(&self) -> Result<Box<dyn Iterator<Item = Subtree> + '_>, StorageError> {
+        self.deref().iter_subtrees()
+    }
+
+    #[inline]
+    fn get_depth24(&self) -> Result<Vec<(u64, Word)>, StorageError> {
+        self.deref().get_depth24()
+    }
+}
+
+impl<T: SmtStorageWriter + ?Sized> SmtStorageWriter for Box<T> {
+    #[inline]
+    fn insert_value(
+        &mut self,
+        index: u64,
+        key: Word,
+        value: Word,
+    ) -> Result<Option<Word>, StorageError> {
+        self.deref_mut().insert_value(index, key, value)
+    }
+
+    #[inline]
+    fn remove_value(&mut self, index: u64, key: Word) -> Result<Option<Word>, StorageError> {
+        self.deref_mut().remove_value(index, key)
+    }
+
+    #[inline]
+    fn set_leaves(&mut self, leaves: Map<u64, SmtLeaf>) -> Result<(), StorageError> {
+        self.deref_mut().set_leaves(leaves)
+    }
+
+    #[inline]
+    fn remove_leaf(&mut self, index: u64) -> Result<Option<SmtLeaf>, StorageError> {
+        self.deref_mut().remove_leaf(index)
+    }
+
+    #[inline]
     fn set_subtree(&mut self, subtree: &Subtree) -> Result<(), StorageError> {
         self.deref_mut().set_subtree(subtree)
     }
@@ -322,11 +359,6 @@ impl<T: SmtStorage + ?Sized> SmtStorage for Box<T> {
     #[inline]
     fn remove_subtree(&mut self, index: NodeIndex) -> Result<(), StorageError> {
         self.deref_mut().remove_subtree(index)
-    }
-
-    #[inline]
-    fn get_inner_node(&self, index: NodeIndex) -> Result<Option<InnerNode>, StorageError> {
-        self.deref().get_inner_node(index)
     }
 
     #[inline]
@@ -346,20 +378,5 @@ impl<T: SmtStorage + ?Sized> SmtStorage for Box<T> {
     #[inline]
     fn apply(&mut self, updates: StorageUpdates) -> Result<(), StorageError> {
         self.deref_mut().apply(updates)
-    }
-
-    #[inline]
-    fn iter_leaves(&self) -> Result<Box<dyn Iterator<Item = (u64, SmtLeaf)> + '_>, StorageError> {
-        self.deref().iter_leaves()
-    }
-
-    #[inline]
-    fn iter_subtrees(&self) -> Result<Box<dyn Iterator<Item = Subtree> + '_>, StorageError> {
-        self.deref().iter_subtrees()
-    }
-
-    #[inline]
-    fn get_depth24(&self) -> Result<Vec<(u64, Word)>, StorageError> {
-        self.deref().get_depth24()
     }
 }
