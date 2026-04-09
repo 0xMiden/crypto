@@ -176,9 +176,12 @@ use alloc::vec::Vec;
 
 use super::{
     EmptySubtreeRoots, InnerNode, InnerNodeInfo, InnerNodes, LeafIndex, MerkleError, NodeIndex,
-    NodeMutation, SMT_DEPTH, SmtLeaf, SmtProof, SparseMerkleTree, Word,
+    NodeMutation, SMT_DEPTH, SmtLeaf, SmtProof, SparseMerklePath, SparseMerkleTree, Word,
 };
-use crate::merkle::smt::{Map, full::concurrent::MutatedSubtreeLeaves};
+use crate::{
+    EMPTY_WORD,
+    merkle::smt::{Map, full::concurrent::MutatedSubtreeLeaves},
+};
 
 mod error;
 pub use error::LargeSmtError;
@@ -273,7 +276,7 @@ type MutatedLeaves = (MutatedSubtreeLeaves, Map<u64, SmtLeaf>, Map<Word, Word>, 
 /// to share an instance between threads or components, wrap it in an
 /// [`Arc`](alloc::sync::Arc) explicitly so the ownership semantics are clear.
 #[derive(Clone, Debug)]
-pub struct LargeSmt<S: SmtStorage> {
+pub struct LargeSmt<S: SmtStorageReader> {
     storage: S,
     /// Flat vector representation of in-memory nodes.
     /// Index 0 is unused; index 1 is root.
@@ -287,11 +290,14 @@ pub struct LargeSmt<S: SmtStorage> {
     entry_count: usize,
 }
 
-impl<S: SmtStorage> LargeSmt<S> {
+impl<S: SmtStorageReader> LargeSmt<S> {
     // CONSTANTS
     // --------------------------------------------------------------------------------------------
     /// The default value used to compute the hash of empty leaves.
-    pub const EMPTY_VALUE: Word = <Self as SparseMerkleTree<SMT_DEPTH>>::EMPTY_VALUE;
+    pub const EMPTY_VALUE: Word = EMPTY_WORD;
+
+    /// The root of an empty tree.
+    pub const EMPTY_ROOT: Word = *EmptySubtreeRoots::entry(SMT_DEPTH, 0);
 
     /// Subtree depths for the subtrees stored in storage.
     pub const SUBTREE_DEPTHS: [u8; 5] = [56, 48, 40, 32, 24];
@@ -327,18 +333,78 @@ impl<S: SmtStorage> LargeSmt<S> {
 
     /// Returns the leaf to which `key` maps
     pub fn get_leaf(&self, key: &Word) -> SmtLeaf {
-        <Self as SparseMerkleTree<SMT_DEPTH>>::get_leaf(self, key)
+        let leaf_pos = LeafIndex::<SMT_DEPTH>::from(*key).position();
+        match self.storage.get_leaf(leaf_pos) {
+            Ok(Some(leaf)) => leaf,
+            Ok(None) => SmtLeaf::new_empty((*key).into()),
+            Err(_) => {
+                panic!("Storage error during get_leaf");
+            },
+        }
     }
 
     /// Returns the value associated with `key`
     pub fn get_value(&self, key: &Word) -> Word {
-        <Self as SparseMerkleTree<SMT_DEPTH>>::get_value(self, key)
+        let leaf_pos = LeafIndex::<SMT_DEPTH>::from(*key);
+        match self.storage.get_leaf(leaf_pos.position()) {
+            Ok(Some(leaf)) => leaf.get_value(key).unwrap_or_default(),
+            Ok(None) => EMPTY_WORD,
+            Err(_) => {
+                panic!("Storage error during get_value");
+            },
+        }
     }
 
     /// Returns an opening of the leaf associated with `key`. Conceptually, an opening is a Merkle
     /// path to the leaf, as well as the leaf itself.
     pub fn open(&self, key: &Word) -> SmtProof {
-        <Self as SparseMerkleTree<SMT_DEPTH>>::open(self, key)
+        let leaf_pos = LeafIndex::<SMT_DEPTH>::from(*key);
+
+        let mut idx: NodeIndex = leaf_pos.into();
+
+        let subtree_roots: Vec<NodeIndex> = (0..NUM_SUBTREE_LEVELS)
+            .scan(idx.parent(), |cursor, _| {
+                let subtree_root = Subtree::find_subtree_root(*cursor);
+                *cursor = subtree_root.parent();
+                Some(subtree_root)
+            })
+            .collect();
+
+        let (leaf_opt, subtree_opts) = self
+            .storage
+            .get_leaf_and_subtrees(leaf_pos.position(), &subtree_roots)
+            .expect("Fetching leaf and subtrees succeeds");
+
+        let leaf = leaf_opt.unwrap_or_else(|| SmtLeaf::new_empty((*key).into()));
+
+        let mut cache = Map::<NodeIndex, Subtree>::new();
+        for (&root, subtree_opt) in subtree_roots.iter().zip(subtree_opts) {
+            let subtree = subtree_opt.unwrap_or_else(|| Subtree::new(root));
+            cache.insert(root, subtree);
+        }
+        let mut path = Vec::with_capacity(idx.depth() as usize);
+        while idx.depth() > 0 {
+            let is_right = idx.is_position_odd();
+            idx = idx.parent();
+
+            let sibling_hash = if idx.depth() < IN_MEMORY_DEPTH {
+                let InnerNode { left, right } = self.get_inner_node(idx);
+                if is_right { left } else { right }
+            } else {
+                let root = Subtree::find_subtree_root(idx);
+                let subtree = &cache[&root];
+                let InnerNode { left, right } = subtree
+                    .get_inner_node(idx)
+                    .unwrap_or_else(|| EmptySubtreeRoots::get_inner_node(SMT_DEPTH, idx.depth()));
+                if is_right { left } else { right }
+            };
+
+            path.push(sibling_hash);
+        }
+
+        let merkle_path =
+            SparseMerklePath::from_sized_iter(path).expect("failed to convert to SparseMerklePath");
+        SmtProof::new_unchecked(merkle_path, leaf)
     }
 
     /// Returns a boolean value indicating whether the SMT is empty.
@@ -389,25 +455,27 @@ impl<S: SmtStorage> LargeSmt<S> {
         Ok(LargeSmtInnerNodeIterator::new(self))
     }
 
-    // STATE MUTATORS
-    // --------------------------------------------------------------------------------------------
-
-    /// Inserts a value at the specified key, returning the previous value associated with that key.
-    /// Recall that by definition, any key that hasn't been updated is associated with
-    /// [`Self::EMPTY_VALUE`].
-    ///
-    /// This also recomputes all hashes between the leaf (associated with the key) and the root,
-    /// updating the root itself.
-    ///
-    /// # Errors
-    /// Returns an error if inserting the key-value pair would exceed
-    /// [`MAX_LEAF_ENTRIES`](super::MAX_LEAF_ENTRIES) (1024 entries) in the leaf.
-    pub fn insert(&mut self, key: Word, value: Word) -> Result<Word, MerkleError> {
-        <Self as SparseMerkleTree<SMT_DEPTH>>::insert(self, key, value)
-    }
-
     // HELPERS
     // --------------------------------------------------------------------------------------------
+
+    /// Returns the inner node at the given index.
+    ///
+    /// For in-memory depths (< 24), reads from the flat in-memory array.
+    /// For deeper nodes, reads from storage.
+    pub(crate) fn get_inner_node(&self, index: NodeIndex) -> InnerNode {
+        if index.depth() < IN_MEMORY_DEPTH {
+            let memory_index = to_memory_index(&index);
+            return InnerNode {
+                left: self.in_memory_nodes[memory_index * 2],
+                right: self.in_memory_nodes[memory_index * 2 + 1],
+            };
+        }
+
+        self.storage
+            .get_inner_node(index)
+            .expect("Failed to get inner node")
+            .unwrap_or_else(|| EmptySubtreeRoots::get_inner_node(SMT_DEPTH, index.depth()))
+    }
 
     /// Helper to get an in-memory node if not empty.
     ///
@@ -439,6 +507,25 @@ impl<S: SmtStorage> LargeSmt<S> {
     }
 }
 
+impl<S: SmtStorageWriter> LargeSmt<S> {
+    // STATE MUTATORS
+    // --------------------------------------------------------------------------------------------
+
+    /// Inserts a value at the specified key, returning the previous value associated with that key.
+    /// Recall that by definition, any key that hasn't been updated is associated with
+    /// [`Self::EMPTY_VALUE`].
+    ///
+    /// This also recomputes all hashes between the leaf (associated with the key) and the root,
+    /// updating the root itself.
+    ///
+    /// # Errors
+    /// Returns an error if inserting the key-value pair would exceed
+    /// [`MAX_LEAF_ENTRIES`](super::MAX_LEAF_ENTRIES) (1024 entries) in the leaf.
+    pub fn insert(&mut self, key: Word, value: Word) -> Result<Word, MerkleError> {
+        <Self as SparseMerkleTree<SMT_DEPTH>>::insert(self, key, value)
+    }
+}
+
 // HELPERS
 // ================================================================================================
 
@@ -458,7 +545,7 @@ pub(super) fn to_memory_index(index: &NodeIndex) -> usize {
     (1usize << index.depth()) + index.position() as usize
 }
 
-impl<S: SmtStorage> PartialEq for LargeSmt<S> {
+impl<S: SmtStorageReader> PartialEq for LargeSmt<S> {
     /// Compares two LargeSmt instances based on their root hash and metadata.
     ///
     /// Note: This comparison only checks the root hash and counts, not the underlying
@@ -471,4 +558,4 @@ impl<S: SmtStorage> PartialEq for LargeSmt<S> {
     }
 }
 
-impl<S: SmtStorage> Eq for LargeSmt<S> {}
+impl<S: SmtStorageReader> Eq for LargeSmt<S> {}

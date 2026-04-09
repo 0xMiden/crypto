@@ -251,8 +251,8 @@ pub trait SmtStorageWriter: SmtStorageReader {
 ///
 /// This trait combines [`SmtStorageReader`] and [`SmtStorageWriter`] into a single bound for
 /// convenience. It is automatically implemented for any type that implements both traits.
-pub trait SmtStorage: SmtStorageWriter {}
-impl<T: SmtStorageWriter> SmtStorage for T {}
+pub trait SmtStorage: SmtStorageReader + SmtStorageWriter {}
+impl<T: SmtStorageReader + SmtStorageWriter> SmtStorage for T {}
 
 impl<T: SmtStorageReader + ?Sized> SmtStorageReader for Box<T> {
     #[inline]
