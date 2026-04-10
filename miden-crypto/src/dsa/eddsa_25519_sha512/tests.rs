@@ -169,3 +169,64 @@ fn from_der_rejects_truncated_integer() {
     let der = [0x30, 0x06, 0x02, 0x01, 0x01, 0x02, 0x01]; // S integer body missing
     assert!(Signature::from_der(&der).is_err());
 }
+
+#[test]
+fn from_der_rejects_long_form_length() {
+    // Valid content but using BER-style long-form length 0x81 0x44 instead of
+    // short-form 0x44. DER requires shortest form, and Ed25519 blobs always fit
+    // in short-form.
+    let inner = encode_der(&[1u8; 32], &[2u8; 32]);
+    // Replace outer SEQUENCE: swap short-form len with long-form
+    let seq_body = &inner[2..]; // skip tag + original 1-byte length
+    let mut der = Vec::new();
+    der.push(0x30); // SEQUENCE tag
+    der.push(0x81); // long-form: 1 subsequent length byte
+    der.push(seq_body.len() as u8);
+    der.extend_from_slice(seq_body);
+    assert!(Signature::from_der(&der).is_err());
+}
+
+#[test]
+fn from_der_rejects_non_canonical_integer_padding() {
+    // An INTEGER with an unnecessary leading 0x00 byte: the next byte's high bit
+    // is clear, so the 0x00 is superfluous and violates X.690 section 8.3.2.
+    // R = 0x00 0x01 (non-canonical: should just be 0x01)
+    let r_int = [0x02, 0x02, 0x00, 0x01]; // INTEGER tag, len=2, body=00 01
+    let s_int = [0x02, 0x01, 0x01]; // INTEGER tag, len=1, body=01
+    let seq_len = (r_int.len() + s_int.len()) as u8;
+    let mut der = Vec::new();
+    der.push(0x30);
+    der.push(seq_len);
+    der.extend_from_slice(&r_int);
+    der.extend_from_slice(&s_int);
+    assert!(Signature::from_der(&der).is_err());
+}
+
+#[test]
+fn from_der_rejects_empty_integer() {
+    // An INTEGER with zero-length content is invalid per DER.
+    let r_int = [0x02, 0x00]; // INTEGER tag, len=0
+    let s_int = [0x02, 0x01, 0x01];
+    let seq_len = (r_int.len() + s_int.len()) as u8;
+    let mut der = Vec::new();
+    der.push(0x30);
+    der.push(seq_len);
+    der.extend_from_slice(&r_int);
+    der.extend_from_slice(&s_int);
+    assert!(Signature::from_der(&der).is_err());
+}
+
+#[test]
+fn from_der_rejects_negative_integer() {
+    // An INTEGER whose first byte has the high bit set (negative in two's
+    // complement) is invalid for an Ed25519 signature component.
+    let r_int = [0x02, 0x01, 0x80]; // INTEGER tag, len=1, body=0x80 (negative)
+    let s_int = [0x02, 0x01, 0x01];
+    let seq_len = (r_int.len() + s_int.len()) as u8;
+    let mut der = Vec::new();
+    der.push(0x30);
+    der.push(seq_len);
+    der.extend_from_slice(&r_int);
+    der.extend_from_slice(&s_int);
+    assert!(Signature::from_der(&der).is_err());
+}

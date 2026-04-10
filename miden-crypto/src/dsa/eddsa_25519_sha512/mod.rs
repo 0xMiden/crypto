@@ -372,6 +372,14 @@ impl Signature {
     /// are the big-endian unsigned integer representations of the Ed25519 signature
     /// components. Since Ed25519 natively uses little-endian encoding (per RFC 8032),
     /// this method handles the byte-order conversion.
+    ///
+    /// Note: Ed25519 does not have a standard DER encoding. RFC 8032 defines the
+    /// native format as the concatenation `ENC(R) || ENC(S)`, and RFC 8410 places
+    /// that blob directly in a `BIT STRING` without additional ASN.1 wrapping.
+    /// This method uses the `SEQUENCE { INTEGER, INTEGER }` layout for
+    /// consistency with the ECDSA `from_der` in this crate and to support
+    /// interoperability with tooling that DER-encodes signature components
+    /// individually.
     pub fn from_der(bytes: &[u8]) -> Result<Self, DeserializationError> {
         // Parse outer SEQUENCE
         let (tag, seq_body, trailing) = parse_der_tlv(bytes)?;
@@ -438,24 +446,54 @@ fn parse_der_tlv(bytes: &[u8]) -> Result<(u8, &[u8], &[u8]), DeserializationErro
 }
 
 /// Decodes a DER definite-form length, returning `(length_value, bytes_consumed)`.
+///
+/// Only short-form lengths (< 128) are accepted. Ed25519 signature DER blobs
+/// never exceed short-form, and DER requires the shortest encoding, so
+/// long-form (`0x81`, `0x82`, ...) is rejected.
 fn parse_der_length(bytes: &[u8]) -> Result<(usize, usize), DeserializationError> {
     match bytes.first() {
         None => Err(DeserializationError::InvalidValue("truncated DER length".into())),
         Some(&b) if b < 0x80 => Ok((b as usize, 1)),
-        Some(&0x81) => {
-            let len = *bytes
-                .get(1)
-                .ok_or_else(|| DeserializationError::InvalidValue("truncated DER length".into()))?;
-            Ok((len as usize, 2))
-        },
-        _ => Err(DeserializationError::InvalidValue("unsupported DER length encoding".into())),
+        _ => Err(DeserializationError::InvalidValue(
+            "non-short-form DER length is not valid for Ed25519 signatures".into(),
+        )),
     }
 }
 
 /// Converts a DER INTEGER (big-endian, possibly sign-padded) into a 32-byte little-endian array
 /// for Ed25519.
+///
+/// Rejects non-canonical encodings per X.690 section 8.3.2:
+/// - empty content (zero-length INTEGER)
+/// - unnecessary leading `0x00` (when the next byte's high bit is clear)
+/// - missing leading `0x00` when the high bit is set (would be interpreted as negative, but this
+///   helper only strips a valid pad)
 fn der_integer_to_le_32(int_bytes: &[u8]) -> Result<[u8; 32], DeserializationError> {
-    // Strip leading 0x00 sign-padding byte if present.
+    if int_bytes.is_empty() {
+        return Err(DeserializationError::InvalidValue(
+            "DER INTEGER content must not be empty".into(),
+        ));
+    }
+
+    // Validate canonical sign-padding per X.690 8.3.2:
+    // A leading 0x00 is only allowed when the next byte has its high bit set.
+    if int_bytes.len() > 1 && int_bytes[0] == 0x00 && (int_bytes[1] & 0x80) == 0 {
+        return Err(DeserializationError::InvalidValue(
+            "non-canonical DER INTEGER: unnecessary leading 0x00".into(),
+        ));
+    }
+
+    // Reject negative integers (high bit set without a 0x00 pad is a negative
+    // value in two's complement, which is invalid for an Ed25519 component).
+    // Note: if the high bit is set AND there is a 0x00 pad, that was already
+    // validated above as canonical.
+    if int_bytes[0] & 0x80 != 0 {
+        return Err(DeserializationError::InvalidValue(
+            "negative DER INTEGER is not valid for Ed25519 component".into(),
+        ));
+    }
+
+    // Strip the canonical leading 0x00 sign-padding byte if present.
     let stripped = match int_bytes {
         [0x00, rest @ ..] if !rest.is_empty() => rest,
         other => other,
