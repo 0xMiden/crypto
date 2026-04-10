@@ -1,8 +1,9 @@
 name: Contribution Quality
 
-# Use pull_request_target so the workflow can safely comment/label on PRs.
+# Uses pull_request_target only to let the pinned shared workflow comment/label via API;
+# it must not checkout or execute PR code.
 on:
-  pull_request_target:
+  pull_request_target: # zizmor: ignore[dangerous-triggers] metadata-only shared workflow, no PR checkout
     types: [opened, reopened, edited, synchronize, ready_for_review]
   workflow_dispatch:
     inputs:
@@ -24,7 +25,7 @@ permissions:
 
 jobs:
   contribution-quality:
-    uses: 0xMiden/.github/.github/workflows/contribution-quality.yml@main
+    uses: 0xMiden/.github/.github/workflows/contribution-quality.yml@385c1c10c311dc0508c71d83abb0be749a2c12ca # pin@main
     with:
       pr_number: ${{ github.event.inputs.pr_number || '' }}
       force_all: ${{ github.event.inputs.force_all || 'false' }}

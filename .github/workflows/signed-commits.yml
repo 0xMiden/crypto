@@ -8,7 +8,7 @@ permissions:
   pull-requests: write
 
 on:
-  pull_request_target:
+  pull_request_target: # zizmor: ignore[dangerous-triggers] metadata-only shared workflow, no PR checkout
     branches:
       - main
       - next
@@ -16,4 +16,4 @@ on:
 
 jobs:
   check-signed-commits:
-    uses: 0xMiden/.github/.github/workflows/signed-commits.yml@main
+    uses: 0xMiden/.github/.github/workflows/signed-commits.yml@385c1c10c311dc0508c71d83abb0be749a2c12ca # pin@main
