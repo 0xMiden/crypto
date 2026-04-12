@@ -5,7 +5,7 @@ use p3_maybe_rayon::prelude::*;
 
 use super::{
     CONSTRUCTION_SUBTREE_BATCH_SIZE, IN_MEMORY_DEPTH, LargeSmt, LargeSmtError, NUM_IN_MEMORY_NODES,
-    ROOT_MEMORY_INDEX, SMT_DEPTH, SmtStorageReader, SmtStorageWriter, StorageError, Subtree,
+    ROOT_MEMORY_INDEX, SMT_DEPTH, SmtStorage, SmtStorageReader, StorageError, Subtree,
 };
 use crate::{
     EMPTY_WORD, Word,
@@ -198,7 +198,7 @@ impl<S: SmtStorageReader> LargeSmt<S> {
     }
 }
 
-impl<S: SmtStorageWriter> LargeSmt<S> {
+impl<S: SmtStorage> LargeSmt<S> {
     /// Returns a new [Smt] instantiated with leaves set as specified by the provided entries.
     ///
     /// If the `concurrent` feature is enabled, this function uses a parallel implementation to

@@ -1,7 +1,7 @@
 use alloc::vec::Vec;
 
 use super::{
-    IN_MEMORY_DEPTH, LargeSmt, NUM_SUBTREE_LEVELS, ROOT_MEMORY_INDEX, SMT_DEPTH, SmtStorageWriter,
+    IN_MEMORY_DEPTH, LargeSmt, NUM_SUBTREE_LEVELS, ROOT_MEMORY_INDEX, SMT_DEPTH, SmtStorage,
     StorageError, Subtree,
 };
 use crate::{
@@ -13,7 +13,7 @@ use crate::{
     },
 };
 
-impl<S: SmtStorageWriter> SparseMerkleTree<SMT_DEPTH> for LargeSmt<S> {
+impl<S: SmtStorage> SparseMerkleTree<SMT_DEPTH> for LargeSmt<S> {
     type Key = Word;
     type Value = Word;
     type Leaf = SmtLeaf;

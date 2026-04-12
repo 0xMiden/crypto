@@ -7,8 +7,7 @@ use rocksdb::{
 };
 
 use super::{
-    SmtStorageReader, SmtStorageWriter, StorageError, StorageUpdateParts, StorageUpdates,
-    SubtreeUpdate,
+    SmtStorage, SmtStorageReader, StorageError, StorageUpdateParts, StorageUpdates, SubtreeUpdate,
 };
 use crate::{
     EMPTY_WORD, Word,
@@ -534,7 +533,7 @@ impl SmtStorageReader for RocksDbStorage {
     }
 }
 
-impl SmtStorageWriter for RocksDbStorage {
+impl SmtStorage for RocksDbStorage {
     /// Inserts a key-value pair into the SMT leaf at the specified logical `index`.
     ///
     /// This operation involves:

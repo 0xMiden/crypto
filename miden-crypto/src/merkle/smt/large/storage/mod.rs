@@ -132,14 +132,14 @@ pub trait SmtStorageReader: 'static + fmt::Debug + Send + Sync {
     fn get_depth24(&self) -> Result<Vec<(u64, Word)>, StorageError>;
 }
 
-/// Write operations for the Sparse Merkle Tree storage backend.
+/// Sparse Merkle Tree storage backend with full read and write capabilities.
 ///
 /// This trait extends [`SmtStorageReader`] with mutation operations required to persist changes
 /// to the SMT.
 ///
 /// All methods are expected to handle potential storage errors by returning a
 /// `Result<_, StorageError>`.
-pub trait SmtStorageWriter: SmtStorageReader {
+pub trait SmtStorage: SmtStorageReader {
     /// Inserts a key-value pair into the SMT leaf at the specified logical `index`.
     ///
     /// - If the leaf at `index` does not exist, it may be created.
@@ -247,13 +247,6 @@ pub trait SmtStorageWriter: SmtStorageReader {
     fn apply(&mut self, updates: StorageUpdates) -> Result<(), StorageError>;
 }
 
-/// Sparse Merkle Tree storage backend.
-///
-/// This trait combines [`SmtStorageReader`] and [`SmtStorageWriter`] into a single bound for
-/// convenience. It is automatically implemented for any type that implements both traits.
-pub trait SmtStorage: SmtStorageReader + SmtStorageWriter {}
-impl<T: SmtStorageReader + SmtStorageWriter> SmtStorage for T {}
-
 impl<T: SmtStorageReader + ?Sized> SmtStorageReader for Box<T> {
     #[inline]
     fn leaf_count(&self) -> Result<usize, StorageError> {
@@ -320,7 +313,7 @@ impl<T: SmtStorageReader + ?Sized> SmtStorageReader for Box<T> {
     }
 }
 
-impl<T: SmtStorageWriter + ?Sized> SmtStorageWriter for Box<T> {
+impl<T: SmtStorage + ?Sized> SmtStorage for Box<T> {
     #[inline]
     fn insert_value(
         &mut self,

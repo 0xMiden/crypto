@@ -196,8 +196,8 @@ pub use subtree::{Subtree, SubtreeError};
 
 mod storage;
 pub use storage::{
-    MemoryStorage, SmtStorage, SmtStorageReader, SmtStorageWriter, StorageError,
-    StorageUpdateParts, StorageUpdates, SubtreeUpdate,
+    MemoryStorage, SmtStorage, SmtStorageReader, StorageError, StorageUpdateParts, StorageUpdates,
+    SubtreeUpdate,
 };
 #[cfg(feature = "rocksdb")]
 pub use storage::{RocksDbConfig, RocksDbStorage};
@@ -507,7 +507,7 @@ impl<S: SmtStorageReader> LargeSmt<S> {
     }
 }
 
-impl<S: SmtStorageWriter> LargeSmt<S> {
+impl<S: SmtStorage> LargeSmt<S> {
     // STATE MUTATORS
     // --------------------------------------------------------------------------------------------
 

@@ -6,7 +6,7 @@ use p3_maybe_rayon::prelude::*;
 
 use super::{
     IN_MEMORY_DEPTH, LargeSmt, LargeSmtError, LoadedLeaves, MutatedLeaves, ROOT_MEMORY_INDEX,
-    SMT_DEPTH, SmtStorageWriter, StorageUpdates, Subtree, SubtreeUpdate,
+    SMT_DEPTH, SmtStorage, StorageUpdates, Subtree, SubtreeUpdate,
 };
 use crate::{
     Word,
@@ -36,7 +36,7 @@ struct PreparedMutations {
 // BATCH OPERATIONS
 // ================================================================================================
 
-impl<S: SmtStorageWriter> LargeSmt<S> {
+impl<S: SmtStorage> LargeSmt<S> {
     /// Processes one set of `subtree_leaves` at a given `subtree_root_depth` and returns:
     /// - node mutations to apply to in-memory nodes (empty if handled in subtree),
     /// - the computed subtree root leaf, and

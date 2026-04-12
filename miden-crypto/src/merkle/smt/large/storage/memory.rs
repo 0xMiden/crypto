@@ -1,8 +1,7 @@
 use alloc::{boxed::Box, vec::Vec};
 
 use super::{
-    SmtStorageReader, SmtStorageWriter, StorageError, StorageUpdateParts, StorageUpdates,
-    SubtreeUpdate,
+    SmtStorage, SmtStorageReader, StorageError, StorageUpdateParts, StorageUpdates, SubtreeUpdate,
 };
 use crate::{
     EMPTY_WORD, Map, MapEntry, Word,
@@ -134,7 +133,7 @@ impl SmtStorageReader for MemoryStorage {
     }
 }
 
-impl SmtStorageWriter for MemoryStorage {
+impl SmtStorage for MemoryStorage {
     /// Inserts a key-value pair into the leaf at the given index.
     ///
     /// - If the leaf at `index` does not exist, a new `SmtLeaf::Single` is created.
