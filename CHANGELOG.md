@@ -1,3 +1,7 @@
+## 0.24.0 (TBD)
+
+- Extracted `SmtStorageReader` trait from `SmtStorage`, allowing `LargeSmt<S>` to work with read-only storage backends ([#958](https://github.com/0xMiden/crypto/pull/958)).
+
 ## 0.23.0 (2026-03-11)
 
 - Replaced `Subtree` internal storage with bitmask layout ([#784](https://github.com/0xMiden/crypto/pull/784)).
