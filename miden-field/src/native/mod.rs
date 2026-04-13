@@ -144,7 +144,7 @@ fn raw_felt_u64(value: &Felt) -> u64 {
 ///
 /// `Felt` is `#[repr(transparent)]` over `Goldilocks`, so the element layout matches.
 #[inline]
-fn felt_as_goldilock_slice(s: &[Felt]) -> &[Goldilocks] {
+fn felts_as_goldilocks_slice(s: &[Felt]) -> &[Goldilocks] {
     // SAFETY: `Felt` is `#[repr(transparent)]` over `Goldilocks`, so the element layout matches.
     unsafe { core::slice::from_raw_parts(s.as_ptr().cast::<Goldilocks>(), s.len()) }
 }
@@ -155,8 +155,8 @@ fn felt_as_goldilock_slice(s: &[Felt]) -> &[Goldilocks] {
 ///
 /// `Felt` is `#[repr(transparent)]` over `Goldilocks`, so `[Felt; N]` matches `[Goldilocks; N]`.
 #[inline]
-fn felt_as_goldilocks_array<const N: usize>(a: &[Felt; N]) -> &[Goldilocks; N] {
-    // SAFETY: same layout as `felt_as_goldilock_slice`, for a fixed `N`.
+fn felts_as_goldilocks_array<const N: usize>(a: &[Felt; N]) -> &[Goldilocks; N] {
+    // SAFETY: same layout as `felts_as_goldilocks_slice`, for a fixed `N`.
     unsafe { &*(a as *const [Felt; N] as *const [Goldilocks; N]) }
 }
 
@@ -250,14 +250,14 @@ impl PrimeCharacteristicRing for Felt {
     #[inline]
     fn sum_array<const N: usize>(input: &[Self]) -> Self {
         assert_eq!(N, input.len());
-        let g = felt_as_goldilock_slice(input);
+        let g = felts_as_goldilocks_slice(input);
         Self(Goldilocks::sum_array::<N>(g))
     }
 
     #[inline]
     fn dot_product<const N: usize>(lhs: &[Self; N], rhs: &[Self; N]) -> Self {
-        let lhs_g = felt_as_goldilocks_array(lhs);
-        let rhs_g = felt_as_goldilocks_array(rhs);
+        let lhs_g = felts_as_goldilocks_array(lhs);
+        let rhs_g = felts_as_goldilocks_array(rhs);
         Self(Goldilocks::dot_product(lhs_g, rhs_g))
     }
 
