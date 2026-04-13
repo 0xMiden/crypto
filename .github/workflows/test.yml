@@ -18,12 +18,17 @@ permissions:
 
 jobs:
   test:
+    # Local timings from 2026-04-13 show these nextest jobs are overwhelmingly compile-bound:
+    # default 94.28s cold / 2.43s warm, no-std 28.84s / 1.25s, large-smt 137.33s / 0.77s.
+    # Restore rust-cache here so cache hits can avoid rebuilding those artifacts from scratch.
     name: test ${{matrix.toolchain}} on ${{matrix.os}} with ${{matrix.args}}
     runs-on: ${{matrix.os}}-latest
     strategy:
       fail-fast: false
       matrix:
-        toolchain: [stable, nightly]
+        # Stable and nightly nextest jobs exercised the same test commands with near-identical
+        # durations in CI, so keep the stable lane and let nightly coverage live elsewhere.
+        toolchain: [stable]
         os: [ubuntu]
         args: [default, no-std, large-smt]
     timeout-minutes: 30
@@ -32,6 +37,7 @@ jobs:
       - name: Cleanup large tools for build space
         uses: ./.github/actions/cleanup-runner
       - uses: taiki-e/install-action@nextest
+      - uses: Swatinem/rust-cache@v2
       - name: Install LLVM/Clang
         if: ${{ matrix.args == 'large-smt' }}
         uses: ./.github/actions/install-llvm
@@ -44,19 +50,22 @@ jobs:
           make test-${{matrix.args}}
 
   test-smt-concurrent:
+    # This nextest lane is also compile-heavy, and stable/nightly timings were effectively the
+    # same in CI (4.25m stable vs 4.38m nightly for the test step).
     name: test-smt-concurrent ${{ matrix.toolchain }}
     runs-on: ubuntu-latest
     if: ${{ github.event_name == 'pull_request' && (github.base_ref == 'main' || github.base_ref == 'next') }}
     strategy:
       fail-fast: false
       matrix:
-        toolchain: [stable, nightly]
+        toolchain: [stable]
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@main
       - name: Cleanup large tools for build space
         uses: ./.github/actions/cleanup-runner
       - uses: taiki-e/install-action@nextest
+      - uses: Swatinem/rust-cache@v2
       - name: Perform concurrent SMT tests
         run: |
           rustup update --no-self-update ${{matrix.toolchain}}
