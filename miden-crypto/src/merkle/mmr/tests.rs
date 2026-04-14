@@ -1037,7 +1037,7 @@ fn test_mmr_invariants() {
         );
 
         let expected_nodes: usize =
-            TreeSizeIterator::new(mmr.forest()).map(super::forest::Forest::num_nodes).sum();
+            TreeSizeIterator::new(mmr.forest()).map(Forest::num_nodes).sum();
 
         assert_eq!(
             expected_nodes,

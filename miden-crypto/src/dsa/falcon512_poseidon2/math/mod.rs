@@ -99,7 +99,7 @@ pub(crate) fn ntru_gen<R: Rng>(n: usize, rng: &mut R) -> [Polynomial<i16>; 4] {
         }
 
         let f_ntt = f.map(|&i| FalconFelt::new(i)).fft();
-        if f_ntt.coefficients.iter().any(num::Zero::is_zero) {
+        if f_ntt.coefficients.iter().any(Zero::is_zero) {
             continue;
         }
         let gamma = gram_schmidt_norm_squared(&f, &g);

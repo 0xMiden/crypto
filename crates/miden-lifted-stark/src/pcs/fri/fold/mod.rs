@@ -300,7 +300,7 @@ pub mod tests {
         // Generate random coset generators and their inverses
         let s_values: Vec<Felt> =
             (0..height).map(|_| rng.sample::<Felt, _>(StandardUniform)).collect();
-        let s_invs: Vec<Felt> = s_values.iter().map(p3_field::Field::inverse).collect();
+        let s_invs: Vec<Felt> = s_values.iter().map(Field::inverse).collect();
 
         let beta: QuadFelt = rng.sample(StandardUniform);
 

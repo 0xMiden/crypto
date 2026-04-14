@@ -219,7 +219,7 @@ proptest! {
         let backend_entries = backend
             .entries(target_lineage)?
             .map(|e| e.map(|e| (e.key, e.value)))
-            .collect::<std::result::Result<Vec<_>, _>>()?
+            .collect::<Result<Vec<_>, _>>()?
             .into_iter()
             .sorted()
             .collect_vec();

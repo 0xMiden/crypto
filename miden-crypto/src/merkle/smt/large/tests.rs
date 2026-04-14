@@ -482,13 +482,13 @@ fn test_insert_batch_empty_tree() {
 
     let entries = vec![
         (
-            crate::Word::new([
+            Word::new([
                 Felt::new_unchecked(1),
                 Felt::new_unchecked(0),
                 Felt::new_unchecked(0),
                 Felt::new_unchecked(0),
             ]),
-            crate::Word::new([
+            Word::new([
                 Felt::new_unchecked(10),
                 Felt::new_unchecked(20),
                 Felt::new_unchecked(30),
@@ -496,13 +496,13 @@ fn test_insert_batch_empty_tree() {
             ]),
         ),
         (
-            crate::Word::new([
+            Word::new([
                 Felt::new_unchecked(2),
                 Felt::new_unchecked(0),
                 Felt::new_unchecked(0),
                 Felt::new_unchecked(0),
             ]),
-            crate::Word::new([
+            Word::new([
                 Felt::new_unchecked(11),
                 Felt::new_unchecked(22),
                 Felt::new_unchecked(33),
@@ -527,23 +527,23 @@ fn test_insert_batch_with_deletions() {
     let mut smt = LargeSmt::new(storage).unwrap();
 
     // Initial data
-    let key_1 = crate::Word::new([ONE, ONE, ONE, Felt::new_unchecked(1)]);
-    let key_2 = crate::Word::new([
+    let key_1 = Word::new([ONE, ONE, ONE, Felt::new_unchecked(1)]);
+    let key_2 = Word::new([
         Felt::new_unchecked(2),
         Felt::new_unchecked(2),
         Felt::new_unchecked(2),
         Felt::new_unchecked(2),
     ]);
-    let key_3 = crate::Word::new([
+    let key_3 = Word::new([
         Felt::new_unchecked(0),
         Felt::new_unchecked(0),
         Felt::new_unchecked(0),
         Felt::new_unchecked(3),
     ]);
 
-    let value_1 = crate::Word::new([ONE; Word::NUM_ELEMENTS]);
-    let value_2 = crate::Word::new([Felt::new_unchecked(2); Word::NUM_ELEMENTS]);
-    let value_3 = crate::Word::new([Felt::new_unchecked(3); Word::NUM_ELEMENTS]);
+    let value_1 = Word::new([ONE; Word::NUM_ELEMENTS]);
+    let value_2 = Word::new([Felt::new_unchecked(2); Word::NUM_ELEMENTS]);
+    let value_3 = Word::new([Felt::new_unchecked(3); Word::NUM_ELEMENTS]);
 
     smt.insert(key_1, value_1).unwrap();
     smt.insert(key_2, value_2).unwrap();
@@ -567,8 +567,8 @@ fn test_insert_batch_no_mutations() {
     let storage = MemoryStorage::new();
     let mut smt = LargeSmt::new(storage).unwrap();
 
-    let key_1 = crate::Word::new([ONE, ONE, ONE, Felt::new_unchecked(1)]);
-    let value_1 = crate::Word::new([ONE; Word::NUM_ELEMENTS]);
+    let key_1 = Word::new([ONE, ONE, ONE, Felt::new_unchecked(1)]);
+    let value_1 = Word::new([ONE; Word::NUM_ELEMENTS]);
 
     smt.insert(key_1, value_1).unwrap();
     let root_before = smt.root();

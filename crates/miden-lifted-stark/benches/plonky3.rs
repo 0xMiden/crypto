@@ -259,7 +259,7 @@ fn bench_pcs_open(c: &mut Criterion) {
                     })
                 })
                 .collect();
-            all_lde_matrices.sort_by_key(p3_matrix::Matrix::height);
+            all_lde_matrices.sort_by_key(Matrix::height);
 
             let tree = lmcs.build_aligned_tree(all_lde_matrices);
             let commitment = tree.root();

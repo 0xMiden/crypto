@@ -19,7 +19,7 @@ use miden_stark_transcript::ProverTranscript;
 use p3_challenger::{CanObserve, FieldChallenger};
 use p3_dft::{Radix2DitParallel, TwoAdicSubgroupDft};
 use p3_field::Field;
-use p3_matrix::dense::RowMajorMatrix;
+use p3_matrix::{Matrix, dense::RowMajorMatrix};
 
 fn bench_pcs(c: &mut Criterion) {
     let dft = Radix2DitParallel::<Felt>::default();
@@ -44,7 +44,7 @@ fn bench_pcs(c: &mut Criterion) {
                 })
             })
             .collect();
-        all_lde_matrices.sort_by_key(p3_matrix::Matrix::height);
+        all_lde_matrices.sort_by_key(Matrix::height);
 
         let tree = lmcs.build_aligned_tree(all_lde_matrices);
         let commitment = tree.root();

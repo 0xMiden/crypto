@@ -165,7 +165,7 @@ impl<EF> DeepPoly<EF> {
         let point_quotient = &quotient.point_quotient;
         let n = point_quotient.len();
 
-        let group_sizes: Vec<usize> = matrices_groups.iter().map(alloc::vec::Vec::len).collect();
+        let group_sizes: Vec<usize> = matrices_groups.iter().map(Vec::len).collect();
         let widths: Vec<usize> =
             matrices_groups.iter().flat_map(|g| g.iter().map(|m| m.width())).collect();
 

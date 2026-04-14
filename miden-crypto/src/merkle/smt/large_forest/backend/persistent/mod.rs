@@ -531,7 +531,7 @@ impl Backend for PersistentBackend {
         let lineage_data = updates_with_batch
             .into_par_iter()
             .map(|(lineage, ops, new_meta, batch)| {
-                let ops = ops.into_iter().map(core::convert::Into::into).collect();
+                let ops = ops.into_iter().map(Into::into).collect();
                 let (batch, reversion, tree_data) =
                     self.update_tree_in_write_batch(batch, lineage, new_meta, version, ops)?;
                 let batch = self.write_metadata(batch, lineage, &tree_data)?;
@@ -623,7 +623,7 @@ impl Backend for PersistentBackend {
         let lineage_data = updates_with_batch
             .into_par_iter()
             .map(|(lineage, ops, tree_data, batch)| {
-                let ops = ops.into_iter().map(core::convert::Into::into).collect();
+                let ops = ops.into_iter().map(Into::into).collect();
                 let (batch, reversion, tree_data) =
                     self.update_tree_in_write_batch(batch, lineage, tree_data, new_version, ops)?;
                 let batch = self.write_metadata(batch, lineage, &tree_data)?;
@@ -1096,8 +1096,7 @@ impl PersistentBackend {
             let leaf_index = LeafIndex::from(leaf_pairs[0].0);
 
             let maybe_old_leaf = leaf_map.get(&leaf_index.position()).and_then(Option::as_ref);
-            let old_entry_count =
-                maybe_old_leaf.map(crate::merkle::smt::SmtLeaf::num_entries).unwrap_or_default();
+            let old_entry_count = maybe_old_leaf.map(SmtLeaf::num_entries).unwrap_or_default();
 
             // Whenever we change a value in the current leaf, we have to store the _old_ version of
             // that value in our reversion pairs.
@@ -1232,7 +1231,7 @@ impl PersistentBackend {
         &self,
         keys: impl Iterator<Item = &'b LeafKey>,
     ) -> Result<Vec<Option<SmtLeaf>>> {
-        let bytes = keys.map(miden_serde_utils::Serializable::to_bytes).collect::<Vec<_>>();
+        let bytes = keys.map(Serializable::to_bytes).collect::<Vec<_>>();
         self.load_leaves_raw(bytes.iter())
     }
 

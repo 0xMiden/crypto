@@ -5,6 +5,7 @@ use core::{
     array, fmt,
     hash::{Hash, Hasher},
     iter::{Product, Sum},
+    mem::{align_of, size_of},
     ops::{Add, AddAssign, Div, DivAssign, Mul, MulAssign, Neg, Sub, SubAssign},
 };
 
@@ -130,8 +131,8 @@ impl Felt {
 #[inline]
 fn raw_felt_u64(value: Felt) -> u64 {
     const _: () = {
-        assert!(core::mem::size_of::<Felt>() == core::mem::size_of::<u64>());
-        assert!(core::mem::align_of::<Felt>() == core::mem::align_of::<u64>());
+        assert!(size_of::<Felt>() == size_of::<u64>());
+        assert!(align_of::<Felt>() == align_of::<u64>());
         assert!(2u128 * (Felt::ORDER as u128) > u64::MAX as u128);
     };
     // SAFETY: Felt is repr(transparent) over Goldilocks, which is repr(transparent) over u64.
@@ -635,7 +636,7 @@ impl Serializable for Felt {
     }
 
     fn get_size_hint(&self) -> usize {
-        core::mem::size_of::<u64>()
+        size_of::<u64>()
     }
 }
 

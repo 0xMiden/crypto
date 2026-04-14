@@ -581,7 +581,7 @@ proptest! {
         entries in prop::collection::vec(arbitrary_batch(), 0..10),
     ) {
         // Build a forest update batch containing all lineages with their respective entries.
-        let mut batch = crate::merkle::smt::SmtForestUpdateBatch::empty();
+        let mut batch = SmtForestUpdateBatch::empty();
         for (i, lineage) in lineages.iter().enumerate() {
             if let Some(entry_batch) = entries.get(i) {
                 *batch.operations(*lineage) = entry_batch.clone();

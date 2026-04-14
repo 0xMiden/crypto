@@ -132,7 +132,7 @@ impl SecretKey {
     // --------------------------------------------------------------------------------------------
 
     /// Signs a message with this secret key.
-    pub fn sign(&self, message: crate::Word) -> Signature {
+    pub fn sign(&self, message: Word) -> Signature {
         use rand::SeedableRng;
         use rand_chacha::ChaCha20Rng;
 

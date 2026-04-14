@@ -1342,7 +1342,7 @@ mod tests {
 
         // Valid case: tracked leaf with its value in nodes
         let mut nodes_with_leaf = BTreeMap::new();
-        let leaf_idx = super::InOrderIndex::from_leaf_pos(0);
+        let leaf_idx = InOrderIndex::from_leaf_pos(0);
         nodes_with_leaf.insert(leaf_idx, int_to_node(0));
         let mut tracked_valid = BTreeSet::new();
         tracked_valid.insert(0);

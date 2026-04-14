@@ -219,7 +219,7 @@ mod tests {
         d11: &Polynomial<Complex64>,
     ) -> [Polynomial<Complex64>; 4] {
         // Compute conj(l10) for use in L*
-        let l10_conj = l10.map(num::Complex::conj);
+        let l10_conj = l10.map(Complex::conj);
 
         // Compute G = L·D·L* using Hadamard operations (FFT domain)
         // G[0,0] = 1*d00*1 + 0*d11*0 = d00
@@ -258,7 +258,7 @@ mod tests {
         }
 
         // Ensure Hermitian property: g10 = conj(g01)
-        let g10 = g01.iter().map(num::Complex::conj).collect();
+        let g10 = g01.iter().map(Complex::conj).collect();
 
         [
             Polynomial::new(g00),
