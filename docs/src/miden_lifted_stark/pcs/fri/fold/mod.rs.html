@@ -1,4 +1,4 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `crates/miden-lifted-stark/src/pcs/fri/fold/mod.rs`."><title>mod.rs - source</title><script>if(window.location.protocol!=="file:")document.head.insertAdjacentHTML("beforeend","SourceSerif4-Regular-6b053e98.ttf.woff2,FiraSans-Italic-81dc35de.woff2,FiraSans-Regular-0fe48ade.woff2,FiraSans-MediumItalic-ccf7e434.woff2,FiraSans-Medium-e1aa3f0a.woff2,SourceCodePro-Regular-8badfe75.ttf.woff2,SourceCodePro-Semibold-aa29a496.ttf.woff2".split(",").map(f=>`<link rel="preload" as="font" type="font/woff2"href="../../../../../static.files/${f}">`).join(""))</script><link rel="stylesheet" href="../../../../../static.files/normalize-9960930a.css"><link rel="stylesheet" href="../../../../../static.files/rustdoc-17e0aaed.css"><meta name="rustdoc-vars" data-root-path="../../../../../" data-static-root-path="../../../../../static.files/" data-current-crate="miden_lifted_stark" data-themes="" data-resource-suffix="" data-rustdoc-version="1.97.0-nightly (14196dbfa 2026-04-12)" data-channel="nightly" data-search-js="search-b5634cc7.js" data-stringdex-js="stringdex-2da4960a.js" data-settings-js="settings-170eb4bf.js" ><script src="../../../../../static.files/storage-41dd4d93.js"></script><script defer src="../../../../../static.files/src-script-813739b1.js"></script><script defer src="../../../../../src-files.js"></script><script defer src="../../../../../static.files/main-5013f961.js"></script><noscript><link rel="stylesheet" href="../../../../../static.files/noscript-f7c3ffd8.css"></noscript><link rel="alternate icon" type="image/png" href="../../../../../static.files/favicon-32x32-eab170b8.png"><link rel="icon" type="image/svg+xml" href="../../../../../static.files/favicon-044be391.svg"></head><body class="rustdoc src"><a class="skip-main-content" href="#main-content">Skip to main content</a><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="src-sidebar-title"><h2>Files</h2></div></nav><div class="sidebar-resizer" title="Drag to resize sidebar"></div><main><section id="main-content" class="content" tabindex="-1"><div class="main-heading"><h1><div class="sub-heading">miden_lifted_stark/pcs/fri/fold/</div>mod.rs</h1><rustdoc-toolbar></rustdoc-toolbar></div><div class="example-wrap digits-3"><pre class="rust"><code><a href=#1 id=1 data-nosnippet>1</a><span class="doccomment">//! FRI folding via polynomial interpolation.
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `crates/miden-lifted-stark/src/pcs/fri/fold/mod.rs`."><title>mod.rs - source</title><script>if(window.location.protocol!=="file:")document.head.insertAdjacentHTML("beforeend","SourceSerif4-Regular-6b053e98.ttf.woff2,FiraSans-Italic-81dc35de.woff2,FiraSans-Regular-0fe48ade.woff2,FiraSans-MediumItalic-ccf7e434.woff2,FiraSans-Medium-e1aa3f0a.woff2,SourceCodePro-Regular-8badfe75.ttf.woff2,SourceCodePro-Semibold-aa29a496.ttf.woff2".split(",").map(f=>`<link rel="preload" as="font" type="font/woff2"href="../../../../../static.files/${f}">`).join(""))</script><link rel="stylesheet" href="../../../../../static.files/normalize-9960930a.css"><link rel="stylesheet" href="../../../../../static.files/rustdoc-17e0aaed.css"><meta name="rustdoc-vars" data-root-path="../../../../../" data-static-root-path="../../../../../static.files/" data-current-crate="miden_lifted_stark" data-themes="" data-resource-suffix="" data-rustdoc-version="1.97.0-nightly (17584a181 2026-04-13)" data-channel="nightly" data-search-js="search-b5634cc7.js" data-stringdex-js="stringdex-2da4960a.js" data-settings-js="settings-170eb4bf.js" ><script src="../../../../../static.files/storage-41dd4d93.js"></script><script defer src="../../../../../static.files/src-script-813739b1.js"></script><script defer src="../../../../../src-files.js"></script><script defer src="../../../../../static.files/main-5013f961.js"></script><noscript><link rel="stylesheet" href="../../../../../static.files/noscript-f7c3ffd8.css"></noscript><link rel="alternate icon" type="image/png" href="../../../../../static.files/favicon-32x32-eab170b8.png"><link rel="icon" type="image/svg+xml" href="../../../../../static.files/favicon-044be391.svg"></head><body class="rustdoc src"><a class="skip-main-content" href="#main-content">Skip to main content</a><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="src-sidebar-title"><h2>Files</h2></div></nav><div class="sidebar-resizer" title="Drag to resize sidebar"></div><main><section id="main-content" class="content" tabindex="-1"><div class="main-heading"><h1><div class="sub-heading">miden_lifted_stark/pcs/fri/fold/</div>mod.rs</h1><rustdoc-toolbar></rustdoc-toolbar></div><div class="example-wrap digits-3"><pre class="rust"><code><a href=#1 id=1 data-nosnippet>1</a><span class="doccomment">//! FRI folding via polynomial interpolation.
 <a href=#2 id=2 data-nosnippet>2</a>//!
 <a href=#3 id=3 data-nosnippet>3</a>//! FRI (Fast Reed-Solomon IOP of Proximity) folds evaluations on a coset into a
 <a href=#4 id=4 data-nosnippet>4</a>//! lower-degree polynomial value parameterized by a challenge `β`. Each row fold
@@ -70,7 +70,7 @@
 <a href=#70 id=70 data-nosnippet>70</a>    /// `f(β)` exactly.
 <a href=#71 id=71 data-nosnippet>71</a>    </span><span class="attr">#[inline]
 <a href=#72 id=72 data-nosnippet>72</a>    </span><span class="kw">pub fn </span>fold_evals&lt;F: TwoAdicField, EF: ExtensionField&lt;F&gt;&gt;(
-<a href=#73 id=73 data-nosnippet>73</a>        <span class="kw-2">&amp;</span><span class="self">self</span>,
+<a href=#73 id=73 data-nosnippet>73</a>        <span class="self">self</span>,
 <a href=#74 id=74 data-nosnippet>74</a>        evals: <span class="kw-2">&amp;</span>[EF],
 <a href=#75 id=75 data-nosnippet>75</a>        s_inv: F,
 <a href=#76 id=76 data-nosnippet>76</a>        beta: EF,
@@ -86,7 +86,7 @@
 <a href=#86 id=86 data-nosnippet>86</a>    <span class="doccomment">/// Packed (SIMD) version of `fold_evals`.
 <a href=#87 id=87 data-nosnippet>87</a>    </span><span class="attr">#[inline]
 <a href=#88 id=88 data-nosnippet>88</a>    </span><span class="kw">fn </span>fold_evals_packed&lt;F: TwoAdicField, EF: ExtensionField&lt;F&gt;&gt;(
-<a href=#89 id=89 data-nosnippet>89</a>        <span class="kw-2">&amp;</span><span class="self">self</span>,
+<a href=#89 id=89 data-nosnippet>89</a>        <span class="self">self</span>,
 <a href=#90 id=90 data-nosnippet>90</a>        evals: <span class="kw-2">&amp;</span>[EF::ExtensionPacking],
 <a href=#91 id=91 data-nosnippet>91</a>        s_inv: F::Packing,
 <a href=#92 id=92 data-nosnippet>92</a>        beta: EF,
@@ -113,7 +113,7 @@
 <a href=#113 id=113 data-nosnippet>113</a>    ///
 <a href=#114 id=114 data-nosnippet>114</a>    /// Automatically dispatches to scalar or packed implementation based on matrix size.
 <a href=#115 id=115 data-nosnippet>115</a>    </span><span class="kw">pub fn </span>fold_matrix&lt;F: TwoAdicField, EF: ExtensionField&lt;F&gt;&gt;(
-<a href=#116 id=116 data-nosnippet>116</a>        <span class="kw-2">&amp;</span><span class="self">self</span>,
+<a href=#116 id=116 data-nosnippet>116</a>        <span class="self">self</span>,
 <a href=#117 id=117 data-nosnippet>117</a>        input: RowMajorMatrixView&lt;<span class="lifetime">'_</span>, EF&gt;,
 <a href=#118 id=118 data-nosnippet>118</a>        s_invs: <span class="kw-2">&amp;</span>[F],
 <a href=#119 id=119 data-nosnippet>119</a>        beta: EF,
@@ -140,7 +140,7 @@
 <a href=#140 id=140 data-nosnippet>140</a>    }
 <a href=#141 id=141 data-nosnippet>141</a>
 <a href=#142 id=142 data-nosnippet>142</a>    <span class="kw">fn </span>fold_matrix_packed_impl&lt;<span class="kw">const </span>ARITY: usize, F, EF&gt;(
-<a href=#143 id=143 data-nosnippet>143</a>        <span class="kw-2">&amp;</span><span class="self">self</span>,
+<a href=#143 id=143 data-nosnippet>143</a>        <span class="self">self</span>,
 <a href=#144 id=144 data-nosnippet>144</a>        input: RowMajorMatrixView&lt;<span class="lifetime">'_</span>, EF&gt;,
 <a href=#145 id=145 data-nosnippet>145</a>        s_invs: <span class="kw-2">&amp;</span>[F],
 <a href=#146 id=146 data-nosnippet>146</a>        beta: EF,
@@ -215,7 +215,7 @@
 <a href=#215 id=215 data-nosnippet>215</a>    ///
 <a href=#216 id=216 data-nosnippet>216</a>    /// Generates a random polynomial, computes evaluations on a coset using NaiveDft,
 <a href=#217 id=217 data-nosnippet>217</a>    /// then verifies fold_evals correctly recovers f(β).
-<a href=#218 id=218 data-nosnippet>218</a>    </span><span class="kw">fn </span>test_fold_evals_naive_dft(fold: <span class="kw-2">&amp;</span>FriFold) {
+<a href=#218 id=218 data-nosnippet>218</a>    </span><span class="kw">fn </span>test_fold_evals_naive_dft(fold: FriFold) {
 <a href=#219 id=219 data-nosnippet>219</a>        <span class="kw">use </span>p3_dft::{NaiveDft, TwoAdicSubgroupDft};
 <a href=#220 id=220 data-nosnippet>220</a>
 <a href=#221 id=221 data-nosnippet>221</a>        <span class="kw">let </span><span class="kw-2">mut </span>rng = SmallRng::seed_from_u64(<span class="number">42</span>);
@@ -249,7 +249,7 @@
 <a href=#249 id=249 data-nosnippet>249</a>    ///
 <a href=#250 id=250 data-nosnippet>250</a>    /// Creates a random polynomial of degree `arity - 1`, evaluates it on a coset
 <a href=#251 id=251 data-nosnippet>251</a>    /// of size `arity`, then verifies that `fold_evals` correctly recovers `f(β)`.
-<a href=#252 id=252 data-nosnippet>252</a>    </span><span class="kw">fn </span>test_fold_correctness&lt;Base, Ext&gt;(fold: <span class="kw-2">&amp;</span>FriFold)
+<a href=#252 id=252 data-nosnippet>252</a>    </span><span class="kw">fn </span>test_fold_correctness&lt;Base, Ext&gt;(fold: FriFold)
 <a href=#253 id=253 data-nosnippet>253</a>    <span class="kw">where
 <a href=#254 id=254 data-nosnippet>254</a>        </span>Base: TwoAdicField,
 <a href=#255 id=255 data-nosnippet>255</a>        Ext: ExtensionField&lt;Base&gt;,
@@ -287,7 +287,7 @@
 <a href=#287 id=287 data-nosnippet>287</a>    ///
 <a href=#288 id=288 data-nosnippet>288</a>    /// Creates a matrix large enough to trigger the packed path, then verifies
 <a href=#289 id=289 data-nosnippet>289</a>    /// the result matches row-by-row scalar `fold_evals` computation.
-<a href=#290 id=290 data-nosnippet>290</a>    </span><span class="kw">fn </span>test_fold_matrix_scalar_packed_equivalence(fold: <span class="kw-2">&amp;</span>FriFold) {
+<a href=#290 id=290 data-nosnippet>290</a>    </span><span class="kw">fn </span>test_fold_matrix_scalar_packed_equivalence(fold: FriFold) {
 <a href=#291 id=291 data-nosnippet>291</a>        <span class="kw">let </span>rng = <span class="kw-2">&amp;mut </span>SmallRng::seed_from_u64(<span class="number">42</span>);
 <a href=#292 id=292 data-nosnippet>292</a>        <span class="kw">let </span>arity = fold.arity();
 <a href=#293 id=293 data-nosnippet>293</a>
@@ -300,7 +300,7 @@
 <a href=#300 id=300 data-nosnippet>300</a>        <span class="comment">// Generate random coset generators and their inverses
 <a href=#301 id=301 data-nosnippet>301</a>        </span><span class="kw">let </span>s_values: Vec&lt;Felt&gt; =
 <a href=#302 id=302 data-nosnippet>302</a>            (<span class="number">0</span>..height).map(|<span class="kw">_</span>| rng.sample::&lt;Felt, <span class="kw">_</span>&gt;(StandardUniform)).collect();
-<a href=#303 id=303 data-nosnippet>303</a>        <span class="kw">let </span>s_invs: Vec&lt;Felt&gt; = s_values.iter().map(|s| s.inverse()).collect();
+<a href=#303 id=303 data-nosnippet>303</a>        <span class="kw">let </span>s_invs: Vec&lt;Felt&gt; = s_values.iter().map(Field::inverse).collect();
 <a href=#304 id=304 data-nosnippet>304</a>
 <a href=#305 id=305 data-nosnippet>305</a>        <span class="kw">let </span>beta: QuadFelt = rng.sample(StandardUniform);
 <a href=#306 id=306 data-nosnippet>306</a>
@@ -321,7 +321,7 @@
 <a href=#321 id=321 data-nosnippet>321</a>    ///
 <a href=#322 id=322 data-nosnippet>322</a>    /// After folding a degree-d polynomial, the result should have degree d/arity.
 <a href=#323 id=323 data-nosnippet>323</a>    /// Verifies by checking that high coefficients are zero after IDFT.
-<a href=#324 id=324 data-nosnippet>324</a>    </span><span class="kw">fn </span>test_folding_preserves_low_degree(fold: <span class="kw-2">&amp;</span>FriFold) {
+<a href=#324 id=324 data-nosnippet>324</a>    </span><span class="kw">fn </span>test_folding_preserves_low_degree(fold: FriFold) {
 <a href=#325 id=325 data-nosnippet>325</a>        <span class="kw">let </span>rng = <span class="kw-2">&amp;mut </span>SmallRng::seed_from_u64(<span class="number">42</span>);
 <a href=#326 id=326 data-nosnippet>326</a>        <span class="kw">let </span>arity = fold.arity();
 <a href=#327 id=327 data-nosnippet>327</a>        <span class="kw">let </span>log_arity = fold.log_arity() <span class="kw">as </span>usize;
@@ -365,38 +365,37 @@
 <a href=#365 id=365 data-nosnippet>365</a>            <span class="macro">assert_eq!</span>(
 <a href=#366 id=366 data-nosnippet>366</a>                <span class="kw-2">*</span>coeff,
 <a href=#367 id=367 data-nosnippet>367</a>                QuadFelt::ZERO,
-<a href=#368 id=368 data-nosnippet>368</a>                <span class="string">"Arity {arity}: High coefficient c[{i}] should be zero but was {:?}"</span>,
-<a href=#369 id=369 data-nosnippet>369</a>                coeff
-<a href=#370 id=370 data-nosnippet>370</a>            );
-<a href=#371 id=371 data-nosnippet>371</a>        }
-<a href=#372 id=372 data-nosnippet>372</a>    }
-<a href=#373 id=373 data-nosnippet>373</a>
-<a href=#374 id=374 data-nosnippet>374</a>    <span class="attr">#[test]
-<a href=#375 id=375 data-nosnippet>375</a>    </span><span class="kw">fn </span>test_fold() {
-<a href=#376 id=376 data-nosnippet>376</a>        test_fold_correctness::&lt;Felt, QuadFelt&gt;(<span class="kw-2">&amp;</span>FRI_FOLD_ARITY_2);
-<a href=#377 id=377 data-nosnippet>377</a>        test_fold_correctness::&lt;Felt, QuadFelt&gt;(<span class="kw-2">&amp;</span>FRI_FOLD_ARITY_4);
-<a href=#378 id=378 data-nosnippet>378</a>        test_fold_correctness::&lt;Felt, QuadFelt&gt;(<span class="kw-2">&amp;</span>FRI_FOLD_ARITY_8);
-<a href=#379 id=379 data-nosnippet>379</a>    }
-<a href=#380 id=380 data-nosnippet>380</a>
-<a href=#381 id=381 data-nosnippet>381</a>    <span class="attr">#[test]
-<a href=#382 id=382 data-nosnippet>382</a>    </span><span class="kw">fn </span>test_fold_evals_against_naive_dft() {
-<a href=#383 id=383 data-nosnippet>383</a>        test_fold_evals_naive_dft(<span class="kw-2">&amp;</span>FRI_FOLD_ARITY_2);
-<a href=#384 id=384 data-nosnippet>384</a>        test_fold_evals_naive_dft(<span class="kw-2">&amp;</span>FRI_FOLD_ARITY_4);
-<a href=#385 id=385 data-nosnippet>385</a>        test_fold_evals_naive_dft(<span class="kw-2">&amp;</span>FRI_FOLD_ARITY_8);
-<a href=#386 id=386 data-nosnippet>386</a>    }
-<a href=#387 id=387 data-nosnippet>387</a>
-<a href=#388 id=388 data-nosnippet>388</a>    <span class="attr">#[test]
-<a href=#389 id=389 data-nosnippet>389</a>    </span><span class="kw">fn </span>test_fold_matrix() {
-<a href=#390 id=390 data-nosnippet>390</a>        test_fold_matrix_scalar_packed_equivalence(<span class="kw-2">&amp;</span>FRI_FOLD_ARITY_2);
-<a href=#391 id=391 data-nosnippet>391</a>        test_fold_matrix_scalar_packed_equivalence(<span class="kw-2">&amp;</span>FRI_FOLD_ARITY_4);
-<a href=#392 id=392 data-nosnippet>392</a>        test_fold_matrix_scalar_packed_equivalence(<span class="kw-2">&amp;</span>FRI_FOLD_ARITY_8);
-<a href=#393 id=393 data-nosnippet>393</a>    }
-<a href=#394 id=394 data-nosnippet>394</a>
-<a href=#395 id=395 data-nosnippet>395</a>    <span class="attr">#[test]
-<a href=#396 id=396 data-nosnippet>396</a>    </span><span class="kw">fn </span>test_fold_low_degree() {
-<a href=#397 id=397 data-nosnippet>397</a>        test_folding_preserves_low_degree(<span class="kw-2">&amp;</span>FRI_FOLD_ARITY_2);
-<a href=#398 id=398 data-nosnippet>398</a>        test_folding_preserves_low_degree(<span class="kw-2">&amp;</span>FRI_FOLD_ARITY_4);
-<a href=#399 id=399 data-nosnippet>399</a>        test_folding_preserves_low_degree(<span class="kw-2">&amp;</span>FRI_FOLD_ARITY_8);
-<a href=#400 id=400 data-nosnippet>400</a>    }
-<a href=#401 id=401 data-nosnippet>401</a>}
+<a href=#368 id=368 data-nosnippet>368</a>                <span class="string">"Arity {arity}: High coefficient c[{i}] should be zero but was {coeff:?}"
+<a href=#369 id=369 data-nosnippet>369</a>            </span>);
+<a href=#370 id=370 data-nosnippet>370</a>        }
+<a href=#371 id=371 data-nosnippet>371</a>    }
+<a href=#372 id=372 data-nosnippet>372</a>
+<a href=#373 id=373 data-nosnippet>373</a>    <span class="attr">#[test]
+<a href=#374 id=374 data-nosnippet>374</a>    </span><span class="kw">fn </span>test_fold() {
+<a href=#375 id=375 data-nosnippet>375</a>        test_fold_correctness::&lt;Felt, QuadFelt&gt;(FRI_FOLD_ARITY_2);
+<a href=#376 id=376 data-nosnippet>376</a>        test_fold_correctness::&lt;Felt, QuadFelt&gt;(FRI_FOLD_ARITY_4);
+<a href=#377 id=377 data-nosnippet>377</a>        test_fold_correctness::&lt;Felt, QuadFelt&gt;(FRI_FOLD_ARITY_8);
+<a href=#378 id=378 data-nosnippet>378</a>    }
+<a href=#379 id=379 data-nosnippet>379</a>
+<a href=#380 id=380 data-nosnippet>380</a>    <span class="attr">#[test]
+<a href=#381 id=381 data-nosnippet>381</a>    </span><span class="kw">fn </span>test_fold_evals_against_naive_dft() {
+<a href=#382 id=382 data-nosnippet>382</a>        test_fold_evals_naive_dft(FRI_FOLD_ARITY_2);
+<a href=#383 id=383 data-nosnippet>383</a>        test_fold_evals_naive_dft(FRI_FOLD_ARITY_4);
+<a href=#384 id=384 data-nosnippet>384</a>        test_fold_evals_naive_dft(FRI_FOLD_ARITY_8);
+<a href=#385 id=385 data-nosnippet>385</a>    }
+<a href=#386 id=386 data-nosnippet>386</a>
+<a href=#387 id=387 data-nosnippet>387</a>    <span class="attr">#[test]
+<a href=#388 id=388 data-nosnippet>388</a>    </span><span class="kw">fn </span>test_fold_matrix() {
+<a href=#389 id=389 data-nosnippet>389</a>        test_fold_matrix_scalar_packed_equivalence(FRI_FOLD_ARITY_2);
+<a href=#390 id=390 data-nosnippet>390</a>        test_fold_matrix_scalar_packed_equivalence(FRI_FOLD_ARITY_4);
+<a href=#391 id=391 data-nosnippet>391</a>        test_fold_matrix_scalar_packed_equivalence(FRI_FOLD_ARITY_8);
+<a href=#392 id=392 data-nosnippet>392</a>    }
+<a href=#393 id=393 data-nosnippet>393</a>
+<a href=#394 id=394 data-nosnippet>394</a>    <span class="attr">#[test]
+<a href=#395 id=395 data-nosnippet>395</a>    </span><span class="kw">fn </span>test_fold_low_degree() {
+<a href=#396 id=396 data-nosnippet>396</a>        test_folding_preserves_low_degree(FRI_FOLD_ARITY_2);
+<a href=#397 id=397 data-nosnippet>397</a>        test_folding_preserves_low_degree(FRI_FOLD_ARITY_4);
+<a href=#398 id=398 data-nosnippet>398</a>        test_folding_preserves_low_degree(FRI_FOLD_ARITY_8);
+<a href=#399 id=399 data-nosnippet>399</a>    }
+<a href=#400 id=400 data-nosnippet>400</a>}
 </code></pre></div></section></main></body></html>

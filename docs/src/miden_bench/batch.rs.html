@@ -1,4 +1,4 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `crates/miden-bench/src/batch.rs`."><title>batch.rs - source</title><script>if(window.location.protocol!=="file:")document.head.insertAdjacentHTML("beforeend","SourceSerif4-Regular-6b053e98.ttf.woff2,FiraSans-Italic-81dc35de.woff2,FiraSans-Regular-0fe48ade.woff2,FiraSans-MediumItalic-ccf7e434.woff2,FiraSans-Medium-e1aa3f0a.woff2,SourceCodePro-Regular-8badfe75.ttf.woff2,SourceCodePro-Semibold-aa29a496.ttf.woff2".split(",").map(f=>`<link rel="preload" as="font" type="font/woff2"href="../../static.files/${f}">`).join(""))</script><link rel="stylesheet" href="../../static.files/normalize-9960930a.css"><link rel="stylesheet" href="../../static.files/rustdoc-17e0aaed.css"><meta name="rustdoc-vars" data-root-path="../../" data-static-root-path="../../static.files/" data-current-crate="miden_bench" data-themes="" data-resource-suffix="" data-rustdoc-version="1.97.0-nightly (14196dbfa 2026-04-12)" data-channel="nightly" data-search-js="search-b5634cc7.js" data-stringdex-js="stringdex-2da4960a.js" data-settings-js="settings-170eb4bf.js" ><script src="../../static.files/storage-41dd4d93.js"></script><script defer src="../../static.files/src-script-813739b1.js"></script><script defer src="../../src-files.js"></script><script defer src="../../static.files/main-5013f961.js"></script><noscript><link rel="stylesheet" href="../../static.files/noscript-f7c3ffd8.css"></noscript><link rel="alternate icon" type="image/png" href="../../static.files/favicon-32x32-eab170b8.png"><link rel="icon" type="image/svg+xml" href="../../static.files/favicon-044be391.svg"></head><body class="rustdoc src"><a class="skip-main-content" href="#main-content">Skip to main content</a><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="src-sidebar-title"><h2>Files</h2></div></nav><div class="sidebar-resizer" title="Drag to resize sidebar"></div><main><section id="main-content" class="content" tabindex="-1"><div class="main-heading"><h1><div class="sub-heading">miden_bench/</div>batch.rs</h1><rustdoc-toolbar></rustdoc-toolbar></div><div class="example-wrap digits-3"><pre class="rust"><code><a href=#1 id=1 data-nosnippet>1</a><span class="doccomment">//! Batch STARK AIR wrappers, lookup implementations, and prove/verify runner.
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `crates/miden-bench/src/batch.rs`."><title>batch.rs - source</title><script>if(window.location.protocol!=="file:")document.head.insertAdjacentHTML("beforeend","SourceSerif4-Regular-6b053e98.ttf.woff2,FiraSans-Italic-81dc35de.woff2,FiraSans-Regular-0fe48ade.woff2,FiraSans-MediumItalic-ccf7e434.woff2,FiraSans-Medium-e1aa3f0a.woff2,SourceCodePro-Regular-8badfe75.ttf.woff2,SourceCodePro-Semibold-aa29a496.ttf.woff2".split(",").map(f=>`<link rel="preload" as="font" type="font/woff2"href="../../static.files/${f}">`).join(""))</script><link rel="stylesheet" href="../../static.files/normalize-9960930a.css"><link rel="stylesheet" href="../../static.files/rustdoc-17e0aaed.css"><meta name="rustdoc-vars" data-root-path="../../" data-static-root-path="../../static.files/" data-current-crate="miden_bench" data-themes="" data-resource-suffix="" data-rustdoc-version="1.97.0-nightly (17584a181 2026-04-13)" data-channel="nightly" data-search-js="search-b5634cc7.js" data-stringdex-js="stringdex-2da4960a.js" data-settings-js="settings-170eb4bf.js" ><script src="../../static.files/storage-41dd4d93.js"></script><script defer src="../../static.files/src-script-813739b1.js"></script><script defer src="../../src-files.js"></script><script defer src="../../static.files/main-5013f961.js"></script><noscript><link rel="stylesheet" href="../../static.files/noscript-f7c3ffd8.css"></noscript><link rel="alternate icon" type="image/png" href="../../static.files/favicon-32x32-eab170b8.png"><link rel="icon" type="image/svg+xml" href="../../static.files/favicon-044be391.svg"></head><body class="rustdoc src"><a class="skip-main-content" href="#main-content">Skip to main content</a><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="src-sidebar-title"><h2>Files</h2></div></nav><div class="sidebar-resizer" title="Drag to resize sidebar"></div><main><section id="main-content" class="content" tabindex="-1"><div class="main-heading"><h1><div class="sub-heading">miden_bench/</div>batch.rs</h1><rustdoc-toolbar></rustdoc-toolbar></div><div class="example-wrap digits-3"><pre class="rust"><code><a href=#1 id=1 data-nosnippet>1</a><span class="doccomment">//! Batch STARK AIR wrappers, lookup implementations, and prove/verify runner.
 <a href=#2 id=2 data-nosnippet>2</a>
 <a href=#3 id=3 data-nosnippet>3</a></span><span class="kw">use </span>miden_lifted_stark::{
 <a href=#4 id=4 data-nosnippet>4</a>    air::{BaseAir, log2_strict_u8},
@@ -289,100 +289,99 @@
 <a href=#289 id=289 data-nosnippet>289</a>    <span class="kw">use </span>p3_symmetric::PaddingFreeSponge;
 <a href=#290 id=290 data-nosnippet>290</a>
 <a href=#291 id=291 data-nosnippet>291</a>    <span class="kw">let </span>(perm, <span class="kw">_</span>, compress) = gl::test_components();
-<a href=#292 id=292 data-nosnippet>292</a>    <span class="kw">let </span>leaf =
-<a href=#293 id=293 data-nosnippet>293</a>        PaddingFreeSponge::&lt;<span class="kw">_</span>, { gl::WIDTH }, { gl::RATE }, { gl::DIGEST }&gt;::new(perm.clone());
-<a href=#294 id=294 data-nosnippet>294</a>    <span class="kw">let </span>config = <span class="macro">batch_config!</span>(
+<a href=#292 id=292 data-nosnippet>292</a>    <span class="kw">let </span>leaf = PaddingFreeSponge::&lt;<span class="kw">_</span>, { gl::WIDTH }, { gl::RATE }, { gl::DIGEST }&gt;::new(perm);
+<a href=#293 id=293 data-nosnippet>293</a>    <span class="kw">let </span>config = <span class="macro">batch_config!</span>(
+<a href=#294 id=294 data-nosnippet>294</a>        gl::PackedFelt,
 <a href=#295 id=295 data-nosnippet>295</a>        gl::PackedFelt,
-<a href=#296 id=296 data-nosnippet>296</a>        gl::PackedFelt,
-<a href=#297 id=297 data-nosnippet>297</a>        { gl::DIGEST },
-<a href=#298 id=298 data-nosnippet>298</a>        leaf,
-<a href=#299 id=299 data-nosnippet>299</a>        compress,
-<a href=#300 id=300 data-nosnippet>300</a>        gl::test_challenger(),
-<a href=#301 id=301 data-nosnippet>301</a>        log_blowup,
-<a href=#302 id=302 data-nosnippet>302</a>        cli
-<a href=#303 id=303 data-nosnippet>303</a>    );
-<a href=#304 id=304 data-nosnippet>304</a>    run_batch(<span class="kw-2">&amp;</span>config, specs, traces, constants, cli)
-<a href=#305 id=305 data-nosnippet>305</a>}
-<a href=#306 id=306 data-nosnippet>306</a>
-<a href=#307 id=307 data-nosnippet>307</a><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>run_batch_keccak(
-<a href=#308 id=308 data-nosnippet>308</a>    specs: <span class="kw-2">&amp;</span>[TraceSpec],
-<a href=#309 id=309 data-nosnippet>309</a>    traces: <span class="kw-2">&amp;</span>[RowMajorMatrix&lt;Felt&gt;],
-<a href=#310 id=310 data-nosnippet>310</a>    constants: <span class="kw-2">&amp;</span><span class="prelude-ty">Option</span>&lt;GlRoundConstants&gt;,
-<a href=#311 id=311 data-nosnippet>311</a>    log_blowup: u8,
-<a href=#312 id=312 data-nosnippet>312</a>    cli: <span class="kw-2">&amp;</span>Cli,
-<a href=#313 id=313 data-nosnippet>313</a>) -&gt; RunResult {
-<a href=#314 id=314 data-nosnippet>314</a>    <span class="kw">use </span>miden_lifted_stark::testing::configs::goldilocks_keccak <span class="kw">as </span>keccak;
-<a href=#315 id=315 data-nosnippet>315</a>    <span class="kw">use </span>p3_keccak::KeccakF;
-<a href=#316 id=316 data-nosnippet>316</a>    <span class="kw">use </span>p3_symmetric::{CompressionFunctionFromHasher, PaddingFreeSponge, SerializingHasher};
-<a href=#317 id=317 data-nosnippet>317</a>
-<a href=#318 id=318 data-nosnippet>318</a>    <span class="kw">type </span>U64Hash = PaddingFreeSponge&lt;KeccakF, <span class="number">25</span>, <span class="number">17</span>, <span class="number">4</span>&gt;;
-<a href=#319 id=319 data-nosnippet>319</a>    <span class="kw">let </span>u64_hash = U64Hash::new(KeccakF);
-<a href=#320 id=320 data-nosnippet>320</a>    <span class="kw">let </span>leaf = SerializingHasher::new(u64_hash);
-<a href=#321 id=321 data-nosnippet>321</a>    <span class="kw">let </span>compress = CompressionFunctionFromHasher::&lt;U64Hash, <span class="number">2</span>, <span class="number">4</span>&gt;::new(u64_hash);
-<a href=#322 id=322 data-nosnippet>322</a>    <span class="kw">let </span>config = <span class="macro">batch_config!</span>(
-<a href=#323 id=323 data-nosnippet>323</a>        [Felt; p3_keccak::VECTOR_LEN],
-<a href=#324 id=324 data-nosnippet>324</a>        [u64; p3_keccak::VECTOR_LEN],
-<a href=#325 id=325 data-nosnippet>325</a>        <span class="number">4</span>,
-<a href=#326 id=326 data-nosnippet>326</a>        leaf,
-<a href=#327 id=327 data-nosnippet>327</a>        compress,
-<a href=#328 id=328 data-nosnippet>328</a>        keccak::test_challenger(),
-<a href=#329 id=329 data-nosnippet>329</a>        log_blowup,
-<a href=#330 id=330 data-nosnippet>330</a>        cli
-<a href=#331 id=331 data-nosnippet>331</a>    );
-<a href=#332 id=332 data-nosnippet>332</a>    run_batch(<span class="kw-2">&amp;</span>config, specs, traces, constants, cli)
-<a href=#333 id=333 data-nosnippet>333</a>}
-<a href=#334 id=334 data-nosnippet>334</a>
-<a href=#335 id=335 data-nosnippet>335</a><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>run_batch_blake3(
-<a href=#336 id=336 data-nosnippet>336</a>    specs: <span class="kw-2">&amp;</span>[TraceSpec],
-<a href=#337 id=337 data-nosnippet>337</a>    traces: <span class="kw-2">&amp;</span>[RowMajorMatrix&lt;Felt&gt;],
-<a href=#338 id=338 data-nosnippet>338</a>    constants: <span class="kw-2">&amp;</span><span class="prelude-ty">Option</span>&lt;GlRoundConstants&gt;,
-<a href=#339 id=339 data-nosnippet>339</a>    log_blowup: u8,
-<a href=#340 id=340 data-nosnippet>340</a>    cli: <span class="kw-2">&amp;</span>Cli,
-<a href=#341 id=341 data-nosnippet>341</a>) -&gt; RunResult {
-<a href=#342 id=342 data-nosnippet>342</a>    <span class="kw">use </span>miden_lifted_stark::testing::configs::goldilocks_blake3 <span class="kw">as </span>blake3;
-<a href=#343 id=343 data-nosnippet>343</a>    <span class="kw">use </span>p3_symmetric::{CompressionFunctionFromHasher, SerializingHasher};
-<a href=#344 id=344 data-nosnippet>344</a>
-<a href=#345 id=345 data-nosnippet>345</a>    <span class="kw">let </span>leaf = SerializingHasher::new(p3_blake3::Blake3);
-<a href=#346 id=346 data-nosnippet>346</a>    <span class="kw">let </span>compress = CompressionFunctionFromHasher::&lt;p3_blake3::Blake3, <span class="number">2</span>, { blake3::DIGEST }&gt;::new(
-<a href=#347 id=347 data-nosnippet>347</a>        p3_blake3::Blake3,
-<a href=#348 id=348 data-nosnippet>348</a>    );
-<a href=#349 id=349 data-nosnippet>349</a>    <span class="kw">let </span>config = <span class="macro">batch_config!</span>(
-<a href=#350 id=350 data-nosnippet>350</a>        Felt,
-<a href=#351 id=351 data-nosnippet>351</a>        u8,
-<a href=#352 id=352 data-nosnippet>352</a>        { blake3::DIGEST },
-<a href=#353 id=353 data-nosnippet>353</a>        leaf,
-<a href=#354 id=354 data-nosnippet>354</a>        compress,
-<a href=#355 id=355 data-nosnippet>355</a>        blake3::test_challenger(),
-<a href=#356 id=356 data-nosnippet>356</a>        log_blowup,
-<a href=#357 id=357 data-nosnippet>357</a>        cli
-<a href=#358 id=358 data-nosnippet>358</a>    );
-<a href=#359 id=359 data-nosnippet>359</a>    run_batch(<span class="kw-2">&amp;</span>config, specs, traces, constants, cli)
-<a href=#360 id=360 data-nosnippet>360</a>}
-<a href=#361 id=361 data-nosnippet>361</a>
-<a href=#362 id=362 data-nosnippet>362</a><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>run_batch_blake3_192(
-<a href=#363 id=363 data-nosnippet>363</a>    specs: <span class="kw-2">&amp;</span>[TraceSpec],
-<a href=#364 id=364 data-nosnippet>364</a>    traces: <span class="kw-2">&amp;</span>[RowMajorMatrix&lt;Felt&gt;],
-<a href=#365 id=365 data-nosnippet>365</a>    constants: <span class="kw-2">&amp;</span><span class="prelude-ty">Option</span>&lt;GlRoundConstants&gt;,
-<a href=#366 id=366 data-nosnippet>366</a>    log_blowup: u8,
-<a href=#367 id=367 data-nosnippet>367</a>    cli: <span class="kw-2">&amp;</span>Cli,
-<a href=#368 id=368 data-nosnippet>368</a>) -&gt; RunResult {
-<a href=#369 id=369 data-nosnippet>369</a>    <span class="kw">use </span>miden_lifted_stark::testing::configs::goldilocks_blake3_192 <span class="kw">as </span>blake3_192;
-<a href=#370 id=370 data-nosnippet>370</a>    <span class="kw">use </span>p3_symmetric::{CompressionFunctionFromHasher, SerializingHasher};
-<a href=#371 id=371 data-nosnippet>371</a>
-<a href=#372 id=372 data-nosnippet>372</a>    <span class="kw">let </span>h = blake3_192::Blake3_192::new(p3_blake3::Blake3);
-<a href=#373 id=373 data-nosnippet>373</a>    <span class="kw">let </span>leaf = SerializingHasher::new(h);
-<a href=#374 id=374 data-nosnippet>374</a>    <span class="kw">let </span>compress =
-<a href=#375 id=375 data-nosnippet>375</a>        CompressionFunctionFromHasher::&lt;blake3_192::Blake3_192, <span class="number">2</span>, { blake3_192::DIGEST }&gt;::new(h);
-<a href=#376 id=376 data-nosnippet>376</a>    <span class="kw">let </span>config = <span class="macro">batch_config!</span>(
-<a href=#377 id=377 data-nosnippet>377</a>        Felt,
-<a href=#378 id=378 data-nosnippet>378</a>        u8,
-<a href=#379 id=379 data-nosnippet>379</a>        { blake3_192::DIGEST },
-<a href=#380 id=380 data-nosnippet>380</a>        leaf,
-<a href=#381 id=381 data-nosnippet>381</a>        compress,
-<a href=#382 id=382 data-nosnippet>382</a>        blake3_192::test_challenger(),
-<a href=#383 id=383 data-nosnippet>383</a>        log_blowup,
-<a href=#384 id=384 data-nosnippet>384</a>        cli
-<a href=#385 id=385 data-nosnippet>385</a>    );
-<a href=#386 id=386 data-nosnippet>386</a>    run_batch(<span class="kw-2">&amp;</span>config, specs, traces, constants, cli)
-<a href=#387 id=387 data-nosnippet>387</a>}
+<a href=#296 id=296 data-nosnippet>296</a>        { gl::DIGEST },
+<a href=#297 id=297 data-nosnippet>297</a>        leaf,
+<a href=#298 id=298 data-nosnippet>298</a>        compress,
+<a href=#299 id=299 data-nosnippet>299</a>        gl::test_challenger(),
+<a href=#300 id=300 data-nosnippet>300</a>        log_blowup,
+<a href=#301 id=301 data-nosnippet>301</a>        cli
+<a href=#302 id=302 data-nosnippet>302</a>    );
+<a href=#303 id=303 data-nosnippet>303</a>    run_batch(<span class="kw-2">&amp;</span>config, specs, traces, constants, cli)
+<a href=#304 id=304 data-nosnippet>304</a>}
+<a href=#305 id=305 data-nosnippet>305</a>
+<a href=#306 id=306 data-nosnippet>306</a><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>run_batch_keccak(
+<a href=#307 id=307 data-nosnippet>307</a>    specs: <span class="kw-2">&amp;</span>[TraceSpec],
+<a href=#308 id=308 data-nosnippet>308</a>    traces: <span class="kw-2">&amp;</span>[RowMajorMatrix&lt;Felt&gt;],
+<a href=#309 id=309 data-nosnippet>309</a>    constants: <span class="kw-2">&amp;</span><span class="prelude-ty">Option</span>&lt;GlRoundConstants&gt;,
+<a href=#310 id=310 data-nosnippet>310</a>    log_blowup: u8,
+<a href=#311 id=311 data-nosnippet>311</a>    cli: <span class="kw-2">&amp;</span>Cli,
+<a href=#312 id=312 data-nosnippet>312</a>) -&gt; RunResult {
+<a href=#313 id=313 data-nosnippet>313</a>    <span class="kw">use </span>miden_lifted_stark::testing::configs::goldilocks_keccak <span class="kw">as </span>keccak;
+<a href=#314 id=314 data-nosnippet>314</a>    <span class="kw">use </span>p3_keccak::KeccakF;
+<a href=#315 id=315 data-nosnippet>315</a>    <span class="kw">use </span>p3_symmetric::{CompressionFunctionFromHasher, PaddingFreeSponge, SerializingHasher};
+<a href=#316 id=316 data-nosnippet>316</a>
+<a href=#317 id=317 data-nosnippet>317</a>    <span class="kw">type </span>U64Hash = PaddingFreeSponge&lt;KeccakF, <span class="number">25</span>, <span class="number">17</span>, <span class="number">4</span>&gt;;
+<a href=#318 id=318 data-nosnippet>318</a>    <span class="kw">let </span>u64_hash = U64Hash::new(KeccakF);
+<a href=#319 id=319 data-nosnippet>319</a>    <span class="kw">let </span>leaf = SerializingHasher::new(u64_hash);
+<a href=#320 id=320 data-nosnippet>320</a>    <span class="kw">let </span>compress = CompressionFunctionFromHasher::&lt;U64Hash, <span class="number">2</span>, <span class="number">4</span>&gt;::new(u64_hash);
+<a href=#321 id=321 data-nosnippet>321</a>    <span class="kw">let </span>config = <span class="macro">batch_config!</span>(
+<a href=#322 id=322 data-nosnippet>322</a>        [Felt; p3_keccak::VECTOR_LEN],
+<a href=#323 id=323 data-nosnippet>323</a>        [u64; p3_keccak::VECTOR_LEN],
+<a href=#324 id=324 data-nosnippet>324</a>        <span class="number">4</span>,
+<a href=#325 id=325 data-nosnippet>325</a>        leaf,
+<a href=#326 id=326 data-nosnippet>326</a>        compress,
+<a href=#327 id=327 data-nosnippet>327</a>        keccak::test_challenger(),
+<a href=#328 id=328 data-nosnippet>328</a>        log_blowup,
+<a href=#329 id=329 data-nosnippet>329</a>        cli
+<a href=#330 id=330 data-nosnippet>330</a>    );
+<a href=#331 id=331 data-nosnippet>331</a>    run_batch(<span class="kw-2">&amp;</span>config, specs, traces, constants, cli)
+<a href=#332 id=332 data-nosnippet>332</a>}
+<a href=#333 id=333 data-nosnippet>333</a>
+<a href=#334 id=334 data-nosnippet>334</a><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>run_batch_blake3(
+<a href=#335 id=335 data-nosnippet>335</a>    specs: <span class="kw-2">&amp;</span>[TraceSpec],
+<a href=#336 id=336 data-nosnippet>336</a>    traces: <span class="kw-2">&amp;</span>[RowMajorMatrix&lt;Felt&gt;],
+<a href=#337 id=337 data-nosnippet>337</a>    constants: <span class="kw-2">&amp;</span><span class="prelude-ty">Option</span>&lt;GlRoundConstants&gt;,
+<a href=#338 id=338 data-nosnippet>338</a>    log_blowup: u8,
+<a href=#339 id=339 data-nosnippet>339</a>    cli: <span class="kw-2">&amp;</span>Cli,
+<a href=#340 id=340 data-nosnippet>340</a>) -&gt; RunResult {
+<a href=#341 id=341 data-nosnippet>341</a>    <span class="kw">use </span>miden_lifted_stark::testing::configs::goldilocks_blake3 <span class="kw">as </span>blake3;
+<a href=#342 id=342 data-nosnippet>342</a>    <span class="kw">use </span>p3_symmetric::{CompressionFunctionFromHasher, SerializingHasher};
+<a href=#343 id=343 data-nosnippet>343</a>
+<a href=#344 id=344 data-nosnippet>344</a>    <span class="kw">let </span>leaf = SerializingHasher::new(p3_blake3::Blake3);
+<a href=#345 id=345 data-nosnippet>345</a>    <span class="kw">let </span>compress = CompressionFunctionFromHasher::&lt;p3_blake3::Blake3, <span class="number">2</span>, { blake3::DIGEST }&gt;::new(
+<a href=#346 id=346 data-nosnippet>346</a>        p3_blake3::Blake3,
+<a href=#347 id=347 data-nosnippet>347</a>    );
+<a href=#348 id=348 data-nosnippet>348</a>    <span class="kw">let </span>config = <span class="macro">batch_config!</span>(
+<a href=#349 id=349 data-nosnippet>349</a>        Felt,
+<a href=#350 id=350 data-nosnippet>350</a>        u8,
+<a href=#351 id=351 data-nosnippet>351</a>        { blake3::DIGEST },
+<a href=#352 id=352 data-nosnippet>352</a>        leaf,
+<a href=#353 id=353 data-nosnippet>353</a>        compress,
+<a href=#354 id=354 data-nosnippet>354</a>        blake3::test_challenger(),
+<a href=#355 id=355 data-nosnippet>355</a>        log_blowup,
+<a href=#356 id=356 data-nosnippet>356</a>        cli
+<a href=#357 id=357 data-nosnippet>357</a>    );
+<a href=#358 id=358 data-nosnippet>358</a>    run_batch(<span class="kw-2">&amp;</span>config, specs, traces, constants, cli)
+<a href=#359 id=359 data-nosnippet>359</a>}
+<a href=#360 id=360 data-nosnippet>360</a>
+<a href=#361 id=361 data-nosnippet>361</a><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>run_batch_blake3_192(
+<a href=#362 id=362 data-nosnippet>362</a>    specs: <span class="kw-2">&amp;</span>[TraceSpec],
+<a href=#363 id=363 data-nosnippet>363</a>    traces: <span class="kw-2">&amp;</span>[RowMajorMatrix&lt;Felt&gt;],
+<a href=#364 id=364 data-nosnippet>364</a>    constants: <span class="kw-2">&amp;</span><span class="prelude-ty">Option</span>&lt;GlRoundConstants&gt;,
+<a href=#365 id=365 data-nosnippet>365</a>    log_blowup: u8,
+<a href=#366 id=366 data-nosnippet>366</a>    cli: <span class="kw-2">&amp;</span>Cli,
+<a href=#367 id=367 data-nosnippet>367</a>) -&gt; RunResult {
+<a href=#368 id=368 data-nosnippet>368</a>    <span class="kw">use </span>miden_lifted_stark::testing::configs::goldilocks_blake3_192 <span class="kw">as </span>blake3_192;
+<a href=#369 id=369 data-nosnippet>369</a>    <span class="kw">use </span>p3_symmetric::{CompressionFunctionFromHasher, SerializingHasher};
+<a href=#370 id=370 data-nosnippet>370</a>
+<a href=#371 id=371 data-nosnippet>371</a>    <span class="kw">let </span>h = blake3_192::Blake3_192::new(p3_blake3::Blake3);
+<a href=#372 id=372 data-nosnippet>372</a>    <span class="kw">let </span>leaf = SerializingHasher::new(h);
+<a href=#373 id=373 data-nosnippet>373</a>    <span class="kw">let </span>compress =
+<a href=#374 id=374 data-nosnippet>374</a>        CompressionFunctionFromHasher::&lt;blake3_192::Blake3_192, <span class="number">2</span>, { blake3_192::DIGEST }&gt;::new(h);
+<a href=#375 id=375 data-nosnippet>375</a>    <span class="kw">let </span>config = <span class="macro">batch_config!</span>(
+<a href=#376 id=376 data-nosnippet>376</a>        Felt,
+<a href=#377 id=377 data-nosnippet>377</a>        u8,
+<a href=#378 id=378 data-nosnippet>378</a>        { blake3_192::DIGEST },
+<a href=#379 id=379 data-nosnippet>379</a>        leaf,
+<a href=#380 id=380 data-nosnippet>380</a>        compress,
+<a href=#381 id=381 data-nosnippet>381</a>        blake3_192::test_challenger(),
+<a href=#382 id=382 data-nosnippet>382</a>        log_blowup,
+<a href=#383 id=383 data-nosnippet>383</a>        cli
+<a href=#384 id=384 data-nosnippet>384</a>    );
+<a href=#385 id=385 data-nosnippet>385</a>    run_batch(<span class="kw-2">&amp;</span>config, specs, traces, constants, cli)
+<a href=#386 id=386 data-nosnippet>386</a>}
 </code></pre></div></section></main></body></html>

@@ -1,4 +1,4 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `miden-crypto/src/dsa/falcon512_poseidon2/math/polynomial.rs`."><title>polynomial.rs - source</title><script>if(window.location.protocol!=="file:")document.head.insertAdjacentHTML("beforeend","SourceSerif4-Regular-6b053e98.ttf.woff2,FiraSans-Italic-81dc35de.woff2,FiraSans-Regular-0fe48ade.woff2,FiraSans-MediumItalic-ccf7e434.woff2,FiraSans-Medium-e1aa3f0a.woff2,SourceCodePro-Regular-8badfe75.ttf.woff2,SourceCodePro-Semibold-aa29a496.ttf.woff2".split(",").map(f=>`<link rel="preload" as="font" type="font/woff2"href="../../../../../static.files/${f}">`).join(""))</script><link rel="stylesheet" href="../../../../../static.files/normalize-9960930a.css"><link rel="stylesheet" href="../../../../../static.files/rustdoc-17e0aaed.css"><meta name="rustdoc-vars" data-root-path="../../../../../" data-static-root-path="../../../../../static.files/" data-current-crate="miden_crypto" data-themes="" data-resource-suffix="" data-rustdoc-version="1.97.0-nightly (14196dbfa 2026-04-12)" data-channel="nightly" data-search-js="search-b5634cc7.js" data-stringdex-js="stringdex-2da4960a.js" data-settings-js="settings-170eb4bf.js" ><script src="../../../../../static.files/storage-41dd4d93.js"></script><script defer src="../../../../../static.files/src-script-813739b1.js"></script><script defer src="../../../../../src-files.js"></script><script defer src="../../../../../static.files/main-5013f961.js"></script><noscript><link rel="stylesheet" href="../../../../../static.files/noscript-f7c3ffd8.css"></noscript><link rel="alternate icon" type="image/png" href="../../../../../static.files/favicon-32x32-eab170b8.png"><link rel="icon" type="image/svg+xml" href="../../../../../static.files/favicon-044be391.svg"></head><body class="rustdoc src"><a class="skip-main-content" href="#main-content">Skip to main content</a><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="src-sidebar-title"><h2>Files</h2></div></nav><div class="sidebar-resizer" title="Drag to resize sidebar"></div><main><section id="main-content" class="content" tabindex="-1"><div class="main-heading"><h1><div class="sub-heading">miden_crypto/dsa/falcon512_poseidon2/math/</div>polynomial.rs</h1><rustdoc-toolbar></rustdoc-toolbar></div><div class="example-wrap digits-3"><pre class="rust"><code><a href=#1 id=1 data-nosnippet>1</a><span class="doccomment">//! Generic polynomial type and operations used in Falcon.
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `miden-crypto/src/dsa/falcon512_poseidon2/math/polynomial.rs`."><title>polynomial.rs - source</title><script>if(window.location.protocol!=="file:")document.head.insertAdjacentHTML("beforeend","SourceSerif4-Regular-6b053e98.ttf.woff2,FiraSans-Italic-81dc35de.woff2,FiraSans-Regular-0fe48ade.woff2,FiraSans-MediumItalic-ccf7e434.woff2,FiraSans-Medium-e1aa3f0a.woff2,SourceCodePro-Regular-8badfe75.ttf.woff2,SourceCodePro-Semibold-aa29a496.ttf.woff2".split(",").map(f=>`<link rel="preload" as="font" type="font/woff2"href="../../../../../static.files/${f}">`).join(""))</script><link rel="stylesheet" href="../../../../../static.files/normalize-9960930a.css"><link rel="stylesheet" href="../../../../../static.files/rustdoc-17e0aaed.css"><meta name="rustdoc-vars" data-root-path="../../../../../" data-static-root-path="../../../../../static.files/" data-current-crate="miden_crypto" data-themes="" data-resource-suffix="" data-rustdoc-version="1.97.0-nightly (17584a181 2026-04-13)" data-channel="nightly" data-search-js="search-b5634cc7.js" data-stringdex-js="stringdex-2da4960a.js" data-settings-js="settings-170eb4bf.js" ><script src="../../../../../static.files/storage-41dd4d93.js"></script><script defer src="../../../../../static.files/src-script-813739b1.js"></script><script defer src="../../../../../src-files.js"></script><script defer src="../../../../../static.files/main-5013f961.js"></script><noscript><link rel="stylesheet" href="../../../../../static.files/noscript-f7c3ffd8.css"></noscript><link rel="alternate icon" type="image/png" href="../../../../../static.files/favicon-32x32-eab170b8.png"><link rel="icon" type="image/svg+xml" href="../../../../../static.files/favicon-044be391.svg"></head><body class="rustdoc src"><a class="skip-main-content" href="#main-content">Skip to main content</a><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="src-sidebar-title"><h2>Files</h2></div></nav><div class="sidebar-resizer" title="Drag to resize sidebar"></div><main><section id="main-content" class="content" tabindex="-1"><div class="main-heading"><h1><div class="sub-heading">miden_crypto/dsa/falcon512_poseidon2/math/</div>polynomial.rs</h1><rustdoc-toolbar></rustdoc-toolbar></div><div class="example-wrap digits-3"><pre class="rust"><code><a href=#1 id=1 data-nosnippet>1</a><span class="doccomment">//! Generic polynomial type and operations used in Falcon.
 <a href=#2 id=2 data-nosnippet>2</a>
 <a href=#3 id=3 data-nosnippet>3</a></span><span class="kw">use </span>alloc::vec::Vec;
 <a href=#4 id=4 data-nosnippet>4</a><span class="kw">use </span>core::{
@@ -229,13 +229,13 @@
 <a href=#229 id=229 data-nosnippet>229</a>    <span class="kw">type </span>Output = Polynomial&lt;F&gt;;
 <a href=#230 id=230 data-nosnippet>230</a>    <span class="kw">fn </span>add(<span class="self">self</span>, rhs: <span class="self">Self</span>) -&gt; <span class="self">Self</span>::Output {
 <a href=#231 id=231 data-nosnippet>231</a>        <span class="kw">let </span>coefficients = <span class="kw">if </span><span class="self">self</span>.coefficients.len() &gt;= rhs.coefficients.len() {
-<a href=#232 id=232 data-nosnippet>232</a>            <span class="kw">let </span><span class="kw-2">mut </span>coefficients = <span class="self">self</span>.coefficients.clone();
+<a href=#232 id=232 data-nosnippet>232</a>            <span class="kw">let </span><span class="kw-2">mut </span>coefficients = <span class="self">self</span>.coefficients;
 <a href=#233 id=233 data-nosnippet>233</a>            <span class="kw">for </span>(i, c) <span class="kw">in </span>rhs.coefficients.into_iter().enumerate() {
 <a href=#234 id=234 data-nosnippet>234</a>                coefficients[i] += c;
 <a href=#235 id=235 data-nosnippet>235</a>            }
 <a href=#236 id=236 data-nosnippet>236</a>            coefficients
 <a href=#237 id=237 data-nosnippet>237</a>        } <span class="kw">else </span>{
-<a href=#238 id=238 data-nosnippet>238</a>            <span class="kw">let </span><span class="kw-2">mut </span>coefficients = rhs.coefficients.clone();
+<a href=#238 id=238 data-nosnippet>238</a>            <span class="kw">let </span><span class="kw-2">mut </span>coefficients = rhs.coefficients;
 <a href=#239 id=239 data-nosnippet>239</a>            <span class="kw">for </span>(i, c) <span class="kw">in </span><span class="self">self</span>.coefficients.into_iter().enumerate() {
 <a href=#240 id=240 data-nosnippet>240</a>                coefficients[i] += c;
 <a href=#241 id=241 data-nosnippet>241</a>            }
@@ -255,7 +255,7 @@
 <a href=#255 id=255 data-nosnippet>255</a>                <span class="self">self</span>.coefficients[i] += c;
 <a href=#256 id=256 data-nosnippet>256</a>            }
 <a href=#257 id=257 data-nosnippet>257</a>        } <span class="kw">else </span>{
-<a href=#258 id=258 data-nosnippet>258</a>            <span class="kw">let </span><span class="kw-2">mut </span>coefficients = rhs.coefficients.clone();
+<a href=#258 id=258 data-nosnippet>258</a>            <span class="kw">let </span><span class="kw-2">mut </span>coefficients = rhs.coefficients;
 <a href=#259 id=259 data-nosnippet>259</a>            <span class="kw">for </span>(i, c) <span class="kw">in </span><span class="self">self</span>.coefficients.iter().enumerate() {
 <a href=#260 id=260 data-nosnippet>260</a>                coefficients[i] += c.clone();
 <a href=#261 id=261 data-nosnippet>261</a>            }
@@ -457,7 +457,7 @@
 <a href=#457 id=457 data-nosnippet>457</a>        <span class="kw">if </span><span class="self">self</span>.is_zero() {
 <a href=#458 id=458 data-nosnippet>458</a>            <span class="self">Self</span>::zero();
 <a href=#459 id=459 data-nosnippet>459</a>        }
-<a href=#460 id=460 data-nosnippet>460</a>        <span class="kw">let </span><span class="kw-2">mut </span>remainder = <span class="self">self</span>.clone();
+<a href=#460 id=460 data-nosnippet>460</a>        <span class="kw">let </span><span class="kw-2">mut </span>remainder = <span class="self">self</span>;
 <a href=#461 id=461 data-nosnippet>461</a>        <span class="kw">let </span><span class="kw-2">mut </span>quotient = Polynomial::&lt;F&gt;::zero();
 <a href=#462 id=462 data-nosnippet>462</a>        <span class="kw">while </span>remainder.degree().unwrap() &gt;= denominator.degree().unwrap() {
 <a href=#463 id=463 data-nosnippet>463</a>            <span class="kw">let </span>shift = remainder.degree().unwrap() - denominator.degree().unwrap();
@@ -582,89 +582,94 @@
 <a href=#582 id=582 data-nosnippet>582</a>        <span class="self">self</span>.coefficients.iter().map(|<span class="kw-2">&amp;</span>a| Felt::from_u16(a.value() <span class="kw">as </span>u16)).collect()
 <a href=#583 id=583 data-nosnippet>583</a>    }
 <a href=#584 id=584 data-nosnippet>584</a>
-<a href=#585 id=585 data-nosnippet>585</a>    <span class="comment">// POLYNOMIAL OPERATIONS
-<a href=#586 id=586 data-nosnippet>586</a>    // --------------------------------------------------------------------------------------------
-<a href=#587 id=587 data-nosnippet>587</a>
-<a href=#588 id=588 data-nosnippet>588</a>    </span><span class="doccomment">/// Multiplies two polynomials over Z_p\[x\] without reducing modulo p. Given that the degrees
-<a href=#589 id=589 data-nosnippet>589</a>    /// of the input polynomials are less than 512 and their coefficients are less than the modulus
-<a href=#590 id=590 data-nosnippet>590</a>    /// q equal to 12289, the resulting product polynomial is guaranteed to have coefficients less
-<a href=#591 id=591 data-nosnippet>591</a>    /// than the Miden prime.
-<a href=#592 id=592 data-nosnippet>592</a>    ///
-<a href=#593 id=593 data-nosnippet>593</a>    /// Note that this multiplication is not over Z_p\[x\]/(phi).
-<a href=#594 id=594 data-nosnippet>594</a>    </span><span class="kw">pub fn </span>mul_modulo_p(a: <span class="kw-2">&amp;</span><span class="self">Self</span>, b: <span class="kw-2">&amp;</span><span class="self">Self</span>) -&gt; [u64; <span class="number">1024</span>] {
-<a href=#595 id=595 data-nosnippet>595</a>        <span class="kw">let </span><span class="kw-2">mut </span>c = [<span class="number">0</span>; <span class="number">2 </span>* N];
-<a href=#596 id=596 data-nosnippet>596</a>        <span class="kw">for </span>i <span class="kw">in </span><span class="number">0</span>..N {
-<a href=#597 id=597 data-nosnippet>597</a>            <span class="kw">for </span>j <span class="kw">in </span><span class="number">0</span>..N {
-<a href=#598 id=598 data-nosnippet>598</a>                c[i + j] += a.coefficients[i].value() <span class="kw">as </span>u64 * b.coefficients[j].value() <span class="kw">as </span>u64;
-<a href=#599 id=599 data-nosnippet>599</a>            }
-<a href=#600 id=600 data-nosnippet>600</a>        }
-<a href=#601 id=601 data-nosnippet>601</a>
-<a href=#602 id=602 data-nosnippet>602</a>        c
-<a href=#603 id=603 data-nosnippet>603</a>    }
-<a href=#604 id=604 data-nosnippet>604</a>
-<a href=#605 id=605 data-nosnippet>605</a>    <span class="doccomment">/// Reduces a polynomial, that is the product of two polynomials over Z_p\[x\], modulo
-<a href=#606 id=606 data-nosnippet>606</a>    /// the irreducible polynomial phi. This results in an element in Z_p\[x\]/(phi).
-<a href=#607 id=607 data-nosnippet>607</a>    </span><span class="kw">pub fn </span>reduce_negacyclic(a: <span class="kw-2">&amp;</span>[u64; <span class="number">1024</span>]) -&gt; <span class="self">Self </span>{
-<a href=#608 id=608 data-nosnippet>608</a>        <span class="kw">let </span><span class="kw-2">mut </span>c = [FalconFelt::zero(); N];
-<a href=#609 id=609 data-nosnippet>609</a>        <span class="kw">let </span>modulus = MODULUS <span class="kw">as </span>u16;
-<a href=#610 id=610 data-nosnippet>610</a>        <span class="kw">for </span>i <span class="kw">in </span><span class="number">0</span>..N {
-<a href=#611 id=611 data-nosnippet>611</a>            <span class="kw">let </span>ai = a[N + i] % modulus <span class="kw">as </span>u64;
-<a href=#612 id=612 data-nosnippet>612</a>            <span class="kw">let </span>neg_ai = (modulus - ai <span class="kw">as </span>u16) % modulus;
-<a href=#613 id=613 data-nosnippet>613</a>
-<a href=#614 id=614 data-nosnippet>614</a>            <span class="kw">let </span>bi = (a[i] % modulus <span class="kw">as </span>u64) <span class="kw">as </span>u16;
-<a href=#615 id=615 data-nosnippet>615</a>            c[i] = FalconFelt::new(((neg_ai + bi) % modulus) <span class="kw">as </span>i16);
-<a href=#616 id=616 data-nosnippet>616</a>        }
-<a href=#617 id=617 data-nosnippet>617</a>
-<a href=#618 id=618 data-nosnippet>618</a>        <span class="self">Self</span>::new(c.to_vec())
-<a href=#619 id=619 data-nosnippet>619</a>    }
-<a href=#620 id=620 data-nosnippet>620</a>}
-<a href=#621 id=621 data-nosnippet>621</a>
-<a href=#622 id=622 data-nosnippet>622</a><span class="kw">impl </span>Polynomial&lt;Felt&gt; {
-<a href=#623 id=623 data-nosnippet>623</a>    <span class="doccomment">/// Returns the coefficients of this polynomial as Miden field elements.
-<a href=#624 id=624 data-nosnippet>624</a>    </span><span class="kw">pub fn </span>to_elements(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; Vec&lt;Felt&gt; {
-<a href=#625 id=625 data-nosnippet>625</a>        <span class="self">self</span>.coefficients.to_vec()
-<a href=#626 id=626 data-nosnippet>626</a>    }
-<a href=#627 id=627 data-nosnippet>627</a>}
-<a href=#628 id=628 data-nosnippet>628</a>
-<a href=#629 id=629 data-nosnippet>629</a><span class="kw">impl </span>Polynomial&lt;i16&gt; {
-<a href=#630 id=630 data-nosnippet>630</a>    <span class="doccomment">/// Returns the balanced values of the coefficients of this polynomial.
-<a href=#631 id=631 data-nosnippet>631</a>    </span><span class="kw">pub fn </span>to_balanced_values(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; Vec&lt;i16&gt; {
-<a href=#632 id=632 data-nosnippet>632</a>        <span class="self">self</span>.coefficients.iter().map(|c| FalconFelt::new(<span class="kw-2">*</span>c).balanced_value()).collect()
-<a href=#633 id=633 data-nosnippet>633</a>    }
-<a href=#634 id=634 data-nosnippet>634</a>}
-<a href=#635 id=635 data-nosnippet>635</a>
-<a href=#636 id=636 data-nosnippet>636</a><span class="comment">// ZEROIZE IMPLEMENTATIONS
-<a href=#637 id=637 data-nosnippet>637</a>// ================================================================================================
-<a href=#638 id=638 data-nosnippet>638</a>
-<a href=#639 id=639 data-nosnippet>639</a></span><span class="kw">impl</span>&lt;F: Zeroize&gt; Zeroize <span class="kw">for </span>Polynomial&lt;F&gt; {
-<a href=#640 id=640 data-nosnippet>640</a>    <span class="kw">fn </span>zeroize(<span class="kw-2">&amp;mut </span><span class="self">self</span>) {
-<a href=#641 id=641 data-nosnippet>641</a>        <span class="self">self</span>.coefficients.zeroize();
-<a href=#642 id=642 data-nosnippet>642</a>    }
-<a href=#643 id=643 data-nosnippet>643</a>}
-<a href=#644 id=644 data-nosnippet>644</a>
-<a href=#645 id=645 data-nosnippet>645</a><span class="kw">impl</span>&lt;F: Zeroize&gt; ZeroizeOnDrop <span class="kw">for </span>Polynomial&lt;F&gt; {}
-<a href=#646 id=646 data-nosnippet>646</a>
-<a href=#647 id=647 data-nosnippet>647</a><span class="comment">// TESTS
-<a href=#648 id=648 data-nosnippet>648</a>// ================================================================================================
+<a href=#585 id=585 data-nosnippet>585</a>    <span class="doccomment">/// Returns the coefficients of this polynomial as balanced signed values.
+<a href=#586 id=586 data-nosnippet>586</a>    </span><span class="kw">pub fn </span>to_balanced_values(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; Vec&lt;i16&gt; {
+<a href=#587 id=587 data-nosnippet>587</a>        <span class="self">self</span>.coefficients.iter().copied().map(FalconFelt::balanced_value).collect()
+<a href=#588 id=588 data-nosnippet>588</a>    }
+<a href=#589 id=589 data-nosnippet>589</a>
+<a href=#590 id=590 data-nosnippet>590</a>    <span class="comment">// POLYNOMIAL OPERATIONS
+<a href=#591 id=591 data-nosnippet>591</a>    // --------------------------------------------------------------------------------------------
+<a href=#592 id=592 data-nosnippet>592</a>
+<a href=#593 id=593 data-nosnippet>593</a>    </span><span class="doccomment">/// Multiplies two polynomials over Z_p\[x\] without reducing modulo p. Given that the degrees
+<a href=#594 id=594 data-nosnippet>594</a>    /// of the input polynomials are less than 512 and their coefficients are less than the modulus
+<a href=#595 id=595 data-nosnippet>595</a>    /// q equal to 12289, the resulting product polynomial is guaranteed to have coefficients less
+<a href=#596 id=596 data-nosnippet>596</a>    /// than the Miden prime.
+<a href=#597 id=597 data-nosnippet>597</a>    ///
+<a href=#598 id=598 data-nosnippet>598</a>    /// Note that this multiplication is not over Z_p\[x\]/(phi).
+<a href=#599 id=599 data-nosnippet>599</a>    </span><span class="kw">pub fn </span>mul_modulo_p(a: <span class="kw-2">&amp;</span><span class="self">Self</span>, b: <span class="kw-2">&amp;</span><span class="self">Self</span>) -&gt; [u64; <span class="number">1024</span>] {
+<a href=#600 id=600 data-nosnippet>600</a>        <span class="kw">let </span><span class="kw-2">mut </span>c = [<span class="number">0</span>; <span class="number">2 </span>* N];
+<a href=#601 id=601 data-nosnippet>601</a>        <span class="kw">for </span>i <span class="kw">in </span><span class="number">0</span>..N {
+<a href=#602 id=602 data-nosnippet>602</a>            <span class="kw">for </span>j <span class="kw">in </span><span class="number">0</span>..N {
+<a href=#603 id=603 data-nosnippet>603</a>                c[i + j] += a.coefficients[i].value() <span class="kw">as </span>u64 * b.coefficients[j].value() <span class="kw">as </span>u64;
+<a href=#604 id=604 data-nosnippet>604</a>            }
+<a href=#605 id=605 data-nosnippet>605</a>        }
+<a href=#606 id=606 data-nosnippet>606</a>
+<a href=#607 id=607 data-nosnippet>607</a>        c
+<a href=#608 id=608 data-nosnippet>608</a>    }
+<a href=#609 id=609 data-nosnippet>609</a>
+<a href=#610 id=610 data-nosnippet>610</a>    <span class="doccomment">/// Reduces a polynomial, that is the product of two polynomials over Z_p\[x\], modulo
+<a href=#611 id=611 data-nosnippet>611</a>    /// the irreducible polynomial phi. This results in an element in Z_p\[x\]/(phi).
+<a href=#612 id=612 data-nosnippet>612</a>    </span><span class="kw">pub fn </span>reduce_negacyclic(a: <span class="kw-2">&amp;</span>[u64; <span class="number">1024</span>]) -&gt; <span class="self">Self </span>{
+<a href=#613 id=613 data-nosnippet>613</a>        <span class="kw">let </span><span class="kw-2">mut </span>c = [FalconFelt::zero(); N];
+<a href=#614 id=614 data-nosnippet>614</a>        <span class="kw">let </span>modulus = MODULUS <span class="kw">as </span>u16;
+<a href=#615 id=615 data-nosnippet>615</a>        <span class="kw">for </span>i <span class="kw">in </span><span class="number">0</span>..N {
+<a href=#616 id=616 data-nosnippet>616</a>            <span class="kw">let </span>ai = a[N + i] % modulus <span class="kw">as </span>u64;
+<a href=#617 id=617 data-nosnippet>617</a>            <span class="kw">let </span>neg_ai = (modulus - ai <span class="kw">as </span>u16) % modulus;
+<a href=#618 id=618 data-nosnippet>618</a>
+<a href=#619 id=619 data-nosnippet>619</a>            <span class="kw">let </span>bi = (a[i] % modulus <span class="kw">as </span>u64) <span class="kw">as </span>u16;
+<a href=#620 id=620 data-nosnippet>620</a>            c[i] = FalconFelt::new(((neg_ai + bi) % modulus) <span class="kw">as </span>i16);
+<a href=#621 id=621 data-nosnippet>621</a>        }
+<a href=#622 id=622 data-nosnippet>622</a>
+<a href=#623 id=623 data-nosnippet>623</a>        <span class="self">Self</span>::new(c.to_vec())
+<a href=#624 id=624 data-nosnippet>624</a>    }
+<a href=#625 id=625 data-nosnippet>625</a>}
+<a href=#626 id=626 data-nosnippet>626</a>
+<a href=#627 id=627 data-nosnippet>627</a><span class="kw">impl </span>Polynomial&lt;Felt&gt; {
+<a href=#628 id=628 data-nosnippet>628</a>    <span class="doccomment">/// Returns the coefficients of this polynomial as Miden field elements.
+<a href=#629 id=629 data-nosnippet>629</a>    </span><span class="kw">pub fn </span>to_elements(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; Vec&lt;Felt&gt; {
+<a href=#630 id=630 data-nosnippet>630</a>        <span class="self">self</span>.coefficients.to_vec()
+<a href=#631 id=631 data-nosnippet>631</a>    }
+<a href=#632 id=632 data-nosnippet>632</a>}
+<a href=#633 id=633 data-nosnippet>633</a>
+<a href=#634 id=634 data-nosnippet>634</a><span class="kw">impl </span>Polynomial&lt;i16&gt; {
+<a href=#635 id=635 data-nosnippet>635</a>    <span class="doccomment">/// Returns the balanced values of the coefficients of this polynomial.
+<a href=#636 id=636 data-nosnippet>636</a>    </span><span class="kw">pub fn </span>to_balanced_values(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; Vec&lt;i16&gt; {
+<a href=#637 id=637 data-nosnippet>637</a>        <span class="self">self</span>.coefficients.iter().map(|c| FalconFelt::new(<span class="kw-2">*</span>c).balanced_value()).collect()
+<a href=#638 id=638 data-nosnippet>638</a>    }
+<a href=#639 id=639 data-nosnippet>639</a>}
+<a href=#640 id=640 data-nosnippet>640</a>
+<a href=#641 id=641 data-nosnippet>641</a><span class="comment">// ZEROIZE IMPLEMENTATIONS
+<a href=#642 id=642 data-nosnippet>642</a>// ================================================================================================
+<a href=#643 id=643 data-nosnippet>643</a>
+<a href=#644 id=644 data-nosnippet>644</a></span><span class="kw">impl</span>&lt;F: Zeroize&gt; Zeroize <span class="kw">for </span>Polynomial&lt;F&gt; {
+<a href=#645 id=645 data-nosnippet>645</a>    <span class="kw">fn </span>zeroize(<span class="kw-2">&amp;mut </span><span class="self">self</span>) {
+<a href=#646 id=646 data-nosnippet>646</a>        <span class="self">self</span>.coefficients.zeroize();
+<a href=#647 id=647 data-nosnippet>647</a>    }
+<a href=#648 id=648 data-nosnippet>648</a>}
 <a href=#649 id=649 data-nosnippet>649</a>
-<a href=#650 id=650 data-nosnippet>650</a></span><span class="attr">#[cfg(test)]
-<a href=#651 id=651 data-nosnippet>651</a></span><span class="kw">mod </span>tests {
-<a href=#652 id=652 data-nosnippet>652</a>    <span class="kw">use </span>super::{FalconFelt, N, Polynomial};
-<a href=#653 id=653 data-nosnippet>653</a>    <span class="kw">use </span><span class="kw">crate</span>::rand::test_utils::prng_array;
+<a href=#650 id=650 data-nosnippet>650</a><span class="kw">impl</span>&lt;F: Zeroize&gt; ZeroizeOnDrop <span class="kw">for </span>Polynomial&lt;F&gt; {}
+<a href=#651 id=651 data-nosnippet>651</a>
+<a href=#652 id=652 data-nosnippet>652</a><span class="comment">// TESTS
+<a href=#653 id=653 data-nosnippet>653</a>// ================================================================================================
 <a href=#654 id=654 data-nosnippet>654</a>
-<a href=#655 id=655 data-nosnippet>655</a>    <span class="attr">#[test]
-<a href=#656 id=656 data-nosnippet>656</a>    </span><span class="kw">fn </span>test_negacyclic_reduction() {
-<a href=#657 id=657 data-nosnippet>657</a>        <span class="kw">let </span>coef1: [u8; N] = prng_array([<span class="number">0u8</span>; <span class="number">32</span>]);
-<a href=#658 id=658 data-nosnippet>658</a>        <span class="kw">let </span>coef2: [u8; N] = prng_array([<span class="number">1u8</span>; <span class="number">32</span>]);
+<a href=#655 id=655 data-nosnippet>655</a></span><span class="attr">#[cfg(test)]
+<a href=#656 id=656 data-nosnippet>656</a></span><span class="kw">mod </span>tests {
+<a href=#657 id=657 data-nosnippet>657</a>    <span class="kw">use </span>super::{FalconFelt, N, Polynomial};
+<a href=#658 id=658 data-nosnippet>658</a>    <span class="kw">use </span><span class="kw">crate</span>::rand::test_utils::prng_array;
 <a href=#659 id=659 data-nosnippet>659</a>
-<a href=#660 id=660 data-nosnippet>660</a>        <span class="kw">let </span>poly1 = Polynomial::new(coef1.iter().map(|<span class="kw-2">&amp;</span>a| FalconFelt::new(a <span class="kw">as </span>i16)).collect());
-<a href=#661 id=661 data-nosnippet>661</a>        <span class="kw">let </span>poly2 = Polynomial::new(coef2.iter().map(|<span class="kw-2">&amp;</span>a| FalconFelt::new(a <span class="kw">as </span>i16)).collect());
-<a href=#662 id=662 data-nosnippet>662</a>        <span class="kw">let </span>prod = poly1.clone() * poly2.clone();
-<a href=#663 id=663 data-nosnippet>663</a>
-<a href=#664 id=664 data-nosnippet>664</a>        <span class="macro">assert_eq!</span>(
-<a href=#665 id=665 data-nosnippet>665</a>            prod.reduce_by_cyclotomic(N),
-<a href=#666 id=666 data-nosnippet>666</a>            Polynomial::reduce_negacyclic(<span class="kw-2">&amp;</span>Polynomial::mul_modulo_p(<span class="kw-2">&amp;</span>poly1, <span class="kw-2">&amp;</span>poly2))
-<a href=#667 id=667 data-nosnippet>667</a>        );
-<a href=#668 id=668 data-nosnippet>668</a>    }
-<a href=#669 id=669 data-nosnippet>669</a>}
+<a href=#660 id=660 data-nosnippet>660</a>    <span class="attr">#[test]
+<a href=#661 id=661 data-nosnippet>661</a>    </span><span class="kw">fn </span>test_negacyclic_reduction() {
+<a href=#662 id=662 data-nosnippet>662</a>        <span class="kw">let </span>coef1: [u8; N] = prng_array([<span class="number">0u8</span>; <span class="number">32</span>]);
+<a href=#663 id=663 data-nosnippet>663</a>        <span class="kw">let </span>coef2: [u8; N] = prng_array([<span class="number">1u8</span>; <span class="number">32</span>]);
+<a href=#664 id=664 data-nosnippet>664</a>
+<a href=#665 id=665 data-nosnippet>665</a>        <span class="kw">let </span>poly1 = Polynomial::new(coef1.iter().map(|<span class="kw-2">&amp;</span>a| FalconFelt::new(a <span class="kw">as </span>i16)).collect());
+<a href=#666 id=666 data-nosnippet>666</a>        <span class="kw">let </span>poly2 = Polynomial::new(coef2.iter().map(|<span class="kw-2">&amp;</span>a| FalconFelt::new(a <span class="kw">as </span>i16)).collect());
+<a href=#667 id=667 data-nosnippet>667</a>        <span class="kw">let </span>prod = poly1.clone() * poly2.clone();
+<a href=#668 id=668 data-nosnippet>668</a>
+<a href=#669 id=669 data-nosnippet>669</a>        <span class="macro">assert_eq!</span>(
+<a href=#670 id=670 data-nosnippet>670</a>            prod.reduce_by_cyclotomic(N),
+<a href=#671 id=671 data-nosnippet>671</a>            Polynomial::reduce_negacyclic(<span class="kw-2">&amp;</span>Polynomial::mul_modulo_p(<span class="kw-2">&amp;</span>poly1, <span class="kw-2">&amp;</span>poly2))
+<a href=#672 id=672 data-nosnippet>672</a>        );
+<a href=#673 id=673 data-nosnippet>673</a>    }
+<a href=#674 id=674 data-nosnippet>674</a>}
 </code></pre></div></section></main></body></html>
