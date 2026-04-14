@@ -36,8 +36,8 @@ impl core::fmt::Display for DeserializationError {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         match self {
             Self::UnexpectedEOF => write!(f, "unexpected end of file"),
-            Self::InvalidValue(msg) => write!(f, "invalid value: {}", msg),
-            Self::UnknownError(msg) => write!(f, "unknown error: {}", msg),
+            Self::InvalidValue(msg) => write!(f, "invalid value: {msg}"),
+            Self::UnknownError(msg) => write!(f, "unknown error: {msg}"),
         }
     }
 }
@@ -288,7 +288,7 @@ impl<T: Serializable> Serializable for Option<T> {
     }
 
     fn get_size_hint(&self) -> usize {
-        core::mem::size_of::<bool>() + self.as_ref().map(|value| value.get_size_hint()).unwrap_or(0)
+        core::mem::size_of::<bool>() + self.as_ref().map(Serializable::get_size_hint).unwrap_or(0)
     }
 }
 
@@ -752,8 +752,7 @@ impl Deserializable for p3_goldilocks::Goldilocks {
         let value = source.read_u64()?;
         Self::from_canonical_checked(value).ok_or_else(|| {
             DeserializationError::InvalidValue(format!(
-                "value {} is not a valid Goldilocks field element",
-                value
+                "value {value} is not a valid Goldilocks field element"
             ))
         })
     }

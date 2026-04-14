@@ -250,7 +250,8 @@ impl<S: SmtStorage> LargeSmt<S> {
 
         // Update cached counts before storing leaves
         self.leaf_count = initial_leaves.len();
-        self.entry_count = initial_leaves.values().map(|leaf| leaf.num_entries()).sum();
+        self.entry_count =
+            initial_leaves.values().map(crate::merkle::smt::SmtLeaf::num_entries).sum();
 
         // Store the initial leaves
         self.storage.set_leaves(initial_leaves).expect("Failed to store initial leaves");

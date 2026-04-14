@@ -142,7 +142,7 @@ where
     }
 
     fn widths(&self) -> Vec<usize> {
-        self.leaves.iter().map(|m| m.width()).collect()
+        self.leaves.iter().map(p3_matrix::Matrix::width).collect()
     }
 
     /// Prove a batch opening and stream it into a transcript channel.
@@ -214,7 +214,10 @@ where
         assert!(!leaves.is_empty(), "cannot commit empty batch");
         debug_assert!(alignment > 0, "alignment must be non-zero");
 
-        let leaves: Vec<M> = leaves.into_iter().map(|m| m.bit_reverse_rows()).collect();
+        let leaves: Vec<M> = leaves
+            .into_iter()
+            .map(super::bitrev::BitReversibleMatrix::bit_reverse_rows)
+            .collect();
 
         // Build leaf hashes: absorb all matrix rows into sponge states, then squeeze.
         let leaf_digests: Vec<[PD::Value; DIGEST_ELEMS]> =

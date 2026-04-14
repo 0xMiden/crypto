@@ -70,7 +70,7 @@ where
                 })
                 .collect();
             // Sort by ascending height (required by LMCS)
-            matrices.sort_by_key(|m| m.height());
+            matrices.sort_by_key(p3_matrix::Matrix::height);
             matrices
         })
         .collect()

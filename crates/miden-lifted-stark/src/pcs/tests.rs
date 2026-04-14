@@ -5,7 +5,7 @@ use alloc::{vec, vec::Vec};
 use miden_stark_transcript::{ProverTranscript, VerifierTranscript};
 use p3_challenger::CanObserve;
 use p3_field::Field;
-use p3_matrix::{Matrix, bitrev::BitReversibleMatrix, dense::RowMajorMatrix};
+use p3_matrix::{bitrev::BitReversibleMatrix, dense::RowMajorMatrix};
 use params::PcsParams;
 use proof::PcsTranscript;
 use prover::open_with_channel;
@@ -46,7 +46,7 @@ fn run_pcs_case(params: &PcsParams, trees: Vec<TestTree>, seed: u64) -> Result<(
     let rng = &mut SmallRng::seed_from_u64(seed);
     let lmcs = test_lmcs();
 
-    let lde_height = trees[0].leaves().last().map(|m| m.height()).unwrap_or(0);
+    let lde_height = trees[0].leaves().last().map(p3_matrix::Matrix::height).unwrap_or(0);
     let log_lde_height = log2_strict_u8(lde_height);
     let eval_points: [QuadFelt; 2] = [rng.sample(StandardUniform), rng.sample(StandardUniform)];
 

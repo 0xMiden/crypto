@@ -326,7 +326,7 @@ fn test_delete_entry() {
 
     let initial_entries = vec![(key1, value1), (key2, value2), (key3, value3)];
 
-    let mut smt = LargeSmt::<_>::with_entries(storage, initial_entries.clone()).unwrap();
+    let mut smt = LargeSmt::<_>::with_entries(storage, initial_entries).unwrap();
 
     let mutations = smt.compute_mutations(vec![(key2, EMPTY_WORD)]).unwrap();
     smt.apply_mutations(mutations).unwrap();
@@ -718,16 +718,14 @@ fn test_flat_layout_children_relationship() {
             let child_on_path = if is_right_child { right_child } else { left_child };
             assert_ne!(
                 child_on_path, empty_hash,
-                "Child on path should be non-empty at depth {}, value {} (on path to leaf {})",
-                depth, node_value, leaf_value
+                "Child on path should be non-empty at depth {depth}, value {node_value} (on path to leaf {leaf_value})"
             );
 
             // Verify the parent-child hash relationship
             let node_hash = Poseidon2::merge(&[left_child, right_child]);
             assert_eq!(
                 in_memory_nodes[memory_idx], node_hash,
-                "Stored hash at memory_idx {} should match computed hash from children at depth {}, value {}",
-                memory_idx, depth, node_value
+                "Stored hash at memory_idx {memory_idx} should match computed hash from children at depth {depth}, value {node_value}"
             );
         }
     }

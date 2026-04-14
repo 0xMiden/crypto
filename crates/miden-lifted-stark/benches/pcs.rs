@@ -19,7 +19,7 @@ use miden_stark_transcript::ProverTranscript;
 use p3_challenger::{CanObserve, FieldChallenger};
 use p3_dft::{Radix2DitParallel, TwoAdicSubgroupDft};
 use p3_field::Field;
-use p3_matrix::{Matrix, dense::RowMajorMatrix};
+use p3_matrix::dense::RowMajorMatrix;
 
 fn bench_pcs(c: &mut Criterion) {
     let dft = Radix2DitParallel::<Felt>::default();
@@ -28,7 +28,7 @@ fn bench_pcs(c: &mut Criterion) {
 
     for &log_lde_height in LOG_HEIGHTS {
         let max_lde_size = 1usize << log_lde_height;
-        let group_name = format!("PCS_Open/{}/goldilocks/poseidon2/{}", max_lde_size, PARALLEL_STR);
+        let group_name = format!("PCS_Open/{max_lde_size}/goldilocks/poseidon2/{PARALLEL_STR}");
         let mut group = c.benchmark_group(&group_name);
 
         let matrix_groups: Vec<Vec<RowMajorMatrix<Felt>>> =
@@ -44,7 +44,7 @@ fn bench_pcs(c: &mut Criterion) {
                 })
             })
             .collect();
-        all_lde_matrices.sort_by_key(|m| m.height());
+        all_lde_matrices.sort_by_key(p3_matrix::Matrix::height);
 
         let tree = lmcs.build_aligned_tree(all_lde_matrices);
         let commitment = tree.root();

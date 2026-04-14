@@ -46,7 +46,7 @@ where
     // Compute powers of x efficiently
     let x2 = x.square();
     let x3 = x2.clone() * x.clone();
-    let x4 = x2.clone().square();
+    let x4 = x2.square();
     let x5 = x4.clone() * x.clone();
     let x6 = x4.clone() * x2.clone();
     let x7 = x4.clone() * x3.clone();

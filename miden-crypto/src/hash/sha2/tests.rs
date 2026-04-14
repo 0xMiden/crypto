@@ -40,7 +40,7 @@ proptest! {
         let expected = Sha256::hash(&concatenated);
 
         // Test with iterator
-        let actual = Sha256::hash_iter(slices.iter().map(|v| v.as_slice()));
+        let actual = Sha256::hash_iter(slices.iter().map(alloc::vec::Vec::as_slice));
         assert_eq!(expected, actual);
 
         // Test with empty slices list
@@ -106,7 +106,7 @@ proptest! {
         let expected = Sha512::hash(&concatenated);
 
         // Test with iterator
-        let actual = Sha512::hash_iter(slices.iter().map(|v| v.as_slice()));
+        let actual = Sha512::hash_iter(slices.iter().map(alloc::vec::Vec::as_slice));
         assert_eq!(expected, actual);
 
         // Test with empty slices list
