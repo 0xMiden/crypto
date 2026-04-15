@@ -346,7 +346,7 @@ use crate::{
 /// A high-performance forest of sparse merkle trees with pluggable storage backends.
 ///
 /// See the module documentation for more information.
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 pub struct LargeSmtForest<B: Backend> {
     /// The configuration for how the forest functions.
     config: Config,
@@ -367,6 +367,17 @@ pub struct LargeSmtForest<B: Backend> {
     ///
     /// It must always be maintained as a strict subset of `lineage_data.keys()`.
     non_empty_histories: Set<LineageId>,
+}
+
+impl<B: Backend + Clone> Clone for LargeSmtForest<B> {
+    fn clone(&self) -> Self {
+        Self {
+            config: self.config.clone(),
+            backend: self.backend.clone(),
+            lineage_data: self.lineage_data.clone(),
+            non_empty_histories: self.non_empty_histories.clone(),
+        }
+    }
 }
 
 // CONSTRUCTION AND BASIC QUERIES
