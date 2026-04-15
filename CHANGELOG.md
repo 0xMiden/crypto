@@ -1,6 +1,6 @@
 ## 0.23.1 (TBD)
 
-- Extracted `SmtStorageReader` trait from `SmtStorage`, allowing `LargeSmt<S>` to work with read-only storage backends ([#958](https://github.com/0xMiden/crypto/pull/958)).
+- Extracted `SmtStorageReader` and `SparseMerkleTreeReader`, allowing `LargeSmt<S>` to work with read-only storage backends ([#958](https://github.com/0xMiden/crypto/pull/958)).
 
 ## 0.23.0 (2026-03-11)
 
