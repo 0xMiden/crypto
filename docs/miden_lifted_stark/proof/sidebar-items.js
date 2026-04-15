@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"struct":["StarkOutput","StarkTranscript"],"type":["StarkDigest","StarkProof"]};
+window.SIDEBAR_ITEMS = {"struct":["StarkOutput","StarkProof","StarkTranscript"],"type":["StarkDigest"]};
