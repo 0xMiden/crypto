@@ -134,7 +134,7 @@ pub trait SmtStorageReader: 'static + fmt::Debug + Send + Sync {
 
 /// Sparse Merkle Tree storage backend with full read and write capabilities.
 ///
-/// This trait extends [`SmtStorageReader`] with mutation operations required to persist changes
+/// This trait extends [`SmtStorageReader`] with the mutation operations required to persist changes
 /// to the SMT.
 ///
 /// All methods are expected to handle potential storage errors by returning a
