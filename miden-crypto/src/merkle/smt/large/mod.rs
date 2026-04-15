@@ -175,8 +175,8 @@
 use alloc::vec::Vec;
 
 use super::{
-    EmptySubtreeRoots, InnerNode, InnerNodeInfo, InnerNodes, LeafIndex, MerkleError, NodeIndex,
-    NodeMutation, SMT_DEPTH, SmtLeaf, SmtProof, SparseMerklePath, SparseMerkleTree, Word,
+    EmptySubtreeRoots, InnerNode, InnerNodeInfo, LeafIndex, MerkleError, NodeIndex, NodeMutation,
+    SMT_DEPTH, SmtLeaf, SmtProof, SparseMerkleTree, SparseMerkleTreeReader, Word,
 };
 use crate::{
     EMPTY_WORD,
@@ -235,8 +235,6 @@ const CONSTRUCTION_SUBTREE_BATCH_SIZE: usize = 10_000;
 
 // TYPES
 // ================================================================================================
-
-type Leaves = super::Leaves<SmtLeaf>;
 
 /// Result of loading leaves from storage: (leaf indices, map of leaf index to leaf).
 type LoadedLeaves = (Vec<u64>, Map<u64, Option<SmtLeaf>>);
@@ -312,7 +310,7 @@ impl<S: SmtStorageReader> LargeSmt<S> {
 
     /// Returns the root of the tree
     pub fn root(&self) -> Word {
-        self.in_memory_nodes[ROOT_MEMORY_INDEX]
+        <Self as SparseMerkleTreeReader<SMT_DEPTH>>::root(self)
     }
 
     /// Returns the number of non-empty leaves in this tree.
@@ -333,78 +331,18 @@ impl<S: SmtStorageReader> LargeSmt<S> {
 
     /// Returns the leaf to which `key` maps
     pub fn get_leaf(&self, key: &Word) -> SmtLeaf {
-        let leaf_pos = LeafIndex::<SMT_DEPTH>::from(*key).position();
-        match self.storage.get_leaf(leaf_pos) {
-            Ok(Some(leaf)) => leaf,
-            Ok(None) => SmtLeaf::new_empty((*key).into()),
-            Err(_) => {
-                panic!("Storage error during get_leaf");
-            },
-        }
+        <Self as SparseMerkleTreeReader<SMT_DEPTH>>::get_leaf(self, key)
     }
 
     /// Returns the value associated with `key`
     pub fn get_value(&self, key: &Word) -> Word {
-        let leaf_pos = LeafIndex::<SMT_DEPTH>::from(*key);
-        match self.storage.get_leaf(leaf_pos.position()) {
-            Ok(Some(leaf)) => leaf.get_value(key).unwrap_or_default(),
-            Ok(None) => EMPTY_WORD,
-            Err(_) => {
-                panic!("Storage error during get_value");
-            },
-        }
+        <Self as SparseMerkleTreeReader<SMT_DEPTH>>::get_value(self, key)
     }
 
     /// Returns an opening of the leaf associated with `key`. Conceptually, an opening is a Merkle
     /// path to the leaf, as well as the leaf itself.
     pub fn open(&self, key: &Word) -> SmtProof {
-        let leaf_pos = LeafIndex::<SMT_DEPTH>::from(*key);
-
-        let mut idx: NodeIndex = leaf_pos.into();
-
-        let subtree_roots: Vec<NodeIndex> = (0..NUM_SUBTREE_LEVELS)
-            .scan(idx.parent(), |cursor, _| {
-                let subtree_root = Subtree::find_subtree_root(*cursor);
-                *cursor = subtree_root.parent();
-                Some(subtree_root)
-            })
-            .collect();
-
-        let (leaf_opt, subtree_opts) = self
-            .storage
-            .get_leaf_and_subtrees(leaf_pos.position(), &subtree_roots)
-            .expect("Fetching leaf and subtrees succeeds");
-
-        let leaf = leaf_opt.unwrap_or_else(|| SmtLeaf::new_empty((*key).into()));
-
-        let mut cache = Map::<NodeIndex, Subtree>::new();
-        for (&root, subtree_opt) in subtree_roots.iter().zip(subtree_opts) {
-            let subtree = subtree_opt.unwrap_or_else(|| Subtree::new(root));
-            cache.insert(root, subtree);
-        }
-        let mut path = Vec::with_capacity(idx.depth() as usize);
-        while idx.depth() > 0 {
-            let is_right = idx.is_position_odd();
-            idx = idx.parent();
-
-            let sibling_hash = if idx.depth() < IN_MEMORY_DEPTH {
-                let InnerNode { left, right } = self.get_inner_node(idx);
-                if is_right { left } else { right }
-            } else {
-                let root = Subtree::find_subtree_root(idx);
-                let subtree = &cache[&root];
-                let InnerNode { left, right } = subtree
-                    .get_inner_node(idx)
-                    .unwrap_or_else(|| EmptySubtreeRoots::get_inner_node(SMT_DEPTH, idx.depth()));
-                if is_right { left } else { right }
-            };
-
-            path.push(sibling_hash);
-        }
-
-        let merkle_path =
-            SparseMerklePath::from_sized_iter(path).expect("failed to convert to SparseMerklePath");
-        SmtProof::new_unchecked(merkle_path, leaf)
+        <Self as SparseMerkleTreeReader<SMT_DEPTH>>::open(self, key)
     }
 
     /// Returns a boolean value indicating whether the SMT is empty.
@@ -463,18 +401,7 @@ impl<S: SmtStorageReader> LargeSmt<S> {
     /// For in-memory depths (< 24), reads from the flat in-memory array.
     /// For deeper nodes, reads from storage.
     pub(crate) fn get_inner_node(&self, index: NodeIndex) -> InnerNode {
-        if index.depth() < IN_MEMORY_DEPTH {
-            let memory_index = to_memory_index(&index);
-            return InnerNode {
-                left: self.in_memory_nodes[memory_index * 2],
-                right: self.in_memory_nodes[memory_index * 2 + 1],
-            };
-        }
-
-        self.storage
-            .get_inner_node(index)
-            .expect("Failed to get inner node")
-            .unwrap_or_else(|| EmptySubtreeRoots::get_inner_node(SMT_DEPTH, index.depth()))
+        <Self as SparseMerkleTreeReader<SMT_DEPTH>>::get_inner_node(self, index)
     }
 
     /// Helper to get an in-memory node if not empty.

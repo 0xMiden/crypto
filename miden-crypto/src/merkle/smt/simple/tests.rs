@@ -11,7 +11,7 @@ use crate::{
     hash::poseidon2::Poseidon2,
     merkle::{
         EmptySubtreeRoots, InnerNodeInfo, MerklePath, MerkleTree, int_to_leaf, int_to_node,
-        smt::{LeafIndex, SparseMerkleTree},
+        smt::{LeafIndex, SparseMerkleTreeReader},
     },
 };
 

@@ -64,26 +64,13 @@ type InnerNodes = Map<NodeIndex, InnerNode>;
 type Leaves<T> = Map<u64, T>;
 type NodeMutations = Map<NodeIndex, NodeMutation>;
 
-/// An abstract description of a sparse Merkle tree.
+/// The read-only portion of a sparse Merkle tree.
 ///
-/// A sparse Merkle tree is a key-value map which also supports proving that a given value is indeed
-/// stored at a given key in the tree. It is viewed as always being fully populated. If a leaf's
-/// value was not explicitly set, then its value is the default value. Typically, the vast majority
-/// of leaves will store the default value (hence it is "sparse"), and therefore the internal
-/// representation of the tree will only keep track of the leaves that have a different value from
-/// the default.
-///
-/// All leaves sit at the same depth. The deeper the tree, the more leaves it has; but also the
-/// longer its proofs are - of exactly `log(depth)` size. A tree cannot have depth 0, since such a
-/// tree is just a single value, and is probably a programming mistake.
-///
-/// Every key maps to one leaf. If there are as many keys as there are leaves, then
-/// [Self::Leaf] should be the same type as [Self::Value], as is the case with
-/// [`SimpleSmt`]. However, if there are more keys than leaves, then [`Self::Leaf`]
-/// must accommodate all keys that map to the same leaf.
-///
-/// [SparseMerkleTree] currently doesn't support optimizations that compress Merkle proofs.
-pub(crate) trait SparseMerkleTree<const DEPTH: u8> {
+/// This trait contains all methods that only require read access to the tree, including querying
+/// values, generating proofs/openings, and computing prospective mutations. Splitting this from
+/// [`SparseMerkleTree`] allows types like `LargeSmt` to implement read-only operations with
+/// weaker generic bounds (e.g., `SmtStorageReader` instead of `SmtStorage`).
+pub(crate) trait SparseMerkleTreeReader<const DEPTH: u8> {
     /// The type for a key
     type Key: Clone + Ord + Eq + Hash;
     /// The type for a value
@@ -139,61 +126,6 @@ pub(crate) trait SparseMerkleTree<const DEPTH: u8> {
         Self::path_and_leaf_to_opening(merkle_path, leaf)
     }
 
-    /// Inserts a value at the specified key, returning the previous value associated with that key.
-    /// Recall that by definition, any key that hasn't been updated is associated with
-    /// [`Self::EMPTY_VALUE`].
-    ///
-    /// This also recomputes all hashes between the leaf (associated with the key) and the root,
-    /// updating the root itself.
-    fn insert(&mut self, key: Self::Key, value: Self::Value) -> Result<Self::Value, MerkleError> {
-        let old_value = self.insert_value(key.clone(), value.clone())?.unwrap_or(Self::EMPTY_VALUE);
-
-        // if the old value and new value are the same, there is nothing to update
-        if value == old_value {
-            return Ok(value);
-        }
-
-        let leaf = self.get_leaf(&key);
-        let node_index = {
-            let leaf_index: LeafIndex<DEPTH> = Self::key_to_leaf_index(&key);
-            leaf_index.into()
-        };
-
-        self.recompute_nodes_from_index_to_root(node_index, Self::hash_leaf(&leaf));
-
-        Ok(old_value)
-    }
-
-    /// Recomputes the branch nodes (including the root) from `index` all the way to the root.
-    /// `node_hash_at_index` is the hash of the node stored at index.
-    fn recompute_nodes_from_index_to_root(
-        &mut self,
-        mut index: NodeIndex,
-        node_hash_at_index: Word,
-    ) {
-        let mut node_hash = node_hash_at_index;
-        for node_depth in (0..index.depth()).rev() {
-            let is_right = index.is_position_odd();
-            index.move_up();
-            let InnerNode { left, right } = self.get_inner_node(index);
-            let (left, right) = if is_right {
-                (left, node_hash)
-            } else {
-                (node_hash, right)
-            };
-            node_hash = Poseidon2::merge(&[left, right]);
-
-            if node_hash == *EmptySubtreeRoots::entry(DEPTH, node_depth) {
-                // If a subtree is empty, then can remove the inner node, since it's equal to the
-                // default value
-                self.remove_inner_node(index);
-            } else {
-                self.insert_inner_node(index, InnerNode { left, right });
-            }
-        }
-        self.set_root(node_hash);
-    }
-
     /// Computes what changes are necessary to insert the specified key-value pairs into this Merkle
     /// tree, allowing for validation before applying those changes.
     ///
@@ -214,7 +146,7 @@ pub(crate) trait SparseMerkleTree<const DEPTH: u8> {
         self.compute_mutations_sequential(kv_pairs)
     }
 
-    /// Sequential version of [`SparseMerkleTree::compute_mutations()`].
+    /// Sequential version of [`SparseMerkleTreeReader::compute_mutations()`].
     /// This is the default implementation.
     fn compute_mutations_sequential(
         &self,
@@ -311,6 +243,135 @@ pub(crate) trait SparseMerkleTree<const DEPTH: u8> {
             node_mutations,
             new_pairs,
         })
+    }
+
+    // REQUIRED METHODS
+    // ---------------------------------------------------------------------------------------------
+
+    /// The root of the tree
+    fn root(&self) -> Word;
+
+    /// Retrieves an inner node at the given index
+    fn get_inner_node(&self, index: NodeIndex) -> InnerNode;
+
+    /// Returns the value at the specified key. Recall that by definition, any key that hasn't been
+    /// updated is associated with [`Self::EMPTY_VALUE`].
+    fn get_value(&self, key: &Self::Key) -> Self::Value;
+
+    /// Returns the leaf at the specified index.
+    fn get_leaf(&self, key: &Self::Key) -> Self::Leaf;
+
+    /// Returns the hash of a leaf
+    fn hash_leaf(leaf: &Self::Leaf) -> Word;
+
+    /// Returns what a leaf would look like if a key-value pair were inserted into the tree, without
+    /// mutating the tree itself. The existing leaf can be empty.
+    ///
+    /// To get a prospective leaf based on the current state of the tree, use `self.get_leaf(key)`
+    /// as the argument for `existing_leaf`. The return value from this function can be chained back
+    /// into this function as the first argument to continue making prospective changes.
+    ///
+    /// # Invariants
+    /// Because this method is for a prospective key-value insertion into a specific leaf,
+    /// `existing_leaf` must have the same leaf index as `key` (as determined by
+    /// [`SparseMerkleTreeReader::key_to_leaf_index()`]), or the result will be meaningless.
+    ///
+    /// # Errors
+    /// If inserting the key-value pair would exceed
+    /// [`crate::merkle::smt::MAX_LEAF_ENTRIES`] (1024 entries) in a leaf,
+    /// returns [`SmtLeafError::TooManyLeafEntries`].
+    fn construct_prospective_leaf(
+        &self,
+        existing_leaf: Self::Leaf,
+        key: &Self::Key,
+        value: &Self::Value,
+    ) -> Result<Self::Leaf, SmtLeafError>;
+
+    /// Maps a key to a leaf index
+    fn key_to_leaf_index(key: &Self::Key) -> LeafIndex<DEPTH>;
+
+    /// Maps a (SparseMerklePath, Self::Leaf) to an opening.
+    ///
+    /// The length `path` is guaranteed to be equal to `DEPTH`
+    fn path_and_leaf_to_opening(path: SparseMerklePath, leaf: Self::Leaf) -> Self::Opening;
+}
+
+/// An abstract description of a sparse Merkle tree with write capabilities.
+///
+/// A sparse Merkle tree is a key-value map which also supports proving that a given value is indeed
+/// stored at a given key in the tree. It is viewed as always being fully populated. If a leaf's
+/// value was not explicitly set, then its value is the default value. Typically, the vast majority
+/// of leaves will store the default value (hence it is "sparse"), and therefore the internal
+/// representation of the tree will only keep track of the leaves that have a different value from
+/// the default.
+///
+/// All leaves sit at the same depth. The deeper the tree, the more leaves it has; but also the
+/// longer its proofs are - of exactly `log(depth)` size. A tree cannot have depth 0, since such a
+/// tree is just a single value, and is probably a programming mistake.
+///
+/// Every key maps to one leaf. If there are as many keys as there are leaves, then
+/// [Self::Leaf] should be the same type as [Self::Value], as is the case with
+/// [`SimpleSmt`]. However, if there are more keys than leaves, then [`Self::Leaf`]
+/// must accommodate all keys that map to the same leaf.
+///
+/// [SparseMerkleTree] currently doesn't support optimizations that compress Merkle proofs.
+pub(crate) trait SparseMerkleTree<const DEPTH: u8>: SparseMerkleTreeReader<DEPTH> {
+    // PROVIDED METHODS
+    // ---------------------------------------------------------------------------------------------
+
+    /// Inserts a value at the specified key, returning the previous value associated with that key.
+    /// Recall that by definition, any key that hasn't been updated is associated with
+    /// [`Self::EMPTY_VALUE`].
+    ///
+    /// This also recomputes all hashes between the leaf (associated with the key) and the root,
+    /// updating the root itself.
+    fn insert(&mut self, key: Self::Key, value: Self::Value) -> Result<Self::Value, MerkleError> {
+        let old_value = self.insert_value(key.clone(), value.clone())?.unwrap_or(Self::EMPTY_VALUE);
+
+        // if the old value and new value are the same, there is nothing to update
+        if value == old_value {
+            return Ok(value);
+        }
+
+        let leaf = self.get_leaf(&key);
+        let node_index = {
+            let leaf_index: LeafIndex<DEPTH> = Self::key_to_leaf_index(&key);
+            leaf_index.into()
+        };
+
+        self.recompute_nodes_from_index_to_root(node_index, Self::hash_leaf(&leaf));
+
+        Ok(old_value)
+    }
+
+    /// Recomputes the branch nodes (including the root) from `index` all the way to the root.
+    /// `node_hash_at_index` is the hash of the node stored at index.
+    fn recompute_nodes_from_index_to_root(
+        &mut self,
+        mut index: NodeIndex,
+        node_hash_at_index: Word,
+    ) {
+        let mut node_hash = node_hash_at_index;
+        for node_depth in (0..index.depth()).rev() {
+            let is_right = index.is_position_odd();
+            index.move_up();
+            let InnerNode { left, right } = self.get_inner_node(index);
+            let (left, right) = if is_right {
+                (left, node_hash)
+            } else {
+                (node_hash, right)
+            };
+            node_hash = Poseidon2::merge(&[left, right]);
+
+            if node_hash == *EmptySubtreeRoots::entry(DEPTH, node_depth) {
+                // If a subtree is empty, then can remove the inner node, since it's equal to the
+                // default value
+                self.remove_inner_node(index);
+            } else {
+                self.insert_inner_node(index, InnerNode { left, right });
+            }
+        }
+        self.set_root(node_hash);
     }
 
     /// Applies the prospective mutations computed with [`SparseMerkleTree::compute_mutations()`] to
@@ -444,24 +505,8 @@ pub(crate) trait SparseMerkleTree<const DEPTH: u8> {
     // REQUIRED METHODS
     // ---------------------------------------------------------------------------------------------
 
-    /// Construct this type from already computed leaves and nodes. The caller ensures passed
-    /// arguments are correct and consistent with each other.
-    fn from_raw_parts(
-        inner_nodes: InnerNodes,
-        leaves: Leaves<Self::Leaf>,
-        root: Word,
-    ) -> Result<Self, MerkleError>
-    where
-        Self: Sized;
-
-    /// The root of the tree
-    fn root(&self) -> Word;
-
     /// Sets the root of the tree
     fn set_root(&mut self, root: Word);
-
-    /// Retrieves an inner node at the given index
-    fn get_inner_node(&self, index: NodeIndex) -> InnerNode;
 
     /// Inserts an inner node at the given index
     fn insert_inner_node(&mut self, index: NodeIndex, inner_node: InnerNode) -> Option<InnerNode>;
@@ -475,47 +520,6 @@ pub(crate) trait SparseMerkleTree<const DEPTH: u8> {
         key: Self::Key,
         value: Self::Value,
     ) -> Result<Option<Self::Value>, MerkleError>;
-
-    /// Returns the value at the specified key. Recall that by definition, any key that hasn't been
-    /// updated is associated with [`Self::EMPTY_VALUE`].
-    fn get_value(&self, key: &Self::Key) -> Self::Value;
-
-    /// Returns the leaf at the specified index.
-    fn get_leaf(&self, key: &Self::Key) -> Self::Leaf;
-
-    /// Returns the hash of a leaf
-    fn hash_leaf(leaf: &Self::Leaf) -> Word;
-
-    /// Returns what a leaf would look like if a key-value pair were inserted into the tree, without
-    /// mutating the tree itself. The existing leaf can be empty.
-    ///
-    /// To get a prospective leaf based on the current state of the tree, use `self.get_leaf(key)`
-    /// as the argument for `existing_leaf`. The return value from this function can be chained back
-    /// into this function as the first argument to continue making prospective changes.
-    ///
-    /// # Invariants
-    /// Because this method is for a prospective key-value insertion into a specific leaf,
-    /// `existing_leaf` must have the same leaf index as `key` (as determined by
-    /// [`SparseMerkleTree::key_to_leaf_index()`]), or the result will be meaningless.
-    ///
-    /// # Errors
-    /// If inserting the key-value pair would exceed
-    /// [`crate::merkle::smt::MAX_LEAF_ENTRIES`] (1024 entries) in a leaf,
-    /// returns [`SmtLeafError::TooManyLeafEntries`].
-    fn construct_prospective_leaf(
-        &self,
-        existing_leaf: Self::Leaf,
-        key: &Self::Key,
-        value: &Self::Value,
-    ) -> Result<Self::Leaf, SmtLeafError>;
-
-    /// Maps a key to a leaf index
-    fn key_to_leaf_index(key: &Self::Key) -> LeafIndex<DEPTH>;
-
-    /// Maps a (SparseMerklePath, Self::Leaf) to an opening.
-    ///
-    /// The length `path` is guaranteed to be equal to `DEPTH`
-    fn path_and_leaf_to_opening(path: SparseMerklePath, leaf: Self::Leaf) -> Self::Opening;
 }
 
 // INNER NODE

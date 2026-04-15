@@ -12,6 +12,7 @@ use crate::{
     hash::poseidon2::Poseidon2,
     merkle::smt::{
         EmptySubtreeRoots, InnerNode, Map, MerkleError, NodeIndex, Smt, SparseMerkleTree,
+        SparseMerkleTreeReader,
         full::concurrent::{
             PairComputations, SUBTREE_DEPTH, SubtreeLeaf, SubtreeLeavesIter, build_subtree,
         },

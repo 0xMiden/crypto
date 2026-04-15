@@ -12,7 +12,7 @@ use crate::{
     Word,
     merkle::smt::{
         EmptySubtreeRoots, LeafIndex, Map, MerkleError, MutationSet, NodeIndex, NodeMutation,
-        NodeMutations, SmtLeaf, SparseMerkleTree,
+        NodeMutations, SmtLeaf, SparseMerkleTree, SparseMerkleTreeReader,
         full::concurrent::{
             SUBTREE_DEPTH, SubtreeLeaf, SubtreeLeavesIter, fetch_sibling_pair,
             process_sorted_pairs_to_leaves,
@@ -462,7 +462,7 @@ impl<S: SmtStorage> LargeSmt<S> {
 
         // Guard against accidentally trying to apply mutations that were computed against a
         // different tree, including a stale version of this tree.
-        let expected_root = SparseMerkleTree::<SMT_DEPTH>::root(self);
+        let expected_root = SparseMerkleTreeReader::<SMT_DEPTH>::root(self);
         if old_root != expected_root {
             return Err(LargeSmtError::Merkle(MerkleError::ConflictingRoots {
                 expected_root,
@@ -706,7 +706,7 @@ impl<S: SmtStorage> LargeSmt<S> {
             self.sorted_pairs_to_mutated_leaves_with_preloaded_leaves(sorted_kv_pairs, &leaf_map);
 
         // If no mutations, return an empty mutation set
-        let old_root = SparseMerkleTree::<SMT_DEPTH>::root(self);
+        let old_root = SparseMerkleTreeReader::<SMT_DEPTH>::root(self);
         if leaves.is_empty() {
             return Ok(MutationSet {
                 old_root,
@@ -761,7 +761,7 @@ impl<S: SmtStorage> LargeSmt<S> {
 
         // Create mutation set
         let mutation_set = MutationSet {
-            old_root: SparseMerkleTree::<SMT_DEPTH>::root(self),
+            old_root: SparseMerkleTreeReader::<SMT_DEPTH>::root(self),
             new_root,
             node_mutations,
             new_pairs,
