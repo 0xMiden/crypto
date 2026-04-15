@@ -92,38 +92,20 @@ fn test_compute_challenge_k_equivalence() {
 // DER tests
 // ================================================================================================
 
-/// Encode R and S (little-endian 32-byte arrays) into DER SEQUENCE { INTEGER, INTEGER }.
-fn encode_der(r_le: &[u8; 32], s_le: &[u8; 32]) -> Vec<u8> {
-    fn le_to_der_integer(le: &[u8; 32]) -> Vec<u8> {
-        let mut be = *le;
-        be.reverse();
-        // Strip leading zeros (but keep at least one byte).
-        let start = be.iter().position(|&b| b != 0).unwrap_or(31);
-        let stripped = &be[start..];
-        let needs_pad = stripped[0] & 0x80 != 0;
-        let len = stripped.len() + usize::from(needs_pad);
-        let mut out = Vec::with_capacity(2 + len);
-        out.push(0x02); // INTEGER tag
-        out.push(len as u8);
-        if needs_pad {
-            out.push(0x00);
-        }
-        out.extend_from_slice(stripped);
-        out
-    }
-    let r_der = le_to_der_integer(r_le);
-    let s_der = le_to_der_integer(s_le);
-    let seq_len = r_der.len() + s_der.len();
-    let mut out = Vec::with_capacity(2 + seq_len);
-    out.push(0x30); // SEQUENCE tag
-    out.push(seq_len as u8);
-    out.extend_from_slice(&r_der);
-    out.extend_from_slice(&s_der);
+/// Wrap a raw 64-byte Ed25519 signature in a DER BIT STRING.
+fn encode_bitstring(sig_bytes: &[u8; 64]) -> Vec<u8> {
+    // BIT STRING tag (0x03), length (65 = 1 unused-bits byte + 64 sig bytes),
+    // unused bits (0x00), then the raw signature.
+    let mut out = Vec::with_capacity(2 + 1 + 64);
+    out.push(0x03); // BIT STRING tag
+    out.push(65); // length: 1 + 64
+    out.push(0x00); // unused bits
+    out.extend_from_slice(sig_bytes);
     out
 }
 
 #[test]
-fn from_der_roundtrip() {
+fn from_der_bitstring_roundtrip() {
     let mut rng = seeded_rng([10u8; 32]);
     let sk = SecretKey::with_rng(&mut rng);
     let pk = sk.public_key();
@@ -131,30 +113,45 @@ fn from_der_roundtrip() {
     let msg = Word::from([Felt::new(1), Felt::new(2), Felt::new(3), Felt::new(4)]);
     let sig = sk.sign(msg);
 
-    // Encode signature to DER
+    // Encode the signature as DER BIT STRING (standard encoding per RFC 8410)
     let sig_bytes = sig.inner.to_bytes();
-    let r: [u8; 32] = sig_bytes[..32].try_into().unwrap();
-    let s: [u8; 32] = sig_bytes[32..].try_into().unwrap();
-    let der = encode_der(&r, &s);
+    let der = encode_bitstring(&sig_bytes);
 
     // Decode and verify
-    let recovered = Signature::from_der(&der).expect("valid DER should parse");
+    let recovered = Signature::from_der(&der).expect("valid DER BIT STRING should parse");
     assert_eq!(recovered, sig);
     assert!(pk.verify(msg, &recovered));
 }
 
 #[test]
-fn from_der_rejects_bad_sequence_tag() {
-    // A valid-length blob but with wrong outer tag (0x31 instead of 0x30)
-    let mut der = encode_der(&[0u8; 32], &[0u8; 32]);
-    der[0] = 0x31;
+fn from_der_raw_64_bytes() {
+    let mut rng = seeded_rng([11u8; 32]);
+    let sk = SecretKey::with_rng(&mut rng);
+    let pk = sk.public_key();
+
+    let msg = Word::from([Felt::new(5), Felt::new(6), Felt::new(7), Felt::new(8)]);
+    let sig = sk.sign(msg);
+
+    // Pass raw 64 bytes directly (RFC 8032 native format)
+    let sig_bytes = sig.inner.to_bytes();
+    let recovered =
+        Signature::from_der(&sig_bytes).expect("raw 64-byte signature should parse");
+    assert_eq!(recovered, sig);
+    assert!(pk.verify(msg, &recovered));
+}
+
+#[test]
+fn from_der_rejects_bad_tag() {
+    // Use SEQUENCE tag (0x30) instead of BIT STRING (0x03)
+    let mut der = encode_bitstring(&[0u8; 64]);
+    der[0] = 0x30;
     assert!(Signature::from_der(&der).is_err());
 }
 
 #[test]
 fn from_der_rejects_trailing_data() {
-    let mut der = encode_der(&[0u8; 32], &[0u8; 32]);
-    der.push(0x00); // extra byte after SEQUENCE
+    let mut der = encode_bitstring(&[0u8; 64]);
+    der.push(0x00); // extra byte after BIT STRING
     assert!(Signature::from_der(&der).is_err());
 }
 
@@ -164,69 +161,33 @@ fn from_der_rejects_empty_input() {
 }
 
 #[test]
-fn from_der_rejects_truncated_integer() {
-    // Craft a SEQUENCE whose declared length extends beyond the actual data.
-    let der = [0x30, 0x06, 0x02, 0x01, 0x01, 0x02, 0x01]; // S integer body missing
+fn from_der_rejects_nonzero_unused_bits() {
+    let mut der = encode_bitstring(&[0u8; 64]);
+    der[2] = 0x01; // unused-bits byte should be 0
+    assert!(Signature::from_der(&der).is_err());
+}
+
+#[test]
+fn from_der_rejects_wrong_length() {
+    // BIT STRING with only 32 bytes of signature (too short)
+    let short_sig = [0u8; 32];
+    let mut der = Vec::new();
+    der.push(0x03); // BIT STRING tag
+    der.push(33); // length: 1 + 32
+    der.push(0x00); // unused bits
+    der.extend_from_slice(&short_sig);
     assert!(Signature::from_der(&der).is_err());
 }
 
 #[test]
 fn from_der_rejects_long_form_length() {
-    // Valid content but using BER-style long-form length 0x81 0x44 instead of
-    // short-form 0x44. DER requires shortest form, and Ed25519 blobs always fit
-    // in short-form.
-    let inner = encode_der(&[1u8; 32], &[2u8; 32]);
-    // Replace outer SEQUENCE: swap short-form len with long-form
-    let seq_body = &inner[2..]; // skip tag + original 1-byte length
+    let sig_bytes = [1u8; 64];
+    // Use BER-style long-form length 0x81 0x41 instead of short-form 0x41.
     let mut der = Vec::new();
-    der.push(0x30); // SEQUENCE tag
+    der.push(0x03); // BIT STRING tag
     der.push(0x81); // long-form: 1 subsequent length byte
-    der.push(seq_body.len() as u8);
-    der.extend_from_slice(seq_body);
-    assert!(Signature::from_der(&der).is_err());
-}
-
-#[test]
-fn from_der_rejects_non_canonical_integer_padding() {
-    // An INTEGER with an unnecessary leading 0x00 byte: the next byte's high bit
-    // is clear, so the 0x00 is superfluous and violates X.690 section 8.3.2.
-    // R = 0x00 0x01 (non-canonical: should just be 0x01)
-    let r_int = [0x02, 0x02, 0x00, 0x01]; // INTEGER tag, len=2, body=00 01
-    let s_int = [0x02, 0x01, 0x01]; // INTEGER tag, len=1, body=01
-    let seq_len = (r_int.len() + s_int.len()) as u8;
-    let mut der = Vec::new();
-    der.push(0x30);
-    der.push(seq_len);
-    der.extend_from_slice(&r_int);
-    der.extend_from_slice(&s_int);
-    assert!(Signature::from_der(&der).is_err());
-}
-
-#[test]
-fn from_der_rejects_empty_integer() {
-    // An INTEGER with zero-length content is invalid per DER.
-    let r_int = [0x02, 0x00]; // INTEGER tag, len=0
-    let s_int = [0x02, 0x01, 0x01];
-    let seq_len = (r_int.len() + s_int.len()) as u8;
-    let mut der = Vec::new();
-    der.push(0x30);
-    der.push(seq_len);
-    der.extend_from_slice(&r_int);
-    der.extend_from_slice(&s_int);
-    assert!(Signature::from_der(&der).is_err());
-}
-
-#[test]
-fn from_der_rejects_negative_integer() {
-    // An INTEGER whose first byte has the high bit set (negative in two's
-    // complement) is invalid for an Ed25519 signature component.
-    let r_int = [0x02, 0x01, 0x80]; // INTEGER tag, len=1, body=0x80 (negative)
-    let s_int = [0x02, 0x01, 0x01];
-    let seq_len = (r_int.len() + s_int.len()) as u8;
-    let mut der = Vec::new();
-    der.push(0x30);
-    der.push(seq_len);
-    der.extend_from_slice(&r_int);
-    der.extend_from_slice(&s_int);
+    der.push(65); // actual length
+    der.push(0x00); // unused bits
+    der.extend_from_slice(&sig_bytes);
     assert!(Signature::from_der(&der).is_err());
 }

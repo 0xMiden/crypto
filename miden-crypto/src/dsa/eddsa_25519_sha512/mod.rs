@@ -366,63 +366,40 @@ impl Signature {
         pub_key.verify(message, self)
     }
 
-    /// Creates a signature from ASN.1 DER format bytes.
+    /// Creates a signature from DER-encoded bytes per [RFC 8410 §6][rfc8410].
     ///
-    /// The expected DER encoding is `SEQUENCE { INTEGER R, INTEGER S }`, where R and S
-    /// are the big-endian unsigned integer representations of the Ed25519 signature
-    /// components. Since Ed25519 natively uses little-endian encoding (per RFC 8032),
-    /// this method handles the byte-order conversion.
+    /// Ed25519 signatures are defined as the raw 64-byte value `ENC(R) || ENC(S)`
+    /// ([RFC 8032 §3.3][rfc8032]). When carried in ASN.1 structures such as X.509
+    /// certificates, this 64-byte blob is placed directly inside a `BIT STRING`
+    /// without additional wrapping ([RFC 8410 §6][rfc8410]).
     ///
-    /// Note: Ed25519 does not have a standard DER encoding. RFC 8032 defines the
-    /// native format as the concatenation `ENC(R) || ENC(S)`, and RFC 8410 places
-    /// that blob directly in a `BIT STRING` without additional ASN.1 wrapping.
-    /// This method uses the `SEQUENCE { INTEGER, INTEGER }` layout for
-    /// consistency with the ECDSA `from_der` in this crate and to support
-    /// interoperability with tooling that DER-encodes signature components
-    /// individually.
+    /// This method accepts two formats:
+    /// 1. A DER `BIT STRING` containing the 64-byte signature (standard ASN.1
+    ///    encoding from X.509 certificates, CMS, etc.).
+    /// 2. The raw 64-byte signature value itself (for convenience).
+    ///
+    /// [rfc8032]: https://datatracker.ietf.org/doc/html/rfc8032#section-3.3
+    /// [rfc8410]: https://datatracker.ietf.org/doc/html/rfc8410#section-6
     pub fn from_der(bytes: &[u8]) -> Result<Self, DeserializationError> {
-        // Parse outer SEQUENCE
-        let (tag, seq_body, trailing) = parse_der_tlv(bytes)?;
-        if tag != 0x30 {
+        let sig_bytes = if bytes.len() == SIGNATURE_BYTES {
+            // Raw 64-byte signature (RFC 8032 native format).
+            bytes
+        } else {
+            // Try to parse as DER BIT STRING.
+            parse_bitstring_contents(bytes)?
+        };
+
+        if sig_bytes.len() != SIGNATURE_BYTES {
             return Err(DeserializationError::InvalidValue(alloc::format!(
-                "expected DER SEQUENCE (0x30), got 0x{tag:02x}"
+                "Ed25519 signature must be {SIGNATURE_BYTES} bytes, got {}",
+                sig_bytes.len()
             )));
         }
-        if !trailing.is_empty() {
-            return Err(DeserializationError::InvalidValue(
-                "trailing data after DER SEQUENCE".into(),
-            ));
-        }
 
-        // Parse R INTEGER
-        let (tag, r_content, remaining) = parse_der_tlv(seq_body)?;
-        if tag != 0x02 {
-            return Err(DeserializationError::InvalidValue(alloc::format!(
-                "expected DER INTEGER (0x02) for R, got 0x{tag:02x}"
-            )));
-        }
-        let r = der_integer_to_le_32(r_content)?;
-
-        // Parse S INTEGER
-        let (tag, s_content, remaining) = parse_der_tlv(remaining)?;
-        if tag != 0x02 {
-            return Err(DeserializationError::InvalidValue(alloc::format!(
-                "expected DER INTEGER (0x02) for S, got 0x{tag:02x}"
-            )));
-        }
-        if !remaining.is_empty() {
-            return Err(DeserializationError::InvalidValue(
-                "trailing data inside DER SEQUENCE".into(),
-            ));
-        }
-        let s = der_integer_to_le_32(s_content)?;
-
-        // Reconstruct 64-byte Ed25519 signature: R || S (little-endian)
-        let mut sig_bytes = [0u8; SIGNATURE_BYTES];
-        sig_bytes[..32].copy_from_slice(&r);
-        sig_bytes[32..].copy_from_slice(&s);
-
-        let inner = ed25519_dalek::Signature::from_bytes(&sig_bytes);
+        let inner =
+            ed25519_dalek::Signature::from_bytes(sig_bytes.try_into().map_err(|_| {
+                DeserializationError::InvalidValue("invalid signature length".into())
+            })?);
         Ok(Self { inner })
     }
 }
@@ -430,19 +407,50 @@ impl Signature {
 // DER HELPERS
 // ================================================================================================
 
-/// Parses a single DER tag-length-value element, returning `(tag, content, rest)`.
-fn parse_der_tlv(bytes: &[u8]) -> Result<(u8, &[u8], &[u8]), DeserializationError> {
+/// Parses a DER `BIT STRING` and returns the contained octets.
+///
+/// The expected encoding is `03 <length> 00 <signature_bytes>`, where the
+/// leading `0x00` byte is the "number of unused bits" (always zero for
+/// Ed25519 signatures since they are an exact number of octets).
+fn parse_bitstring_contents(bytes: &[u8]) -> Result<&[u8], DeserializationError> {
     if bytes.is_empty() {
         return Err(DeserializationError::InvalidValue("empty DER input".into()));
     }
-    let tag = bytes[0];
+
+    // Expect BIT STRING tag (0x03).
+    if bytes[0] != 0x03 {
+        return Err(DeserializationError::InvalidValue(alloc::format!(
+            "expected DER BIT STRING (0x03), got 0x{:02x}",
+            bytes[0]
+        )));
+    }
+
     let (len, header_size) = parse_der_length(&bytes[1..])?;
     let start = 1 + header_size;
     let end = start + len;
-    if end > bytes.len() {
-        return Err(DeserializationError::InvalidValue("DER length exceeds input".into()));
+    if end != bytes.len() {
+        return Err(DeserializationError::InvalidValue(
+            "DER length mismatch or trailing data".into(),
+        ));
     }
-    Ok((tag, &bytes[start..end], &bytes[end..]))
+
+    let content = &bytes[start..end];
+
+    // The first byte of a BIT STRING is the number of unused bits in the
+    // last octet. For Ed25519 signatures this must be 0.
+    if content.is_empty() {
+        return Err(DeserializationError::InvalidValue(
+            "BIT STRING content must not be empty".into(),
+        ));
+    }
+    if content[0] != 0x00 {
+        return Err(DeserializationError::InvalidValue(alloc::format!(
+            "BIT STRING unused-bits byte must be 0 for Ed25519 signatures, got {}",
+            content[0]
+        )));
+    }
+
+    Ok(&content[1..])
 }
 
 /// Decodes a DER definite-form length, returning `(length_value, bytes_consumed)`.
@@ -458,57 +466,6 @@ fn parse_der_length(bytes: &[u8]) -> Result<(usize, usize), DeserializationError
             "non-short-form DER length is not valid for Ed25519 signatures".into(),
         )),
     }
-}
-
-/// Converts a DER INTEGER (big-endian, possibly sign-padded) into a 32-byte little-endian array
-/// for Ed25519.
-///
-/// Rejects non-canonical encodings per X.690 section 8.3.2:
-/// - empty content (zero-length INTEGER)
-/// - unnecessary leading `0x00` (when the next byte's high bit is clear)
-/// - missing leading `0x00` when the high bit is set (would be interpreted as negative, but this
-///   helper only strips a valid pad)
-fn der_integer_to_le_32(int_bytes: &[u8]) -> Result<[u8; 32], DeserializationError> {
-    if int_bytes.is_empty() {
-        return Err(DeserializationError::InvalidValue(
-            "DER INTEGER content must not be empty".into(),
-        ));
-    }
-
-    // Validate canonical sign-padding per X.690 8.3.2:
-    // A leading 0x00 is only allowed when the next byte has its high bit set.
-    if int_bytes.len() > 1 && int_bytes[0] == 0x00 && (int_bytes[1] & 0x80) == 0 {
-        return Err(DeserializationError::InvalidValue(
-            "non-canonical DER INTEGER: unnecessary leading 0x00".into(),
-        ));
-    }
-
-    // Reject negative integers (high bit set without a 0x00 pad is a negative
-    // value in two's complement, which is invalid for an Ed25519 component).
-    // Note: if the high bit is set AND there is a 0x00 pad, that was already
-    // validated above as canonical.
-    if int_bytes[0] & 0x80 != 0 {
-        return Err(DeserializationError::InvalidValue(
-            "negative DER INTEGER is not valid for Ed25519 component".into(),
-        ));
-    }
-
-    // Strip the canonical leading 0x00 sign-padding byte if present.
-    let stripped = match int_bytes {
-        [0x00, rest @ ..] if !rest.is_empty() => rest,
-        other => other,
-    };
-    if stripped.len() > 32 {
-        return Err(DeserializationError::InvalidValue(
-            "DER integer too large for Ed25519 component".into(),
-        ));
-    }
-    // Left-pad to 32 bytes (big-endian).
-    let mut be = [0u8; 32];
-    be[32 - stripped.len()..].copy_from_slice(stripped);
-    // Convert to little-endian.
-    be.reverse();
-    Ok(be)
 }
 
 // SERIALIZATION / DESERIALIZATION
