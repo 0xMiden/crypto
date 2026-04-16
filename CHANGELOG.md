@@ -15,6 +15,7 @@
 - [BREAKING] Per-instance log trace heights moved from `AirInstance` into `StarkProof`; `prove_multi` / `verify_multi` now observe them into the Fiat-Shamir challenger internally ([#956](https://github.com/0xMiden/crypto/pull/956)). Consumers on the temporary `(log_trace_height, proof)` serialization path must drop the wrapper and stop pre-observing the height, or it will be bound twice. `StarkProof` no longer exposes per-instance heights directly — parse the proof with `StarkTranscript::from_proof` to read them; `num_traces()` is available for the count.
 - [BREAKING] Split the `SecretKey` type for both ECDSA-k256 and EdDSA-25519 into `SigningKey` and `KeyExchangeKey` to help enforce better practices around key reuse. `SecretKey` is no longer available in the public API; all usages should be moved to one of the new key types.
 - [BREAKING] Changed the serialization format of `PartialSmt` to be more compact on the wire. If you depended on the serialization format directly (or if it is stored), this will be breaking.
+- Added fuzz coverage for `PartialSmt` deserialization ([#968](https://github.com/0xMiden/crypto/pull/968)).
 
 ## 0.23.0 (2026-03-11)
 
