@@ -2,6 +2,7 @@ use alloc::{
     collections::{BTreeMap, BTreeSet},
     vec::Vec,
 };
+use std::println;
 
 use assert_matches::assert_matches;
 use itertools::Itertools;
@@ -13,7 +14,7 @@ use super::{PartialSmt, SMT_DEPTH, serialization::property_tests::arbitrary_vali
 use crate::{
     EMPTY_WORD, Felt, ONE, Word, ZERO,
     merkle::{
-        EmptySubtreeRoots, MerkleError,
+        EmptySubtreeRoots, MerkleError, NodeIndex,
         smt::{Smt, SmtLeaf},
     },
     rand::test_utils::ContinuousRng,
@@ -768,7 +769,43 @@ fn unique_nodes_roundtrips() {
 }
 
 #[test]
-fn unique_nodes_of_exclusion_proofs_roundtrips() {}
+fn unique_nodes_of_exclusion_proofs_roundtrips() {
+    let mut rng = ChaCha20Rng::from_seed([10u8; 32]);
+    let key = random_word(&mut rng);
+    let val = random_word(&mut rng);
+    let key_1 = random_word(&mut rng);
+    let val_1 = random_word(&mut rng);
+    let key_2 = random_word(&mut rng);
+    let val_2 = random_word(&mut rng);
+    let missing_key = random_word(&mut rng);
+    let smt: Smt = Smt::with_entries([(key, val), (key_1, val_1), (key_2, val_2)]).unwrap();
+
+    let partial_smt = PartialSmt::from_proofs([smt.open(&missing_key)]).unwrap();
+
+    println!("Partial SMT:");
+    partial_smt
+        .inner_nodes
+        .iter()
+        .sorted_by_key(|(i, _)| **i)
+        .for_each(|(ix, v)| println!("{ix}: {v:?}"));
+
+    let unique_nodes = partial_smt.to_unique_nodes();
+    println!("Unique Nodes:");
+    unique_nodes
+        .nodes
+        .iter()
+        .sorted_by_key(|(depth, _)| *depth)
+        .for_each(|(d, nodes)| {
+            nodes.iter().sorted_by_key(|(depth, _)| *depth).for_each(|(p, v)| {
+                let ix = NodeIndex::new_unchecked(*d, *p);
+                println!("{ix}: {v:?}");
+            })
+        });
+
+    let decoded = PartialSmt::from_unique_nodes(unique_nodes).unwrap();
+
+    assert_eq!(partial_smt, decoded);
+}
 
 #[test]
 fn unique_nodes_serialization_roundtrips() {

@@ -426,9 +426,34 @@ impl PartialSmt {
         //
         // It must be ensured that at no point an index that is lower in the tree than any index
         // preceding it is inserted.
-        let mut nodes_to_visit = all_leaves.keys().map(|k| k.parent()).collect::<VecDeque<_>>();
+        let mut node_indices_to_visit =
+            all_leaves.keys().map(|k| k.parent()).collect::<VecDeque<_>>();
 
-        while let Some(ix) = nodes_to_visit.pop_front() {
+        // We also, however, need to account for inner nodes which are not reachable in a parent
+        // chain from a leaf, such as those from an exclusion proof. These are all nodes that do not
+        // have a (present) child in the set of nodes or leaves, so to enforce our layering
+        // invariant we add them in sorted order from bottom to top, left to right.
+        let mut origin_node_indices = nodes
+            .iter()
+            .filter_map(|(i, _)| {
+                let left_sub_root =
+                    matches!(nodes.get(&i.left_child()), Some(NodeValue::EmptySubtreeRoot));
+                let right_sub_root =
+                    matches!(nodes.get(&i.right_child()), Some(NodeValue::EmptySubtreeRoot));
+                let left_in_leaves = all_leaves.contains_key(&i.left_child());
+                let right_in_leaves = all_leaves.contains_key(&i.right_child());
+                if (left_sub_root && right_sub_root) || (!left_in_leaves && !right_in_leaves) {
+                    Some(i)
+                } else {
+                    None
+                }
+            })
+            .collect::<Vec<_>>();
+        origin_node_indices
+            .sort_by(|il, ir| ir.depth().cmp(&il.depth()).then(il.position().cmp(&ir.position())));
+        node_indices_to_visit.extend(origin_node_indices.into_iter());
+
+        while let Some(ix) = node_indices_to_visit.pop_front() {
             // To avoid re-doing work we immediately discard a node that is already in our tree.
             if smt.inner_nodes.contains_key(&ix) {
                 continue;
@@ -460,7 +485,7 @@ impl PartialSmt {
                     smt.get_inner_node(ix).map(|n| Ok(n.hash())).unwrap_or_else(|| {
                         match nodes.get(&ix).ok_or_else(|| {
                             DeserializationError::InvalidValue(format!(
-                                "Node {ix} not found but was required"
+                                "Node at {ix} not found but is required"
                             ))
                         })? {
                             NodeValue::EmptySubtreeRoot => {
@@ -477,7 +502,7 @@ impl PartialSmt {
             }
 
             // Finally, we push the node's parent into the queue.
-            nodes_to_visit.push_back(ix.parent());
+            node_indices_to_visit.push_back(ix.parent());
         }
 
         // With that done, we simply have to write the remaining keys into the tree.
