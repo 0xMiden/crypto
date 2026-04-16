@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"enum":["PublicKeyError","UncheckedVerificationError"],"struct":["PublicKey","SecretKey","Signature"]};
+window.SIDEBAR_ITEMS = {"enum":["PublicKeyError","UncheckedVerificationError"],"struct":["KeyExchangeKey","PublicKey","Signature","SigningKey"]};
