@@ -534,6 +534,18 @@ impl SmtStorageReader for RocksDbStorage {
 }
 
 impl SmtStorage for RocksDbStorage {
+    type Reader = RocksDbStorage;
+
+    /// Returns a read-only handle to the same RocksDB database.
+    ///
+    /// Because `RocksDbStorage` wraps an `Arc<DB>`, the returned value shares the underlying
+    /// database with `self`. The returned value is intentionally typed as a reader, so the caller
+    /// cannot perform writes through it, but it is not isolated from subsequent writes made
+    /// through `self`.
+    fn reader(&self) -> Self::Reader {
+        self.clone()
+    }
+
     /// Inserts a key-value pair into the SMT leaf at the specified logical `index`.
     ///
     /// This operation involves:

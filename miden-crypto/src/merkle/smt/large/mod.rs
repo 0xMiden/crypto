@@ -434,24 +434,15 @@ impl<S: SmtStorageReader> LargeSmt<S> {
     }
 }
 
-impl<S: SmtStorageReader> LargeSmt<S> {
-    /// Returns a read-only `LargeSmt` backed by `reader`, reusing this tree's in-memory top.
+impl<S: SmtStorage> LargeSmt<S> {
+    /// Returns a read-only `LargeSmt` backed by a reader view of this tree's storage.
     ///
-    /// The typical use is to obtain a `LargeSmt<R>` where `R: SmtStorageReader` from a writable
-    /// `LargeSmt<S>` where `S: SmtStorage` — for example, to hand out a read-only view for
-    /// concurrent queries while keeping the writable tree for mutations. The `T: SmtStorageReader`
-    /// bound intentionally excludes write capability on the returned tree.
-    ///
-    /// The returned tree shares the same root, leaf count, and entry count as `self`.
-    ///
-    /// # Correctness
-    ///
-    /// `reader` must observe the same tree state as `self.storage` at the moment of this call.
-    /// If it reflects a different version of the tree, reads below the in-memory depth will be
-    /// inconsistent with the shared in-memory nodes and root.
-    pub fn with_reader<R: SmtStorageReader>(&self, reader: R) -> LargeSmt<R> {
+    /// The new tree shares the same root, leaf count, and entry count as `self`, and its storage
+    /// is produced by [`SmtStorage::reader`]. The returned tree's storage type is
+    /// `S::Reader: SmtStorageReader`, so it cannot be used for mutations.
+    pub fn reader(&self) -> LargeSmt<S::Reader> {
         LargeSmt {
-            storage: reader,
+            storage: self.storage.reader(),
             in_memory_nodes: self.in_memory_nodes.clone(),
             leaf_count: self.leaf_count,
             entry_count: self.entry_count,

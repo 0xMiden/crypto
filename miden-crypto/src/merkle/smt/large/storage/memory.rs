@@ -134,6 +134,13 @@ impl SmtStorageReader for MemoryStorage {
 }
 
 impl SmtStorage for MemoryStorage {
+    type Reader = MemoryStorage;
+
+    /// Returns a read-only snapshot of this in-memory storage by cloning it.
+    fn reader(&self) -> Self::Reader {
+        self.clone()
+    }
+
     /// Inserts a key-value pair into the leaf at the given index.
     ///
     /// - If the leaf at `index` does not exist, a new `SmtLeaf::Single` is created.

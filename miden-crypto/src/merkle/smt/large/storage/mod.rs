@@ -140,6 +140,16 @@ pub trait SmtStorageReader: 'static + fmt::Debug + Send + Sync {
 /// All methods are expected to handle potential storage errors by returning a
 /// `Result<_, StorageError>`.
 pub trait SmtStorage: SmtStorageReader {
+    /// The read-only view type returned by [`Self::reader`].
+    type Reader: SmtStorageReader;
+
+    /// Returns a read-only view of this storage that observes its current state.
+    ///
+    /// The returned value is used to construct a read-only `LargeSmt` (via
+    /// [`super::LargeSmt::reader`]) from a writable one. Implementations are responsible for
+    /// ensuring that the returned reader is consistent with `self` at the time of the call.
+    fn reader(&self) -> Self::Reader;
+
     /// Inserts a key-value pair into the SMT leaf at the specified logical `index`.
     ///
     /// - If the leaf at `index` does not exist, it may be created.
@@ -314,6 +324,13 @@ impl<T: SmtStorageReader + ?Sized> SmtStorageReader for Box<T> {
 }
 
 impl<T: SmtStorage + ?Sized> SmtStorage for Box<T> {
+    type Reader = T::Reader;
+
+    #[inline]
+    fn reader(&self) -> Self::Reader {
+        self.deref().reader()
+    }
+
     #[inline]
     fn insert_value(
         &mut self,
