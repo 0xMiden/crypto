@@ -600,6 +600,7 @@ dependencies = [
  "p3-challenger",
  "p3-field",
  "p3-goldilocks",
+ "p3-util",
  "paste",
  "rand 0.10.1",
  "serde",
