@@ -53,7 +53,7 @@ impl SmtStorageReader for MemoryStorage {
 
     /// Gets the total number of key-value entries currently stored.
     fn entry_count(&self) -> Result<usize, StorageError> {
-        Ok(self.leaves.values().map(|leaf| leaf.num_entries()).sum())
+        Ok(self.leaves.values().map(SmtLeaf::num_entries).sum())
     }
 
     /// Retrieves a single leaf node.

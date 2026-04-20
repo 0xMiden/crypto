@@ -240,13 +240,18 @@ impl<const DEPTH: u8> SimpleSmt<DEPTH> {
     /// [`SimpleSmt::apply_mutations()`] can be called in order to commit these changes to the
     /// Merkle tree, or [`drop()`] to discard them.
     ///
+    /// # Errors
+    ///
+    /// - [`MerkleError::DuplicateValuesForIndex`] if the provided `kv_pairs` contain duplicate
+    ///   keys.
+    ///
     /// # Example
     /// ```
     /// # use miden_crypto::{Felt, Word};
     /// # use miden_crypto::merkle::{smt::{LeafIndex, SimpleSmt, SMT_DEPTH}, EmptySubtreeRoots};
     /// let mut smt: SimpleSmt<3> = SimpleSmt::new().unwrap();
     /// let pair = (LeafIndex::default(), Word::default());
-    /// let mutations = smt.compute_mutations(vec![pair]);
+    /// let mutations = smt.compute_mutations(vec![pair]).unwrap();
     /// assert_eq!(mutations.root(), *EmptySubtreeRoots::entry(3, 0));
     /// smt.apply_mutations(mutations).unwrap();
     /// assert_eq!(smt.root(), *EmptySubtreeRoots::entry(3, 0));
