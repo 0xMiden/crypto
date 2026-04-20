@@ -64,9 +64,9 @@ type InnerNodes = Map<NodeIndex, InnerNode>;
 type Leaves<T> = Map<u64, T>;
 type NodeMutations = Map<NodeIndex, NodeMutation>;
 
-/// The read-only portion of a sparse Merkle tree.
+/// The read-only view of a sparse Merkle tree.
 ///
-/// This trait contains all methods that only require read access to the tree, including querying
+/// This trait contains all methods that require only read access to the tree, including querying
 /// values, generating proofs/openings, and computing prospective mutations. Splitting this from
 /// [`SparseMerkleTree`] allows types like `LargeSmt` to implement read-only operations with
 /// weaker generic bounds (e.g., `SmtStorageReader` instead of `SmtStorage`).
