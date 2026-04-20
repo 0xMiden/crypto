@@ -37,6 +37,8 @@ pub use updates::{StorageUpdateParts, StorageUpdates, SubtreeUpdate};
 ///
 /// All methods are expected to handle potential storage errors by returning a
 /// `Result<_, StorageError>`.
+///
+/// Implementations may return either a point-in-time snapshot or a live view.
 pub trait SmtStorageReader: 'static + fmt::Debug + Send + Sync {
     /// Retrieves the total number of leaf nodes currently stored.
     ///
@@ -220,6 +222,8 @@ pub trait SmtStorage: SmtStorageReader {
     /// The returned value is used to construct a read-only `LargeSmt` (via
     /// [`super::LargeSmt::reader`]) from a writable one. Implementations are responsible for
     /// ensuring that the returned reader is consistent with `self` at the time of the call.
+    ///
+    /// Implementations may return either a point-in-time snapshot or a live view.
     fn reader(&self) -> Self::Reader;
 
     /// Inserts a key-value pair into the SMT leaf at the specified logical `index`.
