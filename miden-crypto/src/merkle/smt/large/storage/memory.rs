@@ -112,16 +112,14 @@ impl SmtStorageReader for MemoryStorage {
     ///
     /// The iterator provides access to the current state of the leaves.
     fn iter_leaves(&self) -> Result<Box<dyn Iterator<Item = (u64, SmtLeaf)> + '_>, StorageError> {
-        let leaves_vec = self.leaves.iter().map(|(&k, v)| (k, v.clone())).collect::<Vec<_>>();
-        Ok(Box::new(leaves_vec.into_iter()))
+        Ok(Box::new(self.leaves.iter().map(|(&k, v)| (k, v.clone()))))
     }
 
     /// Returns an iterator over all Subtrees in the storage.
     ///
     /// The iterator provides access to the current subtrees from storage.
     fn iter_subtrees(&self) -> Result<Box<dyn Iterator<Item = Subtree> + '_>, StorageError> {
-        let subtrees_vec = self.subtrees.values().cloned().collect::<Vec<_>>();
-        Ok(Box::new(subtrees_vec.into_iter()))
+        Ok(Box::new(self.subtrees.values().cloned()))
     }
 
     /// Retrieves all depth 24 roots for fast tree rebuilding.
