@@ -17,6 +17,8 @@ jobs:
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # pin@v4
+        with:
+          persist-credentials: false
       - uses: taiki-e/install-action@055f5df8c3f65ea01cd41e9dc855becd88953486 # pin@v2.75.18
         with:
           tool: typos
@@ -27,6 +29,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # pin@v4
+        with:
+          persist-credentials: false
       - name: Rustup
         run: |
           rustup update --no-self-update nightly
@@ -42,6 +46,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # pin@v4
+        with:
+          persist-credentials: false
       - name: Cleanup large tools for build space
         uses: ./.github/actions/cleanup-runner
       # Added: LLVM/Clang for RocksDB/bindgen
@@ -64,6 +70,8 @@ jobs:
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # pin@v4
+        with:
+          persist-credentials: false
       - uses: taiki-e/install-action@055f5df8c3f65ea01cd41e9dc855becd88953486 # pin@v2.75.18
         with:
           tool: taplo-cli
@@ -74,6 +82,8 @@ jobs:
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # pin@v4
+        with:
+          persist-credentials: false
       - uses: taiki-e/install-action@055f5df8c3f65ea01cd41e9dc855becd88953486 # pin@v2.75.18
         with:
           tool: cargo-workspace-lints
@@ -85,6 +95,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # pin@v4
+        with:
+          persist-credentials: false
       - name: Cleanup large tools for build space
         uses: ./.github/actions/cleanup-runner
       # Added: LLVM/Clang for RocksDB/bindgen
@@ -118,6 +130,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # pin@v4
+        with:
+          persist-credentials: false
       - uses: taiki-e/install-action@055f5df8c3f65ea01cd41e9dc855becd88953486 # pin@v2.75.18
         with:
           tool: cargo-deny
@@ -128,6 +142,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # pin@v4
+        with:
+          persist-credentials: false
       - name: Rustup
         run: |
           rustup update --no-self-update nightly
@@ -139,6 +155,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # pin@v4
+        with:
+          persist-credentials: false
       - run: make check-fuzz
 
   check-features:
@@ -146,6 +164,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # pin@v4
+        with:
+          persist-credentials: false
       - name: Cleanup large tools for build space
         uses: ./.github/actions/cleanup-runner
       # Added: LLVM/Clang for RocksDB/bindgen (needed for rocksdb feature)
