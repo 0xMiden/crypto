@@ -269,11 +269,10 @@ type MutatedLeaves = (MutatedSubtreeLeaves, Map<u64, SmtLeaf>, Map<Word, Word>, 
 /// - Depths 0-23: Stored in memory as a flat array for fast access
 /// - Depths 24-64: Stored in external storage organized as subtrees for efficient batch operations
 ///
-/// `LargeSmt` does **not** implement [`Clone`]. Copying an instance would only duplicate the
-/// in-memory nodes while continuing to share the storage backend, which is misleading. If you need
-/// to share an instance between threads or components, wrap it in an
-/// [`Arc`](alloc::sync::Arc) explicitly so the ownership semantics are clear.
-#[derive(Clone, Debug)]
+/// `LargeSmt` implements [`Clone`] only when `S: Clone`. Read-only storage types (e.g. in-memory
+/// snapshots) may implement `Clone`; mutable backends (e.g. database handles) typically do not,
+/// which prevents accidental duplication of a shared mutable store.
+#[derive(Debug)]
 pub struct LargeSmt<S: SmtStorageReader> {
     storage: S,
     /// Flat vector representation of in-memory nodes.
@@ -286,6 +285,17 @@ pub struct LargeSmt<S: SmtStorageReader> {
     /// Cached count of key-value entries across all leaves. Initialized from
     /// storage on load, updated after each mutation.
     entry_count: usize,
+}
+
+impl<S: SmtStorageReader + Clone> Clone for LargeSmt<S> {
+    fn clone(&self) -> Self {
+        Self {
+            storage: self.storage.clone(),
+            in_memory_nodes: self.in_memory_nodes.clone(),
+            leaf_count: self.leaf_count,
+            entry_count: self.entry_count,
+        }
+    }
 }
 
 impl<S: SmtStorageReader> LargeSmt<S> {
