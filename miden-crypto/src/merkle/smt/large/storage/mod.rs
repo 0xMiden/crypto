@@ -223,7 +223,9 @@ pub trait SmtStorage: SmtStorageReader {
     /// [`super::LargeSmt::reader`]) from a writable one. Implementations are responsible for
     /// ensuring that the returned reader is consistent with `self` at the time of the call.
     ///
-    /// Implementations may return either a point-in-time snapshot or a live view.
+    /// Implementations may return either a point-in-time snapshot or a live view. Either way, the
+    /// view must be of consistent / committed state (not partial). Holding the reader must not
+    /// block writes in any way.
     fn reader(&self) -> Self::Reader;
 
     /// Inserts a key-value pair into the SMT leaf at the specified logical `index`.
