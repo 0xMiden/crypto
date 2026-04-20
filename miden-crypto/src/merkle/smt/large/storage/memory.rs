@@ -132,9 +132,13 @@ impl SmtStorageReader for MemoryStorage {
 }
 
 impl SmtStorage for MemoryStorage {
+    // The reader for in-memory storage is not a read-only view; it's a clone of the storage.
     type Reader = MemoryStorage;
 
-    /// Returns a read-only snapshot of this in-memory storage by cloning it.
+    /// Returns a snapshot of this in-memory storage by cloning it.
+    ///
+    /// The reader is provided as a clone because we don't support a read-only type for in-memory
+    /// storage.
     fn reader(&self) -> Self::Reader {
         self.clone()
     }
