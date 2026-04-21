@@ -69,8 +69,8 @@ impl<T: SmtStorageReader> SmtStorageReader for BoxedStorage<T> {
 impl<T: SmtStorage> SmtStorage for BoxedStorage<T> {
     type Reader = Box<dyn SmtStorageReader>;
 
-    fn reader(&self) -> Self::Reader {
-        Box::new(BoxedStorage(self.0.reader()))
+    fn reader(&self) -> Result<Self::Reader, StorageError> {
+        Ok(Box::new(BoxedStorage(self.0.reader()?)))
     }
     fn insert_value(
         &mut self,

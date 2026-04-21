@@ -261,8 +261,8 @@ pub use subtree::{Subtree, SubtreeError};
 
 mod storage;
 pub use storage::{
-    MemoryStorage, SmtStorage, SmtStorageReader, StorageError, StorageUpdateParts, StorageUpdates,
-    SubtreeUpdate,
+    CloneableSmtStorageReader, MemoryStorage, SmtStorage, SmtStorageReader, SmtStorageSnapshot,
+    StorageError, StorageUpdateParts, StorageUpdates, SubtreeUpdate,
 };
 #[cfg(feature = "rocksdb")]
 pub use storage::{RocksDbConfig, RocksDbStorage};
@@ -334,9 +334,8 @@ type MutatedLeaves = (MutatedSubtreeLeaves, Map<u64, SmtLeaf>, Map<Word, Word>, 
 /// - Depths 0-23: Stored in memory as a flat array for fast access
 /// - Depths 24-64: Stored in external storage organized as subtrees for efficient batch operations
 ///
-/// `LargeSmt` implements [`Clone`] only when `S: Clone`. Read-only storage types (e.g. in-memory
-/// snapshots) may implement `Clone`; mutable backends (e.g. database handles) typically do not,
-/// which prevents accidental duplication of a shared mutable store.
+/// `LargeSmt` implements [`Clone`] only when `S` is a cloneable reader storage type. This prevents
+/// accidental duplication of writable storage backends while keeping read-only snapshots cloneable.
 #[derive(Debug)]
 pub struct LargeSmt<S: SmtStorageReader> {
     storage: S,
@@ -352,7 +351,7 @@ pub struct LargeSmt<S: SmtStorageReader> {
     entry_count: usize,
 }
 
-impl<S: SmtStorageReader + Clone> Clone for LargeSmt<S> {
+impl<S: CloneableSmtStorageReader> Clone for LargeSmt<S> {
     fn clone(&self) -> Self {
         Self {
             storage: self.storage.clone(),
@@ -515,13 +514,13 @@ impl<S: SmtStorage> LargeSmt<S> {
     /// The new tree shares the same root, leaf count, and entry count as `self`, and its storage
     /// is produced by [`SmtStorage::reader`]. The returned tree's storage type is
     /// `S::Reader: SmtStorageReader`, so it cannot be used for mutations.
-    pub fn reader(&self) -> LargeSmt<S::Reader> {
-        LargeSmt {
-            storage: self.storage.reader(),
+    pub fn reader(&self) -> Result<LargeSmt<S::Reader>, LargeSmtError> {
+        Ok(LargeSmt {
+            storage: self.storage.reader()?,
             in_memory_nodes: self.in_memory_nodes.clone(),
             leaf_count: self.leaf_count,
             entry_count: self.entry_count,
-        }
+        })
     }
 }
 
