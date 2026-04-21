@@ -7,7 +7,8 @@ use rocksdb::{
 };
 
 use super::{
-    SmtStorage, SmtStorageReader, StorageError, StorageUpdateParts, StorageUpdates, SubtreeUpdate,
+    MemoryStorage, SmtStorage, SmtStorageReader, SmtStorageSnapshot, StorageError,
+    StorageUpdateParts, StorageUpdates, SubtreeUpdate,
 };
 use crate::{
     EMPTY_WORD, Word,
@@ -534,16 +535,41 @@ impl SmtStorageReader for RocksDbStorage {
 }
 
 impl SmtStorage for RocksDbStorage {
-    type Reader = RocksDbStorage;
+    type Reader = SmtStorageSnapshot;
 
-    /// Returns a read-only handle to the same RocksDB database.
-    ///
-    /// Because `RocksDbStorage` wraps an `Arc<DB>`, the returned value shares the underlying
-    /// database with `self`. The returned value is intentionally typed as a reader, so the caller
-    /// cannot perform writes through it, but it is not isolated from subsequent writes made
-    /// through `self`.
-    fn reader(&self) -> Self::Reader {
-        self.clone()
+    /// Returns a detached read-only snapshot of the current RocksDB-backed storage.
+    fn reader(&self) -> Result<Self::Reader, StorageError> {
+        let snapshot = self.db.snapshot();
+
+        let leaves_cf = self.cf_handle(LEAVES_CF)?;
+        let mut read_opts = ReadOptions::default();
+        read_opts.set_total_order_seek(true);
+        let mut leaves = Map::new();
+        for item in snapshot.iterator_cf_opt(leaves_cf, read_opts, IteratorMode::Start) {
+            let (key_bytes, value_bytes) = item?;
+            let leaf_idx = index_from_key_bytes(&key_bytes)?;
+            let leaf = SmtLeaf::read_from_bytes_with_budget(&value_bytes, value_bytes.len())?;
+            leaves.insert(leaf_idx, leaf);
+        }
+
+        const SUBTREE_CFS: [&str; 5] =
+            [SUBTREE_24_CF, SUBTREE_32_CF, SUBTREE_40_CF, SUBTREE_48_CF, SUBTREE_56_CF];
+        let mut subtrees = Map::new();
+        for (cf_index, cf_name) in SUBTREE_CFS.into_iter().enumerate() {
+            let cf = self.cf_handle(cf_name)?;
+            let depth = IN_MEMORY_DEPTH + (cf_index as u8 * 8);
+            let mut read_opts = ReadOptions::default();
+            read_opts.set_total_order_seek(true);
+
+            for item in snapshot.iterator_cf_opt(cf, read_opts, IteratorMode::Start) {
+                let (key_bytes, value_bytes) = item?;
+                let node_idx = subtree_root_from_key_bytes(&key_bytes, depth)?;
+                let subtree = Subtree::from_vec(node_idx, &value_bytes)?;
+                subtrees.insert(subtree.root_index(), subtree);
+            }
+        }
+
+        Ok(MemoryStorage { leaves, subtrees }.into_snapshot())
     }
 
     /// Inserts a key-value pair into the SMT leaf at the specified logical `index`.

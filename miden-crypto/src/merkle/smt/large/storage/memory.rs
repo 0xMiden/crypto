@@ -1,7 +1,8 @@
 use alloc::{boxed::Box, vec::Vec};
 
 use super::{
-    SmtStorage, SmtStorageReader, StorageError, StorageUpdateParts, StorageUpdates, SubtreeUpdate,
+    CloneableSmtStorageReader, SmtStorage, SmtStorageReader, StorageError, StorageUpdateParts,
+    StorageUpdates, SubtreeUpdate,
 };
 use crate::{
     EMPTY_WORD, Map, MapEntry, Word,
@@ -30,12 +31,25 @@ pub struct MemoryStorage {
     pub subtrees: Map<NodeIndex, Subtree>,
 }
 
+/// Read-only snapshot of SMT storage data.
+///
+/// This type intentionally implements [`SmtStorageReader`] only. It is used as the reader view for
+/// storage backends that need to hand out a detached point-in-time copy without also exposing
+/// mutation methods through [`SmtStorage`].
+#[derive(Debug, Clone)]
+pub struct SmtStorageSnapshot(MemoryStorage);
+
 impl MemoryStorage {
     /// Creates a new, empty in-memory storage for a Sparse Merkle Tree.
     ///
     /// Initializes empty maps for leaves and subtrees.
     pub fn new() -> Self {
         Self { leaves: Map::new(), subtrees: Map::new() }
+    }
+
+    /// Converts this storage into a read-only snapshot.
+    pub fn into_snapshot(self) -> SmtStorageSnapshot {
+        SmtStorageSnapshot(self)
     }
 }
 
@@ -44,6 +58,62 @@ impl Default for MemoryStorage {
         Self::new()
     }
 }
+
+impl SmtStorageReader for SmtStorageSnapshot {
+    fn leaf_count(&self) -> Result<usize, StorageError> {
+        self.0.leaf_count()
+    }
+
+    fn entry_count(&self) -> Result<usize, StorageError> {
+        self.0.entry_count()
+    }
+
+    fn get_leaf(&self, index: u64) -> Result<Option<SmtLeaf>, StorageError> {
+        self.0.get_leaf(index)
+    }
+
+    fn get_leaves(&self, indices: &[u64]) -> Result<Vec<Option<SmtLeaf>>, StorageError> {
+        self.0.get_leaves(indices)
+    }
+
+    fn has_leaves(&self) -> Result<bool, StorageError> {
+        self.0.has_leaves()
+    }
+
+    fn get_subtree(&self, index: NodeIndex) -> Result<Option<Subtree>, StorageError> {
+        self.0.get_subtree(index)
+    }
+
+    fn get_subtrees(&self, indices: &[NodeIndex]) -> Result<Vec<Option<Subtree>>, StorageError> {
+        self.0.get_subtrees(indices)
+    }
+
+    fn get_leaf_and_subtrees(
+        &self,
+        leaf_index: u64,
+        subtree_indices: &[NodeIndex],
+    ) -> Result<(Option<SmtLeaf>, Vec<Option<Subtree>>), StorageError> {
+        self.0.get_leaf_and_subtrees(leaf_index, subtree_indices)
+    }
+
+    fn get_inner_node(&self, index: NodeIndex) -> Result<Option<InnerNode>, StorageError> {
+        self.0.get_inner_node(index)
+    }
+
+    fn iter_leaves(&self) -> Result<Box<dyn Iterator<Item = (u64, SmtLeaf)> + '_>, StorageError> {
+        self.0.iter_leaves()
+    }
+
+    fn iter_subtrees(&self) -> Result<Box<dyn Iterator<Item = Subtree> + '_>, StorageError> {
+        self.0.iter_subtrees()
+    }
+
+    fn get_depth24(&self) -> Result<Vec<(u64, Word)>, StorageError> {
+        self.0.get_depth24()
+    }
+}
+
+impl CloneableSmtStorageReader for SmtStorageSnapshot {}
 
 impl SmtStorageReader for MemoryStorage {
     /// Gets the total number of non-empty leaves currently stored.
@@ -131,16 +201,14 @@ impl SmtStorageReader for MemoryStorage {
     }
 }
 
-impl SmtStorage for MemoryStorage {
-    // The reader for in-memory storage is not a read-only view; it's a clone of the storage.
-    type Reader = MemoryStorage;
+impl CloneableSmtStorageReader for MemoryStorage {}
 
-    /// Returns a snapshot of this in-memory storage by cloning it.
-    ///
-    /// The reader is provided as a clone because we don't support a read-only type for in-memory
-    /// storage.
-    fn reader(&self) -> Self::Reader {
-        self.clone()
+impl SmtStorage for MemoryStorage {
+    type Reader = SmtStorageSnapshot;
+
+    /// Returns a read-only snapshot of this in-memory storage by cloning it.
+    fn reader(&self) -> Result<Self::Reader, StorageError> {
+        Ok(self.clone().into_snapshot())
     }
 
     /// Inserts a key-value pair into the leaf at the given index.

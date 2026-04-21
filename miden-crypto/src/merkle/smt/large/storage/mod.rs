@@ -21,7 +21,7 @@ mod rocksdb;
 pub use rocksdb::{RocksDbConfig, RocksDbStorage};
 
 mod memory;
-pub use memory::MemoryStorage;
+pub use memory::{MemoryStorage, SmtStorageSnapshot};
 
 mod updates;
 pub use updates::{StorageUpdateParts, StorageUpdates, SubtreeUpdate};
@@ -137,6 +137,9 @@ pub trait SmtStorageReader: 'static + fmt::Debug + Send + Sync {
     fn get_depth24(&self) -> Result<Vec<(u64, Word)>, StorageError>;
 }
 
+/// Marker trait for reader storage types that can be cloned without duplicating mutable storage.
+pub trait CloneableSmtStorageReader: SmtStorageReader + Clone {}
+
 impl<T: SmtStorageReader + ?Sized> SmtStorageReader for Box<T> {
     #[inline]
     fn leaf_count(&self) -> Result<usize, StorageError> {
@@ -226,7 +229,7 @@ pub trait SmtStorage: SmtStorageReader {
     /// Implementations may return either a point-in-time snapshot or a live view. Either way, the
     /// view must be of consistent / committed state (not partial). Holding the reader must not
     /// block writes in any way.
-    fn reader(&self) -> Self::Reader;
+    fn reader(&self) -> Result<Self::Reader, StorageError>;
 
     /// Inserts a key-value pair into the SMT leaf at the specified logical `index`.
     ///
@@ -339,7 +342,7 @@ impl<T: SmtStorage + ?Sized> SmtStorage for Box<T> {
     type Reader = T::Reader;
 
     #[inline]
-    fn reader(&self) -> Self::Reader {
+    fn reader(&self) -> Result<Self::Reader, StorageError> {
         self.deref().reader()
     }
 
