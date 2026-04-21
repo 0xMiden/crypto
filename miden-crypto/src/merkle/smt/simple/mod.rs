@@ -259,12 +259,8 @@ impl<const DEPTH: u8> SimpleSmt<DEPTH> {
     pub fn compute_mutations(
         &self,
         kv_pairs: impl IntoIterator<Item = (LeafIndex<DEPTH>, Word)>,
-    ) -> MutationSet<DEPTH, LeafIndex<DEPTH>, Word> {
-        // SAFETY: a SimpleSmt does not contain multi-value leaves. The underlying
-        // SimpleSmt::construct_prospective_leaf does not return any errors so it's safe to unwrap
-        // here.
+    ) -> Result<MutationSet<DEPTH, LeafIndex<DEPTH>, Word>, MerkleError> {
         <Self as SparseMerkleTreeReader<DEPTH>>::compute_mutations(self, kv_pairs)
-            .expect("computing mutations on a simple smt never returns an error")
     }
 
     /// Applies the prospective mutations computed with [`SimpleSmt::compute_mutations()`] to this
