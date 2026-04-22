@@ -55,7 +55,8 @@ impl<F: TwoAdicField> PeriodicLde<F> {
         let log_max_period = log2_strict_u8(max_period);
         assert!(
             coset.log_trace_height >= log_max_period,
-            "periodic column period ({max_period}) exceeds trace height ({})",
+            "periodic column period ({}) exceeds trace height ({})",
+            max_period,
             1 << coset.log_trace_height as usize,
         );
         let log_blowup = coset.log_blowup();
