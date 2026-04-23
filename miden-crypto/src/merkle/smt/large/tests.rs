@@ -2,7 +2,7 @@ use alloc::{collections::BTreeSet, vec::Vec};
 
 use rand::{Rng, prelude::IteratorRandom, rng};
 
-use super::MemoryStorage;
+use super::{IN_MEMORY_DEPTH, MemoryStorage, SmtStorage, SmtStorageReader};
 use crate::{
     EMPTY_WORD, Felt, ONE, Word,
     merkle::{
@@ -698,7 +698,7 @@ fn test_flat_layout_children_relationship() {
 
     for &leaf_value in &leaf_indices {
         // Trace path from depth 1 down to in-memory depth
-        for depth in 1..super::IN_MEMORY_DEPTH {
+        for depth in 1..IN_MEMORY_DEPTH {
             let node_value = leaf_value >> (SMT_DEPTH - depth);
             let node_idx = NodeIndex::new(depth, node_value).unwrap();
             let memory_idx = super::to_memory_index(&node_idx);
@@ -729,4 +729,41 @@ fn test_flat_layout_children_relationship() {
             );
         }
     }
+}
+
+/// Verifies that a snapshot produced by `MemoryStorage::reader()` returns correct depth-24 roots
+/// from `get_depth24()`, and that loading a `LargeSmt` from that snapshot reconstructs the same
+/// root as the original tree.
+#[test]
+fn test_memory_storage_snapshot_depth24() {
+    use crate::merkle::NodeIndex;
+
+    let entries = generate_entries(50);
+    let storage = MemoryStorage::new();
+    let smt = LargeSmt::<MemoryStorage>::with_entries(storage, entries).unwrap();
+    let expected_root = smt.root();
+
+    let snapshot = smt.storage.reader().unwrap();
+
+    // The depth-24 entries must be non-empty for a non-empty tree.
+    let depth24 = snapshot.get_depth24().unwrap();
+    assert!(!depth24.is_empty(), "snapshot must expose depth-24 roots for a non-empty tree");
+
+    // Every returned entry must sit exactly at IN_MEMORY_DEPTH.
+    for (position, _hash) in &depth24 {
+        let index = NodeIndex::new(IN_MEMORY_DEPTH, *position).unwrap();
+        assert_eq!(
+            index.depth(),
+            IN_MEMORY_DEPTH,
+            "depth-24 entry at position {position} has wrong depth"
+        );
+    }
+
+    // Loading a LargeSmt from the snapshot must reproduce the same root.
+    let reloaded = LargeSmt::<_>::load(snapshot).unwrap();
+    assert_eq!(
+        reloaded.root(),
+        expected_root,
+        "root reconstructed from snapshot must match the original"
+    );
 }

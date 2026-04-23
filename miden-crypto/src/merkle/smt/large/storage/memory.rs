@@ -194,10 +194,21 @@ impl SmtStorageReader for MemoryStorage {
 
     /// Retrieves all depth 24 roots for fast tree rebuilding.
     ///
-    /// For MemoryStorage, this returns an empty vector since all data is already in memory
-    /// and there's no startup performance benefit to caching depth 24 roots.
+    /// Derived from the subtrees already in memory: for each subtree whose root sits at
+    /// `IN_MEMORY_DEPTH`, the root node's hash is the depth-24 entry that `initialize_from_storage`
+    /// needs to reconstruct the in-memory top of the tree.
     fn get_depth24(&self) -> Result<Vec<(u64, Word)>, StorageError> {
-        Ok(Vec::new())
+        let depth24 = self
+            .subtrees
+            .values()
+            .filter(|subtree| subtree.root_index().depth() == IN_MEMORY_DEPTH)
+            .filter_map(|subtree| {
+                subtree
+                    .get_inner_node(subtree.root_index())
+                    .map(|node| (subtree.root_index().position(), node.hash()))
+            })
+            .collect();
+        Ok(depth24)
     }
 }
 
