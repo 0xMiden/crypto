@@ -1,10 +1,8 @@
-//! Quotient polynomial helpers: accumulation, vanishing division, decomposition.
+//! Quotient polynomial helpers used by the prover's per-AIR pipeline.
 //!
-//! The prover orchestrates the quotient pipeline (loop over instances, accumulate,
-//! divide, commit). This module provides the building blocks:
-//!
+//! - [`divide_by_vanishing_in_place`]: Divide by Z_H on a quotient evaluation domain
+//! - [`upsample_evals`]: Low-degree extend coset evaluations onto a larger two-adic coset
 //! - [`cyclic_extend_and_scale`]: Horner-style beta scaling + cyclic extension
-//! - [`divide_by_vanishing_in_place`]: Divide by Z_H on the quotient evaluation domain
 //! - [`commit_quotient`]: Decompose Q(gJ) into chunks and commit on gK
 
 use alloc::{format, vec, vec::Vec};
@@ -13,7 +11,7 @@ use p3_dft::TwoAdicSubgroupDft;
 use p3_field::{
     BasedVectorSpace, ExtensionField, Field, TwoAdicField, batch_multiplicative_inverse,
 };
-use p3_matrix::dense::RowMajorMatrix;
+use p3_matrix::{Matrix, dense::RowMajorMatrix};
 use p3_maybe_rayon::prelude::*;
 use p3_util::log2_strict_usize;
 use tracing::info_span;
@@ -26,8 +24,36 @@ use crate::{
 };
 
 // ============================================================================
-// Accumulation
+// Domain lifting and accumulation
 // ============================================================================
+
+/// Low-degree extend coset evaluations onto a larger two-adic coset.
+///
+/// Treats `evals` as evaluations of a polynomial `p` on a coset `g*H` of size
+/// `evals.len()`, and returns evaluations of the same `p` on the coset `g*K`
+/// of size `evals.len() << added_bits` (same shift `g`, one higher two-adic
+/// subgroup).
+///
+/// # Precondition
+///
+/// `deg(p) < evals.len()`. If the input evaluations are of a polynomial whose
+/// actual degree is `>= evals.len()`, this function silently returns evaluations
+/// of a different polynomial (the unique degree-`< evals.len()` interpolant of
+/// the input). The caller is responsible for ensuring the degree bound.
+pub fn upsample_evals<F, EF, DFT>(dft: &DFT, evals: Vec<EF>, added_bits: usize) -> Vec<EF>
+where
+    F: TwoAdicField,
+    EF: ExtensionField<F>,
+    DFT: TwoAdicSubgroupDft<F>,
+{
+    if added_bits == 0 {
+        return evals;
+    }
+
+    dft.lde_algebra_batch(RowMajorMatrix::new_col(evals), added_bits)
+        .to_row_major_matrix()
+        .values
+}
 
 /// Cyclically extend the accumulator to `target_len` and scale every element by `β`.
 ///
@@ -39,15 +65,15 @@ use crate::{
 /// `target_len ≥ accumulator.len()`.
 ///
 /// Cyclic extension is valid because H_small is a subgroup of H_big, so
-/// evaluations repeat cyclically. The β scaling implements Horner folding for
-/// multi-trace accumulation: `acc = acc·β + Nⱼ`.
+/// evaluations repeat cyclically. The β scaling implements Horner folding
+/// across the instance loop: `acc = acc·β + contribution_j`.
 pub fn cyclic_extend_and_scale<EF: Field>(accumulator: &mut Vec<EF>, target_len: usize, beta: EF) {
     if accumulator.is_empty() {
         accumulator.resize(target_len, EF::ZERO);
     } else {
-        // Horner: scale the smaller buffer by beta before upsampling
+        // Horner: scale the existing buffer by beta before extending it.
         accumulator.par_iter_mut().for_each(|v| *v *= beta);
-        // Cyclic extension by repeated doubling (all sizes are powers of 2)
+        // Cyclic extension by repeated doubling (all sizes are powers of 2).
         while accumulator.len() < target_len {
             accumulator.extend_from_within(..);
         }
@@ -235,4 +261,60 @@ where
     let tree = config.lmcs().build_aligned_tree(vec![quotient_matrix]);
 
     Committed::new(tree, log_blowup)
+}
+
+#[cfg(test)]
+mod tests {
+    use alloc::vec::Vec;
+
+    use p3_dft::{NaiveDft, TwoAdicSubgroupDft};
+    use p3_field::{Field, PrimeCharacteristicRing};
+    use p3_matrix::dense::RowMajorMatrix;
+
+    use super::upsample_evals;
+    use crate::testing::configs::goldilocks_poseidon2::{Felt, QuadFelt};
+
+    fn coeffs(height: usize) -> Vec<QuadFelt> {
+        (0..height).map(|i| QuadFelt::from_u64((i as u64) + 1)).collect()
+    }
+
+    /// Checks that `upsample_evals` on `dft` produces the same result as a direct
+    /// coset DFT of zero-padded coefficients.
+    fn assert_upsample_matches_direct<D: TwoAdicSubgroupDft<Felt>>(dft: &D, shift: Felt) {
+        let small_height = 8;
+        let added_bits = 2;
+        let large_height = small_height << added_bits;
+
+        let small_coeffs = RowMajorMatrix::new(coeffs(small_height), 1);
+        let small_evals = NaiveDft.coset_dft_algebra_batch(small_coeffs, shift).values;
+
+        let mut large_coeffs = coeffs(small_height);
+        large_coeffs.resize(large_height, QuadFelt::ZERO);
+        let direct_large = NaiveDft
+            .coset_dft_algebra_batch(RowMajorMatrix::new(large_coeffs, 1), shift)
+            .values;
+
+        let upsampled = upsample_evals::<Felt, QuadFelt, _>(dft, small_evals, added_bits);
+        assert_eq!(upsampled, direct_large);
+    }
+
+    #[test]
+    fn upsample_evals_matches_direct_coset_dft() {
+        assert_upsample_matches_direct(&NaiveDft, Felt::GENERATOR.exp_power_of_2(2));
+    }
+
+    /// Same check with the production DFT backend.
+    #[test]
+    fn upsample_evals_with_radix2_dit_parallel_matches_naive() {
+        use p3_dft::Radix2DitParallel;
+        let dft = Radix2DitParallel::<Felt>::default();
+        assert_upsample_matches_direct(&dft, Felt::GENERATOR.exp_power_of_2(2));
+    }
+
+    #[test]
+    fn upsample_evals_with_zero_added_bits_returns_input_unchanged() {
+        let evals = coeffs(8);
+        let out = upsample_evals::<Felt, QuadFelt, _>(&NaiveDft, evals.clone(), 0);
+        assert_eq!(out, evals);
+    }
 }
