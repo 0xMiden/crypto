@@ -50,7 +50,7 @@ fn generate_updates(entries: Vec<(Word, Word)>, updates: usize) -> Vec<(Word, Wo
     sorted_entries
 }
 
-fn create_equivalent_smts_for_testing<S: super::SmtStorage>(
+fn create_equivalent_smts_for_testing<S: SmtStorage>(
     storage: S,
     entries: Vec<(Word, Word)>,
 ) -> (Smt, LargeSmt<S>) {
