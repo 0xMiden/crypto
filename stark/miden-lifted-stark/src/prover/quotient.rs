@@ -1,8 +1,8 @@
 //! Quotient polynomial helpers used by the prover's per-AIR pipeline.
 //!
-//! - [`divide_by_vanishing_in_place`]: Divide by Z_H on a quotient evaluation domain
 //! - [`upsample_evals`]: Low-degree extend coset evaluations onto a larger two-adic coset
 //! - [`cyclic_extend_and_scale`]: Horner-style beta scaling + cyclic extension
+//! - [`compute_z_h_inverses`]: Precompute the distinct `1 / Z_H` values on a quotient coset
 //! - [`commit_quotient`]: Decompose Q(gJ) into chunks and commit on gK
 
 use alloc::{format, vec, vec::Vec};
@@ -31,7 +31,7 @@ use crate::{
 ///
 /// Treats `evals` as evaluations of a polynomial `p` on a coset `g*H` of size
 /// `evals.len()`, and returns evaluations of the same `p` on the coset `g*K`
-/// of size `evals.len() << added_bits` (same shift `g`, one higher two-adic
+/// of size `evals.len() << added_bits` (same shift `g`, larger two-adic
 /// subgroup).
 ///
 /// # Precondition
@@ -81,33 +81,22 @@ pub fn cyclic_extend_and_scale<EF: Field>(accumulator: &mut Vec<EF>, target_len:
 }
 
 // ============================================================================
-// Vanishing division
+// Vanishing-polynomial inverses
 // ============================================================================
 
-/// Divide quotient numerator by vanishing polynomial in-place (natural order).
+/// Compute the `D = 2^log_constraint_degree` distinct values of `1 / Z_H` on the
+/// quotient evaluation coset `gJ`.
 ///
-/// Replaces each `numerator[i]` with `numerator[i] / Z_H(xᵢ)` where
-/// `Z_H(X) = Xᴺ − 1` and `N` is the trace height.
-///
-/// This uses a periodicity trick: on the quotient evaluation coset `gJ` of size `N·D`,
-/// the values `Z_H(x)` take only `D` distinct values, so we can batch-invert those `D`
-/// values once and reuse them by modular indexing.
-///
-/// Note that here `coset.log_blowup()` is `log2(D)` because `coset` is the *quotient*
-/// domain (blowup = constraint degree), not the PCS/FRI blowup `B`.
-pub fn divide_by_vanishing_in_place<F, EF>(numerator: &mut [EF], coset: &LiftedCoset)
-where
-    F: TwoAdicField,
-    EF: ExtensionField<F>,
-{
-    // D = constraint degree. On the quotient coset, log_blowup() = log₂(D).
+/// On `gJ` of size `N*D`, `Z_H(X) = X^N - 1` takes only `D` distinct values
+/// indexed by `i mod D`, so `D` inverses suffice. The caller applies
+/// `inv_z_h[i & (D - 1)]` to the `i`-th output point.
+pub fn compute_z_h_inverses<F: TwoAdicField>(coset: &LiftedCoset) -> Vec<F> {
+    // For a quotient coset, `log_blowup` is exactly the `log_constraint_degree`.
     let log_blowup = coset.log_blowup();
     let num_distinct = 1 << log_blowup;
 
-    // The D distinct values of Z_H on gJ:
-    // Z_H(g·ω_Jⁱ) = sᴺ·ω_Dⁱ − 1 where
-    // - s is the coset shift
-    // - ω_D is a D-th root of unity.
+    // Z_H(g*w_J^i) = s^N * w_D^i - 1 where s is the coset shift and w_D is a
+    // D-th root of unity.
     let shift: F = coset.lde_shift();
     let s_pow_n = shift.exp_power_of_2(coset.log_trace_height as usize);
     let z_h_evals: Vec<F> = F::two_adic_generator(log_blowup)
@@ -116,14 +105,7 @@ where
         .map(|x| s_pow_n * x - F::ONE)
         .collect();
 
-    let inv_van = batch_multiplicative_inverse(&z_h_evals);
-
-    // Parallel division using modular indexing for periodicity.
-    // Z_H has only num_distinct unique values on gJ; power-of-2 size
-    // lets us use bitmask: i & (num_distinct - 1) == i % num_distinct.
-    numerator.par_iter_mut().enumerate().for_each(|(i, n)| {
-        *n *= inv_van[i & (num_distinct - 1)];
-    });
+    batch_multiplicative_inverse(&z_h_evals)
 }
 
 // ============================================================================
@@ -268,11 +250,14 @@ mod tests {
     use alloc::vec::Vec;
 
     use p3_dft::{NaiveDft, TwoAdicSubgroupDft};
-    use p3_field::{Field, PrimeCharacteristicRing};
+    use p3_field::{Field, PrimeCharacteristicRing, TwoAdicField};
     use p3_matrix::dense::RowMajorMatrix;
 
-    use super::upsample_evals;
-    use crate::testing::configs::goldilocks_poseidon2::{Felt, QuadFelt};
+    use super::{compute_z_h_inverses, upsample_evals};
+    use crate::{
+        coset::LiftedCoset,
+        testing::configs::goldilocks_poseidon2::{Felt, QuadFelt},
+    };
 
     fn coeffs(height: usize) -> Vec<QuadFelt> {
         (0..height).map(|i| QuadFelt::from_u64((i as u64) + 1)).collect()
@@ -316,5 +301,30 @@ mod tests {
         let evals = coeffs(8);
         let out = upsample_evals::<Felt, QuadFelt, _>(&NaiveDft, evals.clone(), 0);
         assert_eq!(out, evals);
+    }
+
+    /// Verify that `compute_z_h_inverses` returns the true pointwise inverses of
+    /// `Z_H(x) = x^N - 1` at the `D` distinct values it takes on the quotient coset.
+    #[test]
+    fn compute_z_h_inverses_product_is_one() {
+        let log_trace_height = 5u8;
+        let log_blowup = 3u8;
+        let log_max_trace_height = 5u8;
+        let log_constraint_degree = 2u8; // D = 4
+
+        let lde = LiftedCoset::new(log_trace_height, log_blowup, log_max_trace_height);
+        let coset = lde.quotient_domain(log_constraint_degree);
+        let inv_z_h = compute_z_h_inverses::<Felt>(&coset);
+
+        assert_eq!(inv_z_h.len(), 1 << log_constraint_degree);
+
+        let n = 1u64 << log_trace_height;
+        let g: Felt = coset.lde_shift();
+        let w_j = Felt::two_adic_generator((log_trace_height + log_constraint_degree) as usize);
+        for (i, &inv) in inv_z_h.iter().enumerate() {
+            let x = g * w_j.exp_u64(i as u64);
+            let z_h_x = x.exp_u64(n) - Felt::ONE;
+            assert_eq!(z_h_x * inv, Felt::ONE, "point {i}");
+        }
     }
 }

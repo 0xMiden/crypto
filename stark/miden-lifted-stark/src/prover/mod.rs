@@ -309,10 +309,10 @@ where
     // 4. Evaluate constraints and accumulate quotient evaluations with beta folding.
     //
     // For each AIR:
-    //   1. Evaluate the folded constraint numerator on the native quotient domain
-    //   2. Divide by the native vanishing polynomial
-    //   3. If `D_j < D_max`, low-degree-extend to the per-trace target domain
-    //   4. Cyclically extend the global accumulator and add in
+    //   1. Evaluate folded constraints divided by `Z_{H_j}` on the native quotient domain (divide
+    //      fused into the evaluation's write step)
+    //   2. If `D_j < D_max`, low-degree-extend to the per-trace target domain
+    //   3. Cyclically extend the global accumulator and add in
     //
     // Pre-allocate with LDE capacity so commit_quotient's resize doesn't reallocate.
     let constraint_degree = 1 << log_constraint_degree as usize;
@@ -351,6 +351,7 @@ where
 
             let mut quotient_evals = vec![EF::ZERO; this_native_quotient_coset.lde_height()];
             let aux_values_i = &all_aux_values[i];
+            let inv_z_h = quotient::compute_z_h_inverses::<F>(&this_native_quotient_coset);
 
             tracing::debug_span!(
                 "eval_instance",
@@ -373,18 +374,7 @@ where
                     &periodic_lde,
                     &layouts[i],
                     aux_values_i,
-                );
-            });
-
-            tracing::debug_span!(
-                "divide_native_by_vanishing",
-                instance = i,
-                height = this_native_quotient_coset.lde_height(),
-            )
-            .in_scope(|| {
-                quotient::divide_by_vanishing_in_place::<F, EF>(
-                    &mut quotient_evals,
-                    &this_native_quotient_coset,
+                    &inv_z_h,
                 );
             });
 
