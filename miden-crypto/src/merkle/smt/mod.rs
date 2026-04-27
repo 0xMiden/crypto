@@ -44,11 +44,11 @@ mod simple;
 pub use simple::{SimpleSmt, SimpleSmtProof};
 
 mod partial;
-pub use partial::PartialSmt;
+pub use partial::{NodeValue, PartialSmt, UniqueNodes};
 
 mod forest;
 pub use forest::SmtForest;
-
+use miden_field::Felt;
 // CONSTANTS
 // ================================================================================================
 
@@ -57,6 +57,9 @@ pub const SMT_MIN_DEPTH: u8 = 1;
 
 /// Maximum supported depth.
 pub const SMT_MAX_DEPTH: u8 = 64;
+
+/// The felt used as a domain separator when hashing leaves in merkle trees.
+pub const LEAF_DOMAIN: Felt = Felt::new_unchecked(0x13af);
 
 // SPARSE MERKLE TREE
 // ================================================================================================
