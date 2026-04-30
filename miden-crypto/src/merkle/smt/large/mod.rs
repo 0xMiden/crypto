@@ -265,7 +265,7 @@ pub use storage::{
     StorageError, StorageUpdateParts, StorageUpdates, SubtreeUpdate,
 };
 #[cfg(feature = "rocksdb")]
-pub use storage::{RocksDbConfig, RocksDbStorage};
+pub use storage::{RocksDbConfig, RocksDbSnapshotStorage, RocksDbStorage};
 
 mod iter;
 pub use iter::LargeSmtInnerNodeIterator;
@@ -512,8 +512,8 @@ impl<S: SmtStorage> LargeSmt<S> {
     /// Returns a read-only `LargeSmt` backed by a reader view of this tree's storage.
     ///
     /// The new tree shares the same root, leaf count, and entry count as `self`, and its storage
-    /// is produced by [`SmtStorage::reader`]. The returned tree's storage type is
-    /// `S::Reader: SmtStorageReader`, so it cannot be used for mutations.
+    /// is a point-in-time snapshot produced by [`SmtStorage::reader`]. The returned tree's storage
+    /// type is `S::Reader: SmtStorageReader`, so it cannot be used for mutations.
     pub fn reader(&self) -> Result<LargeSmt<S::Reader>, LargeSmtError> {
         Ok(LargeSmt {
             storage: self.storage.reader()?,

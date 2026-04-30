@@ -27,7 +27,7 @@ pub use large::{
     Subtree, SubtreeError, SubtreeUpdate,
 };
 #[cfg(feature = "rocksdb")]
-pub use large::{RocksDbConfig, RocksDbStorage};
+pub use large::{RocksDbConfig, RocksDbSnapshotStorage, RocksDbStorage};
 
 mod large_forest;
 pub use large_forest::{

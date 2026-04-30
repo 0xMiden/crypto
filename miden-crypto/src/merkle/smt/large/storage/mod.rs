@@ -18,7 +18,7 @@ pub use error::StorageError;
 #[cfg(feature = "rocksdb")]
 mod rocksdb;
 #[cfg(feature = "rocksdb")]
-pub use rocksdb::{RocksDbConfig, RocksDbStorage};
+pub use rocksdb::{RocksDbConfig, RocksDbSnapshotStorage, RocksDbStorage};
 
 mod memory;
 pub use memory::{MemoryStorage, SmtStorageSnapshot};
@@ -38,7 +38,9 @@ pub use updates::{StorageUpdateParts, StorageUpdates, SubtreeUpdate};
 /// All methods are expected to handle potential storage errors by returning a
 /// `Result<_, StorageError>`.
 ///
-/// Implementations may return either a point-in-time snapshot or a live view.
+/// Implementations used as [`SmtStorage::Reader`] must be point-in-time snapshots. This is required
+/// because `LargeSmt::reader()` copies the in-memory portion of the tree and pairs it with the
+/// returned storage reader.
 pub trait SmtStorageReader: 'static + fmt::Debug + Send + Sync {
     /// Retrieves the total number of leaf nodes currently stored.
     ///
@@ -220,15 +222,14 @@ pub trait SmtStorage: SmtStorageReader {
     /// The read-only view type returned by [`Self::reader`].
     type Reader: SmtStorageReader;
 
-    /// Returns a read-only view of this storage that observes its current state.
+    /// Returns a read-only snapshot of this storage at its current committed state.
     ///
     /// The returned value is used to construct a read-only `LargeSmt` (via
     /// [`super::LargeSmt::reader`]) from a writable one. Implementations are responsible for
-    /// ensuring that the returned reader is consistent with `self` at the time of the call.
+    /// ensuring that the returned reader remains consistent with `self` at the time of the call.
     ///
-    /// Implementations may return either a point-in-time snapshot or a live view. Either way, the
-    /// view must be of consistent / committed state (not partial). Holding the reader must not
-    /// block writes in any way.
+    /// Implementations must return a point-in-time snapshot. Later writes through `self` must not
+    /// affect the returned reader. Holding the reader must not block writes in any way.
     fn reader(&self) -> Result<Self::Reader, StorageError>;
 
     /// Inserts a key-value pair into the SMT leaf at the specified logical `index`.
