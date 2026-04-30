@@ -237,7 +237,7 @@
 //! To optimize memory and I/O: group updates by key locality so that keys sharing
 //! high-order bits are processed together.
 
-use alloc::vec::Vec;
+use alloc::{sync::Arc, vec::Vec};
 
 use super::{
     EmptySubtreeRoots, InnerNode, InnerNodeInfo, LeafIndex, MerkleError, NodeIndex, NodeMutation,
@@ -261,8 +261,8 @@ pub use subtree::{Subtree, SubtreeError};
 
 mod storage;
 pub use storage::{
-    CloneableSmtStorageReader, MemoryStorage, SmtStorage, SmtStorageReader, SmtStorageSnapshot,
-    StorageError, StorageUpdateParts, StorageUpdates, SubtreeUpdate,
+    MemoryStorage, MemoryStorageSnapshot, SmtStorage, SmtStorageReader, StorageError,
+    StorageUpdateParts, StorageUpdates, SubtreeUpdate,
 };
 #[cfg(feature = "rocksdb")]
 pub use storage::{RocksDbConfig, RocksDbSnapshotStorage, RocksDbStorage};
@@ -334,15 +334,15 @@ type MutatedLeaves = (MutatedSubtreeLeaves, Map<u64, SmtLeaf>, Map<Word, Word>, 
 /// - Depths 0-23: Stored in memory as a flat array for fast access
 /// - Depths 24-64: Stored in external storage organized as subtrees for efficient batch operations
 ///
-/// `LargeSmt` implements [`Clone`] only when `S` is a cloneable reader storage type. This prevents
-/// accidental duplication of writable storage backends while keeping read-only snapshots cloneable.
+/// `LargeSmt` implements [`Clone`] when its storage is cloneable. The in-memory top is shared and
+/// detaches on mutation.
 #[derive(Debug)]
 pub struct LargeSmt<S: SmtStorageReader> {
     storage: S,
-    /// Flat vector representation of in-memory nodes.
+    /// Shared flat array representation of in-memory nodes.
     /// Index 0 is unused; index 1 is root.
     /// For node at index i: left child at 2*i, right child at 2*i+1.
-    in_memory_nodes: Vec<Word>,
+    in_memory_nodes: Arc<[Word]>,
     /// Cached count of non-empty leaves. Initialized from storage on load,
     /// updated after each mutation.
     leaf_count: usize,
@@ -351,7 +351,7 @@ pub struct LargeSmt<S: SmtStorageReader> {
     entry_count: usize,
 }
 
-impl<S: CloneableSmtStorageReader> Clone for LargeSmt<S> {
+impl<S: SmtStorageReader + Clone> Clone for LargeSmt<S> {
     fn clone(&self) -> Self {
         Self {
             storage: self.storage.clone(),
@@ -478,6 +478,10 @@ impl<S: SmtStorageReader> LargeSmt<S> {
         <Self as SparseMerkleTreeReader<SMT_DEPTH>>::get_inner_node(self, index)
     }
 
+    pub(crate) fn in_memory_nodes_mut(&mut self) -> &mut [Word] {
+        Arc::make_mut(&mut self.in_memory_nodes)
+    }
+
     /// Helper to get an in-memory node if not empty.
     ///
     /// # Panics
@@ -503,7 +507,7 @@ impl<S: SmtStorageReader> LargeSmt<S> {
     // --------------------------------------------------------------------------------------------
 
     #[cfg(test)]
-    pub(crate) fn in_memory_nodes(&self) -> &Vec<Word> {
+    pub(crate) fn in_memory_nodes(&self) -> &[Word] {
         &self.in_memory_nodes
     }
 }

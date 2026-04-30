@@ -157,19 +157,20 @@ impl<S: SmtStorageReader> SparseMerkleTreeReader<SMT_DEPTH> for LargeSmt<S> {
 
 impl<S: SmtStorage> SparseMerkleTree<SMT_DEPTH> for LargeSmt<S> {
     fn set_root(&mut self, root: Word) {
-        self.in_memory_nodes[ROOT_MEMORY_INDEX] = root;
+        self.in_memory_nodes_mut()[ROOT_MEMORY_INDEX] = root;
     }
 
     fn insert_inner_node(&mut self, index: NodeIndex, inner_node: InnerNode) -> Option<InnerNode> {
         if index.depth() < IN_MEMORY_DEPTH {
             let i = to_memory_index(&index);
+            let nodes = self.in_memory_nodes_mut();
             // Get the old node before replacing
-            let old_left = self.in_memory_nodes[i * 2];
-            let old_right = self.in_memory_nodes[i * 2 + 1];
+            let old_left = nodes[i * 2];
+            let old_right = nodes[i * 2 + 1];
 
             // Store new node in flat layout
-            self.in_memory_nodes[i * 2] = inner_node.left;
-            self.in_memory_nodes[i * 2 + 1] = inner_node.right;
+            nodes[i * 2] = inner_node.left;
+            nodes[i * 2 + 1] = inner_node.right;
 
             // Check if the old node was empty
             if is_empty_parent(old_left, old_right, index.depth() + 1) {
@@ -186,15 +187,16 @@ impl<S: SmtStorage> SparseMerkleTree<SMT_DEPTH> for LargeSmt<S> {
     fn remove_inner_node(&mut self, index: NodeIndex) -> Option<InnerNode> {
         if index.depth() < IN_MEMORY_DEPTH {
             let memory_index = to_memory_index(&index);
+            let nodes = self.in_memory_nodes_mut();
             // Get the old node before replacing with empty hashes
-            let old_left = self.in_memory_nodes[memory_index * 2];
-            let old_right = self.in_memory_nodes[memory_index * 2 + 1];
+            let old_left = nodes[memory_index * 2];
+            let old_right = nodes[memory_index * 2 + 1];
 
             // Replace with empty hashes
             let child_depth = index.depth() + 1;
             let empty_hash = *EmptySubtreeRoots::entry(SMT_DEPTH, child_depth);
-            self.in_memory_nodes[memory_index * 2] = empty_hash;
-            self.in_memory_nodes[memory_index * 2 + 1] = empty_hash;
+            nodes[memory_index * 2] = empty_hash;
+            nodes[memory_index * 2 + 1] = empty_hash;
 
             // Return the old node if it wasn't already empty
             if is_empty_parent(old_left, old_right, child_depth) {

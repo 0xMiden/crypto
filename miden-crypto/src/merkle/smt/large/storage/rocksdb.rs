@@ -8,8 +8,7 @@ use rocksdb::{
 };
 
 use super::{
-    CloneableSmtStorageReader, SmtStorage, SmtStorageReader, StorageError, StorageUpdateParts,
-    StorageUpdates, SubtreeUpdate,
+    SmtStorage, SmtStorageReader, StorageError, StorageUpdateParts, StorageUpdates, SubtreeUpdate,
 };
 use crate::{
     EMPTY_WORD, Word,
@@ -135,8 +134,6 @@ impl RocksDbSnapshotStorage {
         self.cf_handle(name).expect("CF handle missing")
     }
 }
-
-impl CloneableSmtStorageReader for RocksDbSnapshotStorage {}
 
 impl RocksDbStorage {
     /// Opens or creates a RocksDB database at the specified `path` and configures it for SMT

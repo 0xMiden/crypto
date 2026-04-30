@@ -21,7 +21,7 @@ mod rocksdb;
 pub use rocksdb::{RocksDbConfig, RocksDbSnapshotStorage, RocksDbStorage};
 
 mod memory;
-pub use memory::{MemoryStorage, SmtStorageSnapshot};
+pub use memory::{MemoryStorage, MemoryStorageSnapshot};
 
 mod updates;
 pub use updates::{StorageUpdateParts, StorageUpdates, SubtreeUpdate};
@@ -138,9 +138,6 @@ pub trait SmtStorageReader: 'static + fmt::Debug + Send + Sync {
     /// cache management is required.
     fn get_depth24(&self) -> Result<Vec<(u64, Word)>, StorageError>;
 }
-
-/// Marker trait for reader storage types that can be cloned without duplicating mutable storage.
-pub trait CloneableSmtStorageReader: SmtStorageReader + Clone {}
 
 impl<T: SmtStorageReader + ?Sized> SmtStorageReader for Box<T> {
     #[inline]

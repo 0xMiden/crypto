@@ -11,6 +11,7 @@ use miden_crypto::{
 };
 use rand::{Rng, prelude::IteratorRandom, rng};
 
+#[cfg(feature = "executable")]
 mod boxed_storage;
 use boxed_storage::{BoxedSmtStorage as Storage, BoxedStorage};
 

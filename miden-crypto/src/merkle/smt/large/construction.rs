@@ -137,7 +137,7 @@ impl<S: SmtStorageReader> LargeSmt<S> {
         if is_empty {
             return Ok(Self {
                 storage,
-                in_memory_nodes,
+                in_memory_nodes: in_memory_nodes.into(),
                 leaf_count: 0,
                 entry_count: 0,
             });
@@ -192,7 +192,7 @@ impl<S: SmtStorageReader> LargeSmt<S> {
 
         Ok(Self {
             storage,
-            in_memory_nodes,
+            in_memory_nodes: in_memory_nodes.into(),
             leaf_count,
             entry_count,
         })
@@ -340,9 +340,10 @@ impl<S: SmtStorage> LargeSmt<S> {
         for (index, node) in nodes {
             if index.depth() < IN_MEMORY_DEPTH {
                 let memory_index = to_memory_index(&index);
+                let in_memory_nodes = self.in_memory_nodes_mut();
                 // Store in flat layout: left at 2*i, right at 2*i+1
-                self.in_memory_nodes[memory_index * 2] = node.left;
-                self.in_memory_nodes[memory_index * 2 + 1] = node.right;
+                in_memory_nodes[memory_index * 2] = node.left;
+                in_memory_nodes[memory_index * 2 + 1] = node.right;
             }
         }
     }

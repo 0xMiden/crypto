@@ -13,7 +13,7 @@ use crate::{
 enum InnerNodeIteratorState<'a> {
     InMemory {
         current_index: usize,
-        large_smt_in_memory_nodes: &'a Vec<Word>,
+        large_smt_in_memory_nodes: &'a [Word],
     },
     Subtree {
         subtree_iter: Box<dyn Iterator<Item = Subtree> + 'a>,

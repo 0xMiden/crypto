@@ -22,9 +22,8 @@ mod large;
 pub use full::concurrent::{SubtreeLeaf, build_subtree_for_bench};
 #[cfg(feature = "concurrent")]
 pub use large::{
-    CloneableSmtStorageReader, LargeSmt, LargeSmtError, MemoryStorage, SmtStorage,
-    SmtStorageReader, SmtStorageSnapshot, StorageError, StorageUpdateParts, StorageUpdates,
-    Subtree, SubtreeError, SubtreeUpdate,
+    LargeSmt, LargeSmtError, MemoryStorage, MemoryStorageSnapshot, SmtStorage, SmtStorageReader,
+    StorageError, StorageUpdateParts, StorageUpdates, Subtree, SubtreeError, SubtreeUpdate,
 };
 #[cfg(feature = "rocksdb")]
 pub use large::{RocksDbConfig, RocksDbSnapshotStorage, RocksDbStorage};

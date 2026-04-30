@@ -1,8 +1,7 @@
 use alloc::{boxed::Box, vec::Vec};
 
 use super::{
-    CloneableSmtStorageReader, SmtStorage, SmtStorageReader, StorageError, StorageUpdateParts,
-    StorageUpdates, SubtreeUpdate,
+    SmtStorage, SmtStorageReader, StorageError, StorageUpdateParts, StorageUpdates, SubtreeUpdate,
 };
 use crate::{
     EMPTY_WORD, Map, MapEntry, Word,
@@ -37,7 +36,7 @@ pub struct MemoryStorage {
 /// storage backends that need to hand out a detached point-in-time copy without also exposing
 /// mutation methods through [`SmtStorage`].
 #[derive(Debug, Clone)]
-pub struct SmtStorageSnapshot(MemoryStorage);
+pub struct MemoryStorageSnapshot(MemoryStorage);
 
 impl MemoryStorage {
     /// Creates a new, empty in-memory storage for a Sparse Merkle Tree.
@@ -48,8 +47,8 @@ impl MemoryStorage {
     }
 
     /// Converts this storage into a read-only snapshot.
-    pub fn into_snapshot(self) -> SmtStorageSnapshot {
-        SmtStorageSnapshot(self)
+    pub fn into_snapshot(self) -> MemoryStorageSnapshot {
+        MemoryStorageSnapshot(self)
     }
 }
 
@@ -59,7 +58,7 @@ impl Default for MemoryStorage {
     }
 }
 
-impl SmtStorageReader for SmtStorageSnapshot {
+impl SmtStorageReader for MemoryStorageSnapshot {
     fn leaf_count(&self) -> Result<usize, StorageError> {
         self.0.leaf_count()
     }
@@ -112,8 +111,6 @@ impl SmtStorageReader for SmtStorageSnapshot {
         self.0.get_depth24()
     }
 }
-
-impl CloneableSmtStorageReader for SmtStorageSnapshot {}
 
 impl SmtStorageReader for MemoryStorage {
     /// Gets the total number of non-empty leaves currently stored.
@@ -212,10 +209,8 @@ impl SmtStorageReader for MemoryStorage {
     }
 }
 
-impl CloneableSmtStorageReader for MemoryStorage {}
-
 impl SmtStorage for MemoryStorage {
-    type Reader = SmtStorageSnapshot;
+    type Reader = MemoryStorageSnapshot;
 
     /// Returns a read-only snapshot of this in-memory storage by cloning it.
     fn reader(&self) -> Result<Self::Reader, StorageError> {
