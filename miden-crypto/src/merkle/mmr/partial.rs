@@ -4,12 +4,12 @@ use alloc::{
     vec::Vec,
 };
 
-use super::{MmrDelta, MmrPath, MmrProof};
+use super::{MerkleFrontier, MmrDelta, MmrPath, MmrProof};
 use crate::{
     Word,
     hash::poseidon2::Poseidon2,
     merkle::{
-        InnerNodeInfo, MerklePath,
+        InnerNodeInfo, MerklePath, MerkleProof,
         mmr::{InOrderIndex, MmrError, MmrPeaks, forest::Forest},
     },
     utils::{ByteReader, ByteWriter, Deserializable, Serializable},
@@ -193,6 +193,11 @@ impl PartialMmr {
         MmrPeaks::new(self.forest, self.peaks.clone()).expect("invalid MMR peaks")
     }
 
+    /// Returns the current rooted frontier of this partial MMR.
+    pub fn frontier(&self) -> MerkleFrontier {
+        self.peaks().into()
+    }
+
     /// Returns true if this partial MMR tracks an authentication path for the leaf at the
     /// specified position.
     pub fn is_tracked(&self, pos: usize) -> bool {
@@ -258,6 +263,17 @@ impl PartialMmr {
 
         let path = MmrPath::new(self.forest, pos, MerklePath::new(nodes));
         Ok(Some(MmrProof::new(path, leaf)))
+    }
+
+    /// Returns a plain Merkle proof for a tracked leaf against this partial MMR's rooted frontier
+    /// commitment.
+    ///
+    /// The returned proof can be verified with `MerklePath::verify` using
+    /// `self.frontier().root()` as the expected root.
+    pub fn open_frontier(&self, pos: usize) -> Result<Option<MerkleProof>, MmrError> {
+        self.open(pos)?
+            .map(|opening| self.frontier().to_merkle_proof(&opening))
+            .transpose()
     }
 
     // ITERATORS

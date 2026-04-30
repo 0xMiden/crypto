@@ -3,6 +3,7 @@
 mod delta;
 mod error;
 mod forest;
+mod frontier;
 mod full;
 mod inorder;
 mod partial;
@@ -25,6 +26,7 @@ fn nodes_from_mask(mask: usize) -> usize {
 pub use delta::MmrDelta;
 pub use error::MmrError;
 pub use forest::Forest;
+pub use frontier::MerkleFrontier;
 pub use full::Mmr;
 pub use inorder::InOrderIndex;
 pub use partial::PartialMmr;
