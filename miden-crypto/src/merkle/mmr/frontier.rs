@@ -115,7 +115,7 @@ impl MerkleFrontier {
         acc
     }
 
-    /// Converts a peak-local MMR proof into a plain Merkle proof against this frontier's root.
+    /// Converts a peak-local MMR proof into a standard Merkle proof against this frontier's root.
     ///
     /// The input proof must be for the same forest length as this frontier. The returned path can
     /// be verified with [`MerklePath::verify`] using the global leaf position and [`Self::root`].

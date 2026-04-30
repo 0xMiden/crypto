@@ -265,7 +265,7 @@ impl PartialMmr {
         Ok(Some(MmrProof::new(path, leaf)))
     }
 
-    /// Returns a plain Merkle proof for a tracked leaf against this partial MMR's rooted frontier
+    /// Returns a standard Merkle proof for a tracked leaf against this partial MMR's rooted frontier
     /// commitment.
     ///
     /// The returned proof can be verified with `MerklePath::verify` using
