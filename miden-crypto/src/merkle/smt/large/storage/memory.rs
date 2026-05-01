@@ -14,6 +14,9 @@ use crate::{
     },
 };
 
+// MEMORY STORAGE
+// ================================================================================================
+
 /// In-memory storage for a Sparse Merkle Tree (SMT), implementing the `SmtStorage` trait.
 ///
 /// This structure stores the SMT's leaf nodes and subtrees directly in memory.
@@ -29,14 +32,6 @@ pub struct MemoryStorage {
     pub leaves: Map<u64, SmtLeaf>,
     pub subtrees: Map<NodeIndex, Subtree>,
 }
-
-/// Read-only snapshot of SMT storage data.
-///
-/// This type intentionally implements [`SmtStorageReader`] only. It is used as the reader view for
-/// storage backends that need to hand out a detached point-in-time copy without also exposing
-/// mutation methods through [`SmtStorage`].
-#[derive(Debug, Clone)]
-pub struct MemoryStorageSnapshot(MemoryStorage);
 
 impl MemoryStorage {
     /// Creates a new, empty in-memory storage for a Sparse Merkle Tree.
@@ -55,60 +50,6 @@ impl MemoryStorage {
 impl Default for MemoryStorage {
     fn default() -> Self {
         Self::new()
-    }
-}
-
-impl SmtStorageReader for MemoryStorageSnapshot {
-    fn leaf_count(&self) -> Result<usize, StorageError> {
-        self.0.leaf_count()
-    }
-
-    fn entry_count(&self) -> Result<usize, StorageError> {
-        self.0.entry_count()
-    }
-
-    fn get_leaf(&self, index: u64) -> Result<Option<SmtLeaf>, StorageError> {
-        self.0.get_leaf(index)
-    }
-
-    fn get_leaves(&self, indices: &[u64]) -> Result<Vec<Option<SmtLeaf>>, StorageError> {
-        self.0.get_leaves(indices)
-    }
-
-    fn has_leaves(&self) -> Result<bool, StorageError> {
-        self.0.has_leaves()
-    }
-
-    fn get_subtree(&self, index: NodeIndex) -> Result<Option<Subtree>, StorageError> {
-        self.0.get_subtree(index)
-    }
-
-    fn get_subtrees(&self, indices: &[NodeIndex]) -> Result<Vec<Option<Subtree>>, StorageError> {
-        self.0.get_subtrees(indices)
-    }
-
-    fn get_leaf_and_subtrees(
-        &self,
-        leaf_index: u64,
-        subtree_indices: &[NodeIndex],
-    ) -> Result<(Option<SmtLeaf>, Vec<Option<Subtree>>), StorageError> {
-        self.0.get_leaf_and_subtrees(leaf_index, subtree_indices)
-    }
-
-    fn get_inner_node(&self, index: NodeIndex) -> Result<Option<InnerNode>, StorageError> {
-        self.0.get_inner_node(index)
-    }
-
-    fn iter_leaves(&self) -> Result<Box<dyn Iterator<Item = (u64, SmtLeaf)> + '_>, StorageError> {
-        self.0.iter_leaves()
-    }
-
-    fn iter_subtrees(&self) -> Result<Box<dyn Iterator<Item = Subtree> + '_>, StorageError> {
-        self.0.iter_subtrees()
-    }
-
-    fn get_depth24(&self) -> Result<Vec<(u64, Word)>, StorageError> {
-        self.0.get_depth24()
     }
 }
 
@@ -393,5 +334,70 @@ impl SmtStorage for MemoryStorage {
             }
         }
         Ok(())
+    }
+}
+
+// MEMORY STORAGE SNAPSHOT
+// ================================================================================================
+
+/// Read-only snapshot of SMT storage data.
+///
+/// This type intentionally implements [`SmtStorageReader`] only. It is used as the reader view for
+/// storage backends that need to hand out a detached point-in-time copy without also exposing
+/// mutation methods through [`SmtStorage`].
+#[derive(Debug, Clone)]
+pub struct MemoryStorageSnapshot(MemoryStorage);
+
+impl SmtStorageReader for MemoryStorageSnapshot {
+    fn leaf_count(&self) -> Result<usize, StorageError> {
+        self.0.leaf_count()
+    }
+
+    fn entry_count(&self) -> Result<usize, StorageError> {
+        self.0.entry_count()
+    }
+
+    fn get_leaf(&self, index: u64) -> Result<Option<SmtLeaf>, StorageError> {
+        self.0.get_leaf(index)
+    }
+
+    fn get_leaves(&self, indices: &[u64]) -> Result<Vec<Option<SmtLeaf>>, StorageError> {
+        self.0.get_leaves(indices)
+    }
+
+    fn has_leaves(&self) -> Result<bool, StorageError> {
+        self.0.has_leaves()
+    }
+
+    fn get_subtree(&self, index: NodeIndex) -> Result<Option<Subtree>, StorageError> {
+        self.0.get_subtree(index)
+    }
+
+    fn get_subtrees(&self, indices: &[NodeIndex]) -> Result<Vec<Option<Subtree>>, StorageError> {
+        self.0.get_subtrees(indices)
+    }
+
+    fn get_leaf_and_subtrees(
+        &self,
+        leaf_index: u64,
+        subtree_indices: &[NodeIndex],
+    ) -> Result<(Option<SmtLeaf>, Vec<Option<Subtree>>), StorageError> {
+        self.0.get_leaf_and_subtrees(leaf_index, subtree_indices)
+    }
+
+    fn get_inner_node(&self, index: NodeIndex) -> Result<Option<InnerNode>, StorageError> {
+        self.0.get_inner_node(index)
+    }
+
+    fn iter_leaves(&self) -> Result<Box<dyn Iterator<Item = (u64, SmtLeaf)> + '_>, StorageError> {
+        self.0.iter_leaves()
+    }
+
+    fn iter_subtrees(&self) -> Result<Box<dyn Iterator<Item = Subtree> + '_>, StorageError> {
+        self.0.iter_subtrees()
+    }
+
+    fn get_depth24(&self) -> Result<Vec<(u64, Word)>, StorageError> {
+        self.0.get_depth24()
     }
 }
