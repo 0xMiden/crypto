@@ -1,4 +1,4 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `miden-crypto/src/merkle/smt/large/batch_ops.rs`."><title>batch_ops.rs - source</title><script>if(window.location.protocol!=="file:")document.head.insertAdjacentHTML("beforeend","SourceSerif4-Regular-6b053e98.ttf.woff2,FiraSans-Italic-81dc35de.woff2,FiraSans-Regular-0fe48ade.woff2,FiraSans-MediumItalic-ccf7e434.woff2,FiraSans-Medium-e1aa3f0a.woff2,SourceCodePro-Regular-8badfe75.ttf.woff2,SourceCodePro-Semibold-aa29a496.ttf.woff2".split(",").map(f=>`<link rel="preload" as="font" type="font/woff2"href="../../../../../static.files/${f}">`).join(""))</script><link rel="stylesheet" href="../../../../../static.files/normalize-9960930a.css"><link rel="stylesheet" href="../../../../../static.files/rustdoc-17e0aaed.css"><meta name="rustdoc-vars" data-root-path="../../../../../" data-static-root-path="../../../../../static.files/" data-current-crate="miden_crypto" data-themes="" data-resource-suffix="" data-rustdoc-version="1.97.0-nightly (52b6e2c20 2026-04-27)" data-channel="nightly" data-search-js="search-b5634cc7.js" data-stringdex-js="stringdex-2da4960a.js" data-settings-js="settings-170eb4bf.js" ><script src="../../../../../static.files/storage-41dd4d93.js"></script><script defer src="../../../../../static.files/src-script-813739b1.js"></script><script defer src="../../../../../src-files.js"></script><script defer src="../../../../../static.files/main-aa4d37ac.js"></script><noscript><link rel="stylesheet" href="../../../../../static.files/noscript-f7c3ffd8.css"></noscript><link rel="alternate icon" type="image/png" href="../../../../../static.files/favicon-32x32-eab170b8.png"><link rel="icon" type="image/svg+xml" href="../../../../../static.files/favicon-044be391.svg"></head><body class="rustdoc src"><a class="skip-main-content" href="#main-content">Skip to main content</a><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="src-sidebar-title"><h2>Files</h2></div></nav><div class="sidebar-resizer" title="Drag to resize sidebar"></div><main><section id="main-content" class="content" tabindex="-1"><div class="main-heading"><h1><div class="sub-heading">miden_crypto/merkle/smt/large/</div>batch_ops.rs</h1><rustdoc-toolbar></rustdoc-toolbar></div><div class="example-wrap digits-3"><pre class="rust"><code><a href=#1 id=1 data-nosnippet>1</a><span class="kw">use </span>alloc::vec::Vec;
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `miden-crypto/src/merkle/smt/large/batch_ops.rs`."><title>batch_ops.rs - source</title><script>if(window.location.protocol!=="file:")document.head.insertAdjacentHTML("beforeend","SourceSerif4-Regular-6b053e98.ttf.woff2,FiraSans-Italic-81dc35de.woff2,FiraSans-Regular-0fe48ade.woff2,FiraSans-MediumItalic-ccf7e434.woff2,FiraSans-Medium-e1aa3f0a.woff2,SourceCodePro-Regular-8badfe75.ttf.woff2,SourceCodePro-Semibold-aa29a496.ttf.woff2".split(",").map(f=>`<link rel="preload" as="font" type="font/woff2"href="../../../../../static.files/${f}">`).join(""))</script><link rel="stylesheet" href="../../../../../static.files/normalize-9960930a.css"><link rel="stylesheet" href="../../../../../static.files/rustdoc-17e0aaed.css"><meta name="rustdoc-vars" data-root-path="../../../../../" data-static-root-path="../../../../../static.files/" data-current-crate="miden_crypto" data-themes="" data-resource-suffix="" data-rustdoc-version="1.97.0-nightly (f53b654a8 2026-04-30)" data-channel="nightly" data-search-js="search-b5634cc7.js" data-stringdex-js="stringdex-2da4960a.js" data-settings-js="settings-170eb4bf.js" ><script src="../../../../../static.files/storage-41dd4d93.js"></script><script defer src="../../../../../static.files/src-script-813739b1.js"></script><script defer src="../../../../../src-files.js"></script><script defer src="../../../../../static.files/main-aa4d37ac.js"></script><noscript><link rel="stylesheet" href="../../../../../static.files/noscript-f7c3ffd8.css"></noscript><link rel="alternate icon" type="image/png" href="../../../../../static.files/favicon-32x32-eab170b8.png"><link rel="icon" type="image/svg+xml" href="../../../../../static.files/favicon-044be391.svg"></head><body class="rustdoc src"><a class="skip-main-content" href="#main-content">Skip to main content</a><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="src-sidebar-title"><h2>Files</h2></div></nav><div class="sidebar-resizer" title="Drag to resize sidebar"></div><main><section id="main-content" class="content" tabindex="-1"><div class="main-heading"><h1><div class="sub-heading">miden_crypto/merkle/smt/large/</div>batch_ops.rs</h1><rustdoc-toolbar></rustdoc-toolbar></div><div class="example-wrap digits-3"><pre class="rust"><code><a href=#1 id=1 data-nosnippet>1</a><span class="kw">use </span>alloc::vec::Vec;
 <a href=#2 id=2 data-nosnippet>2</a><span class="kw">use </span>core::mem;
 <a href=#3 id=3 data-nosnippet>3</a>
 <a href=#4 id=4 data-nosnippet>4</a><span class="kw">use </span>num::Integer;
@@ -12,7 +12,7 @@
 <a href=#12 id=12 data-nosnippet>12</a>    Word,
 <a href=#13 id=13 data-nosnippet>13</a>    merkle::smt::{
 <a href=#14 id=14 data-nosnippet>14</a>        EmptySubtreeRoots, LeafIndex, Map, MerkleError, MutationSet, NodeIndex, NodeMutation,
-<a href=#15 id=15 data-nosnippet>15</a>        NodeMutations, SmtLeaf, SparseMerkleTree,
+<a href=#15 id=15 data-nosnippet>15</a>        NodeMutations, SmtLeaf, SparseMerkleTree, SparseMerkleTreeReader,
 <a href=#16 id=16 data-nosnippet>16</a>        full::concurrent::{
 <a href=#17 id=17 data-nosnippet>17</a>            SUBTREE_DEPTH, SubtreeLeaf, SubtreeLeavesIter, fetch_sibling_pair,
 <a href=#18 id=18 data-nosnippet>18</a>            process_sorted_pairs_to_leaves,
@@ -449,7 +449,7 @@
 <a href=#449 id=449 data-nosnippet>449</a>        }
 <a href=#450 id=450 data-nosnippet>450</a>
 <a href=#451 id=451 data-nosnippet>451</a>        <span class="kw">let </span>new_root = leaves[<span class="number">0</span>][<span class="number">0</span>].hash;
-<a href=#452 id=452 data-nosnippet>452</a>        <span class="self">self</span>.in_memory_nodes[ROOT_MEMORY_INDEX] = new_root;
+<a href=#452 id=452 data-nosnippet>452</a>        <span class="self">self</span>.in_memory_nodes_mut()[ROOT_MEMORY_INDEX] = new_root;
 <a href=#453 id=453 data-nosnippet>453</a>
 <a href=#454 id=454 data-nosnippet>454</a>        <span class="comment">// Build leaf updates for storage (convert Empty to None for deletion)
 <a href=#455 id=455 data-nosnippet>455</a>        </span><span class="kw">let </span><span class="kw-2">mut </span>leaf_update_map = leaf_map;
@@ -493,7 +493,7 @@
 <a href=#493 id=493 data-nosnippet>493</a>
 <a href=#494 id=494 data-nosnippet>494</a>        <span class="comment">// Guard against accidentally trying to apply mutations that were computed against a
 <a href=#495 id=495 data-nosnippet>495</a>        // different tree, including a stale version of this tree.
-<a href=#496 id=496 data-nosnippet>496</a>        </span><span class="kw">let </span>expected_root = SparseMerkleTree::&lt;SMT_DEPTH&gt;::root(<span class="self">self</span>);
+<a href=#496 id=496 data-nosnippet>496</a>        </span><span class="kw">let </span>expected_root = SparseMerkleTreeReader::&lt;SMT_DEPTH&gt;::root(<span class="self">self</span>);
 <a href=#497 id=497 data-nosnippet>497</a>        <span class="kw">if </span>old_root != expected_root {
 <a href=#498 id=498 data-nosnippet>498</a>            <span class="kw">return </span><span class="prelude-val">Err</span>(LargeSmtError::Merkle(MerkleError::ConflictingRoots {
 <a href=#499 id=499 data-nosnippet>499</a>                expected_root,
@@ -578,7 +578,7 @@
 <a href=#578 id=578 data-nosnippet>578</a>        } = prepared;
 <a href=#579 id=579 data-nosnippet>579</a>
 <a href=#580 id=580 data-nosnippet>580</a>        <span class="comment">// Update the root in memory
-<a href=#581 id=581 data-nosnippet>581</a>        </span><span class="self">self</span>.in_memory_nodes[ROOT_MEMORY_INDEX] = new_root;
+<a href=#581 id=581 data-nosnippet>581</a>        </span><span class="self">self</span>.in_memory_nodes_mut()[ROOT_MEMORY_INDEX] = new_root;
 <a href=#582 id=582 data-nosnippet>582</a>
 <a href=#583 id=583 data-nosnippet>583</a>        <span class="comment">// Process node mutations - group by subtree and apply in batch
 <a href=#584 id=584 data-nosnippet>584</a>        // Since mutations are sorted by subtree root, we can process them in groups
@@ -738,7 +738,7 @@
 <a href=#738 id=738 data-nosnippet>738</a>            <span class="self">self</span>.sorted_pairs_to_mutated_leaves_with_preloaded_leaves(sorted_kv_pairs, <span class="kw-2">&amp;</span>leaf_map);
 <a href=#739 id=739 data-nosnippet>739</a>
 <a href=#740 id=740 data-nosnippet>740</a>        <span class="comment">// If no mutations, return an empty mutation set
-<a href=#741 id=741 data-nosnippet>741</a>        </span><span class="kw">let </span>old_root = SparseMerkleTree::&lt;SMT_DEPTH&gt;::root(<span class="self">self</span>);
+<a href=#741 id=741 data-nosnippet>741</a>        </span><span class="kw">let </span>old_root = SparseMerkleTreeReader::&lt;SMT_DEPTH&gt;::root(<span class="self">self</span>);
 <a href=#742 id=742 data-nosnippet>742</a>        <span class="kw">if </span>leaves.is_empty() {
 <a href=#743 id=743 data-nosnippet>743</a>            <span class="kw">return </span><span class="prelude-val">Ok</span>(MutationSet {
 <a href=#744 id=744 data-nosnippet>744</a>                old_root,
@@ -793,7 +793,7 @@
 <a href=#793 id=793 data-nosnippet>793</a>
 <a href=#794 id=794 data-nosnippet>794</a>        <span class="comment">// Create mutation set
 <a href=#795 id=795 data-nosnippet>795</a>        </span><span class="kw">let </span>mutation_set = MutationSet {
-<a href=#796 id=796 data-nosnippet>796</a>            old_root: SparseMerkleTree::&lt;SMT_DEPTH&gt;::root(<span class="self">self</span>),
+<a href=#796 id=796 data-nosnippet>796</a>            old_root: SparseMerkleTreeReader::&lt;SMT_DEPTH&gt;::root(<span class="self">self</span>),
 <a href=#797 id=797 data-nosnippet>797</a>            new_root,
 <a href=#798 id=798 data-nosnippet>798</a>            node_mutations,
 <a href=#799 id=799 data-nosnippet>799</a>            new_pairs,
