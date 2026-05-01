@@ -1,14 +1,17 @@
+//! Adapter used only by the `miden-crypto` executable benchmark.
+//!
+//! The executable chooses memory or RocksDB storage at runtime. This wrapper erases the concrete
+//! storage type while preserving the associated reader type needed by `SmtStorage`.
+
 use miden_crypto::{
     Map, Word,
     merkle::smt::{InnerNode, SmtLeaf, SmtStorage, SmtStorageReader, StorageError, StorageUpdates},
 };
 
-/// Type alias for boxed storage with boxed reader
-pub type BoxedSmtStorage = Box<dyn SmtStorage<Reader = Box<dyn SmtStorageReader>>>;
+pub(crate) type BoxedSmtStorage = Box<dyn SmtStorage<Reader = Box<dyn SmtStorageReader>>>;
 
-/// Generic wrapper that boxes the Reader type for any SmtStorage implementation
 #[derive(Debug)]
-pub struct BoxedStorage<T>(pub T);
+pub(crate) struct BoxedStorage<T>(pub(crate) T);
 
 impl<T: SmtStorageReader> SmtStorageReader for BoxedStorage<T> {
     fn leaf_count(&self) -> Result<usize, StorageError> {

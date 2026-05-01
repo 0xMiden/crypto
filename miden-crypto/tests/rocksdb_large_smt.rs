@@ -2,7 +2,7 @@ use miden_crypto::{
     EMPTY_WORD, Felt, ONE, Word, ZERO,
     merkle::{
         InnerNodeInfo,
-        smt::{LargeSmt, LargeSmtError, RocksDbConfig, RocksDbStorage, SmtStorageSnapshot},
+        smt::{LargeSmt, LargeSmtError, RocksDbConfig, RocksDbSnapshotStorage, RocksDbStorage},
     },
 };
 use tempfile::TempDir;
@@ -50,9 +50,11 @@ fn rocksdb_sanity_insert_and_get() {
 
 #[test]
 fn rocksdb_reader_is_detached_snapshot() {
-    fn assert_snapshot_reader(_: &LargeSmt<SmtStorageSnapshot>) {}
+    fn assert_snapshot_reader(_: &LargeSmt<RocksDbSnapshotStorage>) {}
 
     let entries = generate_entries(1000);
+    let existing_key = entries[10].0;
+    let existing_value = entries[10].1;
     let (storage, _tmp) = setup_storage();
     let mut smt = LargeSmt::<RocksDbStorage>::with_entries(storage, entries).unwrap();
 
@@ -70,6 +72,13 @@ fn rocksdb_reader_is_detached_snapshot() {
     assert_ne!(smt.root(), reader_root);
     assert_eq!(reader.root(), reader_root);
     assert_eq!(reader.get_value(&key), EMPTY_WORD);
+    assert_eq!(reader.get_value(&existing_key), existing_value);
+
+    drop(smt);
+
+    assert_eq!(reader.root(), reader_root);
+    assert_eq!(reader.get_value(&key), EMPTY_WORD);
+    assert_eq!(reader.get_value(&existing_key), existing_value);
 }
 
 #[test]

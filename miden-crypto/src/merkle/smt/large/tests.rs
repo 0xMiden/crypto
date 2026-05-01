@@ -767,3 +767,41 @@ fn test_memory_storage_snapshot_depth24() {
         "root reconstructed from snapshot must match the original"
     );
 }
+
+#[test]
+fn reader_shares_in_memory_top_until_writer_mutates() {
+    let entries = generate_entries(1000);
+    let storage = MemoryStorage::new();
+    let mut smt = LargeSmt::<MemoryStorage>::with_entries(storage, entries).unwrap();
+
+    let reader = smt.reader().unwrap();
+    let reader_root = reader.root();
+    assert_eq!(smt.in_memory_nodes().as_ptr(), reader.in_memory_nodes().as_ptr());
+
+    let key = Word::new([ONE, ONE, Felt::new_unchecked(10_000), Felt::new_unchecked(10_000)]);
+    let value = Word::new([ONE, ONE, ONE, Felt::new_unchecked(10_000)]);
+    smt.insert(key, value).unwrap();
+
+    assert_ne!(smt.in_memory_nodes().as_ptr(), reader.in_memory_nodes().as_ptr());
+    assert_ne!(smt.root(), reader_root);
+    assert_eq!(reader.root(), reader_root);
+}
+
+#[test]
+fn clone_shares_in_memory_top_until_mutation() {
+    let entries = generate_entries(1000);
+    let storage = MemoryStorage::new();
+    let smt = LargeSmt::<MemoryStorage>::with_entries(storage, entries).unwrap();
+
+    let mut clone = smt.clone();
+    let original_root = smt.root();
+    assert_eq!(smt.in_memory_nodes().as_ptr(), clone.in_memory_nodes().as_ptr());
+
+    let key = Word::new([ONE, ONE, Felt::new_unchecked(10_001), Felt::new_unchecked(10_001)]);
+    let value = Word::new([ONE, ONE, ONE, Felt::new_unchecked(10_001)]);
+    clone.insert(key, value).unwrap();
+
+    assert_ne!(smt.in_memory_nodes().as_ptr(), clone.in_memory_nodes().as_ptr());
+    assert_eq!(smt.root(), original_root);
+    assert_ne!(clone.root(), original_root);
+}

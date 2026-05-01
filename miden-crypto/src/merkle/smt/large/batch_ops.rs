@@ -449,7 +449,7 @@ impl<S: SmtStorage> LargeSmt<S> {
         }
 
         let new_root = leaves[0][0].hash;
-        self.in_memory_nodes[ROOT_MEMORY_INDEX] = new_root;
+        self.in_memory_nodes_mut()[ROOT_MEMORY_INDEX] = new_root;
 
         // Build leaf updates for storage (convert Empty to None for deletion)
         let mut leaf_update_map = leaf_map;
@@ -578,7 +578,7 @@ impl<S: SmtStorage> LargeSmt<S> {
         } = prepared;
 
         // Update the root in memory
-        self.in_memory_nodes[ROOT_MEMORY_INDEX] = new_root;
+        self.in_memory_nodes_mut()[ROOT_MEMORY_INDEX] = new_root;
 
         // Process node mutations - group by subtree and apply in batch
         // Since mutations are sorted by subtree root, we can process them in groups
