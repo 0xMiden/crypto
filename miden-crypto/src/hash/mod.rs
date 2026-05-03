@@ -31,6 +31,9 @@ pub mod rpo {
     };
 }
 
+/// Eidos hash function: Goldilocks-tailored Blake2s compression + VM-layer hash.
+pub mod eidos;
+
 /// Rescue Prime Extended (RPX) hash function.
 pub mod rpx {
     pub use super::algebraic_sponge::rescue::rpx::{
