@@ -49,8 +49,8 @@ type PackedExt<F, EF> = <EF as ExtensionField<F>>::ExtensionPacking;
 /// write loop saves a second pass over the `n_j * D_j`-point output buffer.
 ///
 /// `output` must be a fresh zero-initialized buffer of length `n_j * D_j`; each
-/// point is written once. Upsampling to the batch-wide target and beta-accumulation
-/// into the shared quotient accumulator happen in the caller.
+/// point is written once with `=`. Upsampling to the batch-wide target and
+/// beta-accumulation into the shared quotient accumulator happen in the caller.
 ///
 /// Trace views must be [`BitReversedMatrixView`] over dense row-major storage (as
 /// returned by [`crate::prover::commit::Committed::evals_on_quotient_domain`]), in
