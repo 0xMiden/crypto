@@ -1,13 +1,16 @@
 //! Quotient polynomial helpers used by the prover's per-AIR pipeline.
 //!
 //! - [`upsample_evals`]: Low-degree extend coset evaluations onto a larger two-adic coset
+//! - [`cyclic_extend_and_scale`]: Horner-style beta scaling + cyclic extension
 //! - [`compute_z_h_inverses`]: Precompute the distinct `1 / Z_H` values on a quotient coset
 //! - [`commit_quotient`]: Decompose Q(gJ) into chunks and commit on gK
 
 use alloc::{format, vec, vec::Vec};
 
 use p3_dft::TwoAdicSubgroupDft;
-use p3_field::{BasedVectorSpace, ExtensionField, TwoAdicField, batch_multiplicative_inverse};
+use p3_field::{
+    BasedVectorSpace, ExtensionField, Field, TwoAdicField, batch_multiplicative_inverse,
+};
 use p3_matrix::{Matrix, dense::RowMajorMatrix};
 use p3_maybe_rayon::prelude::*;
 use p3_util::log2_strict_usize;
@@ -21,7 +24,7 @@ use crate::{
 };
 
 // ============================================================================
-// Domain lifting
+// Domain lifting and accumulation
 // ============================================================================
 
 /// Low-degree extend coset evaluations onto a larger two-adic coset.
@@ -50,6 +53,31 @@ where
     dft.lde_algebra_batch(RowMajorMatrix::new_col(evals), added_bits)
         .to_row_major_matrix()
         .values
+}
+
+/// Cyclically extend the accumulator to `target_len` and scale every element by `β`.
+///
+/// On the first call (empty accumulator) this simply zero-fills to `target_len`.
+/// On subsequent calls it scales the existing buffer by `β` (Horner folding)
+/// then doubles via `extend_from_within` until it reaches `target_len`.
+///
+/// Both `accumulator.len()` and `target_len` must be powers of two, and
+/// `target_len ≥ accumulator.len()`.
+///
+/// Cyclic extension is valid because H_small is a subgroup of H_big, so
+/// evaluations repeat cyclically. The β scaling implements Horner folding
+/// across the instance loop: `acc = acc·β + contribution_j`.
+pub fn cyclic_extend_and_scale<EF: Field>(accumulator: &mut Vec<EF>, target_len: usize, beta: EF) {
+    if accumulator.is_empty() {
+        accumulator.resize(target_len, EF::ZERO);
+    } else {
+        // Horner: scale the existing buffer by beta before extending it.
+        accumulator.par_iter_mut().for_each(|v| *v *= beta);
+        // Cyclic extension by repeated doubling (all sizes are powers of 2).
+        while accumulator.len() < target_len {
+            accumulator.extend_from_within(..);
+        }
+    }
 }
 
 // ============================================================================

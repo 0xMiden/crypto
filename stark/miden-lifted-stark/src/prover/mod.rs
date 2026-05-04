@@ -99,7 +99,6 @@ use miden_lifted_air::{AuxBuilder, LiftedAir, VarLenPublicInputs, log2_strict_u8
 use miden_stark_transcript::{Channel, ProverChannel, ProverTranscript};
 use p3_field::{BasedVectorSpace, ExtensionField, TwoAdicField};
 use p3_matrix::{Matrix, dense::RowMajorMatrix};
-use p3_maybe_rayon::prelude::*;
 use periodic::PeriodicLde;
 use thiserror::Error;
 use tracing::{info_span, instrument};
@@ -307,31 +306,23 @@ where
     let alpha: EF = channel.sample_algebra_element::<EF>();
     let beta: EF = channel.sample_algebra_element::<EF>();
 
-    // 4. Evaluate constraints and accumulate quotient evaluations.
+    // 4. Evaluate constraints and accumulate quotient evaluations with beta folding.
     //
-    // Each AIR's quotient `widetilde Q_j` is evaluated on its native domain
-    // (size `n_j * D_j`), scaled by its final coefficient `beta^(n - 1 - j)`
-    // in the linear combination, and added into a bucket keyed by `log_qd_j`.
-    // Bucketing amortizes one upsample DFT per `log_qd` regardless of how many
-    // AIRs share that degree. Post-loop, every non-max bucket is upsampled to
-    // the target domain and added (no further scaling) into the max-degree bucket.
+    // For each AIR:
+    //   1. Evaluate folded constraints divided by `Z_{H_j}` on the native quotient domain (divide
+    //      fused into the evaluation's write step)
+    //   2. If `D_j < D_max`, low-degree-extend to the per-trace target domain
+    //   3. Cyclically extend the global accumulator and add in
+    //
+    // Pre-allocate with LDE capacity so commit_quotient's resize doesn't reallocate.
+    let constraint_degree = 1 << log_constraint_degree as usize;
+    let mut accumulator: Vec<EF> = Vec::with_capacity(max_quotient_height * blowup);
 
     // Pre-compute per-AIR constraint layouts.
     let layouts: Vec<_> = instances
         .iter()
         .map(|(air, ..)| get_constraint_layout::<F, EF, A>(*air))
         .collect();
-
-    let num_instances = instances.len();
-
-    // Precomputed `beta^k` for k in [0, num_instances). AIR `j` is scaled by
-    // `beta_powers[num_instances - 1 - j]` — its coefficient in the final sum.
-    let beta_powers: Vec<EF> = beta.powers().take(num_instances).collect();
-
-    // One bucket per possible `log_qd` in [0, log_constraint_degree]. By construction
-    // every AIR's `log_qd <= log_constraint_degree`, so the bucket index always fits.
-    let num_degree_buckets = (log_constraint_degree as usize) + 1;
-    let mut degree_buckets: Vec<Vec<EF>> = (0..num_degree_buckets).map(|_| Vec::new()).collect();
 
     info_span!("evaluate constraints").in_scope(|| {
         for (i, (air, w, _)) in instances.iter().enumerate() {
@@ -340,14 +331,13 @@ where
             let this_log_constraint_degree = log_constraint_degrees[i];
             let this_constraint_degree = 1usize << this_log_constraint_degree;
 
-            let bucket_idx = this_log_constraint_degree as usize;
-
             // Create LiftedCoset for this trace (may be lifted relative to max).
             let this_lde_coset =
                 LiftedCoset::new(log_trace_height, log_blowup, log_max_trace_height);
             let this_native_quotient_coset =
                 this_lde_coset.quotient_domain(this_log_constraint_degree);
-            let this_native_quotient_height = this_native_quotient_coset.lde_height();
+            let this_target_quotient_height =
+                this_lde_coset.quotient_domain(log_constraint_degree).lde_height();
 
             // Truncate the committed LDE to the AIR's native quotient evaluation domain gJ_j.
             // Since B >= D_j, the committed LDE on gK (size N*B) contains gJ_j as a prefix in
@@ -359,16 +349,17 @@ where
             let periodic_lde =
                 PeriodicLde::build(&this_native_quotient_coset, air.periodic_columns_matrix());
 
+            let mut quotient_evals = vec![EF::ZERO; this_native_quotient_coset.lde_height()];
             let aux_values_i = &all_aux_values[i];
             let inv_z_h = quotient::compute_z_h_inverses::<F>(&this_native_quotient_coset);
 
-            // Eval Q_j into a fresh temp.
-            let mut quotient_evals = vec![EF::ZERO; this_native_quotient_height];
             tracing::debug_span!(
                 "eval_instance",
                 instance = i,
-                native_height = this_native_quotient_height,
+                native_height = this_native_quotient_coset.lde_height(),
+                target_height = this_target_quotient_height,
                 native_degree = this_constraint_degree,
+                target_degree = constraint_degree,
             )
             .in_scope(|| {
                 evaluate_constraints_into::<F, EF, A>(
@@ -387,93 +378,44 @@ where
                 );
             });
 
-            // Cyclic-extend the bucket to fit `Q_j`, then add `beta^(n-1-j) * Q_j`.
-            // Scaling commutes with the lift, so any prior contribution stays
-            // correctly scaled after extension.
-            let scale = beta_powers[num_instances - 1 - i];
-            let bucket = &mut degree_buckets[bucket_idx];
-            if bucket.is_empty() {
-                // First AIR for this `log_qd`. For the max-degree bucket, pre-allocate
-                // the capacity `commit_quotient` will eventually need so the bucket's
-                // growth here and inside `commit_quotient` share one allocation.
-                if this_log_constraint_degree == log_constraint_degree {
-                    bucket.reserve_exact(max_quotient_height * blowup);
-                }
-                bucket.resize(this_native_quotient_height, EF::ZERO);
-            } else {
-                // Bitrev cyclic extension by repeated doubling. The lift factor
-                // `r = this_native_quotient_height / bucket.len()` is a power of two
-                // (both sides are `n * D`, products of two powers of two), so the loop
-                // runs `log2(r)` times. In bit-reversed order, every power-of-two coset
-                // contains the next-smaller power-of-two coset as its first half, so
-                // each doubling preserves values on the previous coset.
-                while bucket.len() < this_native_quotient_height {
-                    bucket.extend_from_within(..);
-                }
+            if this_log_constraint_degree < log_constraint_degree {
+                let added_bits = (log_constraint_degree - this_log_constraint_degree) as usize;
+                quotient_evals = tracing::debug_span!(
+                    "upsample_quotient",
+                    instance = i,
+                    from = this_native_quotient_coset.lde_height(),
+                    to = this_target_quotient_height,
+                )
+                .in_scope(|| {
+                    quotient::upsample_evals::<F, EF, _>(config.dft(), quotient_evals, added_bits)
+                });
             }
-            bucket
-                .par_iter_mut()
-                .zip(quotient_evals.par_iter())
-                .for_each(|(b, &q)| *b += q * scale);
-        }
-    });
 
-    // Take the max-degree bucket as the running accumulator. It is non-empty by
-    // construction: `log_constraint_degree` is the max log_qd, so at least one AIR
-    // fed it. After `mem::take` the slot is empty, so the post-loop `is_empty()`
-    // filter naturally skips it.
-    let target_bucket_idx = log_constraint_degree as usize;
-    let mut accumulator = core::mem::take(&mut degree_buckets[target_bucket_idx]);
-    debug_assert!(!accumulator.is_empty());
+            debug_assert_eq!(quotient_evals.len(), this_target_quotient_height);
 
-    info_span!("accumulate quotient buckets").in_scope(|| {
-        // Cyclic-extend the accumulator to the full target size. Capacity was reserved
-        // up to `max_quotient_height * blowup` on first insert, so this won't reallocate.
-        tracing::debug_span!(
-            "cyclic_extend_main_bucket",
-            from = accumulator.len(),
-            to = max_quotient_height
-        )
-        .in_scope(|| {
-            while accumulator.len() < max_quotient_height {
-                accumulator.extend_from_within(..);
-            }
-        });
-
-        for (bucket_idx, bucket) in degree_buckets.into_iter().enumerate() {
-            if bucket.is_empty() {
-                continue;
-            }
-            let log_degree = bucket_idx as u8;
-            let added_bits = (log_constraint_degree - log_degree) as usize;
-            let mut upsampled = tracing::debug_span!(
-                "upsample_quotient_bucket",
-                from_degree = 1 << log_degree,
-                to_degree = 1 << log_constraint_degree,
-                size = bucket.len(),
-            )
-            .in_scope(|| quotient::upsample_evals::<F, EF, _>(config.dft(), bucket, added_bits));
-
+            // Cyclically extend accumulator across trace-height growth and scale by beta.
             tracing::debug_span!(
-                "cyclic_extend_bucket",
-                from = upsampled.len(),
-                to = max_quotient_height
+                "cyclic_extend",
+                acc_len = accumulator.len(),
+                target = this_target_quotient_height
             )
             .in_scope(|| {
-                upsampled.reserve_exact(max_quotient_height - upsampled.len());
-                while upsampled.len() < max_quotient_height {
-                    upsampled.extend_from_within(..);
-                }
+                quotient::cyclic_extend_and_scale(
+                    &mut accumulator,
+                    this_target_quotient_height,
+                    beta,
+                );
             });
 
             accumulator
-                .par_iter_mut()
-                .zip(upsampled.par_iter())
-                .for_each(|(acc, &val)| *acc += val);
+                .iter_mut()
+                .zip(quotient_evals)
+                .for_each(|(acc, value)| *acc += value);
         }
     });
 
-    debug_assert_eq!(accumulator.len(), max_quotient_height);
+    // Verify we have the expected size (max quotient domain)
+    assert_eq!(accumulator.len(), max_quotient_height);
 
     // 5. Commit quotient.
     let quotient_committed = info_span!("commit to quotient poly chunks")
