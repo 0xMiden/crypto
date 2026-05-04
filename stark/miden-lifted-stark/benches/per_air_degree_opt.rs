@@ -1,5 +1,10 @@
 //! Illustrates the per-AIR quotient-degree optimization.
 //!
+//! This bench compares two synthetic configurations of the **same** code path,
+//! toggled via [`OverrideLogQuotientDegree`]. It is **not** a comparison against
+//! the codebase's pre-PR state; it isolates the speedup attributable to evaluating
+//! a low-degree AIR on its native quotient domain rather than the global one.
+//!
 //! Runs `prove_multi` with two AIRs:
 //! - Core AIR: width 72, max constraint degree 9 (so `D = 8`).
 //! - Chip AIR: width 72, max constraint degree 5 (so `D = 4`).

@@ -1,9 +1,11 @@
 //! Quotient polynomial helpers used by the prover's per-AIR pipeline.
 //!
 //! - [`upsample_evals`]: Low-degree extend coset evaluations onto a larger two-adic coset
-//! - [`cyclic_extend_and_scale`]: Horner-style beta scaling + cyclic extension
-//! - [`compute_z_h_inverses`]: Precompute the distinct `1 / Z_H` values on a quotient coset
-//! - [`commit_quotient`]: Decompose Q(gJ) into chunks and commit on gK
+//!   (the constraint-degree axis: `D_j -> D_max`, same polynomial, denser evaluations).
+//! - [`cyclic_extend_and_scale`]: Lift along the trace-height axis (`n_j -> N`) by cyclic
+//!   repetition, and Horner-fold the running accumulator across AIRs by `beta`.
+//! - [`compute_z_h_inverses`]: Precompute the distinct `1 / Z_H` values on a quotient coset.
+//! - [`commit_quotient`]: Decompose Q(gJ) into chunks and commit on gK.
 
 use alloc::{format, vec, vec::Vec};
 
@@ -55,18 +57,26 @@ where
         .values
 }
 
-/// Cyclically extend the accumulator to `target_len` and scale every element by `β`.
+/// Cyclically extend the accumulator to `target_len` and scale every element by `beta`.
 ///
 /// On the first call (empty accumulator) this simply zero-fills to `target_len`.
-/// On subsequent calls it scales the existing buffer by `β` (Horner folding)
+/// On subsequent calls it scales the existing buffer by `beta` (Horner folding)
 /// then doubles via `extend_from_within` until it reaches `target_len`.
 ///
 /// Both `accumulator.len()` and `target_len` must be powers of two, and
-/// `target_len ≥ accumulator.len()`.
+/// `target_len >= accumulator.len()`.
 ///
-/// Cyclic extension is valid because H_small is a subgroup of H_big, so
-/// evaluations repeat cyclically. The β scaling implements Horner folding
-/// across the instance loop: `acc = acc·β + contribution_j`.
+/// Two things happen here, on two different axes:
+///
+/// - **Trace-height lift.** The previous AIR's quotient was evaluated on its native
+///   subgroup; the new AIR sits on a larger one. Cyclic repetition realizes the
+///   polynomial composition `P(X) -> P(X^r)` that lifts the previous contribution
+///   along the subgroup tower (`H_prev` is a subgroup of `H_new`, and on the larger
+///   coset's bit-reversed buffer the smaller coset is embedded as the first `r`-th
+///   of the entries; appending a copy each doubling preserves values on the smaller
+///   coset).
+/// - **Per-AIR fold.** The `beta` multiplication implements Horner folding of the
+///   per-AIR contributions: `acc <- acc * beta + contribution_j` after each iteration.
 pub fn cyclic_extend_and_scale<EF: Field>(accumulator: &mut Vec<EF>, target_len: usize, beta: EF) {
     if accumulator.is_empty() {
         accumulator.resize(target_len, EF::ZERO);

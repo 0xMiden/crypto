@@ -315,7 +315,6 @@ where
     //   3. Cyclically extend the global accumulator and add in
     //
     // Pre-allocate with LDE capacity so commit_quotient's resize doesn't reallocate.
-    let constraint_degree = 1 << log_constraint_degree as usize;
     let mut accumulator: Vec<EF> = Vec::with_capacity(max_quotient_height * blowup);
 
     // Pre-compute per-AIR constraint layouts.
@@ -359,7 +358,7 @@ where
                 native_height = this_native_quotient_coset.lde_height(),
                 target_height = this_target_quotient_height,
                 native_degree = this_constraint_degree,
-                target_degree = constraint_degree,
+                target_degree = 1 << log_constraint_degree as usize,
             )
             .in_scope(|| {
                 evaluate_constraints_into::<F, EF, A>(
@@ -414,8 +413,7 @@ where
         }
     });
 
-    // Verify we have the expected size (max quotient domain)
-    assert_eq!(accumulator.len(), max_quotient_height);
+    debug_assert_eq!(accumulator.len(), max_quotient_height);
 
     // 5. Commit quotient.
     let quotient_committed = info_span!("commit to quotient poly chunks")
