@@ -15,6 +15,7 @@ use crate::{
             forest::{Forest, TreeSizeIterator, high_bitmask},
         },
     },
+    utils::{Deserializable, DeserializationError, Serializable},
 };
 
 #[test]
@@ -693,6 +694,61 @@ fn test_partial_mmr_open_frontier_verifies_against_frontier_root() {
 fn test_merkle_frontier_rejects_invalid_peaks() {
     let err = MerkleFrontier::new(0b11, vec![LEAVES[0]]).unwrap_err();
     assert_matches!(err, MmrError::InvalidPeaks(_));
+}
+
+#[test]
+fn test_merkle_frontier_serialization_roundtrip() {
+    let mmr = Mmr::try_from_iter(LEAVES).unwrap();
+    let frontier = mmr.frontier();
+
+    let decoded = MerkleFrontier::read_from_bytes(&frontier.to_bytes()).unwrap();
+
+    assert_eq!(decoded, frontier);
+    assert_eq!(decoded.root(), frontier.root());
+}
+
+#[test]
+fn test_merkle_frontier_deserialization_rejects_large_len() {
+    let bytes = (Forest::MAX_LEAVES + 1).to_bytes();
+
+    let result = MerkleFrontier::read_from_bytes(&bytes);
+
+    assert!(matches!(result, Err(DeserializationError::InvalidValue(_))));
+}
+
+#[test]
+fn test_merkle_frontier_deserialization_rejects_invalid_peak_count() {
+    let mut bytes = 0b11usize.to_bytes();
+    bytes.extend_from_slice(&1usize.to_bytes());
+
+    let result = MerkleFrontier::read_from_bytes(&bytes);
+
+    assert!(matches!(result, Err(DeserializationError::InvalidValue(_))));
+}
+
+#[test]
+fn test_merkle_frontier_rejects_proof_from_different_forest() {
+    let mmr = Mmr::try_from_iter(LEAVES).unwrap();
+    let proof = mmr.open_at(0, Forest::new(4).unwrap()).unwrap();
+
+    let err = mmr.frontier().to_merkle_proof(&proof).unwrap_err();
+
+    assert_matches!(
+        err,
+        MmrError::InconsistentProofForest { proof, frontier }
+            if proof == 4 && frontier == LEAVES.len()
+    );
+}
+
+#[test]
+fn test_merkle_frontier_rejects_proof_with_wrong_peak_path_depth() {
+    let mmr = Mmr::try_from_iter(LEAVES).unwrap();
+    let path = MmrPath::new(mmr.forest(), 0, MerklePath::new(Vec::new()));
+    let proof = MmrProof::new(path, LEAVES[0]);
+
+    let err = mmr.frontier().to_merkle_proof(&proof).unwrap_err();
+
+    assert_matches!(err, MmrError::InvalidMerklePath(_));
 }
 
 #[test]
