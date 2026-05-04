@@ -128,7 +128,9 @@ impl MerkleFrontier {
         let peak_height = Forest::new(self.len)
             .expect("frontier length must be valid")
             .leaf_to_corresponding_tree(opening.position())
-            .ok_or(MmrError::PositionNotFound(opening.position()))? as u8;
+            .ok_or(MmrError::PositionNotFound(opening.position()))?;
+        let peak_height =
+            u8::try_from(peak_height).expect("peak height bounded by Forest::MAX_LEAVES");
 
         if opening.merkle_path().depth() != peak_height {
             return Err(MmrError::InvalidMerklePath(MerkleError::InvalidPathLength(
@@ -179,7 +181,7 @@ impl MerkleFrontier {
 
         let frontier_depth = (usize::BITS - self.len.leading_zeros()) as u8;
         let mut acc = empty_subtree_root(0);
-        let mut path = Vec::new();
+        let mut path = Vec::with_capacity(frontier_depth as usize);
         let mut peak_cursor = self.peaks.len();
         let mut contains_target = false;
 
@@ -258,8 +260,7 @@ impl Deserializable for MerkleFrontier {
         })?;
 
         let peaks = source.read_many_iter(num_peaks)?.collect::<Result<_, _>>()?;
-        Self::new(len, peaks)
-            .map_err(|err| DeserializationError::InvalidValue(format!("invalid frontier: {err}")))
+        Ok(Self { len, peaks })
     }
 }
 

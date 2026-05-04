@@ -265,15 +265,17 @@ impl PartialMmr {
         Ok(Some(MmrProof::new(path, leaf)))
     }
 
-    /// Returns a standard Merkle proof for a tracked leaf against this partial MMR's rooted frontier
-    /// commitment.
+    /// Returns a standard Merkle proof for a tracked leaf against this partial MMR's rooted
+    /// frontier commitment.
     ///
     /// The returned proof can be verified with `MerklePath::verify` using
     /// `self.frontier().root()` as the expected root.
     pub fn open_frontier(&self, pos: usize) -> Result<Option<MerkleProof>, MmrError> {
-        self.open(pos)?
-            .map(|opening| self.frontier().to_merkle_proof(&opening))
-            .transpose()
+        let Some(opening) = self.open(pos)? else {
+            return Ok(None);
+        };
+        let proof = self.frontier().to_merkle_proof(&opening)?;
+        Ok(Some(proof))
     }
 
     // ITERATORS
