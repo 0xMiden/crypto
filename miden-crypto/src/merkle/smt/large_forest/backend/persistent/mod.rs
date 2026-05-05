@@ -170,8 +170,8 @@ struct SnapshotInner {
     snapshot: ManuallyDrop<db::Snapshot<'static>>,
     /// Keeps the database alive for at least as long as `snapshot`.
     db: Arc<DB>,
-    /// Point-in-time copy of the lineage metadata, captured when the snapshot was created.
-    lineages: HashMap<LineageId, TreeMetadata>,
+    /// Point-in-time view of the lineage metadata, shared with the backend via copy-on-write.
+    lineages: Arc<HashMap<LineageId, TreeMetadata>>,
 }
 
 impl Drop for SnapshotInner {
@@ -536,7 +536,7 @@ impl Backend for PersistentBackend {
             inner: Arc::new(SnapshotInner {
                 snapshot: ManuallyDrop::new(snapshot),
                 db: Arc::clone(&self.db),
-                lineages: self.lineages.clone(),
+                lineages: Arc::clone(&self.lineages),
             }),
         })
     }
@@ -851,9 +851,12 @@ pub struct PersistentBackend {
     /// An in-memory cache of the tree metadata enabling the more rapid servicing of certain kinds
     /// of queries.
     ///
+    /// Wrapped in an `Arc` for copy-on-write sharing with reader snapshots. Readers clone the
+    /// `Arc` cheaply; mutations use `Arc::make_mut` to fork a private copy only when needed.
+    ///
     /// Care must be taken that this is _always_ kept in sync with the on-disk copy in the
     /// [`METADATA_CF`] column.
-    lineages: HashMap<LineageId, TreeMetadata>,
+    lineages: Arc<HashMap<LineageId, TreeMetadata>>,
 
     /// Whether writes should be synchronously flushed to disk.
     ///
@@ -873,10 +876,15 @@ impl PersistentBackend {
     /// - [`BackendError::Internal`] if the backend cannot be started up properly.
     pub fn load(config: Config) -> Result<Self> {
         let db = Arc::new(Self::build_db_with_options(&config)?);
-        let lineages = Self::read_all_metadata(db.clone())?;
+        let lineages = Arc::new(Self::read_all_metadata(db.clone())?);
         let sync_writes = config.sync_writes;
 
         Ok(Self { db, lineages, sync_writes })
+    }
+
+    // Triggers copy-on-write: clones the shared lineages map only if other references exist.
+    pub(crate) fn lineages_mut(&mut self) -> &mut HashMap<LineageId, TreeMetadata> {
+        Arc::make_mut(&mut self.lineages)
     }
 
     // INTERNAL / UTILITY
@@ -1689,7 +1697,7 @@ impl PersistentBackend {
         // If it hasn't errored, we can now safely update the in-memory metadata cache.
         Ok(metadata
             .map(|(l, d, r)| {
-                self.lineages.insert(l, d);
+                self.lineages_mut().insert(l, d);
                 (l, r)
             })
             .collect())

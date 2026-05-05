@@ -467,6 +467,7 @@ impl<S: SmtStorageReader> LargeSmt<S> {
         <Self as SparseMerkleTreeReader<SMT_DEPTH>>::get_inner_node(self, index)
     }
 
+    // Triggers copy-on-write: clones the shared node array only if other references exist.
     pub(crate) fn in_memory_nodes_mut(&mut self) -> &mut [Word] {
         Arc::make_mut(&mut self.in_memory_nodes)
     }
