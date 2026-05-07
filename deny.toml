@@ -44,10 +44,9 @@ skip = [
   { name = "thiserror-impl" },
 ]
 skip-tree = [
-  # Stable crypto crates still depend on rand_core 0.6, getrandom 0.2, and chacha20 0.9.
+  # Stable crypto crates still depend on rand_core 0.6 and chacha20 0.9.
   { name = "chacha20", version = "=0.9.1" },
   { name = "cpufeatures", version = "0.2.17" },
-  { name = "getrandom", version = "=0.2.17" },
   { name = "rand_core", version = "=0.6.4" },
 
   # Dev/test-only proptest still depends on rand 0.9.
