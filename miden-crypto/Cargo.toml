@@ -112,10 +112,8 @@ num              = { features = ["alloc", "libm"], workspace = true }
 num-complex      = { workspace = true }
 once_cell        = { features = ["alloc", "critical-section"], workspace = true }
 proptest         = { features = ["alloc"], optional = true, workspace = true }
-rand             = { default-features = false, version = "0.9" }
+rand             = { workspace = true }
 rand_chacha      = { workspace = true }
-rand_core        = { workspace = true }
-rand_hc          = { workspace = true }
 rayon            = { optional = true, workspace = true }
 rocksdb          = { features = ["bindgen-runtime", "lz4"], optional = true, workspace = true }
 serde            = { features = ["derive"], optional = true, workspace = true }
