@@ -1223,6 +1223,22 @@ impl<B: BackendReader> LargeSmtForest<B> {
     }
 }
 
+impl<B: Backend> LargeSmtForest<B> {
+    /// Returns a read-only `LargeSmtForest` backed by a reader view of this forest's backend.
+    ///
+    /// The new forest shares the same config, lineage data, and history as `self`, and its backend
+    /// is a point-in-time snapshot produced by [`Backend::reader`]. The returned forest's backend
+    /// type is `B::Reader: BackendReader`, so it cannot be used for mutations.
+    pub fn reader(&self) -> Result<LargeSmtForest<B::Reader>> {
+        Ok(LargeSmtForest {
+            config: self.config.clone(),
+            backend: self.backend.reader()?,
+            lineage_data: self.lineage_data.clone(),
+            non_empty_histories: self.non_empty_histories.clone(),
+        })
+    }
+}
+
 // TESTING FUNCTIONALITY
 // ================================================================================================
 

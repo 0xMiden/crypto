@@ -516,11 +516,6 @@ impl<S: SmtStorage> LargeSmt<S> {
             entry_count: self.entry_count,
         })
     }
-}
-
-impl<S: SmtStorage> LargeSmt<S> {
-    // STATE MUTATORS
-    // --------------------------------------------------------------------------------------------
 
     /// Inserts a value at the specified key, returning the previous value associated with that key.
     /// Recall that by definition, any key that hasn't been updated is associated with
