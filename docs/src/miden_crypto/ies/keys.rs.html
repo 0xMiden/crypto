@@ -1,7 +1,7 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `miden-crypto/src/ies/keys.rs`."><title>keys.rs - source</title><script>if(window.location.protocol!=="file:")document.head.insertAdjacentHTML("beforeend","SourceSerif4-Regular-6b053e98.ttf.woff2,FiraSans-Italic-81dc35de.woff2,FiraSans-Regular-0fe48ade.woff2,FiraSans-MediumItalic-ccf7e434.woff2,FiraSans-Medium-e1aa3f0a.woff2,SourceCodePro-Regular-8badfe75.ttf.woff2,SourceCodePro-Semibold-aa29a496.ttf.woff2".split(",").map(f=>`<link rel="preload" as="font" type="font/woff2"href="../../../static.files/${f}">`).join(""))</script><link rel="stylesheet" href="../../../static.files/normalize-9960930a.css"><link rel="stylesheet" href="../../../static.files/rustdoc-17e0aaed.css"><meta name="rustdoc-vars" data-root-path="../../../" data-static-root-path="../../../static.files/" data-current-crate="miden_crypto" data-themes="" data-resource-suffix="" data-rustdoc-version="1.97.0-nightly (f53b654a8 2026-04-30)" data-channel="nightly" data-search-js="search-b5634cc7.js" data-stringdex-js="stringdex-2da4960a.js" data-settings-js="settings-170eb4bf.js" ><script src="../../../static.files/storage-41dd4d93.js"></script><script defer src="../../../static.files/src-script-813739b1.js"></script><script defer src="../../../src-files.js"></script><script defer src="../../../static.files/main-aa4d37ac.js"></script><noscript><link rel="stylesheet" href="../../../static.files/noscript-f7c3ffd8.css"></noscript><link rel="alternate icon" type="image/png" href="../../../static.files/favicon-32x32-eab170b8.png"><link rel="icon" type="image/svg+xml" href="../../../static.files/favicon-044be391.svg"></head><body class="rustdoc src"><a class="skip-main-content" href="#main-content">Skip to main content</a><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="src-sidebar-title"><h2>Files</h2></div></nav><div class="sidebar-resizer" title="Drag to resize sidebar"></div><main><section id="main-content" class="content" tabindex="-1"><div class="main-heading"><h1><div class="sub-heading">miden_crypto/ies/</div>keys.rs</h1><rustdoc-toolbar></rustdoc-toolbar></div><div class="example-wrap digits-3"><pre class="rust"><code><a href=#1 id=1 data-nosnippet>1</a><span class="kw">use </span>alloc::vec::Vec;
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `miden-crypto/src/ies/keys.rs`."><title>keys.rs - source</title><script>if(window.location.protocol!=="file:")document.head.insertAdjacentHTML("beforeend","SourceSerif4-Regular-6b053e98.ttf.woff2,FiraSans-Italic-81dc35de.woff2,FiraSans-Regular-0fe48ade.woff2,FiraSans-MediumItalic-ccf7e434.woff2,FiraSans-Medium-e1aa3f0a.woff2,SourceCodePro-Regular-8badfe75.ttf.woff2,SourceCodePro-Semibold-aa29a496.ttf.woff2".split(",").map(f=>`<link rel="preload" as="font" type="font/woff2"href="../../../static.files/${f}">`).join(""))</script><link rel="stylesheet" href="../../../static.files/normalize-9960930a.css"><link rel="stylesheet" href="../../../static.files/rustdoc-17e0aaed.css"><meta name="rustdoc-vars" data-root-path="../../../" data-static-root-path="../../../static.files/" data-current-crate="miden_crypto" data-themes="" data-resource-suffix="" data-rustdoc-version="1.97.0-nightly (365c0e1d7 2026-05-06)" data-channel="nightly" data-search-js="search-b5634cc7.js" data-stringdex-js="stringdex-2da4960a.js" data-settings-js="settings-170eb4bf.js" ><script src="../../../static.files/storage-41dd4d93.js"></script><script defer src="../../../static.files/src-script-813739b1.js"></script><script defer src="../../../src-files.js"></script><script defer src="../../../static.files/main-aa4d37ac.js"></script><noscript><link rel="stylesheet" href="../../../static.files/noscript-f7c3ffd8.css"></noscript><link rel="alternate icon" type="image/png" href="../../../static.files/favicon-32x32-eab170b8.png"><link rel="icon" type="image/svg+xml" href="../../../static.files/favicon-044be391.svg"></head><body class="rustdoc src"><a class="skip-main-content" href="#main-content">Skip to main content</a><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="src-sidebar-title"><h2>Files</h2></div></nav><div class="sidebar-resizer" title="Drag to resize sidebar"></div><main><section id="main-content" class="content" tabindex="-1"><div class="main-heading"><h1><div class="sub-heading">miden_crypto/ies/</div>keys.rs</h1><rustdoc-toolbar></rustdoc-toolbar></div><div class="example-wrap digits-3"><pre class="rust"><code><a href=#1 id=1 data-nosnippet>1</a><span class="kw">use </span>alloc::vec::Vec;
 <a href=#2 id=2 data-nosnippet>2</a><span class="kw">use </span>core::fmt;
 <a href=#3 id=3 data-nosnippet>3</a>
-<a href=#4 id=4 data-nosnippet>4</a><span class="kw">use </span>rand::{CryptoRng, RngCore};
+<a href=#4 id=4 data-nosnippet>4</a><span class="kw">use </span>rand::CryptoRng;
 <a href=#5 id=5 data-nosnippet>5</a>
 <a href=#6 id=6 data-nosnippet>6</a><span class="kw">use </span>super::{IesError, IesScheme, crypto_box::CryptoBox, message::SealedMessage};
 <a href=#7 id=7 data-nosnippet>7</a><span class="kw">use </span>crate::{
@@ -38,7 +38,7 @@
 <a href=#38 id=38 data-nosnippet>38</a>        ///
 <a href=#39 id=39 data-nosnippet>39</a>        /// The returned message can be unsealed with the [UnsealingKey] associated with this
 <a href=#40 id=40 data-nosnippet>40</a>        /// sealing key.
-<a href=#41 id=41 data-nosnippet>41</a>        </span><span class="kw">pub fn </span>seal_bytes_with_associated_data&lt;R: CryptoRng + RngCore&gt;(
+<a href=#41 id=41 data-nosnippet>41</a>        </span><span class="kw">pub fn </span>seal_bytes_with_associated_data&lt;R: CryptoRng&gt;(
 <a href=#42 id=42 data-nosnippet>42</a>            <span class="kw-2">&amp;</span><span class="self">self</span>,
 <a href=#43 id=43 data-nosnippet>43</a>            rng: <span class="kw-2">&amp;mut </span>R,
 <a href=#44 id=44 data-nosnippet>44</a>            plaintext: <span class="kw-2">&amp;</span>[u8],
@@ -75,7 +75,7 @@
 <a href=#75 id=75 data-nosnippet>75</a>        ///
 <a href=#76 id=76 data-nosnippet>76</a>        /// The returned message can be unsealed with the [UnsealingKey] associated with this
 <a href=#77 id=77 data-nosnippet>77</a>        /// sealing key.
-<a href=#78 id=78 data-nosnippet>78</a>        </span><span class="kw">pub fn </span>seal_elements_with_associated_data&lt;R: CryptoRng + RngCore&gt;(
+<a href=#78 id=78 data-nosnippet>78</a>        </span><span class="kw">pub fn </span>seal_elements_with_associated_data&lt;R: CryptoRng&gt;(
 <a href=#79 id=79 data-nosnippet>79</a>            <span class="kw-2">&amp;</span><span class="self">self</span>,
 <a href=#80 id=80 data-nosnippet>80</a>            rng: <span class="kw-2">&amp;mut </span>R,
 <a href=#81 id=81 data-nosnippet>81</a>            plaintext: <span class="kw-2">&amp;</span>[Felt],
@@ -221,7 +221,7 @@
 <a href=#221 id=221 data-nosnippet>221</a>    ///
 <a href=#222 id=222 data-nosnippet>222</a>    /// The returned message can be unsealed with the [UnsealingKey] associated with this sealing
 <a href=#223 id=223 data-nosnippet>223</a>    /// key.
-<a href=#224 id=224 data-nosnippet>224</a>    </span><span class="kw">pub fn </span>seal_bytes&lt;R: CryptoRng + RngCore&gt;(
+<a href=#224 id=224 data-nosnippet>224</a>    </span><span class="kw">pub fn </span>seal_bytes&lt;R: CryptoRng&gt;(
 <a href=#225 id=225 data-nosnippet>225</a>        <span class="kw-2">&amp;</span><span class="self">self</span>,
 <a href=#226 id=226 data-nosnippet>226</a>        rng: <span class="kw-2">&amp;mut </span>R,
 <a href=#227 id=227 data-nosnippet>227</a>        plaintext: <span class="kw-2">&amp;</span>[u8],
@@ -240,7 +240,7 @@
 <a href=#240 id=240 data-nosnippet>240</a>    ///
 <a href=#241 id=241 data-nosnippet>241</a>    /// The returned message can be unsealed with the [UnsealingKey] associated with this sealing
 <a href=#242 id=242 data-nosnippet>242</a>    /// key.
-<a href=#243 id=243 data-nosnippet>243</a>    </span><span class="kw">pub fn </span>seal_elements&lt;R: CryptoRng + RngCore&gt;(
+<a href=#243 id=243 data-nosnippet>243</a>    </span><span class="kw">pub fn </span>seal_elements&lt;R: CryptoRng&gt;(
 <a href=#244 id=244 data-nosnippet>244</a>        <span class="kw-2">&amp;</span><span class="self">self</span>,
 <a href=#245 id=245 data-nosnippet>245</a>        rng: <span class="kw-2">&amp;mut </span>R,
 <a href=#246 id=246 data-nosnippet>246</a>        plaintext: <span class="kw-2">&amp;</span>[Felt],
