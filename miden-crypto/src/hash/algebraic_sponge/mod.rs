@@ -14,6 +14,8 @@
 
 use core::ops::Range;
 
+use miden_field::PackedValue;
+
 use super::{Felt, Word, ZERO};
 use crate::field::BasedVectorSpace;
 
@@ -41,6 +43,71 @@ pub(crate) const CAPACITY_RANGE: Range<usize> = 8..12;
 /// The output of the hash function is a digest which consists of 4 field elements or 32 bytes,
 /// taken from the first word of the rate portion of the state.
 pub(crate) const DIGEST_RANGE: Range<usize> = 0..4;
+
+// PACKED-PERMUTATION HELPER
+// ================================================================================================
+
+/// Maximum supported `PackedValue::WIDTH` for the lane-split scratch buffer
+/// in [`permute_packed`]. Real packed Goldilocks types in the wild are at
+/// most 8 lanes (AVX-512); 16 covers any conceivable future widening with
+/// no heap traffic.
+pub(crate) const MAX_PACK_WIDTH: usize = 16;
+
+/// Shared body for the trait-generic `Permutation<[P; STATE_WIDTH]>` impls
+/// on RpoPermutation256 / RpxPermutation256 / Poseidon2Permutation256.
+///
+/// For `P = Felt` (`P::WIDTH = 1`) this collapses, at compile time via
+/// `if const { ... }`, to a direct cast plus `scalar_perm`. For `P::WIDTH
+/// > 1` it lane-splits the packed input into per-lane scalar rows on a
+/// fixed-size stack scratch, runs `scalar_perm` once per lane, then
+/// re-packs via `P::from_fn`. Sponge permutations have no cross-state
+/// operations so this is bit-exact equivalent to running the scalar perm
+/// once per lane.
+///
+/// The const-block check on `P::WIDTH` guarantees per-monomorphization
+/// dead-code elimination of the path that doesn't apply, so the WIDTH=1
+/// case is byte-equivalent to the previous concrete
+/// `impl Permutation<[Felt; STATE_WIDTH]>` body.
+#[inline]
+pub(crate) fn permute_packed<P, F>(state: &mut [P; STATE_WIDTH], scalar_perm: F)
+where
+    P: PackedValue<Value = Felt>,
+    F: Fn(&mut [Felt; STATE_WIDTH]),
+{
+    if const { P::WIDTH == 1 } {
+        // SAFETY: `PackedValue`'s safety contract requires `P` to be
+        // byte-castable to/from `[P::Value; P::WIDTH]`, and with
+        // `P::WIDTH == 1` and `P::Value = Felt` that means `P` and `Felt`
+        // share size and alignment exactly. Hence
+        // `&mut [P; STATE_WIDTH] === &mut [Felt; STATE_WIDTH]`.
+        // This is the only live reference for the duration of the call,
+        // so no aliasing is introduced.
+        let as_felts: &mut [Felt; STATE_WIDTH] =
+            unsafe { &mut *(state.as_mut_ptr().cast::<[Felt; STATE_WIDTH]>()) };
+        scalar_perm(as_felts);
+        return;
+    }
+
+    const { assert!(P::WIDTH <= MAX_PACK_WIDTH, "PackedValue::WIDTH > MAX_PACK_WIDTH not supported") };
+
+    let width = P::WIDTH;
+    // Stack-allocated scratch sized to the upper bound — only the first
+    // `width` rows are populated. Avoids heap traffic in the hot path.
+    let mut rows: [[Felt; STATE_WIDTH]; MAX_PACK_WIDTH] =
+        [[Felt::ZERO; STATE_WIDTH]; MAX_PACK_WIDTH];
+    for col in 0..STATE_WIDTH {
+        let lanes = state[col].as_slice();
+        for lane in 0..width {
+            rows[lane][col] = lanes[lane];
+        }
+    }
+    for lane in 0..width {
+        scalar_perm(&mut rows[lane]);
+    }
+    for col in 0..STATE_WIDTH {
+        state[col] = P::from_fn(|lane| rows[lane][col]);
+    }
+}
 
 /// The number of byte chunks defining a field element when hashing a sequence of bytes
 const BINARY_CHUNK_SIZE: usize = 7;
