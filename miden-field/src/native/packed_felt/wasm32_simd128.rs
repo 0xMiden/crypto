@@ -52,10 +52,13 @@ pub const WIDTH: usize = 2;
 const EPSILON: u64 = Felt::ORDER.wrapping_neg();
 
 // Compile-time guard: PackedFelt is only sound to transmute to/from v128 if
-// its byte layout matches. `[Felt; 2]` === `[u64; 2]` === `v128` (16 bytes,
-// 8-byte aligned at the element level — wasm32 simd128 v128 has 16-byte
-// alignment which is stricter than u64's 8-byte, but transmute over &mut
-// references preserves alignment.) Verified at compile time.
+// its byte layout matches. `[Felt; 2]` === `[u64; 2]` === `v128` (16 bytes
+// total). Note that the `to_vector` / `from_vector` helpers below are
+// VALUE transmutes (`transmute(self) -> v128`), not reference reinterprets,
+// so alignment is irrelevant for them — the compiler allocates space for
+// the result type with whatever alignment that type requires. Only the
+// const v128 initializers (`SIGN_BIT`, `SHIFTED_FIELD_ORDER`, `EPSILON_VEC`
+// below) and the underlying byte-equivalence chain matter.
 const _LAYOUT_INVARIANTS: () = {
     assert!(size_of::<[Felt; WIDTH]>() == size_of::<v128>());
     assert!(size_of::<Felt>() == size_of::<u64>());
@@ -391,8 +394,13 @@ impl_div_methods!(PackedFelt, Felt);
 impl_sum_prod_base_field!(PackedFelt, Felt);
 
 impl Algebra<Felt> for PackedFelt {
-    /// Match the neon BATCHED_LC_CHUNK; can be tuned empirically once
-    /// downstream prove time is measured.
+    /// Match the neon `BATCHED_LC_CHUNK = 2` — sensible default for a
+    /// 2-lane packed type, but unprofiled on wasm32. The Plonky3 doc on
+    /// this constant says it controls how many elements are processed per
+    /// batch in linear-combination accumulation.
+    /// TODO: tune empirically against the wallet's DEEP polynomial-eval
+    /// hot path once a wasm32 microbench is wired up; current value is a
+    /// guess inherited from neon.
     const BATCHED_LC_CHUNK: usize = 2;
 }
 
@@ -519,6 +527,67 @@ mod tests {
                 sum_pkg.0,
                 [scalar_a, scalar_b],
                 "add mismatch for ({a:#x}, {b:#x})"
+            );
+        }
+    }
+
+    /// Cross-check subtraction against scalar Felt for several edge cases.
+    /// `sub` has an independent overflow-detection branch from `add` (the
+    /// `i64x2_gt(y_s, x_s)` mask + `u64x2_shr(mask, 32)` wrapback), so it
+    /// gets its own coverage here even though the modular wrap behavior
+    /// looks symmetric.
+    #[test]
+    #[wasm_bindgen_test]
+    fn sub_edge_cases() {
+        let cases: &[(u64, u64)] = &[
+            (0, 0),
+            (0, 1),                                 // wraps to P-1
+            (1, 0),
+            (Felt::ORDER - 1, Felt::ORDER - 1),     // -> 0
+            (1, Felt::ORDER - 1),                   // (1 - (-1)) mod P = 2
+            (0, Felt::ORDER - 1),                   // -> 1
+            (0xFFFF_FFFF, 0xFFFF_FFFF),
+            // Non-canonical (>P) inputs — both impls should still reduce.
+            (0xFFFF_FFFF_FFFF_FFFF, 1),
+            (1, 0xFFFF_FFFF_FFFF_FFFF),
+        ];
+        for &(a, b) in cases {
+            let pkg_a = PackedFelt::broadcast(Felt::new_unchecked(a));
+            let pkg_b = PackedFelt::broadcast(Felt::new_unchecked(b));
+            let diff_pkg = pkg_a.sub(pkg_b);
+            let scalar = Felt::new_unchecked(a) - Felt::new_unchecked(b);
+            assert_eq!(
+                diff_pkg.0,
+                [scalar, scalar],
+                "sub mismatch for ({a:#x} - {b:#x})"
+            );
+        }
+    }
+
+    /// Cross-check negation against scalar Felt for non-trivial inputs.
+    /// `neg(P-1) == 1` and `neg` of `>P` (non-canonical) inputs both
+    /// exercise the `canonicalize_s` step inside `neg`.
+    #[test]
+    #[wasm_bindgen_test]
+    fn neg_edge_cases() {
+        let cases: &[u64] = &[
+            0,
+            1,
+            2,
+            Felt::ORDER - 1,                  // expect 1
+            Felt::ORDER - 2,                  // expect 2
+            0xFFFF_FFFF,
+            0xFFFF_FFFF_FFFF_FFFF,            // >P input — should canonicalize
+            0x1234_5678_9ABC_DEF0,
+        ];
+        for &a in cases {
+            let pkg_a = PackedFelt::broadcast(Felt::new_unchecked(a));
+            let neg_pkg = pkg_a.neg();
+            let scalar = -Felt::new_unchecked(a);
+            assert_eq!(
+                neg_pkg.0,
+                [scalar, scalar],
+                "neg mismatch for ({a:#x})"
             );
         }
     }

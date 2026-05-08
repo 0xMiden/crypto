@@ -75,13 +75,47 @@ where
     F: Fn(&mut [Felt; STATE_WIDTH]),
 {
     if const { P::WIDTH == 1 } {
-        // SAFETY: `PackedValue`'s safety contract requires `P` to be
-        // byte-castable to/from `[P::Value; P::WIDTH]`, and with
-        // `P::WIDTH == 1` and `P::Value = Felt` that means `P` and `Felt`
-        // share size and alignment exactly. Hence
-        // `&mut [P; STATE_WIDTH] === &mut [Felt; STATE_WIDTH]`.
-        // This is the only live reference for the duration of the call,
-        // so no aliasing is introduced.
+        // SAFETY: the cast `*mut P → *mut [Felt; STATE_WIDTH]` is sound
+        // because:
+        //   (a) Plonky3's blanket `unsafe impl<T: Packable> PackedValue
+        //       for T` (p3-field/src/packed/packed_traits.rs:384) sets
+        //       `type Value = Self`, so any `P: PackedValue<Value = Felt,
+        //       WIDTH = 1>` reachable through that blanket IS `Felt`
+        //       itself.
+        //   (b) For any custom (non-blanket) `unsafe impl PackedValue` of
+        //       `Value = Felt, WIDTH = 1`, the trait's safety contract
+        //       (packed_traits.rs:14-18) requires P to be byte-castable
+        //       to/from `[P::Value; P::WIDTH] = [Felt; 1]` — same
+        //       size/alignment as `Felt`.
+        //   (c) The const-block size/align asserts below are a
+        //       belt-and-suspenders check at monomorphization time. Any
+        //       impl that violates (a) or (b) trips a compile error at
+        //       the use site rather than producing UB at runtime.
+        //
+        // The resulting `&mut [Felt; STATE_WIDTH]` is the only live
+        // reference for the duration of `scalar_perm(as_felts)`, so no
+        // aliasing is introduced.
+        // Inline `const { ... }` blocks evaluate per-monomorphization
+        // unconditionally — they don't honor the surrounding `if const {}`
+        // branch. Both invariants are gated on `P::WIDTH == 1` here so the
+        // check is a no-op for any WIDTH > 1 instantiation, and a real
+        // size/align match check for the WIDTH = 1 case.
+        const {
+            assert!(
+                P::WIDTH != 1 || size_of::<P>() == size_of::<Felt>(),
+                "PackedValue<Value = Felt, WIDTH = 1> must have the same \
+                 size as Felt; the trait safety contract requires byte \
+                 equivalence with [P::Value; P::WIDTH] = [Felt; 1]",
+            );
+        }
+        const {
+            assert!(
+                P::WIDTH != 1 || align_of::<P>() <= align_of::<Felt>(),
+                "PackedValue<Value = Felt, WIDTH = 1> alignment must not \
+                 exceed Felt's alignment for the *mut P → *mut [Felt; N] \
+                 cast to be sound",
+            );
+        }
         let as_felts: &mut [Felt; STATE_WIDTH] =
             unsafe { &mut *(state.as_mut_ptr().cast::<[Felt; STATE_WIDTH]>()) };
         scalar_perm(as_felts);
