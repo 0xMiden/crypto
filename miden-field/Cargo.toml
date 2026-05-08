@@ -34,12 +34,18 @@ serde                   = { default-features = false, features = ["derive"], ver
 subtle                  = { default-features = false, version = "2.6" }
 
 [features]
-default = []
+default = ["packed-felt-simd128"]
 testing = ["dep:proptest"]
 # When ON and target is wasm32+simd128, `Felt::Packing = PackedFelt` (a 2-lane
 # SIMD-packed Felt with `<Felt as Field>::Packing::WIDTH = 2`). On any other
 # target / feature configuration, `Felt::Packing = Self` (scalar, WIDTH=1).
-# Pure no-op everywhere except wasm32+simd128 with feature ON.
+# Pure no-op everywhere except wasm32+simd128 with feature ON — but ON by
+# default because: (a) the cfg-gate triple `feature + target_arch=wasm32 +
+# target_feature=simd128` makes this code invisible to native consumers and
+# non-simd128 wasm consumers; (b) anyone building for wasm32+simd128 should
+# be picking up the SIMD path by default rather than opting in. Disable
+# explicitly with `default-features = false` (e.g. for an A/B baseline
+# bench).
 packed-felt-simd128 = []
 
 [dev-dependencies]
