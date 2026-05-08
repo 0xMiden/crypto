@@ -61,9 +61,22 @@ pub trait PackedFieldExtensionExt<
     fn pack_ext_columns<const N: usize>(rows: &[[ExtField; N]]) -> [Self; N] {
         let width = BaseField::Packing::WIDTH;
         debug_assert_eq!(rows.len(), width);
+        // Stack-allocate the per-column scratch buffer instead of using a
+        // `Vec`, which dominated the DEEP/FRI hot path on SIMD-packed builds
+        // (called once per chunk × N columns × millions of chunks per prove).
+        // Cap at MAX_WIDTH=16 — covers every realistic packing width
+        // (typically 1, 2, 4, 8) with no heap allocator traffic.
+        const MAX_WIDTH: usize = 16;
+        debug_assert!(width <= MAX_WIDTH, "pack_ext_columns: width > 16 not supported");
         array::from_fn(|col| {
-            let col_elems: Vec<ExtField> = (0..width).map(|lane| rows[lane][col]).collect();
-            Self::from_ext_slice(&col_elems)
+            let buf: [ExtField; MAX_WIDTH] = array::from_fn(|lane| {
+                if lane < width {
+                    rows[lane][col]
+                } else {
+                    ExtField::default()
+                }
+            });
+            Self::from_ext_slice(&buf[..width])
         })
     }
 
