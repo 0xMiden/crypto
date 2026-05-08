@@ -1,5 +1,6 @@
 ## Unreleased
 
+- perf: dropped per-chunk `Vec` allocation from `pack_ext_columns` (the `PackedFieldExtensionExt` default impl in `miden-lifted-stark`'s `pcs::utils`) by switching to a stack-allocated `[ExtField; 16]` scratch buffer. No-op for `Felt::Packing = Self` (scalar) builds because the function is unreachable on that code path. For SIMD-packed builds (any width ≥ 2), this collapses a measured per-cycle DEEP/FRI regression from ~1.0s to ~0ms in browser-side wasm32+simd128 prove benchmarks. Wallet-end ECDSA prove improved by ~37% wallclock as a direct result. ([#XXX](https://github.com/0xMiden/crypto/pull/XXX)).
 - Consolidated `p3-miden-lmcs`, `p3-miden-lifted-fri`, `p3-miden-dev-utils`, and `p3-miden-lifted-examples` into `miden-lifted-stark`; extracted profiling binary into `miden-bench` ([#66](https://github.com/0xMiden/p3-miden/pull/66)).
 - Dropped BabyBear support; simplified tests, benchmarks, and dev-utils to Goldilocks-only ([#52](https://github.com/0xMiden/p3-miden/pull/52)).
 - Added crate-local `testing` modules to `p3-miden-lmcs` and `p3-miden-lifted-fri` behind a `testing` feature flag ([#52](https://github.com/0xMiden/p3-miden/pull/52)).
