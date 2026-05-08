@@ -1,6 +1,7 @@
 ## 0.26.0 (TBD)
 
 - [BREAKING] Upgraded direct `rand` dependencies to 0.10, updating RNG trait bounds and removing direct `rand_hc` usage ([#995](https://github.com/0xMiden/crypto/pull/995)).
+- [BREAKING] Bound `MmrPeaks::hash_peaks()` commitments to the forest leaf count, preventing structurally distinct MMRs with identical peak values from producing the same commitment ([#997](https://github.com/0xMiden/crypto/pull/997)).
 
 ## 0.25.0 (2026-05-01)
 
