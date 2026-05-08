@@ -23,26 +23,30 @@
 //! between the three.
 
 use alloc::vec::Vec;
-use core::arch::wasm32::{
-    i32x4_shuffle, i64x2_add, i64x2_extmul_low_u32x4, i64x2_gt, i64x2_shl, i64x2_shuffle,
-    i64x2_sub, u64x2_shr, u64x2_splat, v128, v128_and, v128_andnot, v128_or, v128_xor,
+use core::{
+    arch::wasm32::{
+        i32x4_shuffle, i64x2_add, i64x2_extmul_low_u32x4, i64x2_gt, i64x2_shl, i64x2_shuffle,
+        i64x2_sub, u64x2_shr, u64x2_splat, v128, v128_and, v128_andnot, v128_or, v128_xor,
+    },
+    iter::{Product, Sum},
+    mem::transmute,
+    ops::{Add, AddAssign, Div, DivAssign, Mul, MulAssign, Neg, Sub, SubAssign},
 };
-use core::iter::{Product, Sum};
-use core::mem::transmute;
-use core::ops::{Add, AddAssign, Div, DivAssign, Mul, MulAssign, Neg, Sub, SubAssign};
 
-use p3_field::exponentiation::exp_10540996611094048183;
-use p3_field::op_assign_macros::{
-    impl_add_assign, impl_add_base_field, impl_div_methods, impl_mul_base_field, impl_mul_methods,
-    impl_packed_value, impl_rng, impl_sub_assign, impl_sub_base_field, impl_sum_prod_base_field,
-    ring_sum,
-};
 use p3_field::{
     Algebra, Field, InjectiveMonomial, PackedField, PackedFieldPow2, PackedValue,
     PermutationMonomial, PrimeCharacteristicRing,
+    exponentiation::exp_10540996611094048183,
+    op_assign_macros::{
+        impl_add_assign, impl_add_base_field, impl_div_methods, impl_mul_base_field,
+        impl_mul_methods, impl_packed_value, impl_rng, impl_sub_assign, impl_sub_base_field,
+        impl_sum_prod_base_field, ring_sum,
+    },
 };
-use rand::distr::{Distribution, StandardUniform};
-use rand::{Rng, RngExt};
+use rand::{
+    Rng, RngExt,
+    distr::{Distribution, StandardUniform},
+};
 
 use super::super::Felt;
 
@@ -107,11 +111,9 @@ impl From<Felt> for PackedFelt {
 // Constants used by the shifted-representation arithmetic.
 // ============================================================================
 
-const SIGN_BIT: v128 =
-    unsafe { transmute::<[u64; 2], v128>([0x8000_0000_0000_0000u64; WIDTH]) };
-const SHIFTED_FIELD_ORDER: v128 = unsafe {
-    transmute::<[u64; 2], v128>([Felt::ORDER ^ 0x8000_0000_0000_0000u64; WIDTH])
-};
+const SIGN_BIT: v128 = unsafe { transmute::<[u64; 2], v128>([0x8000_0000_0000_0000u64; WIDTH]) };
+const SHIFTED_FIELD_ORDER: v128 =
+    unsafe { transmute::<[u64; 2], v128>([Felt::ORDER ^ 0x8000_0000_0000_0000u64; WIDTH]) };
 const EPSILON_VEC: v128 = unsafe { transmute::<[u64; 2], v128>([EPSILON; WIDTH]) };
 
 #[inline(always)]
@@ -464,10 +466,7 @@ mod tests {
         let twos = ones.add(ones);
         assert_eq!(
             twos.0,
-            [
-                <Felt as PrimeCharacteristicRing>::TWO,
-                <Felt as PrimeCharacteristicRing>::TWO,
-            ]
+            [<Felt as PrimeCharacteristicRing>::TWO, <Felt as PrimeCharacteristicRing>::TWO,]
         );
     }
 
@@ -515,19 +514,15 @@ mod tests {
             (1, 1),
             (Felt::ORDER - 1, 1), // wraps to 0
             (Felt::ORDER - 1, Felt::ORDER - 1),
-            (0xFFFF_FFFF, 0xFFFF_FFFF),
-            (0xFFFF_FFFF_FFFF_FFFF, 1), // > P input — both impls should reduce
+            (0xffff_ffff, 0xffff_ffff),
+            (0xffff_ffff_ffff_ffff, 1), // > P input — both impls should reduce
         ];
         for &(a, b) in cases {
             let pkg = pack(a, b);
             let sum_pkg = pkg.add(pkg);
             let scalar_a = Felt::new_unchecked(a) + Felt::new_unchecked(a);
             let scalar_b = Felt::new_unchecked(b) + Felt::new_unchecked(b);
-            assert_eq!(
-                sum_pkg.0,
-                [scalar_a, scalar_b],
-                "add mismatch for ({a:#x}, {b:#x})"
-            );
+            assert_eq!(sum_pkg.0, [scalar_a, scalar_b], "add mismatch for ({a:#x}, {b:#x})");
         }
     }
 
@@ -541,26 +536,22 @@ mod tests {
     fn sub_edge_cases() {
         let cases: &[(u64, u64)] = &[
             (0, 0),
-            (0, 1),                                 // wraps to P-1
+            (0, 1), // wraps to P-1
             (1, 0),
-            (Felt::ORDER - 1, Felt::ORDER - 1),     // -> 0
-            (1, Felt::ORDER - 1),                   // (1 - (-1)) mod P = 2
-            (0, Felt::ORDER - 1),                   // -> 1
-            (0xFFFF_FFFF, 0xFFFF_FFFF),
+            (Felt::ORDER - 1, Felt::ORDER - 1), // -> 0
+            (1, Felt::ORDER - 1),               // (1 - (-1)) mod P = 2
+            (0, Felt::ORDER - 1),               // -> 1
+            (0xffff_ffff, 0xffff_ffff),
             // Non-canonical (>P) inputs — both impls should still reduce.
-            (0xFFFF_FFFF_FFFF_FFFF, 1),
-            (1, 0xFFFF_FFFF_FFFF_FFFF),
+            (0xffff_ffff_ffff_ffff, 1),
+            (1, 0xffff_ffff_ffff_ffff),
         ];
         for &(a, b) in cases {
             let pkg_a = PackedFelt::broadcast(Felt::new_unchecked(a));
             let pkg_b = PackedFelt::broadcast(Felt::new_unchecked(b));
             let diff_pkg = pkg_a.sub(pkg_b);
             let scalar = Felt::new_unchecked(a) - Felt::new_unchecked(b);
-            assert_eq!(
-                diff_pkg.0,
-                [scalar, scalar],
-                "sub mismatch for ({a:#x} - {b:#x})"
-            );
+            assert_eq!(diff_pkg.0, [scalar, scalar], "sub mismatch for ({a:#x} - {b:#x})");
         }
     }
 
@@ -574,21 +565,17 @@ mod tests {
             0,
             1,
             2,
-            Felt::ORDER - 1,                  // expect 1
-            Felt::ORDER - 2,                  // expect 2
-            0xFFFF_FFFF,
-            0xFFFF_FFFF_FFFF_FFFF,            // >P input — should canonicalize
-            0x1234_5678_9ABC_DEF0,
+            Felt::ORDER - 1, // expect 1
+            Felt::ORDER - 2, // expect 2
+            0xffff_ffff,
+            0xffff_ffff_ffff_ffff, // >P input — should canonicalize
+            0x1234_5678_9abc_def0,
         ];
         for &a in cases {
             let pkg_a = PackedFelt::broadcast(Felt::new_unchecked(a));
             let neg_pkg = pkg_a.neg();
             let scalar = -Felt::new_unchecked(a);
-            assert_eq!(
-                neg_pkg.0,
-                [scalar, scalar],
-                "neg mismatch for ({a:#x})"
-            );
+            assert_eq!(neg_pkg.0, [scalar, scalar], "neg mismatch for ({a:#x})");
         }
     }
 
@@ -604,8 +591,8 @@ mod tests {
             // Worst-case for the reduce128 boundary: (P-1)^2 lands at the
             // top of the 128-bit product space.
             (Felt::ORDER - 1, Felt::ORDER - 1),
-            (0xFFFF_FFFF, 0xFFFF_FFFF),
-            (0x1234_5678_9ABC_DEF0, 0xFEDC_BA98_7654_3210),
+            (0xffff_ffff, 0xffff_ffff),
+            (0x1234_5678_9abc_def0, 0xfedc_ba98_7654_3210),
         ];
         for &(a, b) in cases {
             let pkg_a = PackedFelt::broadcast(Felt::new_unchecked(a));
@@ -623,17 +610,11 @@ mod tests {
     fn two_lane_independence() {
         // Distinct values per lane to catch lane-swap bugs.
         let pkg_a = pack(0x1111_2222_3333_4444, 0x5555_6666_7777_8888);
-        let pkg_b = pack(0x9999_AAAA_BBBB_CCCC, 0xDDDD_EEEE_FFFF_0001);
+        let pkg_b = pack(0x9999_aaaa_bbbb_cccc, 0xdddd_eeee_ffff_0001);
         let sum = pkg_a.add(pkg_b);
         let prod = pkg_a.mul(pkg_b);
-        assert_eq!(
-            sum.0,
-            [pkg_a.0[0] + pkg_b.0[0], pkg_a.0[1] + pkg_b.0[1]]
-        );
-        assert_eq!(
-            prod.0,
-            [pkg_a.0[0] * pkg_b.0[0], pkg_a.0[1] * pkg_b.0[1]]
-        );
+        assert_eq!(sum.0, [pkg_a.0[0] + pkg_b.0[0], pkg_a.0[1] + pkg_b.0[1]]);
+        assert_eq!(prod.0, [pkg_a.0[0] * pkg_b.0[0], pkg_a.0[1] * pkg_b.0[1]]);
     }
 
     /// Cross-check `halve` against scalar `Felt::halve` for both even and
@@ -643,10 +624,10 @@ mod tests {
     fn halve_matches_scalar() {
         let cases: &[(u64, u64)] = &[
             (0, 0),
-            (2, 4),                                  // both even
-            (1, 3),                                  // both odd
-            (0xFFFF_FFFE, 0xFFFF_FFFF),              // (even, odd) mixed lanes
-            (Felt::ORDER - 2, Felt::ORDER - 1),      // near-P even/odd
+            (2, 4),                             // both even
+            (1, 3),                             // both odd
+            (0xffff_fffe, 0xffff_ffff),         // (even, odd) mixed lanes
+            (Felt::ORDER - 2, Felt::ORDER - 1), // near-P even/odd
         ];
         for &(a, b) in cases {
             let pkg = pack(a, b);
@@ -661,11 +642,7 @@ mod tests {
     #[test]
     #[wasm_bindgen_test]
     fn square_matches_scalar() {
-        let cases: &[(u64, u64)] = &[
-            (0, 0),
-            (1, 2),
-            (Felt::ORDER - 1, 0xDEAD_BEEF_CAFE_BABE),
-        ];
+        let cases: &[(u64, u64)] = &[(0, 0), (1, 2), (Felt::ORDER - 1, 0xdead_beef_cafe_babe)];
         for &(a, b) in cases {
             let pkg = pack(a, b);
             let sq = <PackedFelt as PrimeCharacteristicRing>::square(&pkg);
@@ -739,12 +716,12 @@ mod tests {
     fn bench_packed_vs_scalar_mul() {
         // Two interesting non-trivial values — chosen so reduce128 has
         // real work to do, not zero-length carries.
-        let pkg_a = pack(0x1234_5678_9ABC_DEF0, 0xFEDC_BA98_7654_3210);
-        let pkg_b = pack(0xCAFE_BABE_DEAD_BEEF, 0x0123_4567_89AB_CDEF);
-        let scalar_a0 = Felt::new_unchecked(0x1234_5678_9ABC_DEF0);
-        let scalar_a1 = Felt::new_unchecked(0xFEDC_BA98_7654_3210);
-        let scalar_b0 = Felt::new_unchecked(0xCAFE_BABE_DEAD_BEEF);
-        let scalar_b1 = Felt::new_unchecked(0x0123_4567_89AB_CDEF);
+        let pkg_a = pack(0x1234_5678_9abc_def0, 0xfedc_ba98_7654_3210);
+        let pkg_b = pack(0xcafe_babe_dead_beef, 0x0123_4567_89ab_cdef);
+        let scalar_a0 = Felt::new_unchecked(0x1234_5678_9abc_def0);
+        let scalar_a1 = Felt::new_unchecked(0xfedc_ba98_7654_3210);
+        let scalar_b0 = Felt::new_unchecked(0xcafe_babe_dead_beef);
+        let scalar_b1 = Felt::new_unchecked(0x0123_4567_89ab_cdef);
 
         // Warm-up.
         for _ in 0..1024 {
@@ -796,12 +773,12 @@ mod tests {
     fn bench_packed_vs_scalar_add() {
         // Mirror of mul bench with addition (which exercises a different
         // SIMD path: i64x2_add + epsilon-correction, no full reduce128).
-        let pkg_a = pack(0x1234_5678_9ABC_DEF0, 0xFEDC_BA98_7654_3210);
-        let pkg_b = pack(0xCAFE_BABE_DEAD_BEEF, 0x0123_4567_89AB_CDEF);
-        let scalar_a0 = Felt::new_unchecked(0x1234_5678_9ABC_DEF0);
-        let scalar_a1 = Felt::new_unchecked(0xFEDC_BA98_7654_3210);
-        let scalar_b0 = Felt::new_unchecked(0xCAFE_BABE_DEAD_BEEF);
-        let scalar_b1 = Felt::new_unchecked(0x0123_4567_89AB_CDEF);
+        let pkg_a = pack(0x1234_5678_9abc_def0, 0xfedc_ba98_7654_3210);
+        let pkg_b = pack(0xcafe_babe_dead_beef, 0x0123_4567_89ab_cdef);
+        let scalar_a0 = Felt::new_unchecked(0x1234_5678_9abc_def0);
+        let scalar_a1 = Felt::new_unchecked(0xfedc_ba98_7654_3210);
+        let scalar_b0 = Felt::new_unchecked(0xcafe_babe_dead_beef);
+        let scalar_b1 = Felt::new_unchecked(0x0123_4567_89ab_cdef);
 
         for _ in 0..1024 {
             let _ = core::hint::black_box(pkg_a) + core::hint::black_box(pkg_b);

@@ -59,9 +59,9 @@ rstest   = { workspace = true }
 # and `js-sys::Date::now()` provides millisecond-resolution timing for the
 # arithmetic micro-bench. Native `cargo test` does not pull these in.
 [target.'cfg(target_arch = "wasm32")'.dev-dependencies]
+js-sys            = "0.3"
 wasm-bindgen      = "0.2"
 wasm-bindgen-test = "0.3"
-js-sys            = "0.3"
 
 [lints]
 workspace = true

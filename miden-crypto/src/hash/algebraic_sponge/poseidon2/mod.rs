@@ -301,8 +301,7 @@ use miden_field::PackedValue;
 use p3_challenger::DuplexChallenger;
 use p3_symmetric::{CryptographicPermutation, PaddingFreeSponge, TruncatedPermutation};
 
-use crate::field::BasedVectorSpace;
-use crate::hash::algebraic_sponge::permute_packed;
+use crate::{field::BasedVectorSpace, hash::algebraic_sponge::permute_packed};
 
 /// Plonky3-compatible Poseidon2 permutation.
 ///

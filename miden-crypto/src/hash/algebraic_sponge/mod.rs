@@ -57,12 +57,12 @@ pub(crate) const MAX_PACK_WIDTH: usize = 16;
 /// on RpoPermutation256 / RpxPermutation256 / Poseidon2Permutation256.
 ///
 /// For `P = Felt` (`P::WIDTH = 1`) this collapses, at compile time via
-/// `if const { ... }`, to a direct cast plus `scalar_perm`. For `P::WIDTH
-/// > 1` it lane-splits the packed input into per-lane scalar rows on a
-/// fixed-size stack scratch, runs `scalar_perm` once per lane, then
-/// re-packs via `P::from_fn`. Sponge permutations have no cross-state
-/// operations so this is bit-exact equivalent to running the scalar perm
-/// once per lane.
+/// `if const { ... }`, to a direct cast plus `scalar_perm`. For
+/// `P::WIDTH > 1` it lane-splits the packed input into per-lane scalar
+/// rows on a fixed-size stack scratch, runs `scalar_perm` once per lane,
+/// then re-packs via `P::from_fn`. Sponge permutations have no
+/// cross-state operations so this is bit-exact equivalent to running the
+/// scalar perm once per lane.
 ///
 /// The const-block check on `P::WIDTH` guarantees per-monomorphization
 /// dead-code elimination of the path that doesn't apply, so the WIDTH=1
@@ -135,8 +135,8 @@ where
             rows[lane][col] = lanes[lane];
         }
     }
-    for lane in 0..width {
-        scalar_perm(&mut rows[lane]);
+    for row in rows.iter_mut().take(width) {
+        scalar_perm(row);
     }
     for col in 0..STATE_WIDTH {
         state[col] = P::from_fn(|lane| rows[lane][col]);
