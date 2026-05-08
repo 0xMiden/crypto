@@ -7,6 +7,7 @@
 - Parallelize aux trace building for faster proving ([#1074](https://github.com/0xMiden/crypto/issues/1074)).
 - [BREAKING] Changed ECDSA-k256 public-key commitments to hash native affine-coordinate limbs (`qx || qy`, little-endian `u32` limbs) while keeping compressed SEC1 serialization unchanged ([#1075](https://github.com/0xMiden/crypto/issues/1075)).
 - Fixed SMT leaf advice decoding by rebuilding decoded entries through `SmtLeaf::new`, so decoded entries must match the supplied leaf index ([#1076](https://github.com/0xMiden/crypto/pull/1076)).
+- [BREAKING] Bound `MmrPeaks::hash_peaks()` commitments to the forest leaf count, preventing structurally distinct MMRs with identical peak values from producing the same commitment ([#997](https://github.com/0xMiden/crypto/pull/997)).
 - Made `Felt::from_{u8, u16, u32}` const and added `Felt::MAX` ([#1081](https://github.com/0xMiden/crypto/pull/1081)).
 
 ## 0.27.0 (2026-06-19)
