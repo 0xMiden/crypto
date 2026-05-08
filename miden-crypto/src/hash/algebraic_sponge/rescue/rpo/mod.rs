@@ -206,6 +206,7 @@ impl Rpo256 {
 /// - PaddingFreeSponge for hashing
 /// - TruncatedPermutation for compression
 /// - DuplexChallenger for Fiat-Shamir transforms
+use miden_field::PackedValue;
 use p3_challenger::DuplexChallenger;
 use p3_symmetric::{
     CryptographicPermutation, PaddingFreeSponge, Permutation, TruncatedPermutation,
@@ -262,13 +263,69 @@ impl RpoPermutation256 {
 // PLONKY3 TRAIT IMPLEMENTATIONS
 // ================================================================================================
 
-impl Permutation<[Felt; STATE_WIDTH]> for RpoPermutation256 {
-    fn permute_mut(&self, state: &mut [Felt; STATE_WIDTH]) {
-        Self::apply_permutation(state);
+/// Maximum supported `PackedValue::WIDTH` for the lane-split scratch buffer.
+/// Real packed Goldilocks types in the wild are at most 8 lanes (AVX-512);
+/// 16 covers any conceivable future widening with no heap traffic.
+const MAX_PACK_WIDTH: usize = 16;
+
+/// Blanket `Permutation` over any `P: PackedValue<Value = Felt>`. Covers
+/// the scalar `[Felt; STATE_WIDTH]` case (P = Felt, WIDTH = 1, fast-path
+/// scalar cast) AND any downstream packed type (e.g. wallet's wasm32+simd128
+/// `PackedFelt` with WIDTH = 2; or future Plonky3-shipped packed
+/// Goldilocks types whose `Scalar` happens to be `Felt`).
+///
+/// The general path lane-splits packed input into per-lane `[Felt;
+/// STATE_WIDTH]` rows, runs the existing scalar `apply_permutation` on
+/// each row independently, then re-packs. Sponge permutations have no
+/// cross-state operations, so this is bit-exact equivalent to running the
+/// scalar perm once per lane.
+impl<P> Permutation<[P; STATE_WIDTH]> for RpoPermutation256
+where
+    P: PackedValue<Value = Felt>,
+{
+    fn permute_mut(&self, state: &mut [P; STATE_WIDTH]) {
+        // WIDTH=1 fast-path. Constant-folded per-monomorphization since
+        // `P::WIDTH` is a const after monomorphization. The unsafe cast is
+        // sound because PackedValue's safety invariant guarantees `P` with
+        // `WIDTH=1` is castable to `[Felt; 1]`, hence
+        // `&mut [P; STATE_WIDTH]` === `&mut [Felt; STATE_WIDTH]`.
+        if P::WIDTH == 1 {
+            // SAFETY: P::WIDTH == 1 guarantees byte-equivalence with Felt
+            // per the PackedValue safety invariant; both operands have the
+            // same alignment requirement (Plonky3's blanket impl makes
+            // every WIDTH=1 PackedValue type be the scalar itself).
+            let as_felts: &mut [Felt; STATE_WIDTH] =
+                unsafe { &mut *(state.as_mut_ptr().cast::<[Felt; STATE_WIDTH]>()) };
+            Self::apply_permutation(as_felts);
+            return;
+        }
+
+        let width = P::WIDTH;
+        assert!(width <= MAX_PACK_WIDTH, "PackedValue::WIDTH > {MAX_PACK_WIDTH} not supported");
+        // Stack-allocated scratch sized to the upper bound — only the
+        // first `width` rows are populated. Avoids heap traffic in the
+        // hot path.
+        let mut rows: [[Felt; STATE_WIDTH]; MAX_PACK_WIDTH] =
+            [[Felt::ZERO; STATE_WIDTH]; MAX_PACK_WIDTH];
+        for col in 0..STATE_WIDTH {
+            let lanes = state[col].as_slice();
+            for lane in 0..width {
+                rows[lane][col] = lanes[lane];
+            }
+        }
+        for lane in 0..width {
+            Self::apply_permutation(&mut rows[lane]);
+        }
+        for col in 0..STATE_WIDTH {
+            state[col] = P::from_fn(|lane| rows[lane][col]);
+        }
     }
 }
 
-impl CryptographicPermutation<[Felt; STATE_WIDTH]> for RpoPermutation256 {}
+impl<P> CryptographicPermutation<[P; STATE_WIDTH]> for RpoPermutation256 where
+    P: PackedValue<Value = Felt>
+{
+}
 
 // TYPE ALIASES FOR PLONKY3 INTEGRATION
 // ================================================================================================

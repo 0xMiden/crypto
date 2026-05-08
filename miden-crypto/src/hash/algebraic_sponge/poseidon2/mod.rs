@@ -297,6 +297,7 @@ impl Poseidon2 {
 // PLONKY3 INTEGRATION
 // ================================================================================================
 
+use miden_field::PackedValue;
 use p3_challenger::DuplexChallenger;
 use p3_symmetric::{CryptographicPermutation, PaddingFreeSponge, TruncatedPermutation};
 
@@ -352,13 +353,50 @@ impl Poseidon2Permutation256 {
 // PLONKY3 TRAIT IMPLEMENTATIONS
 // ================================================================================================
 
-impl Permutation<[Felt; STATE_WIDTH]> for Poseidon2Permutation256 {
-    fn permute_mut(&self, state: &mut [Felt; STATE_WIDTH]) {
-        p3_permute(state);
+/// Maximum supported `PackedValue::WIDTH` for the lane-split scratch buffer.
+const MAX_PACK_WIDTH: usize = 16;
+
+/// Blanket `Permutation` over any `P: PackedValue<Value = Felt>`. See the
+/// equivalent impl on `RpoPermutation256` for the full architectural
+/// rationale; this follows the same lane-split-rejoin recipe with a
+/// constant-folded WIDTH=1 scalar fast-path.
+impl<P> Permutation<[P; STATE_WIDTH]> for Poseidon2Permutation256
+where
+    P: PackedValue<Value = Felt>,
+{
+    fn permute_mut(&self, state: &mut [P; STATE_WIDTH]) {
+        if P::WIDTH == 1 {
+            // SAFETY: P::WIDTH == 1 guarantees byte-equivalence with Felt
+            // per the PackedValue safety invariant.
+            let as_felts: &mut [Felt; STATE_WIDTH] =
+                unsafe { &mut *(state.as_mut_ptr().cast::<[Felt; STATE_WIDTH]>()) };
+            p3_permute(as_felts);
+            return;
+        }
+
+        let width = P::WIDTH;
+        assert!(width <= MAX_PACK_WIDTH, "PackedValue::WIDTH > {MAX_PACK_WIDTH} not supported");
+        let mut rows: [[Felt; STATE_WIDTH]; MAX_PACK_WIDTH] =
+            [[Felt::ZERO; STATE_WIDTH]; MAX_PACK_WIDTH];
+        for col in 0..STATE_WIDTH {
+            let lanes = state[col].as_slice();
+            for lane in 0..width {
+                rows[lane][col] = lanes[lane];
+            }
+        }
+        for lane in 0..width {
+            p3_permute(&mut rows[lane]);
+        }
+        for col in 0..STATE_WIDTH {
+            state[col] = P::from_fn(|lane| rows[lane][col]);
+        }
     }
 }
 
-impl CryptographicPermutation<[Felt; STATE_WIDTH]> for Poseidon2Permutation256 {}
+impl<P> CryptographicPermutation<[P; STATE_WIDTH]> for Poseidon2Permutation256 where
+    P: PackedValue<Value = Felt>
+{
+}
 
 // TYPE ALIASES FOR PLONKY3 INTEGRATION
 // ================================================================================================

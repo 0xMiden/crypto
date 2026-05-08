@@ -395,4 +395,59 @@ mod p3_tests {
 
         assert_eq!(result, expected, "RpxCompression should match Rpx256::merge");
     }
+
+    /// Verifies that the trait-generic blanket
+    /// `impl<P: PackedValue<Value = Felt>> Permutation<[P; STATE_WIDTH]> for RpxPermutation256`
+    /// is bit-exact equivalent to running the scalar permutation on each
+    /// lane independently. See the equivalent rpo test for design rationale.
+    #[test]
+    fn test_rpx_permutation_packed_lane_equivalence() {
+        use miden_field::PackedValue;
+
+        #[derive(Copy, Clone, Default, PartialEq, Eq, Debug)]
+        #[repr(transparent)]
+        struct Packed2(pub [Felt; 2]);
+
+        // SAFETY: Packed2 is `repr(transparent)` over `[Felt; 2]`.
+        unsafe impl PackedValue for Packed2 {
+            type Value = Felt;
+            const WIDTH: usize = 2;
+            fn from_slice(slice: &[Felt]) -> &Self {
+                assert_eq!(slice.len(), 2);
+                unsafe { &*slice.as_ptr().cast::<Self>() }
+            }
+            fn from_slice_mut(slice: &mut [Felt]) -> &mut Self {
+                assert_eq!(slice.len(), 2);
+                unsafe { &mut *slice.as_mut_ptr().cast::<Self>() }
+            }
+            fn from_fn<F: FnMut(usize) -> Felt>(mut f: F) -> Self {
+                Self([f(0), f(1)])
+            }
+            fn as_slice(&self) -> &[Felt] {
+                &self.0
+            }
+            fn as_slice_mut(&mut self) -> &mut [Felt] {
+                &mut self.0
+            }
+        }
+
+        let lane0: [Felt; STATE_WIDTH] =
+            core::array::from_fn(|i| Felt::new_unchecked((i as u64) * 7 + 1));
+        let lane1: [Felt; STATE_WIDTH] =
+            core::array::from_fn(|i| Felt::new_unchecked((i as u64) * 13 + 31));
+
+        let mut ref0 = lane0;
+        let mut ref1 = lane1;
+        RpxPermutation256::apply_permutation(&mut ref0);
+        RpxPermutation256::apply_permutation(&mut ref1);
+
+        let mut packed: [Packed2; STATE_WIDTH] =
+            core::array::from_fn(|i| Packed2([lane0[i], lane1[i]]));
+        RpxPermutation256.permute_mut(&mut packed);
+
+        for i in 0..STATE_WIDTH {
+            assert_eq!(packed[i].0[0], ref0[i], "lane 0 mismatch at i={i}");
+            assert_eq!(packed[i].0[1], ref1[i], "lane 1 mismatch at i={i}");
+        }
+    }
 }
