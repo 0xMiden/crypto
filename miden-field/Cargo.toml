@@ -47,6 +47,16 @@ proptest = { features = ["alloc", "std"], workspace = true }
 rand     = { default-features = false, version = "0.10" }
 rstest   = { workspace = true }
 
+# Wasm-only dev-deps. wasm-bindgen-test makes the wasm32+simd128 tests in
+# `native::packed_felt::wasm32_simd128` runnable via
+#   wasm-pack test --node -p miden-field --features packed-felt-simd128
+# and `js-sys::Date::now()` provides millisecond-resolution timing for the
+# arithmetic micro-bench. Native `cargo test` does not pull these in.
+[target.'cfg(target_arch = "wasm32")'.dev-dependencies]
+wasm-bindgen      = "0.2"
+wasm-bindgen-test = "0.3"
+js-sys            = "0.3"
+
 [lints]
 workspace = true
 

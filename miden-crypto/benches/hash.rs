@@ -24,10 +24,11 @@ use miden_crypto::hash::{
     HasherExt,
     blake::{Blake3_192, Blake3_256},
     keccak::Keccak256,
-    poseidon2::Poseidon2,
-    rpo::Rpo256,
-    rpx::Rpx256,
+    poseidon2::{Poseidon2, Poseidon2Permutation256},
+    rpo::{Rpo256, RpoPermutation256},
+    rpx::{Rpx256, RpxPermutation256},
 };
+use p3_symmetric::Permutation;
 
 // Import common utilities
 mod common;
@@ -165,6 +166,95 @@ benchmark_hash_felt!(
     |count| Some(criterion::Throughput::Elements(count as u64))
 );
 
+// === Scalar permutation dispatch (regression check) ===
+//
+// Each `*_permutation_scalar_dispatch` bench measures the cost of
+// `Permutation<[Felt; STATE_WIDTH]>::permute_mut` when invoked through
+// the new trait-generic blanket impl in `algebraic_sponge`. With the
+// const-folded `if const { P::WIDTH == 1 }` fast-path, this should be
+// byte-equivalent to the previous concrete `impl Permutation<[Felt;
+// STATE_WIDTH]>` dispatch (which was a single `apply_permutation` call).
+//
+// Sister benches `*_apply_permutation_direct` call the inherent
+// `apply_permutation` function bypassing the trait. Comparing the two
+// within a single `cargo bench` run answers: did the trait-blanket
+// extraction add measurable overhead to the scalar path?
+//
+// Expected outcome: the two should land within timing noise of each
+// other (typically <1% difference). Any larger gap indicates the
+// const-fold is not happening or some inlining barrier was introduced.
+//
+// To compare against the pre-blanket baseline directly, run this bench
+// at HEAD~3 (before the trait-generic change) and at HEAD, then
+// `cargo bench` numbers can be compared via criterion's saved baselines:
+//   git checkout HEAD~3 -- miden-crypto/src/hash/algebraic_sponge
+//   cargo bench --bench hash -- perm_rpo256 --save-baseline pre
+//   git checkout HEAD -- miden-crypto/src/hash/algebraic_sponge
+//   cargo bench --bench hash -- perm_rpo256 --baseline pre
+
+fn perm_rpo256_scalar_dispatch(c: &mut Criterion) {
+    let perm = RpoPermutation256;
+    c.bench_function("perm_rpo256_scalar_dispatch", |b| {
+        b.iter_batched(
+            || generate_felt_array_sequential(12).try_into().unwrap(),
+            |mut state: [_; 12]| perm.permute_mut(black_box(&mut state)),
+            criterion::BatchSize::SmallInput,
+        );
+    });
+}
+
+fn perm_rpo256_apply_permutation_direct(c: &mut Criterion) {
+    c.bench_function("perm_rpo256_apply_permutation_direct", |b| {
+        b.iter_batched(
+            || generate_felt_array_sequential(12).try_into().unwrap(),
+            |mut state: [_; 12]| RpoPermutation256::apply_permutation(black_box(&mut state)),
+            criterion::BatchSize::SmallInput,
+        );
+    });
+}
+
+fn perm_rpx256_scalar_dispatch(c: &mut Criterion) {
+    let perm = RpxPermutation256;
+    c.bench_function("perm_rpx256_scalar_dispatch", |b| {
+        b.iter_batched(
+            || generate_felt_array_sequential(12).try_into().unwrap(),
+            |mut state: [_; 12]| perm.permute_mut(black_box(&mut state)),
+            criterion::BatchSize::SmallInput,
+        );
+    });
+}
+
+fn perm_rpx256_apply_permutation_direct(c: &mut Criterion) {
+    c.bench_function("perm_rpx256_apply_permutation_direct", |b| {
+        b.iter_batched(
+            || generate_felt_array_sequential(12).try_into().unwrap(),
+            |mut state: [_; 12]| RpxPermutation256::apply_permutation(black_box(&mut state)),
+            criterion::BatchSize::SmallInput,
+        );
+    });
+}
+
+fn perm_poseidon2_scalar_dispatch(c: &mut Criterion) {
+    let perm = Poseidon2Permutation256;
+    c.bench_function("perm_poseidon2_scalar_dispatch", |b| {
+        b.iter_batched(
+            || generate_felt_array_sequential(12).try_into().unwrap(),
+            |mut state: [_; 12]| perm.permute_mut(black_box(&mut state)),
+            criterion::BatchSize::SmallInput,
+        );
+    });
+}
+
+fn perm_poseidon2_apply_permutation_direct(c: &mut Criterion) {
+    c.bench_function("perm_poseidon2_apply_permutation_direct", |b| {
+        b.iter_batched(
+            || generate_felt_array_sequential(12).try_into().unwrap(),
+            |mut state: [_; 12]| Poseidon2Permutation256::apply_permutation(black_box(&mut state)),
+            criterion::BatchSize::SmallInput,
+        );
+    });
+}
+
 criterion_group!(
     hash_benchmark_group,
     // RPO256 benchmarks
@@ -185,6 +275,13 @@ criterion_group!(
     // Keccak256 benchmarks
     hash_keccak_256_merge,
     hash_keccak_256_sequential_felt,
+    // Scalar permutation dispatch — trait blanket vs direct inherent fn.
+    perm_rpo256_scalar_dispatch,
+    perm_rpo256_apply_permutation_direct,
+    perm_rpx256_scalar_dispatch,
+    perm_rpx256_apply_permutation_direct,
+    perm_poseidon2_scalar_dispatch,
+    perm_poseidon2_apply_permutation_direct,
 );
 
 criterion_main!(hash_benchmark_group);

@@ -427,12 +427,17 @@ unsafe impl PackedFieldPow2 for PackedFelt {
 
 #[cfg(test)]
 mod tests {
-    //! These tests run on wasm32 only (the module is cfg-gated to wasm32).
-    //! Native cargo test won't pick them up — exercise via
-    //!   cargo test --target wasm32-unknown-unknown --features packed-felt-simd128
-    //! with a wasm test runner (e.g. wasm-bindgen-test).
+    //! These tests run on wasm32+simd128 only (the module is cfg-gated to
+    //! that target). Native `cargo test` will NOT execute them. Run via:
     //!
-    //! Bit-exact equivalence vs scalar Felt arithmetic.
+    //!   wasm-pack test --node -p miden-field --features packed-felt-simd128
+    //!
+    //! Each `#[test]` is also annotated `#[wasm_bindgen_test]` so the
+    //! wasm-pack runner picks them up. Bit-exact equivalence vs scalar
+    //! Felt arithmetic.
+
+    use wasm_bindgen::prelude::wasm_bindgen;
+    use wasm_bindgen_test::wasm_bindgen_test;
 
     use super::*;
 
@@ -441,6 +446,7 @@ mod tests {
     }
 
     #[test]
+    #[wasm_bindgen_test]
     fn add_zero_and_one() {
         let zeros = PackedFelt::broadcast(Felt::ZERO);
         let ones = PackedFelt::broadcast(Felt::ONE);
@@ -458,6 +464,7 @@ mod tests {
     }
 
     #[test]
+    #[wasm_bindgen_test]
     fn sub_zero_and_one() {
         let ones = PackedFelt::broadcast(Felt::ONE);
         let zeros = PackedFelt::broadcast(Felt::ZERO);
@@ -476,6 +483,7 @@ mod tests {
     }
 
     #[test]
+    #[wasm_bindgen_test]
     fn neg_zero_and_one() {
         let zeros = PackedFelt::broadcast(Felt::ZERO);
         assert_eq!(zeros.neg().0, [Felt::ZERO, Felt::ZERO]);
@@ -492,6 +500,7 @@ mod tests {
 
     /// Cross-check against scalar Felt for several edge cases.
     #[test]
+    #[wasm_bindgen_test]
     fn add_edge_cases() {
         let cases: &[(u64, u64)] = &[
             (0, 0),
@@ -516,12 +525,16 @@ mod tests {
 
     /// Cross-check multiplication against scalar.
     #[test]
+    #[wasm_bindgen_test]
     fn mul_edge_cases() {
         let cases: &[(u64, u64)] = &[
             (0, 0),
             (1, 1),
             (2, 3),
             (Felt::ORDER - 1, 2),
+            // Worst-case for the reduce128 boundary: (P-1)^2 lands at the
+            // top of the 128-bit product space.
+            (Felt::ORDER - 1, Felt::ORDER - 1),
             (0xFFFF_FFFF, 0xFFFF_FFFF),
             (0x1234_5678_9ABC_DEF0, 0xFEDC_BA98_7654_3210),
         ];
@@ -537,6 +550,7 @@ mod tests {
     /// Two-lane independence: lane 0 and lane 1 should produce the same
     /// result as if each were computed with scalar arithmetic in isolation.
     #[test]
+    #[wasm_bindgen_test]
     fn two_lane_independence() {
         // Distinct values per lane to catch lane-swap bugs.
         let pkg_a = pack(0x1111_2222_3333_4444, 0x5555_6666_7777_8888);
@@ -550,6 +564,209 @@ mod tests {
         assert_eq!(
             prod.0,
             [pkg_a.0[0] * pkg_b.0[0], pkg_a.0[1] * pkg_b.0[1]]
+        );
+    }
+
+    /// Cross-check `halve` against scalar `Felt::halve` for both even and
+    /// odd inputs (odd needs the `+ (P+1)/2` fix-up).
+    #[test]
+    #[wasm_bindgen_test]
+    fn halve_matches_scalar() {
+        let cases: &[(u64, u64)] = &[
+            (0, 0),
+            (2, 4),                                  // both even
+            (1, 3),                                  // both odd
+            (0xFFFF_FFFE, 0xFFFF_FFFF),              // (even, odd) mixed lanes
+            (Felt::ORDER - 2, Felt::ORDER - 1),      // near-P even/odd
+        ];
+        for &(a, b) in cases {
+            let pkg = pack(a, b);
+            let halved = <PackedFelt as PrimeCharacteristicRing>::halve(&pkg);
+            let exp_a = <Felt as PrimeCharacteristicRing>::halve(&Felt::new_unchecked(a));
+            let exp_b = <Felt as PrimeCharacteristicRing>::halve(&Felt::new_unchecked(b));
+            assert_eq!(halved.0, [exp_a, exp_b], "halve mismatch for ({a:#x}, {b:#x})");
+        }
+    }
+
+    /// Cross-check `square` against scalar.
+    #[test]
+    #[wasm_bindgen_test]
+    fn square_matches_scalar() {
+        let cases: &[(u64, u64)] = &[
+            (0, 0),
+            (1, 2),
+            (Felt::ORDER - 1, 0xDEAD_BEEF_CAFE_BABE),
+        ];
+        for &(a, b) in cases {
+            let pkg = pack(a, b);
+            let sq = <PackedFelt as PrimeCharacteristicRing>::square(&pkg);
+            let exp_a = <Felt as PrimeCharacteristicRing>::square(&Felt::new_unchecked(a));
+            let exp_b = <Felt as PrimeCharacteristicRing>::square(&Felt::new_unchecked(b));
+            assert_eq!(sq.0, [exp_a, exp_b], "square mismatch for ({a:#x}, {b:#x})");
+        }
+    }
+
+    /// `interleave(block_len=1)`: [a0, a1] x [b0, b1] -> ([a0, b0], [a1, b1]).
+    /// `interleave(block_len=2)`: identity (both inputs already block-sized 2).
+    #[test]
+    #[wasm_bindgen_test]
+    fn interleave_block_len_1_and_2() {
+        let v0 = pack(1, 2);
+        let v1 = pack(3, 4);
+        let (r0, r1) = v0.interleave(v1, 1);
+        assert_eq!(r0.0, [Felt::new_unchecked(1), Felt::new_unchecked(3)]);
+        assert_eq!(r1.0, [Felt::new_unchecked(2), Felt::new_unchecked(4)]);
+
+        let (r0, r1) = v0.interleave(v1, 2);
+        assert_eq!(r0.0, [Felt::new_unchecked(1), Felt::new_unchecked(2)]);
+        assert_eq!(r1.0, [Felt::new_unchecked(3), Felt::new_unchecked(4)]);
+    }
+
+    // ========================================================================
+    // PackedFelt vs scalar Felt arithmetic micro-bench.
+    //
+    // Goal: demonstrate that the wasm32+simd128 PackedFelt path is faster
+    // than running the same arithmetic twice with scalar Felt.
+    //
+    // Methodology: run N iterations of the operation, time via
+    // `js_sys::Date::now()` (millisecond resolution — fine for N >= ~10k).
+    // Print results to the wasm-pack test log. Assert the packed runtime is
+    // within reason of the scalar runtime (catches egregious regressions
+    // like a missing `target_feature = "+simd128"` build flag).
+    //
+    // This is NOT a microsecond-precision bench — for that, use a
+    // criterion-style harness from a real wasm prover bench. This version
+    // gives you a "is the simd128 path actually exercised" sanity number.
+    //
+    // Run via: wasm-pack test --node -p miden-field --features packed-felt-simd128
+    // (the timing print only shows up with `wasm-pack test --node`'s
+    // captured stdout; use --release for meaningful numbers).
+    // ========================================================================
+
+    /// Iteration count for the micro-bench. Must be high enough that the
+    /// total runtime exceeds Date.now()'s millisecond resolution by a
+    /// healthy margin.
+    const BENCH_ITERS: usize = 200_000;
+
+    fn now_ms() -> f64 {
+        js_sys::Date::now()
+    }
+
+    // Direct binding to the host's `console.log`. Printed to wasm-pack's
+    // captured node stdout in `wasm-pack test --node`, and to the
+    // browser console in `wasm-pack test --headless --chrome`.
+    #[wasm_bindgen]
+    extern "C" {
+        #[wasm_bindgen(js_namespace = console)]
+        fn log(s: &str);
+    }
+
+    fn console_log(msg: &str) {
+        log(msg);
+    }
+
+    #[test]
+    #[wasm_bindgen_test]
+    fn bench_packed_vs_scalar_mul() {
+        // Two interesting non-trivial values — chosen so reduce128 has
+        // real work to do, not zero-length carries.
+        let pkg_a = pack(0x1234_5678_9ABC_DEF0, 0xFEDC_BA98_7654_3210);
+        let pkg_b = pack(0xCAFE_BABE_DEAD_BEEF, 0x0123_4567_89AB_CDEF);
+        let scalar_a0 = Felt::new_unchecked(0x1234_5678_9ABC_DEF0);
+        let scalar_a1 = Felt::new_unchecked(0xFEDC_BA98_7654_3210);
+        let scalar_b0 = Felt::new_unchecked(0xCAFE_BABE_DEAD_BEEF);
+        let scalar_b1 = Felt::new_unchecked(0x0123_4567_89AB_CDEF);
+
+        // Warm-up.
+        for _ in 0..1024 {
+            let _ = core::hint::black_box(pkg_a) * core::hint::black_box(pkg_b);
+        }
+
+        // Packed: one PackedFelt::mul == 2 lane multiplies.
+        let t0 = now_ms();
+        let mut acc = pkg_a;
+        for _ in 0..BENCH_ITERS {
+            acc = core::hint::black_box(acc) * core::hint::black_box(pkg_b);
+        }
+        let packed_ms = now_ms() - t0;
+        core::hint::black_box(acc);
+
+        // Scalar: 2 Felt::mul calls (matched lane count to the packed
+        // operation so the comparison is workload-equivalent).
+        let t0 = now_ms();
+        let mut acc0 = scalar_a0;
+        let mut acc1 = scalar_a1;
+        for _ in 0..BENCH_ITERS {
+            acc0 = core::hint::black_box(acc0) * core::hint::black_box(scalar_b0);
+            acc1 = core::hint::black_box(acc1) * core::hint::black_box(scalar_b1);
+        }
+        let scalar_ms = now_ms() - t0;
+        core::hint::black_box((acc0, acc1));
+
+        let speedup = scalar_ms / packed_ms;
+        console_log(&alloc::format!(
+            "[bench] PackedFelt::mul vs 2x Felt::mul over {BENCH_ITERS} iters: \
+             packed={packed_ms:.1}ms  scalar={scalar_ms:.1}ms  speedup={speedup:.2}x"
+        ));
+
+        // Sanity bound — packed should not be MORE than 1.5x slower than
+        // scalar even in adversarial timing. With +simd128 enabled and a
+        // release build, expect ~1.5-2.0x speedup. With +simd128 missing,
+        // packed degrades to scalar+overhead which is roughly equal-or-
+        // slower. With opt-level=0, all bets are off (don't run there).
+        assert!(
+            packed_ms < scalar_ms * 1.5,
+            "PackedFelt::mul is unexpectedly slow: \
+             packed={packed_ms:.1}ms  scalar={scalar_ms:.1}ms  \
+             speedup={speedup:.2}x — is +simd128 enabled and build in release?"
+        );
+    }
+
+    #[test]
+    #[wasm_bindgen_test]
+    fn bench_packed_vs_scalar_add() {
+        // Mirror of mul bench with addition (which exercises a different
+        // SIMD path: i64x2_add + epsilon-correction, no full reduce128).
+        let pkg_a = pack(0x1234_5678_9ABC_DEF0, 0xFEDC_BA98_7654_3210);
+        let pkg_b = pack(0xCAFE_BABE_DEAD_BEEF, 0x0123_4567_89AB_CDEF);
+        let scalar_a0 = Felt::new_unchecked(0x1234_5678_9ABC_DEF0);
+        let scalar_a1 = Felt::new_unchecked(0xFEDC_BA98_7654_3210);
+        let scalar_b0 = Felt::new_unchecked(0xCAFE_BABE_DEAD_BEEF);
+        let scalar_b1 = Felt::new_unchecked(0x0123_4567_89AB_CDEF);
+
+        for _ in 0..1024 {
+            let _ = core::hint::black_box(pkg_a) + core::hint::black_box(pkg_b);
+        }
+
+        let t0 = now_ms();
+        let mut acc = pkg_a;
+        for _ in 0..BENCH_ITERS {
+            acc = core::hint::black_box(acc) + core::hint::black_box(pkg_b);
+        }
+        let packed_ms = now_ms() - t0;
+        core::hint::black_box(acc);
+
+        let t0 = now_ms();
+        let mut acc0 = scalar_a0;
+        let mut acc1 = scalar_a1;
+        for _ in 0..BENCH_ITERS {
+            acc0 = core::hint::black_box(acc0) + core::hint::black_box(scalar_b0);
+            acc1 = core::hint::black_box(acc1) + core::hint::black_box(scalar_b1);
+        }
+        let scalar_ms = now_ms() - t0;
+        core::hint::black_box((acc0, acc1));
+
+        let speedup = scalar_ms / packed_ms;
+        console_log(&alloc::format!(
+            "[bench] PackedFelt::add vs 2x Felt::add over {BENCH_ITERS} iters: \
+             packed={packed_ms:.1}ms  scalar={scalar_ms:.1}ms  speedup={speedup:.2}x"
+        ));
+
+        assert!(
+            packed_ms < scalar_ms * 1.5,
+            "PackedFelt::add is unexpectedly slow: \
+             packed={packed_ms:.1}ms  scalar={scalar_ms:.1}ms  \
+             speedup={speedup:.2}x — is +simd128 enabled and build in release?"
         );
     }
 }
