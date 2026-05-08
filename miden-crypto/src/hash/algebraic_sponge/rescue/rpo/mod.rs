@@ -271,7 +271,7 @@ impl RpoPermutation256 {
 /// wasm32+simd128 `PackedFelt` with WIDTH = 2; or future Plonky3-shipped
 /// packed Goldilocks types whose `Scalar` happens to be `Felt`).
 ///
-/// Body delegated to [`permute_packed`] in the shared
+/// Body delegated to `permute_packed` in the shared
 /// `hash::algebraic_sponge` module — same body across the three sponge
 /// permutations.
 impl<P> Permutation<[P; STATE_WIDTH]> for RpoPermutation256

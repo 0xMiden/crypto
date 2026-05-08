@@ -390,7 +390,7 @@ impl RpxPermutation256 {
 
 /// Blanket `Permutation` over any `P: PackedValue<Value = Felt>`. See the
 /// equivalent impl on `RpoPermutation256` for the full rationale; body
-/// delegated to [`permute_packed`] in the shared
+/// delegated to `permute_packed` in the shared
 /// `hash::algebraic_sponge` module.
 impl<P> Permutation<[P; STATE_WIDTH]> for RpxPermutation256
 where
