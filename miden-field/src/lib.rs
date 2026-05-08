@@ -19,6 +19,14 @@ mod native;
 #[cfg(not(all(target_family = "wasm", miden)))]
 pub use native::{Felt, FeltFromIntError};
 
+#[cfg(all(
+    feature = "packed-felt-simd128",
+    target_arch = "wasm32",
+    target_feature = "simd128",
+    not(all(target_family = "wasm", miden))
+))]
+pub use native::packed_felt::PackedFelt;
+
 pub mod utils;
 
 pub mod word;

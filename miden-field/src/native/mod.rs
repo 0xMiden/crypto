@@ -33,6 +33,9 @@ use subtle::{ConditionallySelectable, ConstantTimeLess};
 #[cfg(test)]
 mod tests;
 
+#[cfg(feature = "packed-felt-simd128")]
+pub mod packed_felt;
+
 // FELT
 // ================================================================================================
 
@@ -186,8 +189,25 @@ impl Hash for Felt {
 // ================================================================================================
 
 impl Field for Felt {
+    // With the `packed-felt-simd128` feature, wasm32+simd128 builds get a
+    // 2-lane PackedFelt; everything else falls back to scalar `Self`. This
+    // is structurally what the `TODO` below asks for on the wasm32 side;
+    // native AVX2/NEON paths remain TODO until similar PackedFelt backends
+    // exist for those targets.
+    //
     // TODO: This should only be the case for WASM targets.
     // Native targets should be able to leverage AVX2 / NEON optimizations from Plonky3.
+    #[cfg(all(
+        feature = "packed-felt-simd128",
+        target_arch = "wasm32",
+        target_feature = "simd128"
+    ))]
+    type Packing = packed_felt::PackedFelt;
+    #[cfg(not(all(
+        feature = "packed-felt-simd128",
+        target_arch = "wasm32",
+        target_feature = "simd128"
+    )))]
     type Packing = Self;
 
     const GENERATOR: Self = Self(Goldilocks::GENERATOR);

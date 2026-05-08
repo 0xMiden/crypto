@@ -36,6 +36,11 @@ subtle                  = { default-features = false, version = "2.6" }
 [features]
 default = []
 testing = ["dep:proptest"]
+# When ON and target is wasm32+simd128, `Felt::Packing = PackedFelt` (a 2-lane
+# SIMD-packed Felt with `<Felt as Field>::Packing::WIDTH = 2`). On any other
+# target / feature configuration, `Felt::Packing = Self` (scalar, WIDTH=1).
+# Pure no-op everywhere except wasm32+simd128 with feature ON.
+packed-felt-simd128 = []
 
 [dev-dependencies]
 proptest = { features = ["alloc", "std"], workspace = true }
