@@ -36,12 +36,12 @@ and code examples.
 3. Sample aux randomness, build aux trace, commit aux LDE.
 4. Sample constraint folding challenge `alpha` and cross-trace accumulator `beta`.
 5. Build periodic LDEs for periodic columns.
-6. Compute folded constraint numerators on each trace's quotient domain `gJ`.
-7. Lift and beta-accumulate numerators onto the max quotient domain.
-8. Divide by the max vanishing polynomial to obtain Q(gJ).
-9. Commit quotient chunks via fused iDFT + scaling + DFT pipeline.
-10. Sample OOD point `z` (rejection-sampled outside trace domain), derive `z_next`.
-11. Open via PCS at `[z, z_next]` for main, aux, and quotient trees.
+6. For each AIR `j` (ascending height): evaluate the per-AIR quotient on its native
+   quotient coset, upsample to the batch-wide constraint degree if needed, and
+   Horner-fold into the running accumulator (lifted to match).
+7. Commit quotient chunks via fused iDFT + scaling + DFT pipeline.
+8. Sample OOD point `z` (rejection-sampled outside trace domain), derive `z_next`.
+9. Open via PCS at `[z, z_next]` for main, aux, and quotient trees.
 
 ## Mathematical background
 
@@ -144,58 +144,71 @@ Implementation-wise:
   truncating to $N D$ rows and bit-reversing. This is what
   `Committed::evals_on_quotient_domain` encodes.
 
-### Lifting numerators instead of re-evaluating constraints
+### Lifting quotients instead of re-evaluating constraints
 
 The expensive part of proving is evaluating constraints across a domain.
-For a short trace $T_j$ we do **not** evaluate constraints over the max domain.
+For a short trace $T_j$ we do **not** evaluate constraints over the max domain,
+and when the AIR's constraint degree $D_j < D_{\max}$ we also do not evaluate at
+$D_{\max}$.
 
-Instead:
+Instead, for each AIR $j$:
 
-1. Evaluate the folded constraint numerator $N_j$ on the *small* quotient coset
-   $(gJ)^{r_j}$ of size $n_j D$.
+1. Evaluate the folded constraint numerator and divide by $Z_{H^{r_j}}$ on the
+   *small* quotient coset $(gJ)^{r_j}$ of size $n_j D_j$ (one fused write — see
+   the next section). The result is $Q_j$ on $(gJ)^{r_j}$.
 
-2. **Lift** $N_j$ onto the max quotient coset $gJ$ by cyclic extension:
+2. If $D_j < D_{\max}$, low-degree-extend $Q_j$ to size $n_j D_{\max}$
+   (iDFT, zero-pad, coset DFT — same polynomial, denser sampling).
 
-$$
-\big(\mathrm{lift}_{r}(v)\big)\lbrack i\rbrack = v\lbrack i \bmod |v|\rbrack,\quad i \in \lbrack 0, r\,|v|).
-$$
-
-This matches $X \mapsto X^{r}$ on two-adic cosets: iterating the $gJ$ points
-in natural order, raising them to the $r$-th power cycles through $(gJ)^r$ with period
-$| (gJ)^r |$.
-
-3. Combine lifted numerators across traces using challenge $\beta$ (Horner):
+3. **Lift** the running accumulator from its current height onto $n_j D_{\max}$
+   by cyclic extension:
 
 $$
-N_{\mathrm{acc}} \leftarrow \mathrm{lift}_{r}(N_{\mathrm{acc}}) \cdot \beta + N_j.
+\big(\mathrm{lift}_{r}(v)\big)\lbrack i\rbrack = v\lbrack i \bmod |v|\rbrack,\quad i \in \lbrack 0, r\,|v|),
 $$
 
-Because $Z_{H^{r_j}}(X^{r_j}) = Z_H(X)$, lifting turns "divisible by $Z_{H^{r_j}}$" into
-"divisible by $Z_H$". After combining, the result is still divisible by $Z_H$,
-so we divide **once** on the max domain.
+and Horner-fold $Q_j$ in:
+
+$$
+\mathrm{acc} \leftarrow \mathrm{lift}_{r}(\mathrm{acc}) \cdot \beta + Q_j.
+$$
+
+Cyclic extension matches $X \mapsto X^{r}$ on two-adic cosets: iterating the $gJ$
+points in natural order, raising them to the $r$-th power cycles through $(gJ)^r$
+with period $|(gJ)^r|$.
+
+When the prior accumulator already sits on the new AIR's domain ($r = 1$, e.g.
+consecutive AIRs share `(trace_height, D)`), the implementation fuses the Horner
+mul and add into a single packed pass — no separate $\beta$-scaling sweep.
+
+Because each $Q_j$ is already divided by its own $Z_{H^{r_j}}$, no separate
+division on the max domain is needed.
 
 ### Vanishing division (periodicity trick)
 
-On $gJ$, the vanishing polynomial
+On $(gJ)^{r_j}$, the per-AIR vanishing polynomial
 
 $$
-Z_H(X) = X^N - 1
+Z_{H^{r_j}}(X) = X^{n_j} - 1
 $$
 
-takes only $D$ distinct values, since for $x = g\,\omega_J^i$:
+takes only $D_j$ distinct values, since for $x = g^{r_j}\,\omega^i$ with $\omega$ of
+order $n_j D_j$:
 
 $$
-x^N = g^N\,(\omega_J^N)^i = g^N\,\omega_S^i
-\qquad\text{where } \omega_S := \omega_J^N \text{ has order } D.
+x^{n_j} = g^{n_j r_j}\,\omega_S^i
+\qquad\text{where } \omega_S := \omega^{n_j} \text{ has order } D_j.
 $$
 
-Division by $Z_H$ batch-inverts those $D$ values once and indexes by
-$i \bmod D$ (a bitmask in code).
+Division by $Z_{H^{r_j}}$ batch-inverts those $D_j$ values once and indexes by
+$i \bmod D_j$ (a bitmask in code), fused into the constraint evaluation's write
+step.
 
 ### Quotient commitment (fused scaling)
 
-After division we have $Q$ evaluated on $gJ$ in natural order. We commit to
-LDE evaluations of the $D$ degree-$<N$ chunks $q_0,\dots,q_{D-1}$ on $gK$.
+After all AIRs are folded in we have $Q$ evaluated on $gJ$ in natural order
+(taking $D := D_{\max}$). We commit to LDE evaluations of the $D$ degree-$<N$
+chunks $q_0,\dots,q_{D-1}$ on $gK$.
 
 The decomposition: $gJ$ splits into $D$ disjoint $H$-cosets,
 

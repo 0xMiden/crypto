@@ -308,11 +308,11 @@ where
 
     // 4. Evaluate constraints and accumulate quotient evaluations with beta folding.
     //
-    // For each AIR:
-    //   1. Evaluate folded constraints divided by `Z_{H_j}` on the native quotient domain (divide
-    //      fused into the evaluation's write step)
-    //   2. If `D_j < D_max`, low-degree-extend to the per-trace target domain
-    //   3. Cyclically extend the global accumulator and add in
+    // Per AIR (ascending height):
+    //   1. Evaluate Q_j = (alpha-folded constraints) / Z_{H_j} on the native quotient domain
+    //      (divide fused into the eval write).
+    //   2. If D_j < D_max, upsample Q_j to the per-trace target domain.
+    //   3. Cyclically extend the accumulator and Horner-fold: acc <- acc * beta + Q_j.
     //
     // Pre-allocate with LDE capacity so commit_quotient's resize doesn't reallocate.
     let mut accumulator: Vec<EF> = Vec::with_capacity(max_quotient_height * blowup);
@@ -392,24 +392,16 @@ where
 
             debug_assert_eq!(quotient_evals.len(), this_target_quotient_height);
 
-            // Cyclically extend accumulator across trace-height growth and scale by beta.
+            // Cyclically extend the running accumulator to the per-AIR target height and
+            // Horner-fold this AIR's contribution in: acc <- acc * beta + Q_j.
             tracing::debug_span!(
-                "cyclic_extend",
+                "cyclic_extend_and_accumulate",
                 acc_len = accumulator.len(),
                 target = this_target_quotient_height
             )
             .in_scope(|| {
-                quotient::cyclic_extend_and_scale(
-                    &mut accumulator,
-                    this_target_quotient_height,
-                    beta,
-                );
+                quotient::cyclic_extend_and_accumulate(&mut accumulator, quotient_evals, beta);
             });
-
-            accumulator
-                .iter_mut()
-                .zip(quotient_evals)
-                .for_each(|(acc, value)| *acc += value);
         }
     });
 

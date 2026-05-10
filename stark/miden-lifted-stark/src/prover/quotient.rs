@@ -2,8 +2,8 @@
 //!
 //! - [`upsample_evals`]: Low-degree extend coset evaluations onto a larger two-adic coset (the
 //!   constraint-degree axis: `D_j -> D_max`, same polynomial, denser evaluations).
-//! - [`cyclic_extend_and_scale`]: Lift along the trace-height axis (`n_j -> N`) by cyclic
-//!   repetition, and Horner-fold the running accumulator across AIRs by `beta`.
+//! - [`cyclic_extend_and_accumulate`]: Lift the running accumulator along the trace-height axis
+//!   (`n_j -> N`) by cyclic repetition, and Horner-fold a new AIR's contribution in via beta.
 //! - [`compute_z_h_inverses`]: Precompute the distinct `1 / Z_H` values on a quotient coset.
 //! - [`commit_quotient`]: Decompose Q(gJ) into chunks and commit on gK.
 
@@ -12,8 +12,9 @@ use alloc::{format, vec, vec::Vec};
 use p3_dft::TwoAdicSubgroupDft;
 use p3_field::{
     BasedVectorSpace, ExtensionField, Field, TwoAdicField, batch_multiplicative_inverse,
+    par_add_scaled_slice_in_place, par_scale_slice_in_place,
 };
-use p3_matrix::{Matrix, dense::RowMajorMatrix};
+use p3_matrix::dense::RowMajorMatrix;
 use p3_maybe_rayon::prelude::*;
 use p3_util::log2_strict_usize;
 use tracing::info_span;
@@ -52,41 +53,59 @@ where
         return evals;
     }
 
-    dft.lde_algebra_batch(RowMajorMatrix::new_col(evals), added_bits)
-        .to_row_major_matrix()
-        .values
+    dft.lde_algebra_batch(RowMajorMatrix::new_col(evals), added_bits).values
 }
 
-/// Cyclically extend the accumulator to `target_len` and scale every element by `beta`.
+/// Fold a new AIR's quotient contribution into the cross-AIR accumulator via one
+/// Horner step, after lifting the prior accumulator onto the larger coset:
 ///
-/// On the first call (empty accumulator) this simply zero-fills to `target_len`.
-/// On subsequent calls it scales the existing buffer by `beta` (Horner folding)
-/// then doubles via `extend_from_within` until it reaches `target_len`.
+/// ```text
+/// acc <- lift_r(acc) * beta + contribution,    r = contribution.len() / acc.len()
+/// ```
 ///
-/// Both `accumulator.len()` and `target_len` must be powers of two, and
-/// `target_len >= accumulator.len()`.
+/// On return, `accumulator.len() == contribution.len()`. `contribution.len()` and
+/// (when non-empty) `accumulator.len()` must be powers of two, with
+/// `contribution.len() >= accumulator.len()`.
 ///
-/// Two things happen here, on two different axes:
+/// # Why
 ///
-/// - **Trace-height lift.** The previous AIR's quotient was evaluated on its native subgroup; the
-///   new AIR sits on a larger one. Cyclic repetition realizes the polynomial composition `P(X) ->
-///   P(X^r)` that lifts the previous contribution along the subgroup tower (`H_prev` is a subgroup
-///   of `H_new`, and on the larger coset's bit-reversed buffer the smaller coset is embedded as the
-///   first `r`-th of the entries; appending a copy each doubling preserves values on the smaller
-///   coset).
-/// - **Per-AIR fold.** The `beta` multiplication implements Horner folding of the per-AIR
-///   contributions: `acc <- acc * beta + contribution_j` after each iteration.
-pub fn cyclic_extend_and_scale<EF: Field>(accumulator: &mut Vec<EF>, target_len: usize, beta: EF) {
+/// - **Scale before extend.** Horner-multiplying the smaller buffer is strictly less work than the
+///   lifted one, and the lifted values are determined entirely by the smaller buffer via cyclic
+///   repetition — there's no reason to materialize them before scaling.
+/// - **Cyclic repetition = polynomial lift on two-adic cosets.** In natural-order coset
+///   evaluations, `extended[i] = original[i mod n_old]` realises the composition `P(X) -> P(X^r)`:
+///   iterating `gJ` in natural order and raising to the `r`-th power cycles through `(gJ)^r` with
+///   period `|(gJ)^r|`. This is what makes the running sum a coherent polynomial across the
+///   trace-height tower.
+pub fn cyclic_extend_and_accumulate<EF: Field>(
+    accumulator: &mut Vec<EF>,
+    contribution: Vec<EF>,
+    beta: EF,
+) {
     if accumulator.is_empty() {
-        accumulator.resize(target_len, EF::ZERO);
-    } else {
-        // Horner: scale the existing buffer by beta before extending it.
-        accumulator.par_iter_mut().for_each(|v| *v *= beta);
-        // Cyclic extension by repeated doubling (all sizes are powers of 2).
-        while accumulator.len() < target_len {
-            accumulator.extend_from_within(..);
-        }
+        *accumulator = contribution;
+        return;
     }
+
+    if accumulator.len() == contribution.len() {
+        // No lift needed; fuse the Horner mul and add into a single packed pass by
+        // computing `contribution + beta * accumulator` in place on the (owned)
+        // contribution buffer and swapping it in.
+        let mut contribution = contribution;
+        par_add_scaled_slice_in_place(&mut contribution, accumulator, beta);
+        *accumulator = contribution;
+        return;
+    }
+
+    par_scale_slice_in_place(accumulator, beta);
+    while accumulator.len() < contribution.len() {
+        accumulator.extend_from_within(..);
+    }
+    // TODO: use parallel packed addition
+    accumulator
+        .par_iter_mut()
+        .zip(contribution.into_par_iter())
+        .for_each(|(a, c)| *a += c);
 }
 
 // ============================================================================
