@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>miden-crypto WASM bench</title>
+    <style>
+      body { font-family: ui-monospace, monospace; padding: 1em; }
+      #status { white-space: pre; }
+    </style>
+  </head>
+  <body>
+    <h1>miden-crypto WASM bench</h1>
+    <div id="status">Loading WASM module…</div>
+    <script type="module">
+      // Wasm-bindgen emits an ESM file at pkg/miden_bench_wasm.js.
+      // The default export initialises the module; named exports are the
+      // bench functions. The driver finds them via window.__bench__.
+      import init, * as benches from "./pkg/miden_bench_wasm.js";
+
+      async function boot() {
+        await init();
+        window.__bench__ = benches;
+        document.getElementById("status").textContent =
+          "Ready. Available benches: " +
+          Object.keys(benches)
+            .filter((k) => k.startsWith("bench_"))
+            .join(", ");
+      }
+      boot().catch((err) => {
+        document.getElementById("status").textContent =
+          "Init failed: " + err.message;
+        throw err;
+      });
+    </script>
+  </body>
+</html>

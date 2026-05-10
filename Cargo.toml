@@ -2,6 +2,7 @@
 exclude = ["miden-crypto-fuzz"]
 members = [
   "miden-bench",
+  "miden-bench-wasm",
   "miden-crypto",
   "miden-crypto-derive",
   "miden-field",

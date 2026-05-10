@@ -1,0 +1,195 @@
+# Performance regression tracking for miden-crypto.
+#
+# Two jobs run on every PR + every push to `next`:
+#
+#   1. bench-wasm:  headless-Chromium + wasm-pack harness in miden-bench-wasm/
+#                   tracks RPO/RPX/Poseidon2/Blake3/Keccak hash perf as
+#                   compiled to wasm32 + run in V8 — the runtime real users
+#                   ship in.
+#
+#   2. bench-native: cargo bench --bench {hash,word,transpose} on the GHA
+#                    runner. Tracks the same primitives at native speed for
+#                    comparison + regression detection.
+#
+# Both jobs feed `benchmark-action/github-action-benchmark`, which:
+#   - Stores each metric over time on the `gh-pages` branch under
+#     `bench/` (separate from the existing `docs/` subdir used by docs.yml,
+#     so the two don't collide).
+#   - Posts a sticky PR comment showing the diff vs the latest `next`
+#     baseline. Header per job, so wasm and native each get their own
+#     comment that updates in place.
+#   - Alerts (writes a comment header) on regression > 15 %. Doesn't fail
+#     the workflow — GHA Linux runners share CPUs and the noise floor on
+#     hash benches is real. False-positive alerts are cheap to ignore;
+#     false-negative reverts are expensive.
+#
+# This is deliberately one workflow with two jobs (rather than two
+# separate workflow files): both produce sticky comments to the same PR,
+# both use the same gh-pages branch, both share the same triage
+# discipline. Putting them next to each other in one file keeps the
+# regression-tracking story coherent.
+
+name: bench
+
+on:
+  pull_request:
+  push:
+    branches: [next]
+  workflow_dispatch:
+
+permissions:
+  contents: write       # github-action-benchmark needs to push to gh-pages
+  pull-requests: write  # for sticky PR comment
+
+# Skip duplicate runs on PR sync events.
+concurrency:
+  group: bench-${{ github.workflow }}-${{ github.head_ref || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  bench-wasm:
+    name: WASM perf (Chromium / V8)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust + wasm32 target
+        run: |
+          rustup update --no-self-update
+          rustup target add wasm32-unknown-unknown
+
+      - name: Install wasm-pack
+        # Pinned major (`v0.13`) — wasm-pack pre-compiled binaries break
+        # at minor bumps occasionally. Bump deliberately, never floating.
+        uses: jetli/wasm-pack-action@v0.4.0
+        with:
+          version: "v0.13.1"
+
+      - name: Build miden-bench-wasm
+        # `--target web` produces an ESM JS file that imports/instantiates
+        # the .wasm via `fetch()` — what the static page expects. The
+        # `--release` profile is required: without it the per-op cost
+        # is dominated by debug-mode overflow checks and the numbers are
+        # meaningless as a perf-tracking signal.
+        run: |
+          wasm-pack build --release --target web \
+            --out-dir static/pkg miden-bench-wasm
+
+      - name: Install Node deps
+        working-directory: miden-bench-wasm
+        run: npm install --no-audit --no-fund
+
+      - name: Install Chromium
+        working-directory: miden-bench-wasm
+        # Chromium-only — the action's matrix support is via npx, but we
+        # only target one browser for now (V8 fidelity to the wallet).
+        run: npx playwright install --with-deps chromium
+
+      - name: Run benches
+        id: run
+        working-directory: miden-bench-wasm
+        run: |
+          node driver.mjs > results.json
+          echo "results=$(cat results.json | wc -l) entries written"
+          # Surface the per-bench medians in the workflow summary so a
+          # human can eyeball them without clicking into the artifact.
+          {
+            echo '## WASM bench results'
+            echo ''
+            echo '| bench | median (ns/iter) |'
+            echo '|---|---|'
+            jq -r '.[] | "| \(.name) | \(.value | tostring) |"' results.json
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload raw results as artifact
+        # Keeps the full per-batch sample distribution + driver stderr
+        # for post-hoc analysis when an alert fires. The
+        # github-action-benchmark store only retains the median.
+        uses: actions/upload-artifact@v4
+        with:
+          name: bench-wasm-results
+          path: miden-bench-wasm/results.json
+          retention-days: 30
+
+      - name: Track + alert on regression
+        uses: benchmark-action/github-action-benchmark@v1
+        with:
+          tool: customSmallerIsBetter
+          output-file-path: miden-bench-wasm/results.json
+          # Separate gh-pages subdir so this never collides with docs.yml's
+          # `destination_dir: docs` deploy (which lives at /docs/).
+          benchmark-data-dir-path: bench/wasm
+          gh-pages-branch: gh-pages
+          # Push baseline updates ONLY on push to next (not on PR runs —
+          # those compare against the existing baseline, they don't update it).
+          auto-push: ${{ github.event_name == 'push' }}
+          comment-on-alert: true
+          # Regression alert threshold. Tuned high (15 %) because GHA Linux
+          # runners share CPUs; 10 % would false-positive on noisy
+          # neighbours. Re-tighten after we have ~50 PR samples and the
+          # measured run-to-run variance stabilises.
+          alert-threshold: "115%"
+          fail-on-alert: false  # warn via comment, don't fail the PR
+          summary-always: true  # keep the diff comment fresh on each run
+          comment-always: ${{ github.event_name == 'pull_request' }}
+          alert-comment-cc-users: '@WiktorStarczewski'
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+  bench-native:
+    name: Native perf (Linux x86_64)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust
+        run: rustup update --no-self-update
+
+      - name: Run benches
+        id: run
+        # Initial bench triage:
+        #   - hash:      RPO/RPX/Poseidon2/Blake3/Keccak merge + sequential.
+        #                The headline. Fast (sub-second per group).
+        #   - word:      Felt arithmetic primitives. Foundational, fast.
+        #   - transpose: Matrix transpose. Foundational, fast.
+        #
+        # Deliberately excluded for now (revisit after first PR lands):
+        #   - smt / merkle / partial_mt / store: moderate runtime, not the
+        #     headline; defer until we know the wasm + tracked-native
+        #     setup is stable.
+        #   - large_smt / large_smt_forest / sparse_path: multi-minute
+        #     runtimes. Wrong fit for per-PR alerts; ideal for a separate
+        #     nightly bench job.
+        #   - encryption / dsa: defer pending review of which sub-benches
+        #     are stable.
+        run: |
+          cargo bench --bench hash --bench word --bench transpose \
+            -p miden-crypto -- --output-format bencher 2>&1 \
+            | tee bench-native.txt
+
+      - name: Upload raw results as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: bench-native-results
+          path: bench-native.txt
+          retention-days: 30
+
+      - name: Track + alert on regression
+        uses: benchmark-action/github-action-benchmark@v1
+        with:
+          tool: cargo
+          output-file-path: bench-native.txt
+          benchmark-data-dir-path: bench/native
+          gh-pages-branch: gh-pages
+          auto-push: ${{ github.event_name == 'push' }}
+          comment-on-alert: true
+          # Native benches are ns-scale, so any timer noise is a larger
+          # relative fraction. 20 % threshold; revisit once variance data
+          # is in.
+          alert-threshold: "120%"
+          fail-on-alert: false
+          summary-always: true
+          comment-always: ${{ github.event_name == 'pull_request' }}
+          alert-comment-cc-users: '@WiktorStarczewski'
+          github-token: ${{ secrets.GITHUB_TOKEN }}

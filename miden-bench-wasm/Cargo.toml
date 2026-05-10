@@ -1,0 +1,46 @@
+[package]
+description            = "WASM benchmarks for miden-crypto hash primitives, run in headless Chromium for production-fidelity perf tracking."
+edition                = "2024"
+homepage               = "https://github.com/0xMiden/crypto"
+license                = "MIT OR Apache-2.0"
+name                   = "miden-bench-wasm"
+publish                = false
+readme                 = "README.md"
+repository             = "https://github.com/0xMiden/crypto"
+rust-version.workspace = true
+version.workspace      = true
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+# Internal — track perf of the public hash primitives. We pull `miden-crypto`
+# (not just `miden-field`) because the benches measure RPO/RPX/Poseidon2/
+# Blake3/Keccak end-to-end, which live in miden-crypto's `hash` module.
+# `default-features = false` strips `concurrent` (rayon — won't build for
+# wasm32-unknown-unknown without wasm-bindgen-rayon scaffolding); we keep
+# `std` so `once_cell` uses real `std::sync` locks rather than falling
+# back to `critical-section`. The latter would require a host-provided
+# `_critical_section_*` impl that the browser doesn't supply, producing
+# unresolved `import "env"` references at module load.
+miden-crypto = { path = "../miden-crypto", default-features = false, features = ["std"] }
+
+# wasm-bindgen lets us export Rust fns to JS so the Playwright driver can
+# invoke them from the bench page. `web-sys` exposes `performance.now()`
+# for sub-µs timing.
+wasm-bindgen = "0.2"
+web-sys      = { version = "0.3", features = ["Performance", "Window"] }
+
+# `getrandom` 0.4 (pulled transitively via `rand 0.10 → getrandom`) needs
+# the `wasm_js` feature on wasm32-unknown-unknown, otherwise its build
+# fails with `cannot find function fill_inner in module backends`. Cargo
+# unifies features within a major, but NOT across majors, so even though
+# the transitive dep is 0.4 we have to declare 0.4 explicitly here to
+# turn the feature on. (0.3 has the same feature, but it isn't in our
+# tree and adding it wouldn't unify with the 0.4 transitive.)
+getrandom = { version = "0.4", features = ["wasm_js"] }
+
+# Random input data for the benches. Stable seeded RNG so PR-time runs
+# and baseline runs use byte-identical inputs.
+rand_chacha.workspace = true
+rand.workspace        = true
