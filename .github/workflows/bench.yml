@@ -50,7 +50,12 @@ jobs:
   bench-wasm:
     name: WASM perf (Chromium / V8)
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    # Local Apple M5 wall-clock for the full bench is ~40s; GHA ubuntu-
+    # latest x86_64 is ~2.7× slower across these benches (measured),
+    # putting the bench step at ~2 min. Plus wasm-pack build (~3 min)
+    # + Chromium install (~30s) + setup overhead = ~6-7 min typical.
+    # 20 min cap leaves comfortable headroom for the worst-case run.
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
 

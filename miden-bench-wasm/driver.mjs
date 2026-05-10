@@ -174,7 +174,15 @@ async function main() {
   process.stdout.write(JSON.stringify(results, null, 2) + "\n");
 }
 
-main().catch((err) => {
-  process.stderr.write(`driver failed: ${err.stack || err.message}\n`);
-  process.exit(1);
-});
+// Explicit `process.exit(0)` after main() returns. Without this, Node's
+// event loop stays alive (open file descriptors from the `npx serve`
+// child's piped stdio + Playwright's lingering handles), and the driver
+// hangs until GHA's job timeout fires — even though every bench has
+// completed and the JSON has been written. SIGKILL on the child doesn't
+// reliably clear the parent's piped fds. Just exit.
+main()
+  .then(() => process.exit(0))
+  .catch((err) => {
+    process.stderr.write(`driver failed: ${err.stack || err.message}\n`);
+    process.exit(1);
+  });
