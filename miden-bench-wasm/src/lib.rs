@@ -4,11 +4,10 @@
 //! Playwright driver from JS. The function:
 //!   1. Constructs the bench's input data (deterministic seeded RNG).
 //!   2. Runs `warmup_iterations` un-timed iterations to settle the V8 JIT.
-//!   3. Runs `num_batches` batches of `batch_size` iterations each, timed via
-//!      `performance.now()` per batch (post-Spectre, single-iter timing is
-//!      too coarse — batching amortizes timer noise).
-//!   4. Returns a `Vec<f64>` of per-iteration times in nanoseconds, one entry
-//!      per batch.
+//!   3. Runs `num_batches` batches of `batch_size` iterations each, timed via `performance.now()`
+//!      per batch (post-Spectre, single-iter timing is too coarse — batching amortizes timer
+//!      noise).
+//!   4. Returns a `Vec<f64>` of per-iteration times in nanoseconds, one entry per batch.
 //!
 //! The driver computes median + IQR + p99 across the batches.
 //!
@@ -23,8 +22,6 @@
 //! These are pure compute, no `SharedArrayBuffer`, no rayon, no Workers. So
 //! the bench page does NOT need COOP/COEP — that's the part of the wallet's
 //! prove harness that's flaky. Skipping it makes CI fast and stable.
-
-extern crate alloc;
 
 use miden_crypto::{
     Felt,
@@ -89,10 +86,7 @@ fn run_batched<F>(num_batches: u32, batch_size: u32, warmup: u32, mut f: F) -> V
 where
     F: FnMut(),
 {
-    let perf = web_sys::window()
-        .expect("no window")
-        .performance()
-        .expect("no performance");
+    let perf = web_sys::window().expect("no window").performance().expect("no performance");
 
     for _ in 0..warmup {
         f();
@@ -183,11 +177,10 @@ bench_sequential!(bench_keccak256_sequential_felt_100, Keccak256, 100);
 // These exercise the new trait-generic `impl<P: PackedValue<Value = Felt>>
 // Permutation<[P; STATE_WIDTH]>` blanket added in 0xMiden/crypto#998.
 // The state type is `<Felt as Field>::Packing`, which:
-//   - On `next` (no simd128 PR): resolves to `Felt`, WIDTH=1, scalar perm.
-//     Numerically identical to the prior concrete impl — the const-folded
-//     fast path the PR explicitly preserves.
-//   - On #998: resolves to `PackedFelt`, WIDTH=2, two candidates per
-//     permutation invocation. Per-call work doubles in throughput.
+//   - On `next` (no simd128 PR): resolves to `Felt`, WIDTH=1, scalar perm. Numerically identical to
+//     the prior concrete impl — the const-folded fast path the PR explicitly preserves.
+//   - On #998: resolves to `PackedFelt`, WIDTH=2, two candidates per permutation invocation.
+//     Per-call work doubles in throughput.
 //
 // On the bench dashboard, this metric is unchanged on `next` and steps
 // down ~50% the moment #998 lands — making the simd128 win automatically
@@ -237,17 +230,16 @@ bench_packed_permute!(bench_poseidon2_packed_permute, Poseidon2Permutation256);
 // Why Blake3 AIR specifically (vs Keccak / Poseidon2 / Miden VM AIR):
 //   - Smallest setup (no round-constants table to thread through).
 //   - Already a workspace test fixture (no new code in `miden-lifted-stark`).
-//   - Exercises the same arithmetic shape as a real prove: base-field
-//     trace, ext-field DEEP/FRI, algebraic-hash-driven LMCS Merkle.
-//   - Constraint density is moderate — heavy enough that the constraint-
-//     evaluation phase contributes meaningfully to total prove time, so
-//     simd128's gain on packed ext-field math will show.
+//   - Exercises the same arithmetic shape as a real prove: base-field trace, ext-field DEEP/FRI,
+//     algebraic-hash-driven LMCS Merkle.
+//   - Constraint density is moderate — heavy enough that the constraint- evaluation phase
+//     contributes meaningfully to total prove time, so simd128's gain on packed ext-field math will
+//     show.
 //
 // Why log_blowup=1 (vs miden-vm production's 3):
 //   - Smaller LDE → faster prove → CI-friendly.
-//   - This is a perf-tracking bench, not a security parameter; the
-//     proven-soundness number from this config is irrelevant. We just
-//     need the same arithmetic shape on every run.
+//   - This is a perf-tracking bench, not a security parameter; the proven-soundness number from
+//     this config is irrelevant. We just need the same arithmetic shape on every run.
 //
 // Trace size is parameterised by `log_n` so we can tune CI runtime
 // without rebuilding the wasm. Default callers should pass log_n=12
@@ -259,7 +251,7 @@ bench_packed_permute!(bench_poseidon2_packed_permute, Poseidon2Permutation256);
 pub fn bench_lifted_stark_prove_blake3(num_runs: u32, log_n: u32) -> Vec<f64> {
     let n = 1usize << log_n;
     let mut rng = ChaCha20Rng::seed_from_u64(SEED);
-    let inputs: alloc::vec::Vec<[u32; 24]> = (0..n)
+    let inputs: Vec<[u32; 24]> = (0..n)
         .map(|_| {
             let mut row = [0u32; 24];
             for v in &mut row {
@@ -278,12 +270,8 @@ pub fn bench_lifted_stark_prove_blake3(num_runs: u32, log_n: u32) -> Vec<f64> {
     // with no PoW, this minimises wall-clock per prove while still
     // exercising the full pipeline.
     let pcs = PcsParams::new(
-        /* log_blowup */ 1,
-        /* log_folding_arity */ 2,
-        /* log_final_degree */ 7,
-        /* folding_pow_bits */ 0,
-        /* deep_pow_bits */ 0,
-        /* num_queries */ 27,
+        /* log_blowup */ 1, /* log_folding_arity */ 2, /* log_final_degree */ 7,
+        /* folding_pow_bits */ 0, /* deep_pow_bits */ 0, /* num_queries */ 27,
         /* query_pow_bits */ 0,
     )
     .expect("invalid PCS params");
@@ -298,7 +286,7 @@ pub fn bench_lifted_stark_prove_blake3(num_runs: u32, log_n: u32) -> Vec<f64> {
     let aux = ZeroAuxBuilder::dummy();
 
     let perf = web_sys::window().expect("no window").performance().expect("no performance");
-    let mut samples = alloc::vec::Vec::with_capacity(num_runs as usize);
+    let mut samples = Vec::with_capacity(num_runs as usize);
     for _ in 0..num_runs {
         // Fresh witness + challenger per run — prove_multi consumes the
         // challenger, and we want byte-identical inputs across runs.
