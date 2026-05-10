@@ -28,7 +28,6 @@ fn test_params() -> PcsParams {
         2, // log_blowup
         1, // log_folding_arity (arity 2)
         2, // log_final_degree
-        1, // folding_pow_bits
         1, // deep_pow_bits
         5, // num_queries
         1, // query_pow_bits
@@ -154,7 +153,6 @@ fn test_pcs_cases() {
         1,  // log_blowup
         1,  // log_folding_arity (arity 2)
         2,  // log_final_degree
-        1,  // folding_pow_bits
         1,  // deep_pow_bits
         20, // num_queries
         1,  // query_pow_bits

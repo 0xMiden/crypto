@@ -39,7 +39,6 @@ struct FriRoundtripCase {
     log_blowup: u8,
     log_final_degree: u8,
     fold: FriFold,
-    folding_pow_bits: usize,
     num_queries: usize,
 }
 
@@ -50,7 +49,6 @@ const FRI_ROUNDTRIP_CASES: &[FriRoundtripCase] = &[
         log_blowup: 2,
         log_final_degree: 2,
         fold: FRI_FOLD_ARITY_2,
-        folding_pow_bits: 1,
         num_queries: 3,
     },
     FriRoundtripCase {
@@ -59,7 +57,6 @@ const FRI_ROUNDTRIP_CASES: &[FriRoundtripCase] = &[
         log_blowup: 2,
         log_final_degree: 2,
         fold: FRI_FOLD_ARITY_4,
-        folding_pow_bits: 1,
         num_queries: 3,
     },
     FriRoundtripCase {
@@ -68,7 +65,6 @@ const FRI_ROUNDTRIP_CASES: &[FriRoundtripCase] = &[
         log_blowup: 2,
         log_final_degree: 2,
         fold: FRI_FOLD_ARITY_8,
-        folding_pow_bits: 1,
         num_queries: 3,
     },
     FriRoundtripCase {
@@ -77,7 +73,6 @@ const FRI_ROUNDTRIP_CASES: &[FriRoundtripCase] = &[
         log_blowup: 0,
         log_final_degree: 3,
         fold: FRI_FOLD_ARITY_2,
-        folding_pow_bits: 0,
         num_queries: 2,
     },
 ];
@@ -102,7 +97,7 @@ fn build_initial_evals(
 }
 
 fn prove_queries(
-    params: &FriParams,
+    params: FriParams,
     lmcs: &BaseLmcs,
     evals: Vec<QuadFelt>,
     tree_indices: TreeIndices,
@@ -114,7 +109,7 @@ fn prove_queries(
 }
 
 fn verify_queries(
-    params: &FriParams,
+    params: FriParams,
     lmcs: &BaseLmcs,
     transcript: &TestTranscriptData,
     lde_size: usize,
@@ -141,7 +136,6 @@ fn run_roundtrip_case(case: &FriRoundtripCase, seed: u64) -> Result<(), FriError
         log_blowup: case.log_blowup,
         fold: case.fold,
         log_final_degree: case.log_final_degree,
-        folding_pow_bits: case.folding_pow_bits,
     };
 
     let evals = random_lde_matrix::<QuadFelt>(
@@ -160,15 +154,15 @@ fn run_roundtrip_case(case: &FriRoundtripCase, seed: u64) -> Result<(), FriError
             .expect("indices are in range");
     let initial_evals = build_initial_evals(&evals, &tree_indices);
 
-    let (prover_digest, transcript) = prove_queries(&params, &lmcs, evals, tree_indices.clone());
+    let (prover_digest, transcript) = prove_queries(params, &lmcs, evals, tree_indices.clone());
     let verifier_digest =
-        verify_queries(&params, &lmcs, &transcript, lde_size, &initial_evals, tree_indices, None)?;
+        verify_queries(params, &lmcs, &transcript, lde_size, &initial_evals, tree_indices, None)?;
     assert_eq!(prover_digest, verifier_digest);
 
     // Re-parse FriTranscript (commit phase only) from a fresh channel.
     let mut reparse_channel = verifier_channel(&transcript);
     FriTranscript::<Felt, QuadFelt, _>::from_verifier_channel(
-        &params,
+        params,
         log_domain_size,
         &mut reparse_channel,
     )
@@ -201,7 +195,6 @@ fn test_fri_verify_wrong_eval() {
         log_blowup,
         fold: FRI_FOLD_ARITY_2,
         log_final_degree,
-        folding_pow_bits: 1,
     };
 
     let evals =
@@ -221,9 +214,9 @@ fn test_fri_verify_wrong_eval() {
     }
     initial_evals.insert(first_idx, wrong_eval);
 
-    let (_prover_digest, transcript) = prove_queries(&params, &lmcs, evals, tree_indices.clone());
+    let (_prover_digest, transcript) = prove_queries(params, &lmcs, evals, tree_indices.clone());
     let result =
-        verify_queries(&params, &lmcs, &transcript, lde_size, &initial_evals, tree_indices, None);
+        verify_queries(params, &lmcs, &transcript, lde_size, &initial_evals, tree_indices, None);
 
     assert!(
         matches!(result, Err(FriError::EvaluationMismatch { .. })),
@@ -249,7 +242,6 @@ fn test_fri_verify_wrong_beta() {
         log_blowup,
         fold: FRI_FOLD_ARITY_2,
         log_final_degree,
-        folding_pow_bits: 0, // No grinding to simplify test
     };
 
     // Create two independent provers with different evaluations.
@@ -260,15 +252,15 @@ fn test_fri_verify_wrong_beta() {
     let lde_size = evals1.len();
     let log_domain_size = log2_strict_u8(lde_size);
 
-    // Prover 1: generate FRI transcript (grinds per-round internally).
+    // Prover 1: generate FRI transcript.
     let tree_indices = TreeIndices::new(sample_indices(&mut rng, lde_size, 2), log_domain_size)
         .expect("indices are in range");
     let initial_evals = build_initial_evals(&evals1, &tree_indices);
-    let (_prover_digest, transcript) = prove_queries(&params, &lmcs, evals1, tree_indices.clone());
+    let (_prover_digest, transcript) = prove_queries(params, &lmcs, evals1, tree_indices.clone());
 
     // Prover 2: generate different transcript (different commitments = different betas).
     let mut prover2_channel = prover_channel();
-    let _ = FriPolys::<Felt, QuadFelt, _>::new(&params, &lmcs, evals2, &mut prover2_channel);
+    let _ = FriPolys::<Felt, QuadFelt, _>::new(params, &lmcs, evals2, &mut prover2_channel);
     let (_, prover2_transcript) = prover2_channel.finalize();
     let other_commitment = prover2_transcript
         .commitments()
@@ -280,7 +272,7 @@ fn test_fri_verify_wrong_beta() {
     let mut wrong_challenger = test_challenger();
     wrong_challenger.observe(other_commitment);
     let result = verify_queries(
-        &params,
+        params,
         &lmcs,
         &transcript,
         lde_size,
@@ -313,7 +305,6 @@ fn test_fri_zero_rounds_final_poly_only() {
         log_blowup,
         fold: FRI_FOLD_ARITY_2,
         log_final_degree,
-        folding_pow_bits: 0,
     };
 
     let evals =
@@ -323,11 +314,11 @@ fn test_fri_zero_rounds_final_poly_only() {
     let tree_indices = TreeIndices::new(sample_indices(&mut rng, lde_size, 2), log_domain_size)
         .expect("indices are in range");
     let initial_evals = build_initial_evals(&evals, &tree_indices);
-    let (prover_digest, transcript) = prove_queries(&params, &lmcs, evals, tree_indices.clone());
+    let (prover_digest, transcript) = prove_queries(params, &lmcs, evals, tree_indices.clone());
 
     let mut channel = verifier_channel(&transcript);
     let fri_transcript: FriTranscript<Felt, QuadFelt, _> =
-        FriTranscript::from_verifier_channel(&params, log_domain_size, &mut channel)
+        FriTranscript::from_verifier_channel(params, log_domain_size, &mut channel)
             .expect("transcript parsing should succeed");
 
     assert!(fri_transcript.rounds.is_empty(), "expected zero folding rounds");
@@ -338,7 +329,7 @@ fn test_fri_zero_rounds_final_poly_only() {
     );
 
     let verifier_digest =
-        verify_queries(&params, &lmcs, &transcript, lde_size, &initial_evals, tree_indices, None)
+        verify_queries(params, &lmcs, &transcript, lde_size, &initial_evals, tree_indices, None)
             .expect("zero-round FRI should verify");
     assert_eq!(prover_digest, verifier_digest);
 }
@@ -358,7 +349,6 @@ fn test_final_polynomial_correctness() {
         log_blowup,
         fold: FRI_FOLD_ARITY_2,
         log_final_degree,
-        folding_pow_bits: 0, // No grinding for this test
     };
 
     let poly_degree = 1usize << log_poly_degree;
@@ -382,12 +372,12 @@ fn test_final_polynomial_correctness() {
     let log_domain_size = log_poly_degree + log_blowup;
 
     let mut prover_channel = prover_channel();
-    let _fri_polys = FriPolys::<Felt, QuadFelt, _>::new(&params, &lmcs, evals, &mut prover_channel);
+    let _fri_polys = FriPolys::<Felt, QuadFelt, _>::new(params, &lmcs, evals, &mut prover_channel);
     let (_, transcript) = prover_channel.finalize();
 
     let mut v_channel = verifier_channel(&transcript);
     let fri_transcript: FriTranscript<Felt, QuadFelt, _> =
-        FriTranscript::from_verifier_channel(&params, log_domain_size, &mut v_channel)
+        FriTranscript::from_verifier_channel(params, log_domain_size, &mut v_channel)
             .expect("transcript parsing should succeed");
 
     assert_eq!(

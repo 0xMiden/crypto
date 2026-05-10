@@ -68,12 +68,12 @@ pub fn open_with_channel<F, EF, L, M, Ch, const N: usize>(
     });
 
     // ─────────────────────────────────────────────────────────────────────────
-    // FRI commit phase (observes commitments, grinds per-round, samples betas)
+    // FRI commit phase (observes commitments, samples betas per round)
     // ─────────────────────────────────────────────────────────────────────────
     // The deep_poly contains evaluations on the LDE domain (size 2^log_lde_height).
     // FRI will prove that this polynomial is low-degree.
     let fri_polys = info_span!("FRI commit phase")
-        .in_scope(|| FriPolys::<F, EF, L>::new(&params.fri, lmcs, deep_poly.deep_evals, channel));
+        .in_scope(|| FriPolys::<F, EF, L>::new(params.fri, lmcs, deep_poly.deep_evals, channel));
 
     // ─────────────────────────────────────────────────────────────────────────
     // Grind for query sampling
@@ -104,7 +104,7 @@ pub fn open_with_channel<F, EF, L, M, Ch, const N: usize>(
 
         // Open all FRI rounds at all query indices at once (one proof per round)
         info_span!("open FRI trees").in_scope(|| {
-            fri_polys.prove_queries(&params.fri, tree_indices, channel);
+            fri_polys.prove_queries(params.fri, tree_indices, channel);
         });
     });
 }

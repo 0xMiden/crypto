@@ -178,6 +178,10 @@ where
     }
 
     fn grind(&mut self, bits: usize) -> Result<Self::F, TranscriptError> {
+        // The `unsound-pow-skip` feature forces difficulty to 0 in lockstep
+        // with the prover, preserving transcript layout while skipping the
+        // check. See the feature's note in `Cargo.toml`.
+        let bits = if cfg!(feature = "unsound-pow-skip") { 0 } else { bits };
         let (witness, rest) = self.fields.split_first().ok_or(TranscriptError::NoMoreFields)?;
         self.fields = rest;
         if self.challenger.check_witness(bits, *witness) {

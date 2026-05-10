@@ -30,9 +30,9 @@ use crate::{
 
 /// FRI low-degree test oracle.
 ///
-/// Created via [`FriOracle::new`], which samples folding challenges from
-/// the Fiat-Shamir transcript. The oracle verifies that evaluations are close
-/// to a low-degree polynomial by checking that each folding round was performed
+/// Created via [`FriOracle::new`], which samples folding challenges from the
+/// Fiat-Shamir transcript. The oracle verifies that evaluations are close to a
+/// low-degree polynomial by checking that each folding round was performed
 /// correctly via spot-check queries, and that the final (small) polynomial
 /// matches the prover's claim exactly.
 ///
@@ -66,7 +66,7 @@ where
 {
     /// Create oracle by reading from a verifier channel.
     pub fn new<Ch>(
-        params: &FriParams,
+        params: FriParams,
         log_domain_size: u8,
         channel: &mut Ch,
     ) -> Result<Self, FriError>
@@ -78,9 +78,6 @@ where
 
         for _ in 0..num_rounds {
             let commitment = channel.receive_commitment()?.clone();
-
-            channel.grind(params.folding_pow_bits)?;
-
             let beta: EF = channel.sample_algebra_element();
             rounds.push(FriRoundOracle { commitment, beta });
         }
@@ -105,7 +102,7 @@ where
     pub fn test_low_degree<Ch>(
         &self,
         lmcs: &L,
-        params: &FriParams,
+        params: FriParams,
         mut evals: BTreeMap<usize, EF>,
         mut tree_indices: TreeIndices,
         channel: &mut Ch,

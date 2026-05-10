@@ -152,8 +152,7 @@ at the outer protocol layer.
 
 ### FRI (`miden-lifted-stark/src/pcs/fri`)
 
-- [ ] For each round: commitment observed -> PoW verified -> folding challenge
-      sampled.
+- [ ] For each round: commitment observed -> folding challenge sampled.
 - [ ] Query indices are shifted consistently across rounds.
 - [ ] The `s_inv` computation matches the prover's bit-reversed coset structure.
 - [ ] Final polynomial coefficients are read in the intended order and evaluated
@@ -243,7 +242,6 @@ Soundness is primarily controlled by:
   - `num_queries`
 - grinding parameters:
   - `DeepParams::deep_pow_bits`
-  - `FriParams::folding_pow_bits`
   - `PcsParams::query_pow_bits`
 
 Notes:

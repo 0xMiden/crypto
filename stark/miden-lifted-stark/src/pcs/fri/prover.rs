@@ -26,8 +26,8 @@ type FoldedTree<F, EF, L> = <L as Lmcs>::Tree<FlatMatrixView<F, EF, RowMajorMatr
 /// Prover's state from the FRI commit phase.
 ///
 /// Contains the data needed to answer queries (LMCS trees).
-/// Commitments, PoW witnesses, and the final polynomial (in descending degree
-/// order) are written to the transcript channel during construction.
+/// Commitments and the final polynomial (in descending degree order) are
+/// written to the transcript channel during construction.
 ///
 /// Uses a single base-field LMCS. Extension field evaluations are flattened
 /// to base field before commitment.
@@ -89,7 +89,7 @@ where
     /// evaluations and sampling a random challenge `beta` — until the degree is small enough to
     /// send the polynomial directly. The query phase then spot-checks that each fold was
     /// performed correctly.
-    pub fn new<Ch>(params: &FriParams, lmcs: &L, evals: Vec<EF>, channel: &mut Ch) -> Self
+    pub fn new<Ch>(params: FriParams, lmcs: &L, evals: Vec<EF>, channel: &mut Ch) -> Self
     where
         Ch: ProverChannel<F = F, Commitment = L::Commitment>,
     {
@@ -151,11 +151,8 @@ where
             channel.send_commitment(commitment.clone());
 
             // ─────────────────────────────────────────────────────────────────────
-            // Grind and sample folding challenge beta
+            // Sample folding challenge beta
             // ─────────────────────────────────────────────────────────────────────
-            let _pow_witness =
-                info_span!("FRI folding grind", round, bits = params.folding_pow_bits)
-                    .in_scope(|| channel.grind(params.folding_pow_bits));
             let beta: EF = channel.sample_algebra_element();
 
             // ─────────────────────────────────────────────────────────────────────
@@ -237,7 +234,7 @@ where
     /// position within the coset the original query fell in.
     pub fn prove_queries<Ch>(
         &self,
-        params: &FriParams,
+        params: FriParams,
         mut tree_indices: TreeIndices,
         channel: &mut Ch,
     ) where

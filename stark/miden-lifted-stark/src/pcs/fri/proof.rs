@@ -1,6 +1,7 @@
 //! FRI transcript data structures.
 
 use alloc::vec::Vec;
+use core::marker::PhantomData;
 
 use miden_stark_transcript::{TranscriptError, VerifierChannel};
 use p3_field::{ExtensionField, TwoAdicField};
@@ -8,13 +9,15 @@ use p3_field::{ExtensionField, TwoAdicField};
 use crate::pcs::fri::FriParams;
 
 /// Structured transcript view for a single FRI folding round.
+///
+/// `F` is retained as a phantom type parameter so the channel's base field
+/// stays part of the type signature; it is no longer carried as data.
 pub struct FriRoundTranscript<F, EF, Commitment> {
     /// Commitment to the folded evaluation matrix for this round.
     pub commitment: Commitment,
-    /// Proof-of-work witness sampled before `beta`.
-    pub pow_witness: F,
     /// Folding challenge `β` for this round.
     pub beta: EF,
+    _phantom: PhantomData<F>,
 }
 
 /// Structured transcript view for the full FRI interaction.
@@ -34,11 +37,11 @@ where
 {
     /// Parse a FRI transcript from a verifier channel.
     ///
-    /// Reads commitments, verifies PoW witnesses, samples challenges, and
-    /// reads the final polynomial. Does not verify low-degree claims;
-    /// that validation happens in `FriOracle::test_low_degree`.
+    /// Reads commitments, samples challenges, and reads the final polynomial.
+    /// Does not verify low-degree claims; that validation happens in
+    /// `FriOracle::test_low_degree`.
     pub fn from_verifier_channel<Ch>(
-        params: &FriParams,
+        params: FriParams,
         log_domain_size: u8,
         channel: &mut Ch,
     ) -> Result<Self, TranscriptError>
@@ -50,11 +53,8 @@ where
 
         for _ in 0..num_rounds {
             let commitment = channel.receive_commitment()?.clone();
-
-            let pow_witness = channel.grind(params.folding_pow_bits)?;
-
             let beta: EF = channel.sample_algebra_element();
-            rounds.push(FriRoundTranscript { commitment, pow_witness, beta });
+            rounds.push(FriRoundTranscript { commitment, beta, _phantom: PhantomData });
         }
 
         let final_degree = params.final_poly_degree(log_domain_size);

@@ -46,9 +46,6 @@ pub struct FriParams {
     /// Final polynomial coefficients are sent in descending degree order
     /// `[cₙ, ..., c₁, c₀]` for direct Horner evaluation by the verifier.
     pub(crate) log_final_degree: u8,
-
-    /// Grinding bits before each folding challenge.
-    pub(crate) folding_pow_bits: usize,
 }
 
 impl FriParams {
@@ -61,7 +58,7 @@ impl FriParams {
     /// Uses `div_ceil` to round up, ensuring we always reach the target degree even if
     /// the domain size doesn't divide evenly by the folding factor.
     #[inline]
-    pub fn num_rounds(&self, log_domain_size: u8) -> usize {
+    pub fn num_rounds(self, log_domain_size: u8) -> usize {
         // Final domain size = final_degree × blowup = 2^(log_final_degree + log_blowup).
         // Safety: PcsParams::new() validates this sum does not exceed MAX_LOG_DOMAIN_SIZE.
         debug_assert!(
@@ -85,7 +82,7 @@ impl FriParams {
     /// Due to `div_ceil` in `num_rounds`, the actual final degree may be smaller than
     /// `2^log_final_degree` when the folding doesn't divide evenly.
     #[inline]
-    pub fn final_poly_degree(&self, log_domain_size: u8) -> usize {
+    pub fn final_poly_degree(self, log_domain_size: u8) -> usize {
         let num_rounds = self.num_rounds(log_domain_size);
         // log of final domain size after folding
         let log_final_size = log_domain_size as usize - num_rounds * self.fold.log_arity() as usize;

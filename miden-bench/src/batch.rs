@@ -204,7 +204,7 @@ macro_rules! batch_config {
             log_final_poly_len: $cli.log_final_degree as usize,
             max_log_arity: $cli.log_folding_arity as usize,
             num_queries: $cli.num_queries,
-            commit_proof_of_work_bits: $cli.folding_pow_bits,
+            commit_proof_of_work_bits: 0,
             query_proof_of_work_bits: $cli.query_pow_bits,
             mmcs: challenge_mmcs,
         };

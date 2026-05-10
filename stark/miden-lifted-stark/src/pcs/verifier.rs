@@ -81,8 +81,8 @@ where
         channel,
     )?;
 
-    // Create FRI oracle (observes commitments + final poly, checks per-round PoW)
-    let fri_oracle = FriOracle::new(&params.fri, log_lde_height, channel)?;
+    // Create FRI oracle (observes commitments + final poly, samples betas per round)
+    let fri_oracle = FriOracle::new(params.fri, log_lde_height, channel)?;
 
     // Check query PoW witness and sample query indices
     channel.grind(params.query_pow_bits())?;
@@ -98,7 +98,7 @@ where
     let deep_evals = deep_oracle.open_batch(lmcs, &tree_indices, channel)?;
 
     // Test low-degree proximity for all queries at once
-    fri_oracle.test_low_degree(lmcs, &params.fri, deep_evals, tree_indices, channel)?;
+    fri_oracle.test_low_degree(lmcs, params.fri, deep_evals, tree_indices, channel)?;
 
     Ok(evals)
 }

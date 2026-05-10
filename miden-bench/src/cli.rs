@@ -94,10 +94,6 @@ pub(crate) struct Cli {
     #[arg(long, default_value_t = 0, help_heading = "PCS Parameters")]
     pub(crate) log_final_degree: u8,
 
-    /// Proof-of-work grinding bits per FRI folding round.
-    #[arg(long, default_value_t = 0, help_heading = "PCS Parameters")]
-    pub(crate) folding_pow_bits: usize,
-
     /// Proof-of-work grinding bits before query index sampling.
     #[arg(long, default_value_t = 0, help_heading = "PCS Parameters")]
     pub(crate) query_pow_bits: usize,

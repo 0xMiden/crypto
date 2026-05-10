@@ -128,7 +128,6 @@ fn print_config(cli: &Cli, specs: &[TraceSpec], traces: &[RowMajorMatrix<Felt>],
     eprintln!("{:<20} {}", "log_final_degree:", cli.log_final_degree);
     eprintln!("{:<20} {}", "num_queries:", cli.num_queries);
     eprintln!("{:<20} {}", "deep_pow_bits:", cli.deep_pow_bits);
-    eprintln!("{:<20} {}", "folding_pow_bits:", cli.folding_pow_bits);
     eprintln!("{:<20} {}", "query_pow_bits:", cli.query_pow_bits);
     eprintln!();
 }
@@ -233,7 +232,6 @@ fn main() {
         log_blowup,
         cli.log_folding_arity,
         cli.log_final_degree,
-        cli.folding_pow_bits,
         cli.deep_pow_bits,
         cli.num_queries,
         cli.query_pow_bits,

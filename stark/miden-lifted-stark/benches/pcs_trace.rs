@@ -42,7 +42,6 @@ fn main() {
         2,  // log_blowup
         2,  // log_folding_arity (arity 4)
         8,  // log_final_degree
-        0,  // folding_pow_bits
         0,  // deep_pow_bits
         30, // num_queries
         0,  // query_pow_bits

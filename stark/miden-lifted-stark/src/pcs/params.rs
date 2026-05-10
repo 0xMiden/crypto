@@ -52,7 +52,6 @@ impl PcsParams {
         log_blowup: u8,
         log_folding_arity: u8,
         log_final_degree: u8,
-        folding_pow_bits: usize,
         deep_pow_bits: usize,
         num_queries: usize,
         query_pow_bits: usize,
@@ -70,12 +69,7 @@ impl PcsParams {
         }
         Ok(Self {
             deep: DeepParams { deep_pow_bits },
-            fri: FriParams {
-                log_blowup,
-                fold,
-                log_final_degree,
-                folding_pow_bits,
-            },
+            fri: FriParams { log_blowup, fold, log_final_degree },
             num_queries,
             query_pow_bits,
         })
@@ -103,12 +97,6 @@ impl PcsParams {
     #[inline]
     pub fn deep_pow_bits(&self) -> usize {
         self.deep.deep_pow_bits
-    }
-
-    /// Grinding bits before each FRI folding round.
-    #[inline]
-    pub fn folding_pow_bits(&self) -> usize {
-        self.fri.folding_pow_bits
     }
 
     /// Log₂ of the FRI folding arity.
