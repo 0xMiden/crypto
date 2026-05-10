@@ -24,17 +24,35 @@
 //! the bench page does NOT need COOP/COEP — that's the part of the wallet's
 //! prove harness that's flaky. Skipping it makes CI fast and stable.
 
+extern crate alloc;
+
 use miden_crypto::{
     Felt,
     hash::{
         HasherExt,
         blake::Blake3_256,
         keccak::Keccak256,
-        poseidon2::Poseidon2,
-        rpo::Rpo256,
-        rpx::Rpx256,
+        poseidon2::{Poseidon2, Poseidon2Permutation256},
+        rpo::{Rpo256, RpoPermutation256},
+        rpx::{Rpx256, RpxPermutation256},
     },
 };
+// Prove-bench types live in lifted-stark's `testing::configs::Felt` (=
+// `p3_goldilocks::Goldilocks`), which is *distinct* from
+// `miden_crypto::Felt` (a wrapper struct around Goldilocks). Aliased here
+// to make the difference explicit at call sites.
+use miden_lifted_stark::{
+    AirWitness, GenericStarkConfig, PcsParams, prove_multi,
+    testing::{
+        airs::{ZeroAuxBuilder, blake3::LiftedBlake3Air},
+        configs::{Felt as StarkFelt, QuadFelt as StarkQuadFelt, goldilocks_blake3},
+    },
+};
+use p3_blake3_air::generate_trace_rows as generate_blake3_air_trace;
+use p3_dft::Radix2DitParallel;
+use p3_field::Field;
+use p3_matrix::dense::RowMajorMatrix;
+use p3_symmetric::Permutation;
 use rand::{RngExt, SeedableRng};
 use rand_chacha::ChaCha20Rng;
 use wasm_bindgen::prelude::*;
@@ -159,3 +177,138 @@ bench_sequential!(bench_blake3_256_sequential_felt_100, Blake3_256, 100);
 
 bench_merge!(bench_keccak256_merge, Keccak256, keccak256_merge_init);
 bench_sequential!(bench_keccak256_sequential_felt_100, Keccak256, 100);
+
+// Packed permutation throughput -----------------------------------------
+//
+// These exercise the new trait-generic `impl<P: PackedValue<Value = Felt>>
+// Permutation<[P; STATE_WIDTH]>` blanket added in 0xMiden/crypto#998.
+// The state type is `<Felt as Field>::Packing`, which:
+//   - On `next` (no simd128 PR): resolves to `Felt`, WIDTH=1, scalar perm.
+//     Numerically identical to the prior concrete impl — the const-folded
+//     fast path the PR explicitly preserves.
+//   - On #998: resolves to `PackedFelt`, WIDTH=2, two candidates per
+//     permutation invocation. Per-call work doubles in throughput.
+//
+// On the bench dashboard, this metric is unchanged on `next` and steps
+// down ~50% the moment #998 lands — making the simd128 win automatically
+// visible in CI without bench-source changes.
+//
+// The merge benches above don't exercise this path (they invoke
+// `permute_mut(&mut [Felt; 12])` — WIDTH=1) so they would show 0%
+// difference on #998. Both shapes are deliberately tracked.
+
+const STATE_WIDTH: usize = 12;
+
+macro_rules! bench_packed_permute {
+    ($name:ident, $perm_ty:ident) => {
+        #[wasm_bindgen]
+        pub fn $name(num_batches: u32, batch_size: u32, warmup: u32) -> Vec<f64> {
+            let perm = $perm_ty;
+            let mut rng = ChaCha20Rng::seed_from_u64(SEED);
+            // Build a fully-populated state of `<Felt as Field>::Packing`.
+            // Each lane gets a distinct value so the perm can't shortcut
+            // a uniform-state edge case.
+            let mut state = [<Felt as Field>::Packing::ZERO; STATE_WIDTH];
+            for slot in &mut state {
+                let lane: <Felt as Field>::Packing =
+                    <Felt as Field>::Packing::from(Felt::new_unchecked(rng.random::<u64>()));
+                *slot = lane;
+            }
+            run_batched(num_batches, batch_size, warmup, || {
+                let mut s = core::hint::black_box(state);
+                perm.permute_mut(&mut s);
+                core::hint::black_box(s);
+            })
+        }
+    };
+}
+
+bench_packed_permute!(bench_rpo256_packed_permute, RpoPermutation256);
+bench_packed_permute!(bench_rpx256_packed_permute, RpxPermutation256);
+bench_packed_permute!(bench_poseidon2_packed_permute, Poseidon2Permutation256);
+
+// End-to-end synthetic prove --------------------------------------------
+//
+// Proves a small `LiftedBlake3Air` instance through `miden-lifted-stark`'s
+// full pipeline (LDE, constraint folding, DEEP composition, FRI, Merkle
+// commits). This is the headline regression-tracking metric: it answers
+// "did this PR slow down the actual prove stack?" in one number.
+//
+// Why Blake3 AIR specifically (vs Keccak / Poseidon2 / Miden VM AIR):
+//   - Smallest setup (no round-constants table to thread through).
+//   - Already a workspace test fixture (no new code in `miden-lifted-stark`).
+//   - Exercises the same arithmetic shape as a real prove: base-field
+//     trace, ext-field DEEP/FRI, algebraic-hash-driven LMCS Merkle.
+//   - Constraint density is moderate — heavy enough that the constraint-
+//     evaluation phase contributes meaningfully to total prove time, so
+//     simd128's gain on packed ext-field math will show.
+//
+// Why log_blowup=1 (vs miden-vm production's 3):
+//   - Smaller LDE → faster prove → CI-friendly.
+//   - This is a perf-tracking bench, not a security parameter; the
+//     proven-soundness number from this config is irrelevant. We just
+//     need the same arithmetic shape on every run.
+//
+// Trace size is parameterised by `log_n` so we can tune CI runtime
+// without rebuilding the wasm. Default callers should pass log_n=12
+// (4096 hashes) — empirically ~1-3s per prove in WASM, gives a stable
+// median across `num_runs` repetitions while staying inside the workflow's
+// 15-minute timeout.
+
+#[wasm_bindgen]
+pub fn bench_lifted_stark_prove_blake3(num_runs: u32, log_n: u32) -> Vec<f64> {
+    let n = 1usize << log_n;
+    let mut rng = ChaCha20Rng::seed_from_u64(SEED);
+    let inputs: alloc::vec::Vec<[u32; 24]> = (0..n)
+        .map(|_| {
+            let mut row = [0u32; 24];
+            for v in &mut row {
+                *v = rng.random::<u32>();
+            }
+            row
+        })
+        .collect();
+    // Trace is built over `StarkFelt` (= Goldilocks), not the wrapper
+    // `miden_crypto::Felt`. The prover takes Goldilocks all the way
+    // through; the wrapper is for the `miden_crypto::hash` public API.
+    let trace: RowMajorMatrix<StarkFelt> = generate_blake3_air_trace(inputs, 0);
+
+    // PCS params calibrated for fast bench runs, NOT production security.
+    // log_blowup=1 gives a 2× LDE rather than miden-vm's 8×; combined
+    // with no PoW, this minimises wall-clock per prove while still
+    // exercising the full pipeline.
+    let pcs = PcsParams::new(
+        /* log_blowup */ 1,
+        /* log_folding_arity */ 2,
+        /* log_final_degree */ 7,
+        /* folding_pow_bits */ 0,
+        /* deep_pow_bits */ 0,
+        /* num_queries */ 27,
+        /* query_pow_bits */ 0,
+    )
+    .expect("invalid PCS params");
+
+    let lmcs = goldilocks_blake3::test_lmcs();
+    let dft = Radix2DitParallel::<StarkFelt>::default();
+    let challenger_factory = goldilocks_blake3::test_challenger;
+    let config: GenericStarkConfig<StarkFelt, StarkQuadFelt, _, _, _> =
+        GenericStarkConfig::new(pcs, lmcs, dft, challenger_factory());
+
+    let air = LiftedBlake3Air;
+    let aux = ZeroAuxBuilder::dummy();
+
+    let perf = web_sys::window().expect("no window").performance().expect("no performance");
+    let mut samples = alloc::vec::Vec::with_capacity(num_runs as usize);
+    for _ in 0..num_runs {
+        // Fresh witness + challenger per run — prove_multi consumes the
+        // challenger, and we want byte-identical inputs across runs.
+        let witness = AirWitness::new(&trace, &[], &[]);
+        let instances = [(&air, witness, &aux)];
+        let challenger = challenger_factory();
+        let t0 = perf.now();
+        let _proof = prove_multi(&config, &instances, challenger).expect("prove_multi failed");
+        // ms → ns/iter (one iter == one full prove)
+        samples.push((perf.now() - t0) * 1_000_000.0);
+    }
+    samples
+}

@@ -7,7 +7,9 @@ non-browser runtime like `wasmtime` would produce.
 
 ## What's tracked
 
-Per algorithm: `merge` (2-to-1) and `hash_elements` over 100 felts.
+Three layers, each catches a different class of regression:
+
+### 1. Hash-primitive throughput (`merge` + `hash_elements(100 felts)`)
 
 | Algorithm   | merge bench                          | sequential bench                                |
 | ----------- | ------------------------------------ | ----------------------------------------------- |
@@ -17,12 +19,52 @@ Per algorithm: `merge` (2-to-1) and `hash_elements` over 100 felts.
 | Blake3_256  | `bench_blake3_256_merge`             | `bench_blake3_256_sequential_felt_100`          |
 | Keccak256   | `bench_keccak256_merge`              | `bench_keccak256_sequential_felt_100`           |
 
-Each bench runs 30 batches × N iterations (N tuned per bench so each
-batch is ~5–10 ms — well above `performance.now()` precision). The
-driver reports the median across batches as the tracked metric;
-`benchmark-action/github-action-benchmark` stores each median over time
-on the `gh-pages` branch and posts a sticky PR comment with the diff vs
-the latest `next` baseline.
+Catches general regressions in the public hash API. Goes through the
+**scalar** (WIDTH=1) fast path of the trait-generic Permutation impl —
+identical numbers between `next` and the simd128 PR, by design (the
+const-folded WIDTH=1 path is meant to be a zero-cost no-op).
+
+### 2. Packed-permutation throughput
+
+| Algorithm | bench                                 |
+| --------- | ------------------------------------- |
+| RPO256    | `bench_rpo256_packed_permute`         |
+| RPX256    | `bench_rpx256_packed_permute`         |
+| Poseidon2 | `bench_poseidon2_packed_permute`      |
+
+Runs `permute_mut(&mut [<Felt as Field>::Packing; 12])`. Resolves to:
+- **`Felt`** on `next` → WIDTH=1 → scalar perm (matches layer 1's
+  numbers; co-tracked as a sanity check on the const-folded fast path).
+- **`PackedFelt`** on the simd128 PR (#998) → WIDTH=2 → packed perm,
+  ns/iter halves.
+
+This is the layer that **automatically shows the simd128 win** the
+moment #998 lands, with no bench-source changes required.
+
+### 3. End-to-end synthetic prove
+
+| bench                                 | shape                                       |
+| ------------------------------------- | ------------------------------------------- |
+| `bench_lifted_stark_prove_blake3`     | full prove of a 4096-row Blake3 AIR trace  |
+
+Drives `miden-lifted-stark::prove_multi` through the complete pipeline
+(LDE → constraint folding → DEEP composition → FRI → LMCS Merkle).
+Same arithmetic shape a real prove hits, on a synthetic AIR small
+enough to fit a 15-minute CI budget. PCS params are calibrated for
+fast bench runs (log_blowup=1, no PoW) — this is a perf-tracking bench,
+not a security parameter; only the relative number matters.
+
+The simd128 PR's gain on packed ext-field math should drop this number
+~30-50% — that's the headline regression-tracking signal for "did this
+PR slow down the prove stack?"
+
+### Storage + alerts
+
+The driver reports the median across samples as each bench's tracked
+metric; `benchmark-action/github-action-benchmark` stores each median
+over time on the `gh-pages` branch (under `bench/wasm/`, separate from
+`docs/`) and posts a sticky PR comment with the diff vs the latest
+`next` baseline. Alerts fire on regression > 15 %.
 
 ## Running locally
 

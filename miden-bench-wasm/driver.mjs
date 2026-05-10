@@ -33,29 +33,48 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const STATIC_DIR = resolve(__dirname, "static");
 const PORT = 3022;
 
-// Per-bench tuning: pick batch_size so each batch is ~5–10 ms (well above
-// performance.now()'s ~5 µs precision in cross-origin-isolated contexts —
-// or even ~100 µs in non-isolated, which is what we run in). num_batches
-// is fixed at 30 so the median + IQR are stable. warmup is one batch
-// worth, untimed, to settle V8's JIT.
+// Per-bench tuning. Two shapes:
 //
-// Per-op cost ranges (rough, updated as we land baseline data):
-//   Blake3 merge:    ~100 ns/op  → batch_size 100_000
-//   Keccak merge:    ~700 ns/op  → batch_size 15_000
-//   Poseidon2 merge: ~5 µs/op    → batch_size 2_000
-//   Rpo/Rpx merge:   ~5 µs/op    → batch_size 2_000
-//   100-felt seq:    ~10 µs/op   → batch_size 1_000
+//   "batched"  → (num_batches, batch_size, warmup): the function runs
+//                num_batches batches of batch_size iterations each, with
+//                `warmup` un-timed iterations preceding. Returns one
+//                ns/iter sample per batch. Used by all microbenches.
+//                Pick batch_size so each batch is ~5–10 ms (well above
+//                `performance.now()`'s ~5 µs precision in cross-origin-
+//                isolated contexts; or ~100 µs without isolation, which
+//                is what we run in). num_batches=30 gives a stable median
+//                + IQR.
+//
+//   "runs"     → (num_runs, log_n): the function runs num_runs full
+//                proves of a 2^log_n-row trace. Returns one ns/run
+//                sample per run. Used by the end-to-end synthetic-prove
+//                bench, where each "iter" is a full prove (~1-3 s).
 const BENCH_CONFIG = {
-  bench_blake3_256_merge:                  { num_batches: 30, batch_size: 100_000, warmup: 100_000 },
-  bench_blake3_256_sequential_felt_100:    { num_batches: 30, batch_size: 5_000,   warmup: 5_000 },
-  bench_keccak256_merge:                   { num_batches: 30, batch_size: 15_000,  warmup: 15_000 },
-  bench_keccak256_sequential_felt_100:     { num_batches: 30, batch_size: 5_000,   warmup: 5_000 },
-  bench_poseidon2_merge:                   { num_batches: 30, batch_size: 2_000,   warmup: 2_000 },
-  bench_poseidon2_sequential_felt_100:     { num_batches: 30, batch_size: 200,     warmup: 200 },
-  bench_rpo256_merge:                      { num_batches: 30, batch_size: 2_000,   warmup: 2_000 },
-  bench_rpo256_sequential_felt_100:        { num_batches: 30, batch_size: 200,     warmup: 200 },
-  bench_rpx256_merge:                      { num_batches: 30, batch_size: 2_000,   warmup: 2_000 },
-  bench_rpx256_sequential_felt_100:        { num_batches: 30, batch_size: 200,     warmup: 200 },
+  // Public-API hash-primitive throughput (scalar fast-path; same numbers
+  // on `next` and on the simd128 PR — these track general regressions,
+  // NOT the simd128 win specifically).
+  bench_blake3_256_merge:                  { shape: "batched", num_batches: 30, batch_size: 100_000, warmup: 100_000 },
+  bench_blake3_256_sequential_felt_100:    { shape: "batched", num_batches: 30, batch_size: 5_000,   warmup: 5_000 },
+  bench_keccak256_merge:                   { shape: "batched", num_batches: 30, batch_size: 15_000,  warmup: 15_000 },
+  bench_keccak256_sequential_felt_100:     { shape: "batched", num_batches: 30, batch_size: 5_000,   warmup: 5_000 },
+  bench_poseidon2_merge:                   { shape: "batched", num_batches: 30, batch_size: 2_000,   warmup: 2_000 },
+  bench_poseidon2_sequential_felt_100:     { shape: "batched", num_batches: 30, batch_size: 200,     warmup: 200 },
+  bench_rpo256_merge:                      { shape: "batched", num_batches: 30, batch_size: 2_000,   warmup: 2_000 },
+  bench_rpo256_sequential_felt_100:        { shape: "batched", num_batches: 30, batch_size: 200,     warmup: 200 },
+  bench_rpx256_merge:                      { shape: "batched", num_batches: 30, batch_size: 2_000,   warmup: 2_000 },
+  bench_rpx256_sequential_felt_100:        { shape: "batched", num_batches: 30, batch_size: 200,     warmup: 200 },
+  // Packed-permutation throughput. On `next` these go through the
+  // WIDTH=1 const-folded fast path (= scalar perm). After PR #998 lands,
+  // the same call resolves to WIDTH=2 packed perm and ns/iter halves.
+  // The dashboard step-down on this metric *is* the simd128 win.
+  bench_rpo256_packed_permute:             { shape: "batched", num_batches: 30, batch_size: 2_000,   warmup: 2_000 },
+  bench_rpx256_packed_permute:             { shape: "batched", num_batches: 30, batch_size: 2_000,   warmup: 2_000 },
+  bench_poseidon2_packed_permute:          { shape: "batched", num_batches: 30, batch_size: 2_000,   warmup: 2_000 },
+  // End-to-end synthetic prove. log_n=12 (4096-row Blake3 AIR trace) —
+  // ~1-3 s per prove, gives the headline regression-tracking metric.
+  // `num_runs` is small to keep CI runtime under the 15-min job timeout
+  // while still producing enough samples for a stable median.
+  bench_lifted_stark_prove_blake3:         { shape: "runs",    num_runs: 5,     log_n: 12 },
 };
 
 function median(arr) {
@@ -99,8 +118,15 @@ async function main() {
   const results = [];
   for (const [name, cfg] of Object.entries(BENCH_CONFIG)) {
     const samples = await page.evaluate(
-      ({ name, cfg }) =>
-        Array.from(window.__bench__[name](cfg.num_batches, cfg.batch_size, cfg.warmup)),
+      ({ name, cfg }) => {
+        const fn = window.__bench__[name];
+        if (cfg.shape === "batched") {
+          return Array.from(fn(cfg.num_batches, cfg.batch_size, cfg.warmup));
+        } else if (cfg.shape === "runs") {
+          return Array.from(fn(cfg.num_runs, cfg.log_n));
+        }
+        throw new Error(`unknown shape: ${cfg.shape}`);
+      },
       { name, cfg },
     );
 
@@ -111,13 +137,16 @@ async function main() {
     // `tool: customSmallerIsBetter`. Each entry is one tracked metric.
     // We surface the median; sample distribution is preserved for
     // post-hoc analysis via the workflow artifact (see bench.yml).
+    const extra = cfg.shape === "batched"
+      ? `n=${samples.length} batch_size=${cfg.batch_size} warmup=${cfg.warmup}`
+      : `n=${samples.length} log_n=${cfg.log_n}`;
     results.push({
       name: name.replace(/^bench_/, ""),
       unit: "ns/iter",
       value: med,
       // `extra` is shown verbatim in the chart tooltip — useful when
       // diagnosing variance later.
-      extra: `n=${samples.length} batch_size=${cfg.batch_size} warmup=${cfg.warmup}`,
+      extra,
     });
   }
 
