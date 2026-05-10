@@ -125,11 +125,14 @@ jobs:
           # those compare against the existing baseline, they don't update it).
           auto-push: ${{ github.event_name == 'push' }}
           comment-on-alert: true
-          # Regression alert threshold. Tuned high (15 %) because GHA Linux
-          # runners share CPUs; 10 % would false-positive on noisy
-          # neighbours. Re-tighten after we have ~50 PR samples and the
-          # measured run-to-run variance stabilises.
-          alert-threshold: "115%"
+          # Regression alert at 10 %. Run-to-run noise on GHA shared
+          # runners is real but accepting 15-20 % headroom would defeat
+          # the purpose: a 15 % regression IS a regression worth
+          # investigating, not the noise floor. Drive variance down
+          # (longer batches, more samples) to fit under this threshold
+          # rather than widening the threshold to fit measured noise.
+          # See README "Noise reduction" for the roadmap to tighten further.
+          alert-threshold: "110%"
           fail-on-alert: false  # warn via comment, don't fail the PR
           summary-always: true  # keep the diff comment fresh on each run
           comment-always: ${{ github.event_name == 'pull_request' }}
@@ -184,10 +187,13 @@ jobs:
           gh-pages-branch: gh-pages
           auto-push: ${{ github.event_name == 'push' }}
           comment-on-alert: true
-          # Native benches are ns-scale, so any timer noise is a larger
-          # relative fraction. 20 % threshold; revisit once variance data
-          # is in.
-          alert-threshold: "120%"
+          # Same 10 % threshold as wasm — native benches are ns-scale and
+          # timer noise is proportionally larger, but criterion's own
+          # statistical pruning already handles much of the per-iteration
+          # variance. If 10 % is too tight in practice, the path forward
+          # is more iterations / `iai-callgrind` instruction-count
+          # benchmarking, NOT a wider threshold.
+          alert-threshold: "110%"
           fail-on-alert: false
           summary-always: true
           comment-always: ${{ github.event_name == 'pull_request' }}

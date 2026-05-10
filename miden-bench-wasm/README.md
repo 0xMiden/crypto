@@ -95,20 +95,60 @@ The output is:
 ## Tuning a bench
 
 Per-bench `num_batches` / `batch_size` / `warmup` are in `driver.mjs`'s
-`BENCH_CONFIG`. Goals:
+`BENCH_CONFIG`. Goals (calibrated against the 10 % regression threshold
+in `bench.yml`):
 
-- `batch_size` × per-op cost ≈ **5–10 ms** per batch. Below 5 ms, timer
-  noise dominates. Above 10 ms, you're just paying for run length without
-  improving variance.
-- `num_batches = 30` gives a stable median + IQR. More is over-spend; less
-  exposes unrelated infra noise on shared GHA runners.
-- `warmup ≈ batch_size` gives V8 one full batch of un-timed iterations to
-  settle JIT tier-up before the timed batches begin.
+- **`batch_size` × per-op cost ≥ 20 ms per batch.** At 20 ms,
+  `performance.now()`'s ~100 µs precision (in non-COOP/COEP contexts,
+  which is what we run in) contributes ~0.5 % per-batch timer noise —
+  far below the 10 % alert threshold. Going below 20 ms exposes timer
+  jitter; going much above is over-spend.
+- **`num_batches = 50`.** Empirically gives a stable median + tight IQR
+  on shared GHA runners. 30 was occasionally producing outliers that
+  inflated single-PR variance. Bumping further has diminishing returns.
+- **`warmup ≈ one batch's worth`.** Gives V8 a full batch of un-timed
+  iterations to settle JIT tier-up before timed batches begin.
 
-If a new bench's variance is high in CI, double `batch_size` first
-(more amortization), then double `num_batches` (more samples for the
-median). The 15 % alert threshold in `bench.yml` is calibrated against
-this tuning — it'll need re-tuning if the runs get noisier.
+If a new bench's variance is high in CI, the order to escalate is:
+1. Bump `num_batches` first (cheaper than bigger batches; tightens the
+   median directly).
+2. Then bump `batch_size` (more amortization per batch — useful for the
+   noisiest GHA neighbours).
+3. Only as a last resort, raise the `alert-threshold` in
+   `.github/workflows/bench.yml`. Anything above 10 % indicates the
+   bench tooling is too coarse, not that the regression is acceptable.
+
+## Noise reduction
+
+The 10 % regression threshold is non-negotiable: a 15 %+ regression IS
+a regression worth investigating, not a "noise floor." Anything we do
+to reduce variance below 10 % is a win; widening the threshold to fit
+measured noise is a loss.
+
+What's already in place:
+
+- **20+ ms per batch** so timer resolution contributes < 1 % noise.
+- **50-sample median** instead of mean — robust to single-batch outliers
+  from CPU contention.
+- **Per-bench tuning** so each metric's own profile dictates iteration
+  count, rather than one-size-fits-all.
+
+Open follow-ups, in order of cost-effectiveness:
+
+1. **`iai-callgrind` for native benches.** Measures retired-instruction
+   count via valgrind, not wall-clock — fully deterministic, identical
+   numbers across runs of the same code. Drops native variance to ~0%.
+   ~30 LoC of workflow change to add as a parallel job.
+2. **Larger GHA runner sizes.** `runs-on: ubuntu-latest-4-cores` (or
+   `buildjet-2vcpu-ubuntu-2204` for true dedicated CPUs) cuts shared-
+   neighbour interference. Costs $$ per minute but makes the existing
+   thresholds easier to hold.
+3. **CodSpeed integration.** SaaS that runs benches under valgrind for
+   the WASM side too. Free for OSS. Replaces the headless-Chromium
+   harness entirely; the comment shape and PR-review UX are similar.
+4. **Multi-run-per-PR with best-of-N.** Run each bench 3 times within
+   the same workflow run, take the best median per metric. Doubles CI
+   time but cuts variance ~30-50 % on the noisiest benches.
 
 ## Why headless Chromium and not wasmtime
 
