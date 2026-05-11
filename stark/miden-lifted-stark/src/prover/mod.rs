@@ -348,7 +348,7 @@ where
             let periodic_lde =
                 PeriodicLde::build(&this_native_quotient_coset, air.periodic_columns_matrix());
 
-            let mut quotient_evals = vec![EF::ZERO; this_native_quotient_coset.lde_height()];
+            let mut quotient_evals = EF::zero_vec(this_native_quotient_coset.lde_height());
             let aux_values_i = &all_aux_values[i];
             let inv_z_h = quotient::compute_z_h_inverses::<F>(&this_native_quotient_coset);
 

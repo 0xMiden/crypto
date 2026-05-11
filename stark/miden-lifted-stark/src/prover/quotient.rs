@@ -71,12 +71,11 @@ where
 ///
 /// - **Scale before extend.** Horner-multiplying the smaller buffer is strictly less work than the
 ///   lifted one, and the lifted values are determined entirely by the smaller buffer via cyclic
-///   repetition — there's no reason to materialize them before scaling.
+///   repetition.
 /// - **Cyclic repetition = polynomial lift on two-adic cosets.** In natural-order coset
 ///   evaluations, `extended[i] = original[i mod n_old]` realises the composition `P(X) -> P(X^r)`:
 ///   iterating `gJ` in natural order and raising to the `r`-th power cycles through `(gJ)^r` with
-///   period `|(gJ)^r|`. This is what makes the running sum a coherent polynomial across the
-///   trace-height tower.
+///   period `|(gJ)^r|`.
 pub fn cyclic_extend_and_accumulate<EF: Field>(
     accumulator: &mut Vec<EF>,
     contribution: Vec<EF>,
