@@ -81,8 +81,12 @@ pub fn cyclic_extend_and_accumulate<EF: Field>(
     contribution: Vec<EF>,
     beta: EF,
 ) {
+    debug_assert!(contribution.len().is_power_of_two());
+    debug_assert!(accumulator.is_empty() || accumulator.len().is_power_of_two());
+    debug_assert!(contribution.len() >= accumulator.len());
+
     if accumulator.is_empty() {
-        *accumulator = contribution;
+        accumulator.extend(contribution);
         return;
     }
 
