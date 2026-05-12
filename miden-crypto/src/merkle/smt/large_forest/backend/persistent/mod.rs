@@ -39,7 +39,6 @@ use alloc::{string::ToString, sync::Arc, vec::Vec};
 use core::ffi::c_int;
 use std::{
     collections::HashMap,
-    iter::once,
     mem::{self, ManuallyDrop},
 };
 
@@ -71,7 +70,9 @@ use crate::{
                     keys::{LeafKey, SubtreeKey},
                     tree_metadata::TreeMetadata,
                 },
-                utils::MutationSet,
+                utils::{
+                    AppliedLineageMutation, LineageMutation, LineageMutationKind, MutationSet,
+                },
             },
         },
     },
@@ -85,6 +86,33 @@ type DB = db::DB;
 
 /// The type of a write batch in the database associated with a transaction.
 type WriteBatch = db::WriteBatch;
+
+/// Prepared mutations for [`PersistentBackend`].
+///
+/// This is the persistent backend's concrete [`Backend::PreparedMutations`] type. It stores
+/// storage-level updates and the resulting metadata computed during the first phase of a forest
+/// update. Applying it builds and commits a RocksDB [`WriteBatch`] without recomputing the Merkle
+/// update batches.
+///
+/// The fields are private because callers should treat prepared mutation data as opaque and pass it
+/// back through
+/// [`LargeSmtForest::apply_mutations`](crate::merkle::smt::LargeSmtForest::apply_mutations).
+#[derive(Debug)]
+pub struct PersistentPreparedMutations {
+    entries: Vec<PersistentPreparedLineageMutation>,
+}
+
+#[derive(Debug)]
+struct PersistentPreparedLineageMutation {
+    lineage: LineageId,
+    old_version: Option<VersionId>,
+    old_root: Word,
+    old_entry_count: usize,
+    reverse: MutationSet,
+    metadata: TreeMetadata,
+    storage_updates: StorageUpdates,
+    kind: LineageMutationKind,
+}
 
 // CONSTANTS / COLUMN FAMILY NAMES
 // ================================================================================================
@@ -525,6 +553,7 @@ impl BackendReader for PersistentBackend {
 
 impl Backend for PersistentBackend {
     type Reader = PersistentBackendReader;
+    type PreparedMutations = PersistentPreparedMutations;
 
     fn reader(&self) -> Result<Self::Reader> {
         let snapshot = self.db.snapshot();
@@ -541,6 +570,186 @@ impl Backend for PersistentBackend {
         })
     }
 
+    fn compute_add_lineage_mutations(
+        &self,
+        lineage: LineageId,
+        version: VersionId,
+        updates: SmtUpdateBatch,
+    ) -> Result<(Vec<LineageMutation>, Self::PreparedMutations)> {
+        if self.lineages.contains_key(&lineage) {
+            return Err(BackendError::DuplicateLineage(lineage));
+        }
+
+        let metadata = TreeMetadata {
+            version,
+            root_value: *EmptySubtreeRoots::entry(SMT_DEPTH, 0),
+            entry_count: 0,
+        };
+        let (mutation, prepared) = self.prepare_tree_update(
+            lineage,
+            metadata,
+            version,
+            updates.into(),
+            LineageMutationKind::AddLineage,
+        )?;
+
+        Ok((vec![mutation], PersistentPreparedMutations { entries: vec![prepared] }))
+    }
+
+    fn compute_update_tree_mutations(
+        &self,
+        lineage: LineageId,
+        new_version: VersionId,
+        updates: SmtUpdateBatch,
+    ) -> Result<(Vec<LineageMutation>, Self::PreparedMutations)> {
+        let metadata = self
+            .lineages
+            .get(&lineage)
+            .ok_or(BackendError::UnknownLineage(lineage))?
+            .clone();
+        let (mutation, prepared) = self.prepare_tree_update(
+            lineage,
+            metadata,
+            new_version,
+            updates.into(),
+            LineageMutationKind::UpdateTree,
+        )?;
+
+        Ok((vec![mutation], PersistentPreparedMutations { entries: vec![prepared] }))
+    }
+
+    fn compute_add_lineages_mutations(
+        &self,
+        version: VersionId,
+        lineages: SmtForestUpdateBatch,
+    ) -> Result<(Vec<LineageMutation>, Self::PreparedMutations)> {
+        let updates = lineages
+            .into_iter()
+            .map(|(lineage, ops)| {
+                if self.lineages.contains_key(&lineage) {
+                    return Err(BackendError::DuplicateLineage(lineage));
+                }
+                Ok((lineage, ops))
+            })
+            .collect::<Result<Vec<_>>>()?;
+
+        let lineage_data = updates
+            .into_par_iter()
+            .map(|(lineage, ops)| {
+                let metadata = TreeMetadata {
+                    version,
+                    root_value: *EmptySubtreeRoots::entry(SMT_DEPTH, 0),
+                    entry_count: 0,
+                };
+                self.prepare_tree_update(
+                    lineage,
+                    metadata,
+                    version,
+                    ops.into_iter().map(Into::into).collect(),
+                    LineageMutationKind::AddLineage,
+                )
+            })
+            .collect::<Result<Vec<_>>>()?;
+        let (mutations, prepared): (Vec<_>, Vec<_>) = lineage_data.into_iter().unzip();
+
+        Ok((mutations, PersistentPreparedMutations { entries: prepared }))
+    }
+
+    fn compute_update_forest_mutations(
+        &self,
+        new_version: VersionId,
+        updates: SmtForestUpdateBatch,
+    ) -> Result<(Vec<LineageMutation>, Self::PreparedMutations)> {
+        let updates = updates
+            .into_iter()
+            .map(|(lineage, ops)| {
+                let metadata = self
+                    .lineages
+                    .get(&lineage)
+                    .ok_or(BackendError::UnknownLineage(lineage))?
+                    .clone();
+                Ok((lineage, ops, metadata))
+            })
+            .collect::<Result<Vec<_>>>()?;
+
+        let lineage_data = updates
+            .into_par_iter()
+            .map(|(lineage, ops, metadata)| {
+                self.prepare_tree_update(
+                    lineage,
+                    metadata,
+                    new_version,
+                    ops.into_iter().map(Into::into).collect(),
+                    LineageMutationKind::UpdateTree,
+                )
+            })
+            .collect::<Result<Vec<_>>>()?;
+        let (mutations, prepared): (Vec<_>, Vec<_>) = lineage_data.into_iter().unzip();
+
+        Ok((mutations, PersistentPreparedMutations { entries: prepared }))
+    }
+
+    fn apply_mutations(
+        &mut self,
+        mutations: Self::PreparedMutations,
+    ) -> Result<Vec<AppliedLineageMutation>> {
+        let lineage_count = mutations.entries.len();
+        let mut batches = Vec::with_capacity(lineage_count);
+        let mut metadata = Vec::with_capacity(lineage_count);
+        let mut applied = Vec::with_capacity(lineage_count);
+
+        for entry in mutations.entries {
+            match entry.kind {
+                LineageMutationKind::AddLineage => {
+                    if self.lineages.contains_key(&entry.lineage) {
+                        return Err(BackendError::DuplicateLineage(entry.lineage));
+                    }
+                },
+                LineageMutationKind::UpdateTree => {
+                    if !self.lineages.contains_key(&entry.lineage) {
+                        return Err(BackendError::UnknownLineage(entry.lineage));
+                    }
+                },
+            }
+
+            let applied_entry = AppliedLineageMutation::new(
+                entry.lineage,
+                entry.old_version,
+                entry.metadata.version,
+                entry.old_root,
+                entry.metadata.root_value,
+                entry.old_entry_count,
+                entry.reverse,
+                entry.kind,
+            );
+            let batch = self.apply_updates_to_lineage(
+                WriteBatch::default(),
+                entry.lineage,
+                entry.storage_updates,
+            )?;
+            let batch = self.write_metadata(batch, entry.lineage, &entry.metadata)?;
+            metadata.push((entry.lineage, entry.metadata, MutationSet::default()));
+            batches.push(batch);
+            applied.push(applied_entry);
+        }
+
+        let final_batch = if lineage_count > MIN_LINEAGES_IN_BATCH_TO_PARALLELIZE {
+            batches
+                .into_par_iter()
+                .fold(WriteBatch::new, |l, r| merge_batches(l, &r))
+                .reduce(WriteBatch::new, |l, r| merge_batches(l, &r))
+        } else {
+            batches.into_iter().fold(WriteBatch::new(), |l, r| merge_batches(l, &r))
+        };
+
+        self.finalize_update(final_batch, metadata.into_iter())?;
+
+        Ok(applied)
+    }
+}
+
+#[cfg(test)]
+impl PersistentBackend {
     /// Adds the provided `lineage` to the forest with the provided `version` and sets the
     /// associated tree to have the value created by applying `updates` to the empty tree, returning
     /// the root of this new tree.
@@ -551,14 +760,14 @@ impl Backend for PersistentBackend {
     ///   backend.
     /// - [`BackendError::Internal`] if the database cannot be accessed at any point.
     /// - [`BackendError::Merkle`] if an error occurs with the merkle tree semantics.
-    fn add_lineage(
+    pub(crate) fn add_lineage(
         &mut self,
         lineage: LineageId,
         version: VersionId,
         updates: SmtUpdateBatch,
     ) -> Result<TreeWithRoot> {
-        // We start by checking if the lineage already exists, as we are expected by contract to
-        // error if it is a duplicate.
+        // We start by checking if the lineage already exists, preserving the behavior expected by
+        // the backend tests.
         if self.lineages.contains_key(&lineage) {
             return Err(BackendError::DuplicateLineage(lineage));
         }
@@ -592,7 +801,7 @@ impl Backend for PersistentBackend {
         // Only when the batch has been successfully written to disk do we write to the in-memory
         // metadata, ensuring that the state remains consistent.
         let new_root = tree_metadata.root_value;
-        self.finalize_update(batch, once((lineage, tree_metadata, reversion_set)))?;
+        self.finalize_update(batch, std::iter::once((lineage, tree_metadata, reversion_set)))?;
 
         // Finally we just return the necessary metadata.
         Ok(TreeWithRoot::new(lineage, version, new_root))
@@ -608,7 +817,7 @@ impl Backend for PersistentBackend {
     /// - [`BackendError::Internal`] if the database cannot be accessed at any point.
     /// - [`BackendError::Merkle`] if an error occurs with the merkle tree semantics.
     /// - [`BackendError::UnknownLineage`] if the provided `lineage` is not known by this backend.
-    fn update_tree(
+    pub(crate) fn update_tree(
         &mut self,
         lineage: LineageId,
         new_version: VersionId,
@@ -642,7 +851,8 @@ impl Backend for PersistentBackend {
 
         // Writing the batch may fail, so we only write to the in-memory metadata once it is
         // successful to ensure the in-memory state cache remains consistent with the database.
-        let mut res = self.finalize_update(batch, once((lineage, tree_metadata, reversion_set)))?;
+        let mut res =
+            self.finalize_update(batch, std::iter::once((lineage, tree_metadata, reversion_set)))?;
         let Some((_, reversion_set)) = res.pop() else {
             unreachable!("finalize_update did not return the same number of output elements")
         };
@@ -663,7 +873,7 @@ impl Backend for PersistentBackend {
     ///   backend.
     /// - [`BackendError::Internal`] if the database cannot be accessed at any point.
     /// - [`BackendError::Merkle`] if an error occurs with the merkle tree semantics.
-    fn add_lineages(
+    pub(crate) fn add_lineages(
         &mut self,
         version: VersionId,
         lineages: SmtForestUpdateBatch,
@@ -762,7 +972,7 @@ impl Backend for PersistentBackend {
     /// - [`BackendError::Internal`] if the database cannot be accessed at any point.
     /// - [`BackendError::Merkle`] if an error occurs with the merkle tree semantics.
     /// - [`BackendError::UnknownLineage`] if the provided `lineage` is not known by this backend.
-    fn update_forest(
+    pub(crate) fn update_forest(
         &mut self,
         new_version: VersionId,
         updates: SmtForestUpdateBatch,
@@ -901,6 +1111,7 @@ impl PersistentBackend {
     ///
     /// - [`BackendError::Internal`] if the backend fails to read to or write from storage.
     /// - [`BackendError::Merkle`] if an error occurs with the merkle tree semantics in the backend.
+    #[cfg(test)]
     fn update_tree_in_write_batch(
         &self,
         batch: WriteBatch,
@@ -1049,6 +1260,172 @@ impl PersistentBackend {
         };
 
         Ok((batch, mutation_set, tree_metadata))
+    }
+
+    fn prepare_tree_update(
+        &self,
+        lineage: LineageId,
+        mut tree_metadata: TreeMetadata,
+        new_version: VersionId,
+        mut updates: Vec<(Word, Word)>,
+        kind: LineageMutationKind,
+    ) -> Result<(LineageMutation, PersistentPreparedLineageMutation)> {
+        updates.sort_by_key(|(k, _)| LeafIndex::from(*k).position());
+
+        let leaf_map = if tree_metadata.entry_count == 0 {
+            HashMap::new()
+        } else {
+            self.get_leaves_for_keys(lineage, &updates.iter().map(|(k, _)| *k).collect::<Vec<_>>())?
+        };
+
+        let LeafMutations {
+            mut leaves,
+            leaf_updates,
+            leaf_count_delta,
+            entry_count_delta,
+            reversion_pairs,
+        } = self.sorted_pairs_to_mutated_leaves(updates, &leaf_map)?;
+
+        let old_version = tree_metadata.version;
+        let old_root = tree_metadata.root_value;
+        let old_entry_count = tree_metadata
+            .entry_count
+            .try_into()
+            .expect("Count of entries should fit into usize");
+
+        if leaves.is_empty() {
+            let empty = MutationSet {
+                old_root,
+                node_mutations: NodeMutations::default(),
+                new_pairs: Map::default(),
+                new_root: old_root,
+            };
+            let mutation = LineageMutation::new(
+                lineage,
+                (kind == LineageMutationKind::UpdateTree).then_some(old_version),
+                new_version,
+                old_root,
+                old_root,
+                kind,
+            );
+            let prepared = PersistentPreparedLineageMutation {
+                lineage,
+                old_version: (kind == LineageMutationKind::UpdateTree).then_some(old_version),
+                old_root,
+                old_entry_count,
+                reverse: empty,
+                metadata: tree_metadata,
+                storage_updates: StorageUpdates::default(),
+                kind,
+            };
+            return Ok((mutation, prepared));
+        }
+
+        let mut subtree_updates: Vec<SubtreeUpdate> = Vec::with_capacity(leaves.len());
+        let mut global_node_reversions = Map::new();
+
+        for subtree_root_depth in
+            (0..=SMT_DEPTH - SUBTREE_DEPTH).step_by(SUBTREE_DEPTH as usize).rev()
+        {
+            let subtree_count = leaves.len();
+
+            let (mut subtree_roots, modified_subtrees, node_reversions) = leaves
+                .into_par_iter()
+                .map(|subtree_leaves| {
+                    self.process_subtree_for_depth(lineage, subtree_leaves, subtree_root_depth)
+                })
+                .fold(
+                    || {
+                        Ok((
+                            Vec::with_capacity(subtree_count),
+                            Vec::with_capacity(subtree_count),
+                            Map::new(),
+                        ))
+                    },
+                    |result, processed_tree| match (result, processed_tree) {
+                        (Ok((mut roots, mut subtrees, mut reversions)), Ok(tree)) => {
+                            roots.push(tree.subtree_root);
+                            reversions.extend(tree.reversion_nodes);
+                            if let Some(action) = tree.storage_action {
+                                subtrees.push(action);
+                            }
+
+                            Ok((roots, subtrees, reversions))
+                        },
+                        (Err(e), _) | (_, Err(e)) => Err(e),
+                    },
+                )
+                .reduce(
+                    || Ok((Vec::new(), Vec::new(), Map::new())),
+                    |data1, data2| match (data1, data2) {
+                        (
+                            Ok((mut roots1, mut trees1, mut reversions1)),
+                            Ok((roots2, trees2, reversions2)),
+                        ) => {
+                            roots1.extend(roots2);
+                            trees1.extend(trees2);
+                            reversions1.extend(reversions2);
+                            Ok((roots1, trees1, reversions1))
+                        },
+                        (Err(e), _) | (_, Err(e)) => Err(e),
+                    },
+                )?;
+
+            subtree_updates.extend(modified_subtrees);
+            global_node_reversions.extend(node_reversions);
+            leaves = SubtreeLeavesIter::from_leaves(&mut subtree_roots).collect();
+
+            debug_assert!(!leaves.is_empty());
+        }
+
+        let mut leaf_update_map = leaf_map;
+        for (idx, mutated_leaf) in leaf_updates {
+            let leaf_opt = match mutated_leaf {
+                SmtLeaf::Empty(_) => None,
+                _ => Some(mutated_leaf),
+            };
+            leaf_update_map.insert(idx, leaf_opt);
+        }
+
+        let storage_updates = StorageUpdates::from_parts(
+            leaf_update_map,
+            subtree_updates,
+            leaf_count_delta,
+            entry_count_delta,
+        );
+
+        let new_root = leaves[0][0].hash;
+        tree_metadata.entry_count = tree_metadata.entry_count.saturating_add_signed(
+            entry_count_delta.try_into().expect("Delta should always fit into i64"),
+        );
+        tree_metadata.root_value = new_root;
+        tree_metadata.version = new_version;
+        let reverse = MutationSet {
+            old_root: new_root,
+            node_mutations: global_node_reversions,
+            new_pairs: reversion_pairs.into_iter().collect(),
+            new_root: old_root,
+        };
+        let mutation = LineageMutation::new(
+            lineage,
+            (kind == LineageMutationKind::UpdateTree).then_some(old_version),
+            new_version,
+            old_root,
+            new_root,
+            kind,
+        );
+        let prepared = PersistentPreparedLineageMutation {
+            lineage,
+            old_version: (kind == LineageMutationKind::UpdateTree).then_some(old_version),
+            old_root,
+            old_entry_count,
+            reverse,
+            metadata: tree_metadata,
+            storage_updates,
+            kind,
+        };
+
+        Ok((mutation, prepared))
     }
 
     /// Applies the `updates` to the specified `lineage` in the context of the provided `batch`.
