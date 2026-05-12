@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"fn":["commit_quotient","cyclic_extend_and_scale","divide_by_vanishing_in_place"]};
+window.SIDEBAR_ITEMS = {"fn":["commit_quotient","compute_z_h_inverses","cyclic_extend_and_accumulate","upsample_evals"]};

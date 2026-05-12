@@ -1,4 +1,4 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `stark/miden-lifted-stark/src/prover/mod.rs`."><title>mod.rs - source</title><script>if(window.location.protocol!=="file:")document.head.insertAdjacentHTML("beforeend","SourceSerif4-Regular-6b053e98.ttf.woff2,FiraSans-Italic-81dc35de.woff2,FiraSans-Regular-0fe48ade.woff2,FiraSans-MediumItalic-ccf7e434.woff2,FiraSans-Medium-e1aa3f0a.woff2,SourceCodePro-Regular-8badfe75.ttf.woff2,SourceCodePro-Semibold-aa29a496.ttf.woff2".split(",").map(f=>`<link rel="preload" as="font" type="font/woff2"href="../../../static.files/${f}">`).join(""))</script><link rel="stylesheet" href="../../../static.files/normalize-9960930a.css"><link rel="stylesheet" href="../../../static.files/rustdoc-17e0aaed.css"><meta name="rustdoc-vars" data-root-path="../../../" data-static-root-path="../../../static.files/" data-current-crate="miden_lifted_stark" data-themes="" data-resource-suffix="" data-rustdoc-version="1.97.0-nightly (365c0e1d7 2026-05-06)" data-channel="nightly" data-search-js="search-b5634cc7.js" data-stringdex-js="stringdex-2da4960a.js" data-settings-js="settings-170eb4bf.js" ><script src="../../../static.files/storage-41dd4d93.js"></script><script defer src="../../../static.files/src-script-813739b1.js"></script><script defer src="../../../src-files.js"></script><script defer src="../../../static.files/main-aa4d37ac.js"></script><noscript><link rel="stylesheet" href="../../../static.files/noscript-f7c3ffd8.css"></noscript><link rel="alternate icon" type="image/png" href="../../../static.files/favicon-32x32-eab170b8.png"><link rel="icon" type="image/svg+xml" href="../../../static.files/favicon-044be391.svg"></head><body class="rustdoc src"><a class="skip-main-content" href="#main-content">Skip to main content</a><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="src-sidebar-title"><h2>Files</h2></div></nav><div class="sidebar-resizer" title="Drag to resize sidebar"></div><main><section id="main-content" class="content" tabindex="-1"><div class="main-heading"><h1><div class="sub-heading">miden_lifted_stark/prover/</div>mod.rs</h1><rustdoc-toolbar></rustdoc-toolbar></div><div class="example-wrap digits-3"><pre class="rust"><code><a href=#1 id=1 data-nosnippet>1</a><span class="doccomment">//! Lifted STARK prover.
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `stark/miden-lifted-stark/src/prover/mod.rs`."><title>mod.rs - source</title><script>if(window.location.protocol!=="file:")document.head.insertAdjacentHTML("beforeend","SourceSerif4-Regular-6b053e98.ttf.woff2,FiraSans-Italic-81dc35de.woff2,FiraSans-Regular-0fe48ade.woff2,FiraSans-MediumItalic-ccf7e434.woff2,FiraSans-Medium-e1aa3f0a.woff2,SourceCodePro-Regular-8badfe75.ttf.woff2,SourceCodePro-Semibold-aa29a496.ttf.woff2".split(",").map(f=>`<link rel="preload" as="font" type="font/woff2"href="../../../static.files/${f}">`).join(""))</script><link rel="stylesheet" href="../../../static.files/normalize-9960930a.css"><link rel="stylesheet" href="../../../static.files/rustdoc-17e0aaed.css"><meta name="rustdoc-vars" data-root-path="../../../" data-static-root-path="../../../static.files/" data-current-crate="miden_lifted_stark" data-themes="" data-resource-suffix="" data-rustdoc-version="1.97.0-nightly (64a965e90 2026-05-11)" data-channel="nightly" data-search-js="search-b5634cc7.js" data-stringdex-js="stringdex-2da4960a.js" data-settings-js="settings-170eb4bf.js" ><script src="../../../static.files/storage-41dd4d93.js"></script><script defer src="../../../static.files/src-script-813739b1.js"></script><script defer src="../../../src-files.js"></script><script defer src="../../../static.files/main-aa4d37ac.js"></script><noscript><link rel="stylesheet" href="../../../static.files/noscript-f7c3ffd8.css"></noscript><link rel="alternate icon" type="image/png" href="../../../static.files/favicon-32x32-eab170b8.png"><link rel="icon" type="image/svg+xml" href="../../../static.files/favicon-044be391.svg"></head><body class="rustdoc src"><a class="skip-main-content" href="#main-content">Skip to main content</a><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="src-sidebar-title"><h2>Files</h2></div></nav><div class="sidebar-resizer" title="Drag to resize sidebar"></div><main><section id="main-content" class="content" tabindex="-1"><div class="main-heading"><h1><div class="sub-heading">miden_lifted_stark/prover/</div>mod.rs</h1><rustdoc-toolbar></rustdoc-toolbar></div><div class="example-wrap digits-3"><pre class="rust"><code><a href=#1 id=1 data-nosnippet>1</a><span class="doccomment">//! Lifted STARK prover.
 <a href=#2 id=2 data-nosnippet>2</a>//!
 <a href=#3 id=3 data-nosnippet>3</a>//! This module provides:
 <a href=#4 id=4 data-nosnippet>4</a>//! - [`prove_single`]: Prove a single AIR instance.
@@ -212,23 +212,23 @@
 <a href=#212 id=212 data-nosnippet>212</a>    // challenges depend on all prior inputs regardless of sponge state.
 <a href=#213 id=213 data-nosnippet>213</a>    </span><span class="kw">let </span>_instance_challenge: EF = channel.sample_algebra_element::&lt;EF&gt;();
 <a href=#214 id=214 data-nosnippet>214</a>
-<a href=#215 id=215 data-nosnippet>215</a>    <span class="comment">// Infer constraint degree from symbolic AIR analysis (max across all AIRs)
-<a href=#216 id=216 data-nosnippet>216</a>    </span><span class="kw">let </span>log_constraint_degree =
-<a href=#217 id=217 data-nosnippet>217</a>        instances.iter().map(|(air, ..)| air.log_quotient_degree()).max().unwrap_or(<span class="number">1</span>) <span class="kw">as </span>u8;
-<a href=#218 id=218 data-nosnippet>218</a>
-<a href=#219 id=219 data-nosnippet>219</a>    <span class="kw">if </span>log_constraint_degree &gt; log_blowup {
-<a href=#220 id=220 data-nosnippet>220</a>        <span class="kw">return </span><span class="prelude-val">Err</span>(ProverError::ConstraintDegreeTooHigh {
-<a href=#221 id=221 data-nosnippet>221</a>            log_quotient_degree: log_constraint_degree,
-<a href=#222 id=222 data-nosnippet>222</a>            log_blowup,
-<a href=#223 id=223 data-nosnippet>223</a>        });
-<a href=#224 id=224 data-nosnippet>224</a>    }
-<a href=#225 id=225 data-nosnippet>225</a>
-<a href=#226 id=226 data-nosnippet>226</a>    <span class="kw">let </span>log_lde_height = log_max_trace_height + log_blowup;
-<a href=#227 id=227 data-nosnippet>227</a>
-<a href=#228 id=228 data-nosnippet>228</a>    <span class="comment">// Max LDE coset (for the largest trace, no lifting)
-<a href=#229 id=229 data-nosnippet>229</a>    </span><span class="kw">let </span>max_lde_coset = LiftedCoset::unlifted(log_max_trace_height, log_blowup);
-<a href=#230 id=230 data-nosnippet>230</a>    <span class="kw">let </span>max_quotient_coset = max_lde_coset.quotient_domain(log_constraint_degree);
-<a href=#231 id=231 data-nosnippet>231</a>    <span class="kw">let </span>max_quotient_height = max_quotient_coset.lde_height();
+<a href=#215 id=215 data-nosnippet>215</a>    <span class="comment">// Infer per-AIR quotient degrees from symbolic analysis.
+<a href=#216 id=216 data-nosnippet>216</a>    </span><span class="kw">let </span>log_constraint_degrees: Vec&lt;u8&gt; =
+<a href=#217 id=217 data-nosnippet>217</a>        instances.iter().map(|(air, ..)| air.log_quotient_degree() <span class="kw">as </span>u8).collect();
+<a href=#218 id=218 data-nosnippet>218</a>    <span class="kw">let </span>log_constraint_degree = log_constraint_degrees.iter().copied().max().unwrap_or(<span class="number">1</span>);
+<a href=#219 id=219 data-nosnippet>219</a>
+<a href=#220 id=220 data-nosnippet>220</a>    <span class="kw">if </span>log_constraint_degree &gt; log_blowup {
+<a href=#221 id=221 data-nosnippet>221</a>        <span class="kw">return </span><span class="prelude-val">Err</span>(ProverError::ConstraintDegreeTooHigh {
+<a href=#222 id=222 data-nosnippet>222</a>            log_quotient_degree: log_constraint_degree,
+<a href=#223 id=223 data-nosnippet>223</a>            log_blowup,
+<a href=#224 id=224 data-nosnippet>224</a>        });
+<a href=#225 id=225 data-nosnippet>225</a>    }
+<a href=#226 id=226 data-nosnippet>226</a>
+<a href=#227 id=227 data-nosnippet>227</a>    <span class="kw">let </span>log_lde_height = log_max_trace_height + log_blowup;
+<a href=#228 id=228 data-nosnippet>228</a>
+<a href=#229 id=229 data-nosnippet>229</a>    <span class="comment">// Max LDE coset (for the largest trace, no lifting)
+<a href=#230 id=230 data-nosnippet>230</a>    </span><span class="kw">let </span>max_lde_coset = LiftedCoset::unlifted(log_max_trace_height, log_blowup);
+<a href=#231 id=231 data-nosnippet>231</a>    <span class="kw">let </span>max_quotient_height = max_lde_coset.quotient_domain(log_constraint_degree).lde_height();
 <a href=#232 id=232 data-nosnippet>232</a>
 <a href=#233 id=233 data-nosnippet>233</a>    <span class="comment">// 1. Commit all main traces (trace order — ascending height).
 <a href=#234 id=234 data-nosnippet>234</a>    //
@@ -247,7 +247,7 @@
 <a href=#247 id=247 data-nosnippet>247</a>        <span class="macro">info_span!</span>(<span class="string">"commit to main traces"</span>).in_scope(|| commit_traces(config, main_traces));
 <a href=#248 id=248 data-nosnippet>248</a>    channel.send_commitment(main_committed.root());
 <a href=#249 id=249 data-nosnippet>249</a>
-<a href=#250 id=250 data-nosnippet>250</a>    <span class="comment">// 2. Sample randomness and build aux traces for all AIRs
+<a href=#250 id=250 data-nosnippet>250</a>    <span class="comment">// 2. Sample randomness, build aux traces, and commit them
 <a href=#251 id=251 data-nosnippet>251</a>    </span><span class="kw">let </span>max_num_randomness =
 <a href=#252 id=252 data-nosnippet>252</a>        instances.iter().map(|(air, ..)| air.num_randomness()).max().unwrap_or(<span class="number">0</span>);
 <a href=#253 id=253 data-nosnippet>253</a>
@@ -302,22 +302,22 @@
 <a href=#302 id=302 data-nosnippet>302</a>        }
 <a href=#303 id=303 data-nosnippet>303</a>    }
 <a href=#304 id=304 data-nosnippet>304</a>
-<a href=#305 id=305 data-nosnippet>305</a>    <span class="comment">// 4. Sample constraint folding alpha and accumulation beta
+<a href=#305 id=305 data-nosnippet>305</a>    <span class="comment">// 3. Sample constraint folding alpha and accumulation beta
 <a href=#306 id=306 data-nosnippet>306</a>    </span><span class="kw">let </span>alpha: EF = channel.sample_algebra_element::&lt;EF&gt;();
 <a href=#307 id=307 data-nosnippet>307</a>    <span class="kw">let </span>beta: EF = channel.sample_algebra_element::&lt;EF&gt;();
 <a href=#308 id=308 data-nosnippet>308</a>
-<a href=#309 id=309 data-nosnippet>309</a>    <span class="comment">// 5. Evaluate constraints and accumulate with beta folding.
+<a href=#309 id=309 data-nosnippet>309</a>    <span class="comment">// 4. Evaluate constraints and accumulate quotient evaluations with beta folding.
 <a href=#310 id=310 data-nosnippet>310</a>    //
-<a href=#311 id=311 data-nosnippet>311</a>    // Single accumulator, processed in trace order (ascending height):
-<a href=#312 id=312 data-nosnippet>312</a>    //   1. Cyclically extend accumulator to the next quotient height
-<a href=#313 id=313 data-nosnippet>313</a>    //   2. Multiply every element by beta (Horner)
-<a href=#314 id=314 data-nosnippet>314</a>    //   3. Add constraint evaluations in-place: acc[i] += eval(i)
-<a href=#315 id=315 data-nosnippet>315</a>    //
-<a href=#316 id=316 data-nosnippet>316</a>    // Pre-allocate with LDE capacity so commit_quotient's resize doesn't reallocate.
-<a href=#317 id=317 data-nosnippet>317</a>    </span><span class="kw">let </span>constraint_degree = <span class="number">1 </span>&lt;&lt; log_constraint_degree <span class="kw">as </span>usize;
-<a href=#318 id=318 data-nosnippet>318</a>    <span class="kw">let </span><span class="kw-2">mut </span>accumulator: Vec&lt;EF&gt; = Vec::with_capacity(max_quotient_height * blowup);
+<a href=#311 id=311 data-nosnippet>311</a>    // Per AIR (ascending height):
+<a href=#312 id=312 data-nosnippet>312</a>    //   1. Evaluate Q_j = (alpha-folded constraints) / Z_{H_j} on the native quotient domain
+<a href=#313 id=313 data-nosnippet>313</a>    //      (divide fused into the eval write).
+<a href=#314 id=314 data-nosnippet>314</a>    //   2. If D_j &lt; D_max, upsample Q_j to the per-trace target domain.
+<a href=#315 id=315 data-nosnippet>315</a>    //   3. Cyclically extend the accumulator and Horner-fold: acc &lt;- acc * beta + Q_j.
+<a href=#316 id=316 data-nosnippet>316</a>    //
+<a href=#317 id=317 data-nosnippet>317</a>    // Pre-allocate with LDE capacity so commit_quotient's resize doesn't reallocate.
+<a href=#318 id=318 data-nosnippet>318</a>    </span><span class="kw">let </span><span class="kw-2">mut </span>accumulator: Vec&lt;EF&gt; = Vec::with_capacity(max_quotient_height * blowup);
 <a href=#319 id=319 data-nosnippet>319</a>
-<a href=#320 id=320 data-nosnippet>320</a>    <span class="comment">// Pre-compute constraint layouts for each AIR (base/ext index mapping)
+<a href=#320 id=320 data-nosnippet>320</a>    <span class="comment">// Pre-compute per-AIR constraint layouts.
 <a href=#321 id=321 data-nosnippet>321</a>    </span><span class="kw">let </span>layouts: Vec&lt;<span class="kw">_</span>&gt; = instances
 <a href=#322 id=322 data-nosnippet>322</a>        .iter()
 <a href=#323 id=323 data-nosnippet>323</a>        .map(|(air, ..)| get_constraint_layout::&lt;F, EF, A&gt;(<span class="kw-2">*</span>air))
@@ -327,92 +327,112 @@
 <a href=#327 id=327 data-nosnippet>327</a>        <span class="kw">for </span>(i, (air, w, <span class="kw">_</span>)) <span class="kw">in </span>instances.iter().enumerate() {
 <a href=#328 id=328 data-nosnippet>328</a>            <span class="kw">let </span>trace_height = w.trace.height();
 <a href=#329 id=329 data-nosnippet>329</a>            <span class="kw">let </span>log_trace_height = log2_strict_u8(trace_height);
-<a href=#330 id=330 data-nosnippet>330</a>
-<a href=#331 id=331 data-nosnippet>331</a>            <span class="comment">// Create LiftedCoset for this trace (may be lifted relative to max)
-<a href=#332 id=332 data-nosnippet>332</a>            </span><span class="kw">let </span>this_lde_coset =
-<a href=#333 id=333 data-nosnippet>333</a>                LiftedCoset::new(log_trace_height, log_blowup, log_max_trace_height);
-<a href=#334 id=334 data-nosnippet>334</a>            <span class="kw">let </span>this_quotient_coset = this_lde_coset.quotient_domain(log_constraint_degree);
-<a href=#335 id=335 data-nosnippet>335</a>            <span class="kw">let </span>this_quotient_height = this_quotient_coset.lde_height();
-<a href=#336 id=336 data-nosnippet>336</a>
-<a href=#337 id=337 data-nosnippet>337</a>            <span class="comment">// Truncate the committed LDE to the quotient evaluation domain gJ (size N·D).
-<a href=#338 id=338 data-nosnippet>338</a>            // Since B ≥ D, the committed LDE on gK (size N·B) contains gJ as a prefix in
-<a href=#339 id=339 data-nosnippet>339</a>            // bit-reversed storage, so this is a zero-copy view.
-<a href=#340 id=340 data-nosnippet>340</a>            </span><span class="kw">let </span>main_on_gj = main_committed.evals_on_quotient_domain(i, constraint_degree);
-<a href=#341 id=341 data-nosnippet>341</a>            <span class="kw">let </span>aux_on_gj = aux_committed.evals_on_quotient_domain(i, constraint_degree);
-<a href=#342 id=342 data-nosnippet>342</a>
-<a href=#343 id=343 data-nosnippet>343</a>            <span class="comment">// Build periodic LDE for this trace via coset method
-<a href=#344 id=344 data-nosnippet>344</a>            </span><span class="kw">let </span>periodic_lde =
-<a href=#345 id=345 data-nosnippet>345</a>                PeriodicLde::build(<span class="kw-2">&amp;</span>this_quotient_coset, air.periodic_columns_matrix());
+<a href=#330 id=330 data-nosnippet>330</a>            <span class="kw">let </span>this_log_constraint_degree = log_constraint_degrees[i];
+<a href=#331 id=331 data-nosnippet>331</a>            <span class="kw">let </span>this_constraint_degree = <span class="number">1usize </span>&lt;&lt; this_log_constraint_degree;
+<a href=#332 id=332 data-nosnippet>332</a>
+<a href=#333 id=333 data-nosnippet>333</a>            <span class="comment">// Create LiftedCoset for this trace (may be lifted relative to max).
+<a href=#334 id=334 data-nosnippet>334</a>            </span><span class="kw">let </span>this_lde_coset =
+<a href=#335 id=335 data-nosnippet>335</a>                LiftedCoset::new(log_trace_height, log_blowup, log_max_trace_height);
+<a href=#336 id=336 data-nosnippet>336</a>            <span class="kw">let </span>this_native_quotient_coset =
+<a href=#337 id=337 data-nosnippet>337</a>                this_lde_coset.quotient_domain(this_log_constraint_degree);
+<a href=#338 id=338 data-nosnippet>338</a>            <span class="kw">let </span>this_target_quotient_height =
+<a href=#339 id=339 data-nosnippet>339</a>                this_lde_coset.quotient_domain(log_constraint_degree).lde_height();
+<a href=#340 id=340 data-nosnippet>340</a>
+<a href=#341 id=341 data-nosnippet>341</a>            <span class="comment">// Truncate the committed LDE to the AIR's native quotient evaluation domain gJ_j.
+<a href=#342 id=342 data-nosnippet>342</a>            // Since B &gt;= D_j, the committed LDE on gK (size N*B) contains gJ_j as a prefix in
+<a href=#343 id=343 data-nosnippet>343</a>            // bit-reversed storage, so this is a zero-copy view.
+<a href=#344 id=344 data-nosnippet>344</a>            </span><span class="kw">let </span>main_on_gj = main_committed.evals_on_quotient_domain(i, this_constraint_degree);
+<a href=#345 id=345 data-nosnippet>345</a>            <span class="kw">let </span>aux_on_gj = aux_committed.evals_on_quotient_domain(i, this_constraint_degree);
 <a href=#346 id=346 data-nosnippet>346</a>
-<a href=#347 id=347 data-nosnippet>347</a>            <span class="comment">// Cyclically extend accumulator to this quotient height and scale by beta.
-<a href=#348 id=348 data-nosnippet>348</a>            // On the first iteration the accumulator is empty, so this is a no-op
-<a href=#349 id=349 data-nosnippet>349</a>            // and evaluate_constraints_into writes into a zero-filled buffer.
-<a href=#350 id=350 data-nosnippet>350</a>            </span><span class="macro">tracing::debug_span!</span>(
-<a href=#351 id=351 data-nosnippet>351</a>                <span class="string">"cyclic_extend"</span>,
-<a href=#352 id=352 data-nosnippet>352</a>                acc_len = accumulator.len(),
-<a href=#353 id=353 data-nosnippet>353</a>                target = this_quotient_height
-<a href=#354 id=354 data-nosnippet>354</a>            )
-<a href=#355 id=355 data-nosnippet>355</a>            .in_scope(|| {
-<a href=#356 id=356 data-nosnippet>356</a>                quotient::cyclic_extend_and_scale(<span class="kw-2">&amp;mut </span>accumulator, this_quotient_height, beta);
-<a href=#357 id=357 data-nosnippet>357</a>            });
-<a href=#358 id=358 data-nosnippet>358</a>
-<a href=#359 id=359 data-nosnippet>359</a>            <span class="kw">let </span>aux_values_i = <span class="kw-2">&amp;</span>all_aux_values[i];
-<a href=#360 id=360 data-nosnippet>360</a>
-<a href=#361 id=361 data-nosnippet>361</a>            <span class="comment">// Add constraint evaluations in-place: accumulator[i] += eval(i)
-<a href=#362 id=362 data-nosnippet>362</a>            </span><span class="macro">info_span!</span>(<span class="string">"eval_instance"</span>, instance = i, height = this_quotient_height).in_scope(
-<a href=#363 id=363 data-nosnippet>363</a>                || {
-<a href=#364 id=364 data-nosnippet>364</a>                    evaluate_constraints_into::&lt;F, EF, A&gt;(
-<a href=#365 id=365 data-nosnippet>365</a>                        <span class="kw-2">&amp;mut </span>accumulator,
-<a href=#366 id=366 data-nosnippet>366</a>                        <span class="kw-2">*</span>air,
-<a href=#367 id=367 data-nosnippet>367</a>                        <span class="kw-2">&amp;</span>main_on_gj,
-<a href=#368 id=368 data-nosnippet>368</a>                        <span class="kw-2">&amp;</span>aux_on_gj,
-<a href=#369 id=369 data-nosnippet>369</a>                        <span class="kw-2">&amp;</span>this_quotient_coset,
-<a href=#370 id=370 data-nosnippet>370</a>                        alpha,
-<a href=#371 id=371 data-nosnippet>371</a>                        <span class="kw-2">&amp;</span>randomness[..air.num_randomness()],
-<a href=#372 id=372 data-nosnippet>372</a>                        w.public_values,
-<a href=#373 id=373 data-nosnippet>373</a>                        <span class="kw-2">&amp;</span>periodic_lde,
-<a href=#374 id=374 data-nosnippet>374</a>                        <span class="kw-2">&amp;</span>layouts[i],
-<a href=#375 id=375 data-nosnippet>375</a>                        aux_values_i,
-<a href=#376 id=376 data-nosnippet>376</a>                    );
-<a href=#377 id=377 data-nosnippet>377</a>                },
-<a href=#378 id=378 data-nosnippet>378</a>            );
-<a href=#379 id=379 data-nosnippet>379</a>        }
-<a href=#380 id=380 data-nosnippet>380</a>    });
-<a href=#381 id=381 data-nosnippet>381</a>
-<a href=#382 id=382 data-nosnippet>382</a>    <span class="comment">// Verify we have the expected size (max quotient domain)
-<a href=#383 id=383 data-nosnippet>383</a>    </span><span class="macro">assert_eq!</span>(accumulator.len(), max_quotient_height);
-<a href=#384 id=384 data-nosnippet>384</a>
-<a href=#385 id=385 data-nosnippet>385</a>    <span class="comment">// 6. Divide by vanishing polynomial once on full gJ (in-place)
-<a href=#386 id=386 data-nosnippet>386</a>    </span><span class="macro">tracing::debug_span!</span>(<span class="string">"divide_by_vanishing"</span>, height = max_quotient_height).in_scope(|| {
-<a href=#387 id=387 data-nosnippet>387</a>        quotient::divide_by_vanishing_in_place::&lt;F, EF&gt;(<span class="kw-2">&amp;mut </span>accumulator, <span class="kw-2">&amp;</span>max_quotient_coset);
-<a href=#388 id=388 data-nosnippet>388</a>    });
-<a href=#389 id=389 data-nosnippet>389</a>
-<a href=#390 id=390 data-nosnippet>390</a>    <span class="comment">// 7. Commit quotient
-<a href=#391 id=391 data-nosnippet>391</a>    </span><span class="kw">let </span>quotient_committed = <span class="macro">info_span!</span>(<span class="string">"commit to quotient poly chunks"</span>)
-<a href=#392 id=392 data-nosnippet>392</a>        .in_scope(|| quotient::commit_quotient(config, accumulator, <span class="kw-2">&amp;</span>max_lde_coset));
-<a href=#393 id=393 data-nosnippet>393</a>    channel.send_commitment(quotient_committed.root());
+<a href=#347 id=347 data-nosnippet>347</a>            <span class="comment">// Build periodic LDE for this trace on the native quotient domain.
+<a href=#348 id=348 data-nosnippet>348</a>            </span><span class="kw">let </span>periodic_lde =
+<a href=#349 id=349 data-nosnippet>349</a>                PeriodicLde::build(<span class="kw-2">&amp;</span>this_native_quotient_coset, air.periodic_columns_matrix());
+<a href=#350 id=350 data-nosnippet>350</a>
+<a href=#351 id=351 data-nosnippet>351</a>            <span class="kw">let </span><span class="kw-2">mut </span>quotient_evals = EF::zero_vec(this_native_quotient_coset.lde_height());
+<a href=#352 id=352 data-nosnippet>352</a>            <span class="kw">let </span>aux_values_i = <span class="kw-2">&amp;</span>all_aux_values[i];
+<a href=#353 id=353 data-nosnippet>353</a>            <span class="kw">let </span>inv_z_h = quotient::compute_z_h_inverses::&lt;F&gt;(<span class="kw-2">&amp;</span>this_native_quotient_coset);
+<a href=#354 id=354 data-nosnippet>354</a>
+<a href=#355 id=355 data-nosnippet>355</a>            <span class="macro">tracing::debug_span!</span>(
+<a href=#356 id=356 data-nosnippet>356</a>                <span class="string">"eval_instance"</span>,
+<a href=#357 id=357 data-nosnippet>357</a>                instance = i,
+<a href=#358 id=358 data-nosnippet>358</a>                native_height = this_native_quotient_coset.lde_height(),
+<a href=#359 id=359 data-nosnippet>359</a>                target_height = this_target_quotient_height,
+<a href=#360 id=360 data-nosnippet>360</a>                native_degree = this_constraint_degree,
+<a href=#361 id=361 data-nosnippet>361</a>                target_degree = <span class="number">1 </span>&lt;&lt; log_constraint_degree <span class="kw">as </span>usize,
+<a href=#362 id=362 data-nosnippet>362</a>            )
+<a href=#363 id=363 data-nosnippet>363</a>            .in_scope(|| {
+<a href=#364 id=364 data-nosnippet>364</a>                evaluate_constraints_into::&lt;F, EF, A&gt;(
+<a href=#365 id=365 data-nosnippet>365</a>                    <span class="kw-2">&amp;mut </span>quotient_evals,
+<a href=#366 id=366 data-nosnippet>366</a>                    <span class="kw-2">*</span>air,
+<a href=#367 id=367 data-nosnippet>367</a>                    <span class="kw-2">&amp;</span>main_on_gj,
+<a href=#368 id=368 data-nosnippet>368</a>                    <span class="kw-2">&amp;</span>aux_on_gj,
+<a href=#369 id=369 data-nosnippet>369</a>                    <span class="kw-2">&amp;</span>this_native_quotient_coset,
+<a href=#370 id=370 data-nosnippet>370</a>                    alpha,
+<a href=#371 id=371 data-nosnippet>371</a>                    <span class="kw-2">&amp;</span>randomness[..air.num_randomness()],
+<a href=#372 id=372 data-nosnippet>372</a>                    w.public_values,
+<a href=#373 id=373 data-nosnippet>373</a>                    <span class="kw-2">&amp;</span>periodic_lde,
+<a href=#374 id=374 data-nosnippet>374</a>                    <span class="kw-2">&amp;</span>layouts[i],
+<a href=#375 id=375 data-nosnippet>375</a>                    aux_values_i,
+<a href=#376 id=376 data-nosnippet>376</a>                    <span class="kw-2">&amp;</span>inv_z_h,
+<a href=#377 id=377 data-nosnippet>377</a>                );
+<a href=#378 id=378 data-nosnippet>378</a>            });
+<a href=#379 id=379 data-nosnippet>379</a>
+<a href=#380 id=380 data-nosnippet>380</a>            <span class="kw">if </span>this_log_constraint_degree &lt; log_constraint_degree {
+<a href=#381 id=381 data-nosnippet>381</a>                <span class="kw">let </span>added_bits = (log_constraint_degree - this_log_constraint_degree) <span class="kw">as </span>usize;
+<a href=#382 id=382 data-nosnippet>382</a>                quotient_evals = <span class="macro">tracing::debug_span!</span>(
+<a href=#383 id=383 data-nosnippet>383</a>                    <span class="string">"upsample_quotient"</span>,
+<a href=#384 id=384 data-nosnippet>384</a>                    instance = i,
+<a href=#385 id=385 data-nosnippet>385</a>                    from = this_native_quotient_coset.lde_height(),
+<a href=#386 id=386 data-nosnippet>386</a>                    to = this_target_quotient_height,
+<a href=#387 id=387 data-nosnippet>387</a>                )
+<a href=#388 id=388 data-nosnippet>388</a>                .in_scope(|| {
+<a href=#389 id=389 data-nosnippet>389</a>                    quotient::upsample_evals::&lt;F, EF, <span class="kw">_</span>&gt;(config.dft(), quotient_evals, added_bits)
+<a href=#390 id=390 data-nosnippet>390</a>                });
+<a href=#391 id=391 data-nosnippet>391</a>            }
+<a href=#392 id=392 data-nosnippet>392</a>
+<a href=#393 id=393 data-nosnippet>393</a>            <span class="macro">debug_assert_eq!</span>(quotient_evals.len(), this_target_quotient_height);
 <a href=#394 id=394 data-nosnippet>394</a>
-<a href=#395 id=395 data-nosnippet>395</a>    <span class="comment">// 8. Sample OOD point (outside H and gK)
-<a href=#396 id=396 data-nosnippet>396</a>    </span><span class="kw">let </span>z: EF = max_lde_coset.sample_ood_point(<span class="kw-2">&amp;mut </span>channel);
-<a href=#397 id=397 data-nosnippet>397</a>    <span class="kw">let </span>h = F::two_adic_generator(log_max_trace_height.into());
-<a href=#398 id=398 data-nosnippet>398</a>    <span class="kw">let </span>z_next = z * h;
-<a href=#399 id=399 data-nosnippet>399</a>
-<a href=#400 id=400 data-nosnippet>400</a>    <span class="comment">// 9. Open via PCS
-<a href=#401 id=401 data-nosnippet>401</a>    </span><span class="kw">let </span>trees = <span class="macro">vec!</span>[main_committed.tree(), aux_committed.tree(), quotient_committed.tree()];
-<a href=#402 id=402 data-nosnippet>402</a>
-<a href=#403 id=403 data-nosnippet>403</a>    <span class="macro">info_span!</span>(<span class="string">"open"</span>).in_scope(|| {
-<a href=#404 id=404 data-nosnippet>404</a>        open_with_channel::&lt;F, EF, SC::Lmcs, RowMajorMatrix&lt;F&gt;, <span class="kw">_</span>, <span class="number">2</span>&gt;(
-<a href=#405 id=405 data-nosnippet>405</a>            config.pcs(),
-<a href=#406 id=406 data-nosnippet>406</a>            config.lmcs(),
-<a href=#407 id=407 data-nosnippet>407</a>            log_lde_height,
-<a href=#408 id=408 data-nosnippet>408</a>            [z, z_next],
-<a href=#409 id=409 data-nosnippet>409</a>            <span class="kw-2">&amp;</span>trees,
-<a href=#410 id=410 data-nosnippet>410</a>            <span class="kw-2">&amp;mut </span>channel,
-<a href=#411 id=411 data-nosnippet>411</a>        )
-<a href=#412 id=412 data-nosnippet>412</a>    });
-<a href=#413 id=413 data-nosnippet>413</a>
-<a href=#414 id=414 data-nosnippet>414</a>    <span class="kw">let </span>(digest, transcript) = channel.finalize();
-<a href=#415 id=415 data-nosnippet>415</a>    <span class="kw">let </span>proof = StarkProof { instance_shapes, transcript };
-<a href=#416 id=416 data-nosnippet>416</a>    <span class="prelude-val">Ok</span>(StarkOutput { digest, proof })
-<a href=#417 id=417 data-nosnippet>417</a>}
+<a href=#395 id=395 data-nosnippet>395</a>            <span class="comment">// Cyclically extend the running accumulator to the per-AIR target height and
+<a href=#396 id=396 data-nosnippet>396</a>            // Horner-fold this AIR's contribution in: acc &lt;- acc * beta + Q_j.
+<a href=#397 id=397 data-nosnippet>397</a>            </span><span class="macro">tracing::debug_span!</span>(
+<a href=#398 id=398 data-nosnippet>398</a>                <span class="string">"cyclic_extend_and_accumulate"</span>,
+<a href=#399 id=399 data-nosnippet>399</a>                acc_len = accumulator.len(),
+<a href=#400 id=400 data-nosnippet>400</a>                target = this_target_quotient_height
+<a href=#401 id=401 data-nosnippet>401</a>            )
+<a href=#402 id=402 data-nosnippet>402</a>            .in_scope(|| {
+<a href=#403 id=403 data-nosnippet>403</a>                quotient::cyclic_extend_and_accumulate(<span class="kw-2">&amp;mut </span>accumulator, quotient_evals, beta);
+<a href=#404 id=404 data-nosnippet>404</a>            });
+<a href=#405 id=405 data-nosnippet>405</a>        }
+<a href=#406 id=406 data-nosnippet>406</a>    });
+<a href=#407 id=407 data-nosnippet>407</a>
+<a href=#408 id=408 data-nosnippet>408</a>    <span class="macro">debug_assert_eq!</span>(accumulator.len(), max_quotient_height);
+<a href=#409 id=409 data-nosnippet>409</a>
+<a href=#410 id=410 data-nosnippet>410</a>    <span class="comment">// 5. Commit quotient.
+<a href=#411 id=411 data-nosnippet>411</a>    </span><span class="kw">let </span>quotient_committed = <span class="macro">info_span!</span>(<span class="string">"commit to quotient poly chunks"</span>)
+<a href=#412 id=412 data-nosnippet>412</a>        .in_scope(|| quotient::commit_quotient(config, accumulator, <span class="kw-2">&amp;</span>max_lde_coset));
+<a href=#413 id=413 data-nosnippet>413</a>    channel.send_commitment(quotient_committed.root());
+<a href=#414 id=414 data-nosnippet>414</a>
+<a href=#415 id=415 data-nosnippet>415</a>    <span class="comment">// 6. Sample OOD point (outside H and gK)
+<a href=#416 id=416 data-nosnippet>416</a>    </span><span class="kw">let </span>z: EF = max_lde_coset.sample_ood_point(<span class="kw-2">&amp;mut </span>channel);
+<a href=#417 id=417 data-nosnippet>417</a>    <span class="kw">let </span>h = F::two_adic_generator(log_max_trace_height.into());
+<a href=#418 id=418 data-nosnippet>418</a>    <span class="kw">let </span>z_next = z * h;
+<a href=#419 id=419 data-nosnippet>419</a>
+<a href=#420 id=420 data-nosnippet>420</a>    <span class="comment">// 7. Open via PCS
+<a href=#421 id=421 data-nosnippet>421</a>    </span><span class="kw">let </span>trees = <span class="macro">vec!</span>[main_committed.tree(), aux_committed.tree(), quotient_committed.tree()];
+<a href=#422 id=422 data-nosnippet>422</a>
+<a href=#423 id=423 data-nosnippet>423</a>    <span class="macro">info_span!</span>(<span class="string">"open"</span>).in_scope(|| {
+<a href=#424 id=424 data-nosnippet>424</a>        open_with_channel::&lt;F, EF, SC::Lmcs, RowMajorMatrix&lt;F&gt;, <span class="kw">_</span>, <span class="number">2</span>&gt;(
+<a href=#425 id=425 data-nosnippet>425</a>            config.pcs(),
+<a href=#426 id=426 data-nosnippet>426</a>            config.lmcs(),
+<a href=#427 id=427 data-nosnippet>427</a>            log_lde_height,
+<a href=#428 id=428 data-nosnippet>428</a>            [z, z_next],
+<a href=#429 id=429 data-nosnippet>429</a>            <span class="kw-2">&amp;</span>trees,
+<a href=#430 id=430 data-nosnippet>430</a>            <span class="kw-2">&amp;mut </span>channel,
+<a href=#431 id=431 data-nosnippet>431</a>        )
+<a href=#432 id=432 data-nosnippet>432</a>    });
+<a href=#433 id=433 data-nosnippet>433</a>
+<a href=#434 id=434 data-nosnippet>434</a>    <span class="kw">let </span>(digest, transcript) = channel.finalize();
+<a href=#435 id=435 data-nosnippet>435</a>    <span class="kw">let </span>proof = StarkProof { instance_shapes, transcript };
+<a href=#436 id=436 data-nosnippet>436</a>    <span class="prelude-val">Ok</span>(StarkOutput { digest, proof })
+<a href=#437 id=437 data-nosnippet>437</a>}
 </code></pre></div></section></main></body></html>
