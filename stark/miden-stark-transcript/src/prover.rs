@@ -138,10 +138,6 @@ where
     }
 
     fn grind(&mut self, bits: usize) -> Self::F {
-        // The `unsound-pow-skip` feature forces difficulty to 0 in lockstep
-        // with the verifier, preserving transcript layout while skipping the
-        // search. See the feature's note in `Cargo.toml`.
-        let bits = if cfg!(feature = "unsound-pow-skip") { 0 } else { bits };
         let witness = self.challenger.grind(bits);
         self.fields.push(witness);
         witness

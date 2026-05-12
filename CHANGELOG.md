@@ -1,6 +1,7 @@
 ## 0.26.0 (TBD)
 
 - [BREAKING] Upgraded direct `rand` dependencies to 0.10, updating RNG trait bounds and removing direct `rand_hc` usage ([#995](https://github.com/0xMiden/crypto/pull/995)).
+- [BREAKING] Removed FRI per-round folding grinding: dropped `FriParams::folding_pow_bits`, the `folding_pow_bits` argument from `PcsParams::new`, the `PcsParams::folding_pow_bits()` getter, and `FriRoundTranscript::pow_witness`. `FriTranscript`/`FriRoundTranscript` keep the base-field `F` type parameter as a phantom marker. The `--folding-pow-bits` CLI flag is removed from `miden-bench`; the batch backend now hardcodes `commit_proof_of_work_bits = 0` ([#1006](https://github.com/0xMiden/crypto/pull/1006)).
 
 ## 0.25.0 (2026-05-01)
 

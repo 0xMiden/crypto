@@ -19,16 +19,5 @@ p3-field.workspace      = true
 serde.workspace         = true
 thiserror.workspace     = true
 
-[features]
-default = []
-
-# Unsound: forces every `Channel::grind` call to difficulty 0, regardless of
-# the requested `bits`. Both prover and verifier honor the override, so the
-# transcript layout is preserved while the PoW search is effectively free.
-# Intended only for tests/benchmarks where realistic `*_pow_bits` settings
-# would dominate runtime; proofs produced with this feature carry no real
-# PoW work and must not be relied on for security.
-unsound-pow-skip = []
-
 [lints]
 workspace = true

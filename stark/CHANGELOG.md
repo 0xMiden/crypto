@@ -1,7 +1,6 @@
 ## Unreleased
 
 - [BREAKING] Removed FRI per-round folding grinding: dropped `FriParams::folding_pow_bits`, the `folding_pow_bits` argument from `PcsParams::new`, the `PcsParams::folding_pow_bits()` getter, and `FriRoundTranscript::pow_witness`. `FriTranscript`/`FriRoundTranscript` keep the base-field `F` type parameter as a phantom marker. The `--folding-pow-bits` CLI flag is removed from `miden-bench`; the batch backend now hardcodes `commit_proof_of_work_bits = 0`.
-- Added unsound `unsound-pow-skip` Cargo feature on `miden-stark-transcript` (forwarded by `miden-lifted-stark`) that forces every `Channel::grind` call to difficulty 0 while preserving transcript layout. Intended only for tests and benchmarks where realistic `*_pow_bits` would dominate runtime; proofs produced with this feature carry no real PoW work.
 - Consolidated `p3-miden-lmcs`, `p3-miden-lifted-fri`, `p3-miden-dev-utils`, and `p3-miden-lifted-examples` into `miden-lifted-stark`; extracted profiling binary into `miden-bench` ([#66](https://github.com/0xMiden/p3-miden/pull/66)).
 - Dropped BabyBear support; simplified tests, benchmarks, and dev-utils to Goldilocks-only ([#52](https://github.com/0xMiden/p3-miden/pull/52)).
 - Added crate-local `testing` modules to `p3-miden-lmcs` and `p3-miden-lifted-fri` behind a `testing` feature flag ([#52](https://github.com/0xMiden/p3-miden/pull/52)).
