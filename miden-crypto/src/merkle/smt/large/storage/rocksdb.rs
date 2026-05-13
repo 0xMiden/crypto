@@ -507,8 +507,14 @@ impl SmtStorageReader for RocksDbStorage {
     ///   during iterator creation.
     fn iter_subtrees(&self) -> Result<Box<dyn Iterator<Item = Subtree> + '_>, StorageError> {
         // All subtree column family names in order
-        const SUBTREE_CFS: [&str; 6] =
-            [SUBTREE_16_CF, SUBTREE_24_CF, SUBTREE_32_CF, SUBTREE_40_CF, SUBTREE_48_CF, SUBTREE_56_CF];
+        const SUBTREE_CFS: [&str; 6] = [
+            SUBTREE_16_CF,
+            SUBTREE_24_CF,
+            SUBTREE_32_CF,
+            SUBTREE_40_CF,
+            SUBTREE_48_CF,
+            SUBTREE_56_CF,
+        ];
 
         let mut cf_handles = Vec::new();
         for cf_name in SUBTREE_CFS {
@@ -1564,8 +1570,14 @@ impl SmtStorageReader for RocksDbSnapshotStorage {
 
     /// Returns an iterator over all subtrees in this snapshot.
     fn iter_subtrees(&self) -> Result<Box<dyn Iterator<Item = Subtree> + '_>, StorageError> {
-        const SUBTREE_CFS: [&str; 6] =
-            [SUBTREE_16_CF, SUBTREE_24_CF, SUBTREE_32_CF, SUBTREE_40_CF, SUBTREE_48_CF, SUBTREE_56_CF];
+        const SUBTREE_CFS: [&str; 6] = [
+            SUBTREE_16_CF,
+            SUBTREE_24_CF,
+            SUBTREE_32_CF,
+            SUBTREE_40_CF,
+            SUBTREE_48_CF,
+            SUBTREE_56_CF,
+        ];
 
         let mut cf_handles = Vec::new();
         for cf_name in SUBTREE_CFS {
