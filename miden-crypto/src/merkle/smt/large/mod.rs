@@ -278,7 +278,7 @@ mod smt_trait;
 // ================================================================================================
 
 /// Number of levels of the tree that are stored in memory
-const IN_MEMORY_DEPTH: u8 = 24;
+const IN_MEMORY_DEPTH: u8 = 16;
 
 /// Number of nodes that are stored in memory (including the unused index 0)
 const NUM_IN_MEMORY_NODES: usize = 1 << (IN_MEMORY_DEPTH + 1);
@@ -286,8 +286,8 @@ const NUM_IN_MEMORY_NODES: usize = 1 << (IN_MEMORY_DEPTH + 1);
 /// Index of the root node inside `in_memory_nodes`.
 pub(super) const ROOT_MEMORY_INDEX: usize = 1;
 
-/// Number of subtree levels below in-memory depth (24-64 in steps of 8)
-const NUM_SUBTREE_LEVELS: usize = 5;
+/// Number of subtree levels below in-memory depth (16-64 in steps of 8)
+const NUM_SUBTREE_LEVELS: usize = 6;
 
 /// How many subtrees we buffer before flushing them to storage **during the
 /// SMT construction phase**.
@@ -372,7 +372,7 @@ impl<S: SmtStorageReader> LargeSmt<S> {
     pub const EMPTY_ROOT: Word = *EmptySubtreeRoots::entry(SMT_DEPTH, 0);
 
     /// Subtree depths for the subtrees stored in storage.
-    pub const SUBTREE_DEPTHS: [u8; 5] = [56, 48, 40, 32, 24];
+    pub const SUBTREE_DEPTHS: [u8; 6] = [56, 48, 40, 32, 24, 16];
 
     // PUBLIC ACCESSORS
     // --------------------------------------------------------------------------------------------

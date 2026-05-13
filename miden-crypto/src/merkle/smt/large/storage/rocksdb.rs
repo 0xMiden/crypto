@@ -25,6 +25,7 @@ use crate::{
 /// The name of the RocksDB column family used for storing SMT leaves.
 const LEAVES_CF: &str = "leaves";
 /// The names of the RocksDB column families used for storing SMT subtrees (deep nodes).
+const SUBTREE_16_CF: &str = "st16";
 const SUBTREE_24_CF: &str = "st24";
 const SUBTREE_32_CF: &str = "st32";
 const SUBTREE_40_CF: &str = "st40";
@@ -172,6 +173,7 @@ impl RocksDbStorage {
         // Define column families with tailored options
         let cfs = vec![
             ColumnFamilyDescriptor::new(LEAVES_CF, leaves_opts),
+            ColumnFamilyDescriptor::new(SUBTREE_16_CF, subtree_cf(&cache, 8.0)),
             ColumnFamilyDescriptor::new(SUBTREE_24_CF, subtree_cf(&cache, 8.0)),
             ColumnFamilyDescriptor::new(SUBTREE_32_CF, subtree_cf(&cache, 10.0)),
             ColumnFamilyDescriptor::new(SUBTREE_40_CF, subtree_cf(&cache, 10.0)),
@@ -199,6 +201,7 @@ impl RocksDbStorage {
 
         for name in [
             LEAVES_CF,
+            SUBTREE_16_CF,
             SUBTREE_24_CF,
             SUBTREE_32_CF,
             SUBTREE_40_CF,
@@ -226,6 +229,7 @@ impl RocksDbStorage {
     #[inline(always)]
     fn subtree_db_key(index: NodeIndex) -> KeyBytes {
         let keep = match index.depth() {
+            16 => 2,
             24 => 3,
             32 => 4,
             40 => 5,
@@ -390,7 +394,7 @@ impl SmtStorageReader for RocksDbStorage {
     fn get_subtrees(&self, indices: &[NodeIndex]) -> Result<Vec<Option<Subtree>>, StorageError> {
         use p3_maybe_rayon::prelude::*;
 
-        let mut depth_buckets: [Vec<(usize, NodeIndex)>; 5] = Default::default();
+        let mut depth_buckets: [Vec<(usize, NodeIndex)>; 6] = Default::default();
 
         for (original_index, &node_index) in indices.iter().enumerate() {
             let depth = node_index.depth();
@@ -400,6 +404,7 @@ impl SmtStorageReader for RocksDbStorage {
                 40 => 2,
                 32 => 3,
                 24 => 4,
+                16 => 5,
                 _ => {
                     return Err(StorageError::Unsupported(format!(
                         "unsupported subtree depth {depth}"
@@ -502,8 +507,8 @@ impl SmtStorageReader for RocksDbStorage {
     ///   during iterator creation.
     fn iter_subtrees(&self) -> Result<Box<dyn Iterator<Item = Subtree> + '_>, StorageError> {
         // All subtree column family names in order
-        const SUBTREE_CFS: [&str; 5] =
-            [SUBTREE_24_CF, SUBTREE_32_CF, SUBTREE_40_CF, SUBTREE_48_CF, SUBTREE_56_CF];
+        const SUBTREE_CFS: [&str; 6] =
+            [SUBTREE_16_CF, SUBTREE_24_CF, SUBTREE_32_CF, SUBTREE_40_CF, SUBTREE_48_CF, SUBTREE_56_CF];
 
         let mut cf_handles = Vec::new();
         for cf_name in SUBTREE_CFS {
@@ -1309,6 +1314,7 @@ fn subtree_root_from_key_bytes(key_bytes: &[u8], depth: u8) -> Result<NodeIndex,
 #[inline(always)]
 fn cf_for_depth(depth: u8) -> &'static str {
     match depth {
+        16 => SUBTREE_16_CF,
         24 => SUBTREE_24_CF,
         32 => SUBTREE_32_CF,
         40 => SUBTREE_40_CF,
@@ -1471,7 +1477,7 @@ impl SmtStorageReader for RocksDbSnapshotStorage {
     fn get_subtrees(&self, indices: &[NodeIndex]) -> Result<Vec<Option<Subtree>>, StorageError> {
         use p3_maybe_rayon::prelude::*;
 
-        let mut depth_buckets: [Vec<(usize, NodeIndex)>; 5] = Default::default();
+        let mut depth_buckets: [Vec<(usize, NodeIndex)>; 6] = Default::default();
 
         for (original_index, &node_index) in indices.iter().enumerate() {
             let depth = node_index.depth();
@@ -1481,6 +1487,7 @@ impl SmtStorageReader for RocksDbSnapshotStorage {
                 40 => 2,
                 32 => 3,
                 24 => 4,
+                16 => 5,
                 _ => {
                     return Err(StorageError::Unsupported(format!(
                         "unsupported subtree depth {depth}"
@@ -1557,8 +1564,8 @@ impl SmtStorageReader for RocksDbSnapshotStorage {
 
     /// Returns an iterator over all subtrees in this snapshot.
     fn iter_subtrees(&self) -> Result<Box<dyn Iterator<Item = Subtree> + '_>, StorageError> {
-        const SUBTREE_CFS: [&str; 5] =
-            [SUBTREE_24_CF, SUBTREE_32_CF, SUBTREE_40_CF, SUBTREE_48_CF, SUBTREE_56_CF];
+        const SUBTREE_CFS: [&str; 6] =
+            [SUBTREE_16_CF, SUBTREE_24_CF, SUBTREE_32_CF, SUBTREE_40_CF, SUBTREE_48_CF, SUBTREE_56_CF];
 
         let mut cf_handles = Vec::new();
         for cf_name in SUBTREE_CFS {
