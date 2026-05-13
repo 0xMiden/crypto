@@ -1,1 +1,0 @@
-window.SIDEBAR_ITEMS = {"fn":["materialize_bitrev"],"trait":["BitReversibleMatrix"]};

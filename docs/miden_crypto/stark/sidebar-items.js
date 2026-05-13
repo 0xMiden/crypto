@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"mod":["air","challenger","debug","dft","fri","hasher","lmcs","matrix","proof","prover","symmetric","transcript","verifier"],"struct":["GenericStarkConfig"],"trait":["StarkConfig"]};
+window.SIDEBAR_ITEMS = {"mod":["air","challenger","debug","dft","hasher","lmcs","matrix","proof","prover","symmetric","transcript","verifier"],"struct":["GenericStarkConfig"],"trait":["StarkConfig"]};

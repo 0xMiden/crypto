@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"enum":["LmcsError"],"mod":["bitrev","config","hiding_config","lifted_tree","merkle_witness","node_id","proof","row_list","tree_indices","utils"],"trait":["Lmcs","LmcsTree"],"type":["OpenedRows"]};
+window.SIDEBAR_ITEMS = {"enum":["LmcsError"],"mod":["config","hiding_config","lifted_tree","merkle_witness","node_id","proof","row_list","tree_indices"],"trait":["Lmcs","LmcsTree"],"type":["OpenedRows"]};

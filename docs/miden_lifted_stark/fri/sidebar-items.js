@@ -1,1 +1,0 @@
-window.SIDEBAR_ITEMS = {"mod":["deep","params","proof","round_proof","verifier"]};

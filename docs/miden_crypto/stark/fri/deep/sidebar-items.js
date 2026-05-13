@@ -1,1 +1,0 @@
-window.SIDEBAR_ITEMS = {"enum":["DeepError"],"mod":["proof","verifier"],"struct":["DeepTranscript"],"type":["PcsOpenedValues"]};

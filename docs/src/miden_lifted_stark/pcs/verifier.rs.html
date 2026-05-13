@@ -1,4 +1,4 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `stark/miden-lifted-stark/src/pcs/verifier.rs`."><title>verifier.rs - source</title><script>if(window.location.protocol!=="file:")document.head.insertAdjacentHTML("beforeend","SourceSerif4-Regular-6b053e98.ttf.woff2,FiraSans-Italic-81dc35de.woff2,FiraSans-Regular-0fe48ade.woff2,FiraSans-MediumItalic-ccf7e434.woff2,FiraSans-Medium-e1aa3f0a.woff2,SourceCodePro-Regular-8badfe75.ttf.woff2,SourceCodePro-Semibold-aa29a496.ttf.woff2".split(",").map(f=>`<link rel="preload" as="font" type="font/woff2"href="../../../static.files/${f}">`).join(""))</script><link rel="stylesheet" href="../../../static.files/normalize-9960930a.css"><link rel="stylesheet" href="../../../static.files/rustdoc-17e0aaed.css"><meta name="rustdoc-vars" data-root-path="../../../" data-static-root-path="../../../static.files/" data-current-crate="miden_lifted_stark" data-themes="" data-resource-suffix="" data-rustdoc-version="1.97.0-nightly (64a965e90 2026-05-11)" data-channel="nightly" data-search-js="search-b5634cc7.js" data-stringdex-js="stringdex-2da4960a.js" data-settings-js="settings-170eb4bf.js" ><script src="../../../static.files/storage-41dd4d93.js"></script><script defer src="../../../static.files/src-script-813739b1.js"></script><script defer src="../../../src-files.js"></script><script defer src="../../../static.files/main-aa4d37ac.js"></script><noscript><link rel="stylesheet" href="../../../static.files/noscript-f7c3ffd8.css"></noscript><link rel="alternate icon" type="image/png" href="../../../static.files/favicon-32x32-eab170b8.png"><link rel="icon" type="image/svg+xml" href="../../../static.files/favicon-044be391.svg"></head><body class="rustdoc src"><a class="skip-main-content" href="#main-content">Skip to main content</a><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="src-sidebar-title"><h2>Files</h2></div></nav><div class="sidebar-resizer" title="Drag to resize sidebar"></div><main><section id="main-content" class="content" tabindex="-1"><div class="main-heading"><h1><div class="sub-heading">miden_lifted_stark/pcs/</div>verifier.rs</h1><rustdoc-toolbar></rustdoc-toolbar></div><div class="example-wrap digits-3"><pre class="rust"><code><a href=#1 id=1 data-nosnippet>1</a><span class="doccomment">//! PCS Verifier
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `stark/miden-lifted-stark/src/pcs/verifier.rs`."><title>verifier.rs - source</title><script>if(window.location.protocol!=="file:")document.head.insertAdjacentHTML("beforeend","SourceSerif4-Regular-6b053e98.ttf.woff2,FiraSans-Italic-81dc35de.woff2,FiraSans-Regular-0fe48ade.woff2,FiraSans-MediumItalic-ccf7e434.woff2,FiraSans-Medium-e1aa3f0a.woff2,SourceCodePro-Regular-8badfe75.ttf.woff2,SourceCodePro-Semibold-aa29a496.ttf.woff2".split(",").map(f=>`<link rel="preload" as="font" type="font/woff2"href="../../../static.files/${f}">`).join(""))</script><link rel="stylesheet" href="../../../static.files/normalize-9960930a.css"><link rel="stylesheet" href="../../../static.files/rustdoc-17e0aaed.css"><meta name="rustdoc-vars" data-root-path="../../../" data-static-root-path="../../../static.files/" data-current-crate="miden_lifted_stark" data-themes="" data-resource-suffix="" data-rustdoc-version="1.97.0-nightly (8b03437a8 2026-05-12)" data-channel="nightly" data-search-js="search-b5634cc7.js" data-stringdex-js="stringdex-2da4960a.js" data-settings-js="settings-170eb4bf.js" ><script src="../../../static.files/storage-41dd4d93.js"></script><script defer src="../../../static.files/src-script-813739b1.js"></script><script defer src="../../../src-files.js"></script><script defer src="../../../static.files/main-aa4d37ac.js"></script><noscript><link rel="stylesheet" href="../../../static.files/noscript-f7c3ffd8.css"></noscript><link rel="alternate icon" type="image/png" href="../../../static.files/favicon-32x32-eab170b8.png"><link rel="icon" type="image/svg+xml" href="../../../static.files/favicon-044be391.svg"></head><body class="rustdoc src"><a class="skip-main-content" href="#main-content">Skip to main content</a><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="src-sidebar-title"><h2>Files</h2></div></nav><div class="sidebar-resizer" title="Drag to resize sidebar"></div><main><section id="main-content" class="content" tabindex="-1"><div class="main-heading"><h1><div class="sub-heading">miden_lifted_stark/pcs/</div>verifier.rs</h1><rustdoc-toolbar></rustdoc-toolbar></div><div class="example-wrap digits-3"><pre class="rust"><code><a href=#1 id=1 data-nosnippet>1</a><span class="doccomment">//! PCS Verifier
 <a href=#2 id=2 data-nosnippet>2</a>//!
 <a href=#3 id=3 data-nosnippet>3</a>//! Verifies polynomial evaluation claims against commitments.
 <a href=#4 id=4 data-nosnippet>4</a>//!
@@ -21,7 +21,7 @@
 <a href=#21 id=21 data-nosnippet>21</a><span class="kw">use </span>thiserror::Error;
 <a href=#22 id=22 data-nosnippet>22</a>
 <a href=#23 id=23 data-nosnippet>23</a><span class="kw">use </span>crate::{
-<a href=#24 id=24 data-nosnippet>24</a>    lmcs::{Lmcs, tree_indices::TreeIndices, utils::aligned_widths},
+<a href=#24 id=24 data-nosnippet>24</a>    lmcs::{Lmcs, tree_indices::TreeIndices},
 <a href=#25 id=25 data-nosnippet>25</a>    pcs::{
 <a href=#26 id=26 data-nosnippet>26</a>        deep::{
 <a href=#27 id=27 data-nosnippet>27</a>            proof::OpenedValues,
@@ -30,141 +30,142 @@
 <a href=#30 id=30 data-nosnippet>30</a>        fri::verifier::{FriError, FriOracle},
 <a href=#31 id=31 data-nosnippet>31</a>        params::PcsParams,
 <a href=#32 id=32 data-nosnippet>32</a>    },
-<a href=#33 id=33 data-nosnippet>33</a>};
-<a href=#34 id=34 data-nosnippet>34</a>
-<a href=#35 id=35 data-nosnippet>35</a><span class="doccomment">/// Verify polynomial evaluation claims against commitments.
-<a href=#36 id=36 data-nosnippet>36</a>///
-<a href=#37 id=37 data-nosnippet>37</a>/// Commitment widths must match the committed rows (including any alignment padding
-<a href=#38 id=38 data-nosnippet>38</a>/// from `build_aligned_tree`). The PCS is alignment-agnostic; callers that use
-<a href=#39 id=39 data-nosnippet>39</a>/// aligned trees must pass aligned widths and handle truncation themselves.
-<a href=#40 id=40 data-nosnippet>40</a>/// See [`verify_aligned`] for automatic alignment handling.
-<a href=#41 id=41 data-nosnippet>41</a>///
-<a href=#42 id=42 data-nosnippet>42</a>/// Does **not** check that the channel is fully consumed after verification.
-<a href=#43 id=43 data-nosnippet>43</a>/// Callers should use
-<a href=#44 id=44 data-nosnippet>44</a>/// [`VerifierTranscript::finalize`](miden_stark_transcript::VerifierTranscript::finalize) to
-<a href=#45 id=45 data-nosnippet>45</a>/// enforce transcript exhaustion.
-<a href=#46 id=46 data-nosnippet>46</a>///
-<a href=#47 id=47 data-nosnippet>47</a>/// # Preconditions
-<a href=#48 id=48 data-nosnippet>48</a>/// - `eval_points` must lie outside both the trace-domain subgroup `H` and the LDE evaluation coset
-<a href=#49 id=49 data-nosnippet>49</a>///   `gK`. Otherwise denominators `(zⱼ − X)` in the DEEP quotient become zero, making it undefined.
-<a href=#50 id=50 data-nosnippet>50</a>/// - All commitments must be lifted to the same LDE height `2^log_lde_height`.
-<a href=#51 id=51 data-nosnippet>51</a>///
-<a href=#52 id=52 data-nosnippet>52</a>/// # Returns
-<a href=#53 id=53 data-nosnippet>53</a>/// `opened[group][matrix]` as a `RowMajorMatrix&lt;EF&gt;` with `N` rows
-<a href=#54 id=54 data-nosnippet>54</a>/// (one per evaluation point), using the same widths that were passed in.
-<a href=#55 id=55 data-nosnippet>55</a></span><span class="kw">pub fn </span>verify&lt;F, EF, L, Ch, <span class="kw">const </span>N: usize&gt;(
-<a href=#56 id=56 data-nosnippet>56</a>    params: <span class="kw-2">&amp;</span>PcsParams,
-<a href=#57 id=57 data-nosnippet>57</a>    lmcs: <span class="kw-2">&amp;</span>L,
-<a href=#58 id=58 data-nosnippet>58</a>    commitments: <span class="kw-2">&amp;</span>[(L::Commitment, Vec&lt;usize&gt;)],
-<a href=#59 id=59 data-nosnippet>59</a>    log_lde_height: u8,
-<a href=#60 id=60 data-nosnippet>60</a>    eval_points: [EF; N],
-<a href=#61 id=61 data-nosnippet>61</a>    channel: <span class="kw-2">&amp;mut </span>Ch,
-<a href=#62 id=62 data-nosnippet>62</a>) -&gt; <span class="prelude-ty">Result</span>&lt;OpenedValues&lt;EF&gt;, PcsError&gt;
-<a href=#63 id=63 data-nosnippet>63</a><span class="kw">where
-<a href=#64 id=64 data-nosnippet>64</a>    </span>F: TwoAdicField,
-<a href=#65 id=65 data-nosnippet>65</a>    EF: ExtensionField&lt;F&gt; + PartialEq + Clone,
-<a href=#66 id=66 data-nosnippet>66</a>    L: Lmcs&lt;F = F&gt;,
-<a href=#67 id=67 data-nosnippet>67</a>    Ch: VerifierChannel&lt;F = F, Commitment = L::Commitment&gt;,
-<a href=#68 id=68 data-nosnippet>68</a>{
-<a href=#69 id=69 data-nosnippet>69</a>    <span class="kw">const </span>{ <span class="macro">assert!</span>(N &gt; <span class="number">0</span>, <span class="string">"at least one evaluation point required"</span>) };
-<a href=#70 id=70 data-nosnippet>70</a>
-<a href=#71 id=71 data-nosnippet>71</a>    <span class="kw">if </span>commitments.is_empty() {
-<a href=#72 id=72 data-nosnippet>72</a>        <span class="kw">return </span><span class="prelude-val">Err</span>(PcsError::NoCommitments);
-<a href=#73 id=73 data-nosnippet>73</a>    }
-<a href=#74 id=74 data-nosnippet>74</a>
-<a href=#75 id=75 data-nosnippet>75</a>    <span class="comment">// Construct verifier's DEEP oracle (observes evals, checks PoW, samples α/β)
-<a href=#76 id=76 data-nosnippet>76</a>    </span><span class="kw">let </span>(deep_oracle, evals) = DeepOracle::&lt;F, EF, L&gt;::new(
-<a href=#77 id=77 data-nosnippet>77</a>        params.deep,
-<a href=#78 id=78 data-nosnippet>78</a>        <span class="kw-2">&amp;</span>eval_points,
-<a href=#79 id=79 data-nosnippet>79</a>        commitments.to_vec(),
-<a href=#80 id=80 data-nosnippet>80</a>        log_lde_height,
-<a href=#81 id=81 data-nosnippet>81</a>        channel,
-<a href=#82 id=82 data-nosnippet>82</a>    )<span class="question-mark">?</span>;
-<a href=#83 id=83 data-nosnippet>83</a>
-<a href=#84 id=84 data-nosnippet>84</a>    <span class="comment">// Create FRI oracle (observes commitments + final poly, checks per-round PoW)
-<a href=#85 id=85 data-nosnippet>85</a>    </span><span class="kw">let </span>fri_oracle = FriOracle::new(<span class="kw-2">&amp;</span>params.fri, log_lde_height, channel)<span class="question-mark">?</span>;
-<a href=#86 id=86 data-nosnippet>86</a>
-<a href=#87 id=87 data-nosnippet>87</a>    <span class="comment">// Check query PoW witness and sample query indices
-<a href=#88 id=88 data-nosnippet>88</a>    </span>channel.grind(params.query_pow_bits())<span class="question-mark">?</span>;
-<a href=#89 id=89 data-nosnippet>89</a>
-<a href=#90 id=90 data-nosnippet>90</a>    <span class="comment">// Sample query indices (domain indices). The LMCS tree is indexed by domain order.
-<a href=#91 id=91 data-nosnippet>91</a>    </span><span class="kw">let </span>sampled_indices_iter =
-<a href=#92 id=92 data-nosnippet>92</a>        (<span class="number">0</span>..params.num_queries()).map(|<span class="kw">_</span>| channel.sample_bits(log_lde_height <span class="kw">as </span>usize));
-<a href=#93 id=93 data-nosnippet>93</a>    <span class="kw">let </span>tree_indices = TreeIndices::new(sampled_indices_iter, log_lde_height)
-<a href=#94 id=94 data-nosnippet>94</a>        .expect(<span class="string">"sampled indices are in range"</span>);
-<a href=#95 id=95 data-nosnippet>95</a>
-<a href=#96 id=96 data-nosnippet>96</a>    <span class="comment">// Verify DEEP openings for all queries at once
-<a href=#97 id=97 data-nosnippet>97</a>    // tree_indices are bit-reversed positions; deep_evals is keyed by tree index
-<a href=#98 id=98 data-nosnippet>98</a>    </span><span class="kw">let </span>deep_evals = deep_oracle.open_batch(lmcs, <span class="kw-2">&amp;</span>tree_indices, channel)<span class="question-mark">?</span>;
-<a href=#99 id=99 data-nosnippet>99</a>
-<a href=#100 id=100 data-nosnippet>100</a>    <span class="comment">// Test low-degree proximity for all queries at once
-<a href=#101 id=101 data-nosnippet>101</a>    </span>fri_oracle.test_low_degree(lmcs, <span class="kw-2">&amp;</span>params.fri, deep_evals, tree_indices, channel)<span class="question-mark">?</span>;
-<a href=#102 id=102 data-nosnippet>102</a>
-<a href=#103 id=103 data-nosnippet>103</a>    <span class="prelude-val">Ok</span>(evals)
-<a href=#104 id=104 data-nosnippet>104</a>}
-<a href=#105 id=105 data-nosnippet>105</a>
-<a href=#106 id=106 data-nosnippet>106</a><span class="doccomment">/// Like [`verify`], but handles LMCS alignment automatically.
-<a href=#107 id=107 data-nosnippet>107</a>///
-<a href=#108 id=108 data-nosnippet>108</a>/// Commitment widths should be the original (unpadded) data widths. This function:
-<a href=#109 id=109 data-nosnippet>109</a>/// 1. Aligns widths to `lmcs.alignment()`
-<a href=#110 id=110 data-nosnippet>110</a>/// 2. Calls [`verify`] with aligned widths
-<a href=#111 id=111 data-nosnippet>111</a>/// 3. Truncates returned evals back to original widths
-<a href=#112 id=112 data-nosnippet>112</a></span><span class="kw">pub fn </span>verify_aligned&lt;F, EF, L, Ch, <span class="kw">const </span>N: usize&gt;(
-<a href=#113 id=113 data-nosnippet>113</a>    params: <span class="kw-2">&amp;</span>PcsParams,
-<a href=#114 id=114 data-nosnippet>114</a>    lmcs: <span class="kw-2">&amp;</span>L,
-<a href=#115 id=115 data-nosnippet>115</a>    commitments: <span class="kw-2">&amp;</span>[(L::Commitment, Vec&lt;usize&gt;)],
-<a href=#116 id=116 data-nosnippet>116</a>    log_lde_height: u8,
-<a href=#117 id=117 data-nosnippet>117</a>    eval_points: [EF; N],
-<a href=#118 id=118 data-nosnippet>118</a>    channel: <span class="kw-2">&amp;mut </span>Ch,
-<a href=#119 id=119 data-nosnippet>119</a>) -&gt; <span class="prelude-ty">Result</span>&lt;OpenedValues&lt;EF&gt;, PcsError&gt;
-<a href=#120 id=120 data-nosnippet>120</a><span class="kw">where
-<a href=#121 id=121 data-nosnippet>121</a>    </span>F: TwoAdicField,
-<a href=#122 id=122 data-nosnippet>122</a>    EF: ExtensionField&lt;F&gt; + PartialEq + Clone,
-<a href=#123 id=123 data-nosnippet>123</a>    L: Lmcs&lt;F = F&gt;,
-<a href=#124 id=124 data-nosnippet>124</a>    Ch: VerifierChannel&lt;F = F, Commitment = L::Commitment&gt;,
-<a href=#125 id=125 data-nosnippet>125</a>{
-<a href=#126 id=126 data-nosnippet>126</a>    <span class="kw">let </span>alignment = lmcs.alignment();
-<a href=#127 id=127 data-nosnippet>127</a>    <span class="kw">let </span>aligned_commitments: Vec&lt;<span class="kw">_</span>&gt; = commitments
-<a href=#128 id=128 data-nosnippet>128</a>        .iter()
-<a href=#129 id=129 data-nosnippet>129</a>        .map(|(c, widths)| (c.clone(), aligned_widths(widths.clone(), alignment)))
-<a href=#130 id=130 data-nosnippet>130</a>        .collect();
-<a href=#131 id=131 data-nosnippet>131</a>
-<a href=#132 id=132 data-nosnippet>132</a>    <span class="kw">let </span>evals = verify(params, lmcs, <span class="kw-2">&amp;</span>aligned_commitments, log_lde_height, eval_points, channel)<span class="question-mark">?</span>;
-<a href=#133 id=133 data-nosnippet>133</a>
-<a href=#134 id=134 data-nosnippet>134</a>    <span class="comment">// Truncate each matrix back to original widths, removing alignment padding.
-<a href=#135 id=135 data-nosnippet>135</a>    </span><span class="kw">let </span>truncated = evals
-<a href=#136 id=136 data-nosnippet>136</a>        .into_iter()
-<a href=#137 id=137 data-nosnippet>137</a>        .zip(commitments)
-<a href=#138 id=138 data-nosnippet>138</a>        .map(|(group, (<span class="kw">_</span>, orig_widths))| {
-<a href=#139 id=139 data-nosnippet>139</a>            group
-<a href=#140 id=140 data-nosnippet>140</a>                .into_iter()
-<a href=#141 id=141 data-nosnippet>141</a>                .zip(orig_widths)
-<a href=#142 id=142 data-nosnippet>142</a>                .map(|(mat, <span class="kw-2">&amp;</span>orig_w)| {
-<a href=#143 id=143 data-nosnippet>143</a>                    HorizontallyTruncated::new(mat, orig_w)
-<a href=#144 id=144 data-nosnippet>144</a>                        .expect(<span class="string">"original width must not exceed aligned width"</span>)
-<a href=#145 id=145 data-nosnippet>145</a>                        .to_row_major_matrix()
-<a href=#146 id=146 data-nosnippet>146</a>                })
-<a href=#147 id=147 data-nosnippet>147</a>                .collect()
-<a href=#148 id=148 data-nosnippet>148</a>        })
-<a href=#149 id=149 data-nosnippet>149</a>        .collect();
-<a href=#150 id=150 data-nosnippet>150</a>
-<a href=#151 id=151 data-nosnippet>151</a>    <span class="prelude-val">Ok</span>(truncated)
-<a href=#152 id=152 data-nosnippet>152</a>}
-<a href=#153 id=153 data-nosnippet>153</a>
-<a href=#154 id=154 data-nosnippet>154</a><span class="comment">// ============================================================================
-<a href=#155 id=155 data-nosnippet>155</a>// Error Types
-<a href=#156 id=156 data-nosnippet>156</a>// ============================================================================
-<a href=#157 id=157 data-nosnippet>157</a>
-<a href=#158 id=158 data-nosnippet>158</a></span><span class="doccomment">/// Errors that can occur during PCS verification.
-<a href=#159 id=159 data-nosnippet>159</a></span><span class="attr">#[derive(Debug, Error)]
-<a href=#160 id=160 data-nosnippet>160</a></span><span class="kw">pub enum </span>PcsError {
-<a href=#161 id=161 data-nosnippet>161</a>    <span class="attr">#[error(<span class="string">"no commitments provided"</span>)]
-<a href=#162 id=162 data-nosnippet>162</a>    </span>NoCommitments,
-<a href=#163 id=163 data-nosnippet>163</a>    <span class="attr">#[error(<span class="string">"DEEP error: {0}"</span>)]
-<a href=#164 id=164 data-nosnippet>164</a>    </span>DeepError(<span class="attr">#[from] </span>DeepError),
-<a href=#165 id=165 data-nosnippet>165</a>    <span class="attr">#[error(<span class="string">"FRI error: {0}"</span>)]
-<a href=#166 id=166 data-nosnippet>166</a>    </span>FriError(<span class="attr">#[from] </span>FriError),
-<a href=#167 id=167 data-nosnippet>167</a>    <span class="attr">#[error(<span class="string">"transcript error: {0}"</span>)]
-<a href=#168 id=168 data-nosnippet>168</a>    </span>TranscriptError(<span class="attr">#[from] </span>TranscriptError),
-<a href=#169 id=169 data-nosnippet>169</a>}
+<a href=#33 id=33 data-nosnippet>33</a>    util::align::aligned_widths,
+<a href=#34 id=34 data-nosnippet>34</a>};
+<a href=#35 id=35 data-nosnippet>35</a>
+<a href=#36 id=36 data-nosnippet>36</a><span class="doccomment">/// Verify polynomial evaluation claims against commitments.
+<a href=#37 id=37 data-nosnippet>37</a>///
+<a href=#38 id=38 data-nosnippet>38</a>/// Commitment widths must match the committed rows (including any alignment padding
+<a href=#39 id=39 data-nosnippet>39</a>/// from `build_aligned_tree`). The PCS is alignment-agnostic; callers that use
+<a href=#40 id=40 data-nosnippet>40</a>/// aligned trees must pass aligned widths and handle truncation themselves.
+<a href=#41 id=41 data-nosnippet>41</a>/// See [`verify_aligned`] for automatic alignment handling.
+<a href=#42 id=42 data-nosnippet>42</a>///
+<a href=#43 id=43 data-nosnippet>43</a>/// Does **not** check that the channel is fully consumed after verification.
+<a href=#44 id=44 data-nosnippet>44</a>/// Callers should use
+<a href=#45 id=45 data-nosnippet>45</a>/// [`VerifierTranscript::finalize`](miden_stark_transcript::VerifierTranscript::finalize) to
+<a href=#46 id=46 data-nosnippet>46</a>/// enforce transcript exhaustion.
+<a href=#47 id=47 data-nosnippet>47</a>///
+<a href=#48 id=48 data-nosnippet>48</a>/// # Preconditions
+<a href=#49 id=49 data-nosnippet>49</a>/// - `eval_points` must lie outside both the trace-domain subgroup `H` and the LDE evaluation coset
+<a href=#50 id=50 data-nosnippet>50</a>///   `gK`. Otherwise denominators `(zⱼ − X)` in the DEEP quotient become zero, making it undefined.
+<a href=#51 id=51 data-nosnippet>51</a>/// - All commitments must be lifted to the same LDE height `2^log_lde_height`.
+<a href=#52 id=52 data-nosnippet>52</a>///
+<a href=#53 id=53 data-nosnippet>53</a>/// # Returns
+<a href=#54 id=54 data-nosnippet>54</a>/// `opened[group][matrix]` as a `RowMajorMatrix&lt;EF&gt;` with `N` rows
+<a href=#55 id=55 data-nosnippet>55</a>/// (one per evaluation point), using the same widths that were passed in.
+<a href=#56 id=56 data-nosnippet>56</a></span><span class="kw">pub fn </span>verify&lt;F, EF, L, Ch, <span class="kw">const </span>N: usize&gt;(
+<a href=#57 id=57 data-nosnippet>57</a>    params: <span class="kw-2">&amp;</span>PcsParams,
+<a href=#58 id=58 data-nosnippet>58</a>    lmcs: <span class="kw-2">&amp;</span>L,
+<a href=#59 id=59 data-nosnippet>59</a>    commitments: <span class="kw-2">&amp;</span>[(L::Commitment, Vec&lt;usize&gt;)],
+<a href=#60 id=60 data-nosnippet>60</a>    log_lde_height: u8,
+<a href=#61 id=61 data-nosnippet>61</a>    eval_points: [EF; N],
+<a href=#62 id=62 data-nosnippet>62</a>    channel: <span class="kw-2">&amp;mut </span>Ch,
+<a href=#63 id=63 data-nosnippet>63</a>) -&gt; <span class="prelude-ty">Result</span>&lt;OpenedValues&lt;EF&gt;, PcsError&gt;
+<a href=#64 id=64 data-nosnippet>64</a><span class="kw">where
+<a href=#65 id=65 data-nosnippet>65</a>    </span>F: TwoAdicField,
+<a href=#66 id=66 data-nosnippet>66</a>    EF: ExtensionField&lt;F&gt; + PartialEq + Clone,
+<a href=#67 id=67 data-nosnippet>67</a>    L: Lmcs&lt;F = F&gt;,
+<a href=#68 id=68 data-nosnippet>68</a>    Ch: VerifierChannel&lt;F = F, Commitment = L::Commitment&gt;,
+<a href=#69 id=69 data-nosnippet>69</a>{
+<a href=#70 id=70 data-nosnippet>70</a>    <span class="kw">const </span>{ <span class="macro">assert!</span>(N &gt; <span class="number">0</span>, <span class="string">"at least one evaluation point required"</span>) };
+<a href=#71 id=71 data-nosnippet>71</a>
+<a href=#72 id=72 data-nosnippet>72</a>    <span class="kw">if </span>commitments.is_empty() {
+<a href=#73 id=73 data-nosnippet>73</a>        <span class="kw">return </span><span class="prelude-val">Err</span>(PcsError::NoCommitments);
+<a href=#74 id=74 data-nosnippet>74</a>    }
+<a href=#75 id=75 data-nosnippet>75</a>
+<a href=#76 id=76 data-nosnippet>76</a>    <span class="comment">// Construct verifier's DEEP oracle (observes evals, checks PoW, samples α/β)
+<a href=#77 id=77 data-nosnippet>77</a>    </span><span class="kw">let </span>(deep_oracle, evals) = DeepOracle::&lt;F, EF, L&gt;::new(
+<a href=#78 id=78 data-nosnippet>78</a>        params.deep,
+<a href=#79 id=79 data-nosnippet>79</a>        <span class="kw-2">&amp;</span>eval_points,
+<a href=#80 id=80 data-nosnippet>80</a>        commitments.to_vec(),
+<a href=#81 id=81 data-nosnippet>81</a>        log_lde_height,
+<a href=#82 id=82 data-nosnippet>82</a>        channel,
+<a href=#83 id=83 data-nosnippet>83</a>    )<span class="question-mark">?</span>;
+<a href=#84 id=84 data-nosnippet>84</a>
+<a href=#85 id=85 data-nosnippet>85</a>    <span class="comment">// Create FRI oracle (observes commitments + final poly, checks per-round PoW)
+<a href=#86 id=86 data-nosnippet>86</a>    </span><span class="kw">let </span>fri_oracle = FriOracle::new(<span class="kw-2">&amp;</span>params.fri, log_lde_height, channel)<span class="question-mark">?</span>;
+<a href=#87 id=87 data-nosnippet>87</a>
+<a href=#88 id=88 data-nosnippet>88</a>    <span class="comment">// Check query PoW witness and sample query indices
+<a href=#89 id=89 data-nosnippet>89</a>    </span>channel.grind(params.query_pow_bits())<span class="question-mark">?</span>;
+<a href=#90 id=90 data-nosnippet>90</a>
+<a href=#91 id=91 data-nosnippet>91</a>    <span class="comment">// Sample query indices (domain indices). The LMCS tree is indexed by domain order.
+<a href=#92 id=92 data-nosnippet>92</a>    </span><span class="kw">let </span>sampled_indices_iter =
+<a href=#93 id=93 data-nosnippet>93</a>        (<span class="number">0</span>..params.num_queries()).map(|<span class="kw">_</span>| channel.sample_bits(log_lde_height <span class="kw">as </span>usize));
+<a href=#94 id=94 data-nosnippet>94</a>    <span class="kw">let </span>tree_indices = TreeIndices::new(sampled_indices_iter, log_lde_height)
+<a href=#95 id=95 data-nosnippet>95</a>        .expect(<span class="string">"sampled indices are in range"</span>);
+<a href=#96 id=96 data-nosnippet>96</a>
+<a href=#97 id=97 data-nosnippet>97</a>    <span class="comment">// Verify DEEP openings for all queries at once
+<a href=#98 id=98 data-nosnippet>98</a>    // tree_indices are bit-reversed positions; deep_evals is keyed by tree index
+<a href=#99 id=99 data-nosnippet>99</a>    </span><span class="kw">let </span>deep_evals = deep_oracle.open_batch(lmcs, <span class="kw-2">&amp;</span>tree_indices, channel)<span class="question-mark">?</span>;
+<a href=#100 id=100 data-nosnippet>100</a>
+<a href=#101 id=101 data-nosnippet>101</a>    <span class="comment">// Test low-degree proximity for all queries at once
+<a href=#102 id=102 data-nosnippet>102</a>    </span>fri_oracle.test_low_degree(lmcs, <span class="kw-2">&amp;</span>params.fri, deep_evals, tree_indices, channel)<span class="question-mark">?</span>;
+<a href=#103 id=103 data-nosnippet>103</a>
+<a href=#104 id=104 data-nosnippet>104</a>    <span class="prelude-val">Ok</span>(evals)
+<a href=#105 id=105 data-nosnippet>105</a>}
+<a href=#106 id=106 data-nosnippet>106</a>
+<a href=#107 id=107 data-nosnippet>107</a><span class="doccomment">/// Like [`verify`], but handles LMCS alignment automatically.
+<a href=#108 id=108 data-nosnippet>108</a>///
+<a href=#109 id=109 data-nosnippet>109</a>/// Commitment widths should be the original (unpadded) data widths. This function:
+<a href=#110 id=110 data-nosnippet>110</a>/// 1. Aligns widths to `lmcs.alignment()`
+<a href=#111 id=111 data-nosnippet>111</a>/// 2. Calls [`verify`] with aligned widths
+<a href=#112 id=112 data-nosnippet>112</a>/// 3. Truncates returned evals back to original widths
+<a href=#113 id=113 data-nosnippet>113</a></span><span class="kw">pub fn </span>verify_aligned&lt;F, EF, L, Ch, <span class="kw">const </span>N: usize&gt;(
+<a href=#114 id=114 data-nosnippet>114</a>    params: <span class="kw-2">&amp;</span>PcsParams,
+<a href=#115 id=115 data-nosnippet>115</a>    lmcs: <span class="kw-2">&amp;</span>L,
+<a href=#116 id=116 data-nosnippet>116</a>    commitments: <span class="kw-2">&amp;</span>[(L::Commitment, Vec&lt;usize&gt;)],
+<a href=#117 id=117 data-nosnippet>117</a>    log_lde_height: u8,
+<a href=#118 id=118 data-nosnippet>118</a>    eval_points: [EF; N],
+<a href=#119 id=119 data-nosnippet>119</a>    channel: <span class="kw-2">&amp;mut </span>Ch,
+<a href=#120 id=120 data-nosnippet>120</a>) -&gt; <span class="prelude-ty">Result</span>&lt;OpenedValues&lt;EF&gt;, PcsError&gt;
+<a href=#121 id=121 data-nosnippet>121</a><span class="kw">where
+<a href=#122 id=122 data-nosnippet>122</a>    </span>F: TwoAdicField,
+<a href=#123 id=123 data-nosnippet>123</a>    EF: ExtensionField&lt;F&gt; + PartialEq + Clone,
+<a href=#124 id=124 data-nosnippet>124</a>    L: Lmcs&lt;F = F&gt;,
+<a href=#125 id=125 data-nosnippet>125</a>    Ch: VerifierChannel&lt;F = F, Commitment = L::Commitment&gt;,
+<a href=#126 id=126 data-nosnippet>126</a>{
+<a href=#127 id=127 data-nosnippet>127</a>    <span class="kw">let </span>alignment = lmcs.alignment();
+<a href=#128 id=128 data-nosnippet>128</a>    <span class="kw">let </span>aligned_commitments: Vec&lt;<span class="kw">_</span>&gt; = commitments
+<a href=#129 id=129 data-nosnippet>129</a>        .iter()
+<a href=#130 id=130 data-nosnippet>130</a>        .map(|(c, widths)| (c.clone(), aligned_widths(widths.clone(), alignment)))
+<a href=#131 id=131 data-nosnippet>131</a>        .collect();
+<a href=#132 id=132 data-nosnippet>132</a>
+<a href=#133 id=133 data-nosnippet>133</a>    <span class="kw">let </span>evals = verify(params, lmcs, <span class="kw-2">&amp;</span>aligned_commitments, log_lde_height, eval_points, channel)<span class="question-mark">?</span>;
+<a href=#134 id=134 data-nosnippet>134</a>
+<a href=#135 id=135 data-nosnippet>135</a>    <span class="comment">// Truncate each matrix back to original widths, removing alignment padding.
+<a href=#136 id=136 data-nosnippet>136</a>    </span><span class="kw">let </span>truncated = evals
+<a href=#137 id=137 data-nosnippet>137</a>        .into_iter()
+<a href=#138 id=138 data-nosnippet>138</a>        .zip(commitments)
+<a href=#139 id=139 data-nosnippet>139</a>        .map(|(group, (<span class="kw">_</span>, orig_widths))| {
+<a href=#140 id=140 data-nosnippet>140</a>            group
+<a href=#141 id=141 data-nosnippet>141</a>                .into_iter()
+<a href=#142 id=142 data-nosnippet>142</a>                .zip(orig_widths)
+<a href=#143 id=143 data-nosnippet>143</a>                .map(|(mat, <span class="kw-2">&amp;</span>orig_w)| {
+<a href=#144 id=144 data-nosnippet>144</a>                    HorizontallyTruncated::new(mat, orig_w)
+<a href=#145 id=145 data-nosnippet>145</a>                        .expect(<span class="string">"original width must not exceed aligned width"</span>)
+<a href=#146 id=146 data-nosnippet>146</a>                        .to_row_major_matrix()
+<a href=#147 id=147 data-nosnippet>147</a>                })
+<a href=#148 id=148 data-nosnippet>148</a>                .collect()
+<a href=#149 id=149 data-nosnippet>149</a>        })
+<a href=#150 id=150 data-nosnippet>150</a>        .collect();
+<a href=#151 id=151 data-nosnippet>151</a>
+<a href=#152 id=152 data-nosnippet>152</a>    <span class="prelude-val">Ok</span>(truncated)
+<a href=#153 id=153 data-nosnippet>153</a>}
+<a href=#154 id=154 data-nosnippet>154</a>
+<a href=#155 id=155 data-nosnippet>155</a><span class="comment">// ============================================================================
+<a href=#156 id=156 data-nosnippet>156</a>// Error Types
+<a href=#157 id=157 data-nosnippet>157</a>// ============================================================================
+<a href=#158 id=158 data-nosnippet>158</a>
+<a href=#159 id=159 data-nosnippet>159</a></span><span class="doccomment">/// Errors that can occur during PCS verification.
+<a href=#160 id=160 data-nosnippet>160</a></span><span class="attr">#[derive(Debug, Error)]
+<a href=#161 id=161 data-nosnippet>161</a></span><span class="kw">pub enum </span>PcsError {
+<a href=#162 id=162 data-nosnippet>162</a>    <span class="attr">#[error(<span class="string">"no commitments provided"</span>)]
+<a href=#163 id=163 data-nosnippet>163</a>    </span>NoCommitments,
+<a href=#164 id=164 data-nosnippet>164</a>    <span class="attr">#[error(<span class="string">"DEEP error: {0}"</span>)]
+<a href=#165 id=165 data-nosnippet>165</a>    </span>DeepError(<span class="attr">#[from] </span>DeepError),
+<a href=#166 id=166 data-nosnippet>166</a>    <span class="attr">#[error(<span class="string">"FRI error: {0}"</span>)]
+<a href=#167 id=167 data-nosnippet>167</a>    </span>FriError(<span class="attr">#[from] </span>FriError),
+<a href=#168 id=168 data-nosnippet>168</a>    <span class="attr">#[error(<span class="string">"transcript error: {0}"</span>)]
+<a href=#169 id=169 data-nosnippet>169</a>    </span>TranscriptError(<span class="attr">#[from] </span>TranscriptError),
+<a href=#170 id=170 data-nosnippet>170</a>}
 </code></pre></div></section></main></body></html>

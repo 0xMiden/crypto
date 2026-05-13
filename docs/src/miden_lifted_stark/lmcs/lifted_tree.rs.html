@@ -1,4 +1,4 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `stark/miden-lifted-stark/src/lmcs/lifted_tree.rs`."><title>lifted_tree.rs - source</title><script>if(window.location.protocol!=="file:")document.head.insertAdjacentHTML("beforeend","SourceSerif4-Regular-6b053e98.ttf.woff2,FiraSans-Italic-81dc35de.woff2,FiraSans-Regular-0fe48ade.woff2,FiraSans-MediumItalic-ccf7e434.woff2,FiraSans-Medium-e1aa3f0a.woff2,SourceCodePro-Regular-8badfe75.ttf.woff2,SourceCodePro-Semibold-aa29a496.ttf.woff2".split(",").map(f=>`<link rel="preload" as="font" type="font/woff2"href="../../../static.files/${f}">`).join(""))</script><link rel="stylesheet" href="../../../static.files/normalize-9960930a.css"><link rel="stylesheet" href="../../../static.files/rustdoc-17e0aaed.css"><meta name="rustdoc-vars" data-root-path="../../../" data-static-root-path="../../../static.files/" data-current-crate="miden_lifted_stark" data-themes="" data-resource-suffix="" data-rustdoc-version="1.97.0-nightly (64a965e90 2026-05-11)" data-channel="nightly" data-search-js="search-b5634cc7.js" data-stringdex-js="stringdex-2da4960a.js" data-settings-js="settings-170eb4bf.js" ><script src="../../../static.files/storage-41dd4d93.js"></script><script defer src="../../../static.files/src-script-813739b1.js"></script><script defer src="../../../src-files.js"></script><script defer src="../../../static.files/main-aa4d37ac.js"></script><noscript><link rel="stylesheet" href="../../../static.files/noscript-f7c3ffd8.css"></noscript><link rel="alternate icon" type="image/png" href="../../../static.files/favicon-32x32-eab170b8.png"><link rel="icon" type="image/svg+xml" href="../../../static.files/favicon-044be391.svg"></head><body class="rustdoc src"><a class="skip-main-content" href="#main-content">Skip to main content</a><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="src-sidebar-title"><h2>Files</h2></div></nav><div class="sidebar-resizer" title="Drag to resize sidebar"></div><main><section id="main-content" class="content" tabindex="-1"><div class="main-heading"><h1><div class="sub-heading">miden_lifted_stark/lmcs/</div>lifted_tree.rs</h1><rustdoc-toolbar></rustdoc-toolbar></div><div class="example-wrap digits-3"><pre class="rust"><code><a href=#1 id=1 data-nosnippet>1</a><span class="kw">use </span>alloc::{vec, vec::Vec};
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `stark/miden-lifted-stark/src/lmcs/lifted_tree.rs`."><title>lifted_tree.rs - source</title><script>if(window.location.protocol!=="file:")document.head.insertAdjacentHTML("beforeend","SourceSerif4-Regular-6b053e98.ttf.woff2,FiraSans-Italic-81dc35de.woff2,FiraSans-Regular-0fe48ade.woff2,FiraSans-MediumItalic-ccf7e434.woff2,FiraSans-Medium-e1aa3f0a.woff2,SourceCodePro-Regular-8badfe75.ttf.woff2,SourceCodePro-Semibold-aa29a496.ttf.woff2".split(",").map(f=>`<link rel="preload" as="font" type="font/woff2"href="../../../static.files/${f}">`).join(""))</script><link rel="stylesheet" href="../../../static.files/normalize-9960930a.css"><link rel="stylesheet" href="../../../static.files/rustdoc-17e0aaed.css"><meta name="rustdoc-vars" data-root-path="../../../" data-static-root-path="../../../static.files/" data-current-crate="miden_lifted_stark" data-themes="" data-resource-suffix="" data-rustdoc-version="1.97.0-nightly (8b03437a8 2026-05-12)" data-channel="nightly" data-search-js="search-b5634cc7.js" data-stringdex-js="stringdex-2da4960a.js" data-settings-js="settings-170eb4bf.js" ><script src="../../../static.files/storage-41dd4d93.js"></script><script defer src="../../../static.files/src-script-813739b1.js"></script><script defer src="../../../src-files.js"></script><script defer src="../../../static.files/main-aa4d37ac.js"></script><noscript><link rel="stylesheet" href="../../../static.files/noscript-f7c3ffd8.css"></noscript><link rel="alternate icon" type="image/png" href="../../../static.files/favicon-32x32-eab170b8.png"><link rel="icon" type="image/svg+xml" href="../../../static.files/favicon-044be391.svg"></head><body class="rustdoc src"><a class="skip-main-content" href="#main-content">Skip to main content</a><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="src-sidebar-title"><h2>Files</h2></div></nav><div class="sidebar-resizer" title="Drag to resize sidebar"></div><main><section id="main-content" class="content" tabindex="-1"><div class="main-heading"><h1><div class="sub-heading">miden_lifted_stark/lmcs/</div>lifted_tree.rs</h1><rustdoc-toolbar></rustdoc-toolbar></div><div class="example-wrap digits-3"><pre class="rust"><code><a href=#1 id=1 data-nosnippet>1</a><span class="kw">use </span>alloc::{vec, vec::Vec};
 <a href=#2 id=2 data-nosnippet>2</a><span class="kw">use </span>core::{array, mem};
 <a href=#3 id=3 data-nosnippet>3</a>
 <a href=#4 id=4 data-nosnippet>4</a><span class="kw">use </span>miden_stark_transcript::ProverChannel;
@@ -10,9 +10,9 @@
 <a href=#10 id=10 data-nosnippet>10</a><span class="kw">use </span>p3_util::{log2_strict_usize, reverse_bits_len};
 <a href=#11 id=11 data-nosnippet>11</a><span class="kw">use </span>tracing::info_span;
 <a href=#12 id=12 data-nosnippet>12</a>
-<a href=#13 id=13 data-nosnippet>13</a><span class="kw">use </span><span class="kw">crate</span>::lmcs::{
-<a href=#14 id=14 data-nosnippet>14</a>    LmcsTree, bitrev::BitReversibleMatrix, proof::LeafOpening, row_list::RowList,
-<a href=#15 id=15 data-nosnippet>15</a>    tree_indices::TreeIndices, utils::PackedValueExt,
+<a href=#13 id=13 data-nosnippet>13</a><span class="kw">use </span>crate::{
+<a href=#14 id=14 data-nosnippet>14</a>    lmcs::{LmcsTree, proof::LeafOpening, row_list::RowList, tree_indices::TreeIndices},
+<a href=#15 id=15 data-nosnippet>15</a>    util::{bitrev::BitReversibleMatrix, packing::PackedValueExt},
 <a href=#16 id=16 data-nosnippet>16</a>};
 <a href=#17 id=17 data-nosnippet>17</a>
 <a href=#18 id=18 data-nosnippet>18</a><span class="doccomment">/// A uniform binary Merkle tree whose leaves are constructed from matrices with power-of-two
@@ -535,121 +535,122 @@
 <a href=#535 id=535 data-nosnippet>535</a>
 <a href=#536 id=536 data-nosnippet>536</a>    <span class="kw">use </span>super::<span class="kw-2">*</span>;
 <a href=#537 id=537 data-nosnippet>537</a>    <span class="kw">use </span>crate::{
-<a href=#538 id=538 data-nosnippet>538</a>        lmcs::{tests::build_leaves_single, utils::aligned_len},
+<a href=#538 id=538 data-nosnippet>538</a>        lmcs::tests::build_leaves_single,
 <a href=#539 id=539 data-nosnippet>539</a>        testing::configs::goldilocks_poseidon2::{
 <a href=#540 id=540 data-nosnippet>540</a>            <span class="self">self </span><span class="kw">as </span>gl, DIGEST, Felt, PackedFelt, RATE, Sponge,
 <a href=#541 id=541 data-nosnippet>541</a>        },
-<a href=#542 id=542 data-nosnippet>542</a>    };
-<a href=#543 id=543 data-nosnippet>543</a>
-<a href=#544 id=544 data-nosnippet>544</a>    <span class="doccomment">/// Common matrix group scenarios for testing lifting with varying heights.
-<a href=#545 id=545 data-nosnippet>545</a>    </span><span class="kw">fn </span>matrix_scenarios&lt;P: PackedValue&gt;(rate: usize) -&gt; Vec&lt;Vec&lt;(usize, usize)&gt;&gt; {
-<a href=#546 id=546 data-nosnippet>546</a>        <span class="kw">let </span>pack_width = P::WIDTH.max(<span class="number">2</span>);
-<a href=#547 id=547 data-nosnippet>547</a>        <span class="macro">vec!</span>[
-<a href=#548 id=548 data-nosnippet>548</a>            <span class="comment">// Single matrices
-<a href=#549 id=549 data-nosnippet>549</a>            </span><span class="macro">vec!</span>[(<span class="number">1</span>, <span class="number">1</span>)],
-<a href=#550 id=550 data-nosnippet>550</a>            <span class="macro">vec!</span>[(<span class="number">1</span>, rate - <span class="number">1</span>)],
-<a href=#551 id=551 data-nosnippet>551</a>            <span class="comment">// Multiple heights (must be ascending)
-<a href=#552 id=552 data-nosnippet>552</a>            </span><span class="macro">vec!</span>[(<span class="number">2</span>, <span class="number">3</span>), (<span class="number">4</span>, <span class="number">5</span>), (<span class="number">8</span>, rate)],
-<a href=#553 id=553 data-nosnippet>553</a>            <span class="macro">vec!</span>[(<span class="number">1</span>, <span class="number">5</span>), (<span class="number">1</span>, <span class="number">3</span>), (<span class="number">2</span>, <span class="number">7</span>), (<span class="number">4</span>, <span class="number">1</span>), (<span class="number">8</span>, rate + <span class="number">1</span>)],
-<a href=#554 id=554 data-nosnippet>554</a>            <span class="comment">// Packing boundary tests
-<a href=#555 id=555 data-nosnippet>555</a>            </span><span class="macro">vec!</span>[(pack_width / <span class="number">2</span>, rate - <span class="number">1</span>), (pack_width, rate), (pack_width * <span class="number">2</span>, rate + <span class="number">3</span>)],
-<a href=#556 id=556 data-nosnippet>556</a>            <span class="macro">vec!</span>[(pack_width, rate + <span class="number">5</span>), (pack_width * <span class="number">2</span>, <span class="number">25</span>)],
-<a href=#557 id=557 data-nosnippet>557</a>            <span class="macro">vec!</span>[
-<a href=#558 id=558 data-nosnippet>558</a>                (<span class="number">1</span>, rate * <span class="number">2</span>),
-<a href=#559 id=559 data-nosnippet>559</a>                (pack_width / <span class="number">2</span>, rate * <span class="number">2 </span>- <span class="number">1</span>),
-<a href=#560 id=560 data-nosnippet>560</a>                (pack_width, rate * <span class="number">2</span>),
-<a href=#561 id=561 data-nosnippet>561</a>                (pack_width * <span class="number">2</span>, rate * <span class="number">3 </span>- <span class="number">2</span>),
-<a href=#562 id=562 data-nosnippet>562</a>            ],
-<a href=#563 id=563 data-nosnippet>563</a>            <span class="comment">// Same-height matrices
-<a href=#564 id=564 data-nosnippet>564</a>            </span><span class="macro">vec!</span>[(<span class="number">4</span>, rate - <span class="number">1</span>), (<span class="number">4</span>, rate), (<span class="number">8</span>, rate + <span class="number">3</span>), (<span class="number">8</span>, rate * <span class="number">2</span>)],
-<a href=#565 id=565 data-nosnippet>565</a>            <span class="comment">// Single tall matrix
-<a href=#566 id=566 data-nosnippet>566</a>            </span><span class="macro">vec!</span>[(pack_width * <span class="number">2</span>, rate - <span class="number">1</span>)],
-<a href=#567 id=567 data-nosnippet>567</a>        ]
-<a href=#568 id=568 data-nosnippet>568</a>    }
-<a href=#569 id=569 data-nosnippet>569</a>
-<a href=#570 id=570 data-nosnippet>570</a>    <span class="doccomment">/// Concatenate matrices horizontally, padding each to a multiple of `R`.
-<a href=#571 id=571 data-nosnippet>571</a>    /// All matrices are lifted to the maximum height first.
-<a href=#572 id=572 data-nosnippet>572</a>    </span><span class="kw">fn </span>concatenate_matrices&lt;F: Field + PrimeCharacteristicRing, <span class="kw">const </span>R: usize&gt;(
-<a href=#573 id=573 data-nosnippet>573</a>        matrices: <span class="kw-2">&amp;</span>[RowMajorMatrix&lt;F&gt;],
-<a href=#574 id=574 data-nosnippet>574</a>    ) -&gt; RowMajorMatrix&lt;F&gt; {
-<a href=#575 id=575 data-nosnippet>575</a>        <span class="kw">let </span>max_height = matrices.last().unwrap().height();
-<a href=#576 id=576 data-nosnippet>576</a>        <span class="kw">let </span>width: usize = matrices.iter().map(|m| aligned_len(m.width(), R)).sum();
-<a href=#577 id=577 data-nosnippet>577</a>
-<a href=#578 id=578 data-nosnippet>578</a>        <span class="kw">let </span>concatenated_data: Vec&lt;<span class="kw">_</span>&gt; = (<span class="number">0</span>..max_height)
-<a href=#579 id=579 data-nosnippet>579</a>            .flat_map(|idx| {
-<a href=#580 id=580 data-nosnippet>580</a>                matrices.iter().flat_map(<span class="kw">move </span>|m| {
-<a href=#581 id=581 data-nosnippet>581</a>                    <span class="kw">let </span><span class="kw-2">mut </span>row = m.row_slice(idx).unwrap().to_vec();
-<a href=#582 id=582 data-nosnippet>582</a>                    <span class="kw">let </span>padded_width = aligned_len(row.len(), R);
-<a href=#583 id=583 data-nosnippet>583</a>                    row.resize(padded_width, F::ZERO);
-<a href=#584 id=584 data-nosnippet>584</a>                    row
-<a href=#585 id=585 data-nosnippet>585</a>                })
-<a href=#586 id=586 data-nosnippet>586</a>            })
-<a href=#587 id=587 data-nosnippet>587</a>            .collect();
-<a href=#588 id=588 data-nosnippet>588</a>        RowMajorMatrix::new(concatenated_data, width)
-<a href=#589 id=589 data-nosnippet>589</a>    }
-<a href=#590 id=590 data-nosnippet>590</a>
-<a href=#591 id=591 data-nosnippet>591</a>    <span class="doccomment">/// Upsample matrix to exactly `target_height` rows via nearest-neighbor repetition.
-<a href=#592 id=592 data-nosnippet>592</a>    </span><span class="kw">fn </span>upsample_matrix&lt;F: Clone + Send + Sync&gt;(
-<a href=#593 id=593 data-nosnippet>593</a>        matrix: <span class="kw-2">&amp;</span><span class="kw">impl </span>Matrix&lt;F&gt;,
-<a href=#594 id=594 data-nosnippet>594</a>        target_height: usize,
-<a href=#595 id=595 data-nosnippet>595</a>    ) -&gt; RowMajorMatrix&lt;F&gt; {
-<a href=#596 id=596 data-nosnippet>596</a>        <span class="kw">let </span>height = matrix.height();
-<a href=#597 id=597 data-nosnippet>597</a>        <span class="macro">assert!</span>(target_height &gt;= height);
-<a href=#598 id=598 data-nosnippet>598</a>        <span class="macro">assert!</span>(height.is_power_of_two() &amp;&amp; target_height.is_power_of_two());
-<a href=#599 id=599 data-nosnippet>599</a>
-<a href=#600 id=600 data-nosnippet>600</a>        <span class="kw">let </span>repeat_factor = target_height / height;
-<a href=#601 id=601 data-nosnippet>601</a>        <span class="kw">let </span>width = matrix.width();
-<a href=#602 id=602 data-nosnippet>602</a>
-<a href=#603 id=603 data-nosnippet>603</a>        <span class="kw">let </span><span class="kw-2">mut </span>values = Vec::with_capacity(target_height * width);
-<a href=#604 id=604 data-nosnippet>604</a>        <span class="kw">for </span>row <span class="kw">in </span>matrix.rows() {
-<a href=#605 id=605 data-nosnippet>605</a>            <span class="kw">let </span>row_vec: Vec&lt;F&gt; = row.collect();
-<a href=#606 id=606 data-nosnippet>606</a>            <span class="kw">for _ in </span><span class="number">0</span>..repeat_factor {
-<a href=#607 id=607 data-nosnippet>607</a>                values.extend(row_vec.iter().cloned());
-<a href=#608 id=608 data-nosnippet>608</a>            }
-<a href=#609 id=609 data-nosnippet>609</a>        }
-<a href=#610 id=610 data-nosnippet>610</a>
-<a href=#611 id=611 data-nosnippet>611</a>        RowMajorMatrix::new(values, width)
-<a href=#612 id=612 data-nosnippet>612</a>    }
-<a href=#613 id=613 data-nosnippet>613</a>
-<a href=#614 id=614 data-nosnippet>614</a>    <span class="kw">fn </span>build_leaves_upsampled(
-<a href=#615 id=615 data-nosnippet>615</a>        matrices: <span class="kw-2">&amp;</span>[RowMajorMatrix&lt;Felt&gt;],
-<a href=#616 id=616 data-nosnippet>616</a>        sponge: <span class="kw-2">&amp;</span>Sponge,
-<a href=#617 id=617 data-nosnippet>617</a>    ) -&gt; Vec&lt;[Felt; DIGEST]&gt; {
-<a href=#618 id=618 data-nosnippet>618</a>        <span class="kw">let </span><span class="kw-2">mut </span>states =
-<a href=#619 id=619 data-nosnippet>619</a>            build_leaf_states_upsampled::&lt;PackedFelt, PackedFelt, <span class="kw">_</span>, <span class="kw">_</span>, <span class="kw">_</span>, <span class="kw">_</span>&gt;(matrices, sponge);
-<a href=#620 id=620 data-nosnippet>620</a>        states.iter_mut().map(|s| sponge.squeeze(s)).collect()
-<a href=#621 id=621 data-nosnippet>621</a>    }
-<a href=#622 id=622 data-nosnippet>622</a>
-<a href=#623 id=623 data-nosnippet>623</a>    <span class="doccomment">/// Test that upsampled lifting produces correct results:
-<a href=#624 id=624 data-nosnippet>624</a>    /// 1. Incremental lifting equals explicit lifting
-<a href=#625 id=625 data-nosnippet>625</a>    /// 2. Explicit lifting equals single-matrix concatenation baseline
-<a href=#626 id=626 data-nosnippet>626</a>    </span><span class="attr">#[test]
-<a href=#627 id=627 data-nosnippet>627</a>    </span><span class="kw">fn </span>upsampled_equivalence() {
-<a href=#628 id=628 data-nosnippet>628</a>        <span class="kw">let </span>(<span class="kw">_</span>, sponge, _compressor) = gl::test_components();
-<a href=#629 id=629 data-nosnippet>629</a>        <span class="kw">let </span><span class="kw-2">mut </span>rng = SmallRng::seed_from_u64(<span class="number">42</span>);
-<a href=#630 id=630 data-nosnippet>630</a>
-<a href=#631 id=631 data-nosnippet>631</a>        <span class="kw">for </span>scenario <span class="kw">in </span>matrix_scenarios::&lt;PackedFelt&gt;(RATE) {
-<a href=#632 id=632 data-nosnippet>632</a>            <span class="kw">let </span>matrices: Vec&lt;RowMajorMatrix&lt;Felt&gt;&gt; = scenario
-<a href=#633 id=633 data-nosnippet>633</a>                .into_iter()
-<a href=#634 id=634 data-nosnippet>634</a>                .map(|(h, w)| RowMajorMatrix::rand(<span class="kw-2">&amp;mut </span>rng, h, w))
-<a href=#635 id=635 data-nosnippet>635</a>                .collect();
-<a href=#636 id=636 data-nosnippet>636</a>
-<a href=#637 id=637 data-nosnippet>637</a>            <span class="kw">let </span>max_height = matrices.last().unwrap().height();
-<a href=#638 id=638 data-nosnippet>638</a>
-<a href=#639 id=639 data-nosnippet>639</a>            <span class="comment">// Upsampled path equivalence vs explicit upsampled lifting and single-concat baseline
-<a href=#640 id=640 data-nosnippet>640</a>            </span><span class="kw">let </span>leaves = build_leaves_upsampled(<span class="kw-2">&amp;</span>matrices, <span class="kw-2">&amp;</span>sponge);
-<a href=#641 id=641 data-nosnippet>641</a>
-<a href=#642 id=642 data-nosnippet>642</a>            <span class="kw">let </span>matrices_upsampled: Vec&lt;<span class="kw">_</span>&gt; = matrices
-<a href=#643 id=643 data-nosnippet>643</a>                .iter()
-<a href=#644 id=644 data-nosnippet>644</a>                .map(|m: <span class="kw-2">&amp;</span>RowMajorMatrix&lt;Felt&gt;| upsample_matrix(m, max_height))
-<a href=#645 id=645 data-nosnippet>645</a>                .collect();
-<a href=#646 id=646 data-nosnippet>646</a>            <span class="kw">let </span>leaves_lifted = build_leaves_upsampled(<span class="kw-2">&amp;</span>matrices_upsampled, <span class="kw-2">&amp;</span>sponge);
-<a href=#647 id=647 data-nosnippet>647</a>            <span class="macro">assert_eq!</span>(leaves, leaves_lifted);
-<a href=#648 id=648 data-nosnippet>648</a>
-<a href=#649 id=649 data-nosnippet>649</a>            <span class="kw">let </span>matrix_single = concatenate_matrices::&lt;<span class="kw">_</span>, RATE&gt;(<span class="kw-2">&amp;</span>matrices_upsampled);
-<a href=#650 id=650 data-nosnippet>650</a>            <span class="kw">let </span>leaves_single = build_leaves_single(<span class="kw-2">&amp;</span>matrix_single, <span class="kw-2">&amp;</span>sponge);
-<a href=#651 id=651 data-nosnippet>651</a>            <span class="macro">assert_eq!</span>(leaves, leaves_single);
-<a href=#652 id=652 data-nosnippet>652</a>        }
-<a href=#653 id=653 data-nosnippet>653</a>    }
-<a href=#654 id=654 data-nosnippet>654</a>}
+<a href=#542 id=542 data-nosnippet>542</a>        util::align::aligned_len,
+<a href=#543 id=543 data-nosnippet>543</a>    };
+<a href=#544 id=544 data-nosnippet>544</a>
+<a href=#545 id=545 data-nosnippet>545</a>    <span class="doccomment">/// Common matrix group scenarios for testing lifting with varying heights.
+<a href=#546 id=546 data-nosnippet>546</a>    </span><span class="kw">fn </span>matrix_scenarios&lt;P: PackedValue&gt;(rate: usize) -&gt; Vec&lt;Vec&lt;(usize, usize)&gt;&gt; {
+<a href=#547 id=547 data-nosnippet>547</a>        <span class="kw">let </span>pack_width = P::WIDTH.max(<span class="number">2</span>);
+<a href=#548 id=548 data-nosnippet>548</a>        <span class="macro">vec!</span>[
+<a href=#549 id=549 data-nosnippet>549</a>            <span class="comment">// Single matrices
+<a href=#550 id=550 data-nosnippet>550</a>            </span><span class="macro">vec!</span>[(<span class="number">1</span>, <span class="number">1</span>)],
+<a href=#551 id=551 data-nosnippet>551</a>            <span class="macro">vec!</span>[(<span class="number">1</span>, rate - <span class="number">1</span>)],
+<a href=#552 id=552 data-nosnippet>552</a>            <span class="comment">// Multiple heights (must be ascending)
+<a href=#553 id=553 data-nosnippet>553</a>            </span><span class="macro">vec!</span>[(<span class="number">2</span>, <span class="number">3</span>), (<span class="number">4</span>, <span class="number">5</span>), (<span class="number">8</span>, rate)],
+<a href=#554 id=554 data-nosnippet>554</a>            <span class="macro">vec!</span>[(<span class="number">1</span>, <span class="number">5</span>), (<span class="number">1</span>, <span class="number">3</span>), (<span class="number">2</span>, <span class="number">7</span>), (<span class="number">4</span>, <span class="number">1</span>), (<span class="number">8</span>, rate + <span class="number">1</span>)],
+<a href=#555 id=555 data-nosnippet>555</a>            <span class="comment">// Packing boundary tests
+<a href=#556 id=556 data-nosnippet>556</a>            </span><span class="macro">vec!</span>[(pack_width / <span class="number">2</span>, rate - <span class="number">1</span>), (pack_width, rate), (pack_width * <span class="number">2</span>, rate + <span class="number">3</span>)],
+<a href=#557 id=557 data-nosnippet>557</a>            <span class="macro">vec!</span>[(pack_width, rate + <span class="number">5</span>), (pack_width * <span class="number">2</span>, <span class="number">25</span>)],
+<a href=#558 id=558 data-nosnippet>558</a>            <span class="macro">vec!</span>[
+<a href=#559 id=559 data-nosnippet>559</a>                (<span class="number">1</span>, rate * <span class="number">2</span>),
+<a href=#560 id=560 data-nosnippet>560</a>                (pack_width / <span class="number">2</span>, rate * <span class="number">2 </span>- <span class="number">1</span>),
+<a href=#561 id=561 data-nosnippet>561</a>                (pack_width, rate * <span class="number">2</span>),
+<a href=#562 id=562 data-nosnippet>562</a>                (pack_width * <span class="number">2</span>, rate * <span class="number">3 </span>- <span class="number">2</span>),
+<a href=#563 id=563 data-nosnippet>563</a>            ],
+<a href=#564 id=564 data-nosnippet>564</a>            <span class="comment">// Same-height matrices
+<a href=#565 id=565 data-nosnippet>565</a>            </span><span class="macro">vec!</span>[(<span class="number">4</span>, rate - <span class="number">1</span>), (<span class="number">4</span>, rate), (<span class="number">8</span>, rate + <span class="number">3</span>), (<span class="number">8</span>, rate * <span class="number">2</span>)],
+<a href=#566 id=566 data-nosnippet>566</a>            <span class="comment">// Single tall matrix
+<a href=#567 id=567 data-nosnippet>567</a>            </span><span class="macro">vec!</span>[(pack_width * <span class="number">2</span>, rate - <span class="number">1</span>)],
+<a href=#568 id=568 data-nosnippet>568</a>        ]
+<a href=#569 id=569 data-nosnippet>569</a>    }
+<a href=#570 id=570 data-nosnippet>570</a>
+<a href=#571 id=571 data-nosnippet>571</a>    <span class="doccomment">/// Concatenate matrices horizontally, padding each to a multiple of `R`.
+<a href=#572 id=572 data-nosnippet>572</a>    /// All matrices are lifted to the maximum height first.
+<a href=#573 id=573 data-nosnippet>573</a>    </span><span class="kw">fn </span>concatenate_matrices&lt;F: Field + PrimeCharacteristicRing, <span class="kw">const </span>R: usize&gt;(
+<a href=#574 id=574 data-nosnippet>574</a>        matrices: <span class="kw-2">&amp;</span>[RowMajorMatrix&lt;F&gt;],
+<a href=#575 id=575 data-nosnippet>575</a>    ) -&gt; RowMajorMatrix&lt;F&gt; {
+<a href=#576 id=576 data-nosnippet>576</a>        <span class="kw">let </span>max_height = matrices.last().unwrap().height();
+<a href=#577 id=577 data-nosnippet>577</a>        <span class="kw">let </span>width: usize = matrices.iter().map(|m| aligned_len(m.width(), R)).sum();
+<a href=#578 id=578 data-nosnippet>578</a>
+<a href=#579 id=579 data-nosnippet>579</a>        <span class="kw">let </span>concatenated_data: Vec&lt;<span class="kw">_</span>&gt; = (<span class="number">0</span>..max_height)
+<a href=#580 id=580 data-nosnippet>580</a>            .flat_map(|idx| {
+<a href=#581 id=581 data-nosnippet>581</a>                matrices.iter().flat_map(<span class="kw">move </span>|m| {
+<a href=#582 id=582 data-nosnippet>582</a>                    <span class="kw">let </span><span class="kw-2">mut </span>row = m.row_slice(idx).unwrap().to_vec();
+<a href=#583 id=583 data-nosnippet>583</a>                    <span class="kw">let </span>padded_width = aligned_len(row.len(), R);
+<a href=#584 id=584 data-nosnippet>584</a>                    row.resize(padded_width, F::ZERO);
+<a href=#585 id=585 data-nosnippet>585</a>                    row
+<a href=#586 id=586 data-nosnippet>586</a>                })
+<a href=#587 id=587 data-nosnippet>587</a>            })
+<a href=#588 id=588 data-nosnippet>588</a>            .collect();
+<a href=#589 id=589 data-nosnippet>589</a>        RowMajorMatrix::new(concatenated_data, width)
+<a href=#590 id=590 data-nosnippet>590</a>    }
+<a href=#591 id=591 data-nosnippet>591</a>
+<a href=#592 id=592 data-nosnippet>592</a>    <span class="doccomment">/// Upsample matrix to exactly `target_height` rows via nearest-neighbor repetition.
+<a href=#593 id=593 data-nosnippet>593</a>    </span><span class="kw">fn </span>upsample_matrix&lt;F: Clone + Send + Sync&gt;(
+<a href=#594 id=594 data-nosnippet>594</a>        matrix: <span class="kw-2">&amp;</span><span class="kw">impl </span>Matrix&lt;F&gt;,
+<a href=#595 id=595 data-nosnippet>595</a>        target_height: usize,
+<a href=#596 id=596 data-nosnippet>596</a>    ) -&gt; RowMajorMatrix&lt;F&gt; {
+<a href=#597 id=597 data-nosnippet>597</a>        <span class="kw">let </span>height = matrix.height();
+<a href=#598 id=598 data-nosnippet>598</a>        <span class="macro">assert!</span>(target_height &gt;= height);
+<a href=#599 id=599 data-nosnippet>599</a>        <span class="macro">assert!</span>(height.is_power_of_two() &amp;&amp; target_height.is_power_of_two());
+<a href=#600 id=600 data-nosnippet>600</a>
+<a href=#601 id=601 data-nosnippet>601</a>        <span class="kw">let </span>repeat_factor = target_height / height;
+<a href=#602 id=602 data-nosnippet>602</a>        <span class="kw">let </span>width = matrix.width();
+<a href=#603 id=603 data-nosnippet>603</a>
+<a href=#604 id=604 data-nosnippet>604</a>        <span class="kw">let </span><span class="kw-2">mut </span>values = Vec::with_capacity(target_height * width);
+<a href=#605 id=605 data-nosnippet>605</a>        <span class="kw">for </span>row <span class="kw">in </span>matrix.rows() {
+<a href=#606 id=606 data-nosnippet>606</a>            <span class="kw">let </span>row_vec: Vec&lt;F&gt; = row.collect();
+<a href=#607 id=607 data-nosnippet>607</a>            <span class="kw">for _ in </span><span class="number">0</span>..repeat_factor {
+<a href=#608 id=608 data-nosnippet>608</a>                values.extend(row_vec.iter().cloned());
+<a href=#609 id=609 data-nosnippet>609</a>            }
+<a href=#610 id=610 data-nosnippet>610</a>        }
+<a href=#611 id=611 data-nosnippet>611</a>
+<a href=#612 id=612 data-nosnippet>612</a>        RowMajorMatrix::new(values, width)
+<a href=#613 id=613 data-nosnippet>613</a>    }
+<a href=#614 id=614 data-nosnippet>614</a>
+<a href=#615 id=615 data-nosnippet>615</a>    <span class="kw">fn </span>build_leaves_upsampled(
+<a href=#616 id=616 data-nosnippet>616</a>        matrices: <span class="kw-2">&amp;</span>[RowMajorMatrix&lt;Felt&gt;],
+<a href=#617 id=617 data-nosnippet>617</a>        sponge: <span class="kw-2">&amp;</span>Sponge,
+<a href=#618 id=618 data-nosnippet>618</a>    ) -&gt; Vec&lt;[Felt; DIGEST]&gt; {
+<a href=#619 id=619 data-nosnippet>619</a>        <span class="kw">let </span><span class="kw-2">mut </span>states =
+<a href=#620 id=620 data-nosnippet>620</a>            build_leaf_states_upsampled::&lt;PackedFelt, PackedFelt, <span class="kw">_</span>, <span class="kw">_</span>, <span class="kw">_</span>, <span class="kw">_</span>&gt;(matrices, sponge);
+<a href=#621 id=621 data-nosnippet>621</a>        states.iter_mut().map(|s| sponge.squeeze(s)).collect()
+<a href=#622 id=622 data-nosnippet>622</a>    }
+<a href=#623 id=623 data-nosnippet>623</a>
+<a href=#624 id=624 data-nosnippet>624</a>    <span class="doccomment">/// Test that upsampled lifting produces correct results:
+<a href=#625 id=625 data-nosnippet>625</a>    /// 1. Incremental lifting equals explicit lifting
+<a href=#626 id=626 data-nosnippet>626</a>    /// 2. Explicit lifting equals single-matrix concatenation baseline
+<a href=#627 id=627 data-nosnippet>627</a>    </span><span class="attr">#[test]
+<a href=#628 id=628 data-nosnippet>628</a>    </span><span class="kw">fn </span>upsampled_equivalence() {
+<a href=#629 id=629 data-nosnippet>629</a>        <span class="kw">let </span>(<span class="kw">_</span>, sponge, _compressor) = gl::test_components();
+<a href=#630 id=630 data-nosnippet>630</a>        <span class="kw">let </span><span class="kw-2">mut </span>rng = SmallRng::seed_from_u64(<span class="number">42</span>);
+<a href=#631 id=631 data-nosnippet>631</a>
+<a href=#632 id=632 data-nosnippet>632</a>        <span class="kw">for </span>scenario <span class="kw">in </span>matrix_scenarios::&lt;PackedFelt&gt;(RATE) {
+<a href=#633 id=633 data-nosnippet>633</a>            <span class="kw">let </span>matrices: Vec&lt;RowMajorMatrix&lt;Felt&gt;&gt; = scenario
+<a href=#634 id=634 data-nosnippet>634</a>                .into_iter()
+<a href=#635 id=635 data-nosnippet>635</a>                .map(|(h, w)| RowMajorMatrix::rand(<span class="kw-2">&amp;mut </span>rng, h, w))
+<a href=#636 id=636 data-nosnippet>636</a>                .collect();
+<a href=#637 id=637 data-nosnippet>637</a>
+<a href=#638 id=638 data-nosnippet>638</a>            <span class="kw">let </span>max_height = matrices.last().unwrap().height();
+<a href=#639 id=639 data-nosnippet>639</a>
+<a href=#640 id=640 data-nosnippet>640</a>            <span class="comment">// Upsampled path equivalence vs explicit upsampled lifting and single-concat baseline
+<a href=#641 id=641 data-nosnippet>641</a>            </span><span class="kw">let </span>leaves = build_leaves_upsampled(<span class="kw-2">&amp;</span>matrices, <span class="kw-2">&amp;</span>sponge);
+<a href=#642 id=642 data-nosnippet>642</a>
+<a href=#643 id=643 data-nosnippet>643</a>            <span class="kw">let </span>matrices_upsampled: Vec&lt;<span class="kw">_</span>&gt; = matrices
+<a href=#644 id=644 data-nosnippet>644</a>                .iter()
+<a href=#645 id=645 data-nosnippet>645</a>                .map(|m: <span class="kw-2">&amp;</span>RowMajorMatrix&lt;Felt&gt;| upsample_matrix(m, max_height))
+<a href=#646 id=646 data-nosnippet>646</a>                .collect();
+<a href=#647 id=647 data-nosnippet>647</a>            <span class="kw">let </span>leaves_lifted = build_leaves_upsampled(<span class="kw-2">&amp;</span>matrices_upsampled, <span class="kw-2">&amp;</span>sponge);
+<a href=#648 id=648 data-nosnippet>648</a>            <span class="macro">assert_eq!</span>(leaves, leaves_lifted);
+<a href=#649 id=649 data-nosnippet>649</a>
+<a href=#650 id=650 data-nosnippet>650</a>            <span class="kw">let </span>matrix_single = concatenate_matrices::&lt;<span class="kw">_</span>, RATE&gt;(<span class="kw-2">&amp;</span>matrices_upsampled);
+<a href=#651 id=651 data-nosnippet>651</a>            <span class="kw">let </span>leaves_single = build_leaves_single(<span class="kw-2">&amp;</span>matrix_single, <span class="kw-2">&amp;</span>sponge);
+<a href=#652 id=652 data-nosnippet>652</a>            <span class="macro">assert_eq!</span>(leaves, leaves_single);
+<a href=#653 id=653 data-nosnippet>653</a>        }
+<a href=#654 id=654 data-nosnippet>654</a>    }
+<a href=#655 id=655 data-nosnippet>655</a>}
 </code></pre></div></section></main></body></html>
