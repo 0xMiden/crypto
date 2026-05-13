@@ -1221,7 +1221,7 @@ pub(crate) struct KeyBytes {
 impl KeyBytes {
     #[inline(always)]
     pub fn new(value: u64, keep: usize) -> Self {
-        debug_assert!((3..=7).contains(&keep));
+        debug_assert!((2..=7).contains(&keep));
         let bytes = value.to_be_bytes();
         debug_assert!(bytes[..8 - keep].iter().all(|&b| b == 0));
         Self { bytes, len: keep as u8 }
