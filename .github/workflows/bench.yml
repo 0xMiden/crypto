@@ -109,7 +109,7 @@ jobs:
         working-directory: miden-bench-wasm
         run: |
           node driver.mjs > results.json
-          echo "results=$(cat results.json | wc -l) entries written"
+          echo "results=$(wc -l < results.json) entries written"
           # Surface the per-bench medians in the workflow summary so a
           # human can eyeball them without clicking into the artifact.
           {
@@ -190,6 +190,11 @@ jobs:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # pin@v4
         with:
           ref: ${{ github.event.repository.default_branch }}
+          # `benchmark-action/github-action-benchmark` reads its credential
+          # from the `github-token` input rather than `.git/config`, so the
+          # persisted token isn't needed. Strip it to satisfy zizmor's
+          # `artipacked` audit.
+          persist-credentials: false
 
       - name: Download bench results
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # pin@v4
@@ -236,6 +241,11 @@ jobs:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # pin@v4
         with:
           ref: ${{ github.event.repository.default_branch }}
+          # `benchmark-action/github-action-benchmark` reads its credential
+          # from the `github-token` input rather than `.git/config`, so the
+          # persisted token isn't needed. Strip it to satisfy zizmor's
+          # `artipacked` audit.
+          persist-credentials: false
 
       - name: Download bench results
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # pin@v4
