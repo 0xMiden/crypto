@@ -108,6 +108,12 @@ jobs:
         id: run
         working-directory: miden-bench-wasm
         run: |
+          # `pipefail` is load-bearing: the driver streams to a file via
+          # a shell redirect, so a panicking driver would still leave a
+          # partial `results.json` on disk; `set -e` ensures the step
+          # fails fast and the trusted publish job never sees a bad
+          # baseline.
+          set -euo pipefail
           node driver.mjs > results.json
           echo "results=$(wc -l < results.json) entries written"
           # Surface the per-bench medians in the workflow summary so a
@@ -163,6 +169,12 @@ jobs:
         #   - encryption / dsa: defer pending review of which sub-benches
         #     are stable.
         run: |
+          # `pipefail` ensures a failed `cargo bench` (compile or run)
+          # propagates through the `tee` and fails the step. Without
+          # it, only tee's exit status is observed and a broken bench
+          # would silently produce an empty/partial `bench-native.txt`
+          # for the trusted publish job to ingest as a baseline.
+          set -euo pipefail
           cargo bench --bench hash --bench word --bench transpose \
             -p miden-crypto -- --output-format bencher 2>&1 \
             | tee bench-native.txt
@@ -225,13 +237,28 @@ jobs:
           alert-threshold: "110%"
           fail-on-alert: false  # warn via comment, don't fail the PR
           summary-always: true  # keep the diff comment fresh on each run
-          comment-always: ${{ github.event_name == 'pull_request' }}
+          # Gate the sticky comment to same-repo PRs. GitHub silently
+          # strips `pull-requests: write` from `GITHUB_TOKEN` for fork
+          # PRs regardless of the workflow-declared permissions, so
+          # `comment-always: true` would otherwise crash the publish
+          # step with "Resource not accessible by integration" on every
+          # external contribution. Fork PRs still get the workflow
+          # summary table and the artifact — just no PR comment.
+          comment-always: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository }}
           alert-comment-cc-users: '@WiktorStarczewski'
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
   publish-native:
     name: Publish native bench
-    needs: bench-native
+    # Serialized after `publish-wasm` so the two never race on gh-pages.
+    # Both jobs `git fetch gh-pages → commit → push`, and on a `push to
+    # next` event both fire concurrently — whichever pushes second hits
+    # non-fast-forward and the metric for that job is lost. Running them
+    # in series costs ~20 s on push events and zero on PR runs (which
+    # don't push). Cheaper than the alternative (merging the publishers
+    # into one job) because it keeps the per-job permission scope
+    # narrow and lets each artifact pass/fail independently.
+    needs: [bench-native, publish-wasm]
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
@@ -271,6 +298,7 @@ jobs:
           alert-threshold: "110%"
           fail-on-alert: false
           summary-always: true
-          comment-always: ${{ github.event_name == 'pull_request' }}
+          # See `publish-wasm` for why this is gated to same-repo PRs.
+          comment-always: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository }}
           alert-comment-cc-users: '@WiktorStarczewski'
           github-token: ${{ secrets.GITHUB_TOKEN }}
