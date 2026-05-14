@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"enum":["DomainError"],"struct":["EvaluationDomain","LiftedDomain","TwoAdicCoset","TwoAdicSubgroup"],"trait":["Coset"]};

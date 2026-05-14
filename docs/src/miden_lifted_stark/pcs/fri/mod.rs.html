@@ -1,99 +1,118 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `stark/miden-lifted-stark/src/pcs/fri/mod.rs`."><title>mod.rs - source</title><script>if(window.location.protocol!=="file:")document.head.insertAdjacentHTML("beforeend","SourceSerif4-Regular-6b053e98.ttf.woff2,FiraSans-Italic-81dc35de.woff2,FiraSans-Regular-0fe48ade.woff2,FiraSans-MediumItalic-ccf7e434.woff2,FiraSans-Medium-e1aa3f0a.woff2,SourceCodePro-Regular-8badfe75.ttf.woff2,SourceCodePro-Semibold-aa29a496.ttf.woff2".split(",").map(f=>`<link rel="preload" as="font" type="font/woff2"href="../../../../static.files/${f}">`).join(""))</script><link rel="stylesheet" href="../../../../static.files/normalize-9960930a.css"><link rel="stylesheet" href="../../../../static.files/rustdoc-17e0aaed.css"><meta name="rustdoc-vars" data-root-path="../../../../" data-static-root-path="../../../../static.files/" data-current-crate="miden_lifted_stark" data-themes="" data-resource-suffix="" data-rustdoc-version="1.97.0-nightly (8b03437a8 2026-05-12)" data-channel="nightly" data-search-js="search-b5634cc7.js" data-stringdex-js="stringdex-2da4960a.js" data-settings-js="settings-170eb4bf.js" ><script src="../../../../static.files/storage-41dd4d93.js"></script><script defer src="../../../../static.files/src-script-813739b1.js"></script><script defer src="../../../../src-files.js"></script><script defer src="../../../../static.files/main-aa4d37ac.js"></script><noscript><link rel="stylesheet" href="../../../../static.files/noscript-f7c3ffd8.css"></noscript><link rel="alternate icon" type="image/png" href="../../../../static.files/favicon-32x32-eab170b8.png"><link rel="icon" type="image/svg+xml" href="../../../../static.files/favicon-044be391.svg"></head><body class="rustdoc src"><a class="skip-main-content" href="#main-content">Skip to main content</a><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="src-sidebar-title"><h2>Files</h2></div></nav><div class="sidebar-resizer" title="Drag to resize sidebar"></div><main><section id="main-content" class="content" tabindex="-1"><div class="main-heading"><h1><div class="sub-heading">miden_lifted_stark/pcs/fri/</div>mod.rs</h1><rustdoc-toolbar></rustdoc-toolbar></div><div class="example-wrap digits-2"><pre class="rust"><code><a href=#1 id=1 data-nosnippet>1</a><span class="doccomment">//! # FRI Protocol Implementation
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `stark/miden-lifted-stark/src/pcs/fri/mod.rs`."><title>mod.rs - source</title><script>if(window.location.protocol!=="file:")document.head.insertAdjacentHTML("beforeend","SourceSerif4-Regular-6b053e98.ttf.woff2,FiraSans-Italic-81dc35de.woff2,FiraSans-Regular-0fe48ade.woff2,FiraSans-MediumItalic-ccf7e434.woff2,FiraSans-Medium-e1aa3f0a.woff2,SourceCodePro-Regular-8badfe75.ttf.woff2,SourceCodePro-Semibold-aa29a496.ttf.woff2".split(",").map(f=>`<link rel="preload" as="font" type="font/woff2"href="../../../../static.files/${f}">`).join(""))</script><link rel="stylesheet" href="../../../../static.files/normalize-9960930a.css"><link rel="stylesheet" href="../../../../static.files/rustdoc-17e0aaed.css"><meta name="rustdoc-vars" data-root-path="../../../../" data-static-root-path="../../../../static.files/" data-current-crate="miden_lifted_stark" data-themes="" data-resource-suffix="" data-rustdoc-version="1.97.0-nightly (ff9a9ea07 2026-05-13)" data-channel="nightly" data-search-js="search-b5634cc7.js" data-stringdex-js="stringdex-2da4960a.js" data-settings-js="settings-170eb4bf.js" ><script src="../../../../static.files/storage-41dd4d93.js"></script><script defer src="../../../../static.files/src-script-813739b1.js"></script><script defer src="../../../../src-files.js"></script><script defer src="../../../../static.files/main-aa4d37ac.js"></script><noscript><link rel="stylesheet" href="../../../../static.files/noscript-f7c3ffd8.css"></noscript><link rel="alternate icon" type="image/png" href="../../../../static.files/favicon-32x32-eab170b8.png"><link rel="icon" type="image/svg+xml" href="../../../../static.files/favicon-044be391.svg"></head><body class="rustdoc src"><a class="skip-main-content" href="#main-content">Skip to main content</a><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="src-sidebar-title"><h2>Files</h2></div></nav><div class="sidebar-resizer" title="Drag to resize sidebar"></div><main><section id="main-content" class="content" tabindex="-1"><div class="main-heading"><h1><div class="sub-heading">miden_lifted_stark/pcs/fri/</div>mod.rs</h1><rustdoc-toolbar></rustdoc-toolbar></div><div class="example-wrap digits-3"><pre class="rust"><code><a href=#1 id=1 data-nosnippet>1</a><span class="doccomment">//! # FRI Protocol Implementation
 <a href=#2 id=2 data-nosnippet>2</a>//!
 <a href=#3 id=3 data-nosnippet>3</a>//! Fast Reed-Solomon Interactive Oracle Proof for low-degree testing.
 <a href=#4 id=4 data-nosnippet>4</a>//! Proves that a committed polynomial has degree below a target bound.
 <a href=#5 id=5 data-nosnippet>5</a>//!
 <a href=#6 id=6 data-nosnippet>6</a>//! ## Domain Convention
 <a href=#7 id=7 data-nosnippet>7</a>//!
-<a href=#8 id=8 data-nosnippet>8</a>//! This FRI implementation treats inputs as evaluations over the unshifted two-adic subgroup.
-<a href=#9 id=9 data-nosnippet>9</a>//! If the PCS evaluates over a coset `gK`, the shift is absorbed into the polynomial:
-<a href=#10 id=10 data-nosnippet>10</a>//! `Q'(X) = Q(g·X)`. The low-degree test is run on `Q'` using subgroup points.
-<a href=#11 id=11 data-nosnippet>11</a>
-<a href=#12 id=12 data-nosnippet>12</a></span><span class="kw">pub mod </span>fold;
-<a href=#13 id=13 data-nosnippet>13</a><span class="kw">pub mod </span>proof;
-<a href=#14 id=14 data-nosnippet>14</a><span class="kw">pub mod </span>prover;
-<a href=#15 id=15 data-nosnippet>15</a><span class="kw">pub mod </span>verifier;
-<a href=#16 id=16 data-nosnippet>16</a>
-<a href=#17 id=17 data-nosnippet>17</a><span class="kw">use </span>fold::FriFold;
-<a href=#18 id=18 data-nosnippet>18</a>
-<a href=#19 id=19 data-nosnippet>19</a><span class="doccomment">/// FRI protocol parameters.
-<a href=#20 id=20 data-nosnippet>20</a>///
-<a href=#21 id=21 data-nosnippet>21</a>/// Controls the trade-off between proof size, prover time, and verifier time.
-<a href=#22 id=22 data-nosnippet>22</a>///
-<a href=#23 id=23 data-nosnippet>23</a>/// Higher `log_blowup` increases soundness per query (fewer queries needed) but introduces
-<a href=#24 id=24 data-nosnippet>24</a>/// larger Merkle trees — increasing both proof size (longer authentication paths) and prover time
-<a href=#25 id=25 data-nosnippet>25</a>/// (LDE over a larger domain). Higher arity reduces the number of FRI rounds (fewer Merkle
-<a href=#26 id=26 data-nosnippet>26</a>/// tree commitments) but increases per-query proof size (each opening reveals `arity`
-<a href=#27 id=27 data-nosnippet>27</a>/// siblings). `log_final_degree` reduces the number of rounds and therefore the number of
-<a href=#28 id=28 data-nosnippet>28</a>/// Merkle commitments; if too large, the final polynomial's coefficients dominate the proof
-<a href=#29 id=29 data-nosnippet>29</a>/// size.
-<a href=#30 id=30 data-nosnippet>30</a></span><span class="attr">#[derive(Clone, Copy, Debug)]
-<a href=#31 id=31 data-nosnippet>31</a></span><span class="kw">pub struct </span>FriParams {
-<a href=#32 id=32 data-nosnippet>32</a>    <span class="doccomment">/// Log₂ of the blowup factor (LDE domain size / polynomial degree).
-<a href=#33 id=33 data-nosnippet>33</a>    ///
-<a href=#34 id=34 data-nosnippet>34</a>    /// Higher values increase soundness but also proof size and prover time.
-<a href=#35 id=35 data-nosnippet>35</a>    /// Typical values: 2-4 (blowup factors of 4-16).
-<a href=#36 id=36 data-nosnippet>36</a>    </span><span class="kw">pub</span>(<span class="kw">crate</span>) log_blowup: u8,
-<a href=#37 id=37 data-nosnippet>37</a>
-<a href=#38 id=38 data-nosnippet>38</a>    <span class="doccomment">/// The FRI folding strategy.
-<a href=#39 id=39 data-nosnippet>39</a>    ///
-<a href=#40 id=40 data-nosnippet>40</a>    /// Determines the folding arity (2, 4, or 8).
-<a href=#41 id=41 data-nosnippet>41</a>    </span><span class="kw">pub</span>(<span class="kw">crate</span>) fold: FriFold,
-<a href=#42 id=42 data-nosnippet>42</a>
-<a href=#43 id=43 data-nosnippet>43</a>    <span class="doccomment">/// Log₂ of the final polynomial degree.
-<a href=#44 id=44 data-nosnippet>44</a>    ///
-<a href=#45 id=45 data-nosnippet>45</a>    /// Folding stops when degree reaches `2^log_final_degree`.
-<a href=#46 id=46 data-nosnippet>46</a>    /// Final polynomial coefficients are sent in descending degree order
-<a href=#47 id=47 data-nosnippet>47</a>    /// `[cₙ, ..., c₁, c₀]` for direct Horner evaluation by the verifier.
-<a href=#48 id=48 data-nosnippet>48</a>    </span><span class="kw">pub</span>(<span class="kw">crate</span>) log_final_degree: u8,
-<a href=#49 id=49 data-nosnippet>49</a>
-<a href=#50 id=50 data-nosnippet>50</a>    <span class="doccomment">/// Grinding bits before each folding challenge.
-<a href=#51 id=51 data-nosnippet>51</a>    </span><span class="kw">pub</span>(<span class="kw">crate</span>) folding_pow_bits: usize,
-<a href=#52 id=52 data-nosnippet>52</a>}
-<a href=#53 id=53 data-nosnippet>53</a>
-<a href=#54 id=54 data-nosnippet>54</a><span class="kw">impl </span>FriParams {
-<a href=#55 id=55 data-nosnippet>55</a>    <span class="doccomment">/// Compute the number of folding rounds for a given initial evaluation domain size.
-<a href=#56 id=56 data-nosnippet>56</a>    ///
-<a href=#57 id=57 data-nosnippet>57</a>    /// Each round reduces the domain by `2^log_folding_factor`. We fold until the domain
-<a href=#58 id=58 data-nosnippet>58</a>    /// size reaches `2^(log_final_degree + log_blowup)`, at which point the polynomial
-<a href=#59 id=59 data-nosnippet>59</a>    /// degree is at most `2^log_final_degree`.
-<a href=#60 id=60 data-nosnippet>60</a>    ///
-<a href=#61 id=61 data-nosnippet>61</a>    /// Uses `div_ceil` to round up, ensuring we always reach the target degree even if
-<a href=#62 id=62 data-nosnippet>62</a>    /// the domain size doesn't divide evenly by the folding factor.
-<a href=#63 id=63 data-nosnippet>63</a>    </span><span class="attr">#[inline]
-<a href=#64 id=64 data-nosnippet>64</a>    </span><span class="kw">pub fn </span>num_rounds(<span class="kw-2">&amp;</span><span class="self">self</span>, log_domain_size: u8) -&gt; usize {
-<a href=#65 id=65 data-nosnippet>65</a>        <span class="comment">// Final domain size = final_degree × blowup = 2^(log_final_degree + log_blowup).
-<a href=#66 id=66 data-nosnippet>66</a>        // Safety: PcsParams::new() validates this sum does not exceed MAX_LOG_DOMAIN_SIZE.
-<a href=#67 id=67 data-nosnippet>67</a>        </span><span class="macro">debug_assert!</span>(
-<a href=#68 id=68 data-nosnippet>68</a>            (<span class="self">self</span>.log_final_degree <span class="kw">as </span>u16 + <span class="self">self</span>.log_blowup <span class="kw">as </span>u16)
-<a href=#69 id=69 data-nosnippet>69</a>                &lt;= <span class="kw">crate</span>::pcs::params::MAX_LOG_DOMAIN_SIZE <span class="kw">as </span>u16,
-<a href=#70 id=70 data-nosnippet>70</a>            <span class="string">"log_final_degree + log_blowup overflows; construct FriParams via PcsParams::new()"</span>,
-<a href=#71 id=71 data-nosnippet>71</a>        );
-<a href=#72 id=72 data-nosnippet>72</a>        <span class="kw">let </span>log_max_final_size = <span class="self">self</span>.log_final_degree + <span class="self">self</span>.log_blowup;
-<a href=#73 id=73 data-nosnippet>73</a>        <span class="comment">// Number of times we need to divide by 2^log_folding_factor
-<a href=#74 id=74 data-nosnippet>74</a>        </span>log_domain_size
-<a href=#75 id=75 data-nosnippet>75</a>            .saturating_sub(log_max_final_size)
-<a href=#76 id=76 data-nosnippet>76</a>            .div_ceil(<span class="self">self</span>.fold.log_arity()) <span class="kw">as </span>usize
-<a href=#77 id=77 data-nosnippet>77</a>    }
-<a href=#78 id=78 data-nosnippet>78</a>
-<a href=#79 id=79 data-nosnippet>79</a>    <span class="doccomment">/// Compute the final polynomial degree after folding.
-<a href=#80 id=80 data-nosnippet>80</a>    ///
-<a href=#81 id=81 data-nosnippet>81</a>    /// After `num_rounds` folding rounds, the domain shrinks from `2^log_domain_size`
-<a href=#82 id=82 data-nosnippet>82</a>    /// to `2^(log_domain_size - num_rounds × log_folding_factor)`. The polynomial
-<a href=#83 id=83 data-nosnippet>83</a>    /// degree is then `domain_size / blowup`.
-<a href=#84 id=84 data-nosnippet>84</a>    ///
-<a href=#85 id=85 data-nosnippet>85</a>    /// Due to `div_ceil` in `num_rounds`, the actual final degree may be smaller than
-<a href=#86 id=86 data-nosnippet>86</a>    /// `2^log_final_degree` when the folding doesn't divide evenly.
-<a href=#87 id=87 data-nosnippet>87</a>    </span><span class="attr">#[inline]
-<a href=#88 id=88 data-nosnippet>88</a>    </span><span class="kw">pub fn </span>final_poly_degree(<span class="kw-2">&amp;</span><span class="self">self</span>, log_domain_size: u8) -&gt; usize {
-<a href=#89 id=89 data-nosnippet>89</a>        <span class="kw">let </span>num_rounds = <span class="self">self</span>.num_rounds(log_domain_size);
-<a href=#90 id=90 data-nosnippet>90</a>        <span class="comment">// log of final domain size after folding
-<a href=#91 id=91 data-nosnippet>91</a>        </span><span class="kw">let </span>log_final_size = log_domain_size <span class="kw">as </span>usize - num_rounds * <span class="self">self</span>.fold.log_arity() <span class="kw">as </span>usize;
-<a href=#92 id=92 data-nosnippet>92</a>        <span class="comment">// degree = domain_size / blowup = 2^(log_final_size - log_blowup)
-<a href=#93 id=93 data-nosnippet>93</a>        </span><span class="number">1 </span>&lt;&lt; log_final_size.saturating_sub(<span class="self">self</span>.log_blowup <span class="kw">as </span>usize)
-<a href=#94 id=94 data-nosnippet>94</a>    }
-<a href=#95 id=95 data-nosnippet>95</a>}
-<a href=#96 id=96 data-nosnippet>96</a>
-<a href=#97 id=97 data-nosnippet>97</a><span class="attr">#[cfg(test)]
-<a href=#98 id=98 data-nosnippet>98</a></span><span class="kw">mod </span>tests;
+<a href=#8 id=8 data-nosnippet>8</a>//! This FRI implementation treats inputs as evaluations over the unshifted two-adic
+<a href=#9 id=9 data-nosnippet>9</a>//! subgroup. If the PCS evaluates over a coset `gK`, the shift is absorbed into
+<a href=#10 id=10 data-nosnippet>10</a>//! the polynomial: `Q'(X) = Q(g·X)`. The low-degree test is run on `Q'` using
+<a href=#11 id=11 data-nosnippet>11</a>//! subgroup points.
+<a href=#12 id=12 data-nosnippet>12</a>//!
+<a href=#13 id=13 data-nosnippet>13</a>//! ## Type vocabulary
+<a href=#14 id=14 data-nosnippet>14</a>//!
+<a href=#15 id=15 data-nosnippet>15</a>//! FRI takes its initial domain as a [`LiftedDomain&lt;F&gt;`](crate::domain::LiftedDomain) —
+<a href=#16 id=16 data-nosnippet>16</a>//! the protocol-level LDE object carrying both the LDE subgroup size and the blowup
+<a href=#17 id=17 data-nosnippet>17</a>//! ratio relative to the trace. The unshifted subgroup view is reached via
+<a href=#18 id=18 data-nosnippet>18</a>//! `domain.lde_coset().subgroup()`. Each fold round shrinks the working subgroup by the
+<a href=#19 id=19 data-nosnippet>19</a>//! folding arity, derived via [`TwoAdicSubgroup::shrink`](crate::domain::TwoAdicSubgroup::shrink)
+<a href=#20 id=20 data-nosnippet>20</a>//! (or per-round generator squaring inside the round loop, which is equivalent and avoids
+<a href=#21 id=21 data-nosnippet>21</a>//! re-querying `F::two_adic_generator`). Internal `arity`-th roots of unity used by the fold
+<a href=#22 id=22 data-nosnippet>22</a>//! operations come from `TwoAdicSubgroup::&lt;F&gt;::new(log_arity).generator()`. Routing every
+<a href=#23 id=23 data-nosnippet>23</a>//! two-adic root and every multiplicative coset shift through these encapsulation types keeps
+<a href=#24 id=24 data-nosnippet>24</a>//! `F::two_adic_generator` and `F::GENERATOR` confined to their single canonical sites.
+<a href=#25 id=25 data-nosnippet>25</a>
+<a href=#26 id=26 data-nosnippet>26</a></span><span class="kw">pub mod </span>fold;
+<a href=#27 id=27 data-nosnippet>27</a><span class="kw">pub mod </span>proof;
+<a href=#28 id=28 data-nosnippet>28</a><span class="kw">pub mod </span>prover;
+<a href=#29 id=29 data-nosnippet>29</a><span class="kw">pub mod </span>verifier;
+<a href=#30 id=30 data-nosnippet>30</a>
+<a href=#31 id=31 data-nosnippet>31</a><span class="kw">use </span>fold::FriFold;
+<a href=#32 id=32 data-nosnippet>32</a><span class="kw">use </span>p3_field::TwoAdicField;
+<a href=#33 id=33 data-nosnippet>33</a>
+<a href=#34 id=34 data-nosnippet>34</a><span class="kw">use </span><span class="kw">crate</span>::domain::LiftedDomain;
+<a href=#35 id=35 data-nosnippet>35</a>
+<a href=#36 id=36 data-nosnippet>36</a><span class="doccomment">/// FRI protocol parameters.
+<a href=#37 id=37 data-nosnippet>37</a>///
+<a href=#38 id=38 data-nosnippet>38</a>/// Controls the trade-off between proof size, prover time, and verifier time.
+<a href=#39 id=39 data-nosnippet>39</a>///
+<a href=#40 id=40 data-nosnippet>40</a>/// Higher arity reduces the number of FRI rounds (fewer Merkle tree commitments) but increases
+<a href=#41 id=41 data-nosnippet>41</a>/// per-query proof size (each opening reveals `arity` siblings). `log_final_degree` reduces the
+<a href=#42 id=42 data-nosnippet>42</a>/// number of rounds and therefore the number of Merkle commitments; if too large, the final
+<a href=#43 id=43 data-nosnippet>43</a>/// polynomial's coefficients dominate the proof size.
+<a href=#44 id=44 data-nosnippet>44</a>///
+<a href=#45 id=45 data-nosnippet>45</a>/// The LDE blowup factor is **not** stored here — it is a structural property of the codeword
+<a href=#46 id=46 data-nosnippet>46</a>/// being tested and is read from the [`LiftedDomain`](crate::domain::LiftedDomain) passed to
+<a href=#47 id=47 data-nosnippet>47</a>/// [`num_rounds`](Self::num_rounds), [`final_poly_degree`](Self::final_poly_degree),
+<a href=#48 id=48 data-nosnippet>48</a>/// [`FriPolys::new`](prover::FriPolys::new), and
+<a href=#49 id=49 data-nosnippet>49</a>/// [`FriOracle::new`](verifier::FriOracle::new).
+<a href=#50 id=50 data-nosnippet>50</a></span><span class="attr">#[derive(Clone, Copy, Debug)]
+<a href=#51 id=51 data-nosnippet>51</a></span><span class="kw">pub struct </span>FriParams {
+<a href=#52 id=52 data-nosnippet>52</a>    <span class="doccomment">/// The FRI folding strategy.
+<a href=#53 id=53 data-nosnippet>53</a>    ///
+<a href=#54 id=54 data-nosnippet>54</a>    /// Determines the folding arity (2, 4, or 8).
+<a href=#55 id=55 data-nosnippet>55</a>    </span><span class="kw">pub</span>(<span class="kw">crate</span>) fold: FriFold,
+<a href=#56 id=56 data-nosnippet>56</a>
+<a href=#57 id=57 data-nosnippet>57</a>    <span class="doccomment">/// Log₂ of the final polynomial degree.
+<a href=#58 id=58 data-nosnippet>58</a>    ///
+<a href=#59 id=59 data-nosnippet>59</a>    /// Folding stops when degree reaches `2^log_final_degree`.
+<a href=#60 id=60 data-nosnippet>60</a>    /// Final polynomial coefficients are sent in descending degree order
+<a href=#61 id=61 data-nosnippet>61</a>    /// `[cₙ, ..., c₁, c₀]` for direct Horner evaluation by the verifier.
+<a href=#62 id=62 data-nosnippet>62</a>    </span><span class="kw">pub</span>(<span class="kw">crate</span>) log_final_degree: u8,
+<a href=#63 id=63 data-nosnippet>63</a>
+<a href=#64 id=64 data-nosnippet>64</a>    <span class="doccomment">/// Grinding bits before each folding challenge.
+<a href=#65 id=65 data-nosnippet>65</a>    </span><span class="kw">pub</span>(<span class="kw">crate</span>) folding_pow_bits: usize,
+<a href=#66 id=66 data-nosnippet>66</a>}
+<a href=#67 id=67 data-nosnippet>67</a>
+<a href=#68 id=68 data-nosnippet>68</a><span class="kw">impl </span>FriParams {
+<a href=#69 id=69 data-nosnippet>69</a>    <span class="doccomment">/// Compute the number of folding rounds for an LDE codeword evaluated on `domain`.
+<a href=#70 id=70 data-nosnippet>70</a>    ///
+<a href=#71 id=71 data-nosnippet>71</a>    /// Each round reduces the domain by `2^log_folding_factor`. We fold until the domain
+<a href=#72 id=72 data-nosnippet>72</a>    /// size reaches `2^(log_final_degree + log_blowup)`, at which point the polynomial
+<a href=#73 id=73 data-nosnippet>73</a>    /// degree is at most `2^log_final_degree`.
+<a href=#74 id=74 data-nosnippet>74</a>    ///
+<a href=#75 id=75 data-nosnippet>75</a>    /// Uses `div_ceil` to round up, ensuring we always reach the target degree even if
+<a href=#76 id=76 data-nosnippet>76</a>    /// the domain size doesn't divide evenly by the folding factor.
+<a href=#77 id=77 data-nosnippet>77</a>    </span><span class="attr">#[inline]
+<a href=#78 id=78 data-nosnippet>78</a>    </span><span class="kw">pub fn </span>num_rounds&lt;F: TwoAdicField&gt;(<span class="kw-2">&amp;</span><span class="self">self</span>, domain: <span class="kw-2">&amp;</span>LiftedDomain&lt;F&gt;) -&gt; usize {
+<a href=#79 id=79 data-nosnippet>79</a>        <span class="comment">// Maximum domain size needed to accommodate a degree-`2^log_final_degree` polynomial
+<a href=#80 id=80 data-nosnippet>80</a>        // after folding `num_rounds` times.
+<a href=#81 id=81 data-nosnippet>81</a>        </span><span class="kw">let </span>log_max_final_size = u16::from(<span class="self">self</span>.log_final_degree) + u16::from(domain.log_blowup());
+<a href=#82 id=82 data-nosnippet>82</a>        <span class="comment">// Number of domain squarings required to reach a domain of size at most
+<a href=#83 id=83 data-nosnippet>83</a>        // `log_max_final_size`. `saturating_sub` covers the degenerate "LDE already at or
+<a href=#84 id=84 data-nosnippet>84</a>        // below target" case.
+<a href=#85 id=85 data-nosnippet>85</a>        </span><span class="kw">let </span>num_steps = u16::from(domain.log_lde_height()).saturating_sub(log_max_final_size);
+<a href=#86 id=86 data-nosnippet>86</a>        <span class="comment">// Divide the number of steps by the folding factor to get the number of rounds.
+<a href=#87 id=87 data-nosnippet>87</a>        // Round up so the final domain is ≤ `2^log_max_final_size` even when the
+<a href=#88 id=88 data-nosnippet>88</a>        // folding factor doesn't divide `num_steps` evenly. The last round may
+<a href=#89 id=89 data-nosnippet>89</a>        // overshoot, leaving the actual final degree strictly below the bound —
+<a href=#90 id=90 data-nosnippet>90</a>        // see [`final_poly_degree`](Self::final_poly_degree).
+<a href=#91 id=91 data-nosnippet>91</a>        </span>num_steps.div_ceil(u16::from(<span class="self">self</span>.fold.log_arity())) <span class="kw">as </span>usize
+<a href=#92 id=92 data-nosnippet>92</a>    }
+<a href=#93 id=93 data-nosnippet>93</a>
+<a href=#94 id=94 data-nosnippet>94</a>    <span class="doccomment">/// Compute the final polynomial degree after folding the codeword evaluated on `domain`.
+<a href=#95 id=95 data-nosnippet>95</a>    ///
+<a href=#96 id=96 data-nosnippet>96</a>    /// After `num_rounds` folding rounds, the LDE domain shrinks from
+<a href=#97 id=97 data-nosnippet>97</a>    /// `2^domain.log_lde_height()` to `2^(log_lde_height − num_rounds × log_folding_factor)`.
+<a href=#98 id=98 data-nosnippet>98</a>    /// The polynomial degree is then `domain_size / blowup`.
+<a href=#99 id=99 data-nosnippet>99</a>    ///
+<a href=#100 id=100 data-nosnippet>100</a>    /// Due to `div_ceil` in `num_rounds`, the actual final degree may be smaller than
+<a href=#101 id=101 data-nosnippet>101</a>    /// `2^log_final_degree` when the folding doesn't divide evenly.
+<a href=#102 id=102 data-nosnippet>102</a>    </span><span class="attr">#[inline]
+<a href=#103 id=103 data-nosnippet>103</a>    </span><span class="kw">pub fn </span>final_poly_degree&lt;F: TwoAdicField&gt;(<span class="kw-2">&amp;</span><span class="self">self</span>, domain: <span class="kw-2">&amp;</span>LiftedDomain&lt;F&gt;) -&gt; usize {
+<a href=#104 id=104 data-nosnippet>104</a>        <span class="kw">let </span>num_rounds = <span class="self">self</span>.num_rounds(domain);
+<a href=#105 id=105 data-nosnippet>105</a>        <span class="comment">// log of the final domain size: starting LDE shrunk by num_rounds folds of
+<a href=#106 id=106 data-nosnippet>106</a>        // factor 2^log_arity.
+<a href=#107 id=107 data-nosnippet>107</a>        </span><span class="kw">let </span>log_final_domain_size = (domain.log_lde_height() <span class="kw">as </span>usize)
+<a href=#108 id=108 data-nosnippet>108</a>            .saturating_sub(num_rounds * <span class="self">self</span>.fold.log_arity() <span class="kw">as </span>usize);
+<a href=#109 id=109 data-nosnippet>109</a>        <span class="kw">let </span>log_final_poly_degree =
+<a href=#110 id=110 data-nosnippet>110</a>            log_final_domain_size.saturating_sub(domain.log_blowup() <span class="kw">as </span>usize);
+<a href=#111 id=111 data-nosnippet>111</a>        <span class="comment">// Poly degree = final domain size / blowup.
+<a href=#112 id=112 data-nosnippet>112</a>        </span><span class="number">1 </span>&lt;&lt; log_final_poly_degree
+<a href=#113 id=113 data-nosnippet>113</a>    }
+<a href=#114 id=114 data-nosnippet>114</a>}
+<a href=#115 id=115 data-nosnippet>115</a>
+<a href=#116 id=116 data-nosnippet>116</a><span class="attr">#[cfg(test)]
+<a href=#117 id=117 data-nosnippet>117</a></span><span class="kw">mod </span>tests;
 </code></pre></div></section></main></body></html>

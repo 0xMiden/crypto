@@ -1,4 +1,4 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `stark/miden-lifted-stark/src/pcs/fri/fold/mod.rs`."><title>mod.rs - source</title><script>if(window.location.protocol!=="file:")document.head.insertAdjacentHTML("beforeend","SourceSerif4-Regular-6b053e98.ttf.woff2,FiraSans-Italic-81dc35de.woff2,FiraSans-Regular-0fe48ade.woff2,FiraSans-MediumItalic-ccf7e434.woff2,FiraSans-Medium-e1aa3f0a.woff2,SourceCodePro-Regular-8badfe75.ttf.woff2,SourceCodePro-Semibold-aa29a496.ttf.woff2".split(",").map(f=>`<link rel="preload" as="font" type="font/woff2"href="../../../../../static.files/${f}">`).join(""))</script><link rel="stylesheet" href="../../../../../static.files/normalize-9960930a.css"><link rel="stylesheet" href="../../../../../static.files/rustdoc-17e0aaed.css"><meta name="rustdoc-vars" data-root-path="../../../../../" data-static-root-path="../../../../../static.files/" data-current-crate="miden_lifted_stark" data-themes="" data-resource-suffix="" data-rustdoc-version="1.97.0-nightly (8b03437a8 2026-05-12)" data-channel="nightly" data-search-js="search-b5634cc7.js" data-stringdex-js="stringdex-2da4960a.js" data-settings-js="settings-170eb4bf.js" ><script src="../../../../../static.files/storage-41dd4d93.js"></script><script defer src="../../../../../static.files/src-script-813739b1.js"></script><script defer src="../../../../../src-files.js"></script><script defer src="../../../../../static.files/main-aa4d37ac.js"></script><noscript><link rel="stylesheet" href="../../../../../static.files/noscript-f7c3ffd8.css"></noscript><link rel="alternate icon" type="image/png" href="../../../../../static.files/favicon-32x32-eab170b8.png"><link rel="icon" type="image/svg+xml" href="../../../../../static.files/favicon-044be391.svg"></head><body class="rustdoc src"><a class="skip-main-content" href="#main-content">Skip to main content</a><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="src-sidebar-title"><h2>Files</h2></div></nav><div class="sidebar-resizer" title="Drag to resize sidebar"></div><main><section id="main-content" class="content" tabindex="-1"><div class="main-heading"><h1><div class="sub-heading">miden_lifted_stark/pcs/fri/fold/</div>mod.rs</h1><rustdoc-toolbar></rustdoc-toolbar></div><div class="example-wrap digits-3"><pre class="rust"><code><a href=#1 id=1 data-nosnippet>1</a><span class="doccomment">//! FRI folding via polynomial interpolation.
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `stark/miden-lifted-stark/src/pcs/fri/fold/mod.rs`."><title>mod.rs - source</title><script>if(window.location.protocol!=="file:")document.head.insertAdjacentHTML("beforeend","SourceSerif4-Regular-6b053e98.ttf.woff2,FiraSans-Italic-81dc35de.woff2,FiraSans-Regular-0fe48ade.woff2,FiraSans-MediumItalic-ccf7e434.woff2,FiraSans-Medium-e1aa3f0a.woff2,SourceCodePro-Regular-8badfe75.ttf.woff2,SourceCodePro-Semibold-aa29a496.ttf.woff2".split(",").map(f=>`<link rel="preload" as="font" type="font/woff2"href="../../../../../static.files/${f}">`).join(""))</script><link rel="stylesheet" href="../../../../../static.files/normalize-9960930a.css"><link rel="stylesheet" href="../../../../../static.files/rustdoc-17e0aaed.css"><meta name="rustdoc-vars" data-root-path="../../../../../" data-static-root-path="../../../../../static.files/" data-current-crate="miden_lifted_stark" data-themes="" data-resource-suffix="" data-rustdoc-version="1.97.0-nightly (ff9a9ea07 2026-05-13)" data-channel="nightly" data-search-js="search-b5634cc7.js" data-stringdex-js="stringdex-2da4960a.js" data-settings-js="settings-170eb4bf.js" ><script src="../../../../../static.files/storage-41dd4d93.js"></script><script defer src="../../../../../static.files/src-script-813739b1.js"></script><script defer src="../../../../../src-files.js"></script><script defer src="../../../../../static.files/main-aa4d37ac.js"></script><noscript><link rel="stylesheet" href="../../../../../static.files/noscript-f7c3ffd8.css"></noscript><link rel="alternate icon" type="image/png" href="../../../../../static.files/favicon-32x32-eab170b8.png"><link rel="icon" type="image/svg+xml" href="../../../../../static.files/favicon-044be391.svg"></head><body class="rustdoc src"><a class="skip-main-content" href="#main-content">Skip to main content</a><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="src-sidebar-title"><h2>Files</h2></div></nav><div class="sidebar-resizer" title="Drag to resize sidebar"></div><main><section id="main-content" class="content" tabindex="-1"><div class="main-heading"><h1><div class="sub-heading">miden_lifted_stark/pcs/fri/fold/</div>mod.rs</h1><rustdoc-toolbar></rustdoc-toolbar></div><div class="example-wrap digits-3"><pre class="rust"><code><a href=#1 id=1 data-nosnippet>1</a><span class="doccomment">//! FRI folding via polynomial interpolation.
 <a href=#2 id=2 data-nosnippet>2</a>//!
 <a href=#3 id=3 data-nosnippet>3</a>//! FRI (Fast Reed-Solomon IOP of Proximity) folds evaluations on a coset into a
 <a href=#4 id=4 data-nosnippet>4</a>//! lower-degree polynomial value parameterized by a challenge `β`. Each row fold
@@ -190,34 +190,34 @@
 <a href=#190 id=190 data-nosnippet>190</a></span><span class="kw">pub mod </span>tests {
 <a href=#191 id=191 data-nosnippet>191</a>    <span class="kw">use </span>alloc::vec::Vec;
 <a href=#192 id=192 data-nosnippet>192</a>
-<a href=#193 id=193 data-nosnippet>193</a>    <span class="kw">use </span>p3_field::{ExtensionField, Field, PrimeCharacteristicRing, TwoAdicField};
-<a href=#194 id=194 data-nosnippet>194</a>    <span class="kw">use </span>p3_matrix::dense::RowMajorMatrix;
-<a href=#195 id=195 data-nosnippet>195</a>    <span class="kw">use </span>p3_util::reverse_slice_index_bits;
-<a href=#196 id=196 data-nosnippet>196</a>    <span class="kw">use </span>rand::{
-<a href=#197 id=197 data-nosnippet>197</a>        RngExt, SeedableRng,
-<a href=#198 id=198 data-nosnippet>198</a>        distr::{Distribution, StandardUniform},
-<a href=#199 id=199 data-nosnippet>199</a>        prelude::SmallRng,
-<a href=#200 id=200 data-nosnippet>200</a>    };
-<a href=#201 id=201 data-nosnippet>201</a>
-<a href=#202 id=202 data-nosnippet>202</a>    <span class="kw">use </span>super::<span class="kw-2">*</span>;
-<a href=#203 id=203 data-nosnippet>203</a>    <span class="kw">use </span>crate::{
-<a href=#204 id=204 data-nosnippet>204</a>        testing::{
-<a href=#205 id=205 data-nosnippet>205</a>            configs::goldilocks_poseidon2::{Felt, QuadFelt},
-<a href=#206 id=206 data-nosnippet>206</a>            params::{FRI_FOLD_ARITY_2, FRI_FOLD_ARITY_4, FRI_FOLD_ARITY_8},
-<a href=#207 id=207 data-nosnippet>207</a>        },
-<a href=#208 id=208 data-nosnippet>208</a>        util::horner::horner,
-<a href=#209 id=209 data-nosnippet>209</a>    };
-<a href=#210 id=210 data-nosnippet>210</a>
-<a href=#211 id=211 data-nosnippet>211</a>    <span class="comment">// Type alias for tests using packed fields
-<a href=#212 id=212 data-nosnippet>212</a>    </span><span class="kw">type </span>Pf = &lt;Felt <span class="kw">as </span>Field&gt;::Packing;
-<a href=#213 id=213 data-nosnippet>213</a>
-<a href=#214 id=214 data-nosnippet>214</a>    <span class="doccomment">/// Test fold_evals against NaiveDft coset evaluations for a specific arity.
-<a href=#215 id=215 data-nosnippet>215</a>    ///
-<a href=#216 id=216 data-nosnippet>216</a>    /// Generates a random polynomial, computes evaluations on a coset using NaiveDft,
-<a href=#217 id=217 data-nosnippet>217</a>    /// then verifies fold_evals correctly recovers f(β).
-<a href=#218 id=218 data-nosnippet>218</a>    </span><span class="kw">fn </span>test_fold_evals_naive_dft(fold: FriFold) {
-<a href=#219 id=219 data-nosnippet>219</a>        <span class="kw">use </span>p3_dft::{NaiveDft, TwoAdicSubgroupDft};
-<a href=#220 id=220 data-nosnippet>220</a>
+<a href=#193 id=193 data-nosnippet>193</a>    <span class="kw">use </span>p3_dft::{NaiveDft, Radix2DFTSmallBatch, TwoAdicSubgroupDft};
+<a href=#194 id=194 data-nosnippet>194</a>    <span class="kw">use </span>p3_field::{ExtensionField, Field, PrimeCharacteristicRing, TwoAdicField};
+<a href=#195 id=195 data-nosnippet>195</a>    <span class="kw">use </span>p3_matrix::dense::RowMajorMatrix;
+<a href=#196 id=196 data-nosnippet>196</a>    <span class="kw">use </span>p3_util::reverse_slice_index_bits;
+<a href=#197 id=197 data-nosnippet>197</a>    <span class="kw">use </span>rand::{
+<a href=#198 id=198 data-nosnippet>198</a>        RngExt, SeedableRng,
+<a href=#199 id=199 data-nosnippet>199</a>        distr::{Distribution, StandardUniform},
+<a href=#200 id=200 data-nosnippet>200</a>        prelude::SmallRng,
+<a href=#201 id=201 data-nosnippet>201</a>    };
+<a href=#202 id=202 data-nosnippet>202</a>
+<a href=#203 id=203 data-nosnippet>203</a>    <span class="kw">use </span>super::<span class="kw-2">*</span>;
+<a href=#204 id=204 data-nosnippet>204</a>    <span class="kw">use </span>crate::{
+<a href=#205 id=205 data-nosnippet>205</a>        domain::{Coset, TwoAdicSubgroup},
+<a href=#206 id=206 data-nosnippet>206</a>        testing::{
+<a href=#207 id=207 data-nosnippet>207</a>            configs::goldilocks_poseidon2::{Felt, QuadFelt},
+<a href=#208 id=208 data-nosnippet>208</a>            params::{FRI_FOLD_ARITY_2, FRI_FOLD_ARITY_4, FRI_FOLD_ARITY_8},
+<a href=#209 id=209 data-nosnippet>209</a>        },
+<a href=#210 id=210 data-nosnippet>210</a>        util::horner::horner,
+<a href=#211 id=211 data-nosnippet>211</a>    };
+<a href=#212 id=212 data-nosnippet>212</a>
+<a href=#213 id=213 data-nosnippet>213</a>    <span class="comment">// Type alias for tests using packed fields
+<a href=#214 id=214 data-nosnippet>214</a>    </span><span class="kw">type </span>Pf = &lt;Felt <span class="kw">as </span>Field&gt;::Packing;
+<a href=#215 id=215 data-nosnippet>215</a>
+<a href=#216 id=216 data-nosnippet>216</a>    <span class="doccomment">/// Test fold_evals against NaiveDft coset evaluations for a specific arity.
+<a href=#217 id=217 data-nosnippet>217</a>    ///
+<a href=#218 id=218 data-nosnippet>218</a>    /// Generates a random polynomial, computes evaluations on a coset using NaiveDft,
+<a href=#219 id=219 data-nosnippet>219</a>    /// then verifies fold_evals correctly recovers f(β).
+<a href=#220 id=220 data-nosnippet>220</a>    </span><span class="kw">fn </span>test_fold_evals_naive_dft(fold: FriFold) {
 <a href=#221 id=221 data-nosnippet>221</a>        <span class="kw">let </span><span class="kw-2">mut </span>rng = SmallRng::seed_from_u64(<span class="number">42</span>);
 <a href=#222 id=222 data-nosnippet>222</a>        <span class="kw">let </span>arity = fold.arity();
 <a href=#223 id=223 data-nosnippet>223</a>
@@ -258,144 +258,142 @@
 <a href=#258 id=258 data-nosnippet>258</a>        <span class="kw">let </span>rng = <span class="kw-2">&amp;mut </span>SmallRng::seed_from_u64(<span class="number">1</span>);
 <a href=#259 id=259 data-nosnippet>259</a>        <span class="kw">let </span>beta: Ext = rng.sample(StandardUniform);
 <a href=#260 id=260 data-nosnippet>260</a>        <span class="kw">let </span>arity = fold.arity();
-<a href=#261 id=261 data-nosnippet>261</a>        <span class="kw">let </span>log_arity = fold.log_arity() <span class="kw">as </span>usize;
+<a href=#261 id=261 data-nosnippet>261</a>        <span class="kw">let </span>log_arity = fold.log_arity();
 <a href=#262 id=262 data-nosnippet>262</a>
 <a href=#263 id=263 data-nosnippet>263</a>        <span class="comment">// Random polynomial of degree arity - 1
 <a href=#264 id=264 data-nosnippet>264</a>        </span><span class="kw">let </span>poly: Vec&lt;Ext&gt; = (<span class="number">0</span>..arity).map(|<span class="kw">_</span>| rng.sample(StandardUniform)).collect();
 <a href=#265 id=265 data-nosnippet>265</a>
-<a href=#266 id=266 data-nosnippet>266</a>        <span class="comment">// Compute roots of unity in bit-reversed order for this arity
-<a href=#267 id=267 data-nosnippet>267</a>        </span><span class="kw">let </span><span class="kw-2">mut </span>roots: Vec&lt;Base&gt; =
-<a href=#268 id=268 data-nosnippet>268</a>            Base::two_adic_generator(log_arity).powers().take(arity).collect();
-<a href=#269 id=269 data-nosnippet>269</a>        reverse_slice_index_bits(<span class="kw-2">&amp;mut </span>roots);
-<a href=#270 id=270 data-nosnippet>270</a>
-<a href=#271 id=271 data-nosnippet>271</a>        <span class="kw">let </span>s: Base = rng.sample(StandardUniform);
-<a href=#272 id=272 data-nosnippet>272</a>        <span class="kw">let </span>s_inv = s.inverse();
-<a href=#273 id=273 data-nosnippet>273</a>
-<a href=#274 id=274 data-nosnippet>274</a>        <span class="comment">// Evaluate polynomial at coset points: [f(s·root) for root in roots]
-<a href=#275 id=275 data-nosnippet>275</a>        </span><span class="kw">let </span>evals: Vec&lt;Ext&gt; =
-<a href=#276 id=276 data-nosnippet>276</a>            roots.iter().map(|<span class="kw-2">&amp;</span>root| horner(root * s, poly.iter().rev().copied())).collect();
-<a href=#277 id=277 data-nosnippet>277</a>
-<a href=#278 id=278 data-nosnippet>278</a>        <span class="comment">// Expected: f(beta)
-<a href=#279 id=279 data-nosnippet>279</a>        </span><span class="kw">let </span>expected = horner(beta, poly.iter().rev().copied());
-<a href=#280 id=280 data-nosnippet>280</a>
-<a href=#281 id=281 data-nosnippet>281</a>        <span class="comment">// Test fold_evals
-<a href=#282 id=282 data-nosnippet>282</a>        </span><span class="kw">let </span>result = fold.fold_evals(<span class="kw-2">&amp;</span>evals, s_inv, beta);
-<a href=#283 id=283 data-nosnippet>283</a>        <span class="macro">assert_eq!</span>(result, expected);
-<a href=#284 id=284 data-nosnippet>284</a>    }
-<a href=#285 id=285 data-nosnippet>285</a>
-<a href=#286 id=286 data-nosnippet>286</a>    <span class="doccomment">/// Test that `fold_matrix` scalar and packed paths produce identical results.
-<a href=#287 id=287 data-nosnippet>287</a>    ///
-<a href=#288 id=288 data-nosnippet>288</a>    /// Creates a matrix large enough to trigger the packed path, then verifies
-<a href=#289 id=289 data-nosnippet>289</a>    /// the result matches row-by-row scalar `fold_evals` computation.
-<a href=#290 id=290 data-nosnippet>290</a>    </span><span class="kw">fn </span>test_fold_matrix_scalar_packed_equivalence(fold: FriFold) {
-<a href=#291 id=291 data-nosnippet>291</a>        <span class="kw">let </span>rng = <span class="kw-2">&amp;mut </span>SmallRng::seed_from_u64(<span class="number">42</span>);
-<a href=#292 id=292 data-nosnippet>292</a>        <span class="kw">let </span>arity = fold.arity();
-<a href=#293 id=293 data-nosnippet>293</a>
-<a href=#294 id=294 data-nosnippet>294</a>        <span class="comment">// Create input matrix with height = multiple of packing width (triggers packed path)
-<a href=#295 id=295 data-nosnippet>295</a>        </span><span class="kw">let </span>height = Pf::WIDTH * <span class="number">4</span>;
-<a href=#296 id=296 data-nosnippet>296</a>        <span class="kw">let </span>values: Vec&lt;QuadFelt&gt; =
-<a href=#297 id=297 data-nosnippet>297</a>            (<span class="number">0</span>..height * arity).map(|<span class="kw">_</span>| rng.sample(StandardUniform)).collect();
-<a href=#298 id=298 data-nosnippet>298</a>        <span class="kw">let </span>input = RowMajorMatrix::new(values.clone(), arity);
-<a href=#299 id=299 data-nosnippet>299</a>
-<a href=#300 id=300 data-nosnippet>300</a>        <span class="comment">// Generate random coset generators and their inverses
-<a href=#301 id=301 data-nosnippet>301</a>        </span><span class="kw">let </span>s_values: Vec&lt;Felt&gt; =
-<a href=#302 id=302 data-nosnippet>302</a>            (<span class="number">0</span>..height).map(|<span class="kw">_</span>| rng.sample::&lt;Felt, <span class="kw">_</span>&gt;(StandardUniform)).collect();
-<a href=#303 id=303 data-nosnippet>303</a>        <span class="kw">let </span>s_invs: Vec&lt;Felt&gt; = s_values.iter().map(Field::inverse).collect();
+<a href=#266 id=266 data-nosnippet>266</a>        <span class="comment">// Roots of unity in bit-reversed order for this arity.
+<a href=#267 id=267 data-nosnippet>267</a>        </span><span class="kw">let </span>roots: Vec&lt;Base&gt; = TwoAdicSubgroup::&lt;Base&gt;::new(log_arity).bit_reversed_points();
+<a href=#268 id=268 data-nosnippet>268</a>
+<a href=#269 id=269 data-nosnippet>269</a>        <span class="kw">let </span>s: Base = rng.sample(StandardUniform);
+<a href=#270 id=270 data-nosnippet>270</a>        <span class="kw">let </span>s_inv = s.inverse();
+<a href=#271 id=271 data-nosnippet>271</a>
+<a href=#272 id=272 data-nosnippet>272</a>        <span class="comment">// Evaluate polynomial at coset points: [f(s·root) for root in roots]
+<a href=#273 id=273 data-nosnippet>273</a>        </span><span class="kw">let </span>evals: Vec&lt;Ext&gt; =
+<a href=#274 id=274 data-nosnippet>274</a>            roots.iter().map(|<span class="kw-2">&amp;</span>root| horner(root * s, poly.iter().rev().copied())).collect();
+<a href=#275 id=275 data-nosnippet>275</a>
+<a href=#276 id=276 data-nosnippet>276</a>        <span class="comment">// Expected: f(beta)
+<a href=#277 id=277 data-nosnippet>277</a>        </span><span class="kw">let </span>expected = horner(beta, poly.iter().rev().copied());
+<a href=#278 id=278 data-nosnippet>278</a>
+<a href=#279 id=279 data-nosnippet>279</a>        <span class="comment">// Test fold_evals
+<a href=#280 id=280 data-nosnippet>280</a>        </span><span class="kw">let </span>result = fold.fold_evals(<span class="kw-2">&amp;</span>evals, s_inv, beta);
+<a href=#281 id=281 data-nosnippet>281</a>        <span class="macro">assert_eq!</span>(result, expected);
+<a href=#282 id=282 data-nosnippet>282</a>    }
+<a href=#283 id=283 data-nosnippet>283</a>
+<a href=#284 id=284 data-nosnippet>284</a>    <span class="doccomment">/// Test that `fold_matrix` scalar and packed paths produce identical results.
+<a href=#285 id=285 data-nosnippet>285</a>    ///
+<a href=#286 id=286 data-nosnippet>286</a>    /// Creates a matrix large enough to trigger the packed path, then verifies
+<a href=#287 id=287 data-nosnippet>287</a>    /// the result matches row-by-row scalar `fold_evals` computation.
+<a href=#288 id=288 data-nosnippet>288</a>    </span><span class="kw">fn </span>test_fold_matrix_scalar_packed_equivalence(fold: FriFold) {
+<a href=#289 id=289 data-nosnippet>289</a>        <span class="kw">let </span>rng = <span class="kw-2">&amp;mut </span>SmallRng::seed_from_u64(<span class="number">42</span>);
+<a href=#290 id=290 data-nosnippet>290</a>        <span class="kw">let </span>arity = fold.arity();
+<a href=#291 id=291 data-nosnippet>291</a>
+<a href=#292 id=292 data-nosnippet>292</a>        <span class="comment">// Create input matrix with height = multiple of packing width (triggers packed path)
+<a href=#293 id=293 data-nosnippet>293</a>        </span><span class="kw">let </span>height = Pf::WIDTH * <span class="number">4</span>;
+<a href=#294 id=294 data-nosnippet>294</a>        <span class="kw">let </span>values: Vec&lt;QuadFelt&gt; =
+<a href=#295 id=295 data-nosnippet>295</a>            (<span class="number">0</span>..height * arity).map(|<span class="kw">_</span>| rng.sample(StandardUniform)).collect();
+<a href=#296 id=296 data-nosnippet>296</a>        <span class="kw">let </span>input = RowMajorMatrix::new(values.clone(), arity);
+<a href=#297 id=297 data-nosnippet>297</a>
+<a href=#298 id=298 data-nosnippet>298</a>        <span class="comment">// Generate random coset generators and their inverses
+<a href=#299 id=299 data-nosnippet>299</a>        </span><span class="kw">let </span>s_values: Vec&lt;Felt&gt; =
+<a href=#300 id=300 data-nosnippet>300</a>            (<span class="number">0</span>..height).map(|<span class="kw">_</span>| rng.sample::&lt;Felt, <span class="kw">_</span>&gt;(StandardUniform)).collect();
+<a href=#301 id=301 data-nosnippet>301</a>        <span class="kw">let </span>s_invs: Vec&lt;Felt&gt; = s_values.iter().map(Field::inverse).collect();
+<a href=#302 id=302 data-nosnippet>302</a>
+<a href=#303 id=303 data-nosnippet>303</a>        <span class="kw">let </span>beta: QuadFelt = rng.sample(StandardUniform);
 <a href=#304 id=304 data-nosnippet>304</a>
-<a href=#305 id=305 data-nosnippet>305</a>        <span class="kw">let </span>beta: QuadFelt = rng.sample(StandardUniform);
-<a href=#306 id=306 data-nosnippet>306</a>
-<a href=#307 id=307 data-nosnippet>307</a>        <span class="comment">// Scalar path: compute fold_evals for each row
-<a href=#308 id=308 data-nosnippet>308</a>        </span><span class="kw">let </span>scalar_result: Vec&lt;QuadFelt&gt; = values
-<a href=#309 id=309 data-nosnippet>309</a>            .chunks(arity)
-<a href=#310 id=310 data-nosnippet>310</a>            .zip(s_invs.iter())
-<a href=#311 id=311 data-nosnippet>311</a>            .map(|(evals, <span class="kw-2">&amp;</span>s_inv)| fold.fold_evals(evals, s_inv, beta))
-<a href=#312 id=312 data-nosnippet>312</a>            .collect();
-<a href=#313 id=313 data-nosnippet>313</a>
-<a href=#314 id=314 data-nosnippet>314</a>        <span class="comment">// Packed path: call fold_matrix (uses packed impl for large matrices)
-<a href=#315 id=315 data-nosnippet>315</a>        </span><span class="kw">let </span>packed_result = fold.fold_matrix(input.as_view(), <span class="kw-2">&amp;</span>s_invs, beta);
-<a href=#316 id=316 data-nosnippet>316</a>
-<a href=#317 id=317 data-nosnippet>317</a>        <span class="macro">assert_eq!</span>(scalar_result, packed_result, <span class="string">"Scalar vs packed mismatch for arity {arity}"</span>);
-<a href=#318 id=318 data-nosnippet>318</a>    }
-<a href=#319 id=319 data-nosnippet>319</a>
-<a href=#320 id=320 data-nosnippet>320</a>    <span class="doccomment">/// Test that folding preserves low-degree structure.
-<a href=#321 id=321 data-nosnippet>321</a>    ///
-<a href=#322 id=322 data-nosnippet>322</a>    /// After folding a degree-d polynomial, the result should have degree d/arity.
-<a href=#323 id=323 data-nosnippet>323</a>    /// Verifies by checking that high coefficients are zero after IDFT.
-<a href=#324 id=324 data-nosnippet>324</a>    </span><span class="kw">fn </span>test_folding_preserves_low_degree(fold: FriFold) {
-<a href=#325 id=325 data-nosnippet>325</a>        <span class="kw">let </span>rng = <span class="kw-2">&amp;mut </span>SmallRng::seed_from_u64(<span class="number">42</span>);
-<a href=#326 id=326 data-nosnippet>326</a>        <span class="kw">let </span>arity = fold.arity();
-<a href=#327 id=327 data-nosnippet>327</a>        <span class="kw">let </span>log_arity = fold.log_arity() <span class="kw">as </span>usize;
-<a href=#328 id=328 data-nosnippet>328</a>
-<a href=#329 id=329 data-nosnippet>329</a>        <span class="kw">let </span>log_blowup = <span class="number">2</span>;
-<a href=#330 id=330 data-nosnippet>330</a>        <span class="kw">let </span>log_poly_degree = <span class="number">4</span>; <span class="comment">// degree 16 polynomial
-<a href=#331 id=331 data-nosnippet>331</a>        </span><span class="kw">let </span>poly_degree = <span class="number">1 </span>&lt;&lt; log_poly_degree;
-<a href=#332 id=332 data-nosnippet>332</a>        <span class="kw">let </span>log_lde_size = log_poly_degree + log_blowup;
-<a href=#333 id=333 data-nosnippet>333</a>        <span class="kw">let </span>lde_size = <span class="number">1 </span>&lt;&lt; log_lde_size;
-<a href=#334 id=334 data-nosnippet>334</a>
-<a href=#335 id=335 data-nosnippet>335</a>        <span class="comment">// Generate random low-degree polynomial
-<a href=#336 id=336 data-nosnippet>336</a>        </span><span class="kw">let </span>coeffs: Vec&lt;QuadFelt&gt; = (<span class="number">0</span>..poly_degree).map(|<span class="kw">_</span>| rng.sample(StandardUniform)).collect();
-<a href=#337 id=337 data-nosnippet>337</a>
-<a href=#338 id=338 data-nosnippet>338</a>        <span class="comment">// Compute LDE in bit-reversed order
-<a href=#339 id=339 data-nosnippet>339</a>        </span><span class="kw">let </span><span class="kw-2">mut </span>full_coeffs = coeffs;
-<a href=#340 id=340 data-nosnippet>340</a>        full_coeffs.resize(lde_size, QuadFelt::ZERO);
-<a href=#341 id=341 data-nosnippet>341</a>        <span class="kw">let </span>dft = p3_dft::Radix2DFTSmallBatch::&lt;QuadFelt&gt;::default();
-<a href=#342 id=342 data-nosnippet>342</a>        <span class="kw">let </span><span class="kw-2">mut </span>evals = p3_dft::TwoAdicSubgroupDft::dft_algebra(<span class="kw-2">&amp;</span>dft, full_coeffs);
-<a href=#343 id=343 data-nosnippet>343</a>        reverse_slice_index_bits(<span class="kw-2">&amp;mut </span>evals);
-<a href=#344 id=344 data-nosnippet>344</a>
-<a href=#345 id=345 data-nosnippet>345</a>        <span class="comment">// Compute s_invs
-<a href=#346 id=346 data-nosnippet>346</a>        </span><span class="kw">let </span>log_num_cosets = log_lde_size - log_arity;
-<a href=#347 id=347 data-nosnippet>347</a>        <span class="kw">let </span>num_cosets = <span class="number">1 </span>&lt;&lt; log_num_cosets;
-<a href=#348 id=348 data-nosnippet>348</a>        <span class="kw">let </span>g_inv = Felt::two_adic_generator(log_lde_size).inverse();
-<a href=#349 id=349 data-nosnippet>349</a>        <span class="kw">let </span><span class="kw-2">mut </span>s_invs: Vec&lt;Felt&gt; = g_inv.powers().take(num_cosets).collect();
-<a href=#350 id=350 data-nosnippet>350</a>        reverse_slice_index_bits(<span class="kw-2">&amp;mut </span>s_invs);
-<a href=#351 id=351 data-nosnippet>351</a>
-<a href=#352 id=352 data-nosnippet>352</a>        <span class="comment">// Fold with random beta
-<a href=#353 id=353 data-nosnippet>353</a>        </span><span class="kw">let </span>beta: QuadFelt = rng.sample(StandardUniform);
-<a href=#354 id=354 data-nosnippet>354</a>        <span class="kw">let </span>matrix = RowMajorMatrix::new(evals, arity);
-<a href=#355 id=355 data-nosnippet>355</a>        <span class="kw">let </span>folded = fold.fold_matrix(matrix.as_view(), <span class="kw-2">&amp;</span>s_invs, beta);
-<a href=#356 id=356 data-nosnippet>356</a>
-<a href=#357 id=357 data-nosnippet>357</a>        <span class="comment">// IDFT the result to get coefficients
-<a href=#358 id=358 data-nosnippet>358</a>        </span><span class="kw">let </span><span class="kw-2">mut </span>folded_for_idft = folded;
-<a href=#359 id=359 data-nosnippet>359</a>        reverse_slice_index_bits(<span class="kw-2">&amp;mut </span>folded_for_idft);
-<a href=#360 id=360 data-nosnippet>360</a>        <span class="kw">let </span>folded_coeffs = p3_dft::TwoAdicSubgroupDft::idft_algebra(<span class="kw-2">&amp;</span>dft, folded_for_idft);
-<a href=#361 id=361 data-nosnippet>361</a>
-<a href=#362 id=362 data-nosnippet>362</a>        <span class="comment">// Check that all coefficients beyond degree/arity are zero
-<a href=#363 id=363 data-nosnippet>363</a>        </span><span class="kw">let </span>expected_degree = poly_degree / arity;
-<a href=#364 id=364 data-nosnippet>364</a>        <span class="kw">for </span>(i, coeff) <span class="kw">in </span>folded_coeffs.iter().enumerate().skip(expected_degree) {
-<a href=#365 id=365 data-nosnippet>365</a>            <span class="macro">assert_eq!</span>(
-<a href=#366 id=366 data-nosnippet>366</a>                <span class="kw-2">*</span>coeff,
-<a href=#367 id=367 data-nosnippet>367</a>                QuadFelt::ZERO,
-<a href=#368 id=368 data-nosnippet>368</a>                <span class="string">"Arity {arity}: High coefficient c[{i}] should be zero but was {coeff:?}"
-<a href=#369 id=369 data-nosnippet>369</a>            </span>);
-<a href=#370 id=370 data-nosnippet>370</a>        }
-<a href=#371 id=371 data-nosnippet>371</a>    }
-<a href=#372 id=372 data-nosnippet>372</a>
-<a href=#373 id=373 data-nosnippet>373</a>    <span class="attr">#[test]
-<a href=#374 id=374 data-nosnippet>374</a>    </span><span class="kw">fn </span>test_fold() {
-<a href=#375 id=375 data-nosnippet>375</a>        test_fold_correctness::&lt;Felt, QuadFelt&gt;(FRI_FOLD_ARITY_2);
-<a href=#376 id=376 data-nosnippet>376</a>        test_fold_correctness::&lt;Felt, QuadFelt&gt;(FRI_FOLD_ARITY_4);
-<a href=#377 id=377 data-nosnippet>377</a>        test_fold_correctness::&lt;Felt, QuadFelt&gt;(FRI_FOLD_ARITY_8);
-<a href=#378 id=378 data-nosnippet>378</a>    }
-<a href=#379 id=379 data-nosnippet>379</a>
-<a href=#380 id=380 data-nosnippet>380</a>    <span class="attr">#[test]
-<a href=#381 id=381 data-nosnippet>381</a>    </span><span class="kw">fn </span>test_fold_evals_against_naive_dft() {
-<a href=#382 id=382 data-nosnippet>382</a>        test_fold_evals_naive_dft(FRI_FOLD_ARITY_2);
-<a href=#383 id=383 data-nosnippet>383</a>        test_fold_evals_naive_dft(FRI_FOLD_ARITY_4);
-<a href=#384 id=384 data-nosnippet>384</a>        test_fold_evals_naive_dft(FRI_FOLD_ARITY_8);
-<a href=#385 id=385 data-nosnippet>385</a>    }
-<a href=#386 id=386 data-nosnippet>386</a>
-<a href=#387 id=387 data-nosnippet>387</a>    <span class="attr">#[test]
-<a href=#388 id=388 data-nosnippet>388</a>    </span><span class="kw">fn </span>test_fold_matrix() {
-<a href=#389 id=389 data-nosnippet>389</a>        test_fold_matrix_scalar_packed_equivalence(FRI_FOLD_ARITY_2);
-<a href=#390 id=390 data-nosnippet>390</a>        test_fold_matrix_scalar_packed_equivalence(FRI_FOLD_ARITY_4);
-<a href=#391 id=391 data-nosnippet>391</a>        test_fold_matrix_scalar_packed_equivalence(FRI_FOLD_ARITY_8);
-<a href=#392 id=392 data-nosnippet>392</a>    }
-<a href=#393 id=393 data-nosnippet>393</a>
-<a href=#394 id=394 data-nosnippet>394</a>    <span class="attr">#[test]
-<a href=#395 id=395 data-nosnippet>395</a>    </span><span class="kw">fn </span>test_fold_low_degree() {
-<a href=#396 id=396 data-nosnippet>396</a>        test_folding_preserves_low_degree(FRI_FOLD_ARITY_2);
-<a href=#397 id=397 data-nosnippet>397</a>        test_folding_preserves_low_degree(FRI_FOLD_ARITY_4);
-<a href=#398 id=398 data-nosnippet>398</a>        test_folding_preserves_low_degree(FRI_FOLD_ARITY_8);
-<a href=#399 id=399 data-nosnippet>399</a>    }
-<a href=#400 id=400 data-nosnippet>400</a>}
+<a href=#305 id=305 data-nosnippet>305</a>        <span class="comment">// Scalar path: compute fold_evals for each row
+<a href=#306 id=306 data-nosnippet>306</a>        </span><span class="kw">let </span>scalar_result: Vec&lt;QuadFelt&gt; = values
+<a href=#307 id=307 data-nosnippet>307</a>            .chunks(arity)
+<a href=#308 id=308 data-nosnippet>308</a>            .zip(s_invs.iter())
+<a href=#309 id=309 data-nosnippet>309</a>            .map(|(evals, <span class="kw-2">&amp;</span>s_inv)| fold.fold_evals(evals, s_inv, beta))
+<a href=#310 id=310 data-nosnippet>310</a>            .collect();
+<a href=#311 id=311 data-nosnippet>311</a>
+<a href=#312 id=312 data-nosnippet>312</a>        <span class="comment">// Packed path: call fold_matrix (uses packed impl for large matrices)
+<a href=#313 id=313 data-nosnippet>313</a>        </span><span class="kw">let </span>packed_result = fold.fold_matrix(input.as_view(), <span class="kw-2">&amp;</span>s_invs, beta);
+<a href=#314 id=314 data-nosnippet>314</a>
+<a href=#315 id=315 data-nosnippet>315</a>        <span class="macro">assert_eq!</span>(scalar_result, packed_result, <span class="string">"Scalar vs packed mismatch for arity {arity}"</span>);
+<a href=#316 id=316 data-nosnippet>316</a>    }
+<a href=#317 id=317 data-nosnippet>317</a>
+<a href=#318 id=318 data-nosnippet>318</a>    <span class="doccomment">/// Test that folding preserves low-degree structure.
+<a href=#319 id=319 data-nosnippet>319</a>    ///
+<a href=#320 id=320 data-nosnippet>320</a>    /// After folding a degree-d polynomial, the result should have degree d/arity.
+<a href=#321 id=321 data-nosnippet>321</a>    /// Verifies by checking that high coefficients are zero after IDFT.
+<a href=#322 id=322 data-nosnippet>322</a>    </span><span class="kw">fn </span>test_folding_preserves_low_degree(fold: FriFold) {
+<a href=#323 id=323 data-nosnippet>323</a>        <span class="kw">let </span>rng = <span class="kw-2">&amp;mut </span>SmallRng::seed_from_u64(<span class="number">42</span>);
+<a href=#324 id=324 data-nosnippet>324</a>        <span class="kw">let </span>arity = fold.arity();
+<a href=#325 id=325 data-nosnippet>325</a>        <span class="kw">let </span>log_arity: u8 = fold.log_arity();
+<a href=#326 id=326 data-nosnippet>326</a>
+<a href=#327 id=327 data-nosnippet>327</a>        <span class="kw">let </span>log_blowup: u8 = <span class="number">2</span>;
+<a href=#328 id=328 data-nosnippet>328</a>        <span class="kw">let </span>log_poly_degree: u8 = <span class="number">4</span>; <span class="comment">// degree 16 polynomial
+<a href=#329 id=329 data-nosnippet>329</a>        </span><span class="kw">let </span>poly_degree = <span class="number">1usize </span>&lt;&lt; log_poly_degree;
+<a href=#330 id=330 data-nosnippet>330</a>        <span class="kw">let </span>log_lde_size: u8 = log_poly_degree + log_blowup;
+<a href=#331 id=331 data-nosnippet>331</a>        <span class="kw">let </span>lde_size = <span class="number">1usize </span>&lt;&lt; log_lde_size;
+<a href=#332 id=332 data-nosnippet>332</a>
+<a href=#333 id=333 data-nosnippet>333</a>        <span class="comment">// Generate random low-degree polynomial
+<a href=#334 id=334 data-nosnippet>334</a>        </span><span class="kw">let </span>coeffs: Vec&lt;QuadFelt&gt; = (<span class="number">0</span>..poly_degree).map(|<span class="kw">_</span>| rng.sample(StandardUniform)).collect();
+<a href=#335 id=335 data-nosnippet>335</a>
+<a href=#336 id=336 data-nosnippet>336</a>        <span class="comment">// Compute LDE in bit-reversed order
+<a href=#337 id=337 data-nosnippet>337</a>        </span><span class="kw">let </span><span class="kw-2">mut </span>full_coeffs = coeffs;
+<a href=#338 id=338 data-nosnippet>338</a>        full_coeffs.resize(lde_size, QuadFelt::ZERO);
+<a href=#339 id=339 data-nosnippet>339</a>        <span class="kw">let </span>dft = Radix2DFTSmallBatch::&lt;QuadFelt&gt;::default();
+<a href=#340 id=340 data-nosnippet>340</a>        <span class="kw">let </span><span class="kw-2">mut </span>evals = dft.dft_algebra(full_coeffs);
+<a href=#341 id=341 data-nosnippet>341</a>        reverse_slice_index_bits(<span class="kw-2">&amp;mut </span>evals);
+<a href=#342 id=342 data-nosnippet>342</a>
+<a href=#343 id=343 data-nosnippet>343</a>        <span class="comment">// Compute s_invs
+<a href=#344 id=344 data-nosnippet>344</a>        </span><span class="kw">let </span>log_num_cosets = log_lde_size - log_arity;
+<a href=#345 id=345 data-nosnippet>345</a>        <span class="kw">let </span>num_cosets = <span class="number">1usize </span>&lt;&lt; log_num_cosets;
+<a href=#346 id=346 data-nosnippet>346</a>        <span class="kw">let </span>g_inv = TwoAdicSubgroup::&lt;Felt&gt;::new(log_lde_size).generator_inverse();
+<a href=#347 id=347 data-nosnippet>347</a>        <span class="kw">let </span><span class="kw-2">mut </span>s_invs: Vec&lt;Felt&gt; = g_inv.powers().take(num_cosets).collect();
+<a href=#348 id=348 data-nosnippet>348</a>        reverse_slice_index_bits(<span class="kw-2">&amp;mut </span>s_invs);
+<a href=#349 id=349 data-nosnippet>349</a>
+<a href=#350 id=350 data-nosnippet>350</a>        <span class="comment">// Fold with random beta
+<a href=#351 id=351 data-nosnippet>351</a>        </span><span class="kw">let </span>beta: QuadFelt = rng.sample(StandardUniform);
+<a href=#352 id=352 data-nosnippet>352</a>        <span class="kw">let </span>matrix = RowMajorMatrix::new(evals, arity);
+<a href=#353 id=353 data-nosnippet>353</a>        <span class="kw">let </span>folded = fold.fold_matrix(matrix.as_view(), <span class="kw-2">&amp;</span>s_invs, beta);
+<a href=#354 id=354 data-nosnippet>354</a>
+<a href=#355 id=355 data-nosnippet>355</a>        <span class="comment">// IDFT the result to get coefficients
+<a href=#356 id=356 data-nosnippet>356</a>        </span><span class="kw">let </span><span class="kw-2">mut </span>folded_for_idft = folded;
+<a href=#357 id=357 data-nosnippet>357</a>        reverse_slice_index_bits(<span class="kw-2">&amp;mut </span>folded_for_idft);
+<a href=#358 id=358 data-nosnippet>358</a>        <span class="kw">let </span>folded_coeffs = dft.idft_algebra(folded_for_idft);
+<a href=#359 id=359 data-nosnippet>359</a>
+<a href=#360 id=360 data-nosnippet>360</a>        <span class="comment">// Check that all coefficients beyond degree/arity are zero
+<a href=#361 id=361 data-nosnippet>361</a>        </span><span class="kw">let </span>expected_degree = poly_degree / arity;
+<a href=#362 id=362 data-nosnippet>362</a>        <span class="kw">for </span>(i, coeff) <span class="kw">in </span>folded_coeffs.iter().enumerate().skip(expected_degree) {
+<a href=#363 id=363 data-nosnippet>363</a>            <span class="macro">assert_eq!</span>(
+<a href=#364 id=364 data-nosnippet>364</a>                <span class="kw-2">*</span>coeff,
+<a href=#365 id=365 data-nosnippet>365</a>                QuadFelt::ZERO,
+<a href=#366 id=366 data-nosnippet>366</a>                <span class="string">"Arity {arity}: High coefficient c[{i}] should be zero but was {coeff:?}"
+<a href=#367 id=367 data-nosnippet>367</a>            </span>);
+<a href=#368 id=368 data-nosnippet>368</a>        }
+<a href=#369 id=369 data-nosnippet>369</a>    }
+<a href=#370 id=370 data-nosnippet>370</a>
+<a href=#371 id=371 data-nosnippet>371</a>    <span class="attr">#[test]
+<a href=#372 id=372 data-nosnippet>372</a>    </span><span class="kw">fn </span>test_fold() {
+<a href=#373 id=373 data-nosnippet>373</a>        test_fold_correctness::&lt;Felt, QuadFelt&gt;(FRI_FOLD_ARITY_2);
+<a href=#374 id=374 data-nosnippet>374</a>        test_fold_correctness::&lt;Felt, QuadFelt&gt;(FRI_FOLD_ARITY_4);
+<a href=#375 id=375 data-nosnippet>375</a>        test_fold_correctness::&lt;Felt, QuadFelt&gt;(FRI_FOLD_ARITY_8);
+<a href=#376 id=376 data-nosnippet>376</a>    }
+<a href=#377 id=377 data-nosnippet>377</a>
+<a href=#378 id=378 data-nosnippet>378</a>    <span class="attr">#[test]
+<a href=#379 id=379 data-nosnippet>379</a>    </span><span class="kw">fn </span>test_fold_evals_against_naive_dft() {
+<a href=#380 id=380 data-nosnippet>380</a>        test_fold_evals_naive_dft(FRI_FOLD_ARITY_2);
+<a href=#381 id=381 data-nosnippet>381</a>        test_fold_evals_naive_dft(FRI_FOLD_ARITY_4);
+<a href=#382 id=382 data-nosnippet>382</a>        test_fold_evals_naive_dft(FRI_FOLD_ARITY_8);
+<a href=#383 id=383 data-nosnippet>383</a>    }
+<a href=#384 id=384 data-nosnippet>384</a>
+<a href=#385 id=385 data-nosnippet>385</a>    <span class="attr">#[test]
+<a href=#386 id=386 data-nosnippet>386</a>    </span><span class="kw">fn </span>test_fold_matrix() {
+<a href=#387 id=387 data-nosnippet>387</a>        test_fold_matrix_scalar_packed_equivalence(FRI_FOLD_ARITY_2);
+<a href=#388 id=388 data-nosnippet>388</a>        test_fold_matrix_scalar_packed_equivalence(FRI_FOLD_ARITY_4);
+<a href=#389 id=389 data-nosnippet>389</a>        test_fold_matrix_scalar_packed_equivalence(FRI_FOLD_ARITY_8);
+<a href=#390 id=390 data-nosnippet>390</a>    }
+<a href=#391 id=391 data-nosnippet>391</a>
+<a href=#392 id=392 data-nosnippet>392</a>    <span class="attr">#[test]
+<a href=#393 id=393 data-nosnippet>393</a>    </span><span class="kw">fn </span>test_fold_low_degree() {
+<a href=#394 id=394 data-nosnippet>394</a>        test_folding_preserves_low_degree(FRI_FOLD_ARITY_2);
+<a href=#395 id=395 data-nosnippet>395</a>        test_folding_preserves_low_degree(FRI_FOLD_ARITY_4);
+<a href=#396 id=396 data-nosnippet>396</a>        test_folding_preserves_low_degree(FRI_FOLD_ARITY_8);
+<a href=#397 id=397 data-nosnippet>397</a>    }
+<a href=#398 id=398 data-nosnippet>398</a>}
 </code></pre></div></section></main></body></html>

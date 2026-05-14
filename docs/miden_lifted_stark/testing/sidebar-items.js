@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"fn":["bit_reversed_coset_points","generate_matrices_from_specs","open_with_channel","total_elements"],"mod":["airs","configs","params"],"struct":["FriFold","PointQuotients"]};
+window.SIDEBAR_ITEMS = {"fn":["generate_matrices_from_specs","open_with_channel","total_elements"],"mod":["airs","configs","params"],"struct":["FriFold","PointQuotients"]};

@@ -1,4 +1,4 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `stark/miden-lifted-air/src/air.rs`."><title>air.rs - source</title><script>if(window.location.protocol!=="file:")document.head.insertAdjacentHTML("beforeend","SourceSerif4-Regular-6b053e98.ttf.woff2,FiraSans-Italic-81dc35de.woff2,FiraSans-Regular-0fe48ade.woff2,FiraSans-MediumItalic-ccf7e434.woff2,FiraSans-Medium-e1aa3f0a.woff2,SourceCodePro-Regular-8badfe75.ttf.woff2,SourceCodePro-Semibold-aa29a496.ttf.woff2".split(",").map(f=>`<link rel="preload" as="font" type="font/woff2"href="../../static.files/${f}">`).join(""))</script><link rel="stylesheet" href="../../static.files/normalize-9960930a.css"><link rel="stylesheet" href="../../static.files/rustdoc-17e0aaed.css"><meta name="rustdoc-vars" data-root-path="../../" data-static-root-path="../../static.files/" data-current-crate="miden_lifted_air" data-themes="" data-resource-suffix="" data-rustdoc-version="1.97.0-nightly (8b03437a8 2026-05-12)" data-channel="nightly" data-search-js="search-b5634cc7.js" data-stringdex-js="stringdex-2da4960a.js" data-settings-js="settings-170eb4bf.js" ><script src="../../static.files/storage-41dd4d93.js"></script><script defer src="../../static.files/src-script-813739b1.js"></script><script defer src="../../src-files.js"></script><script defer src="../../static.files/main-aa4d37ac.js"></script><noscript><link rel="stylesheet" href="../../static.files/noscript-f7c3ffd8.css"></noscript><link rel="alternate icon" type="image/png" href="../../static.files/favicon-32x32-eab170b8.png"><link rel="icon" type="image/svg+xml" href="../../static.files/favicon-044be391.svg"></head><body class="rustdoc src"><a class="skip-main-content" href="#main-content">Skip to main content</a><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="src-sidebar-title"><h2>Files</h2></div></nav><div class="sidebar-resizer" title="Drag to resize sidebar"></div><main><section id="main-content" class="content" tabindex="-1"><div class="main-heading"><h1><div class="sub-heading">miden_lifted_air/</div>air.rs</h1><rustdoc-toolbar></rustdoc-toolbar></div><div class="example-wrap digits-3"><pre class="rust"><code><a href=#1 id=1 data-nosnippet>1</a><span class="doccomment">//! The `LiftedAir` super-trait for AIR definitions in the lifted STARK system.
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `stark/miden-lifted-air/src/air.rs`."><title>air.rs - source</title><script>if(window.location.protocol!=="file:")document.head.insertAdjacentHTML("beforeend","SourceSerif4-Regular-6b053e98.ttf.woff2,FiraSans-Italic-81dc35de.woff2,FiraSans-Regular-0fe48ade.woff2,FiraSans-MediumItalic-ccf7e434.woff2,FiraSans-Medium-e1aa3f0a.woff2,SourceCodePro-Regular-8badfe75.ttf.woff2,SourceCodePro-Semibold-aa29a496.ttf.woff2".split(",").map(f=>`<link rel="preload" as="font" type="font/woff2"href="../../static.files/${f}">`).join(""))</script><link rel="stylesheet" href="../../static.files/normalize-9960930a.css"><link rel="stylesheet" href="../../static.files/rustdoc-17e0aaed.css"><meta name="rustdoc-vars" data-root-path="../../" data-static-root-path="../../static.files/" data-current-crate="miden_lifted_air" data-themes="" data-resource-suffix="" data-rustdoc-version="1.97.0-nightly (ff9a9ea07 2026-05-13)" data-channel="nightly" data-search-js="search-b5634cc7.js" data-stringdex-js="stringdex-2da4960a.js" data-settings-js="settings-170eb4bf.js" ><script src="../../static.files/storage-41dd4d93.js"></script><script defer src="../../static.files/src-script-813739b1.js"></script><script defer src="../../src-files.js"></script><script defer src="../../static.files/main-aa4d37ac.js"></script><noscript><link rel="stylesheet" href="../../static.files/noscript-f7c3ffd8.css"></noscript><link rel="alternate icon" type="image/png" href="../../static.files/favicon-32x32-eab170b8.png"><link rel="icon" type="image/svg+xml" href="../../static.files/favicon-044be391.svg"></head><body class="rustdoc src"><a class="skip-main-content" href="#main-content">Skip to main content</a><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="src-sidebar-title"><h2>Files</h2></div></nav><div class="sidebar-resizer" title="Drag to resize sidebar"></div><main><section id="main-content" class="content" tabindex="-1"><div class="main-heading"><h1><div class="sub-heading">miden_lifted_air/</div>air.rs</h1><rustdoc-toolbar></rustdoc-toolbar></div><div class="example-wrap digits-3"><pre class="rust"><code><a href=#1 id=1 data-nosnippet>1</a><span class="doccomment">//! The `LiftedAir` super-trait for AIR definitions in the lifted STARK system.
 <a href=#2 id=2 data-nosnippet>2</a>//!
 <a href=#3 id=3 data-nosnippet>3</a>//! # Panic safety of `eval()`
 <a href=#4 id=4 data-nosnippet>4</a>//!
@@ -25,13 +25,13 @@
 <a href=#25 id=25 data-nosnippet>25</a><span class="kw">use </span>p3_air::{BaseAir, WindowAccess};
 <a href=#26 id=26 data-nosnippet>26</a><span class="kw">use </span>p3_field::{ExtensionField, Field};
 <a href=#27 id=27 data-nosnippet>27</a><span class="kw">use </span>p3_matrix::dense::RowMajorMatrix;
-<a href=#28 id=28 data-nosnippet>28</a><span class="kw">use </span>p3_util::log2_ceil_usize;
-<a href=#29 id=29 data-nosnippet>29</a><span class="kw">use </span>thiserror::Error;
-<a href=#30 id=30 data-nosnippet>30</a>
-<a href=#31 id=31 data-nosnippet>31</a><span class="kw">use </span>crate::{
-<a href=#32 id=32 data-nosnippet>32</a>    LiftedAirBuilder,
-<a href=#33 id=33 data-nosnippet>33</a>    auxiliary::{ReducedAuxValues, ReductionError, VarLenPublicInputs},
-<a href=#34 id=34 data-nosnippet>34</a>    symbolic::{AirLayout, SymbolicAirBuilder, SymbolicExpression, SymbolicExpressionExt},
+<a href=#28 id=28 data-nosnippet>28</a><span class="kw">use </span>thiserror::Error;
+<a href=#29 id=29 data-nosnippet>29</a>
+<a href=#30 id=30 data-nosnippet>30</a><span class="kw">use </span>crate::{
+<a href=#31 id=31 data-nosnippet>31</a>    LiftedAirBuilder,
+<a href=#32 id=32 data-nosnippet>32</a>    auxiliary::{ReducedAuxValues, ReductionError, VarLenPublicInputs},
+<a href=#33 id=33 data-nosnippet>33</a>    symbolic::{AirLayout, SymbolicAirBuilder, SymbolicExpression, SymbolicExpressionExt},
+<a href=#34 id=34 data-nosnippet>34</a>    util::log2_ceil_u8,
 <a href=#35 id=35 data-nosnippet>35</a>};
 <a href=#36 id=36 data-nosnippet>36</a>
 <a href=#37 id=37 data-nosnippet>37</a><span class="doccomment">/// Super-trait for AIR definitions used by the lifted STARK prover/verifier.
@@ -224,7 +224,7 @@
 <a href=#224 id=224 data-nosnippet>224</a>    /// We clamp M ≥ 2 so that D ≥ 1. If M = 1 then `deg(C) &lt; N`, and divisibility by
 <a href=#225 id=225 data-nosnippet>225</a>    /// `Z_H` would force C(X) to be the zero polynomial (i.e. the constraint carries no
 <a href=#226 id=226 data-nosnippet>226</a>    /// information about the trace).
-<a href=#227 id=227 data-nosnippet>227</a>    </span><span class="kw">fn </span>log_quotient_degree(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; usize
+<a href=#227 id=227 data-nosnippet>227</a>    </span><span class="kw">fn </span>log_quotient_degree(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; u8
 <a href=#228 id=228 data-nosnippet>228</a>    <span class="kw">where
 <a href=#229 id=229 data-nosnippet>229</a>        </span><span class="self">Self</span>: Sized,
 <a href=#230 id=230 data-nosnippet>230</a>    {
@@ -246,15 +246,15 @@
 <a href=#246 id=246 data-nosnippet>246</a>            .unwrap_or(<span class="number">0</span>);
 <a href=#247 id=247 data-nosnippet>247</a>        <span class="kw">let </span>constraint_degree = base_degree.max(ext_degree).max(<span class="number">2</span>);
 <a href=#248 id=248 data-nosnippet>248</a>
-<a href=#249 id=249 data-nosnippet>249</a>        log2_ceil_usize(constraint_degree - <span class="number">1</span>)
+<a href=#249 id=249 data-nosnippet>249</a>        log2_ceil_u8(constraint_degree - <span class="number">1</span>)
 <a href=#250 id=250 data-nosnippet>250</a>    }
 <a href=#251 id=251 data-nosnippet>251</a>
 <a href=#252 id=252 data-nosnippet>252</a>    <span class="doccomment">/// Number of quotient chunks: `2^log_quotient_degree()`.
-<a href=#253 id=253 data-nosnippet>253</a>    </span><span class="kw">fn </span>constraint_degree(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; usize
+<a href=#253 id=253 data-nosnippet>253</a>    </span><span class="kw">fn </span>quotient_degree(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; usize
 <a href=#254 id=254 data-nosnippet>254</a>    <span class="kw">where
 <a href=#255 id=255 data-nosnippet>255</a>        </span><span class="self">Self</span>: Sized,
 <a href=#256 id=256 data-nosnippet>256</a>    {
-<a href=#257 id=257 data-nosnippet>257</a>        <span class="number">1 </span>&lt;&lt; <span class="self">self</span>.log_quotient_degree()
+<a href=#257 id=257 data-nosnippet>257</a>        <span class="number">1 </span>&lt;&lt; <span class="self">self</span>.log_quotient_degree() <span class="kw">as </span>usize
 <a href=#258 id=258 data-nosnippet>258</a>    }
 <a href=#259 id=259 data-nosnippet>259</a>
 <a href=#260 id=260 data-nosnippet>260</a>    <span class="doccomment">/// Check that a builder's dimensions match this AIR.
