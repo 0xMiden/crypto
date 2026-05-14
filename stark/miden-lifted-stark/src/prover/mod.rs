@@ -95,7 +95,7 @@ use alloc::{vec, vec::Vec};
 
 use commit::commit_traces;
 use constraints::{evaluate_constraints_into, layout::get_constraint_layout};
-use miden_lifted_air::{AuxBuilder, LiftedAir, VarLenPublicInputs, log2_strict_u8};
+use miden_lifted_air::{AuxBuilder, LiftedAir, VarLenPublicInputs};
 use miden_stark_transcript::{Channel, ProverChannel, ProverTranscript};
 use p3_field::{BasedVectorSpace, ExtensionField, TwoAdicField};
 use p3_matrix::{Matrix, dense::RowMajorMatrix};
@@ -105,8 +105,8 @@ use tracing::{info_span, instrument};
 
 use crate::{
     StarkConfig,
-    coset::LiftedCoset,
-    instance::{AirWitness, InstanceShapes, InstanceValidationError, validate_inputs},
+    domain::{Coset, LiftedDomain},
+    instance::{AirWitness, InstanceShapes, InstanceValidationError},
     pcs::prover::open_with_channel,
     proof::{StarkOutput, StarkProof},
 };
@@ -116,6 +116,8 @@ use crate::{
 pub enum ProverError {
     #[error("instance validation failed: {0}")]
     Instance(#[from] InstanceValidationError),
+    #[error("domain construction failed: {0}")]
+    Domain(#[from] crate::domain::DomainError),
     #[error(
         "constraint degree exceeds blowup: \
          log_quotient_degree {log_quotient_degree} > log_blowup {log_blowup}"
@@ -190,8 +192,8 @@ where
 
     let log_blowup = config.pcs().log_blowup();
 
-    // Validate AIR structure, instance dimensions, heights, and trace widths.
-    let log_max_trace_height = validate_inputs(&verifier_instances, &instance_shapes, log_blowup)?;
+    // Validate AIR structure, instance dimensions, and trace widths.
+    instance_shapes.validate_instance_data(&verifier_instances)?;
     for &(air, w, _) in &instances {
         if w.trace.width() != air.width() {
             return Err(InstanceValidationError::WidthMismatch {
@@ -201,6 +203,14 @@ where
             .into());
         }
     }
+
+    let instance_domains = LiftedDomain::<F>::try_many_from_ascending_heights(
+        instance_shapes.log_trace_heights(),
+        log_blowup,
+    )?;
+    let max_lde_domain = *instance_domains
+        .last()
+        .expect("non-empty: validated by try_many_from_ascending_heights");
 
     // Observe shape metadata before creating the transcript.
     instance_shapes.observe_heights::<F, _>(&mut challenger);
@@ -212,23 +222,27 @@ where
     // challenges depend on all prior inputs regardless of sponge state.
     let _instance_challenge: EF = channel.sample_algebra_element::<EF>();
 
-    // Infer constraint degree from symbolic AIR analysis (max across all AIRs)
-    let log_constraint_degree =
-        instances.iter().map(|(air, ..)| air.log_quotient_degree()).max().unwrap_or(1) as u8;
+    // Infer per-AIR quotient degrees from symbolic analysis (per-AIR optimization).
+    let log_constraint_degrees: Vec<u8> =
+        instances.iter().map(|(air, ..)| air.log_quotient_degree()).collect();
+    let log_quotient_degree = log_constraint_degrees.iter().copied().max().unwrap_or(1);
 
-    if log_constraint_degree > log_blowup {
-        return Err(ProverError::ConstraintDegreeTooHigh {
-            log_quotient_degree: log_constraint_degree,
-            log_blowup,
-        });
+    if log_quotient_degree > log_blowup {
+        return Err(ProverError::ConstraintDegreeTooHigh { log_quotient_degree, log_blowup });
     }
 
-    let log_lde_height = log_max_trace_height + log_blowup;
+    // Pair the max LDE domain with the quotient degree. The `EvaluationDomain`
+    // now flows through the constraint and quotient layers. Per-instance variants
+    // are pre-built so the constraint loop just indexes into a `Vec`.
+    let max_eval_domain = max_lde_domain.evaluation_domain(log_quotient_degree);
+    let instance_eval_domains: Vec<_> = instance_domains
+        .iter()
+        .map(|d| d.evaluation_domain(log_quotient_degree))
+        .collect();
 
-    // Max LDE coset (for the largest trace, no lifting)
-    let max_lde_coset = LiftedCoset::unlifted(log_max_trace_height, log_blowup);
-    let max_quotient_coset = max_lde_coset.quotient_domain(log_constraint_degree);
-    let max_quotient_height = max_quotient_coset.lde_height();
+    // Quotient evaluation coset: a sub-coset of the LDE coset where Q is evaluated
+    // before being decomposed into D chunks and committed on the LDE coset itself.
+    let max_quotient_height = max_eval_domain.size();
 
     // 1. Commit all main traces (trace order — ascending height).
     //
@@ -243,11 +257,11 @@ where
             RowMajorMatrix::new(values, w.trace.width())
         })
         .collect();
-    let main_committed =
-        info_span!("commit to main traces").in_scope(|| commit_traces(config, main_traces));
+    let main_committed = info_span!("commit to main traces")
+        .in_scope(|| commit_traces(config, &instance_domains, main_traces));
     channel.send_commitment(main_committed.root());
 
-    // 2. Sample randomness and build aux traces for all AIRs
+    // 2. Sample randomness, build aux traces, and commit them
     let max_num_randomness =
         instances.iter().map(|(air, ..)| air.num_randomness()).max().unwrap_or(0);
 
@@ -290,8 +304,8 @@ where
         })
         .collect();
 
-    let aux_committed =
-        info_span!("commit to aux traces").in_scope(|| commit_traces(config, aux_traces));
+    let aux_committed = info_span!("commit to aux traces")
+        .in_scope(|| commit_traces(config, &instance_domains, aux_traces));
     channel.send_commitment(aux_committed.root());
 
     // Observe aux values into the transcript (binds to Fiat-Shamir state).
@@ -302,22 +316,22 @@ where
         }
     }
 
-    // 4. Sample constraint folding alpha and accumulation beta
+    // 3. Sample constraint folding alpha and accumulation beta
     let alpha: EF = channel.sample_algebra_element::<EF>();
     let beta: EF = channel.sample_algebra_element::<EF>();
 
-    // 5. Evaluate constraints and accumulate with beta folding.
+    // 4. Evaluate constraints and accumulate quotient evaluations with beta folding.
     //
-    // Single accumulator, processed in trace order (ascending height):
-    //   1. Cyclically extend accumulator to the next quotient height
-    //   2. Multiply every element by beta (Horner)
-    //   3. Add constraint evaluations in-place: acc[i] += eval(i)
+    // Per AIR (ascending height):
+    //   1. Evaluate Q_j = (alpha-folded constraints) / Z_{H_j} on the native quotient domain
+    //      (divide fused into the eval write).
+    //   2. If D_j < D_max, upsample Q_j to the per-trace target domain.
+    //   3. Cyclically extend the accumulator and Horner-fold: acc <- acc * beta + Q_j.
     //
     // Pre-allocate with LDE capacity so commit_quotient's resize doesn't reallocate.
-    let constraint_degree = 1 << log_constraint_degree as usize;
     let mut accumulator: Vec<EF> = Vec::with_capacity(max_quotient_height * blowup);
 
-    // Pre-compute constraint layouts for each AIR (base/ext index mapping)
+    // Pre-compute per-AIR constraint layouts.
     let layouts: Vec<_> = instances
         .iter()
         .map(|(air, ..)| get_constraint_layout::<F, EF, A>(*air))
@@ -325,86 +339,102 @@ where
 
     info_span!("evaluate constraints").in_scope(|| {
         for (i, (air, w, _)) in instances.iter().enumerate() {
-            let trace_height = w.trace.height();
-            let log_trace_height = log2_strict_u8(trace_height);
+            let this_log_constraint_degree = log_constraint_degrees[i];
+            let this_constraint_degree = 1usize << this_log_constraint_degree;
 
-            // Create LiftedCoset for this trace (may be lifted relative to max)
-            let this_lde_coset =
-                LiftedCoset::new(log_trace_height, log_blowup, log_max_trace_height);
-            let this_quotient_coset = this_lde_coset.quotient_domain(log_constraint_degree);
-            let this_quotient_height = this_quotient_coset.lde_height();
+            // Per-AIR native quotient evaluation domain `gJ_j` (size n_j · D_j,
+            // before upsampling to n_j · D_max).
+            let this_quotient_eval_domain =
+                instance_domains[i].evaluation_domain(this_log_constraint_degree);
+            // Target after upsample to D_max (size n_j · D_max).
+            let this_target_quotient_height = instance_eval_domains[i].size();
 
-            // Truncate the committed LDE to the quotient evaluation domain gJ (size N·D).
-            // Since B ≥ D, the committed LDE on gK (size N·B) contains gJ as a prefix in
+            // Truncate the committed LDE to the AIR's native quotient evaluation domain gJ_j.
+            // Since B >= D_j, the committed LDE on gK (size N*B) contains gJ_j as a prefix in
             // bit-reversed storage, so this is a zero-copy view.
-            let main_on_gj = main_committed.evals_on_quotient_domain(i, constraint_degree);
-            let aux_on_gj = aux_committed.evals_on_quotient_domain(i, constraint_degree);
+            let main_on_gj = main_committed.evals_on_quotient_domain(i, &this_quotient_eval_domain);
+            let aux_on_gj = aux_committed.evals_on_quotient_domain(i, &this_quotient_eval_domain);
 
-            // Build periodic LDE for this trace via coset method
             let periodic_lde =
-                PeriodicLde::build(&this_quotient_coset, air.periodic_columns_matrix());
+                PeriodicLde::build(&this_quotient_eval_domain, air.periodic_columns_matrix());
 
-            // Cyclically extend accumulator to this quotient height and scale by beta.
-            // On the first iteration the accumulator is empty, so this is a no-op
-            // and evaluate_constraints_into writes into a zero-filled buffer.
+            let mut quotient_evals = EF::zero_vec(this_quotient_eval_domain.size());
+            let aux_values_i = &all_aux_values[i];
+            let inv_z_h = this_quotient_eval_domain.inv_vanishing_evals();
+
             tracing::debug_span!(
-                "cyclic_extend",
-                acc_len = accumulator.len(),
-                target = this_quotient_height
+                "eval_instance",
+                instance = i,
+                native_height = this_quotient_eval_domain.size(),
+                target_height = this_target_quotient_height,
+                native_degree = this_constraint_degree,
+                target_degree = 1 << log_quotient_degree as usize,
             )
             .in_scope(|| {
-                quotient::cyclic_extend_and_scale(&mut accumulator, this_quotient_height, beta);
+                evaluate_constraints_into::<F, EF, A>(
+                    &mut quotient_evals,
+                    *air,
+                    &main_on_gj,
+                    &aux_on_gj,
+                    &this_quotient_eval_domain,
+                    alpha,
+                    &randomness[..air.num_randomness()],
+                    w.public_values,
+                    &periodic_lde,
+                    &layouts[i],
+                    aux_values_i,
+                    &inv_z_h,
+                );
             });
 
-            let aux_values_i = &all_aux_values[i];
+            if this_log_constraint_degree < log_quotient_degree {
+                let added_bits = (log_quotient_degree - this_log_constraint_degree) as usize;
+                quotient_evals = tracing::debug_span!(
+                    "upsample_quotient",
+                    instance = i,
+                    from = this_quotient_eval_domain.size(),
+                    to = this_target_quotient_height,
+                )
+                .in_scope(|| {
+                    quotient::upsample_evals::<F, EF, _>(config.dft(), quotient_evals, added_bits)
+                });
+            }
 
-            // Add constraint evaluations in-place: accumulator[i] += eval(i)
-            info_span!("eval_instance", instance = i, height = this_quotient_height).in_scope(
-                || {
-                    evaluate_constraints_into::<F, EF, A>(
-                        &mut accumulator,
-                        *air,
-                        &main_on_gj,
-                        &aux_on_gj,
-                        &this_quotient_coset,
-                        alpha,
-                        &randomness[..air.num_randomness()],
-                        w.public_values,
-                        &periodic_lde,
-                        &layouts[i],
-                        aux_values_i,
-                    );
-                },
-            );
+            debug_assert_eq!(quotient_evals.len(), this_target_quotient_height);
+
+            // Cyclically extend the running accumulator to the per-AIR target height and
+            // Horner-fold this AIR's contribution in: acc <- acc * beta + Q_j.
+            tracing::debug_span!(
+                "cyclic_extend_and_accumulate",
+                acc_len = accumulator.len(),
+                target = this_target_quotient_height
+            )
+            .in_scope(|| {
+                quotient::cyclic_extend_and_accumulate(&mut accumulator, quotient_evals, beta);
+            });
         }
     });
 
-    // Verify we have the expected size (max quotient domain)
-    assert_eq!(accumulator.len(), max_quotient_height);
+    debug_assert_eq!(accumulator.len(), max_quotient_height);
 
-    // 6. Divide by vanishing polynomial once on full gJ (in-place)
-    tracing::debug_span!("divide_by_vanishing", height = max_quotient_height).in_scope(|| {
-        quotient::divide_by_vanishing_in_place::<F, EF>(&mut accumulator, &max_quotient_coset);
-    });
-
-    // 7. Commit quotient
+    // 5. Commit quotient.
     let quotient_committed = info_span!("commit to quotient poly chunks")
-        .in_scope(|| quotient::commit_quotient(config, accumulator, &max_lde_coset));
+        .in_scope(|| quotient::commit_quotient(config, accumulator, &max_eval_domain));
     channel.send_commitment(quotient_committed.root());
 
-    // 8. Sample OOD point (outside H and gK)
-    let z: EF = max_lde_coset.sample_ood_point(&mut channel);
-    let h = F::two_adic_generator(log_max_trace_height.into());
+    // 6. Sample OOD point (outside H and gK)
+    let z: EF = max_lde_domain.sample_ood_point(&mut channel);
+    let h = max_lde_domain.trace_subgroup().generator();
     let z_next = z * h;
 
-    // 9. Open via PCS
+    // 7. Open via PCS
     let trees = vec![main_committed.tree(), aux_committed.tree(), quotient_committed.tree()];
 
     info_span!("open").in_scope(|| {
         open_with_channel::<F, EF, SC::Lmcs, RowMajorMatrix<F>, _, 2>(
             config.pcs(),
             config.lmcs(),
-            log_lde_height,
+            &max_lde_domain,
             [z, z_next],
             &trees,
             &mut channel,
