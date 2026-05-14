@@ -1,0 +1,373 @@
+# Performance regression tracking for miden-crypto — TRUSTED stage.
+#
+# Triggered when `bench.yml` finishes. Runs in the base repo's context
+# with the BASE repo's `GITHUB_TOKEN`, so it has write scope even for
+# PRs from forks (the `pull_request` event would silently strip those
+# scopes for fork PRs, breaking the comment step). This workflow does
+# NOT execute any PR-supplied code — the only thing crossing the trust
+# boundary is the bench-results JSON artifact uploaded by `bench.yml`.
+# Cross-workflow artifact download is via `actions/download-artifact`
+# with `run-id: ${{ github.event.workflow_run.id }}`, which fetches
+# whatever bytes the artifact happens to contain without ever materialising
+# the PR's tree on disk in this job.
+#
+# Two jobs:
+#   - publish-wasm:   pushes the WASM perf metric onto gh-pages (push to
+#                     next only) and posts the sticky PR comment.
+#   - publish-native: same for the native metric, serialized after
+#                     publish-wasm so the two never race on gh-pages.
+#
+# Why a separate workflow instead of `pull_request_target`: GHAS's
+# `actions/cache-poisoning/poisonable-step` rule flags any step under
+# `pull_request_target` that executes untrusted code, because the
+# implicit `ACTIONS_RUNTIME_TOKEN` grants Actions-cache write to the
+# job regardless of `permissions:`. The `workflow_run` split keeps the
+# untrusted bench execution in a job with no privileged token at all,
+# and brings privilege online only in this workflow — which doesn't
+# touch PR code. Documented pattern from GitHub Security Lab.
+
+name: bench-publish
+
+on:
+  workflow_run:
+    workflows: [bench]
+    types: [completed]
+
+permissions:
+  contents: write       # github-action-benchmark pushes to gh-pages on push to next
+  pull-requests: write  # for the sticky comment
+  actions: read         # to download artifacts from the triggering workflow run
+
+# Serialize publishes per source branch so two pushes to next don't race
+# on gh-pages. `cancel-in-progress: false` because cancelling mid-push
+# could leave gh-pages with a half-applied change.
+concurrency:
+  group: bench-publish-${{ github.event.workflow_run.head_branch }}
+  cancel-in-progress: false
+
+jobs:
+  publish-wasm:
+    name: Publish WASM bench
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      # Under `workflow_run`, the default ref is the workflow file's
+      # branch on the BASE repo (so for a PR from a fork, this is the
+      # base's `next`, not the fork's tree). Explicit `persist-credentials:
+      # false` because benchmark-action gets its token via the
+      # `github-token` input, not via `.git/config` — no need to hand
+      # the persisted token to any subsequent step.
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # pin@v4
+        with:
+          persist-credentials: false
+
+      - name: Download bench-wasm artifact
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # pin@v4
+        with:
+          name: bench-wasm-results
+          path: artifacts/wasm
+          # Cross-workflow download: target the triggering workflow's
+          # run-id and provide a token. Without these, the action
+          # defaults to looking in the current workflow's artifacts
+          # (and finds nothing).
+          run-id: ${{ github.event.workflow_run.id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Read PR metadata
+        id: meta
+        run: |
+          set -euo pipefail
+          meta="artifacts/wasm/metadata.json"
+          if [ ! -f "$meta" ]; then
+            echo "::error::metadata.json missing from bench-wasm-results artifact"
+            exit 1
+          fi
+          # PR-author-controlled file — validate before trusting.
+          event=$(jq -r '.event // ""' "$meta")
+          pr_number=$(jq -r '.pr_number // ""' "$meta")
+          pr_head_sha=$(jq -r '.pr_head_sha // ""' "$meta")
+
+          # pr_number must be a positive integer or empty.
+          if [ -n "$pr_number" ] && ! [[ "$pr_number" =~ ^[0-9]+$ ]]; then
+            echo "::error::pr_number from metadata is not a positive integer: '$pr_number'"
+            exit 1
+          fi
+          # pr_head_sha must be a 40-char hex string or empty.
+          if [ -n "$pr_head_sha" ] && ! [[ "$pr_head_sha" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "::error::pr_head_sha from metadata is not a 40-char SHA: '$pr_head_sha'"
+            exit 1
+          fi
+          # event must be one of the known triggers.
+          case "$event" in
+            pull_request|push|workflow_dispatch) ;;
+            *)
+              echo "::error::unrecognised event in metadata: '$event'"
+              exit 1
+              ;;
+          esac
+
+          {
+            echo "event=$event"
+            echo "pr_number=$pr_number"
+            echo "pr_head_sha=$pr_head_sha"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Track + push baseline
+        uses: benchmark-action/github-action-benchmark@52576c92bccf6ac60c8223ec7eb2565637cae9ba # pin@v1.22.1
+        with:
+          tool: customSmallerIsBetter
+          output-file-path: artifacts/wasm/results.json
+          # Separate gh-pages subdir so this never collides with docs.yml's
+          # `destination_dir: docs` deploy (which lives at /docs/).
+          benchmark-data-dir-path: bench/wasm
+          gh-pages-branch: gh-pages
+          # Push baseline updates ONLY on push to next (PR runs compare
+          # against the existing baseline, they don't update it).
+          auto-push: ${{ steps.meta.outputs.event == 'push' }}
+          alert-threshold: "110%"
+          fail-on-alert: false
+          summary-always: true
+          # benchmark-action's comment-posting relies on the
+          # `context.issue.number` that GitHub populates for
+          # `pull_request` events. Under `workflow_run` the event
+          # context is `workflow_run` and `issue.number` is undefined —
+          # so the action's comment step is a no-op here. We post our
+          # own sticky comment below using the PR number from the
+          # validated metadata file.
+          comment-always: false
+          comment-on-alert: false
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Post sticky PR comment
+        if: ${{ steps.meta.outputs.event == 'pull_request' && steps.meta.outputs.pr_number != '' }}
+        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # pin@v7
+        env:
+          PR_NUMBER: ${{ steps.meta.outputs.pr_number }}
+          PR_HEAD_SHA: ${{ steps.meta.outputs.pr_head_sha }}
+          BENCH_NAME: WASM perf (Chromium / V8)
+          MARKER: "<!-- bench-comment:wasm -->"
+          DATA_PATH: ./benchmark-data-repository/bench/wasm/data.js
+        with:
+          script: |
+            const fs = require('fs');
+
+            // Parse the local gh-pages clone benchmark-action just
+            // populated. The file is a JS assignment, not pure JSON —
+            // strip the `window.BENCHMARK_DATA = ` prefix and the
+            // trailing semicolon.
+            const raw = fs.readFileSync(process.env.DATA_PATH, 'utf8');
+            const match = raw.match(/window\.BENCHMARK_DATA\s*=\s*(\{[\s\S]+\});?\s*$/);
+            if (!match) {
+              core.setFailed(`could not parse ${process.env.DATA_PATH}`);
+              return;
+            }
+            const data = JSON.parse(match[1]);
+            const history = data.entries[process.env.BENCH_NAME];
+            if (!history || history.length === 0) {
+              core.warning(`no history yet for "${process.env.BENCH_NAME}"; skipping comment`);
+              return;
+            }
+
+            const current = history[history.length - 1];
+            const baseline = history.length > 1 ? history[history.length - 2] : null;
+
+            const fmt = (v, unit) => `${Number(v).toLocaleString('en-US', { maximumFractionDigits: 0 })} ${unit}`;
+            const pctDelta = (cur, prev) => {
+              if (prev === undefined || prev === null || prev === 0) return 'n/a';
+              const pct = ((cur - prev) / prev) * 100;
+              const sign = pct >= 0 ? '+' : '';
+              const tag = pct > 10 ? ' ⚠️' : pct < -10 ? ' ⚡' : '';
+              return `${sign}${pct.toFixed(1)}%${tag}`;
+            };
+
+            let body = `${process.env.MARKER}\n## ${process.env.BENCH_NAME}\n\n`;
+            body += '| Bench | Baseline | Current | Δ |\n|---|---|---|---|\n';
+            for (const bench of current.benches) {
+              const prev = baseline?.benches.find((b) => b.name === bench.name);
+              body += `| \`${bench.name}\` | ${prev ? fmt(prev.value, prev.unit) : '—'} | ${fmt(bench.value, bench.unit)} | ${pctDelta(bench.value, prev?.value)} |\n`;
+            }
+            body += `\n<sub>Baseline: latest \`${data.repoUrl?.split('/').slice(-2).join('/') || 'gh-pages'}\` entry. Comparing PR head \`${(process.env.PR_HEAD_SHA || '').slice(0, 8)}\`. _cc @WiktorStarczewski on regressions > 10%._</sub>\n`;
+
+            const prNumber = parseInt(process.env.PR_NUMBER, 10);
+
+            // Sticky-comment: find existing by marker, update; else create.
+            const comments = await github.paginate(github.rest.issues.listComments, {
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: prNumber,
+              per_page: 100,
+            });
+            const existing = comments.find((c) => c.body && c.body.startsWith(process.env.MARKER));
+            if (existing) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: existing.id,
+                body,
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: prNumber,
+                body,
+              });
+            }
+
+  publish-native:
+    name: Publish native bench
+    # Serialized after publish-wasm so the two never race on gh-pages.
+    # Both jobs `git fetch gh-pages → commit → push`, and on a push-to-
+    # next event they fire concurrently — whichever pushes second hits
+    # non-fast-forward and the metric for that job is lost. Running them
+    # in series costs ~20 s on push events and zero on PR runs (which
+    # don't push). Cheaper than merging the publishers into one job
+    # because the per-job permission scope stays narrow and each
+    # artifact passes/fails independently.
+    needs: publish-wasm
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # pin@v4
+        with:
+          persist-credentials: false
+
+      - name: Download bench-native artifact
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # pin@v4
+        with:
+          name: bench-native-results
+          path: artifacts/native
+          run-id: ${{ github.event.workflow_run.id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Read PR metadata
+        id: meta
+        # See `publish-wasm.Read PR metadata` for why each field is
+        # validated against a tight format before being trusted.
+        run: |
+          set -euo pipefail
+          meta="artifacts/native/metadata.json"
+          if [ ! -f "$meta" ]; then
+            echo "::error::metadata.json missing from bench-native-results artifact"
+            exit 1
+          fi
+          event=$(jq -r '.event // ""' "$meta")
+          pr_number=$(jq -r '.pr_number // ""' "$meta")
+          pr_head_sha=$(jq -r '.pr_head_sha // ""' "$meta")
+          if [ -n "$pr_number" ] && ! [[ "$pr_number" =~ ^[0-9]+$ ]]; then
+            echo "::error::pr_number from metadata is not a positive integer: '$pr_number'"
+            exit 1
+          fi
+          if [ -n "$pr_head_sha" ] && ! [[ "$pr_head_sha" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "::error::pr_head_sha from metadata is not a 40-char SHA: '$pr_head_sha'"
+            exit 1
+          fi
+          case "$event" in
+            pull_request|push|workflow_dispatch) ;;
+            *)
+              echo "::error::unrecognised event in metadata: '$event'"
+              exit 1
+              ;;
+          esac
+          {
+            echo "event=$event"
+            echo "pr_number=$pr_number"
+            echo "pr_head_sha=$pr_head_sha"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Track + push baseline
+        uses: benchmark-action/github-action-benchmark@52576c92bccf6ac60c8223ec7eb2565637cae9ba # pin@v1.22.1
+        with:
+          tool: cargo
+          output-file-path: artifacts/native/bench-native.txt
+          benchmark-data-dir-path: bench/native
+          gh-pages-branch: gh-pages
+          auto-push: ${{ steps.meta.outputs.event == 'push' }}
+          # See publish-wasm for why benchmark-action's own comment is
+          # disabled here and we post our own from this workflow.
+          alert-threshold: "110%"
+          fail-on-alert: false
+          summary-always: true
+          comment-always: false
+          comment-on-alert: false
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Post sticky PR comment
+        if: ${{ steps.meta.outputs.event == 'pull_request' && steps.meta.outputs.pr_number != '' }}
+        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # pin@v7
+        env:
+          PR_NUMBER: ${{ steps.meta.outputs.pr_number }}
+          PR_HEAD_SHA: ${{ steps.meta.outputs.pr_head_sha }}
+          BENCH_NAME: Native perf (Linux x86_64)
+          MARKER: "<!-- bench-comment:native -->"
+          DATA_PATH: ./benchmark-data-repository/bench/native/data.js
+        with:
+          script: |
+            const fs = require('fs');
+
+            // First-ever run: gh-pages doesn't exist yet, so
+            // benchmark-action skipped its local clone. Nothing to
+            // diff against — skip the comment gracefully rather than
+            // failing the job. Subsequent runs will have data.
+            if (!fs.existsSync(process.env.DATA_PATH)) {
+              core.warning(`${process.env.DATA_PATH} not found — likely the first run on this repo; skipping comment`);
+              return;
+            }
+            const raw = fs.readFileSync(process.env.DATA_PATH, 'utf8');
+            const match = raw.match(/window\.BENCHMARK_DATA\s*=\s*(\{[\s\S]+\});?\s*$/);
+            if (!match) {
+              core.setFailed(`could not parse ${process.env.DATA_PATH}`);
+              return;
+            }
+            const data = JSON.parse(match[1]);
+            const history = data.entries[process.env.BENCH_NAME];
+            if (!history || history.length === 0) {
+              core.warning(`no history yet for "${process.env.BENCH_NAME}"; skipping comment`);
+              return;
+            }
+
+            const current = history[history.length - 1];
+            const baseline = history.length > 1 ? history[history.length - 2] : null;
+
+            const fmt = (v, unit) => `${Number(v).toLocaleString('en-US', { maximumFractionDigits: 0 })} ${unit}`;
+            const pctDelta = (cur, prev) => {
+              if (prev === undefined || prev === null || prev === 0) return 'n/a';
+              const pct = ((cur - prev) / prev) * 100;
+              const sign = pct >= 0 ? '+' : '';
+              const tag = pct > 10 ? ' ⚠️' : pct < -10 ? ' ⚡' : '';
+              return `${sign}${pct.toFixed(1)}%${tag}`;
+            };
+
+            let body = `${process.env.MARKER}\n## ${process.env.BENCH_NAME}\n\n`;
+            body += '| Bench | Baseline | Current | Δ |\n|---|---|---|---|\n';
+            for (const bench of current.benches) {
+              const prev = baseline?.benches.find((b) => b.name === bench.name);
+              body += `| \`${bench.name}\` | ${prev ? fmt(prev.value, prev.unit) : '—'} | ${fmt(bench.value, bench.unit)} | ${pctDelta(bench.value, prev?.value)} |\n`;
+            }
+            body += `\n<sub>Baseline: latest \`${data.repoUrl?.split('/').slice(-2).join('/') || 'gh-pages'}\` entry. Comparing PR head \`${(process.env.PR_HEAD_SHA || '').slice(0, 8)}\`. _cc @WiktorStarczewski on regressions > 10%._</sub>\n`;
+
+            const prNumber = parseInt(process.env.PR_NUMBER, 10);
+            const comments = await github.paginate(github.rest.issues.listComments, {
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: prNumber,
+              per_page: 100,
+            });
+            const existing = comments.find((c) => c.body && c.body.startsWith(process.env.MARKER));
+            if (existing) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: existing.id,
+                body,
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: prNumber,
+                body,
+              });
+            }

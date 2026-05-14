@@ -1,4 +1,4 @@
-# Performance regression tracking for miden-crypto.
+# Performance regression tracking for miden-crypto — UNTRUSTED stage.
 #
 # Two jobs run on every PR + every push to `next`:
 #
@@ -11,61 +11,34 @@
 #                    runner. Tracks the same primitives at native speed for
 #                    comparison + regression detection.
 #
-# Each bench job is paired with a trusted `publish-*` job that downloads
-# its artifact and calls `benchmark-action/github-action-benchmark` with
-# the write-capable token. The split is deliberate: the bench jobs run
-# PR-controlled code (Rust, npm install, Node) and therefore MUST NOT
-# hold credentials, so they run with `contents: read` and
-# `persist-credentials: false`. The publish jobs check out the default
-# branch (trusted ref) before running the action, so the PR's tree never
-# reaches a step that has write scope. This is the same split miden-vm's
-# non-regression workflows use.
+# Both jobs run PR-controlled code (Rust, npm install, Node) and so MUST
+# NOT hold any privileged token. This workflow runs on `pull_request`
+# (not `pull_request_target`), declares `permissions: contents: read` at
+# both workflow and job scope, and strips the persisted token from
+# `actions/checkout`. The results are uploaded as artifacts and consumed
+# by the separate `bench-publish.yml` workflow, which fires via
+# `workflow_run` from a trusted base-repo context.
 #
-# `benchmark-action/github-action-benchmark`:
-#   - Stores each metric over time on the `gh-pages` branch under
-#     `bench/` (separate from the existing `docs/` subdir used by docs.yml,
-#     so the two don't collide).
-#   - Posts a sticky PR comment showing the diff vs the latest `next`
-#     baseline. Header per job, so wasm and native each get their own
-#     comment that updates in place.
-#   - Alerts (writes a comment header) on regression > 10 %. Doesn't fail
-#     the workflow — GHA Linux runners share CPUs and the noise floor on
-#     hash benches is real. False-positive alerts are cheap to ignore;
-#     false-negative reverts are expensive.
+# Why two workflows: GitHub Advanced Security's
+# `actions/cache-poisoning/poisonable-step` rule flags any step under
+# `pull_request_target` that executes PR-supplied code, because the
+# implicit `ACTIONS_RUNTIME_TOKEN` always present in such jobs grants
+# write access to the Actions cache. The split — untrusted bench in
+# this workflow, trusted publish in `bench-publish.yml` triggered by
+# `workflow_run` — is the GitHub Security Lab's documented pattern
+# for "bench on PR, comment on PR, can't trust the PR's code." See
+# https://securitylab.github.com/research/github-actions-preventing-pwn-requests/
 
 name: bench
 
-# `pull_request_target` (not `pull_request`) so the publish job's
-# `GITHUB_TOKEN` keeps `pull-requests: write` and `contents: write` on
-# fork PRs. Under `pull_request`, GitHub silently strips both scopes
-# from `GITHUB_TOKEN` for fork PRs regardless of what `permissions:`
-# declares, which makes the sticky comment step crash with "Resource
-# not accessible by integration" on every external contribution. The
-# same pattern is used in web-sdk's `check-linked-client-pr.yml` for
-# the same reason.
-#
-# SAFETY: `pull_request_target` is safe here because the bench jobs
-# (the only steps that execute PR-controlled code) hold no privileged
-# token. Each bench job declares per-job `permissions: contents: read`,
-# checks out the PR head with `persist-credentials: false`, and
-# doesn't reference any `secrets.*` — so even though the PR's tree is
-# on disk, build.rs / npm postinstall / Node has nothing privileged to
-# reach for. The trusted publish jobs check out the base ref (which is
-# what `pull_request_target` defaults to anyway), so PR-supplied code
-# never touches a step that has the write token. Under
-# `pull_request_target` the workflow file itself is the base's, not
-# the PR's, so a malicious PR can't edit the workflow logic that's run
-# against them.
 on:
-  pull_request_target:
-    types: [opened, synchronize, reopened, ready_for_review]
+  pull_request:
   push:
     branches: [next]
   workflow_dispatch:
 
-# Default to read-only at workflow scope. Privileged scopes are granted
-# per-job and only on the trusted publish jobs that do NOT execute any
-# PR-controlled code.
+# Read-only at workflow scope; per-job permissions narrow this further.
+# `bench-publish.yml` is where the write scopes live.
 permissions:
   contents: read
 
@@ -89,11 +62,6 @@ jobs:
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # pin@v4
         with:
-          # Under `pull_request_target`, the default checkout is the
-          # BASE branch — but we need to benchmark the PR's code, so
-          # explicitly target the PR head SHA. `github.sha` is the
-          # fallback for push and workflow_dispatch events.
-          ref: ${{ github.event.pull_request.head.sha || github.sha }}
           # The default checkout writes the GHA token to `.git/config`,
           # which PR-controlled build scripts (build.rs, npm postinstall,
           # etc.) would then have access to. Strip it — this job has no
@@ -138,7 +106,7 @@ jobs:
           # `pipefail` is load-bearing: the driver streams to a file via
           # a shell redirect, so a panicking driver would still leave a
           # partial `results.json` on disk; `set -e` ensures the step
-          # fails fast and the trusted publish job never sees a bad
+          # fails fast and the trusted publish workflow never sees a bad
           # baseline.
           set -euo pipefail
           node driver.mjs > results.json
@@ -153,15 +121,35 @@ jobs:
             jq -r '.[] | "| \(.name) | \(.value | tostring) |"' results.json
           } >> "$GITHUB_STEP_SUMMARY"
 
+      - name: Write metadata for publish workflow
+        working-directory: miden-bench-wasm
+        # `workflow_run.pull_requests` is empty for fork PRs, so the
+        # trusted publish workflow can't get the PR number from the
+        # event payload. Stash the PR number + event + head SHA here so
+        # the publish workflow has somewhere to look. Note: this file
+        # is PR-author-controlled by being on the runner where PR code
+        # executed — the publish workflow MUST validate / sanity-check
+        # it rather than trust it blindly.
+        run: |
+          set -euo pipefail
+          jq -n \
+            --arg event "${{ github.event_name }}" \
+            --arg pr_number "${{ github.event.pull_request.number || '' }}" \
+            --arg pr_head_sha "${{ github.event.pull_request.head.sha || '' }}" \
+            '{event: $event, pr_number: $pr_number, pr_head_sha: $pr_head_sha}' \
+            > metadata.json
+
       - name: Upload raw results as artifact
-        # Picked up by the trusted `publish-wasm` job, which runs the
-        # benchmark-action against this file with write-scope token. Also
-        # keeps the full per-batch sample distribution for post-hoc
-        # analysis when an alert fires.
+        # Picked up by `bench-publish.yml` via `workflow_run`. The
+        # publish workflow runs in the base repo's trusted context with
+        # write-scope token; this artifact is the only thing crossing
+        # the trust boundary.
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # pin@v4
         with:
           name: bench-wasm-results
-          path: miden-bench-wasm/results.json
+          path: |
+            miden-bench-wasm/results.json
+            miden-bench-wasm/metadata.json
           retention-days: 30
 
   bench-native:
@@ -173,9 +161,6 @@ jobs:
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # pin@v4
         with:
-          # See `bench-wasm` for why both `ref:` and `persist-credentials`
-          # are set explicitly under `pull_request_target`.
-          ref: ${{ github.event.pull_request.head.sha || github.sha }}
           persist-credentials: false
 
       - name: Install Rust
@@ -203,131 +188,28 @@ jobs:
           # propagates through the `tee` and fails the step. Without
           # it, only tee's exit status is observed and a broken bench
           # would silently produce an empty/partial `bench-native.txt`
-          # for the trusted publish job to ingest as a baseline.
+          # for the trusted publish workflow to ingest as a baseline.
           set -euo pipefail
           cargo bench --bench hash --bench word --bench transpose \
             -p miden-crypto -- --output-format bencher 2>&1 \
             | tee bench-native.txt
 
+      - name: Write metadata for publish workflow
+        # See `bench-wasm` for why we emit this.
+        run: |
+          set -euo pipefail
+          jq -n \
+            --arg event "${{ github.event_name }}" \
+            --arg pr_number "${{ github.event.pull_request.number || '' }}" \
+            --arg pr_head_sha "${{ github.event.pull_request.head.sha || '' }}" \
+            '{event: $event, pr_number: $pr_number, pr_head_sha: $pr_head_sha}' \
+            > metadata.json
+
       - name: Upload raw results as artifact
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # pin@v4
         with:
           name: bench-native-results
-          path: bench-native.txt
+          path: |
+            bench-native.txt
+            metadata.json
           retention-days: 30
-
-  publish-wasm:
-    name: Publish WASM bench
-    needs: bench-wasm
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    permissions:
-      contents: write       # github-action-benchmark pushes to gh-pages on `push to next`
-      pull-requests: write  # for sticky PR comment on pull_request_target runs
-    steps:
-      # Explicitly check out the default branch (trusted ref). Under
-      # `pull_request_target` this would be the default anyway, but
-      # spelling it out keeps the invariant ("publish jobs never touch
-      # PR-supplied code") visible to anyone reading the workflow.
-      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # pin@v4
-        with:
-          ref: ${{ github.event.repository.default_branch }}
-          # `benchmark-action/github-action-benchmark` reads its credential
-          # from the `github-token` input rather than `.git/config`, so the
-          # persisted token isn't needed. Strip it to satisfy zizmor's
-          # `artipacked` audit.
-          persist-credentials: false
-
-      - name: Download bench results
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # pin@v4
-        with:
-          name: bench-wasm-results
-          path: results
-
-      - name: Track + alert on regression
-        uses: benchmark-action/github-action-benchmark@52576c92bccf6ac60c8223ec7eb2565637cae9ba # pin@v1.22.1
-        with:
-          tool: customSmallerIsBetter
-          output-file-path: results/results.json
-          # Separate gh-pages subdir so this never collides with docs.yml's
-          # `destination_dir: docs` deploy (which lives at /docs/).
-          benchmark-data-dir-path: bench/wasm
-          gh-pages-branch: gh-pages
-          # Push baseline updates ONLY on push to next (not on PR runs —
-          # those compare against the existing baseline, they don't update it).
-          auto-push: ${{ github.event_name == 'push' }}
-          comment-on-alert: true
-          # Regression alert at 10 %. Run-to-run noise on GHA shared
-          # runners is real but accepting 15-20 % headroom would defeat
-          # the purpose: a 15 % regression IS a regression worth
-          # investigating, not the noise floor. Drive variance down
-          # (longer batches, more samples) to fit under this threshold
-          # rather than widening the threshold to fit measured noise.
-          # See README "Noise reduction" for the roadmap to tighten further.
-          alert-threshold: "110%"
-          fail-on-alert: false  # warn via comment, don't fail the PR
-          summary-always: true  # keep the diff comment fresh on each run
-          # `pull_request_target` (vs. `pull_request`) is what keeps the
-          # write token alive for fork PRs — see the header comment.
-          # The event name we match here is `pull_request_target`
-          # because that's what `github.event_name` resolves to under
-          # this trigger; the value is NOT `pull_request`.
-          comment-always: ${{ github.event_name == 'pull_request_target' }}
-          alert-comment-cc-users: '@WiktorStarczewski'
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-
-  publish-native:
-    name: Publish native bench
-    # Serialized after `publish-wasm` so the two never race on gh-pages.
-    # Both jobs `git fetch gh-pages → commit → push`, and on a `push to
-    # next` event both fire concurrently — whichever pushes second hits
-    # non-fast-forward and the metric for that job is lost. Running them
-    # in series costs ~20 s on push events and zero on PR runs (which
-    # don't push). Cheaper than the alternative (merging the publishers
-    # into one job) because it keeps the per-job permission scope
-    # narrow and lets each artifact pass/fail independently.
-    needs: [bench-native, publish-wasm]
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    permissions:
-      contents: write
-      pull-requests: write
-    steps:
-      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # pin@v4
-        with:
-          ref: ${{ github.event.repository.default_branch }}
-          # `benchmark-action/github-action-benchmark` reads its credential
-          # from the `github-token` input rather than `.git/config`, so the
-          # persisted token isn't needed. Strip it to satisfy zizmor's
-          # `artipacked` audit.
-          persist-credentials: false
-
-      - name: Download bench results
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # pin@v4
-        with:
-          name: bench-native-results
-          path: results
-
-      - name: Track + alert on regression
-        uses: benchmark-action/github-action-benchmark@52576c92bccf6ac60c8223ec7eb2565637cae9ba # pin@v1.22.1
-        with:
-          tool: cargo
-          output-file-path: results/bench-native.txt
-          benchmark-data-dir-path: bench/native
-          gh-pages-branch: gh-pages
-          auto-push: ${{ github.event_name == 'push' }}
-          comment-on-alert: true
-          # Same 10 % threshold as wasm — native benches are ns-scale and
-          # timer noise is proportionally larger, but criterion's own
-          # statistical pruning already handles much of the per-iteration
-          # variance. If 10 % is too tight in practice, the path forward
-          # is more iterations / `iai-callgrind` instruction-count
-          # benchmarking, NOT a wider threshold.
-          alert-threshold: "110%"
-          fail-on-alert: false
-          summary-always: true
-          # See `publish-wasm` and the header comment for why we match
-          # on `pull_request_target` rather than `pull_request`.
-          comment-always: ${{ github.event_name == 'pull_request_target' }}
-          alert-comment-cc-users: '@WiktorStarczewski'
-          github-token: ${{ secrets.GITHUB_TOKEN }}
