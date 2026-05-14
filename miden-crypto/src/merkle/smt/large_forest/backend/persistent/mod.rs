@@ -36,20 +36,15 @@ mod snapshot;
 mod tests;
 mod tree_metadata;
 
-pub use snapshot::PersistentBackendReader;
-
 use alloc::{string::ToString, sync::Arc, vec::Vec};
 use core::ffi::c_int;
-use std::{
-    collections::HashMap,
-    iter::once,
-    mem,
-};
+use std::{collections::HashMap, iter::once, mem};
 
 use miden_serde_utils::{Deserializable, DeserializationError, Serializable};
 use num::Integer;
 use rayon::prelude::*;
 use rocksdb as db;
+pub use snapshot::PersistentBackendReader;
 
 use super::{BackendError, Result};
 use crate::{
@@ -57,8 +52,8 @@ use crate::{
     merkle::{
         EmptySubtreeRoots, MerkleError, NodeIndex,
         smt::{
-            Backend, BackendReader, LeafIndex, LineageId, NodeMutation, NodeMutations,
-            SMT_DEPTH, SmtForestUpdateBatch, SmtLeaf, SmtLeafError, SmtProof, SmtUpdateBatch,
+            Backend, BackendReader, LeafIndex, LineageId, NodeMutation, NodeMutations, SMT_DEPTH,
+            SmtForestUpdateBatch, SmtLeaf, SmtLeafError, SmtProof, SmtUpdateBatch,
             StorageUpdateParts, StorageUpdates, Subtree, SubtreeError, TreeEntry, TreeWithRoot,
             VersionId,
             full::concurrent::{

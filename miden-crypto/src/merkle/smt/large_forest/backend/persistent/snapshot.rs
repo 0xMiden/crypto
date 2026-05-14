@@ -6,21 +6,20 @@ use miden_serde_utils::{Deserializable, Serializable};
 use rocksdb as db;
 
 use super::{
+    super::{BackendError, Result},
     LEAVES_CF,
     iterator::PersistentBackendEntriesIterator,
     keys::{LeafKey, SubtreeKey},
     subtree_cf_name,
     tree_metadata::TreeMetadata,
 };
-use super::super::{BackendError, Result};
 use crate::{
     Word,
     merkle::{
         EmptySubtreeRoots, NodeIndex, SparseMerklePath,
         smt::{
             BackendReader, InnerNode, LeafIndex, LineageId, SMT_DEPTH, SmtLeaf, SmtProof, Subtree,
-            TreeEntry, TreeWithRoot, VersionId,
-            full::concurrent::SUBTREE_DEPTH,
+            TreeEntry, TreeWithRoot, VersionId, full::concurrent::SUBTREE_DEPTH,
         },
     },
 };
