@@ -19,12 +19,6 @@ pub const RATE: usize = 8;
 /// Number of felts in a digest (Word width).
 pub const DIGEST_WIDTH: usize = 4;
 
-/// Standard Blake2s parameter word for unkeyed-256 (digest_length=32, key_length=0,
-/// fanout=1, depth=1). Folded into `BASE0` at compile time; only referenced by the
-/// `base_constants_match_iv_and_param_word` test that verifies the SPEC §4.2 derivation.
-#[cfg(test)]
-const PARAM_WORD_0: u32 = 0x0101_0020;
-
 /// Mode bit distinguishing felt-mode (0) from byte-mode (`MODE_BIT`) in the init.
 const MODE_BIT: u32 = 1 << 31;
 
@@ -41,11 +35,10 @@ const MAX_DOMAIN: u32 = (1 << 31) - 1;
 // ================================================================================================
 //
 // These are the four `Felt`s of the initial chaining value before `domain` and `n`
-// are added. They were independently verified by hand (SPEC §4.2).
+// are added. They were independently verified by hand (SPEC §4.4).
 
-/// `pack(IV[0] ^ PARAM_WORD_0, IV[1])`: low 32 bits = `IV[0] ^ PARAM_WORD_0`, high 32 bits
-/// = `IV[1] & 0x7fff_ffff`.
-const BASE0: u64 = 0x3b67_ae85_6b08_e647;
+/// `pack(IV[0], IV[1])`: low 32 bits = `IV[0]`, high 32 bits = `IV[1] & 0x7fff_ffff`.
+const BASE0: u64 = 0x3b67_ae85_6a09_e667;
 
 /// `pack(IV[2], IV[3])`: low 32 bits = `IV[2]`, high 32 bits = `IV[3] & 0x7fff_ffff`.
 const BASE1: u64 = 0x254f_f53a_3c6e_f372;
@@ -64,7 +57,7 @@ const BASE3: u64 = 0x5be0_cd19_0000_0000;
 ///
 /// The top bit of `hi` is forced to zero so the resulting 64-bit value fits in
 /// `[0, 2^63)`, which is unambiguously canonical in Goldilocks. This is the source of
-/// the 4-bit-per-felt entropy loss documented in SPEC §3.2.
+/// the one-bit-per-felt entropy loss documented in SPEC §5.5.
 #[inline]
 fn pack(lo: u32, hi: u32) -> Felt {
     Felt::new_unchecked((((hi & 0x7fff_ffff) as u64) << 32) | lo as u64)
@@ -87,19 +80,14 @@ fn unpack_to_cv(w: Word) -> [u32; 8] {
     [a, b, c, d, e, f, g, h]
 }
 
-/// Convert an 8-`u32` chaining value to a 4-felt `Word`.
+/// Convert an 8-`u32` chaining value to a 4-felt `Word`, applying BlakeG's
+/// output mask to the high lane of each Felt.
 ///
-/// Assumes the chaining value lives in the 252-bit subspace (top bit of words 1, 3, 5, 7
-/// is zero). This invariant is established by [`init_cv`] and preserved by
-/// [`BlakeG::compress`].
+/// This is an output-finalization rule; input Felts are decoded canonically by
+/// [`unpack`].
 #[inline]
 fn pack_to_word(cv: [u32; 8]) -> Word {
-    Word::new([
-        pack(cv[0], cv[1]),
-        pack(cv[2], cv[3]),
-        pack(cv[4], cv[5]),
-        pack(cv[6], cv[7]),
-    ])
+    Word::new([pack(cv[0], cv[1]), pack(cv[2], cv[3]), pack(cv[4], cv[5]), pack(cv[6], cv[7])])
 }
 
 // INITIAL CHAINING VALUE
@@ -107,16 +95,13 @@ fn pack_to_word(cv: [u32; 8]) -> Word {
 
 /// Construct the initial chaining value for a hash of length `n` under `domain` in `mode`.
 ///
-/// See SPEC §4.2 for the formula:
+/// See SPEC §4.4 for the formula:
 /// ```text
 /// cv_0 = pack(BASE0, BASE1, BASE2 + (domain + mode), BASE3 + n)
 /// ```
 fn init_cv(domain: u32, mode: u32, n: u32) -> [u32; 8] {
     debug_assert!(domain <= MAX_DOMAIN, "domain must fit in 31 bits");
-    debug_assert!(
-        mode == FELT_MODE || mode == BYTE_MODE,
-        "mode must be FELT_MODE or BYTE_MODE"
-    );
+    debug_assert!(mode == FELT_MODE || mode == BYTE_MODE, "mode must be FELT_MODE or BYTE_MODE");
 
     let init_word = Word::new([
         Felt::new_unchecked(BASE0),
@@ -162,7 +147,7 @@ impl Eidos {
 
         let mut cv = init_cv(0, BYTE_MODE, n);
 
-        // Empty input still hashes one zero block (SPEC §4.5).
+        // Empty input still hashes one zero block (SPEC §4.7).
         if bytes.is_empty() {
             let block = [0u32; 16];
             cv = BlakeG::compress(cv, block);
@@ -206,15 +191,12 @@ impl Eidos {
         };
 
         // Pass 1: total felt count.
-        let n_total: usize = elements
-            .iter()
-            .map(|e| E::as_basis_coefficients_slice(e).len())
-            .sum();
+        let n_total: usize = elements.iter().map(|e| E::as_basis_coefficients_slice(e).len()).sum();
         let n = u32::try_from(n_total).expect("input too long: felt count must fit in u32");
 
         let mut cv = init_cv(domain_u32, FELT_MODE, n);
 
-        // Empty input still hashes one zero block (SPEC §4.5).
+        // Empty input still hashes one zero block (SPEC §4.7).
         if n == 0 {
             cv = BlakeG::compress(cv, [0u32; 16]);
             return pack_to_word(cv);
@@ -280,7 +262,6 @@ impl Eidos {
     }
 }
 
-
 // TESTS
 // ================================================================================================
 
@@ -291,13 +272,13 @@ mod tests {
     use super::*;
 
     #[test]
-    fn base_constants_match_iv_and_param_word() {
-        // Verify that BASE0..BASE3 are exactly what SPEC §4.2 says they are:
-        //   BASE0 = pack(IV[0] ^ PARAM_WORD_0, IV[1])
+    fn base_constants_match_iv() {
+        // Verify that BASE0..BASE3 are exactly what SPEC §4.4 says they are:
+        //   BASE0 = pack(IV[0], IV[1])
         //   BASE1 = pack(IV[2], IV[3])
         //   BASE2 = pack(0, IV[5])
         //   BASE3 = pack(0, IV[7])
-        assert_eq!(BASE0, pack(IV[0] ^ PARAM_WORD_0, IV[1]).as_canonical_u64());
+        assert_eq!(BASE0, pack(IV[0], IV[1]).as_canonical_u64());
         assert_eq!(BASE1, pack(IV[2], IV[3]).as_canonical_u64());
         assert_eq!(BASE2, pack(0, IV[5]).as_canonical_u64());
         assert_eq!(BASE3, pack(0, IV[7]).as_canonical_u64());

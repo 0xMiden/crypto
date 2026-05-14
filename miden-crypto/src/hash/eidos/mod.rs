@@ -5,7 +5,7 @@
 //!
 //! # Two-stream architecture
 //!
-//! - [`BlakeG`] (Stream 1): Goldilocks-tailored Blake2s compression function. Field-layer
+//! - [`BlakeG`] (Stream 1): Goldilocks-tailored BLAKE3 compression function. Field-layer
 //!   primitive with no Miden VM dependencies. Suitable for any Goldilocks project.
 //! - [`Eidos`] (Stream 2): VM-layer hash function built on BlakeG. Owns padding, domain
 //!   separation, mode bits, and the public API. Mirrors the Poseidon2 surface.
