@@ -12,6 +12,28 @@ members = [
   "stark/miden-stark-transcript",
   "stark/miden-stateful-hasher",
 ]
+# `miden-bench-wasm` is intentionally NOT a default member. It hard-
+# depends on `miden-crypto/std` (browser benches need `std` for the
+# `once_cell` real-sync path; the `critical-section` fallback requires
+# a host-provided impl that browsers don't supply), so including it in
+# the default workspace build would cause `make build-no-std` —
+# `cargo build --no-default-features --target wasm32-unknown-unknown`,
+# no `--workspace` flag — to silently enable `std` on `miden-crypto`
+# through Cargo feature unification. The no-std gate would pass while
+# not actually validating `miden-crypto` in the intended no-std config.
+# `cargo bench`/`wasm-pack` invoke the bench crate via explicit package
+# paths, so this exclusion has no effect on the bench workflow itself.
+default-members = [
+  "miden-bench",
+  "miden-crypto",
+  "miden-crypto-derive",
+  "miden-field",
+  "miden-serde-utils",
+  "stark/miden-lifted-air",
+  "stark/miden-lifted-stark",
+  "stark/miden-stark-transcript",
+  "stark/miden-stateful-hasher",
+]
 resolver = "3"
 
 [workspace.package]
