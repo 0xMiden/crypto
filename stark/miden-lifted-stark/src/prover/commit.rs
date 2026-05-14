@@ -149,8 +149,9 @@ where
 
 /// Commit multiple trace matrices with lifting: LDE → LMCS tree.
 ///
-/// Traces must be sorted by height in ascending order. Each trace is lifted to
-/// the max LDE domain using the appropriate nested coset shift.
+/// Traces must be sorted by height in ascending order. Each trace is committed
+/// on its own canonical coset (see [`crate::coset::lde_coset_shift`]), which
+/// nests inside the max-trace LDE coset.
 ///
 /// The DFT output is wrapped in `BitReversedMatrixView` (zero-cost view) and
 /// passed directly to the LMCS — no materialization needed.
@@ -169,11 +170,12 @@ where
 /// - If trace heights are not powers of two
 /// - If traces are not sorted by height in ascending order
 ///
-/// Lifting note: for a trace of height `n` embedded into a max height `n_max`, let
-/// `r = n_max / n`. The commitment should behave as if it contains evaluations of the
-/// lifted polynomial `f_lift(X) = f(Xʳ)` on the max LDE coset. This is achieved by
-/// evaluating the original trace on a *nested* coset with shift gʳ: the map
-/// `(g·ω)ʳ = gʳ·ωʳ` sends the max domain down to the smaller one.
+/// Lifting note: for a trace of height `n` embedded into a max height `n_max`
+/// via `r = n_max / n`, let `g_n` be the canonical shift for size `n` and `g`
+/// the canonical max-trace shift; the lifting identity `g^r = g_n` means
+/// evaluating the original trace on its own nested coset `g_n · K_n` matches
+/// `f_lift(X) = f(Xʳ)` on the max LDE coset `g · K_max`, via
+/// `(g · ω)ʳ = gʳ · ωʳ = g_n · ωʳ`.
 pub fn commit_traces<F, EF, SC>(
     config: &SC,
     traces: Vec<RowMajorMatrix<F>>,

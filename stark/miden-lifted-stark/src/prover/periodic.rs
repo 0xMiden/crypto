@@ -105,7 +105,7 @@ mod tests {
     use alloc::{vec, vec::Vec};
 
     use p3_dft::TwoAdicSubgroupDft;
-    use p3_field::{Field, PackedValue, PrimeCharacteristicRing};
+    use p3_field::{PackedValue, PrimeCharacteristicRing};
 
     use super::*;
     use crate::testing::configs::goldilocks_poseidon2 as gl;
@@ -136,13 +136,14 @@ mod tests {
         let periodic_lde = PeriodicLde::build(&coset, Some(repeated_matrix));
 
         // Compute expected LDE for each column via full expansion (natural order)
+        let expected_shift = coset.lde_shift::<gl::Felt>();
         let expected: Vec<Vec<gl::Felt>> = columns
             .iter()
             .map(|col| {
                 let full: Vec<gl::Felt> = (0..trace_height).map(|i| col[i % col.len()]).collect();
                 let matrix = RowMajorMatrix::new(full, 1);
                 NaiveDft
-                    .coset_lde_batch(matrix, log_blowup.into(), gl::Felt::GENERATOR)
+                    .coset_lde_batch(matrix, log_blowup.into(), expected_shift)
                     .to_row_major_matrix()
                     .values
             })

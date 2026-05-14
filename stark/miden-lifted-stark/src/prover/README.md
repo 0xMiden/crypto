@@ -59,7 +59,8 @@ Let:
   $n_j D_j$. Let $D_{\max} = \max_j D_j$.
 - $B$ be the **PCS/FRI blowup** used for commitment domains, with
   $D_{\max} \le B$.
-- $g$ be the fixed multiplicative shift (`F::GENERATOR`).
+- $g$ be the canonical multiplicative shift, defined per trace height as
+  $g_n = \texttt{F::GENERATOR}^{2^{(\texttt{F::TWO\_ADICITY} - \log_2 n)}}$.
 
 Define two-adic subgroups:
 

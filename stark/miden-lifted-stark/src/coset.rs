@@ -13,21 +13,35 @@ use p3_util::log2_strict_usize;
 
 use crate::{pcs::params::MAX_LOG_DOMAIN_SIZE, selectors::Selectors};
 
+/// Canonical multiplicative coset shift for a trace of height `2^log_trace_height`.
+///
+/// # Panics
+///
+/// Panics if `log_trace_height > F::TWO_ADICITY`.
+#[inline]
+pub fn lde_coset_shift<F: TwoAdicField>(log_trace_height: u8) -> F {
+    assert!(
+        (log_trace_height as usize) <= F::TWO_ADICITY,
+        "log_trace_height ({log_trace_height}) exceeds F::TWO_ADICITY ({})",
+        F::TWO_ADICITY,
+    );
+    F::GENERATOR.exp_power_of_2(F::TWO_ADICITY - log_trace_height as usize)
+}
+
 // ============================================================================
 // LiftedCoset
 // ============================================================================
 
 /// Lifted coset for polynomial evaluation.
 ///
-/// Represents a coset (gK)ʳ where:
+/// Represents the LDE coset that a trace lives on:
 /// - K is the evaluation domain of size 2^log_lde_height
 /// - r = 2^log_lift_ratio is the lift factor (row repetition)
-/// - The shift is gʳ where g = F::GENERATOR
+/// - The shift is [`lde_coset_shift`] applied to `log_trace_height`.
 ///
 /// Key relationships:
 /// - log_blowup = log_lde_height - log_trace_height
 /// - log_lift_ratio = log_max_lde_height - log_lde_height
-/// - lde_shift = gʳ = F::GENERATOR.exp_power_of_2(log_lift_ratio)
 ///
 /// # Invariants
 ///
@@ -118,18 +132,15 @@ impl LiftedCoset {
         self.log_lde_height < self.log_max_lde_height
     }
 
-    /// Compute the coset shift for this matrix's LDE domain.
+    /// Compute the coset shift for this trace's evaluation domains.
     ///
-    /// For a matrix with lift ratio `r = 2^log_lift_ratio`, the coset shift is gʳ
-    /// where g is the field generator.
+    /// Equivalent to `lde_coset_shift(self.log_trace_height)`.
     ///
-    /// Why gʳ: lifting embeds a smaller-domain polynomial into the max domain by
-    /// composition `p_lift(X) = p(Xʳ)`. Evaluating `p_lift` on the max coset `g·K_max`
-    /// corresponds to evaluating `p` on the nested coset `gʳ·K`, because
-    /// `(g·ω)ʳ = gʳ·ωʳ` and ωʳ ranges over K when ω ranges over `K_max`.
+    /// Lifting is preserved: `(max_shift)^r = sub_shift` for `r = N_max / N_sub`,
+    /// so `p_lift(X) = p(X^r)` on the max coset matches `p` on the sub coset.
     #[inline]
     pub fn lde_shift<F: TwoAdicField>(&self) -> F {
-        F::GENERATOR.exp_power_of_2(self.log_lift_ratio())
+        lde_coset_shift::<F>(self.log_trace_height)
     }
 
     /// The trace height (number of constraint rows).
@@ -433,23 +444,45 @@ mod tests {
 
     #[test]
     fn domain_info_lde_shift() {
-        // Trace height 2^10, blowup 2^3, max trace 2^12
         let info = LiftedCoset::new(10, 3, 12);
         let shift: Felt = info.lde_shift();
-
-        // shift = g^(2^2) = g^4
-        let expected = Felt::GENERATOR.exp_power_of_2(2);
+        let expected = Felt::GENERATOR.exp_power_of_2(Felt::TWO_ADICITY - 10);
         assert_eq!(shift, expected);
     }
 
     #[test]
     fn domain_info_no_lift_shift() {
-        // When not lifted, shift should be g^1 = g
         let info = LiftedCoset::unlifted(10, 3);
         let shift: Felt = info.lde_shift();
+        let expected = Felt::GENERATOR.exp_power_of_2(Felt::TWO_ADICITY - 10);
+        assert_eq!(shift, expected);
+    }
 
-        // shift = g^(2^0) = g
-        assert_eq!(shift, Felt::GENERATOR);
+    #[test]
+    fn lde_shift_is_stable_across_per_proof_max() {
+        let a: Felt = LiftedCoset::new(10, 3, 12).lde_shift();
+        let b: Felt = LiftedCoset::new(10, 3, 14).lde_shift();
+        let c: Felt = LiftedCoset::unlifted(10, 3).lde_shift();
+        assert_eq!(a, b);
+        assert_eq!(a, c);
+    }
+
+    #[test]
+    fn lde_shift_is_invariant_under_quotient_domain() {
+        let lde = LiftedCoset::new(10, 3, 12);
+        let quot = lde.quotient_domain(2);
+        assert_eq!(lde.lde_shift::<Felt>(), quot.lde_shift::<Felt>());
+    }
+
+    #[test]
+    fn lde_shift_lifting_invariant() {
+        // (max_shift)^r == sub_shift  where  r = N_max / N_sub
+        let sub = LiftedCoset::new(8, 3, 12);
+        let max = LiftedCoset::new(12, 3, 12);
+        let r = max.log_trace_height - sub.log_trace_height;
+        let sub_shift: Felt = sub.lde_shift();
+        let max_shift: Felt = max.lde_shift();
+        assert_eq!(max_shift.exp_power_of_2(r as usize), sub_shift);
     }
 
     #[test]

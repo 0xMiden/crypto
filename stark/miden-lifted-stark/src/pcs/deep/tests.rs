@@ -70,9 +70,15 @@ fn deep_quotient_end_to_end() {
 
     // Step 4: Verifier constructs DeepOracle with same transcript state
     let mut verifier_channel = verifier_channel_with_commitment(&transcript, &commitment);
-    let (deep_oracle, _evals) =
-        DeepOracle::new(params, &[z1, z2], commitments, log_lde_height, &mut verifier_channel)
-            .expect("DeepOracle construction should succeed");
+    let (deep_oracle, _evals) = DeepOracle::new(
+        params,
+        &[z1, z2],
+        commitments,
+        log_lde_height,
+        log_blowup,
+        &mut verifier_channel,
+    )
+    .expect("DeepOracle construction should succeed");
 
     // Step 5: Verify at multiple query tree indices (proofs are read from transcript)
     let verifier_evals = deep_oracle

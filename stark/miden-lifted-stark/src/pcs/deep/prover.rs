@@ -71,7 +71,11 @@ impl<EF> DeepPoly<EF> {
         );
 
         let log_lde_height = log2_strict_u8(lde_height);
-        let coset_points = bit_reversed_coset_points::<L::F>(log_lde_height);
+        let log_trace_height = log_lde_height
+            .checked_sub(log_blowup)
+            .expect("log_blowup must not exceed log_lde_height");
+        let lde_shift = crate::coset::lde_coset_shift::<L::F>(log_trace_height);
+        let coset_points = bit_reversed_coset_points::<L::F>(lde_shift, log_lde_height);
 
         let matrices_groups: Vec<Vec<&M>> =
             trace_trees.iter().map(|tree| tree.leaves().iter().collect()).collect();

@@ -232,7 +232,7 @@ mod tests {
         let shift = Felt::GENERATOR;
 
         // Coset points in bit-reversed order for our barycentric evaluation
-        let coset_points_br = bit_reversed_coset_points::<Felt>(log_n);
+        let coset_points_br = bit_reversed_coset_points::<Felt>(shift, log_n);
 
         // Random out-of-domain evaluation point
         let z: QuadFelt = rng.sample(StandardUniform);
@@ -308,7 +308,7 @@ mod tests {
         let shift = Felt::GENERATOR;
 
         // Coset points in both orderings
-        let coset_points_br = bit_reversed_coset_points::<Felt>(log_n);
+        let coset_points_br = bit_reversed_coset_points::<Felt>(shift, log_n);
         let mut coset_points_std = coset_points_br.clone();
         reverse_slice_index_bits(&mut coset_points_std); // Convert to standard order
 
@@ -374,7 +374,7 @@ mod tests {
         let shift = Felt::GENERATOR;
 
         // Coset points in bit-reversed order
-        let coset_points_br = bit_reversed_coset_points::<Felt>(log_n);
+        let coset_points_br = bit_reversed_coset_points::<Felt>(shift, log_n);
 
         // Two random out-of-domain evaluation points
         let z1: QuadFelt = rng.sample(StandardUniform);
@@ -456,7 +456,7 @@ mod tests {
         let n = 1 << log_n;
         let shift = Felt::GENERATOR;
 
-        let coset_points_br = bit_reversed_coset_points::<Felt>(log_n);
+        let coset_points_br = bit_reversed_coset_points::<Felt>(shift, log_n);
 
         let z1: QuadFelt = rng.sample(StandardUniform);
         let z2: QuadFelt = rng.sample(StandardUniform);

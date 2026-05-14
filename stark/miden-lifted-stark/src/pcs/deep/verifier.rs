@@ -42,6 +42,9 @@ pub struct DeepOracle<F: TwoAdicField, EF: ExtensionField<F>, L: Lmcs<F = F>> {
     /// Verifier expects all commitments to be lifted to this same LDE height.
     log_lde_height: u8,
 
+    /// Log₂ of the LDE blowup factor.
+    log_blowup: u8,
+
     /// Reduced openings: pairs of `(zⱼ, f_reduced(zⱼ))` from the prover's claims.
     reduced_openings: Vec<(EF, EF)>,
 
@@ -73,11 +76,16 @@ impl<F: TwoAdicField, EF: ExtensionField<F>, L: Lmcs<F = F>> DeepOracle<F, EF, L
         eval_points: &[EF],
         commitments: Vec<(L::Commitment, Vec<usize>)>,
         log_lde_height: u8,
+        log_blowup: u8,
         channel: &mut Ch,
     ) -> Result<(Self, OpenedValues<EF>), DeepError>
     where
         Ch: VerifierChannel<F = F, Commitment = L::Commitment>,
     {
+        if log_blowup > log_lde_height {
+            return Err(DeepError::BlowupExceedsLdeHeight { log_lde_height, log_blowup });
+        }
+
         let group_widths: Vec<&[usize]> = commitments.iter().map(|(_, gw)| gw.as_slice()).collect();
         let evals = read_eval_matrices::<F, EF, Ch>(&group_widths, eval_points.len(), channel)?;
 
@@ -108,6 +116,7 @@ impl<F: TwoAdicField, EF: ExtensionField<F>, L: Lmcs<F = F>> DeepOracle<F, EF, L
         let oracle = Self {
             commitments,
             log_lde_height,
+            log_blowup,
             reduced_openings,
             challenge_columns,
             challenge_points,
@@ -161,7 +170,7 @@ impl<F: TwoAdicField, EF: ExtensionField<F>, L: Lmcs<F = F>> DeepOracle<F, EF, L
         }
 
         let generator = F::two_adic_generator(self.log_lde_height as usize);
-        let shift = F::GENERATOR;
+        let shift = crate::coset::lde_coset_shift::<F>(self.log_lde_height - self.log_blowup);
 
         // Reconstruct Q(x) at each queried domain point x from the opened row data.
         // If the prover's OOD claims were correct, these values lie on the
@@ -204,6 +213,8 @@ pub enum DeepError {
     InvalidOpening { tree: usize, tree_index: usize },
     #[error("evaluation point coincides with domain point at tree index {tree_index}")]
     EvalPointOnDomain { tree_index: usize },
+    #[error("log_blowup ({log_blowup}) exceeds log_lde_height ({log_lde_height})")]
+    BlowupExceedsLdeHeight { log_lde_height: u8, log_blowup: u8 },
     #[error("transcript error: {0}")]
     TranscriptError(#[from] TranscriptError),
 }

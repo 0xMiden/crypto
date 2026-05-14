@@ -79,6 +79,7 @@ where
         &eval_points,
         commitments.to_vec(),
         log_lde_height,
+        params.fri.log_blowup,
         channel,
     )?;
 

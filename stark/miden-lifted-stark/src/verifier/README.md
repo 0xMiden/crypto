@@ -63,7 +63,8 @@ Let:
 - $N = 2^n$ be the **maximum** trace height across all traces.
 - $D = 2^d$ be the **constraint degree** (quotient-domain blowup).
 - $B = 2^b$ be the **PCS/FRI blowup**, with $D \le B$.
-- $g$ be the fixed multiplicative shift (`F::GENERATOR`).
+- $g$ be the canonical coset shift for the max trace:
+  $g = \texttt{F::GENERATOR}^{2^{(\texttt{F::TWO\_ADICITY} - n)}}$.
 
 Define subgroups:
 
