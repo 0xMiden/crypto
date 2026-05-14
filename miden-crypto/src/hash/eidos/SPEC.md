@@ -1,5 +1,21 @@
 # Eidos - Design and Specification
 
+## Contents
+
+1. [Overview](#1-overview)
+2. [Architecture](#2-architecture) - layering rationale, design constraints, module layout, type surface
+3. [Shared BLAKE3 compression core](#3-shared-blake3-compression-core) - `p`-parameterised core, IV, G, message schedule, output equations
+4. [BlakeG mode](#4-blakeg-mode) - Goldilocks specialization: packing, signature, init, padding, optional wide output
+5. [Security claims](#5-security-claims) - bounds, indifferentiability, round count, output finalizer
+6. [Design rationale](#6-design-rationale) - why this set of choices
+7. [AEAD direction (future work)](#7-aead-direction-future-work) - open keystream-finalizer problem + two construction sketches
+8. [Length-binding alternatives](#8-length-binding-alternatives)
+9. [Forward compatibility with standard BLAKE3 compression](#9-forward-compatibility-with-standard-blake3-compression)
+10. [References](#10-references)
+11. [Appendix A - Notation glossary](#appendix-a---notation-glossary)
+
+---
+
 ## 1. Overview
 
 Eidos is a cryptographic hash function with three conceptual layers:
@@ -227,23 +243,15 @@ blakeg_core(h, m):
     return mask_odd_lanes(low)
 ```
 
-BlakeG intentionally drops standard BLAKE3's per-call `(counter_lo, counter_hi, block_len, flags)` inputs. Eidos binds the stream-wide information that it needs (`domain`, `MODE_BIT`, and `n`) once into the initial chaining value instead. This keeps the steady-state VM loop to one block load and one compression call.
-
-In current Miden MASM, the block load is `adv_pipe`: it pops two words, i.e. 8 Felts, from the advice stack, overwrites the top two stack words used as the rate/block window, writes those two words to memory at the current pointer, and advances the pointer. For BlakeG's cost model, the important part is that one `adv_pipe` supplies exactly one 8-Felt compression block. The current opcode used for the compression-shaped hash step is `hperm`, inherited from the older sponge/permutation interface. In BlakeG terminology, the equivalent operation is `bcompress`:
+BlakeG intentionally drops standard BLAKE3's per-call `(counter_lo, counter_hi, block_len, flags)` inputs. Eidos binds the stream-wide information that it needs (`domain`, `MODE_BIT`, and `n`) once into the initial chaining value instead. This keeps the steady-state VM loop to one block load and one compression call:
 
 ```text
-adv_pipe
-bcompress
+adv_pipe        # see Appendix A: supplies exactly one 8-Felt compression block
+bcompress       # the BlakeG-mode compression; current implementations may still
+                # spell this `hperm` while the chiplet is being reused
 ```
 
-Equivalently, current implementations may still spell the second line as `hperm` while the chiplet is being reused:
-
-```text
-adv_pipe
-hperm
-```
-
-The important property is the cost shape: no per-block stack traffic except loading the next block and invoking the BlakeG compression.
+The important property is the cost shape: no per-block stack traffic except loading the next block and invoking the BlakeG compression. The full init prologue and steady-state loop are spelled out in Section 6.5.
 
 The fixed BLAKE3-tail `p` value and the Eidos initialization play different roles. The value
 `p = [IV[4], IV[5], IV[6], IV[7]]` is used on every BlakeG compression call only
@@ -317,13 +325,16 @@ Implementation:
 4. Fold the upper half of the BLAKE3 working state into the lower half:
    cv_new[i] = v'[i] ^ v'[i+8]    for i in 0..8
 
-5. Apply the BlakeG 252-bit subspace mask to the folded chaining value:
+5. Apply the BlakeG 252-bit subspace mask (Section 4.2) to the odd `u32` lanes
+   of the folded chaining value:
    cv_new[1] &= 0x7fff_ffff
    cv_new[3] &= 0x7fff_ffff
    cv_new[5] &= 0x7fff_ffff
    cv_new[7] &= 0x7fff_ffff
 
-6. Return cv_new.
+6. Return cv_new. Each pair `(cv_new[2t], cv_new[2t+1])` becomes one output Felt
+   via `pack_masked` (Section 4.2); the masking step above ensures the resulting
+   Felts are canonical in Goldilocks.
 ```
 
 ### 4.4 BlakeG init chaining word
@@ -412,8 +423,14 @@ Length `n` must fit in `u32`. For byte mode this limits a single hash call to 4 
 
 Both Eidos modes pad the final block with zeros to the full block width:
 
-- Felt mode: pad with `Felt::ZERO` until the final block contains 8 felts.
-- Byte mode: pad with `0u8` until the final block contains 64 bytes.
+- Felt mode: pad with `Felt::ZERO` until the final block contains 8 felts. Each block-felt is decomposed into two `u32` lanes via the canonical decomposition of Section 4.2.
+- Byte mode: pad with `0u8` until the final block contains 64 bytes. The 64 bytes are then interpreted as 16 little-endian `u32` words:
+
+  ```text
+  m[k] = bytes[4k] | (bytes[4k+1] << 8) | (bytes[4k+2] << 16) | (bytes[4k+3] << 24)
+  ```
+
+  for `k in 0..16`.
 
 Empty input rule: if the input is empty, the hash performs one zero-block compression with `n = 0`. There is no special zero-output shortcut. Empty input and single-zero input do not collide by padding alone because their `cv_0` values differ in the `n` slot.
 
@@ -580,16 +597,21 @@ This does not imply that the chiplet can only ever support BlakeG mode. Future s
 BlakeG mode is designed so that the init prologue pays for Eidos-specific binding once, and the steady-state loop stays minimal:
 
 ```text
-# Init
+# Init prologue
 push.BASE3 push.n add
 push.BASE2 push.(domain + MODE_BIT_VALUE) add
 push.BASE1
 push.BASE0
 padw padw
 
-# Absorb full blocks
+# Post-init stack (top first):
+#   block window:  0     0     0     0     0     0     0     0
+#   cv_0:          BASE0 BASE1 BASE2+(domain+mode) BASE3+n
+# (the block window's 8 zeros are overwritten by the first adv_pipe.)
+
+# Steady-state loop
 repeat.NUM_BLOCKS
-    adv_pipe      # load next 8-Felt block into the stack window
+    adv_pipe      # load next 8-Felt block into the block window (top of stack)
     bcompress     # current implementations may spell this hperm
 end
 ```
@@ -838,10 +860,12 @@ This future mode would be a standard BLAKE3 compression operation, not automatic
 
 ### Cryptanalysis and design literature
 
-- Aumasson, J.-P. *Too Much Crypto.* IACR ePrint 2019/1492.
-- Coron, J.-S., Dodis, Y., Malinaud, C., Puniya, P. *Merkle-Damgard Revisited: how to Construct a Hash Function.* CRYPTO 2005.
-- Bernstein, D. J. *The Poly1305-AES MAC.* FSE 2005.
-- Bellare, M., Namprempre, C. *Authenticated Encryption: Relations among notions and analysis of the generic composition paradigm.* ASIACRYPT 2000.
+The BLAKE3 sources above are normative for the round function, message schedule, and compression-output wiring inherited by BlakeG. The works below cover the analytical and constructional foundations referenced in this spec.
+
+- Aumasson, J.-P. *Too Much Crypto.* IACR ePrint 2019/1492. (Argument for 7-round security margin.)
+- Coron, J.-S., Dodis, Y., Malinaud, C., Puniya, P. *Merkle-Damgard Revisited: how to Construct a Hash Function.* CRYPTO 2005. (Indifferentiability framework used in Section 5.3.)
+- Bernstein, D. J. *The Poly1305-AES MAC.* FSE 2005. (Wegman-Carter-Shoup polynomial-MAC construction; pattern for Option B in Section 7.3.)
+- Bellare, M., Namprempre, C. *Authenticated Encryption: Relations among notions and analysis of the generic composition paradigm.* ASIACRYPT 2000. (Encrypt-then-MAC composition theorem; foundation for Section 7's IND-CCA argument.)
 
 ---
 
