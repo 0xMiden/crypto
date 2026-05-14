@@ -35,8 +35,30 @@
 
 name: bench
 
+# `pull_request_target` (not `pull_request`) so the publish job's
+# `GITHUB_TOKEN` keeps `pull-requests: write` and `contents: write` on
+# fork PRs. Under `pull_request`, GitHub silently strips both scopes
+# from `GITHUB_TOKEN` for fork PRs regardless of what `permissions:`
+# declares, which makes the sticky comment step crash with "Resource
+# not accessible by integration" on every external contribution. The
+# same pattern is used in web-sdk's `check-linked-client-pr.yml` for
+# the same reason.
+#
+# SAFETY: `pull_request_target` is safe here because the bench jobs
+# (the only steps that execute PR-controlled code) hold no privileged
+# token. Each bench job declares per-job `permissions: contents: read`,
+# checks out the PR head with `persist-credentials: false`, and
+# doesn't reference any `secrets.*` — so even though the PR's tree is
+# on disk, build.rs / npm postinstall / Node has nothing privileged to
+# reach for. The trusted publish jobs check out the base ref (which is
+# what `pull_request_target` defaults to anyway), so PR-supplied code
+# never touches a step that has the write token. Under
+# `pull_request_target` the workflow file itself is the base's, not
+# the PR's, so a malicious PR can't edit the workflow logic that's run
+# against them.
 on:
-  pull_request:
+  pull_request_target:
+    types: [opened, synchronize, reopened, ready_for_review]
   push:
     branches: [next]
   workflow_dispatch:
@@ -67,6 +89,11 @@ jobs:
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # pin@v4
         with:
+          # Under `pull_request_target`, the default checkout is the
+          # BASE branch — but we need to benchmark the PR's code, so
+          # explicitly target the PR head SHA. `github.sha` is the
+          # fallback for push and workflow_dispatch events.
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
           # The default checkout writes the GHA token to `.git/config`,
           # which PR-controlled build scripts (build.rs, npm postinstall,
           # etc.) would then have access to. Strip it — this job has no
@@ -146,6 +173,9 @@ jobs:
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # pin@v4
         with:
+          # See `bench-wasm` for why both `ref:` and `persist-credentials`
+          # are set explicitly under `pull_request_target`.
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
           persist-credentials: false
 
       - name: Install Rust
@@ -193,12 +223,12 @@ jobs:
     timeout-minutes: 10
     permissions:
       contents: write       # github-action-benchmark pushes to gh-pages on `push to next`
-      pull-requests: write  # for sticky PR comment on pull_request runs
+      pull-requests: write  # for sticky PR comment on pull_request_target runs
     steps:
-      # Explicitly check out the default branch (trusted ref). On a
-      # `pull_request` event, the default `actions/checkout` resolves to
-      # the PR's merge ref — that's PR-controlled code, which has no
-      # business being on disk in a job that holds the write token.
+      # Explicitly check out the default branch (trusted ref). Under
+      # `pull_request_target` this would be the default anyway, but
+      # spelling it out keeps the invariant ("publish jobs never touch
+      # PR-supplied code") visible to anyone reading the workflow.
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # pin@v4
         with:
           ref: ${{ github.event.repository.default_branch }}
@@ -237,14 +267,12 @@ jobs:
           alert-threshold: "110%"
           fail-on-alert: false  # warn via comment, don't fail the PR
           summary-always: true  # keep the diff comment fresh on each run
-          # Gate the sticky comment to same-repo PRs. GitHub silently
-          # strips `pull-requests: write` from `GITHUB_TOKEN` for fork
-          # PRs regardless of the workflow-declared permissions, so
-          # `comment-always: true` would otherwise crash the publish
-          # step with "Resource not accessible by integration" on every
-          # external contribution. Fork PRs still get the workflow
-          # summary table and the artifact — just no PR comment.
-          comment-always: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository }}
+          # `pull_request_target` (vs. `pull_request`) is what keeps the
+          # write token alive for fork PRs — see the header comment.
+          # The event name we match here is `pull_request_target`
+          # because that's what `github.event_name` resolves to under
+          # this trigger; the value is NOT `pull_request`.
+          comment-always: ${{ github.event_name == 'pull_request_target' }}
           alert-comment-cc-users: '@WiktorStarczewski'
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
@@ -298,7 +326,8 @@ jobs:
           alert-threshold: "110%"
           fail-on-alert: false
           summary-always: true
-          # See `publish-wasm` for why this is gated to same-repo PRs.
-          comment-always: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository }}
+          # See `publish-wasm` and the header comment for why we match
+          # on `pull_request_target` rather than `pull_request`.
+          comment-always: ${{ github.event_name == 'pull_request_target' }}
           alert-comment-cc-users: '@WiktorStarczewski'
           github-token: ${{ secrets.GITHUB_TOKEN }}
