@@ -569,13 +569,10 @@ impl Backend for PersistentBackend {
                     self.apply_updates_to_lineage(batch, entry.lineage, entry.storage_updates)?;
                 let batch = self.write_metadata(batch, entry.lineage, &entry.metadata)?;
 
-                Ok((
-                    batch,
-                    (applied_entry, (entry.lineage, entry.metadata, MutationSet::default())),
-                ))
+                Ok((batch, (applied_entry, (entry.lineage, entry.metadata))))
             })
             .collect::<Result<Vec<_>>>()?;
-        let (batches, (applied_entries, mutation_sets)): (Vec<_>, (Vec<_>, Vec<_>)) =
+        let (batches, (applied_entries, metadata_updates)): (Vec<_>, (Vec<_>, Vec<_>)) =
             lineage_data.into_iter().unzip();
 
         // We construct our final WriteBatch in parallel if we have enough of them, otherwise we
@@ -589,8 +586,11 @@ impl Backend for PersistentBackend {
             batches.into_iter().fold(WriteBatch::new(), |l, r| merge_batches(l, &r))
         };
 
-        // FIXME: we don't need the mutation set returned here, only the metadata update.
-        self.finalize_update(final_batch, mutation_sets.into_iter())?;
+        // We first write the full atomic update to disk. If it errors, we bail.
+        self.write(final_batch)?;
+
+        // If it hasn't errored, we can now safely update the in-memory metadata cache.
+        self.lineages_mut().extend(metadata_updates);
 
         Ok(applied_entries)
     }
@@ -1611,29 +1611,6 @@ impl PersistentBackend {
         let metadata_value = tree_metadata.to_bytes();
         batch.put_cf(metadata, &metadata_key, &metadata_value);
         Ok(batch)
-    }
-
-    /// Finalizes the update by committing the provided `batch` to disk and updating the in-memory
-    /// cache with the provided `metadata`.
-    ///
-    /// # Errors
-    ///
-    /// - [`BackendError::Internal`] if the underlying database cannot be written to.
-    fn finalize_update(
-        &mut self,
-        batch: WriteBatch,
-        metadata: impl Iterator<Item = (LineageId, TreeMetadata, MutationSet)>,
-    ) -> Result<Vec<(LineageId, MutationSet)>> {
-        // We first write the full atomic update to disk. If it errors, we bail.
-        self.write(batch)?;
-
-        // If it hasn't errored, we can now safely update the in-memory metadata cache.
-        Ok(metadata
-            .map(|(l, d, r)| {
-                self.lineages_mut().insert(l, d);
-                (l, r)
-            })
-            .collect())
     }
 
     /// Reads all the lineages and their corresponding metadata out of the on-disk storage as part
