@@ -114,15 +114,23 @@ fn rocksdb_persistence_after_insertion() {
     let db_path = temp_dir_guard.path().to_path_buf();
 
     let mut smt = LargeSmt::<RocksDbStorage>::with_entries(initial_storage, entries).unwrap();
-    let key = Word::new([ONE, ONE, ONE, ONE]);
+    let initial_num_leaves = smt.num_leaves();
+    let initial_num_entries = smt.num_entries();
+    let key = Word::new([ONE, ONE, Felt::new_unchecked(20_000), Felt::new_unchecked(20_000)]);
     let new_value = Word::new([
         Felt::new_unchecked(2),
         Felt::new_unchecked(2),
         Felt::new_unchecked(2),
         Felt::new_unchecked(2),
     ]);
-    smt.insert(key, new_value).unwrap();
+    let previous_value = smt.insert(key, new_value).unwrap();
+    assert_eq!(previous_value, EMPTY_WORD);
+    assert_eq!(smt.get_value(&key), new_value);
+    assert_eq!(smt.num_leaves(), initial_num_leaves + 1);
+    assert_eq!(smt.num_entries(), initial_num_entries + 1);
     let root = smt.root();
+    let num_leaves = smt.num_leaves();
+    let num_entries = smt.num_entries();
 
     let mut inner_nodes: Vec<InnerNodeInfo> = smt.inner_nodes().unwrap().collect();
     inner_nodes.sort_by_key(|info| info.value);
@@ -137,6 +145,9 @@ fn rocksdb_persistence_after_insertion() {
     assert_eq!(inner_nodes.len(), inner_nodes_2.len());
     assert_eq!(inner_nodes, inner_nodes_2);
     assert_eq!(smt.root(), root);
+    assert_eq!(smt.num_leaves(), num_leaves);
+    assert_eq!(smt.num_entries(), num_entries);
+    assert_eq!(smt.get_value(&key), new_value);
 }
 
 #[test]
