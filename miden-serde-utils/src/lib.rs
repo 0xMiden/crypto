@@ -482,6 +482,10 @@ where
         let v1 = T1::read_from(source)?;
         Ok((v1,))
     }
+
+    fn min_serialized_size() -> usize {
+        T1::min_serialized_size()
+    }
 }
 
 impl<T1, T2> Deserializable for (T1, T2)
@@ -872,5 +876,15 @@ mod tests {
         let result = BTreeSet::<u8>::read_from_bytes(&bytes);
 
         assert!(matches!(result, Err(DeserializationError::InvalidValue(_))));
+    }
+
+    #[test]
+    fn budgeted_vec_of_one_element_tuples_accepts_exact_budget() {
+        let values = Vec::<(usize,)>::from([(0,), (1,), (2,)]);
+        let bytes = values.to_bytes();
+
+        let decoded = Vec::<(usize,)>::read_from_bytes_with_budget(&bytes, bytes.len()).unwrap();
+
+        assert_eq!(decoded, values);
     }
 }
