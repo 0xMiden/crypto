@@ -1,14 +1,14 @@
+#[cfg(any(test, feature = "rocksdb"))]
+use std::path::Path;
 use std::{path::PathBuf, time::Instant};
 
 use clap::{Parser, ValueEnum};
-#[cfg(not(feature = "rocksdb"))]
-use miden_crypto::merkle::smt::StorageError;
 #[cfg(feature = "rocksdb")]
 use miden_crypto::merkle::smt::{RocksDbConfig, RocksDbStorage};
 use miden_crypto::{
     EMPTY_WORD, Felt, ONE, Word,
     hash::poseidon2::Poseidon2,
-    merkle::smt::{LargeSmt, LargeSmtError, MemoryStorage},
+    merkle::smt::{LargeSmt, LargeSmtError, MemoryStorage, StorageError},
     rand::test_utils::rand_value,
 };
 use rand::{RngExt, prelude::IteratorRandom, rng};
@@ -35,6 +35,9 @@ pub struct BenchmarkCmd {
     /// Open existing database and skip construction
     #[clap(short = 'o', long = "open", default_value = "false")]
     open: bool,
+    /// Delete an existing benchmark database path before creating a new one
+    #[clap(long = "reset", default_value = "false")]
+    reset: bool,
     /// Number of batch operations
     #[clap(short = 'b', long = "batches", default_value = "1")]
     batches: usize,
@@ -63,6 +66,7 @@ pub fn benchmark_smt() -> Result<(), LargeSmtError> {
     let updates = args.updates;
     let storage_path = args.storage_path;
     let batches = args.batches;
+    let reset = args.reset;
 
     println!(
         "Running benchmark with {} storage",
@@ -83,7 +87,7 @@ pub fn benchmark_smt() -> Result<(), LargeSmtError> {
     let mut tree = if args.open {
         open_existing(storage_path, args.storage)?
     } else {
-        construction(entries.clone(), tree_size, storage_path, args.storage)?
+        construction(entries.clone(), tree_size, storage_path, args.storage, reset)?
     };
     insertion(&mut tree, insertions)?;
     for _ in 0..batches {
@@ -101,10 +105,11 @@ pub fn construction(
     size: usize,
     database_path: Option<PathBuf>,
     storage: StorageKind,
+    reset: bool,
 ) -> Result<LargeSmt<Storage>, LargeSmtError> {
     println!("Running a construction benchmark:");
     let now = Instant::now();
-    let storage = get_storage(database_path, false, storage)?;
+    let storage = get_storage(database_path, false, reset, storage)?;
     let tree = LargeSmt::with_entries(storage, entries)?;
     let elapsed = now.elapsed().as_secs_f32();
     println!("Constructed an SMT with {size} key-value pairs in {elapsed:.1} seconds");
@@ -119,7 +124,7 @@ pub fn open_existing(
 ) -> Result<LargeSmt<Storage>, LargeSmtError> {
     println!("Opening an existing database:");
     let now = Instant::now();
-    let storage = get_storage(storage_path, true, storage)?;
+    let storage = get_storage(storage_path, true, false, storage)?;
     let tree = LargeSmt::load(storage)?;
     let elapsed = now.elapsed().as_secs_f32();
     println!("Opened an existing database in {elapsed:.1} seconds");
@@ -286,6 +291,7 @@ pub fn proof_generation(tree: &mut LargeSmt<Storage>) -> Result<(), LargeSmtErro
 fn get_storage(
     database_path: Option<PathBuf>,
     open: bool,
+    reset: bool,
     kind: StorageKind,
 ) -> Result<Storage, LargeSmtError> {
     match kind {
@@ -297,12 +303,7 @@ fn get_storage(
                     .unwrap_or_else(|| std::env::temp_dir().join("miden_crypto_benchmark"));
                 println!("Using database path: {}", path.display());
                 if !open {
-                    // delete the folder if it exists as we are creating a new database
-                    if path.exists() {
-                        std::fs::remove_dir_all(path.clone()).unwrap();
-                    }
-                    std::fs::create_dir_all(path.clone())
-                        .expect("Failed to create database directory");
+                    prepare_database_directory(&path, reset)?;
                 }
                 let db = RocksDbStorage::open(
                     RocksDbConfig::new(path).with_cache_size(1 << 30).with_max_open_files(2048),
@@ -320,6 +321,35 @@ fn get_storage(
     }
 }
 
+#[cfg(any(test, feature = "rocksdb"))]
+fn prepare_database_directory(path: &Path, reset: bool) -> Result<(), LargeSmtError> {
+    if path.exists() {
+        if !reset {
+            return Err(StorageError::Unsupported(format!(
+                "database path already exists: {}; pass --reset to delete it before creating a new benchmark database",
+                path.display()
+            ))
+            .into());
+        }
+
+        std::fs::remove_dir_all(path).map_err(|err| {
+            storage_io_error(format!("failed to reset database path {}", path.display()), err)
+        })?;
+    }
+
+    std::fs::create_dir_all(path).map_err(|err| {
+        storage_io_error(format!("failed to create database path {}", path.display()), err)
+    })?;
+
+    Ok(())
+}
+
+#[cfg(any(test, feature = "rocksdb"))]
+fn storage_io_error(message: String, err: std::io::Error) -> LargeSmtError {
+    StorageError::Backend(Box::new(std::io::Error::new(err.kind(), format!("{message}: {err}"))))
+        .into()
+}
+
 #[cfg(test)]
 mod tests {
     use clap::ValueEnum;
@@ -334,7 +364,7 @@ mod tests {
     #[cfg(not(feature = "rocksdb"))]
     #[test]
     fn rejects_explicit_rocksdb_storage_without_feature() {
-        let err = get_storage(None, false, StorageKind::Rocksdb).unwrap_err();
+        let err = get_storage(None, false, false, StorageKind::Rocksdb).unwrap_err();
         match err {
             LargeSmtError::Storage(StorageError::Unsupported(msg)) => {
                 assert!(msg.contains("rocksdb feature"));
@@ -347,5 +377,34 @@ mod tests {
     #[test]
     fn storage_value_parser_accepts_rocksdb_with_feature() {
         assert_eq!(StorageKind::from_str("rocksdb", true).unwrap(), StorageKind::Rocksdb);
+    }
+
+    #[test]
+    fn existing_database_path_requires_reset_and_preserves_contents() {
+        let temp_dir = tempfile::tempdir().unwrap();
+        let sentinel = temp_dir.path().join("sentinel.txt");
+        std::fs::write(&sentinel, "keep").unwrap();
+
+        let err = prepare_database_directory(temp_dir.path(), false).unwrap_err();
+        match err {
+            LargeSmtError::Storage(StorageError::Unsupported(msg)) => {
+                assert!(msg.contains("--reset"));
+            },
+            other => panic!("expected reset-required error, got {other:?}"),
+        }
+
+        assert_eq!(std::fs::read_to_string(&sentinel).unwrap(), "keep");
+    }
+
+    #[test]
+    fn reset_database_path_removes_existing_contents() {
+        let temp_dir = tempfile::tempdir().unwrap();
+        let sentinel = temp_dir.path().join("sentinel.txt");
+        std::fs::write(&sentinel, "delete").unwrap();
+
+        prepare_database_directory(temp_dir.path(), true).unwrap();
+
+        assert!(temp_dir.path().is_dir());
+        assert!(!sentinel.exists());
     }
 }
