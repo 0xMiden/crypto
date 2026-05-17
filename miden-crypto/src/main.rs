@@ -42,7 +42,7 @@ pub struct BenchmarkCmd {
     #[clap(short = 'b', long = "batches", default_value = "1")]
     batches: usize,
     /// Storage backend to use at runtime: memory or rocksdb
-    #[arg(short = 's', long = "storage", value_enum, default_value = "memory")]
+    #[arg(long = "storage", value_enum, default_value = "memory")]
     storage: StorageKind,
 }
 
@@ -352,13 +352,26 @@ fn storage_io_error(message: String, err: std::io::Error) -> LargeSmtError {
 
 #[cfg(test)]
 mod tests {
-    use clap::ValueEnum;
+    use clap::{CommandFactory, Parser, ValueEnum};
 
     use super::*;
 
     #[test]
     fn storage_value_parser_accepts_memory() {
         assert_eq!(StorageKind::from_str("memory", true).unwrap(), StorageKind::Memory);
+    }
+
+    #[test]
+    fn clap_command_definition_is_valid() {
+        BenchmarkCmd::command().debug_assert();
+    }
+
+    #[test]
+    fn parses_size_short_and_memory_storage() {
+        let args = BenchmarkCmd::parse_from(["miden-crypto", "-s", "10", "--storage", "memory"]);
+
+        assert_eq!(args.size, 10);
+        assert_eq!(args.storage, StorageKind::Memory);
     }
 
     #[cfg(not(feature = "rocksdb"))]
@@ -377,6 +390,16 @@ mod tests {
     #[test]
     fn storage_value_parser_accepts_rocksdb_with_feature() {
         assert_eq!(StorageKind::from_str("rocksdb", true).unwrap(), StorageKind::Rocksdb);
+    }
+
+    #[cfg(feature = "rocksdb")]
+    #[test]
+    fn parses_explicit_rocksdb_storage_with_feature() {
+        let args =
+            BenchmarkCmd::parse_from(["miden-crypto", "--size", "10", "--storage", "rocksdb"]);
+
+        assert_eq!(args.size, 10);
+        assert_eq!(args.storage, StorageKind::Rocksdb);
     }
 
     #[test]
