@@ -143,6 +143,19 @@ fn rocksdb_persistence_after_insertion() {
 fn rocksdb_persistence_after_insert_batch_with_deletions() {
     // Create a tree with initial entries
     let entries = generate_entries(10_000);
+    let unchanged_key = entries[1_500].0;
+    let unchanged_value = entries[1_500].1;
+    let updated_key = entries[1_501].0;
+    let updated_value = Word::new([
+        Felt::new_unchecked(3),
+        Felt::new_unchecked(3),
+        Felt::new_unchecked(3),
+        Felt::new_unchecked(3),
+    ]);
+    let deleted_key = entries[100].0;
+    let newly_inserted_key =
+        Word::new([ONE, ONE, Felt::new_unchecked(20_000), Felt::new_unchecked(20_000 % 1000)]);
+    let newly_inserted_value = Word::new([ONE, ONE, ONE, Felt::new_unchecked(20_000)]);
 
     let (initial_storage, temp_dir_guard) = setup_storage();
     let db_path = temp_dir_guard.path().to_path_buf();
@@ -163,6 +176,9 @@ fn rocksdb_persistence_after_insert_batch_with_deletions() {
         let value = Word::new([ONE, ONE, ONE, Felt::new_unchecked(i as u64)]);
         batch_entries.push((key, value));
     }
+
+    // Update an existing entry that is not deleted below
+    batch_entries.push((updated_key, updated_value));
 
     // Delete some existing entries
     for i in 0..1000 {
@@ -197,6 +213,10 @@ fn rocksdb_persistence_after_insert_batch_with_deletions() {
     assert_eq!(num_leaves, num_leaves_2);
     assert_eq!(num_entries, num_entries_2);
     assert_eq!(smt.root(), root, "Tree reconstruction failed - root mismatch after deletions");
+    assert_eq!(smt.get_value(&unchanged_key), unchanged_value);
+    assert_eq!(smt.get_value(&newly_inserted_key), newly_inserted_value);
+    assert_eq!(smt.get_value(&updated_key), updated_value);
+    assert_eq!(smt.get_value(&deleted_key), EMPTY_WORD);
 }
 
 #[test]
