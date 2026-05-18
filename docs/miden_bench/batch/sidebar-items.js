@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"enum":["BatchBenchAir"],"fn":["run_batch","run_batch_blake3","run_batch_blake3_192","run_batch_keccak","run_batch_poseidon2"],"macro":["batch_config"],"struct":["KeccakWithLookup","MidenWithLookups"]};
+window.SIDEBAR_ITEMS = {"enum":["BatchBenchAir"],"fn":["run_batch","run_batch_blake3","run_batch_blake3_192","run_batch_keccak","run_batch_poseidon2"],"macro":[["batch_config",1]],"struct":["KeccakWithLookup","MidenWithLookups"]};
