@@ -332,7 +332,7 @@ pub use utils::{AppliedLineageMutation, ForestMutationSet, LineageMutation, Line
 use crate::{
     EMPTY_WORD, Map, Set, Word,
     merkle::{
-        MerkleError, NodeIndex, SparseMerklePath,
+        NodeIndex, SparseMerklePath,
         smt::{
             LeafIndex, SMT_DEPTH, SmtLeaf, SmtProof,
             large_forest::{
@@ -1150,15 +1150,15 @@ impl<B: Backend> LargeSmtForest<B> {
     /// - [`Self::compute_add_lineages_mutations`], or
     /// - [`Self::compute_update_forest_mutations`].
     ///
-    /// Before committing anything, this method validates that the mutation set is still applicable
-    /// to the current forest state. For update mutations, the latest version and root of every
-    /// affected lineage must still match the version/root captured during the compute phase. For
-    /// new-lineage mutations, the lineage must still be absent. These checks prevent stale
-    /// mutation sets from being applied after intervening forest changes.
+    /// The backend validates that the mutation set is still applicable before committing anything.
+    /// For update mutations, the latest version and root of every affected lineage must still match
+    /// the version/root captured during the compute phase. For new-lineage mutations, the lineage
+    /// must still be absent. These checks prevent stale mutation sets from being applied after
+    /// intervening forest changes.
     ///
-    /// If validation succeeds, the opaque backend-prepared data is committed first. Only after the
-    /// backend apply succeeds does the forest update its in-memory lineage metadata and history.
-    /// This ordering keeps the forest consistent if the backend reports an error.
+    /// If backend validation succeeds, the opaque backend-prepared data is committed first. Only
+    /// after the backend apply succeeds does the forest update its in-memory lineage metadata and
+    /// history. This ordering keeps the forest consistent if the backend reports an error.
     ///
     /// The returned roots match [`ForestMutationSet::roots`] for the applied mutation set. No-op
     /// update mutations return the existing latest version/root for their lineages.
@@ -1179,35 +1179,6 @@ impl<B: Backend> LargeSmtForest<B> {
         mutations: ForestMutationSet<B>,
     ) -> Result<Vec<TreeWithRoot>> {
         let (entries, prepared) = mutations.into_parts();
-
-        for entry in &entries {
-            match entry.kind() {
-                LineageMutationKind::AddLineage => {
-                    if self.lineage_data.contains_key(&entry.lineage()) {
-                        return Err(LargeSmtForestError::DuplicateLineage(entry.lineage()));
-                    }
-                },
-                LineageMutationKind::UpdateTree => {
-                    let Some(lineage_data) = self.lineage_data.get(&entry.lineage()) else {
-                        return Err(LargeSmtForestError::UnknownLineage(entry.lineage()));
-                    };
-
-                    if Some(lineage_data.latest_version) != entry.old_version() {
-                        return Err(LargeSmtForestError::BadVersion {
-                            provided: entry.old_version().unwrap_or_default(),
-                            latest: lineage_data.latest_version,
-                        });
-                    }
-                    if lineage_data.latest_root != entry.old_root() {
-                        return Err(MerkleError::ConflictingRoots {
-                            expected_root: entry.old_root(),
-                            actual_root: lineage_data.latest_root,
-                        }
-                        .into());
-                    }
-                },
-            }
-        }
 
         let applied_entries = self.backend.apply_mutations(prepared)?;
 

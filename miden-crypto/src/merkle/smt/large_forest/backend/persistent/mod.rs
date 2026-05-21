@@ -531,8 +531,24 @@ impl Backend for PersistentBackend {
                     }
                 },
                 LineageMutationKind::UpdateTree => {
-                    if !self.lineages.contains_key(&entry.lineage) {
-                        return Err(BackendError::UnknownLineage(entry.lineage));
+                    let metadata = self
+                        .lineages
+                        .get(&entry.lineage)
+                        .ok_or(BackendError::UnknownLineage(entry.lineage))?;
+
+                    if Some(metadata.version) != entry.old_version {
+                        return Err(BackendError::BadVersion {
+                            provided: entry.old_version.unwrap_or_default(),
+                            latest: metadata.version,
+                        });
+                    }
+
+                    if metadata.root_value != entry.old_root {
+                        return Err(MerkleError::ConflictingRoots {
+                            expected_root: entry.old_root,
+                            actual_root: metadata.root_value,
+                        }
+                        .into());
                     }
                 },
             }

@@ -9,14 +9,19 @@ use alloc::vec::Vec;
 
 use crate::{
     EMPTY_WORD, Map, Word,
-    merkle::smt::{
-        LeafIndex, SMT_DEPTH, Smt, SmtLeaf, SmtProof, VersionId,
-        large_forest::{
-            Backend, BackendReader,
-            backend::{BackendError, Result},
-            operation::{SmtForestUpdateBatch, SmtUpdateBatch},
-            root::{LineageId, TreeEntry, TreeWithRoot},
-            utils::{AppliedLineageMutation, LineageMutation, LineageMutationKind, MutationSet},
+    merkle::{
+        MerkleError,
+        smt::{
+            LeafIndex, SMT_DEPTH, Smt, SmtLeaf, SmtProof, VersionId,
+            large_forest::{
+                Backend, BackendReader,
+                backend::{BackendError, Result},
+                operation::{SmtForestUpdateBatch, SmtUpdateBatch},
+                root::{LineageId, TreeEntry, TreeWithRoot},
+                utils::{
+                    AppliedLineageMutation, LineageMutation, LineageMutationKind, MutationSet,
+                },
+            },
         },
     },
 };
@@ -411,8 +416,26 @@ impl Backend for InMemoryBackend {
                     }
                 },
                 LineageMutationKind::UpdateTree => {
-                    if !self.trees.contains_key(&mutation.lineage) {
-                        return Err(BackendError::UnknownLineage(mutation.lineage));
+                    let tree_data = self
+                        .trees
+                        .get(&mutation.lineage)
+                        .ok_or(BackendError::UnknownLineage(mutation.lineage))?;
+
+                    if Some(tree_data.version) != mutation.old_version {
+                        return Err(BackendError::BadVersion {
+                            provided: mutation.old_version.unwrap_or_default(),
+                            latest: tree_data.version,
+                        });
+                    }
+
+                    let old_root = mutation.forward.old_root();
+                    let latest_root = tree_data.tree.root();
+                    if latest_root != old_root {
+                        return Err(MerkleError::ConflictingRoots {
+                            expected_root: old_root,
+                            actual_root: latest_root,
+                        }
+                        .into());
                     }
                 },
             }

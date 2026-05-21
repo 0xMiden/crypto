@@ -665,6 +665,40 @@ fn apply_mutations_returns_reversion_data() -> Result<()> {
 }
 
 #[test]
+fn apply_mutations_rejects_stale_prepared_update() -> Result<()> {
+    let mut backend = InMemoryBackend::new();
+    let mut rng = ContinuousRng::new([0xa5; 32]);
+
+    let lineage: LineageId = rng.value();
+    let key_1: Word = rng.value();
+    let value_1: Word = rng.value();
+    let key_2: Word = rng.value();
+    let value_2: Word = rng.value();
+    let key_3: Word = rng.value();
+    let value_3: Word = rng.value();
+
+    let mut initial = SmtUpdateBatch::default();
+    initial.add_insert(key_1, value_1);
+    backend.add_lineage(lineage, 1, initial)?;
+
+    let mut stale_updates = SmtUpdateBatch::default();
+    stale_updates.add_insert(key_2, value_2);
+    let (_visible, stale_prepared) =
+        backend.compute_update_tree_mutations(lineage, 2, stale_updates)?;
+
+    let mut intervening_updates = SmtUpdateBatch::default();
+    intervening_updates.add_insert(key_3, value_3);
+    backend.update_tree(lineage, 2, intervening_updates)?;
+
+    assert!(
+        backend.apply_mutations(stale_prepared).is_err(),
+        "stale prepared mutations must not apply after the lineage root changes"
+    );
+
+    Ok(())
+}
+
+#[test]
 fn update_forest() -> Result<()> {
     let mut backend = InMemoryBackend::new();
     let mut rng = ContinuousRng::new([0x76; 32]);

@@ -284,6 +284,10 @@ pub trait Backend: BackendReader {
     ///
     /// Implementations must guarantee the following behavior in addition to the global invariants:
     ///
+    /// - The prepared mutation data must still be applicable to the current backend state before
+    ///   any mutation is written. For updates, the current version and root must match the
+    ///   version/root captured during the compute phase. For additions, the lineage must still be
+    ///   absent.
     /// - User-derived errors must leave the backend in a consistent committed state.
     /// - If the prepared data contains multiple lineage updates, they should be committed
     ///   atomically when the backend's storage engine supports atomic batched writes.
@@ -304,6 +308,10 @@ pub trait Backend: BackendReader {
 /// The error type for use within Backends.
 #[derive(Debug, Error)]
 pub enum BackendError {
+    /// Raised when an update was prepared against a version that is no longer current.
+    #[error("Version {provided} is not current backend version {latest}")]
+    BadVersion { provided: VersionId, latest: VersionId },
+
     /// Raised when corrupted data is encountered in the backend.
     ///
     /// It exists as a separate error variant to allow the forest itself to handle it better if
