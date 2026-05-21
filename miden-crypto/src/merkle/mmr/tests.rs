@@ -9,7 +9,7 @@ use super::{
 use crate::{
     Felt,
     merkle::{
-        EmptySubtreeRoots, MerklePath, MerkleTree, NodeIndex, int_to_node,
+        EmptySubtreeRoots, MerklePath, MerkleProof, MerkleTree, NodeIndex, int_to_node,
         mmr::{
             InOrderIndex, MmrPath, MmrProof,
             forest::{Forest, TreeSizeIterator, high_bitmask},
@@ -662,13 +662,36 @@ fn test_mmr_open_frontier_verifies_against_frontier_root() {
         mmr.add(leaf).unwrap();
 
         let frontier = mmr.frontier();
-        let root = frontier.root();
 
         for pos in 0..=len {
             let proof = mmr.open_frontier(pos).unwrap();
-            proof.path.verify(pos as u64, proof.value, &root).unwrap();
+            frontier.verify(pos, &proof).unwrap();
         }
     }
+}
+
+#[test]
+fn test_merkle_frontier_verify_rejects_out_of_range_empty_padding() {
+    let empty_leaf = empty_subtree_root(0);
+    let mut mmr = Mmr::new();
+    mmr.add(empty_leaf).unwrap();
+    mmr.add(empty_leaf).unwrap();
+
+    let frontier_len2 = mmr.frontier();
+    let mut frontier_len3 = frontier_len2.clone();
+    frontier_len3.append(empty_leaf).unwrap();
+
+    assert_eq!(frontier_len2.len(), 2);
+    assert_eq!(frontier_len3.len(), 3);
+    assert_eq!(frontier_len2.root(), frontier_len3.root());
+
+    let out_of_range_path = MerklePath::new(vec![empty_leaf, frontier_len2.peaks()[0]]);
+    out_of_range_path.verify(2, empty_leaf, &frontier_len2.root()).unwrap();
+
+    let err = frontier_len2
+        .verify(2, &MerkleProof::new(empty_leaf, out_of_range_path))
+        .unwrap_err();
+    assert_matches!(err, MmrError::PositionNotFound(2));
 }
 
 #[test]
@@ -681,10 +704,10 @@ fn test_partial_mmr_open_frontier_verifies_against_frontier_root() {
         partial.track(pos, proof.leaf(), proof.merkle_path()).unwrap();
     }
 
-    let root = partial.frontier().root();
+    let frontier = partial.frontier();
     for pos in [0, 2, 5, 6] {
         let proof = partial.open_frontier(pos).unwrap().unwrap();
-        proof.path.verify(pos as u64, proof.value, &root).unwrap();
+        frontier.verify(pos, &proof).unwrap();
     }
 
     assert!(partial.open_frontier(1).unwrap().is_none());

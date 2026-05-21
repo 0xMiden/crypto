@@ -124,8 +124,8 @@ impl MmrPeaks {
 
     /// Hashes the peaks.
     ///
-    /// This is the legacy MMR commitment. New consumers should use [`MerkleFrontier::root`] to
-    /// commit to the rooted append-only frontier.
+    /// This is the legacy MMR commitment. New consumers can use [`MerkleFrontier::root`] as a raw
+    /// Merkle root, authenticated together with the frontier length.
     ///
     /// The procedure will:
     /// - Flatten and pad the peaks to a vector of Felts.

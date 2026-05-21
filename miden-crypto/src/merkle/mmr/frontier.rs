@@ -1,8 +1,9 @@
 //! A compact rooted frontier for append-only Merkle trees.
 //!
 //! A [`MerkleFrontier`] stores the next leaf index (`len`) and the full left subtrees (`peaks`) on
-//! the path to that next leaf. Empty right subtrees are implied, and the public commitment is the
-//! Merkle root obtained by folding this path.
+//! the path to that next leaf. Empty right subtrees are implied, and the raw Merkle root is
+//! obtained by folding this path. The authenticated frontier state is the pair `(len, root)`: the
+//! root alone does not distinguish real leaves from implied empty padding.
 
 use alloc::vec::Vec;
 
@@ -86,10 +87,12 @@ impl MerkleFrontier {
     // FUNCTIONALITY
     // --------------------------------------------------------------------------------------------
 
-    /// Returns the Merkle root of this frontier.
+    /// Returns the raw Merkle root of this frontier.
     ///
     /// The root is computed by folding the path to `len`: set bits consume peaks on the left and
-    /// unset bits imply empty subtrees on the right.
+    /// unset bits imply empty subtrees on the right. This root should be authenticated together
+    /// with [`Self::len`]; by itself, it does not bind the number of real leaves before the implied
+    /// empty padding.
     pub fn root(&self) -> Word {
         if self.len == 0 {
             return empty_subtree_root(0);
@@ -115,10 +118,41 @@ impl MerkleFrontier {
         acc
     }
 
+    /// Verifies a Merkle proof against this frontier.
+    ///
+    /// This treats the frontier's authenticated state as `(len, root)`: the position must be below
+    /// [`Self::len`] before the proof is verified against [`Self::root`].
+    pub fn verify(&self, position: usize, proof: &MerkleProof) -> Result<(), MmrError> {
+        Self::verify_leaf(self.len, self.root(), position, proof.value, &proof.path)
+    }
+
+    /// Verifies a leaf opening against an authenticated `(len, root)` frontier pair.
+    ///
+    /// This is the safe public check to use when a verifier receives only the frontier length and
+    /// raw root rather than the full [`MerkleFrontier`] state.
+    pub fn verify_leaf(
+        len: usize,
+        root: Word,
+        position: usize,
+        leaf: Word,
+        path: &MerklePath,
+    ) -> Result<(), MmrError> {
+        if !Forest::is_valid_size(len) {
+            return Err(MmrError::ForestSizeExceeded { requested: len, max: Forest::MAX_LEAVES });
+        }
+        if position >= len {
+            return Err(MmrError::PositionNotFound(position));
+        }
+
+        path.verify(position as u64, leaf, &root).map_err(MmrError::InvalidMerklePath)
+    }
+
     /// Converts a peak-local MMR proof into a standard Merkle proof against this frontier's root.
     ///
     /// The input proof must be for the same forest length as this frontier. The returned path can
-    /// be verified with [`MerklePath::verify`] using the global leaf position and [`Self::root`].
+    /// be verified with [`Self::verify`] using the global leaf position. If only the frontier
+    /// length and raw root are available, use [`Self::verify_leaf`] so the position is checked
+    /// against the authenticated length before calling [`MerklePath::verify`].
     pub fn to_merkle_proof(&self, opening: &MmrProof) -> Result<MerkleProof, MmrError> {
         let proof_len = opening.forest().num_leaves();
         if proof_len != self.len {

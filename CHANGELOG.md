@@ -6,6 +6,7 @@
 - [BREAKING] Reorganized `miden-lifted-stark` internals: consolidated `align`, `bitrev`, `horner`, and `packing` helpers under a new `util` module; removed the legacy `fri::*` re-export facade ([#1000](https://github.com/0xMiden/crypto/pull/1000)).
 - [BREAKING] Extracted `BackendReader`, allowing `LargeSmtForest<S>` to work with read-only storage backends ([#986](https://github.com/0xMiden/crypto/pull/986)).
 - [BREAKING] Refactored `miden-lifted-stark::domain` around a uniform `Coset` trait shared by `TwoAdicSubgroup` and `TwoAdicCoset`, slimmed the `LiftedDomain` surface (drops dead getters, removes silently-dispatched `points`/`bit_reversed_points`/`vanishing_at` in favour of explicit `trace_subgroup()` / `lde_coset()` access), made `LiftedDomain` constructors fallible, moved selector logic onto `LiftedDomain`, and changed `log_blowup` to return `u8` ([#993](https://github.com/0xMiden/crypto/pull/993)).
+- Added `MerkleFrontier` as append-only `len + peaks` state with a raw Merkle root, append support, legacy `MmrPeaks` conversion, and standard Merkle proof bridging that authenticates `(len, root)` during verification ([#984](https://github.com/0xMiden/crypto/pull/984)).
 
 ## 0.25.0 (2026-05-01)
 
@@ -16,7 +17,6 @@
 - Added `Signature::from_der()` for EdDSA signatures ([#979](https://github.com/0xMiden/crypto/pull/979)).
 - Fixed `SimpleSmt::set_subtree()` to clear stale leaves and inner nodes in the replaced subtree region ([#981](https://github.com/0xMiden/crypto/pull/981)).
 - Fixed `SliceReader` bounds checking to reject overflowing read lengths ([#987](https://github.com/0xMiden/crypto/pull/987)).
-- Added `MerkleFrontier` as append-only `len + peaks` state with a normal Merkle root commitment, append support, legacy `MmrPeaks` conversion, and standard Merkle proof bridging ([#984](https://github.com/0xMiden/crypto/pull/984)).
 
 ## 0.24.0 (2026-04-19)
 

@@ -119,10 +119,10 @@ impl Mmr {
     }
 
     /// Returns a standard Merkle proof for the leaf at the specified position against the rooted
-    /// frontier commitment.
+    /// frontier.
     ///
-    /// The returned proof can be verified with `MerklePath::verify` using
-    /// `self.frontier().root()` as the expected root.
+    /// The returned proof can be verified with [`MerkleFrontier::verify`] using the authenticated
+    /// frontier state `(len, root)`.
     pub fn open_frontier(&self, pos: usize) -> Result<MerkleProof, MmrError> {
         let opening = self.open(pos)?;
         self.frontier().to_merkle_proof(&opening)
