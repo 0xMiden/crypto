@@ -175,20 +175,21 @@ fn bench_mmr_verify(c: &mut Criterion) {
             },
         );
 
-        group.bench_with_input(BenchmarkId::new("frontier-root", size), &size, |b, &size| {
+        group.bench_with_input(BenchmarkId::new("frontier-len-root", size), &size, |b, &size| {
             let data = build_data(size);
+            let len = data.frontier.len();
             let root = data.frontier.root();
             let proof = data.mmr.open_frontier(data.leaf_pos).unwrap();
 
             b.iter(|| {
-                proof
-                    .path
-                    .verify(
-                        data.leaf_pos as u64,
-                        hint::black_box(proof.value),
-                        hint::black_box(&root),
-                    )
-                    .unwrap();
+                MerkleFrontier::verify_leaf(
+                    hint::black_box(len),
+                    hint::black_box(root),
+                    hint::black_box(data.leaf_pos),
+                    hint::black_box(proof.value),
+                    hint::black_box(&proof.path),
+                )
+                .unwrap();
             });
         });
     }
