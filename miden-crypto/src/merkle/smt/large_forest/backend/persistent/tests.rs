@@ -825,6 +825,29 @@ fn update_forest() -> Result<()> {
 }
 
 #[test]
+fn forest_apply_noop_update_tree_does_not_panic() {
+    let (_dir, backend) = default_backend().unwrap();
+    let mut forest = LargeSmtForest::new(backend).unwrap();
+    let mut rng = ContinuousRng::new([0x99; 32]);
+
+    let lineage: LineageId = rng.value();
+    let key: Word = rng.value();
+    let value: Word = rng.value();
+
+    let mut initial = SmtUpdateBatch::default();
+    initial.add_insert(key, value);
+    forest.add_lineage(lineage, 1, initial).unwrap();
+
+    let mut noop = SmtUpdateBatch::default();
+    noop.add_insert(key, value);
+    let mutations = forest.compute_update_tree_mutations(lineage, 2, noop).unwrap();
+    let roots = forest.apply_mutations(mutations).unwrap();
+
+    assert_eq!(roots.len(), 1);
+    assert_eq!(roots[0].version(), 1);
+}
+
+#[test]
 fn apply_mutations_rejects_stale_prepared_update() -> Result<()> {
     let (_dir, mut backend) = default_backend()?;
     let mut rng = ContinuousRng::new([0xa5; 32]);

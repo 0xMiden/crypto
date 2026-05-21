@@ -105,6 +105,7 @@ pub struct PersistentPreparedMutations {
 struct PersistentPreparedLineageMutation {
     lineage: LineageId,
     old_version: Option<VersionId>,
+    new_version: VersionId,
     old_root: Word,
     old_entry_count: usize,
     reverse: MutationSet,
@@ -574,7 +575,7 @@ impl Backend for PersistentBackend {
                 let applied_entry = AppliedLineageMutation::new(
                     entry.lineage,
                     entry.old_version,
-                    entry.metadata.version,
+                    entry.new_version,
                     entry.old_root,
                     entry.metadata.root_value,
                     entry.old_entry_count,
@@ -868,6 +869,7 @@ impl PersistentBackend {
             let prepared = PersistentPreparedLineageMutation {
                 lineage,
                 old_version: (kind == LineageMutationKind::UpdateTree).then_some(old_version),
+                new_version,
                 old_root,
                 old_entry_count,
                 reverse: empty,
@@ -989,6 +991,7 @@ impl PersistentBackend {
         let prepared = PersistentPreparedLineageMutation {
             lineage,
             old_version: (kind == LineageMutationKind::UpdateTree).then_some(old_version),
+            new_version,
             old_root,
             old_entry_count,
             reverse,
