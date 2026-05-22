@@ -14,13 +14,14 @@ use alloc::vec::Vec;
 
 use super::{
     super::{InnerNodeInfo, MerklePath},
-    MmrDelta, MmrError, MmrPath, MmrPeaks, MmrProof,
+    MerkleFrontier, MmrDelta, MmrError, MmrPath, MmrPeaks, MmrProof,
     forest::{Forest, TreeSizeIterator},
     nodes_from_mask,
 };
 use crate::{
     Word,
     hash::poseidon2::Poseidon2,
+    merkle::MerkleProof,
     utils::{ByteReader, ByteWriter, Deserializable, DeserializationError, Serializable},
 };
 
@@ -117,6 +118,16 @@ impl Mmr {
         self.open_at(pos, self.forest)
     }
 
+    /// Returns a standard Merkle proof for the leaf at the specified position against the rooted
+    /// frontier.
+    ///
+    /// The returned proof can be verified with [`MerkleFrontier::verify`] using the authenticated
+    /// frontier state `(len, root)`.
+    pub fn open_frontier(&self, pos: usize) -> Result<MerkleProof, MmrError> {
+        let opening = self.open(pos)?;
+        self.frontier().to_merkle_proof(&opening)
+    }
+
     /// Returns an [MmrProof] for the leaf at the specified position using the state of the MMR
     /// at the specified `forest`.
     ///
@@ -187,6 +198,11 @@ impl Mmr {
     /// Returns the current peaks of the MMR.
     pub fn peaks(&self) -> MmrPeaks {
         self.peaks_at(self.forest).expect("failed to get peaks at current forest")
+    }
+
+    /// Returns the current rooted frontier of the MMR.
+    pub fn frontier(&self) -> MerkleFrontier {
+        self.peaks().into()
     }
 
     /// Returns the peaks of the MMR at the state specified by `forest`.

@@ -3,14 +3,14 @@ use alloc::vec::Vec;
 use crate::{
     Felt, Word, ZERO,
     hash::poseidon2::Poseidon2,
-    merkle::mmr::{Forest, MmrError, MmrProof},
+    merkle::mmr::{Forest, MerkleFrontier, MmrError, MmrProof},
 };
 
 // MMR PEAKS
 // ================================================================================================
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-#[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct MmrPeaks {
     /// The number of leaves (represented by [`Forest`]) is used to differentiate MMRs that have
     /// the same number of peaks. This happens because the number of peaks goes up-and-down as
@@ -117,7 +117,15 @@ impl MmrPeaks {
         (self.forest, self.peaks)
     }
 
+    /// Converts these peaks into a rooted [`MerkleFrontier`].
+    pub fn into_frontier(self) -> MerkleFrontier {
+        self.into()
+    }
+
     /// Hashes the peaks.
+    ///
+    /// This is the legacy MMR commitment. New consumers can use [`MerkleFrontier::root`] as a raw
+    /// Merkle root, authenticated together with the frontier length.
     ///
     /// The procedure will:
     /// - Flatten and pad the peaks to a vector of Felts.
@@ -178,5 +186,22 @@ impl MmrPeaks {
 impl From<MmrPeaks> for Vec<Word> {
     fn from(peaks: MmrPeaks) -> Self {
         peaks.peaks
+    }
+}
+
+#[cfg(feature = "serde")]
+impl<'de> serde::Deserialize<'de> for MmrPeaks {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        #[derive(serde::Deserialize)]
+        struct MmrPeaksParts {
+            forest: Forest,
+            peaks: Vec<Word>,
+        }
+
+        let parts = MmrPeaksParts::deserialize(deserializer)?;
+        MmrPeaks::new(parts.forest, parts.peaks).map_err(serde::de::Error::custom)
     }
 }

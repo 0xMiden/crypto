@@ -4,17 +4,18 @@ use assert_matches::assert_matches;
 
 use super::{
     super::{InnerNodeInfo, Poseidon2, Word},
-    Mmr, MmrError, MmrPeaks, PartialMmr, nodes_from_mask,
+    MerkleFrontier, Mmr, MmrError, MmrPeaks, PartialMmr, nodes_from_mask,
 };
 use crate::{
     Felt,
     merkle::{
-        MerklePath, MerkleTree, NodeIndex, int_to_node,
+        EmptySubtreeRoots, MerklePath, MerkleProof, MerkleTree, NodeIndex, int_to_node,
         mmr::{
             InOrderIndex, MmrPath, MmrProof,
             forest::{Forest, TreeSizeIterator, high_bitmask},
         },
     },
+    utils::{Deserializable, DeserializationError, Serializable},
 };
 
 #[test]
@@ -22,6 +23,16 @@ fn tests_empty_mmr_peaks() {
     let peaks = MmrPeaks::default();
     assert_eq!(peaks.num_peaks(), 0);
     assert_eq!(peaks.num_leaves(), 0);
+}
+
+#[test]
+fn test_empty_merkle_frontier() {
+    let frontier = MerkleFrontier::default();
+    assert_eq!(frontier.len(), 0);
+    assert_eq!(frontier.num_leaves(), 0);
+    assert_eq!(frontier.num_peaks(), 0);
+    assert!(frontier.is_empty());
+    assert_eq!(frontier.root(), empty_subtree_root(0));
 }
 
 #[test]
@@ -573,6 +584,195 @@ const LEAVES: [Word; 7] = [
     int_to_node(5),
     int_to_node(6),
 ];
+
+#[test]
+fn test_merkle_frontier_root_small_forests() {
+    let peak_01 = merge(LEAVES[0], LEAVES[1]);
+    let peak_23 = merge(LEAVES[2], LEAVES[3]);
+    let peak_0123 = merge(peak_01, peak_23);
+    let peak_45 = merge(LEAVES[4], LEAVES[5]);
+
+    let cases = [
+        (0, vec![], empty_subtree_root(0)),
+        (1, vec![LEAVES[0]], merge(LEAVES[0], empty_subtree_root(0))),
+        (2, vec![peak_01], merge(peak_01, empty_subtree_root(1))),
+        (
+            3,
+            vec![peak_01, LEAVES[2]],
+            merge(peak_01, merge(LEAVES[2], empty_subtree_root(0))),
+        ),
+        (4, vec![peak_0123], merge(peak_0123, empty_subtree_root(2))),
+        (
+            5,
+            vec![peak_0123, LEAVES[4]],
+            merge(peak_0123, merge(merge(LEAVES[4], empty_subtree_root(0)), empty_subtree_root(1))),
+        ),
+        (
+            6,
+            vec![peak_0123, peak_45],
+            merge(peak_0123, merge(peak_45, empty_subtree_root(1))),
+        ),
+        (
+            7,
+            vec![peak_0123, peak_45, LEAVES[6]],
+            merge(peak_0123, merge(peak_45, merge(LEAVES[6], empty_subtree_root(0)))),
+        ),
+    ];
+
+    for (len, peaks, expected_root) in cases {
+        let frontier = MerkleFrontier::new(len, peaks).unwrap();
+        assert_eq!(frontier.root(), expected_root);
+    }
+}
+
+#[test]
+fn test_merkle_frontier_append_matches_mmr() {
+    let mut frontier = MerkleFrontier::default();
+    let mut mmr = Mmr::new();
+
+    for leaf in LEAVES {
+        frontier.append(leaf).unwrap();
+        mmr.add(leaf).unwrap();
+
+        let mmr_frontier = mmr.frontier();
+        assert_eq!(frontier, mmr_frontier);
+        assert_eq!(frontier.root(), mmr_frontier.root());
+        assert_eq!(MmrPeaks::from(frontier.clone()), mmr.peaks());
+    }
+}
+
+#[test]
+fn test_merkle_frontier_converts_from_mmr_peaks() {
+    let mmr = Mmr::try_from_iter(LEAVES).unwrap();
+    let peaks = mmr.peaks();
+    let frontier = MerkleFrontier::from(&peaks);
+
+    assert_eq!(frontier.len(), peaks.num_leaves());
+    assert_eq!(frontier.peaks(), peaks.peaks());
+    assert_eq!(frontier.clone().into_legacy_peaks(), peaks);
+    assert_eq!(frontier.root(), MerkleFrontier::from(mmr.peaks()).root());
+}
+
+#[test]
+fn test_mmr_open_frontier_verifies_against_frontier_root() {
+    let mut mmr = Mmr::new();
+
+    for len in 0..32 {
+        let leaf = int_to_node(len as u64);
+        mmr.add(leaf).unwrap();
+
+        let frontier = mmr.frontier();
+
+        for pos in 0..=len {
+            let proof = mmr.open_frontier(pos).unwrap();
+            frontier.verify(pos, &proof).unwrap();
+        }
+    }
+}
+
+#[test]
+fn test_merkle_frontier_verify_rejects_out_of_range_empty_padding() {
+    let empty_leaf = empty_subtree_root(0);
+    let mut mmr = Mmr::new();
+    mmr.add(empty_leaf).unwrap();
+    mmr.add(empty_leaf).unwrap();
+
+    let frontier_len2 = mmr.frontier();
+    let mut frontier_len3 = frontier_len2.clone();
+    frontier_len3.append(empty_leaf).unwrap();
+
+    assert_eq!(frontier_len2.len(), 2);
+    assert_eq!(frontier_len3.len(), 3);
+    assert_eq!(frontier_len2.root(), frontier_len3.root());
+
+    let out_of_range_path = MerklePath::new(vec![empty_leaf, frontier_len2.peaks()[0]]);
+    out_of_range_path.verify(2, empty_leaf, &frontier_len2.root()).unwrap();
+
+    let err = frontier_len2
+        .verify(2, &MerkleProof::new(empty_leaf, out_of_range_path))
+        .unwrap_err();
+    assert_matches!(err, MmrError::PositionNotFound(2));
+}
+
+#[test]
+fn test_partial_mmr_open_frontier_verifies_against_frontier_root() {
+    let mmr = Mmr::try_from_iter(LEAVES).unwrap();
+    let mut partial = PartialMmr::from_peaks(mmr.peaks());
+
+    for pos in [0, 2, 5, 6] {
+        let proof = mmr.open(pos).unwrap();
+        partial.track(pos, proof.leaf(), proof.merkle_path()).unwrap();
+    }
+
+    let frontier = partial.frontier();
+    for pos in [0, 2, 5, 6] {
+        let proof = partial.open_frontier(pos).unwrap().unwrap();
+        frontier.verify(pos, &proof).unwrap();
+    }
+
+    assert!(partial.open_frontier(1).unwrap().is_none());
+}
+
+#[test]
+fn test_merkle_frontier_rejects_invalid_peaks() {
+    let err = MerkleFrontier::new(0b11, vec![LEAVES[0]]).unwrap_err();
+    assert_matches!(err, MmrError::InvalidPeaks(_));
+}
+
+#[test]
+fn test_merkle_frontier_serialization_roundtrip() {
+    let mmr = Mmr::try_from_iter(LEAVES).unwrap();
+    let frontier = mmr.frontier();
+
+    let decoded = MerkleFrontier::read_from_bytes(&frontier.to_bytes()).unwrap();
+
+    assert_eq!(decoded, frontier);
+    assert_eq!(decoded.root(), frontier.root());
+}
+
+#[test]
+fn test_merkle_frontier_deserialization_rejects_large_len() {
+    let bytes = (Forest::MAX_LEAVES + 1).to_bytes();
+
+    let result = MerkleFrontier::read_from_bytes(&bytes);
+
+    assert!(matches!(result, Err(DeserializationError::InvalidValue(_))));
+}
+
+#[test]
+fn test_merkle_frontier_deserialization_rejects_invalid_peak_count() {
+    let mut bytes = 0b11usize.to_bytes();
+    bytes.extend_from_slice(&1usize.to_bytes());
+
+    let result = MerkleFrontier::read_from_bytes(&bytes);
+
+    assert!(matches!(result, Err(DeserializationError::InvalidValue(_))));
+}
+
+#[test]
+fn test_merkle_frontier_rejects_proof_from_different_forest() {
+    let mmr = Mmr::try_from_iter(LEAVES).unwrap();
+    let proof = mmr.open_at(0, Forest::new(4).unwrap()).unwrap();
+
+    let err = mmr.frontier().to_merkle_proof(&proof).unwrap_err();
+
+    assert_matches!(
+        err,
+        MmrError::InconsistentProofForest { proof, frontier }
+            if proof == 4 && frontier == LEAVES.len()
+    );
+}
+
+#[test]
+fn test_merkle_frontier_rejects_proof_with_wrong_peak_path_depth() {
+    let mmr = Mmr::try_from_iter(LEAVES).unwrap();
+    let path = MmrPath::new(mmr.forest(), 0, MerklePath::new(Vec::new()));
+    let proof = MmrProof::new(path, LEAVES[0]);
+
+    let err = mmr.frontier().to_merkle_proof(&proof).unwrap_err();
+
+    assert_matches!(err, MmrError::InvalidMerklePath(_));
+}
 
 #[test]
 fn test_mmr_simple() {
@@ -1511,6 +1711,10 @@ fn digests_to_elements(digests: &[Word]) -> Vec<Felt> {
 // short hand for the Poseidon2 hash, used to make test code more concise and easy to read
 fn merge(l: Word, r: Word) -> Word {
     Poseidon2::merge(&[l, r])
+}
+
+fn empty_subtree_root(height: u8) -> Word {
+    *EmptySubtreeRoots::entry(height, 0)
 }
 
 /// Given a leaf index and the current forest, return the tree number responsible for
