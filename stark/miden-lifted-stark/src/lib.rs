@@ -103,7 +103,6 @@ pub mod air {
         AirBuilderWithContext,
         BaseAir,
         ConstraintDegrees,
-        EmptyWindow,
         ExtensionBuilder,
         FilteredAirBuilder,
         // Lifted AIR types
