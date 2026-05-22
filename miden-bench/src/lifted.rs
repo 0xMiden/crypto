@@ -3,7 +3,7 @@
 use std::fmt;
 
 use miden_lifted_stark::{
-    StarkConfig,
+    StarkConfig, StarkProverStatement, StarkStatement,
     air::{BaseAir, LiftedAir, LiftedAirBuilder, MultiAir, ProverStatement, Statement},
     prove,
     testing::airs::{
@@ -138,10 +138,11 @@ where
     let statement =
         Statement::new(BenchMultiAir { airs }, Vec::new(), Vec::new()).expect("statement");
     let prover_statement = ProverStatement::new(statement, traces).expect("prover statement");
+    let stark_prover_statement =
+        StarkProverStatement::new(config, &prover_statement).expect("no preprocessed columns");
 
-    let output = info_span!("prove").in_scope(|| {
-        prove(config, &prover_statement, config.challenger()).expect("proving failed")
-    });
+    let output = info_span!("prove")
+        .in_scope(|| prove(&stark_prover_statement, config.challenger()).expect("proving failed"));
 
     let result = RunResult {
         proof_size_bytes: output.proof.size_in_bytes(),
@@ -151,9 +152,10 @@ where
 
     if !cli.no_verify {
         info_span!("verify").in_scope(|| {
-            let digest =
-                verify(config, prover_statement.statement(), &output.proof, config.challenger())
-                    .expect("verification failed");
+            let stark_statement = StarkStatement::new(config, prover_statement.statement())
+                .expect("no preprocessed columns");
+            let digest = verify(&stark_statement, &output.proof, config.challenger())
+                .expect("verification failed");
             assert_eq!(output.digest, digest);
         });
     }

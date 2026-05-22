@@ -6,8 +6,7 @@
 use alloc::{vec, vec::Vec};
 
 use miden_lifted_air::{
-    AirBuilder, EmptyWindow, ExtensionBuilder, LiftedAir, PeriodicAirBuilder,
-    PermutationAirBuilder,
+    AirBuilder, ExtensionBuilder, LiftedAir, PeriodicAirBuilder, PermutationAirBuilder,
     symbolic::{AirLayout, ConstraintLayout},
 };
 use p3_field::{ExtensionField, Field};
@@ -48,6 +47,7 @@ where
 /// capture the `&self` lifetime from `main()`.
 struct ConstraintLayoutBuilder<F: Field> {
     main: RowMajorMatrix<F>,
+    preprocessed: RowMajorMatrix<F>,
     public_values: Vec<F>,
     periodic_values: Vec<F>,
     permutation: RowMajorMatrix<F>,
@@ -60,6 +60,7 @@ struct ConstraintLayoutBuilder<F: Field> {
 impl<F: Field> ConstraintLayoutBuilder<F> {
     fn new(layout: AirLayout) -> Self {
         let AirLayout {
+            preprocessed_width,
             main_width,
             num_public_values,
             permutation_width,
@@ -70,6 +71,12 @@ impl<F: Field> ConstraintLayoutBuilder<F> {
         } = layout;
         Self {
             main: RowMajorMatrix::new(vec![F::ZERO; 2 * main_width], main_width),
+            // `.max(1)` avoids a zero-width matrix when there are no preprocessed
+            // columns; the window is never read in that case.
+            preprocessed: RowMajorMatrix::new(
+                vec![F::ZERO; 2 * preprocessed_width.max(1)],
+                preprocessed_width.max(1),
+            ),
             public_values: vec![F::ZERO; num_public_values],
             periodic_values: vec![F::ZERO; num_periodic_columns],
             permutation: RowMajorMatrix::new(
@@ -92,7 +99,7 @@ impl<F: Field> AirBuilder for ConstraintLayoutBuilder<F> {
     type F = F;
     type Expr = F;
     type Var = F;
-    type PreprocessedWindow = EmptyWindow<F>;
+    type PreprocessedWindow = RowMajorMatrix<F>;
     type MainWindow = RowMajorMatrix<F>;
     type PublicVar = F;
 
@@ -101,7 +108,7 @@ impl<F: Field> AirBuilder for ConstraintLayoutBuilder<F> {
     }
 
     fn preprocessed(&self) -> &Self::PreprocessedWindow {
-        EmptyWindow::empty_ref()
+        &self.preprocessed
     }
 
     fn is_first_row(&self) -> Self::Expr {

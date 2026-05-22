@@ -48,16 +48,20 @@ use miden_lifted_air::{
     BaseAir, InstanceError, LiftedAir, MultiAir, ReductionError, RowWindow, Statement,
 };
 use miden_stark_transcript::{Channel, TranscriptError, VerifierChannel, VerifierTranscript};
+use p3_challenger::CanObserve;
 use p3_field::{ExtensionField, TwoAdicField};
 use p3_matrix::Matrix;
 use periodic::PeriodicPolys;
 use thiserror::Error;
 
 use crate::{
-    StarkConfig,
+    StarkConfig, StarkStatement,
     domain::{Coset, DomainError, LiftedDomain, log_quotient_degree},
     order::{ShapeError, TraceOrder},
-    pcs::verifier::{PcsError, verify_aligned},
+    pcs::{
+        group_indices,
+        verifier::{PcsError, verify_aligned},
+    },
     proof::{StarkDigest, StarkProofData},
     util::packing::row_to_packed_ext,
 };
@@ -113,13 +117,32 @@ pub enum VerifierError {
 /// codeword encodes `p_lift(X) = p(X^{rⱼ})`; opening at `[z, z · h_max]`
 /// yields the local/next row pair for the original trace domain.
 ///
-/// As with [`crate::prove`], only runtime statement/proof data is validated; the
-/// AIR structural contract is trusted (see the crate-level trust model). The
-/// proof's declared heights are not compared against any caller expectation —
-/// see the module-level docs to bind them yourself.
+/// **Statement-bound heights:** this function does not compare the proof's
+/// declared heights against any caller expectation. If your statement fixes
+/// trace dimensions, parse via
+/// [`StarkProof::from_data`](crate::proof::StarkProof::from_data)
+/// and check `proof.log_trace_heights()` before calling this. See the module-level docs for the
+/// full contract.
+///
+/// # Trust contract
+///
+/// `verify` validates the runtime statement plus everything carried on the
+/// proof; the AIR list is **trusted** (run
+/// [`miden_lifted_air::debug::assert_multi_air_valid`] from tests).
+///
+/// ## Validated
+/// - Same statement checks as [`crate::prove`] minus trace shape (no traces here)
+/// - Same `log_quotient_degree <= log_blowup` compat check
+/// - Proof shape via the internal trace-order reconstruction from log heights
+/// - Proof byte parsing (transcript channel)
+/// - PCS / FRI / DEEP / LMCS / transcript / constraint identity
+/// - External assertions from [`Statement::eval_external`]
+/// - Preprocessed openings against the trusted commitment (via the PCS)
+///
+/// ## Trusted (NOT validated)
+/// - AIR structural shape (same list as in [`crate::prove`])
 pub fn verify<F, EF, MA, SC>(
-    config: &SC,
-    statement: &Statement<F, EF, MA>,
+    stark_statement: &StarkStatement<'_, F, EF, MA, SC>,
     proof: &StarkProofData<F, EF, SC>,
     mut challenger: SC::Challenger,
 ) -> Result<StarkDigest<F, EF, SC>, VerifierError>
@@ -130,6 +153,9 @@ where
     MA: MultiAir<F, EF>,
 {
     // --- Trust boundary (see doc-block above). -------------------------------
+    let config = stark_statement.config();
+    let statement: &Statement<F, EF, MA> = stark_statement.statement();
+    let preprocessed_commitment = stark_statement.preprocessed_commitment();
     //
     // `TraceOrder::from_log_heights` validates the (untrusted) proof heights
     // against the AIRs: it bounds `log_h` within the host's `usize` width
@@ -140,6 +166,11 @@ where
         statement.airs(),
         proof.log_trace_heights.clone(),
     )?;
+
+    // Preprocessed leaf↔AIR mappings (instance order), reconstructed from the
+    // heights — the same ones the prover used.
+    let leaf_to_air = trace_order.preprocessed_air_for_leaf::<F, EF, _>(statement.airs());
+    let air_to_leaf = trace_order.preprocessed_leaf_for_air::<F, EF, _>(statement.airs());
 
     let air_refs: Vec<&MA::Air> = statement.airs().iter().collect();
     let proof_ordered_airs = trace_order.to_proof_order(&air_refs);
@@ -153,6 +184,12 @@ where
         .iter()
         .map(|&log_h| max_lde_domain.try_sub_domain(log_h))
         .collect::<Result<_, _>>()?;
+
+    // Observe the preprocessed commitment first (when present); mirrors the
+    // prover. It is a trusted statement input, not read from the proof.
+    if let Some(commitment) = preprocessed_commitment {
+        challenger.observe(commitment.clone());
+    }
 
     // `Statement::observe` absorbs statement-owned inputs. The protocol then
     // binds the instance count and each log trace height in instance order.
@@ -231,11 +268,24 @@ where
 
     // Build commitments with original (unpadded) widths.
     // The PCS aligned wrapper handles alignment and truncation internally.
-    let commitments = vec![
-        (main_commit, main_widths),
-        (aux_commit, aux_widths),
-        (quotient_commit, quotient_widths),
-    ];
+    // The preprocessed group (when present) is first, mirroring the prover; its
+    // widths are in tree (leaf) order, while main/aux are in proof order.
+    let (preproc_g, main_g, aux_g, quot_g) = group_indices(preprocessed_commitment.is_some());
+    let mut commitments = Vec::with_capacity(4);
+    if let Some(commitment) = preprocessed_commitment {
+        let preprocessed_widths: Vec<usize> = leaf_to_air
+            .iter()
+            .map(|&air_idx| statement.airs()[air_idx as usize].preprocessed_width())
+            .collect();
+        debug_assert_eq!(commitments.len(), preproc_g.expect("group present"));
+        commitments.push((commitment.clone(), preprocessed_widths));
+    }
+    debug_assert_eq!(commitments.len(), main_g);
+    commitments.push((main_commit, main_widths));
+    debug_assert_eq!(commitments.len(), aux_g);
+    commitments.push((aux_commit, aux_widths));
+    debug_assert_eq!(commitments.len(), quot_g);
+    commitments.push((quotient_commit, quotient_widths));
 
     // 8. Verify PCS openings (returns per-matrix RowMajorMatrix<EF>, truncated to original widths)
     let opened = verify_aligned::<F, EF, SC::Lmcs, _, 2>(
@@ -247,10 +297,7 @@ where
         &mut channel,
     )?;
 
-    // 9. Group indices for accessing opened matrices: [main, aux, quotient].
-    let (main_g, aux_g, quot_g) = (0, 1, 2);
-
-    // 10. Per-AIR constraint evaluation and beta accumulation.
+    // 9. Per-AIR constraint evaluation and beta accumulation.
     //
     // opened[g] has one matrix per AIR (for main/aux) or one matrix total (quotient).
     // Each matrix has N=2 rows: row 0 = local (z), row 1 = next (z·h).
@@ -290,8 +337,42 @@ where
 
         let aux_values_j = &all_aux_values[j];
         let num_rand = air.num_randomness();
+
+        // Extract opened preprocessed rows when this AIR declares preprocessed
+        // columns. The tree leaf index comes from the inverse `air_to_leaf`
+        // mapping; opened values are already EF, truncated to the declared
+        // width by `verify_aligned`.
+        let preproc_local;
+        let preproc_next;
+        let instance_idx = trace_order.instance_indices()[j] as usize;
+        let preprocessed_window = match air_to_leaf[instance_idx] {
+            Some(leaf_idx) => {
+                let g = preproc_g
+                    .expect("AIR resolves to a preprocessed leaf, so the preproc group is present");
+                let preproc_mat = &opened[g][leaf_idx];
+                preproc_local = preproc_mat
+                    .row_slice(0)
+                    .expect("preprocessed row 0")
+                    .iter()
+                    .copied()
+                    .collect::<Vec<EF>>();
+                preproc_next = preproc_mat
+                    .row_slice(1)
+                    .expect("preprocessed row 1")
+                    .iter()
+                    .copied()
+                    .collect::<Vec<EF>>();
+                RowWindow::from_two_rows(preproc_local.as_slice(), preproc_next.as_slice())
+            },
+            None => {
+                let empty: &[EF] = &[];
+                RowWindow::from_two_rows(empty, empty)
+            },
+        };
+
         let mut folder = ConstraintFolder {
             main: main_window,
+            preprocessed: preprocessed_window,
             aux: aux_window,
             randomness: &randomness[..num_rand],
             public_values: air_inputs,

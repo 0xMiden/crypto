@@ -47,3 +47,18 @@ pub use fri::{
 pub use params::{PcsParams, PcsParamsError};
 pub use proof::PcsProof;
 pub use verifier::PcsError;
+
+/// Commitment-group indices for a proof, in batch order.
+///
+/// The groups are committed, observed, and opened as
+/// `[preprocessed?, main, aux, quotient]`. The preprocessed group is present
+/// (index 0) only when some AIR declares preprocessed columns; `main`/`aux`/
+/// `quotient` shift up by one accordingly. Prover and verifier derive the
+/// indices from the same `has_preprocessed` flag, keeping the batch ordering
+/// in lockstep.
+///
+/// Returns `(preprocessed, main, aux, quotient)`.
+pub(crate) fn group_indices(has_preprocessed: bool) -> (Option<usize>, usize, usize, usize) {
+    let s = has_preprocessed as usize;
+    (has_preprocessed.then_some(0), s, s + 1, s + 2)
+}

@@ -7,7 +7,7 @@ use p3_field::PrimeCharacteristicRing;
 use p3_matrix::{Matrix, dense::RowMajorMatrix};
 
 use crate::{
-    VerifierError,
+    StarkProverStatement, StarkStatement, VerifierError,
     air::{
         AirBuilder, BaseAir, ExtensionBuilder, InstanceError, LiftedAir, LiftedAirBuilder,
         MultiAir, ProverStatement, Statement, WindowAccess,
@@ -204,11 +204,16 @@ fn malformed_transcript_is_rejected() {
     )
     .expect("valid");
 
-    let output =
-        prove(&config, &prover_statement, test_challenger()).expect("proving should succeed");
+    let output = prove(
+        &StarkProverStatement::new(&config, &prover_statement).expect("no preprocessed columns"),
+        test_challenger(),
+    )
+    .expect("proving should succeed");
 
     // Baseline should verify
-    let _digest = verify(&config, prover_statement.statement(), &output.proof, test_challenger())
+    let baseline_statement = StarkStatement::new(&config, prover_statement.statement())
+        .expect("no preprocessed columns");
+    let _digest = verify(&baseline_statement, &output.proof, test_challenger())
         .expect("baseline proof should verify");
 
     // Extra field element should cause rejection
@@ -217,7 +222,7 @@ fn malformed_transcript_is_rejected() {
     fields.push(Felt::ONE);
     bad_proof.transcript = TranscriptData::new(fields, commitments);
 
-    let err = verify(&config, prover_statement.statement(), &bad_proof, test_challenger())
+    let err = verify(&baseline_statement, &bad_proof, test_challenger())
         .expect_err("extra transcript data should fail verification");
     assert!(matches!(err, VerifierError::Transcript(TranscriptError::TrailingData)));
 }
@@ -232,9 +237,13 @@ fn malformed_log_trace_heights_is_rejected() {
     )
     .expect("valid");
     let statement = prover_statement.statement();
+    let stark_statement = StarkStatement::new(&config, statement).expect("no preprocessed columns");
 
-    let output =
-        prove(&config, &prover_statement, test_challenger()).expect("proving should succeed");
+    let output = prove(
+        &StarkProverStatement::new(&config, &prover_statement).expect("no preprocessed columns"),
+        test_challenger(),
+    )
+    .expect("proving should succeed");
 
     // Poke the `pub(crate)` `log_trace_heights` directly to feed the verifier
     // malformed shapes that bypass `ProverStatement` construction — the cases
@@ -244,7 +253,7 @@ fn malformed_log_trace_heights_is_rejected() {
     // before `1usize << log_h` could overflow.
     let mut bad_proof = output.proof.clone();
     bad_proof.log_trace_heights = vec![200];
-    let err = verify(&config, statement, &bad_proof, test_challenger())
+    let err = verify(&stark_statement, &bad_proof, test_challenger())
         .expect_err("oversized log trace height should fail verification");
     assert!(matches!(
         err,
@@ -255,7 +264,7 @@ fn malformed_log_trace_heights_is_rejected() {
     // domain (33 > 32), rejected by `try_canonical` before any generator lookup.
     let mut bad_proof = output.proof;
     bad_proof.log_trace_heights = vec![30];
-    let err = verify(&config, statement, &bad_proof, test_challenger())
+    let err = verify(&stark_statement, &bad_proof, test_challenger())
         .expect_err("log_h + log_blowup exceeding two-adicity should fail verification");
     assert!(matches!(err, VerifierError::Domain(DomainError::LdeOrderTooLarge { .. })));
 }
@@ -333,8 +342,11 @@ fn air_order_reflects_caller_order() {
     )
     .expect("valid");
 
-    let output =
-        prove(&config, &prover_statement, test_challenger()).expect("proving should succeed");
+    let output = prove(
+        &StarkProverStatement::new(&config, &prover_statement).expect("no preprocessed columns"),
+        test_challenger(),
+    )
+    .expect("proving should succeed");
 
     // The proof carries heights in instance order: [height=8, height=4]
     // → [log_h=3, log_h=2]. The proof's AIR ordering itself is implicit

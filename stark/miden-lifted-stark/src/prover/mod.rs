@@ -39,13 +39,15 @@
 //! // ... bind AIR configurations + air ordering (see below) ...
 //!
 //! // --- Prove ---
-//! let output = prove(&config, &prover_statement, ch)?;
+//! let stark_prover_statement = StarkProverStatement::new(&config, prover_statement)?;
+//! let output = prove(&stark_prover_statement, ch)?;
 //!
 //! // --- Verify (identical binding + the same statement) ---
 //! let mut ch = Challenger::new(perm);
 //! ch.observe_slice(&b"MY_APP_V1".map(|b| F::from_u8(b)));
 //! ch.observe(F::from_u8(config.pcs().log_blowup()));
-//! let verifier_digest = verify(&config, prover_statement.statement(), &output.proof, ch)?;
+//! let stark_statement = StarkStatement::new(&config, stark_prover_statement.statement())?;
+//! let verifier_digest = verify(&stark_statement, &output.proof, ch)?;
 //! assert_eq!(output.digest, verifier_digest);
 //! ```
 //!
@@ -67,12 +69,13 @@ pub(crate) mod constraints;
 pub(crate) mod periodic;
 pub(crate) mod quotient;
 
-use alloc::{vec, vec::Vec};
+use alloc::vec::Vec;
 
 use commit::commit_traces;
 use constraints::{evaluate_constraints_into, layout::get_constraint_layout};
-use miden_lifted_air::{InstanceError, LiftedAir, MultiAir, ProverStatement, ReductionError};
+use miden_lifted_air::{InstanceError, LiftedAir, MultiAir, ReductionError};
 use miden_stark_transcript::{Channel, ProverChannel, ProverTranscript};
+use p3_challenger::CanObserve;
 use p3_field::{BasedVectorSpace, ExtensionField, TwoAdicField};
 use p3_matrix::{Matrix, dense::RowMajorMatrix};
 use periodic::PeriodicLde;
@@ -80,14 +83,14 @@ use thiserror::Error;
 use tracing::{info_span, instrument};
 
 use crate::{
-    StarkConfig,
+    StarkConfig, StarkProverStatement,
     domain::{Coset, DomainError, LiftedDomain, log_quotient_degree},
     order::TraceOrder,
-    pcs::prover::open_with_channel,
+    pcs::{group_indices, prover::open_with_channel},
     proof::{StarkOutput, StarkProofData},
 };
 
-/// Prove a [`ProverStatement`].
+/// Prove a [`StarkProverStatement`].
 ///
 /// The caller's challenger must already be bound to protocol parameters and
 /// AIR configurations — see the module-level docs. The statement's `air_inputs`
@@ -95,21 +98,40 @@ use crate::{
 /// [`Statement::observe`](crate::air::Statement::observe); both prover and verifier
 /// must carry the same statement.
 ///
-/// Validates only untrusted runtime inputs (returning [`ProverError`]); the AIR
-/// structural contract is trusted — see the crate-level trust model and
-/// [`crate::debug::assert_prover_setup`].
+/// # Trust contract
+///
+/// `prove` validates ONLY untrusted runtime inputs and returns typed
+/// [`ProverError`] on failure. AIR structural correctness is the
+/// implementer's contract — call [`crate::debug::assert_prover_setup`]
+/// from your test harness to enforce it in debug builds.
+///
+/// ## Validated
+/// - per AIR: `air.num_public_values() == statement.air_inputs().len()`
+/// - `statement.aux_inputs().len() <= multi_air.max_aux_inputs()`
+/// - `prover_statement.traces().len() == statement.airs().len()` and `<= u8::MAX + 1`
+/// - per AIR: `trace.width() == air.width()`
+/// - per AIR: `trace.height().is_power_of_two()`
+/// - per AIR: `trace.height() >= max periodic column length`
+/// - per AIR: `log_quotient_degree(air) <= config.pcs().log_blowup()`
+/// - LDE domain fits the field's two-adicity (via `LiftedDomain::try_canonical`)
+/// - Preprocessed bundle presence and shape via `StarkProverStatement` construction
+///
+/// ## Trusted (NOT validated)
+/// - AIR structural shape (positive `aux_width`, power-of-two periodic columns, window size 2)
+/// - [`crate::air::ProverStatement::build_aux_traces`] output dimensions — a malformed output is
+///   caught by the LDE/commit (panic) or by verification, since the verifier re-derives these
+///   shapes.
 ///
 /// # Arguments
-/// - `config`: STARK configuration (PCS params, LMCS, DFT)
-/// - `prover_statement`: validated statement plus per-AIR traces (instance order)
+/// - `stark_prover_statement`: the config, the validated prover statement (AIRs, shared
+///   `air_inputs`, and per-AIR traces, all in instance order), and the optional preprocessed bundle
 /// - `challenger`: Fiat-Shamir challenger pre-bound to protocol parameters and AIR configurations
 ///
 /// # Returns
 /// `Ok(StarkOutput { digest, proof })`, or a [`ProverError`] if validation fails.
 #[instrument(name = "prove", skip_all)]
 pub fn prove<F, EF, MA, SC>(
-    config: &SC,
-    prover_statement: &ProverStatement<F, EF, MA>,
+    stark_prover_statement: &StarkProverStatement<'_, F, EF, MA, SC>,
     mut challenger: SC::Challenger,
 ) -> Result<StarkOutput<F, EF, SC>, ProverError>
 where
@@ -119,6 +141,9 @@ where
     MA: MultiAir<F, EF>,
 {
     // --- Trust boundary (see doc-block above). -------------------------------
+    let config = stark_prover_statement.config();
+    let prover_statement = stark_prover_statement.prover_statement();
+    let preprocessed = stark_prover_statement.preprocessed();
     let statement = prover_statement.statement();
     let airs = statement.airs();
     let air_inputs = statement.air_inputs();
@@ -127,11 +152,13 @@ where
     let trace_order = TraceOrder::from_trace_heights::<F, EF, _>(airs, &trace_heights)
         .expect("ProverStatement::new should reject malformed heights");
 
-    // Bind statement-owned inputs and shape as soon as the validated trace order
-    // is known, before any prover messages are written to the transcript.
-    statement.observe(&mut challenger, trace_order.log_heights());
-    trace_order.observe_shape::<F, _>(&mut challenger);
-    let mut channel = ProverTranscript::new(challenger);
+    // Preprocessed: AIR→leaf lookup (instance order) for the per-AIR opening
+    // view. Empty when there is no preprocessed data (then never indexed).
+    let air_to_leaf = if preprocessed.is_some() {
+        trace_order.preprocessed_leaf_for_air::<F, EF, _>(airs)
+    } else {
+        Vec::new()
+    };
 
     // Borrow each AIR and trace, then reorder both into ascending-height (proof)
     // order. AIRs are passed as `&MA::Air` (the existing constraint code expects
@@ -154,6 +181,20 @@ where
         .iter()
         .map(|&log_h| max_lde_domain.try_sub_domain(log_h))
         .collect::<Result<_, _>>()?;
+
+    // Observe the preprocessed commitment first (when present); it is part of
+    // the statement and binds Fiat-Shamir before any other instance data. The
+    // verifier mirrors this through `StarkStatement`.
+    if let Some(preprocessed) = preprocessed {
+        challenger.observe(preprocessed.commitment());
+    }
+
+    // `Statement::observe` absorbs statement-owned inputs. The protocol then
+    // binds the instance count and each log trace height in instance order.
+    statement.observe(&mut challenger, trace_order.log_heights());
+    trace_order.observe_shape::<F, _>(&mut challenger);
+
+    let mut channel = ProverTranscript::new(challenger);
 
     // Infer per-AIR quotient degrees from symbolic analysis (per-AIR optimization).
     let log_quotient_degrees: Vec<u8> = proof_ordered
@@ -318,6 +359,18 @@ where
             let main_on_gj = main_committed.evals_on_quotient_domain(i, &this_quotient_eval_domain);
             let aux_on_gj = aux_committed.evals_on_quotient_domain(i, &this_quotient_eval_domain);
 
+            // Preprocessed view: fetched only when this AIR declares preprocessed
+            // columns. Resolve the tree leaf via the inverse mapping
+            // `air_to_leaf[instance_idx]`; the leaf shares the max-LDE coset with
+            // the main trace, so `evals_on_quotient_domain` truncates it to this
+            // AIR's quotient domain the same way.
+            let preproc_on_gj = preprocessed.and_then(|p| {
+                let instance_idx = trace_order.instance_indices()[i] as usize;
+                air_to_leaf[instance_idx].map(|leaf| {
+                    p.committed().evals_on_quotient_domain(leaf, &this_quotient_eval_domain)
+                })
+            });
+
             let periodic_lde =
                 PeriodicLde::build(&this_quotient_eval_domain, air.periodic_columns_matrix());
 
@@ -338,6 +391,7 @@ where
                     &mut quotient_evals,
                     air,
                     &main_on_gj,
+                    preproc_on_gj.as_ref(),
                     &aux_on_gj,
                     &this_quotient_eval_domain,
                     alpha,
@@ -390,8 +444,26 @@ where
     let h = max_lde_domain.trace_subgroup().generator();
     let z_next = z * h;
 
-    // 7. Open via PCS
-    let trees = vec![main_committed.tree(), aux_committed.tree(), quotient_committed.tree()];
+    // 7. Open via PCS. The preprocessed tree (when present) is opened first,
+    // mirroring the observe order; the verifier reconstructs the same ordering
+    // via `group_indices`.
+    let (preproc_g, main_g, aux_g, quot_g) = group_indices(preprocessed.is_some());
+    let mut trees = Vec::with_capacity(4);
+    if let Some(idx) = preproc_g {
+        debug_assert_eq!(idx, trees.len());
+        trees.push(
+            preprocessed
+                .expect("preproc group implies preprocessed present")
+                .committed()
+                .tree(),
+        );
+    }
+    debug_assert_eq!(main_g, trees.len());
+    trees.push(main_committed.tree());
+    debug_assert_eq!(aux_g, trees.len());
+    trees.push(aux_committed.tree());
+    debug_assert_eq!(quot_g, trees.len());
+    trees.push(quotient_committed.tree());
 
     info_span!("open").in_scope(|| {
         open_with_channel::<F, EF, SC::Lmcs, RowMajorMatrix<F>, _, 2>(

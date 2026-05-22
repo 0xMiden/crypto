@@ -231,6 +231,40 @@ impl TraceOrder {
             .map(|o| o.expect("instance_indices is a permutation of 0..n"))
             .collect()
     }
+
+    /// AIR instance index backing each preprocessed-tree leaf, in leaf order.
+    ///
+    /// The preprocessed tree commits one leaf per AIR with
+    /// [`preprocessed_width`](miden_lifted_air::LiftedAir::preprocessed_width)
+    /// `> 0`, in proof order (the LMCS height-monotone leaf order). The result
+    /// length is the number of preprocessed AIRs, which is `<= len()`.
+    pub(crate) fn preprocessed_air_for_leaf<F, EF, A>(&self, airs: &[A]) -> Vec<u8>
+    where
+        F: Field,
+        A: LiftedAir<F, EF>,
+    {
+        self.instance_indices
+            .iter()
+            .copied()
+            .filter(|&i| airs[i as usize].preprocessed_width() > 0)
+            .collect()
+    }
+
+    /// Preprocessed-tree leaf index for each AIR, or `None` when the AIR
+    /// declares no preprocessed columns. Length is [`Self::len`]; the inverse
+    /// of [`Self::preprocessed_air_for_leaf`].
+    pub(crate) fn preprocessed_leaf_for_air<F, EF, A>(&self, airs: &[A]) -> Vec<Option<usize>>
+    where
+        F: Field,
+        A: LiftedAir<F, EF>,
+    {
+        let air_for_leaf = self.preprocessed_air_for_leaf::<F, EF, A>(airs);
+        let mut v = alloc::vec![None; airs.len()];
+        for (leaf, &air_idx) in air_for_leaf.iter().enumerate() {
+            v[air_idx as usize] = Some(leaf);
+        }
+        v
+    }
 }
 
 // ============================================================================

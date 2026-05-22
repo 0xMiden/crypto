@@ -14,7 +14,7 @@ extern crate alloc;
 use alloc::vec::Vec;
 
 use miden_lifted_air::{
-    AirBuilder, EmptyWindow, ExtensionBuilder, LiftedAir, MultiAir, PeriodicAirBuilder,
+    AirBuilder, BaseAir, ExtensionBuilder, LiftedAir, MultiAir, PeriodicAirBuilder,
     PermutationAirBuilder, ProverStatement, RowWindow, debug::assert_multi_air_valid,
 };
 use p3_challenger::{CanObserve, CanSample};
@@ -29,11 +29,15 @@ use crate::order::TraceOrder;
 
 /// Assert the AIR's structural contract via [`assert_multi_air_valid`].
 ///
-/// Only the *trusted* structural contract is asserted. The AIR ↔ PCS
+/// Only the *trusted* structural contract is asserted here. The AIR ↔ PCS
 /// compatibility bound (`log_quotient_degree <= log_blowup`) is a validated
 /// runtime input — prover and verifier surface it as
 /// [`DomainError::ConstraintDegreeTooHigh`](crate::DomainError) — so it is not
 /// re-checked here.
+///
+/// The preprocessed bundle's shape (tree presence, per-leaf width, per-AIR
+/// height) is validated when constructing a stark-layer prover statement, so it
+/// is not re-checked here.
 pub fn assert_prover_setup<F, EF, MA>(prover_statement: &ProverStatement<F, EF, MA>)
 where
     F: Field,
@@ -79,6 +83,11 @@ pub fn check_constraints<F, EF, MA, Ch>(
     assert!(!airs.is_empty(), "no instances provided");
     assert_eq!(airs.len(), traces.len(), "airs and traces counts must match");
 
+    // Preprocessed matrices come straight off the AIRs (debug-only; this
+    // re-materialises `BaseAir::preprocessed_trace`).
+    let preprocessed_per_air: Vec<Option<RowMajorMatrix<F>>> =
+        airs.iter().map(|a| a.preprocessed_trace()).collect();
+
     // Seed deterministic debug challenges from the same initial statement/height
     // observations as the protocol. Do not replay the prover transcript here.
     let trace_heights: Vec<usize> = traces.iter().map(Matrix::height).collect();
@@ -106,14 +115,37 @@ pub fn check_constraints<F, EF, MA, Ch>(
             aux_trace.height()
         );
 
-        check_single_trace(air, main, &aux_trace, &aux_values, air_inputs, &challenges, i);
+        // Preprocessed height must match the main trace (debug guard); width is
+        // checked per row by `check_builder_shape`.
+        if let Some(preproc) = &preprocessed_per_air[i] {
+            assert_eq!(
+                preproc.height(),
+                main.height(),
+                "instance {i}: preprocessed trace height mismatch: expected {}, got {}",
+                main.height(),
+                preproc.height()
+            );
+        }
+
+        check_single_trace(
+            air,
+            main,
+            preprocessed_per_air[i].as_ref(),
+            &aux_trace,
+            &aux_values,
+            air_inputs,
+            &challenges,
+            i,
+        );
     }
 }
 
 /// Check constraints for one instance's traces row by row.
+#[allow(clippy::too_many_arguments)]
 fn check_single_trace<F, EF, A>(
     air: &A,
     main: &RowMajorMatrix<F>,
+    preprocessed: Option<&RowMajorMatrix<F>>,
     aux_trace: &RowMajorMatrix<EF>,
     aux_values: &[EF],
     public_values: &[F],
@@ -141,8 +173,16 @@ fn check_single_trace<F, EF, A>(
         let periodic_row = periodic_matrix.as_ref().map(|m| m.row_slice(row % m.height()).unwrap());
         let periodic_values: &[F] = periodic_row.as_deref().unwrap_or(&[]);
 
+        // Preprocessed rows (empty window when the AIR declares none).
+        let preprocessed_current = preprocessed.map(|m| m.row_slice(row).unwrap());
+        let preprocessed_next = preprocessed.map(|m| m.row_slice(next_row).unwrap());
+
         let mut builder = DebugConstraintBuilder {
             main: RowWindow::from_two_rows(&main_current, &main_next),
+            preprocessed: RowWindow::from_two_rows(
+                preprocessed_current.as_deref().unwrap_or(&[]),
+                preprocessed_next.as_deref().unwrap_or(&[]),
+            ),
             permutation: RowWindow::from_two_rows(&aux_current, &aux_next),
             randomness: &challenges[..air.num_randomness()],
             public_values,
@@ -173,6 +213,7 @@ fn check_single_trace<F, EF, A>(
 /// (permutation) trace, matching the actual field layout of lifted STARK traces.
 struct DebugConstraintBuilder<'a, F: Field, EF: ExtensionField<F>> {
     main: RowWindow<'a, F>,
+    preprocessed: RowWindow<'a, F>,
     permutation: RowWindow<'a, EF>,
     randomness: &'a [EF],
     public_values: &'a [F],
@@ -193,7 +234,7 @@ where
     type F = F;
     type Expr = F;
     type Var = F;
-    type PreprocessedWindow = EmptyWindow<F>;
+    type PreprocessedWindow = RowWindow<'a, F>;
     type MainWindow = RowWindow<'a, F>;
     type PublicVar = F;
 
@@ -202,7 +243,7 @@ where
     }
 
     fn preprocessed(&self) -> &Self::PreprocessedWindow {
-        EmptyWindow::empty_ref()
+        &self.preprocessed
     }
 
     fn is_first_row(&self) -> Self::Expr {

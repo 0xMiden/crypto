@@ -2,7 +2,18 @@
 //! are meant for tests / setup; the prover and verifier hot paths assume AIRs
 //! are well-formed.
 //!
-//! Runtime checks on caller-supplied data live instead on
+//! # When to use what
+//!
+//! - [`assert_multi_air_valid`]: verify a [`MultiAir`] satisfies the structural contract assumed by
+//!   the rest of the protocol — per AIR positive auxiliary width and power-of-two periodic columns;
+//!   across AIRs a shared `num_public_values`. This also cross-checks the overridable
+//!   [`MultiAir::num_air_inputs`] / [`LiftedAir::max_periodic_length`] against the raw AIR data, so
+//!   an override that lies about either is caught here.
+//! - [`check_builder_shape`]: verify a concrete builder's accessor dimensions match an AIR before
+//!   calling [`LiftedAir::eval`]. Used as a `cfg(debug_assertions)` belt-and-suspenders inside the
+//!   prover and verifier loops.
+//!
+//! Runtime checks on caller-supplied data live on the constructors
 //! [`Statement::new`](crate::Statement::new) /
 //! [`ProverStatement::new`](crate::ProverStatement::new).
 
@@ -16,7 +27,6 @@ use crate::{BaseAir, LiftedAir, LiftedAirBuilder, MultiAir, WindowAccess};
 /// - [`MultiAir::airs`] is non-empty.
 /// - All AIRs agree on [`BaseAir::num_public_values`].
 /// - [`MultiAir::num_air_inputs`] agrees with the per-AIR public value count.
-/// - Each AIR has no preprocessed trace.
 /// - Each AIR has positive auxiliary width.
 /// - Each periodic column is non-empty and has power-of-two length.
 /// - [`LiftedAir::max_periodic_length`] agrees with the raw periodic columns.
@@ -56,10 +66,6 @@ where
     F: Field,
     A: LiftedAir<F, EF>,
 {
-    assert!(
-        air.preprocessed_trace().is_none(),
-        "AIR {idx}: preprocessed traces are not supported"
-    );
     assert!(air.aux_width() > 0, "AIR {idx}: aux_width must be positive");
 
     // Derive the max period from the raw columns (asserting positive-power-of-two)
