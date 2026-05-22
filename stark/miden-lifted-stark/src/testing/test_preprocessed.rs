@@ -1,12 +1,11 @@
-//! End-to-end tests for preprocessed traces on the stark-statement API.
+//! End-to-end tests for preprocessed traces on the stark-instance API.
 //!
 //! These exercise the real preprocessed path: the commitment is observed
 //! first, the tree is opened via the PCS, and the per-AIR window is fed to the
 //! constraint folders. Preprocessed content is served through
 //! [`BaseAir::preprocessed_trace`]; the prover bundles it via
-//! [`Preprocessed::build`] + [`StarkProverStatement::with_preprocessed`], and
-//! the verifier receives only the commitment via
-//! [`StarkStatement::with_preprocessed`].
+//! [`Preprocessed::build`] + [`ProverInstance::new`], and the verifier receives
+//! only the commitment via [`VerifierInstance::new`].
 
 use alloc::{vec, vec::Vec};
 
@@ -14,14 +13,12 @@ use p3_field::PrimeCharacteristicRing;
 use p3_matrix::{Matrix, dense::RowMajorMatrix};
 
 use crate::{
-    Preprocessed, PreprocessedValidationError, StarkProverStatement, StarkStatement,
+    Preprocessed, PreprocessedValidationError, ProverInstance, VerifierInstance,
     air::{
         AirBuilder, BaseAir, ExtensionBuilder, LiftedAir, LiftedAirBuilder, MultiAir,
         ProverStatement, Statement, WindowAccess,
     },
-    prove,
     testing::configs::goldilocks_poseidon2::{Felt, QuadFelt, test_challenger, test_config},
-    verify,
 };
 
 // ---------------------------------------------------------------------------
@@ -322,12 +319,15 @@ fn single_air_with_preprocessed() {
     let config = test_config();
 
     let preprocessed = Preprocessed::build(ps.statement(), &config).expect("has preprocessed");
-    let sps = StarkProverStatement::with_preprocessed(&config, &ps, &preprocessed).expect("valid");
-    let output = prove(&sps, test_challenger()).expect("prove succeeds");
+    let output = ProverInstance::new(&config, &ps, Some(&preprocessed))
+        .expect("valid")
+        .prove(test_challenger())
+        .expect("prove succeeds");
 
-    let ss = StarkStatement::with_preprocessed(&config, ps.statement(), preprocessed.commitment())
-        .expect("valid");
-    let digest = verify(&ss, &output.proof, test_challenger()).expect("verify succeeds");
+    let digest = VerifierInstance::new(&config, ps.statement(), Some(preprocessed.commitment()))
+        .expect("valid")
+        .verify(&output.proof, test_challenger())
+        .expect("verify succeeds");
     assert_eq!(output.digest, digest);
 }
 
@@ -344,12 +344,15 @@ fn mixed_airs_preprocessed_at_index_1() {
     let config = test_config();
 
     let preprocessed = Preprocessed::build(ps.statement(), &config).expect("has preprocessed");
-    let sps = StarkProverStatement::with_preprocessed(&config, &ps, &preprocessed).expect("valid");
-    let output = prove(&sps, test_challenger()).expect("prove succeeds");
+    let output = ProverInstance::new(&config, &ps, Some(&preprocessed))
+        .expect("valid")
+        .prove(test_challenger())
+        .expect("prove succeeds");
 
-    let ss = StarkStatement::with_preprocessed(&config, ps.statement(), preprocessed.commitment())
-        .expect("valid");
-    let digest = verify(&ss, &output.proof, test_challenger()).expect("verify succeeds");
+    let digest = VerifierInstance::new(&config, ps.statement(), Some(preprocessed.commitment()))
+        .expect("valid")
+        .verify(&output.proof, test_challenger())
+        .expect("verify succeeds");
     assert_eq!(output.digest, digest);
 }
 
@@ -363,7 +366,7 @@ fn rejects_width_mismatch() {
     let config = test_config();
 
     let preprocessed = Preprocessed::build(ps.statement(), &config).expect("has preprocessed");
-    let result = StarkProverStatement::with_preprocessed(&config, &ps, &preprocessed);
+    let result = ProverInstance::new(&config, &ps, Some(&preprocessed));
     assert!(
         matches!(
             result,
@@ -383,7 +386,7 @@ fn rejects_height_mismatch() {
     let config = test_config();
 
     let preprocessed = Preprocessed::build(ps.statement(), &config).expect("has preprocessed");
-    let result = StarkProverStatement::with_preprocessed(&config, &ps, &preprocessed);
+    let result = ProverInstance::new(&config, &ps, Some(&preprocessed));
     assert!(
         matches!(
             result,
@@ -408,7 +411,7 @@ fn rejects_max_height_below_max_trace() {
     let config = test_config();
 
     let preprocessed = Preprocessed::build(ps.statement(), &config).expect("has preprocessed");
-    let result = StarkProverStatement::with_preprocessed(&config, &ps, &preprocessed);
+    let result = ProverInstance::new(&config, &ps, Some(&preprocessed));
     assert!(
         matches!(
             result,

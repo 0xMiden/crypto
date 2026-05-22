@@ -18,9 +18,10 @@
 //!
 //! 2. **AIR configurations** — The framework does not commit to the [`MultiAir::airs`] list. The
 //!    caller MUST bind every AIR configuration into the challenger before calling [`prove`] /
-//!    [`verify`](crate::verify). The AIR ordering on the wire is derived deterministically from the
-//!    trace heights (stable sort on `(log_trace_height, instance_index)`), so callers do not need
-//!    to commit to it separately as long as they commit to the AIR list and trace heights match.
+//!    [`verify`](crate::VerifierInstance::verify). The AIR ordering on the wire is derived
+//!    deterministically from the trace heights (stable sort on `(log_trace_height,
+//!    instance_index)`), so callers do not need to commit to it separately as long as they commit
+//!    to the AIR list and trace heights match.
 //!
 //! The statement's `air_inputs` and `aux_inputs` are absorbed automatically by
 //! [`Statement::observe`](crate::air::Statement::observe), followed by protocol-level
@@ -39,15 +40,15 @@
 //! // ... bind AIR configurations + air ordering (see below) ...
 //!
 //! // --- Prove ---
-//! let stark_prover_statement = StarkProverStatement::new(&config, prover_statement)?;
-//! let output = prove(&stark_prover_statement, ch)?;
+//! let prover_instance = ProverInstance::new(&config, &prover_statement, None)?;
+//! let output = prover_instance.prove(ch)?;
 //!
 //! // --- Verify (identical binding + the same statement) ---
 //! let mut ch = Challenger::new(perm);
 //! ch.observe_slice(&b"MY_APP_V1".map(|b| F::from_u8(b)));
 //! ch.observe(F::from_u8(config.pcs().log_blowup()));
-//! let stark_statement = StarkStatement::new(&config, stark_prover_statement.statement())?;
-//! let verifier_digest = verify(&stark_statement, &output.proof, ch)?;
+//! let verifier_instance = VerifierInstance::new(&config, prover_instance.statement(), None)?;
+//! let verifier_digest = verifier_instance.verify(&output.proof, ch)?;
 //! assert_eq!(output.digest, verifier_digest);
 //! ```
 //!
@@ -73,7 +74,9 @@ use alloc::vec::Vec;
 
 use commit::commit_traces;
 use constraints::{evaluate_constraints_into, layout::get_constraint_layout};
-use miden_lifted_air::{InstanceError, LiftedAir, MultiAir, ReductionError};
+use miden_lifted_air::{
+    InstanceError, LiftedAir, MultiAir, ProverStatement, ReductionError, Statement,
+};
 use miden_stark_transcript::{Channel, ProverChannel, ProverTranscript};
 use p3_challenger::CanObserve;
 use p3_field::{BasedVectorSpace, ExtensionField, TwoAdicField};
@@ -83,14 +86,100 @@ use thiserror::Error;
 use tracing::{info_span, instrument};
 
 use crate::{
-    StarkConfig, StarkProverStatement,
+    StarkConfig,
     domain::{Coset, DomainError, LiftedDomain, log_quotient_degree},
+    lmcs::Lmcs,
     order::TraceOrder,
-    pcs::{group_indices, prover::open_with_channel},
+    pcs::prover::open_with_channel,
+    preprocessed::{Preprocessed, PreprocessedValidationError, validate_preprocessed},
     proof::{StarkOutput, StarkProofData},
 };
 
-/// Prove a [`StarkProverStatement`].
+// ============================================================================
+// ProverInstance
+// ============================================================================
+
+/// Prover-side bundle: a [`StarkConfig`], a borrowed [`ProverStatement`], and
+/// the optional borrowed [`Preprocessed`] data.
+///
+/// Construction validates preprocessed presence parity (and, when present, the
+/// bundle's shape against the AIRs), so holding a `ProverInstance` is a
+/// guarantee its preprocessed shape is consistent; [`prove`] never re-checks it.
+pub struct ProverInstance<'a, F, EF, MA, SC>
+where
+    F: TwoAdicField,
+    EF: ExtensionField<F>,
+    MA: MultiAir<F, EF>,
+    SC: StarkConfig<F, EF>,
+{
+    config: &'a SC,
+    prover_statement: &'a ProverStatement<F, EF, MA>,
+    preprocessed: Option<&'a Preprocessed<F, SC::Lmcs>>,
+}
+
+impl<'a, F, EF, MA, SC> ProverInstance<'a, F, EF, MA, SC>
+where
+    F: TwoAdicField,
+    EF: ExtensionField<F>,
+    MA: MultiAir<F, EF>,
+    SC: StarkConfig<F, EF>,
+{
+    /// Bundle a config + prover statement with an optional preprocessed bundle.
+    ///
+    /// `preprocessed` must be `Some` exactly when some AIR declares preprocessed
+    /// columns; otherwise this errors with
+    /// [`PreprocessedValidationError::TreeExpected`] /
+    /// [`TreeUnexpected`](PreprocessedValidationError::TreeUnexpected). When both
+    /// hold, the bundle's shape is validated against the AIRs.
+    pub fn new(
+        config: &'a SC,
+        prover_statement: &'a ProverStatement<F, EF, MA>,
+        preprocessed: Option<&'a Preprocessed<F, SC::Lmcs>>,
+    ) -> Result<Self, PreprocessedValidationError> {
+        let any = prover_statement.statement().airs().iter().any(|a| a.preprocessed_width() > 0);
+        match (any, preprocessed) {
+            (true, None) => return Err(PreprocessedValidationError::TreeExpected),
+            (false, Some(_)) => return Err(PreprocessedValidationError::TreeUnexpected),
+            (true, Some(p)) => validate_preprocessed(prover_statement, p)?,
+            (false, None) => {},
+        }
+        Ok(Self { config, prover_statement, preprocessed })
+    }
+
+    /// Prove this instance — see [`prove`] for the full contract.
+    pub fn prove(&self, challenger: SC::Challenger) -> Result<StarkOutput<F, EF, SC>, ProverError> {
+        prove(self, challenger)
+    }
+
+    /// Borrow the STARK configuration.
+    pub fn config(&self) -> &SC {
+        self.config
+    }
+
+    /// Borrow the wrapped air-crate prover statement.
+    pub fn prover_statement(&self) -> &ProverStatement<F, EF, MA> {
+        self.prover_statement
+    }
+
+    /// Borrow the verifier-side statement (the AIRs + public inputs).
+    pub fn statement(&self) -> &Statement<F, EF, MA> {
+        self.prover_statement.statement()
+    }
+
+    /// Commitment to the preprocessed tree, for the verifier's
+    /// [`VerifierInstance::new`](crate::VerifierInstance::new); `None` when there
+    /// is none.
+    pub fn preprocessed_commitment(&self) -> Option<<SC::Lmcs as Lmcs>::Commitment> {
+        self.preprocessed.map(|p| p.commitment())
+    }
+
+    /// Borrow the preprocessed bundle, if any.
+    pub(crate) fn preprocessed(&self) -> Option<&Preprocessed<F, SC::Lmcs>> {
+        self.preprocessed
+    }
+}
+
+/// Prove a [`ProverInstance`].
 ///
 /// The caller's challenger must already be bound to protocol parameters and
 /// AIR configurations — see the module-level docs. The statement's `air_inputs`
@@ -114,7 +203,7 @@ use crate::{
 /// - per AIR: `trace.height() >= max periodic column length`
 /// - per AIR: `log_quotient_degree(air) <= config.pcs().log_blowup()`
 /// - LDE domain fits the field's two-adicity (via `LiftedDomain::try_canonical`)
-/// - Preprocessed bundle presence and shape via `StarkProverStatement` construction
+/// - Preprocessed bundle presence and shape via `ProverInstance` construction
 ///
 /// ## Trusted (NOT validated)
 /// - AIR structural shape (positive `aux_width`, power-of-two periodic columns, window size 2)
@@ -123,15 +212,15 @@ use crate::{
 ///   shapes.
 ///
 /// # Arguments
-/// - `stark_prover_statement`: the config, the validated prover statement (AIRs, shared
-///   `air_inputs`, and per-AIR traces, all in instance order), and the optional preprocessed bundle
+/// - `instance`: the config, the validated prover statement (AIRs, shared `air_inputs`, and per-AIR
+///   traces, all in instance order), and the optional preprocessed bundle
 /// - `challenger`: Fiat-Shamir challenger pre-bound to protocol parameters and AIR configurations
 ///
 /// # Returns
 /// `Ok(StarkOutput { digest, proof })`, or a [`ProverError`] if validation fails.
 #[instrument(name = "prove", skip_all)]
-pub fn prove<F, EF, MA, SC>(
-    stark_prover_statement: &StarkProverStatement<'_, F, EF, MA, SC>,
+pub(crate) fn prove<F, EF, MA, SC>(
+    instance: &ProverInstance<'_, F, EF, MA, SC>,
     mut challenger: SC::Challenger,
 ) -> Result<StarkOutput<F, EF, SC>, ProverError>
 where
@@ -141,9 +230,9 @@ where
     MA: MultiAir<F, EF>,
 {
     // --- Trust boundary (see doc-block above). -------------------------------
-    let config = stark_prover_statement.config();
-    let prover_statement = stark_prover_statement.prover_statement();
-    let preprocessed = stark_prover_statement.preprocessed();
+    let config = instance.config();
+    let prover_statement = instance.prover_statement();
+    let preprocessed = instance.preprocessed();
     let statement = prover_statement.statement();
     let airs = statement.airs();
     let air_inputs = statement.air_inputs();
@@ -184,7 +273,7 @@ where
 
     // Observe the preprocessed commitment first (when present); it is part of
     // the statement and binds Fiat-Shamir before any other instance data. The
-    // verifier mirrors this through `StarkStatement`.
+    // verifier mirrors this through `VerifierInstance`.
     if let Some(preprocessed) = preprocessed {
         challenger.observe(preprocessed.commitment());
     }
@@ -446,23 +535,13 @@ where
 
     // 7. Open via PCS. The preprocessed tree (when present) is opened first,
     // mirroring the observe order; the verifier reconstructs the same ordering
-    // via `group_indices`.
-    let (preproc_g, main_g, aux_g, quot_g) = group_indices(preprocessed.is_some());
+    // via its `group_indices`. Groups: `[preprocessed?, main, aux, quotient]`.
     let mut trees = Vec::with_capacity(4);
-    if let Some(idx) = preproc_g {
-        debug_assert_eq!(idx, trees.len());
-        trees.push(
-            preprocessed
-                .expect("preproc group implies preprocessed present")
-                .committed()
-                .tree(),
-        );
+    if let Some(p) = preprocessed {
+        trees.push(p.committed().tree());
     }
-    debug_assert_eq!(main_g, trees.len());
     trees.push(main_committed.tree());
-    debug_assert_eq!(aux_g, trees.len());
     trees.push(aux_committed.tree());
-    debug_assert_eq!(quot_g, trees.len());
     trees.push(quotient_committed.tree());
 
     info_span!("open").in_scope(|| {

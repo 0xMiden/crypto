@@ -30,7 +30,7 @@ use miden_lifted_air::{
     AirBuilder, BaseAir, ConstraintDegrees, LiftedAir, LiftedAirBuilder, WindowAccess,
 };
 use miden_lifted_stark::{
-    GenericStarkConfig, StarkProverStatement, prove,
+    GenericStarkConfig, ProverInstance,
     testing::{
         MultiAir, PcsParams, ProverStatement, Statement,
         configs::goldilocks_poseidon2::{Dft, Felt, QuadFelt, test_challenger, test_lmcs},
@@ -293,9 +293,9 @@ fn run_prove(
     eprintln!("{}\n", "=".repeat(70));
 
     let start = Instant::now();
-    let stark_prover_statement =
-        StarkProverStatement::new(&config, &prover_statement).expect("no preprocessed columns");
-    let _output = prove::<Felt, QuadFelt, _, _>(&stark_prover_statement, test_challenger())
+    let _output = ProverInstance::new(&config, &prover_statement, None)
+        .expect("no preprocessed columns")
+        .prove(test_challenger())
         .expect("prove succeeds");
     let elapsed = start.elapsed();
 

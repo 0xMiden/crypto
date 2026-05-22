@@ -1,20 +1,17 @@
-//! Stark-layer statement wrappers that bundle a [`StarkConfig`] with the
-//! air-crate [`Statement`] / [`ProverStatement`] and the optional preprocessed
-//! data.
+//! Preprocessed data: the fixed per-AIR matrices and their committed LDE tree.
 //!
 //! Preprocessed columns are *fixed circuit data* (lookup tables, selectors)
 //! declared by the AIR via [`BaseAir::preprocessed_trace`] and committed once
-//! at setup. The prover side ([`StarkProverStatement`]) holds the cached raw
-//! matrices plus their LDE tree (the [`Preprocessed`] bundle, built once and
-//! borrowed across proofs); the verifier side ([`StarkStatement`]) holds only
-//! the commitment (a root hash, trusted like the AIR list itself).
+//! at setup. The prover holds the cached raw matrices plus their LDE tree (the
+//! [`Preprocessed`] bundle, built once and borrowed across proofs); the
+//! verifier holds only the commitment (a root hash, trusted like the AIR list
+//! itself).
 //!
-//! Each side has two constructors: `new` (no preprocessed — asserts every AIR
-//! has `preprocessed_width() == 0`) and `with_preprocessed` (asserts at least
-//! one AIR declares preprocessed columns, and on the prover side validates the
-//! bundle against the AIRs). Holding either wrapper is a guarantee its
-//! preprocessed shape is consistent, so [`prove`](crate::prove) /
-//! [`verify`](crate::verify) never re-check it.
+//! [`Preprocessed::build`] caches the by-value [`BaseAir::preprocessed_trace`]
+//! evals and builds the aligned LDE tree. [`validate_preprocessed`] checks a
+//! bundle against a prover statement's AIRs; it runs at
+//! [`ProverInstance::new`](crate::ProverInstance::new) construction time, so the
+//! prover never re-checks the shape.
 
 use alloc::vec::Vec;
 
@@ -91,6 +88,15 @@ where
             return None;
         }
 
+        // Leaf order: preprocessed AIRs sorted by `(height, air_idx)`. This must
+        // match the leaf↔AIR mapping the prover/verifier reconstruct via
+        // `TraceOrder::preprocessed_air_for_leaf` (preprocessed AIRs in proof
+        // order, i.e. sorted by `(main_trace_height, air_idx)`). The two
+        // coincide because `validate_preprocessed` rejects any bundle whose
+        // preprocessed height differs from the main trace height — so sorting by
+        // the preprocessed matrix height here yields the same order. `build`
+        // sees only the AIR list (fixed circuit data), not the witness traces,
+        // so it cannot call `TraceOrder` directly.
         let mut pairs: Vec<(usize, &RowMajorMatrix<F>)> = traces
             .iter()
             .enumerate()
@@ -131,7 +137,7 @@ where
     }
 
     /// Commitment (Merkle root) of the preprocessed LDE tree — handed to the
-    /// verifier via [`StarkStatement::with_preprocessed`].
+    /// verifier via [`VerifierInstance::new`](crate::VerifierInstance::new).
     pub fn commitment(&self) -> L::Commitment {
         self.committed.root()
     }
@@ -148,7 +154,11 @@ where
 
 /// Validate a [`Preprocessed`] bundle against a prover statement's AIRs: tree
 /// presence, per-leaf width, per-AIR height, and the PCS max-height invariant.
-fn validate_preprocessed<F, EF, MA, L>(
+///
+/// Called by [`ProverInstance::new`](crate::ProverInstance::new) only when both
+/// the AIRs declare preprocessed columns and a bundle is supplied; presence
+/// parity is checked separately by the constructor.
+pub(crate) fn validate_preprocessed<F, EF, MA, L>(
     prover_statement: &ProverStatement<F, EF, MA>,
     preprocessed: &Preprocessed<F, L>,
 ) -> Result<(), PreprocessedValidationError>
@@ -160,10 +170,6 @@ where
 {
     let airs = prover_statement.statement().airs();
     let main_traces = prover_statement.traces();
-
-    if !airs.iter().any(|a| a.preprocessed_width() > 0) {
-        return Err(PreprocessedValidationError::TreeUnexpected);
-    }
 
     // Reconstruct the leaf↔AIR mapping the prover/verifier use. Heights are
     // already validated by `ProverStatement::new`, so this cannot fail.
@@ -224,7 +230,7 @@ where
     Ok(())
 }
 
-/// Errors from constructing a stark-layer statement: preprocessed presence
+/// Errors from constructing a stark-layer instance: preprocessed presence
 /// parity and (prover side) the bundle's shape against the AIR declarations.
 #[derive(Debug, Error)]
 pub enum PreprocessedValidationError {
@@ -262,165 +268,4 @@ pub enum PreprocessedValidationError {
          ({max_trace}); PCS requires matching LDE heights across trees"
     )]
     MaxHeightBelowMaxTrace { preprocessed: usize, max_trace: usize },
-}
-
-// ============================================================================
-// StarkProverStatement
-// ============================================================================
-
-/// Prover-side bundle: a [`StarkConfig`], an owned [`ProverStatement`], and the
-/// optional borrowed [`Preprocessed`] data.
-pub struct StarkProverStatement<'a, F, EF, MA, SC>
-where
-    F: TwoAdicField,
-    EF: ExtensionField<F>,
-    MA: MultiAir<F, EF>,
-    SC: StarkConfig<F, EF>,
-{
-    config: &'a SC,
-    prover_statement: &'a ProverStatement<F, EF, MA>,
-    preprocessed: Option<&'a Preprocessed<F, SC::Lmcs>>,
-}
-
-impl<'a, F, EF, MA, SC> StarkProverStatement<'a, F, EF, MA, SC>
-where
-    F: TwoAdicField,
-    EF: ExtensionField<F>,
-    MA: MultiAir<F, EF>,
-    SC: StarkConfig<F, EF>,
-{
-    /// Bundle a config + prover statement with no preprocessed data.
-    ///
-    /// Errors with [`PreprocessedValidationError::TreeExpected`] if any AIR
-    /// declares preprocessed columns — use [`Self::with_preprocessed`] instead.
-    pub fn new(
-        config: &'a SC,
-        prover_statement: &'a ProverStatement<F, EF, MA>,
-    ) -> Result<Self, PreprocessedValidationError> {
-        if prover_statement.statement().airs().iter().any(|a| a.preprocessed_width() > 0) {
-            return Err(PreprocessedValidationError::TreeExpected);
-        }
-        Ok(Self {
-            config,
-            prover_statement,
-            preprocessed: None,
-        })
-    }
-
-    /// Bundle a config + prover statement with a prebuilt preprocessed bundle,
-    /// validating it against the AIRs.
-    pub fn with_preprocessed(
-        config: &'a SC,
-        prover_statement: &'a ProverStatement<F, EF, MA>,
-        preprocessed: &'a Preprocessed<F, SC::Lmcs>,
-    ) -> Result<Self, PreprocessedValidationError> {
-        validate_preprocessed(prover_statement, preprocessed)?;
-        Ok(Self {
-            config,
-            prover_statement,
-            preprocessed: Some(preprocessed),
-        })
-    }
-
-    /// Borrow the STARK configuration.
-    pub fn config(&self) -> &SC {
-        self.config
-    }
-
-    /// Borrow the wrapped air-crate prover statement.
-    pub fn prover_statement(&self) -> &ProverStatement<F, EF, MA> {
-        self.prover_statement
-    }
-
-    /// Borrow the verifier-side statement (the AIRs + public inputs).
-    pub fn statement(&self) -> &Statement<F, EF, MA> {
-        self.prover_statement.statement()
-    }
-
-    /// Commitment to the preprocessed tree, for the verifier's
-    /// [`StarkStatement::with_preprocessed`]; `None` when there is none.
-    pub fn preprocessed_commitment(&self) -> Option<<SC::Lmcs as Lmcs>::Commitment> {
-        self.preprocessed.map(|p| p.commitment())
-    }
-
-    /// Borrow the preprocessed bundle, if any.
-    pub(crate) fn preprocessed(&self) -> Option<&Preprocessed<F, SC::Lmcs>> {
-        self.preprocessed
-    }
-}
-
-// ============================================================================
-// StarkStatement
-// ============================================================================
-
-/// Verifier-side bundle: a [`StarkConfig`], a borrowed [`Statement`], and the
-/// optional preprocessed commitment (a trusted setup input, not read from the
-/// proof).
-pub struct StarkStatement<'a, F, EF, MA, SC>
-where
-    F: TwoAdicField,
-    EF: ExtensionField<F>,
-    MA: MultiAir<F, EF>,
-    SC: StarkConfig<F, EF>,
-{
-    config: &'a SC,
-    statement: &'a Statement<F, EF, MA>,
-    preprocessed_commitment: Option<<SC::Lmcs as Lmcs>::Commitment>,
-}
-
-impl<'a, F, EF, MA, SC> StarkStatement<'a, F, EF, MA, SC>
-where
-    F: TwoAdicField,
-    EF: ExtensionField<F>,
-    MA: MultiAir<F, EF>,
-    SC: StarkConfig<F, EF>,
-{
-    /// Bundle a config + statement with no preprocessed commitment.
-    ///
-    /// Errors with [`PreprocessedValidationError::CommitmentExpected`] if any
-    /// AIR declares preprocessed columns — use [`Self::with_preprocessed`].
-    pub fn new(
-        config: &'a SC,
-        statement: &'a Statement<F, EF, MA>,
-    ) -> Result<Self, PreprocessedValidationError> {
-        if statement.airs().iter().any(|a| a.preprocessed_width() > 0) {
-            return Err(PreprocessedValidationError::CommitmentExpected);
-        }
-        Ok(Self {
-            config,
-            statement,
-            preprocessed_commitment: None,
-        })
-    }
-
-    /// Bundle a config + statement with the preprocessed commitment.
-    pub fn with_preprocessed(
-        config: &'a SC,
-        statement: &'a Statement<F, EF, MA>,
-        commitment: <SC::Lmcs as Lmcs>::Commitment,
-    ) -> Result<Self, PreprocessedValidationError> {
-        if !statement.airs().iter().any(|a| a.preprocessed_width() > 0) {
-            return Err(PreprocessedValidationError::CommitmentUnexpected);
-        }
-        Ok(Self {
-            config,
-            statement,
-            preprocessed_commitment: Some(commitment),
-        })
-    }
-
-    /// Borrow the STARK configuration.
-    pub fn config(&self) -> &SC {
-        self.config
-    }
-
-    /// Borrow the wrapped air-crate statement.
-    pub fn statement(&self) -> &Statement<F, EF, MA> {
-        self.statement
-    }
-
-    /// Borrow the preprocessed commitment, if any.
-    pub(crate) fn preprocessed_commitment(&self) -> Option<&<SC::Lmcs as Lmcs>::Commitment> {
-        self.preprocessed_commitment.as_ref()
-    }
 }

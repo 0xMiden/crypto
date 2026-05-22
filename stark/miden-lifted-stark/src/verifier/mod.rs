@@ -55,20 +55,102 @@ use periodic::PeriodicPolys;
 use thiserror::Error;
 
 use crate::{
-    StarkConfig, StarkStatement,
+    StarkConfig,
     domain::{Coset, DomainError, LiftedDomain, log_quotient_degree},
+    lmcs::Lmcs,
     order::{ShapeError, TraceOrder},
-    pcs::{
-        group_indices,
-        verifier::{PcsError, verify_aligned},
-    },
+    pcs::verifier::{PcsError, verify_aligned},
+    preprocessed::PreprocessedValidationError,
     proof::{StarkDigest, StarkProofData},
     util::packing::row_to_packed_ext,
 };
 
-/// Errors from verification — runtime instance / proof-shape failures or
-/// cryptographic verification failures. The AIR's structural contract is
-/// trusted (see the crate-level trust model).
+// ============================================================================
+// VerifierInstance
+// ============================================================================
+
+/// Verifier-side bundle: a [`StarkConfig`], a borrowed [`Statement`], and the
+/// optional preprocessed commitment (a trusted setup input, not read from the
+/// proof).
+///
+/// Construction validates preprocessed presence parity, so holding a
+/// `VerifierInstance` guarantees the commitment is present exactly when the
+/// AIRs declare preprocessed columns.
+pub struct VerifierInstance<'a, F, EF, MA, SC>
+where
+    F: TwoAdicField,
+    EF: ExtensionField<F>,
+    MA: MultiAir<F, EF>,
+    SC: StarkConfig<F, EF>,
+{
+    config: &'a SC,
+    statement: &'a Statement<F, EF, MA>,
+    preprocessed_commitment: Option<<SC::Lmcs as Lmcs>::Commitment>,
+}
+
+impl<'a, F, EF, MA, SC> VerifierInstance<'a, F, EF, MA, SC>
+where
+    F: TwoAdicField,
+    EF: ExtensionField<F>,
+    MA: MultiAir<F, EF>,
+    SC: StarkConfig<F, EF>,
+{
+    /// Bundle a config + statement with an optional preprocessed commitment.
+    ///
+    /// The commitment must be `Some` exactly when some AIR declares preprocessed
+    /// columns; otherwise this errors with
+    /// [`PreprocessedValidationError::CommitmentExpected`] /
+    /// [`CommitmentUnexpected`](PreprocessedValidationError::CommitmentUnexpected).
+    pub fn new(
+        config: &'a SC,
+        statement: &'a Statement<F, EF, MA>,
+        preprocessed_commitment: Option<<SC::Lmcs as Lmcs>::Commitment>,
+    ) -> Result<Self, PreprocessedValidationError> {
+        let any = statement.airs().iter().any(|a| a.preprocessed_width() > 0);
+        match (any, preprocessed_commitment.is_some()) {
+            (true, false) => return Err(PreprocessedValidationError::CommitmentExpected),
+            (false, true) => return Err(PreprocessedValidationError::CommitmentUnexpected),
+            _ => {},
+        }
+        Ok(Self {
+            config,
+            statement,
+            preprocessed_commitment,
+        })
+    }
+
+    /// Verify a proof against this instance — see [`verify`] for the full
+    /// contract.
+    pub fn verify(
+        &self,
+        proof: &StarkProofData<F, EF, SC>,
+        challenger: SC::Challenger,
+    ) -> Result<StarkDigest<F, EF, SC>, VerifierError> {
+        verify(self, proof, challenger)
+    }
+
+    /// Borrow the STARK configuration.
+    pub fn config(&self) -> &SC {
+        self.config
+    }
+
+    /// Borrow the wrapped air-crate statement.
+    pub fn statement(&self) -> &Statement<F, EF, MA> {
+        self.statement
+    }
+
+    /// Borrow the preprocessed commitment, if any.
+    pub(crate) fn preprocessed_commitment(&self) -> Option<&<SC::Lmcs as Lmcs>::Commitment> {
+        self.preprocessed_commitment.as_ref()
+    }
+}
+
+/// Errors that can occur during verification.
+///
+/// Returned exclusively for runtime instance / proof-shape failures or
+/// cryptographic verification failures. AIR structural correctness is
+/// trusted — call [`crate::debug::assert_prover_setup`] (or
+/// [`miden_lifted_air::debug::assert_multi_air_valid`]) from tests.
 #[derive(Debug, Error)]
 pub enum VerifierError {
     #[error(transparent)]
@@ -131,7 +213,8 @@ pub enum VerifierError {
 /// [`miden_lifted_air::debug::assert_multi_air_valid`] from tests).
 ///
 /// ## Validated
-/// - Same statement checks as [`crate::prove`] minus trace shape (no traces here)
+/// - Same statement checks as [`prove`](crate::ProverInstance::prove) minus trace shape (no traces
+///   here)
 /// - Same `log_quotient_degree <= log_blowup` compat check
 /// - Proof shape via the internal trace-order reconstruction from log heights
 /// - Proof byte parsing (transcript channel)
@@ -140,9 +223,9 @@ pub enum VerifierError {
 /// - Preprocessed openings against the trusted commitment (via the PCS)
 ///
 /// ## Trusted (NOT validated)
-/// - AIR structural shape (same list as in [`crate::prove`])
-pub fn verify<F, EF, MA, SC>(
-    stark_statement: &StarkStatement<'_, F, EF, MA, SC>,
+/// - AIR structural shape (same list as in [`prove`](crate::ProverInstance::prove))
+pub(crate) fn verify<F, EF, MA, SC>(
+    instance: &VerifierInstance<'_, F, EF, MA, SC>,
     proof: &StarkProofData<F, EF, SC>,
     mut challenger: SC::Challenger,
 ) -> Result<StarkDigest<F, EF, SC>, VerifierError>
@@ -153,9 +236,9 @@ where
     MA: MultiAir<F, EF>,
 {
     // --- Trust boundary (see doc-block above). -------------------------------
-    let config = stark_statement.config();
-    let statement: &Statement<F, EF, MA> = stark_statement.statement();
-    let preprocessed_commitment = stark_statement.preprocessed_commitment();
+    let config = instance.config();
+    let statement: &Statement<F, EF, MA> = instance.statement();
+    let preprocessed_commitment = instance.preprocessed_commitment();
     //
     // `TraceOrder::from_log_heights` validates the (untrusted) proof heights
     // against the AIRs: it bounds `log_h` within the host's `usize` width
@@ -270,21 +353,23 @@ where
     // The PCS aligned wrapper handles alignment and truncation internally.
     // The preprocessed group (when present) is first, mirroring the prover; its
     // widths are in tree (leaf) order, while main/aux are in proof order.
-    let (preproc_g, main_g, aux_g, quot_g) = group_indices(preprocessed_commitment.is_some());
+    //
+    // Group indices, in batch order `[preprocessed?, main, aux, quotient]`: the
+    // preprocessed group occupies index 0 only when present, shifting the rest
+    // up by one. The prover builds its `trees` vector in this same order.
+    let s = preprocessed_commitment.is_some() as usize;
+    let (preproc_g, main_g, aux_g, quot_g) =
+        (preprocessed_commitment.is_some().then_some(0), s, s + 1, s + 2);
     let mut commitments = Vec::with_capacity(4);
     if let Some(commitment) = preprocessed_commitment {
         let preprocessed_widths: Vec<usize> = leaf_to_air
             .iter()
             .map(|&air_idx| statement.airs()[air_idx as usize].preprocessed_width())
             .collect();
-        debug_assert_eq!(commitments.len(), preproc_g.expect("group present"));
         commitments.push((commitment.clone(), preprocessed_widths));
     }
-    debug_assert_eq!(commitments.len(), main_g);
     commitments.push((main_commit, main_widths));
-    debug_assert_eq!(commitments.len(), aux_g);
     commitments.push((aux_commit, aux_widths));
-    debug_assert_eq!(commitments.len(), quot_g);
     commitments.push((quotient_commit, quotient_widths));
 
     // 8. Verify PCS openings (returns per-matrix RowMajorMatrix<EF>, truncated to original widths)
@@ -338,36 +423,17 @@ where
         let aux_values_j = &all_aux_values[j];
         let num_rand = air.num_randomness();
 
-        // Extract opened preprocessed rows when this AIR declares preprocessed
-        // columns. The tree leaf index comes from the inverse `air_to_leaf`
-        // mapping; opened values are already EF, truncated to the declared
-        // width by `verify_aligned`.
-        let preproc_local;
-        let preproc_next;
+        // Extract the opened preprocessed window when this AIR declares
+        // preprocessed columns. The tree leaf index comes from the inverse
+        // `air_to_leaf` mapping; the opened matrix is a 2-row `RowMajorMatrix`
+        // already truncated to the declared width by `verify_aligned`, so this
+        // is a zero-copy view (mirrors the main window above).
         let instance_idx = trace_order.instance_indices()[j] as usize;
         let preprocessed_window = match air_to_leaf[instance_idx] {
-            Some(leaf_idx) => {
-                let g = preproc_g
-                    .expect("AIR resolves to a preprocessed leaf, so the preproc group is present");
-                let preproc_mat = &opened[g][leaf_idx];
-                preproc_local = preproc_mat
-                    .row_slice(0)
-                    .expect("preprocessed row 0")
-                    .iter()
-                    .copied()
-                    .collect::<Vec<EF>>();
-                preproc_next = preproc_mat
-                    .row_slice(1)
-                    .expect("preprocessed row 1")
-                    .iter()
-                    .copied()
-                    .collect::<Vec<EF>>();
-                RowWindow::from_two_rows(preproc_local.as_slice(), preproc_next.as_slice())
-            },
-            None => {
-                let empty: &[EF] = &[];
-                RowWindow::from_two_rows(empty, empty)
-            },
+            Some(leaf) => RowWindow::from_view(
+                &opened[preproc_g.expect("preproc group present")][leaf].as_view(),
+            ),
+            None => RowWindow::from_two_rows(&[], &[]),
         };
 
         let mut folder = ConstraintFolder {

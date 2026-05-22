@@ -36,8 +36,8 @@ use crate::order::TraceOrder;
 /// re-checked here.
 ///
 /// The preprocessed bundle's shape (tree presence, per-leaf width, per-AIR
-/// height) is validated when constructing a stark-layer prover statement, so it
-/// is not re-checked here.
+/// height) is validated at [`ProverInstance::new`](crate::ProverInstance::new)
+/// construction time, so it is not re-checked here.
 pub fn assert_prover_setup<F, EF, MA>(prover_statement: &ProverStatement<F, EF, MA>)
 where
     F: Field,
@@ -100,10 +100,33 @@ pub fn check_constraints<F, EF, MA, Ch>(
         .map(|_| EF::from_basis_coefficients_fn(|_| challenger.sample()))
         .collect();
 
-    for (i, (air, main)) in airs.iter().zip(traces.iter()).enumerate() {
+    let mut aux_traces = Vec::with_capacity(airs.len());
+    let mut aux_values_per_air = Vec::with_capacity(airs.len());
+    for (air, main) in airs.iter().zip(traces.iter()) {
         let num_randomness = air.num_randomness();
         let (aux_trace, aux_values) =
             air.build_aux_trace(main, air_inputs, aux_inputs, &challenges[..num_randomness]);
+        aux_traces.push(aux_trace);
+        aux_values_per_air.push(aux_values);
+    }
+
+    // Mirror the verifier's external-assertion check: the cross-AIR
+    // interactions must hold for these aux values and public inputs. Each
+    // assertion is a concrete value, so a zero-check is exact.
+    let aux_views: Vec<&[EF]> = aux_values_per_air.iter().map(Vec::as_slice).collect();
+    let assertions = statement
+        .eval_external(&challenges, &aux_views, trace_order.log_heights())
+        .expect("eval_external failed during check_constraints");
+    for (k, assertion) in assertions.iter().enumerate() {
+        assert_eq!(*assertion, EF::ZERO, "external assertion {k} is non-zero");
+    }
+
+    for (i, ((air, main), (aux_trace, aux_values))) in airs
+        .iter()
+        .zip(traces.iter())
+        .zip(aux_traces.iter().zip(aux_values_per_air.iter()))
+        .enumerate()
+    {
         // `check_builder_shape` validates row-window widths per row, but aux trace
         // height is invisible to a single row window — check it here so a short aux
         // trace fails cleanly rather than via an opaque row-slice panic.
@@ -131,8 +154,8 @@ pub fn check_constraints<F, EF, MA, Ch>(
             air,
             main,
             preprocessed_per_air[i].as_ref(),
-            &aux_trace,
-            &aux_values,
+            aux_trace,
+            aux_values,
             air_inputs,
             &challenges,
             i,

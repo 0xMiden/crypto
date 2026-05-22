@@ -146,16 +146,16 @@ where
 {
     let config = test_config();
 
-    let stark_prover_statement = crate::StarkProverStatement::new(&config, prover_statement)
+    let prover_instance = crate::ProverInstance::new(&config, prover_statement, None)
         .expect("no preprocessed columns");
-    let output = crate::prover::prove(&stark_prover_statement, test_challenger())
-        .expect("proving should succeed");
+    let output = prover_instance.prove(test_challenger()).expect("proving should succeed");
 
-    let stark_statement = crate::StarkStatement::new(&config, prover_statement.statement())
-        .expect("no preprocessed columns");
-    let verifier_digest =
-        crate::verifier::verify(&stark_statement, &output.proof, test_challenger())
-            .expect("verification should succeed");
+    let verifier_instance =
+        crate::VerifierInstance::new(&config, prover_statement.statement(), None)
+            .expect("no preprocessed columns");
+    let verifier_digest = verifier_instance
+        .verify(&output.proof, test_challenger())
+        .expect("verification should succeed");
     assert_eq!(output.digest, verifier_digest);
 
     // Re-parse transcript from a fresh challenger and verify digest agreement.

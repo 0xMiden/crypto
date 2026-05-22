@@ -69,10 +69,10 @@ pub(crate) mod domain;
 pub mod lmcs;
 mod order;
 pub mod pcs;
+mod preprocessed;
 pub mod proof;
 pub mod prover;
 mod selectors;
-mod stark_statement;
 pub(crate) mod util;
 pub mod verifier;
 
@@ -82,11 +82,9 @@ pub use debug::check_constraints;
 // `ProverError` / `VerifierError`, so they need a public path of their own.
 pub use domain::DomainError;
 pub use order::ShapeError;
-pub use prover::{ProverError, prove};
-pub use stark_statement::{
-    Preprocessed, PreprocessedValidationError, StarkProverStatement, StarkStatement,
-};
-pub use verifier::{VerifierError, verify};
+pub use preprocessed::{Preprocessed, PreprocessedValidationError};
+pub use prover::{ProverError, ProverInstance};
+pub use verifier::{VerifierError, VerifierInstance};
 
 // ============================================================================
 // Namespaced re-exports from upstream crates
