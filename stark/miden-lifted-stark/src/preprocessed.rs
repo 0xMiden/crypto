@@ -153,7 +153,7 @@ where
 // ============================================================================
 
 /// Validate a [`Preprocessed`] bundle against a prover statement's AIRs: tree
-/// presence, per-leaf width, per-AIR height, and the PCS max-height invariant.
+/// presence, per-leaf width, and per-AIR height.
 ///
 /// Called by [`ProverInstance::new`](crate::ProverInstance::new) only when both
 /// the AIRs declare preprocessed columns and a bundle is supplied; presence
@@ -210,23 +210,6 @@ where
         }
     }
 
-    // The PCS currently requires every top-level tree to share the max LDE
-    // height, so the tallest preprocessed leaf must reach the max trace height.
-    // Compare unlifted heights so the check is blowup-independent.
-    let max_trace = 1usize << trace_order.max_log_height() as usize;
-    let max_preproc = preprocessed
-        .traces
-        .iter()
-        .filter_map(|t| t.as_ref().map(Matrix::height))
-        .max()
-        .unwrap_or(0);
-    if max_preproc != max_trace {
-        return Err(PreprocessedValidationError::MaxHeightBelowMaxTrace {
-            preprocessed: max_preproc,
-            max_trace,
-        });
-    }
-
     Ok(())
 }
 
@@ -263,9 +246,4 @@ pub enum PreprocessedValidationError {
         main: usize,
         preprocessed: usize,
     },
-    #[error(
-        "preprocessed tree's tallest leaf ({preprocessed}) is below the max trace height \
-         ({max_trace}); PCS requires matching LDE heights across trees"
-    )]
-    MaxHeightBelowMaxTrace { preprocessed: usize, max_trace: usize },
 }

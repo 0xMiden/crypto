@@ -154,18 +154,27 @@ pub trait Lmcs: Clone {
     /// `widths` must match the committed tree (including any alignment padding
     /// if `build_aligned_tree` was used).
     ///
+    /// `tree_log_height` is the committed tree's depth (`log₂` of its leaf
+    /// count). It may be smaller than `indices.depth()`: a tree committed below
+    /// the query domain (e.g. a setup-fixed preprocessed tree) is virtually
+    /// lifted, so each query index `i` folds to committed leaf
+    /// `i mod 2^tree_log_height`. Pass `indices.depth()` for a full-height tree.
+    ///
     /// # Preconditions
-    /// - `indices` must be non-empty and have depth matching `log₂(tree height)`.
+    /// - `indices` must be non-empty.
+    /// - `tree_log_height <= indices.depth()`.
     ///
     /// # Postconditions
-    /// On success, the returned map contains exactly one entry per unique index.
-    /// Each entry's `RowList<F>` has one row per width in `widths`, with that
-    /// row's length matching the corresponding width.
+    /// On success, the returned map is keyed by the original (query) indices —
+    /// one entry per unique index. Indices that fold to the same committed leaf
+    /// share that leaf's rows. Each entry's `RowList<F>` has one row per width in
+    /// `widths`, with that row's length matching the corresponding width.
     fn open_batch<Ch>(
         &self,
         commitment: &Self::Commitment,
         widths: &[usize],
         indices: &TreeIndices,
+        tree_log_height: u8,
         channel: &mut Ch,
     ) -> Result<OpenedRows<Self::F>, LmcsError>
     where
@@ -177,12 +186,18 @@ pub trait Lmcs: Clone {
     /// and reconstructs the Merkle witness. Does not verify against a commitment;
     /// validation happens in [`open_batch`](Lmcs::open_batch).
     ///
+    /// `tree_log_height` is the committed tree's depth; see
+    /// [`open_batch`](Lmcs::open_batch) for the virtual-lift folding when it is
+    /// below `indices.depth()`. The returned witness and openings are keyed by
+    /// committed-leaf index (the folded indices).
+    ///
     /// Use [`merkle_witness::MerkleWitness::path`] on the returned witness to extract
     /// authentication paths.
     fn read_batch_proof<Ch>(
         &self,
         widths: &[usize],
         indices: &TreeIndices,
+        tree_log_height: u8,
         channel: &mut Ch,
     ) -> Result<Self::BatchProof, LmcsError>
     where

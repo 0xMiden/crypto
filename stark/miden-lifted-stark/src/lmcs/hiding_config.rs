@@ -166,24 +166,26 @@ where
         commitment: &Self::Commitment,
         widths: &[usize],
         indices: &TreeIndices,
+        tree_log_height: u8,
         channel: &mut Ch,
     ) -> Result<OpenedRows<Self::F>, LmcsError>
     where
         Ch: VerifierChannel<F = Self::F, Commitment = Self::Commitment>,
     {
-        self.inner.open_batch(commitment, widths, indices, channel)
+        self.inner.open_batch(commitment, widths, indices, tree_log_height, channel)
     }
 
     fn read_batch_proof<Ch>(
         &self,
         widths: &[usize],
         indices: &TreeIndices,
+        tree_log_height: u8,
         channel: &mut Ch,
     ) -> Result<Self::BatchProof, LmcsError>
     where
         Ch: VerifierChannel<F = Self::F, Commitment = Self::Commitment>,
     {
-        self.inner.read_batch_proof(widths, indices, channel)
+        self.inner.read_batch_proof(widths, indices, tree_log_height, channel)
     }
 
     fn alignment(&self) -> usize {

@@ -59,7 +59,7 @@ use crate::{
     domain::{Coset, DomainError, LiftedDomain, log_quotient_degree},
     lmcs::Lmcs,
     order::{ShapeError, TraceOrder},
-    pcs::verifier::{PcsError, verify_aligned},
+    pcs::verifier::{CommitmentGroup, PcsError, verify_aligned},
     preprocessed::PreprocessedValidationError,
     proof::{StarkDigest, StarkProofData},
     util::packing::row_to_packed_ext,
@@ -360,17 +360,43 @@ where
     let s = preprocessed_commitment.is_some() as usize;
     let (preproc_g, main_g, aux_g, quot_g) =
         (preprocessed_commitment.is_some().then_some(0), s, s + 1, s + 2);
+    let full_log_height = log_max_trace_height + log_blowup;
     let mut commitments = Vec::with_capacity(4);
     if let Some(commitment) = preprocessed_commitment {
         let preprocessed_widths: Vec<usize> = leaf_to_air
             .iter()
             .map(|&air_idx| statement.airs()[air_idx as usize].preprocessed_width())
             .collect();
-        commitments.push((commitment.clone(), preprocessed_widths));
+        // The preprocessed tree is committed at its own (setup-fixed) height — the
+        // tallest preprocessed-AIR trace height — which the PCS virtually lifts to the
+        // max when shorter.
+        let preproc_log_height = leaf_to_air
+            .iter()
+            .map(|&air_idx| trace_order.log_heights_instance()[air_idx as usize])
+            .max()
+            .expect("preprocessed group is non-empty when a commitment is present")
+            + log_blowup;
+        commitments.push(CommitmentGroup {
+            root: commitment.clone(),
+            widths: preprocessed_widths,
+            log_height: preproc_log_height,
+        });
     }
-    commitments.push((main_commit, main_widths));
-    commitments.push((aux_commit, aux_widths));
-    commitments.push((quotient_commit, quotient_widths));
+    commitments.push(CommitmentGroup {
+        root: main_commit,
+        widths: main_widths,
+        log_height: full_log_height,
+    });
+    commitments.push(CommitmentGroup {
+        root: aux_commit,
+        widths: aux_widths,
+        log_height: full_log_height,
+    });
+    commitments.push(CommitmentGroup {
+        root: quotient_commit,
+        widths: quotient_widths,
+        log_height: full_log_height,
+    });
 
     // 8. Verify PCS openings (returns per-matrix RowMajorMatrix<EF>, truncated to original widths)
     let opened = verify_aligned::<F, EF, SC::Lmcs, _, 2>(

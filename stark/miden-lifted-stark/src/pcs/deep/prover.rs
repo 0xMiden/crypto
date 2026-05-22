@@ -1,7 +1,6 @@
 use alloc::vec::Vec;
 use core::iter::zip;
 
-use miden_lifted_air::log2_strict_u8;
 use miden_stark_transcript::ProverChannel;
 use p3_field::{
     ExtensionField, Field, FieldArray, PackedFieldExtension, PackedValue, TwoAdicField,
@@ -62,15 +61,19 @@ impl<EF> DeepPoly<EF> {
         M: Matrix<L::F>,
         Ch: ProverChannel<F = L::F, Commitment = L::Commitment>,
     {
-        let lde_height = trace_trees.first().expect("at least one trace tree required").height();
+        assert!(!trace_trees.is_empty(), "at least one trace tree required");
+        let lde_height = domain.lde_height();
+        // Trees shorter than the max (e.g. a setup-fixed preprocessed tree) are virtually
+        // lifted by `batch_eval_lifted`; each just needs a power-of-two height ≤ the max.
         assert!(
-            trace_trees.iter().all(|tree| tree.height() == lde_height),
-            "mixed trace tree heights are not supported"
+            trace_trees
+                .iter()
+                .all(|tree| tree.height().is_power_of_two() && tree.height() <= lde_height),
+            "tree heights must be powers of two ≤ the max LDE height"
         );
-        debug_assert_eq!(
-            log2_strict_u8(lde_height),
-            domain.log_lde_height(),
-            "tree height must match domain log_lde_height"
+        debug_assert!(
+            trace_trees.iter().any(|tree| tree.height() == lde_height),
+            "at least one tree must fill the max LDE height"
         );
 
         let coset_points = domain.lde_coset().bit_reversed_points();
@@ -249,15 +252,10 @@ impl<EF> DeepPoly<EF> {
                             neg_column_coeffs_iter.by_ref().take(size).collect();
                         accumulate_matrices(matrices_group, &group_coeffs)
                     })
-                    .reduce(|mut acc, next| {
-                        debug_assert_eq!(acc.len(), next.len());
-                        acc.par_chunks_mut(w).zip(next.par_chunks(w)).for_each(
-                            |(acc_chunk, next_chunk)| {
-                                EF::add_slices(acc_chunk, next_chunk);
-                            },
-                        );
-                        acc
-                    })
+                    // Combine groups of (possibly) different heights. A group shorter than
+                    // the global height — a setup-fixed preprocessed tree — is lifted onto
+                    // the taller buffer in place. Sequential reduce folds left-to-right.
+                    .reduce(|a, b| add_lifted(w, a, b))
                     .unwrap_or_else(|| EF::zero_vec(n))
             };
 
@@ -394,6 +392,34 @@ fn accumulate_matrices<F: Field, EF: ExtensionField<F>, M: Matrix<F>, C: AsRef<[
     }
 
     acc
+}
+
+/// Sum two DEEP reduced-eval buffers whose power-of-two heights may differ, lifting
+/// the shorter onto the taller by bit-reversed nearest-neighbor repetition
+/// (`long[j*r + k] += short[j]`). Returns the taller buffer, reused in place — no fresh
+/// allocation. `w` is the base-field packing width for the equal-height SIMD add.
+///
+/// `reduce` folds groups left-to-right, so a short group (e.g. a setup-fixed
+/// preprocessed tree, opened first) is lifted into the first full-height group it meets.
+fn add_lifted<EF: Field>(w: usize, a: Vec<EF>, b: Vec<EF>) -> Vec<EF> {
+    let (mut long, short) = if a.len() >= b.len() { (a, b) } else { (b, a) };
+    debug_assert!(
+        !short.is_empty() && long.len() % short.len() == 0,
+        "DEEP group heights must be nested powers of two"
+    );
+    let r = long.len() / short.len();
+    if r == 1 {
+        long.par_chunks_mut(w)
+            .zip(short.par_chunks(w))
+            .for_each(|(x, y)| EF::add_slices(x, y));
+    } else {
+        // `short[j]` covers the `r` contiguous slots `[j*r, (j+1)*r)` of the taller
+        // buffer — the bit-reversed nearest-neighbor lift, fused with the add.
+        long.par_chunks_mut(r)
+            .zip(short.par_iter())
+            .for_each(|(chunk, &v)| chunk.iter_mut().for_each(|x| *x += v));
+    }
+    long
 }
 
 #[cfg(test)]

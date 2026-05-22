@@ -156,8 +156,16 @@ where
     where
         Ch: ProverChannel<F = F, Commitment = Hash<F, D, DIGEST_ELEMS>>,
     {
+        // Fold virtually-lifted query indices down to this tree's own depth: a
+        // query at global index `i` against a height-`H` tree opens leaf
+        // `i mod H`. `shrink_depth` masks + dedups; a no-op when the caller's
+        // depth already equals this tree's (the common full-height case).
+        let my_depth = log2_strict_usize(self.height()) as u8;
+        let mut local = indices.clone();
+        local.shrink_depth(indices.depth().saturating_sub(my_depth));
+
         // Stream leaf openings in sorted tree index order.
-        for &index in indices.iter() {
+        for &index in local.iter() {
             let opening = LeafOpening {
                 rows: self.aligned_rows(index),
                 salt: self.salt(index),
@@ -166,7 +174,7 @@ where
         }
 
         // Emit missing sibling hashes left-to-right, bottom-to-top.
-        for sibling in indices.missing_siblings() {
+        for sibling in local.missing_siblings() {
             let hash = self.digest_layers[sibling.depth()][sibling.position()];
             channel.hint_commitment(Hash::from(hash));
         }

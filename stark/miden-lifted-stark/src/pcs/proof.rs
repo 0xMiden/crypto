@@ -85,10 +85,13 @@ where
         let deep_witnesses: Vec<_> = commitments
             .iter()
             .map(|(_commitment, widths)| {
-                lmcs.read_batch_proof(widths, &tree_indices, channel).map_err(|e| match e {
-                    LmcsError::TranscriptError(te) => te,
-                    _ => TranscriptError::NoMoreFields,
-                })
+                // Structured-proof parsing is preprocessed-unaware; every tree here is
+                // full-height, so the committed depth equals the query depth.
+                lmcs.read_batch_proof(widths, &tree_indices, tree_indices.depth(), channel)
+                    .map_err(|e| match e {
+                        LmcsError::TranscriptError(te) => te,
+                        _ => TranscriptError::NoMoreFields,
+                    })
             })
             .collect::<Result<Vec<_>, _>>()?;
 
@@ -103,12 +106,12 @@ where
             let base_width = arity * EF::DIMENSION;
             // FRI round openings are unaligned, so use the base width directly.
             let round_widths = [base_width];
-            let batch = lmcs.read_batch_proof(&round_widths, &round_indices, channel).map_err(
-                |e| match e {
+            let batch = lmcs
+                .read_batch_proof(&round_widths, &round_indices, round_indices.depth(), channel)
+                .map_err(|e| match e {
                     LmcsError::TranscriptError(te) => te,
                     _ => TranscriptError::NoMoreFields,
-                },
-            )?;
+                })?;
             fri_witnesses.push(batch);
         }
 

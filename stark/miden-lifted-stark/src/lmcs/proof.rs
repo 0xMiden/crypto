@@ -170,7 +170,12 @@ mod tests {
             let mut verifier_channel = gl::verifier_channel(&transcript);
             let tree_indices = TreeIndices::new(indices.iter().copied(), log_max_height).unwrap();
             let witness = lmcs
-                .read_batch_proof(&widths, &tree_indices, &mut verifier_channel)
+                .read_batch_proof(
+                    &widths,
+                    &tree_indices,
+                    tree_indices.depth(),
+                    &mut verifier_channel,
+                )
                 .expect("batch witness should parse");
             assert!(verifier_channel.is_empty(), "parse path should fully consume transcript");
 

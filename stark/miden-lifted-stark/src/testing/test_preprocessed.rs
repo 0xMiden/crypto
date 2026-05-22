@@ -397,10 +397,10 @@ fn rejects_height_mismatch() {
 }
 
 #[test]
-fn rejects_max_height_below_max_trace() {
-    // The tallest AIR (ConstantAir, height 8) has no preprocessed trace, so the
-    // preprocessed tree's tallest leaf (RowCounter, height 4) sits below the
-    // max trace height — rejected by the PCS equal-height restriction.
+fn preprocessed_shorter_than_max_trace() {
+    // The tallest AIR (ConstantAir, height 8) has no preprocessed columns, so the
+    // preprocessed tree's tallest leaf (RowCounter, height 4) sits below the max
+    // trace height. The PCS virtually lifts the shorter preprocessed tree.
     let ps = prover_statement(
         vec![
             MixedAir::Constant(ConstantAir),
@@ -411,15 +411,68 @@ fn rejects_max_height_below_max_trace() {
     let config = test_config();
 
     let preprocessed = Preprocessed::build(ps.statement(), &config).expect("has preprocessed");
-    let result = ProverInstance::new(&config, &ps, Some(&preprocessed));
-    assert!(
-        matches!(
-            result,
-            Err(PreprocessedValidationError::MaxHeightBelowMaxTrace {
-                preprocessed: 4,
-                max_trace: 8
-            })
-        ),
-        "expected MaxHeightBelowMaxTrace {{ preprocessed: 4, max_trace: 8 }}",
+    let output = ProverInstance::new(&config, &ps, Some(&preprocessed))
+        .expect("valid")
+        .prove(test_challenger())
+        .expect("prove succeeds");
+
+    let digest = VerifierInstance::new(&config, ps.statement(), Some(preprocessed.commitment()))
+        .expect("valid")
+        .verify(&output.proof, test_challenger())
+        .expect("verify succeeds");
+    assert_eq!(output.digest, digest);
+}
+
+#[test]
+fn preprocessed_much_shorter_than_max_trace() {
+    // Larger lift ratio: the preprocessed tree (height 2) is folded by 4 at query
+    // time against a max trace height of 8.
+    let ps = prover_statement(
+        vec![
+            MixedAir::Constant(ConstantAir),
+            MixedAir::RowCounter(RowCounterAir { preprocessed: row_index_trace(2) }),
+        ],
+        vec![squaring_trace(8), row_index_trace(2)],
     );
+    let config = test_config();
+
+    let preprocessed = Preprocessed::build(ps.statement(), &config).expect("has preprocessed");
+    let output = ProverInstance::new(&config, &ps, Some(&preprocessed))
+        .expect("valid")
+        .prove(test_challenger())
+        .expect("prove succeeds");
+
+    let digest = VerifierInstance::new(&config, ps.statement(), Some(preprocessed.commitment()))
+        .expect("valid")
+        .verify(&output.proof, test_challenger())
+        .expect("verify succeeds");
+    assert_eq!(output.digest, digest);
+}
+
+#[test]
+fn preprocessed_multiple_heights_below_max() {
+    // Two preprocessed AIRs at heights 2 and 4 (so the preprocessed tree lifts
+    // internally to 4), under a taller non-preprocessed AIR at height 8. Exercises
+    // both within-tree lifting and the global query fold.
+    let ps = prover_statement(
+        vec![
+            MixedAir::Constant(ConstantAir),
+            MixedAir::RowCounter(RowCounterAir { preprocessed: row_index_trace(4) }),
+            MixedAir::RowCounter(RowCounterAir { preprocessed: row_index_trace(2) }),
+        ],
+        vec![squaring_trace(8), row_index_trace(4), row_index_trace(2)],
+    );
+    let config = test_config();
+
+    let preprocessed = Preprocessed::build(ps.statement(), &config).expect("has preprocessed");
+    let output = ProverInstance::new(&config, &ps, Some(&preprocessed))
+        .expect("valid")
+        .prove(test_challenger())
+        .expect("prove succeeds");
+
+    let digest = VerifierInstance::new(&config, ps.statement(), Some(preprocessed.commitment()))
+        .expect("valid")
+        .verify(&output.proof, test_challenger())
+        .expect("verify succeeds");
+    assert_eq!(output.digest, digest);
 }
