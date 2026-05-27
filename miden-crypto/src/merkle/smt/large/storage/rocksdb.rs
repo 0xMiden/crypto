@@ -1074,7 +1074,7 @@ impl<'a> RocksDbSubtreeIterator<'a> {
     ) -> Option<Subtree> {
         iter.find_map(|result| {
             let (key_bytes, value_bytes) = result.ok()?;
-            let depth = 24 + (cf_index * 8) as u8;
+            let depth = IN_MEMORY_DEPTH + (cf_index * 8) as u8;
 
             let node_idx = subtree_root_from_key_bytes(&key_bytes, depth).ok()?;
             let value_vec = value_bytes.into_vec();
@@ -1299,6 +1299,7 @@ fn collect_depth24(
 #[inline(always)]
 fn subtree_root_from_key_bytes(key_bytes: &[u8], depth: u8) -> Result<NodeIndex, StorageError> {
     let expected = match depth {
+        16 => 2,
         24 => 3,
         32 => 4,
         40 => 5,

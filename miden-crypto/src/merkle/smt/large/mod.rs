@@ -278,7 +278,7 @@ mod smt_trait;
 // ================================================================================================
 
 /// Number of levels of the tree that are stored in memory
-const IN_MEMORY_DEPTH: u8 = 16;
+pub(super) const IN_MEMORY_DEPTH: u8 = 16;
 
 /// Number of nodes that are stored in memory (including the unused index 0)
 const NUM_IN_MEMORY_NODES: usize = 1 << (IN_MEMORY_DEPTH + 1);
