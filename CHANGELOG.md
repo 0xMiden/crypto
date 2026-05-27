@@ -8,6 +8,10 @@
 - [BREAKING] Refactored `miden-lifted-stark::domain` around a uniform `Coset` trait shared by `TwoAdicSubgroup` and `TwoAdicCoset`, slimmed the `LiftedDomain` surface (drops dead getters, removes silently-dispatched `points`/`bit_reversed_points`/`vanishing_at` in favour of explicit `trace_subgroup()` / `lde_coset()` access), made `LiftedDomain` constructors fallible, moved selector logic onto `LiftedDomain`, and changed `log_blowup` to return `u8` ([#993](https://github.com/0xMiden/crypto/pull/993)).
 - [BREAKING] Implemented two-phase commit_mutations() / apply_mutations()-style API for `LargeSmtForest` ([#1018](https://github.com/0xMiden/crypto/pull/1018)).
 
+## 0.25.1 (2026-05-21)
+
+- Fixed `miden-lifted-stark` builds when `p3-maybe-rayon/parallel` is enabled without `miden-lifted-stark/parallel` ([#1023](https://github.com/0xMiden/crypto/pull/1023)).
+
 ## 0.25.0 (2026-05-01)
 
 - [BREAKING] Changed the serialization format of `PartialSmt` to be more compact on the wire ([#957](https://github.com/0xMiden/crypto/pull/957)).
