@@ -320,8 +320,8 @@ type MutatedLeaves = (MutatedSubtreeLeaves, Map<u64, SmtLeaf>, Map<Word, Word>, 
 ///
 /// Unlike the regular `Smt`, this implementation is designed for very large trees by using external
 /// storage (such as RocksDB) for the bulk of the tree data, while keeping only the upper levels (up
-/// to `IN_MEMORY_DEPTH`) in memory. This hybrid approach allows the tree to scale beyond memory limitations
-/// while maintaining good performance for common operations.
+/// to `IN_MEMORY_DEPTH`) in memory. This hybrid approach allows the tree to scale beyond memory
+/// limitations while maintaining good performance for common operations.
 ///
 /// All leaves sit at depth 64. The most significant element of the key is used to identify the leaf
 /// to which the key maps.

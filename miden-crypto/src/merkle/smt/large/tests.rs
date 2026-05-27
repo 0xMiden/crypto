@@ -747,7 +747,10 @@ fn test_memory_storage_snapshot_in_mem_depth() {
 
     // The in-memory-depth entries must be non-empty for a non-empty tree.
     let in_mem_roots = snapshot.get_depth_in_mem().unwrap();
-    assert!(!in_mem_roots.is_empty(), "snapshot must expose in-memory-depth roots for a non-empty tree");
+    assert!(
+        !in_mem_roots.is_empty(),
+        "snapshot must expose in-memory-depth roots for a non-empty tree"
+    );
 
     // Every returned entry must sit exactly at IN_MEMORY_DEPTH.
     for (position, _hash) in &in_mem_roots {
