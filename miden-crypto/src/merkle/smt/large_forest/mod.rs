@@ -325,9 +325,11 @@ pub use backend::{
 };
 pub use config::{Config, DEFAULT_MAX_HISTORY_VERSIONS, MIN_HISTORY_VERSIONS};
 pub use error::{LargeSmtForestError, Result};
-pub use operation::{ForestOperation, SmtForestUpdateBatch, SmtUpdateBatch};
+pub use operation::{SmtForestOperation, SmtForestUpdateBatch, SmtUpdateBatch};
 pub use root::{LineageId, RootInfo, TreeEntry, TreeId, TreeWithRoot, VersionId};
-pub use utils::{AppliedLineageMutation, ForestMutationSet, LineageMutation, LineageMutationKind};
+pub use utils::{
+    AppliedLineageMutation, LineageMutation, LineageMutationKind, SmtForestMutationSet,
+};
 
 use crate::{
     EMPTY_WORD, Map, Set, Word,
@@ -833,7 +835,7 @@ impl<B: Backend> LargeSmtForest<B> {
         lineage: LineageId,
         new_version: VersionId,
         updates: SmtUpdateBatch,
-    ) -> Result<ForestMutationSet<B>> {
+    ) -> Result<SmtForestMutationSet<B>> {
         if let Some(lineage_data) = self.lineage_data.get(&lineage)
             && lineage_data.latest_version >= new_version
         {
@@ -846,7 +848,7 @@ impl<B: Backend> LargeSmtForest<B> {
         let mut batch = SmtForestUpdateBatch::empty();
         batch.operations(lineage).add_operations(updates.into_iter());
         let (entries, prepared) = self.backend.compute_mutations(new_version, batch)?;
-        Ok(ForestMutationSet::new(entries, prepared))
+        Ok(SmtForestMutationSet::new(entries, prepared))
     }
 
     /// Computes the mutations required to add a new `lineage`, without applying them.
@@ -855,7 +857,7 @@ impl<B: Backend> LargeSmtForest<B> {
         lineage: LineageId,
         new_version: VersionId,
         updates: SmtUpdateBatch,
-    ) -> Result<ForestMutationSet<B>> {
+    ) -> Result<SmtForestMutationSet<B>> {
         if self.lineage_data.contains_key(&lineage) {
             return Err(LargeSmtForestError::DuplicateLineage(lineage));
         }
@@ -898,7 +900,7 @@ impl<B: Backend> LargeSmtForest<B> {
         lineage: LineageId,
         new_version: VersionId,
         updates: SmtUpdateBatch,
-    ) -> Result<ForestMutationSet<B>> {
+    ) -> Result<SmtForestMutationSet<B>> {
         let Some(lineage_data) = self.lineage_data.get(&lineage) else {
             return Err(LargeSmtForestError::UnknownLineage(lineage));
         };
@@ -1058,7 +1060,7 @@ impl<B: Backend> LargeSmtForest<B> {
         &self,
         version: VersionId,
         lineages: SmtForestUpdateBatch,
-    ) -> Result<ForestMutationSet<B>> {
+    ) -> Result<SmtForestMutationSet<B>> {
         for lineage in lineages.lineages() {
             if self.lineage_data.contains_key(lineage) {
                 return Err(LargeSmtForestError::DuplicateLineage(*lineage));
@@ -1066,7 +1068,7 @@ impl<B: Backend> LargeSmtForest<B> {
         }
 
         let (entries, prepared) = self.backend.compute_mutations(version, lineages)?;
-        Ok(ForestMutationSet::new(entries, prepared))
+        Ok(SmtForestMutationSet::new(entries, prepared))
     }
 
     /// Computes mutations that would add or update multiple lineages without applying them.
@@ -1077,7 +1079,7 @@ impl<B: Backend> LargeSmtForest<B> {
         &self,
         new_version: VersionId,
         updates: SmtForestUpdateBatch,
-    ) -> Result<ForestMutationSet<B>> {
+    ) -> Result<SmtForestMutationSet<B>> {
         updates
             .lineages()
             .map(|lineage| {
@@ -1097,7 +1099,7 @@ impl<B: Backend> LargeSmtForest<B> {
             .collect::<Result<Vec<_>>>()?;
 
         let (entries, prepared) = self.backend.compute_mutations(new_version, updates)?;
-        Ok(ForestMutationSet::new(entries, prepared))
+        Ok(SmtForestMutationSet::new(entries, prepared))
     }
 
     /// Performs the provided `updates` on the forest, adding at most one new root with version
@@ -1165,7 +1167,7 @@ impl<B: Backend> LargeSmtForest<B> {
         &self,
         new_version: VersionId,
         updates: SmtForestUpdateBatch,
-    ) -> Result<ForestMutationSet<B>> {
+    ) -> Result<SmtForestMutationSet<B>> {
         updates
             .lineages()
             .map(|lineage| {
@@ -1223,7 +1225,7 @@ impl<B: Backend> LargeSmtForest<B> {
     /// - [`LargeSmtForestError::Fatal`] if the backend fails while applying its prepared data.
     pub fn apply_mutations(
         &mut self,
-        mutations: ForestMutationSet<B>,
+        mutations: SmtForestMutationSet<B>,
     ) -> Result<Vec<TreeWithRoot>> {
         let (entries, prepared) = mutations.into_parts();
 

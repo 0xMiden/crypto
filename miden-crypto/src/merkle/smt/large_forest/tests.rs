@@ -18,9 +18,8 @@ use crate::{
     merkle::{
         EmptySubtreeRoots,
         smt::{
-            BackendReader, ForestInMemoryBackend, ForestOperation, LargeSmtForest,
-            LargeSmtForestError, RootInfo, Smt, SmtForestUpdateBatch, SmtUpdateBatch, TreeId,
-            VersionId,
+            BackendReader, ForestInMemoryBackend, LargeSmtForest, LargeSmtForestError, RootInfo,
+            Smt, SmtForestOperation, SmtForestUpdateBatch, SmtUpdateBatch, TreeId, VersionId,
             large_forest::{
                 LineageData,
                 history::{ChangedKeys, History, NodeChanges},
@@ -321,7 +320,7 @@ fn lineage_count() -> Result<()> {
 
     // This should stay the same if we update a tree.
     let operations =
-        SmtUpdateBatch::new([ForestOperation::insert(rng.value(), rng.value())].into_iter());
+        SmtUpdateBatch::new([SmtForestOperation::insert(rng.value(), rng.value())].into_iter());
     forest.update_tree(lineage_1, version + 1, operations)?;
     assert_eq!(forest.lineage_count(), 3);
 
@@ -338,12 +337,12 @@ fn root_info() -> Result<()> {
     let lineage_1: LineageId = rng.value();
     let version_1: VersionId = rng.value();
     let operations =
-        SmtUpdateBatch::new([ForestOperation::insert(rng.value(), rng.value())].into_iter());
+        SmtUpdateBatch::new([SmtForestOperation::insert(rng.value(), rng.value())].into_iter());
     let historical_root = forest.add_lineage(lineage_1, version_1, operations)?;
 
     let version_2 = version_1 + 1;
     let operations =
-        SmtUpdateBatch::new([ForestOperation::insert(rng.value(), rng.value())].into_iter());
+        SmtUpdateBatch::new([SmtForestOperation::insert(rng.value(), rng.value())].into_iter());
     let current_root = forest.update_tree(lineage_1, version_2, operations)?;
 
     // When we query for a root (lineage_1, version_1), we should get back HistoricalVersion.
@@ -400,8 +399,8 @@ fn open() -> Result<()> {
         version_1,
         SmtUpdateBatch::new(
             [
-                ForestOperation::insert(key_1, value_1_v1),
-                ForestOperation::insert(key_2, value_2_v1),
+                SmtForestOperation::insert(key_1, value_1_v1),
+                SmtForestOperation::insert(key_2, value_2_v1),
             ]
             .into_iter(),
         ),
@@ -443,9 +442,9 @@ fn open() -> Result<()> {
         version_2,
         SmtUpdateBatch::new(
             [
-                ForestOperation::insert(key_1, value_1_v2),
-                ForestOperation::insert(key_3, value_3_v1),
-                ForestOperation::remove(key_2),
+                SmtForestOperation::insert(key_1, value_1_v2),
+                SmtForestOperation::insert(key_3, value_3_v1),
+                SmtForestOperation::remove(key_2),
             ]
             .into_iter(),
         ),
@@ -500,8 +499,8 @@ fn get() -> Result<()> {
         version_1,
         SmtUpdateBatch::new(
             [
-                ForestOperation::insert(key_1, value_1_v1),
-                ForestOperation::insert(key_2, value_2_v1),
+                SmtForestOperation::insert(key_1, value_1_v1),
+                SmtForestOperation::insert(key_2, value_2_v1),
             ]
             .into_iter(),
         ),
@@ -541,8 +540,8 @@ fn get() -> Result<()> {
         version_2,
         SmtUpdateBatch::new(
             [
-                ForestOperation::insert(key_1, value_1_v2),
-                ForestOperation::insert(key_3, value_3_v1),
+                SmtForestOperation::insert(key_1, value_1_v2),
+                SmtForestOperation::insert(key_3, value_3_v1),
             ]
             .into_iter(),
         ),
@@ -914,8 +913,11 @@ fn entries_never_returns_empty_entry() -> Result<()> {
     let key_2: Word = rng.value();
     let value_2: Word = rng.value();
     let operations = SmtUpdateBatch::new(
-        [ForestOperation::insert(key_1, value_1), ForestOperation::insert(key_2, value_2)]
-            .into_iter(),
+        [
+            SmtForestOperation::insert(key_1, value_1),
+            SmtForestOperation::insert(key_2, value_2),
+        ]
+        .into_iter(),
     );
     forest.update_tree(lineage_1, version_2, operations)?;
 
@@ -931,7 +933,7 @@ fn entries_never_returns_empty_entry() -> Result<()> {
     forest.add_lineage(
         lineage_2,
         version_1,
-        SmtUpdateBatch::new([ForestOperation::insert(key_1, value_1)].into_iter()),
+        SmtUpdateBatch::new([SmtForestOperation::insert(key_1, value_1)].into_iter()),
     )?;
 
     // Now we add an update to a different leaf.
@@ -940,7 +942,7 @@ fn entries_never_returns_empty_entry() -> Result<()> {
     forest.update_tree(
         lineage_2,
         version_2,
-        SmtUpdateBatch::new([ForestOperation::insert(key_2, value_2)].into_iter()),
+        SmtUpdateBatch::new([SmtForestOperation::insert(key_2, value_2)].into_iter()),
     )?;
 
     // Now, when we query for entries on the historical version, we should only see one entry, and
@@ -958,7 +960,7 @@ fn entries_never_returns_empty_entry() -> Result<()> {
     forest.add_lineage(
         lineage_3,
         version_1,
-        SmtUpdateBatch::new([ForestOperation::insert(key_1, value_1)].into_iter()),
+        SmtUpdateBatch::new([SmtForestOperation::insert(key_1, value_1)].into_iter()),
     )?;
 
     // We now add an update in the same leaf.
@@ -967,7 +969,7 @@ fn entries_never_returns_empty_entry() -> Result<()> {
     forest.update_tree(
         lineage_3,
         version_2,
-        SmtUpdateBatch::new([ForestOperation::insert(key_2, value_2)].into_iter()),
+        SmtUpdateBatch::new([SmtForestOperation::insert(key_2, value_2)].into_iter()),
     )?;
 
     // Now when we query the historical version, we should only see one entry, and no reversions.
@@ -998,8 +1000,8 @@ fn entries_history_empty_values_do_not_reorder() -> Result<()> {
         version_1,
         SmtUpdateBatch::new(
             [
-                ForestOperation::insert(key_a, value_a),
-                ForestOperation::insert(key_c, value_c_v1),
+                SmtForestOperation::insert(key_a, value_a),
+                SmtForestOperation::insert(key_c, value_c_v1),
             ]
             .into_iter(),
         ),
@@ -1015,8 +1017,8 @@ fn entries_history_empty_values_do_not_reorder() -> Result<()> {
         version_2,
         SmtUpdateBatch::new(
             [
-                ForestOperation::insert(key_b, value_b),
-                ForestOperation::insert(key_c, value_c_v2),
+                SmtForestOperation::insert(key_b, value_b),
+                SmtForestOperation::insert(key_c, value_c_v2),
             ]
             .into_iter(),
         ),

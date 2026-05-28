@@ -14,9 +14,9 @@ use proptest::prelude::*;
 use crate::{
     EMPTY_WORD, Map, ONE, ZERO,
     merkle::smt::{
-        Backend, BackendReader, ForestInMemoryBackend, ForestOperation, LargeSmtForest, LeafIndex,
-        LineageId, MAX_LEAF_ENTRIES, RootInfo, SMT_DEPTH, Smt, SmtForestUpdateBatch, SmtProof,
-        SmtUpdateBatch, TreeId, VersionId,
+        Backend, BackendReader, ForestInMemoryBackend, LargeSmtForest, LeafIndex, LineageId,
+        MAX_LEAF_ENTRIES, RootInfo, SMT_DEPTH, Smt, SmtForestOperation, SmtForestUpdateBatch,
+        SmtProof, SmtUpdateBatch, TreeId, VersionId,
         large_forest::{
             backend::{BackendError, Result as BackendResult},
             root::{TreeEntry, TreeWithRoot},
@@ -121,9 +121,9 @@ pub fn arbitrary_batch() -> impl Strategy<Value = SmtUpdateBatch> {
     arbitrary_entries().prop_map(|e| {
         SmtUpdateBatch::new(e.into_iter().map(|(k, v)| {
             if v == EMPTY_WORD {
-                ForestOperation::remove(k)
+                SmtForestOperation::remove(k)
             } else {
-                ForestOperation::insert(k, v)
+                SmtForestOperation::insert(k, v)
             }
         }))
     })

@@ -43,12 +43,12 @@ pub type MutationSet = crate::merkle::smt::MutationSet<SMT_DEPTH, Word, Word>;
 ///
 /// Values of this type are only valid for the forest state against which they were computed.
 /// Applying them after the target lineage has changed will fail during forest-level validation.
-pub struct ForestMutationSet<B: Backend> {
+pub struct SmtForestMutationSet<B: Backend> {
     entries: Vec<LineageMutation>,
     prepared: B::PreparedMutations,
 }
 
-impl<B: Backend> ForestMutationSet<B> {
+impl<B: Backend> SmtForestMutationSet<B> {
     /// Constructs a forest mutation set from inspectable lineage entries and backend-prepared data.
     ///
     /// This constructor is crate-private because only forest/backend code can maintain the
