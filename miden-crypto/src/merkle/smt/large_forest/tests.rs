@@ -1208,6 +1208,48 @@ fn compute_and_apply_update_tree_mutations() -> Result<()> {
 }
 
 #[test]
+fn compute_and_apply_forest_mutations_can_mix_additions_and_updates() -> Result<()> {
+    let backend = ForestInMemoryBackend::new();
+    let mut forest = Forest::new(backend)?;
+    let mut rng = ContinuousRng::new([0x74; 32]);
+
+    let existing_lineage: LineageId = rng.value();
+    let new_lineage: LineageId = rng.value();
+    let version_1: VersionId = 10;
+    let version_2: VersionId = 11;
+
+    let existing_key: Word = rng.value();
+    let existing_value: Word = rng.value();
+    let new_key: Word = rng.value();
+    let new_value: Word = rng.value();
+
+    forest.add_lineage(existing_lineage, version_1, SmtUpdateBatch::default())?;
+
+    let mut batch = SmtForestUpdateBatch::empty();
+    batch.operations(existing_lineage).add_insert(existing_key, existing_value);
+    batch.operations(new_lineage).add_insert(new_key, new_value);
+
+    let mutations = forest.compute_forest_mutations(version_2, batch)?;
+    let proposed_roots = mutations.roots().collect::<Vec<_>>();
+    assert_eq!(proposed_roots.len(), 2);
+    assert!(proposed_roots.iter().any(|root| root.lineage() == existing_lineage));
+    assert!(proposed_roots.iter().any(|root| root.lineage() == new_lineage));
+
+    assert_eq!(forest.get(TreeId::new(existing_lineage, version_1), existing_key)?, None);
+    assert_matches!(forest.root_info(TreeId::new(new_lineage, version_2)), RootInfo::Missing);
+
+    let applied_roots = forest.apply_mutations(mutations)?;
+    assert_eq!(applied_roots.len(), 2);
+    assert_eq!(
+        forest.get(TreeId::new(existing_lineage, version_2), existing_key)?,
+        Some(existing_value)
+    );
+    assert_eq!(forest.get(TreeId::new(new_lineage, version_2), new_key)?, Some(new_value));
+
+    Ok(())
+}
+
+#[test]
 fn apply_update_tree_mutations_rejects_stale_state() -> Result<()> {
     let backend = ForestInMemoryBackend::new();
     let mut forest = Forest::new(backend)?;
