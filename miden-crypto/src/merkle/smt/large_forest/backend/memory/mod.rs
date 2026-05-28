@@ -395,17 +395,6 @@ impl Backend for InMemoryBackend {
 // These are the implementations of helper methods used by the backend tests.
 #[cfg(test)]
 impl InMemoryBackend {
-    pub(crate) fn compute_update_tree_mutations(
-        &self,
-        lineage: LineageId,
-        new_version: VersionId,
-        updates: SmtUpdateBatch,
-    ) -> Result<(Vec<LineageMutation>, InMemoryPreparedMutations)> {
-        let mut batch = SmtForestUpdateBatch::empty();
-        batch.operations(lineage).add_operations(updates.into_iter());
-        self.compute_mutations(new_version, batch)
-    }
-
     /// Adds the provided `lineage` to the forest.
     ///
     /// # Errors

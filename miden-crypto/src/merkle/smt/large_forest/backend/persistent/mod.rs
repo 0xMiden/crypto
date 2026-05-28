@@ -492,17 +492,6 @@ impl Backend for PersistentBackend {
 // These are the implementations of helper methods used by the backend tests.
 #[cfg(test)]
 impl PersistentBackend {
-    pub(crate) fn compute_update_tree_mutations(
-        &self,
-        lineage: LineageId,
-        new_version: VersionId,
-        updates: SmtUpdateBatch,
-    ) -> Result<(Vec<LineageMutation>, PersistentPreparedMutations)> {
-        let mut batch = SmtForestUpdateBatch::empty();
-        batch.operations(lineage).add_operations(updates.into_iter());
-        self.compute_mutations(new_version, batch)
-    }
-
     /// Adds the provided `lineage` to the forest with the provided `version` and sets the
     /// associated tree to have the value created by applying `updates` to the empty tree, returning
     /// the root of this new tree.
