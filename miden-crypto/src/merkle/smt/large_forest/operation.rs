@@ -78,13 +78,13 @@ impl SmtUpdateBatch {
         self.operations.extend(operations);
     }
 
-    /// Adds the [`ForestOperation::Insert`] operation for the provided `key` and `value` pair to
+    /// Adds the [`SmtForestOperation::Insert`] operation for the provided `key` and `value` pair to
     /// the batch.
     pub fn add_insert(&mut self, key: Word, value: Word) {
         self.operations.push(SmtForestOperation::insert(key, value));
     }
 
-    /// Adds the [`ForestOperation::Remove`] operation for the provided `key` to the batch.
+    /// Adds the [`SmtForestOperation::Remove`] operation for the provided `key` to the batch.
     pub fn add_remove(&mut self, key: Word) {
         self.operations.push(SmtForestOperation::remove(key));
     }

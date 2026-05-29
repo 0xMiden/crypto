@@ -109,7 +109,7 @@ impl LineageMutation {
     /// Constructs a lineage mutation.
     ///
     /// This constructor is crate-private because callers must not be able to fabricate mutation
-    /// metadata that is inconsistent with the backend-prepared data in a [`ForestMutationSet`].
+    /// metadata that is inconsistent with the backend-prepared data in an [`SmtForestMutationSet`].
     pub(crate) fn new(
         lineage: LineageId,
         old_version: Option<VersionId>,
