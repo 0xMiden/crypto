@@ -249,7 +249,7 @@ use crate::{
 };
 
 mod error;
-pub use error::LargeSmtError;
+pub use error::{LargeSmtError, LargeSmtResult};
 
 #[cfg(test)]
 mod property_tests;
@@ -423,9 +423,7 @@ impl<S: SmtStorageReader> LargeSmt<S> {
     ///
     /// # Errors
     /// Returns an error if the storage backend fails to create the iterator.
-    pub fn leaves(
-        &self,
-    ) -> Result<impl Iterator<Item = (LeafIndex<SMT_DEPTH>, SmtLeaf)>, LargeSmtError> {
+    pub fn leaves(&self) -> LargeSmtResult<impl Iterator<Item = (LeafIndex<SMT_DEPTH>, SmtLeaf)>> {
         let iter = self.storage.iter_leaves()?;
         Ok(iter.map(|(idx, leaf)| (LeafIndex::new_max_depth(idx), leaf)))
     }
@@ -435,7 +433,7 @@ impl<S: SmtStorageReader> LargeSmt<S> {
     ///
     /// # Errors
     /// Returns an error if the storage backend fails to create the iterator.
-    pub fn entries(&self) -> Result<impl Iterator<Item = (Word, Word)>, LargeSmtError> {
+    pub fn entries(&self) -> LargeSmtResult<impl Iterator<Item = (Word, Word)>> {
         let leaves_iter = self.leaves()?;
         Ok(leaves_iter.flat_map(|(_, leaf)| {
             // Collect the (Word, Word) tuples into an owned Vec
@@ -450,7 +448,7 @@ impl<S: SmtStorageReader> LargeSmt<S> {
     ///
     /// # Errors
     /// Returns an error if the storage backend fails during iteration setup.
-    pub fn inner_nodes(&self) -> Result<impl Iterator<Item = InnerNodeInfo> + '_, LargeSmtError> {
+    pub fn inner_nodes(&self) -> LargeSmtResult<impl Iterator<Item = InnerNodeInfo> + '_> {
         // Pre-validate that storage is accessible
         let _ = self.storage.iter_subtrees()?;
         Ok(LargeSmtInnerNodeIterator::new(self))
@@ -508,7 +506,7 @@ impl<S: SmtStorage> LargeSmt<S> {
     /// The new tree shares the same root, leaf count, and entry count as `self`, and its storage
     /// is a point-in-time snapshot produced by [`SmtStorage::reader`]. The returned tree's storage
     /// type is `S::Reader: SmtStorageReader`, so it cannot be used for mutations.
-    pub fn reader(&self) -> Result<LargeSmt<S::Reader>, LargeSmtError> {
+    pub fn reader(&self) -> LargeSmtResult<LargeSmt<S::Reader>> {
         Ok(LargeSmt {
             storage: self.storage.reader()?,
             in_memory_nodes: self.in_memory_nodes.clone(),
