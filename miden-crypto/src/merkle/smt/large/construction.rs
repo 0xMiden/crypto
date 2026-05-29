@@ -16,7 +16,7 @@ use crate::{
         full::concurrent::{
             PairComputations, SUBTREE_DEPTH, SubtreeLeaf, SubtreeLeavesIter, build_subtree,
         },
-        large::to_memory_index,
+        large::{NUM_IN_MEMORY_LEAVES, to_memory_index},
     },
 };
 
@@ -149,6 +149,7 @@ impl<S: SmtStorageReader> LargeSmt<S> {
 
         // Get the in-memory top of tree leaves from storage
         let in_memory_tree_leaves = storage.get_depth_in_mem()?;
+        assert_eq!(in_memory_tree_leaves.len(), NUM_IN_MEMORY_LEAVES);
 
         // Convert in-memory top of tree leaves to SubtreeLeaf
         let mut leaf_subtrees: Vec<SubtreeLeaf> = in_memory_tree_leaves

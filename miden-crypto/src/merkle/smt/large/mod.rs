@@ -277,16 +277,19 @@ mod smt_trait;
 // CONSTANTS
 // ================================================================================================
 
-/// Number of levels of the tree that are stored in memory
+/// Number of levels of the tree that are stored in memory.
 pub(super) const IN_MEMORY_DEPTH: u8 = 16;
 
-/// Number of nodes that are stored in memory (including the unused index 0)
+/// Number of leaves that are stored in memory.
+const NUM_IN_MEMORY_LEAVES: usize = 1 << (IN_MEMORY_DEPTH);
+
+/// Number of nodes that are stored in memory (including the unused index 0).
 const NUM_IN_MEMORY_NODES: usize = 1 << (IN_MEMORY_DEPTH + 1);
 
 /// Index of the root node inside `in_memory_nodes`.
 pub(super) const ROOT_MEMORY_INDEX: usize = 1;
 
-/// Number of subtree levels below in-memory depth (16-64 in steps of 8)
+/// Number of subtree levels below in-memory depth (16-64 in steps of 8).
 const NUM_SUBTREE_LEVELS: usize = 6;
 
 /// How many subtrees we buffer before flushing them to storage **during the
