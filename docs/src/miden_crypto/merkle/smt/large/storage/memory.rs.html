@@ -130,13 +130,13 @@
 <a href=#130 id=130 data-nosnippet>130</a>        <span class="prelude-val">Ok</span>(Box::new(<span class="self">self</span>.subtrees.values().cloned()))
 <a href=#131 id=131 data-nosnippet>131</a>    }
 <a href=#132 id=132 data-nosnippet>132</a>
-<a href=#133 id=133 data-nosnippet>133</a>    <span class="doccomment">/// Retrieves all depth 24 roots for fast tree rebuilding.
+<a href=#133 id=133 data-nosnippet>133</a>    <span class="doccomment">/// Retrieves roots of all subtrees at `IN_MEMORY_DEPTH` depth.
 <a href=#134 id=134 data-nosnippet>134</a>    ///
 <a href=#135 id=135 data-nosnippet>135</a>    /// Derived from the subtrees already in memory: for each subtree whose root sits at
-<a href=#136 id=136 data-nosnippet>136</a>    /// `IN_MEMORY_DEPTH`, the root node's hash is the depth-24 entry that `initialize_from_storage`
+<a href=#136 id=136 data-nosnippet>136</a>    /// `IN_MEMORY_DEPTH`, the root node's hash is the entry that `initialize_from_storage`
 <a href=#137 id=137 data-nosnippet>137</a>    /// needs to reconstruct the in-memory top of the tree.
-<a href=#138 id=138 data-nosnippet>138</a>    </span><span class="kw">fn </span>get_depth24(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Result</span>&lt;Vec&lt;(u64, Word)&gt;, StorageError&gt; {
-<a href=#139 id=139 data-nosnippet>139</a>        <span class="kw">let </span>depth24 = <span class="self">self
+<a href=#138 id=138 data-nosnippet>138</a>    </span><span class="kw">fn </span>get_top_subtree_roots(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Result</span>&lt;Vec&lt;(u64, Word)&gt;, StorageError&gt; {
+<a href=#139 id=139 data-nosnippet>139</a>        <span class="kw">let </span>in_mem_roots = <span class="self">self
 <a href=#140 id=140 data-nosnippet>140</a>            </span>.subtrees
 <a href=#141 id=141 data-nosnippet>141</a>            .values()
 <a href=#142 id=142 data-nosnippet>142</a>            .filter(|subtree| subtree.root_index().depth() == IN_MEMORY_DEPTH)
@@ -146,7 +146,7 @@
 <a href=#146 id=146 data-nosnippet>146</a>                    .map(|node| (subtree.root_index().position(), node.hash()))
 <a href=#147 id=147 data-nosnippet>147</a>            })
 <a href=#148 id=148 data-nosnippet>148</a>            .collect();
-<a href=#149 id=149 data-nosnippet>149</a>        <span class="prelude-val">Ok</span>(depth24)
+<a href=#149 id=149 data-nosnippet>149</a>        <span class="prelude-val">Ok</span>(in_mem_roots)
 <a href=#150 id=150 data-nosnippet>150</a>    }
 <a href=#151 id=151 data-nosnippet>151</a>}
 <a href=#152 id=152 data-nosnippet>152</a>
@@ -397,8 +397,8 @@
 <a href=#397 id=397 data-nosnippet>397</a>        <span class="self">self</span>.<span class="number">0</span>.iter_subtrees()
 <a href=#398 id=398 data-nosnippet>398</a>    }
 <a href=#399 id=399 data-nosnippet>399</a>
-<a href=#400 id=400 data-nosnippet>400</a>    <span class="kw">fn </span>get_depth24(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Result</span>&lt;Vec&lt;(u64, Word)&gt;, StorageError&gt; {
-<a href=#401 id=401 data-nosnippet>401</a>        <span class="self">self</span>.<span class="number">0</span>.get_depth24()
+<a href=#400 id=400 data-nosnippet>400</a>    <span class="kw">fn </span>get_top_subtree_roots(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Result</span>&lt;Vec&lt;(u64, Word)&gt;, StorageError&gt; {
+<a href=#401 id=401 data-nosnippet>401</a>        <span class="self">self</span>.<span class="number">0</span>.get_top_subtree_roots()
 <a href=#402 id=402 data-nosnippet>402</a>    }
 <a href=#403 id=403 data-nosnippet>403</a>}
 </code></pre></div></section></main></body></html>

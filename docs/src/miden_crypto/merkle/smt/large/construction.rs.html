@@ -50,7 +50,7 @@
 <a href=#50 id=50 data-nosnippet>50</a>    <span class="doccomment">/// Loads an existing [LargeSmt] from storage without validating the root.
 <a href=#51 id=51 data-nosnippet>51</a>    ///
 <a href=#52 id=52 data-nosnippet>52</a>    /// If the storage is empty, the SMT is initialized with the root of an empty tree.
-<a href=#53 id=53 data-nosnippet>53</a>    /// Otherwise, the in-memory top of the tree is reconstructed from the cached depth-24
+<a href=#53 id=53 data-nosnippet>53</a>    /// Otherwise, the in-memory top of the tree is reconstructed from the cached in-memory-depth
 <a href=#54 id=54 data-nosnippet>54</a>    /// subtree hashes stored in the backend.
 <a href=#55 id=55 data-nosnippet>55</a>    ///
 <a href=#56 id=56 data-nosnippet>56</a>    /// **Note:** This method does not validate the reconstructed root. Use this only when
@@ -75,7 +75,7 @@
 <a href=#75 id=75 data-nosnippet>75</a>
 <a href=#76 id=76 data-nosnippet>76</a>    <span class="doccomment">/// Loads an existing [LargeSmt] from storage and validates it against the expected root.
 <a href=#77 id=77 data-nosnippet>77</a>    ///
-<a href=#78 id=78 data-nosnippet>78</a>    /// This method reconstructs the in-memory top of the tree from the cached depth-24
+<a href=#78 id=78 data-nosnippet>78</a>    /// This method reconstructs the in-memory top of the tree from the cached in-memory-depth
 <a href=#79 id=79 data-nosnippet>79</a>    /// subtree hashes, computes the root, and validates it against `expected_root`.
 <a href=#80 id=80 data-nosnippet>80</a>    ///
 <a href=#81 id=81 data-nosnippet>81</a>    /// Use this method when reloading a tree to ensure the storage contains the expected
@@ -117,7 +117,7 @@
 <a href=#117 id=117 data-nosnippet>117</a>    <span class="doccomment">/// Internal method that initializes the in-memory tree from storage.
 <a href=#118 id=118 data-nosnippet>118</a>    ///
 <a href=#119 id=119 data-nosnippet>119</a>    /// For empty storage, returns an empty tree. For non-empty storage,
-<a href=#120 id=120 data-nosnippet>120</a>    /// rebuilds the in-memory top from cached depth-24 hashes.
+<a href=#120 id=120 data-nosnippet>120</a>    /// rebuilds the in-memory top from cached in-memory-depth hashes.
 <a href=#121 id=121 data-nosnippet>121</a>    </span><span class="kw">fn </span>initialize_from_storage(storage: S) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="self">Self</span>, LargeSmtError&gt; {
 <a href=#122 id=122 data-nosnippet>122</a>        <span class="comment">// Initialize in-memory nodes
 <a href=#123 id=123 data-nosnippet>123</a>        </span><span class="kw">let </span><span class="kw-2">mut </span>in_memory_nodes: Vec&lt;Word&gt; = <span class="macro">vec!</span>[EMPTY_WORD; NUM_IN_MEMORY_NODES];
@@ -147,8 +147,8 @@
 <a href=#147 id=147 data-nosnippet>147</a>        </span><span class="kw">let </span>leaf_count = storage.leaf_count()<span class="question-mark">?</span>;
 <a href=#148 id=148 data-nosnippet>148</a>        <span class="kw">let </span>entry_count = storage.entry_count()<span class="question-mark">?</span>;
 <a href=#149 id=149 data-nosnippet>149</a>
-<a href=#150 id=150 data-nosnippet>150</a>        <span class="comment">// Get the in-memory top of tree leaves from storage
-<a href=#151 id=151 data-nosnippet>151</a>        </span><span class="kw">let </span>in_memory_tree_leaves = storage.get_depth24()<span class="question-mark">?</span>;
+<a href=#150 id=150 data-nosnippet>150</a>        <span class="comment">// Get the tops of subtrees from storage; these become the leaves of the in-memory tree
+<a href=#151 id=151 data-nosnippet>151</a>        </span><span class="kw">let </span>in_memory_tree_leaves = storage.get_top_subtree_roots()<span class="question-mark">?</span>;
 <a href=#152 id=152 data-nosnippet>152</a>
 <a href=#153 id=153 data-nosnippet>153</a>        <span class="comment">// Convert in-memory top of tree leaves to SubtreeLeaf
 <a href=#154 id=154 data-nosnippet>154</a>        </span><span class="kw">let </span><span class="kw-2">mut </span>leaf_subtrees: Vec&lt;SubtreeLeaf&gt; = in_memory_tree_leaves

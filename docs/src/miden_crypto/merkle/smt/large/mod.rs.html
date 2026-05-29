@@ -1,10 +1,10 @@
 <!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `miden-crypto/src/merkle/smt/large/mod.rs`."><title>mod.rs - source</title><script>if(window.location.protocol!=="file:")document.head.insertAdjacentHTML("beforeend","SourceSerif4-Regular-6b053e98.ttf.woff2,FiraSans-Italic-81dc35de.woff2,FiraSans-Regular-0fe48ade.woff2,FiraSans-MediumItalic-ccf7e434.woff2,FiraSans-Medium-e1aa3f0a.woff2,SourceCodePro-Regular-8badfe75.ttf.woff2,SourceCodePro-Semibold-aa29a496.ttf.woff2".split(",").map(f=>`<link rel="preload" as="font" type="font/woff2"href="../../../../../static.files/${f}">`).join(""))</script><link rel="stylesheet" href="../../../../../static.files/normalize-9960930a.css"><link rel="stylesheet" href="../../../../../static.files/rustdoc-17e0aaed.css"><meta name="rustdoc-vars" data-root-path="../../../../../" data-static-root-path="../../../../../static.files/" data-current-crate="miden_crypto" data-themes="" data-resource-suffix="" data-rustdoc-version="1.98.0-nightly (cced03bfd 2026-05-28)" data-channel="nightly" data-search-js="search-fd9372ac.js" data-stringdex-js="stringdex-2da4960a.js" data-settings-js="settings-170eb4bf.js" ><script src="../../../../../static.files/storage-41dd4d93.js"></script><script defer src="../../../../../static.files/src-script-813739b1.js"></script><script defer src="../../../../../src-files.js"></script><script defer src="../../../../../static.files/main-fcd733ba.js"></script><noscript><link rel="stylesheet" href="../../../../../static.files/noscript-f7c3ffd8.css"></noscript><link rel="alternate icon" type="image/png" href="../../../../../static.files/favicon-32x32-eab170b8.png"><link rel="icon" type="image/svg+xml" href="../../../../../static.files/favicon-044be391.svg"></head><body class="rustdoc src"><a class="skip-main-content" href="#main-content">Skip to main content</a><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="src-sidebar-title"><h2>Files</h2></div></nav><div class="sidebar-resizer" title="Drag to resize sidebar"></div><main><section id="main-content" class="content" tabindex="-1"><div class="main-heading"><h1><div class="sub-heading">miden_crypto/merkle/smt/large/</div>mod.rs</h1><rustdoc-toolbar></rustdoc-toolbar></div><div class="example-wrap digits-3"><pre class="rust"><code><a href=#1 id=1 data-nosnippet>1</a><span class="doccomment">//! Large-scale Sparse Merkle Tree backed by pluggable storage.
 <a href=#2 id=2 data-nosnippet>2</a>//!
-<a href=#3 id=3 data-nosnippet>3</a>//! `LargeSmt` stores the top of the tree (depths 0–23) in memory and persists the lower
-<a href=#4 id=4 data-nosnippet>4</a>//! depths (24–64) in storage as fixed-size subtrees. This hybrid layout scales beyond RAM
+<a href=#3 id=3 data-nosnippet>3</a>//! `LargeSmt` stores the top of the tree (depths 0–`IN_MEMORY_DEPTH`-1) in memory and persists
+<a href=#4 id=4 data-nosnippet>4</a>//! the lower depths in storage as fixed-size subtrees. This hybrid layout scales beyond RAM
 <a href=#5 id=5 data-nosnippet>5</a>//! while keeping common operations fast. With the `rocksdb` feature enabled, the lower
 <a href=#6 id=6 data-nosnippet>6</a>//! subtrees and leaves are stored in RocksDB. On reload, the in-memory top is reconstructed
-<a href=#7 id=7 data-nosnippet>7</a>//! from cached depth-24 subtree roots.
+<a href=#7 id=7 data-nosnippet>7</a>//! from cached in-memory-depth subtree roots.
 <a href=#8 id=8 data-nosnippet>8</a>//!
 <a href=#9 id=9 data-nosnippet>9</a>//! Examples below require the `rocksdb` feature.
 <a href=#10 id=10 data-nosnippet>10</a>//!
@@ -277,17 +277,17 @@
 <a href=#277 id=277 data-nosnippet>277</a><span class="comment">// CONSTANTS
 <a href=#278 id=278 data-nosnippet>278</a>// ================================================================================================
 <a href=#279 id=279 data-nosnippet>279</a>
-<a href=#280 id=280 data-nosnippet>280</a></span><span class="doccomment">/// Number of levels of the tree that are stored in memory
-<a href=#281 id=281 data-nosnippet>281</a></span><span class="kw">const </span>IN_MEMORY_DEPTH: u8 = <span class="number">24</span>;
+<a href=#280 id=280 data-nosnippet>280</a></span><span class="doccomment">/// Number of levels of the tree that are stored in memory.
+<a href=#281 id=281 data-nosnippet>281</a></span><span class="kw">pub</span>(<span class="kw">super</span>) <span class="kw">const </span>IN_MEMORY_DEPTH: u8 = <span class="number">16</span>;
 <a href=#282 id=282 data-nosnippet>282</a>
-<a href=#283 id=283 data-nosnippet>283</a><span class="doccomment">/// Number of nodes that are stored in memory (including the unused index 0)
+<a href=#283 id=283 data-nosnippet>283</a><span class="doccomment">/// Number of nodes that are stored in memory (including the unused index 0).
 <a href=#284 id=284 data-nosnippet>284</a></span><span class="kw">const </span>NUM_IN_MEMORY_NODES: usize = <span class="number">1 </span>&lt;&lt; (IN_MEMORY_DEPTH + <span class="number">1</span>);
 <a href=#285 id=285 data-nosnippet>285</a>
 <a href=#286 id=286 data-nosnippet>286</a><span class="doccomment">/// Index of the root node inside `in_memory_nodes`.
 <a href=#287 id=287 data-nosnippet>287</a></span><span class="kw">pub</span>(<span class="kw">super</span>) <span class="kw">const </span>ROOT_MEMORY_INDEX: usize = <span class="number">1</span>;
 <a href=#288 id=288 data-nosnippet>288</a>
-<a href=#289 id=289 data-nosnippet>289</a><span class="doccomment">/// Number of subtree levels below in-memory depth (24-64 in steps of 8)
-<a href=#290 id=290 data-nosnippet>290</a></span><span class="kw">const </span>NUM_SUBTREE_LEVELS: usize = <span class="number">5</span>;
+<a href=#289 id=289 data-nosnippet>289</a><span class="doccomment">/// Number of subtree levels below in-memory depth (16-64 in steps of 8).
+<a href=#290 id=290 data-nosnippet>290</a></span><span class="kw">const </span>NUM_SUBTREE_LEVELS: usize = <span class="number">6</span>;
 <a href=#291 id=291 data-nosnippet>291</a>
 <a href=#292 id=292 data-nosnippet>292</a><span class="doccomment">/// How many subtrees we buffer before flushing them to storage **during the
 <a href=#293 id=293 data-nosnippet>293</a>/// SMT construction phase**.
@@ -320,8 +320,8 @@
 <a href=#320 id=320 data-nosnippet>320</a>///
 <a href=#321 id=321 data-nosnippet>321</a>/// Unlike the regular `Smt`, this implementation is designed for very large trees by using external
 <a href=#322 id=322 data-nosnippet>322</a>/// storage (such as RocksDB) for the bulk of the tree data, while keeping only the upper levels (up
-<a href=#323 id=323 data-nosnippet>323</a>/// to depth 24) in memory. This hybrid approach allows the tree to scale beyond memory limitations
-<a href=#324 id=324 data-nosnippet>324</a>/// while maintaining good performance for common operations.
+<a href=#323 id=323 data-nosnippet>323</a>/// to `IN_MEMORY_DEPTH`) in memory. This hybrid approach allows the tree to scale beyond memory
+<a href=#324 id=324 data-nosnippet>324</a>/// limitations while maintaining good performance for common operations.
 <a href=#325 id=325 data-nosnippet>325</a>///
 <a href=#326 id=326 data-nosnippet>326</a>/// All leaves sit at depth 64. The most significant element of the key is used to identify the leaf
 <a href=#327 id=327 data-nosnippet>327</a>/// to which the key maps.
@@ -361,7 +361,7 @@
 <a href=#361 id=361 data-nosnippet>361</a>    </span><span class="kw">pub const </span>EMPTY_ROOT: Word = <span class="kw-2">*</span>EmptySubtreeRoots::entry(SMT_DEPTH, <span class="number">0</span>);
 <a href=#362 id=362 data-nosnippet>362</a>
 <a href=#363 id=363 data-nosnippet>363</a>    <span class="doccomment">/// Subtree depths for the subtrees stored in storage.
-<a href=#364 id=364 data-nosnippet>364</a>    </span><span class="kw">pub const </span>SUBTREE_DEPTHS: [u8; <span class="number">5</span>] = [<span class="number">56</span>, <span class="number">48</span>, <span class="number">40</span>, <span class="number">32</span>, <span class="number">24</span>];
+<a href=#364 id=364 data-nosnippet>364</a>    </span><span class="kw">pub const </span>SUBTREE_DEPTHS: [u8; <span class="number">6</span>] = [<span class="number">56</span>, <span class="number">48</span>, <span class="number">40</span>, <span class="number">32</span>, <span class="number">24</span>, <span class="number">16</span>];
 <a href=#365 id=365 data-nosnippet>365</a>
 <a href=#366 id=366 data-nosnippet>366</a>    <span class="comment">// PUBLIC ACCESSORS
 <a href=#367 id=367 data-nosnippet>367</a>    // --------------------------------------------------------------------------------------------
