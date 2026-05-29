@@ -1,25 +1,28 @@
 //! Lifted STARK prover.
 //!
 //! This module provides:
-//! - [`prove`]: Prove one or more AIR instances with traces of (possibly) different heights.
+//! - [`ProverInstance::prove`](crate::ProverInstance::prove): Prove one or more AIR instances with
+//!   traces of (possibly) different heights.
 //!
-//! [`prove`] writes the proof into a [`miden_stark_transcript::ProverChannel`]
-//! (commitments, grinding witnesses, and openings).
+//! [`ProverInstance::prove`](crate::ProverInstance::prove) writes the proof into a
+//! [`miden_stark_transcript::ProverChannel`] (commitments, grinding witnesses,
+//! and openings).
 //!
 //! # Fiat-Shamir / transcript binding (initial challenger state)
 //!
 //! This crate does **not** prescribe the *initial* transcript state. The caller
-//! must bind protocol and AIR configuration data before calling [`prove`]. Both
-//! prover and verifier must produce identical challenger states. Concretely, the
-//! caller **MUST** observe:
+//! must bind protocol and AIR configuration data before calling
+//! [`ProverInstance::prove`](crate::ProverInstance::prove). Both prover and verifier must produce
+//! identical challenger states. Concretely, the caller **MUST** observe:
 //!
 //! 1. **Protocol parameters** — e.g. the STARK configuration, blowup factor, and any
 //!    application-level domain separator.
 //!
 //! 2. **AIR configurations** — The framework does not commit to the [`MultiAir::airs`] list. The
-//!    caller MUST bind every AIR configuration into the challenger before calling [`prove`] /
-//!    [`verify`](crate::VerifierInstance::verify). The AIR ordering on the wire is derived
-//!    deterministically from the trace heights (stable sort on `(log_trace_height,
+//!    caller MUST bind every AIR configuration into the challenger before calling
+//!    [`ProverInstance::prove`](crate::ProverInstance::prove) /
+//!    [`VerifierInstance::verify`](crate::VerifierInstance::verify). The AIR ordering on the wire
+//!    is derived deterministically from the trace heights (stable sort on `(log_trace_height,
 //!    instance_index)`), so callers do not need to commit to it separately as long as they commit
 //!    to the AIR list and trace heights match.
 //!
@@ -104,7 +107,7 @@ use crate::{
 ///
 /// Construction validates preprocessed presence parity (and, when present, the
 /// bundle's shape against the AIRs), so holding a `ProverInstance` is a
-/// guarantee its preprocessed shape is consistent; [`prove`] never re-checks it.
+/// guarantee its preprocessed shape is consistent; proving never re-checks it.
 pub struct ProverInstance<'a, F, EF, MA, SC>
 where
     F: TwoAdicField,
@@ -146,7 +149,7 @@ where
         Ok(Self { config, prover_statement, preprocessed })
     }
 
-    /// Prove this instance — see [`prove`] for the full contract.
+    /// Prove this instance.
     pub fn prove(&self, challenger: SC::Challenger) -> Result<StarkOutput<F, EF, SC>, ProverError> {
         prove(self, challenger)
     }
@@ -170,7 +173,7 @@ where
     /// [`VerifierInstance::new`](crate::VerifierInstance::new); `None` when there
     /// is none.
     pub fn preprocessed_commitment(&self) -> Option<<SC::Lmcs as Lmcs>::Commitment> {
-        self.preprocessed.map(|p| p.commitment())
+        self.preprocessed.map(Preprocessed::commitment)
     }
 
     /// Borrow the preprocessed bundle, if any.

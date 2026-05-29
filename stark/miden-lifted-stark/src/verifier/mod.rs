@@ -1,7 +1,7 @@
 //! Lifted STARK verifier.
 //!
 //! This module provides:
-//! - [`verify`]: Verify a [`Statement`].
+//! - [`VerifierInstance::verify`](crate::VerifierInstance::verify): Verify a [`Statement`].
 //!
 //! Takes a challenger (consumed by value) and proof data, constructs the
 //! verifier transcript internally, and returns a [`StarkDigest`] on success.
@@ -13,9 +13,10 @@
 //! prover module-level docs for the full binding contract and recommended
 //! pattern.
 //!
-//! The proof's instance count and per-AIR log trace heights are carried on
-//! [`StarkProofData`] (in instance order) and observed into the challenger by
-//! [`verify`] at the protocol layer. Callers must not pre-observe them.
+//! The proof's per-AIR log trace heights are carried on [`StarkProofData`] (in
+//! instance order); [`VerifierInstance::verify`](crate::VerifierInstance::verify)
+//! observes the derived instance count and those heights at the protocol layer.
+//! Callers must not pre-observe them.
 //!
 //! # Statement-bound trace heights
 //!
@@ -27,13 +28,15 @@
 //!
 //! # Transcript boundaries (strict consumption)
 //!
-//! [`verify`] finalizes the transcript internally: it rejects proofs with
-//! trailing data (via [`TranscriptError::TrailingData`]) and returns a binding
-//! digest that must match the prover's digest.
+//! [`VerifierInstance::verify`](crate::VerifierInstance::verify) finalizes the
+//! transcript internally: it rejects proofs with trailing data (via
+//! [`TranscriptError::TrailingData`]) and returns a binding digest that must
+//! match the prover's digest.
 //!
 //! If you want to bundle extra data alongside the proof, you must manage
 //! boundaries yourself (e.g. parse and validate that data first, then pass the
-//! remaining transcript to [`verify`]).
+//! remaining transcript to
+//! [`VerifierInstance::verify`](crate::VerifierInstance::verify)).
 
 extern crate alloc;
 
@@ -119,8 +122,7 @@ where
         })
     }
 
-    /// Verify a proof against this instance — see [`verify`] for the full
-    /// contract.
+    /// Verify a proof against this instance.
     pub fn verify(
         &self,
         proof: &StarkProofData<F, EF, SC>,
@@ -372,7 +374,7 @@ where
         // max when shorter.
         let preproc_log_height = leaf_to_air
             .iter()
-            .map(|&air_idx| trace_order.log_heights_instance()[air_idx as usize])
+            .map(|&air_idx| trace_order.log_heights()[air_idx as usize])
             .max()
             .expect("preprocessed group is non-empty when a commitment is present")
             + log_blowup;

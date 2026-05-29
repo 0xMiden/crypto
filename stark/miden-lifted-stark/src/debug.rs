@@ -14,8 +14,8 @@ extern crate alloc;
 use alloc::vec::Vec;
 
 use miden_lifted_air::{
-    AirBuilder, BaseAir, ExtensionBuilder, LiftedAir, MultiAir, PeriodicAirBuilder,
-    PermutationAirBuilder, ProverStatement, RowWindow, debug::assert_multi_air_valid,
+    AirBuilder, ExtensionBuilder, LiftedAir, MultiAir, PeriodicAirBuilder, PermutationAirBuilder,
+    ProverStatement, RowWindow, debug::assert_multi_air_valid,
 };
 use p3_challenger::{CanObserve, CanSample};
 use p3_field::{ExtensionField, Field};
@@ -58,9 +58,9 @@ where
 ///
 /// Derives auxiliary-trace challenges from the supplied challenger by observing
 /// statement-owned data, then the instance count and log trace heights in
-/// instance order. This is a local constraint debugger: it does not commit
-/// traces or replay [`prove`](crate::prove), so its challenges are only for
-/// deterministic debug evaluation.
+/// instance order. This is a local constraint debugger: it intentionally skips
+/// main commitments, so sampled challenges need not match a full proof
+/// transcript produced by [`ProverInstance::prove`](crate::ProverInstance::prove).
 ///
 /// # Panics
 ///
@@ -86,7 +86,7 @@ pub fn check_constraints<F, EF, MA, Ch>(
     // Preprocessed matrices come straight off the AIRs (debug-only; this
     // re-materialises `BaseAir::preprocessed_trace`).
     let preprocessed_per_air: Vec<Option<RowMajorMatrix<F>>> =
-        airs.iter().map(|a| a.preprocessed_trace()).collect();
+        airs.iter().map(miden_lifted_air::BaseAir::preprocessed_trace).collect();
 
     // Seed deterministic debug challenges from the same initial statement/height
     // observations as the protocol. Do not replay the prover transcript here.

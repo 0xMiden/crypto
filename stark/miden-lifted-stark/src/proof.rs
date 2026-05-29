@@ -108,8 +108,8 @@ where
 pub type StarkDigest<F, EF, SC> =
     <<SC as StarkConfig<F, EF>>::Challenger as CanFinalizeDigest>::Digest;
 
-/// Output of [`crate::prover::prove`]: the proof data and
-/// its transcript digest.
+/// Output of [`ProverInstance::prove`](crate::ProverInstance::prove): the proof
+/// data and its transcript digest.
 pub struct StarkOutput<F: TwoAdicField, EF: ExtensionField<F>, SC: StarkConfig<F, EF>> {
     /// Transcript digest committing to the entire prover–verifier interaction.
     pub digest: StarkDigest<F, EF, SC>,
@@ -138,7 +138,8 @@ where
 /// Captures the reconstructed AIR ordering, commitments, sampled challenges,
 /// the OOD evaluation point, and the PCS sub-transcript. Constructed via
 /// [`from_data`](Self::from_data), which mirrors steps 0–9 of
-/// [`verify`](crate::verifier::verify) but skips the constraint check.
+/// [`VerifierInstance::verify`](crate::VerifierInstance::verify) but skips the
+/// constraint check.
 pub struct StarkProof<EF, L>
 where
     L: Lmcs,
@@ -191,7 +192,8 @@ where
 
     /// Parse a STARK transcript from proof data and a challenger.
     ///
-    /// Mirrors steps 0–9 of [`verify`](crate::verifier::verify):
+    /// Mirrors steps 0–9 of
+    /// [`VerifierInstance::verify`](crate::VerifierInstance::verify):
     /// 0. Reconstruct + validate AIR ordering from heights, absorb statement-owned inputs, then
     ///    observe the instance count and log trace heights in instance order
     /// 1. Receive main trace commitment

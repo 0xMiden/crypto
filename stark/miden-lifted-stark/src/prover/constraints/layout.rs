@@ -67,7 +67,6 @@ impl<F: Field> ConstraintLayoutBuilder<F> {
             num_permutation_challenges,
             num_permutation_values,
             num_periodic_columns,
-            ..
         } = layout;
         Self {
             main: RowMajorMatrix::new(vec![F::ZERO; 2 * main_width], main_width),

@@ -83,7 +83,7 @@ where
         C: StarkConfig<F, EF, Lmcs = L>,
     {
         let traces: Vec<Option<RowMajorMatrix<F>>> =
-            statement.airs().iter().map(|a| a.preprocessed_trace()).collect();
+            statement.airs().iter().map(BaseAir::preprocessed_trace).collect();
         if traces.iter().all(Option::is_none) {
             return None;
         }
