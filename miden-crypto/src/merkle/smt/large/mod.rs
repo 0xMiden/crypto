@@ -281,7 +281,7 @@ mod smt_trait;
 pub(super) const IN_MEMORY_DEPTH: u8 = 16;
 
 /// Number of leaves that are stored in memory.
-const NUM_IN_MEMORY_LEAVES: usize = 1 << (IN_MEMORY_DEPTH);
+const NUM_IN_MEMORY_LEAVES: usize = 1 << IN_MEMORY_DEPTH;
 
 /// Number of nodes that are stored in memory (including the unused index 0).
 const NUM_IN_MEMORY_NODES: usize = 1 << (IN_MEMORY_DEPTH + 1);
