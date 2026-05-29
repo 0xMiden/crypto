@@ -190,18 +190,18 @@ where
             return Err(LmcsError::InvalidProof);
         }
 
-        // Fold virtually-lifted query indices down to the committed tree's depth:
+        // Project virtually-lifted query indices down to the committed tree's depth:
         // query index `i` opens leaf `i mod 2^tree_log_height`. A no-op when the
         // tree fills the query domain (`tree_log_height == indices.depth()`).
-        let mut leaves = indices.clone();
-        leaves.shrink_depth(indices.depth().saturating_sub(tree_log_height));
-        let mask = (1usize << tree_log_height) - 1;
+        let projection = indices.project_to_depth(tree_log_height)?;
+        let leaf_indices = projection.leaf_indices();
 
         // 1. Read one opening per unique committed leaf and hash it.
         let mut leaf_rows: BTreeMap<usize, RowList<Self::F>> = BTreeMap::new();
-        let mut leaf_hashes: Vec<(usize, Self::Commitment)> = Vec::with_capacity(leaves.len());
+        let mut leaf_hashes: Vec<(usize, Self::Commitment)> =
+            Vec::with_capacity(leaf_indices.len());
 
-        for &leaf in leaves.iter() {
+        for &leaf in leaf_indices.iter() {
             let opening =
                 LeafOpening::<_, SALT_ELEMS>::read_from_channel(widths.to_vec(), channel)?;
             leaf_hashes.push((leaf, opening.leaf_hash(self)));
@@ -211,7 +211,7 @@ where
         // 2. Recompute root by streaming siblings directly from the channel.
         let tree = MerkleWitness::build(
             leaf_hashes,
-            leaves.depth() as usize,
+            leaf_indices.depth() as usize,
             |_| -> Result<_, LmcsError> { Ok(*channel.receive_hint_commitment()?) },
             |l, r| self.compress(l, r),
         )?;
@@ -223,7 +223,7 @@ where
 
         // 3. Re-key by the original query indices, sharing each committed leaf's
         // rows across the indices that fold to it.
-        Ok(indices.iter().map(|&i| (i, leaf_rows[&(i & mask)].clone())).collect())
+        projection.expand_leaf_values(&leaf_rows)
     }
 
     /// Parse batch hints into per-index opening proofs.
@@ -244,15 +244,16 @@ where
     where
         Ch: VerifierChannel<F = Self::F, Commitment = Self::Commitment>,
     {
-        // Fold virtually-lifted query indices to the committed tree's depth; the
+        // Project virtually-lifted query indices to the committed tree's depth; the
         // returned witness and openings are keyed by committed-leaf index.
-        let mut leaves = indices.clone();
-        leaves.shrink_depth(indices.depth().saturating_sub(tree_log_height));
+        let projection = indices.project_to_depth(tree_log_height)?;
+        let leaf_indices = projection.leaf_indices();
 
         let mut openings = BTreeMap::new();
-        let mut leaf_hashes: Vec<(usize, Self::Commitment)> = Vec::with_capacity(leaves.len());
+        let mut leaf_hashes: Vec<(usize, Self::Commitment)> =
+            Vec::with_capacity(leaf_indices.len());
 
-        for &leaf in leaves.iter() {
+        for &leaf in leaf_indices.iter() {
             let opening =
                 LeafOpening::<_, SALT_ELEMS>::read_from_channel(widths.to_vec(), channel)?;
             leaf_hashes.push((leaf, opening.leaf_hash(self)));
@@ -262,7 +263,7 @@ where
         // 2. Build PrunedTree from leaf hashes + channel siblings.
         let witness = MerkleWitness::build(
             leaf_hashes,
-            leaves.depth() as usize,
+            leaf_indices.depth() as usize,
             |_| -> Result<_, LmcsError> { Ok(*channel.receive_hint_commitment()?) },
             |l, r| self.compress(l, r),
         )?;
@@ -415,6 +416,47 @@ mod tests {
             ),
             Err(LmcsError::InvalidProof)
         );
+    }
+
+    #[test]
+    fn virtual_lifted_indices_fold_to_committed_leaves() {
+        let lmcs = gl::test_lmcs();
+        let tree = lmcs.build_tree(vec![small_matrix(4, 2, 0)]);
+        let widths = tree.aligned_widths();
+        let commitment = tree.root();
+        let tree_log_height = log2_strict_u8(tree.height());
+        let query_depth = tree_log_height + 1;
+        let indices = TreeIndices::new([0usize, 4, 5, 7], query_depth).unwrap();
+
+        let make_transcript = || {
+            let mut prover_channel = gl::prover_channel();
+            tree.prove_batch(&indices, &mut prover_channel);
+            prover_channel.finalize()
+        };
+
+        let (prover_digest, transcript) = make_transcript();
+        let mut verifier_channel = gl::verifier_channel(&transcript);
+        let opened = lmcs
+            .open_batch(&commitment, &widths, &indices, tree_log_height, &mut verifier_channel)
+            .unwrap();
+
+        assert_eq!(opened[&0], tree.aligned_rows(0));
+        assert_eq!(opened[&4], tree.aligned_rows(0));
+        assert_eq!(opened[&5], tree.aligned_rows(1));
+        assert_eq!(opened[&7], tree.aligned_rows(3));
+        let verifier_digest =
+            verifier_channel.finalize().expect("transcript should finalize cleanly");
+        assert_eq!(prover_digest, verifier_digest);
+
+        let (_, transcript) = make_transcript();
+        let mut verifier_channel = gl::verifier_channel(&transcript);
+        let batch = lmcs
+            .read_batch_proof(&widths, &indices, tree_log_height, &mut verifier_channel)
+            .unwrap();
+        assert_eq!(batch.openings.len(), 3);
+        assert!(batch.openings.contains_key(&0));
+        assert!(batch.openings.contains_key(&1));
+        assert!(batch.openings.contains_key(&3));
     }
 
     /// Reproduces the "root mismatch" bug when using Goldilocks + Blake3 (byte-based hash).

@@ -158,14 +158,16 @@ where
     {
         // Fold virtually-lifted query indices down to this tree's own depth: a
         // query at global index `i` against a height-`H` tree opens leaf
-        // `i mod H`. `shrink_depth` masks + dedups; a no-op when the caller's
-        // depth already equals this tree's (the common full-height case).
+        // `i mod H`. A no-op when the caller's depth already equals this tree's
+        // (the common full-height case).
         let my_depth = log2_strict_usize(self.height()) as u8;
-        let mut local = indices.clone();
-        local.shrink_depth(indices.depth().saturating_sub(my_depth));
+        let projection = indices
+            .project_to_depth(my_depth)
+            .expect("query index depth must be at least the committed tree depth");
+        let leaf_indices = projection.leaf_indices();
 
-        // Stream leaf openings in sorted tree index order.
-        for &index in local.iter() {
+        // Stream leaf openings in sorted committed-leaf order.
+        for &index in leaf_indices.iter() {
             let opening = LeafOpening {
                 rows: self.aligned_rows(index),
                 salt: self.salt(index),
@@ -174,7 +176,7 @@ where
         }
 
         // Emit missing sibling hashes left-to-right, bottom-to-top.
-        for sibling in local.missing_siblings() {
+        for sibling in leaf_indices.missing_siblings() {
             let hash = self.digest_layers[sibling.depth()][sibling.position()];
             channel.hint_commitment(Hash::from(hash));
         }

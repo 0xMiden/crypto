@@ -1,19 +1,20 @@
-//! Validated Merkle tree leaf indices and missing sibling iteration.
+//! Validated Merkle tree indices and missing sibling iteration.
 //!
-//! [`TreeIndices`] bundles a sorted, deduplicated set of leaf indices with
-//! the tree depth, enforcing the invariant that every index is in `0..2^depth`.
+//! [`TreeIndices`] bundles a sorted, deduplicated set of domain indices with
+//! their source depth, enforcing the invariant that every index is in `0..2^depth`.
 //!
 //! [`MissingSiblingsIter`] walks the tree upward from a set of leaf positions
 //! and yields the sibling nodes absent from the set — exactly the nodes whose
 //! hashes must be provided to reconstruct the root.
 
-use alloc::vec::Vec;
+use alloc::{collections::BTreeMap, vec::Vec};
 
 use crate::lmcs::{LmcsError, node_id::NodeId};
 
-/// A validated set of Merkle tree leaf indices at a given depth.
+/// A validated set of Merkle tree indices at a given source depth.
 ///
-/// Invariants (enforced by [`new`](Self::new) and [`shrink_depth`](Self::shrink_depth)):
+/// Invariants (enforced by [`new`](Self::new), [`project_to_depth`](Self::project_to_depth),
+/// and [`shrink_depth`](Self::shrink_depth)):
 /// - `indices` is sorted ascending with no duplicates.
 /// - Every index satisfies `index < 2^depth`.
 ///
@@ -68,26 +69,89 @@ impl TreeIndices {
         MissingSiblingsIter::new(&self.indices, self.depth)
     }
 
-    /// Map domain indices to folded domain indices `shift` levels down, in place.
+    /// Project these source-domain indices onto a committed tree at `target_depth`.
     ///
-    /// In natural (domain) order, folding by `2^shift` maps each index to its
-    /// low `(depth - shift)` bits: `index & ((1 << (depth - shift)) - 1)`.
-    /// The depth is reduced and duplicates (from indices in the same coset)
-    /// are removed.
+    /// In natural (domain) order, a query index opens the committed leaf selected by its low
+    /// `target_depth` bits: `query & ((1 << target_depth) - 1)`. The returned projection keeps
+    /// both views together: original query indices for result keys, and deduplicated committed
+    /// leaf indices for transcript and Merkle-witness work.
+    pub fn project_to_depth(&self, target_depth: u8) -> Result<TreeIndexProjection<'_>, LmcsError> {
+        let mut leaf_indices = self.clone();
+        leaf_indices.fold_in_place(target_depth)?;
+        let leaf_mask = (1usize << target_depth as usize) - 1;
+        Ok(TreeIndexProjection {
+            query_indices: self,
+            leaf_indices,
+            leaf_mask,
+        })
+    }
+
+    /// Map domain indices to folded domain indices at `target_depth`, in place.
     ///
-    /// Unlike the bit-reversed right-shift, masking can reorder indices,
-    /// so `sort_unstable()` is needed before `dedup()`.
-    ///
-    /// Shrinking a root-only set (depth 0) has no effect.
-    pub fn shrink_depth(&mut self, shift: u8) {
-        let new_depth = self.depth.saturating_sub(shift);
-        let mask = (1usize << new_depth as usize) - 1;
+    /// In natural (domain) order, folding maps each index to its low `target_depth`
+    /// bits: `index & ((1 << target_depth) - 1)`. The depth is reduced and duplicates
+    /// from indices in the same coset are removed. Returns `InvalidProof` if
+    /// `target_depth` is above the current source depth.
+    fn fold_in_place(&mut self, target_depth: u8) -> Result<(), LmcsError> {
+        if target_depth > self.depth {
+            return Err(LmcsError::InvalidProof);
+        }
+
+        let mask = (1usize << target_depth as usize) - 1;
         for idx in &mut self.indices {
             *idx &= mask;
         }
         self.indices.sort_unstable();
         self.indices.dedup();
-        self.depth = new_depth;
+        self.depth = target_depth;
+        Ok(())
+    }
+
+    /// Map domain indices to folded domain indices `shift` levels down, in place.
+    ///
+    /// Shifts larger than the current depth fold to the root. Use
+    /// [`project_to_depth`](Self::project_to_depth) when invalid target depths should be
+    /// rejected instead of saturated.
+    pub fn shrink_depth(&mut self, shift: u8) {
+        let target_depth = self.depth.saturating_sub(shift);
+        self.fold_in_place(target_depth)
+            .expect("target depth is derived from current depth");
+    }
+}
+
+/// A query-index set projected onto a particular committed tree depth.
+///
+/// The projection owns the deduplicated committed-leaf indices used by the Merkle proof, while
+/// retaining a reference to the original query indices used by callers. This keeps the two index
+/// spaces explicit and avoids re-deriving their relationship at each call site.
+#[derive(Debug)]
+pub struct TreeIndexProjection<'a> {
+    query_indices: &'a TreeIndices,
+    leaf_indices: TreeIndices,
+    leaf_mask: usize,
+}
+
+impl TreeIndexProjection<'_> {
+    /// The unique committed leaves opened by this projection.
+    pub fn leaf_indices(&self) -> &TreeIndices {
+        &self.leaf_indices
+    }
+
+    fn pairs(&self) -> impl Iterator<Item = (usize, usize)> + '_ {
+        self.query_indices.iter().map(move |&query| (query, query & self.leaf_mask))
+    }
+
+    /// Re-key values stored by committed leaf back to the original query indices.
+    pub fn expand_leaf_values<T: Clone>(
+        &self,
+        leaf_values: &BTreeMap<usize, T>,
+    ) -> Result<BTreeMap<usize, T>, LmcsError> {
+        self.pairs()
+            .map(|(query, leaf)| {
+                let value = leaf_values.get(&leaf).ok_or(LmcsError::InvalidProof)?;
+                Ok((query, value.clone()))
+            })
+            .collect()
     }
 }
 
@@ -212,6 +276,21 @@ mod tests {
         assert!(TreeIndices::new([3], 2).is_ok());
         assert!(TreeIndices::new([4], 2).is_err());
         assert!(TreeIndices::new([0, 4], 2).is_err());
+    }
+
+    #[test]
+    fn projection_to_depth_is_checked_and_non_mutating() {
+        let ti = TreeIndices::new([0, 4, 5, 7], 3).unwrap();
+        let projection = ti.project_to_depth(2).unwrap();
+        let leaves = projection.leaf_indices();
+
+        assert_eq!(ti.iter().copied().collect::<Vec<_>>(), [0, 4, 5, 7]);
+        assert_eq!(ti.depth(), 3);
+        assert_eq!(leaves.iter().copied().collect::<Vec<_>>(), [0, 1, 3]);
+        assert_eq!(leaves.depth(), 2);
+        assert_eq!(projection.pairs().collect::<Vec<_>>(), vec![(0, 0), (4, 0), (5, 1), (7, 3)]);
+
+        assert!(ti.project_to_depth(4).is_err());
     }
 
     #[test]
