@@ -177,7 +177,9 @@ benchmark_with_setup_data! {
         (smt, temp_dir)
     },
     |b: &mut criterion::Bencher, (smt, _temp_dir): &(LargeSmt<RocksDbStorage>, tempfile::TempDir)| {
-        b.iter(|| hint::black_box(smt.clone()))
+        // iter_batched drops the returned clone after the timed section, keeping the
+        // RocksDbStorage::drop flush out of the measurement.
+        b.iter_batched(|| (), |_| hint::black_box(smt.clone()), criterion::BatchSize::SmallInput)
     },
 }
 
