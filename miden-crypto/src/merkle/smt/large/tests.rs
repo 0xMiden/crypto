@@ -731,9 +731,9 @@ fn test_flat_layout_children_relationship() {
     }
 }
 
-/// Verifies that a snapshot produced by `MemoryStorage::reader()` returns correct in-memory-depth
-/// roots from `get_depth_in_mem()`, and that loading a `LargeSmt` from that snapshot reconstructs
-/// the same root as the original tree.
+/// Verifies that a snapshot produced by `MemoryStorage::reader()` returns correct top subtree
+/// roots from `get_top_subtree_roots()`, and that loading a `LargeSmt` from that snapshot
+/// reconstructs the same root as the original tree.
 #[test]
 fn test_memory_storage_snapshot_in_mem_depth() {
     use crate::merkle::NodeIndex;
@@ -746,7 +746,7 @@ fn test_memory_storage_snapshot_in_mem_depth() {
     let snapshot = smt.storage.reader().unwrap();
 
     // The in-memory-depth entries must be non-empty for a non-empty tree.
-    let in_mem_roots = snapshot.get_depth_in_mem().unwrap();
+    let in_mem_roots = snapshot.get_top_subtree_roots().unwrap();
     assert!(
         !in_mem_roots.is_empty(),
         "snapshot must expose in-memory-depth roots for a non-empty tree"

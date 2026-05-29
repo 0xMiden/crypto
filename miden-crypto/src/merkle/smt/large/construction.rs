@@ -147,8 +147,8 @@ impl<S: SmtStorageReader> LargeSmt<S> {
         let leaf_count = storage.leaf_count()?;
         let entry_count = storage.entry_count()?;
 
-        // Get the in-memory top of tree leaves from storage
-        let in_memory_tree_leaves = storage.get_depth_in_mem()?;
+        // Get the tops of subtrees from storage; these become the leaves of the in-memory tree
+        let in_memory_tree_leaves = storage.get_top_subtree_roots()?;
 
         // Convert in-memory top of tree leaves to SubtreeLeaf
         let mut leaf_subtrees: Vec<SubtreeLeaf> = in_memory_tree_leaves

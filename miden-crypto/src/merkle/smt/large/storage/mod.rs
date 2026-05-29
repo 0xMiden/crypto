@@ -127,16 +127,15 @@ pub trait SmtStorageReader: 'static + fmt::Debug + Send + Sync {
     /// The order of iteration is not guaranteed unless specified by the implementation.
     fn iter_subtrees(&self) -> Result<Box<dyn Iterator<Item = Subtree> + '_>, StorageError>;
 
-    /// Retrieves all in-memory-depth hashes from storage for efficient startup reconstruction.
+    /// Retrieves roots of all top level subtrees for efficient startup reconstruction.
     ///
-    /// Returns a vector of `(node_index_value, InnerNode)` tuples representing
-    /// the cached roots of nodes at `IN_MEMORY_DEPTH` (the in-memory/storage boundary).
-    /// These roots enable fast reconstruction of the upper tree without loading
-    /// entire subtrees.
+    /// Returns a vector of `(node_index_value, Word)` tuples representing the roots of nodes at
+    /// `IN_MEMORY_DEPTH` (the in-memory/storage boundary). These roots enable fast reconstruction
+    /// of the upper tree without loading entire subtrees.
     ///
-    /// The hash cache is automatically maintained by subtree operations - no manual
-    /// cache management is required.
-    fn get_depth_in_mem(&self) -> Result<Vec<(u64, Word)>, StorageError>;
+    /// The hash cache is automatically maintained by subtree operations - no manual cache
+    /// management is required.
+    fn get_top_subtree_roots(&self) -> Result<Vec<(u64, Word)>, StorageError>;
 }
 
 impl<T: SmtStorageReader + ?Sized> SmtStorageReader for Box<T> {
@@ -200,8 +199,8 @@ impl<T: SmtStorageReader + ?Sized> SmtStorageReader for Box<T> {
     }
 
     #[inline]
-    fn get_depth_in_mem(&self) -> Result<Vec<(u64, Word)>, StorageError> {
-        self.deref().get_depth_in_mem()
+    fn get_top_subtree_roots(&self) -> Result<Vec<(u64, Word)>, StorageError> {
+        self.deref().get_top_subtree_roots()
     }
 }
 

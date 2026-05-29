@@ -527,13 +527,13 @@ impl SmtStorageReader for RocksDbStorage {
         Ok(Box::new(RocksDbSubtreeIterator::new(&self.db, cf_handles)))
     }
 
-    /// Retrieves all in-memory-depth hashes for fast tree rebuilding.
+    /// Retrieves roots of all top level subtrees for efficient startup reconstruction.
     ///
     /// # Errors
     /// - `StorageError::Backend`: If the in-memory-depth column family is missing or a RocksDB
     ///   error occurs.
     /// - `StorageError::Value`: If any hash bytes are corrupt.
-    fn get_depth_in_mem(&self) -> Result<Vec<(u64, Word)>, StorageError> {
+    fn get_top_subtree_roots(&self) -> Result<Vec<(u64, Word)>, StorageError> {
         let cf = self.cf_handle(IN_MEM_DEPTH_CF)?;
         let iter = self.db.iterator_cf(cf, IteratorMode::Start);
         let mut hashes = Vec::new();
@@ -1269,7 +1269,7 @@ fn read_count(what: &'static str, bytes: &[u8]) -> Result<usize, StorageError> {
     Ok(usize::from_be_bytes(arr))
 }
 
-fn collect_depth_in_mem(
+fn collect_to_subtree_roots(
     iter: DBIteratorWithThreadMode<'_, DB>,
 ) -> Result<Vec<(u64, Word)>, StorageError> {
     let mut hashes = Vec::new();
@@ -1592,11 +1592,11 @@ impl SmtStorageReader for RocksDbSnapshotStorage {
         Ok(Box::new(RocksDbSnapshotSubtreeIterator::new(&self.inner.snapshot, cf_handles)))
     }
 
-    /// Retrieves all in-memory-depth hashes from this snapshot.
-    fn get_depth_in_mem(&self) -> Result<Vec<(u64, Word)>, StorageError> {
+    /// Retrieves roots of all top level subtrees for efficient startup reconstruction.
+    fn get_top_subtree_roots(&self) -> Result<Vec<(u64, Word)>, StorageError> {
         let cf = self.cf_handle(IN_MEM_DEPTH_CF)?;
         let iter = self.inner.snapshot.iterator_cf(cf, IteratorMode::Start);
-        collect_depth_in_mem(iter)
+        collect_to_subtree_roots(iter)
     }
 }
 
