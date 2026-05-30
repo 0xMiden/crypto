@@ -3,6 +3,7 @@
 
 use alloc::{vec, vec::Vec};
 
+use p3_challenger::CanObserve;
 use p3_field::PrimeCharacteristicRing;
 use p3_matrix::{Matrix, dense::RowMajorMatrix};
 
@@ -171,6 +172,55 @@ fn trace_of_height(height: usize) -> RowMajorMatrix<Felt> {
 // ---------------------------------------------------------------------------
 // Single-trace tests
 // ---------------------------------------------------------------------------
+
+#[test]
+fn prover_statement_rejects_one_row_trace() {
+    let err = match tiny_prover_statement(
+        vec![TinyAir::new(vec![])],
+        vec![trace_of_height(1)],
+        vec![Felt::from_u64(START)],
+    ) {
+        Ok(_) => panic!("one-row traces must be rejected before proving"),
+        Err(err) => err,
+    };
+
+    assert!(
+        matches!(err, InstanceError::TraceHeightTooSmall { air: 0, height: 1 }),
+        "unexpected error: {err:?}",
+    );
+}
+
+struct CollectingChallenger(Vec<Felt>);
+
+impl CanObserve<Felt> for CollectingChallenger {
+    fn observe(&mut self, value: Felt) {
+        self.0.push(value);
+    }
+}
+
+#[test]
+fn default_observe_prefixes_input_lengths() {
+    let multi_air = TinyMultiAir { airs: vec![TinyAir::new(vec![])] };
+    let mut challenger = CollectingChallenger(Vec::new());
+
+    multi_air.observe(
+        &mut challenger,
+        &[Felt::from_u64(11)],
+        &[Felt::from_u64(22), Felt::from_u64(33)],
+        &[],
+    );
+
+    assert_eq!(
+        challenger.0,
+        vec![
+            Felt::from_u64(1),
+            Felt::from_u64(11),
+            Felt::from_u64(2),
+            Felt::from_u64(22),
+            Felt::from_u64(33),
+        ],
+    );
+}
 
 #[test]
 fn single_trace() {
