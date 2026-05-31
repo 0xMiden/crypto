@@ -10,6 +10,7 @@
 - [BREAKING] Implemented two-phase commit_mutations() / apply_mutations()-style API for `LargeSmtForest` ([#1018](https://github.com/0xMiden/crypto/pull/1018)).
 - [BREAKING] Fixed RocksDB CLI safety, non-canonical serde input handling, and qualified `WordWrapper` derive paths ([#1022](https://github.com/0xMiden/crypto/pull/1022)).
 - [BREAKING] Simplify `LargeSmtForest` backend API ([#1030](https://github.com/0xMiden/crypto/pull/1030)).
+- [BREAKING] Made `LargeSmt` leaf/entry/inner node iterators fallible.
 
 ## 0.25.1 (2026-05-21)
 
