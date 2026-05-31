@@ -22,9 +22,11 @@ prove(config, &prover_statement, challenger)
 A `MultiAir` impl exposes its AIRs via `type Air` + `fn airs() -> &[Self::Air]`
 and optionally overrides `max_aux_inputs()`, `eval_external(...)`, and
 `observe(challenger, ...)` (defaults: zero `aux_inputs` budget, no assertions,
-observe `air_inputs` then `aux_inputs` then `log_heights`). Each AIR builds its
-own auxiliary trace via `LiftedAir::build_aux_trace(main, air_inputs, aux_inputs,
-challenges)`. A `Statement` wraps a `MultiAir` with the
+and observe `air_inputs.len()`, `air_inputs`, `aux_inputs.len()`, then
+`aux_inputs`). The protocol separately binds the instance count and log trace
+heights after this hook. Each AIR builds its own auxiliary trace via
+`LiftedAir::build_aux_trace(main, air_inputs, aux_inputs, challenges)`. A
+`Statement` wraps a `MultiAir` with the
 `air_inputs` shared by every AIR and the optional `aux_inputs`; `Statement::new`
 validates the inputs against the AIRs. A `ProverStatement` wraps a `Statement`
 with `traces()` (per-AIR main traces in instance order); `ProverStatement::new`
@@ -39,13 +41,14 @@ prescribe the *initial* challenger state used for Fiat-Shamir.
 The caller must bind protocol parameters and AIR configurations into the
 challenger before calling `prove`. The wire-format AIR ordering is derived
 deterministically from the trace heights (no explicit `air_order` to bind).
-The proof's `air_inputs`, `aux_inputs`, and log trace heights are absorbed
-automatically by `Statement::observe`. See the Rust module-level docs for
-the full contract and code examples.
+The proof's `air_inputs` and `aux_inputs` are absorbed automatically by
+`Statement::observe`; the protocol then absorbs the instance count and log
+trace heights. See the Rust module-level docs for the full contract and code
+examples.
 
 ## Protocol flow
 
-0. Absorb caller-supplied inputs via `Statement::observe` and the per-instance log trace heights into the challenger.
+0. Absorb caller-supplied inputs via `Statement::observe`, then absorb the instance count and per-instance log trace heights into the challenger.
 1. Validate trace dimensions against AIR definition.
 2. Commit main trace LDE on nested coset (bit-reversed), observe commitment.
 3. Sample aux randomness, build aux trace, commit aux LDE.

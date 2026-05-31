@@ -21,9 +21,11 @@ verify(config, &statement, proof, challenger)
 
 The `statement` carries its `MultiAir` (the AIRs and the cross-AIR
 `eval_external` check) plus the proof's `air_inputs` and (if any)
-`aux_inputs`. The framework absorbs both `air_inputs` and `aux_inputs` into
-Fiat-Shamir automatically via `Statement::observe` — callers must pass a
-`Statement` carrying the same data on prover and verifier sides.
+`aux_inputs`. The framework absorbs `air_inputs.len()`, `air_inputs`,
+`aux_inputs.len()`, and `aux_inputs` into Fiat-Shamir automatically via
+`Statement::observe` — callers must pass a `Statement` carrying the same data on
+prover and verifier sides. The protocol separately binds the instance count and
+proof log trace heights after that hook.
 
 The proof is read from the provided transcript channel. This crate does not
 prescribe the *initial* challenger state used for Fiat-Shamir.
@@ -41,7 +43,7 @@ bundle extra data in the same transcript, you must manage boundaries yourself.
 ## Protocol flow
 
 0. Reconstruct `TraceOrder` from the proof's log trace heights and reorder caller AIRs into the proof's ascending-height ordering.
-1. Absorb the caller-supplied statement via `Statement::observe` (which itself absorbs the heights) into the challenger.
+1. Absorb the caller-supplied statement via `Statement::observe`, then absorb the instance count and proof log trace heights into the challenger.
 2. Receive main trace commitment.
 3. Sample aux randomness.
 4. Receive aux trace commitment.
