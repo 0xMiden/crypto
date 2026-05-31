@@ -120,12 +120,13 @@ pub trait SmtStorageReader: 'static + fmt::Debug + Send + Sync {
     /// Returns an iterator over all (logical_index, SmtLeaf) pairs currently in storage.
     ///
     /// The order of iteration is not guaranteed unless specified by the implementation.
-    fn iter_leaves(&self) -> StorageResult<Box<dyn Iterator<Item = (u64, SmtLeaf)> + '_>>;
+    fn iter_leaves(&self) -> StorageResult<BoxedFallibleLeafIterator<'_>>;
 
     /// Returns an iterator over all `Subtree` instances currently in storage.
     ///
     /// The order of iteration is not guaranteed unless specified by the implementation.
-    fn iter_subtrees(&self) -> StorageResult<Box<dyn Iterator<Item = Subtree> + '_>>;
+    fn iter_subtrees(&self)
+    -> StorageResult<Box<dyn Iterator<Item = StorageResult<Subtree>> + '_>>;
 
     /// Retrieves roots of all top level subtrees for efficient startup reconstruction.
     ///
@@ -137,6 +138,9 @@ pub trait SmtStorageReader: 'static + fmt::Debug + Send + Sync {
     /// management is required.
     fn get_top_subtree_roots(&self) -> StorageResult<Vec<(u64, Word)>>;
 }
+
+pub type BoxedFallibleLeafIterator<'a> =
+    Box<dyn Iterator<Item = StorageResult<(u64, SmtLeaf)>> + 'a>;
 
 impl<T: SmtStorageReader + ?Sized> SmtStorageReader for Box<T> {
     #[inline]
@@ -189,12 +193,16 @@ impl<T: SmtStorageReader + ?Sized> SmtStorageReader for Box<T> {
     }
 
     #[inline]
-    fn iter_leaves(&self) -> StorageResult<Box<dyn Iterator<Item = (u64, SmtLeaf)> + '_>> {
+    fn iter_leaves(
+        &self,
+    ) -> StorageResult<Box<dyn Iterator<Item = StorageResult<(u64, SmtLeaf)>> + '_>> {
         self.deref().iter_leaves()
     }
 
     #[inline]
-    fn iter_subtrees(&self) -> StorageResult<Box<dyn Iterator<Item = Subtree> + '_>> {
+    fn iter_subtrees(
+        &self,
+    ) -> StorageResult<Box<dyn Iterator<Item = StorageResult<Subtree>> + '_>> {
         self.deref().iter_subtrees()
     }
 

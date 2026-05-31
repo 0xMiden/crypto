@@ -483,12 +483,14 @@ impl SmtStorageReader for RocksDbStorage {
     ///
     /// The iterator uses a RocksDB snapshot for consistency and iterates in lexicographical
     /// order of the keys (leaf indices). Errors during iteration (e.g., deserialization issues)
-    /// cause the iterator to skip the problematic item and attempt to continue.
+    /// are returned as iterator items.
     ///
     /// # Errors
     /// - `StorageError::Backend`: If the leaves column family is missing or a RocksDB error occurs
     ///   during iterator creation.
-    fn iter_leaves(&self) -> StorageResult<Box<dyn Iterator<Item = (u64, SmtLeaf)> + '_>> {
+    fn iter_leaves(
+        &self,
+    ) -> StorageResult<Box<dyn Iterator<Item = StorageResult<(u64, SmtLeaf)>> + '_>> {
         let cf = self.cf_handle(LEAVES_CF)?;
         let mut read_opts = ReadOptions::default();
         read_opts.set_total_order_seek(true);
@@ -501,13 +503,14 @@ impl SmtStorageReader for RocksDbStorage {
     ///
     /// The iterator uses a RocksDB snapshot and iterates in lexicographical order of keys
     /// (subtree root NodeIndex) across all depth column families (24, 32, 40, 48, 56).
-    /// Errors during iteration (e.g., deserialization issues) cause the iterator to skip
-    /// the problematic item and attempt to continue.
+    /// Errors during iteration (e.g., deserialization issues) are returned as iterator items.
     ///
     /// # Errors
     /// - `StorageError::Backend`: If any subtree column family is missing or a RocksDB error occurs
     ///   during iterator creation.
-    fn iter_subtrees(&self) -> StorageResult<Box<dyn Iterator<Item = Subtree> + '_>> {
+    fn iter_subtrees(
+        &self,
+    ) -> StorageResult<Box<dyn Iterator<Item = StorageResult<Subtree>> + '_>> {
         // All subtree column family names in order
         const SUBTREE_CFS: [&str; 6] = [
             SUBTREE_16_CF,
@@ -1011,22 +1014,21 @@ impl Drop for RocksDbStorage {
 /// An iterator over leaves directly from RocksDB.
 ///
 /// Wraps a `DBIteratorWithThreadMode` and handles deserialization of keys to `u64` (leaf index)
-/// and values to `SmtLeaf`. Skips items that fail to deserialize or if a RocksDB error occurs
-/// for an item, attempting to continue iteration.
+/// and values to `SmtLeaf`.
 struct RocksDbDirectLeafIterator<'a> {
     iter: DBIteratorWithThreadMode<'a, DB>,
 }
 
 impl Iterator for RocksDbDirectLeafIterator<'_> {
-    type Item = (u64, SmtLeaf);
+    type Item = StorageResult<(u64, SmtLeaf)>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        self.iter.find_map(|result| {
-            let (key_bytes, value_bytes) = result.ok()?;
-            let leaf_idx = index_from_key_bytes(&key_bytes).ok()?;
-            let leaf =
-                SmtLeaf::read_from_bytes_with_budget(&value_bytes, value_bytes.len()).ok()?;
-            Some((leaf_idx, leaf))
+        self.iter.next().map(|result| {
+            result.map_err(StorageError::from).and_then(|(key_bytes, value_bytes)| {
+                let leaf_idx = index_from_key_bytes(&key_bytes)?;
+                let leaf = SmtLeaf::read_from_bytes_with_budget(&value_bytes, value_bytes.len())?;
+                Ok((leaf_idx, leaf))
+            })
         })
     }
 }
@@ -1065,31 +1067,32 @@ impl<'a> RocksDbSubtreeIterator<'a> {
         }
     }
 
-    fn try_next_from_iter(
+    fn next_from_iter(
         iter: &mut DBIteratorWithThreadMode<DB>,
         cf_index: usize,
-    ) -> Option<Subtree> {
-        iter.find_map(|result| {
-            let (key_bytes, value_bytes) = result.ok()?;
-            let depth = IN_MEMORY_DEPTH + (cf_index * 8) as u8;
+    ) -> Option<StorageResult<Subtree>> {
+        iter.next().map(|result| {
+            result.map_err(StorageError::from).and_then(|(key_bytes, value_bytes)| {
+                let depth = IN_MEMORY_DEPTH + (cf_index * 8) as u8;
 
-            let node_idx = subtree_root_from_key_bytes(&key_bytes, depth).ok()?;
-            let value_vec = value_bytes.into_vec();
-            Subtree::from_vec(node_idx, &value_vec).ok()
+                let node_idx = subtree_root_from_key_bytes(&key_bytes, depth)?;
+                let value_vec = value_bytes.into_vec();
+                Ok(Subtree::from_vec(node_idx, &value_vec)?)
+            })
         })
     }
 }
 
 impl Iterator for RocksDbSubtreeIterator<'_> {
-    type Item = Subtree;
+    type Item = StorageResult<Subtree>;
 
     fn next(&mut self) -> Option<Self::Item> {
         loop {
             let iter = self.current_iter.as_mut()?;
 
             // Try to get the next valid subtree from current iterator
-            if let Some(subtree) = Self::try_next_from_iter(iter, self.current_cf_index) {
-                return Some(subtree);
+            if let Some(result) = Self::next_from_iter(iter, self.current_cf_index) {
+                return Some(result);
             }
 
             // Current CF exhausted, advance to next
@@ -1554,7 +1557,9 @@ impl SmtStorageReader for RocksDbSnapshotStorage {
     }
 
     /// Returns an iterator over all leaves in this snapshot.
-    fn iter_leaves(&self) -> StorageResult<Box<dyn Iterator<Item = (u64, SmtLeaf)> + '_>> {
+    fn iter_leaves(
+        &self,
+    ) -> StorageResult<Box<dyn Iterator<Item = StorageResult<(u64, SmtLeaf)>> + '_>> {
         let cf = self.cf_handle(LEAVES_CF)?;
         let mut read_opts = ReadOptions::default();
         read_opts.set_total_order_seek(true);
@@ -1564,7 +1569,9 @@ impl SmtStorageReader for RocksDbSnapshotStorage {
     }
 
     /// Returns an iterator over all subtrees in this snapshot.
-    fn iter_subtrees(&self) -> StorageResult<Box<dyn Iterator<Item = Subtree> + '_>> {
+    fn iter_subtrees(
+        &self,
+    ) -> StorageResult<Box<dyn Iterator<Item = StorageResult<Subtree>> + '_>> {
         const SUBTREE_CFS: [&str; 6] = [
             SUBTREE_16_CF,
             SUBTREE_24_CF,
@@ -1627,16 +1634,16 @@ impl<'a> RocksDbSnapshotSubtreeIterator<'a> {
 }
 
 impl Iterator for RocksDbSnapshotSubtreeIterator<'_> {
-    type Item = Subtree;
+    type Item = StorageResult<Subtree>;
 
     fn next(&mut self) -> Option<Self::Item> {
         loop {
             let iter = self.current_iter.as_mut()?;
 
-            if let Some(subtree) =
-                RocksDbSubtreeIterator::try_next_from_iter(iter, self.current_cf_index)
+            if let Some(result) =
+                RocksDbSubtreeIterator::next_from_iter(iter, self.current_cf_index)
             {
-                return Some(subtree);
+                return Some(result);
             }
 
             self.current_cf_index += 1;

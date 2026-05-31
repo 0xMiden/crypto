@@ -42,4 +42,4 @@ pub enum StorageError {
 }
 
 /// The result type for use with backends.
-pub type StorageResult<T> = core::result::Result<T, StorageError>;
+pub type StorageResult<T> = Result<T, StorageError>;

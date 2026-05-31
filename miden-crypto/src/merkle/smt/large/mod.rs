@@ -423,9 +423,16 @@ impl<S: SmtStorageReader> LargeSmt<S> {
     ///
     /// # Errors
     /// Returns an error if the storage backend fails to create the iterator.
-    pub fn leaves(&self) -> LargeSmtResult<impl Iterator<Item = (LeafIndex<SMT_DEPTH>, SmtLeaf)>> {
+    pub fn leaves(
+        &self,
+    ) -> LargeSmtResult<impl Iterator<Item = LargeSmtResult<(LeafIndex<SMT_DEPTH>, SmtLeaf)>> + '_>
+    {
         let iter = self.storage.iter_leaves()?;
-        Ok(iter.map(|(idx, leaf)| (LeafIndex::new_max_depth(idx), leaf)))
+        Ok(iter.map(|result| {
+            result
+                .map(|(idx, leaf)| (LeafIndex::new_max_depth(idx), leaf))
+                .map_err(Into::into)
+        }))
     }
 
     /// Returns an iterator over the key-value pairs of this [`LargeSmt`].
@@ -433,13 +440,18 @@ impl<S: SmtStorageReader> LargeSmt<S> {
     ///
     /// # Errors
     /// Returns an error if the storage backend fails to create the iterator.
-    pub fn entries(&self) -> LargeSmtResult<impl Iterator<Item = (Word, Word)>> {
+    pub fn entries(
+        &self,
+    ) -> LargeSmtResult<impl Iterator<Item = LargeSmtResult<(Word, Word)>> + '_> {
         let leaves_iter = self.leaves()?;
-        Ok(leaves_iter.flat_map(|(_, leaf)| {
-            // Collect the (Word, Word) tuples into an owned Vec
-            // This ensures they outlive the 'leaf' from which they are derived.
-            let owned_entries: Vec<(Word, Word)> = leaf.entries().to_vec();
-            // Return an iterator over this owned Vec
+        Ok(leaves_iter.flat_map(|result| {
+            let mut owned_entries = Vec::new();
+            match result {
+                Ok((_, leaf)) => {
+                    owned_entries.extend(leaf.entries().iter().copied().map(Ok));
+                },
+                Err(err) => owned_entries.push(Err(err)),
+            }
             owned_entries.into_iter()
         }))
     }
@@ -448,10 +460,11 @@ impl<S: SmtStorageReader> LargeSmt<S> {
     ///
     /// # Errors
     /// Returns an error if the storage backend fails during iteration setup.
-    pub fn inner_nodes(&self) -> LargeSmtResult<impl Iterator<Item = InnerNodeInfo> + '_> {
-        // Pre-validate that storage is accessible
-        let _ = self.storage.iter_subtrees()?;
-        Ok(LargeSmtInnerNodeIterator::new(self))
+    pub fn inner_nodes(
+        &self,
+    ) -> LargeSmtResult<impl Iterator<Item = LargeSmtResult<InnerNodeInfo>> + '_> {
+        let subtree_iter = self.storage.iter_subtrees()?;
+        Ok(LargeSmtInnerNodeIterator::new(self, subtree_iter))
     }
 
     // HELPERS

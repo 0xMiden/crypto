@@ -35,7 +35,7 @@ pub enum LargeSmtError {
 }
 
 /// The result type for use within the large SMT portion of the library.
-pub type LargeSmtResult<T> = core::result::Result<T, LargeSmtError>;
+pub type LargeSmtResult<T> = Result<T, LargeSmtError>;
 
 #[cfg(test)]
 // Compile-time assertion that LargeSmtError implements the required traits

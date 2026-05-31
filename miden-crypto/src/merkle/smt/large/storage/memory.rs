@@ -120,15 +120,19 @@ impl SmtStorageReader for MemoryStorage {
     /// Returns an iterator over all (index, SmtLeaf) pairs in the storage.
     ///
     /// The iterator provides access to the current state of the leaves.
-    fn iter_leaves(&self) -> StorageResult<Box<dyn Iterator<Item = (u64, SmtLeaf)> + '_>> {
-        Ok(Box::new(self.leaves.iter().map(|(&k, v)| (k, v.clone()))))
+    fn iter_leaves(
+        &self,
+    ) -> StorageResult<Box<dyn Iterator<Item = StorageResult<(u64, SmtLeaf)>> + '_>> {
+        Ok(Box::new(self.leaves.iter().map(|(&k, v)| Ok((k, v.clone())))))
     }
 
     /// Returns an iterator over all Subtrees in the storage.
     ///
     /// The iterator provides access to the current subtrees from storage.
-    fn iter_subtrees(&self) -> StorageResult<Box<dyn Iterator<Item = Subtree> + '_>> {
-        Ok(Box::new(self.subtrees.values().cloned()))
+    fn iter_subtrees(
+        &self,
+    ) -> StorageResult<Box<dyn Iterator<Item = StorageResult<Subtree>> + '_>> {
+        Ok(Box::new(self.subtrees.values().cloned().map(Ok)))
     }
 
     /// Retrieves roots of all subtrees at `IN_MEMORY_DEPTH` depth.
@@ -385,11 +389,15 @@ impl SmtStorageReader for MemoryStorageSnapshot {
         self.0.get_inner_node(index)
     }
 
-    fn iter_leaves(&self) -> StorageResult<Box<dyn Iterator<Item = (u64, SmtLeaf)> + '_>> {
+    fn iter_leaves(
+        &self,
+    ) -> StorageResult<Box<dyn Iterator<Item = StorageResult<(u64, SmtLeaf)>> + '_>> {
         self.0.iter_leaves()
     }
 
-    fn iter_subtrees(&self) -> StorageResult<Box<dyn Iterator<Item = Subtree> + '_>> {
+    fn iter_subtrees(
+        &self,
+    ) -> StorageResult<Box<dyn Iterator<Item = StorageResult<Subtree>> + '_>> {
         self.0.iter_subtrees()
     }
 
