@@ -262,7 +262,7 @@ pub use subtree::{Subtree, SubtreeError};
 mod storage;
 pub use storage::{
     MemoryStorage, MemoryStorageSnapshot, SmtStorage, SmtStorageReader, StorageError,
-    StorageUpdateParts, StorageUpdates, SubtreeUpdate,
+    StorageResult, StorageUpdateParts, StorageUpdates, SubtreeUpdate,
 };
 #[cfg(feature = "rocksdb")]
 pub use storage::{RocksDbConfig, RocksDbSnapshotStorage, RocksDbStorage};

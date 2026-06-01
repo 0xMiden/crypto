@@ -1,6 +1,6 @@
 use alloc::{boxed::Box, vec::Vec};
 
-use super::{IN_MEMORY_DEPTH, LargeSmtResult, StorageError, is_empty_parent};
+use super::{IN_MEMORY_DEPTH, LargeSmtResult, StorageResult, is_empty_parent};
 use crate::{
     Word,
     hash::poseidon2::Poseidon2,
@@ -14,10 +14,10 @@ enum InnerNodeIteratorState<'a> {
     InMemory {
         current_index: usize,
         large_smt_in_memory_nodes: &'a [Word],
-        subtree_iter: Option<Box<dyn Iterator<Item = Result<Subtree, StorageError>> + 'a>>,
+        subtree_iter: Option<Box<dyn Iterator<Item = StorageResult<Subtree>> + 'a>>,
     },
     Subtree {
-        subtree_iter: Box<dyn Iterator<Item = Result<Subtree, StorageError>> + 'a>,
+        subtree_iter: Box<dyn Iterator<Item = StorageResult<Subtree>> + 'a>,
         current_subtree_node_iter: Option<Box<dyn Iterator<Item = InnerNodeInfo> + 'a>>,
     },
     Done,
@@ -30,7 +30,7 @@ pub struct LargeSmtInnerNodeIterator<'a> {
 impl<'a> LargeSmtInnerNodeIterator<'a> {
     pub(super) fn new(
         large_smt_in_memory_nodes: &'a [Word],
-        subtree_iter: Box<dyn Iterator<Item = Result<Subtree, StorageError>> + 'a>,
+        subtree_iter: Box<dyn Iterator<Item = StorageResult<Subtree>> + 'a>,
     ) -> Self {
         // in-memory nodes should never be empty
         Self {
