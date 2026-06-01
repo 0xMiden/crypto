@@ -84,11 +84,6 @@ pub fn check_constraints<F, EF, MA, Ch>(
     assert!(!airs.is_empty(), "no instances provided");
     assert_eq!(airs.len(), traces.len(), "airs and traces counts must match");
 
-    // Preprocessed matrices come straight off the AIRs (debug-only; this
-    // re-materialises `BaseAir::preprocessed_trace`).
-    let preprocessed_per_air: Vec<Option<RowMajorMatrix<F>>> =
-        airs.iter().map(miden_lifted_air::BaseAir::preprocessed_trace).collect();
-
     // Seed deterministic debug challenges from statement/height observations only.
     // Do not observe setup/trace commitments or replay the prover transcript here.
     let trace_heights: Vec<usize> = traces.iter().map(Matrix::height).collect();
@@ -139,28 +134,7 @@ pub fn check_constraints<F, EF, MA, Ch>(
             aux_trace.height()
         );
 
-        // Preprocessed height must match the main trace (debug guard); width is
-        // checked per row by `check_builder_shape`.
-        if let Some(preproc) = &preprocessed_per_air[i] {
-            assert_eq!(
-                preproc.height(),
-                main.height(),
-                "instance {i}: preprocessed trace height mismatch: expected {}, got {}",
-                main.height(),
-                preproc.height()
-            );
-        }
-
-        check_single_trace(
-            air,
-            main,
-            preprocessed_per_air[i].as_ref(),
-            aux_trace,
-            aux_values,
-            air_inputs,
-            &challenges,
-            i,
-        );
+        check_single_trace(air, main, aux_trace, aux_values, air_inputs, &challenges, i);
     }
 }
 
@@ -169,7 +143,6 @@ pub fn check_constraints<F, EF, MA, Ch>(
 fn check_single_trace<F, EF, A>(
     air: &A,
     main: &RowMajorMatrix<F>,
-    preprocessed: Option<&RowMajorMatrix<F>>,
     aux_trace: &RowMajorMatrix<EF>,
     aux_values: &[EF],
     public_values: &[F],
@@ -181,6 +154,20 @@ fn check_single_trace<F, EF, A>(
     A: LiftedAir<F, EF>,
 {
     let height = main.height();
+
+    // Preprocessed matrix comes straight off the AIR (debug-only; this
+    // re-materialises `BaseAir::preprocessed_trace`). Its height must match the main
+    // trace; width is checked per row by `check_builder_shape`.
+    let preprocessed = air.preprocessed_trace();
+    if let Some(preproc) = &preprocessed {
+        assert_eq!(
+            preproc.height(),
+            height,
+            "instance {instance_index}: preprocessed trace height mismatch: expected {height}, got {}",
+            preproc.height()
+        );
+    }
+
     let periodic_matrix = air.periodic_columns_matrix();
     for row in 0..height {
         let next_row = (row + 1) % height;
@@ -198,8 +185,8 @@ fn check_single_trace<F, EF, A>(
         let periodic_values: &[F] = periodic_row.as_deref().unwrap_or(&[]);
 
         // Preprocessed rows (empty window when the AIR declares none).
-        let preprocessed_current = preprocessed.map(|m| m.row_slice(row).unwrap());
-        let preprocessed_next = preprocessed.map(|m| m.row_slice(next_row).unwrap());
+        let preprocessed_current = preprocessed.as_ref().map(|m| m.row_slice(row).unwrap());
+        let preprocessed_next = preprocessed.as_ref().map(|m| m.row_slice(next_row).unwrap());
 
         let mut builder = DebugConstraintBuilder {
             main: RowWindow::from_two_rows(&main_current, &main_next),
