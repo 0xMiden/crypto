@@ -475,7 +475,7 @@ impl<S: SmtStorageReader> LargeSmt<S> {
         &self,
     ) -> LargeSmtResult<impl Iterator<Item = LargeSmtResult<InnerNodeInfo>> + '_> {
         let subtree_iter = self.storage.iter_subtrees()?;
-        Ok(LargeSmtInnerNodeIterator::new(self, subtree_iter))
+        Ok(LargeSmtInnerNodeIterator::new(&self.in_memory_nodes, subtree_iter))
     }
 
     // HELPERS

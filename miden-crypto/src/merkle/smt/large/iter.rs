@@ -1,8 +1,6 @@
 use alloc::{boxed::Box, vec::Vec};
 
-use super::{
-    IN_MEMORY_DEPTH, LargeSmt, LargeSmtResult, SmtStorageReader, StorageError, is_empty_parent,
-};
+use super::{IN_MEMORY_DEPTH, LargeSmtResult, StorageError, is_empty_parent};
 use crate::{
     Word,
     hash::poseidon2::Poseidon2,
@@ -25,29 +23,27 @@ enum InnerNodeIteratorState<'a> {
     Done,
 }
 
-pub struct LargeSmtInnerNodeIterator<'a, S: SmtStorageReader> {
-    _large_smt: &'a LargeSmt<S>,
+pub struct LargeSmtInnerNodeIterator<'a> {
     state: InnerNodeIteratorState<'a>,
 }
 
-impl<'a, S: SmtStorageReader> LargeSmtInnerNodeIterator<'a, S> {
+impl<'a> LargeSmtInnerNodeIterator<'a> {
     pub(super) fn new(
-        large_smt: &'a LargeSmt<S>,
+        large_smt_in_memory_nodes: &'a [Word],
         subtree_iter: Box<dyn Iterator<Item = Result<Subtree, StorageError>> + 'a>,
     ) -> Self {
         // in-memory nodes should never be empty
         Self {
-            _large_smt: large_smt,
             state: InnerNodeIteratorState::InMemory {
                 current_index: 0,
-                large_smt_in_memory_nodes: &large_smt.in_memory_nodes,
+                large_smt_in_memory_nodes,
                 subtree_iter: Some(subtree_iter),
             },
         }
     }
 }
 
-impl<S: SmtStorageReader> Iterator for LargeSmtInnerNodeIterator<'_, S> {
+impl Iterator for LargeSmtInnerNodeIterator<'_> {
     type Item = LargeSmtResult<InnerNodeInfo>;
 
     /// Returns the next inner node info in the tree.
