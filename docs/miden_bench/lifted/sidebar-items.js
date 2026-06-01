@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"enum":["LiftedBenchAir"],"fn":["run_lifted"]};
+window.SIDEBAR_ITEMS = {"enum":["LiftedBenchAir"],"fn":["run_lifted"],"struct":["BenchMultiAir"]};

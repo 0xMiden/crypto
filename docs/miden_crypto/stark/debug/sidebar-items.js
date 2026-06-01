@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"fn":["check_constraints","check_constraints_multi"]};
+window.SIDEBAR_ITEMS = {"fn":["assert_prover_setup","check_constraints"]};

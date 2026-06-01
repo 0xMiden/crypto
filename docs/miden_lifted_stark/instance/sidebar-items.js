@@ -1,1 +1,0 @@
-window.SIDEBAR_ITEMS = {"enum":["InstanceValidationError"],"struct":["AirInstance","AirWitness","InstanceShapes"]};

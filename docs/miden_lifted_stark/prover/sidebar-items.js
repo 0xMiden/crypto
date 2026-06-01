@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"enum":["ProverError"],"fn":["prove_multi","prove_single"],"mod":["commit","constraints","periodic","quotient"]};
+window.SIDEBAR_ITEMS = {"enum":["ProverError"],"fn":["prove"]};

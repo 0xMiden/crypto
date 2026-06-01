@@ -1,1 +1,0 @@
-window.SIDEBAR_ITEMS = {"fn":["commit_quotient","cyclic_extend_and_accumulate","upsample_evals"]};

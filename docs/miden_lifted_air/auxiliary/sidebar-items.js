@@ -1,1 +1,0 @@
-window.SIDEBAR_ITEMS = {"struct":["ReducedAuxValues"],"trait":["AuxBuilder"],"type":["ReductionError","VarLenPublicInputs"]};

@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"fn":["generate_matrices_from_specs","open_with_channel","total_elements"],"mod":["airs","configs","params"],"struct":["FriFold","PointQuotients"]};
+window.SIDEBAR_ITEMS = {"fn":["canonical_domain","commit_quotient","generate_matrices_from_specs","log2_strict_u8","open_with_channel","total_elements"],"mod":["airs","configs","params"],"struct":["FriFold","LiftedDomain","PcsParams","PointQuotients","ProverStatement","Statement"],"trait":["Coset","MultiAir"]};

@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"struct":["StarkOutput","StarkProof","StarkTranscript"],"type":["StarkDigest"]};
+window.SIDEBAR_ITEMS = {"enum":["TranscriptError"],"struct":["StarkOutput","StarkProof","StarkProofData","TranscriptData"],"trait":["TranscriptChallenger"],"type":["StarkDigest"]};
