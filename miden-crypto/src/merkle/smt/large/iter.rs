@@ -4,7 +4,10 @@ use super::{IN_MEMORY_DEPTH, LargeSmtResult, StorageResult, is_empty_parent};
 use crate::{
     Word,
     hash::poseidon2::Poseidon2,
-    merkle::{InnerNodeInfo, smt::large::subtree::Subtree},
+    merkle::{
+        InnerNodeInfo,
+        smt::{LargeSmt, SmtStorageReader, large::subtree::Subtree},
+    },
 };
 
 // ITERATORS
@@ -14,7 +17,6 @@ enum InnerNodeIteratorState<'a> {
     InMemory {
         current_index: usize,
         large_smt_in_memory_nodes: &'a [Word],
-        subtree_iter: Option<Box<dyn Iterator<Item = StorageResult<Subtree>> + 'a>>,
     },
     Subtree {
         subtree_iter: Box<dyn Iterator<Item = StorageResult<Subtree>> + 'a>,
@@ -23,27 +25,25 @@ enum InnerNodeIteratorState<'a> {
     Done,
 }
 
-pub struct LargeSmtInnerNodeIterator<'a> {
+pub struct LargeSmtInnerNodeIterator<'a, S: SmtStorageReader> {
+    large_smt: &'a LargeSmt<S>,
     state: InnerNodeIteratorState<'a>,
 }
 
-impl<'a> LargeSmtInnerNodeIterator<'a> {
-    pub(super) fn new(
-        large_smt_in_memory_nodes: &'a [Word],
-        subtree_iter: Box<dyn Iterator<Item = StorageResult<Subtree>> + 'a>,
-    ) -> Self {
+impl<'a, S: SmtStorageReader> LargeSmtInnerNodeIterator<'a, S> {
+    pub(super) fn new(large_smt: &'a LargeSmt<S>) -> Self {
         // in-memory nodes should never be empty
         Self {
+            large_smt,
             state: InnerNodeIteratorState::InMemory {
                 current_index: 0,
-                large_smt_in_memory_nodes,
-                subtree_iter: Some(subtree_iter),
+                large_smt_in_memory_nodes: &large_smt.in_memory_nodes,
             },
         }
     }
 }
 
-impl Iterator for LargeSmtInnerNodeIterator<'_> {
+impl<S: SmtStorageReader> Iterator for LargeSmtInnerNodeIterator<'_, S> {
     type Item = LargeSmtResult<InnerNodeInfo>;
 
     /// Returns the next inner node info in the tree.
@@ -56,11 +56,7 @@ impl Iterator for LargeSmtInnerNodeIterator<'_> {
         loop {
             match &mut self.state {
                 // Phase 1: Process in-memory nodes (depths 0-23)
-                InnerNodeIteratorState::InMemory {
-                    current_index,
-                    large_smt_in_memory_nodes,
-                    subtree_iter,
-                } => {
+                InnerNodeIteratorState::InMemory { current_index, large_smt_in_memory_nodes } => {
                     // Iterate through nodes at depths 0 to IN_MEMORY_DEPTH-1
                     // Start at index 1 (root), max node index is (1 << IN_MEMORY_DEPTH) - 1
                     if *current_index == 0 {
@@ -91,13 +87,19 @@ impl Iterator for LargeSmtInnerNodeIterator<'_> {
                     }
 
                     // All in-memory nodes processed. Transition to Phase 2: Subtree iteration
-                    self.state = InnerNodeIteratorState::Subtree {
-                        subtree_iter: subtree_iter
-                            .take()
-                            .expect("subtree iterator must be present before transition"),
-                        current_subtree_node_iter: None,
-                    };
-                    continue; // Start processing subtrees immediately
+                    match self.large_smt.storage.iter_subtrees() {
+                        Ok(subtree_iter) => {
+                            self.state = InnerNodeIteratorState::Subtree {
+                                subtree_iter,
+                                current_subtree_node_iter: None,
+                            };
+                            continue; // Start processing subtrees immediately
+                        },
+                        Err(e) => {
+                            // Storage error occurred - we should propagate this properly
+                            return Some(LargeSmtResult::Err(e.into()));
+                        },
+                    }
                 },
                 // Phase 2: Process storage subtrees (depths 25-64)
                 InnerNodeIteratorState::Subtree { subtree_iter, current_subtree_node_iter } => {
