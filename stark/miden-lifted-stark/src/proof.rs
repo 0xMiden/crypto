@@ -335,7 +335,7 @@ where
             .map(|air| aligned_len(air.aux_width() * EF::DIMENSION, alignment))
             .collect();
 
-        let full_tree_depth = log_max_trace_height + log_blowup;
+        let full_log_height = log_max_trace_height + log_blowup;
         let mut commitments = Vec::with_capacity(4);
         if let Some(commitment) = preprocessed_commitment {
             let preprocessed_widths: Vec<usize> = preprocessed_trace_to_air
@@ -344,7 +344,7 @@ where
                     aligned_len(statement.airs()[air_idx as usize].preprocessed_width(), alignment)
                 })
                 .collect();
-            let preprocessed_tree_depth = preprocessed_trace_to_air
+            let preprocessed_log_height = preprocessed_trace_to_air
                 .iter()
                 .map(|&air_idx| trace_order.log_heights()[air_idx as usize])
                 .max()
@@ -353,23 +353,23 @@ where
             commitments.push(CommitmentGroup {
                 root: commitment.clone(),
                 widths: preprocessed_widths,
-                tree_depth: preprocessed_tree_depth,
+                log_height: preprocessed_log_height,
             });
         }
         commitments.push(CommitmentGroup {
             root: main_commit.clone(),
             widths: main_widths,
-            tree_depth: full_tree_depth,
+            log_height: full_log_height,
         });
         commitments.push(CommitmentGroup {
             root: aux_commit.clone(),
             widths: aux_widths,
-            tree_depth: full_tree_depth,
+            log_height: full_log_height,
         });
         commitments.push(CommitmentGroup {
             root: quotient_commit.clone(),
             widths: vec![quotient_width],
-            tree_depth: full_tree_depth,
+            log_height: full_log_height,
         });
 
         // 9. Parse PCS sub-proof

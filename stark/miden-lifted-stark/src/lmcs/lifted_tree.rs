@@ -159,10 +159,10 @@ where
     where
         Ch: ProverChannel<F = F, Commitment = Hash<F, D, DIGEST_ELEMS>>,
     {
-        let tree_depth = log2_strict_usize(self.height()) as u8;
+        let tree_log_height = log2_strict_usize(self.height()) as u8;
         assert_eq!(
             indices.depth(),
-            tree_depth,
+            tree_log_height,
             "exact batch indices must be in the committed tree's index space",
         );
 

@@ -39,7 +39,7 @@ pub(in crate::pcs) struct DeepOracle<F: TwoAdicField, EF: ExtensionField<F>, L: 
     /// Committed groups (root + widths + tree depth), one per tree.
     ///
     /// Widths must match the committed rows (including any alignment padding if
-    /// `build_aligned_tree` was used). A group's `tree_depth` may be below the
+    /// `build_aligned_tree` was used). A group's `log_height` may be below the
     /// query depth — a virtually-lifted, setup-fixed preprocessed tree.
     commitments: Vec<CommitmentGroup<L::Commitment>>,
 
@@ -62,7 +62,7 @@ impl<F: TwoAdicField, EF: ExtensionField<F>, L: Lmcs<F = F>> DeepOracle<F, EF, L
     /// Construct by reading evaluations, checking PoW, and sampling challenges.
     ///
     /// Commitment widths must match the committed rows (including any alignment padding).
-    /// Each group's `tree_depth` must be `≤ domain.log_lde_height()`; shorter groups
+    /// Each group's `log_height` must be `≤ domain.log_lde_height()`; shorter groups
     /// are virtually lifted at query time.
     ///
     /// Preconditions: `eval_points` must be distinct and lie outside the trace subgroup `H`
@@ -150,7 +150,7 @@ impl<F: TwoAdicField, EF: ExtensionField<F>, L: Lmcs<F = F>> DeepOracle<F, EF, L
                     &group.root,
                     &group.widths,
                     tree_indices,
-                    group.tree_depth,
+                    group.log_height,
                     channel,
                 )
                 .map_err(|source| DeepError::LmcsError { source, tree: group_idx })?;

@@ -76,7 +76,7 @@ fn deep_quotient_end_to_end() {
     let commitments = vec![CommitmentGroup {
         root: commitment,
         widths,
-        tree_depth: log_lde_height,
+        log_height: log_lde_height,
     }];
 
     // Step 4: Verifier constructs DeepOracle with same transcript state

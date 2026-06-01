@@ -60,7 +60,7 @@ fn run_pcs_case(params: &PcsParams, trees: Vec<TestTree>, seed: u64) -> Result<(
         .map(|t| CommitmentGroup {
             root: t.root(),
             widths: t.widths(),
-            tree_depth: log2_strict_u8(t.height()),
+            log_height: log2_strict_u8(t.height()),
         })
         .collect();
     let trace_trees: Vec<&_> = trees.iter().collect();
@@ -110,7 +110,7 @@ fn run_pcs_case(params: &PcsParams, trees: Vec<TestTree>, seed: u64) -> Result<(
             .map(|group| CommitmentGroup {
                 root: group.root,
                 widths: aligned_widths(group.widths.clone(), alignment),
-                tree_depth: group.tree_depth,
+                log_height: group.log_height,
             })
             .collect();
 

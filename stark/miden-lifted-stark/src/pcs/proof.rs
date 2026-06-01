@@ -99,7 +99,7 @@ where
                 lmcs.read_lifted_batch_proof(
                     &group.widths,
                     &tree_indices,
-                    group.tree_depth,
+                    group.log_height,
                     channel,
                 )
                 .map_err(|e| match e {

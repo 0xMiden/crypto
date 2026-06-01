@@ -177,23 +177,23 @@ pub trait Lmcs: Clone {
     /// Open a virtually lifted batch proof.
     ///
     /// `query_indices` live in the query domain. They are projected to
-    /// `tree_depth`, opened with [`Self::open_batch`], then expanded back to the
+    /// `tree_log_height`, opened with [`Self::open_batch`], then expanded back to the
     /// original query indices. The returned map is keyed by the original query
     /// indices, so callers can reduce all commitment groups uniformly.
     ///
-    /// Returns [`LmcsError::InvalidProof`] if `tree_depth > query_indices.depth()`.
+    /// Returns [`LmcsError::InvalidProof`] if `tree_log_height > query_indices.depth()`.
     fn open_lifted_batch<Ch>(
         &self,
         commitment: &Self::Commitment,
         widths: &[usize],
         query_indices: &TreeIndices,
-        tree_depth: u8,
+        tree_log_height: u8,
         channel: &mut Ch,
     ) -> Result<OpenedRows<Self::F>, LmcsError>
     where
         Ch: VerifierChannel<F = Self::F, Commitment = Self::Commitment>,
     {
-        let projection = query_indices.project_to_depth(tree_depth)?;
+        let projection = query_indices.project_to_depth(tree_log_height)?;
         let rows_by_leaf =
             self.open_batch(commitment, widths, projection.leaf_indices(), channel)?;
         projection.expand_leaf_values(&rows_by_leaf)
@@ -220,22 +220,22 @@ pub trait Lmcs: Clone {
 
     /// Parse a virtually lifted batch opening from transcript hints.
     ///
-    /// `query_indices` are projected to `tree_depth`, then parsed with
+    /// `query_indices` are projected to `tree_log_height`, then parsed with
     /// [`Self::read_batch_proof`]. The returned proof is the same `BatchProof`
     /// type as the exact parser and remains keyed by projected tree indices.
     ///
-    /// Returns [`LmcsError::InvalidProof`] if `tree_depth > query_indices.depth()`.
+    /// Returns [`LmcsError::InvalidProof`] if `tree_log_height > query_indices.depth()`.
     fn read_lifted_batch_proof<Ch>(
         &self,
         widths: &[usize],
         query_indices: &TreeIndices,
-        tree_depth: u8,
+        tree_log_height: u8,
         channel: &mut Ch,
     ) -> Result<Self::BatchProof, LmcsError>
     where
         Ch: VerifierChannel<F = Self::F, Commitment = Self::Commitment>,
     {
-        let projection = query_indices.project_to_depth(tree_depth)?;
+        let projection = query_indices.project_to_depth(tree_log_height)?;
         self.read_batch_proof(widths, projection.leaf_indices(), channel)
     }
 
@@ -300,9 +300,9 @@ pub trait LmcsTree<F, Commitment, M> {
     where
         Ch: ProverChannel<F = F, Commitment = Commitment>,
     {
-        let tree_depth = miden_lifted_air::log2_strict_u8(self.height());
+        let tree_log_height = miden_lifted_air::log2_strict_u8(self.height());
         let projection = query_indices
-            .project_to_depth(tree_depth)
+            .project_to_depth(tree_log_height)
             .expect("query index depth must be at least the committed tree depth");
         self.prove_batch(projection.leaf_indices(), channel);
     }

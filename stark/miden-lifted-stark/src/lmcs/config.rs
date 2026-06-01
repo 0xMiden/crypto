@@ -374,8 +374,8 @@ mod tests {
         let tree = lmcs.build_tree(vec![small_matrix(4, 2, 0)]);
         let widths = tree.aligned_widths();
         let commitment = tree.root();
-        let tree_depth = log2_strict_u8(tree.height());
-        let query_depth = tree_depth + 1;
+        let tree_log_height = log2_strict_u8(tree.height());
+        let query_depth = tree_log_height + 1;
         let indices = TreeIndices::new([0usize, 4, 5, 7], query_depth).unwrap();
 
         let make_transcript = || {
@@ -387,7 +387,13 @@ mod tests {
         let (prover_digest, transcript) = make_transcript();
         let mut verifier_channel = gl::verifier_channel(&transcript);
         let opened = lmcs
-            .open_lifted_batch(&commitment, &widths, &indices, tree_depth, &mut verifier_channel)
+            .open_lifted_batch(
+                &commitment,
+                &widths,
+                &indices,
+                tree_log_height,
+                &mut verifier_channel,
+            )
             .unwrap();
 
         assert_eq!(opened[&0], tree.aligned_rows(0));
@@ -401,14 +407,14 @@ mod tests {
         let (_, transcript) = make_transcript();
         let mut verifier_channel = gl::verifier_channel(&transcript);
         let batch = lmcs
-            .read_lifted_batch_proof(&widths, &indices, tree_depth, &mut verifier_channel)
+            .read_lifted_batch_proof(&widths, &indices, tree_log_height, &mut verifier_channel)
             .unwrap();
         assert_eq!(batch.openings.len(), 3);
         assert!(batch.openings.contains_key(&0));
         assert!(batch.openings.contains_key(&1));
         assert!(batch.openings.contains_key(&3));
 
-        let invalid_tree_depth = query_depth + 1;
+        let invalid_tree_log_height = query_depth + 1;
         let (_, transcript) = gl::prover_channel().finalize();
         let mut verifier_channel = gl::verifier_channel(&transcript);
         assert_eq!(
@@ -416,7 +422,7 @@ mod tests {
                 &commitment,
                 &widths,
                 &indices,
-                invalid_tree_depth,
+                invalid_tree_log_height,
                 &mut verifier_channel,
             ),
             Err(LmcsError::InvalidProof)
@@ -427,7 +433,7 @@ mod tests {
             lmcs.read_lifted_batch_proof(
                 &widths,
                 &indices,
-                invalid_tree_depth,
+                invalid_tree_log_height,
                 &mut verifier_channel
             ),
             Err(LmcsError::InvalidProof)
