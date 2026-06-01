@@ -1,5 +1,9 @@
 //! Merkle Mountain Range (MMR) data structures.
 
+#[cfg(feature = "internal")]
+pub mod belt;
+#[cfg(not(feature = "internal"))]
+pub(crate) mod belt;
 mod delta;
 mod error;
 mod forest;
