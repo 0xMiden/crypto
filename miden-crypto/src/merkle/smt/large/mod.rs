@@ -419,7 +419,11 @@ impl<S: SmtStorageReader> LargeSmt<S> {
     // --------------------------------------------------------------------------------------------
 
     /// Returns an iterator over the leaves of this [`LargeSmt`].
-    /// Note: This iterator returns owned SmtLeaf values.
+    ///
+    /// The returned iterator is fallible: each item is a [`LargeSmtResult`] so storage errors
+    /// encountered while advancing the iterator are surfaced instead of being skipped.
+    ///
+    /// Note: This iterator returns owned [`SmtLeaf`] values.
     ///
     /// # Errors
     /// Returns an error if the storage backend fails to create the iterator.
@@ -436,7 +440,11 @@ impl<S: SmtStorageReader> LargeSmt<S> {
     }
 
     /// Returns an iterator over the key-value pairs of this [`LargeSmt`].
-    /// Note: This iterator returns owned (Word, Word) tuples.
+    ///
+    /// The returned iterator is fallible: each item is a [`LargeSmtResult`] so storage errors
+    /// from the underlying leaf iterator are propagated while flattening leaf entries.
+    ///
+    /// Note: This iterator returns owned `(Word, Word)` tuples.
     ///
     /// # Errors
     /// Returns an error if the storage backend fails to create the iterator.
@@ -457,6 +465,9 @@ impl<S: SmtStorageReader> LargeSmt<S> {
     }
 
     /// Returns an iterator over the inner nodes of this [`LargeSmt`].
+    ///
+    /// The returned iterator is fallible: each item is a [`LargeSmtResult`] so storage errors
+    /// from the underlying inner node iterator are propagated while flattening leaf entries.
     ///
     /// # Errors
     /// Returns an error if the storage backend fails during iteration setup.

@@ -26,6 +26,9 @@ pub use memory::{MemoryStorage, MemoryStorageSnapshot};
 mod updates;
 pub use updates::{StorageUpdateParts, StorageUpdates, SubtreeUpdate};
 
+pub type BoxedFallibleLeafIterator<'a> =
+    Box<dyn Iterator<Item = StorageResult<(u64, SmtLeaf)>> + 'a>;
+
 // SMT STORAGE READER
 // ================================================================================================
 
@@ -117,12 +120,18 @@ pub trait SmtStorageReader: 'static + fmt::Debug + Send + Sync {
     /// Returns `Ok(None)` if the containing Subtree or the specific inner node is not found.
     fn get_inner_node(&self, index: NodeIndex) -> StorageResult<Option<InnerNode>>;
 
-    /// Returns an iterator over all (logical_index, SmtLeaf) pairs currently in storage.
+    /// Returns an iterator over all `(logical_index, SmtLeaf)` pairs currently in storage.
+    ///
+    /// The returned iterator is fallible: each item is a [`StorageResult`] so backends can report
+    /// per-element read or deserialization failures encountered after iterator creation.
     ///
     /// The order of iteration is not guaranteed unless specified by the implementation.
     fn iter_leaves(&self) -> StorageResult<BoxedFallibleLeafIterator<'_>>;
 
     /// Returns an iterator over all `Subtree` instances currently in storage.
+    ///
+    /// The returned iterator is fallible: each item is a [`StorageResult`] so backends can report
+    /// per-element read or deserialization failures encountered after iterator creation.
     ///
     /// The order of iteration is not guaranteed unless specified by the implementation.
     fn iter_subtrees(&self)
@@ -138,9 +147,6 @@ pub trait SmtStorageReader: 'static + fmt::Debug + Send + Sync {
     /// management is required.
     fn get_top_subtree_roots(&self) -> StorageResult<Vec<(u64, Word)>>;
 }
-
-pub type BoxedFallibleLeafIterator<'a> =
-    Box<dyn Iterator<Item = StorageResult<(u64, SmtLeaf)>> + 'a>;
 
 impl<T: SmtStorageReader + ?Sized> SmtStorageReader for Box<T> {
     #[inline]
@@ -193,9 +199,7 @@ impl<T: SmtStorageReader + ?Sized> SmtStorageReader for Box<T> {
     }
 
     #[inline]
-    fn iter_leaves(
-        &self,
-    ) -> StorageResult<Box<dyn Iterator<Item = StorageResult<(u64, SmtLeaf)>> + '_>> {
+    fn iter_leaves(&self) -> StorageResult<BoxedFallibleLeafIterator<'_>> {
         self.deref().iter_leaves()
     }
 
