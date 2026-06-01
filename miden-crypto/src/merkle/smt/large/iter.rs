@@ -96,7 +96,9 @@ impl<S: SmtStorageReader> Iterator for LargeSmtInnerNodeIterator<'_, S> {
                             continue; // Start processing subtrees immediately
                         },
                         Err(e) => {
-                            // Storage error occurred - we should propagate this properly
+                            // Storage error occurred - we should propagate this error.
+                            // We also transition to Done state to avoid infinite loops.
+                            self.state = InnerNodeIteratorState::Done;
                             return Some(LargeSmtResult::Err(e.into()));
                         },
                     }
