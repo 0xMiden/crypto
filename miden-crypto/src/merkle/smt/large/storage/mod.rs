@@ -122,16 +122,18 @@ pub trait SmtStorageReader: 'static + fmt::Debug + Send + Sync {
 
     /// Returns an iterator over all `(logical_index, SmtLeaf)` pairs currently in storage.
     ///
-    /// The returned iterator is fallible: each item is a [`StorageResult`] so backends can report
-    /// per-element read or deserialization failures encountered after iterator creation.
+    /// The returned iterator is fallible: each item is a
+    /// [`crate::merkle::smt::StorageResult`] so backends can report per-element read or
+    /// deserialization failures encountered after iterator creation.
     ///
     /// The order of iteration is not guaranteed unless specified by the implementation.
     fn iter_leaves(&self) -> StorageResult<BoxedFallibleLeafIterator<'_>>;
 
     /// Returns an iterator over all `Subtree` instances currently in storage.
     ///
-    /// The returned iterator is fallible: each item is a [`StorageResult`] so backends can report
-    /// per-element read or deserialization failures encountered after iterator creation.
+    /// The returned iterator is fallible: each item is a
+    /// [`crate::merkle::smt::StorageResult`] so backends can report per-element read or
+    /// deserialization failures encountered after iterator creation.
     ///
     /// The order of iteration is not guaranteed unless specified by the implementation.
     fn iter_subtrees(&self)
