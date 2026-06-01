@@ -193,10 +193,9 @@ pub trait Lmcs: Clone {
     where
         Ch: VerifierChannel<F = Self::F, Commitment = Self::Commitment>,
     {
-        let projection = query_indices.project_to_depth(tree_log_height)?;
-        let rows_by_leaf =
-            self.open_batch(commitment, widths, projection.leaf_indices(), channel)?;
-        projection.expand_leaf_values(&rows_by_leaf)
+        let leaf_indices = query_indices.fold_to_depth(tree_log_height)?;
+        let rows_by_leaf = self.open_batch(commitment, widths, &leaf_indices, channel)?;
+        query_indices.expand_leaf_values(tree_log_height, &rows_by_leaf)
     }
 
     /// Parse an exact batch opening from transcript hints without verification.
@@ -235,8 +234,8 @@ pub trait Lmcs: Clone {
     where
         Ch: VerifierChannel<F = Self::F, Commitment = Self::Commitment>,
     {
-        let projection = query_indices.project_to_depth(tree_log_height)?;
-        self.read_batch_proof(widths, projection.leaf_indices(), channel)
+        let leaf_indices = query_indices.fold_to_depth(tree_log_height)?;
+        self.read_batch_proof(widths, &leaf_indices, channel)
     }
 
     /// Get the alignment used by `build_aligned_tree`.
@@ -301,10 +300,10 @@ pub trait LmcsTree<F, Commitment, M> {
         Ch: ProverChannel<F = F, Commitment = Commitment>,
     {
         let tree_log_height = miden_lifted_air::log2_strict_u8(self.height());
-        let projection = query_indices
-            .project_to_depth(tree_log_height)
+        let leaf_indices = query_indices
+            .fold_to_depth(tree_log_height)
             .expect("query index depth must be at least the committed tree depth");
-        self.prove_batch(projection.leaf_indices(), channel);
+        self.prove_batch(&leaf_indices, channel);
     }
 }
 

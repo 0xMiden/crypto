@@ -13,7 +13,7 @@ use crate::lmcs::{LmcsError, node_id::NodeId};
 
 /// A validated set of Merkle tree indices at a given source depth.
 ///
-/// Invariants (enforced by [`new`](Self::new), [`project_to_depth`](Self::project_to_depth),
+/// Invariants (enforced by [`new`](Self::new), [`fold_to_depth`](Self::fold_to_depth),
 /// and [`shrink_depth`](Self::shrink_depth)):
 /// - `indices` is sorted ascending with no duplicates.
 /// - Every index satisfies `index < 2^depth`.
@@ -69,21 +69,39 @@ impl TreeIndices {
         MissingSiblingsIter::new(&self.indices, self.depth)
     }
 
-    /// Project these source-domain indices onto a committed tree at `target_depth`.
+    /// Fold these source-domain indices onto a committed tree at `target_depth`.
     ///
     /// In natural (domain) order, a query index opens the leaf selected by its low
-    /// `target_depth` bits: `query & ((1 << target_depth) - 1)`. The returned projection keeps
-    /// both views together: original query indices for result keys, and deduplicated leaf indices
-    /// for transcript and Merkle-witness work.
-    pub fn project_to_depth(&self, target_depth: u8) -> Result<TreeIndexProjection<'_>, LmcsError> {
+    /// `target_depth` bits: `query & ((1 << target_depth) - 1)`. Returns the
+    /// deduplicated leaf indices, leaving `self` unchanged. Use
+    /// [`expand_leaf_values`](Self::expand_leaf_values) to re-key leaf-keyed
+    /// results back to the original query indices.
+    ///
+    /// Returns `InvalidProof` if `target_depth` is above the current source depth.
+    pub fn fold_to_depth(&self, target_depth: u8) -> Result<TreeIndices, LmcsError> {
         let mut leaf_indices = self.clone();
         leaf_indices.fold_in_place(target_depth)?;
+        Ok(leaf_indices)
+    }
+
+    /// Re-key leaf-keyed values back to the original query indices.
+    ///
+    /// Each query index maps to the leaf selected by its low `target_depth` bits;
+    /// `target_depth` must match the depth passed to the [`fold_to_depth`](Self::fold_to_depth)
+    /// that produced `leaf_values`. Returns `InvalidProof` if a required leaf is absent.
+    pub fn expand_leaf_values<T: Clone>(
+        &self,
+        target_depth: u8,
+        leaf_values: &BTreeMap<usize, T>,
+    ) -> Result<BTreeMap<usize, T>, LmcsError> {
         let leaf_mask = (1usize << target_depth as usize) - 1;
-        Ok(TreeIndexProjection {
-            query_indices: self,
-            leaf_indices,
-            leaf_mask,
-        })
+        self.indices
+            .iter()
+            .map(|&query| {
+                let value = leaf_values.get(&(query & leaf_mask)).ok_or(LmcsError::InvalidProof)?;
+                Ok((query, value.clone()))
+            })
+            .collect()
     }
 
     /// Map domain indices to folded domain indices at `target_depth`, in place.
@@ -112,48 +130,12 @@ impl TreeIndices {
     /// Shifts at or beyond the current depth collapse every index to depth 0,
     /// where the tree has a single root/leaf at index 0 (for example, the
     /// commitment tree of a one-row matrix). Use
-    /// [`project_to_depth`](Self::project_to_depth) when invalid target depths
+    /// [`fold_to_depth`](Self::fold_to_depth) when invalid target depths
     /// should be rejected instead of saturated.
     pub fn shrink_depth(&mut self, shift: u8) {
         let target_depth = self.depth.saturating_sub(shift);
         self.fold_in_place(target_depth)
             .expect("target depth is derived from current depth");
-    }
-}
-
-/// A query-index set projected onto a particular committed tree depth.
-///
-/// The projection owns the deduplicated leaf indices used by the Merkle proof, while retaining a
-/// reference to the original query indices used by callers. This keeps the two index spaces
-/// explicit and avoids re-deriving their relationship at each call site.
-#[derive(Debug)]
-pub struct TreeIndexProjection<'a> {
-    query_indices: &'a TreeIndices,
-    leaf_indices: TreeIndices,
-    leaf_mask: usize,
-}
-
-impl TreeIndexProjection<'_> {
-    /// The unique leaves opened by this projection.
-    pub fn leaf_indices(&self) -> &TreeIndices {
-        &self.leaf_indices
-    }
-
-    fn pairs(&self) -> impl Iterator<Item = (usize, usize)> + '_ {
-        self.query_indices.iter().map(move |&query| (query, query & self.leaf_mask))
-    }
-
-    /// Re-key values stored by leaf back to the original query indices.
-    pub fn expand_leaf_values<T: Clone>(
-        &self,
-        leaf_values: &BTreeMap<usize, T>,
-    ) -> Result<BTreeMap<usize, T>, LmcsError> {
-        self.pairs()
-            .map(|(query, leaf)| {
-                let value = leaf_values.get(&leaf).ok_or(LmcsError::InvalidProof)?;
-                Ok((query, value.clone()))
-            })
-            .collect()
     }
 }
 
@@ -281,18 +263,26 @@ mod tests {
     }
 
     #[test]
-    fn projection_to_depth_is_checked_and_non_mutating() {
+    fn fold_to_depth_then_expand_leaf_values() {
+        // Query indices at depth 3 fold to their low 2 bits: 0,4→0; 5→1; 7→3.
         let ti = TreeIndices::new([0, 4, 5, 7], 3).unwrap();
-        let projection = ti.project_to_depth(2).unwrap();
-        let leaves = projection.leaf_indices();
-
-        assert_eq!(ti.iter().copied().collect::<Vec<_>>(), [0, 4, 5, 7]);
-        assert_eq!(ti.depth(), 3);
+        let leaves = ti.fold_to_depth(2).unwrap();
         assert_eq!(leaves.iter().copied().collect::<Vec<_>>(), [0, 1, 3]);
         assert_eq!(leaves.depth(), 2);
-        assert_eq!(projection.pairs().collect::<Vec<_>>(), vec![(0, 0), (4, 0), (5, 1), (7, 3)]);
 
-        assert!(ti.project_to_depth(4).is_err());
+        // Folding leaves the source untouched and rejects a depth above it.
+        assert_eq!(ti.iter().copied().collect::<Vec<_>>(), [0, 4, 5, 7]);
+        assert_eq!(ti.depth(), 3);
+        assert!(ti.fold_to_depth(4).is_err());
+
+        // Each query index reads its low-2-bit leaf: 0,4→'a'; 5→'b'; 7→'c'.
+        let leaf_values: BTreeMap<usize, char> =
+            [(0, 'a'), (1, 'b'), (3, 'c')].into_iter().collect();
+        let expanded = ti.expand_leaf_values(2, &leaf_values).unwrap();
+        assert_eq!(
+            expanded.into_iter().collect::<Vec<_>>(),
+            vec![(0, 'a'), (4, 'a'), (5, 'b'), (7, 'c')]
+        );
     }
 
     #[test]
