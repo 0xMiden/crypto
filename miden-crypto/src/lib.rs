@@ -53,8 +53,8 @@ pub mod stark {
     //! - [`pcs`] — PCS parameters, DEEP + FRI sub-proofs
     //! - [`lmcs`] — Lifted Merkle commitment scheme
     //! - [`hasher`] — Stateful hasher primitives
-    //! - [`prover`] — `prove`
-    //! - [`verifier`] — `verify`
+    //! - [`prover`] — [`ProverInstance::prove`]
+    //! - [`verifier`] — [`VerifierInstance::verify`]
     //! - [`debug`] — Debug constraint checker for lifted AIRs
     //!
     //! Sub-modules from upstream Plonky3:

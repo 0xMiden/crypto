@@ -10,7 +10,7 @@
 //! that parses it from a verifier instance, proof data, and a challenger, following
 //! the same pattern as [`PcsProof`] alongside the PCS verifier. After parsing,
 //! custom verifiers can use the structured proof plus the same
-//! [`VerifierInstance`](crate::VerifierInstance) without replaying the challenger.
+//! [`VerifierInstance`] without replaying the challenger.
 
 extern crate alloc;
 
@@ -141,7 +141,7 @@ where
 /// PCS sub-transcript, and LMCS hint data needed to implement verification logic
 /// without replaying the Fiat-Shamir challenger. Verification context that is not
 /// proof data — the STARK config, statement, and optional preprocessed setup
-/// commitment — remains on [`VerifierInstance`](crate::VerifierInstance).
+/// commitment — remains on [`VerifierInstance`].
 ///
 /// Constructed via [`from_data`](Self::from_data), which mirrors the transcript
 /// steps of [`VerifierInstance::verify`](crate::VerifierInstance::verify),
@@ -213,7 +213,7 @@ where
     /// 7. Sample the OOD point `z`.
     /// 8. Build PCS commitment groups, including per-group tree depths for any virtually lifted
     ///    preprocessed tree.
-    /// 9. Parse the PCS sub-proof via [`PcsProof::read_from_channel`].
+    /// 9. Parse the PCS sub-proof via `PcsProof::read_from_channel`.
     ///
     /// Does **not** verify constraints or check the quotient identity.
     /// Finalizes the transcript and returns the digest alongside the parsed view.
