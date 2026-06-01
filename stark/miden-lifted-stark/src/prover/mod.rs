@@ -106,8 +106,9 @@ use crate::{
 /// the optional borrowed [`Preprocessed`] data.
 ///
 /// Construction validates preprocessed presence parity (and, when present, the
-/// bundle's shape against the AIRs), so holding a `ProverInstance` is a
-/// guarantee its preprocessed shape is consistent; proving never re-checks it.
+/// bundle's shape against the AIRs and STARK config), so holding a
+/// `ProverInstance` is a guarantee its preprocessed shape is consistent;
+/// proving never re-checks it.
 pub struct ProverInstance<'a, F, EF, MA, SC>
 where
     F: TwoAdicField,
@@ -132,7 +133,8 @@ where
     /// `preprocessed` must be `Some` exactly when some AIR declares preprocessed
     /// columns; otherwise this errors with
     /// [`PreprocessedValidationError::PresenceMismatch`]. When both hold, the
-    /// bundle's shape is validated against the AIRs.
+    /// bundle's raw and committed shapes are validated against the AIRs and
+    /// config.
     pub fn new(
         config: &'a SC,
         prover_statement: &'a ProverStatement<F, EF, MA>,
@@ -145,7 +147,7 @@ where
             return Err(PreprocessedValidationError::PresenceMismatch { expected, actual });
         }
         if let Some(p) = preprocessed {
-            validate_preprocessed(prover_statement, p)?;
+            validate_preprocessed(config, prover_statement, p)?;
         }
         Ok(Self { config, prover_statement, preprocessed })
     }
@@ -207,7 +209,8 @@ where
 /// - per AIR: `trace.height() >= max periodic column length`
 /// - per AIR: `log_quotient_degree(air) <= config.pcs().log_blowup()`
 /// - LDE domain fits the field's two-adicity (via `LiftedDomain::try_canonical`)
-/// - Preprocessed bundle presence and shape via `ProverInstance` construction
+/// - Preprocessed bundle presence, shape, and config-dependent LDE dimensions via `ProverInstance`
+///   construction
 ///
 /// ## Trusted (NOT validated)
 /// - AIR structural shape (positive `aux_width`, power-of-two periodic columns, window size 2)

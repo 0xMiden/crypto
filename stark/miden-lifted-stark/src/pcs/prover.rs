@@ -47,22 +47,10 @@ pub fn open_with_channel<F, EF, L, M, Ch, const N: usize>(
 {
     const { assert!(N > 0, "at least one evaluation point required") };
 
-    // Determine LDE domain size from the supplied LDE coset. Trees shorter than the
-    // max (e.g. a setup-fixed preprocessed tree) are virtually lifted: `prove_lifted_batch`
-    // projects the sampled query indices down to each tree's own depth.
-    assert!(!trace_trees.is_empty(), "at least one trace tree required");
+    // Trees shorter than the max (e.g. a setup-fixed preprocessed tree) are virtually
+    // lifted: `prove_lifted_batch` projects sampled query indices down to each tree's
+    // own depth. `DeepPoly::from_trees` validates the tree-height preconditions below.
     let log_lde_height = domain.log_lde_height();
-    let expected_height = domain.lde_height();
-    assert!(
-        trace_trees
-            .iter()
-            .all(|tree| tree.height().is_power_of_two() && tree.height() <= expected_height),
-        "tree heights must be powers of two ≤ the max LDE height",
-    );
-    assert!(
-        trace_trees.iter().any(|tree| tree.height() == expected_height),
-        "at least one tree must fill the max LDE height",
-    );
     // ─────────────────────────────────────────────────────────────────────────
     // Construct DEEP quotient (observes evals, grinds, samples alpha and beta)
     // ─────────────────────────────────────────────────────────────────────────

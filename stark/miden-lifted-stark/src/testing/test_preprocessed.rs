@@ -18,8 +18,11 @@ use crate::{
         AirBuilder, BaseAir, ExtensionBuilder, LiftedAir, LiftedAirBuilder, MultiAir,
         ProverStatement, Statement, WindowAccess,
     },
-    proof::StarkProof,
-    testing::configs::goldilocks_poseidon2::{Felt, QuadFelt, test_challenger, test_config},
+    pcs::params::PcsParams,
+    proof::{StarkOutput, StarkProof},
+    testing::configs::goldilocks_poseidon2::{
+        Felt, Lmcs, QuadFelt, TestConfig, test_challenger, test_config,
+    },
 };
 
 // ---------------------------------------------------------------------------
@@ -281,6 +284,10 @@ fn row_index_trace(height: usize) -> RowMajorMatrix<Felt> {
     RowMajorMatrix::new((0..height).map(|r| Felt::from_u64(r as u64)).collect(), 1)
 }
 
+fn shifted_row_index_trace(height: usize) -> RowMajorMatrix<Felt> {
+    RowMajorMatrix::new((0..height).map(|r| Felt::from_u64((r + 1) as u64)).collect(), 1)
+}
+
 /// Trace satisfying [`ConstantAir`]'s `next == local²` transition.
 fn squaring_trace(height: usize) -> RowMajorMatrix<Felt> {
     let mut values = Vec::with_capacity(height);
@@ -306,6 +313,55 @@ fn prover_statement<A: LiftedAir<Felt, QuadFelt>>(
     ProverStatement::new(statement, traces).expect("prover statement")
 }
 
+type TestOutput = StarkOutput<Felt, QuadFelt, TestConfig>;
+type TestPreprocessed = Preprocessed<Felt, Lmcs>;
+
+fn prove_with_preprocessed<MA>(
+    config: &TestConfig,
+    ps: &ProverStatement<Felt, QuadFelt, MA>,
+) -> (TestOutput, TestPreprocessed)
+where
+    MA: MultiAir<Felt, QuadFelt>,
+{
+    let preprocessed = Preprocessed::build(ps.statement(), config).expect("has preprocessed");
+    let output = ProverInstance::new(config, ps, Some(&preprocessed))
+        .expect("valid preprocessed setup")
+        .prove(test_challenger())
+        .expect("prove succeeds");
+    (output, preprocessed)
+}
+
+fn verify_and_reparse<MA>(
+    config: &TestConfig,
+    ps: &ProverStatement<Felt, QuadFelt, MA>,
+    output: &TestOutput,
+    preprocessed: &TestPreprocessed,
+) where
+    MA: MultiAir<Felt, QuadFelt>,
+{
+    let verifier_instance =
+        VerifierInstance::new(config, ps.statement(), Some(preprocessed.commitment()))
+            .expect("valid preprocessed setup");
+    let digest = verifier_instance
+        .verify(&output.proof, test_challenger())
+        .expect("verify succeeds");
+    assert_eq!(output.digest, digest);
+
+    let (_, reparse_digest) =
+        StarkProof::from_data(&verifier_instance, &output.proof, test_challenger())
+            .expect("preprocessed transcript re-parse should succeed");
+    assert_eq!(output.digest, reparse_digest);
+}
+
+fn prove_verify_reparse<MA>(ps: &ProverStatement<Felt, QuadFelt, MA>)
+where
+    MA: MultiAir<Felt, QuadFelt>,
+{
+    let config = test_config();
+    let (output, preprocessed) = prove_with_preprocessed(&config, ps);
+    verify_and_reparse(&config, ps, &output, &preprocessed);
+}
+
 // ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
@@ -318,25 +374,8 @@ fn single_air_with_preprocessed() {
         vec![row_index_trace(height)],
     );
     let config = test_config();
-
-    let preprocessed = Preprocessed::build(ps.statement(), &config).expect("has preprocessed");
-    let output = ProverInstance::new(&config, &ps, Some(&preprocessed))
-        .expect("valid")
-        .prove(test_challenger())
-        .expect("prove succeeds");
-
-    let verifier_instance =
-        VerifierInstance::new(&config, ps.statement(), Some(preprocessed.commitment()))
-            .expect("valid");
-    let digest = verifier_instance
-        .verify(&output.proof, test_challenger())
-        .expect("verify succeeds");
-    assert_eq!(output.digest, digest);
-
-    let (_, reparse_digest) =
-        StarkProof::from_data(&verifier_instance, &output.proof, test_challenger())
-            .expect("preprocessed transcript re-parse should succeed");
-    assert_eq!(output.digest, reparse_digest);
+    let (output, preprocessed) = prove_with_preprocessed(&config, &ps);
+    verify_and_reparse(&config, &ps, &output, &preprocessed);
 
     let missing_commitment = VerifierInstance::new(&config, ps.statement(), None);
     assert!(
@@ -358,19 +397,8 @@ fn mixed_airs_preprocessed_at_index_1() {
         ],
         vec![squaring_trace(height), row_index_trace(height)],
     );
-    let config = test_config();
 
-    let preprocessed = Preprocessed::build(ps.statement(), &config).expect("has preprocessed");
-    let output = ProverInstance::new(&config, &ps, Some(&preprocessed))
-        .expect("valid")
-        .prove(test_challenger())
-        .expect("prove succeeds");
-
-    let digest = VerifierInstance::new(&config, ps.statement(), Some(preprocessed.commitment()))
-        .expect("valid")
-        .verify(&output.proof, test_challenger())
-        .expect("verify succeeds");
-    assert_eq!(output.digest, digest);
+    prove_verify_reparse(&ps);
 }
 
 #[test]
@@ -414,6 +442,62 @@ fn rejects_height_mismatch() {
 }
 
 #[test]
+fn rejects_log_blowup_mismatch() {
+    let height = 8;
+    let ps = prover_statement(
+        vec![RowCounterAir { preprocessed: row_index_trace(height) }],
+        vec![row_index_trace(height)],
+    );
+    let build_config = test_config();
+    let preprocessed =
+        Preprocessed::build(ps.statement(), &build_config).expect("has preprocessed");
+
+    let mut proving_config = test_config();
+    proving_config.pcs = PcsParams::new(2, 2, 2, 0, 0, 2, 0).expect("valid PCS params");
+    let result = ProverInstance::new(&proving_config, &ps, Some(&preprocessed));
+    assert!(
+        matches!(
+            result,
+            Err(PreprocessedValidationError::LdeHeightMismatch {
+                log_blowup: 2,
+                expected: 32,
+                actual: 64,
+                ..
+            })
+        ),
+        "expected LdeHeightMismatch for setup built with a different log_blowup",
+    );
+}
+
+#[test]
+fn rejects_wrong_trusted_preprocessed_commitment() {
+    let height = 8;
+    let ps = prover_statement(
+        vec![RowCounterAir { preprocessed: row_index_trace(height) }],
+        vec![row_index_trace(height)],
+    );
+    let config = test_config();
+    let (output, _preprocessed) = prove_with_preprocessed(&config, &ps);
+
+    let wrong_ps = prover_statement(
+        vec![RowCounterAir {
+            preprocessed: shifted_row_index_trace(height),
+        }],
+        vec![row_index_trace(height)],
+    );
+    let wrong_preprocessed =
+        Preprocessed::build(wrong_ps.statement(), &config).expect("has preprocessed");
+    let verifier_instance =
+        VerifierInstance::new(&config, ps.statement(), Some(wrong_preprocessed.commitment()))
+            .expect("presence is valid");
+
+    assert!(
+        verifier_instance.verify(&output.proof, test_challenger()).is_err(),
+        "verification must reject a proof checked against the wrong trusted setup commitment",
+    );
+}
+
+#[test]
 fn preprocessed_shorter_than_max_trace() {
     // The tallest AIR (ConstantAir, height 8) has no preprocessed columns, so the
     // tallest preprocessed trace (RowCounter, height 4) sits below the max trace
@@ -425,26 +509,8 @@ fn preprocessed_shorter_than_max_trace() {
         ],
         vec![squaring_trace(8), row_index_trace(4)],
     );
-    let config = test_config();
 
-    let preprocessed = Preprocessed::build(ps.statement(), &config).expect("has preprocessed");
-    let output = ProverInstance::new(&config, &ps, Some(&preprocessed))
-        .expect("valid")
-        .prove(test_challenger())
-        .expect("prove succeeds");
-
-    let verifier_instance =
-        VerifierInstance::new(&config, ps.statement(), Some(preprocessed.commitment()))
-            .expect("valid");
-    let digest = verifier_instance
-        .verify(&output.proof, test_challenger())
-        .expect("verify succeeds");
-    assert_eq!(output.digest, digest);
-
-    let (_, reparse_digest) =
-        StarkProof::from_data(&verifier_instance, &output.proof, test_challenger())
-            .expect("short preprocessed transcript re-parse should succeed");
-    assert_eq!(output.digest, reparse_digest);
+    prove_verify_reparse(&ps);
 }
 
 #[test]
@@ -458,19 +524,8 @@ fn preprocessed_much_shorter_than_max_trace() {
         ],
         vec![squaring_trace(8), row_index_trace(2)],
     );
-    let config = test_config();
 
-    let preprocessed = Preprocessed::build(ps.statement(), &config).expect("has preprocessed");
-    let output = ProverInstance::new(&config, &ps, Some(&preprocessed))
-        .expect("valid")
-        .prove(test_challenger())
-        .expect("prove succeeds");
-
-    let digest = VerifierInstance::new(&config, ps.statement(), Some(preprocessed.commitment()))
-        .expect("valid")
-        .verify(&output.proof, test_challenger())
-        .expect("verify succeeds");
-    assert_eq!(output.digest, digest);
+    prove_verify_reparse(&ps);
 }
 
 #[test]
@@ -486,24 +541,6 @@ fn preprocessed_multiple_heights_below_max() {
         ],
         vec![squaring_trace(8), row_index_trace(4), row_index_trace(2)],
     );
-    let config = test_config();
 
-    let preprocessed = Preprocessed::build(ps.statement(), &config).expect("has preprocessed");
-    let output = ProverInstance::new(&config, &ps, Some(&preprocessed))
-        .expect("valid")
-        .prove(test_challenger())
-        .expect("prove succeeds");
-
-    let verifier_instance =
-        VerifierInstance::new(&config, ps.statement(), Some(preprocessed.commitment()))
-            .expect("valid");
-    let digest = verifier_instance
-        .verify(&output.proof, test_challenger())
-        .expect("verify succeeds");
-    assert_eq!(output.digest, digest);
-
-    let (_, reparse_digest) =
-        StarkProof::from_data(&verifier_instance, &output.proof, test_challenger())
-            .expect("mixed-height preprocessed transcript re-parse should succeed");
-    assert_eq!(output.digest, reparse_digest);
+    prove_verify_reparse(&ps);
 }

@@ -112,8 +112,7 @@ where
     let tree_indices = TreeIndices::new(sampled_indices_iter, log_lde_height)
         .expect("sampled indices are in range");
 
-    // Verify DEEP openings for all queries at once
-    // tree_indices are bit-reversed positions; deep_evals is keyed by tree index
+    // Verify DEEP openings for all sampled domain indices at once.
     let deep_evals = deep_oracle.open_batch(lmcs, &tree_indices, channel)?;
 
     // Test low-degree proximity for all queries at once

@@ -18,6 +18,7 @@
 //! [`ProverStatement::new`](crate::ProverStatement::new).
 
 use p3_field::{ExtensionField, Field};
+use p3_matrix::Matrix;
 
 use crate::{BaseAir, LiftedAir, LiftedAirBuilder, MultiAir, WindowAccess};
 
@@ -28,6 +29,8 @@ use crate::{BaseAir, LiftedAir, LiftedAirBuilder, MultiAir, WindowAccess};
 /// - All AIRs agree on [`BaseAir::num_public_values`].
 /// - [`MultiAir::num_air_inputs`] agrees with the per-AIR public value count.
 /// - Each AIR has positive auxiliary width.
+/// - Each AIR's [`LiftedAir::preprocessed_width`] agrees with [`BaseAir::preprocessed_trace`]
+///   presence and width.
 /// - Each periodic column is non-empty and has power-of-two length.
 /// - [`LiftedAir::max_periodic_length`] agrees with the raw periodic columns.
 ///
@@ -67,6 +70,32 @@ where
     A: LiftedAir<F, EF>,
 {
     assert!(air.aux_width() > 0, "AIR {idx}: aux_width must be positive");
+
+    let preprocessed_width = air.preprocessed_width();
+    match air.preprocessed_trace() {
+        Some(trace) => {
+            assert!(
+                preprocessed_width > 0,
+                "AIR {idx}: preprocessed_trace returned Some but preprocessed_width() is 0",
+            );
+            assert_eq!(
+                trace.width(),
+                preprocessed_width,
+                "AIR {idx}: preprocessed_trace width disagrees with preprocessed_width()",
+            );
+            assert!(
+                trace.height().is_power_of_two(),
+                "AIR {idx}: preprocessed_trace height must be a positive power of two, got {height}",
+                height = trace.height(),
+            );
+        },
+        None => {
+            assert_eq!(
+                preprocessed_width, 0,
+                "AIR {idx}: preprocessed_width() is {preprocessed_width} but preprocessed_trace returned None",
+            );
+        },
+    }
 
     // Derive the max period from the raw columns (asserting positive-power-of-two)
     // and confirm the overridable `max_periodic_length` agrees.
