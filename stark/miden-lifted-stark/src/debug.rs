@@ -35,7 +35,7 @@ use crate::order::TraceOrder;
 /// [`DomainError::ConstraintDegreeTooHigh`](crate::DomainError) — so it is not
 /// re-checked here.
 ///
-/// The preprocessed bundle's shape (tree presence, per-leaf width, per-AIR
+/// The preprocessed bundle's shape (tree presence, per-trace width, per-AIR
 /// height) is validated at [`ProverInstance::new`](crate::ProverInstance::new)
 /// construction time, so it is not re-checked here.
 pub fn assert_prover_setup<F, EF, MA>(prover_statement: &ProverStatement<F, EF, MA>)
@@ -56,11 +56,12 @@ where
 /// Constraints are checked row-by-row using the trace + aux trace built by
 /// [`ProverStatement`]. All AIRs see the same `air_inputs` from `statement`.
 ///
-/// Derives auxiliary-trace challenges from the supplied challenger by observing
-/// statement-owned data, then the instance count and log trace heights in
-/// instance order. This is a local constraint debugger: it intentionally skips
-/// main commitments, so sampled challenges need not match a full proof
-/// transcript produced by [`ProverInstance::prove`](crate::ProverInstance::prove).
+/// Derives auxiliary-trace challenges from the supplied challenger using only
+/// statement-owned data plus the instance count and log trace heights. This is
+/// a local constraint debugger: it intentionally skips protocol commitments
+/// (including any preprocessed setup commitment), so sampled challenges need
+/// not match a full proof transcript produced by
+/// [`ProverInstance::prove`](crate::ProverInstance::prove).
 ///
 /// # Panics
 ///
@@ -88,8 +89,8 @@ pub fn check_constraints<F, EF, MA, Ch>(
     let preprocessed_per_air: Vec<Option<RowMajorMatrix<F>>> =
         airs.iter().map(miden_lifted_air::BaseAir::preprocessed_trace).collect();
 
-    // Seed deterministic debug challenges from the same initial statement/height
-    // observations as the protocol. Do not replay the prover transcript here.
+    // Seed deterministic debug challenges from statement/height observations only.
+    // Do not observe setup/trace commitments or replay the prover transcript here.
     let trace_heights: Vec<usize> = traces.iter().map(Matrix::height).collect();
     let trace_order = TraceOrder::from_trace_heights::<F, EF, _>(airs, &trace_heights)
         .expect("ProverStatement::new should reject malformed heights");

@@ -159,13 +159,9 @@ where
     assert_eq!(output.digest, verifier_digest);
 
     // Re-parse transcript from a fresh challenger and verify digest agreement.
-    let (_, reparse_digest) = crate::proof::StarkProof::from_data(
-        &config,
-        prover_statement.statement(),
-        &output.proof,
-        test_challenger(),
-    )
-    .expect("transcript re-parse should succeed");
+    let (_, reparse_digest) =
+        crate::proof::StarkProof::from_data(&verifier_instance, &output.proof, test_challenger())
+            .expect("transcript re-parse should succeed");
     assert_eq!(output.digest, reparse_digest);
 }
 

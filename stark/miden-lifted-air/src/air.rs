@@ -5,7 +5,8 @@
 //!
 //! [`LiftedAir::eval`] is generic over `AB: LiftedAirBuilder`, so it cannot branch
 //! on the concrete builder type. All builders expose data through the same trait
-//! methods — [`main()`](crate::AirBuilder::main),
+//! methods — [`preprocessed()`](crate::AirBuilder::preprocessed),
+//! [`main()`](crate::AirBuilder::main),
 //! [`permutation()`](crate::PermutationAirBuilder::permutation),
 //! [`public_values()`](crate::AirBuilder::public_values),
 //! [`permutation_randomness()`](crate::PermutationAirBuilder::permutation_randomness),

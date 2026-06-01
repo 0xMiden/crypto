@@ -23,8 +23,8 @@
 //! The verifier accepts whatever trace heights the proof carries; it never
 //! compares them against a caller-supplied expectation. If your statement
 //! fixes the trace size (e.g. a proof for a 2^16-row execution), parse it
-//! with [`StarkProof::from_data`](crate::proof::StarkProof::from_data)
-//! and check `proof.log_trace_heights()` yourself.
+//! with [`StarkProof::from_data`](crate::proof::StarkProof::from_data) using the same
+//! [`VerifierInstance`], and check `proof.log_trace_heights()` yourself.
 //!
 //! # Transcript boundaries (strict consumption)
 //!
@@ -102,18 +102,16 @@ where
     ///
     /// The commitment must be `Some` exactly when some AIR declares preprocessed
     /// columns; otherwise this errors with
-    /// [`PreprocessedValidationError::CommitmentExpected`] /
-    /// [`CommitmentUnexpected`](PreprocessedValidationError::CommitmentUnexpected).
+    /// [`PreprocessedValidationError::PresenceMismatch`].
     pub fn new(
         config: &'a SC,
         statement: &'a Statement<F, EF, MA>,
         preprocessed_commitment: Option<<SC::Lmcs as Lmcs>::Commitment>,
     ) -> Result<Self, PreprocessedValidationError> {
-        let any = statement.airs().iter().any(|a| a.preprocessed_width() > 0);
-        match (any, preprocessed_commitment.is_some()) {
-            (true, false) => return Err(PreprocessedValidationError::CommitmentExpected),
-            (false, true) => return Err(PreprocessedValidationError::CommitmentUnexpected),
-            _ => {},
+        let expected = statement.airs().iter().any(|a| a.preprocessed_width() > 0);
+        let actual = preprocessed_commitment.is_some();
+        if expected != actual {
+            return Err(PreprocessedValidationError::PresenceMismatch { expected, actual });
         }
         Ok(Self {
             config,
@@ -142,7 +140,7 @@ where
     }
 
     /// Borrow the preprocessed commitment, if any.
-    pub(crate) fn preprocessed_commitment(&self) -> Option<&<SC::Lmcs as Lmcs>::Commitment> {
+    pub fn preprocessed_commitment(&self) -> Option<&<SC::Lmcs as Lmcs>::Commitment> {
         self.preprocessed_commitment.as_ref()
     }
 }
@@ -204,9 +202,9 @@ pub enum VerifierError {
 /// **Statement-bound heights:** this function does not compare the proof's
 /// declared heights against any caller expectation. If your statement fixes
 /// trace dimensions, parse via
-/// [`StarkProof::from_data`](crate::proof::StarkProof::from_data)
-/// and check `proof.log_trace_heights()` before calling this. See the module-level docs for the
-/// full contract.
+/// [`StarkProof::from_data`](crate::proof::StarkProof::from_data) using this instance and check
+/// `proof.log_trace_heights()` before calling this. See the module-level docs for the full
+/// contract.
 ///
 /// # Trust contract
 ///
@@ -252,10 +250,12 @@ where
         proof.log_trace_heights.clone(),
     )?;
 
-    // Preprocessed leaf↔AIR mappings (instance order), reconstructed from the
+    // Preprocessed trace↔AIR mappings (instance order), reconstructed from the
     // heights — the same ones the prover used.
-    let leaf_to_air = trace_order.preprocessed_air_for_leaf::<F, EF, _>(statement.airs());
-    let air_to_leaf = trace_order.preprocessed_leaf_for_air::<F, EF, _>(statement.airs());
+    let preprocessed_trace_to_air =
+        trace_order.preprocessed_air_for_trace_index::<F, EF, _>(statement.airs());
+    let air_to_preprocessed_trace =
+        trace_order.preprocessed_trace_index_for_air::<F, EF, _>(statement.airs());
 
     let air_refs: Vec<&MA::Air> = statement.airs().iter().collect();
     let proof_ordered_airs = trace_order.to_proof_order(&air_refs);
@@ -354,7 +354,7 @@ where
     // Build commitments with original (unpadded) widths.
     // The PCS aligned wrapper handles alignment and truncation internally.
     // The preprocessed group (when present) is first, mirroring the prover; its
-    // widths are in tree (leaf) order, while main/aux are in proof order.
+    // widths are in committed preprocessed trace order, while main/aux are in proof order.
     //
     // Group indices, in batch order `[preprocessed?, main, aux, quotient]`: the
     // preprocessed group occupies index 0 only when present, shifting the rest
@@ -362,17 +362,16 @@ where
     let s = preprocessed_commitment.is_some() as usize;
     let (preproc_g, main_g, aux_g, quot_g) =
         (preprocessed_commitment.is_some().then_some(0), s, s + 1, s + 2);
-    let full_log_height = log_max_trace_height + log_blowup;
+    let full_tree_depth = log_max_trace_height + log_blowup;
     let mut commitments = Vec::with_capacity(4);
     if let Some(commitment) = preprocessed_commitment {
-        let preprocessed_widths: Vec<usize> = leaf_to_air
+        let preprocessed_widths: Vec<usize> = preprocessed_trace_to_air
             .iter()
             .map(|&air_idx| statement.airs()[air_idx as usize].preprocessed_width())
             .collect();
-        // The preprocessed tree is committed at its own (setup-fixed) height — the
-        // tallest preprocessed-AIR trace height — which the PCS virtually lifts to the
-        // max when shorter.
-        let preproc_log_height = leaf_to_air
+        // The preprocessed tree is committed at its own setup-fixed depth, determined by the
+        // tallest preprocessed trace. The PCS virtually lifts it to the max when shorter.
+        let preprocessed_tree_depth = preprocessed_trace_to_air
             .iter()
             .map(|&air_idx| trace_order.log_heights()[air_idx as usize])
             .max()
@@ -381,23 +380,23 @@ where
         commitments.push(CommitmentGroup {
             root: commitment.clone(),
             widths: preprocessed_widths,
-            log_height: preproc_log_height,
+            tree_depth: preprocessed_tree_depth,
         });
     }
     commitments.push(CommitmentGroup {
         root: main_commit,
         widths: main_widths,
-        log_height: full_log_height,
+        tree_depth: full_tree_depth,
     });
     commitments.push(CommitmentGroup {
         root: aux_commit,
         widths: aux_widths,
-        log_height: full_log_height,
+        tree_depth: full_tree_depth,
     });
     commitments.push(CommitmentGroup {
         root: quotient_commit,
         widths: quotient_widths,
-        log_height: full_log_height,
+        tree_depth: full_tree_depth,
     });
 
     // 8. Verify PCS openings (returns per-matrix RowMajorMatrix<EF>, truncated to original widths)
@@ -452,14 +451,15 @@ where
         let num_rand = air.num_randomness();
 
         // Extract the opened preprocessed window when this AIR declares
-        // preprocessed columns. The tree leaf index comes from the inverse
-        // `air_to_leaf` mapping; the opened matrix is a 2-row `RowMajorMatrix`
-        // already truncated to the declared width by `verify_aligned`, so this
+        // preprocessed columns. The preprocessed trace index comes from the inverse
+        // `air_to_preprocessed_trace` mapping; the opened matrix is a 2-row
+        // `RowMajorMatrix` already truncated to the declared width by `verify_aligned`, so this
         // is a zero-copy view (mirrors the main window above).
         let instance_idx = trace_order.instance_indices()[j] as usize;
-        let preprocessed_window = match air_to_leaf[instance_idx] {
-            Some(leaf) => RowWindow::from_view(
-                &opened[preproc_g.expect("preproc group present")][leaf].as_view(),
+        let preprocessed_window = match air_to_preprocessed_trace[instance_idx] {
+            Some(preprocessed_trace_idx) => RowWindow::from_view(
+                &opened[preproc_g.expect("preproc group present")][preprocessed_trace_idx]
+                    .as_view(),
             ),
             None => RowWindow::from_two_rows(&[], &[]),
         };

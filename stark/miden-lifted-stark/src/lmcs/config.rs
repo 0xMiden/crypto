@@ -26,19 +26,19 @@ use crate::{
 /// This implementation defines the transcript hint layout used by
 /// [`LmcsTree::prove_batch`](crate::lmcs::LmcsTree::prove_batch) and consumed by
 /// `open_batch` and [`Lmcs::read_batch_proof`]:
-/// - For each *distinct* query index (in caller order, skipping duplicates): one row per matrix (in
-///   leaf order), then `SALT_ELEMS` field elements of salt.
-/// - After all indices: missing sibling hashes, level-by-level, left-to-right, bottom-to-top.
+/// - For each distinct tree index (sorted ascending): one row per committed matrix (in committed
+///   matrix order), then `SALT_ELEMS` field elements of salt.
+/// - After all leaves: missing sibling hashes, level-by-level, left-to-right, bottom-to-top.
 ///
 /// Hints are not observed into the Fiat-Shamir challenger.
 ///
-/// `open_batch` expects `widths` and `log_max_height` to match the committed tree,
+/// `open_batch` expects `widths` and `indices.depth()` to match the committed tree,
 /// rejects empty `indices`, and ignores extra hint data. Widths must match the
 /// committed row lengths (including any alignment padding if `build_aligned_tree`
 /// was used). Duplicate indices are coalesced in the returned openings.
 /// [`read_batch_proof`](crate::lmcs::Lmcs::read_batch_proof) parses
-/// the same hint stream, hashes leaves, and reconstructs per-index authentication paths
-/// without verifying against a commitment. Empty indices yield an empty map, and
+/// the same hint stream, hashes leaves, and reconstructs leaf authentication paths without
+/// verifying against a commitment. Empty indices are accepted by `read_batch_proof`;
 /// out-of-range indices return `InvalidProof`.
 ///
 /// Padding note:
@@ -158,29 +158,25 @@ where
         Hash::from(self.compress.compress([left_digest, right_digest]))
     }
 
-    /// Verify a batch opening from transcript hints.
+    /// Verify an exact batch opening from transcript hints.
     ///
     /// Security notes:
-    /// - `widths` and `tree_log_height` must describe the committed tree; they are not checked.
+    /// - `widths` and `indices.depth()` must describe the committed tree; they are not checked.
     /// - `widths` must match the committed row lengths (including any alignment padding if
     ///   `build_aligned_tree` was used); LMCS does not enforce that padded values are zero.
     ///   Verifiers cannot distinguish zero padding from arbitrary values unless they check the
     ///   opened rows or constrain them elsewhere.
     /// - Empty `indices` returns `InvalidProof`.
-    /// - Query indices are folded to the committed depth (`i mod 2^tree_log_height`); the returned
-    ///   map is keyed by the original query indices, and indices that fold together share a leaf's
-    ///   rows.
     /// - Missing siblings or malformed hints return `InvalidProof`.
     /// - Extra hints are ignored and left unread.
     /// - Returns `RootMismatch` only after a well-formed proof yields a different root.
     ///
-    /// Leaf openings are read in **sorted committed-leaf order** (ascending, deduplicated).
+    /// Leaf openings are read in sorted tree index order (ascending, deduplicated).
     fn open_batch<Ch>(
         &self,
         commitment: &Self::Commitment,
         widths: &[usize],
         indices: &TreeIndices,
-        tree_log_height: u8,
         channel: &mut Ch,
     ) -> Result<OpenedRows<Self::F>, LmcsError>
     where
@@ -190,18 +186,11 @@ where
             return Err(LmcsError::InvalidProof);
         }
 
-        // Project virtually-lifted query indices down to the committed tree's depth:
-        // query index `i` opens leaf `i mod 2^tree_log_height`. A no-op when the
-        // tree fills the query domain (`tree_log_height == indices.depth()`).
-        let projection = indices.project_to_depth(tree_log_height)?;
-        let leaf_indices = projection.leaf_indices();
-
-        // 1. Read one opening per unique committed leaf and hash it.
+        // 1. Read one opening per unique leaf and hash it.
         let mut leaf_rows: BTreeMap<usize, RowList<Self::F>> = BTreeMap::new();
-        let mut leaf_hashes: Vec<(usize, Self::Commitment)> =
-            Vec::with_capacity(leaf_indices.len());
+        let mut leaf_hashes: Vec<(usize, Self::Commitment)> = Vec::with_capacity(indices.len());
 
-        for &leaf in leaf_indices.iter() {
+        for &leaf in indices.iter() {
             let opening =
                 LeafOpening::<_, SALT_ELEMS>::read_from_channel(widths.to_vec(), channel)?;
             leaf_hashes.push((leaf, opening.leaf_hash(self)));
@@ -211,7 +200,7 @@ where
         // 2. Recompute root by streaming siblings directly from the channel.
         let tree = MerkleWitness::build(
             leaf_hashes,
-            leaf_indices.depth() as usize,
+            indices.depth() as usize,
             |_| -> Result<_, LmcsError> { Ok(*channel.receive_hint_commitment()?) },
             |l, r| self.compress(l, r),
         )?;
@@ -221,12 +210,10 @@ where
             return Err(LmcsError::RootMismatch);
         }
 
-        // 3. Re-key by the original query indices, sharing each committed leaf's
-        // rows across the indices that fold to it.
-        projection.expand_leaf_values(&leaf_rows)
+        Ok(leaf_rows)
     }
 
-    /// Parse batch hints into per-index opening proofs.
+    /// Parse batch hints into per-leaf opening proofs.
     ///
     /// Reads openings, hashes leaves, builds a pruned tree, and extracts
     /// authentication paths. Salt is stored as `Vec<F>` in the output.
@@ -238,22 +225,15 @@ where
         &self,
         widths: &[usize],
         indices: &TreeIndices,
-        tree_log_height: u8,
         channel: &mut Ch,
     ) -> Result<Self::BatchProof, LmcsError>
     where
         Ch: VerifierChannel<F = Self::F, Commitment = Self::Commitment>,
     {
-        // Project virtually-lifted query indices to the committed tree's depth; the
-        // returned witness and openings are keyed by committed-leaf index.
-        let projection = indices.project_to_depth(tree_log_height)?;
-        let leaf_indices = projection.leaf_indices();
-
         let mut openings = BTreeMap::new();
-        let mut leaf_hashes: Vec<(usize, Self::Commitment)> =
-            Vec::with_capacity(leaf_indices.len());
+        let mut leaf_hashes: Vec<(usize, Self::Commitment)> = Vec::with_capacity(indices.len());
 
-        for &leaf in leaf_indices.iter() {
+        for &leaf in indices.iter() {
             let opening =
                 LeafOpening::<_, SALT_ELEMS>::read_from_channel(widths.to_vec(), channel)?;
             leaf_hashes.push((leaf, opening.leaf_hash(self)));
@@ -263,7 +243,7 @@ where
         // 2. Build PrunedTree from leaf hashes + channel siblings.
         let witness = MerkleWitness::build(
             leaf_hashes,
-            leaf_indices.depth() as usize,
+            indices.depth() as usize,
             |_| -> Result<_, LmcsError> { Ok(*channel.receive_hint_commitment()?) },
             |l, r| self.compress(l, r),
         )?;
@@ -320,13 +300,7 @@ mod tests {
             let (prover_digest, transcript) = make_transcript(&tree_indices);
             let mut verifier_channel = gl::verifier_channel(&transcript);
             let opened = lmcs
-                .open_batch(
-                    &commitment,
-                    &widths,
-                    &tree_indices,
-                    tree_indices.depth(),
-                    &mut verifier_channel,
-                )
+                .open_batch(&commitment, &widths, &tree_indices, &mut verifier_channel)
                 .unwrap();
             for &idx in indices {
                 assert_eq!(opened[&idx], tree.aligned_rows(idx));
@@ -351,13 +325,7 @@ mod tests {
         let (prover_digest, transcript) = prover_channel.finalize();
         let mut verifier_channel = gl::verifier_channel(&transcript);
         let opened = lmcs
-            .open_batch(
-                &tiny_tree.root(),
-                &widths_tiny,
-                &tiny_indices,
-                tiny_indices.depth(),
-                &mut verifier_channel,
-            )
+            .open_batch(&tiny_tree.root(), &widths_tiny, &tiny_indices, &mut verifier_channel)
             .unwrap();
         assert_eq!(opened[&0], tiny_tree.aligned_rows(0));
         let verifier_digest =
@@ -373,13 +341,7 @@ mod tests {
         let mut verifier_channel = gl::verifier_channel(&transcript);
         let wrong_tree = lmcs.build_tree(vec![small_matrix(4, 2, 999)]);
         assert_eq!(
-            lmcs.open_batch(
-                &wrong_tree.root(),
-                &widths,
-                &tree_indices_0,
-                tree_indices_0.depth(),
-                &mut verifier_channel,
-            ),
+            lmcs.open_batch(&wrong_tree.root(), &widths, &tree_indices_0, &mut verifier_channel),
             Err(LmcsError::RootMismatch)
         );
 
@@ -390,13 +352,7 @@ mod tests {
         let truncated = TranscriptData::new(fields, commitments);
         let mut verifier_channel = gl::verifier_channel(&truncated);
         assert_eq!(
-            lmcs.open_batch(
-                &commitment,
-                &widths,
-                &tree_indices_0,
-                tree_indices_0.depth(),
-                &mut verifier_channel,
-            ),
+            lmcs.open_batch(&commitment, &widths, &tree_indices_0, &mut verifier_channel),
             Err(LmcsError::TranscriptError(
                 miden_stark_transcript::TranscriptError::NoMoreCommitments
             ))
@@ -407,13 +363,7 @@ mod tests {
         let (_, transcript) = gl::prover_channel().finalize();
         let mut verifier_channel = gl::verifier_channel(&transcript);
         assert_eq!(
-            lmcs.open_batch(
-                &commitment,
-                &widths,
-                &empty_indices,
-                empty_indices.depth(),
-                &mut verifier_channel
-            ),
+            lmcs.open_batch(&commitment, &widths, &empty_indices, &mut verifier_channel),
             Err(LmcsError::InvalidProof)
         );
     }
@@ -424,20 +374,20 @@ mod tests {
         let tree = lmcs.build_tree(vec![small_matrix(4, 2, 0)]);
         let widths = tree.aligned_widths();
         let commitment = tree.root();
-        let tree_log_height = log2_strict_u8(tree.height());
-        let query_depth = tree_log_height + 1;
+        let tree_depth = log2_strict_u8(tree.height());
+        let query_depth = tree_depth + 1;
         let indices = TreeIndices::new([0usize, 4, 5, 7], query_depth).unwrap();
 
         let make_transcript = || {
             let mut prover_channel = gl::prover_channel();
-            tree.prove_batch(&indices, &mut prover_channel);
+            tree.prove_lifted_batch(&indices, &mut prover_channel);
             prover_channel.finalize()
         };
 
         let (prover_digest, transcript) = make_transcript();
         let mut verifier_channel = gl::verifier_channel(&transcript);
         let opened = lmcs
-            .open_batch(&commitment, &widths, &indices, tree_log_height, &mut verifier_channel)
+            .open_lifted_batch(&commitment, &widths, &indices, tree_depth, &mut verifier_channel)
             .unwrap();
 
         assert_eq!(opened[&0], tree.aligned_rows(0));
@@ -451,12 +401,37 @@ mod tests {
         let (_, transcript) = make_transcript();
         let mut verifier_channel = gl::verifier_channel(&transcript);
         let batch = lmcs
-            .read_batch_proof(&widths, &indices, tree_log_height, &mut verifier_channel)
+            .read_lifted_batch_proof(&widths, &indices, tree_depth, &mut verifier_channel)
             .unwrap();
         assert_eq!(batch.openings.len(), 3);
         assert!(batch.openings.contains_key(&0));
         assert!(batch.openings.contains_key(&1));
         assert!(batch.openings.contains_key(&3));
+
+        let invalid_tree_depth = query_depth + 1;
+        let (_, transcript) = gl::prover_channel().finalize();
+        let mut verifier_channel = gl::verifier_channel(&transcript);
+        assert_eq!(
+            lmcs.open_lifted_batch(
+                &commitment,
+                &widths,
+                &indices,
+                invalid_tree_depth,
+                &mut verifier_channel,
+            ),
+            Err(LmcsError::InvalidProof)
+        );
+
+        let mut verifier_channel = gl::verifier_channel(&transcript);
+        assert!(matches!(
+            lmcs.read_lifted_batch_proof(
+                &widths,
+                &indices,
+                invalid_tree_depth,
+                &mut verifier_channel
+            ),
+            Err(LmcsError::InvalidProof)
+        ));
     }
 
     /// Reproduces the "root mismatch" bug when using Goldilocks + Blake3 (byte-based hash).
@@ -508,7 +483,7 @@ mod tests {
 
         let mut verifier_channel = VerifierTranscript::from_data(challenger(), &transcript);
         let opened = lmcs
-            .open_batch(&commitment, &widths, &indices, indices.depth(), &mut verifier_channel)
+            .open_batch(&commitment, &widths, &indices, &mut verifier_channel)
             .expect("Goldilocks+Blake3 LMCS roundtrip should verify");
 
         assert_eq!(opened[&0], tree.aligned_rows(0));
@@ -561,7 +536,7 @@ mod tests {
 
         let mut verifier_channel = VerifierTranscript::from_data(challenger(), &transcript);
         let opened = lmcs
-            .open_batch(&commitment, &widths, &indices, indices.depth(), &mut verifier_channel)
+            .open_batch(&commitment, &widths, &indices, &mut verifier_channel)
             .expect("Goldilocks+Blake3-192 LMCS roundtrip should verify");
 
         assert_eq!(opened[&0], tree.rows(0));

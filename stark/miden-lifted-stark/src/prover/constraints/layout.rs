@@ -7,6 +7,7 @@ use alloc::{vec, vec::Vec};
 
 use miden_lifted_air::{
     AirBuilder, ExtensionBuilder, LiftedAir, PeriodicAirBuilder, PermutationAirBuilder,
+    WindowAccess,
     symbolic::{AirLayout, ConstraintLayout},
 };
 use p3_field::{ExtensionField, Field};
@@ -42,12 +43,33 @@ where
 /// tracking, no `Arc` allocations. Builds a [`ConstraintLayout`] directly by recording
 /// which `assert_*` method is called for each constraint.
 ///
-/// Uses `RowMajorMatrix<F>` as `MainWindow` because the builder owns its trace data.
-/// `RowWindow` cannot be used here — it borrows, but the associated type can't
-/// capture the `&self` lifetime from `main()`.
+/// Uses owned windows because the builder owns its trace data. `RowWindow` cannot be used here —
+/// it borrows, but the associated type can't capture the `&self` lifetime from `main()`.
+#[derive(Clone)]
+struct OwnedRowWindow<F> {
+    values: Vec<F>,
+    width: usize,
+}
+
+impl<F: Field> OwnedRowWindow<F> {
+    fn zeros(width: usize) -> Self {
+        Self { values: vec![F::ZERO; 2 * width], width }
+    }
+}
+
+impl<F> WindowAccess<F> for OwnedRowWindow<F> {
+    fn current_slice(&self) -> &[F] {
+        &self.values[..self.width]
+    }
+
+    fn next_slice(&self) -> &[F] {
+        &self.values[self.width..]
+    }
+}
+
 struct ConstraintLayoutBuilder<F: Field> {
     main: RowMajorMatrix<F>,
-    preprocessed: RowMajorMatrix<F>,
+    preprocessed: OwnedRowWindow<F>,
     public_values: Vec<F>,
     periodic_values: Vec<F>,
     permutation: RowMajorMatrix<F>,
@@ -70,12 +92,7 @@ impl<F: Field> ConstraintLayoutBuilder<F> {
         } = layout;
         Self {
             main: RowMajorMatrix::new(vec![F::ZERO; 2 * main_width], main_width),
-            // `.max(1)` avoids a zero-width matrix when there are no preprocessed
-            // columns; the window is never read in that case.
-            preprocessed: RowMajorMatrix::new(
-                vec![F::ZERO; 2 * preprocessed_width.max(1)],
-                preprocessed_width.max(1),
-            ),
+            preprocessed: OwnedRowWindow::zeros(preprocessed_width),
             public_values: vec![F::ZERO; num_public_values],
             periodic_values: vec![F::ZERO; num_periodic_columns],
             permutation: RowMajorMatrix::new(
@@ -98,7 +115,7 @@ impl<F: Field> AirBuilder for ConstraintLayoutBuilder<F> {
     type F = F;
     type Expr = F;
     type Var = F;
-    type PreprocessedWindow = RowMajorMatrix<F>;
+    type PreprocessedWindow = OwnedRowWindow<F>;
     type MainWindow = RowMajorMatrix<F>;
     type PublicVar = F;
 

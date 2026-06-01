@@ -34,19 +34,18 @@ use crate::{
     util::align::aligned_widths,
 };
 
-/// A committed group to open: its root, per-matrix (unpadded) widths, and the
-/// committed tree's log height.
+/// A committed group to open: its root, per-matrix (unpadded) widths, and tree depth.
 ///
-/// `log_height` is `log₂` of the committed tree's leaf count. It is `≤
+/// `tree_depth` is `log₂` of the committed tree's leaf count. It is `≤
 /// domain.log_lde_height()`: a tree committed below the query domain (e.g. a
-/// setup-fixed preprocessed tree) is virtually lifted, and its query indices are
-/// folded down to this depth inside [`Lmcs::open_batch`](crate::lmcs::Lmcs::open_batch).
+/// setup-fixed preprocessed tree) is virtually lifted with
+/// [`Lmcs::open_lifted_batch`](crate::lmcs::Lmcs::open_lifted_batch).
 /// Full-height groups set it to `domain.log_lde_height()`.
 #[derive(Clone, Debug)]
 pub(crate) struct CommitmentGroup<C> {
     pub root: C,
     pub widths: Vec<usize>,
-    pub log_height: u8,
+    pub tree_depth: u8,
 }
 
 /// Verify polynomial evaluation claims against commitments.
@@ -64,7 +63,7 @@ pub(crate) struct CommitmentGroup<C> {
 /// # Preconditions
 /// - `eval_points` must lie outside both the trace-domain subgroup `H` and the LDE evaluation coset
 ///   `gK`. Otherwise denominators `(zⱼ − X)` in the DEEP quotient become zero, making it undefined.
-/// - Each group's `log_height` must be `≤ domain.log_lde_height()`; shorter groups are virtually
+/// - Each group's `tree_depth` must be `≤ domain.log_lde_height()`; shorter groups are virtually
 ///   lifted (their query indices fold down to the committed depth).
 ///
 /// # Returns
@@ -149,7 +148,7 @@ where
         .map(|g| CommitmentGroup {
             root: g.root.clone(),
             widths: aligned_widths(g.widths.clone(), alignment),
-            log_height: g.log_height,
+            tree_depth: g.tree_depth,
         })
         .collect();
 

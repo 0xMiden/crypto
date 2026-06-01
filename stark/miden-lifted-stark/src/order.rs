@@ -232,13 +232,13 @@ impl TraceOrder {
             .collect()
     }
 
-    /// AIR instance index backing each preprocessed-tree leaf, in leaf order.
+    /// AIR instance index backing each committed preprocessed trace.
     ///
-    /// The preprocessed tree commits one leaf per AIR with
+    /// The preprocessed commitment contains one committed LDE trace per AIR with
     /// [`preprocessed_width`](miden_lifted_air::LiftedAir::preprocessed_width)
-    /// `> 0`, in proof order (the LMCS height-monotone leaf order). The result
+    /// `> 0`, in proof order (the LMCS height-monotone committed-trace order). The result
     /// length is the number of preprocessed AIRs, which is `<= len()`.
-    pub(crate) fn preprocessed_air_for_leaf<F, EF, A>(&self, airs: &[A]) -> Vec<u8>
+    pub(crate) fn preprocessed_air_for_trace_index<F, EF, A>(&self, airs: &[A]) -> Vec<u8>
     where
         F: Field,
         A: LiftedAir<F, EF>,
@@ -250,18 +250,21 @@ impl TraceOrder {
             .collect()
     }
 
-    /// Preprocessed-tree leaf index for each AIR, or `None` when the AIR
-    /// declares no preprocessed columns. Length is [`Self::len`]; the inverse
-    /// of [`Self::preprocessed_air_for_leaf`].
-    pub(crate) fn preprocessed_leaf_for_air<F, EF, A>(&self, airs: &[A]) -> Vec<Option<usize>>
+    /// Preprocessed trace index for each AIR, or `None` when the AIR declares no
+    /// preprocessed columns. Length is [`Self::len`]; the inverse of
+    /// [`Self::preprocessed_air_for_trace_index`].
+    pub(crate) fn preprocessed_trace_index_for_air<F, EF, A>(
+        &self,
+        airs: &[A],
+    ) -> Vec<Option<usize>>
     where
         F: Field,
         A: LiftedAir<F, EF>,
     {
-        let air_for_leaf = self.preprocessed_air_for_leaf::<F, EF, A>(airs);
+        let air_for_preprocessed_trace = self.preprocessed_air_for_trace_index::<F, EF, A>(airs);
         let mut v = alloc::vec![None; airs.len()];
-        for (leaf, &air_idx) in air_for_leaf.iter().enumerate() {
-            v[air_idx as usize] = Some(leaf);
+        for (preprocessed_trace_idx, &air_idx) in air_for_preprocessed_trace.iter().enumerate() {
+            v[air_idx as usize] = Some(preprocessed_trace_idx);
         }
         v
     }

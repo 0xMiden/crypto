@@ -71,10 +71,10 @@ impl TreeIndices {
 
     /// Project these source-domain indices onto a committed tree at `target_depth`.
     ///
-    /// In natural (domain) order, a query index opens the committed leaf selected by its low
+    /// In natural (domain) order, a query index opens the leaf selected by its low
     /// `target_depth` bits: `query & ((1 << target_depth) - 1)`. The returned projection keeps
-    /// both views together: original query indices for result keys, and deduplicated committed
-    /// leaf indices for transcript and Merkle-witness work.
+    /// both views together: original query indices for result keys, and deduplicated leaf indices
+    /// for transcript and Merkle-witness work.
     pub fn project_to_depth(&self, target_depth: u8) -> Result<TreeIndexProjection<'_>, LmcsError> {
         let mut leaf_indices = self.clone();
         leaf_indices.fold_in_place(target_depth)?;
@@ -109,9 +109,11 @@ impl TreeIndices {
 
     /// Map domain indices to folded domain indices `shift` levels down, in place.
     ///
-    /// Shifts larger than the current depth fold to the root. Use
-    /// [`project_to_depth`](Self::project_to_depth) when invalid target depths should be
-    /// rejected instead of saturated.
+    /// Shifts at or beyond the current depth collapse every index to depth 0,
+    /// where the tree has a single root/leaf at index 0 (for example, the
+    /// commitment tree of a one-row matrix). Use
+    /// [`project_to_depth`](Self::project_to_depth) when invalid target depths
+    /// should be rejected instead of saturated.
     pub fn shrink_depth(&mut self, shift: u8) {
         let target_depth = self.depth.saturating_sub(shift);
         self.fold_in_place(target_depth)
@@ -121,9 +123,9 @@ impl TreeIndices {
 
 /// A query-index set projected onto a particular committed tree depth.
 ///
-/// The projection owns the deduplicated committed-leaf indices used by the Merkle proof, while
-/// retaining a reference to the original query indices used by callers. This keeps the two index
-/// spaces explicit and avoids re-deriving their relationship at each call site.
+/// The projection owns the deduplicated leaf indices used by the Merkle proof, while retaining a
+/// reference to the original query indices used by callers. This keeps the two index spaces
+/// explicit and avoids re-deriving their relationship at each call site.
 #[derive(Debug)]
 pub struct TreeIndexProjection<'a> {
     query_indices: &'a TreeIndices,
@@ -132,7 +134,7 @@ pub struct TreeIndexProjection<'a> {
 }
 
 impl TreeIndexProjection<'_> {
-    /// The unique committed leaves opened by this projection.
+    /// The unique leaves opened by this projection.
     pub fn leaf_indices(&self) -> &TreeIndices {
         &self.leaf_indices
     }
@@ -141,7 +143,7 @@ impl TreeIndexProjection<'_> {
         self.query_indices.iter().map(move |&query| (query, query & self.leaf_mask))
     }
 
-    /// Re-key values stored by committed leaf back to the original query indices.
+    /// Re-key values stored by leaf back to the original query indices.
     pub fn expand_leaf_values<T: Clone>(
         &self,
         leaf_values: &BTreeMap<usize, T>,

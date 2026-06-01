@@ -18,6 +18,7 @@ use crate::{
         AirBuilder, BaseAir, ExtensionBuilder, LiftedAir, LiftedAirBuilder, MultiAir,
         ProverStatement, Statement, WindowAccess,
     },
+    proof::StarkProof,
     testing::configs::goldilocks_poseidon2::{Felt, QuadFelt, test_challenger, test_config},
 };
 
@@ -324,11 +325,27 @@ fn single_air_with_preprocessed() {
         .prove(test_challenger())
         .expect("prove succeeds");
 
-    let digest = VerifierInstance::new(&config, ps.statement(), Some(preprocessed.commitment()))
-        .expect("valid")
+    let verifier_instance =
+        VerifierInstance::new(&config, ps.statement(), Some(preprocessed.commitment()))
+            .expect("valid");
+    let digest = verifier_instance
         .verify(&output.proof, test_challenger())
         .expect("verify succeeds");
     assert_eq!(output.digest, digest);
+
+    let (_, reparse_digest) =
+        StarkProof::from_data(&verifier_instance, &output.proof, test_challenger())
+            .expect("preprocessed transcript re-parse should succeed");
+    assert_eq!(output.digest, reparse_digest);
+
+    let missing_commitment = VerifierInstance::new(&config, ps.statement(), None);
+    assert!(
+        matches!(
+            missing_commitment,
+            Err(PreprocessedValidationError::PresenceMismatch { expected: true, actual: false })
+        ),
+        "preprocessed statements require the setup commitment",
+    );
 }
 
 #[test]
@@ -399,8 +416,8 @@ fn rejects_height_mismatch() {
 #[test]
 fn preprocessed_shorter_than_max_trace() {
     // The tallest AIR (ConstantAir, height 8) has no preprocessed columns, so the
-    // preprocessed tree's tallest leaf (RowCounter, height 4) sits below the max
-    // trace height. The PCS virtually lifts the shorter preprocessed tree.
+    // tallest preprocessed trace (RowCounter, height 4) sits below the max trace
+    // height. The PCS virtually lifts the shorter preprocessed tree.
     let ps = prover_statement(
         vec![
             MixedAir::Constant(ConstantAir),
@@ -416,11 +433,18 @@ fn preprocessed_shorter_than_max_trace() {
         .prove(test_challenger())
         .expect("prove succeeds");
 
-    let digest = VerifierInstance::new(&config, ps.statement(), Some(preprocessed.commitment()))
-        .expect("valid")
+    let verifier_instance =
+        VerifierInstance::new(&config, ps.statement(), Some(preprocessed.commitment()))
+            .expect("valid");
+    let digest = verifier_instance
         .verify(&output.proof, test_challenger())
         .expect("verify succeeds");
     assert_eq!(output.digest, digest);
+
+    let (_, reparse_digest) =
+        StarkProof::from_data(&verifier_instance, &output.proof, test_challenger())
+            .expect("short preprocessed transcript re-parse should succeed");
+    assert_eq!(output.digest, reparse_digest);
 }
 
 #[test]
@@ -470,9 +494,16 @@ fn preprocessed_multiple_heights_below_max() {
         .prove(test_challenger())
         .expect("prove succeeds");
 
-    let digest = VerifierInstance::new(&config, ps.statement(), Some(preprocessed.commitment()))
-        .expect("valid")
+    let verifier_instance =
+        VerifierInstance::new(&config, ps.statement(), Some(preprocessed.commitment()))
+            .expect("valid");
+    let digest = verifier_instance
         .verify(&output.proof, test_challenger())
         .expect("verify succeeds");
     assert_eq!(output.digest, digest);
+
+    let (_, reparse_digest) =
+        StarkProof::from_data(&verifier_instance, &output.proof, test_challenger())
+            .expect("mixed-height preprocessed transcript re-parse should succeed");
+    assert_eq!(output.digest, reparse_digest);
 }

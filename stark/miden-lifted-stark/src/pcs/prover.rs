@@ -22,6 +22,8 @@ use crate::{
 /// - Every trace tree's height must be a power of two `≤ domain.lde_height()`. A tree shorter than
 ///   the max (e.g. a setup-fixed preprocessed tree) is virtually lifted — the query phase folds the
 ///   sampled indices down to each tree's own depth.
+/// - At least one trace tree must have height `domain.lde_height()`, so the DEEP quotient is
+///   constructed over the full max domain.
 ///
 /// `domain` is the max LDE coset the trace trees were committed on; `domain.log_lde_height`
 /// equals `log_trace_height + domain.log_blowup()` for the tallest trace.
@@ -46,8 +48,8 @@ pub fn open_with_channel<F, EF, L, M, Ch, const N: usize>(
     const { assert!(N > 0, "at least one evaluation point required") };
 
     // Determine LDE domain size from the supplied LDE coset. Trees shorter than the
-    // max (e.g. a setup-fixed preprocessed tree) are virtually lifted: `prove_batch`
-    // folds the sampled query indices down to each tree's own depth.
+    // max (e.g. a setup-fixed preprocessed tree) are virtually lifted: `prove_lifted_batch`
+    // projects the sampled query indices down to each tree's own depth.
     assert!(!trace_trees.is_empty(), "at least one trace tree required");
     let log_lde_height = domain.log_lde_height();
     let expected_height = domain.lde_height();
@@ -56,6 +58,10 @@ pub fn open_with_channel<F, EF, L, M, Ch, const N: usize>(
             .iter()
             .all(|tree| tree.height().is_power_of_two() && tree.height() <= expected_height),
         "tree heights must be powers of two ≤ the max LDE height",
+    );
+    assert!(
+        trace_trees.iter().any(|tree| tree.height() == expected_height),
+        "at least one tree must fill the max LDE height",
     );
     // ─────────────────────────────────────────────────────────────────────────
     // Construct DEEP quotient (observes evals, grinds, samples alpha and beta)
@@ -96,7 +102,7 @@ pub fn open_with_channel<F, EF, L, M, Ch, const N: usize>(
         // Open input trees at all query indices at once (one proof per tree)
         info_span!("open input trees", n_trees = trace_trees.len()).in_scope(|| {
             for tree in trace_trees {
-                tree.prove_batch(&tree_indices, channel);
+                tree.prove_lifted_batch(&tree_indices, channel);
             }
         });
 

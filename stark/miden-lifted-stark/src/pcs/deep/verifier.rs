@@ -33,13 +33,13 @@ use crate::{
 /// - reduces the opened row to `f_red(X)` using Horner with the same `α`,
 /// - reconstructs `Q(X)` and returns it to the FRI verifier.
 ///
-/// Lifting is transparent at this layer: the prover commits to lifted codewords, so
-/// every opened column is interpreted as a polynomial over the same max domain.
+/// Full-height groups live on the max domain. Shorter groups are interpreted by
+/// folding query indices to their committed depth.
 pub(in crate::pcs) struct DeepOracle<F: TwoAdicField, EF: ExtensionField<F>, L: Lmcs<F = F>> {
-    /// Committed groups (root + widths + committed log height), one per tree.
+    /// Committed groups (root + widths + tree depth), one per tree.
     ///
     /// Widths must match the committed rows (including any alignment padding if
-    /// `build_aligned_tree` was used). A group's `log_height` may be below the
+    /// `build_aligned_tree` was used). A group's `tree_depth` may be below the
     /// query depth — a virtually-lifted, setup-fixed preprocessed tree.
     commitments: Vec<CommitmentGroup<L::Commitment>>,
 
@@ -62,7 +62,7 @@ impl<F: TwoAdicField, EF: ExtensionField<F>, L: Lmcs<F = F>> DeepOracle<F, EF, L
     /// Construct by reading evaluations, checking PoW, and sampling challenges.
     ///
     /// Commitment widths must match the committed rows (including any alignment padding).
-    /// Each group's `log_height` must be `≤ domain.log_lde_height()`; shorter groups
+    /// Each group's `tree_depth` must be `≤ domain.log_lde_height()`; shorter groups
     /// are virtually lifted at query time.
     ///
     /// Preconditions: `eval_points` must be distinct and lie outside the trace subgroup `H`
@@ -143,11 +143,16 @@ impl<F: TwoAdicField, EF: ExtensionField<F>, L: Lmcs<F = F>> DeepOracle<F, EF, L
             tree_indices.iter().map(|&idx| (idx, EF::ZERO)).collect();
 
         for (group_idx, group) in self.commitments.iter().enumerate() {
-            // `open_batch` folds the query indices to this group's committed depth and
-            // re-keys the result by the original query indices, so the reduction below
-            // is identical whether or not the group was lifted.
+            // `open_lifted_batch` returns rows keyed by the original query indices, even when
+            // this group is committed at a shorter depth, so the reduction is uniform.
             let opened_rows = lmcs
-                .open_batch(&group.root, &group.widths, tree_indices, group.log_height, channel)
+                .open_lifted_batch(
+                    &group.root,
+                    &group.widths,
+                    tree_indices,
+                    group.tree_depth,
+                    channel,
+                )
                 .map_err(|source| DeepError::LmcsError { source, tree: group_idx })?;
 
             // Reduce opened rows via Horner: f_reduced(X) = Σᵢ αᵂ⁻¹⁻ⁱ · fᵢ(X).

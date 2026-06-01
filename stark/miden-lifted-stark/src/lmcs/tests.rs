@@ -46,8 +46,7 @@ where
     C: Lmcs<F = Felt, Commitment = TestCommitment>,
 {
     let mut verifier_channel = gl::verifier_channel(transcript);
-    let result =
-        lmcs.open_batch(commitment, widths, indices, indices.depth(), &mut verifier_channel);
+    let result = lmcs.open_batch(commitment, widths, indices, &mut verifier_channel);
     if result.is_ok() {
         let verifier_digest =
             verifier_channel.finalize().expect("transcript should finalize cleanly");
@@ -148,7 +147,7 @@ fn lmcs_duplicate_indices_roundtrip() {
     let tree_indices = TreeIndices::new(indices.iter().copied(), log_max_height).unwrap();
     let mut verifier_channel = gl::verifier_channel(&transcript);
     let batch = lmcs
-        .read_batch_proof(&widths, &tree_indices, tree_indices.depth(), &mut verifier_channel)
+        .read_batch_proof(&widths, &tree_indices, &mut verifier_channel)
         .expect("batch witness should parse from transcript");
 
     assert_eq!(batch.openings.len(), 3);
@@ -276,14 +275,12 @@ fn batch_proof_handles_empty_or_oob() {
     // Empty indices → no openings parsed.
     let empty = TreeIndices::new([], log_max_height).unwrap();
     let mut verifier_channel = gl::verifier_channel(&transcript);
-    let batch = lmcs
-        .read_batch_proof(&widths, &empty, empty.depth(), &mut verifier_channel)
-        .unwrap();
+    let batch = lmcs.read_batch_proof(&widths, &empty, &mut verifier_channel).unwrap();
     assert!(batch.openings.is_empty());
 
     // Zero-width openings with a valid index.
     let mut verifier_channel = gl::verifier_channel(&transcript);
-    let batch = lmcs.read_batch_proof(&[], &idx0, idx0.depth(), &mut verifier_channel).unwrap();
+    let batch = lmcs.read_batch_proof(&[], &idx0, &mut verifier_channel).unwrap();
     assert_eq!(batch.openings.len(), 1);
     let opening = batch.openings.get(&0).expect("opening for index 0");
     assert_eq!(opening.rows.num_rows(), 0);

@@ -87,8 +87,8 @@ where
     );
 }
 
-/// Assert a concrete builder's accessor dimensions match `air` — main and aux
-/// trace, public values, randomness, aux values, and periodic values.
+/// Assert a concrete builder's accessor dimensions match `air` — preprocessed,
+/// main and aux trace, public values, randomness, aux values, and periodic values.
 ///
 /// Guards the invariant that makes [`LiftedAir::eval`] panic-free: if symbolic
 /// evaluation in `constraint_degree` succeeds and this check passes, `eval()`
@@ -105,6 +105,14 @@ where
             "{part} dimension mismatch: expected {expected}, got {actual}"
         );
     };
+
+    let preprocessed = builder.preprocessed();
+    check(
+        "preprocessed (current)",
+        air.preprocessed_width(),
+        preprocessed.current_slice().len(),
+    );
+    check("preprocessed (next)", air.preprocessed_width(), preprocessed.next_slice().len());
 
     let main = builder.main();
     check("main (current)", air.width(), main.current_slice().len());

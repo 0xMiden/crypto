@@ -131,20 +131,21 @@ where
     ///
     /// `preprocessed` must be `Some` exactly when some AIR declares preprocessed
     /// columns; otherwise this errors with
-    /// [`PreprocessedValidationError::TreeExpected`] /
-    /// [`TreeUnexpected`](PreprocessedValidationError::TreeUnexpected). When both
-    /// hold, the bundle's shape is validated against the AIRs.
+    /// [`PreprocessedValidationError::PresenceMismatch`]. When both hold, the
+    /// bundle's shape is validated against the AIRs.
     pub fn new(
         config: &'a SC,
         prover_statement: &'a ProverStatement<F, EF, MA>,
         preprocessed: Option<&'a Preprocessed<F, SC::Lmcs>>,
     ) -> Result<Self, PreprocessedValidationError> {
-        let any = prover_statement.statement().airs().iter().any(|a| a.preprocessed_width() > 0);
-        match (any, preprocessed) {
-            (true, None) => return Err(PreprocessedValidationError::TreeExpected),
-            (false, Some(_)) => return Err(PreprocessedValidationError::TreeUnexpected),
-            (true, Some(p)) => validate_preprocessed(prover_statement, p)?,
-            (false, None) => {},
+        let expected =
+            prover_statement.statement().airs().iter().any(|a| a.preprocessed_width() > 0);
+        let actual = preprocessed.is_some();
+        if expected != actual {
+            return Err(PreprocessedValidationError::PresenceMismatch { expected, actual });
+        }
+        if let Some(p) = preprocessed {
+            validate_preprocessed(prover_statement, p)?;
         }
         Ok(Self { config, prover_statement, preprocessed })
     }
@@ -244,10 +245,10 @@ where
     let trace_order = TraceOrder::from_trace_heights::<F, EF, _>(airs, &trace_heights)
         .expect("ProverStatement::new should reject malformed heights");
 
-    // Preprocessed: AIR→leaf lookup (instance order) for the per-AIR opening
-    // view. Empty when there is no preprocessed data (then never indexed).
-    let air_to_leaf = if preprocessed.is_some() {
-        trace_order.preprocessed_leaf_for_air::<F, EF, _>(airs)
+    // Map each AIR to its preprocessed trace index. Only used when a preprocessed
+    // tree is present.
+    let air_to_preprocessed_trace = if preprocessed.is_some() {
+        trace_order.preprocessed_trace_index_for_air::<F, EF, _>(airs)
     } else {
         Vec::new()
     };
@@ -275,8 +276,7 @@ where
         .collect::<Result<_, _>>()?;
 
     // Observe the preprocessed commitment first (when present); it is part of
-    // the statement and binds Fiat-Shamir before any other instance data. The
-    // verifier mirrors this through `VerifierInstance`.
+    // the statement and binds Fiat-Shamir before any other instance data.
     if let Some(preprocessed) = preprocessed {
         challenger.observe(preprocessed.commitment());
     }
@@ -452,14 +452,17 @@ where
             let aux_on_gj = aux_committed.evals_on_quotient_domain(i, &this_quotient_eval_domain);
 
             // Preprocessed view: fetched only when this AIR declares preprocessed
-            // columns. Resolve the tree leaf via the inverse mapping
-            // `air_to_leaf[instance_idx]`; the leaf shares the max-LDE coset with
+            // columns. Resolve the committed trace via the inverse mapping
+            // `air_to_preprocessed_trace[instance_idx]`; it shares the max-LDE coset with
             // the main trace, so `evals_on_quotient_domain` truncates it to this
             // AIR's quotient domain the same way.
             let preproc_on_gj = preprocessed.and_then(|p| {
                 let instance_idx = trace_order.instance_indices()[i] as usize;
-                air_to_leaf[instance_idx].map(|leaf| {
-                    p.committed().evals_on_quotient_domain(leaf, &this_quotient_eval_domain)
+                air_to_preprocessed_trace[instance_idx].map(|preprocessed_trace_idx| {
+                    p.committed().evals_on_quotient_domain(
+                        preprocessed_trace_idx,
+                        &this_quotient_eval_domain,
+                    )
                 })
             });
 
@@ -536,9 +539,8 @@ where
     let h = max_lde_domain.trace_subgroup().generator();
     let z_next = z * h;
 
-    // 7. Open via PCS. The preprocessed tree (when present) is opened first,
-    // mirroring the observe order; the verifier reconstructs the same ordering
-    // via its `group_indices`. Groups: `[preprocessed?, main, aux, quotient]`.
+    // 7. Open via PCS. The prover and verifier use the same group order:
+    // `[preprocessed?, main, aux, quotient]`.
     let mut trees = Vec::with_capacity(4);
     if let Some(p) = preprocessed {
         trees.push(p.committed().tree());

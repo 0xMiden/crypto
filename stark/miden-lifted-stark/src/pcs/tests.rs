@@ -60,7 +60,7 @@ fn run_pcs_case(params: &PcsParams, trees: Vec<TestTree>, seed: u64) -> Result<(
         .map(|t| CommitmentGroup {
             root: t.root(),
             widths: t.widths(),
-            log_height: log2_strict_u8(t.height()),
+            tree_depth: log2_strict_u8(t.height()),
         })
         .collect();
     let trace_trees: Vec<&_> = trees.iter().collect();
@@ -105,9 +105,13 @@ fn run_pcs_case(params: &PcsParams, trees: Vec<TestTree>, seed: u64) -> Result<(
 
         // Re-parse PcsProof from a fresh channel and verify digest agreement.
         let alignment = lmcs.alignment();
-        let aligned_commitments: Vec<_> = commitments
+        let aligned_commitments: Vec<_> = commitment_groups
             .iter()
-            .map(|(c, widths)| (*c, aligned_widths(widths.clone(), alignment)))
+            .map(|group| CommitmentGroup {
+                root: group.root,
+                widths: aligned_widths(group.widths.clone(), alignment),
+                tree_depth: group.tree_depth,
+            })
             .collect();
 
         let mut challenger = gl::test_challenger();

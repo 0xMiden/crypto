@@ -96,7 +96,7 @@ use crate::util::{align::aligned_len, bitrev::BitReversibleMatrix};
 // Type Aliases
 // ============================================================================
 
-/// Opened rows keyed by leaf index, returned by [`Lmcs::open_batch`].
+/// Opened rows keyed by tree or query index, returned by LMCS opening APIs.
 pub type OpenedRows<F> = BTreeMap<usize, RowList<F>>;
 
 // ============================================================================
@@ -113,7 +113,8 @@ pub trait Lmcs: Clone {
     type Commitment: Clone + Eq;
     /// Tree type (prover data), parameterized by stored matrix type.
     type Tree<Stored: Matrix<Self::F>>: LmcsTree<Self::F, Self::Commitment, Stored>;
-    /// Batch witness type returned by [`read_batch_proof`](Self::read_batch_proof).
+    /// Batch witness type returned by [`read_batch_proof`](Self::read_batch_proof) and
+    /// [`read_lifted_batch_proof`](Self::read_lifted_batch_proof).
     type BatchProof: BatchProofView<Self::F, Self::Commitment>;
 
     /// Build a tree from domain-ordered matrices with no transcript padding (alignment = 1).
@@ -147,49 +148,64 @@ pub trait Lmcs: Clone {
     /// Compress two hashes into their parent (2-to-1 compression).
     fn compress(&self, left: Self::Commitment, right: Self::Commitment) -> Self::Commitment;
 
-    /// Open a batch proof by reading hint data from a transcript channel.
+    /// Open an exact batch proof by reading hint data from a transcript channel.
     ///
     /// The hint format is implementation-defined; callers must use the matching
-    /// `LmcsTree::prove_batch` implementation to produce compatible hints.
+    /// exact [`LmcsTree::prove_batch`] implementation to produce compatible hints.
     /// `widths` must match the committed tree (including any alignment padding
-    /// if `build_aligned_tree` was used).
-    ///
-    /// `tree_log_height` is the committed tree's depth (`log₂` of its leaf
-    /// count). It may be smaller than `indices.depth()`: a tree committed below
-    /// the query domain (e.g. a setup-fixed preprocessed tree) is virtually
-    /// lifted, so each query index `i` folds to committed leaf
-    /// `i mod 2^tree_log_height`. Pass `indices.depth()` for a full-height tree.
+    /// if `build_aligned_tree` was used), and `indices` must already be in the
+    /// committed tree's own index space.
     ///
     /// # Preconditions
     /// - `indices` must be non-empty.
-    /// - `tree_log_height <= indices.depth()`.
+    /// - `indices.depth()` must be the committed tree depth.
     ///
     /// # Postconditions
-    /// On success, the returned map is keyed by the original (query) indices —
-    /// one entry per unique index. Indices that fold to the same committed leaf
-    /// share that leaf's rows. Each entry's `RowList<F>` has one row per width in
-    /// `widths`, with that row's length matching the corresponding width.
+    /// On success, the returned map is keyed by the exact tree indices — one
+    /// entry per unique index. Each entry's `RowList<F>` has one row per width
+    /// in `widths`, with that row's length matching the corresponding width.
     fn open_batch<Ch>(
         &self,
         commitment: &Self::Commitment,
         widths: &[usize],
         indices: &TreeIndices,
-        tree_log_height: u8,
         channel: &mut Ch,
     ) -> Result<OpenedRows<Self::F>, LmcsError>
     where
         Ch: VerifierChannel<F = Self::F, Commitment = Self::Commitment>;
 
-    /// Parse a batch opening from transcript hints without verification.
+    /// Open a virtually lifted batch proof.
+    ///
+    /// `query_indices` live in the query domain. They are projected to
+    /// `tree_depth`, opened with [`Self::open_batch`], then expanded back to the
+    /// original query indices. The returned map is keyed by the original query
+    /// indices, so callers can reduce all commitment groups uniformly.
+    ///
+    /// Returns [`LmcsError::InvalidProof`] if `tree_depth > query_indices.depth()`.
+    fn open_lifted_batch<Ch>(
+        &self,
+        commitment: &Self::Commitment,
+        widths: &[usize],
+        query_indices: &TreeIndices,
+        tree_depth: u8,
+        channel: &mut Ch,
+    ) -> Result<OpenedRows<Self::F>, LmcsError>
+    where
+        Ch: VerifierChannel<F = Self::F, Commitment = Self::Commitment>,
+    {
+        let projection = query_indices.project_to_depth(tree_depth)?;
+        let rows_by_leaf =
+            self.open_batch(commitment, widths, projection.leaf_indices(), channel)?;
+        projection.expand_leaf_values(&rows_by_leaf)
+    }
+
+    /// Parse an exact batch opening from transcript hints without verification.
     ///
     /// Reads leaf openings and sibling hashes from the channel, hashes leaves,
     /// and reconstructs the Merkle witness. Does not verify against a commitment;
-    /// validation happens in [`open_batch`](Lmcs::open_batch).
-    ///
-    /// `tree_log_height` is the committed tree's depth; see
-    /// [`open_batch`](Lmcs::open_batch) for the virtual-lift folding when it is
-    /// below `indices.depth()`. The returned witness and openings are keyed by
-    /// committed-leaf index (the folded indices).
+    /// validation happens in [`open_batch`](Lmcs::open_batch). The returned
+    /// witness and openings are keyed by the exact tree indices, because Merkle
+    /// paths are defined for leaves of the actual tree.
     ///
     /// Use [`merkle_witness::MerkleWitness::path`] on the returned witness to extract
     /// authentication paths.
@@ -197,11 +213,31 @@ pub trait Lmcs: Clone {
         &self,
         widths: &[usize],
         indices: &TreeIndices,
-        tree_log_height: u8,
         channel: &mut Ch,
     ) -> Result<Self::BatchProof, LmcsError>
     where
         Ch: VerifierChannel<F = Self::F, Commitment = Self::Commitment>;
+
+    /// Parse a virtually lifted batch opening from transcript hints.
+    ///
+    /// `query_indices` are projected to `tree_depth`, then parsed with
+    /// [`Self::read_batch_proof`]. The returned proof is the same `BatchProof`
+    /// type as the exact parser and remains keyed by projected tree indices.
+    ///
+    /// Returns [`LmcsError::InvalidProof`] if `tree_depth > query_indices.depth()`.
+    fn read_lifted_batch_proof<Ch>(
+        &self,
+        widths: &[usize],
+        query_indices: &TreeIndices,
+        tree_depth: u8,
+        channel: &mut Ch,
+    ) -> Result<Self::BatchProof, LmcsError>
+    where
+        Ch: VerifierChannel<F = Self::F, Commitment = Self::Commitment>,
+    {
+        let projection = query_indices.project_to_depth(tree_depth)?;
+        self.read_batch_proof(widths, projection.leaf_indices(), channel)
+    }
 
     /// Get the alignment used by `build_aligned_tree`.
     ///
@@ -244,16 +280,32 @@ pub trait LmcsTree<F, Commitment, M> {
         self.widths().into_iter().map(|w| aligned_len(w, alignment)).collect()
     }
 
-    /// Prove a batch opening and stream it into a transcript channel.
+    /// Prove an exact batch opening and stream it into a transcript channel.
     ///
     /// The hint format is implementation-defined and must be consumed by the
-    /// corresponding `Lmcs::open_batch` implementation. Rows are padded to the
-    /// tree's alignment before being written to the channel.
+    /// corresponding exact `Lmcs::open_batch` implementation. Rows are padded to
+    /// the tree's alignment before being written to the channel. `indices` must
+    /// already be in this tree's own index space.
     ///
     /// Leaf openings are written in **sorted tree index order** (ascending, deduplicated).
     fn prove_batch<Ch>(&self, indices: &TreeIndices, channel: &mut Ch)
     where
         Ch: ProverChannel<F = F, Commitment = Commitment>;
+
+    /// Prove a virtually lifted batch opening.
+    ///
+    /// Projects `query_indices` to this tree's depth and then delegates to exact
+    /// [`Self::prove_batch`].
+    fn prove_lifted_batch<Ch>(&self, query_indices: &TreeIndices, channel: &mut Ch)
+    where
+        Ch: ProverChannel<F = F, Commitment = Commitment>,
+    {
+        let tree_depth = miden_lifted_air::log2_strict_u8(self.height());
+        let projection = query_indices
+            .project_to_depth(tree_depth)
+            .expect("query index depth must be at least the committed tree depth");
+        self.prove_batch(projection.leaf_indices(), channel);
+    }
 }
 
 // ============================================================================

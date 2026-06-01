@@ -39,8 +39,8 @@ use crate::{
 /// committed LDE tree.
 ///
 /// `traces[i]` is `Some` exactly when AIR `i` declares preprocessed columns;
-/// the LDE tree commits one leaf per such AIR, in proof (leaf) order. Built
-/// once at setup via [`Preprocessed::build`] and borrowed across proofs.
+/// the LDE tree commits one LDE trace per such AIR, in proof order. Built once
+/// at setup via [`Preprocessed::build`] and borrowed across proofs.
 ///
 /// Parameterized over the LMCS `L` rather than a full [`StarkConfig`] because
 /// the bundle depends only on the base field and the commitment scheme.
@@ -54,7 +54,7 @@ where
     /// `preprocessed_trace` re-allocates on every call, so they are computed
     /// once here and retained for validation and `check_constraints`.
     traces: Vec<Option<RowMajorMatrix<F>>>,
-    /// Committed LDE tree, one leaf per preprocessed AIR.
+    /// Committed LDE tree, one committed LDE trace per preprocessed AIR.
     committed: Committed<F, RowMajorMatrix<F>, L>,
 }
 
@@ -68,8 +68,8 @@ where
     ///
     /// Calls [`BaseAir::preprocessed_trace`] once per AIR (caching the by-value
     /// result), then LDEs the declared matrices — sorted height-ascending,
-    /// tiebroken by AIR index, the LMCS leaf order both sides reproduce — and
-    /// builds the aligned tree.
+    /// tiebroken by AIR index, the committed trace order both sides reproduce —
+    /// and builds the aligned tree.
     ///
     /// # Panics
     ///
@@ -88,9 +88,9 @@ where
             return None;
         }
 
-        // Leaf order: preprocessed AIRs sorted by `(height, air_idx)`. This must
-        // match the leaf↔AIR mapping the prover/verifier reconstruct via
-        // `TraceOrder::preprocessed_air_for_leaf` (preprocessed AIRs in proof
+        // Committed trace order: preprocessed AIRs sorted by `(height, air_idx)`. This must
+        // match the trace↔AIR mapping the prover/verifier reconstruct via
+        // `TraceOrder::preprocessed_air_for_trace_index` (preprocessed AIRs in proof
         // order, i.e. sorted by `(main_trace_height, air_idx)`). The two
         // coincide because `validate_preprocessed` rejects any bundle whose
         // preprocessed height differs from the main trace height — so sorting by
@@ -152,8 +152,8 @@ where
 // Validation
 // ============================================================================
 
-/// Validate a [`Preprocessed`] bundle against a prover statement's AIRs: tree
-/// presence, per-leaf width, and per-AIR height.
+/// Validate a [`Preprocessed`] bundle against a prover statement's AIRs:
+/// preprocessed trace count, per-trace width, and per-AIR height.
 ///
 /// Called by [`ProverInstance::new`](crate::ProverInstance::new) only when both
 /// the AIRs declare preprocessed columns and a bundle is supplied; presence
@@ -171,28 +171,28 @@ where
     let airs = prover_statement.statement().airs();
     let main_traces = prover_statement.traces();
 
-    // Reconstruct the leaf↔AIR mapping the prover/verifier use. Heights are
-    // already validated by `ProverStatement::new`, so this cannot fail.
+    // Reconstruct the trace↔AIR mapping the prover/verifier use.
+    // Heights are already validated by `ProverStatement::new`, so this cannot fail.
     let heights: Vec<usize> = main_traces.iter().map(Matrix::height).collect();
     let trace_order = TraceOrder::from_trace_heights::<F, EF, _>(airs, &heights)
         .expect("ProverStatement guarantees valid trace shapes");
-    let leaf_to_air = trace_order.preprocessed_air_for_leaf::<F, EF, _>(airs);
+    let preprocessed_trace_to_air = trace_order.preprocessed_air_for_trace_index::<F, EF, _>(airs);
 
-    let leaves = preprocessed.committed.tree().leaves();
-    if leaves.len() != leaf_to_air.len() {
+    let committed_traces = preprocessed.committed.tree().leaves();
+    if committed_traces.len() != preprocessed_trace_to_air.len() {
         return Err(PreprocessedValidationError::TreeLengthMismatch {
-            expected: leaf_to_air.len(),
-            actual: leaves.len(),
+            expected: preprocessed_trace_to_air.len(),
+            actual: committed_traces.len(),
         });
     }
 
-    for (leaf, &air_idx_u8) in leaf_to_air.iter().enumerate() {
+    for (preprocessed_trace_idx, &air_idx_u8) in preprocessed_trace_to_air.iter().enumerate() {
         let air_idx = air_idx_u8 as usize;
         let expected = airs[air_idx].preprocessed_width();
-        let actual = leaves[leaf].width();
+        let actual = committed_traces[preprocessed_trace_idx].width();
         if actual != expected {
             return Err(PreprocessedValidationError::WidthMismatch {
-                leaf,
+                trace: preprocessed_trace_idx,
                 air: air_idx,
                 expected,
                 actual,
@@ -217,25 +217,21 @@ where
 /// parity and (prover side) the bundle's shape against the AIR declarations.
 #[derive(Debug, Error)]
 pub enum PreprocessedValidationError {
-    #[error("AIRs declare preprocessed columns but no preprocessed bundle was supplied")]
-    TreeExpected,
-    #[error("a preprocessed bundle was supplied but no AIR declares preprocessed columns")]
-    TreeUnexpected,
-    #[error("AIRs declare preprocessed columns but no preprocessed commitment was supplied")]
-    CommitmentExpected,
-    #[error("a preprocessed commitment was supplied but no AIR declares preprocessed columns")]
-    CommitmentUnexpected,
     #[error(
-        "preprocessed leaf {leaf} (AIR {air}) width mismatch: AIR declares {expected}, tree has {actual}"
+        "preprocessed setup presence mismatch: AIRs declare preprocessed columns = {expected}, setup supplied = {actual}"
+    )]
+    PresenceMismatch { expected: bool, actual: bool },
+    #[error(
+        "preprocessed trace {trace} (AIR {air}) width mismatch: AIR declares {expected}, tree has {actual}"
     )]
     WidthMismatch {
-        leaf: usize,
+        trace: usize,
         air: usize,
         expected: usize,
         actual: usize,
     },
     #[error(
-        "preprocessed tree leaf count {actual} does not match the preprocessed-AIR count {expected}"
+        "preprocessed trace count {actual} does not match the preprocessed-AIR count {expected}"
     )]
     TreeLengthMismatch { expected: usize, actual: usize },
     #[error(

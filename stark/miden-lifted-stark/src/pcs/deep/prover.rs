@@ -45,8 +45,12 @@ impl<EF> DeepPoly<EF> {
     /// This computes the LDE coset points from `domain`, evaluates the committed
     /// matrices at `eval_points`, and then calls [`Self::from_evals`].
     ///
-    /// Preconditions: `eval_points` must be distinct and lie outside the trace subgroup `H`
-    /// and LDE evaluation coset `gK`. The outer protocol is expected to enforce this.
+    /// Preconditions:
+    /// - `eval_points` must be distinct and lie outside the trace subgroup `H` and LDE evaluation
+    ///   coset `gK`. The outer protocol is expected to enforce this.
+    /// - Every trace tree height must be a power of two `≤ domain.lde_height()`. Shorter trees are
+    ///   virtually lifted to the max domain during batched evaluation.
+    /// - At least one trace tree must have height `domain.lde_height()`.
     pub fn from_trees<L, M, const N: usize, Ch>(
         params: DeepParams,
         domain: &LiftedDomain<L::F>,
@@ -63,15 +67,13 @@ impl<EF> DeepPoly<EF> {
     {
         assert!(!trace_trees.is_empty(), "at least one trace tree required");
         let lde_height = domain.lde_height();
-        // Trees shorter than the max (e.g. a setup-fixed preprocessed tree) are virtually
-        // lifted by `batch_eval_lifted`; each just needs a power-of-two height ≤ the max.
         assert!(
             trace_trees
                 .iter()
                 .all(|tree| tree.height().is_power_of_two() && tree.height() <= lde_height),
             "tree heights must be powers of two ≤ the max LDE height"
         );
-        debug_assert!(
+        assert!(
             trace_trees.iter().any(|tree| tree.height() == lde_height),
             "at least one tree must fill the max LDE height"
         );
@@ -135,9 +137,8 @@ impl<EF> DeepPoly<EF> {
             "mixed trace tree alignments are not supported"
         );
 
-        // Collect the LDE matrices from each committed tree, grouped by commitment.
-        // matrices_groups[group_idx][matrix_idx] is a reference to the LDE matrix
-        // whose rows are bit-reversed coset evaluations at height `lde_height`.
+        // Collect LDE matrices grouped by commitment. Each matrix is at its
+        // committed tree height; shorter groups are lifted when combined/opened.
         let matrices_groups: Vec<Vec<&M>> =
             trace_trees.iter().map(|tree| tree.leaves().iter().collect()).collect();
 
@@ -252,9 +253,8 @@ impl<EF> DeepPoly<EF> {
                             neg_column_coeffs_iter.by_ref().take(size).collect();
                         accumulate_matrices(matrices_group, &group_coeffs)
                     })
-                    // Combine groups of (possibly) different heights. A group shorter than
-                    // the global height — a setup-fixed preprocessed tree — is lifted onto
-                    // the taller buffer in place. Sequential reduce folds left-to-right.
+                    // Combine groups of different heights; `add_lifted` lifts the shorter
+                    // buffer onto the taller one before adding.
                     .reduce(|a, b| add_lifted(w, a, b))
                     .unwrap_or_else(|| EF::zero_vec(n))
             };

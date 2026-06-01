@@ -138,13 +138,7 @@ where
 
             // FRI round trees are full-height at the (already shrunk) round depth.
             let opened_rows = lmcs
-                .open_batch(
-                    &round.commitment,
-                    &widths,
-                    &tree_indices,
-                    tree_indices.depth(),
-                    channel,
-                )
+                .open_batch(&round.commitment, &widths, &tree_indices, channel)
                 .map_err(|source| FriError::LmcsError { source, round: round_idx })?;
 
             // Drain, verify, fold, and rebuild with new keys.
