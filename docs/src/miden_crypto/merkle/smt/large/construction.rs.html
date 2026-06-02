@@ -1,4 +1,4 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `miden-crypto/src/merkle/smt/large/construction.rs`."><title>construction.rs - source</title><script>if(window.location.protocol!=="file:")document.head.insertAdjacentHTML("beforeend","SourceSerif4-Regular-6b053e98.ttf.woff2,FiraSans-Italic-81dc35de.woff2,FiraSans-Regular-0fe48ade.woff2,FiraSans-MediumItalic-ccf7e434.woff2,FiraSans-Medium-e1aa3f0a.woff2,SourceCodePro-Regular-8badfe75.ttf.woff2,SourceCodePro-Semibold-aa29a496.ttf.woff2".split(",").map(f=>`<link rel="preload" as="font" type="font/woff2"href="../../../../../static.files/${f}">`).join(""))</script><link rel="stylesheet" href="../../../../../static.files/normalize-9960930a.css"><link rel="stylesheet" href="../../../../../static.files/rustdoc-17e0aaed.css"><meta name="rustdoc-vars" data-root-path="../../../../../" data-static-root-path="../../../../../static.files/" data-current-crate="miden_crypto" data-themes="" data-resource-suffix="" data-rustdoc-version="1.98.0-nightly (14210df0e 2026-05-31)" data-channel="nightly" data-search-js="search-fd9372ac.js" data-stringdex-js="stringdex-2da4960a.js" data-settings-js="settings-170eb4bf.js" ><script src="../../../../../static.files/storage-41dd4d93.js"></script><script defer src="../../../../../static.files/src-script-813739b1.js"></script><script defer src="../../../../../src-files.js"></script><script defer src="../../../../../static.files/main-fcd733ba.js"></script><noscript><link rel="stylesheet" href="../../../../../static.files/noscript-f7c3ffd8.css"></noscript><link rel="alternate icon" type="image/png" href="../../../../../static.files/favicon-32x32-eab170b8.png"><link rel="icon" type="image/svg+xml" href="../../../../../static.files/favicon-044be391.svg"></head><body class="rustdoc src"><a class="skip-main-content" href="#main-content">Skip to main content</a><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="src-sidebar-title"><h2>Files</h2></div></nav><div class="sidebar-resizer" title="Drag to resize sidebar"></div><main><section id="main-content" class="content" tabindex="-1"><div class="main-heading"><h1><div class="sub-heading">miden_crypto/merkle/smt/large/</div>construction.rs</h1><rustdoc-toolbar></rustdoc-toolbar></div><div class="example-wrap digits-3"><pre class="rust"><code><a href=#1 id=1 data-nosnippet>1</a><span class="kw">use </span>alloc::vec::Vec;
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `miden-crypto/src/merkle/smt/large/construction.rs`."><title>construction.rs - source</title><script>if(window.location.protocol!=="file:")document.head.insertAdjacentHTML("beforeend","SourceSerif4-Regular-6b053e98.ttf.woff2,FiraSans-Italic-81dc35de.woff2,FiraSans-Regular-0fe48ade.woff2,FiraSans-MediumItalic-ccf7e434.woff2,FiraSans-Medium-e1aa3f0a.woff2,SourceCodePro-Regular-8badfe75.ttf.woff2,SourceCodePro-Semibold-aa29a496.ttf.woff2".split(",").map(f=>`<link rel="preload" as="font" type="font/woff2"href="../../../../../static.files/${f}">`).join(""))</script><link rel="stylesheet" href="../../../../../static.files/normalize-9960930a.css"><link rel="stylesheet" href="../../../../../static.files/rustdoc-17e0aaed.css"><meta name="rustdoc-vars" data-root-path="../../../../../" data-static-root-path="../../../../../static.files/" data-current-crate="miden_crypto" data-themes="" data-resource-suffix="" data-rustdoc-version="1.98.0-nightly (6bdf43094 2026-06-01)" data-channel="nightly" data-search-js="search-fd9372ac.js" data-stringdex-js="stringdex-2da4960a.js" data-settings-js="settings-170eb4bf.js" ><script src="../../../../../static.files/storage-41dd4d93.js"></script><script defer src="../../../../../static.files/src-script-813739b1.js"></script><script defer src="../../../../../src-files.js"></script><script defer src="../../../../../static.files/main-fcd733ba.js"></script><noscript><link rel="stylesheet" href="../../../../../static.files/noscript-f7c3ffd8.css"></noscript><link rel="alternate icon" type="image/png" href="../../../../../static.files/favicon-32x32-eab170b8.png"><link rel="icon" type="image/svg+xml" href="../../../../../static.files/favicon-044be391.svg"></head><body class="rustdoc src"><a class="skip-main-content" href="#main-content">Skip to main content</a><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="src-sidebar-title"><h2>Files</h2></div></nav><div class="sidebar-resizer" title="Drag to resize sidebar"></div><main><section id="main-content" class="content" tabindex="-1"><div class="main-heading"><h1><div class="sub-heading">miden_crypto/merkle/smt/large/</div>construction.rs</h1><rustdoc-toolbar></rustdoc-toolbar></div><div class="example-wrap digits-3"><pre class="rust"><code><a href=#1 id=1 data-nosnippet>1</a><span class="kw">use </span>alloc::vec::Vec;
 <a href=#2 id=2 data-nosnippet>2</a><span class="kw">use </span>core::mem;
 <a href=#3 id=3 data-nosnippet>3</a>
 <a href=#4 id=4 data-nosnippet>4</a><span class="kw">use </span>p3_maybe_rayon::prelude::<span class="kw-2">*</span>;
@@ -16,7 +16,7 @@
 <a href=#16 id=16 data-nosnippet>16</a>        full::concurrent::{
 <a href=#17 id=17 data-nosnippet>17</a>            PairComputations, SUBTREE_DEPTH, SubtreeLeaf, SubtreeLeavesIter, build_subtree,
 <a href=#18 id=18 data-nosnippet>18</a>        },
-<a href=#19 id=19 data-nosnippet>19</a>        large::to_memory_index,
+<a href=#19 id=19 data-nosnippet>19</a>        large::{LargeSmtResult, to_memory_index},
 <a href=#20 id=20 data-nosnippet>20</a>    },
 <a href=#21 id=21 data-nosnippet>21</a>};
 <a href=#22 id=22 data-nosnippet>22</a>
@@ -40,7 +40,7 @@
 <a href=#40 id=40 data-nosnippet>40</a>    /// let storage = MemoryStorage::new();
 <a href=#41 id=41 data-nosnippet>41</a>    /// let smt = LargeSmt::new(storage).expect("Failed to create SMT");
 <a href=#42 id=42 data-nosnippet>42</a>    /// ```
-<a href=#43 id=43 data-nosnippet>43</a>    </span><span class="kw">pub fn </span>new(storage: S) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="self">Self</span>, LargeSmtError&gt; {
+<a href=#43 id=43 data-nosnippet>43</a>    </span><span class="kw">pub fn </span>new(storage: S) -&gt; LargeSmtResult&lt;<span class="self">Self</span>&gt; {
 <a href=#44 id=44 data-nosnippet>44</a>        <span class="kw">if </span>storage.has_leaves()<span class="question-mark">? </span>{
 <a href=#45 id=45 data-nosnippet>45</a>            <span class="kw">return </span><span class="prelude-val">Err</span>(LargeSmtError::StorageNotEmpty);
 <a href=#46 id=46 data-nosnippet>46</a>        }
@@ -69,7 +69,7 @@
 <a href=#69 id=69 data-nosnippet>69</a>    /// let smt = LargeSmt::load(storage).expect("Failed to load SMT");
 <a href=#70 id=70 data-nosnippet>70</a>    /// # }
 <a href=#71 id=71 data-nosnippet>71</a>    /// ```
-<a href=#72 id=72 data-nosnippet>72</a>    </span><span class="kw">pub fn </span>load(storage: S) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="self">Self</span>, LargeSmtError&gt; {
+<a href=#72 id=72 data-nosnippet>72</a>    </span><span class="kw">pub fn </span>load(storage: S) -&gt; LargeSmtResult&lt;<span class="self">Self</span>&gt; {
 <a href=#73 id=73 data-nosnippet>73</a>        <span class="self">Self</span>::initialize_from_storage(storage)
 <a href=#74 id=74 data-nosnippet>74</a>    }
 <a href=#75 id=75 data-nosnippet>75</a>
@@ -100,7 +100,7 @@
 <a href=#100 id=100 data-nosnippet>100</a>    ///     .expect("Failed to load SMT with expected root");
 <a href=#101 id=101 data-nosnippet>101</a>    /// # }
 <a href=#102 id=102 data-nosnippet>102</a>    /// ```
-<a href=#103 id=103 data-nosnippet>103</a>    </span><span class="kw">pub fn </span>load_with_root(storage: S, expected_root: Word) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="self">Self</span>, LargeSmtError&gt; {
+<a href=#103 id=103 data-nosnippet>103</a>    </span><span class="kw">pub fn </span>load_with_root(storage: S, expected_root: Word) -&gt; LargeSmtResult&lt;<span class="self">Self</span>&gt; {
 <a href=#104 id=104 data-nosnippet>104</a>        <span class="kw">let </span>smt = <span class="self">Self</span>::load(storage)<span class="question-mark">?</span>;
 <a href=#105 id=105 data-nosnippet>105</a>
 <a href=#106 id=106 data-nosnippet>106</a>        <span class="kw">let </span>actual_root = smt.root();
@@ -118,7 +118,7 @@
 <a href=#118 id=118 data-nosnippet>118</a>    ///
 <a href=#119 id=119 data-nosnippet>119</a>    /// For empty storage, returns an empty tree. For non-empty storage,
 <a href=#120 id=120 data-nosnippet>120</a>    /// rebuilds the in-memory top from cached in-memory-depth hashes.
-<a href=#121 id=121 data-nosnippet>121</a>    </span><span class="kw">fn </span>initialize_from_storage(storage: S) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="self">Self</span>, LargeSmtError&gt; {
+<a href=#121 id=121 data-nosnippet>121</a>    </span><span class="kw">fn </span>initialize_from_storage(storage: S) -&gt; LargeSmtResult&lt;<span class="self">Self</span>&gt; {
 <a href=#122 id=122 data-nosnippet>122</a>        <span class="comment">// Initialize in-memory nodes
 <a href=#123 id=123 data-nosnippet>123</a>        </span><span class="kw">let </span><span class="kw-2">mut </span>in_memory_nodes: Vec&lt;Word&gt; = <span class="macro">vec!</span>[EMPTY_WORD; NUM_IN_MEMORY_NODES];
 <a href=#124 id=124 data-nosnippet>124</a>
@@ -212,7 +212,7 @@
 <a href=#212 id=212 data-nosnippet>212</a>    </span><span class="kw">pub fn </span>with_entries(
 <a href=#213 id=213 data-nosnippet>213</a>        storage: S,
 <a href=#214 id=214 data-nosnippet>214</a>        entries: <span class="kw">impl </span>IntoIterator&lt;Item = (Word, Word)&gt;,
-<a href=#215 id=215 data-nosnippet>215</a>    ) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="self">Self</span>, LargeSmtError&gt; {
+<a href=#215 id=215 data-nosnippet>215</a>    ) -&gt; LargeSmtResult&lt;<span class="self">Self</span>&gt; {
 <a href=#216 id=216 data-nosnippet>216</a>        <span class="kw">let </span>entries: Vec&lt;(Word, Word)&gt; = entries.into_iter().collect();
 <a href=#217 id=217 data-nosnippet>217</a>
 <a href=#218 id=218 data-nosnippet>218</a>        <span class="kw">if </span>storage.has_leaves()<span class="question-mark">? </span>{
