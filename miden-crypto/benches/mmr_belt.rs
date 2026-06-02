@@ -1,7 +1,7 @@
 //! MMR vs experimental Merkle Mountain Belt benchmarks.
 //!
 //! The belt implementation benchmarked here is a reference prototype behind the `internal`
-//! feature. It keeps enough in-memory tree state to derive summaries/proofs, so these numbers
+//! feature. It keeps in-memory hash-array state to derive summaries/proofs, so these numbers
 //! should be read as construction-comparison data rather than production storage performance.
 
 use std::{hint, time::Duration};
@@ -20,6 +20,7 @@ use common::data::{WordPattern, generate_word_pattern, generate_words_pattern};
 
 const MMR_BELT_SIZES: &[usize] = &[1_000, 1_023, 1_024, 50_000, 65_535, 65_536];
 const RECENCIES: &[usize] = &[1, 2, 4, 8, 16, 32, 64, 128, 256, 512, 1_024, 4_096, 16_384];
+const APPEND_SEQUENCE_LEN: usize = 1_024;
 const MEASUREMENT_TIME: Duration = Duration::from_secs(2);
 const SAMPLE_SIZE: usize = 20;
 
@@ -46,6 +47,12 @@ impl MmrBeltBenchData {
 
         Self { leaves, mmr, peaks, belt, belt_summary }
     }
+}
+
+fn append_sequence(start: usize) -> Vec<Word> {
+    (start..start + APPEND_SEQUENCE_LEN)
+        .map(|idx| generate_word_pattern(idx as u64, WordPattern::Sequential))
+        .collect()
 }
 
 fn bench_mmr_belt_build(c: &mut Criterion) {
@@ -140,6 +147,45 @@ fn bench_mmr_belt_append(c: &mut Criterion) {
                 );
             },
         );
+    }
+
+    group.finish();
+}
+
+fn bench_mmr_belt_append_sequence(c: &mut Criterion) {
+    let mut group = c.benchmark_group("mmr-belt-append-sequence");
+    configure_group(&mut group);
+    group.throughput(criterion::Throughput::Elements(APPEND_SEQUENCE_LEN as u64));
+
+    for &size in MMR_BELT_SIZES {
+        let data = MmrBeltBenchData::build(size);
+        let leaves = append_sequence(size);
+
+        group.bench_with_input(BenchmarkId::new("current-mmr", size), &size, |b, _| {
+            b.iter_batched_ref(
+                || (data.mmr.clone(), leaves.clone()),
+                |(mmr, leaves)| {
+                    for leaf in leaves.iter().copied() {
+                        mmr.add(hint::black_box(leaf)).unwrap();
+                    }
+                    hint::black_box(mmr);
+                },
+                BatchSize::LargeInput,
+            );
+        });
+
+        group.bench_with_input(BenchmarkId::new("belt-prototype", size), &size, |b, _| {
+            b.iter_batched_ref(
+                || (data.belt.clone(), leaves.clone()),
+                |(belt, leaves)| {
+                    for leaf in leaves.iter().copied() {
+                        belt.add(hint::black_box(leaf)).unwrap();
+                    }
+                    hint::black_box(belt);
+                },
+                BatchSize::LargeInput,
+            );
+        });
     }
 
     group.finish();
@@ -366,6 +412,7 @@ criterion_group!(
     mmr_belt_benches,
     bench_mmr_belt_build,
     bench_mmr_belt_append,
+    bench_mmr_belt_append_sequence,
     bench_mmr_belt_commitment,
     bench_mmr_belt_open,
     bench_mmr_belt_verify,

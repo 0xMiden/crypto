@@ -1,19 +1,25 @@
-use alloc::{collections::BTreeMap, rc::Rc, vec::Vec};
+use alloc::{collections::BTreeMap, vec::Vec};
 use core::ops::Range;
 
 use super::{Forest, MmrError};
-use crate::{EMPTY_WORD, Word, hash::poseidon2::Poseidon2};
+use crate::{EMPTY_WORD, Felt, Word, ZERO, hash::poseidon2::Poseidon2};
+
+/// Domain separator for the final root, which binds the leaf count into the commitment.
+///
+/// Because the belt shape is a pure function of the leaf count (Lemma 6), binding the count makes
+/// the root commit to the entire structure: it cannot be reinterpreted under a different length.
+const BELT_ROOT_DOMAIN: Felt = Felt::new_unchecked(0x4d4d_425f_524f_4f54); // "MMB_ROOT"
 
 /// Prototype implementation of the Merkle Mountain Belt construction.
 ///
 /// This type is intentionally reference-oriented: it keeps live mountains in a linked list and
 /// re-derives belt ranges, summaries, and proofs from that list while the paper mechanics settle.
-/// Appends use stable mountain slots, local links, and a mergeable-pair stack; the verifier-facing
-/// geometry is still reconstructed from the leaf count in `O(log n)`. What is not yet implemented
-/// is the paper's indexed hash-array storage and increment proofs.
+/// Appends use stable mountain slots, local links, a mergeable-pair stack, and indexed hash-array
+/// storage for committed nodes. Increment proofs are not yet implemented.
 #[derive(Debug, Clone, Default)]
 pub struct MmrBelt {
     mountains: Vec<Option<BeltMountainSlot>>,
+    hashes: BeltHashArray,
     free_mountain_slots: Vec<usize>,
     head: Option<usize>,
     tail: Option<usize>,
@@ -35,7 +41,10 @@ impl MmrBelt {
             });
         }
 
-        let new_idx = self.push_mountain(BeltMountain::new(self.num_leaves, leaf));
+        let leaf_index = leaf_hash_index(self.num_leaves);
+        self.hashes.set(leaf_index, leaf);
+
+        let new_idx = self.push_mountain(BeltMountain::new(self.num_leaves, leaf_index));
         self.num_leaves += 1;
         if let Some(prev_idx) = self.mountain_slot(new_idx).prev {
             self.track_mergeable_pair(prev_idx, new_idx);
@@ -69,7 +78,10 @@ impl MmrBelt {
     /// double-bagged [`BeltSummary::root`], this list is incremental: after a `k`-increment only
     /// its `O(log k)` rightmost entries change (see [`MmrBelt::delta`]).
     pub fn peaks(&self) -> Vec<Word> {
-        self.ordered_mountains().iter().map(|mountain| mountain.root()).collect()
+        self.ordered_mountains()
+            .iter()
+            .map(|mountain| self.hash_at(mountain.index))
+            .collect()
     }
 
     pub fn summary(&self) -> BeltSummary {
@@ -97,7 +109,6 @@ impl MmrBelt {
         let common = common_peak_prefix_len(from_num_leaves, self.num_leaves);
         let peaks = self.peaks();
 
-        let mountains = self.ordered_mountains();
         let from_shape = shape_mountains(from_num_leaves);
         let to_shape = shape_mountains(self.num_leaves);
         let mut merge_auth = BTreeMap::new();
@@ -112,7 +123,7 @@ impl MmrBelt {
             {
                 merge_auth
                     .entry((sibling_start, height))
-                    .or_insert_with(|| self.node_at(&mountains, sibling_start, height));
+                    .or_insert_with(|| self.node_at(sibling_start, height));
             }
         }
 
@@ -124,12 +135,12 @@ impl MmrBelt {
         })
     }
 
-    fn node_at(&self, mountains: &[&BeltMountain], start: usize, height: usize) -> Word {
-        let mountain = mountains
-            .iter()
-            .find(|mountain| mountain.start <= start && start < mountain.start + mountain.size())
-            .expect("node must lie within a mountain");
-        mountain.node_at(start, height)
+    fn node_at(&self, start: usize, height: usize) -> Word {
+        self.hash_at(node_hash_index(start, height))
+    }
+
+    fn hash_at(&self, index: HashIndex) -> Word {
+        self.hashes.get(index).expect("hash must be present in storage")
     }
 
     pub fn open(&self, position: usize) -> Result<BeltProof, MmrError> {
@@ -141,13 +152,37 @@ impl MmrBelt {
         let shape = shape_from_mountains(&mountains);
         let mountain_idx = shape_mountain_for_position(&shape, position)
             .ok_or(MmrError::PositionNotFound(position))?;
-        let mountain = mountains[mountain_idx];
-        let (leaf, mut nodes) = mountain.open(position - mountain.start);
+        let mountain = shape[mountain_idx];
+        let (leaf, mut nodes) = self.open_within_mountain(position, mountain);
 
-        let peaks = mountains.iter().map(|mountain| mountain.root()).collect::<Vec<_>>();
+        let peaks = mountains
+            .iter()
+            .map(|mountain| self.hash_at(mountain.index))
+            .collect::<Vec<_>>();
         nodes.extend(bagging_path_nodes(&peaks, &shape_ranges(&shape), mountain_idx));
 
         Ok(BeltProof { position, leaf, nodes })
+    }
+
+    fn open_within_mountain(
+        &self,
+        position: usize,
+        mountain: ShapeMountain,
+    ) -> (Word, Vec<BeltProofNode>) {
+        let leaf = self.node_at(position, 0);
+        let mut nodes = Vec::with_capacity(mountain.height);
+        let mut node_start = position;
+
+        for height in 0..mountain.height {
+            let (sibling_start, parent_start) = sibling_and_parent_start(node_start, height);
+            nodes.push(BeltProofNode {
+                value: self.node_at(sibling_start, height),
+                side: sibling_side((node_start >> height) & 1 == 0),
+            });
+            node_start = parent_start;
+        }
+
+        (leaf, nodes)
     }
 
     #[cfg(test)]
@@ -204,7 +239,12 @@ impl MmrBelt {
         let left = self.mountains[left_idx]
             .take()
             .expect("left member of mergeable pair must be active");
+        let root = Poseidon2::merge(&[
+            self.hash_at(left.mountain.index),
+            self.hash_at(right.mountain.index),
+        ]);
         let merged = left.mountain.merge(right.mountain);
+        self.hashes.set(merged.index, root);
 
         self.mountains[left_idx] = Some(BeltMountainSlot {
             mountain: merged,
@@ -303,6 +343,24 @@ struct BeltMountainSlot {
 struct MergeablePair {
     right_idx: usize,
     right_generation: u64,
+}
+
+#[derive(Debug, Clone, Default)]
+struct BeltHashArray {
+    nodes: Vec<Option<Word>>,
+}
+
+impl BeltHashArray {
+    fn get(&self, index: HashIndex) -> Option<Word> {
+        self.nodes.get(index.0).copied().flatten()
+    }
+
+    fn set(&mut self, index: HashIndex, value: Word) {
+        if self.nodes.len() <= index.0 {
+            self.nodes.resize(index.0 + 1, None);
+        }
+        self.nodes[index.0] = Some(value);
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -622,12 +680,12 @@ impl BeltProof {
             return false;
         }
 
-        let root = self.nodes.iter().fold(self.leaf, |current, node| match node.side {
+        let bagged = self.nodes.iter().fold(self.leaf, |current, node| match node.side {
             SiblingSide::Left => Poseidon2::merge(&[node.value, current]),
             SiblingSide::Right => Poseidon2::merge(&[current, node.value]),
         });
 
-        root == summary.root
+        bind_length(bagged, summary.num_leaves) == summary.root
     }
 
     #[cfg(test)]
@@ -657,113 +715,29 @@ enum SiblingSide {
 struct BeltMountain {
     start: usize,
     height: usize,
-    node: Rc<MountainNode>,
+    index: HashIndex,
 }
 
 impl BeltMountain {
-    fn new(start: usize, leaf: Word) -> Self {
-        Self {
-            start,
-            height: 0,
-            node: Rc::new(MountainNode::Leaf(leaf)),
-        }
+    fn new(start: usize, index: HashIndex) -> Self {
+        Self { start, height: 0, index }
     }
 
     fn merge(self, other: Self) -> Self {
         debug_assert_eq!(self.height, other.height);
         debug_assert_eq!(self.start + self.size(), other.start);
 
-        let root = Poseidon2::merge(&[self.root(), other.root()]);
+        let index = parent_hash_index(self.index);
+        debug_assert_eq!(index, parent_hash_index(other.index));
         Self {
             start: self.start,
             height: self.height + 1,
-            node: Rc::new(MountainNode::Inner { root, left: self.node, right: other.node }),
+            index,
         }
     }
 
     fn size(&self) -> usize {
         1usize << self.height
-    }
-
-    fn root(&self) -> Word {
-        self.node.root()
-    }
-
-    fn open(&self, local_position: usize) -> (Word, Vec<BeltProofNode>) {
-        let mut path = Vec::with_capacity(self.height);
-        let leaf = self.node.open(self.height, local_position, &mut path);
-        (leaf, path)
-    }
-
-    fn node_at(&self, target_start: usize, target_height: usize) -> Word {
-        self.node.node_at(self.start, self.height, target_start, target_height)
-    }
-}
-
-#[derive(Debug, Clone)]
-enum MountainNode {
-    Leaf(Word),
-    Inner {
-        root: Word,
-        left: Rc<MountainNode>,
-        right: Rc<MountainNode>,
-    },
-}
-
-impl MountainNode {
-    fn root(&self) -> Word {
-        match self {
-            Self::Leaf(root) | Self::Inner { root, .. } => *root,
-        }
-    }
-
-    fn open(&self, height: usize, local_position: usize, path: &mut Vec<BeltProofNode>) -> Word {
-        match self {
-            Self::Leaf(leaf) => *leaf,
-            Self::Inner { left, right, .. } => {
-                let half = 1usize << (height - 1);
-                if local_position < half {
-                    let leaf = left.open(height - 1, local_position, path);
-                    path.push(BeltProofNode {
-                        value: right.root(),
-                        side: SiblingSide::Right,
-                    });
-                    leaf
-                } else {
-                    let leaf = right.open(height - 1, local_position - half, path);
-                    path.push(BeltProofNode {
-                        value: left.root(),
-                        side: SiblingSide::Left,
-                    });
-                    leaf
-                }
-            },
-        }
-    }
-
-    fn node_at(
-        &self,
-        cur_start: usize,
-        cur_height: usize,
-        target_start: usize,
-        target_height: usize,
-    ) -> Word {
-        if cur_height == target_height {
-            debug_assert_eq!(cur_start, target_start);
-            return self.root();
-        }
-
-        match self {
-            Self::Leaf(_) => unreachable!("target height is below a leaf"),
-            Self::Inner { left, right, .. } => {
-                let mid = cur_start + (1usize << (cur_height - 1));
-                if target_start < mid {
-                    left.node_at(cur_start, cur_height - 1, target_start, target_height)
-                } else {
-                    right.node_at(mid, cur_height - 1, target_start, target_height)
-                }
-            },
-        }
     }
 }
 
@@ -835,6 +809,33 @@ fn proof_sides_for_position(num_leaves: usize, position: usize) -> Option<Vec<Si
     sides.extend(forward_tree_sides(ranges.len(), range_idx));
 
     Some(sides)
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct HashIndex(usize);
+
+fn leaf_hash_index(position: usize) -> HashIndex {
+    HashIndex(2 * (position + 1) + 1)
+}
+
+fn parent_hash_index(child: HashIndex) -> HashIndex {
+    let span = 1usize << (child.0.trailing_zeros() as usize + 2);
+    HashIndex(child.0 + child.0 % span)
+}
+
+#[cfg(test)]
+fn hash_children(parent: HashIndex) -> (HashIndex, HashIndex) {
+    debug_assert!(parent.0 % 2 == 0);
+    let span = 1usize << (parent.0.trailing_zeros() as usize - 1);
+    (HashIndex(parent.0 - 3 * span), HashIndex(parent.0 - span))
+}
+
+fn node_hash_index(start: usize, height: usize) -> HashIndex {
+    let mut index = leaf_hash_index(start);
+    for _ in 0..height {
+        index = parent_hash_index(index);
+    }
+    index
 }
 
 /// This is the common currency for all belt geometry: both the prover (over its live mountain
@@ -956,7 +957,16 @@ fn bag_peaks(num_leaves: usize, peaks: &[Word]) -> Word {
         .map(|range| forward_bag(peaks[range].iter().copied()))
         .collect::<Vec<_>>();
 
-    forward_bag(range_roots)
+    bind_length(forward_bag(range_roots), num_leaves)
+}
+
+/// Binds the leaf count into a bagged root, yielding the final length-committing commitment.
+///
+/// This is the step that closes the `hash_peaks()` shape-omission gap (issue #863): the returned
+/// root authenticates `num_leaves`, and hence the belt's entire shape, on its own.
+fn bind_length(bagged_root: Word, num_leaves: usize) -> Word {
+    let length = Word::new([Felt::new_unchecked(num_leaves as u64), ZERO, ZERO, ZERO]);
+    Poseidon2::merge_in_domain(&[bagged_root, length], BELT_ROOT_DOMAIN)
 }
 
 /// Returns the number of leftmost peaks shared between the `from` and `to` states.
@@ -1008,8 +1018,83 @@ fn forward_tree_sides(len: usize, target_idx: usize) -> Vec<SiblingSide> {
 mod tests {
     use alloc::{vec, vec::Vec};
 
-    use super::{BeltSummary, MmrBelt, PartialMmrBelt};
-    use crate::merkle::int_to_node;
+    use super::{
+        BeltSummary, HashIndex, MmrBelt, PartialMmrBelt, hash_children, leaf_hash_index,
+        node_hash_index, parent_hash_index, shape_mountains, shape_ranges,
+    };
+    use crate::{Word, hash::poseidon2::Poseidon2, merkle::int_to_node};
+
+    fn shape_heights(num_leaves: usize) -> Vec<usize> {
+        shape_mountains(num_leaves).iter().map(|mountain| mountain.height).collect()
+    }
+
+    fn shape_hash_indices(num_leaves: usize) -> Vec<usize> {
+        shape_mountains(num_leaves)
+            .iter()
+            .map(|mountain| node_hash_index(mountain.start, mountain.height).0)
+            .collect()
+    }
+
+    fn hash_range(leaves: &[Word], start: usize, height: usize) -> Word {
+        if height == 0 {
+            return leaves[start];
+        }
+
+        let half = 1usize << (height - 1);
+        Poseidon2::merge(&[
+            hash_range(leaves, start, height - 1),
+            hash_range(leaves, start + half, height - 1),
+        ])
+    }
+
+    #[test]
+    fn belt_hash_indices_match_clojure_layout() {
+        let leaf_indices = (0..6).map(|position| leaf_hash_index(position).0).collect::<Vec<_>>();
+        assert_eq!(leaf_indices, vec![3, 5, 7, 9, 11, 13]);
+
+        assert_eq!(parent_hash_index(HashIndex(3)), HashIndex(6));
+        assert_eq!(parent_hash_index(HashIndex(5)), HashIndex(6));
+        assert_eq!(hash_children(HashIndex(6)), (HashIndex(3), HashIndex(5)));
+
+        assert_eq!(parent_hash_index(HashIndex(6)), HashIndex(12));
+        assert_eq!(parent_hash_index(HashIndex(10)), HashIndex(12));
+        assert_eq!(hash_children(HashIndex(12)), (HashIndex(6), HashIndex(10)));
+    }
+
+    #[test]
+    fn belt_shape_hash_indices_match_peak_layout() {
+        assert_eq!(shape_hash_indices(1), vec![3]);
+        assert_eq!(shape_hash_indices(2), vec![6]);
+        assert_eq!(shape_hash_indices(3), vec![6, 7]);
+        assert_eq!(shape_hash_indices(4), vec![6, 10]);
+        assert_eq!(shape_hash_indices(5), vec![12, 11]);
+        assert_eq!(shape_hash_indices(9), vec![12, 20, 19]);
+        assert_eq!(shape_hash_indices(10), vec![12, 20, 22]);
+    }
+
+    #[test]
+    fn belt_hash_array_stores_live_mountain_nodes() {
+        let mut belt = MmrBelt::new();
+        let leaves = (0..64).map(int_to_node).collect::<Vec<_>>();
+
+        for leaf in leaves.iter().copied() {
+            belt.add(leaf).unwrap();
+        }
+
+        for mountain in belt.ordered_mountains() {
+            for height in 0..=mountain.height {
+                let width = 1usize << height;
+                for start in (mountain.start..mountain.start + mountain.size()).step_by(width) {
+                    assert_eq!(
+                        belt.hashes.get(node_hash_index(start, height)),
+                        Some(hash_range(&leaves, start, height)),
+                        "missing hash for node [{start}, {})",
+                        start + width
+                    );
+                }
+            }
+        }
+    }
 
     #[test]
     fn belt_lazy_append_height_sequence() {
@@ -1145,6 +1230,33 @@ mod tests {
         proof.set_position_for_testing(5);
 
         assert!(!proof.verify(&summary));
+    }
+
+    #[test]
+    fn belt_root_binds_leaf_count() {
+        use super::{bind_length, forward_bag};
+
+        let num_leaves = 20usize;
+        let mut belt = MmrBelt::new();
+        for idx in 0..num_leaves {
+            belt.add(int_to_node(idx as u64)).unwrap();
+        }
+        let summary = belt.summary();
+
+        // Reconstruct the un-bound double-bagging (the raw peak commitment).
+        let peaks = belt.peaks();
+        let shape = shape_mountains(num_leaves);
+        let range_roots = shape_ranges(&shape)
+            .into_iter()
+            .map(|range| forward_bag(peaks[range].iter().copied()))
+            .collect::<Vec<_>>();
+        let unbound = forward_bag(range_roots);
+
+        // The published root binds the leaf count: it differs from the raw bagging, and equals the
+        // raw bagging only once the count is mixed in. So the count cannot be omitted from the root.
+        assert_ne!(unbound, summary.root());
+        assert_eq!(bind_length(unbound, num_leaves), summary.root());
+        assert_ne!(bind_length(unbound, num_leaves), bind_length(unbound, num_leaves + 1));
     }
 
     #[test]
@@ -1365,5 +1477,61 @@ mod tests {
         }
         let partial = PartialMmrBelt::from_peaks(belt.num_leaves(), belt.peaks()).unwrap();
         assert!(partial.open(3).unwrap().is_none());
+    }
+
+    #[test]
+    fn belt_height_sequences_match_paper() {
+        // Golden mountain-height sequences S_n published in the MMB paper (arXiv:2511.13582):
+        // §3.1 for n = 9, Figure 5 for n = 10, Figures 5/6 for n = 11, and Figure 7/9 for n = 1337.
+        // Both the live structure and the O(log n) shape derivation must reproduce them.
+        let golden: [(usize, &[usize]); 4] = [
+            (9, &[2, 2, 0]),
+            (10, &[2, 2, 1]),
+            (11, &[3, 1, 0]),
+            (1337, &[9, 9, 7, 6, 6, 5, 4, 2, 2, 0]),
+        ];
+
+        for (num_leaves, expected) in golden {
+            assert_eq!(shape_heights(num_leaves), expected, "shape S_{num_leaves}");
+
+            let mut belt = MmrBelt::new();
+            for idx in 0..num_leaves {
+                belt.add(int_to_node(idx as u64)).unwrap();
+            }
+            assert_eq!(belt.mountain_heights(), expected, "live S_{num_leaves}");
+        }
+    }
+
+    #[test]
+    fn belt_merge_peak_lands_in_last_two_ranges() {
+        // Lemma 16: when an append performs a merge, the new merge peak sits at the right end of
+        // its range, in either the rightmost or second-rightmost range. A merge happens on
+        // the append that brings the count to `n` exactly when `n + 1` is not a power of
+        // two (Lemma 6.3), and the merge peak then sits at position `nu2(n + 1)` counted
+        // from the right (Lemma 6.3).
+        for num_leaves in 2..4096usize {
+            if (num_leaves + 1).is_power_of_two() {
+                continue; // merge step skipped on this append
+            }
+
+            let shape = shape_mountains(num_leaves);
+            let merge_idx = shape.len() - 1 - (num_leaves + 1).trailing_zeros() as usize;
+
+            let ranges = shape_ranges(&shape);
+            let range_idx = ranges
+                .iter()
+                .position(|range| range.contains(&merge_idx))
+                .expect("merge peak must lie in a range");
+
+            assert_eq!(
+                ranges[range_idx].end,
+                merge_idx + 1,
+                "n={num_leaves}: merge peak must sit at the right end of its range"
+            );
+            assert!(
+                range_idx + 2 >= ranges.len(),
+                "n={num_leaves}: merge peak must be in the rightmost or second-rightmost range"
+            );
+        }
     }
 }
