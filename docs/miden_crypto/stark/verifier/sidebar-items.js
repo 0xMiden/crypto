@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"enum":["VerifierError"],"fn":["verify"]};
+window.SIDEBAR_ITEMS = {"enum":["VerifierError"],"struct":["VerifierInstance"]};

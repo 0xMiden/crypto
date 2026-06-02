@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"mod":["air","challenger","debug","dft","hasher","lmcs","matrix","pcs","proof","prover","symmetric","verifier"],"struct":["GenericStarkConfig"],"trait":["StarkConfig"]};
+window.SIDEBAR_ITEMS = {"enum":["PreprocessedValidationError"],"mod":["air","challenger","debug","dft","hasher","lmcs","matrix","pcs","proof","prover","symmetric","verifier"],"struct":["GenericStarkConfig","Preprocessed","ProverInstance","VerifierInstance"],"trait":["StarkConfig"]};

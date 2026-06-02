@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"enum":["DomainError","ShapeError"],"mod":["air","debug","hasher","lmcs","pcs","proof","prover","testing","verifier"],"struct":["GenericStarkConfig"],"trait":["StarkConfig"]};
+window.SIDEBAR_ITEMS = {"enum":["DomainError","PreprocessedValidationError","ShapeError"],"mod":["air","debug","hasher","lmcs","pcs","proof","prover","testing","verifier"],"struct":["GenericStarkConfig","Preprocessed"],"trait":["StarkConfig"]};

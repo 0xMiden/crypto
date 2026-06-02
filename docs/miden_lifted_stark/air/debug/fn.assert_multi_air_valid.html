@@ -7,8 +7,9 @@
 <li><a href="../trait.MultiAir.html#tymethod.airs" title="method miden_lifted_stark::air::MultiAir::airs"><code>MultiAir::airs</code></a> is non-empty.</li>
 <li>All AIRs agree on <a href="../trait.BaseAir.html#method.num_public_values" title="method miden_lifted_stark::air::BaseAir::num_public_values"><code>BaseAir::num_public_values</code></a>.</li>
 <li><a href="../trait.MultiAir.html#method.num_air_inputs" title="method miden_lifted_stark::air::MultiAir::num_air_inputs"><code>MultiAir::num_air_inputs</code></a> agrees with the per-AIR public value count.</li>
-<li>Each AIR has no preprocessed trace.</li>
 <li>Each AIR has positive auxiliary width.</li>
+<li>Each AIR’s <a href="../trait.LiftedAir.html#method.preprocessed_width" title="method miden_lifted_stark::air::LiftedAir::preprocessed_width"><code>LiftedAir::preprocessed_width</code></a> agrees with <a href="../trait.BaseAir.html#method.preprocessed_trace" title="method miden_lifted_stark::air::BaseAir::preprocessed_trace"><code>BaseAir::preprocessed_trace</code></a>
+presence and width.</li>
 <li>Each periodic column is non-empty and has power-of-two length.</li>
 <li><a href="../trait.LiftedAir.html#method.max_periodic_length" title="method miden_lifted_stark::air::LiftedAir::max_periodic_length"><code>LiftedAir::max_periodic_length</code></a> agrees with the raw periodic columns.</li>
 </ul>
