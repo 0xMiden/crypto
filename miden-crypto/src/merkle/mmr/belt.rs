@@ -2,20 +2,40 @@ use alloc::{collections::BTreeMap, vec::Vec};
 use core::ops::Range;
 
 use super::{Forest, MmrError};
-use crate::{EMPTY_WORD, Felt, Word, ZERO, hash::poseidon2::Poseidon2};
+use crate::{EMPTY_WORD, Felt, Word, hash::poseidon2::Poseidon2};
 
-/// Domain separator for the final root, which binds the leaf count into the commitment.
-///
-/// Because the belt shape is a pure function of the leaf count (Lemma 6), binding the count makes
-/// the root commit to the entire structure: it cannot be reinterpreted under a different length.
-const BELT_ROOT_DOMAIN: Felt = Felt::new_unchecked(0x4d4d_425f_524f_4f54); // "MMB_ROOT"
+/// Range-layer domain base; low bits encode mountain height.
+const BELT_RANGE_DOMAIN_BASE: u64 = 0x4d4d_425f_5247_0000; // "MMB_RG" + height
+/// Belt-layer domain.
+const BELT_BAG_DOMAIN: Felt = Felt::new_unchecked(0x4d4d_425f_4247_4254); // "MMB_BGBT"
+
+fn range_domain(height: usize) -> Felt {
+    Felt::new_unchecked(BELT_RANGE_DOMAIN_BASE + height as u64)
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum FoldDomain {
+    Mountain,
+    Range(usize),
+    Belt,
+}
+
+impl FoldDomain {
+    fn merge(self, left: Word, right: Word) -> Word {
+        match self {
+            FoldDomain::Mountain => Poseidon2::merge(&[left, right]),
+            FoldDomain::Range(height) => {
+                Poseidon2::merge_in_domain(&[left, right], range_domain(height))
+            },
+            FoldDomain::Belt => Poseidon2::merge_in_domain(&[left, right], BELT_BAG_DOMAIN),
+        }
+    }
+}
 
 /// Prototype implementation of the Merkle Mountain Belt construction.
 ///
-/// This type is intentionally reference-oriented: it keeps live mountains in a linked list and
-/// re-derives belt ranges, summaries, and proofs from that list while the paper mechanics settle.
-/// Appends use stable mountain slots, local links, a mergeable-pair stack, and indexed hash-array
-/// storage for committed nodes. Increment proofs are not yet implemented.
+/// This reference-oriented implementation uses stable mountain slots, a mergeable-pair stack, and
+/// indexed hash-array storage. Increment proofs are not yet implemented.
 #[derive(Debug, Clone, Default)]
 pub struct MmrBelt {
     mountains: Vec<Option<BeltMountainSlot>>,
@@ -72,11 +92,7 @@ impl MmrBelt {
         self.num_leaves
     }
 
-    /// Returns the ordered mountain peaks: the additive mountain-order summary.
-    ///
-    /// These are the mountain roots from left (oldest) to right (newest). Unlike the single
-    /// double-bagged [`BeltSummary::root`], this list is incremental: after a `k`-increment only
-    /// its `O(log k)` rightmost entries change (see [`MmrBelt::delta`]).
+    /// Returns the left-to-right mountain roots.
     pub fn peaks(&self) -> Vec<Word> {
         self.ordered_mountains()
             .iter()
@@ -91,13 +107,7 @@ impl MmrBelt {
         }
     }
 
-    /// Returns the delta needed to update a mountain-order summary from `from_num_leaves` leaves to
-    /// the current state.
-    ///
-    /// By Lemma 9 of the MMB paper, the peak lists of two states differ in only `O(log k)` hashes,
-    /// all at the rightmost end, so the delta carries just the changed tail of the peak list. It
-    /// also carries the `O(log² k)` within-mountain authentication nodes needed to extend any
-    /// tracked leaf whose mountain merged, so a [`PartialMmrBelt`] never has to re-track.
+    /// Returns the delta needed to update a mountain-order summary from `from_num_leaves`.
     ///
     /// # Errors
     /// Returns an error if `from_num_leaves` exceeds the current leaf count.
@@ -159,7 +169,7 @@ impl MmrBelt {
             .iter()
             .map(|mountain| self.hash_at(mountain.index))
             .collect::<Vec<_>>();
-        nodes.extend(bagging_path_nodes(&peaks, &shape_ranges(&shape), mountain_idx));
+        nodes.extend(bagging_path_nodes(&shape, &peaks, &shape_ranges(&shape), mountain_idx));
 
         Ok(BeltProof { position, leaf, nodes })
     }
@@ -170,17 +180,12 @@ impl MmrBelt {
         mountain: ShapeMountain,
     ) -> (Word, Vec<BeltProofNode>) {
         let leaf = self.node_at(position, 0);
-        let mut nodes = Vec::with_capacity(mountain.height);
-        let mut node_start = position;
-
-        for height in 0..mountain.height {
-            let (sibling_start, parent_start) = sibling_and_parent_start(node_start, height);
-            nodes.push(BeltProofNode {
+        let nodes = climb_to_peak(position, 0, mountain.height)
+            .map(|(side, sibling_start, height)| BeltProofNode {
                 value: self.node_at(sibling_start, height),
-                side: sibling_side((node_start >> height) & 1 == 0),
-            });
-            node_start = parent_start;
-        }
+                side,
+            })
+            .collect();
 
         (leaf, nodes)
     }
@@ -372,10 +377,6 @@ pub struct BeltSummary {
 impl BeltSummary {
     /// Builds a summary by double-bagging a mountain-order peak list.
     ///
-    /// This lets a client that maintains only the additive peak list (see [`MmrBelt::peaks`])
-    /// derive the same `O(1)` commitment a full node publishes, without storing the belt
-    /// itself.
-    ///
     /// # Errors
     /// Returns an error if the number of peaks does not match the shape implied by `num_leaves`.
     pub fn from_peaks(num_leaves: usize, peaks: &[Word]) -> Result<Self, MmrError> {
@@ -395,8 +396,7 @@ impl BeltSummary {
 
     /// Returns the number of leaves authenticated by this summary.
     ///
-    /// The authenticated commitment is the pair `(num_leaves, root)`. The root alone is not a
-    /// length-binding commitment, matching the convention used by the frontier benchmarks.
+    /// The count lets consumers derive the expected shape and proof handedness.
     pub fn num_leaves(&self) -> usize {
         self.num_leaves
     }
@@ -406,21 +406,13 @@ impl BeltSummary {
     }
 }
 
-/// An incremental update to a mountain-order summary, carrying only the peaks that changed during a
-/// `k`-increment.
-///
-/// The unchanged peaks form a prefix of the peak list (the leftmost mountains never participate in
-/// a merge during the increment), so only the rightmost `O(log k)` peaks need to be transmitted. A
-/// client applies it to its summary with [`MmrBeltDelta::apply`], and to its tracked leaves with
-/// [`PartialMmrBelt::apply`], using the carried `merge_auth` nodes.
+/// Incremental update to a mountain-order summary.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct MmrBeltDelta {
     from_num_leaves: usize,
     to_num_leaves: usize,
     new_tail_peaks: Vec<Word>,
-    /// Within-mountain authentication nodes, keyed by their `(start, height)` coordinate, that let
-    /// a client extend the path of any tracked leaf whose mountain merged during the
-    /// increment.
+    /// Authentication nodes for extending tracked leaves whose mountain merged.
     merge_auth: BTreeMap<(usize, usize), Word>,
 }
 
@@ -441,11 +433,7 @@ impl MmrBeltDelta {
         self.merge_auth.len()
     }
 
-    /// Applies this delta to a client's `old_peaks` (the mountain-order summary at
-    /// [`Self::from_num_leaves`]), returning the updated peak list at [`Self::to_num_leaves`].
-    ///
-    /// The unchanged prefix length is recomputed from the leaf counts alone, so a client does not
-    /// trust the producer's split point.
+    /// Applies this delta to a client's old mountain-order peak list.
     ///
     /// # Errors
     /// Returns an error if `old_peaks` does not match the shape implied by
@@ -477,17 +465,10 @@ impl MmrBeltDelta {
 // PARTIAL MERKLE MOUNTAIN BELT
 // ================================================================================================
 
-/// A client-side view of a Merkle Mountain Belt.
+/// Client-side view of a Merkle Mountain Belt.
 ///
-/// It stores the mountain-order summary `(num_leaves, peaks)` — enough to derive the `O(1)`
-/// commitment locally and to authenticate newly tracked leaves — plus the within-mountain
-/// authentication path of a tracked subset of leaves. The bagging layers (range and belt nodes) are
-/// not stored: a client holding all mountain peaks rebuilds them locally on demand (Lemma 15 of the
-/// MMB paper), which keeps tracked state small and lets every append re-bag for free.
-///
-/// A tracked leaf's within-mountain path is invariant as long as its mountain does not merge (the
-/// covered leaves are immutable). [`Self::apply`] extends tracked leaves in place when their
-/// mountains merge during the increment, using the delta's carried authentication nodes.
+/// Stores the mountain-order summary plus within-mountain paths for tracked leaves. Range and belt
+/// paths are rebuilt from the local peak list on demand.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PartialMmrBelt {
     num_leaves: usize,
@@ -594,16 +575,12 @@ impl PartialMmrBelt {
             shape_mountain_for_position(&shape, pos).ok_or(MmrError::PositionNotFound(pos))?;
 
         let mut nodes = tracked.within_path.clone();
-        nodes.extend(bagging_path_nodes(&self.peaks, &shape_ranges(&shape), mountain_idx));
+        nodes.extend(bagging_path_nodes(&shape, &self.peaks, &shape_ranges(&shape), mountain_idx));
 
         Ok(Some(BeltProof { position: pos, leaf: tracked.leaf, nodes }))
     }
 
-    /// Applies an increment delta, advancing the summary and every tracked leaf to the delta's
-    /// target state.
-    ///
-    /// Tracked leaves whose mountain merged during the increment have their within-mountain path
-    /// extended in place using the delta's authentication nodes, so no re-tracking is ever needed.
+    /// Applies an increment delta to the summary and tracked paths.
     ///
     /// # Errors
     /// Returns an error if the delta does not originate from the current state, if it does not
@@ -623,17 +600,14 @@ impl PartialMmrBelt {
                 .ok_or(MmrError::PositionNotFound(pos))?;
             let new_mountain = new_shape[mountain_idx];
 
-            for (node_start, sibling_start, height) in
+            for (side, sibling_start, height) in
                 climb_to_peak(tracked.mountain_start, tracked.mountain_height, new_mountain.height)
             {
                 let &value = delta
                     .merge_auth
                     .get(&(sibling_start, height))
                     .ok_or(MmrError::InvalidUpdate)?;
-                tracked.within_path.push(BeltProofNode {
-                    value,
-                    side: sibling_side((node_start >> height) & 1 == 0),
-                });
+                tracked.within_path.push(BeltProofNode { value, side });
             }
 
             tracked.mountain_start = new_mountain.start;
@@ -665,27 +639,26 @@ impl BeltProof {
             return false;
         }
 
-        let Some(expected_sides) = proof_sides_for_position(summary.num_leaves, self.position)
-        else {
+        let Some(steps) = proof_steps_for_position(summary.num_leaves, self.position) else {
             return false;
         };
 
-        if self.nodes.len() != expected_sides.len()
-            || self
-                .nodes
-                .iter()
-                .zip(expected_sides)
-                .any(|(node, expected_side)| node.side != expected_side)
+        if self.nodes.len() != steps.len()
+            || self.nodes.iter().zip(&steps).any(|(node, (side, _))| node.side != *side)
         {
             return false;
         }
 
-        let bagged = self.nodes.iter().fold(self.leaf, |current, node| match node.side {
-            SiblingSide::Left => Poseidon2::merge(&[node.value, current]),
-            SiblingSide::Right => Poseidon2::merge(&[current, node.value]),
-        });
+        let root =
+            self.nodes
+                .iter()
+                .zip(&steps)
+                .fold(self.leaf, |current, (node, (side, domain))| match side {
+                    SiblingSide::Left => domain.merge(node.value, current),
+                    SiblingSide::Right => domain.merge(current, node.value),
+                });
 
-        bind_length(bagged, summary.num_leaves) == summary.root
+        root == summary.root
     }
 
     #[cfg(test)]
@@ -741,36 +714,8 @@ impl BeltMountain {
     }
 }
 
-fn forward_bag<T>(nodes: T) -> Word
-where
-    T: IntoIterator<Item = Word>,
-{
-    let mut iter = nodes.into_iter();
-    let Some(first) = iter.next() else {
-        return EMPTY_WORD;
-    };
-
-    iter.fold(first, |left, right| Poseidon2::merge(&[left, right]))
-}
-
-// The target's subtree is the left child at every level it climbs, so its path is the prefix bag
-// to its left (one node, if any) followed by each peak to its right.
-fn forward_tree_path(nodes: &[Word], target_idx: usize) -> Vec<BeltProofNode> {
-    debug_assert!(!nodes.is_empty());
-    debug_assert!(target_idx < nodes.len());
-
-    let mut path = Vec::with_capacity(nodes.len() - target_idx);
-    if target_idx > 0 {
-        let left = forward_bag(nodes[..target_idx].iter().copied());
-        path.push(BeltProofNode { value: left, side: SiblingSide::Left });
-    }
-    for &node in &nodes[target_idx + 1..] {
-        path.push(BeltProofNode { value: node, side: SiblingSide::Right });
-    }
-    path
-}
-
 fn bagging_path_nodes(
+    shape: &[ShapeMountain],
     peaks: &[Word],
     ranges: &[Range<usize>],
     mountain_idx: usize,
@@ -781,34 +726,63 @@ fn bagging_path_nodes(
         .expect("mountain must be part of a range");
     let range = ranges[range_idx].clone();
 
-    let mut nodes = forward_tree_path(&peaks[range.clone()], mountain_idx - range.start);
+    let mut nodes = Vec::new();
+
+    let prefix = bag_range(&shape[range.start..mountain_idx], &peaks[range.start..mountain_idx]);
+    nodes.push(BeltProofNode { value: prefix, side: SiblingSide::Left });
+    for &peak in &peaks[mountain_idx + 1..range.end] {
+        nodes.push(BeltProofNode { value: peak, side: SiblingSide::Right });
+    }
+
     let range_roots = ranges
         .iter()
-        .map(|range| forward_bag(peaks[range.clone()].iter().copied()))
+        .map(|range| bag_range(&shape[range.clone()], &peaks[range.clone()]))
         .collect::<Vec<_>>();
-    nodes.extend(forward_tree_path(&range_roots, range_idx));
+    let prefix_belt = bag_belt(&range_roots[..range_idx]);
+    nodes.push(BeltProofNode {
+        value: prefix_belt,
+        side: SiblingSide::Left,
+    });
+    for &root in &range_roots[range_idx + 1..] {
+        nodes.push(BeltProofNode { value: root, side: SiblingSide::Right });
+    }
+
     nodes
 }
 
-fn proof_sides_for_position(num_leaves: usize, position: usize) -> Option<Vec<SiblingSide>> {
+fn proof_steps_for_position(
+    num_leaves: usize,
+    position: usize,
+) -> Option<Vec<(SiblingSide, FoldDomain)>> {
     if position >= num_leaves {
         return None;
     }
 
-    let mountains = shape_mountains(num_leaves);
-    let mountain_idx = shape_mountain_for_position(&mountains, position)?;
-    let mountain = mountains[mountain_idx];
-    let local_position = position - mountain.start;
+    let shape = shape_mountains(num_leaves);
+    let mountain_idx = shape_mountain_for_position(&shape, position)?;
+    let mountain = shape[mountain_idx];
 
-    let mut sides = balanced_tree_sides(mountain.height, local_position);
+    let mut steps: Vec<(SiblingSide, FoldDomain)> =
+        balanced_tree_sides(mountain.height, position - mountain.start)
+            .into_iter()
+            .map(|side| (side, FoldDomain::Mountain))
+            .collect();
 
-    let ranges = shape_ranges(&mountains);
+    let ranges = shape_ranges(&shape);
     let range_idx = ranges.iter().position(|range| range.contains(&mountain_idx))?;
     let range = ranges[range_idx].clone();
-    sides.extend(forward_tree_sides(range.len(), mountain_idx - range.start));
-    sides.extend(forward_tree_sides(ranges.len(), range_idx));
 
-    Some(sides)
+    steps.push((SiblingSide::Left, FoldDomain::Range(mountain.height)));
+    for mountain in &shape[mountain_idx + 1..range.end] {
+        steps.push((SiblingSide::Right, FoldDomain::Range(mountain.height)));
+    }
+
+    steps.push((SiblingSide::Left, FoldDomain::Belt));
+    for _ in (range_idx + 1)..ranges.len() {
+        steps.push((SiblingSide::Right, FoldDomain::Belt));
+    }
+
+    Some(steps)
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -831,16 +805,10 @@ fn hash_children(parent: HashIndex) -> (HashIndex, HashIndex) {
 }
 
 fn node_hash_index(start: usize, height: usize) -> HashIndex {
-    let mut index = leaf_hash_index(start);
-    for _ in 0..height {
-        index = parent_hash_index(index);
-    }
-    index
+    // Lemma 24 closed form for the node covering `[start, start + 2^height)`.
+    HashIndex((2 * (start >> height) + 3) << height)
 }
 
-/// This is the common currency for all belt geometry: both the prover (over its live mountain
-/// list) and the verifier (over a shape derived solely from the leaf count) reduce to a slice of
-/// `ShapeMountain` before computing ranges, positions, and proof handedness.
 #[derive(Debug, Clone, Copy)]
 struct ShapeMountain {
     start: usize,
@@ -863,12 +831,6 @@ fn shape_from_mountains(mountains: &[&BeltMountain]) -> Vec<ShapeMountain> {
         .collect()
 }
 
-/// Derives the left-to-right mountain shape directly from the leaf count, in O(log n) time.
-///
-/// By Lemma 6 of the MMB paper, if `num_leaves + 1 = (b_t .. b_1 b_0)` in binary then there are
-/// `t = floor(log2(num_leaves + 1))` mountains, and the mountain at position `i` (counted from the
-/// right, starting at zero) has height `s_i = i + b_i`; the leading bit `b_t` is ignored. This lets
-/// a verifier reconstruct the geometry without replaying every append.
 fn shape_mountains(num_leaves: usize) -> Vec<ShapeMountain> {
     if num_leaves == 0 {
         return Vec::new();
@@ -922,29 +884,25 @@ fn shape_range_split_after(mountains: &[ShapeMountain], idx: usize) -> bool {
     drops_by_two || left_is_right_member_of_mergeable_pair
 }
 
-// `start` is a multiple of `2^height`, so the parity of `start >> height` decides handedness: even
-// is a left child (sibling to the right), odd is a right child (sibling to the left).
-fn sibling_and_parent_start(start: usize, height: usize) -> (usize, usize) {
+fn sibling_and_parent_start(start: usize, height: usize) -> (SiblingSide, usize, usize) {
     let span = 1usize << height;
     if (start >> height) & 1 == 0 {
-        (start + span, start)
+        (SiblingSide::Right, start + span, start)
     } else {
-        (start - span, start - span)
+        (SiblingSide::Left, start - span, start - span)
     }
 }
 
-// The delta producer and client walk this same sequence to avoid path-extension drift.
 fn climb_to_peak(
     start: usize,
     from_height: usize,
     to_height: usize,
-) -> impl Iterator<Item = (usize, usize, usize)> {
+) -> impl Iterator<Item = (SiblingSide, usize, usize)> {
     let mut start = start;
     (from_height..to_height).map(move |height| {
-        let node_start = start;
-        let (sibling_start, parent_start) = sibling_and_parent_start(start, height);
+        let (side, sibling_start, parent_start) = sibling_and_parent_start(start, height);
         start = parent_start;
-        (node_start, sibling_start, height)
+        (side, sibling_start, height)
     })
 }
 
@@ -954,26 +912,25 @@ fn bag_peaks(num_leaves: usize, peaks: &[Word]) -> Word {
 
     let range_roots = shape_ranges(&shape)
         .into_iter()
-        .map(|range| forward_bag(peaks[range].iter().copied()))
+        .map(|range| bag_range(&shape[range.clone()], &peaks[range]))
         .collect::<Vec<_>>();
 
-    bind_length(forward_bag(range_roots), num_leaves)
+    bag_belt(&range_roots)
 }
 
-/// Binds the leaf count into a bagged root, yielding the final length-committing commitment.
-///
-/// This is the step that closes the `hash_peaks()` shape-omission gap (issue #863): the returned
-/// root authenticates `num_leaves`, and hence the belt's entire shape, on its own.
-fn bind_length(bagged_root: Word, num_leaves: usize) -> Word {
-    let length = Word::new([Felt::new_unchecked(num_leaves as u64), ZERO, ZERO, ZERO]);
-    Poseidon2::merge_in_domain(&[bagged_root, length], BELT_ROOT_DOMAIN)
+fn bag_range(mountains: &[ShapeMountain], peaks: &[Word]) -> Word {
+    debug_assert_eq!(mountains.len(), peaks.len());
+    mountains.iter().zip(peaks).fold(EMPTY_WORD, |acc, (mountain, &peak)| {
+        FoldDomain::Range(mountain.height).merge(acc, peak)
+    })
 }
 
-/// Returns the number of leftmost peaks shared between the `from` and `to` states.
-///
-/// Two mountains with the same start offset and height cover the same immutable leaf range, so they
-/// have identical peak hashes. The shared prefix is therefore the longest run of position-identical
-/// mountains, and everything past it is what a [`MmrBeltDelta`] must carry.
+fn bag_belt(range_roots: &[Word]) -> Word {
+    range_roots
+        .iter()
+        .fold(EMPTY_WORD, |acc, &root| FoldDomain::Belt.merge(acc, root))
+}
+
 fn common_peak_prefix_len(from_num_leaves: usize, to_num_leaves: usize) -> usize {
     let from_shape = shape_mountains(from_num_leaves);
     let to_shape = shape_mountains(to_num_leaves);
@@ -999,18 +956,6 @@ fn balanced_tree_sides(height: usize, mut local_position: usize) -> Vec<SiblingS
         sides.push(sibling_side(local_position & 1 == 0));
         local_position >>= 1;
     }
-    sides
-}
-
-fn forward_tree_sides(len: usize, target_idx: usize) -> Vec<SiblingSide> {
-    debug_assert!(len > 0);
-    debug_assert!(target_idx < len);
-
-    let mut sides = Vec::with_capacity(len - target_idx);
-    if target_idx > 0 {
-        sides.push(SiblingSide::Left);
-    }
-    sides.resize(sides.len() + (len - 1 - target_idx), SiblingSide::Right);
     sides
 }
 
@@ -1233,30 +1178,21 @@ mod tests {
     }
 
     #[test]
-    fn belt_root_binds_leaf_count() {
-        use super::{bind_length, forward_bag};
-
-        let num_leaves = 20usize;
+    fn belt_root_binds_shape_and_separates_layers() {
         let mut belt = MmrBelt::new();
-        for idx in 0..num_leaves {
-            belt.add(int_to_node(idx as u64)).unwrap();
+        for idx in 0..2 {
+            belt.add(int_to_node(idx)).unwrap();
         }
         let summary = belt.summary();
-
-        // Reconstruct the un-bound double-bagging (the raw peak commitment).
         let peaks = belt.peaks();
-        let shape = shape_mountains(num_leaves);
-        let range_roots = shape_ranges(&shape)
-            .into_iter()
-            .map(|range| forward_bag(peaks[range].iter().copied()))
-            .collect::<Vec<_>>();
-        let unbound = forward_bag(range_roots);
+        assert_eq!(peaks.len(), 1);
+        assert_ne!(summary.root(), peaks[0], "root must not be transparent to its peak");
 
-        // The published root binds the leaf count: it differs from the raw bagging, and equals the
-        // raw bagging only once the count is mixed in. So the count cannot be omitted from the root.
-        assert_ne!(unbound, summary.root());
-        assert_eq!(bind_length(unbound, num_leaves), summary.root());
-        assert_ne!(bind_length(unbound, num_leaves), bind_length(unbound, num_leaves + 1));
+        let mut bigger = MmrBelt::new();
+        for idx in 0..3 {
+            bigger.add(int_to_node(idx)).unwrap();
+        }
+        assert_ne!(bigger.summary().root(), summary.root());
     }
 
     #[test]
@@ -1481,9 +1417,7 @@ mod tests {
 
     #[test]
     fn belt_height_sequences_match_paper() {
-        // Golden mountain-height sequences S_n published in the MMB paper (arXiv:2511.13582):
-        // §3.1 for n = 9, Figure 5 for n = 10, Figures 5/6 for n = 11, and Figure 7/9 for n = 1337.
-        // Both the live structure and the O(log n) shape derivation must reproduce them.
+        // Golden S_n sequences from arXiv:2511.13582, §3.1 and Figures 5/7/9.
         let golden: [(usize, &[usize]); 4] = [
             (9, &[2, 2, 0]),
             (10, &[2, 2, 1]),
@@ -1504,11 +1438,7 @@ mod tests {
 
     #[test]
     fn belt_merge_peak_lands_in_last_two_ranges() {
-        // Lemma 16: when an append performs a merge, the new merge peak sits at the right end of
-        // its range, in either the rightmost or second-rightmost range. A merge happens on
-        // the append that brings the count to `n` exactly when `n + 1` is not a power of
-        // two (Lemma 6.3), and the merge peak then sits at position `nu2(n + 1)` counted
-        // from the right (Lemma 6.3).
+        // Lemma 16.
         for num_leaves in 2..4096usize {
             if (num_leaves + 1).is_power_of_two() {
                 continue; // merge step skipped on this append
