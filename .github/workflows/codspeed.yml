@@ -20,9 +20,9 @@ jobs:
       contents: read
       id-token: write
     env:
-      CRYPTO_SMT_MEASUREMENT_TIME_SECS: "2"
+      CRYPTO_SMT_MEASUREMENT_TIME_MILLIS: "1000"
       CRYPTO_SMT_SAMPLE_SIZE: "10"
-      CRYPTO_SMT_WARM_UP_TIME_SECS: "1"
+      CRYPTO_SMT_WARM_UP_TIME_MILLIS: "250"
       RAYON_NUM_THREADS: "8"
     steps:
       - name: Check out repository

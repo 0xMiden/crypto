@@ -23,24 +23,24 @@ fn env_usize(name: &str, default: usize) -> usize {
     }
 }
 
-fn env_u64(name: &str, default: u64) -> u64 {
+fn env_duration_millis(name: &str, default: u64) -> Duration {
     match std::env::var(name) {
         Ok(raw) => {
             let value = raw
                 .parse::<u64>()
                 .unwrap_or_else(|error| panic!("{name} must be a positive integer: {error}"));
             assert!(value > 0, "{name} must be greater than zero");
-            value
+            Duration::from_millis(value)
         },
-        Err(_) => default,
+        Err(_) => Duration::from_millis(default),
     }
 }
 
 fn criterion_config() -> Criterion {
     Criterion::default()
         .sample_size(env_usize("CRYPTO_SMT_SAMPLE_SIZE", 10))
-        .measurement_time(Duration::from_secs(env_u64("CRYPTO_SMT_MEASUREMENT_TIME_SECS", 2)))
-        .warm_up_time(Duration::from_secs(env_u64("CRYPTO_SMT_WARM_UP_TIME_SECS", 1)))
+        .measurement_time(env_duration_millis("CRYPTO_SMT_MEASUREMENT_TIME_MILLIS", 1_000))
+        .warm_up_time(env_duration_millis("CRYPTO_SMT_WARM_UP_TIME_MILLIS", 250))
 }
 
 fn configure_group<M: criterion::measurement::Measurement>(
@@ -49,8 +49,8 @@ fn configure_group<M: criterion::measurement::Measurement>(
     group
         .sampling_mode(SamplingMode::Flat)
         .sample_size(env_usize("CRYPTO_SMT_SAMPLE_SIZE", 10))
-        .measurement_time(Duration::from_secs(env_u64("CRYPTO_SMT_MEASUREMENT_TIME_SECS", 2)))
-        .warm_up_time(Duration::from_secs(env_u64("CRYPTO_SMT_WARM_UP_TIME_SECS", 1)));
+        .measurement_time(env_duration_millis("CRYPTO_SMT_MEASUREMENT_TIME_MILLIS", 1_000))
+        .warm_up_time(env_duration_millis("CRYPTO_SMT_WARM_UP_TIME_MILLIS", 250));
 }
 
 fn word(seed: u64) -> Word {
