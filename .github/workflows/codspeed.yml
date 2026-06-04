@@ -34,8 +34,12 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          toolchain="$(sed -n 's/^channel[[:space:]]*=[[:space:]]*"\(.*\)"$/\1/p' rust-toolchain.toml)"
-          rustup toolchain install "${toolchain}" --profile minimal
+          rustup toolchain install --profile minimal
+
+      - name: Install LLVM/Clang
+        uses: ./.github/actions/install-llvm
+        with:
+          version: "17"
 
       - name: Cache Rust dependencies
         uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
