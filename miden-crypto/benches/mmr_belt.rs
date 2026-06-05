@@ -97,24 +97,24 @@ fn bench_mmr_belt_append(c: &mut Criterion) {
         let next_leaf = generate_word_pattern(size as u64, WordPattern::Sequential);
 
         group.bench_with_input(BenchmarkId::new("current-mmr", size), &size, |b, _| {
-            b.iter_batched(
+            b.iter_batched_ref(
                 || data.mmr.clone(),
-                |mut mmr| {
+                |mmr| {
                     mmr.add(hint::black_box(next_leaf)).unwrap();
-                    hint::black_box(mmr);
+                    hint::black_box(mmr.forest().num_leaves());
                 },
-                BatchSize::SmallInput,
+                BatchSize::LargeInput,
             );
         });
 
         group.bench_with_input(BenchmarkId::new("belt-prototype", size), &size, |b, _| {
-            b.iter_batched(
+            b.iter_batched_ref(
                 || data.belt.clone(),
-                |mut belt| {
+                |belt| {
                     belt.add(hint::black_box(next_leaf)).unwrap();
-                    hint::black_box(belt);
+                    hint::black_box(belt.num_leaves());
                 },
-                BatchSize::SmallInput,
+                BatchSize::LargeInput,
             );
         });
 

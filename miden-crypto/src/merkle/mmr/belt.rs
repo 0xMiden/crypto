@@ -2,21 +2,12 @@ use alloc::{collections::BTreeMap, vec::Vec};
 use core::ops::Range;
 
 use super::{Forest, MmrError};
-use crate::{EMPTY_WORD, Felt, Word, hash::poseidon2::Poseidon2};
-
-/// Range-layer domain base; low bits encode mountain height.
-const BELT_RANGE_DOMAIN_BASE: u64 = 0x4d4d_425f_5247_0000; // "MMB_RG" + height
-/// Belt-layer domain.
-const BELT_BAG_DOMAIN: Felt = Felt::new_unchecked(0x4d4d_425f_4247_4254); // "MMB_BGBT"
-
-fn range_domain(height: usize) -> Felt {
-    Felt::new_unchecked(BELT_RANGE_DOMAIN_BASE + height as u64)
-}
+use crate::{EMPTY_WORD, Word, hash::poseidon2::Poseidon2};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum FoldDomain {
     Mountain,
-    Range(usize),
+    Range,
     Belt,
 }
 
@@ -24,10 +15,8 @@ impl FoldDomain {
     fn merge(self, left: Word, right: Word) -> Word {
         match self {
             FoldDomain::Mountain => Poseidon2::merge(&[left, right]),
-            FoldDomain::Range(height) => {
-                Poseidon2::merge_in_domain(&[left, right], range_domain(height))
-            },
-            FoldDomain::Belt => Poseidon2::merge_in_domain(&[left, right], BELT_BAG_DOMAIN),
+            FoldDomain::Range => Poseidon2::merge(&[left, right]),
+            FoldDomain::Belt => Poseidon2::merge(&[left, right]),
         }
     }
 }
@@ -43,8 +32,7 @@ pub struct MmrBelt {
     free_mountain_slots: Vec<usize>,
     head: Option<usize>,
     tail: Option<usize>,
-    mergeable_pairs: Vec<MergeablePair>,
-    next_slot_generation: u64,
+    rightmost_mergeable: Option<usize>,
     num_leaves: usize,
 }
 
@@ -70,7 +58,7 @@ impl MmrBelt {
             self.track_mergeable_pair(prev_idx, new_idx);
         }
 
-        if let Some(right_idx) = self.pop_mergeable_pair() {
+        if let Some(right_idx) = self.rightmost_mergeable {
             self.merge_pair(right_idx);
             Ok(1)
         } else {
@@ -86,6 +74,14 @@ impl MmrBelt {
     #[cfg(test)]
     fn storage_slots_for_testing(&self) -> usize {
         self.mountains.len()
+    }
+
+    #[cfg(test)]
+    fn rightmost_mergeable_pair_for_testing(&self) -> Option<(usize, usize)> {
+        let right_idx = self.rightmost_mergeable?;
+        let right = self.mountain_slot(right_idx);
+        let left_idx = right.prev?;
+        Some((self.mountain_slot(left_idx).mountain.start, right.mountain.start))
     }
 
     pub fn num_leaves(&self) -> usize {
@@ -201,13 +197,13 @@ impl MmrBelt {
     }
 
     fn push_mountain(&mut self, mountain: BeltMountain) -> usize {
-        let generation = self.next_slot_generation;
-        self.next_slot_generation += 1;
         let slot = BeltMountainSlot {
             mountain,
             prev: self.tail,
             next: None,
-            generation,
+            mergeable_prev: None,
+            mergeable_next: None,
+            in_mergeable_list: false,
         };
 
         let idx = if let Some(idx) = self.free_mountain_slots.pop() {
@@ -236,7 +232,14 @@ impl MmrBelt {
             .expect("right member of mergeable pair must have left neighbor");
         let right_next = self.mountain_slot(right_idx).next;
         let left_prev = self.mountain_slot(left_idx).prev;
-        let left_generation = self.mountain_slot(left_idx).generation;
+        let insert_after = if self.mountain_slot(left_idx).in_mergeable_list {
+            self.mountain_slot(left_idx).mergeable_prev
+        } else {
+            self.mountain_slot(right_idx).mergeable_prev
+        };
+
+        self.untrack_mergeable_pair(right_idx);
+        self.untrack_mergeable_pair(left_idx);
 
         let right = self.mountains[right_idx]
             .take()
@@ -255,7 +258,9 @@ impl MmrBelt {
             mountain: merged,
             prev: left_prev,
             next: right_next,
-            generation: left_generation,
+            mergeable_prev: None,
+            mergeable_next: None,
+            in_mergeable_list: false,
         });
 
         if let Some(next_idx) = right_next {
@@ -266,41 +271,64 @@ impl MmrBelt {
         self.free_mountain_slots.push(right_idx);
 
         if let Some(prev_idx) = left_prev {
-            self.track_mergeable_pair(prev_idx, left_idx);
+            self.track_mergeable_pair_after(insert_after, prev_idx, left_idx);
         }
         if let Some(next_idx) = right_next {
-            self.track_mergeable_pair(left_idx, next_idx);
+            self.track_mergeable_pair_after(self.rightmost_mergeable, left_idx, next_idx);
         }
     }
 
     fn track_mergeable_pair(&mut self, left_idx: usize, right_idx: usize) {
-        if self.is_mergeable_pair(left_idx, right_idx) {
-            self.mergeable_pairs.push(MergeablePair {
-                right_idx,
-                right_generation: self.mountain_slot(right_idx).generation,
-            });
-        }
+        self.track_mergeable_pair_after(self.rightmost_mergeable, left_idx, right_idx);
     }
 
-    fn pop_mergeable_pair(&mut self) -> Option<usize> {
-        while let Some(pair) = self.mergeable_pairs.pop() {
-            let right_idx = pair.right_idx;
-            let Some(right_slot) = self.mountains.get(right_idx).and_then(Option::as_ref) else {
-                continue;
-            };
-            if right_slot.generation != pair.right_generation {
-                continue;
-            }
-            let Some(left_idx) = right_slot.prev else {
-                continue;
-            };
-
-            if self.is_mergeable_pair(left_idx, right_idx) {
-                return Some(right_idx);
-            }
+    fn track_mergeable_pair_after(
+        &mut self,
+        prev_pair: Option<usize>,
+        left_idx: usize,
+        right_idx: usize,
+    ) {
+        if !self.is_mergeable_pair(left_idx, right_idx)
+            || self.mountain_slot(right_idx).in_mergeable_list
+        {
+            return;
         }
 
-        None
+        if let Some(prev_idx) = prev_pair {
+            self.mountain_slot_mut(prev_idx).mergeable_next = Some(right_idx);
+        }
+
+        let slot = self.mountain_slot_mut(right_idx);
+        slot.mergeable_prev = prev_pair;
+        slot.mergeable_next = None;
+        slot.in_mergeable_list = true;
+        self.rightmost_mergeable = Some(right_idx);
+    }
+
+    fn untrack_mergeable_pair(&mut self, right_idx: usize) {
+        let Some(slot) = self.mountains.get(right_idx).and_then(Option::as_ref) else {
+            return;
+        };
+        if !slot.in_mergeable_list {
+            return;
+        }
+
+        let prev = slot.mergeable_prev;
+        let next = slot.mergeable_next;
+
+        if let Some(prev_idx) = prev {
+            self.mountain_slot_mut(prev_idx).mergeable_next = next;
+        }
+        if let Some(next_idx) = next {
+            self.mountain_slot_mut(next_idx).mergeable_prev = prev;
+        } else {
+            self.rightmost_mergeable = prev;
+        }
+
+        let slot = self.mountain_slot_mut(right_idx);
+        slot.mergeable_prev = None;
+        slot.mergeable_next = None;
+        slot.in_mergeable_list = false;
     }
 
     fn is_mergeable_pair(&self, left_idx: usize, right_idx: usize) -> bool {
@@ -341,13 +369,9 @@ struct BeltMountainSlot {
     mountain: BeltMountain,
     prev: Option<usize>,
     next: Option<usize>,
-    generation: u64,
-}
-
-#[derive(Debug, Clone, Copy)]
-struct MergeablePair {
-    right_idx: usize,
-    right_generation: u64,
+    mergeable_prev: Option<usize>,
+    mergeable_next: Option<usize>,
+    in_mergeable_list: bool,
 }
 
 #[derive(Debug, Clone, Default)]
@@ -772,9 +796,9 @@ fn proof_steps_for_position(
     let range_idx = ranges.iter().position(|range| range.contains(&mountain_idx))?;
     let range = ranges[range_idx].clone();
 
-    steps.push((SiblingSide::Left, FoldDomain::Range(mountain.height)));
-    for mountain in &shape[mountain_idx + 1..range.end] {
-        steps.push((SiblingSide::Right, FoldDomain::Range(mountain.height)));
+    steps.push((SiblingSide::Left, FoldDomain::Range));
+    for _ in &shape[mountain_idx + 1..range.end] {
+        steps.push((SiblingSide::Right, FoldDomain::Range));
     }
 
     steps.push((SiblingSide::Left, FoldDomain::Belt));
@@ -920,9 +944,10 @@ fn bag_peaks(num_leaves: usize, peaks: &[Word]) -> Word {
 
 fn bag_range(mountains: &[ShapeMountain], peaks: &[Word]) -> Word {
     debug_assert_eq!(mountains.len(), peaks.len());
-    mountains.iter().zip(peaks).fold(EMPTY_WORD, |acc, (mountain, &peak)| {
-        FoldDomain::Range(mountain.height).merge(acc, peak)
-    })
+    mountains
+        .iter()
+        .zip(peaks)
+        .fold(EMPTY_WORD, |acc, (_, &peak)| FoldDomain::Range.merge(acc, peak))
 }
 
 fn bag_belt(range_roots: &[Word]) -> Word {
@@ -964,10 +989,10 @@ mod tests {
     use alloc::{vec, vec::Vec};
 
     use super::{
-        BeltSummary, HashIndex, MmrBelt, PartialMmrBelt, hash_children, leaf_hash_index,
+        BeltSummary, HashIndex, MmrBelt, PartialMmrBelt, bag_range, hash_children, leaf_hash_index,
         node_hash_index, parent_hash_index, shape_mountains, shape_ranges,
     };
-    use crate::{Word, hash::poseidon2::Poseidon2, merkle::int_to_node};
+    use crate::{EMPTY_WORD, Word, hash::poseidon2::Poseidon2, merkle::int_to_node};
 
     fn shape_heights(num_leaves: usize) -> Vec<usize> {
         shape_mountains(num_leaves).iter().map(|mountain| mountain.height).collect()
@@ -1090,6 +1115,24 @@ mod tests {
     }
 
     #[test]
+    fn belt_tracks_rightmost_mergeable_pair_without_stale_stack() {
+        let mut belt = MmrBelt::new();
+
+        for idx in 0..512 {
+            belt.add(int_to_node(idx)).unwrap();
+
+            let mountains = belt.ordered_mountains();
+            let expected = mountains
+                .windows(2)
+                .rev()
+                .find(|pair| pair[0].height == pair[1].height)
+                .map(|pair| (pair[0].start, pair[1].start));
+
+            assert_eq!(belt.rightmost_mergeable_pair_for_testing(), expected, "after {idx}");
+        }
+    }
+
+    #[test]
     fn belt_range_splits_follow_mmb_rules() {
         let mut belt = MmrBelt::new();
         let expected = [
@@ -1178,7 +1221,7 @@ mod tests {
     }
 
     #[test]
-    fn belt_root_binds_shape_and_separates_layers() {
+    fn belt_root_binds_shape_without_belt_domain_separation() {
         let mut belt = MmrBelt::new();
         for idx in 0..2 {
             belt.add(int_to_node(idx)).unwrap();
@@ -1193,6 +1236,46 @@ mod tests {
             bigger.add(int_to_node(idx)).unwrap();
         }
         assert_ne!(bigger.summary().root(), summary.root());
+    }
+
+    #[test]
+    fn belt_second_bagging_uses_plain_merkle_merge() {
+        let mut belt = MmrBelt::new();
+        for idx in 0..5 {
+            belt.add(int_to_node(idx)).unwrap();
+        }
+
+        let shape = shape_mountains(belt.num_leaves());
+        let peaks = belt.peaks();
+        let range_roots = shape_ranges(&shape)
+            .into_iter()
+            .map(|range| bag_range(&shape[range.clone()], &peaks[range]))
+            .collect::<Vec<_>>();
+        assert!(range_roots.len() > 1);
+
+        let expected =
+            range_roots.iter().fold(EMPTY_WORD, |acc, &root| Poseidon2::merge(&[acc, root]));
+
+        assert_eq!(belt.summary().root(), expected);
+    }
+
+    #[test]
+    fn belt_range_bagging_uses_plain_merkle_merge() {
+        let mut belt = MmrBelt::new();
+        for idx in 0..9 {
+            belt.add(int_to_node(idx)).unwrap();
+        }
+
+        let shape = shape_mountains(belt.num_leaves());
+        let peaks = belt.peaks();
+        let first_range = shape_ranges(&shape).into_iter().next().unwrap();
+        assert!(first_range.len() > 1);
+
+        let expected = peaks[first_range.clone()]
+            .iter()
+            .fold(EMPTY_WORD, |acc, &peak| Poseidon2::merge(&[acc, peak]));
+
+        assert_eq!(bag_range(&shape[first_range.clone()], &peaks[first_range]), expected);
     }
 
     #[test]
@@ -1384,6 +1467,46 @@ mod tests {
                 assert_eq!(partial.open(position).unwrap().unwrap(), belt.open(position).unwrap());
             }
         }
+    }
+
+    #[test]
+    fn partial_belt_protocol_model_resyncs_after_offline_increment() {
+        let from = 128usize;
+        let to = 191usize;
+        let leaves = (0..to as u64).map(int_to_node).collect::<Vec<_>>();
+
+        let mut full_node = MmrBelt::new();
+        for &leaf in &leaves[..from] {
+            full_node.add(leaf).unwrap();
+        }
+
+        let mut client =
+            PartialMmrBelt::from_peaks(full_node.num_leaves(), full_node.peaks()).unwrap();
+        for &position in &[0usize, 1, 7, 63, 64, 100, 127] {
+            client.track(&full_node.open(position).unwrap()).unwrap();
+        }
+        assert_eq!(client.summary(), full_node.summary());
+
+        for &leaf in &leaves[from..to] {
+            full_node.add(leaf).unwrap();
+        }
+        let server_delta = full_node.delta(from).unwrap();
+
+        assert_ne!(client.summary(), full_node.summary());
+        client.apply(&server_delta).unwrap();
+        assert_eq!(client.summary(), full_node.summary());
+
+        for &position in &[0usize, 1, 7, 63, 64, 100, 127] {
+            let client_proof = client.open(position).unwrap().unwrap();
+            assert!(client_proof.verify(&client.summary()));
+            assert_eq!(client_proof, full_node.open(position).unwrap());
+            assert_eq!(client.get(position), Some(leaves[position]));
+        }
+
+        let newest_position = to - 1;
+        client.track(&full_node.open(newest_position).unwrap()).unwrap();
+        assert_eq!(client.get(newest_position), Some(leaves[newest_position]));
+        assert!(client.open(newest_position).unwrap().unwrap().verify(&client.summary()));
     }
 
     #[test]
