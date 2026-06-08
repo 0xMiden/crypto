@@ -11,6 +11,7 @@ members = [
   "stark/miden-lifted-stark",
   "stark/miden-stark-transcript",
   "stark/miden-stateful-hasher",
+  "tests/wycheproof",
 ]
 resolver = "3"
 
@@ -86,6 +87,7 @@ shake            = { default-features = false, version = "0.1" }
 subtle           = { default-features = false, version = "2.6" }
 syn              = "2.0"
 tempfile         = "3.20"
+wycheproof       = { default-features = false, git = "https://github.com/huitseeker/wycheproof-rs", rev = "412bbde1d28588525910cd71e2d3cc18635fd16d" }
 x25519-dalek     = { default-features = false, version = "3.0.0-rc.0" }
 
 # Shared third-party dependencies used by imported Miden STARK crates

@@ -659,6 +659,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "data-encoding"
+version = "2.11.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a4ae5f15dda3c708c0ade84bfee31ccab44a3da4f88015ed22f63732abe300c8"
+
+[[package]]
 name = "der"
 version = "0.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1331,6 +1337,18 @@ dependencies = [
  "codspeed-criterion-compat",
  "miden-crypto",
  "tempfile",
+]
+
+[[package]]
+name = "miden-crypto-wycheproof-tests"
+version = "0.27.0"
+dependencies = [
+ "ed25519-dalek",
+ "hex",
+ "k256",
+ "miden-crypto",
+ "wycheproof",
+ "x25519-dalek",
 ]
 
 [[package]]
@@ -3182,6 +3200,17 @@ checksum = "81b8f9936fa4378fbe26130d702e51a9d723b22a073105500dfd80d9bb508199"
 dependencies = [
  "ff",
  "group",
+]
+
+[[package]]
+name = "wycheproof"
+version = "0.7.0"
+source = "git+https://github.com/huitseeker/wycheproof-rs?rev=412bbde1d28588525910cd71e2d3cc18635fd16d#412bbde1d28588525910cd71e2d3cc18635fd16d"
+dependencies = [
+ "data-encoding",
+ "serde",
+ "serde_derive",
+ "serde_json",
 ]
 
 [[package]]
