@@ -59,8 +59,8 @@ These are requirements on *applications* composing these crates.
   metadata, and any other statement metadata not owned by `Statement::observe`
   into the Fiat-Shamir challenger state, identically on both prover and verifier.
 - If you override `MultiAir::observe`, you MUST preserve equivalent binding of
-  `air_inputs`, `max_aux_inputs`, `aux_inputs.len()`, and `aux_inputs` before
-  challenges are derived.
+  `air_inputs`, `air_inputs.len()`, `max_aux_inputs`, `aux_inputs.len()`, and
+  `aux_inputs` before challenges are derived.
 - You MUST enforce transcript boundaries / canonicality at the protocol boundary.
   The lifted STARK verifier rejects trailing data; if you compose the PCS
   separately, use `verify_strict` or check `channel.is_empty()` at
