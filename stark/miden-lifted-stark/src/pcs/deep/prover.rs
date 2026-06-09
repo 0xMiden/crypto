@@ -13,7 +13,7 @@ use crate::{
     domain::{Coset, LiftedDomain},
     lmcs::{Lmcs, LmcsTree, row_list::RowList},
     pcs::deep::{DeepParams, interpolate::PointQuotients},
-    util::{align::aligned_widths, horner::horner, packing::PackedFieldExtensionExt},
+    util::{align::aligned_widths, horner::horner},
 };
 
 /// The DEEP quotient `Q(X)` evaluated over the LDE domain.

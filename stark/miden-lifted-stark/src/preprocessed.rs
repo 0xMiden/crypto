@@ -16,7 +16,7 @@
 
 use alloc::vec::Vec;
 
-use miden_lifted_air::{BaseAir, LiftedAir, MultiAir, ProverStatement, Statement, log2_strict_u8};
+use miden_lifted_air::{BaseAir, MultiAir, ProverStatement, Statement, log2_strict_u8};
 use p3_dft::TwoAdicSubgroupDft;
 use p3_field::{ExtensionField, TwoAdicField};
 use p3_matrix::{Matrix, dense::RowMajorMatrix};

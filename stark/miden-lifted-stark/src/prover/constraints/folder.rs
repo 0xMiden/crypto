@@ -7,9 +7,7 @@
 use alloc::vec::Vec;
 use core::marker::PhantomData;
 
-use miden_lifted_air::{
-    AirBuilder, ExtensionBuilder, PeriodicAirBuilder, PermutationAirBuilder, RowWindow,
-};
+use miden_lifted_air::{AirBuilder, ExtensionBuilder, PermutationAirBuilder, RowWindow};
 use p3_field::{
     Algebra, BasedVectorSpace, ExtensionField, Field, PackedField, PrimeCharacteristicRing,
 };
@@ -21,8 +19,8 @@ const CONSTRAINT_BATCH: usize = 8;
 
 /// Batched linear combination of packed extension field values with EF coefficients.
 ///
-/// Extension-field analogue of [`PackedField::packed_linear_combination`]. Processes
-/// `coeffs` and `values` in chunks of [`CONSTRAINT_BATCH`], then handles the remainder.
+/// Processes `coeffs` and `values` in chunks of [`CONSTRAINT_BATCH`], then handles the
+/// remainder.
 #[inline]
 fn batched_ext_linear_combination<PE, EF>(coeffs: &[EF], values: &[PE]) -> PE
 where
@@ -47,8 +45,8 @@ where
 
 /// Batched linear combination of packed base field values with F coefficients.
 ///
-/// Wraps [`PackedField::packed_linear_combination`] with batched chunking
-/// and remainder handling, mirroring [`batched_ext_linear_combination`].
+/// Processes `coeffs` and `values` in chunks of [`CONSTRAINT_BATCH`], then handles the
+/// remainder, mirroring [`batched_ext_linear_combination`].
 #[inline]
 fn batched_base_linear_combination<P: PackedField>(coeffs: &[P::Scalar], values: &[P]) -> P {
     debug_assert_eq!(coeffs.len(), values.len());
@@ -56,10 +54,9 @@ fn batched_base_linear_combination<P: PackedField>(coeffs: &[P::Scalar], values:
     let mut acc = P::ZERO;
     let mut start = 0;
     while start + CONSTRAINT_BATCH <= len {
-        acc += P::packed_linear_combination::<CONSTRAINT_BATCH>(
-            &coeffs[start..start + CONSTRAINT_BATCH],
-            &values[start..start + CONSTRAINT_BATCH],
-        );
+        let batch: [P; CONSTRAINT_BATCH] =
+            core::array::from_fn(|i| values[start + i] * coeffs[start + i]);
+        acc += P::sum_array::<CONSTRAINT_BATCH>(&batch);
         start += CONSTRAINT_BATCH;
     }
     for (&coeff, &val) in coeffs[start..].iter().zip(&values[start..]) {
@@ -175,6 +172,7 @@ where
     type PreprocessedWindow = RowWindow<'a, P>;
     type MainWindow = RowWindow<'a, P>;
     type PublicVar = F;
+    type PeriodicVar = P;
 
     #[inline]
     fn main(&self) -> Self::MainWindow {
@@ -197,12 +195,8 @@ where
     }
 
     #[inline]
-    fn is_transition_window(&self, size: usize) -> Self::Expr {
-        if size == 2 {
-            self.selectors.is_transition
-        } else {
-            panic!("only window size 2 supported")
-        }
+    fn is_transition(&self) -> Self::Expr {
+        self.selectors.is_transition
     }
 
     #[inline]
@@ -221,6 +215,11 @@ where
     #[inline]
     fn public_values(&self) -> &[Self::PublicVar] {
         self.public_values
+    }
+
+    #[inline]
+    fn periodic_values(&self) -> &[Self::PeriodicVar] {
+        self.periodic_values
     }
 }
 
@@ -269,20 +268,5 @@ where
     #[inline]
     fn permutation_values(&self) -> &[Self::PermutationVar] {
         self.permutation_values
-    }
-}
-
-impl<'a, F, EF, P, PE> PeriodicAirBuilder for ProverConstraintFolder<'a, F, EF, P, PE>
-where
-    F: Field,
-    EF: ExtensionField<F>,
-    P: PackedField<Scalar = F>,
-    PE: Algebra<EF> + Algebra<P> + BasedVectorSpace<P> + Copy + Send + Sync,
-{
-    type PeriodicVar = P;
-
-    #[inline]
-    fn periodic_values(&self) -> &[Self::PeriodicVar] {
-        self.periodic_values
     }
 }

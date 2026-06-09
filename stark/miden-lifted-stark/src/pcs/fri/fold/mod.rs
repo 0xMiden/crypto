@@ -21,11 +21,9 @@ mod arity8;
 
 use alloc::vec::Vec;
 
-use p3_field::{ExtensionField, PackedValue, TwoAdicField};
+use p3_field::{ExtensionField, PackedFieldExtension, PackedValue, TwoAdicField};
 use p3_matrix::{Matrix, dense::RowMajorMatrixView};
 use p3_maybe_rayon::prelude::*;
-
-use crate::util::packing::PackedFieldExtensionExt;
 
 /// FRI folding strategy.
 ///
@@ -167,13 +165,13 @@ impl FriFold {
             .zip(s_invs.par_chunks_exact(width))
             .for_each(|((new_evals_chunk, evals_chunk), s_inv_chunk)| {
                 let evals_packed =
-                    <EF::ExtensionPacking as PackedFieldExtensionExt<F, EF>>::pack_ext_columns::<
-                        ARITY,
-                    >(evals_chunk);
+                    <EF::ExtensionPacking as PackedFieldExtension<F, EF>>::pack_ext_columns::<ARITY>(
+                        evals_chunk,
+                    );
                 let s_invs_packed = F::Packing::from_slice(s_inv_chunk);
                 let new_evals_packed =
                     self.fold_evals_packed::<F, EF>(&evals_packed, *s_invs_packed, beta);
-                <EF::ExtensionPacking as PackedFieldExtensionExt<F, EF>>::to_ext_slice(
+                <EF::ExtensionPacking as PackedFieldExtension<F, EF>>::to_ext_slice(
                     &new_evals_packed,
                     new_evals_chunk,
                 );
