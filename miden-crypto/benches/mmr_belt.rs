@@ -1,16 +1,10 @@
-//! MMR vs experimental Merkle Mountain Belt benchmarks.
-//!
-//! The belt implementation benchmarked here is a reference prototype behind the `internal`
-//! feature. It keeps in-memory hash-array state to derive summaries/proofs, so these numbers
-//! should be read as construction-comparison data rather than production storage performance.
-
 use std::{hint, time::Duration};
 
 use criterion::{BatchSize, BenchmarkId, Criterion, criterion_group, criterion_main};
 use miden_crypto::{
     Word,
     merkle::mmr::{
-        Mmr, MmrPeaks,
+        MerkleFrontier, Mmr, MmrPeaks,
         belt::{BeltSummary, MmrBelt},
     },
 };
@@ -29,6 +23,7 @@ struct MmrBeltBenchData {
     leaves: Vec<Word>,
     mmr: Mmr,
     peaks: MmrPeaks,
+    frontier: MerkleFrontier,
     belt: MmrBelt,
     belt_summary: BeltSummary,
 }
@@ -38,6 +33,7 @@ impl MmrBeltBenchData {
         let leaves = generate_words_pattern(size, WordPattern::Sequential);
         let mmr = Mmr::try_from_iter(leaves.iter().copied()).unwrap();
         let peaks = mmr.peaks();
+        let frontier = mmr.frontier();
 
         let mut belt = MmrBelt::new();
         for leaf in leaves.iter().copied() {
@@ -45,7 +41,14 @@ impl MmrBeltBenchData {
         }
         let belt_summary = belt.summary();
 
-        Self { leaves, mmr, peaks, belt, belt_summary }
+        Self {
+            leaves,
+            mmr,
+            peaks,
+            frontier,
+            belt,
+            belt_summary,
+        }
     }
 }
 
@@ -53,6 +56,11 @@ fn append_sequence(start: usize) -> Vec<Word> {
     (start..start + APPEND_SEQUENCE_LEN)
         .map(|idx| generate_word_pattern(idx as u64, WordPattern::Sequential))
         .collect()
+}
+
+fn rebuilt_belt_summary(belt: &MmrBelt) -> BeltSummary {
+    let roots = belt.peaks();
+    BeltSummary::from_roots(belt.num_leaves(), &roots).unwrap()
 }
 
 fn bench_mmr_belt_build(c: &mut Criterion) {
@@ -83,6 +91,20 @@ fn bench_mmr_belt_build(c: &mut Criterion) {
                 BatchSize::SmallInput,
             );
         });
+
+        group.bench_with_input(BenchmarkId::new("belt-lazy-bagging", size), &size, |b, &size| {
+            b.iter_batched(
+                || generate_words_pattern(size, WordPattern::Sequential),
+                |leaves| {
+                    let mut belt = MmrBelt::new();
+                    for leaf in leaves {
+                        belt.add_without_bagging_for_benchmark(leaf).unwrap();
+                    }
+                    hint::black_box(belt);
+                },
+                BatchSize::SmallInput,
+            );
+        });
     }
 
     group.finish();
@@ -107,11 +129,33 @@ fn bench_mmr_belt_append(c: &mut Criterion) {
             );
         });
 
+        group.bench_with_input(BenchmarkId::new("frontier", size), &size, |b, _| {
+            b.iter_batched_ref(
+                || data.frontier.clone(),
+                |frontier| {
+                    frontier.append(hint::black_box(next_leaf)).unwrap();
+                    hint::black_box(frontier.num_leaves());
+                },
+                BatchSize::LargeInput,
+            );
+        });
+
         group.bench_with_input(BenchmarkId::new("belt-prototype", size), &size, |b, _| {
             b.iter_batched_ref(
                 || data.belt.clone(),
                 |belt| {
                     belt.add(hint::black_box(next_leaf)).unwrap();
+                    hint::black_box(belt.num_leaves());
+                },
+                BatchSize::LargeInput,
+            );
+        });
+
+        group.bench_with_input(BenchmarkId::new("belt-lazy-bagging", size), &size, |b, _| {
+            b.iter_batched_ref(
+                || data.belt.clone(),
+                |belt| {
+                    belt.add_without_bagging_for_benchmark(hint::black_box(next_leaf)).unwrap();
                     hint::black_box(belt.num_leaves());
                 },
                 BatchSize::LargeInput,
@@ -133,6 +177,17 @@ fn bench_mmr_belt_append(c: &mut Criterion) {
             },
         );
 
+        group.bench_with_input(BenchmarkId::new("frontier-and-root", size), &size, |b, _| {
+            b.iter_batched(
+                || data.frontier.clone(),
+                |mut frontier| {
+                    frontier.append(hint::black_box(next_leaf)).unwrap();
+                    hint::black_box(frontier.root());
+                },
+                BatchSize::SmallInput,
+            );
+        });
+
         group.bench_with_input(
             BenchmarkId::new("belt-prototype-and-summary", size),
             &size,
@@ -142,6 +197,47 @@ fn bench_mmr_belt_append(c: &mut Criterion) {
                     |mut belt| {
                         belt.add(hint::black_box(next_leaf)).unwrap();
                         hint::black_box(belt.summary());
+                    },
+                    BatchSize::SmallInput,
+                );
+            },
+        );
+
+        group.bench_with_input(
+            BenchmarkId::new("belt-lazy-bagging-and-rebuilt-summary", size),
+            &size,
+            |b, _| {
+                b.iter_batched(
+                    || data.belt.clone(),
+                    |mut belt| {
+                        belt.add_without_bagging_for_benchmark(hint::black_box(next_leaf)).unwrap();
+                        hint::black_box(rebuilt_belt_summary(&belt));
+                    },
+                    BatchSize::SmallInput,
+                );
+            },
+        );
+
+        group.bench_with_input(BenchmarkId::new("belt-prototype-and-root", size), &size, |b, _| {
+            b.iter_batched(
+                || data.belt.clone(),
+                |mut belt| {
+                    belt.add(hint::black_box(next_leaf)).unwrap();
+                    hint::black_box(belt.commitment_root());
+                },
+                BatchSize::SmallInput,
+            );
+        });
+
+        group.bench_with_input(
+            BenchmarkId::new("belt-lazy-bagging-and-rebuilt-root", size),
+            &size,
+            |b, _| {
+                b.iter_batched(
+                    || data.belt.clone(),
+                    |mut belt| {
+                        belt.add_without_bagging_for_benchmark(hint::black_box(next_leaf)).unwrap();
+                        hint::black_box(rebuilt_belt_summary(&belt).commitment_root());
                     },
                     BatchSize::SmallInput,
                 );
@@ -186,6 +282,19 @@ fn bench_mmr_belt_append_sequence(c: &mut Criterion) {
                 BatchSize::LargeInput,
             );
         });
+
+        group.bench_with_input(BenchmarkId::new("belt-lazy-bagging", size), &size, |b, _| {
+            b.iter_batched_ref(
+                || (data.belt.clone(), leaves.clone()),
+                |(belt, leaves)| {
+                    for leaf in leaves.iter().copied() {
+                        belt.add_without_bagging_for_benchmark(hint::black_box(leaf)).unwrap();
+                    }
+                    hint::black_box(belt);
+                },
+                BatchSize::LargeInput,
+            );
+        });
     }
 
     group.finish();
@@ -204,9 +313,21 @@ fn bench_mmr_belt_commitment(c: &mut Criterion) {
             });
         });
 
+        group.bench_with_input(BenchmarkId::new("frontier-root", size), &size, |b, _| {
+            b.iter(|| {
+                hint::black_box(data.frontier.root());
+            });
+        });
+
         group.bench_with_input(BenchmarkId::new("belt-summary", size), &size, |b, _| {
             b.iter(|| {
                 hint::black_box(data.belt.summary());
+            });
+        });
+
+        group.bench_with_input(BenchmarkId::new("belt-commitment-root", size), &size, |b, _| {
+            b.iter(|| {
+                hint::black_box(data.belt.commitment_root());
             });
         });
     }
