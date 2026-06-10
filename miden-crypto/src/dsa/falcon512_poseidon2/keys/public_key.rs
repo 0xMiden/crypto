@@ -88,7 +88,7 @@ impl Serializable for &PublicKey {
 
 impl fmt::Display for PublicKey {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        crate::dsa::write_hex(f, &self.to_bytes())
+        crate::utils::write_hex(f, &self.to_bytes())
     }
 }
 

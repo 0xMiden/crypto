@@ -141,7 +141,7 @@ impl Deserializable for Signature {
 
 impl fmt::Display for Signature {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        crate::dsa::write_hex(f, &self.to_bytes())
+        crate::utils::write_hex(f, &self.to_bytes())
     }
 }
 

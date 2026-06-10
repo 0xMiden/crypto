@@ -541,7 +541,7 @@ impl Deserializable for PublicKey {
 
 impl fmt::Display for PublicKey {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        super::write_hex(f, &self.to_bytes())
+        crate::utils::write_hex(f, &self.to_bytes())
     }
 }
 
@@ -561,6 +561,6 @@ impl Deserializable for Signature {
 
 impl fmt::Display for Signature {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        super::write_hex(f, &self.to_bytes())
+        crate::utils::write_hex(f, &self.to_bytes())
     }
 }
