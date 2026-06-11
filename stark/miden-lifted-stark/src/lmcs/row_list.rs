@@ -65,7 +65,7 @@ impl<T> RowList<T> {
 
     /// Iterate over all elements by value.
     #[inline]
-    pub fn iter_values(&self) -> impl Iterator<Item = T> + '_
+    pub fn iter_values(&self) -> impl DoubleEndedIterator<Item = T> + '_
     where
         T: Copy,
     {
@@ -108,9 +108,20 @@ impl<T: Copy + Default> RowList<T> {
     ///
     /// Yields the original row elements followed by implicit zeros, without allocating
     /// a padded copy.
-    pub fn iter_aligned(&self, alignment: usize) -> impl Iterator<Item = T> + '_ {
-        self.iter_rows().flat_map(move |row| {
-            let padding = aligned_len(row.len(), alignment) - row.len();
+    pub fn iter_aligned(&self, alignment: usize) -> impl DoubleEndedIterator<Item = T> + '_ {
+        let mut offset = 0;
+        let ranges: Vec<(usize, usize)> = self
+            .widths
+            .iter()
+            .map(|&w| {
+                let entry = (offset, w);
+                offset += w;
+                entry
+            })
+            .collect();
+        ranges.into_iter().flat_map(move |(off, w)| {
+            let row = &self.elems[off..off + w];
+            let padding = aligned_len(w, alignment) - w;
             row.iter().copied().chain(core::iter::repeat_n(T::default(), padding))
         })
     }

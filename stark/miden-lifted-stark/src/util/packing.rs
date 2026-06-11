@@ -22,13 +22,7 @@ where
     }
     Some(
         row.chunks_exact(EF::DIMENSION)
-            .map(|chunk| {
-                chunk
-                    .iter()
-                    .enumerate()
-                    .map(|(j, &c)| EF::ith_basis_element(j).unwrap() * c)
-                    .sum()
-            })
+            .map(|chunk| EF::from_ext_basis_coefficients(chunk).unwrap())
             .collect(),
     )
 }

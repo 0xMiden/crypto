@@ -189,7 +189,7 @@ pub mod tests {
     use alloc::vec::Vec;
 
     use p3_dft::{NaiveDft, Radix2DFTSmallBatch, TwoAdicSubgroupDft};
-    use p3_field::{ExtensionField, Field, PrimeCharacteristicRing, TwoAdicField};
+    use p3_field::{ExtensionField, Field, HornerIter, PrimeCharacteristicRing, TwoAdicField};
     use p3_matrix::dense::RowMajorMatrix;
     use p3_util::reverse_slice_index_bits;
     use rand::{
@@ -205,7 +205,6 @@ pub mod tests {
             configs::goldilocks_poseidon2::{Felt, QuadFelt},
             params::{FRI_FOLD_ARITY_2, FRI_FOLD_ARITY_4, FRI_FOLD_ARITY_8},
         },
-        util::horner::horner,
     };
 
     // Type alias for tests using packed fields
@@ -239,7 +238,7 @@ pub mod tests {
         let result = fold.fold_evals(&evals, s_inv, beta);
 
         // Expected: direct Horner evaluation at beta
-        let expected = horner(beta, coeffs.iter().rev().copied());
+        let expected = coeffs.iter().copied().horner(beta);
         assert_eq!(result, expected, "fold_evals mismatch for arity {arity}");
     }
 
@@ -269,10 +268,10 @@ pub mod tests {
 
         // Evaluate polynomial at coset points: [f(s·root) for root in roots]
         let evals: Vec<Ext> =
-            roots.iter().map(|&root| horner(root * s, poly.iter().rev().copied())).collect();
+            roots.iter().map(|&root| poly.iter().copied().horner(root * s)).collect();
 
         // Expected: f(beta)
-        let expected = horner(beta, poly.iter().rev().copied());
+        let expected = poly.iter().copied().horner(beta);
 
         // Test fold_evals
         let result = fold.fold_evals(&evals, s_inv, beta);

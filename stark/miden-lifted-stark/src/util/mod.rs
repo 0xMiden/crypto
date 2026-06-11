@@ -2,5 +2,4 @@
 
 pub(crate) mod align;
 pub(crate) mod bitrev;
-pub(crate) mod horner;
 pub(crate) mod packing;
