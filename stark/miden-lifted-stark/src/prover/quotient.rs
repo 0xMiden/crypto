@@ -23,7 +23,6 @@ use crate::{
     domain::{Coset, EvaluationDomain},
     lmcs::Lmcs,
     prover::commit::Committed,
-    util::bitrev::materialize_bitrev,
 };
 
 // ============================================================================
@@ -210,9 +209,7 @@ where
             )
         });
 
-    let quotient_matrix = materialize_bitrev(lde);
-
-    let tree = config.lmcs().build_aligned_tree(vec![quotient_matrix]);
+    let tree = config.lmcs().build_aligned_tree(vec![lde]);
 
     // The quotient is committed on the same LDE coset as the trace commits.
     Committed::new(tree)
