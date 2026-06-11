@@ -20,7 +20,10 @@ use crate::{
         LOG_N, SK_LEN, hash_to_point::hash_to_point_poseidon2, math::ntru_gen,
     },
     hash::blake::Blake3_256,
-    utils::zeroize::{Zeroize, ZeroizeOnDrop},
+    utils::{
+        read_sensitive_array,
+        zeroize::{Zeroize, ZeroizeOnDrop},
+    },
 };
 
 // CONSTANTS
@@ -342,7 +345,7 @@ impl Serializable for SecretKey {
 
 impl Deserializable for SecretKey {
     fn read_from<R: ByteReader>(source: &mut R) -> Result<Self, DeserializationError> {
-        let byte_vector: [u8; SK_LEN] = source.read_array()?;
+        let byte_vector = read_sensitive_array::<SK_LEN, _>(source)?;
 
         // read fields
         let header = byte_vector[0];
