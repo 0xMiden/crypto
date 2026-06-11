@@ -36,7 +36,7 @@ mod signing_key {
         // A scalar of all 0xFF is above the secp256k1 curve order, and an all-zero scalar is
         // also invalid, so both must be rejected with an error rather than a panic. This is the
         // early-return path that previously skipped zeroizing the read buffer.
-        for invalid in [[0xFFu8; 32], [0u8; 32]] {
+        for invalid in [[0xffu8; 32], [0u8; 32]] {
             let result = SigningKey::read_from_bytes(&invalid);
             assert!(result.is_err(), "invalid secret key bytes must fail to deserialize");
         }
