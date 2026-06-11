@@ -1306,7 +1306,9 @@ dependencies = [
  "hex",
  "k256",
  "miden-crypto",
- "wycheproof",
+ "wycheproof-ng-core",
+ "wycheproof-ng-dh",
+ "wycheproof-ng-eddsa",
  "x25519-dalek",
 ]
 
@@ -3143,14 +3145,38 @@ dependencies = [
 ]
 
 [[package]]
-name = "wycheproof"
-version = "0.7.0"
-source = "git+https://github.com/huitseeker/wycheproof-rs?rev=412bbde1d28588525910cd71e2d3cc18635fd16d#412bbde1d28588525910cd71e2d3cc18635fd16d"
+name = "wycheproof-ng-core"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4d0e89090053cf9d1f0df96abb1709600b116db8ec4ede6c682c2c8c93be9d55"
 dependencies = [
  "data-encoding",
  "serde",
  "serde_derive",
+]
+
+[[package]]
+name = "wycheproof-ng-dh"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e548b151164a6763784cadc0bff64378f474802326c9ff5c3eb24f085684d890"
+dependencies = [
+ "serde",
+ "serde_derive",
  "serde_json",
+ "wycheproof-ng-core",
+]
+
+[[package]]
+name = "wycheproof-ng-eddsa"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "fca44c429bb687a0322b7559147fc998147740c3fe9297b7ae3ec54c16bbd09d"
+dependencies = [
+ "serde",
+ "serde_derive",
+ "serde_json",
+ "wycheproof-ng-core",
 ]
 
 [[package]]

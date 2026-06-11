@@ -9,11 +9,13 @@ mod tests {
         ies::{IesError, IesScheme, SealedMessage, UnsealingKey},
         utils::{Deserializable, Serializable},
     };
+    use wycheproof_ng_core::TestResult;
 
     #[test]
     fn secp256k1_ecdh_vectors() {
-        let test_set = wycheproof::ecdh::TestSet::load(wycheproof::ecdh::TestName::EcdhSecp256k1)
-            .expect("secp256k1 ECDH Wycheproof vectors should load");
+        let test_set =
+            wycheproof_ng_dh::ecdh::TestSet::load(wycheproof_ng_dh::ecdh::TestName::EcdhSecp256k1)
+                .expect("secp256k1 ECDH Wycheproof vectors should load");
 
         for group in test_set.test_groups {
             for test in group.tests {
@@ -83,8 +85,9 @@ mod tests {
 
     #[test]
     fn x25519_vectors_and_miden_rejection_path() {
-        let test_set = wycheproof::xdh::TestSet::load(wycheproof::xdh::TestName::X25519)
-            .expect("X25519 Wycheproof vectors should load");
+        let test_set =
+            wycheproof_ng_dh::xdh::TestSet::load(wycheproof_ng_dh::xdh::TestName::X25519)
+                .expect("X25519 Wycheproof vectors should load");
 
         for group in test_set.test_groups {
             for test in group.tests {
@@ -129,7 +132,7 @@ mod tests {
 
     #[test]
     fn ed25519_vectors_and_word_sized_wrapper_contract() {
-        let test_set = wycheproof::eddsa::TestSet::load(wycheproof::eddsa::TestName::Ed25519)
+        let test_set = wycheproof_ng_eddsa::TestSet::load(wycheproof_ng_eddsa::TestName::Ed25519)
             .expect("Ed25519 Wycheproof vectors should load");
 
         for group in test_set.test_groups {
@@ -239,11 +242,11 @@ mod tests {
         bytes.try_into().ok()
     }
 
-    fn is_valid(result: wycheproof::TestResult) -> bool {
-        matches!(result, wycheproof::TestResult::Valid)
+    fn is_valid(result: TestResult) -> bool {
+        matches!(result, TestResult::Valid)
     }
 
-    fn is_invalid(result: wycheproof::TestResult) -> bool {
-        matches!(result, wycheproof::TestResult::Invalid)
+    fn is_invalid(result: TestResult) -> bool {
+        matches!(result, TestResult::Invalid)
     }
 }

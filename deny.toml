@@ -54,7 +54,7 @@ wildcards = "allow"
 
 # Sources configuration
 [sources]
-allow-git        = ["https://github.com/huitseeker/wycheproof-rs"]
+allow-git        = []
 allow-registry   = ["https://github.com/rust-lang/crates.io-index"]
 unknown-git      = "deny"
 unknown-registry = "deny"
