@@ -8,62 +8,9 @@ use alloc::vec::Vec;
 use core::marker::PhantomData;
 
 use miden_lifted_air::{AirBuilder, ExtensionBuilder, PermutationAirBuilder, RowWindow};
-use p3_field::{
-    Algebra, BasedVectorSpace, ExtensionField, Field, PackedField, PrimeCharacteristicRing,
-};
+use p3_field::{Algebra, BasedVectorSpace, ExtensionField, Field, PackedField};
 
 use crate::selectors::Selectors;
-
-/// Batch size for constraint linear-combination chunks in [`finalize_constraints`].
-const CONSTRAINT_BATCH: usize = 8;
-
-/// Batched linear combination of packed extension field values with EF coefficients.
-///
-/// Processes `coeffs` and `values` in chunks of [`CONSTRAINT_BATCH`], then handles the
-/// remainder.
-#[inline]
-fn batched_ext_linear_combination<PE, EF>(coeffs: &[EF], values: &[PE]) -> PE
-where
-    EF: Field,
-    PE: PrimeCharacteristicRing + Algebra<EF> + Copy,
-{
-    debug_assert_eq!(coeffs.len(), values.len());
-    let len = coeffs.len();
-    let mut acc = PE::ZERO;
-    let mut start = 0;
-    while start + CONSTRAINT_BATCH <= len {
-        let batch: [PE; CONSTRAINT_BATCH] =
-            core::array::from_fn(|i| values[start + i] * coeffs[start + i]);
-        acc += PE::sum_array::<CONSTRAINT_BATCH>(&batch);
-        start += CONSTRAINT_BATCH;
-    }
-    for (&coeff, &val) in coeffs[start..].iter().zip(&values[start..]) {
-        acc += val * coeff;
-    }
-    acc
-}
-
-/// Batched linear combination of packed base field values with F coefficients.
-///
-/// Processes `coeffs` and `values` in chunks of [`CONSTRAINT_BATCH`], then handles the
-/// remainder, mirroring [`batched_ext_linear_combination`].
-#[inline]
-fn batched_base_linear_combination<P: PackedField>(coeffs: &[P::Scalar], values: &[P]) -> P {
-    debug_assert_eq!(coeffs.len(), values.len());
-    let len = coeffs.len();
-    let mut acc = P::ZERO;
-    let mut start = 0;
-    while start + CONSTRAINT_BATCH <= len {
-        let batch: [P; CONSTRAINT_BATCH] =
-            core::array::from_fn(|i| values[start + i] * coeffs[start + i]);
-        acc += P::sum_array::<CONSTRAINT_BATCH>(&batch);
-        start += CONSTRAINT_BATCH;
-    }
-    for (&coeff, &val) in coeffs[start..].iter().zip(&values[start..]) {
-        acc += val * coeff;
-    }
-    acc
-}
 
 /// Packed constraint folder for SIMD-optimized prover evaluation.
 ///
@@ -73,7 +20,7 @@ fn batched_base_linear_combination<P: PackedField>(coeffs: &[P::Scalar], values:
 ///
 /// Collects constraints during `air.eval()` into separate base/ext vectors, then
 /// combines them in [`Self::finalize_constraints`] using decomposed alpha powers and
-/// `packed_linear_combination` for efficient SIMD accumulation.
+/// `Algebra::batched_linear_combination` for efficient SIMD accumulation.
 ///
 /// # Type Parameters
 /// - `F`: Base field scalar
@@ -129,10 +76,9 @@ where
 {
     /// Combine all collected constraints with their pre-computed alpha powers.
     ///
-    /// Base constraints use `batched_base_linear_combination` per basis dimension,
+    /// Base constraints use `Algebra::batched_linear_combination` per basis dimension,
     /// decomposing the extension-field multiply into D base-field SIMD dot products.
-    /// Extension constraints use `batched_ext_linear_combination` with scalar EF
-    /// coefficients. Both process in chunks of `CONSTRAINT_BATCH`.
+    /// Extension constraints use the same batched combination with scalar EF coefficients.
     ///
     /// We keep base and extension constraints separate because the base constraints can
     /// stay in the base field and use packed SIMD arithmetic. Decomposing EF powers of
@@ -151,11 +97,11 @@ where
         let base = &self.base_constraints;
         let base_powers = self.base_alpha_powers;
         let acc = PE::from_basis_coefficients_fn(|d| {
-            batched_base_linear_combination(&base_powers[d], base)
+            P::batched_linear_combination(base, &base_powers[d])
         });
 
         // Extension constraints: EF-coefficient dot product
-        acc + batched_ext_linear_combination(self.ext_alpha_powers, &self.ext_constraints)
+        acc + PE::batched_linear_combination(&self.ext_constraints, self.ext_alpha_powers)
     }
 }
 
