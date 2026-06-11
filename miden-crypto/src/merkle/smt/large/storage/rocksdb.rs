@@ -70,6 +70,11 @@ const ENTRY_COUNT_KEY: &[u8] = b"entry_count";
 #[derive(Debug, Clone)]
 pub struct RocksDbStorage {
     db: Arc<DB>,
+    /// Whether writes should be synchronously flushed to disk.
+    ///
+    /// Setting this to true will result in reduced throughput but may result in higher durability
+    /// in the presence of crashes.
+    sync_writes: bool,
 }
 
 impl RocksDbStorage {
@@ -190,7 +195,10 @@ impl RocksDbStorage {
         // Open the database with our tuned CFs
         let db = DB::open_cf_descriptors(&db_opts, config.path, cfs)?;
 
-        Ok(Self { db: Arc::new(db) })
+        Ok(Self {
+            db: Arc::new(db),
+            sync_writes: config.sync_writes,
+        })
     }
 
     /// Syncs the RocksDB database to disk.
@@ -219,6 +227,14 @@ impl RocksDbStorage {
         }
 
         self.db.flush_wal(true)?;
+        Ok(())
+    }
+
+    /// Writes a batch to RocksDB, respecting the configured sync mode.
+    fn write_batch(&self, batch: WriteBatch) -> StorageResult<()> {
+        let mut write_opts = rocksdb::WriteOptions::default();
+        write_opts.set_sync(self.sync_writes);
+        self.db.write_opt(batch, &write_opts)?;
         Ok(())
     }
 
@@ -623,7 +639,7 @@ impl SmtStorage for RocksDbStorage {
         batch.put_cf(metadata_cf, ENTRY_COUNT_KEY, current_entry_count.to_be_bytes());
 
         // Atomically write all changes (leaf data and metadata counts).
-        self.db.write(batch)?;
+        self.write_batch(batch)?;
 
         Ok(value_to_return)
     }
@@ -670,7 +686,7 @@ impl SmtStorage for RocksDbStorage {
         }
         batch.put_cf(metadata_cf, LEAF_COUNT_KEY, leaf_count.to_be_bytes());
         batch.put_cf(metadata_cf, ENTRY_COUNT_KEY, entry_count.to_be_bytes());
-        self.db.write(batch)?;
+        self.write_batch(batch)?;
         Ok(current_value)
     }
 
@@ -700,7 +716,7 @@ impl SmtStorage for RocksDbStorage {
         let metadata_cf = self.cf_handle(METADATA_CF)?;
         batch.put_cf(metadata_cf, LEAF_COUNT_KEY, leaf_count.to_be_bytes());
         batch.put_cf(metadata_cf, ENTRY_COUNT_KEY, entry_count.to_be_bytes());
-        self.db.write(batch)?;
+        self.write_batch(batch)?;
         Ok(())
     }
 
@@ -761,7 +777,7 @@ impl SmtStorage for RocksDbStorage {
             batch.put_cf(in_mem_depth_cf, hash_key, root_hash.to_bytes());
         }
 
-        self.db.write(batch)?;
+        self.write_batch(batch)?;
         Ok(())
     }
 
@@ -797,7 +813,7 @@ impl SmtStorage for RocksDbStorage {
             }
         }
 
-        self.db.write(batch)?;
+        self.write_batch(batch)?;
         Ok(())
     }
 
@@ -820,7 +836,7 @@ impl SmtStorage for RocksDbStorage {
             batch.delete_cf(in_mem_depth_cf, hash_key);
         }
 
-        self.db.write(batch)?;
+        self.write_batch(batch)?;
         Ok(())
     }
 
@@ -985,10 +1001,7 @@ impl SmtStorage for RocksDbStorage {
             batch.put_cf(metadata_cf, ENTRY_COUNT_KEY, new_entry_count.to_be_bytes());
         }
 
-        let mut write_opts = rocksdb::WriteOptions::default();
-        // Disable immediate WAL sync to disk for better performance
-        write_opts.set_sync(false);
-        self.db.write_opt(batch, &write_opts)?;
+        self.write_batch(batch)?;
 
         Ok(())
     }
@@ -1108,6 +1121,10 @@ impl Iterator for RocksDbSubtreeIterator<'_> {
 // ROCKSDB CONFIGURATION
 // --------------------------------------------------------------------------------------------
 
+const DEFAULT_CACHE_SIZE: usize = 1 << 30;
+const DEFAULT_MAX_OPEN_FILES: i32 = 512;
+const DEFAULT_SYNC_WRITES: bool = false;
+
 /// Configuration for RocksDB storage used by the Sparse Merkle Tree implementation.
 ///
 /// This struct contains the essential configuration parameters needed to initialize
@@ -1135,6 +1152,12 @@ pub struct RocksDbConfig {
     /// process. Higher values may improve performance for databases with many SST files but
     /// increase resource usage. Default: 512 files
     pub(crate) max_open_files: i32,
+
+    /// Whether writes should be synchronously flushed to disk.
+    ///
+    /// Setting this to true will result in reduced throughput but may result in higher durability
+    /// in the presence of crashes. Default: false
+    pub(crate) sync_writes: bool,
 }
 
 impl RocksDbConfig {
@@ -1157,8 +1180,9 @@ impl RocksDbConfig {
     pub fn new<P: Into<PathBuf>>(path: P) -> Self {
         Self {
             path: path.into(),
-            cache_size: 1 << 30,
-            max_open_files: 512,
+            cache_size: DEFAULT_CACHE_SIZE,
+            max_open_files: DEFAULT_MAX_OPEN_FILES,
+            sync_writes: DEFAULT_SYNC_WRITES,
         }
     }
 
@@ -1201,6 +1225,25 @@ impl RocksDbConfig {
     /// ```
     pub fn with_max_open_files(mut self, count: i32) -> Self {
         self.max_open_files = count;
+        self
+    }
+
+    /// Sets whether writes should be synchronously flushed to disk.
+    ///
+    /// When enabled, each write is flushed to disk before returning, providing stronger durability
+    /// guarantees at the cost of reduced throughput.
+    ///
+    /// # Arguments
+    /// * `sync_writes` - `true` to enable synchronous writes, `false` (default) for async.
+    ///
+    /// # Examples
+    /// ```
+    /// use miden_crypto::merkle::smt::RocksDbConfig;
+    ///
+    /// let config = RocksDbConfig::new("/path/to/database").with_sync_writes(true);
+    /// ```
+    pub fn with_sync_writes(mut self, sync_writes: bool) -> Self {
+        self.sync_writes = sync_writes;
         self
     }
 }
@@ -1651,5 +1694,28 @@ impl Iterator for RocksDbSnapshotSubtreeIterator<'_> {
 
             self.current_iter.as_ref()?;
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn config_defaults() {
+        let dir = tempfile::tempdir().unwrap();
+        let config = RocksDbConfig::new(dir.path());
+
+        assert_eq!(config.cache_size, DEFAULT_CACHE_SIZE);
+        assert_eq!(config.max_open_files, DEFAULT_MAX_OPEN_FILES);
+        assert_eq!(config.sync_writes, DEFAULT_SYNC_WRITES);
+    }
+
+    #[test]
+    fn config_with_sync_writes() {
+        let dir = tempfile::tempdir().unwrap();
+        let config = RocksDbConfig::new(dir.path()).with_sync_writes(true);
+
+        assert!(config.sync_writes);
     }
 }
