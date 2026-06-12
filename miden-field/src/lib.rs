@@ -16,6 +16,15 @@ pub use wasm_miden::{Felt, FeltFromIntError};
 
 #[cfg(not(all(target_family = "wasm", miden)))]
 mod native;
+#[cfg(all(
+    not(all(target_family = "wasm", miden)),
+    any(
+        all(target_arch = "x86_64", target_feature = "avx2"),
+        all(target_arch = "aarch64", target_feature = "neon"),
+        all(target_arch = "wasm32", target_feature = "simd128"),
+    )
+))]
+pub use native::PackedFelt;
 #[cfg(not(all(target_family = "wasm", miden)))]
 pub use native::{Felt, FeltFromIntError};
 
