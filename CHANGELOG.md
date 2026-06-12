@@ -13,6 +13,7 @@
 - Made `Felt::from_{u8, u16, u32}` const and added `Felt::MAX` ([#1081](https://github.com/0xMiden/crypto/pull/1081)).
 
 - Added a zeroizing read helper for deserializing sensitive material, fixing secret-key read buffers that were not wiped on error paths (ECDSA) or at all (Falcon, Poseidon2 AEAD) ([#1057](https://github.com/0xMiden/crypto/pull/1057)).
+- Made Falcon secret polynomial temporaries wipeable and wiped: added `Zeroize` for `FalconFelt`, removed the unbacked `ZeroizeOnDrop` marker on `Polynomial`, and zeroized the secret-carrying temporaries in `SecretKey` deserialization, serialization, and seed generation ([#1061](https://github.com/0xMiden/crypto/pull/1061)).
 
 ## 0.27.0 (2026-06-19)
 

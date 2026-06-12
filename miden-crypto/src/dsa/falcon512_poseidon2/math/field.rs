@@ -4,6 +4,7 @@ use core::ops::{Add, AddAssign, Div, DivAssign, Mul, MulAssign, Neg, Sub, SubAss
 use num::{One, Zero};
 
 use super::{Inverse, MODULUS, fft::CyclotomicFourier};
+use crate::utils::zeroize::Zeroize;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub struct FalconFelt(u32);
@@ -30,6 +31,12 @@ impl FalconFelt {
 
     pub const fn multiply(self, other: Self) -> Self {
         FalconFelt((self.0 * other.0) % MODULUS as u32)
+    }
+}
+
+impl Zeroize for FalconFelt {
+    fn zeroize(&mut self) {
+        self.0.zeroize();
     }
 }
 

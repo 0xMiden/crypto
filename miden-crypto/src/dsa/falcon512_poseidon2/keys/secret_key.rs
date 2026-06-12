@@ -270,7 +270,9 @@ impl SecretKey {
     fn generate_seed(&self, message: &Word) -> [u8; 32] {
         let mut buffer = Vec::with_capacity(1 + SK_LEN + Word::SERIALIZED_SIZE);
         buffer.push(LOG_N);
-        buffer.extend_from_slice(&self.to_bytes());
+        // Bind the serialized key so the temporary holding it is wiped, not just `buffer`.
+        let sk_bytes = Zeroizing::new(self.to_bytes());
+        buffer.extend_from_slice(&sk_bytes);
         buffer.extend_from_slice(&message.to_bytes());
 
         let digest = Blake3_256::hash(&buffer);
@@ -307,39 +309,42 @@ impl Serializable for SecretKey {
         let g = &basis[0];
         let neg_big_f = &basis[3];
 
-        let mut buffer = Vec::with_capacity(1281);
+        let mut buffer = Zeroizing::new(Vec::with_capacity(1281));
         buffer.push(header);
 
-        let mut f_i8: Vec<i8> = neg_f
-            .coefficients
-            .iter()
-            .map(|&a| FalconFelt::new(-a).balanced_value() as i8)
-            .collect();
-        let f_i8_encoded = encode_i8(&f_i8, WIDTH_SMALL_POLY_COEFFICIENT).unwrap();
+        let f_i8: Zeroizing<Vec<i8>> = Zeroizing::new(
+            neg_f
+                .coefficients
+                .iter()
+                .map(|&a| FalconFelt::new(-a).balanced_value() as i8)
+                .collect(),
+        );
+        let f_i8_encoded = Zeroizing::new(encode_i8(&f_i8, WIDTH_SMALL_POLY_COEFFICIENT).unwrap());
         buffer.extend_from_slice(&f_i8_encoded);
-        f_i8.zeroize();
 
-        let mut g_i8: Vec<i8> = g
-            .coefficients
-            .iter()
-            .map(|&a| FalconFelt::new(a).balanced_value() as i8)
-            .collect();
-        let g_i8_encoded = encode_i8(&g_i8, WIDTH_SMALL_POLY_COEFFICIENT).unwrap();
+        let g_i8: Zeroizing<Vec<i8>> = Zeroizing::new(
+            g.coefficients
+                .iter()
+                .map(|&a| FalconFelt::new(a).balanced_value() as i8)
+                .collect(),
+        );
+        let g_i8_encoded = Zeroizing::new(encode_i8(&g_i8, WIDTH_SMALL_POLY_COEFFICIENT).unwrap());
         buffer.extend_from_slice(&g_i8_encoded);
-        g_i8.zeroize();
 
-        let mut big_f_i8: Vec<i8> = neg_big_f
-            .coefficients
-            .iter()
-            .map(|&a| FalconFelt::new(-a).balanced_value() as i8)
-            .collect();
-        let big_f_i8_encoded = encode_i8(&big_f_i8, WIDTH_BIG_POLY_COEFFICIENT).unwrap();
+        let big_f_i8: Zeroizing<Vec<i8>> = Zeroizing::new(
+            neg_big_f
+                .coefficients
+                .iter()
+                .map(|&a| FalconFelt::new(-a).balanced_value() as i8)
+                .collect(),
+        );
+        let big_f_i8_encoded =
+            Zeroizing::new(encode_i8(&big_f_i8, WIDTH_BIG_POLY_COEFFICIENT).unwrap());
         buffer.extend_from_slice(&big_f_i8_encoded);
-        big_f_i8.zeroize();
 
+        // `write_bytes` only borrows the buffer, so it is wiped here on drop; the target
+        // owns its copy of the encoded key and is responsible for it.
         target.write_bytes(&buffer);
-        // Note: buffer is not zeroized here as it's being passed to write_bytes which consumes it
-        // The caller should ensure proper handling of the written bytes
     }
 }
 
@@ -391,17 +396,34 @@ impl Deserializable for SecretKey {
             .unwrap(),
         );
 
-        let f = Polynomial::new(f.iter().map(|&c| FalconFelt::new(c.into())).collect());
-        let g = Polynomial::new(g.iter().map(|&c| FalconFelt::new(c.into())).collect());
-        let big_f = Polynomial::new(big_f.iter().map(|&c| FalconFelt::new(c.into())).collect());
+        let f =
+            Zeroizing::new(Polynomial::new(f.iter().map(|&c| FalconFelt::new(c.into())).collect()));
+        let g =
+            Zeroizing::new(Polynomial::new(g.iter().map(|&c| FalconFelt::new(c.into())).collect()));
+        let big_f = Zeroizing::new(Polynomial::new(
+            big_f.iter().map(|&c| FalconFelt::new(c.into())).collect(),
+        ));
 
-        // big_g * f - g * big_f = p (mod X^n + 1)
-        let big_g = g.fft().hadamard_div(&f.fft()).hadamard_mul(&big_f.fft()).ifft();
+        // big_g * f - g * big_f = p (mod X^n + 1). Each FFT-domain step is bound in
+        // `Zeroizing` so every secret-carrying intermediate is wiped, including the
+        // inverse that `hadamard_div` would otherwise allocate out of reach.
+        let f_fft = Zeroizing::new(f.fft());
+        let g_fft = Zeroizing::new(g.fft());
+        let big_f_fft = Zeroizing::new(big_f.fft());
+        let f_fft_inv = Zeroizing::new(f_fft.hadamard_inv());
+        let quotient = Zeroizing::new(g_fft.hadamard_mul(&f_fft_inv));
+        let big_g_fft = Zeroizing::new(quotient.hadamard_mul(&big_f_fft));
+        let big_g = Zeroizing::new(big_g_fft.ifft());
+
+        // Negate through references so the un-negated temporaries stay wrapped and wiped;
+        // `-Polynomial` by value would drop them intact.
+        let f_balanced = Zeroizing::new(Polynomial::new(f.to_balanced_values()));
+        let big_f_balanced = Zeroizing::new(Polynomial::new(big_f.to_balanced_values()));
         let basis = [
             Polynomial::new(g.to_balanced_values()),
-            -Polynomial::new(f.to_balanced_values()),
+            -(&*f_balanced),
             Polynomial::new(big_g.to_balanced_values()),
-            -Polynomial::new(big_f.to_balanced_values()),
+            -(&*big_f_balanced),
         ];
         Ok(Self::from_short_lattice_basis(basis))
     }
