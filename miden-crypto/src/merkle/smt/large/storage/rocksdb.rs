@@ -738,7 +738,9 @@ impl SmtStorage for RocksDbStorage {
         let key = Self::index_db_key(index);
         let cf = self.cf_handle(LEAVES_CF)?;
         let old_bytes = self.db.get_cf(cf, key)?;
-        self.db.delete_cf(cf, key)?;
+        let mut batch = WriteBatch::default();
+        batch.delete_cf(cf, key);
+        self.write_batch(batch)?;
         Ok(old_bytes.map(|bytes| {
             SmtLeaf::read_from_bytes_with_budget(&bytes, bytes.len())
                 .expect("failed to deserialize leaf")
