@@ -44,85 +44,6 @@ const LEAF_COUNT_KEY: &[u8] = b"leaf_count";
 /// The key used in the `METADATA_CF` column family to store the total count of key-value entries.
 const ENTRY_COUNT_KEY: &[u8] = b"entry_count";
 
-// SYNC DB
-// ================================================================================================
-
-/// A thin wrapper around `Arc<DB>` that couples the database with its sync-write configuration.
-///
-/// All write paths go through [`SyncDb::write_batch`], which ensures that writes are either
-/// synchronous (if `sync_writes` is `true`) or asynchronous (if `sync_writes` is `false`).
-#[derive(Debug, Clone)]
-struct SyncDb {
-    db: Arc<DB>,
-    sync_writes: bool,
-}
-
-impl SyncDb {
-    fn new(db: Arc<DB>, sync_writes: bool) -> Self {
-        Self { db, sync_writes }
-    }
-
-    /// The only write path. Applies `sync_writes` before committing the batch.
-    fn write_batch(&self, batch: WriteBatch) -> StorageResult<()> {
-        let mut write_opts = rocksdb::WriteOptions::default();
-        write_opts.set_sync(self.sync_writes);
-        self.db.write_opt(batch, &write_opts)?;
-        Ok(())
-    }
-
-    fn cf_handle(&self, name: &str) -> StorageResult<&rocksdb::ColumnFamily> {
-        self.db
-            .cf_handle(name)
-            .ok_or_else(|| StorageError::Unsupported(format!("unknown column family `{name}`")))
-    }
-
-    fn get_cf<K: AsRef<[u8]>>(
-        &self,
-        cf: &rocksdb::ColumnFamily,
-        key: K,
-    ) -> StorageResult<Option<Vec<u8>>> {
-        Ok(self.db.get_cf(cf, key)?)
-    }
-
-    fn multi_get_cf<'a, K, I>(&self, keys: I) -> Vec<Result<Option<Vec<u8>>, rocksdb::Error>>
-    where
-        K: AsRef<[u8]>,
-        I: IntoIterator<Item = (&'a rocksdb::ColumnFamily, K)>,
-    {
-        self.db.multi_get_cf(keys)
-    }
-
-    fn flush_cf_opt(&self, cf: &rocksdb::ColumnFamily, opts: &FlushOptions) -> StorageResult<()> {
-        Ok(self.db.flush_cf_opt(cf, opts)?)
-    }
-
-    fn flush_wal(&self, sync: bool) -> StorageResult<()> {
-        Ok(self.db.flush_wal(sync)?)
-    }
-
-    fn iterator_cf_opt<'a>(
-        &'a self,
-        cf: &rocksdb::ColumnFamily,
-        opts: ReadOptions,
-        mode: IteratorMode,
-    ) -> DBIteratorWithThreadMode<'a, DB> {
-        self.db.iterator_cf_opt(cf, opts, mode)
-    }
-
-    fn iterator_cf<'a>(
-        &'a self,
-        cf: &rocksdb::ColumnFamily,
-        mode: IteratorMode,
-    ) -> DBIteratorWithThreadMode<'a, DB> {
-        self.db.iterator_cf(cf, mode)
-    }
-
-    /// Returns a clone of the underlying `Arc<DB>` for use by read-only snapshot readers.
-    fn to_inner(&self) -> Arc<DB> {
-        Arc::clone(&self.db)
-    }
-}
-
 // ROCKSDB STORAGE
 // ================================================================================================
 
@@ -148,7 +69,12 @@ impl SyncDb {
 ///   leaf count, and total entry count.
 #[derive(Debug, Clone)]
 pub struct RocksDbStorage {
-    db: SyncDb,
+    db: Arc<DB>,
+    /// Whether writes should be synchronously flushed to disk.
+    ///
+    /// Setting this to true will result in reduced throughput but may result in higher durability
+    /// in the presence of crashes.
+    sync_writes: bool,
 }
 
 impl RocksDbStorage {
@@ -270,7 +196,8 @@ impl RocksDbStorage {
         let db = DB::open_cf_descriptors(&db_opts, config.path, cfs)?;
 
         Ok(Self {
-            db: SyncDb::new(Arc::new(db), config.sync_writes),
+            db: Arc::new(db),
+            sync_writes: config.sync_writes,
         })
     }
 
@@ -303,6 +230,14 @@ impl RocksDbStorage {
         Ok(())
     }
 
+    /// Writes a batch to RocksDB, respecting the configured sync mode.
+    fn write_batch(&self, batch: WriteBatch) -> StorageResult<()> {
+        let mut write_opts = rocksdb::WriteOptions::default();
+        write_opts.set_sync(self.sync_writes);
+        self.db.write_opt(batch, &write_opts)?;
+        Ok(())
+    }
+
     /// Converts an index (u64) into a fixed-size byte array for use as a RocksDB key.
     #[inline(always)]
     fn index_db_key(index: u64) -> [u8; 8] {
@@ -331,7 +266,9 @@ impl RocksDbStorage {
     /// Returns `StorageError::Backend` if the column family with the given `name` does not
     /// exist.
     fn cf_handle(&self, name: &str) -> StorageResult<&rocksdb::ColumnFamily> {
-        self.db.cf_handle(name)
+        self.db
+            .cf_handle(name)
+            .ok_or_else(|| StorageError::Unsupported(format!("unknown column family `{name}`")))
     }
 
     /* helper: CF handle from NodeIndex ------------------------------------- */
@@ -637,7 +574,7 @@ impl SmtStorage for RocksDbStorage {
 
     /// Returns a detached read-only snapshot of the current RocksDB-backed storage.
     fn reader(&self) -> StorageResult<Self::Reader> {
-        Ok(RocksDbSnapshotStorage::new(self.db.to_inner()))
+        Ok(RocksDbSnapshotStorage::new(Arc::clone(&self.db)))
     }
 
     /// Inserts a key-value pair into the SMT leaf at the specified logical `index`.
@@ -702,7 +639,7 @@ impl SmtStorage for RocksDbStorage {
         batch.put_cf(metadata_cf, ENTRY_COUNT_KEY, current_entry_count.to_be_bytes());
 
         // Atomically write all changes (leaf data and metadata counts).
-        self.db.write_batch(batch)?;
+        self.write_batch(batch)?;
 
         Ok(value_to_return)
     }
@@ -749,7 +686,7 @@ impl SmtStorage for RocksDbStorage {
         }
         batch.put_cf(metadata_cf, LEAF_COUNT_KEY, leaf_count.to_be_bytes());
         batch.put_cf(metadata_cf, ENTRY_COUNT_KEY, entry_count.to_be_bytes());
-        self.db.write_batch(batch)?;
+        self.write_batch(batch)?;
         Ok(current_value)
     }
 
@@ -779,7 +716,7 @@ impl SmtStorage for RocksDbStorage {
         let metadata_cf = self.cf_handle(METADATA_CF)?;
         batch.put_cf(metadata_cf, LEAF_COUNT_KEY, leaf_count.to_be_bytes());
         batch.put_cf(metadata_cf, ENTRY_COUNT_KEY, entry_count.to_be_bytes());
-        self.db.write_batch(batch)?;
+        self.write_batch(batch)?;
         Ok(())
     }
 
@@ -803,7 +740,7 @@ impl SmtStorage for RocksDbStorage {
         let old_bytes = self.db.get_cf(cf, key)?;
         let mut batch = WriteBatch::default();
         batch.delete_cf(cf, key);
-        self.db.write_batch(batch)?;
+        self.write_batch(batch)?;
         Ok(old_bytes.map(|bytes| {
             SmtLeaf::read_from_bytes_with_budget(&bytes, bytes.len())
                 .expect("failed to deserialize leaf")
@@ -842,7 +779,7 @@ impl SmtStorage for RocksDbStorage {
             batch.put_cf(in_mem_depth_cf, hash_key, root_hash.to_bytes());
         }
 
-        self.db.write_batch(batch)?;
+        self.write_batch(batch)?;
         Ok(())
     }
 
@@ -878,7 +815,7 @@ impl SmtStorage for RocksDbStorage {
             }
         }
 
-        self.db.write_batch(batch)?;
+        self.write_batch(batch)?;
         Ok(())
     }
 
@@ -901,7 +838,7 @@ impl SmtStorage for RocksDbStorage {
             batch.delete_cf(in_mem_depth_cf, hash_key);
         }
 
-        self.db.write_batch(batch)?;
+        self.write_batch(batch)?;
         Ok(())
     }
 
@@ -1066,7 +1003,7 @@ impl SmtStorage for RocksDbStorage {
             batch.put_cf(metadata_cf, ENTRY_COUNT_KEY, new_entry_count.to_be_bytes());
         }
 
-        self.db.write_batch(batch)?;
+        self.write_batch(batch)?;
 
         Ok(())
     }
@@ -1116,14 +1053,14 @@ impl Iterator for RocksDbDirectLeafIterator<'_> {
 /// Iterates through all subtree column families (24, 32, 40, 48, 56) sequentially.
 /// When one column family is exhausted, it moves to the next one.
 struct RocksDbSubtreeIterator<'a> {
-    db: &'a SyncDb,
+    db: &'a DB,
     cf_handles: Vec<&'a rocksdb::ColumnFamily>,
     current_cf_index: usize,
     current_iter: Option<DBIteratorWithThreadMode<'a, DB>>,
 }
 
 impl<'a> RocksDbSubtreeIterator<'a> {
-    fn new(db: &'a SyncDb, cf_handles: Vec<&'a rocksdb::ColumnFamily>) -> Self {
+    fn new(db: &'a DB, cf_handles: Vec<&'a rocksdb::ColumnFamily>) -> Self {
         let mut iterator = Self {
             db,
             cf_handles,
