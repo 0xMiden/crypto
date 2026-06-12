@@ -6,7 +6,7 @@
 - Use faster DFT algorithm for `PeriodicPolys` ([#1054](https://github.com/0xMiden/crypto/pull/1054)).
 - [BREAKING] Bumped Plonky3 upstream dependencies to v0.6.0 ([#1053](https://github.com/0xMiden/crypto/pull/1053)).
 - [BREAKING] Make `Felt::Packing` resolve to the SIMD-packed `PackedFelt` from Plonky3 ([#1060](https://github.com/0xMiden/crypto/pull/1060)).
-- Added the ability to configure the sync-to-disk behavior of the RocksDB storage using its config ([#1056](https://github.com/0xMiden/crypto/pull/1056)).
+- Improved LargeSmt RocksDB defaults, added per-DB memory-budget controls, and exposed durability mode selection ([#1056](https://github.com/0xMiden/crypto/pull/1056)).
 
 ## 0.26.0 (06-02-2026)
 
