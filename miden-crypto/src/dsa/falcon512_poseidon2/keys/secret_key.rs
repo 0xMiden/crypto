@@ -194,12 +194,16 @@ impl SecretKey {
 
     /// Derives the public key corresponding to this secret key using h = g /f [mod ϕ][mod p].
     fn compute_pub_key_poly(&self) -> PublicKey {
-        let g: Polynomial<FalconFelt> = self.secret_key[0].clone().into();
-        let g_fft = g.fft();
-        let minus_f: Polynomial<FalconFelt> = self.secret_key[1].clone().into();
-        let f = -minus_f;
-        let f_fft = f.fft();
-        let h_fft = g_fft.hadamard_div(&f_fft);
+        let g: Zeroizing<Polynomial<FalconFelt>> =
+            Zeroizing::new(self.secret_key[0].clone().into());
+        let g_fft = Zeroizing::new(g.fft());
+        let minus_f: Zeroizing<Polynomial<FalconFelt>> =
+            Zeroizing::new(self.secret_key[1].clone().into());
+        let f = Zeroizing::new(-(&*minus_f));
+        let f_fft = Zeroizing::new(f.fft());
+        let f_fft_inv = Zeroizing::new(f_fft.hadamard_inv());
+        // h = g / f is the public key, so the result needs no wiping.
+        let h_fft = g_fft.hadamard_mul(&f_fft_inv);
         h_fft.ifft().into()
     }
 
