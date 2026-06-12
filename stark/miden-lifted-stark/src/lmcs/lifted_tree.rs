@@ -1,5 +1,5 @@
 use alloc::{vec, vec::Vec};
-use core::{array, mem};
+use core::array;
 
 use miden_stark_transcript::ProverChannel;
 use miden_stateful_hasher::StatefulHasher;
@@ -230,12 +230,12 @@ where
         // Build leaf hashes: absorb all matrix rows into sponge states, then squeeze.
         let leaf_digests: Vec<[PD::Value; DIGEST_ELEMS]> =
             info_span!("hash leaves").in_scope(|| {
-                let mut leaf_states: Vec<[PD::Value; WIDTH]> =
+                let mut leaf_states =
                     build_leaf_states_upsampled::<PF, PD, M, H, WIDTH, DIGEST_ELEMS>(&leaves, h);
 
                 // Absorb salt into states using SIMD-parallelized path (no-op when salt is None)
                 if let Some(ref salt_matrix) = salt {
-                    debug_assert_eq!(salt_matrix.height(), leaf_states.len());
+                    debug_assert_eq!(salt_matrix.height(), leaf_states.num_leaves());
                     debug_assert_eq!(salt_matrix.width(), SALT_ELEMS);
                     info_span!("absorb salt", height = salt_matrix.height(), width = SALT_ELEMS)
                         .in_scope(|| {
@@ -247,17 +247,16 @@ where
                         });
                 }
 
-                // Squeeze leaf hashes and bit-reverse in one pass: digest[i] =
-                // squeeze(state[bitrev(i)]). This places digests in domain order so
-                // the Merkle tree is indexed naturally.
-                let n = leaf_states.len();
+                // Squeeze leaf hashes in physical row order, then permute into domain
+                // order: digest[i] = squeeze(state[bitrev(i)]). This places digests in
+                // domain order so the Merkle tree is indexed naturally.
+                let physical_digests = info_span!("squeeze leaves")
+                    .in_scope(|| squeeze_states::<PF, PD, H, WIDTH, DIGEST_ELEMS>(&leaf_states, h));
+                let n = physical_digests.len();
                 let log_n = log2_strict_usize(n);
                 (0..n)
                     .into_par_iter()
-                    .map(|i| {
-                        let src = reverse_bits_len(i, log_n);
-                        h.squeeze(&leaf_states[src])
-                    })
+                    .map(|i| physical_digests[reverse_bits_len(i, log_n)])
                     .collect()
             });
 
@@ -344,10 +343,34 @@ where
     }
 }
 
+/// Per-leaf sponge states in either scalar or packed-lane representation.
+///
+/// The packed variant transposes `PD::WIDTH` consecutive leaf states into packed columns:
+/// entry `p` holds the states of leaves `p * PD::WIDTH..(p + 1) * PD::WIDTH`, with column
+/// `col` of leaf `p * PD::WIDTH + lane` stored in `entry[col]` at SIMD lane `lane`.
+///
+/// States are packed as soon as the active height reaches `PD::WIDTH` and stay packed
+/// across matrices, salt absorption and squeezing, so the lane transpose is paid only at
+/// height changes rather than once per matrix.
+enum LeafStates<PD: PackedValue, const WIDTH: usize> {
+    Scalar(Vec<[PD::Value; WIDTH]>),
+    Packed(Vec<[PD; WIDTH]>),
+}
+
+impl<PD: PackedValue, const WIDTH: usize> LeafStates<PD, WIDTH> {
+    /// Number of leaf states represented.
+    fn num_leaves(&self) -> usize {
+        match self {
+            Self::Scalar(states) => states.len(),
+            Self::Packed(states) => states.len() * PD::WIDTH,
+        }
+    }
+}
+
 /// Build leaf states using the upsampled view (nearest-neighbor upsampling).
 ///
 /// Returns the sponge states after absorbing all matrix rows but **before squeezing**.
-/// Callers must squeeze the states to obtain final leaf hashes.
+/// Callers must squeeze the states (see [`squeeze_states`]) to obtain final leaf hashes.
 ///
 /// Conceptually, each matrix is virtually extended to height `H` by repeating each row
 /// `L = H / h` times (width unchanged), and the leaf `r` absorbs the `r`-th row from each
@@ -360,13 +383,13 @@ where
 ///
 /// # Preconditions
 /// - `matrices` is non-empty and sorted by non-decreasing power-of-two heights.
-/// - `P::WIDTH` is a power of two.
+/// - `PF::WIDTH` and `PD::WIDTH` are equal powers of two.
 ///
 /// Panics in debug builds if preconditions are violated.
 fn build_leaf_states_upsampled<PF, PD, M, H, const WIDTH: usize, const DIGEST_ELEMS: usize>(
     matrices: &[M],
     sponge: &H,
-) -> Vec<[PD::Value; WIDTH]>
+) -> LeafStates<PD, WIDTH>
 where
     PF: PackedValue,
     PD: PackedValue,
@@ -377,41 +400,35 @@ where
 {
     const { assert!(PF::WIDTH.is_power_of_two()) };
     const { assert!(PD::WIDTH.is_power_of_two()) };
-    let final_height = validate_heights(matrices.iter().map(|d| d.dimensions().height));
+    const { assert!(PF::WIDTH == PD::WIDTH) };
+    validate_heights(matrices.iter().map(|d| d.dimensions().height));
 
-    // Memory buffers:
-    // - states: Per-leaf scalar states (one per final row), maintained across matrices.
-    // - scratch_states: Temporary buffer used when duplicating states during upsampling.
-    let default_state = [PD::Value::default(); WIDTH];
-    let mut states = vec![default_state; final_height];
-    let mut scratch_states = vec![default_state; final_height];
+    // States are sized to the active height and re-expanded at each height increase.
+    let first_height = matrices.first().unwrap().height();
+    let mut states = if first_height < PD::WIDTH || PD::WIDTH == 1 {
+        LeafStates::Scalar(vec![[PD::Value::default(); WIDTH]; first_height])
+    } else {
+        LeafStates::Packed(vec![
+            [PD::broadcast(PD::Value::default()); WIDTH];
+            first_height / PD::WIDTH
+        ])
+    };
 
-    let mut active_height = matrices.first().unwrap().height();
+    let mut active_height = first_height;
 
     for matrix in matrices {
         let height = matrix.height();
 
-        // Upsample states when height increases (applies to both scalar and packed paths).
-        // Duplicate each existing state to fill the expanded height.
-        // E.g., [s0, s1] with scaling_factor=2 → [s0, s0, s1, s1]
+        // Upsample states when height increases. Duplicate each existing state to fill
+        // the expanded height. E.g., [s0, s1] with scaling_factor=2 → [s0, s0, s1, s1]
         if height > active_height {
             let scaling_factor = height / active_height;
-
-            // Copy `states` into `scratch_states`, repeating each entry `scaling_factor` times
-            // so we keep the accumulated sponge states aligned with the taller matrix.
-            scratch_states[..height]
-                .par_chunks_mut(scaling_factor)
-                .zip(states[..active_height].par_iter())
-                .for_each(|(chunk, state)| chunk.fill(*state));
-
-            // Copy upsampled states back to canonical buffer
-            mem::swap(&mut scratch_states, &mut states);
+            states = upsample_states(states, scaling_factor);
         }
 
         // Absorb the rows of the matrix into the extended state vector
-        info_span!("absorb matrix", height, width = matrix.width()).in_scope(|| {
-            absorb_matrix::<PF, PD, _, _, _, _>(&mut states[..height], matrix, sponge)
-        });
+        info_span!("absorb matrix", height, width = matrix.width())
+            .in_scope(|| absorb_matrix::<PF, PD, _, _, _, _>(&mut states, matrix, sponge));
 
         active_height = height;
     }
@@ -419,16 +436,59 @@ where
     states
 }
 
+/// Duplicate each leaf state `scaling_factor` times to align with a taller matrix.
+///
+/// Switches from the scalar to the packed representation once the target height reaches
+/// `PD::WIDTH`; once packed, states stay packed and the duplication is a lane-wise shuffle
+/// within the packed domain.
+fn upsample_states<PD: PackedValue, const WIDTH: usize>(
+    states: LeafStates<PD, WIDTH>,
+    scaling_factor: usize,
+) -> LeafStates<PD, WIDTH> {
+    let w = PD::WIDTH;
+    let target_height = states.num_leaves() * scaling_factor;
+
+    match states {
+        LeafStates::Scalar(states) if w == 1 || target_height < w => LeafStates::Scalar(
+            (0..target_height).into_par_iter().map(|i| states[i / scaling_factor]).collect(),
+        ),
+        LeafStates::Scalar(states) => LeafStates::Packed(
+            (0..target_height / w)
+                .into_par_iter()
+                .map(|p| {
+                    array::from_fn(|col| {
+                        PD::from_fn(|lane| states[(p * w + lane) / scaling_factor][col])
+                    })
+                })
+                .collect(),
+        ),
+        LeafStates::Packed(states) => LeafStates::Packed(
+            (0..target_height / w)
+                .into_par_iter()
+                .map(|p| {
+                    array::from_fn(|col| {
+                        PD::from_fn(|lane| {
+                            let i = (p * w + lane) / scaling_factor;
+                            states[i / w][col].extract(i % w)
+                        })
+                    })
+                })
+                .collect(),
+        ),
+    }
+}
+
 /// Incorporate one matrix's row-wise contribution into the running per-leaf states.
 ///
-/// Semantics: given `states` of length `h = matrix.height()`, for each row index `r ∈ [0, h)`
-/// update `states[r]` by absorbing the matrix row `r` into that state. In the overall tree
-/// construction, callers ensure that `states` is the correct lifted view for the current matrix
-/// (either the "nearest-neighbor" duplication or the "modulo" duplication across the final
-/// height). This helper performs exactly one absorption round for that matrix and returns with the
-/// states mutated; it does not change the lifting shape or squeeze hashes.
+/// Semantics: given `states` covering `h = matrix.height()` leaves, for each row index
+/// `r ∈ [0, h)` update the state of leaf `r` by absorbing the matrix row `r` into that state.
+/// In the overall tree construction, callers ensure that `states` is the correct lifted view
+/// for the current matrix (either the "nearest-neighbor" duplication or the "modulo"
+/// duplication across the final height). This helper performs exactly one absorption round
+/// for that matrix and returns with the states mutated; it does not change the lifting shape
+/// or squeeze hashes.
 fn absorb_matrix<PF, PD, M, H, const WIDTH: usize, const DIGEST_ELEMS: usize>(
-    states: &mut [[PD::Value; WIDTH]],
+    states: &mut LeafStates<PD, WIDTH>,
     matrix: &M,
     sponge: &H,
 ) where
@@ -439,27 +499,55 @@ fn absorb_matrix<PF, PD, M, H, const WIDTH: usize, const DIGEST_ELEMS: usize>(
         + StatefulHasher<PF, [PD; DIGEST_ELEMS], State = [PD; WIDTH]>
         + Sync,
 {
-    let height = matrix.height();
-    assert_eq!(height, states.len());
+    assert_eq!(matrix.height(), states.num_leaves());
 
-    if height < PF::WIDTH || PF::WIDTH == 1 {
-        // Scalar path: walk every final leaf state and absorb the wrapped row for this matrix.
-        states.par_iter_mut().zip(matrix.par_rows()).for_each(|(state, row)| {
-            sponge.absorb_into(state, row);
-        });
-    } else {
-        // SIMD path: gather → absorb wrapped packed row → scatter per chunk.
-        states
-            .par_chunks_mut(PF::WIDTH)
-            .enumerate()
-            .for_each(|(packed_idx, states_chunk)| {
-                let mut packed_state: [PD; WIDTH] =
-                    array::from_fn(|col| PD::from_fn(|lane| states_chunk[lane][col]));
-                let row_idx = packed_idx * PF::WIDTH;
-                let row = matrix.vertically_packed_row::<PF>(row_idx);
-                sponge.absorb_into(&mut packed_state, row);
-                PD::unpack_into(&packed_state, states_chunk);
+    match states {
+        LeafStates::Scalar(states) => {
+            // Scalar path: walk every leaf state and absorb the matching row for this matrix.
+            states.par_iter_mut().zip(matrix.par_rows()).for_each(|(state, row)| {
+                sponge.absorb_into(state, row);
             });
+        },
+        LeafStates::Packed(states) => {
+            // SIMD path: states are already lane-transposed; absorb the packed row directly.
+            states.par_iter_mut().enumerate().for_each(|(packed_idx, state)| {
+                let row = matrix.vertically_packed_row::<PF>(packed_idx * PF::WIDTH);
+                sponge.absorb_into(state, row);
+            });
+        },
+    }
+}
+
+/// Squeeze one digest per leaf from the accumulated states, in physical row order.
+///
+/// The packed representation is squeezed `PD::WIDTH` leaves at a time and scattered into
+/// scalar digests in a single pass.
+fn squeeze_states<PF, PD, H, const WIDTH: usize, const DIGEST_ELEMS: usize>(
+    states: &LeafStates<PD, WIDTH>,
+    sponge: &H,
+) -> Vec<[PD::Value; DIGEST_ELEMS]>
+where
+    PF: PackedValue,
+    PD: PackedValue,
+    H: StatefulHasher<PF::Value, [PD::Value; DIGEST_ELEMS], State = [PD::Value; WIDTH]>
+        + StatefulHasher<PF, [PD; DIGEST_ELEMS], State = [PD; WIDTH]>
+        + Sync,
+{
+    match states {
+        LeafStates::Scalar(states) => {
+            states.par_iter().map(|state| sponge.squeeze(state)).collect()
+        },
+        LeafStates::Packed(states) => {
+            let default_digest = [PD::Value::default(); DIGEST_ELEMS];
+            let mut digests = vec![default_digest; states.len() * PD::WIDTH];
+            digests.par_chunks_exact_mut(PD::WIDTH).zip(states.par_iter()).for_each(
+                |(digest_chunk, state)| {
+                    let packed_digest: [PD; DIGEST_ELEMS] = sponge.squeeze(state);
+                    PD::unpack_into(&packed_digest, digest_chunk);
+                },
+            );
+            digests
+        },
     }
 }
 
@@ -627,9 +715,9 @@ mod tests {
         matrices: &[RowMajorMatrix<Felt>],
         sponge: &Sponge,
     ) -> Vec<[Felt; DIGEST]> {
-        let mut states =
+        let states =
             build_leaf_states_upsampled::<PackedFelt, PackedFelt, _, _, _, _>(matrices, sponge);
-        states.iter_mut().map(|s| sponge.squeeze(s)).collect()
+        squeeze_states::<PackedFelt, PackedFelt, _, _, _>(&states, sponge)
     }
 
     /// Test that upsampled lifting produces correct results:
