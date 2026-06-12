@@ -1898,10 +1898,7 @@ mod tests {
     #[test]
     fn config_defaults_to_relaxed_durability() {
         let dir = tempfile::tempdir().unwrap();
-        assert_eq!(
-            RocksDbConfig::new(dir.path()).durability_mode,
-            RocksDbDurabilityMode::Relaxed
-        );
+        assert_eq!(RocksDbConfig::new(dir.path()).durability_mode, RocksDbDurabilityMode::Relaxed);
     }
 
     #[test]
