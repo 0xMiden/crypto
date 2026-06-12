@@ -2,15 +2,16 @@
 //!
 //! `DuplexChallenger`'s `GrindingChallenger` impl requires the permutation to also work over
 //! `[Felt::Packing; STATE_WIDTH]` so that proof-of-work grinding can test one witness candidate
-//! per SIMD lane. The algebraic permutations have no vectorized implementation, so these impls
-//! apply the scalar permutation to each lane independently: throughput matches the scalar path.
+//! per SIMD lane. Poseidon2 delegates to Plonky3's vectorized packed-Goldilocks permutation.
+//! RPO and RPX have no vectorized implementation, so their impls apply the scalar permutation
+//! to each lane independently: throughput matches the scalar path.
 
 use miden_field::{PackedFelt, PackedValue};
 use p3_symmetric::{CryptographicPermutation, Permutation};
 
 use super::{
     Felt, STATE_WIDTH,
-    poseidon2::Poseidon2Permutation256,
+    poseidon2::{Poseidon2Permutation256, p3_permute_packed},
     rescue::{rpo::RpoPermutation256, rpx::RpxPermutation256},
 };
 
@@ -46,7 +47,7 @@ impl CryptographicPermutation<[PackedFelt; STATE_WIDTH]> for RpxPermutation256 {
 
 impl Permutation<[PackedFelt; STATE_WIDTH]> for Poseidon2Permutation256 {
     fn permute_mut(&self, state: &mut [PackedFelt; STATE_WIDTH]) {
-        permute_lanes(state, Self::apply_permutation);
+        p3_permute_packed(state);
     }
 }
 

@@ -74,6 +74,17 @@ impl PackedFelt {
     const fn broadcast(value: Felt) -> Self {
         Self([value; WIDTH])
     }
+
+    /// Reinterprets a mutable `PackedFelt` array as the underlying Plonky3 packed Goldilocks
+    /// array for this architecture (i.e. `<Goldilocks as Field>::Packing`).
+    #[inline]
+    pub fn as_goldilocks_array_mut<const N: usize>(
+        a: &mut [PackedFelt; N],
+    ) -> &mut [PackedGoldilocks; N] {
+        // SAFETY: `PackedFelt` and `PackedGoldilocks` have identical layouts (see
+        // `PackedFelt::to_inner`), so `[PackedFelt; N]` matches `[PackedGoldilocks; N]`.
+        unsafe { &mut *(a as *mut [PackedFelt; N] as *mut [PackedGoldilocks; N]) }
+    }
 }
 
 /// Reinterprets a `PackedFelt` array as `PackedGoldilocks`.
