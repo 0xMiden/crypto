@@ -74,7 +74,7 @@ impl<F: TwoAdicField> PeriodicPolys<F> {
             let y = z.exp_u64((trace_height / period) as u64);
             // Coefficients are stored in ascending degree (idft output): [c₀, c₁, ..., cₙ₋₁],
             // which is the order `HornerIter` consumes directly.
-            result.push(coeffs.iter().copied().horner_acc(EF::ZERO, y));
+            result.push(coeffs.iter().copied().horner(y));
         }
 
         result
