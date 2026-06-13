@@ -197,12 +197,13 @@ where
                             Layout::Natural => r,
                             Layout::BitReversed => reverse_bits_len(r, log_n),
                         };
+                        let row_base = row_bases[k];
                         let mut scale = F::ONE;
-                        for (col, val) in row.iter_mut().enumerate() {
-                            if col != 0 && col.is_multiple_of(EF::DIMENSION) {
-                                scale *= row_bases[k];
+                        for chunk in row.chunks_exact_mut(EF::DIMENSION) {
+                            for val in chunk {
+                                *val *= scale;
                             }
-                            *val *= scale;
+                            scale *= row_base;
                         }
                     });
                 },
