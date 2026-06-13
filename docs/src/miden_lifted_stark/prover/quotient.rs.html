@@ -1,4 +1,4 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `stark/miden-lifted-stark/src/prover/quotient.rs`."><title>quotient.rs - source</title><script>if(window.location.protocol!=="file:")document.head.insertAdjacentHTML("beforeend","SourceSerif4-Regular-6b053e98.ttf.woff2,FiraSans-Italic-81dc35de.woff2,FiraSans-Regular-0fe48ade.woff2,FiraSans-MediumItalic-ccf7e434.woff2,FiraSans-Medium-e1aa3f0a.woff2,SourceCodePro-Regular-8badfe75.ttf.woff2,SourceCodePro-Semibold-aa29a496.ttf.woff2".split(",").map(f=>`<link rel="preload" as="font" type="font/woff2"href="../../../static.files/${f}">`).join(""))</script><link rel="stylesheet" href="../../../static.files/normalize-9960930a.css"><link rel="stylesheet" href="../../../static.files/rustdoc-1ed95124.css"><meta name="rustdoc-vars" data-root-path="../../../" data-static-root-path="../../../static.files/" data-current-crate="miden_lifted_stark" data-themes="" data-resource-suffix="" data-rustdoc-version="1.98.0-nightly (485ec3fbc 2026-06-10)" data-channel="nightly" data-search-js="search-fd9372ac.js" data-stringdex-js="stringdex-2da4960a.js" data-settings-js="settings-170eb4bf.js" ><script src="../../../static.files/storage-41dd4d93.js"></script><script defer src="../../../static.files/src-script-813739b1.js"></script><script defer src="../../../src-files.js"></script><script defer src="../../../static.files/main-fcd733ba.js"></script><noscript><link rel="stylesheet" href="../../../static.files/noscript-f7c3ffd8.css"></noscript><link rel="alternate icon" type="image/png" href="../../../static.files/favicon-32x32-eab170b8.png"><link rel="icon" type="image/svg+xml" href="../../../static.files/favicon-044be391.svg"></head><body class="rustdoc src"><a class="skip-main-content" href="#main-content">Skip to main content</a><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="src-sidebar-title"><h2>Files</h2></div></nav><div class="sidebar-resizer" title="Drag to resize sidebar"></div><main><section id="main-content" class="content" tabindex="-1"><div class="main-heading"><h1><div class="sub-heading">miden_lifted_stark/prover/</div>quotient.rs</h1><rustdoc-toolbar></rustdoc-toolbar></div><div class="example-wrap digits-3"><pre class="rust"><code><a href=#1 id=1 data-nosnippet>1</a><span class="doccomment">//! Quotient polynomial helpers used by the prover's per-AIR pipeline.
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `stark/miden-lifted-stark/src/prover/quotient.rs`."><title>quotient.rs - source</title><script>if(window.location.protocol!=="file:")document.head.insertAdjacentHTML("beforeend","SourceSerif4-Regular-6b053e98.ttf.woff2,FiraSans-Italic-81dc35de.woff2,FiraSans-Regular-0fe48ade.woff2,FiraSans-MediumItalic-ccf7e434.woff2,FiraSans-Medium-e1aa3f0a.woff2,SourceCodePro-Regular-8badfe75.ttf.woff2,SourceCodePro-Semibold-aa29a496.ttf.woff2".split(",").map(f=>`<link rel="preload" as="font" type="font/woff2"href="../../../static.files/${f}">`).join(""))</script><link rel="stylesheet" href="../../../static.files/normalize-9960930a.css"><link rel="stylesheet" href="../../../static.files/rustdoc-1ed95124.css"><meta name="rustdoc-vars" data-root-path="../../../" data-static-root-path="../../../static.files/" data-current-crate="miden_lifted_stark" data-themes="" data-resource-suffix="" data-rustdoc-version="1.98.0-nightly (654079540 2026-06-12)" data-channel="nightly" data-search-js="search-fd9372ac.js" data-stringdex-js="stringdex-2da4960a.js" data-settings-js="settings-170eb4bf.js" ><script src="../../../static.files/storage-41dd4d93.js"></script><script defer src="../../../static.files/src-script-813739b1.js"></script><script defer src="../../../src-files.js"></script><script defer src="../../../static.files/main-fcd733ba.js"></script><noscript><link rel="stylesheet" href="../../../static.files/noscript-f7c3ffd8.css"></noscript><link rel="alternate icon" type="image/png" href="../../../static.files/favicon-32x32-eab170b8.png"><link rel="icon" type="image/svg+xml" href="../../../static.files/favicon-044be391.svg"></head><body class="rustdoc src"><a class="skip-main-content" href="#main-content">Skip to main content</a><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="src-sidebar-title"><h2>Files</h2></div></nav><div class="sidebar-resizer" title="Drag to resize sidebar"></div><main><section id="main-content" class="content" tabindex="-1"><div class="main-heading"><h1><div class="sub-heading">miden_lifted_stark/prover/</div>quotient.rs</h1><rustdoc-toolbar></rustdoc-toolbar></div><div class="example-wrap digits-3"><pre class="rust"><code><a href=#1 id=1 data-nosnippet>1</a><span class="doccomment">//! Quotient polynomial helpers used by the prover's per-AIR pipeline.
 <a href=#2 id=2 data-nosnippet>2</a>//!
 <a href=#3 id=3 data-nosnippet>3</a>//! - [`upsample_evals`]: Low-degree extend coset evaluations onto a larger two-adic coset (the
 <a href=#4 id=4 data-nosnippet>4</a>//!   constraint-degree axis: `D_j -&gt; D_max`, same polynomial, denser evaluations).
@@ -8,21 +8,21 @@
 <a href=#8 id=8 data-nosnippet>8</a>
 <a href=#9 id=9 data-nosnippet>9</a></span><span class="kw">use </span>alloc::{format, vec, vec::Vec};
 <a href=#10 id=10 data-nosnippet>10</a>
-<a href=#11 id=11 data-nosnippet>11</a><span class="kw">use </span>p3_dft::TwoAdicSubgroupDft;
+<a href=#11 id=11 data-nosnippet>11</a><span class="kw">use </span>p3_dft::{Layout, TwoAdicSubgroupDft};
 <a href=#12 id=12 data-nosnippet>12</a><span class="kw">use </span>p3_field::{
 <a href=#13 id=13 data-nosnippet>13</a>    BasedVectorSpace, ExtensionField, Field, TwoAdicField, par_add_scaled_slice_in_place,
 <a href=#14 id=14 data-nosnippet>14</a>    par_scale_slice_in_place,
 <a href=#15 id=15 data-nosnippet>15</a>};
 <a href=#16 id=16 data-nosnippet>16</a><span class="kw">use </span>p3_matrix::dense::RowMajorMatrix;
 <a href=#17 id=17 data-nosnippet>17</a><span class="kw">use </span>p3_maybe_rayon::prelude::<span class="kw-2">*</span>;
-<a href=#18 id=18 data-nosnippet>18</a><span class="kw">use </span>tracing::info_span;
-<a href=#19 id=19 data-nosnippet>19</a>
-<a href=#20 id=20 data-nosnippet>20</a><span class="kw">use crate</span>::{
-<a href=#21 id=21 data-nosnippet>21</a>    StarkConfig,
-<a href=#22 id=22 data-nosnippet>22</a>    domain::{Coset, EvaluationDomain},
-<a href=#23 id=23 data-nosnippet>23</a>    lmcs::Lmcs,
-<a href=#24 id=24 data-nosnippet>24</a>    prover::commit::Committed,
-<a href=#25 id=25 data-nosnippet>25</a>    util::bitrev::materialize_bitrev,
+<a href=#18 id=18 data-nosnippet>18</a><span class="kw">use </span>p3_util::{log2_strict_usize, reverse_bits_len};
+<a href=#19 id=19 data-nosnippet>19</a><span class="kw">use </span>tracing::info_span;
+<a href=#20 id=20 data-nosnippet>20</a>
+<a href=#21 id=21 data-nosnippet>21</a><span class="kw">use crate</span>::{
+<a href=#22 id=22 data-nosnippet>22</a>    StarkConfig,
+<a href=#23 id=23 data-nosnippet>23</a>    domain::{Coset, EvaluationDomain},
+<a href=#24 id=24 data-nosnippet>24</a>    lmcs::Lmcs,
+<a href=#25 id=25 data-nosnippet>25</a>    prover::commit::Committed,
 <a href=#26 id=26 data-nosnippet>26</a>};
 <a href=#27 id=27 data-nosnippet>27</a>
 <a href=#28 id=28 data-nosnippet>28</a><span class="comment">// ============================================================================
@@ -158,147 +158,117 @@
 <a href=#158 id=158 data-nosnippet>158</a>    <span class="comment">// D ≤ B (i.e. lde_height ≥ N · D) is enforced by `EvaluationDomain::new`.
 <a href=#159 id=159 data-nosnippet>159</a>
 <a href=#160 id=160 data-nosnippet>160</a>    // ═══════════════════════════════════════════════════════════════════════
-<a href=#161 id=161 data-nosnippet>161</a>    // Step 0: Reshape to N × D matrix
+<a href=#161 id=161 data-nosnippet>161</a>    // Step 0: Reshape to N × D and flatten EF → F
 <a href=#162 id=162 data-nosnippet>162</a>    // ═══════════════════════════════════════════════════════════════════════
-<a href=#163 id=163 data-nosnippet>163</a>    // q_evals[r·D + t] = Q(g·ω_Jᵗ·ω_Hʳ), so column t gives
-<a href=#164 id=164 data-nosnippet>164</a>    // qₜ evaluated on the coset g·ω_Jᵗ·H.
-<a href=#165 id=165 data-nosnippet>165</a>    </span><span class="kw">let </span>m = RowMajorMatrix::new(q_evals, d);
-<a href=#166 id=166 data-nosnippet>166</a>
-<a href=#167 id=167 data-nosnippet>167</a>    <span class="comment">// ═══════════════════════════════════════════════════════════════════════
-<a href=#168 id=168 data-nosnippet>168</a>    // Step 1: Batched iDFT over H
-<a href=#169 id=169 data-nosnippet>169</a>    // ═══════════════════════════════════════════════════════════════════════
-<a href=#170 id=170 data-nosnippet>170</a>    // iDFT treats each column as evaluations on H (not the actual coset
-<a href=#171 id=171 data-nosnippet>171</a>    // g·ω_Jᵗ·H), producing shifted coefficients:
-<a href=#172 id=172 data-nosnippet>172</a>    //   c_hat[t, k] = a[t, k]·(g·ω_Jᵗ)ᵏ
-<a href=#173 id=173 data-nosnippet>173</a>    // where a[t, k] are the true coefficients of qₜ.
-<a href=#174 id=174 data-nosnippet>174</a>    </span><span class="kw">let </span><span class="kw-2">mut </span>coeffs = <span class="macro">info_span!</span>(<span class="string">"quotient iDFT"</span>, dims = %<span class="macro">format!</span>(<span class="string">"{n}x{d}"</span>))
-<a href=#175 id=175 data-nosnippet>175</a>        .in_scope(|| config.dft().idft_algebra_batch(m));
-<a href=#176 id=176 data-nosnippet>176</a>
-<a href=#177 id=177 data-nosnippet>177</a>    <span class="comment">// ═══════════════════════════════════════════════════════════════════════
-<a href=#178 id=178 data-nosnippet>178</a>    // Step 2: Fused coefficient scaling
-<a href=#179 id=179 data-nosnippet>179</a>    // ═══════════════════════════════════════════════════════════════════════
-<a href=#180 id=180 data-nosnippet>180</a>    // Multiply c_hat[t, k] by (ω_Jᵗ)⁻ᵏ → a[t, k]·gᵏ.
-<a href=#181 id=181 data-nosnippet>181</a>    // This removes the per-coset shift ω_Jᵗ while keeping gᵏ baked in.
-<a href=#182 id=182 data-nosnippet>182</a>    </span><span class="macro">info_span!</span>(<span class="string">"quotient scaling"</span>, n).in_scope(|| {
-<a href=#183 id=183 data-nosnippet>183</a>        <span class="kw">let </span>omega_j_inv = domain.subgroup().generator_inverse();
-<a href=#184 id=184 data-nosnippet>184</a>
-<a href=#185 id=185 data-nosnippet>185</a>        <span class="comment">// Precompute ω_J⁻ᵏ for k = 0..N with sequential multiplications
-<a href=#186 id=186 data-nosnippet>186</a>        </span><span class="kw">let </span>row_bases: Vec&lt;F&gt; = omega_j_inv.powers().take(n).collect();
-<a href=#187 id=187 data-nosnippet>187</a>
-<a href=#188 id=188 data-nosnippet>188</a>        <span class="comment">// Row k, column t: multiply by (ω_J⁻ᵏ)ᵗ
-<a href=#189 id=189 data-nosnippet>189</a>        </span>coeffs.par_rows_mut().zip(row_bases.par_iter()).for_each(|(row, <span class="kw-2">&amp;</span>row_base)| {
-<a href=#190 id=190 data-nosnippet>190</a>            <span class="kw">for </span>(val, scale) <span class="kw">in </span>row.iter_mut().zip(row_base.powers()) {
-<a href=#191 id=191 data-nosnippet>191</a>                <span class="kw-2">*</span>val <span class="kw-2">*</span>= scale;
-<a href=#192 id=192 data-nosnippet>192</a>            }
-<a href=#193 id=193 data-nosnippet>193</a>        });
-<a href=#194 id=194 data-nosnippet>194</a>    });
-<a href=#195 id=195 data-nosnippet>195</a>
-<a href=#196 id=196 data-nosnippet>196</a>    <span class="comment">// ═══════════════════════════════════════════════════════════════════════
-<a href=#197 id=197 data-nosnippet>197</a>    // Step 3: Flatten EF → F, zero-pad to LDE height (N·B rows)
-<a href=#198 id=198 data-nosnippet>198</a>    // ═══════════════════════════════════════════════════════════════════════
-<a href=#199 id=199 data-nosnippet>199</a>    // We flatten before the DFT (rather than using dft_algebra_batch) because
-<a href=#200 id=200 data-nosnippet>200</a>    // we need base field for commitment anyway — this skips the reconstitute.
-<a href=#201 id=201 data-nosnippet>201</a>    //
-<a href=#202 id=202 data-nosnippet>202</a>    // Zero-padding from N to lde_height rows is needed because `dft_batch`
-<a href=#203 id=203 data-nosnippet>203</a>    // expects the full target-size buffer. The extra rows are zero because each
-<a href=#204 id=204 data-nosnippet>204</a>    // qₜ has degree &lt; N. We pad here (after iDFT + scaling) so those two steps
-<a href=#205 id=205 data-nosnippet>205</a>    // work on the smaller N-row buffer.
-<a href=#206 id=206 data-nosnippet>206</a>    //
-<a href=#207 id=207 data-nosnippet>207</a>    // PERF: the full N·B-size DFT processes N·(B−1) zero rows through every
-<a href=#208 id=208 data-nosnippet>208</a>    // butterfly stage, costing O(N·B·log(N·B)) instead of O(N·B·log N). For
-<a href=#209 id=209 data-nosnippet>209</a>    // B = 4, N = 2^20 that is ≈ 9% overhead on this step (small relative to
-<a href=#210 id=210 data-nosnippet>210</a>    // total proving time since the quotient matrix has only D·DIM columns).
-<a href=#211 id=211 data-nosnippet>211</a>    //
-<a href=#212 id=212 data-nosnippet>212</a>    // The existing `lde_batch`/`coset_lde_batch` APIs cannot help: they take
-<a href=#213 id=213 data-nosnippet>213</a>    // *evaluations*, not coefficients. Using them would add a redundant DFT(N)
-<a href=#214 id=214 data-nosnippet>214</a>    // → iDFT(N) round-trip.
-<a href=#215 id=215 data-nosnippet>215</a>    //
-<a href=#216 id=216 data-nosnippet>216</a>    // What is conceptually missing from `TwoAdicSubgroupDft` is an
-<a href=#217 id=217 data-nosnippet>217</a>    // `added_bits` parameter on `dft_batch` / `coset_dft_batch` that evaluates
-<a href=#218 id=218 data-nosnippet>218</a>    // degree-&lt; N coefficients on a larger domain of size N·2^added_bits. The
-<a href=#219 id=219 data-nosnippet>219</a>    // default would be zero-pad + the existing same-size DFT, but an optimized
-<a href=#220 id=220 data-nosnippet>220</a>    // implementation (like `Radix2DftParallel`) could run B separate N-size
-<a href=#221 id=221 data-nosnippet>221</a>    // DFTs — one per coset of H inside K — matching what its `coset_lde_batch`
-<a href=#222 id=222 data-nosnippet>222</a>    // already does internally after the iDFT phase.
-<a href=#223 id=223 data-nosnippet>223</a>    </span><span class="kw">let </span>base_width = d * EF::DIMENSION;
-<a href=#224 id=224 data-nosnippet>224</a>    <span class="kw">let </span><span class="kw-2">mut </span>base_coeffs = &lt;EF <span class="kw">as </span>BasedVectorSpace&lt;F&gt;&gt;::flatten_to_base(coeffs.values);
-<a href=#225 id=225 data-nosnippet>225</a>    base_coeffs.resize(lde_height * base_width, F::ZERO);
-<a href=#226 id=226 data-nosnippet>226</a>    <span class="kw">let </span>coeffs_padded = RowMajorMatrix::new(base_coeffs, base_width);
-<a href=#227 id=227 data-nosnippet>227</a>
-<a href=#228 id=228 data-nosnippet>228</a>    <span class="comment">// ═══════════════════════════════════════════════════════════════════════
-<a href=#229 id=229 data-nosnippet>229</a>    // Step 4: Plain DFT (not coset DFT) on base field
-<a href=#230 id=230 data-nosnippet>230</a>    // ═══════════════════════════════════════════════════════════════════════
-<a href=#231 id=231 data-nosnippet>231</a>    // Because gᵏ is baked into the coefficients, the plain DFT evaluates
-<a href=#232 id=232 data-nosnippet>232</a>    // on gK directly: entry (i, t) gives qₜ(g·ω_Kⁱ).
-<a href=#233 id=233 data-nosnippet>233</a>    </span><span class="kw">let </span>quotient_matrix = <span class="macro">info_span!</span>(<span class="string">"quotient DFT"</span>, dims = %<span class="macro">format!</span>(<span class="string">"{lde_height}x{base_width}"</span>))
-<a href=#234 id=234 data-nosnippet>234</a>        .in_scope(|| {
-<a href=#235 id=235 data-nosnippet>235</a>            <span class="kw">let </span>lde = config.dft().dft_batch(coeffs_padded);
-<a href=#236 id=236 data-nosnippet>236</a>
-<a href=#237 id=237 data-nosnippet>237</a>            <span class="comment">// ═══════════════════════════════════════════════════════════════
-<a href=#238 id=238 data-nosnippet>238</a>            // Step 5: Wrap for commitment
-<a href=#239 id=239 data-nosnippet>239</a>            // ═══════════════════════════════════════════════════════════════
-<a href=#240 id=240 data-nosnippet>240</a>            </span>materialize_bitrev(lde)
-<a href=#241 id=241 data-nosnippet>241</a>        });
-<a href=#242 id=242 data-nosnippet>242</a>
-<a href=#243 id=243 data-nosnippet>243</a>    <span class="kw">let </span>tree = config.lmcs().build_aligned_tree(<span class="macro">vec!</span>[quotient_matrix]);
-<a href=#244 id=244 data-nosnippet>244</a>
-<a href=#245 id=245 data-nosnippet>245</a>    <span class="comment">// The quotient is committed on the same LDE coset as the trace commits.
-<a href=#246 id=246 data-nosnippet>246</a>    </span>Committed::new(tree)
-<a href=#247 id=247 data-nosnippet>247</a>}
-<a href=#248 id=248 data-nosnippet>248</a>
-<a href=#249 id=249 data-nosnippet>249</a><span class="attr">#[cfg(test)]
-<a href=#250 id=250 data-nosnippet>250</a></span><span class="kw">mod </span>tests {
-<a href=#251 id=251 data-nosnippet>251</a>    <span class="kw">use </span>alloc::vec::Vec;
-<a href=#252 id=252 data-nosnippet>252</a>
-<a href=#253 id=253 data-nosnippet>253</a>    <span class="kw">use </span>p3_dft::{NaiveDft, TwoAdicSubgroupDft};
-<a href=#254 id=254 data-nosnippet>254</a>    <span class="kw">use </span>p3_field::{Field, PrimeCharacteristicRing};
-<a href=#255 id=255 data-nosnippet>255</a>    <span class="kw">use </span>p3_matrix::dense::RowMajorMatrix;
-<a href=#256 id=256 data-nosnippet>256</a>
-<a href=#257 id=257 data-nosnippet>257</a>    <span class="kw">use </span><span class="kw">super</span>::upsample_evals;
-<a href=#258 id=258 data-nosnippet>258</a>    <span class="kw">use </span><span class="kw">crate</span>::testing::configs::goldilocks_poseidon2::{Felt, QuadFelt};
-<a href=#259 id=259 data-nosnippet>259</a>
-<a href=#260 id=260 data-nosnippet>260</a>    <span class="kw">fn </span>coeffs(height: usize) -&gt; Vec&lt;QuadFelt&gt; {
-<a href=#261 id=261 data-nosnippet>261</a>        (<span class="number">0</span>..height).map(|i| QuadFelt::from_u64((i <span class="kw">as </span>u64) + <span class="number">1</span>)).collect()
-<a href=#262 id=262 data-nosnippet>262</a>    }
-<a href=#263 id=263 data-nosnippet>263</a>
-<a href=#264 id=264 data-nosnippet>264</a>    <span class="doccomment">/// Checks that `upsample_evals` on `dft` produces the same result as a direct
-<a href=#265 id=265 data-nosnippet>265</a>    /// coset DFT of zero-padded coefficients.
-<a href=#266 id=266 data-nosnippet>266</a>    </span><span class="kw">fn </span>assert_upsample_matches_direct&lt;D: TwoAdicSubgroupDft&lt;Felt&gt;&gt;(dft: <span class="kw-2">&amp;</span>D, shift: Felt) {
-<a href=#267 id=267 data-nosnippet>267</a>        <span class="kw">let </span>small_height = <span class="number">8</span>;
-<a href=#268 id=268 data-nosnippet>268</a>        <span class="kw">let </span>added_bits = <span class="number">2</span>;
-<a href=#269 id=269 data-nosnippet>269</a>        <span class="kw">let </span>large_height = small_height &lt;&lt; added_bits;
-<a href=#270 id=270 data-nosnippet>270</a>
-<a href=#271 id=271 data-nosnippet>271</a>        <span class="kw">let </span>small_coeffs = RowMajorMatrix::new(coeffs(small_height), <span class="number">1</span>);
-<a href=#272 id=272 data-nosnippet>272</a>        <span class="kw">let </span>small_evals = NaiveDft.coset_dft_algebra_batch(small_coeffs, shift).values;
-<a href=#273 id=273 data-nosnippet>273</a>
-<a href=#274 id=274 data-nosnippet>274</a>        <span class="kw">let </span><span class="kw-2">mut </span>large_coeffs = coeffs(small_height);
-<a href=#275 id=275 data-nosnippet>275</a>        large_coeffs.resize(large_height, QuadFelt::ZERO);
-<a href=#276 id=276 data-nosnippet>276</a>        <span class="kw">let </span>direct_large = NaiveDft
-<a href=#277 id=277 data-nosnippet>277</a>            .coset_dft_algebra_batch(RowMajorMatrix::new(large_coeffs, <span class="number">1</span>), shift)
-<a href=#278 id=278 data-nosnippet>278</a>            .values;
-<a href=#279 id=279 data-nosnippet>279</a>
-<a href=#280 id=280 data-nosnippet>280</a>        <span class="kw">let </span>upsampled = upsample_evals::&lt;Felt, QuadFelt, <span class="kw">_</span>&gt;(dft, small_evals, added_bits);
-<a href=#281 id=281 data-nosnippet>281</a>        <span class="macro">assert_eq!</span>(upsampled, direct_large);
-<a href=#282 id=282 data-nosnippet>282</a>    }
-<a href=#283 id=283 data-nosnippet>283</a>
-<a href=#284 id=284 data-nosnippet>284</a>    <span class="attr">#[test]
-<a href=#285 id=285 data-nosnippet>285</a>    </span><span class="kw">fn </span>upsample_evals_matches_direct_coset_dft() {
-<a href=#286 id=286 data-nosnippet>286</a>        assert_upsample_matches_direct(<span class="kw-2">&amp;</span>NaiveDft, Felt::GENERATOR.exp_power_of_2(<span class="number">2</span>));
-<a href=#287 id=287 data-nosnippet>287</a>    }
-<a href=#288 id=288 data-nosnippet>288</a>
-<a href=#289 id=289 data-nosnippet>289</a>    <span class="doccomment">/// Same check with the production DFT backend.
-<a href=#290 id=290 data-nosnippet>290</a>    </span><span class="attr">#[test]
-<a href=#291 id=291 data-nosnippet>291</a>    </span><span class="kw">fn </span>upsample_evals_with_radix2_dit_parallel_matches_naive() {
-<a href=#292 id=292 data-nosnippet>292</a>        <span class="kw">use </span>p3_dft::Radix2DitParallel;
-<a href=#293 id=293 data-nosnippet>293</a>        <span class="kw">let </span>dft = Radix2DitParallel::&lt;Felt&gt;::default();
-<a href=#294 id=294 data-nosnippet>294</a>        assert_upsample_matches_direct(<span class="kw-2">&amp;</span>dft, Felt::GENERATOR.exp_power_of_2(<span class="number">2</span>));
-<a href=#295 id=295 data-nosnippet>295</a>    }
-<a href=#296 id=296 data-nosnippet>296</a>
-<a href=#297 id=297 data-nosnippet>297</a>    <span class="attr">#[test]
-<a href=#298 id=298 data-nosnippet>298</a>    </span><span class="kw">fn </span>upsample_evals_with_zero_added_bits_returns_input_unchanged() {
-<a href=#299 id=299 data-nosnippet>299</a>        <span class="kw">let </span>evals = coeffs(<span class="number">8</span>);
-<a href=#300 id=300 data-nosnippet>300</a>        <span class="kw">let </span>out = upsample_evals::&lt;Felt, QuadFelt, <span class="kw">_</span>&gt;(<span class="kw-2">&amp;</span>NaiveDft, evals.clone(), <span class="number">0</span>);
-<a href=#301 id=301 data-nosnippet>301</a>        <span class="macro">assert_eq!</span>(out, evals);
-<a href=#302 id=302 data-nosnippet>302</a>    }
-<a href=#303 id=303 data-nosnippet>303</a>}
+<a href=#163 id=163 data-nosnippet>163</a>    // q_evals[r·D + t] = Q(g·ω_Jᵗ·ω_Hʳ), so column t gives qₜ evaluated on the
+<a href=#164 id=164 data-nosnippet>164</a>    // coset g·ω_Jᵗ·H. The commitment is base-valued and the iDFT/DFT are
+<a href=#165 id=165 data-nosnippet>165</a>    // F-linear, so flattening to the base field commutes with both.
+<a href=#166 id=166 data-nosnippet>166</a>    </span><span class="kw">let </span>base_width = d * EF::DIMENSION;
+<a href=#167 id=167 data-nosnippet>167</a>    <span class="kw">let </span>coeffs =
+<a href=#168 id=168 data-nosnippet>168</a>        RowMajorMatrix::new(&lt;EF <span class="kw">as </span>BasedVectorSpace&lt;F&gt;&gt;::flatten_to_base(q_evals), base_width);
+<a href=#169 id=169 data-nosnippet>169</a>
+<a href=#170 id=170 data-nosnippet>170</a>    <span class="comment">// ═══════════════════════════════════════════════════════════════════════
+<a href=#171 id=171 data-nosnippet>171</a>    // Steps 1–4: fused iDFT over H → coefficient scaling → coset LDE onto gK
+<a href=#172 id=172 data-nosnippet>172</a>    // ═══════════════════════════════════════════════════════════════════════
+<a href=#173 id=173 data-nosnippet>173</a>    // `coset_lde_batch_with_transform` runs the iDFT, applies `transform` to the
+<a href=#174 id=174 data-nosnippet>174</a>    // coefficient buffer, zero-pads by `added_bits`, then evaluates on the
+<a href=#175 id=175 data-nosnippet>175</a>    // coset. The iDFT treats each column as evaluations on H, producing shifted
+<a href=#176 id=176 data-nosnippet>176</a>    // coefficients c_hat[k, t] = a[k, t]·(g·ω_Jᵗ)ᵏ. `transform` multiplies by
+<a href=#177 id=177 data-nosnippet>177</a>    // (ω_Jᵗ)⁻ᵏ, removing the per-coset shift ω_Jᵗ while keeping gᵏ baked in, so a
+<a href=#178 id=178 data-nosnippet>178</a>    // shift-1 LDE then evaluates directly on the shifted coset gK.
+<a href=#179 id=179 data-nosnippet>179</a>    </span><span class="kw">let </span>added_bits = log2_strict_usize(lde_height) - log2_strict_usize(n);
+<a href=#180 id=180 data-nosnippet>180</a>    <span class="kw">let </span>omega_j_inv = domain.subgroup().generator_inverse();
+<a href=#181 id=181 data-nosnippet>181</a>    <span class="kw">let </span>row_bases: Vec&lt;F&gt; = omega_j_inv.powers().take(n).collect();
+<a href=#182 id=182 data-nosnippet>182</a>    <span class="kw">let </span>log_n = log2_strict_usize(n);
+<a href=#183 id=183 data-nosnippet>183</a>
+<a href=#184 id=184 data-nosnippet>184</a>    <span class="kw">let </span>lde =
+<a href=#185 id=185 data-nosnippet>185</a>        <span class="macro">info_span!</span>(<span class="string">"quotient LDE"</span>, dims = %<span class="macro">format!</span>(<span class="string">"{lde_height}x{base_width}"</span>)).in_scope(|| {
+<a href=#186 id=186 data-nosnippet>186</a>            config.dft().coset_lde_batch_with_transform(
+<a href=#187 id=187 data-nosnippet>187</a>                coeffs,
+<a href=#188 id=188 data-nosnippet>188</a>                added_bits,
+<a href=#189 id=189 data-nosnippet>189</a>                F::ONE,
+<a href=#190 id=190 data-nosnippet>190</a>                |buf, layout| {
+<a href=#191 id=191 data-nosnippet>191</a>                    <span class="comment">// Row r holds coefficient index k — bit-reversed when the buffer is in
+<a href=#192 id=192 data-nosnippet>192</a>                    // bit-reversed layout. Multiply column t (each spanning `EF::DIMENSION`
+<a href=#193 id=193 data-nosnippet>193</a>                    // flattened base columns) by (ω_J⁻ᵏ)ᵗ.
+<a href=#194 id=194 data-nosnippet>194</a>                    </span><span class="kw">let </span>width = buf.width;
+<a href=#195 id=195 data-nosnippet>195</a>                    buf.values.par_chunks_mut(width).enumerate().for_each(|(r, row)| {
+<a href=#196 id=196 data-nosnippet>196</a>                        <span class="kw">let </span>k = <span class="kw">match </span>layout {
+<a href=#197 id=197 data-nosnippet>197</a>                            Layout::Natural =&gt; r,
+<a href=#198 id=198 data-nosnippet>198</a>                            Layout::BitReversed =&gt; reverse_bits_len(r, log_n),
+<a href=#199 id=199 data-nosnippet>199</a>                        };
+<a href=#200 id=200 data-nosnippet>200</a>                        <span class="kw">let </span>row_base = row_bases[k];
+<a href=#201 id=201 data-nosnippet>201</a>                        <span class="kw">let </span><span class="kw-2">mut </span>scale = F::ONE;
+<a href=#202 id=202 data-nosnippet>202</a>                        <span class="kw">for </span>chunk <span class="kw">in </span>row.chunks_exact_mut(EF::DIMENSION) {
+<a href=#203 id=203 data-nosnippet>203</a>                            <span class="kw">for </span>val <span class="kw">in </span>chunk {
+<a href=#204 id=204 data-nosnippet>204</a>                                <span class="kw-2">*</span>val <span class="kw-2">*</span>= scale;
+<a href=#205 id=205 data-nosnippet>205</a>                            }
+<a href=#206 id=206 data-nosnippet>206</a>                            scale <span class="kw-2">*</span>= row_base;
+<a href=#207 id=207 data-nosnippet>207</a>                        }
+<a href=#208 id=208 data-nosnippet>208</a>                    });
+<a href=#209 id=209 data-nosnippet>209</a>                },
+<a href=#210 id=210 data-nosnippet>210</a>            )
+<a href=#211 id=211 data-nosnippet>211</a>        });
+<a href=#212 id=212 data-nosnippet>212</a>
+<a href=#213 id=213 data-nosnippet>213</a>    <span class="kw">let </span>tree = config.lmcs().build_aligned_tree(<span class="macro">vec!</span>[lde]);
+<a href=#214 id=214 data-nosnippet>214</a>
+<a href=#215 id=215 data-nosnippet>215</a>    <span class="comment">// The quotient is committed on the same LDE coset as the trace commits.
+<a href=#216 id=216 data-nosnippet>216</a>    </span>Committed::new(tree)
+<a href=#217 id=217 data-nosnippet>217</a>}
+<a href=#218 id=218 data-nosnippet>218</a>
+<a href=#219 id=219 data-nosnippet>219</a><span class="attr">#[cfg(test)]
+<a href=#220 id=220 data-nosnippet>220</a></span><span class="kw">mod </span>tests {
+<a href=#221 id=221 data-nosnippet>221</a>    <span class="kw">use </span>alloc::vec::Vec;
+<a href=#222 id=222 data-nosnippet>222</a>
+<a href=#223 id=223 data-nosnippet>223</a>    <span class="kw">use </span>p3_dft::{NaiveDft, TwoAdicSubgroupDft};
+<a href=#224 id=224 data-nosnippet>224</a>    <span class="kw">use </span>p3_field::{Field, PrimeCharacteristicRing};
+<a href=#225 id=225 data-nosnippet>225</a>    <span class="kw">use </span>p3_matrix::dense::RowMajorMatrix;
+<a href=#226 id=226 data-nosnippet>226</a>
+<a href=#227 id=227 data-nosnippet>227</a>    <span class="kw">use </span><span class="kw">super</span>::upsample_evals;
+<a href=#228 id=228 data-nosnippet>228</a>    <span class="kw">use </span><span class="kw">crate</span>::testing::configs::goldilocks_poseidon2::{Felt, QuadFelt};
+<a href=#229 id=229 data-nosnippet>229</a>
+<a href=#230 id=230 data-nosnippet>230</a>    <span class="kw">fn </span>coeffs(height: usize) -&gt; Vec&lt;QuadFelt&gt; {
+<a href=#231 id=231 data-nosnippet>231</a>        (<span class="number">0</span>..height).map(|i| QuadFelt::from_u64((i <span class="kw">as </span>u64) + <span class="number">1</span>)).collect()
+<a href=#232 id=232 data-nosnippet>232</a>    }
+<a href=#233 id=233 data-nosnippet>233</a>
+<a href=#234 id=234 data-nosnippet>234</a>    <span class="doccomment">/// Checks that `upsample_evals` on `dft` produces the same result as a direct
+<a href=#235 id=235 data-nosnippet>235</a>    /// coset DFT of zero-padded coefficients.
+<a href=#236 id=236 data-nosnippet>236</a>    </span><span class="kw">fn </span>assert_upsample_matches_direct&lt;D: TwoAdicSubgroupDft&lt;Felt&gt;&gt;(dft: <span class="kw-2">&amp;</span>D, shift: Felt) {
+<a href=#237 id=237 data-nosnippet>237</a>        <span class="kw">let </span>small_height = <span class="number">8</span>;
+<a href=#238 id=238 data-nosnippet>238</a>        <span class="kw">let </span>added_bits = <span class="number">2</span>;
+<a href=#239 id=239 data-nosnippet>239</a>        <span class="kw">let </span>large_height = small_height &lt;&lt; added_bits;
+<a href=#240 id=240 data-nosnippet>240</a>
+<a href=#241 id=241 data-nosnippet>241</a>        <span class="kw">let </span>small_coeffs = RowMajorMatrix::new(coeffs(small_height), <span class="number">1</span>);
+<a href=#242 id=242 data-nosnippet>242</a>        <span class="kw">let </span>small_evals = NaiveDft.coset_dft_algebra_batch(small_coeffs, shift).values;
+<a href=#243 id=243 data-nosnippet>243</a>
+<a href=#244 id=244 data-nosnippet>244</a>        <span class="kw">let </span><span class="kw-2">mut </span>large_coeffs = coeffs(small_height);
+<a href=#245 id=245 data-nosnippet>245</a>        large_coeffs.resize(large_height, QuadFelt::ZERO);
+<a href=#246 id=246 data-nosnippet>246</a>        <span class="kw">let </span>direct_large = NaiveDft
+<a href=#247 id=247 data-nosnippet>247</a>            .coset_dft_algebra_batch(RowMajorMatrix::new(large_coeffs, <span class="number">1</span>), shift)
+<a href=#248 id=248 data-nosnippet>248</a>            .values;
+<a href=#249 id=249 data-nosnippet>249</a>
+<a href=#250 id=250 data-nosnippet>250</a>        <span class="kw">let </span>upsampled = upsample_evals::&lt;Felt, QuadFelt, <span class="kw">_</span>&gt;(dft, small_evals, added_bits);
+<a href=#251 id=251 data-nosnippet>251</a>        <span class="macro">assert_eq!</span>(upsampled, direct_large);
+<a href=#252 id=252 data-nosnippet>252</a>    }
+<a href=#253 id=253 data-nosnippet>253</a>
+<a href=#254 id=254 data-nosnippet>254</a>    <span class="attr">#[test]
+<a href=#255 id=255 data-nosnippet>255</a>    </span><span class="kw">fn </span>upsample_evals_matches_direct_coset_dft() {
+<a href=#256 id=256 data-nosnippet>256</a>        assert_upsample_matches_direct(<span class="kw-2">&amp;</span>NaiveDft, Felt::GENERATOR.exp_power_of_2(<span class="number">2</span>));
+<a href=#257 id=257 data-nosnippet>257</a>    }
+<a href=#258 id=258 data-nosnippet>258</a>
+<a href=#259 id=259 data-nosnippet>259</a>    <span class="doccomment">/// Same check with the production DFT backend.
+<a href=#260 id=260 data-nosnippet>260</a>    </span><span class="attr">#[test]
+<a href=#261 id=261 data-nosnippet>261</a>    </span><span class="kw">fn </span>upsample_evals_with_radix2_dit_parallel_matches_naive() {
+<a href=#262 id=262 data-nosnippet>262</a>        <span class="kw">use </span>p3_dft::Radix2DitParallel;
+<a href=#263 id=263 data-nosnippet>263</a>        <span class="kw">let </span>dft = Radix2DitParallel::&lt;Felt&gt;::default();
+<a href=#264 id=264 data-nosnippet>264</a>        assert_upsample_matches_direct(<span class="kw-2">&amp;</span>dft, Felt::GENERATOR.exp_power_of_2(<span class="number">2</span>));
+<a href=#265 id=265 data-nosnippet>265</a>    }
+<a href=#266 id=266 data-nosnippet>266</a>
+<a href=#267 id=267 data-nosnippet>267</a>    <span class="attr">#[test]
+<a href=#268 id=268 data-nosnippet>268</a>    </span><span class="kw">fn </span>upsample_evals_with_zero_added_bits_returns_input_unchanged() {
+<a href=#269 id=269 data-nosnippet>269</a>        <span class="kw">let </span>evals = coeffs(<span class="number">8</span>);
+<a href=#270 id=270 data-nosnippet>270</a>        <span class="kw">let </span>out = upsample_evals::&lt;Felt, QuadFelt, <span class="kw">_</span>&gt;(<span class="kw-2">&amp;</span>NaiveDft, evals.clone(), <span class="number">0</span>);
+<a href=#271 id=271 data-nosnippet>271</a>        <span class="macro">assert_eq!</span>(out, evals);
+<a href=#272 id=272 data-nosnippet>272</a>    }
+<a href=#273 id=273 data-nosnippet>273</a>}
 </code></pre></div></section></main></body></html>
