@@ -68,11 +68,7 @@ impl MmrBelt {
             self.track_mergeable_pair(prev_idx, new_idx);
         }
 
-        let merged = if let Some(right_idx) = self.rightmost_mergeable {
-            Some(self.merge_pair(right_idx))
-        } else {
-            None
-        };
+        let merged = self.rightmost_mergeable.map(|right_idx| self.merge_pair(right_idx));
         let num_merges = usize::from(merged.is_some());
 
         if refresh_bagging {
@@ -124,11 +120,6 @@ impl MmrBelt {
     #[cfg(test)]
     fn live_commitment_root_for_testing(&self) -> Word {
         self.bagging.root()
-    }
-
-    #[cfg(test)]
-    fn bagging_storage_lengths_for_testing(&self) -> [usize; 4] {
-        self.bagging.storage_lengths()
     }
 
     #[cfg(test)]
@@ -486,6 +477,7 @@ pub struct BeltSummary {
 
 impl BeltSummary {
     pub fn from_roots(num_leaves: usize, roots: &[Word]) -> Result<Self, MmrError> {
+        validate_num_leaves(num_leaves)?;
         let bagging = BeltBaggingState::from_roots(num_leaves, roots)?;
 
         Ok(Self {

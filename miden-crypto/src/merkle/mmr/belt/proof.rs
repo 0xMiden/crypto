@@ -1,9 +1,8 @@
 use alloc::vec::Vec;
 use core::ops::Range;
 
-use super::BeltSummary;
-use super::shape::*;
-use crate::{Word, hash::poseidon2::Poseidon2};
+use super::{BeltSummary, shape::*};
+use crate::Word;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct BeltProof {
@@ -37,13 +36,9 @@ impl BeltProof {
         }
 
         let root =
-            self.nodes
-                .iter()
-                .zip(&steps)
-                .fold(self.leaf, |current, (node, side)| match side {
-                    SiblingSide::Left => Poseidon2::merge(&[node.value, current]),
-                    SiblingSide::Right => Poseidon2::merge(&[current, node.value]),
-                });
+            self.nodes.iter().zip(&steps).fold(self.leaf, |current, (node, &side)| {
+                merge_with_side(side, current, node.value)
+            });
 
         root == summary.commitment_root()
     }

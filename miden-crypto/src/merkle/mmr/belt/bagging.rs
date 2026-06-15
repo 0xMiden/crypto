@@ -1,8 +1,7 @@
 use alloc::{format, vec::Vec};
 use core::ops::Range;
 
-use super::shape::*;
-use super::{BeltMountain, MmrError};
+use super::{BeltMountain, MmrError, shape::*};
 use crate::{EMPTY_WORD, Word, hash::poseidon2::Poseidon2};
 
 struct AppendChangedRanges {
@@ -31,7 +30,7 @@ impl AppendChangedRanges {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub(super) struct BeltBaggingState {
     num_leaves: usize,
     range_len: usize,
@@ -117,7 +116,7 @@ impl BeltBaggingState {
             *self = Self {
                 num_leaves: new_num_leaves,
                 range_len: 1,
-                ranges: Vec::from([0..1]),
+                ranges: core::iter::once(0..1).collect(),
                 range_roots: Vec::from([range_node.root]),
                 range_nodes: Vec::from([Vec::from([range_node])]),
                 belt_nodes: Vec::from([belt_node]),
@@ -151,7 +150,6 @@ impl BeltBaggingState {
                 range_idx,
                 range.clone(),
                 changed_root,
-                range_idx,
                 old_ranges_len,
             );
             hashes += range_hashes;
@@ -186,7 +184,6 @@ impl BeltBaggingState {
         range_idx: usize,
         new_range: Range<usize>,
         changed_root: Word,
-        first_old_range_idx: usize,
         old_ranges_len: usize,
     ) -> usize {
         debug_assert!(new_range.start < new_range.end);
@@ -207,7 +204,7 @@ impl BeltBaggingState {
             .expect("new range prefix must reuse an old mountain");
             let old_range_idx = shape_range_index_for_num_leaves(old_num_leaves, old_idx)
                 .expect("reused mountain must belong to an old range");
-            debug_assert!((first_old_range_idx..old_ranges_len).contains(&old_range_idx));
+            debug_assert!((range_idx..old_ranges_len).contains(&old_range_idx));
             let old_range = self.ranges[old_range_idx].clone();
             debug_assert_eq!(old_idx, old_range.start);
             debug_assert!(old_range.start + changed <= old_range.end);
@@ -353,16 +350,6 @@ impl BeltBaggingState {
         &self.belt_nodes[..self.range_len]
     }
 
-    #[cfg(test)]
-    pub(super) fn storage_lengths(&self) -> [usize; 4] {
-        [
-            self.ranges.len(),
-            self.range_roots.len(),
-            self.range_nodes.len(),
-            self.belt_nodes.len(),
-        ]
-    }
-
     pub(super) fn root(&self) -> Word {
         if self.range_len == 0 {
             EMPTY_WORD
@@ -384,19 +371,6 @@ impl PartialEq for BeltBaggingState {
 }
 
 impl Eq for BeltBaggingState {}
-
-impl Default for BeltBaggingState {
-    fn default() -> Self {
-        Self {
-            num_leaves: 0,
-            range_len: 0,
-            ranges: Vec::new(),
-            range_roots: Vec::new(),
-            range_nodes: Vec::new(),
-            belt_nodes: Vec::new(),
-        }
-    }
-}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(super) struct RangeNode {

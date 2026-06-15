@@ -1,9 +1,10 @@
-use alloc::{collections::BTreeMap, vec::Vec};
+use alloc::{
+    collections::{BTreeMap, BTreeSet},
+    vec::Vec,
+};
 
-use super::proof::*;
-use super::shape::*;
-use super::{BeltProof, BeltSummary, MmrError};
-use crate::{Word, hash::poseidon2::Poseidon2};
+use super::{BeltProof, BeltSummary, MmrError, proof::*, shape::*};
+use crate::Word;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct MmrBeltDelta {
@@ -26,6 +27,8 @@ impl MmrBeltDelta {
         if from_num_leaves > to_num_leaves {
             return Err(MmrError::ForestOutOfBounds(from_num_leaves, to_num_leaves));
         }
+        // `to_num_leaves` bounds `from_num_leaves`, so validating it guards both shape derivations.
+        validate_num_leaves(to_num_leaves)?;
 
         let common = common_peak_prefix_len(from_num_leaves, to_num_leaves);
         let new_len = shape_len_for_num_leaves(to_num_leaves);
@@ -106,6 +109,7 @@ impl MmrBeltDelta {
         new_shape: &[ShapeMountain],
         common: usize,
     ) -> Result<bool, MmrError> {
+        let mut required = BTreeSet::new();
         for (old_mountain, &old_root) in old_shape.iter().zip(old_summary.roots()).skip(common) {
             let new_idx = shape_mountain_for_position(new_shape, old_mountain.start)
                 .ok_or(MmrError::InvalidUpdate)?;
@@ -124,17 +128,21 @@ impl MmrBeltDelta {
             for (side, sibling_start, height) in
                 climb_to_peak(old_mountain.start, old_mountain.height, new_mountain.height)
             {
+                required.insert((sibling_start, height));
                 let &sibling =
                     self.merge_auth.get(&(sibling_start, height)).ok_or(MmrError::InvalidUpdate)?;
-                root = match side {
-                    SiblingSide::Left => Poseidon2::merge(&[sibling, root]),
-                    SiblingSide::Right => Poseidon2::merge(&[root, sibling]),
-                };
+                root = merge_with_side(side, root, sibling);
             }
 
             if root != new_summary.roots()[new_idx] {
                 return Ok(false);
             }
+        }
+
+        // Every required key is present (the climb would have errored otherwise), so an equal count
+        // rejects deltas padded with auth nodes outside the required set.
+        if self.merge_auth.len() != required.len() {
+            return Ok(false);
         }
 
         Ok(true)
@@ -184,6 +192,7 @@ struct TrackedLeaf {
 
 impl PartialMmrBelt {
     pub fn from_peaks(num_leaves: usize, peaks: Vec<Word>) -> Result<Self, MmrError> {
+        validate_num_leaves(num_leaves)?;
         let expected = shape_len_for_num_leaves(num_leaves);
         if peaks.len() != expected {
             return Err(MmrError::InvalidPeaks(format!(
@@ -275,11 +284,8 @@ impl PartialMmrBelt {
             return Err(MmrError::InvalidUpdate);
         }
 
-        let mut updated = self.clone();
-        updated.apply(delta)?;
-        *self = updated;
-
-        Ok(())
+        // `apply` is transactional, so a failure here cannot leave the view partially advanced.
+        self.apply(delta)
     }
 
     pub fn apply(&mut self, delta: &MmrBeltDelta) -> Result<(), MmrError> {
@@ -287,15 +293,18 @@ impl PartialMmrBelt {
             return Err(MmrError::InvalidUpdate);
         }
 
-        self.peaks = delta.apply(&self.peaks)?;
-        self.num_leaves = delta.to_num_leaves();
+        // Build the new state in locals and commit only after every fallible step succeeds.
+        let new_peaks = delta.apply(&self.peaks)?;
+        let new_num_leaves = delta.to_num_leaves();
+        let new_shape = shape_mountains(new_num_leaves);
 
-        let new_shape = shape_mountains(self.num_leaves);
-        for (&pos, tracked) in self.tracked.iter_mut() {
+        let mut new_tracked = BTreeMap::new();
+        for (&pos, tracked) in &self.tracked {
             let mountain_idx = shape_mountain_for_position(&new_shape, pos)
                 .ok_or(MmrError::PositionNotFound(pos))?;
             let new_mountain = new_shape[mountain_idx];
 
+            let mut within_path = tracked.within_path.clone();
             for (side, sibling_start, height) in
                 climb_to_peak(tracked.mountain_start, tracked.mountain_height, new_mountain.height)
             {
@@ -303,12 +312,23 @@ impl PartialMmrBelt {
                     .merge_auth
                     .get(&(sibling_start, height))
                     .ok_or(MmrError::InvalidUpdate)?;
-                tracked.within_path.push(BeltProofNode { value, side });
+                within_path.push(BeltProofNode { value, side });
             }
 
-            tracked.mountain_start = new_mountain.start;
-            tracked.mountain_height = new_mountain.height;
+            new_tracked.insert(
+                pos,
+                TrackedLeaf {
+                    leaf: tracked.leaf,
+                    mountain_start: new_mountain.start,
+                    mountain_height: new_mountain.height,
+                    within_path,
+                },
+            );
         }
+
+        self.peaks = new_peaks;
+        self.num_leaves = new_num_leaves;
+        self.tracked = new_tracked;
 
         Ok(())
     }

@@ -1,5 +1,4 @@
 use alloc::{vec, vec::Vec};
-use std::println;
 
 use super::{
     BeltBaggingState, BeltHashArray, BeltSummary, ChangedMountain, HashIndex, MmrBelt,
@@ -689,6 +688,75 @@ fn belt_delta_rejects_mutated_tail_peak() {
 }
 
 #[test]
+fn belt_delta_verify_rejects_padded_auth_nodes() {
+    let from = 128usize;
+    let to = 191usize;
+    let mut belt = MmrBelt::new();
+    for idx in 0..from {
+        belt.add(int_to_node(idx as u64)).unwrap();
+    }
+    let old_summary = belt.summary();
+
+    for idx in from..to {
+        belt.add(int_to_node(idx as u64)).unwrap();
+    }
+    let new_summary = belt.summary();
+    let delta = belt.delta(from).unwrap();
+    assert!(delta.verify_transition(&old_summary, &new_summary).unwrap());
+
+    // Padding a valid delta with an auth node outside the required climb set must be rejected, so a
+    // peer cannot inflate a sync delta with bogus data.
+    let mut padded_auth = delta.merge_auth_nodes().collect::<Vec<_>>();
+    padded_auth.push(((usize::MAX, 0), int_to_node(123_456)));
+    let padded = MmrBeltDelta::from_parts(
+        delta.from_num_leaves(),
+        delta.to_num_leaves(),
+        delta.new_tail_peaks().to_vec(),
+        padded_auth,
+    )
+    .unwrap();
+
+    assert!(!padded.verify_transition(&old_summary, &new_summary).unwrap());
+}
+
+#[test]
+fn belt_constructors_reject_oversized_num_leaves() {
+    // `shape_mountains` computes `num_leaves + 1`; oversized counts must error, not panic.
+    assert!(BeltSummary::from_roots(usize::MAX, &[]).is_err());
+    assert!(PartialMmrBelt::from_peaks(usize::MAX, Vec::new()).is_err());
+    assert!(MmrBeltDelta::from_parts(0, usize::MAX, Vec::new(), core::iter::empty()).is_err());
+}
+
+#[test]
+fn partial_belt_apply_is_transactional_on_missing_auth() {
+    let from = 200usize;
+    let to = 260usize;
+    let mut belt = MmrBelt::new();
+    for idx in 0..from {
+        belt.add(int_to_node(idx as u64)).unwrap();
+    }
+
+    let mut partial = PartialMmrBelt::from_peaks(belt.num_leaves(), belt.peaks()).unwrap();
+    for pos in 0..from {
+        partial.track(&belt.open(pos).unwrap()).unwrap();
+    }
+
+    for idx in from..to {
+        belt.add(int_to_node(idx as u64)).unwrap();
+    }
+
+    let mut delta = belt.delta(from).unwrap();
+    assert!(delta.num_merge_auth_nodes() > 0, "increment must merge some tracked mountains");
+    // Drop the auth nodes a now-merged tracked leaf needs, so the update cannot complete.
+    delta.merge_auth.clear();
+
+    let before = partial.clone();
+    assert!(partial.apply(&delta).is_err());
+    // The failure must leave the view untouched — no partial advance of num_leaves/peaks/tracked.
+    assert_eq!(partial, before);
+}
+
+#[test]
 fn belt_delta_rejects_wrong_absorbed_old_summary_root() {
     let from = 128usize;
     let to = 191usize;
@@ -1148,9 +1216,13 @@ fn partial_belt_delta_merge_auth_is_polylogarithmic() {
     }
 }
 
+// Gated behind `std` so the no-std test build (which has no `println!`) still compiles.
+#[cfg(feature = "std")]
 #[test]
 #[ignore = "prints deterministic MMB issue measurement tables"]
 fn mmb_issue_measurement_report() {
+    use std::println;
+
     const STORAGE_SIZES: &[usize] = &[1_000, 65_536, 100_000];
     const PROOF_SIZE: usize = 65_536;
     const DELTA_SIZE: usize = 100_000;
@@ -1231,6 +1303,7 @@ fn mmb_issue_measurement_report() {
     }
 }
 
+#[cfg(feature = "std")]
 fn build_mmr_and_belt(size: usize) -> (crate::merkle::mmr::Mmr, MmrBelt) {
     let leaves = (0..size as u64).map(int_to_node).collect::<Vec<_>>();
     let mmr = crate::merkle::mmr::Mmr::try_from_iter(leaves.iter().copied()).unwrap();

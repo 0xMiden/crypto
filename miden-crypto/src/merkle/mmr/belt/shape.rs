@@ -1,7 +1,21 @@
 use alloc::vec::Vec;
 use core::ops::Range;
 
+use super::super::{Forest, MmrError};
 use crate::{EMPTY_WORD, Word, hash::poseidon2::Poseidon2};
+
+/// Rejects forest sizes past [`Forest::MAX_LEAVES`] so `num_leaves + 1` cannot overflow in the
+/// shape helpers, and the public constructors error rather than panic on oversized counts.
+pub(super) fn validate_num_leaves(num_leaves: usize) -> Result<(), MmrError> {
+    if Forest::is_valid_size(num_leaves) {
+        Ok(())
+    } else {
+        Err(MmrError::ForestSizeExceeded {
+            requested: num_leaves,
+            max: Forest::MAX_LEAVES,
+        })
+    }
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(super) enum SiblingSide {
@@ -23,7 +37,7 @@ pub(super) fn parent_hash_index(child: HashIndex) -> HashIndex {
 
 #[cfg(test)]
 pub(super) fn hash_children(parent: HashIndex) -> (HashIndex, HashIndex) {
-    debug_assert!(parent.0 % 2 == 0);
+    debug_assert!(parent.0.is_multiple_of(2));
     let span = 1usize << (parent.0.trailing_zeros() as usize - 1);
     (HashIndex(parent.0 - 3 * span), HashIndex(parent.0 - span))
 }
@@ -112,28 +126,27 @@ pub(super) fn shape_mountain_index_for_num_leaves(
     index
 }
 
-pub(super) fn shape_mountain_index_candidate(
-    bits: usize,
-    num_mountains: usize,
-    position: usize,
-    target: ShapeMountain,
-) -> Option<usize> {
-    let bit = (bits >> position) & 1;
-    let height = position + bit;
-    if height != target.height {
-        return None;
-    }
+/// The mountain at bit `position` (counted from the right) of `bits = num_leaves + 1` (Lemma 6).
+fn mountain_at_position(bits: usize, num_mountains: usize, position: usize) -> ShapeMountain {
+    let height = position + ((bits >> position) & 1);
 
     let lower_mask = (1usize << (position + 1)) - 1;
     let mountain_mask = (1usize << num_mountains) - 1;
     let higher_mask = mountain_mask ^ lower_mask;
     let base = (1usize << num_mountains) - (1usize << (position + 1));
     let start = base + (bits & higher_mask);
-    if start != target.start {
-        return None;
-    }
 
-    Some(num_mountains - 1 - position)
+    ShapeMountain { start, height }
+}
+
+pub(super) fn shape_mountain_index_candidate(
+    bits: usize,
+    num_mountains: usize,
+    position: usize,
+    target: ShapeMountain,
+) -> Option<usize> {
+    (mountain_at_position(bits, num_mountains, position) == target)
+        .then_some(num_mountains - 1 - position)
 }
 
 pub(super) fn shape_len_for_num_leaves(num_leaves: usize) -> usize {
@@ -156,15 +169,7 @@ pub(super) fn shape_mountain_at_index(num_leaves: usize, index: usize) -> Option
     }
 
     let position = num_mountains - 1 - index;
-    let bit = (bits >> position) & 1;
-    let height = position + bit;
-    let lower_mask = (1usize << (position + 1)) - 1;
-    let mountain_mask = (1usize << num_mountains) - 1;
-    let higher_mask = mountain_mask ^ lower_mask;
-    let base = (1usize << num_mountains) - (1usize << (position + 1));
-    let start = base + (bits & higher_mask);
-
-    Some(ShapeMountain { start, height })
+    Some(mountain_at_position(bits, num_mountains, position))
 }
 
 #[cfg(test)]
@@ -265,6 +270,14 @@ pub(super) fn bag_range(peaks: &[Word]) -> Word {
 
 pub(super) fn bag_belt(range_roots: &[Word]) -> Word {
     range_roots.iter().fold(EMPTY_WORD, |acc, &root| Poseidon2::merge(&[acc, root]))
+}
+
+/// Folds `sibling` into `current` on the given side, the shared step of every belt path climb.
+pub(super) fn merge_with_side(side: SiblingSide, current: Word, sibling: Word) -> Word {
+    match side {
+        SiblingSide::Left => Poseidon2::merge(&[sibling, current]),
+        SiblingSide::Right => Poseidon2::merge(&[current, sibling]),
+    }
 }
 
 pub(super) fn common_peak_prefix_len(from_num_leaves: usize, to_num_leaves: usize) -> usize {
