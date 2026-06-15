@@ -1,9 +1,11 @@
 //! Merkle Mountain Range (MMR) data structures.
 
+// The belt prototype is gated behind `internal`, where it is part of the public API (so its items
+// are never dead). Compiling it under non-`internal` builds would leave an unused module that trips
+// `-D warnings` in the no-default-features feature check. Its tests run via `make test-default`,
+// which enables `internal`.
 #[cfg(feature = "internal")]
 pub mod belt;
-#[cfg(not(feature = "internal"))]
-pub(crate) mod belt;
 mod delta;
 mod error;
 mod forest;
