@@ -462,7 +462,7 @@ impl BeltHashArray {
 
     #[cfg(test)]
     fn value_slot_bytes_for_testing() -> usize {
-        core::mem::size_of::<Word>()
+        size_of::<Word>()
     }
 }
 

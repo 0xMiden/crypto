@@ -67,7 +67,7 @@ fn belt_hash_array_preserves_holes_with_compact_value_slots() {
     assert_eq!(hashes.get(HashIndex(4)), None);
     assert_eq!(hashes.get(HashIndex(5)), Some(value));
     assert_eq!(hashes.get(HashIndex(6)), None);
-    assert_eq!(BeltHashArray::value_slot_bytes_for_testing(), core::mem::size_of::<Word>());
+    assert_eq!(BeltHashArray::value_slot_bytes_for_testing(), size_of::<Word>());
 }
 
 #[test]
@@ -1112,7 +1112,7 @@ fn belt_delta_from_parts_reconstructs_sync_response() {
         server_delta.from_num_leaves(),
         server_delta.to_num_leaves(),
         server_delta.new_tail_peaks().to_vec(),
-        server_delta.merge_auth_nodes().collect::<Vec<_>>(),
+        server_delta.merge_auth_nodes(),
     )
     .unwrap();
     let summary_roots = server_summary.roots().to_vec();
@@ -1141,7 +1141,7 @@ fn belt_delta_from_parts_rejects_invalid_tail_shape() {
             server_delta.from_num_leaves(),
             server_delta.to_num_leaves(),
             vec![],
-            server_delta.merge_auth_nodes().collect::<Vec<_>>()
+            server_delta.merge_auth_nodes()
         )
         .is_err()
     );
