@@ -10,7 +10,7 @@
     EF: ExtensionField&lt;F&gt;,
     L: <a class="trait" href="../lmcs/trait.Lmcs.html" title="trait miden_lifted_stark::lmcs::Lmcs">Lmcs</a>&lt;F = F&gt;,
     M: Matrix&lt;F&gt;,
-    Ch: <a class="trait" href="../../miden_stark_transcript/prover/trait.ProverChannel.html" title="trait miden_stark_transcript::prover::ProverChannel">ProverChannel</a>&lt;F = F, Commitment = L::<a class="associatedtype" href="../lmcs/trait.Lmcs.html#associatedtype.Commitment" title="type miden_lifted_stark::lmcs::Lmcs::Commitment">Commitment</a>&gt;,</div></code></pre><details class="toggle top-doc" open><summary class="hideme"><span>Expand description</span></summary><div class="docblock"><p>Open committed matrices at N evaluation points, writing to a prover channel.</p>
+    Ch: ProverChannel&lt;F = F, Commitment = L::<a class="associatedtype" href="../lmcs/trait.Lmcs.html#associatedtype.Commitment" title="type miden_lifted_stark::lmcs::Lmcs::Commitment">Commitment</a>&gt;,</div></code></pre><details class="toggle top-doc" open><summary class="hideme"><span>Expand description</span></summary><div class="docblock"><p>Open committed matrices at N evaluation points, writing to a prover channel.</p>
 <h2 id="preconditions"><a class="doc-anchor" href="#preconditions">§</a>Preconditions</h2>
 <ul>
 <li><code>eval_points</code> must lie outside both the trace-domain subgroup <code>H</code> and the LDE evaluation coset
