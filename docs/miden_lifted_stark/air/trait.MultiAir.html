@@ -97,7 +97,9 @@ emits no assertions.</p>
 <code>max_aux_inputs()</code>, <code>aux_inputs.len()</code>, then <code>aux_inputs</code>. The protocol
 observes the instance count and <code>log_trace_heights</code> separately after this
 hook, but passes the heights here so custom bindings can include AIR
-metadata that depends on the prover-chosen trace ordering or heights.</p>
+metadata that depends on the prover-chosen trace ordering or heights.
+See <a href="struct.Statement.html#method.observe" title="method miden_lifted_stark::air::Statement::observe"><code>Statement::observe</code></a> for a runnable
+example of the default binding sequence.</p>
 <h5 id="soundness-gap-todo"><a class="doc-anchor" href="#soundness-gap-todo">§</a>Soundness gap (TODO)</h5>
 <p>The default binds inputs but does NOT canonically bind the <code>MultiAir</code>
 itself — neither its AIR collection nor <code>eval_external</code> logic — into
