@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"mod":["k256","x25519"]};
+window.SIDEBAR_ITEMS = {"enum":["KeyAgreementError"],"fn":["extract_key_material"],"mod":["k256","x25519"]};
