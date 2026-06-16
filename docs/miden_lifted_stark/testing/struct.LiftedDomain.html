@@ -77,7 +77,7 @@ this reduces to plain trace-subgroup selectors at <code>z</code>.</p>
 For an OOD <code>z</code> sampled via <a href="struct.LiftedDomain.html#method.sample_ood_point" title="method miden_lifted_stark::testing::LiftedDomain::sample_ood_point"><code>sample_ood_point</code></a>
 this is statistically impossible; callers passing arbitrary <code>z</code> must
 avoid those two values.</p>
-</div></details><details class="toggle method-toggle" open><summary><section id="method.sample_ood_point" class="method"><a class="src rightside" href="../../src/miden_lifted_stark/domain.rs.html#539-549">Source</a><h4 class="code-header">pub fn <a href="#method.sample_ood_point" class="fn">sample_ood_point</a>&lt;EF&gt;(&amp;self, channel: &amp;mut impl Channel&lt;F = F&gt;) -&gt; EF<div class="where">where
+</div></details><details class="toggle method-toggle" open><summary><section id="method.sample_ood_point" class="method"><a class="src rightside" href="../../src/miden_lifted_stark/domain.rs.html#539-549">Source</a><h4 class="code-header">pub fn <a href="#method.sample_ood_point" class="fn">sample_ood_point</a>&lt;EF&gt;(&amp;self, channel: &amp;mut impl <a class="trait" href="../../miden_stark_transcript/channel/trait.Channel.html" title="trait miden_stark_transcript::channel::Channel">Channel</a>&lt;F = F&gt;) -&gt; EF<div class="where">where
     EF: ExtensionField&lt;F&gt;,</div></h4></section></summary><div class="docblock"><p>Sample an OOD evaluation point outside both <code>H</code> and the LDE coset.</p>
 <p>Repeatedly draws candidates from <code>channel</code> until one falls outside both exclusion
 sets. Terminates with overwhelming probability because <code>|H ∪ gK|</code> is negligible
