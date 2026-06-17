@@ -1,0 +1,14 @@
+{
+  "name": "miden-bench-wasm-driver",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Headless-Chromium driver for the miden-crypto WASM bench harness.",
+  "scripts": {
+    "bench": "node driver.mjs"
+  },
+  "devDependencies": {
+    "playwright": "^1.50.0",
+    "serve": "^14.2.4"
+  }
+}

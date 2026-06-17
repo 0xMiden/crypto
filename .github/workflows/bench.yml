@@ -1,0 +1,215 @@
+# Performance regression tracking for miden-crypto — UNTRUSTED stage.
+#
+# Two jobs run on every PR + every push to `next`:
+#
+#   1. bench-wasm:  headless-Chromium + wasm-pack harness in miden-bench-wasm/
+#                   tracks RPO/RPX/Poseidon2/Blake3/Keccak hash perf as
+#                   compiled to wasm32 + run in V8 — the runtime real users
+#                   ship in.
+#
+#   2. bench-native: cargo bench --bench {hash,word,transpose} on the GHA
+#                    runner. Tracks the same primitives at native speed for
+#                    comparison + regression detection.
+#
+# Both jobs run PR-controlled code (Rust, npm install, Node) and so MUST
+# NOT hold any privileged token. This workflow runs on `pull_request`
+# (not `pull_request_target`), declares `permissions: contents: read` at
+# both workflow and job scope, and strips the persisted token from
+# `actions/checkout`. The results are uploaded as artifacts and consumed
+# by the separate `bench-publish.yml` workflow, which fires via
+# `workflow_run` from a trusted base-repo context.
+#
+# Why two workflows: GitHub Advanced Security's
+# `actions/cache-poisoning/poisonable-step` rule flags any step under
+# `pull_request_target` that executes PR-supplied code, because the
+# implicit `ACTIONS_RUNTIME_TOKEN` always present in such jobs grants
+# write access to the Actions cache. The split — untrusted bench in
+# this workflow, trusted publish in `bench-publish.yml` triggered by
+# `workflow_run` — is the GitHub Security Lab's documented pattern
+# for "bench on PR, comment on PR, can't trust the PR's code." See
+# https://securitylab.github.com/research/github-actions-preventing-pwn-requests/
+
+name: bench
+
+on:
+  pull_request:
+  push:
+    branches: [next]
+  workflow_dispatch:
+
+# Read-only at workflow scope; per-job permissions narrow this further.
+# `bench-publish.yml` is where the write scopes live.
+permissions:
+  contents: read
+
+# Skip duplicate runs on PR sync events.
+concurrency:
+  group: bench-${{ github.workflow }}-${{ github.head_ref || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  bench-wasm:
+    name: WASM perf (Chromium / V8)
+    runs-on: ubuntu-latest
+    # Local Apple M5 wall-clock for the full bench is ~40s; GHA ubuntu-
+    # latest x86_64 is ~2.7× slower across these benches (measured),
+    # putting the bench step at ~2 min. Plus wasm-pack build (~3 min)
+    # + Chromium install (~30s) + setup overhead = ~6-7 min typical.
+    # 20 min cap leaves comfortable headroom for the worst-case run.
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # pin@v4
+        with:
+          # The default checkout writes the GHA token to `.git/config`,
+          # which PR-controlled build scripts (build.rs, npm postinstall,
+          # etc.) would then have access to. Strip it — this job has no
+          # business holding any credential.
+          persist-credentials: false
+
+      - name: Install Rust + wasm32 target
+        run: |
+          rustup update --no-self-update
+          rustup target add wasm32-unknown-unknown
+
+      - name: Install wasm-pack
+        # Pinned to v0.4.0 SHA. The action installs wasm-pack v0.13.1.
+        uses: jetli/wasm-pack-action@0d096b08b4e5a7de8c28de67e11e945404e9eefa # pin@v0.4.0
+        with:
+          version: "v0.13.1"
+
+      - name: Build miden-bench-wasm
+        # `--target web` produces an ESM JS file that imports/instantiates
+        # the .wasm via `fetch()` — what the static page expects. The
+        # `--release` profile is required: without it the per-op cost
+        # is dominated by debug-mode overflow checks and the numbers are
+        # meaningless as a perf-tracking signal.
+        run: |
+          wasm-pack build --release --target web \
+            --out-dir static/pkg miden-bench-wasm
+
+      - name: Install Node deps
+        working-directory: miden-bench-wasm
+        run: npm install --no-audit --no-fund
+
+      - name: Install Chromium
+        working-directory: miden-bench-wasm
+        # Chromium-only — the action's matrix support is via npx, but we
+        # only target one browser for now (V8 fidelity to the wallet).
+        run: npx playwright install --with-deps chromium
+
+      - name: Run benches
+        id: run
+        working-directory: miden-bench-wasm
+        run: |
+          # `pipefail` is load-bearing: the driver streams to a file via
+          # a shell redirect, so a panicking driver would still leave a
+          # partial `results.json` on disk; `set -e` ensures the step
+          # fails fast and the trusted publish workflow never sees a bad
+          # baseline.
+          set -euo pipefail
+          node driver.mjs > results.json
+          echo "results=$(wc -l < results.json) entries written"
+          # Surface the per-bench medians in the workflow summary so a
+          # human can eyeball them without clicking into the artifact.
+          {
+            echo '## WASM bench results'
+            echo ''
+            echo '| bench | median (ns/iter) |'
+            echo '|---|---|'
+            jq -r '.[] | "| \(.name) | \(.value | tostring) |"' results.json
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Write metadata for publish workflow
+        working-directory: miden-bench-wasm
+        # `workflow_run.pull_requests` is empty for fork PRs, so the
+        # trusted publish workflow can't get the PR number from the
+        # event payload. Stash the PR number + event + head SHA here so
+        # the publish workflow has somewhere to look. Note: this file
+        # is PR-author-controlled by being on the runner where PR code
+        # executed — the publish workflow MUST validate / sanity-check
+        # it rather than trust it blindly.
+        run: |
+          set -euo pipefail
+          jq -n \
+            --arg event "${{ github.event_name }}" \
+            --arg pr_number "${{ github.event.pull_request.number || '' }}" \
+            --arg pr_head_sha "${{ github.event.pull_request.head.sha || '' }}" \
+            '{event: $event, pr_number: $pr_number, pr_head_sha: $pr_head_sha}' \
+            > metadata.json
+
+      - name: Upload raw results as artifact
+        # Picked up by `bench-publish.yml` via `workflow_run`. The
+        # publish workflow runs in the base repo's trusted context with
+        # write-scope token; this artifact is the only thing crossing
+        # the trust boundary.
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # pin@v4
+        with:
+          name: bench-wasm-results
+          path: |
+            miden-bench-wasm/results.json
+            miden-bench-wasm/metadata.json
+          retention-days: 30
+
+  bench-native:
+    name: Native perf (Linux x86_64)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # pin@v4
+        with:
+          persist-credentials: false
+
+      - name: Install Rust
+        run: rustup update --no-self-update
+
+      - name: Run benches
+        id: run
+        # Initial bench triage:
+        #   - hash:      RPO/RPX/Poseidon2/Blake3/Keccak merge + sequential.
+        #                The headline. Fast (sub-second per group).
+        #   - word:      Felt arithmetic primitives. Foundational, fast.
+        #   - transpose: Matrix transpose. Foundational, fast.
+        #
+        # Deliberately excluded for now (revisit after first PR lands):
+        #   - smt / merkle / partial_mt / store: moderate runtime, not the
+        #     headline; defer until we know the wasm + tracked-native
+        #     setup is stable.
+        #   - large_smt / large_smt_forest / sparse_path: multi-minute
+        #     runtimes. Wrong fit for per-PR alerts; ideal for a separate
+        #     nightly bench job.
+        #   - encryption / dsa: defer pending review of which sub-benches
+        #     are stable.
+        run: |
+          # `pipefail` ensures a failed `cargo bench` (compile or run)
+          # propagates through the `tee` and fails the step. Without
+          # it, only tee's exit status is observed and a broken bench
+          # would silently produce an empty/partial `bench-native.txt`
+          # for the trusted publish workflow to ingest as a baseline.
+          set -euo pipefail
+          cargo bench --bench hash --bench word --bench transpose \
+            -p miden-crypto -- --output-format bencher 2>&1 \
+            | tee bench-native.txt
+
+      - name: Write metadata for publish workflow
+        # See `bench-wasm` for why we emit this.
+        run: |
+          set -euo pipefail
+          jq -n \
+            --arg event "${{ github.event_name }}" \
+            --arg pr_number "${{ github.event.pull_request.number || '' }}" \
+            --arg pr_head_sha "${{ github.event.pull_request.head.sha || '' }}" \
+            '{event: $event, pr_number: $pr_number, pr_head_sha: $pr_head_sha}' \
+            > metadata.json
+
+      - name: Upload raw results as artifact
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # pin@v4
+        with:
+          name: bench-native-results
+          path: |
+            bench-native.txt
+            metadata.json
+          retention-days: 30

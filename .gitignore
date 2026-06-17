@@ -13,3 +13,8 @@ cmake-build-*
 
 # Proptest
 tests.txt
+
+# wasm-pack build output for miden-bench-wasm
+miden-bench-wasm/static/pkg/
+miden-bench-wasm/node_modules/
+miden-bench-wasm/results.json

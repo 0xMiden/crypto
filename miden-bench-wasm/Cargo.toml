@@ -1,0 +1,84 @@
+[package]
+description            = "WASM benchmarks for miden-crypto hash primitives, run in headless Chromium for production-fidelity perf tracking."
+edition                = "2024"
+homepage               = "https://github.com/0xMiden/crypto"
+license                = "MIT OR Apache-2.0"
+name                   = "miden-bench-wasm"
+publish                = false
+readme                 = "README.md"
+repository             = "https://github.com/0xMiden/crypto"
+rust-version.workspace = true
+version.workspace      = true
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+# No tests / doctests in this crate — it's a wasm-bindgen export surface,
+# exercised end-to-end via the Playwright driver in `driver.mjs`. Setting
+# both to false silences the `cargo build --tests` warning emitted on
+# `cdylib` targets that have no `#[test]` items.
+doctest = false
+test    = false
+
+# Inherit workspace-level lint config (clippy denies, etc.). Required by
+# `make workspace-check`.
+[lints]
+workspace = true
+
+# `getrandom` is declared as a direct dep purely to enable the `wasm_js`
+# Cargo feature on the transitive 0.4 version pulled in by `rand 0.10`
+# (see comment on the dep itself for why this is necessary). No symbol
+# from `getrandom` is named in our source, so cargo-shear flags it as
+# unused — but removing it would silently re-break the wasm32 link.
+[package.metadata.cargo-shear]
+ignored = ["getrandom"]
+
+[dependencies]
+# Internal — track perf of the public hash primitives. We pull `miden-crypto`
+# (not just `miden-field`) because the benches measure RPO/RPX/Poseidon2/
+# Blake3/Keccak end-to-end, which live in miden-crypto's `hash` module.
+# `default-features = false` strips `concurrent` (rayon — won't build for
+# wasm32-unknown-unknown without wasm-bindgen-rayon scaffolding); we keep
+# `std` so `once_cell` uses real `std::sync` locks rather than falling
+# back to `critical-section`. The latter would require a host-provided
+# `_critical_section_*` impl that the browser doesn't supply, producing
+# unresolved `import "env"` references at module load.
+miden-crypto = { default-features = false, features = ["std"], path = "../miden-crypto" }
+
+# Lifted STARK prover for the end-to-end synthetic-prove bench. `testing`
+# pulls the LiftedBlake3Air fixture + the goldilocks_blake3 config helpers
+# we use to assemble a small representative prove. We do NOT enable
+# `parallel` — `p3-maybe-rayon` falls back to a serial impl on wasm32, and
+# wasm-bindgen-rayon scaffolding is out of scope for the bench.
+miden-lifted-stark = { features = ["testing"], workspace = true }
+
+# Plonky3 building blocks: `Radix2DitParallel` is the DFT impl
+# `miden-lifted-stark` expects (with `parallel` off it runs serially);
+# `RowMajorMatrix` is the trace container; `Field` is needed to name the
+# `<Felt as Field>::Packing` associated type used by the packed-perm
+# benches; `Blake3Air::generate_trace_rows` produces the synthetic
+# Blake3 AIR trace used by the end-to-end prove bench.
+p3-blake3-air = { default-features = false, workspace = true }
+p3-dft        = { default-features = false, workspace = true }
+p3-field      = { default-features = false, workspace = true }
+p3-matrix     = { default-features = false, workspace = true }
+p3-symmetric  = { default-features = false, workspace = true }
+
+# wasm-bindgen lets us export Rust fns to JS so the Playwright driver can
+# invoke them from the bench page. `web-sys` exposes `performance.now()`
+# for sub-µs timing.
+wasm-bindgen = "0.2"
+web-sys      = { features = ["Performance", "Window"], version = "0.3" }
+
+# `getrandom` 0.4 (pulled transitively via `rand 0.10 → getrandom`) needs
+# the `wasm_js` feature on wasm32-unknown-unknown, otherwise its build
+# fails with `cannot find function fill_inner in module backends`. Cargo
+# unifies features within a major, but NOT across majors, so even though
+# the transitive dep is 0.4 we have to declare 0.4 explicitly here to
+# turn the feature on. (0.3 has the same feature, but it isn't in our
+# tree and adding it wouldn't unify with the 0.4 transitive.)
+getrandom = { features = ["wasm_js"], version = "0.4" }
+
+# Random input data for the benches. Stable seeded RNG so PR-time runs
+# and baseline runs use byte-identical inputs.
+rand.workspace        = true
+rand_chacha.workspace = true
