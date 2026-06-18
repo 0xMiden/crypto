@@ -1,6 +1,6 @@
 //! Reference model for the Eidos u32-XOR AEAD stream.
 //!
-//! This module is for tests and VM-vector generation. It does not manage
+//! This module is for tests and vector generation. It does not manage
 //! nonces. Production callers must never reuse `(key, nonce)` and must not
 //! repeat counter blocks under a fixed CTR key.
 

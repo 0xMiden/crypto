@@ -31,9 +31,7 @@ enum EidosChallengerMode {
 
 /// Generic Eidos challenger.
 ///
-/// This type supports scalar observation for Plonky3 challenger traits. Miden's
-/// recursive-verifier transcript uses [`MidenEidosChallenger`] so every absorb
-/// event has an explicit 8-felt block layout.
+/// This type supports scalar observation for Plonky3 challenger traits.
 #[derive(Clone, Debug)]
 pub struct EidosChallenger {
     cv: Word,

@@ -126,7 +126,7 @@ impl StatefulHasher<PackedFelt, PackedDigest> for EidosLmcsHasher {
 }
 
 impl<Input, Target> Alignable<Input, Target> for EidosLmcsHasher {
-    // This is the tree/advice alignment used by the proof transcript. It is not
+    // LMCS rows are absorbed in Eidos rate-sized groups; this is independent of
     // the host SIMD lane count.
     const ALIGNMENT: usize = RATE;
 }

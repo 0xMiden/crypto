@@ -419,7 +419,7 @@ where
     cv
 }
 
-/// Eidos VM hash construction.
+/// Eidos hash construction.
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub struct Eidos;
 

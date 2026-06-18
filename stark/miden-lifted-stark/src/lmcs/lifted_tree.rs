@@ -443,12 +443,12 @@ fn absorb_matrix<PF, PD, M, H, const WIDTH: usize, const DIGEST_ELEMS: usize>(
     assert_eq!(height, states.len());
 
     if height < PF::WIDTH || PF::WIDTH == 1 {
-        // Scalar path: walk every final leaf state and absorb the wrapped row for this matrix.
+        // Scalar path: absorb one matrix row into each leaf state.
         states.par_iter_mut().zip(matrix.par_rows()).for_each(|(state, row)| {
             sponge.absorb_into(state, row);
         });
     } else {
-        // SIMD path: gather → absorb wrapped packed row → scatter per chunk.
+        // SIMD path: gather states, absorb a vertically packed row, then scatter.
         states
             .par_chunks_mut(PF::WIDTH)
             .enumerate()
