@@ -1,7 +1,7 @@
-//! A deterministic Falcon512 Poseidon2 signature over a message.
+//! A deterministic Falcon512 signature over a message using Eidos hashing.
 //!
-//! This version differs from the reference implementation in its use of the Poseidon2 algebraic
-//! hash function in its hash-to-point algorithm.
+//! This version differs from the reference implementation in its use of the Eidos hash function in
+//! its hash-to-point algorithm.
 //!
 //! Another point of difference is the determinism in the signing process. The approach used to
 //! achieve this is the one proposed in [1].
@@ -33,7 +33,6 @@
 
 use crate::{
     Felt, ZERO,
-    hash::poseidon2::Poseidon2,
     utils::{ByteReader, ByteWriter, Deserializable, DeserializationError, Serializable},
 };
 
@@ -78,7 +77,7 @@ const PREVERSIONED_NONCE_LEN: usize = 39;
 /// The usefulness of the notion of versioned fixed nonce is discussed in Section 2.1 in [1].
 ///
 /// [1]: <https://github.com/algorand/falcon/blob/main/falcon-det.pdf>
-const NONCE_VERSION_BYTE: u8 = 1;
+const NONCE_VERSION_BYTE: u8 = 2;
 
 /// The preversioned portion of the fixed nonce constructed following [1].
 ///
@@ -86,23 +85,23 @@ const NONCE_VERSION_BYTE: u8 = 1;
 ///
 /// [1]: <https://github.com/algorand/falcon/blob/main/falcon-det.pdf>
 const PREVERSIONED_NONCE: [u8; PREVERSIONED_NONCE_LEN] = [
-    9, 70, 65, 76, 67, 79, 78, 45, 80, 79, 83, 69, 73, 68, 79, 78, 50, 45, 68, 69, 84, 0, 0, 0, 0,
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    9, 70, 65, 76, 67, 79, 78, 45, 66, 76, 65, 75, 69, 71, 45, 68, 69, 84, 0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
 ];
 
-/// Number of filed elements used to encode a nonce.
+/// Number of field elements used to encode a nonce.
 const NONCE_ELEMENTS: usize = 8;
 
-/// Public key length as a u8 vector.
+/// Public key length in bytes.
 pub const PK_LEN: usize = 897;
 
-/// Secret key length as a u8 vector.
+/// Secret key length in bytes.
 pub const SK_LEN: usize = 1281;
 
-/// Signature length as a u8 vector.
+/// Encoded signature polynomial length in bytes.
 const SIG_POLY_BYTE_LEN: usize = 625;
 
-/// Signature size when serialized as a u8 vector.
+/// Serialized signature length in bytes.
 #[cfg(test)]
 const SIG_SERIALIZED_LEN: usize = 1524;
 
@@ -131,7 +130,7 @@ impl Nonce {
     ///
     /// 1. a byte serving as a version byte,
     /// 2. a pre-versioned fixed nonce which is the UTF8 encoding of the domain separator
-    ///    "FALCON-POSEIDON2-DET" padded with enough zeros to make it of size 39 bytes.
+    ///    "FALCON-BLAKEG-DET" padded with enough zeros to make it of size 39 bytes.
     ///
     /// The usefulness of the notion of versioned fixed nonce is discussed in Section 2.1 in [1].
     ///
@@ -164,7 +163,7 @@ impl Nonce {
         Self(nonce_bytes)
     }
 
-    /// Converts byte representation of the nonce into field element representation.
+    /// Converts the nonce bytes into field elements.
     ///
     /// Nonce bytes are converted to field elements by taking consecutive 5 byte chunks
     /// of the nonce and interpreting them as field elements.

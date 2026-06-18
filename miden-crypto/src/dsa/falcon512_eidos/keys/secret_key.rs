@@ -16,9 +16,7 @@ use super::{
 };
 use crate::{
     Word,
-    dsa::falcon512_poseidon2::{
-        LOG_N, SK_LEN, hash_to_point::hash_to_point_poseidon2, math::ntru_gen,
-    },
+    dsa::falcon512_eidos::{LOG_N, SK_LEN, hash_to_point::hash_to_point_eidos, math::ntru_gen},
     hash::blake::Blake3_256,
     utils::zeroize::{Zeroize, ZeroizeOnDrop},
 };
@@ -91,7 +89,7 @@ impl SecretKey {
         Self::with_rng(&mut rng)
     }
 
-    /// Generates a secret_key using the provided random number generator `Rng`.
+    /// Generates a secret key using the provided random number generator.
     pub fn with_rng<R: Rng>(rng: &mut R) -> Self {
         let basis = ntru_gen(N, rng);
         Self::from_short_lattice_basis(basis)
@@ -140,7 +138,7 @@ impl SecretKey {
         let mut rng = ChaCha20Rng::from_seed(seed);
         let signature = self.sign_with_rng(message, &mut rng);
 
-        // Zeroize the seed to prevent leakage
+        // Zeroize the seed to prevent leakage.
         seed.zeroize();
 
         signature
@@ -151,7 +149,7 @@ impl SecretKey {
         let nonce = Nonce::deterministic();
 
         let h = self.compute_pub_key_poly();
-        let c = hash_to_point_poseidon2(message, &nonce);
+        let c = hash_to_point_eidos(message, &nonce);
         let s2 = self.sign_helper(c, rng);
 
         Signature::new(nonce, h, s2)
@@ -171,9 +169,7 @@ impl SecretKey {
     /// These changes make the signature algorithm compliant with the reference implementation.
     #[cfg(test)]
     pub fn sign_with_rng_testing<R: Rng>(&self, message: &[u8], rng: &mut R) -> Signature {
-        use crate::dsa::falcon512_poseidon2::{
-            hash_to_point::hash_to_point_shake256, tests::ChaCha,
-        };
+        use crate::dsa::falcon512_eidos::{hash_to_point::hash_to_point_shake256, tests::ChaCha};
 
         let nonce = Nonce::random(rng);
 
@@ -252,16 +248,13 @@ impl SecretKey {
         }
     }
 
-    /// Deterministically generates a seed for seeding the PRNG used in the trapdoor sampling
-    /// algorithm used during signature generation.
+    /// Deterministically generates the PRNG seed used by trapdoor sampling.
     ///
     /// This uses the argument described in [RFC 6979](https://datatracker.ietf.org/doc/html/rfc6979#section-3.5)
     /// § 3.5 where the concatenation of the private key and the hashed message, i.e., sk || H(m),
     /// is used in order to construct the initial seed of a PRNG. See also [1].
     ///
-    ///
-    /// Note that we hash in also a `log_2(N)` where `N = 512` in order to domain separate between
-    /// different versions of the Falcon DSA, see [1] Section 3.4.1.
+    /// `log2(N)` is included to separate Falcon parameter sets.
     ///
     /// [1]: <https://github.com/algorand/falcon/blob/main/falcon-det.pdf>
     fn generate_seed(&self, message: &Word) -> [u8; 32] {
@@ -272,7 +265,7 @@ impl SecretKey {
 
         let digest = Blake3_256::hash(&buffer);
 
-        // Zeroize the buffer as it contains secret key material
+        // Zeroize the buffer as it contains secret key material.
         buffer.zeroize();
 
         digest.into()
@@ -295,7 +288,7 @@ impl Serializable for SecretKey {
     fn write_into<W: ByteWriter>(&self, target: &mut W) {
         let basis = &self.secret_key;
 
-        // header
+        // Header.
         let n = basis[0].coefficients.len();
         let l = n.checked_ilog2().unwrap() as u8;
         let header: u8 = (5 << 4) | l;
@@ -334,9 +327,8 @@ impl Serializable for SecretKey {
         buffer.extend_from_slice(&big_f_i8_encoded);
         big_f_i8.zeroize();
 
+        // `write_bytes` consumes the buffer. The caller owns the serialized bytes after this point.
         target.write_bytes(&buffer);
-        // Note: buffer is not zeroized here as it's being passed to write_bytes which consumes it
-        // The caller should ensure proper handling of the written bytes
     }
 }
 
@@ -344,19 +336,19 @@ impl Deserializable for SecretKey {
     fn read_from<R: ByteReader>(source: &mut R) -> Result<Self, DeserializationError> {
         let byte_vector: [u8; SK_LEN] = source.read_array()?;
 
-        // read fields
+        // Read fields.
         let header = byte_vector[0];
 
-        // check fixed bits in header
+        // Check fixed bits in header.
         if (header >> 4) != 5 {
             return Err(DeserializationError::InvalidValue("Invalid header format".to_string()));
         }
 
-        // check log n
+        // Check log n.
         let logn = (header & 15) as usize;
         let n = 1 << logn;
 
-        // match against const variant generic parameter
+        // Match against the supported Falcon parameter set.
         if n != N {
             return Err(DeserializationError::InvalidValue(
                 "Unsupported Falcon DSA variant".to_string(),

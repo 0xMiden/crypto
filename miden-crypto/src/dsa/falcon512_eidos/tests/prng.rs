@@ -10,7 +10,7 @@ use shake::{
 };
 
 use super::data::SYNC_DATA;
-use crate::dsa::falcon512_poseidon2::SIG_NONCE_LEN;
+use crate::dsa::falcon512_eidos::SIG_NONCE_LEN;
 
 /// Length of the seed for the ChaCha20-based PRNG.
 pub(crate) const CHACHA_SEED_LEN: usize = 56;

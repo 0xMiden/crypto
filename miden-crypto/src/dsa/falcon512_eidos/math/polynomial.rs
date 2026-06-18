@@ -12,7 +12,7 @@ use num::{One, Zero};
 use super::{Inverse, field::FalconFelt};
 use crate::{
     Felt,
-    dsa::falcon512_poseidon2::{MODULUS, N},
+    dsa::falcon512_eidos::{MODULUS, N},
     utils::zeroize::{Zeroize, ZeroizeOnDrop},
 };
 

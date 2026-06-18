@@ -3,7 +3,7 @@
 use libfuzzer_sys::fuzz_target;
 use miden_crypto::{
     utils::Deserializable,
-    dsa::falcon512_poseidon2::PublicKey,
+    dsa::falcon512_eidos::PublicKey,
     ies::{SealingKey, SealedMessage},
 };
 

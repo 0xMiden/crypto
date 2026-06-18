@@ -20,7 +20,7 @@ mod tests {
 
     use crate::{
         ONE, Word,
-        dsa::falcon512_poseidon2::SecretKey,
+        dsa::falcon512_eidos::SecretKey,
         utils::{Deserializable, Serializable},
     };
 

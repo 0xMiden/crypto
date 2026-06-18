@@ -6,7 +6,7 @@ use num::Zero;
 use super::{
     ByteReader, ByteWriter, Deserializable, DeserializationError, LOG_N, MODULUS, N, Nonce,
     SIG_L2_BOUND, SIG_POLY_BYTE_LEN, Serializable,
-    hash_to_point::hash_to_point_poseidon2,
+    hash_to_point::hash_to_point_eidos,
     keys::PublicKey,
     math::{FalconFelt, FastFft, Polynomial},
 };
@@ -15,52 +15,39 @@ use crate::Word;
 // FALCON SIGNATURE
 // ================================================================================================
 
-/// A deterministic Falcon512 Poseidon2 signature over a message.
+/// A deterministic Falcon512-Eidos signature.
 ///
-/// The signature is a pair of polynomials (s1, s2) in (Z_p\[x\]/(phi))^2 a nonce `r`, and a public
-/// key polynomial `h` where:
+/// The signature contains a nonce `r`, a signature polynomial `s2`, and the public key polynomial
+/// `h`. Verification reconstructs `s1` in `(Z_p[x]/(phi))` where:
 /// - p := 12289
 /// - phi := x^512 + 1
 ///
-/// The signature  verifies against a public key `pk` if and only if:
+/// The signature verifies against the public key polynomial `h` if and only if:
 /// 1. s1 = c - s2 * h
 /// 2. |s1|^2 + |s2|^2 <= SIG_L2_BOUND
 ///
-/// where |.| is the norm and:
-/// - c = HashToPoint(r || message)
-/// - pk = Poseidon2::hash(h)
+/// where `c = HashToPoint(r || message)`. The Eidos commitment to `h` is exposed through
+/// [`PublicKey::to_commitment`](super::keys::PublicKey::to_commitment).
 ///
-/// Here h is a polynomial representing the public key and pk is its digest using the Poseidon2 hash
-/// function. c is a polynomial that is the hash-to-point of the message being signed.
-///  
-///  To summarize the main points of differences with the reference implementation, we have that:
+/// Main differences from the Falcon reference implementation:
 ///
-/// 1. the hash-to-point algorithm is made deterministic by using a fixed nonce `r`. This fixed
-///    nonce is formed as `nonce_version_byte || preversioned_nonce` where `preversioned_nonce` is a
-///    39-byte string that is defined as: i. a byte representing `log_2(512)`, followed by ii. the
-///    UTF8 representation of the string "FALCON-POSEIDON2-DET", followed by iii. the required
-///    number of 0_u8 padding to make the total length equal 39 bytes. Note that the above means in
-///    particular that only the `nonce_version_byte` needs to be serialized when serializing the
-///    signature. This reduces the deterministic signature compared to the reference implementation
-///    by 39 bytes.
-/// 2. the RNG used in the trapdoor sampler (i.e., the ffSampling algorithm) is ChaCha20Rng seeded
-///    with the `Blake3` hash of `log_2(512) || sk || message`.
+/// 1. Hash-to-point uses Eidos and a fixed nonce. The nonce is `nonce_version_byte ||
+///    preversioned_nonce`, where `preversioned_nonce` is `log2(512) || "FALCON-BLAKEG-DET" || zero
+///    padding` and is not serialized.
+/// 2. The trapdoor sampler uses `ChaCha20Rng` seeded with `Blake3(log2(512) || sk || message)`.
 ///
 /// The signature is serialized as:
 ///
-/// 1. A header byte specifying the algorithm used to encode the coefficients of the `s2` polynomial
-///    together with the degree of the irreducible polynomial phi. For Falcon512 Poseidon2, the
-///    header byte is set to `10111001` to differentiate it from the standardized instantiation of
-///    the Falcon signature.
-/// 2. 1 byte for the nonce version.
-/// 4. 625 bytes encoding the `s2` polynomial above.
+/// 1. 1-byte header, set to `10111001` for Falcon512-Eidos.
+/// 2. 1-byte nonce version.
+/// 3. 625 bytes encoding the `s2` polynomial.
 ///
-/// In addition to the signature itself, the polynomial h is also serialized with the signature as:
+/// The public key polynomial `h` is serialized after the signature as:
 ///
-/// 1. 1 byte representing the log2(512) i.e., 9.
-/// 2. 896 bytes for the public key itself.
+/// 1. 1 byte representing `log2(512)`.
+/// 2. 896 bytes encoding the public key.
 ///
-/// The total size of the signature (including the extended public key) is 1524 bytes.
+/// The total serialized length is 1524 bytes.
 ///
 /// [1]: <https://github.com/algorand/falcon/blob/main/falcon-det.pdf>
 /// [2]: <https://datatracker.ietf.org/doc/html/rfc6979#section-3.5>
@@ -108,13 +95,12 @@ impl Signature {
     // SIGNATURE VERIFICATION
     // --------------------------------------------------------------------------------------------
 
-    /// Returns true if this signature is a valid signature for the specified message generated
-    /// against the secret key matching the specified public key commitment.
+    /// Returns true if this signature is valid for the specified message and public key.
     pub fn verify(&self, message: Word, pub_key: &PublicKey) -> bool {
         if self.h != *pub_key {
             return false;
         }
-        let c = hash_to_point_poseidon2(message, &self.nonce);
+        let c = hash_to_point_eidos(message, &self.nonce);
         verify_helper(&c, &self.s2, pub_key)
     }
 }
@@ -160,9 +146,9 @@ impl Default for SignatureHeader {
     ///    and `10` denotes encoding using the uncompressed method.
     /// 2. `nnnn` encodes `LOG_N`.
     ///
-    /// For Poseidon2 Falcon 512 we use compression encoding and N = 512. Moreover, to differentiate
-    /// the Poseidon2 Falcon variant from the reference variant using SHAKE256, we flip the
-    /// first bit in the header. Thus, for Poseidon2 Falcon 512 the header is `10111001`
+    /// For this Falcon 512 variant we use compression encoding and N = 512. Moreover, to
+    /// differentiate it from the reference variant using SHAKE256, we flip the first bit in the
+    /// header. Thus, the header is `10111001`.
     ///
     /// [1]: <https://falcon-sign.info/falcon.pdf>
     fn default() -> Self {
