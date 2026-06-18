@@ -9,7 +9,7 @@ use core::{
 use super::{EmptySubtreeRoots, InnerNodeInfo, MerkleError, NodeIndex, SparseMerklePath};
 use crate::{
     EMPTY_WORD, Map, Set, Word,
-    hash::poseidon2::Poseidon2,
+    hash::eidos::Eidos,
     utils::{ByteReader, ByteWriter, Deserializable, DeserializationError, Serializable},
 };
 
@@ -22,23 +22,20 @@ mod large;
 pub use full::concurrent::{SubtreeLeaf, build_subtree_for_bench};
 #[cfg(feature = "concurrent")]
 pub use large::{
-    LargeSmt, LargeSmtError, LargeSmtResult, MemoryStorage, MemoryStorageSnapshot, SmtStorage,
-    SmtStorageReader, StorageError, StorageResult, StorageUpdateParts, StorageUpdates, Subtree,
-    SubtreeError, SubtreeUpdate,
+    LargeSmt, LargeSmtError, MemoryStorage, MemoryStorageSnapshot, SmtStorage, SmtStorageReader,
+    StorageError, StorageUpdateParts, StorageUpdates, Subtree, SubtreeError, SubtreeUpdate,
 };
 #[cfg(feature = "rocksdb")]
 pub use large::{RocksDbConfig, RocksDbSnapshotStorage, RocksDbStorage};
 
 mod large_forest;
 pub use large_forest::{
-    AppliedLineageMutation, Backend, BackendError, BackendReader, Config as ForestConfig,
-    DEFAULT_MAX_HISTORY_VERSIONS as FOREST_DEFAULT_MAX_HISTORY_VERSIONS,
+    Backend, BackendError, BackendReader, Config as ForestConfig,
+    DEFAULT_MAX_HISTORY_VERSIONS as FOREST_DEFAULT_MAX_HISTORY_VERSIONS, ForestOperation,
     InMemoryBackend as ForestInMemoryBackend,
     InMemoryBackendSnapshot as ForestInMemoryBackendReader, LargeSmtForest, LargeSmtForestError,
-    LineageId, LineageMutation, LineageMutationKind,
-    MIN_HISTORY_VERSIONS as FOREST_MIN_HISTORY_VERSIONS, RootInfo, SmtForestMutationSet,
-    SmtForestOperation, SmtForestUpdateBatch, SmtUpdateBatch, TreeEntry, TreeId, TreeWithRoot,
-    VersionId,
+    LineageId, MIN_HISTORY_VERSIONS as FOREST_MIN_HISTORY_VERSIONS, RootInfo, SmtForestUpdateBatch,
+    SmtUpdateBatch, TreeEntry, TreeId, TreeWithRoot, VersionId,
 };
 #[cfg(feature = "persistent-forest")]
 pub use large_forest::{
@@ -405,7 +402,7 @@ pub(crate) trait SparseMerkleTree<const DEPTH: u8>: SparseMerkleTreeReader<DEPTH
             } else {
                 (node_hash, right)
             };
-            node_hash = Poseidon2::merge(&[left, right]);
+            node_hash = Eidos::merge(&[left, right]);
 
             if node_hash == *EmptySubtreeRoots::entry(DEPTH, node_depth) {
                 // If a subtree is empty, then can remove the inner node, since it's equal to the
@@ -581,7 +578,7 @@ pub struct InnerNode {
 
 impl InnerNode {
     pub fn hash(&self) -> Word {
-        Poseidon2::merge(&[self.left, self.right])
+        Eidos::merge(&[self.left, self.right])
     }
 }
 

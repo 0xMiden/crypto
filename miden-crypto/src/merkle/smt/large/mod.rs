@@ -1,10 +1,10 @@
 //! Large-scale Sparse Merkle Tree backed by pluggable storage.
 //!
-//! `LargeSmt` stores the top of the tree (depths 0–`IN_MEMORY_DEPTH`-1) in memory and persists
-//! the lower depths in storage as fixed-size subtrees. This hybrid layout scales beyond RAM
+//! `LargeSmt` stores the top of the tree (depths 0–23) in memory and persists the lower
+//! depths (24–64) in storage as fixed-size subtrees. This hybrid layout scales beyond RAM
 //! while keeping common operations fast. With the `rocksdb` feature enabled, the lower
 //! subtrees and leaves are stored in RocksDB. On reload, the in-memory top is reconstructed
-//! from cached in-memory-depth subtree roots.
+//! from cached depth-24 subtree roots.
 //!
 //! Examples below require the `rocksdb` feature.
 //!
@@ -249,7 +249,7 @@ use crate::{
 };
 
 mod error;
-pub use error::{LargeSmtError, LargeSmtResult};
+pub use error::LargeSmtError;
 
 #[cfg(test)]
 mod property_tests;
@@ -262,7 +262,7 @@ pub use subtree::{Subtree, SubtreeError};
 mod storage;
 pub use storage::{
     MemoryStorage, MemoryStorageSnapshot, SmtStorage, SmtStorageReader, StorageError,
-    StorageResult, StorageUpdateParts, StorageUpdates, SubtreeUpdate,
+    StorageUpdateParts, StorageUpdates, SubtreeUpdate,
 };
 #[cfg(feature = "rocksdb")]
 pub use storage::{RocksDbConfig, RocksDbSnapshotStorage, RocksDbStorage};
@@ -277,17 +277,17 @@ mod smt_trait;
 // CONSTANTS
 // ================================================================================================
 
-/// Number of levels of the tree that are stored in memory.
-pub(super) const IN_MEMORY_DEPTH: u8 = 16;
+/// Number of levels of the tree that are stored in memory
+const IN_MEMORY_DEPTH: u8 = 24;
 
-/// Number of nodes that are stored in memory (including the unused index 0).
+/// Number of nodes that are stored in memory (including the unused index 0)
 const NUM_IN_MEMORY_NODES: usize = 1 << (IN_MEMORY_DEPTH + 1);
 
 /// Index of the root node inside `in_memory_nodes`.
 pub(super) const ROOT_MEMORY_INDEX: usize = 1;
 
-/// Number of subtree levels below in-memory depth (16-64 in steps of 8).
-const NUM_SUBTREE_LEVELS: usize = 6;
+/// Number of subtree levels below in-memory depth (24-64 in steps of 8)
+const NUM_SUBTREE_LEVELS: usize = 5;
 
 /// How many subtrees we buffer before flushing them to storage **during the
 /// SMT construction phase**.
@@ -320,8 +320,8 @@ type MutatedLeaves = (MutatedSubtreeLeaves, Map<u64, SmtLeaf>, Map<Word, Word>, 
 ///
 /// Unlike the regular `Smt`, this implementation is designed for very large trees by using external
 /// storage (such as RocksDB) for the bulk of the tree data, while keeping only the upper levels (up
-/// to `IN_MEMORY_DEPTH`) in memory. This hybrid approach allows the tree to scale beyond memory
-/// limitations while maintaining good performance for common operations.
+/// to depth 24) in memory. This hybrid approach allows the tree to scale beyond memory limitations
+/// while maintaining good performance for common operations.
 ///
 /// All leaves sit at depth 64. The most significant element of the key is used to identify the leaf
 /// to which the key maps.
@@ -361,7 +361,7 @@ impl<S: SmtStorageReader> LargeSmt<S> {
     pub const EMPTY_ROOT: Word = *EmptySubtreeRoots::entry(SMT_DEPTH, 0);
 
     /// Subtree depths for the subtrees stored in storage.
-    pub const SUBTREE_DEPTHS: [u8; 6] = [56, 48, 40, 32, 24, 16];
+    pub const SUBTREE_DEPTHS: [u8; 5] = [56, 48, 40, 32, 24];
 
     // PUBLIC ACCESSORS
     // --------------------------------------------------------------------------------------------
@@ -419,61 +419,40 @@ impl<S: SmtStorageReader> LargeSmt<S> {
     // --------------------------------------------------------------------------------------------
 
     /// Returns an iterator over the leaves of this [`LargeSmt`].
-    ///
-    /// The returned iterator is fallible: each item is a [`LargeSmtResult`] so storage errors
-    /// encountered while advancing the iterator are surfaced instead of being skipped.
-    ///
-    /// Note: This iterator returns owned [`SmtLeaf`] values.
+    /// Note: This iterator returns owned SmtLeaf values.
     ///
     /// # Errors
     /// Returns an error if the storage backend fails to create the iterator.
     pub fn leaves(
         &self,
-    ) -> LargeSmtResult<impl Iterator<Item = LargeSmtResult<(LeafIndex<SMT_DEPTH>, SmtLeaf)>> + '_>
-    {
+    ) -> Result<impl Iterator<Item = (LeafIndex<SMT_DEPTH>, SmtLeaf)>, LargeSmtError> {
         let iter = self.storage.iter_leaves()?;
-        Ok(iter.map(|result| {
-            result
-                .map(|(idx, leaf)| (LeafIndex::new_max_depth(idx), leaf))
-                .map_err(Into::into)
-        }))
+        Ok(iter.map(|(idx, leaf)| (LeafIndex::new_max_depth(idx), leaf)))
     }
 
     /// Returns an iterator over the key-value pairs of this [`LargeSmt`].
-    ///
-    /// The returned iterator is fallible: each item is a [`LargeSmtResult`] so storage errors
-    /// from the underlying leaf iterator are propagated while flattening leaf entries.
-    ///
-    /// Note: This iterator returns owned `(Word, Word)` tuples.
+    /// Note: This iterator returns owned (Word, Word) tuples.
     ///
     /// # Errors
     /// Returns an error if the storage backend fails to create the iterator.
-    pub fn entries(
-        &self,
-    ) -> LargeSmtResult<impl Iterator<Item = LargeSmtResult<(Word, Word)>> + '_> {
+    pub fn entries(&self) -> Result<impl Iterator<Item = (Word, Word)>, LargeSmtError> {
         let leaves_iter = self.leaves()?;
-        Ok(leaves_iter.flat_map(|result| {
-            let mut owned_entries = Vec::new();
-            match result {
-                Ok((_, leaf)) => {
-                    owned_entries.extend(leaf.entries().iter().copied().map(Ok));
-                },
-                Err(err) => owned_entries.push(Err(err)),
-            }
+        Ok(leaves_iter.flat_map(|(_, leaf)| {
+            // Collect the (Word, Word) tuples into an owned Vec
+            // This ensures they outlive the 'leaf' from which they are derived.
+            let owned_entries: Vec<(Word, Word)> = leaf.entries().to_vec();
+            // Return an iterator over this owned Vec
             owned_entries.into_iter()
         }))
     }
 
     /// Returns an iterator over the inner nodes of this [`LargeSmt`].
     ///
-    /// The returned iterator is fallible: each item is a [`LargeSmtResult`] so storage errors
-    /// from the underlying inner node iterator are propagated while flattening leaf entries.
-    ///
     /// # Errors
     /// Returns an error if the storage backend fails during iteration setup.
-    pub fn inner_nodes(
-        &self,
-    ) -> LargeSmtResult<impl Iterator<Item = LargeSmtResult<InnerNodeInfo>> + '_> {
+    pub fn inner_nodes(&self) -> Result<impl Iterator<Item = InnerNodeInfo> + '_, LargeSmtError> {
+        // Pre-validate that storage is accessible
+        let _ = self.storage.iter_subtrees()?;
         Ok(LargeSmtInnerNodeIterator::new(self))
     }
 
@@ -529,7 +508,7 @@ impl<S: SmtStorage> LargeSmt<S> {
     /// The new tree shares the same root, leaf count, and entry count as `self`, and its storage
     /// is a point-in-time snapshot produced by [`SmtStorage::reader`]. The returned tree's storage
     /// type is `S::Reader: SmtStorageReader`, so it cannot be used for mutations.
-    pub fn reader(&self) -> LargeSmtResult<LargeSmt<S::Reader>> {
+    pub fn reader(&self) -> Result<LargeSmt<S::Reader>, LargeSmtError> {
         Ok(LargeSmt {
             storage: self.storage.reader()?,
             in_memory_nodes: self.in_memory_nodes.clone(),

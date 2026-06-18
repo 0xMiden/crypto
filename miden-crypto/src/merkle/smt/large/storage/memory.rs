@@ -1,8 +1,7 @@
 use alloc::{boxed::Box, vec::Vec};
 
 use super::{
-    SmtStorage, SmtStorageReader, StorageError, StorageResult, StorageUpdateParts, StorageUpdates,
-    SubtreeUpdate,
+    SmtStorage, SmtStorageReader, StorageError, StorageUpdateParts, StorageUpdates, SubtreeUpdate,
 };
 use crate::{
     EMPTY_WORD, Map, MapEntry, Word,
@@ -56,41 +55,41 @@ impl Default for MemoryStorage {
 
 impl SmtStorageReader for MemoryStorage {
     /// Gets the total number of non-empty leaves currently stored.
-    fn leaf_count(&self) -> StorageResult<usize> {
+    fn leaf_count(&self) -> Result<usize, StorageError> {
         Ok(self.leaves.len())
     }
 
     /// Gets the total number of key-value entries currently stored.
-    fn entry_count(&self) -> StorageResult<usize> {
+    fn entry_count(&self) -> Result<usize, StorageError> {
         Ok(self.leaves.values().map(SmtLeaf::num_entries).sum())
     }
 
     /// Retrieves a single leaf node.
-    fn get_leaf(&self, index: u64) -> StorageResult<Option<SmtLeaf>> {
+    fn get_leaf(&self, index: u64) -> Result<Option<SmtLeaf>, StorageError> {
         Ok(self.leaves.get(&index).cloned())
     }
 
     /// Retrieves multiple leaf nodes. Returns Ok(None) for indices not found.
-    fn get_leaves(&self, indices: &[u64]) -> StorageResult<Vec<Option<SmtLeaf>>> {
+    fn get_leaves(&self, indices: &[u64]) -> Result<Vec<Option<SmtLeaf>>, StorageError> {
         let leaves = indices.iter().map(|idx| self.leaves.get(idx).cloned()).collect();
         Ok(leaves)
     }
 
     /// Returns true if the storage has any leaves.
-    fn has_leaves(&self) -> StorageResult<bool> {
+    fn has_leaves(&self) -> Result<bool, StorageError> {
         Ok(!self.leaves.is_empty())
     }
 
     /// Retrieves a single Subtree (representing deep nodes) by its root NodeIndex.
     /// Assumes index.depth() >= IN_MEMORY_DEPTH. Returns Ok(None) if not found.
-    fn get_subtree(&self, index: NodeIndex) -> StorageResult<Option<Subtree>> {
+    fn get_subtree(&self, index: NodeIndex) -> Result<Option<Subtree>, StorageError> {
         Ok(self.subtrees.get(&index).cloned())
     }
 
     /// Retrieves multiple Subtrees.
     /// Assumes index.depth() >= IN_MEMORY_DEPTH for all indices. Returns Ok(None) for indices not
     /// found.
-    fn get_subtrees(&self, indices: &[NodeIndex]) -> StorageResult<Vec<Option<Subtree>>> {
+    fn get_subtrees(&self, indices: &[NodeIndex]) -> Result<Vec<Option<Subtree>>, StorageError> {
         let subtrees: Vec<_> = indices.iter().map(|idx| self.subtrees.get(idx).cloned()).collect();
         Ok(subtrees)
     }
@@ -104,7 +103,7 @@ impl SmtStorageReader for MemoryStorage {
     /// - `StorageError::Unsupported`: If `index.depth() < IN_MEMORY_DEPTH`.
     ///
     /// Returns `Ok(None)` if the subtree or the specific inner node within it is not found.
-    fn get_inner_node(&self, index: NodeIndex) -> StorageResult<Option<InnerNode>> {
+    fn get_inner_node(&self, index: NodeIndex) -> Result<Option<InnerNode>, StorageError> {
         if index.depth() < IN_MEMORY_DEPTH {
             return Err(StorageError::Unsupported(
                 "Cannot get inner node from upper part of the tree".into(),
@@ -120,28 +119,24 @@ impl SmtStorageReader for MemoryStorage {
     /// Returns an iterator over all (index, SmtLeaf) pairs in the storage.
     ///
     /// The iterator provides access to the current state of the leaves.
-    fn iter_leaves(
-        &self,
-    ) -> StorageResult<Box<dyn Iterator<Item = StorageResult<(u64, SmtLeaf)>> + '_>> {
-        Ok(Box::new(self.leaves.iter().map(|(&k, v)| Ok((k, v.clone())))))
+    fn iter_leaves(&self) -> Result<Box<dyn Iterator<Item = (u64, SmtLeaf)> + '_>, StorageError> {
+        Ok(Box::new(self.leaves.iter().map(|(&k, v)| (k, v.clone()))))
     }
 
     /// Returns an iterator over all Subtrees in the storage.
     ///
     /// The iterator provides access to the current subtrees from storage.
-    fn iter_subtrees(
-        &self,
-    ) -> StorageResult<Box<dyn Iterator<Item = StorageResult<Subtree>> + '_>> {
-        Ok(Box::new(self.subtrees.values().cloned().map(Ok)))
+    fn iter_subtrees(&self) -> Result<Box<dyn Iterator<Item = Subtree> + '_>, StorageError> {
+        Ok(Box::new(self.subtrees.values().cloned()))
     }
 
-    /// Retrieves roots of all subtrees at `IN_MEMORY_DEPTH` depth.
+    /// Retrieves all depth 24 roots for fast tree rebuilding.
     ///
     /// Derived from the subtrees already in memory: for each subtree whose root sits at
-    /// `IN_MEMORY_DEPTH`, the root node's hash is the entry that `initialize_from_storage`
+    /// `IN_MEMORY_DEPTH`, the root node's hash is the depth-24 entry that `initialize_from_storage`
     /// needs to reconstruct the in-memory top of the tree.
-    fn get_top_subtree_roots(&self) -> StorageResult<Vec<(u64, Word)>> {
-        let in_mem_roots = self
+    fn get_depth24(&self) -> Result<Vec<(u64, Word)>, StorageError> {
+        let depth24 = self
             .subtrees
             .values()
             .filter(|subtree| subtree.root_index().depth() == IN_MEMORY_DEPTH)
@@ -151,7 +146,7 @@ impl SmtStorageReader for MemoryStorage {
                     .map(|node| (subtree.root_index().position(), node.hash()))
             })
             .collect();
-        Ok(in_mem_roots)
+        Ok(depth24)
     }
 }
 
@@ -159,7 +154,7 @@ impl SmtStorage for MemoryStorage {
     type Reader = MemoryStorageSnapshot;
 
     /// Returns a read-only snapshot of this in-memory storage by cloning it.
-    fn reader(&self) -> StorageResult<Self::Reader> {
+    fn reader(&self) -> Result<Self::Reader, StorageError> {
         Ok(self.clone().into_snapshot())
     }
 
@@ -171,7 +166,12 @@ impl SmtStorage for MemoryStorage {
     ///
     /// # Panics
     /// Panics in debug builds if `value` is `EMPTY_WORD`.
-    fn insert_value(&mut self, index: u64, key: Word, value: Word) -> StorageResult<Option<Word>> {
+    fn insert_value(
+        &mut self,
+        index: u64,
+        key: Word,
+        value: Word,
+    ) -> Result<Option<Word>, StorageError> {
         debug_assert_ne!(value, EMPTY_WORD);
 
         match self.leaves.get_mut(&index) {
@@ -191,7 +191,7 @@ impl SmtStorage for MemoryStorage {
     ///   returned (as `leaf.get_value(&key)` would be `None`).
     /// - If the leaf at `index` does not exist, `Ok(None)` is returned, as no value could be
     ///   removed.
-    fn remove_value(&mut self, index: u64, key: Word) -> StorageResult<Option<Word>> {
+    fn remove_value(&mut self, index: u64, key: Word) -> Result<Option<Word>, StorageError> {
         let old_value = match self.leaves.entry(index) {
             MapEntry::Occupied(mut entry) => {
                 let (old_value, is_empty) = entry.get_mut().remove(key);
@@ -209,13 +209,13 @@ impl SmtStorage for MemoryStorage {
     /// Sets multiple leaf nodes in storage.
     ///
     /// If a leaf at a given index already exists, it is overwritten.
-    fn set_leaves(&mut self, leaves_map: Map<u64, SmtLeaf>) -> StorageResult<()> {
+    fn set_leaves(&mut self, leaves_map: Map<u64, SmtLeaf>) -> Result<(), StorageError> {
         self.leaves.extend(leaves_map);
         Ok(())
     }
 
     /// Removes a single leaf node.
-    fn remove_leaf(&mut self, index: u64) -> StorageResult<Option<SmtLeaf>> {
+    fn remove_leaf(&mut self, index: u64) -> Result<Option<SmtLeaf>, StorageError> {
         Ok(self.leaves.remove(&index))
     }
 
@@ -223,7 +223,7 @@ impl SmtStorage for MemoryStorage {
     ///
     /// If a subtree with the same root NodeIndex already exists, it is overwritten.
     /// Assumes `subtree.root_index().depth() >= IN_MEMORY_DEPTH`.
-    fn set_subtree(&mut self, subtree: &Subtree) -> StorageResult<()> {
+    fn set_subtree(&mut self, subtree: &Subtree) -> Result<(), StorageError> {
         self.subtrees.insert(subtree.root_index(), subtree.clone());
         Ok(())
     }
@@ -232,14 +232,14 @@ impl SmtStorage for MemoryStorage {
     ///
     /// If a subtree with a given root NodeIndex already exists, it is overwritten.
     /// Assumes `subtree.root_index().depth() >= IN_MEMORY_DEPTH` for all subtrees in the vector.
-    fn set_subtrees(&mut self, subtrees_vec: Vec<Subtree>) -> StorageResult<()> {
+    fn set_subtrees(&mut self, subtrees_vec: Vec<Subtree>) -> Result<(), StorageError> {
         self.subtrees
             .extend(subtrees_vec.into_iter().map(|subtree| (subtree.root_index(), subtree)));
         Ok(())
     }
 
     /// Removes a single Subtree (representing deep nodes) by its root NodeIndex.
-    fn remove_subtree(&mut self, index: NodeIndex) -> StorageResult<()> {
+    fn remove_subtree(&mut self, index: NodeIndex) -> Result<(), StorageError> {
         self.subtrees.remove(&index);
         Ok(())
     }
@@ -258,7 +258,7 @@ impl SmtStorage for MemoryStorage {
         &mut self,
         index: NodeIndex,
         node: InnerNode,
-    ) -> StorageResult<Option<InnerNode>> {
+    ) -> Result<Option<InnerNode>, StorageError> {
         if index.depth() < IN_MEMORY_DEPTH {
             return Err(StorageError::Unsupported(
                 "Cannot set inner node in upper part of the tree".into(),
@@ -284,7 +284,7 @@ impl SmtStorage for MemoryStorage {
     ///
     /// # Errors
     /// - `StorageError::Unsupported`: If `index.depth() < IN_MEMORY_DEPTH`.
-    fn remove_inner_node(&mut self, index: NodeIndex) -> StorageResult<Option<InnerNode>> {
+    fn remove_inner_node(&mut self, index: NodeIndex) -> Result<Option<InnerNode>, StorageError> {
         if index.depth() < IN_MEMORY_DEPTH {
             return Err(StorageError::Unsupported(
                 "Cannot remove inner node from upper part of the tree".into(),
@@ -308,7 +308,7 @@ impl SmtStorage for MemoryStorage {
     /// This method handles updates to:
     /// - Leaves: Inserts new or updated leaves, removes specified leaves.
     /// - Subtrees: Inserts new or updated subtrees, removes specified subtrees.
-    fn apply(&mut self, updates: StorageUpdates) -> StorageResult<()> {
+    fn apply(&mut self, updates: StorageUpdates) -> Result<(), StorageError> {
         let StorageUpdateParts {
             leaf_updates,
             subtree_updates,
@@ -349,31 +349,31 @@ impl SmtStorage for MemoryStorage {
 pub struct MemoryStorageSnapshot(MemoryStorage);
 
 impl SmtStorageReader for MemoryStorageSnapshot {
-    fn leaf_count(&self) -> StorageResult<usize> {
+    fn leaf_count(&self) -> Result<usize, StorageError> {
         self.0.leaf_count()
     }
 
-    fn entry_count(&self) -> StorageResult<usize> {
+    fn entry_count(&self) -> Result<usize, StorageError> {
         self.0.entry_count()
     }
 
-    fn get_leaf(&self, index: u64) -> StorageResult<Option<SmtLeaf>> {
+    fn get_leaf(&self, index: u64) -> Result<Option<SmtLeaf>, StorageError> {
         self.0.get_leaf(index)
     }
 
-    fn get_leaves(&self, indices: &[u64]) -> StorageResult<Vec<Option<SmtLeaf>>> {
+    fn get_leaves(&self, indices: &[u64]) -> Result<Vec<Option<SmtLeaf>>, StorageError> {
         self.0.get_leaves(indices)
     }
 
-    fn has_leaves(&self) -> StorageResult<bool> {
+    fn has_leaves(&self) -> Result<bool, StorageError> {
         self.0.has_leaves()
     }
 
-    fn get_subtree(&self, index: NodeIndex) -> StorageResult<Option<Subtree>> {
+    fn get_subtree(&self, index: NodeIndex) -> Result<Option<Subtree>, StorageError> {
         self.0.get_subtree(index)
     }
 
-    fn get_subtrees(&self, indices: &[NodeIndex]) -> StorageResult<Vec<Option<Subtree>>> {
+    fn get_subtrees(&self, indices: &[NodeIndex]) -> Result<Vec<Option<Subtree>>, StorageError> {
         self.0.get_subtrees(indices)
     }
 
@@ -381,27 +381,23 @@ impl SmtStorageReader for MemoryStorageSnapshot {
         &self,
         leaf_index: u64,
         subtree_indices: &[NodeIndex],
-    ) -> StorageResult<(Option<SmtLeaf>, Vec<Option<Subtree>>)> {
+    ) -> Result<(Option<SmtLeaf>, Vec<Option<Subtree>>), StorageError> {
         self.0.get_leaf_and_subtrees(leaf_index, subtree_indices)
     }
 
-    fn get_inner_node(&self, index: NodeIndex) -> StorageResult<Option<InnerNode>> {
+    fn get_inner_node(&self, index: NodeIndex) -> Result<Option<InnerNode>, StorageError> {
         self.0.get_inner_node(index)
     }
 
-    fn iter_leaves(
-        &self,
-    ) -> StorageResult<Box<dyn Iterator<Item = StorageResult<(u64, SmtLeaf)>> + '_>> {
+    fn iter_leaves(&self) -> Result<Box<dyn Iterator<Item = (u64, SmtLeaf)> + '_>, StorageError> {
         self.0.iter_leaves()
     }
 
-    fn iter_subtrees(
-        &self,
-    ) -> StorageResult<Box<dyn Iterator<Item = StorageResult<Subtree>> + '_>> {
+    fn iter_subtrees(&self) -> Result<Box<dyn Iterator<Item = Subtree> + '_>, StorageError> {
         self.0.iter_subtrees()
     }
 
-    fn get_top_subtree_roots(&self) -> StorageResult<Vec<(u64, Word)>> {
-        self.0.get_top_subtree_roots()
+    fn get_depth24(&self) -> Result<Vec<(u64, Word)>, StorageError> {
+        self.0.get_depth24()
     }
 }

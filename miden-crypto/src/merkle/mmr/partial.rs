@@ -7,7 +7,7 @@ use alloc::{
 use super::{MmrDelta, MmrPath, MmrProof};
 use crate::{
     Word,
-    hash::poseidon2::Poseidon2,
+    hash::eidos::Eidos,
     merkle::{
         InnerNodeInfo, MerklePath,
         mmr::{InOrderIndex, MmrError, MmrPeaks, forest::Forest},
@@ -366,7 +366,7 @@ impl PartialMmr {
 
                 // Merge the current layer. The result is either the right element of the next
                 // merge, or a new peak.
-                right = Poseidon2::merge(&[left, right]);
+                right = Eidos::merge(&[left, right]);
 
                 // This iteration merged the left and right nodes, the new value is always used as
                 // the next iteration's right node. Therefore the tracking flags of this iteration
@@ -617,7 +617,7 @@ impl PartialMmr {
                 }
 
                 peak_idx = peak_idx.parent();
-                new = Poseidon2::merge(&[left, right]);
+                new = Eidos::merge(&[left, right]);
                 target = target.next_larger_tree()?;
             }
 
@@ -717,7 +717,7 @@ impl<I: Iterator<Item = (usize, Word)>> Iterator for InnerNodeIterator<'_, I> {
                 } else {
                     (*sibling, node)
                 };
-                let parent = Poseidon2::merge(&[left, right]);
+                let parent = Eidos::merge(&[left, right]);
                 let inner_node = InnerNodeInfo { value: parent, left, right };
 
                 self.stack.push((parent_idx, parent));
@@ -766,14 +766,7 @@ impl Deserializable for PartialMmr {
             ));
         }
         let tracked: Vec<usize> = Vec::read_from(source)?;
-        let mut tracked_leaves = BTreeSet::new();
-        for leaf_pos in tracked {
-            if !tracked_leaves.insert(leaf_pos) {
-                return Err(DeserializationError::InvalidValue(
-                    "duplicate tracked leaf in partial mmr encoding".to_string(),
-                ));
-            }
-        }
+        let tracked_leaves: BTreeSet<usize> = tracked.into_iter().collect();
 
         // Construct MmrPeaks to validate forest/peaks consistency
         let peaks = MmrPeaks::new(forest, peaks_vec).map_err(|e| {
@@ -1071,27 +1064,6 @@ mod tests {
         let decoded = PartialMmr::read_from_bytes(&bytes).unwrap();
 
         assert_eq!(partial_mmr, decoded);
-    }
-
-    #[test]
-    fn test_partial_mmr_deserialization_rejects_duplicate_tracked_leaves() {
-        let mmr = Mmr::try_from_iter(LEAVES.iter().copied()).unwrap();
-        let mut partial_mmr = PartialMmr::from_peaks(mmr.peaks());
-        let leaf_pos = 1usize;
-        let node = mmr.get(leaf_pos).unwrap();
-        let proof = mmr.open(leaf_pos).unwrap();
-        partial_mmr.track(leaf_pos, node, proof.path().merkle_path()).unwrap();
-
-        let mut bytes = Vec::new();
-        partial_mmr.forest.num_leaves().write_into(&mut bytes);
-        partial_mmr.peaks.write_into(&mut bytes);
-        partial_mmr.nodes.write_into(&mut bytes);
-        bytes.write_u8(PartialMmr::TRACKED_LEAVES_MARKER);
-        vec![leaf_pos, leaf_pos].write_into(&mut bytes);
-
-        let result = PartialMmr::read_from_bytes(&bytes);
-
-        assert!(matches!(result, Err(DeserializationError::InvalidValue(_))));
     }
 
     #[test]
@@ -1462,7 +1434,6 @@ mod tests {
         bad_bytes.extend_from_slice(&1usize.to_bytes()); // BTreeMap length
         bad_bytes.extend_from_slice(&0usize.to_bytes()); // invalid index 0
         bad_bytes.extend_from_slice(&int_to_node(0).to_bytes()); // value
-        bad_bytes.push(PartialMmr::TRACKED_LEAVES_MARKER);
         // tracked_leaves: empty vec
         bad_bytes.extend_from_slice(&0usize.to_bytes());
 

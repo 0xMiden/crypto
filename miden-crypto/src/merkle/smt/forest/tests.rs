@@ -6,12 +6,16 @@ use crate::{
     EMPTY_WORD, Felt, ONE, ZERO,
     merkle::{
         int_to_node,
-        smt::{SMT_DEPTH, SmtProofError},
+        smt::{SMT_DEPTH, Smt, SmtProofError},
     },
 };
 
 // TESTS
 // ================================================================================================
+
+fn root_for(entries: impl IntoIterator<Item = (Word, Word)>) -> Word {
+    Smt::with_entries(entries).expect("test entries must build a valid SMT").root()
+}
 
 #[test]
 fn test_insert_root_not_in_store() -> Result<(), MerkleError> {
@@ -32,15 +36,7 @@ fn test_insert_root_empty() -> Result<(), MerkleError> {
     let empty_tree_root = *EmptySubtreeRoots::entry(SMT_DEPTH, 0);
     let key = Word::new([ZERO; Word::NUM_ELEMENTS]);
     let value = Word::new([ONE; Word::NUM_ELEMENTS]);
-    assert_eq!(
-        forest.insert(empty_tree_root, key, value)?,
-        Word::new([
-            Felt::new_unchecked(16906950376809463586),
-            Felt::new_unchecked(12041256092349224868),
-            Felt::new_unchecked(1176700509486931830),
-            Felt::new_unchecked(7542611981105929079),
-        ]),
-    );
+    assert_eq!(forest.insert(empty_tree_root, key, value)?, root_for([(key, value)]));
     Ok(())
 }
 
@@ -52,26 +48,10 @@ fn test_insert_multiple_values() -> Result<(), MerkleError> {
     let key = Word::new([ZERO; Word::NUM_ELEMENTS]);
     let value = Word::new([ONE; Word::NUM_ELEMENTS]);
     let new_root = forest.insert(empty_tree_root, key, value)?;
-    assert_eq!(
-        new_root,
-        Word::new([
-            Felt::new_unchecked(16906950376809463586),
-            Felt::new_unchecked(12041256092349224868),
-            Felt::new_unchecked(1176700509486931830),
-            Felt::new_unchecked(7542611981105929079),
-        ]),
-    );
+    assert_eq!(new_root, root_for([(key, value)]));
 
     let new_root = forest.insert(new_root, key, value)?;
-    assert_eq!(
-        new_root,
-        Word::new([
-            Felt::new_unchecked(16906950376809463586),
-            Felt::new_unchecked(12041256092349224868),
-            Felt::new_unchecked(1176700509486931830),
-            Felt::new_unchecked(7542611981105929079),
-        ]),
-    );
+    assert_eq!(new_root, root_for([(key, value)]));
 
     // Inserting the same key-value pair again should return the same root
     let root_duplicate = forest.insert(new_root, key, value)?;
@@ -79,15 +59,7 @@ fn test_insert_multiple_values() -> Result<(), MerkleError> {
 
     let key2 = Word::new([ZERO, ONE, ZERO, ONE]);
     let new_root = forest.insert(new_root, key2, value)?;
-    assert_eq!(
-        new_root,
-        Word::new([
-            Felt::new_unchecked(16815662437327551981),
-            Felt::new_unchecked(5197991956083107546),
-            Felt::new_unchecked(1939115207259100000),
-            Felt::new_unchecked(6159513656306598644),
-        ])
-    );
+    assert_eq!(new_root, root_for([(key, value), (key2, value)]));
 
     Ok(())
 }
@@ -108,15 +80,7 @@ fn test_batch_insert() -> Result<(), MerkleError> {
         let mut forest = forest.clone();
         let new_root = forest.batch_insert(empty_tree_root, values.clone()).unwrap();
 
-        assert_eq!(
-            new_root,
-            Word::new([
-                Felt::new_unchecked(5427929042044360539),
-                Felt::new_unchecked(6118532261391705453),
-                Felt::new_unchecked(5681692130190572868),
-                Felt::new_unchecked(8495277686282924792),
-            ])
-        );
+        assert_eq!(new_root, root_for(values.clone()));
 
         for (key, value) in values {
             let proof = forest.open(new_root, key).unwrap();

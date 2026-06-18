@@ -40,6 +40,3 @@ pub enum StorageError {
     #[error("failed to decode value bytes")]
     Value(#[from] crate::utils::DeserializationError),
 }
-
-/// The result type for use with backends.
-pub type StorageResult<T> = Result<T, StorageError>;

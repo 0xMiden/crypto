@@ -14,13 +14,13 @@ use proptest::prelude::*;
 use crate::{
     EMPTY_WORD, Map, ONE, ZERO,
     merkle::smt::{
-        Backend, BackendReader, ForestInMemoryBackend, LargeSmtForest, LeafIndex, LineageId,
-        MAX_LEAF_ENTRIES, RootInfo, SMT_DEPTH, Smt, SmtForestOperation, SmtForestUpdateBatch,
-        SmtProof, SmtUpdateBatch, TreeId, VersionId,
+        Backend, BackendReader, ForestInMemoryBackend, ForestOperation, LargeSmtForest, LeafIndex,
+        LineageId, MAX_LEAF_ENTRIES, RootInfo, SMT_DEPTH, Smt, SmtForestUpdateBatch, SmtProof,
+        SmtUpdateBatch, TreeId, VersionId,
         large_forest::{
             backend::{BackendError, Result as BackendResult},
             root::{TreeEntry, TreeWithRoot},
-            utils::{AppliedLineageMutation, LineageMutation},
+            utils::MutationSet,
         },
     },
 };
@@ -121,9 +121,9 @@ pub fn arbitrary_batch() -> impl Strategy<Value = SmtUpdateBatch> {
     arbitrary_entries().prop_map(|e| {
         SmtUpdateBatch::new(e.into_iter().map(|(k, v)| {
             if v == EMPTY_WORD {
-                SmtForestOperation::remove(k)
+                ForestOperation::remove(k)
             } else {
-                SmtForestOperation::insert(k, v)
+                ForestOperation::insert(k, v)
             }
         }))
     })
@@ -319,24 +319,42 @@ impl BackendReader for FallibleEntriesBackend {
 
 impl Backend for FallibleEntriesBackend {
     type Reader = <ForestInMemoryBackend as Backend>::Reader;
-    type PreparedMutations = <ForestInMemoryBackend as Backend>::PreparedMutations;
 
     fn reader(&self) -> BackendResult<Self::Reader> {
         self.inner.reader()
     }
 
-    fn compute_mutations(
-        &self,
-        new_version: VersionId,
-        updates: SmtForestUpdateBatch,
-    ) -> BackendResult<(Vec<LineageMutation>, Self::PreparedMutations)> {
-        self.inner.compute_mutations(new_version, updates)
+    fn add_lineage(
+        &mut self,
+        lineage: LineageId,
+        version: VersionId,
+        updates: SmtUpdateBatch,
+    ) -> BackendResult<TreeWithRoot> {
+        self.inner.add_lineage(lineage, version, updates)
     }
 
-    fn apply_mutations(
+    fn update_tree(
         &mut self,
-        mutations: Self::PreparedMutations,
-    ) -> BackendResult<Vec<AppliedLineageMutation>> {
-        self.inner.apply_mutations(mutations)
+        lineage: LineageId,
+        new_version: VersionId,
+        updates: SmtUpdateBatch,
+    ) -> BackendResult<MutationSet> {
+        self.inner.update_tree(lineage, new_version, updates)
+    }
+
+    fn add_lineages(
+        &mut self,
+        version: VersionId,
+        lineages: SmtForestUpdateBatch,
+    ) -> BackendResult<Vec<(LineageId, TreeWithRoot)>> {
+        self.inner.add_lineages(version, lineages)
+    }
+
+    fn update_forest(
+        &mut self,
+        new_version: VersionId,
+        updates: SmtForestUpdateBatch,
+    ) -> BackendResult<Vec<(LineageId, MutationSet)>> {
+        self.inner.update_forest(new_version, updates)
     }
 }

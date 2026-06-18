@@ -20,7 +20,7 @@ use super::{
 };
 use crate::{
     Word,
-    hash::poseidon2::Poseidon2,
+    hash::eidos::Eidos,
     utils::{ByteReader, ByteWriter, Deserializable, DeserializationError, Serializable},
 };
 
@@ -168,7 +168,7 @@ impl Mmr {
         let mut right = el;
         let mut left_tree = 1usize;
         while (old_forest.num_leaves() & left_tree) != 0 {
-            right = Poseidon2::merge(&[self.nodes[left_offset], right]);
+            right = Eidos::merge(&[self.nodes[left_offset], right]);
             self.nodes.push(right);
 
             debug_assert!(left_tree <= Forest::MAX_LEAVES);

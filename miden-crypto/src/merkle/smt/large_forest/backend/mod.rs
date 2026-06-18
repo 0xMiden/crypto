@@ -17,9 +17,9 @@ use crate::{
         smt::{
             LeafIndex, SMT_DEPTH, SmtLeaf, SmtProof,
             large_forest::{
-                operation::SmtForestUpdateBatch,
+                operation::{SmtForestUpdateBatch, SmtUpdateBatch},
                 root::{LineageId, TreeEntry, TreeWithRoot, VersionId},
-                utils::{AppliedLineageMutation, LineageMutation},
+                utils::MutationSet,
             },
         },
     },
@@ -163,70 +163,82 @@ pub trait Backend: BackendReader {
     /// reader must not block writes in any way.
     type Reader: BackendReader;
 
-    /// Backend-specific data prepared during mutation computation and consumed during application.
-    ///
-    /// This type is intentionally opaque to forest users. Implementations should store enough
-    /// information here to apply the already-computed mutations without repeating the expensive
-    /// tree update computation.
-    ///
-    /// The prepared value must represent only prospective changes. Computing it must not change
-    /// the backend's committed state. It may contain ordinary SMT mutation sets, storage-level
-    /// updates, serialized values, or any other implementation-specific data needed to apply the
-    /// mutation efficiently later.
-    type PreparedMutations;
-
     /// Returns a read-only view of this backend that observes its current state.
     fn reader(&self) -> Result<Self::Reader>;
 
-    // TWO-PHASE MODIFIERS
+    // SINGLE-TREE MODIFIERS
     // ============================================================================================
 
-    /// Computes the backend data required to mutate lineages, without applying it.
+    /// Adds a new `lineage` to the forest with the provided `version` and sets the associated SMT
+    /// to have the value created by applying `updates` to the empty tree, returning the new root of
+    /// that tree.
     ///
     /// # Expected Behavior
     ///
     /// Implementations must guarantee the following behavior in addition to the global invariants:
     ///
-    /// - The backend's committed state must not change.
-    /// - Each unknown lineage in `updates` is treated as an addition from the empty tree.
-    /// - Each known lineage in `updates` is treated as an update to its latest tree.
-    /// - Each lineage in `updates` must produce at most one [`LineageMutation`].
-    /// - No-op lineage updates must not allocate new backend tree versions when applied.
-    /// - The prepared mutations must be applicable atomically by [`Self::apply_mutations`] where
-    ///   the backend supports atomic writes.
-    fn compute_mutations(
-        &self,
+    /// - If the provided `lineage` conflicts with an already-existing lineage in the backend, it
+    ///   must return [`BackendError::DuplicateLineage`].
+    fn add_lineage(
+        &mut self,
+        lineage: LineageId,
+        version: VersionId,
+        updates: SmtUpdateBatch,
+    ) -> Result<TreeWithRoot>;
+
+    /// Performs the provided `updates` on the tree with the specified `lineage`, returning the
+    /// mutation set that will revert the changes made to the tree.
+    ///
+    /// # Expected Behavior
+    ///
+    /// Implementations must guarantee the following behavior in addition to the global invariants:
+    ///
+    /// - At most one new root must be added to the forest for the entire batch.
+    /// - If applying the provided `updates` results in no changes to the tree, no new tree must be
+    ///   allocated.
+    fn update_tree(
+        &mut self,
+        lineage: LineageId,
+        new_version: VersionId,
+        updates: SmtUpdateBatch,
+    ) -> Result<MutationSet>;
+
+    // MULTI-TREE MODIFIERS
+    // ============================================================================================
+
+    /// Adds multiple new `lineages` to the backend with the provided `version` and sets the
+    /// associated SMTs to have the value created by applying the provided updates to the empty
+    /// tree, returning the new root of that tree.
+    ///
+    /// # Expected Behavior
+    ///
+    /// Implementations must guarantee the following behavior in addition to the global invariants:
+    ///
+    /// - If any provided lineage conflicts with an already-existing lineage in the backend, it must
+    ///   return [`BackendError::DuplicateLineage`].
+    fn add_lineages(
+        &mut self,
+        version: VersionId,
+        lineages: SmtForestUpdateBatch,
+    ) -> Result<Vec<(LineageId, TreeWithRoot)>>;
+
+    /// Performs the provided `updates` on the forest, setting all new tree states to have the
+    /// provided `new_version` and returning a vector of the mutation sets that reverse the changes
+    /// to each changed tree.
+    ///
+    /// # Expected Behavior
+    ///
+    /// Implementations must guarantee the following behavior in addition to the global invariants:
+    ///
+    /// - At most one new root must be added to the forest for each target root in the provided
+    ///   `updates`.
+    /// - If applying the provided `updates` results in no changes to a given lineage of trees in
+    ///   the forest, then no new tree must be allocated in that lineage.
+    fn update_forest(
+        &mut self,
         new_version: VersionId,
         updates: SmtForestUpdateBatch,
-    ) -> Result<(Vec<LineageMutation>, Self::PreparedMutations)>;
-
-    /// Applies previously-computed backend mutations.
-    ///
-    /// This method consumes the opaque prepared data returned by one of the backend compute
-    /// methods. It commits the backend's latest-tree state and returns the applied lineage data
-    /// needed by [`crate::merkle::smt::LargeSmtForest`] to update forest-level lineage metadata and
-    /// history.
-    ///
-    /// # Expected Behavior
-    ///
-    /// Implementations must guarantee the following behavior in addition to the global invariants:
-    ///
-    /// - The prepared mutation data must still be applicable to the current backend state before
-    ///   any mutation is written. For updates, the current version and root must match the
-    ///   version/root captured during the compute phase. For additions, the lineage must still be
-    ///   absent.
-    /// - User-derived errors must leave the backend in a consistent committed state.
-    /// - If the prepared data contains multiple lineage updates, they should be committed
-    ///   atomically when the backend's storage engine supports atomic batched writes.
-    /// - The method must not recompute Merkle mutations from the original user updates; that work
-    ///   belongs to the compute methods.
-    /// - On success, the returned [`AppliedLineageMutation`] values must correspond to the applied
-    ///   prepared mutations in the same lineage set, including reverse mutations and old entry
-    ///   counts for update history.
-    fn apply_mutations(
-        &mut self,
-        mutations: Self::PreparedMutations,
-    ) -> Result<Vec<AppliedLineageMutation>>;
+    ) -> Result<Vec<(LineageId, MutationSet)>>;
 }
 
 // BACKEND ERROR
@@ -235,10 +247,6 @@ pub trait Backend: BackendReader {
 /// The error type for use within Backends.
 #[derive(Debug, Error)]
 pub enum BackendError {
-    /// Raised when an update was prepared against a version that is no longer current.
-    #[error("Version {provided} is not current backend version {latest}")]
-    BadVersion { provided: VersionId, latest: VersionId },
-
     /// Raised when corrupted data is encountered in the backend.
     ///
     /// It exists as a separate error variant to allow the forest itself to handle it better if
