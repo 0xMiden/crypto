@@ -1,13 +1,13 @@
 //! Local BLAKE3 compression schedule used by BlakeG.
 //!
 //! This module owns only the raw BLAKE3 round schedule and architecture-specific packed
-//! backends. BlakeG output masking, field packing, and Eidos framing stay in `primitive.rs`
+//! backends. BlakeG finalization, field packing, and Eidos framing stay in `primitive.rs`
 //! and `framing.rs`.
 //!
 //! TODO(upstream-blake3): replace this module with a stable word-oriented `compress_many`
 //! hazmat API that accepts batches of 8-word CVs, 16-word message blocks, and caller-supplied
 //! parameter words for `v[12..16]`, returning either the post-round state or the raw CV/XOF
-//! folds before BlakeG applies its output mask.
+//! folds before BlakeG applies its output finalizer.
 
 use core::array;
 
@@ -47,8 +47,11 @@ mod native_backend {
     pub(super) const LANES: usize = 16;
 
     #[inline(always)]
-    pub(super) fn compress(cv: [[u32; LANES]; 8], block: [[u32; LANES]; 16]) -> [[u32; LANES]; 8] {
-        super::x86_64_avx512::compress_packed_16(cv, block)
+    pub(super) fn compress_raw_xof(
+        cv: [[u32; LANES]; 8],
+        block: [[u32; LANES]; 16],
+    ) -> [[u32; LANES]; 16] {
+        super::x86_64_avx512::compress_packed_16_raw_xof(cv, block)
     }
 }
 
@@ -57,8 +60,11 @@ mod native_backend {
     pub(super) const LANES: usize = 8;
 
     #[inline(always)]
-    pub(super) fn compress(cv: [[u32; LANES]; 8], block: [[u32; LANES]; 16]) -> [[u32; LANES]; 8] {
-        super::x86_64_avx2::compress_packed_8(cv, block)
+    pub(super) fn compress_raw_xof(
+        cv: [[u32; LANES]; 8],
+        block: [[u32; LANES]; 16],
+    ) -> [[u32; LANES]; 16] {
+        super::x86_64_avx2::compress_packed_8_raw_xof(cv, block)
     }
 }
 
@@ -70,8 +76,11 @@ mod native_backend {
     pub(super) const LANES: usize = 4;
 
     #[inline(always)]
-    pub(super) fn compress(cv: [[u32; LANES]; 8], block: [[u32; LANES]; 16]) -> [[u32; LANES]; 8] {
-        super::compress_packed_4(cv, block)
+    pub(super) fn compress_raw_xof(
+        cv: [[u32; LANES]; 8],
+        block: [[u32; LANES]; 16],
+    ) -> [[u32; LANES]; 16] {
+        super::compress_packed_4_raw_xof(cv, block)
     }
 }
 
@@ -183,15 +192,13 @@ pub(super) fn compress_raw_xof_with_parameter_words(
     array::from_fn(|i| if i < 8 { v[i] ^ v[i + 8] } else { v[i] ^ cv[i - 8] })
 }
 
-/// Applies the raw BLAKE3 schedule to several independent lanes.
-///
-/// Lane `i` of the result is identical to `compress_raw(cv_i, block_i)`, where
-/// `cv_i[j] = cv[j][i]` and `block_i[j] = block[j][i]`.
+/// Applies the raw BLAKE3 schedule to several independent lanes and returns the
+/// 16-word XOF fold.
 #[cfg(any(test, not(any(target_arch = "aarch64", target_arch = "x86_64"))))]
-pub(super) fn compress_packed<const LANES: usize>(
+pub(super) fn compress_packed_raw_xof<const LANES: usize>(
     cv: [[u32; LANES]; 8],
     block: [[u32; LANES]; 16],
-) -> [[u32; LANES]; 8] {
+) -> [[u32; LANES]; 16] {
     let mut v = [[0u32; LANES]; 16];
     v[..8].copy_from_slice(&cv);
     for i in 0..8 {
@@ -209,82 +216,93 @@ pub(super) fn compress_packed<const LANES: usize>(
         g_packed(&mut v, 3, 4, 9, 14, block[s[14]], block[s[15]]);
     }
 
-    array::from_fn(|i| xor_packed(v[i], v[i + 8]))
+    array::from_fn(|i| {
+        if i < 8 {
+            xor_packed(v[i], v[i + 8])
+        } else {
+            xor_packed(v[i], cv[i - 8])
+        }
+    })
 }
 
-/// Applies the raw BLAKE3 schedule to four independent lanes.
+/// Applies the raw BLAKE3 schedule to four independent lanes and returns the
+/// 16-word XOF fold.
 #[inline]
-pub(super) fn compress_packed_4(cv: [[u32; 4]; 8], block: [[u32; 4]; 16]) -> [[u32; 4]; 8] {
+pub(super) fn compress_packed_4_raw_xof(
+    cv: [[u32; 4]; 8],
+    block: [[u32; 4]; 16],
+) -> [[u32; 4]; 16] {
     #[cfg(target_arch = "aarch64")]
     {
-        return neon::compress_packed_4(cv, block);
+        return neon::compress_packed_4_raw_xof(cv, block);
     }
 
     #[cfg(target_arch = "x86_64")]
     {
-        return x86_64_sse2::compress_packed_4(cv, block);
+        return x86_64_sse2::compress_packed_4_raw_xof(cv, block);
     }
 
     #[cfg(not(any(target_arch = "aarch64", target_arch = "x86_64")))]
     {
-        compress_packed(cv, block)
+        compress_packed_raw_xof(cv, block)
     }
 }
 
-/// Applies the raw BLAKE3 schedule to the build's selected native lane width.
+/// Applies the raw BLAKE3 schedule to the build's selected native lane width
+/// and returns the 16-word XOF fold.
 #[inline]
-pub(super) fn compress_packed_native(
+pub(super) fn compress_packed_native_raw_xof(
     cv: [[u32; PACKED_LANES]; 8],
     block: [[u32; PACKED_LANES]; 16],
-) -> [[u32; PACKED_LANES]; 8] {
-    native_backend::compress(cv, block)
+) -> [[u32; PACKED_LANES]; 16] {
+    native_backend::compress_raw_xof(cv, block)
 }
 
-#[cfg(feature = "internal")]
-pub(super) fn compress_packed_4_rotr8_shift(
+#[cfg(test)]
+pub(super) fn compress_packed_4_rotr8_shift_raw_xof(
     cv: [[u32; 4]; 8],
     block: [[u32; 4]; 16],
-) -> [[u32; 4]; 8] {
+) -> [[u32; 4]; 16] {
     #[cfg(target_arch = "aarch64")]
     {
-        return neon::compress_packed_4_rotr8_shift(cv, block);
+        return neon::compress_packed_4_rotr8_shift_raw_xof(cv, block);
     }
 
     #[cfg(not(target_arch = "aarch64"))]
     {
-        compress_packed_4(cv, block)
+        compress_packed_4_raw_xof(cv, block)
     }
 }
 
-#[cfg(feature = "internal")]
-pub(super) fn compress_packed_4_rotr8_cached(
+#[cfg(test)]
+pub(super) fn compress_packed_4_rotr8_cached_raw_xof(
     cv: [[u32; 4]; 8],
     block: [[u32; 4]; 16],
-) -> [[u32; 4]; 8] {
+) -> [[u32; 4]; 16] {
     #[cfg(target_arch = "aarch64")]
     {
-        return neon::compress_packed_4_rotr8_cached(cv, block);
+        return neon::compress_packed_4_rotr8_cached_raw_xof(cv, block);
     }
 
     #[cfg(not(target_arch = "aarch64"))]
     {
-        compress_packed_4(cv, block)
+        compress_packed_4_raw_xof(cv, block)
     }
 }
 
-#[cfg(feature = "internal")]
-pub(super) fn compress_packed_4_preloaded_messages(
+#[cfg(test)]
+pub(super) fn compress_packed_4_preloaded_messages_raw_xof(
     cv: [[u32; 4]; 8],
     block: [[u32; 4]; 16],
-) -> [[u32; 4]; 8] {
+) -> [[u32; 4]; 16] {
     #[cfg(target_arch = "aarch64")]
     {
-        return neon::compress_packed_4_preloaded_messages(cv, block);
+        return neon::compress_packed_4_preloaded_messages_raw_xof(cv, block);
     }
 
     #[cfg(not(target_arch = "aarch64"))]
     {
-        compress_packed_4(cv, block)
+        compress_packed_4_raw_xof(cv, block)
     }
 }
 
@@ -296,7 +314,7 @@ macro_rules! define_x86_packed_compress {
         pub(super) fn $name(
             cv: [[u32; $lanes]; 8],
             block: [[u32; $lanes]; 16],
-        ) -> [[u32; $lanes]; 8] {
+        ) -> [[u32; $lanes]; 16] {
             let mut v0 = load(&cv[0]);
             let mut v1 = load(&cv[1]);
             let mut v2 = load(&cv[2]);
@@ -435,6 +453,14 @@ macro_rules! define_x86_packed_compress {
                 store(xor(v5, v13)),
                 store(xor(v6, v14)),
                 store(xor(v7, v15)),
+                store(xor(v8, load(&cv[0]))),
+                store(xor(v9, load(&cv[1]))),
+                store(xor(v10, load(&cv[2]))),
+                store(xor(v11, load(&cv[3]))),
+                store(xor(v12, load(&cv[4]))),
+                store(xor(v13, load(&cv[5]))),
+                store(xor(v14, load(&cv[6]))),
+                store(xor(v15, load(&cv[7]))),
             ]
         }
     };
@@ -493,7 +519,7 @@ mod x86_64_sse2 {
         unsafe { _mm_or_si128(_mm_srli_epi32::<7>(x), _mm_slli_epi32::<25>(x)) }
     }
 
-    define_x86_packed_compress!(compress_packed_4, 4);
+    define_x86_packed_compress!(compress_packed_4_raw_xof, 4);
 }
 
 #[cfg(all(target_arch = "x86_64", target_feature = "avx2", not(target_feature = "avx512f")))]
@@ -549,7 +575,7 @@ mod x86_64_avx2 {
         unsafe { _mm256_or_si256(_mm256_srli_epi32::<7>(x), _mm256_slli_epi32::<25>(x)) }
     }
 
-    define_x86_packed_compress!(compress_packed_8, 8);
+    define_x86_packed_compress!(compress_packed_8_raw_xof, 8);
 }
 
 #[cfg(all(target_arch = "x86_64", target_feature = "avx512f"))]
@@ -605,7 +631,7 @@ mod x86_64_avx512 {
         unsafe { _mm512_ror_epi32::<7>(x) }
     }
 
-    define_x86_packed_compress!(compress_packed_16, 16);
+    define_x86_packed_compress!(compress_packed_16_raw_xof, 16);
 }
 
 #[cfg(target_arch = "aarch64")]
@@ -653,7 +679,7 @@ mod neon {
         unsafe { vsriq_n_u32::<12>(vshlq_n_u32::<20>(x), x) }
     }
 
-    #[cfg(feature = "internal")]
+    #[cfg(test)]
     #[inline(always)]
     fn rotr8_shift_insert(x: uint32x4_t) -> uint32x4_t {
         unsafe { vsriq_n_u32::<8>(vshlq_n_u32::<24>(x), x) }
@@ -675,7 +701,18 @@ mod neon {
     }
 
     #[inline(always)]
-    pub(super) fn compress_packed_4(cv: [[u32; 4]; 8], block: [[u32; 4]; 16]) -> [[u32; 4]; 8] {
+    pub(super) fn compress_packed_4_raw_xof(
+        cv: [[u32; 4]; 8],
+        block: [[u32; 4]; 16],
+    ) -> [[u32; 4]; 16] {
+        compress_packed_4_raw_xof_vectors(cv, block).map(store)
+    }
+
+    #[inline(always)]
+    pub(super) fn compress_packed_4_raw_xof_vectors(
+        cv: [[u32; 4]; 8],
+        block: [[u32; 4]; 16],
+    ) -> [uint32x4_t; 16] {
         let mut v0 = load(&cv[0]);
         let mut v1 = load(&cv[1]);
         let mut v2 = load(&cv[2]);
@@ -809,58 +846,66 @@ mod neon {
         round!(11, 15, 5, 0, 1, 9, 8, 6, 14, 10, 2, 12, 3, 4, 7, 13);
 
         [
-            store(xor(v0, v8)),
-            store(xor(v1, v9)),
-            store(xor(v2, v10)),
-            store(xor(v3, v11)),
-            store(xor(v4, v12)),
-            store(xor(v5, v13)),
-            store(xor(v6, v14)),
-            store(xor(v7, v15)),
+            xor(v0, v8),
+            xor(v1, v9),
+            xor(v2, v10),
+            xor(v3, v11),
+            xor(v4, v12),
+            xor(v5, v13),
+            xor(v6, v14),
+            xor(v7, v15),
+            xor(v8, load(&cv[0])),
+            xor(v9, load(&cv[1])),
+            xor(v10, load(&cv[2])),
+            xor(v11, load(&cv[3])),
+            xor(v12, load(&cv[4])),
+            xor(v13, load(&cv[5])),
+            xor(v14, load(&cv[6])),
+            xor(v15, load(&cv[7])),
         ]
     }
 
-    #[cfg(feature = "internal")]
+    #[cfg(test)]
     macro_rules! message_direct {
         ($block:ident, $messages:ident, $idx:literal) => {
             load(&$block[$idx])
         };
     }
 
-    #[cfg(feature = "internal")]
+    #[cfg(test)]
     macro_rules! message_preloaded {
         ($block:ident, $messages:ident, $idx:literal) => {
             $messages[$idx]
         };
     }
 
-    #[cfg(feature = "internal")]
+    #[cfg(test)]
     macro_rules! rot8_shift {
         ($x:expr, $rot8_idx:ident) => {
             rotr8_shift_insert($x)
         };
     }
 
-    #[cfg(feature = "internal")]
+    #[cfg(test)]
     macro_rules! rot8_cached_table {
         ($x:expr, $rot8_idx:ident) => {
             rotr8_table($x, $rot8_idx)
         };
     }
 
-    #[cfg(feature = "internal")]
+    #[cfg(test)]
     macro_rules! setup_none {
         ($block:ident, $messages:ident, $rot8_idx:ident) => {};
     }
 
-    #[cfg(feature = "internal")]
+    #[cfg(test)]
     macro_rules! setup_rot8_cached {
         ($block:ident, $messages:ident, $rot8_idx:ident) => {
             let $rot8_idx = load_rot8_idx();
         };
     }
 
-    #[cfg(feature = "internal")]
+    #[cfg(test)]
     macro_rules! setup_preloaded_messages {
         ($block:ident, $messages:ident, $rot8_idx:ident) => {
             let $rot8_idx = load_rot8_idx();
@@ -885,7 +930,7 @@ mod neon {
         };
     }
 
-    #[cfg(feature = "internal")]
+    #[cfg(test)]
     #[rustfmt::skip]
     macro_rules! define_compress_variant {
         (
@@ -897,7 +942,7 @@ mod neon {
             $setup:ident
         ) => {
             #[inline(always)]
-            pub(super) fn $name(cv: [[u32; 4]; 8], block: [[u32; 4]; 16]) -> [[u32; 4]; 8] {
+            pub(super) fn $name(cv: [[u32; 4]; 8], block: [[u32; 4]; 16]) -> [[u32; 4]; 16] {
                 let mut v0 = load(&cv[0]);
                 let mut v1 = load(&cv[1]);
                 let mut v2 = load(&cv[2]);
@@ -1038,14 +1083,22 @@ mod neon {
                     store(xor(v5, v13)),
                     store(xor(v6, v14)),
                     store(xor(v7, v15)),
+                    store(xor(v8, load(&cv[0]))),
+                    store(xor(v9, load(&cv[1]))),
+                    store(xor(v10, load(&cv[2]))),
+                    store(xor(v11, load(&cv[3]))),
+                    store(xor(v12, load(&cv[4]))),
+                    store(xor(v13, load(&cv[5]))),
+                    store(xor(v14, load(&cv[6]))),
+                    store(xor(v15, load(&cv[7]))),
                 ]
             }
         };
     }
 
-    #[cfg(feature = "internal")]
+    #[cfg(test)]
     define_compress_variant!(
-        compress_packed_4_rotr8_shift,
+        compress_packed_4_rotr8_shift_raw_xof,
         message_direct,
         rot8_shift,
         messages,
@@ -1053,9 +1106,9 @@ mod neon {
         setup_none
     );
 
-    #[cfg(feature = "internal")]
+    #[cfg(test)]
     define_compress_variant!(
-        compress_packed_4_rotr8_cached,
+        compress_packed_4_rotr8_cached_raw_xof,
         message_direct,
         rot8_cached_table,
         messages,
@@ -1063,9 +1116,9 @@ mod neon {
         setup_rot8_cached
     );
 
-    #[cfg(feature = "internal")]
+    #[cfg(test)]
     define_compress_variant!(
-        compress_packed_4_preloaded_messages,
+        compress_packed_4_preloaded_messages_raw_xof,
         message_preloaded,
         rot8_cached_table,
         messages,

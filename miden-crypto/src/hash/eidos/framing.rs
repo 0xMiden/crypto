@@ -30,23 +30,19 @@ const MAX_DOMAIN: u32 = (1 << 31) - 1;
 
 // Initial CV bases. `BASE2` reserves its low lane for domain + mode; `BASE3`
 // reserves its low lane for input length.
-const BASE0: u64 = 0x3b67_ae85_6a09_e667;
-const BASE1: u64 = 0x254f_f53a_3c6e_f372;
-const BASE2: u64 = 0x1b05_688c_0000_0000;
+const BASE0: u64 = 0xbb67_ae85_6a09_e667;
+const BASE1: u64 = 0xa54f_f53a_3c6e_f372;
+const BASE2: u64 = 0x9b05_688c_0000_0000;
 const BASE3: u64 = 0x5be0_cd19_0000_0000;
 
-/// Pack two `u32` lanes into one Goldilocks field element.
-///
-/// The high lane is masked before packing:
-/// `pack(lo, hi) = ((hi & 0x7fff_ffff) << 32) | lo`.
+/// Pack a canonical Goldilocks field element encoded as two `u32` limbs.
 #[inline]
 pub(super) fn pack_u32_pair(lo: u32, hi: u32) -> Felt {
-    Felt::new_unchecked((((hi & 0x7fff_ffff) as u64) << 32) | lo as u64)
+    let value = ((hi as u64) << 32) | lo as u64;
+    Felt::new(value).expect("packed Eidos CV word must be canonical")
 }
 
 /// Unpack a canonical field element into two `u32` lanes.
-///
-/// This does not check that `f` was produced by [`pack_u32_pair`].
 #[inline]
 pub(super) fn unpack_u32_pair(f: Felt) -> (u32, u32) {
     let v = f.as_canonical_u64();
@@ -97,7 +93,9 @@ fn pack_cv_to_packed_u64s<const LANES: usize>(
 
 #[inline]
 pub(super) fn pack_u32_pair_u64(lo: u32, hi: u32) -> u64 {
-    (((hi & 0x7fff_ffff) as u64) << 32) | lo as u64
+    let value = ((hi as u64) << 32) | lo as u64;
+    debug_assert!(Felt::new(value).is_ok(), "packed Eidos CV word must be canonical");
+    value
 }
 
 #[inline]
@@ -639,7 +637,7 @@ mod tests {
     }
 
     #[test]
-    fn pack_unpack_roundtrip_in_subspace() {
+    fn pack_unpack_roundtrip_for_canonical_pair() {
         let lo = 0x1234_5678u32;
         let hi = 0x4abc_def0u32;
         let f = pack_u32_pair(lo, hi);
@@ -648,9 +646,18 @@ mod tests {
     }
 
     #[test]
-    fn pack_masks_top_bit_of_high_lane() {
-        let (_, hi) = unpack_u32_pair(pack_u32_pair(0, 0xffff_ffff));
-        assert_eq!(hi, 0x7fff_ffff);
+    fn pack_preserves_high_lane_top_bit_when_pair_is_canonical() {
+        let lo = 0u32;
+        let hi = 0xffff_ffffu32;
+        let f = pack_u32_pair(lo, hi);
+
+        assert_eq!(unpack_u32_pair(f), (lo, hi));
+    }
+
+    #[test]
+    #[should_panic(expected = "packed Eidos CV word must be canonical")]
+    fn pack_rejects_non_canonical_pair() {
+        let _ = pack_u32_pair(1, 0xffff_ffff);
     }
 
     #[test]
@@ -680,13 +687,13 @@ mod tests {
     }
 
     #[test]
-    fn init_cv_lives_in_252_bit_subspace() {
+    fn init_cv_uses_full_iv_lanes() {
         let cv = init_cv(0, FELT_MODE, 0);
 
-        assert_eq!(cv[1] & !0x7fff_ffff, 0);
-        assert_eq!(cv[3] & !0x7fff_ffff, 0);
-        assert_eq!(cv[5] & !0x7fff_ffff, 0);
-        assert_eq!(cv[7] & !0x7fff_ffff, 0);
+        assert_eq!(cv[1], IV[1]);
+        assert_eq!(cv[3], IV[3]);
+        assert_eq!(cv[5], IV[5]);
+        assert_eq!(cv[7], IV[7]);
     }
 
     #[test]

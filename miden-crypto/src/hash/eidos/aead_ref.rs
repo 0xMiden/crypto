@@ -30,8 +30,8 @@ type QuadFelt = BinomialExtensionField<Felt, 2>;
 /// Domain-separates `(key, nonce)` and compresses to a CTR chaining value via
 /// Eidos.
 ///
-/// The returned word is a masked Eidos digest with 252 bits of entropy, usable
-/// as an input CV to [`BlakeG::compress_raw`] for keystream generation.
+/// The returned word is an Eidos digest usable as the keystream CV for
+/// [`BlakeG::compress_raw`].
 pub fn derive_ctr_key(key: Word, nonce: Word) -> Word {
     // Fixed-arity derivations use the domain tag for separation; variable-length
     // Eidos hashes bind length in the initial chaining value.
@@ -277,16 +277,16 @@ mod tests {
 
         let ciphertext = encrypt_felts_expanded(key(), nonce(), &plaintext);
         let expected = vec![
-            Felt::from_u32(0xf1b1_faf2),
-            Felt::from_u32(0xb516_6354),
-            Felt::from_u32(0xf063_24fe),
-            Felt::from_u32(0x72f2_0f8d),
-            Felt::from_u32(0x7945_2ccf),
-            Felt::from_u32(0x28e5_c557),
-            Felt::from_u32(0x59fc_5080),
-            Felt::from_u32(0x7896_8ab9),
-            Felt::from_u32(0x8616_0fdd),
-            Felt::from_u32(0x6cf8_c822),
+            Felt::from_u32(0x7593_d461),
+            Felt::from_u32(0x609b_ab1a),
+            Felt::from_u32(0xc6ab_945b),
+            Felt::from_u32(0x5565_d59a),
+            Felt::from_u32(0x894a_5075),
+            Felt::from_u32(0x991f_9ee6),
+            Felt::from_u32(0xe1ed_596b),
+            Felt::from_u32(0x5f91_1491),
+            Felt::from_u32(0xc050_9a28),
+            Felt::from_u32(0x97a9_454f),
         ];
 
         assert_eq!(ciphertext, expected);
@@ -306,8 +306,8 @@ mod tests {
         let ciphertext = encrypt_felts_expanded(key(), nonce(), &plaintext);
         let tag = auth_tag_expanded(key(), nonce(), &associated_data, &ciphertext);
         let expected = [
-            Felt::new_unchecked(6127600617032766561),
-            Felt::new_unchecked(13291603915237176549),
+            Felt::new_unchecked(0xa883_01e3_c123_ea0f),
+            Felt::new_unchecked(0x10a2_18c8_b41a_5f07),
         ];
 
         assert_eq!(tag, expected);
