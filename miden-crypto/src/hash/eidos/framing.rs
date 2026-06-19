@@ -30,18 +30,17 @@ const MAX_DOMAIN: u32 = (1 << 31) - 1;
 
 // Initial CV bases. `BASE2` reserves its low lane for domain + mode; `BASE3`
 // reserves its low lane for input length.
-const BASE0: u64 = 0x3b67_ae85_6a09_e667;
-const BASE1: u64 = 0x254f_f53a_3c6e_f372;
-const BASE2: u64 = 0x1b05_688c_0000_0000;
+const BASE0: u64 = 0xbb67_ae85_6a09_e667;
+const BASE1: u64 = 0xa54f_f53a_3c6e_f372;
+const BASE2: u64 = 0x9b05_688c_0000_0000;
 const BASE3: u64 = 0x5be0_cd19_0000_0000;
 
 /// Pack two `u32` lanes into one Goldilocks field element.
 ///
-/// The high lane is masked before packing:
-/// `pack(lo, hi) = ((hi & 0x7fff_ffff) << 32) | lo`.
+/// The pair must encode a canonical Goldilocks value.
 #[inline]
 pub(super) fn pack_u32_pair(lo: u32, hi: u32) -> Felt {
-    Felt::new_unchecked((((hi & 0x7fff_ffff) as u64) << 32) | lo as u64)
+    Felt::new_unchecked(pack_u32_pair_u64(lo, hi))
 }
 
 /// Unpack a canonical field element into two `u32` lanes.
@@ -97,7 +96,9 @@ fn pack_cv_to_packed_u64s<const LANES: usize>(
 
 #[inline]
 pub(super) fn pack_u32_pair_u64(lo: u32, hi: u32) -> u64 {
-    (((hi & 0x7fff_ffff) as u64) << 32) | lo as u64
+    let value = ((hi as u64) << 32) | lo as u64;
+    debug_assert!(value < Felt::ORDER, "u32 pair must encode a canonical field element");
+    value
 }
 
 #[inline]
@@ -639,18 +640,20 @@ mod tests {
     }
 
     #[test]
-    fn pack_unpack_roundtrip_in_subspace() {
+    fn pack_unpack_roundtrip_for_canonical_pair() {
         let lo = 0x1234_5678u32;
-        let hi = 0x4abc_def0u32;
+        let hi = 0xfabc_def0u32;
         let f = pack_u32_pair(lo, hi);
 
         assert_eq!(unpack_u32_pair(f), (lo, hi));
     }
 
     #[test]
-    fn pack_masks_top_bit_of_high_lane() {
-        let (_, hi) = unpack_u32_pair(pack_u32_pair(0, 0xffff_ffff));
-        assert_eq!(hi, 0x7fff_ffff);
+    fn pack_accepts_largest_canonical_pair() {
+        let f = pack_u32_pair(0, u32::MAX);
+
+        assert_eq!(f.as_canonical_u64(), Felt::ORDER - 1);
+        assert_eq!(unpack_u32_pair(f), (0, u32::MAX));
     }
 
     #[test]
@@ -680,13 +683,13 @@ mod tests {
     }
 
     #[test]
-    fn init_cv_lives_in_252_bit_subspace() {
+    fn init_cv_uses_canonical_field_elements() {
         let cv = init_cv(0, FELT_MODE, 0);
 
-        assert_eq!(cv[1] & !0x7fff_ffff, 0);
-        assert_eq!(cv[3] & !0x7fff_ffff, 0);
-        assert_eq!(cv[5] & !0x7fff_ffff, 0);
-        assert_eq!(cv[7] & !0x7fff_ffff, 0);
+        for word in 0..DIGEST_WIDTH {
+            let value = ((cv[2 * word + 1] as u64) << 32) | cv[2 * word] as u64;
+            assert!(value < Felt::ORDER, "init CV word {word} must be canonical");
+        }
     }
 
     #[test]

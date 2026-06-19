@@ -3,6 +3,10 @@
 //! This module is for tests and vector generation. It does not manage
 //! nonces. Production callers must never reuse `(key, nonce)` and must not
 //! repeat counter blocks under a fixed CTR key.
+//!
+//! Stream encryption uses raw BlakeG u32 output. The CTR and MAC keys, and
+//! therefore the authentication tag mask, pass through Eidos finalization and
+//! should be counted as carrying at most 63 bits of min-entropy per Felt.
 
 use alloc::vec::Vec;
 
@@ -30,8 +34,8 @@ type QuadFelt = BinomialExtensionField<Felt, 2>;
 /// Domain-separates `(key, nonce)` and compresses to a CTR chaining value via
 /// Eidos.
 ///
-/// The returned word is a masked Eidos digest with 252 bits of entropy, usable
-/// as an input CV to [`BlakeG::compress_raw`] for keystream generation.
+/// The returned word is an Eidos digest, usable as an input CV to
+/// [`BlakeG::compress_raw`] for keystream generation.
 pub fn derive_ctr_key(key: Word, nonce: Word) -> Word {
     // Fixed-arity derivations use the domain tag for separation; variable-length
     // Eidos hashes bind length in the initial chaining value.
@@ -277,16 +281,16 @@ mod tests {
 
         let ciphertext = encrypt_felts_expanded(key(), nonce(), &plaintext);
         let expected = vec![
-            Felt::from_u32(0xf1b1_faf2),
-            Felt::from_u32(0xb516_6354),
-            Felt::from_u32(0xf063_24fe),
-            Felt::from_u32(0x72f2_0f8d),
-            Felt::from_u32(0x7945_2ccf),
-            Felt::from_u32(0x28e5_c557),
-            Felt::from_u32(0x59fc_5080),
-            Felt::from_u32(0x7896_8ab9),
-            Felt::from_u32(0x8616_0fdd),
-            Felt::from_u32(0x6cf8_c822),
+            Felt::from_u32(0xee78_47f4),
+            Felt::from_u32(0x3a82_d8d4),
+            Felt::from_u32(0xfb7f_0f43),
+            Felt::from_u32(0x095a_ceb7),
+            Felt::from_u32(0x500f_fb54),
+            Felt::from_u32(0xe37f_99ca),
+            Felt::from_u32(0xdb83_6641),
+            Felt::from_u32(0xd61d_134c),
+            Felt::from_u32(0x6354_7251),
+            Felt::from_u32(0x385c_291a),
         ];
 
         assert_eq!(ciphertext, expected);
@@ -306,8 +310,8 @@ mod tests {
         let ciphertext = encrypt_felts_expanded(key(), nonce(), &plaintext);
         let tag = auth_tag_expanded(key(), nonce(), &associated_data, &ciphertext);
         let expected = [
-            Felt::new_unchecked(6127600617032766561),
-            Felt::new_unchecked(13291603915237176549),
+            Felt::new_unchecked(0x5fa4_716f_3768_973e),
+            Felt::new_unchecked(0xba07_b15d_65b1_fecf),
         ];
 
         assert_eq!(tag, expected);

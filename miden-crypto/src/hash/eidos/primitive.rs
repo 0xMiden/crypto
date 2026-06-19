@@ -1,34 +1,70 @@
 //! Goldilocks-tailored BLAKE3 compression.
 //!
 //! BlakeG uses BLAKE3's 7-round compression core with fixed parameter words.
-//! `compress` clears the top bit of odd output lanes so the 8-word chaining
-//! value packs losslessly into four Goldilocks field elements:
-//! `pack(lo, hi) = ((hi & 0x7fff_ffff) << 32) | lo`.
+//! `compress` reduces each raw 64-bit output pair modulo the Goldilocks prime
+//! so the 8-word chaining value packs into four canonical field elements.
+//! Reducing a uniform 64-bit word modulo `p = 2^64 - 2^32 + 1` is not uniform:
+//! the low `2^32 - 1` residues have two preimages. Treat each finalized Felt as
+//! having at most 63 bits of min-entropy.
 
 mod blake3_schedule;
+
+use crate::Felt;
 
 #[cfg(test)]
 pub(super) const IV: [u32; 8] = blake3_schedule::IV;
 pub(super) const PACKED_LANES: usize = blake3_schedule::PACKED_LANES;
 
-/// Mask applied to odd output lanes before field-element packing.
-const ODD_LANE_MASK: u32 = 0x7fff_ffff;
-
 #[inline(always)]
-fn apply_output_mask(cv: &mut [u32; 8]) {
-    cv[1] &= ODD_LANE_MASK;
-    cv[3] &= ODD_LANE_MASK;
-    cv[5] &= ODD_LANE_MASK;
-    cv[7] &= ODD_LANE_MASK;
+fn reduce_u32_pair(lo: u32, hi: u32) -> (u32, u32) {
+    let value = ((hi as u64) << 32) | lo as u64;
+    let reduced = if value >= Felt::ORDER {
+        value - Felt::ORDER
+    } else {
+        value
+    };
+    (reduced as u32, (reduced >> 32) as u32)
 }
 
 #[inline(always)]
-fn apply_packed_output_mask<const LANES: usize>(cv: &mut [[u32; LANES]; 8]) {
-    for word in [1, 3, 5, 7] {
-        for lane in cv[word].iter_mut() {
-            *lane &= ODD_LANE_MASK;
+fn finalize_output(mut cv: [u32; 8]) -> [u32; 8] {
+    (cv[0], cv[1]) = reduce_u32_pair(cv[0], cv[1]);
+    (cv[2], cv[3]) = reduce_u32_pair(cv[2], cv[3]);
+    (cv[4], cv[5]) = reduce_u32_pair(cv[4], cv[5]);
+    (cv[6], cv[7]) = reduce_u32_pair(cv[6], cv[7]);
+    cv
+}
+
+#[inline(always)]
+#[cfg(any(test, not(any(target_arch = "aarch64", target_arch = "x86_64"))))]
+fn finalize_packed_output_scalar<const LANES: usize>(
+    mut cv: [[u32; LANES]; 8],
+) -> [[u32; LANES]; 8] {
+    for word in 0..4 {
+        for lane in 0..LANES {
+            (cv[2 * word][lane], cv[2 * word + 1][lane]) =
+                reduce_u32_pair(cv[2 * word][lane], cv[2 * word + 1][lane]);
         }
     }
+    cv
+}
+
+#[inline(always)]
+#[cfg(test)]
+fn finalize_packed_output<const LANES: usize>(cv: [[u32; LANES]; 8]) -> [[u32; LANES]; 8] {
+    finalize_packed_output_scalar(cv)
+}
+
+#[inline(always)]
+#[cfg(any(feature = "internal", test))]
+#[cfg_attr(feature = "internal", allow(dead_code))]
+fn finalize_packed_output_4(cv: [[u32; 4]; 8]) -> [[u32; 4]; 8] {
+    packed_finalizer::finalize_4(cv)
+}
+
+#[inline(always)]
+fn finalize_packed_output_native(cv: [[u32; PACKED_LANES]; 8]) -> [[u32; PACKED_LANES]; 8] {
+    packed_finalizer::finalize_native(cv)
 }
 
 /// Goldilocks-tailored BLAKE3 compression.
@@ -36,18 +72,16 @@ fn apply_packed_output_mask<const LANES: usize>(cv: &mut [[u32; LANES]; 8]) {
 pub(super) struct BlakeG;
 
 impl BlakeG {
-    /// Applies BlakeG and masks the odd output lanes.
+    /// Applies BlakeG and reduces each output pair to a canonical field element.
     ///
     /// The input chaining value may contain arbitrary `u32` lanes. The
-    /// Goldilocks subspace mask is an output-finalization rule, not an input
+    /// Goldilocks reduction is an output-finalization rule, not an input
     /// invariant.
     pub(super) fn compress(cv: [u32; 8], block: [u32; 16]) -> [u32; 8] {
-        let mut cv_new = Self::compress_raw(cv, block);
-        apply_output_mask(&mut cv_new);
-        cv_new
+        finalize_output(Self::compress_raw(cv, block))
     }
 
-    /// Apply BlakeG's compression function without the Goldilocks output mask.
+    /// Apply BlakeG's compression function before Goldilocks output reduction.
     ///
     /// Returns the eight folded BLAKE3/BlakeG output words:
     ///
@@ -55,7 +89,7 @@ impl BlakeG {
     /// out[i] = v[i] ^ v[i + 8]
     /// ```
     ///
-    /// These are the words consumed by [`Self::compress`] before odd-lane masking.
+    /// These are the words consumed by [`Self::compress`] before modular reduction.
     /// This is a raw compression output, not an Eidos digest. Callers that use
     /// BlakeG as a hash must bind domain, mode, and length into the input CV.
     pub fn compress_raw(cv: [u32; 8], block: [u32; 16]) -> [u32; 8] {
@@ -63,7 +97,7 @@ impl BlakeG {
     }
 
     /// Apply BlakeG and return the full 16-word XOF output (low half || high
-    /// half), without the Goldilocks output mask.
+    /// half), before Goldilocks output reduction.
     ///
     /// ```text
     /// out[i]     = v[i] ^ v[i + 8]    (i in 0..8)   // standard CV fold (low half)
@@ -87,9 +121,7 @@ impl BlakeG {
         cv: [[u32; LANES]; 8],
         block: [[u32; LANES]; 16],
     ) -> [[u32; LANES]; 8] {
-        let mut cv_new = blake3_schedule::compress_packed(cv, block);
-        apply_packed_output_mask(&mut cv_new);
-        cv_new
+        finalize_packed_output(blake3_schedule::compress_packed(cv, block))
     }
 
     /// Apply BlakeG to four independent lanes.
@@ -97,11 +129,10 @@ impl BlakeG {
     /// On `aarch64`, this uses NEON. On `x86_64`, this uses SSE2. Other targets
     /// fall back to the portable packed implementation.
     #[cfg(any(feature = "internal", test))]
+    #[cfg_attr(feature = "internal", allow(dead_code))]
     #[inline]
     pub(super) fn compress_packed_4(cv: [[u32; 4]; 8], block: [[u32; 4]; 16]) -> [[u32; 4]; 8] {
-        let mut cv_new = blake3_schedule::compress_packed_4(cv, block);
-        apply_packed_output_mask(&mut cv_new);
-        cv_new
+        finalize_packed_output_4(blake3_schedule::compress_packed_4(cv, block))
     }
 
     /// Apply BlakeG to the build's selected native packed lane width.
@@ -110,39 +141,266 @@ impl BlakeG {
         cv: [[u32; PACKED_LANES]; 8],
         block: [[u32; PACKED_LANES]; 16],
     ) -> [[u32; PACKED_LANES]; 8] {
-        let mut cv_new = blake3_schedule::compress_packed_native(cv, block);
-        apply_packed_output_mask(&mut cv_new);
-        cv_new
+        finalize_packed_output_native(blake3_schedule::compress_packed_native(cv, block))
     }
 
     #[cfg(feature = "internal")]
+    #[allow(dead_code)]
     pub(super) fn compress_packed_4_rotr8_shift(
         cv: [[u32; 4]; 8],
         block: [[u32; 4]; 16],
     ) -> [[u32; 4]; 8] {
-        let mut cv_new = blake3_schedule::compress_packed_4_rotr8_shift(cv, block);
-        apply_packed_output_mask(&mut cv_new);
-        cv_new
+        finalize_packed_output_4(blake3_schedule::compress_packed_4_rotr8_shift(cv, block))
     }
 
     #[cfg(feature = "internal")]
+    #[allow(dead_code)]
     pub(super) fn compress_packed_4_rotr8_cached(
         cv: [[u32; 4]; 8],
         block: [[u32; 4]; 16],
     ) -> [[u32; 4]; 8] {
-        let mut cv_new = blake3_schedule::compress_packed_4_rotr8_cached(cv, block);
-        apply_packed_output_mask(&mut cv_new);
-        cv_new
+        finalize_packed_output_4(blake3_schedule::compress_packed_4_rotr8_cached(cv, block))
     }
 
     #[cfg(feature = "internal")]
+    #[allow(dead_code)]
     pub(super) fn compress_packed_4_preloaded_messages(
         cv: [[u32; 4]; 8],
         block: [[u32; 4]; 16],
     ) -> [[u32; 4]; 8] {
-        let mut cv_new = blake3_schedule::compress_packed_4_preloaded_messages(cv, block);
-        apply_packed_output_mask(&mut cv_new);
-        cv_new
+        finalize_packed_output_4(blake3_schedule::compress_packed_4_preloaded_messages(cv, block))
+    }
+}
+
+mod packed_finalizer {
+    use super::PACKED_LANES;
+
+    // For p = 0xffff_ffff_0000_0001, a 64-bit pair `hi:lo` needs reduction
+    // exactly when `hi == u32::MAX && lo != 0`; the reduced pair is `(lo - 1, 0)`.
+
+    #[cfg(any(
+        feature = "internal",
+        test,
+        not(all(
+            target_arch = "x86_64",
+            any(target_feature = "avx2", target_feature = "avx512f"),
+        )),
+    ))]
+    #[inline(always)]
+    pub(super) fn finalize_4(cv: [[u32; 4]; 8]) -> [[u32; 4]; 8] {
+        #[cfg(target_arch = "aarch64")]
+        {
+            return neon::finalize_4(cv);
+        }
+
+        #[cfg(target_arch = "x86_64")]
+        {
+            return x86_64_sse2::finalize_4(cv);
+        }
+
+        #[cfg(not(any(target_arch = "aarch64", target_arch = "x86_64")))]
+        {
+            super::finalize_packed_output_scalar(cv)
+        }
+    }
+
+    #[inline(always)]
+    pub(super) fn finalize_native(cv: [[u32; PACKED_LANES]; 8]) -> [[u32; PACKED_LANES]; 8] {
+        native_backend::finalize(cv)
+    }
+
+    #[cfg(all(target_arch = "x86_64", target_feature = "avx512f"))]
+    mod native_backend {
+        pub(super) fn finalize(cv: [[u32; 16]; 8]) -> [[u32; 16]; 8] {
+            super::x86_64_avx512::finalize_16(cv)
+        }
+    }
+
+    #[cfg(all(target_arch = "x86_64", target_feature = "avx2", not(target_feature = "avx512f")))]
+    mod native_backend {
+        pub(super) fn finalize(cv: [[u32; 8]; 8]) -> [[u32; 8]; 8] {
+            super::x86_64_avx2::finalize_8(cv)
+        }
+    }
+
+    #[cfg(not(any(
+        all(target_arch = "x86_64", target_feature = "avx2"),
+        all(target_arch = "x86_64", target_feature = "avx512f"),
+    )))]
+    mod native_backend {
+        use super::finalize_4;
+
+        pub(super) fn finalize(cv: [[u32; 4]; 8]) -> [[u32; 4]; 8] {
+            finalize_4(cv)
+        }
+    }
+
+    #[cfg(all(
+        target_arch = "x86_64",
+        any(
+            feature = "internal",
+            test,
+            not(any(target_feature = "avx2", target_feature = "avx512f")),
+        ),
+    ))]
+    mod x86_64_sse2 {
+        use core::arch::x86_64::*;
+
+        #[inline(always)]
+        fn load(xs: &[u32; 4]) -> __m128i {
+            unsafe { _mm_loadu_si128(xs.as_ptr().cast()) }
+        }
+
+        #[inline(always)]
+        fn store(x: __m128i) -> [u32; 4] {
+            let mut out = [0u32; 4];
+            unsafe { _mm_storeu_si128(out.as_mut_ptr().cast(), x) };
+            out
+        }
+
+        #[inline(always)]
+        fn reduce_pair(lo: __m128i, hi: __m128i) -> (__m128i, __m128i) {
+            unsafe {
+                let zero = _mm_setzero_si128();
+                let ones = _mm_set1_epi32(-1);
+                let reduce = _mm_andnot_si128(_mm_cmpeq_epi32(lo, zero), _mm_cmpeq_epi32(hi, ones));
+                let lo = _mm_sub_epi32(lo, _mm_and_si128(reduce, _mm_set1_epi32(1)));
+                let hi = _mm_andnot_si128(reduce, hi);
+                (lo, hi)
+            }
+        }
+
+        pub(super) fn finalize_4(mut cv: [[u32; 4]; 8]) -> [[u32; 4]; 8] {
+            for word in 0..4 {
+                let lo_idx = 2 * word;
+                let hi_idx = lo_idx + 1;
+                let (lo, hi) = reduce_pair(load(&cv[lo_idx]), load(&cv[hi_idx]));
+                cv[lo_idx] = store(lo);
+                cv[hi_idx] = store(hi);
+            }
+            cv
+        }
+    }
+
+    #[cfg(all(target_arch = "x86_64", target_feature = "avx2", not(target_feature = "avx512f")))]
+    mod x86_64_avx2 {
+        use core::arch::x86_64::*;
+
+        #[inline(always)]
+        fn load(xs: &[u32; 8]) -> __m256i {
+            unsafe { _mm256_loadu_si256(xs.as_ptr().cast()) }
+        }
+
+        #[inline(always)]
+        fn store(x: __m256i) -> [u32; 8] {
+            let mut out = [0u32; 8];
+            unsafe { _mm256_storeu_si256(out.as_mut_ptr().cast(), x) };
+            out
+        }
+
+        #[inline(always)]
+        fn reduce_pair(lo: __m256i, hi: __m256i) -> (__m256i, __m256i) {
+            unsafe {
+                let zero = _mm256_setzero_si256();
+                let ones = _mm256_set1_epi32(-1);
+                let reduce =
+                    _mm256_andnot_si256(_mm256_cmpeq_epi32(lo, zero), _mm256_cmpeq_epi32(hi, ones));
+                let lo = _mm256_sub_epi32(lo, _mm256_and_si256(reduce, _mm256_set1_epi32(1)));
+                let hi = _mm256_andnot_si256(reduce, hi);
+                (lo, hi)
+            }
+        }
+
+        pub(super) fn finalize_8(mut cv: [[u32; 8]; 8]) -> [[u32; 8]; 8] {
+            for word in 0..4 {
+                let lo_idx = 2 * word;
+                let hi_idx = lo_idx + 1;
+                let (lo, hi) = reduce_pair(load(&cv[lo_idx]), load(&cv[hi_idx]));
+                cv[lo_idx] = store(lo);
+                cv[hi_idx] = store(hi);
+            }
+            cv
+        }
+    }
+
+    #[cfg(all(target_arch = "x86_64", target_feature = "avx512f"))]
+    mod x86_64_avx512 {
+        use core::arch::x86_64::*;
+
+        #[inline(always)]
+        fn load(xs: &[u32; 16]) -> __m512i {
+            unsafe { _mm512_loadu_si512(xs.as_ptr().cast()) }
+        }
+
+        #[inline(always)]
+        fn store(x: __m512i) -> [u32; 16] {
+            let mut out = [0u32; 16];
+            unsafe { _mm512_storeu_si512(out.as_mut_ptr().cast(), x) };
+            out
+        }
+
+        #[inline(always)]
+        fn reduce_pair(lo: __m512i, hi: __m512i) -> (__m512i, __m512i) {
+            unsafe {
+                let zero = _mm512_setzero_si512();
+                let reduce = _mm512_cmpeq_epi32_mask(hi, _mm512_set1_epi32(-1))
+                    & !_mm512_cmpeq_epi32_mask(lo, zero);
+                let lo = _mm512_mask_sub_epi32(lo, reduce, lo, _mm512_set1_epi32(1));
+                let hi = _mm512_mask_mov_epi32(hi, reduce, zero);
+                (lo, hi)
+            }
+        }
+
+        pub(super) fn finalize_16(mut cv: [[u32; 16]; 8]) -> [[u32; 16]; 8] {
+            for word in 0..4 {
+                let lo_idx = 2 * word;
+                let hi_idx = lo_idx + 1;
+                let (lo, hi) = reduce_pair(load(&cv[lo_idx]), load(&cv[hi_idx]));
+                cv[lo_idx] = store(lo);
+                cv[hi_idx] = store(hi);
+            }
+            cv
+        }
+    }
+
+    #[cfg(target_arch = "aarch64")]
+    mod neon {
+        use core::arch::aarch64::*;
+
+        #[inline(always)]
+        fn load(xs: &[u32; 4]) -> uint32x4_t {
+            unsafe { vld1q_u32(xs.as_ptr()) }
+        }
+
+        #[inline(always)]
+        fn store(x: uint32x4_t) -> [u32; 4] {
+            let mut out = [0u32; 4];
+            unsafe { vst1q_u32(out.as_mut_ptr(), x) };
+            out
+        }
+
+        #[inline(always)]
+        fn reduce_pair(lo: uint32x4_t, hi: uint32x4_t) -> (uint32x4_t, uint32x4_t) {
+            unsafe {
+                let zero = vdupq_n_u32(0);
+                let reduce =
+                    vandq_u32(vceqq_u32(hi, vdupq_n_u32(u32::MAX)), vmvnq_u32(vceqq_u32(lo, zero)));
+                let lo = vsubq_u32(lo, vandq_u32(reduce, vdupq_n_u32(1)));
+                let hi = vandq_u32(hi, vmvnq_u32(reduce));
+                (lo, hi)
+            }
+        }
+
+        pub(super) fn finalize_4(mut cv: [[u32; 4]; 8]) -> [[u32; 4]; 8] {
+            for word in 0..4 {
+                let lo_idx = 2 * word;
+                let hi_idx = lo_idx + 1;
+                let (lo, hi) = reduce_pair(load(&cv[lo_idx]), load(&cv[hi_idx]));
+                cv[lo_idx] = store(lo);
+                cv[hi_idx] = store(hi);
+            }
+            cv
+        }
     }
 }
 
@@ -150,16 +408,16 @@ impl BlakeG {
 mod tests {
     use super::*;
 
-    /// A chaining value whose odd lanes already fit the field-packing mask.
+    /// A chaining value used across the BlakeG tests.
     const TEST_CV: [u32; 8] = [
         0x6a09_e667,
-        0x3b67_ae85, // IV[1] with top bit cleared
+        0xbb67_ae85,
         0x3c6e_f372,
-        0x254f_f53a, // IV[3] (top bit already 0)
+        0x254f_f53a,
         0x0000_0000,
-        0x1b05_688c, // IV[5] (top bit already 0)
+        0x9b05_688c,
         0x0000_0000,
-        0x5be0_cd19, // IV[7] (top bit already 0)
+        0x5be0_cd19,
     ];
 
     fn test_block() -> [u32; 16] {
@@ -208,13 +466,6 @@ mod tests {
         out
     }
 
-    fn mask_odd_lanes(cv: &mut [u32; 8]) {
-        cv[1] &= ODD_LANE_MASK;
-        cv[3] &= ODD_LANE_MASK;
-        cv[5] &= ODD_LANE_MASK;
-        cv[7] &= ODD_LANE_MASK;
-    }
-
     #[test]
     fn reference_core_matches_standard_blake3_compression() {
         let cv = TEST_CV;
@@ -247,12 +498,11 @@ mod tests {
     }
 
     #[test]
-    fn blakeg_is_blake3_core_with_fixed_iv_tail_and_mask() {
+    fn blakeg_is_blake3_core_with_fixed_iv_tail_and_modular_reduction() {
         let cv = TEST_CV;
         let block = test_block();
-        let mut expected = reference_core_with_p(cv, block, [IV[4], IV[5], IV[6], IV[7]]);
-
-        mask_odd_lanes(&mut expected);
+        let expected =
+            finalize_output(reference_core_with_p(cv, block, [IV[4], IV[5], IV[6], IV[7]]));
 
         assert_eq!(BlakeG::compress(cv, block), expected);
     }
@@ -308,14 +558,49 @@ mod tests {
     }
 
     #[test]
-    fn compress_raw_then_mask_matches_compress() {
+    fn compress_raw_then_reduce_matches_compress() {
         let cv = TEST_CV;
         let block = test_block();
-        let mut raw = BlakeG::compress_raw(cv, block);
 
-        apply_output_mask(&mut raw);
+        assert_eq!(finalize_output(BlakeG::compress_raw(cv, block)), BlakeG::compress(cv, block));
+    }
 
-        assert_eq!(raw, BlakeG::compress(cv, block));
+    #[test]
+    fn reduction_wraps_goldilocks_modulus() {
+        assert_eq!(reduce_u32_pair(0, 0), (0, 0));
+        assert_eq!(reduce_u32_pair(0, 0xffff_ffff), (0, 0xffff_ffff));
+        assert_eq!(reduce_u32_pair(1, 0xffff_ffff), (0, 0));
+        assert_eq!(reduce_u32_pair(u32::MAX, u32::MAX), (u32::MAX - 1, 0));
+    }
+
+    fn packed_finalizer_edge_input<const LANES: usize>() -> [[u32; LANES]; 8] {
+        const CASES: [(u32, u32); 6] = [
+            (0, 0),
+            (0, u32::MAX),
+            (1, u32::MAX),
+            (u32::MAX, u32::MAX),
+            (17, 0x7fff_ffff),
+            (0x8000_0000, 0xffff_fffe),
+        ];
+
+        core::array::from_fn(|word| {
+            core::array::from_fn(|lane| {
+                let (lo, hi) = CASES[(lane + word / 2) % CASES.len()];
+                if word % 2 == 0 { lo } else { hi }
+            })
+        })
+    }
+
+    #[test]
+    fn packed_finalizer_4_matches_scalar_edges() {
+        let cv = packed_finalizer_edge_input::<4>();
+        assert_eq!(finalize_packed_output_4(cv), finalize_packed_output_scalar(cv));
+    }
+
+    #[test]
+    fn native_packed_finalizer_matches_scalar_edges() {
+        let cv = packed_finalizer_edge_input::<PACKED_LANES>();
+        assert_eq!(finalize_packed_output_native(cv), finalize_packed_output_scalar(cv));
     }
 
     #[test]
@@ -326,9 +611,8 @@ mod tests {
         cv[5] |= 0x8000_0000;
         cv[7] |= 0x8000_0000;
         let block = test_block();
-        let mut expected = reference_core_with_p(cv, block, [IV[4], IV[5], IV[6], IV[7]]);
-
-        mask_odd_lanes(&mut expected);
+        let expected =
+            finalize_output(reference_core_with_p(cv, block, [IV[4], IV[5], IV[6], IV[7]]));
 
         assert_eq!(BlakeG::compress(cv, block), expected);
     }
@@ -337,22 +621,20 @@ mod tests {
     fn standard_blake3_compression_is_not_blakeg_mode() {
         let cv = TEST_CV;
         let block = test_block();
-        let mut standard = standard_blake3_compress(cv, block, 0, 64, 0);
-
-        mask_odd_lanes(&mut standard);
+        let standard = finalize_output(standard_blake3_compress(cv, block, 0, 64, 0));
 
         assert_ne!(BlakeG::compress(cv, block), standard);
     }
 
     #[test]
-    fn compress_output_lives_in_252_bit_subspace() {
+    fn compress_output_lanes_encode_canonical_felts() {
         let block: [u32; 16] = core::array::from_fn(|i| i as u32 + 1);
         let cv_new = BlakeG::compress(TEST_CV, block);
 
-        assert_eq!(cv_new[1] & !ODD_LANE_MASK, 0, "cv_new[1] top bit must be 0");
-        assert_eq!(cv_new[3] & !ODD_LANE_MASK, 0, "cv_new[3] top bit must be 0");
-        assert_eq!(cv_new[5] & !ODD_LANE_MASK, 0, "cv_new[5] top bit must be 0");
-        assert_eq!(cv_new[7] & !ODD_LANE_MASK, 0, "cv_new[7] top bit must be 0");
+        for word in 0..4 {
+            let value = ((cv_new[2 * word + 1] as u64) << 32) | cv_new[2 * word] as u64;
+            assert!(value < Felt::ORDER, "cv_new pair {word} must be canonical");
+        }
     }
 
     #[test]

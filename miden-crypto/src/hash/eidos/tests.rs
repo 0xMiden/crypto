@@ -24,32 +24,32 @@ fn assert_digest(actual: Word, expected: [u64; 4]) {
 fn frozen_eidos_vectors() {
     assert_digest(
         Eidos::hash_elements::<Felt>(&[]),
-        [0x326c9b9587c45a4a, 0x6424a4c96d3eeb39, 0x16db09dcba212a64, 0x460d18e8ee0153cb],
+        [0x8836e87a3267f64b, 0x318b8ad5cbc2f9ac, 0x97c66d9ecff70db7, 0xa97f74f0927a20f1],
     );
     assert_digest(
         Eidos::hash(&[]),
-        [0x05b05aaa98c617d5, 0x7a37cbe7cf4bb0db, 0x09ff23e57d078555, 0x17bf876c5bc2e522],
+        [0x927f9a8899f4a2ab, 0xaa44942701d49d34, 0x00808d540be077fd, 0x3eb788f33345e35f],
     );
     assert_digest(
         Eidos::hash_elements(&felts_seq(3)),
-        [0x632b474f42bb4483, 0x3f2581effe3a9706, 0x69e6502c9b27be32, 0x5b35a3b5e8f64f85],
+        [0x2f0f21885d7a2b59, 0x1ef148ba8a8e7b29, 0x2d7a5515853fb54c, 0x9be863e9e0f3f6c9],
     );
     assert_digest(
         Eidos::hash(b"abc"),
-        [0x5392a7c9471655f2, 0x2764c78e4578d013, 0x61851923e9399c67, 0x697cde4e8152d9e8],
+        [0x81a130c8158663c4, 0xab7a64cbb673562a, 0x3aa3772223d0a621, 0xffaaccdf4b619c38],
     );
     assert_digest(
         Eidos::hash_elements_in_domain(&felts_seq(4), Felt::new_unchecked(42)),
-        [0x59ae96e1822d138f, 0x7482c9c35ad41329, 0x411b9503209a78c8, 0x0f042fc1fc749816],
+        [0x471e6b04c6a1838a, 0x0897975f3f528546, 0xa0bd446968a01ec6, 0x0fdb2d6beea3af27],
     );
     assert_digest(
         Eidos::hash_elements(&felts_seq(9)),
-        [0x0eeb046c099fb3eb, 0x7fe7278457ca00d8, 0x0f7623a511faf41e, 0x2b7d8a8269a253cf],
+        [0xf874842f3fee95ac, 0x3de81df64930b516, 0xc8f2ba4a3df35e5e, 0xd683fd7c28db3520],
     );
     let bytes: Vec<u8> = (0..65).map(|i| i as u8).collect();
     assert_digest(
         Eidos::hash(&bytes),
-        [0x44dc855e1076e8e8, 0x4463b02685f53bd7, 0x4160488693060e2e, 0x2597ddd5fd143123],
+        [0x4b211b2316a587fb, 0xadb91df1af45baab, 0xf8447441d9a156f4, 0x1d345726aed0d556],
     );
 }
 

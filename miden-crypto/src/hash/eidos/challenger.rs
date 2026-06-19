@@ -2,6 +2,10 @@
 //!
 //! The challenger keeps a 4-felt chaining value. Absorbs compress 8-felt blocks
 //! into that value; squeezes use a transition tag and counter blocks.
+//!
+//! With the modular-reduction BlakeG finalizer, each sampled Felt should be
+//! counted as carrying at most 63 bits of min-entropy. A challenge sampled from `k`
+//! Felts therefore loses up to `k` bits versus an ideal uniform field source.
 
 use alloc::vec::Vec;
 

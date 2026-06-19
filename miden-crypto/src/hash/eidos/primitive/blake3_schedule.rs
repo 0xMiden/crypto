@@ -1,13 +1,13 @@
 //! Local BLAKE3 compression schedule used by BlakeG.
 //!
 //! This module owns only the raw BLAKE3 round schedule and architecture-specific packed
-//! backends. BlakeG output masking, field packing, and Eidos framing stay in `primitive.rs`
+//! backends. BlakeG output finalization, field packing, and Eidos framing stay in `primitive.rs`
 //! and `framing.rs`.
 //!
 //! TODO(upstream-blake3): replace this module with a stable word-oriented `compress_many`
 //! hazmat API that accepts batches of 8-word CVs, 16-word message blocks, and caller-supplied
 //! parameter words for `v[12..16]`, returning either the post-round state or the raw CV/XOF
-//! folds before BlakeG applies its output mask.
+//! folds before BlakeG applies its output finalizer.
 
 use core::array;
 
@@ -213,6 +213,11 @@ pub(super) fn compress_packed<const LANES: usize>(
 }
 
 /// Applies the raw BLAKE3 schedule to four independent lanes.
+#[cfg(any(
+    feature = "internal",
+    test,
+    not(all(target_arch = "x86_64", any(target_feature = "avx2", target_feature = "avx512f"),)),
+))]
 #[inline]
 pub(super) fn compress_packed_4(cv: [[u32; 4]; 8], block: [[u32; 4]; 16]) -> [[u32; 4]; 8] {
     #[cfg(target_arch = "aarch64")]
@@ -440,7 +445,14 @@ macro_rules! define_x86_packed_compress {
     };
 }
 
-#[cfg(target_arch = "x86_64")]
+#[cfg(all(
+    target_arch = "x86_64",
+    any(
+        feature = "internal",
+        test,
+        not(any(target_feature = "avx2", target_feature = "avx512f")),
+    ),
+))]
 mod x86_64_sse2 {
     use core::arch::x86_64::*;
 
@@ -654,6 +666,7 @@ mod neon {
     }
 
     #[cfg(feature = "internal")]
+    #[allow(dead_code)]
     #[inline(always)]
     fn rotr8_shift_insert(x: uint32x4_t) -> uint32x4_t {
         unsafe { vsriq_n_u32::<8>(vshlq_n_u32::<24>(x), x) }
@@ -896,6 +909,7 @@ mod neon {
             $rot8_idx:ident,
             $setup:ident
         ) => {
+            #[allow(dead_code)]
             #[inline(always)]
             pub(super) fn $name(cv: [[u32; 4]; 8], block: [[u32; 4]; 16]) -> [[u32; 4]; 8] {
                 let mut v0 = load(&cv[0]);
