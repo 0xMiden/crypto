@@ -58,11 +58,6 @@ fn append_sequence(start: usize) -> Vec<Word> {
         .collect()
 }
 
-fn rebuilt_belt_summary(belt: &MmrBelt) -> BeltSummary {
-    let roots = belt.peaks();
-    BeltSummary::from_roots(belt.num_leaves(), &roots).unwrap()
-}
-
 fn bench_mmr_belt_build(c: &mut Criterion) {
     let mut group = c.benchmark_group("mmr-belt-build");
     configure_group(&mut group);
@@ -98,7 +93,7 @@ fn bench_mmr_belt_build(c: &mut Criterion) {
                 |leaves| {
                     let mut belt = MmrBelt::new();
                     for leaf in leaves {
-                        belt.add_without_bagging_for_benchmark(leaf).unwrap();
+                        belt.add_deferred(leaf).unwrap();
                     }
                     hint::black_box(belt);
                 },
@@ -155,7 +150,7 @@ fn bench_mmr_belt_append(c: &mut Criterion) {
             b.iter_batched_ref(
                 || data.belt.clone(),
                 |belt| {
-                    belt.add_without_bagging_for_benchmark(hint::black_box(next_leaf)).unwrap();
+                    belt.add_deferred(hint::black_box(next_leaf)).unwrap();
                     hint::black_box(belt.num_leaves());
                 },
                 BatchSize::LargeInput,
@@ -210,8 +205,8 @@ fn bench_mmr_belt_append(c: &mut Criterion) {
                 b.iter_batched(
                     || data.belt.clone(),
                     |mut belt| {
-                        belt.add_without_bagging_for_benchmark(hint::black_box(next_leaf)).unwrap();
-                        hint::black_box(rebuilt_belt_summary(&belt));
+                        belt.add_deferred(hint::black_box(next_leaf)).unwrap();
+                        hint::black_box(belt.summary());
                     },
                     BatchSize::SmallInput,
                 );
@@ -236,8 +231,8 @@ fn bench_mmr_belt_append(c: &mut Criterion) {
                 b.iter_batched(
                     || data.belt.clone(),
                     |mut belt| {
-                        belt.add_without_bagging_for_benchmark(hint::black_box(next_leaf)).unwrap();
-                        hint::black_box(rebuilt_belt_summary(&belt).commitment_root());
+                        belt.add_deferred(hint::black_box(next_leaf)).unwrap();
+                        hint::black_box(belt.commitment_root());
                     },
                     BatchSize::SmallInput,
                 );
@@ -288,7 +283,7 @@ fn bench_mmr_belt_append_sequence(c: &mut Criterion) {
                 || (data.belt.clone(), leaves.clone()),
                 |(belt, leaves)| {
                     for leaf in leaves.iter().copied() {
-                        belt.add_without_bagging_for_benchmark(hint::black_box(leaf)).unwrap();
+                        belt.add_deferred(hint::black_box(leaf)).unwrap();
                     }
                     hint::black_box(belt);
                 },

@@ -19,6 +19,7 @@ pub struct MmrBelt {
     mountains: Vec<Option<BeltMountainSlot>>,
     hashes: BeltHashArray,
     bagging: BeltBaggingState,
+    bagging_dirty: bool,
     last_bagging_update_hashes: usize,
     free_mountain_slots: Vec<usize>,
     head: Option<usize>,
@@ -36,13 +37,18 @@ impl MmrBelt {
         self.add_with_bagging_mode(leaf, true)
     }
 
-    /// Benchmark-only append that skips live summary maintenance.
+    /// Appends a leaf without refreshing the live summary state.
     ///
-    /// This leaves [`Self::summary`] and [`Self::commitment_root`] stale. Rebuild a diagnostic
-    /// summary with [`BeltSummary::from_roots`] after calling this method.
+    /// [`Self::summary`] and [`Self::commitment_root`] remain safe to call; they rebuild the
+    /// derived summary from current mountain roots while the live summary state is dirty.
+    pub fn add_deferred(&mut self, leaf: Word) -> Result<usize, MmrError> {
+        self.add_with_bagging_mode(leaf, false)
+    }
+
+    /// Benchmark-only alias for deferred append.
     #[cfg(any(test, feature = "internal"))]
     pub fn add_without_bagging_for_benchmark(&mut self, leaf: Word) -> Result<usize, MmrError> {
-        self.add_with_bagging_mode(leaf, false)
+        self.add_deferred(leaf)
     }
 
     fn add_with_bagging_mode(
@@ -72,23 +78,30 @@ impl MmrBelt {
         let num_merges = usize::from(merged.is_some());
 
         if refresh_bagging {
-            let leaf_change = ChangedMountain::new(leaf_position, 0, leaf);
-            let mut changed = [leaf_change; 2];
-            let mut changed_len = 0;
+            if self.bagging_dirty {
+                self.rebuild_bagging_state();
+            } else {
+                let leaf_change = ChangedMountain::new(leaf_position, 0, leaf);
+                let mut changed = [leaf_change; 2];
+                let mut changed_len = 0;
 
-            if let Some(merged) = merged {
-                changed[changed_len] = merged;
-                changed_len += 1;
-                if !merged.contains_position(leaf_position) {
+                if let Some(merged) = merged {
+                    changed[changed_len] = merged;
+                    changed_len += 1;
+                    if !merged.contains_position(leaf_position) {
+                        changed[changed_len] = leaf_change;
+                        changed_len += 1;
+                    }
+                } else {
                     changed[changed_len] = leaf_change;
                     changed_len += 1;
                 }
-            } else {
-                changed[changed_len] = leaf_change;
-                changed_len += 1;
-            }
 
-            self.refresh_bagging_state(old_num_leaves, &changed[..changed_len]);
+                self.refresh_bagging_state(old_num_leaves, &changed[..changed_len]);
+            }
+        } else {
+            self.bagging_dirty = true;
+            self.last_bagging_update_hashes = 0;
         }
 
         Ok(num_merges)
@@ -136,10 +149,18 @@ impl MmrBelt {
     }
 
     pub fn commitment_root(&self) -> Word {
+        if self.bagging_dirty {
+            return self.rebuilt_summary().commitment_root();
+        }
+
         self.bagging.root()
     }
 
     pub fn summary(&self) -> BeltSummary {
+        if self.bagging_dirty {
+            return self.rebuilt_summary();
+        }
+
         BeltSummary::from_roots_and_bagging(self.num_leaves, self.peaks(), &self.bagging)
             .expect("live mountain-order summary must match the current shape")
     }
@@ -188,7 +209,22 @@ impl MmrBelt {
 
     fn refresh_bagging_state(&mut self, old_num_leaves: usize, changed: &[ChangedMountain]) {
         let hashes = self.bagging.append_update(old_num_leaves, self.num_leaves, changed);
+        self.bagging_dirty = false;
         self.last_bagging_update_hashes = hashes;
+    }
+
+    fn rebuild_bagging_state(&mut self) {
+        let peaks = self.peaks();
+        let (bagging, hashes) = BeltBaggingState::from_roots_with_stats(self.num_leaves, &peaks)
+            .expect("current mountain roots must match the belt shape");
+        self.bagging = bagging;
+        self.bagging_dirty = false;
+        self.last_bagging_update_hashes = hashes;
+    }
+
+    fn rebuilt_summary(&self) -> BeltSummary {
+        BeltSummary::from_roots(self.num_leaves, &self.peaks())
+            .expect("current mountain roots must match the belt shape")
     }
 
     pub fn open(&self, position: usize) -> Result<BeltProof, MmrError> {

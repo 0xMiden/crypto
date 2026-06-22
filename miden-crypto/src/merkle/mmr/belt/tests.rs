@@ -557,6 +557,40 @@ fn belt_lazy_bagging_append_keeps_mountain_state() {
 }
 
 #[test]
+fn belt_deferred_append_summary_matches_live_append() {
+    let mut live = MmrBelt::new();
+    let mut deferred = MmrBelt::new();
+
+    for idx in 0..512 {
+        let leaf = int_to_node(idx);
+        live.add(leaf).unwrap();
+        deferred.add_deferred(leaf).unwrap();
+
+        assert_eq!(deferred.summary(), live.summary());
+        assert_eq!(deferred.commitment_root(), live.commitment_root());
+    }
+}
+
+#[test]
+fn belt_live_append_after_deferred_append_refreshes_summary() {
+    let mut live = MmrBelt::new();
+    let mut mixed = MmrBelt::new();
+
+    for idx in 0..128 {
+        let leaf = int_to_node(idx);
+        live.add(leaf).unwrap();
+        if idx % 4 == 3 {
+            mixed.add(leaf).unwrap();
+        } else {
+            mixed.add_deferred(leaf).unwrap();
+        }
+
+        assert_eq!(mixed.summary(), live.summary());
+        assert_eq!(mixed.commitment_root(), live.commitment_root());
+    }
+}
+
+#[test]
 fn belt_lazy_bagging_append_does_not_touch_live_bagging() {
     let mut belt = MmrBelt::new();
 
