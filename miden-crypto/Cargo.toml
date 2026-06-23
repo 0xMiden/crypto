@@ -46,6 +46,11 @@ required-features = ["std"]
 
 [[bench]]
 harness           = false
+name              = "mmr_belt"
+required-features = ["internal"]
+
+[[bench]]
+harness           = false
 name              = "partial_mt"
 required-features = ["std"]
 
