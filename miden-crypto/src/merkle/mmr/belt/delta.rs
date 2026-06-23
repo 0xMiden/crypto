@@ -234,6 +234,9 @@ impl PartialMmrBelt {
     }
 
     pub fn track(&mut self, proof: &BeltProof) -> Result<(), MmrError> {
+        // Like `PartialMmr::track`, an out-of-range or otherwise invalid proof is rejected by
+        // verification (`BeltProof::verify` returns `false` for `position >= num_leaves`) rather
+        // than by a dedicated position check.
         if !proof.verify(&self.summary()) {
             return Err(MmrError::PeakPathMismatch);
         }
@@ -261,6 +264,10 @@ impl PartialMmrBelt {
     }
 
     pub fn open(&self, pos: usize) -> Result<Option<BeltProof>, MmrError> {
+        if pos >= self.num_leaves {
+            return Err(MmrError::PositionNotFound(pos));
+        }
+
         let Some(tracked) = self.tracked.get(&pos) else {
             return Ok(None);
         };
@@ -290,7 +297,13 @@ impl PartialMmrBelt {
 
     pub fn apply(&mut self, delta: &MmrBeltDelta) -> Result<(), MmrError> {
         if delta.from_num_leaves() != self.num_leaves {
-            return Err(MmrError::InvalidUpdate);
+            // Mirror `PartialMmr::apply`, which reports a descriptive error when a delta does not
+            // line up with the current state rather than a bare `InvalidUpdate`.
+            return Err(MmrError::InvalidPeaks(format!(
+                "delta starts at {} leaves but the partial belt has {} leaves",
+                delta.from_num_leaves(),
+                self.num_leaves
+            )));
         }
 
         // Build the new state in locals and commit only after every fallible step succeeds.

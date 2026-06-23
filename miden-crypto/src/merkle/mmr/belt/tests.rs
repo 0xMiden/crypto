@@ -1,13 +1,24 @@
 use alloc::{vec, vec::Vec};
 
+use assert_matches::assert_matches;
+
 use super::{
     BeltBaggingState, BeltHashArray, BeltSummary, ChangedMountain, HashIndex, MmrBelt,
-    MmrBeltDelta, PartialMmrBelt, append_shape_in_place, bag_belt, bag_range,
+    MmrBeltDelta, MmrError, PartialMmrBelt, append_shape_in_place, bag_belt, bag_range,
     common_peak_prefix_len, hash_children, leaf_hash_index, node_hash_index, parent_hash_index,
     shape_mountain_index, shape_mountain_index_for_num_leaves, shape_mountains,
     shape_range_index_for_mountain, shape_range_index_for_num_leaves, shape_ranges,
 };
 use crate::{EMPTY_WORD, Word, hash::poseidon2::Poseidon2, merkle::int_to_node};
+
+/// Builds a belt with leaves appended for positions `0..n`.
+fn belt_with_leaves(n: usize) -> MmrBelt {
+    let mut belt = MmrBelt::new();
+    for idx in 0..n {
+        belt.add(int_to_node(idx as u64)).unwrap();
+    }
+    belt
+}
 
 fn shape_heights(num_leaves: usize) -> Vec<usize> {
     shape_mountains(num_leaves).iter().map(|mountain| mountain.height).collect()
@@ -252,10 +263,7 @@ fn belt_openings_verify_for_all_leaves() {
 
 #[test]
 fn belt_opening_rejects_wrong_leaf() {
-    let mut belt = MmrBelt::new();
-    for idx in 0..16 {
-        belt.add(int_to_node(idx)).unwrap();
-    }
+    let belt = belt_with_leaves(16);
     let summary = belt.summary();
     let mut proof = belt.open(7).unwrap();
 
@@ -266,10 +274,7 @@ fn belt_opening_rejects_wrong_leaf() {
 
 #[test]
 fn belt_proof_rejects_tampered_node() {
-    let mut belt = MmrBelt::new();
-    for idx in 0..37 {
-        belt.add(int_to_node(idx)).unwrap();
-    }
+    let belt = belt_with_leaves(37);
     let summary = belt.summary();
 
     let pristine = belt.open(13).unwrap();
@@ -284,10 +289,7 @@ fn belt_proof_rejects_tampered_node() {
 
 #[test]
 fn belt_opening_rejects_wrong_position() {
-    let mut belt = MmrBelt::new();
-    for idx in 0..37 {
-        belt.add(int_to_node(idx)).unwrap();
-    }
+    let belt = belt_with_leaves(37);
     let summary = belt.summary();
     let mut proof = belt.open(7).unwrap();
 
@@ -298,28 +300,19 @@ fn belt_opening_rejects_wrong_position() {
 
 #[test]
 fn belt_root_binds_shape_without_belt_domain_separation() {
-    let mut belt = MmrBelt::new();
-    for idx in 0..2 {
-        belt.add(int_to_node(idx)).unwrap();
-    }
+    let belt = belt_with_leaves(2);
     let summary = belt.summary();
     let peaks = belt.peaks();
     assert_eq!(peaks.len(), 1);
     assert_ne!(summary.root(), peaks[0], "root must not be transparent to its peak");
 
-    let mut bigger = MmrBelt::new();
-    for idx in 0..3 {
-        bigger.add(int_to_node(idx)).unwrap();
-    }
+    let bigger = belt_with_leaves(3);
     assert_ne!(bigger.summary().root(), summary.root());
 }
 
 #[test]
 fn belt_second_bagging_uses_plain_merkle_merge() {
-    let mut belt = MmrBelt::new();
-    for idx in 0..5 {
-        belt.add(int_to_node(idx)).unwrap();
-    }
+    let belt = belt_with_leaves(5);
 
     let shape = shape_mountains(belt.num_leaves());
     let peaks = belt.peaks();
@@ -336,10 +329,7 @@ fn belt_second_bagging_uses_plain_merkle_merge() {
 
 #[test]
 fn belt_range_bagging_uses_plain_merkle_merge() {
-    let mut belt = MmrBelt::new();
-    for idx in 0..9 {
-        belt.add(int_to_node(idx)).unwrap();
-    }
+    let belt = belt_with_leaves(9);
 
     let shape = shape_mountains(belt.num_leaves());
     let peaks = belt.peaks();
@@ -394,10 +384,7 @@ fn belt_summary_from_roots_matches_full_summary() {
 
 #[test]
 fn belt_summary_exposes_mountain_order_roots() {
-    let mut belt = MmrBelt::new();
-    for idx in 0..37 {
-        belt.add(int_to_node(idx)).unwrap();
-    }
+    let belt = belt_with_leaves(37);
 
     let summary = belt.summary();
     let peaks = belt.peaks();
@@ -412,10 +399,7 @@ fn belt_summary_exposes_mountain_order_roots() {
 
 #[test]
 fn belt_summary_uses_maintained_mountain_order_roots() {
-    let mut belt = MmrBelt::new();
-    for idx in 0..37 {
-        belt.add(int_to_node(idx)).unwrap();
-    }
+    let mut belt = belt_with_leaves(37);
 
     let summary = belt.summary();
     let roots = belt.peaks();
@@ -428,10 +412,7 @@ fn belt_summary_uses_maintained_mountain_order_roots() {
 
 #[test]
 fn belt_summary_carries_explicit_range_bagging_state() {
-    let mut belt = MmrBelt::new();
-    for idx in 0..190 {
-        belt.add(int_to_node(idx)).unwrap();
-    }
+    let belt = belt_with_leaves(190);
 
     let summary = belt.summary();
     let shape = shape_mountains(summary.num_leaves());
@@ -447,10 +428,7 @@ fn belt_summary_carries_explicit_range_bagging_state() {
 
 #[test]
 fn belt_bagging_state_uses_explicit_range_and_belt_nodes() {
-    let mut belt = MmrBelt::new();
-    for idx in 0..190 {
-        belt.add(int_to_node(idx)).unwrap();
-    }
+    let belt = belt_with_leaves(190);
 
     for (nodes, &range_root) in belt.bagging.range_nodes().iter().zip(belt.bagging.range_roots()) {
         let mut prefix = EMPTY_WORD;
@@ -634,10 +612,7 @@ fn belt_live_bagging_update_touches_constant_commitment_hashes() {
 fn belt_delta_resyncs_client_summary() {
     let total = 600usize;
     for from in [0usize, 1, 7, 64, 255, 256, 511] {
-        let mut belt = MmrBelt::new();
-        for idx in 0..from {
-            belt.add(int_to_node(idx as u64)).unwrap();
-        }
+        let mut belt = belt_with_leaves(from);
         let client_peaks = belt.peaks();
 
         for idx in from..total {
@@ -662,10 +637,7 @@ fn belt_delta_resyncs_client_summary() {
 fn belt_delta_verifies_summary_transition() {
     let from = 128usize;
     let to = 191usize;
-    let mut belt = MmrBelt::new();
-    for idx in 0..from {
-        belt.add(int_to_node(idx as u64)).unwrap();
-    }
+    let mut belt = belt_with_leaves(from);
     let old_summary = belt.summary();
 
     for idx in from..to {
@@ -681,10 +653,7 @@ fn belt_delta_verifies_summary_transition() {
 fn belt_delta_rejects_wrong_transition_endpoint() {
     let from = 64usize;
     let to = 96usize;
-    let mut belt = MmrBelt::new();
-    for idx in 0..from {
-        belt.add(int_to_node(idx as u64)).unwrap();
-    }
+    let mut belt = belt_with_leaves(from);
     let old_summary = belt.summary();
 
     for idx in from..to {
@@ -705,10 +674,7 @@ fn belt_delta_rejects_wrong_transition_endpoint() {
 fn belt_delta_rejects_mutated_tail_peak() {
     let from = 128usize;
     let to = 191usize;
-    let mut belt = MmrBelt::new();
-    for idx in 0..from {
-        belt.add(int_to_node(idx as u64)).unwrap();
-    }
+    let mut belt = belt_with_leaves(from);
     let old_summary = belt.summary();
 
     for idx in from..to {
@@ -725,10 +691,7 @@ fn belt_delta_rejects_mutated_tail_peak() {
 fn belt_delta_verify_rejects_padded_auth_nodes() {
     let from = 128usize;
     let to = 191usize;
-    let mut belt = MmrBelt::new();
-    for idx in 0..from {
-        belt.add(int_to_node(idx as u64)).unwrap();
-    }
+    let mut belt = belt_with_leaves(from);
     let old_summary = belt.summary();
 
     for idx in from..to {
@@ -765,10 +728,7 @@ fn belt_constructors_reject_oversized_num_leaves() {
 fn partial_belt_apply_is_transactional_on_missing_auth() {
     let from = 200usize;
     let to = 260usize;
-    let mut belt = MmrBelt::new();
-    for idx in 0..from {
-        belt.add(int_to_node(idx as u64)).unwrap();
-    }
+    let mut belt = belt_with_leaves(from);
 
     let mut partial = PartialMmrBelt::from_peaks(belt.num_leaves(), belt.peaks()).unwrap();
     for pos in 0..from {
@@ -791,13 +751,28 @@ fn partial_belt_apply_is_transactional_on_missing_auth() {
 }
 
 #[test]
+fn partial_belt_apply_rejects_delta_with_mismatched_from() {
+    // Snapshot the partial view at 16 leaves, then grow the belt and build a delta that starts at
+    // 20 leaves, so the delta's `from` does not line up with the partial's current state.
+    let mut belt = belt_with_leaves(16);
+    let mut partial = PartialMmrBelt::from_peaks(belt.num_leaves(), belt.peaks()).unwrap();
+
+    for idx in 16..24 {
+        belt.add(int_to_node(idx)).unwrap();
+    }
+    let delta = belt.delta(20).unwrap();
+
+    // Like `PartialMmr::apply`, a delta that does not line up with the current state is rejected
+    // with a descriptive error rather than a bare `InvalidUpdate`.
+    let err = partial.apply(&delta).unwrap_err();
+    assert_matches!(err, MmrError::InvalidPeaks(_));
+}
+
+#[test]
 fn belt_delta_rejects_wrong_absorbed_old_summary_root() {
     let from = 128usize;
     let to = 191usize;
-    let mut belt = MmrBelt::new();
-    for idx in 0..from {
-        belt.add(int_to_node(idx as u64)).unwrap();
-    }
+    let mut belt = belt_with_leaves(from);
     let old_summary = belt.summary();
     let common = common_peak_prefix_len(from, to);
     assert!(common < old_summary.roots().len());
@@ -819,10 +794,7 @@ fn belt_delta_rejects_wrong_absorbed_old_summary_root() {
 fn belt_delta_transition_requires_merge_auth_for_absorbed_old_roots() {
     let from = 200usize;
     let to = 260usize;
-    let mut belt = MmrBelt::new();
-    for idx in 0..from {
-        belt.add(int_to_node(idx as u64)).unwrap();
-    }
+    let mut belt = belt_with_leaves(from);
     let old_summary = belt.summary();
 
     for idx in from..to {
@@ -840,10 +812,7 @@ fn belt_delta_transition_requires_merge_auth_for_absorbed_old_roots() {
 fn belt_delta_rejects_forged_merge_auth_value() {
     let from = 200usize;
     let to = 260usize;
-    let mut belt = MmrBelt::new();
-    for idx in 0..from {
-        belt.add(int_to_node(idx as u64)).unwrap();
-    }
+    let mut belt = belt_with_leaves(from);
     let old_summary = belt.summary();
 
     for idx in from..to {
@@ -885,10 +854,7 @@ fn belt_zero_and_single_leaf_summaries() {
 
 #[test]
 fn belt_delta_from_same_leaf_count_is_noop() {
-    let mut belt = MmrBelt::new();
-    for idx in 0..50 {
-        belt.add(int_to_node(idx)).unwrap();
-    }
+    let belt = belt_with_leaves(50);
     let summary = belt.summary();
 
     let delta = belt.delta(belt.num_leaves()).unwrap();
@@ -904,10 +870,7 @@ fn belt_delta_from_same_leaf_count_is_noop() {
 
 #[test]
 fn belt_delta_is_logarithmic_in_increment() {
-    let mut belt = MmrBelt::new();
-    for idx in 0..100_000u64 {
-        belt.add(int_to_node(idx)).unwrap();
-    }
+    let belt = belt_with_leaves(100_000);
 
     for k in [1usize, 2, 10, 100, 1000] {
         let delta = belt.delta(100_000 - k).unwrap();
@@ -922,10 +885,7 @@ fn belt_delta_is_logarithmic_in_increment() {
 
 #[test]
 fn belt_delta_rejects_future_origin() {
-    let mut belt = MmrBelt::new();
-    for idx in 0..10 {
-        belt.add(int_to_node(idx)).unwrap();
-    }
+    let belt = belt_with_leaves(10);
     assert!(belt.delta(11).is_err());
 }
 
@@ -955,10 +915,7 @@ fn partial_belt_tracks_and_opens_like_full_belt() {
 
 #[test]
 fn partial_belt_from_peaks_rejects_wrong_count() {
-    let mut belt = MmrBelt::new();
-    for idx in 0..7 {
-        belt.add(int_to_node(idx)).unwrap();
-    }
+    let belt = belt_with_leaves(7);
     let mut peaks = belt.peaks();
     peaks.pop();
     assert!(PartialMmrBelt::from_peaks(belt.num_leaves(), peaks).is_err());
@@ -966,10 +923,7 @@ fn partial_belt_from_peaks_rejects_wrong_count() {
 
 #[test]
 fn partial_belt_track_rejects_unauthenticated_proof() {
-    let mut belt = MmrBelt::new();
-    for idx in 0..16 {
-        belt.add(int_to_node(idx)).unwrap();
-    }
+    let belt = belt_with_leaves(16);
     let mut partial = PartialMmrBelt::from_peaks(belt.num_leaves(), belt.peaks()).unwrap();
 
     let mut proof = belt.open(5).unwrap();
@@ -979,14 +933,25 @@ fn partial_belt_track_rejects_unauthenticated_proof() {
 }
 
 #[test]
+fn partial_belt_track_rejects_out_of_range_position() {
+    let belt = belt_with_leaves(16);
+    let mut partial = PartialMmrBelt::from_peaks(belt.num_leaves(), belt.peaks()).unwrap();
+
+    let mut proof = belt.open(5).unwrap();
+    proof.set_position_for_testing(belt.num_leaves());
+    let err = partial.track(&proof).unwrap_err();
+
+    // Like `PartialMmr::track`, an out-of-range position is rejected by verification rather than a
+    // dedicated position check.
+    assert_matches!(err, MmrError::PeakPathMismatch);
+}
+
+#[test]
 fn partial_belt_apply_extends_all_tracks_in_place() {
     let from = 200usize;
     let to = 260usize;
 
-    let mut belt = MmrBelt::new();
-    for idx in 0..from {
-        belt.add(int_to_node(idx as u64)).unwrap();
-    }
+    let mut belt = belt_with_leaves(from);
 
     let mut partial = PartialMmrBelt::from_peaks(belt.num_leaves(), belt.peaks()).unwrap();
     for position in 0..from {
@@ -1011,10 +976,7 @@ fn partial_belt_apply_extends_all_tracks_in_place() {
 
 #[test]
 fn partial_belt_apply_extends_across_many_increments() {
-    let mut belt = MmrBelt::new();
-    for idx in 0..40u64 {
-        belt.add(int_to_node(idx)).unwrap();
-    }
+    let mut belt = belt_with_leaves(40);
 
     let mut partial = PartialMmrBelt::from_peaks(belt.num_leaves(), belt.peaks()).unwrap();
     let tracked = [0usize, 1, 17, 38, 39];
@@ -1081,10 +1043,7 @@ fn partial_belt_protocol_model_resyncs_after_offline_increment() {
 fn belt_delta_and_summary_verify_sync_response_transition() {
     let from = 128usize;
     let to = 191usize;
-    let mut belt = MmrBelt::new();
-    for idx in 0..from {
-        belt.add(int_to_node(idx as u64)).unwrap();
-    }
+    let mut belt = belt_with_leaves(from);
     let old_summary = belt.summary();
 
     for idx in from..to {
@@ -1164,10 +1123,7 @@ fn belt_delta_from_parts_reconstructs_sync_response() {
 
 #[test]
 fn belt_delta_from_parts_rejects_invalid_tail_shape() {
-    let mut belt = MmrBelt::new();
-    for idx in 0..191 {
-        belt.add(int_to_node(idx as u64)).unwrap();
-    }
+    let belt = belt_with_leaves(191);
     let server_delta = belt.delta(128).unwrap();
 
     assert!(
@@ -1185,10 +1141,7 @@ fn belt_delta_from_parts_rejects_invalid_tail_shape() {
 fn partial_belt_apply_verified_rejects_wrong_new_summary() {
     let from = 64usize;
     let to = 96usize;
-    let mut belt = MmrBelt::new();
-    for idx in 0..from {
-        belt.add(int_to_node(idx as u64)).unwrap();
-    }
+    let mut belt = belt_with_leaves(from);
     let mut client = PartialMmrBelt::from_peaks(belt.num_leaves(), belt.peaks()).unwrap();
     client.track(&belt.open(from - 1).unwrap()).unwrap();
     let old_summary = client.summary();
@@ -1212,10 +1165,7 @@ fn partial_belt_apply_verified_rejects_wrong_new_summary() {
 fn partial_belt_apply_verified_rejects_missing_merge_auth_without_mutating() {
     let from = 200usize;
     let to = 260usize;
-    let mut belt = MmrBelt::new();
-    for idx in 0..from {
-        belt.add(int_to_node(idx as u64)).unwrap();
-    }
+    let mut belt = belt_with_leaves(from);
     let mut client = PartialMmrBelt::from_peaks(belt.num_leaves(), belt.peaks()).unwrap();
     client.track(&belt.open(from - 1).unwrap()).unwrap();
     let old_summary = client.summary();
@@ -1233,10 +1183,7 @@ fn partial_belt_apply_verified_rejects_missing_merge_auth_without_mutating() {
 
 #[test]
 fn partial_belt_delta_merge_auth_is_polylogarithmic() {
-    let mut belt = MmrBelt::new();
-    for idx in 0..100_000u64 {
-        belt.add(int_to_node(idx)).unwrap();
-    }
+    let belt = belt_with_leaves(100_000);
 
     for k in [1usize, 2, 16, 256, 4096] {
         let delta = belt.delta(100_000 - k).unwrap();
@@ -1350,12 +1297,19 @@ fn build_mmr_and_belt(size: usize) -> (crate::merkle::mmr::Mmr, MmrBelt) {
 
 #[test]
 fn partial_belt_open_untracked_returns_none() {
-    let mut belt = MmrBelt::new();
-    for idx in 0..16 {
-        belt.add(int_to_node(idx)).unwrap();
-    }
+    let belt = belt_with_leaves(16);
     let partial = PartialMmrBelt::from_peaks(belt.num_leaves(), belt.peaks()).unwrap();
     assert!(partial.open(3).unwrap().is_none());
+}
+
+#[test]
+fn partial_belt_open_rejects_out_of_range_position() {
+    let belt = belt_with_leaves(16);
+
+    let partial = PartialMmrBelt::from_peaks(belt.num_leaves(), belt.peaks()).unwrap();
+    let err = partial.open(belt.num_leaves()).unwrap_err();
+
+    assert_matches!(err, MmrError::PositionNotFound(16));
 }
 
 #[test]
@@ -1371,10 +1325,7 @@ fn belt_height_sequences_match_paper() {
     for (num_leaves, expected) in golden {
         assert_eq!(shape_heights(num_leaves), expected, "shape S_{num_leaves}");
 
-        let mut belt = MmrBelt::new();
-        for idx in 0..num_leaves {
-            belt.add(int_to_node(idx as u64)).unwrap();
-        }
+        let belt = belt_with_leaves(num_leaves);
         assert_eq!(belt.mountain_heights(), expected, "live S_{num_leaves}");
     }
 }
