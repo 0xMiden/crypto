@@ -25,7 +25,7 @@
 <a href=#25 id=25 data-nosnippet>25</a>    utils::{
 <a href=#26 id=26 data-nosnippet>26</a>        ByteReader, ByteWriter, Deserializable, DeserializationError, Serializable,
 <a href=#27 id=27 data-nosnippet>27</a>        bytes_to_elements_exact, bytes_to_elements_with_padding, elements_to_bytes,
-<a href=#28 id=28 data-nosnippet>28</a>        padded_elements_to_bytes,
+<a href=#28 id=28 data-nosnippet>28</a>        padded_elements_to_bytes, read_sensitive_array,
 <a href=#29 id=29 data-nosnippet>29</a>        zeroize::{Zeroize, ZeroizeOnDrop},
 <a href=#30 id=30 data-nosnippet>30</a>    },
 <a href=#31 id=31 data-nosnippet>31</a>};
@@ -629,9 +629,9 @@
 <a href=#629 id=629 data-nosnippet>629</a>
 <a href=#630 id=630 data-nosnippet>630</a><span class="kw">impl </span>Deserializable <span class="kw">for </span>SecretKey {
 <a href=#631 id=631 data-nosnippet>631</a>    <span class="kw">fn </span>read_from&lt;R: ByteReader&gt;(source: <span class="kw-2">&amp;mut </span>R) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="self">Self</span>, DeserializationError&gt; {
-<a href=#632 id=632 data-nosnippet>632</a>        <span class="kw">let </span>bytes: [u8; SK_SIZE_BYTES] = source.read_array()<span class="question-mark">?</span>;
+<a href=#632 id=632 data-nosnippet>632</a>        <span class="kw">let </span>bytes = read_sensitive_array::&lt;SK_SIZE_BYTES, <span class="kw">_</span>&gt;(source)<span class="question-mark">?</span>;
 <a href=#633 id=633 data-nosnippet>633</a>
-<a href=#634 id=634 data-nosnippet>634</a>        <span class="kw">match </span>bytes_to_elements_exact(<span class="kw-2">&amp;</span>bytes) {
+<a href=#634 id=634 data-nosnippet>634</a>        <span class="kw">match </span>bytes_to_elements_exact(bytes.as_slice()) {
 <a href=#635 id=635 data-nosnippet>635</a>            <span class="prelude-val">Some</span>(inner) =&gt; {
 <a href=#636 id=636 data-nosnippet>636</a>                <span class="kw">let </span>inner: [Felt; <span class="number">4</span>] = inner.try_into().map_err(|<span class="kw">_</span>| {
 <a href=#637 id=637 data-nosnippet>637</a>                    DeserializationError::InvalidValue(<span class="string">"malformed secret key"</span>.to_string())
