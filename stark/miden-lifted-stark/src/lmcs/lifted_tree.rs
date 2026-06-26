@@ -224,11 +224,28 @@ where
         assert!(!leaves.is_empty(), "cannot commit empty batch");
         debug_assert!(alignment > 0, "alignment must be non-zero");
 
+        validate_heights(leaves.iter().map(|matrix| matrix.dimensions().height));
+
+        let use_equal_height_path =
+            salt.is_none() && leaves.iter().all(|matrix| matrix.height() == leaves[0].height());
+        let leaf_digests = if use_equal_height_path {
+            Some(info_span!("hash leaves").in_scope(|| {
+                hash_equal_height_leaf_digests::<PF, PD, DomainM, H, WIDTH, DIGEST_ELEMS>(
+                    &leaves, h,
+                )
+            }))
+        } else {
+            None
+        };
+
         let leaves: Vec<M> =
             leaves.into_iter().map(BitReversibleMatrix::bit_reverse_rows).collect();
 
         // Build leaf hashes: absorb all matrix rows into sponge states, then squeeze.
-        let leaf_digests: Vec<[PD::Value; DIGEST_ELEMS]> =
+        let leaf_digests: Vec<[PD::Value; DIGEST_ELEMS]> = if let Some(leaf_digests) = leaf_digests
+        {
+            leaf_digests
+        } else {
             info_span!("hash leaves").in_scope(|| {
                 let mut leaf_states: Vec<[PD::Value; WIDTH]> =
                     build_leaf_states_upsampled::<PF, PD, M, H, WIDTH, DIGEST_ELEMS>(&leaves, h);
@@ -259,7 +276,8 @@ where
                         h.squeeze(&leaf_states[src])
                     })
                     .collect()
-            });
+            })
+        };
 
         // Build digest layers by repeatedly compressing until we reach the root,
         // then reverse so index 0 = root, matching the top-down NodeId convention.
@@ -344,6 +362,105 @@ where
     }
 }
 
+/// Hash same-height domain-ordered matrices directly into domain-ordered leaf digests.
+///
+/// This avoids materializing full leaf states when no lifting or salt absorption is needed.
+fn hash_equal_height_leaf_digests<PF, PD, M, H, const WIDTH: usize, const DIGEST_ELEMS: usize>(
+    matrices: &[M],
+    sponge: &H,
+) -> Vec<[PD::Value; DIGEST_ELEMS]>
+where
+    PF: PackedValue,
+    PD: PackedValue,
+    M: Matrix<PF::Value> + Sync,
+    H: StatefulHasher<PF::Value, [PD::Value; DIGEST_ELEMS], State = [PD::Value; WIDTH]>
+        + StatefulHasher<PF, [PD; DIGEST_ELEMS], State = [PD; WIDTH]>
+        + Sync,
+{
+    if matrices.len() == 1 {
+        return hash_single_matrix_leaf_digests::<PF, PD, M, H, WIDTH, DIGEST_ELEMS>(
+            &matrices[0],
+            sponge,
+        );
+    }
+
+    let height = matrices[0].height();
+    let default_digest = [PD::Value::default(); DIGEST_ELEMS];
+
+    if height < PF::WIDTH || PF::WIDTH == 1 {
+        let default_state = [PD::Value::default(); WIDTH];
+        (0..height)
+            .into_par_iter()
+            .map(|row_idx| {
+                let mut state = default_state;
+                for matrix in matrices {
+                    let row = matrix.row(row_idx).expect("row_idx must be in bounds");
+                    sponge.absorb_into(&mut state, row);
+                }
+                sponge.squeeze(&state)
+            })
+            .collect()
+    } else {
+        let mut digests = vec![default_digest; height];
+        digests.par_chunks_exact_mut(PF::WIDTH).enumerate().for_each(
+            |(packed_idx, digests_chunk)| {
+                let mut packed_state: [PD; WIDTH] =
+                    array::from_fn(|_| PD::from_fn(|_| PD::Value::default()));
+                let row_idx = packed_idx * PF::WIDTH;
+                for matrix in matrices {
+                    let row = matrix.vertically_packed_row::<PF>(row_idx);
+                    sponge.absorb_into(&mut packed_state, row);
+                }
+                let packed_digest = sponge.squeeze(&packed_state);
+                PD::unpack_into(&packed_digest, digests_chunk);
+            },
+        );
+        digests
+    }
+}
+
+fn hash_single_matrix_leaf_digests<PF, PD, M, H, const WIDTH: usize, const DIGEST_ELEMS: usize>(
+    matrix: &M,
+    sponge: &H,
+) -> Vec<[PD::Value; DIGEST_ELEMS]>
+where
+    PF: PackedValue,
+    PD: PackedValue,
+    M: Matrix<PF::Value> + Sync,
+    H: StatefulHasher<PF::Value, [PD::Value; DIGEST_ELEMS], State = [PD::Value; WIDTH]>
+        + StatefulHasher<PF, [PD; DIGEST_ELEMS], State = [PD; WIDTH]>
+        + Sync,
+{
+    let height = matrix.height();
+    let default_digest = [PD::Value::default(); DIGEST_ELEMS];
+
+    if height < PF::WIDTH || PF::WIDTH == 1 {
+        let default_state = [PD::Value::default(); WIDTH];
+        matrix
+            .par_rows()
+            .map(|row| {
+                let mut state = default_state;
+                sponge.absorb_into(&mut state, row);
+                sponge.squeeze(&state)
+            })
+            .collect()
+    } else {
+        let mut digests = vec![default_digest; height];
+        digests.par_chunks_exact_mut(PF::WIDTH).enumerate().for_each(
+            |(packed_idx, digests_chunk)| {
+                let mut packed_state: [PD; WIDTH] =
+                    array::from_fn(|_| PD::from_fn(|_| PD::Value::default()));
+                let row_idx = packed_idx * PF::WIDTH;
+                let row = matrix.vertically_packed_row::<PF>(row_idx);
+                sponge.absorb_into(&mut packed_state, row);
+                let packed_digest = sponge.squeeze(&packed_state);
+                PD::unpack_into(&packed_digest, digests_chunk);
+            },
+        );
+        digests
+    }
+}
+
 /// Build leaf states using the upsampled view (nearest-neighbor upsampling).
 ///
 /// Returns the sponge states after absorbing all matrix rows but **before squeezing**.
@@ -381,10 +498,10 @@ where
 
     // Memory buffers:
     // - states: Per-leaf scalar states (one per final row), maintained across matrices.
-    // - scratch_states: Temporary buffer used when duplicating states during upsampling.
+    // - scratch_states: Temporary buffer allocated only if a later matrix raises the active height.
     let default_state = [PD::Value::default(); WIDTH];
     let mut states = vec![default_state; final_height];
-    let mut scratch_states = vec![default_state; final_height];
+    let mut scratch_states = None;
 
     let mut active_height = matrices.first().unwrap().height();
 
@@ -397,15 +514,17 @@ where
         if height > active_height {
             let scaling_factor = height / active_height;
 
-            // Copy `states` into `scratch_states`, repeating each entry `scaling_factor` times
+            let scratch = scratch_states.get_or_insert_with(|| vec![default_state; final_height]);
+
+            // Copy `states` into scratch, repeating each entry `scaling_factor` times
             // so we keep the accumulated sponge states aligned with the taller matrix.
-            scratch_states[..height]
+            scratch[..height]
                 .par_chunks_mut(scaling_factor)
                 .zip(states[..active_height].par_iter())
                 .for_each(|(chunk, state)| chunk.fill(*state));
 
-            // Copy upsampled states back to canonical buffer
-            mem::swap(&mut scratch_states, &mut states);
+            // Copy upsampled states back to canonical buffer.
+            mem::swap(scratch, &mut states);
         }
 
         // Absorb the rows of the matrix into the extended state vector
@@ -488,13 +607,18 @@ fn compress_uniform<
     let default_digest = [P::Value::default(); DIGEST_ELEMS];
     let mut next_digests = vec![default_digest; next_len];
 
-    // Use scalar path when output is too small for packing
-    if next_len < P::WIDTH || P::WIDTH == 1 {
+    if P::WIDTH == 1 {
         next_digests.par_iter_mut().zip(prev_layer.par_chunks_exact(2)).for_each(
             |(next_digest, prev_layer_pair)| {
                 *next_digest = c.compress([prev_layer_pair[0], prev_layer_pair[1]]);
             },
         );
+    } else if next_len < P::WIDTH {
+        for (next_digest, prev_layer_pair) in
+            next_digests.iter_mut().zip(prev_layer.chunks_exact(2))
+        {
+            *next_digest = c.compress([prev_layer_pair[0], prev_layer_pair[1]]);
+        }
     } else {
         // Packed path: since next_len and P::WIDTH are both powers of 2,
         // next_len is a multiple of P::WIDTH, so no remainder handling needed.

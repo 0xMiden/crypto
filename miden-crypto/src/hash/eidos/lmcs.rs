@@ -5,10 +5,9 @@ use core::array;
 use p3_symmetric::PseudoCompressionFunction;
 
 use super::{
-    Eidos,
     framing::{
-        compress_packed_u64_block, compress_u64_block, encode_felt_block, encode_packed_felt_block,
-        pack_u32_pair_u64,
+        FELT_INIT_DIGEST_U64, compress_packed_u64_block, compress_u64_block, encode_felt_block,
+        encode_packed_felt_block, pack_u32_pair_u64,
     },
     primitive::{BlakeG, PACKED_LANES},
 };
@@ -154,12 +153,12 @@ where
 
         if filled == RATE {
             digest = compress(digest, block);
-            block = [zero; RATE];
             filled = 0;
         }
     }
 
     if filled != 0 {
+        block[filled..].fill(zero);
         digest = compress(digest, block);
     }
 
@@ -171,7 +170,7 @@ fn ensure_initialized(state: &mut State) {
         return;
     }
 
-    write_digest(state, initial_digest());
+    write_digest(state, FELT_INIT_DIGEST_U64);
     state[INIT_FLAG_IDX] = 1;
 }
 
@@ -186,16 +185,10 @@ fn ensure_packed_initialized(state: &mut PackedState) {
         return;
     }
 
-    let initial = initial_digest();
-    for (word, value) in state[..DIGEST_WIDTH].iter_mut().zip(initial) {
+    for (word, value) in state[..DIGEST_WIDTH].iter_mut().zip(FELT_INIT_DIGEST_U64) {
         *word = [value; PACKED_LANES];
     }
     state[INIT_FLAG_IDX] = [1; PACKED_LANES];
-}
-
-fn initial_digest() -> Digest {
-    let initial = Eidos::init_chaining_word(0, 0);
-    array::from_fn(|idx| initial[idx].as_canonical_u64())
 }
 
 fn read_digest<T: Copy, const WIDTH: usize>(state: &[T; WIDTH]) -> [T; DIGEST_WIDTH] {
@@ -255,6 +248,7 @@ mod tests {
 
     use super::*;
     use crate::{
+        hash::eidos::Eidos,
         hash::eidos::framing::compress_felt_digest_block,
         stark::hasher::{Alignable, StatefulHasher},
     };

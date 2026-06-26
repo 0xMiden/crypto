@@ -92,18 +92,6 @@ impl BlakeG {
         cv_new
     }
 
-    /// Apply BlakeG to four independent lanes.
-    ///
-    /// On `aarch64`, this uses NEON. On `x86_64`, this uses SSE2. Other targets
-    /// fall back to the portable packed implementation.
-    #[cfg(any(feature = "internal", test))]
-    #[inline]
-    pub(super) fn compress_packed_4(cv: [[u32; 4]; 8], block: [[u32; 4]; 16]) -> [[u32; 4]; 8] {
-        let mut cv_new = blake3_schedule::compress_packed_4(cv, block);
-        apply_packed_output_mask(&mut cv_new);
-        cv_new
-    }
-
     /// Apply BlakeG to the build's selected native packed lane width.
     #[inline]
     pub(super) fn compress_packed_native(
@@ -111,36 +99,6 @@ impl BlakeG {
         block: [[u32; PACKED_LANES]; 16],
     ) -> [[u32; PACKED_LANES]; 8] {
         let mut cv_new = blake3_schedule::compress_packed_native(cv, block);
-        apply_packed_output_mask(&mut cv_new);
-        cv_new
-    }
-
-    #[cfg(feature = "internal")]
-    pub(super) fn compress_packed_4_rotr8_shift(
-        cv: [[u32; 4]; 8],
-        block: [[u32; 4]; 16],
-    ) -> [[u32; 4]; 8] {
-        let mut cv_new = blake3_schedule::compress_packed_4_rotr8_shift(cv, block);
-        apply_packed_output_mask(&mut cv_new);
-        cv_new
-    }
-
-    #[cfg(feature = "internal")]
-    pub(super) fn compress_packed_4_rotr8_cached(
-        cv: [[u32; 4]; 8],
-        block: [[u32; 4]; 16],
-    ) -> [[u32; 4]; 8] {
-        let mut cv_new = blake3_schedule::compress_packed_4_rotr8_cached(cv, block);
-        apply_packed_output_mask(&mut cv_new);
-        cv_new
-    }
-
-    #[cfg(feature = "internal")]
-    pub(super) fn compress_packed_4_preloaded_messages(
-        cv: [[u32; 4]; 8],
-        block: [[u32; 4]; 16],
-    ) -> [[u32; 4]; 8] {
-        let mut cv_new = blake3_schedule::compress_packed_4_preloaded_messages(cv, block);
         apply_packed_output_mask(&mut cv_new);
         cv_new
     }
@@ -397,33 +355,11 @@ mod tests {
         let packed_block: [[u32; LANES]; 16] =
             core::array::from_fn(|word| core::array::from_fn(|lane| blocks[lane][word]));
         let packed_out = BlakeG::compress_packed(packed_cv, packed_block);
-        let packed_out_4 = BlakeG::compress_packed_4(packed_cv, packed_block);
-        #[cfg(feature = "internal")]
-        let packed_out_4_shift = BlakeG::compress_packed_4_rotr8_shift(packed_cv, packed_block);
-        #[cfg(feature = "internal")]
-        let packed_out_4_cached = BlakeG::compress_packed_4_rotr8_cached(packed_cv, packed_block);
-        #[cfg(feature = "internal")]
-        let packed_out_4_preloaded =
-            BlakeG::compress_packed_4_preloaded_messages(packed_cv, packed_block);
 
         for lane in 0..LANES {
             let scalar = BlakeG::compress(cvs[lane], blocks[lane]);
             let packed_lane: [u32; 8] = core::array::from_fn(|word| packed_out[word][lane]);
-            let packed_lane_4: [u32; 8] = core::array::from_fn(|word| packed_out_4[word][lane]);
             assert_eq!(packed_lane, scalar);
-            assert_eq!(packed_lane_4, scalar);
-            #[cfg(feature = "internal")]
-            {
-                let shift_lane: [u32; 8] =
-                    core::array::from_fn(|word| packed_out_4_shift[word][lane]);
-                let cached_lane: [u32; 8] =
-                    core::array::from_fn(|word| packed_out_4_cached[word][lane]);
-                let preloaded_lane: [u32; 8] =
-                    core::array::from_fn(|word| packed_out_4_preloaded[word][lane]);
-                assert_eq!(shift_lane, scalar);
-                assert_eq!(cached_lane, scalar);
-                assert_eq!(preloaded_lane, scalar);
-            }
         }
     }
 

@@ -213,6 +213,7 @@ pub(super) fn compress_packed<const LANES: usize>(
 }
 
 /// Applies the raw BLAKE3 schedule to four independent lanes.
+#[cfg(not(all(target_arch = "x86_64", any(target_feature = "avx2", target_feature = "avx512f"))))]
 #[inline]
 pub(super) fn compress_packed_4(cv: [[u32; 4]; 8], block: [[u32; 4]; 16]) -> [[u32; 4]; 8] {
     #[cfg(target_arch = "aarch64")]
@@ -238,54 +239,6 @@ pub(super) fn compress_packed_native(
     block: [[u32; PACKED_LANES]; 16],
 ) -> [[u32; PACKED_LANES]; 8] {
     native_backend::compress(cv, block)
-}
-
-#[cfg(feature = "internal")]
-pub(super) fn compress_packed_4_rotr8_shift(
-    cv: [[u32; 4]; 8],
-    block: [[u32; 4]; 16],
-) -> [[u32; 4]; 8] {
-    #[cfg(target_arch = "aarch64")]
-    {
-        return neon::compress_packed_4_rotr8_shift(cv, block);
-    }
-
-    #[cfg(not(target_arch = "aarch64"))]
-    {
-        compress_packed_4(cv, block)
-    }
-}
-
-#[cfg(feature = "internal")]
-pub(super) fn compress_packed_4_rotr8_cached(
-    cv: [[u32; 4]; 8],
-    block: [[u32; 4]; 16],
-) -> [[u32; 4]; 8] {
-    #[cfg(target_arch = "aarch64")]
-    {
-        return neon::compress_packed_4_rotr8_cached(cv, block);
-    }
-
-    #[cfg(not(target_arch = "aarch64"))]
-    {
-        compress_packed_4(cv, block)
-    }
-}
-
-#[cfg(feature = "internal")]
-pub(super) fn compress_packed_4_preloaded_messages(
-    cv: [[u32; 4]; 8],
-    block: [[u32; 4]; 16],
-) -> [[u32; 4]; 8] {
-    #[cfg(target_arch = "aarch64")]
-    {
-        return neon::compress_packed_4_preloaded_messages(cv, block);
-    }
-
-    #[cfg(not(target_arch = "aarch64"))]
-    {
-        compress_packed_4(cv, block)
-    }
 }
 
 #[cfg(target_arch = "x86_64")]
@@ -440,7 +393,10 @@ macro_rules! define_x86_packed_compress {
     };
 }
 
-#[cfg(target_arch = "x86_64")]
+#[cfg(all(
+    target_arch = "x86_64",
+    not(any(target_feature = "avx2", target_feature = "avx512f"))
+))]
 mod x86_64_sse2 {
     use core::arch::x86_64::*;
 
@@ -653,12 +609,6 @@ mod neon {
         unsafe { vsriq_n_u32::<12>(vshlq_n_u32::<20>(x), x) }
     }
 
-    #[cfg(feature = "internal")]
-    #[inline(always)]
-    fn rotr8_shift_insert(x: uint32x4_t) -> uint32x4_t {
-        unsafe { vsriq_n_u32::<8>(vshlq_n_u32::<24>(x), x) }
-    }
-
     #[inline(always)]
     fn rotr8_table(x: uint32x4_t, idx: uint8x16_t) -> uint32x4_t {
         unsafe { vreinterpretq_u32_u8(vqtbl1q_u8(vreinterpretq_u8_u32(x), idx)) }
@@ -819,257 +769,4 @@ mod neon {
             store(xor(v7, v15)),
         ]
     }
-
-    #[cfg(feature = "internal")]
-    macro_rules! message_direct {
-        ($block:ident, $messages:ident, $idx:literal) => {
-            load(&$block[$idx])
-        };
-    }
-
-    #[cfg(feature = "internal")]
-    macro_rules! message_preloaded {
-        ($block:ident, $messages:ident, $idx:literal) => {
-            $messages[$idx]
-        };
-    }
-
-    #[cfg(feature = "internal")]
-    macro_rules! rot8_shift {
-        ($x:expr, $rot8_idx:ident) => {
-            rotr8_shift_insert($x)
-        };
-    }
-
-    #[cfg(feature = "internal")]
-    macro_rules! rot8_cached_table {
-        ($x:expr, $rot8_idx:ident) => {
-            rotr8_table($x, $rot8_idx)
-        };
-    }
-
-    #[cfg(feature = "internal")]
-    macro_rules! setup_none {
-        ($block:ident, $messages:ident, $rot8_idx:ident) => {};
-    }
-
-    #[cfg(feature = "internal")]
-    macro_rules! setup_rot8_cached {
-        ($block:ident, $messages:ident, $rot8_idx:ident) => {
-            let $rot8_idx = load_rot8_idx();
-        };
-    }
-
-    #[cfg(feature = "internal")]
-    macro_rules! setup_preloaded_messages {
-        ($block:ident, $messages:ident, $rot8_idx:ident) => {
-            let $rot8_idx = load_rot8_idx();
-            let $messages = [
-                load(&$block[0]),
-                load(&$block[1]),
-                load(&$block[2]),
-                load(&$block[3]),
-                load(&$block[4]),
-                load(&$block[5]),
-                load(&$block[6]),
-                load(&$block[7]),
-                load(&$block[8]),
-                load(&$block[9]),
-                load(&$block[10]),
-                load(&$block[11]),
-                load(&$block[12]),
-                load(&$block[13]),
-                load(&$block[14]),
-                load(&$block[15]),
-            ];
-        };
-    }
-
-    #[cfg(feature = "internal")]
-    #[rustfmt::skip]
-    macro_rules! define_compress_variant {
-        (
-            $name:ident,
-            $message:ident,
-            $rot8:ident,
-            $messages:ident,
-            $rot8_idx:ident,
-            $setup:ident
-        ) => {
-            #[inline(always)]
-            pub(super) fn $name(cv: [[u32; 4]; 8], block: [[u32; 4]; 16]) -> [[u32; 4]; 8] {
-                let mut v0 = load(&cv[0]);
-                let mut v1 = load(&cv[1]);
-                let mut v2 = load(&cv[2]);
-                let mut v3 = load(&cv[3]);
-                let mut v4 = load(&cv[4]);
-                let mut v5 = load(&cv[5]);
-                let mut v6 = load(&cv[6]);
-                let mut v7 = load(&cv[7]);
-                let mut v8 = splat(IV[0]);
-                let mut v9 = splat(IV[1]);
-                let mut v10 = splat(IV[2]);
-                let mut v11 = splat(IV[3]);
-                let mut v12 = splat(IV[4]);
-                let mut v13 = splat(IV[5]);
-                let mut v14 = splat(IV[6]);
-                let mut v15 = splat(IV[7]);
-
-                $setup!(block, $messages, $rot8_idx);
-
-                macro_rules! round {
-                    (
-                        $m0:literal,
-                        $m1:literal,
-                        $m2:literal,
-                        $m3:literal,
-                        $m4:literal,
-                        $m5:literal,
-                        $m6:literal,
-                        $m7:literal,
-                        $m8:literal,
-                        $m9:literal,
-                        $m10:literal,
-                        $m11:literal,
-                        $m12:literal,
-                        $m13:literal,
-                        $m14:literal,
-                        $m15:literal
-                    ) => {{
-                        let m0 = $message!(block, $messages, $m0);
-                        let m1 = $message!(block, $messages, $m1);
-                        let m2 = $message!(block, $messages, $m2);
-                        let m3 = $message!(block, $messages, $m3);
-                        let m4 = $message!(block, $messages, $m4);
-                        let m5 = $message!(block, $messages, $m5);
-                        let m6 = $message!(block, $messages, $m6);
-                        let m7 = $message!(block, $messages, $m7);
-                        let m8 = $message!(block, $messages, $m8);
-                        let m9 = $message!(block, $messages, $m9);
-                        let m10 = $message!(block, $messages, $m10);
-                        let m11 = $message!(block, $messages, $m11);
-                        let m12 = $message!(block, $messages, $m12);
-                        let m13 = $message!(block, $messages, $m13);
-                        let m14 = $message!(block, $messages, $m14);
-                        let m15 = $message!(block, $messages, $m15);
-
-                        v0 = add(add(v0, v4), m0);
-                        v1 = add(add(v1, v5), m2);
-                        v2 = add(add(v2, v6), m4);
-                        v3 = add(add(v3, v7), m6);
-                        v12 = rotr16(xor(v12, v0));
-                        v13 = rotr16(xor(v13, v1));
-                        v14 = rotr16(xor(v14, v2));
-                        v15 = rotr16(xor(v15, v3));
-                        v8 = add(v8, v12);
-                        v9 = add(v9, v13);
-                        v10 = add(v10, v14);
-                        v11 = add(v11, v15);
-                        v4 = rotr12(xor(v4, v8));
-                        v5 = rotr12(xor(v5, v9));
-                        v6 = rotr12(xor(v6, v10));
-                        v7 = rotr12(xor(v7, v11));
-                        v0 = add(add(v0, v4), m1);
-                        v1 = add(add(v1, v5), m3);
-                        v2 = add(add(v2, v6), m5);
-                        v3 = add(add(v3, v7), m7);
-                        v12 = $rot8!(xor(v12, v0), $rot8_idx);
-                        v13 = $rot8!(xor(v13, v1), $rot8_idx);
-                        v14 = $rot8!(xor(v14, v2), $rot8_idx);
-                        v15 = $rot8!(xor(v15, v3), $rot8_idx);
-                        v8 = add(v8, v12);
-                        v9 = add(v9, v13);
-                        v10 = add(v10, v14);
-                        v11 = add(v11, v15);
-                        v4 = rotr7(xor(v4, v8));
-                        v5 = rotr7(xor(v5, v9));
-                        v6 = rotr7(xor(v6, v10));
-                        v7 = rotr7(xor(v7, v11));
-
-                        v0 = add(add(v0, v5), m8);
-                        v1 = add(add(v1, v6), m10);
-                        v2 = add(add(v2, v7), m12);
-                        v3 = add(add(v3, v4), m14);
-                        v15 = rotr16(xor(v15, v0));
-                        v12 = rotr16(xor(v12, v1));
-                        v13 = rotr16(xor(v13, v2));
-                        v14 = rotr16(xor(v14, v3));
-                        v10 = add(v10, v15);
-                        v11 = add(v11, v12);
-                        v8 = add(v8, v13);
-                        v9 = add(v9, v14);
-                        v5 = rotr12(xor(v5, v10));
-                        v6 = rotr12(xor(v6, v11));
-                        v7 = rotr12(xor(v7, v8));
-                        v4 = rotr12(xor(v4, v9));
-                        v0 = add(add(v0, v5), m9);
-                        v1 = add(add(v1, v6), m11);
-                        v2 = add(add(v2, v7), m13);
-                        v3 = add(add(v3, v4), m15);
-                        v15 = $rot8!(xor(v15, v0), $rot8_idx);
-                        v12 = $rot8!(xor(v12, v1), $rot8_idx);
-                        v13 = $rot8!(xor(v13, v2), $rot8_idx);
-                        v14 = $rot8!(xor(v14, v3), $rot8_idx);
-                        v10 = add(v10, v15);
-                        v11 = add(v11, v12);
-                        v8 = add(v8, v13);
-                        v9 = add(v9, v14);
-                        v5 = rotr7(xor(v5, v10));
-                        v6 = rotr7(xor(v6, v11));
-                        v7 = rotr7(xor(v7, v8));
-                        v4 = rotr7(xor(v4, v9));
-                    }};
-                }
-
-                round!(0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15);
-                round!(2, 6, 3, 10, 7, 0, 4, 13, 1, 11, 12, 5, 9, 14, 15, 8);
-                round!(3, 4, 10, 12, 13, 2, 7, 14, 6, 5, 9, 0, 11, 15, 8, 1);
-                round!(10, 7, 12, 9, 14, 3, 13, 15, 4, 0, 11, 2, 5, 8, 1, 6);
-                round!(12, 13, 9, 11, 15, 10, 14, 8, 7, 2, 5, 3, 0, 1, 6, 4);
-                round!(9, 14, 11, 5, 8, 12, 15, 1, 13, 3, 0, 10, 2, 6, 4, 7);
-                round!(11, 15, 5, 0, 1, 9, 8, 6, 14, 10, 2, 12, 3, 4, 7, 13);
-
-                [
-                    store(xor(v0, v8)),
-                    store(xor(v1, v9)),
-                    store(xor(v2, v10)),
-                    store(xor(v3, v11)),
-                    store(xor(v4, v12)),
-                    store(xor(v5, v13)),
-                    store(xor(v6, v14)),
-                    store(xor(v7, v15)),
-                ]
-            }
-        };
-    }
-
-    #[cfg(feature = "internal")]
-    define_compress_variant!(
-        compress_packed_4_rotr8_shift,
-        message_direct,
-        rot8_shift,
-        messages,
-        rot8_idx,
-        setup_none
-    );
-
-    #[cfg(feature = "internal")]
-    define_compress_variant!(
-        compress_packed_4_rotr8_cached,
-        message_direct,
-        rot8_cached_table,
-        messages,
-        rot8_idx,
-        setup_rot8_cached
-    );
-
-    #[cfg(feature = "internal")]
-    define_compress_variant!(
-        compress_packed_4_preloaded_messages,
-        message_preloaded,
-        rot8_cached_table,
-        messages,
-        rot8_idx,
-        setup_preloaded_messages
-    );
 }

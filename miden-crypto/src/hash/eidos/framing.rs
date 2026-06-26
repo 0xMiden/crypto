@@ -35,6 +35,10 @@ const BASE1: u64 = 0x254f_f53a_3c6e_f372;
 const BASE2: u64 = 0x1b05_688c_0000_0000;
 const BASE3: u64 = 0x5be0_cd19_0000_0000;
 
+const FELT_RATE_CV: [u32; 8] = init_cv_unchecked(0, FELT_MODE, RATE as u32);
+// Felt-mode initial chaining word, before absorbing the required zero block for empty input.
+pub(super) const FELT_INIT_DIGEST_U64: [u64; DIGEST_WIDTH] = [BASE0, BASE1, BASE2, BASE3];
+
 /// Pack two `u32` lanes into one Goldilocks field element.
 ///
 /// The high lane is masked before packing:
@@ -120,6 +124,13 @@ fn init_packed_u64_digest<const LANES: usize>(
     pack_cv_to_packed_u64s(array::from_fn(|word| [cv[word]; LANES]))
 }
 
+#[inline]
+fn domain_to_u32(domain: Felt) -> u32 {
+    let d = domain.as_canonical_u64();
+    assert!(d <= MAX_DOMAIN as u64, "domain must fit in 31 bits");
+    d as u32
+}
+
 /// Construct the initial chaining value.
 ///
 /// `domain`, `mode`, and input length `n` are injected before the first
@@ -128,13 +139,22 @@ fn init_cv(domain: u32, mode: u32, n: u32) -> [u32; 8] {
     debug_assert!(domain <= MAX_DOMAIN, "domain must fit in 31 bits");
     debug_assert!(mode == FELT_MODE || mode == BYTE_MODE, "invalid Eidos mode");
 
-    let init_word = Word::new([
-        Felt::new_unchecked(BASE0),
-        Felt::new_unchecked(BASE1),
-        Felt::new_unchecked(BASE2 + (domain as u64) + (mode as u64)),
-        Felt::new_unchecked(BASE3 + n as u64),
-    ]);
-    unpack_to_cv(init_word)
+    init_cv_unchecked(domain, mode, n)
+}
+
+const fn init_cv_unchecked(domain: u32, mode: u32, n: u32) -> [u32; 8] {
+    let word2 = BASE2 + (domain as u64) + (mode as u64);
+    let word3 = BASE3 + n as u64;
+    [
+        BASE0 as u32,
+        (BASE0 >> 32) as u32,
+        BASE1 as u32,
+        (BASE1 >> 32) as u32,
+        word2 as u32,
+        (word2 >> 32) as u32,
+        word3 as u32,
+        (word3 >> 32) as u32,
+    ]
 }
 
 #[inline]
@@ -161,6 +181,25 @@ pub(super) fn encode_felt_block(chunk: &[Felt]) -> [u32; 16] {
         block[2 * i + 1] = hi;
     }
     block
+}
+
+#[inline]
+fn encode_digest_pair(values: &[Word; 2]) -> [u32; 16] {
+    let mut block = [0u32; 16];
+    for (word_idx, word) in values.iter().enumerate() {
+        for (felt_idx, &felt) in word.iter().enumerate() {
+            let (lo, hi) = unpack_u32_pair(felt);
+            let offset = 2 * (word_idx * DIGEST_WIDTH + felt_idx);
+            block[offset] = lo;
+            block[offset + 1] = hi;
+        }
+    }
+    block
+}
+
+#[inline]
+fn compress_digest_pair(values: &[Word; 2], cv: [u32; 8]) -> Word {
+    pack_to_word(BlakeG::compress(cv, encode_digest_pair(values)))
 }
 
 #[inline]
@@ -234,8 +273,7 @@ fn encode_packed_u64_block<const LANES: usize>(block: [[u64; LANES]; RATE]) -> [
 /// Hash one full felt-mode block of `u64`-encoded field elements under domain 0.
 #[inline]
 pub(super) fn compress_u64_block(block: [u64; RATE]) -> [u64; DIGEST_WIDTH] {
-    let cv = init_cv(0, FELT_MODE, RATE as u32);
-    pack_cv_to_u64s(BlakeG::compress(cv, encode_u64_block(&block)))
+    pack_cv_to_u64s(BlakeG::compress(FELT_RATE_CV, encode_u64_block(&block)))
 }
 
 /// Hash one full packed felt-mode block of `u64`-encoded field elements under domain 0.
@@ -243,8 +281,7 @@ pub(super) fn compress_u64_block(block: [u64; RATE]) -> [u64; DIGEST_WIDTH] {
 pub(super) fn compress_packed_u64_block(
     block: [[u64; PACKED_LANES]; RATE],
 ) -> [[u64; PACKED_LANES]; DIGEST_WIDTH] {
-    let cv = init_cv(0, FELT_MODE, RATE as u32);
-    let cv = array::from_fn(|word| [cv[word]; PACKED_LANES]);
+    let cv = array::from_fn(|word| [FELT_RATE_CV[word]; PACKED_LANES]);
     let block = encode_packed_u64_block(block);
     pack_cv_to_packed_u64s(BlakeG::compress_packed_native(cv, block))
 }
@@ -306,12 +343,15 @@ where
 
         if pos == RATE {
             cv = BlakeG::compress(cv, block);
-            block = [0u32; 16];
             pos = 0;
         }
     }
 
     assert_yielded_len(count, len);
+
+    if pos != 0 {
+        block[2 * pos..].fill(0);
+    }
 
     if count == 0 || pos != 0 {
         cv = BlakeG::compress(cv, block);
@@ -337,12 +377,15 @@ where
 
         if pos == RATE {
             cv = BlakeG::compress(cv, encode_u64_block(&block));
-            block = [0u64; RATE];
             pos = 0;
         }
     }
 
     assert_yielded_len(count, len);
+
+    if pos != 0 {
+        block[pos..].fill(0);
+    }
 
     if count == 0 || pos != 0 {
         cv = BlakeG::compress(cv, encode_u64_block(&block));
@@ -368,12 +411,15 @@ where
 
         if pos == RATE {
             cv = compress_packed_felt_digest_block(cv, block);
-            block = [[Felt::ZERO; PACKED_LANES]; RATE];
             pos = 0;
         }
     }
 
     assert_yielded_len(count, len);
+
+    if pos != 0 {
+        block[pos..].fill([Felt::ZERO; PACKED_LANES]);
+    }
 
     if count == 0 || pos != 0 {
         cv = compress_packed_felt_digest_block(cv, block);
@@ -402,12 +448,15 @@ where
                 unpack_packed_u64_digest(cv),
                 encode_packed_u64_block(block),
             ));
-            block = [[0; PACKED_LANES]; RATE];
             pos = 0;
         }
     }
 
     assert_yielded_len(count, len);
+
+    if pos != 0 {
+        block[pos..].fill([0; PACKED_LANES]);
+    }
 
     if count == 0 || pos != 0 {
         cv = pack_cv_to_packed_u64s(BlakeG::compress_packed_native(
@@ -486,13 +535,11 @@ impl Eidos {
         elements: &[E],
         domain: Felt,
     ) -> Word {
-        let domain_u32 = {
-            let d = domain.as_canonical_u64();
-            assert!(d <= MAX_DOMAIN as u64, "domain must fit in 31 bits");
-            d as u32
-        };
-
-        let n_total: usize = elements.iter().map(|e| E::as_basis_coefficients_slice(e).len()).sum();
+        let domain_u32 = domain_to_u32(domain);
+        let n_total = elements
+            .len()
+            .checked_mul(E::DIMENSION)
+            .expect("input too long: felt count overflowed usize");
         let n = u32::try_from(n_total).expect("input too long: felt count must fit in u32");
         let mut cv = init_cv(domain_u32, FELT_MODE, n);
 
@@ -512,13 +559,13 @@ impl Eidos {
 
                 if pos == RATE {
                     cv = BlakeG::compress(cv, block);
-                    block = [0u32; 16];
                     pos = 0;
                 }
             }
         }
 
         if pos != 0 {
+            block[2 * pos..].fill(0);
             cv = BlakeG::compress(cv, block);
         }
 
@@ -528,14 +575,19 @@ impl Eidos {
     /// Hash two digest words under domain 0.
     #[inline]
     pub fn merge(values: &[Word; 2]) -> Word {
-        Self::merge_in_domain(values, Felt::ZERO)
+        compress_digest_pair(values, FELT_RATE_CV)
     }
 
     /// Hash two digest words under a user domain.
     #[inline]
     pub fn merge_in_domain(values: &[Word; 2], domain: Felt) -> Word {
-        let elements: [Felt; RATE] = array::from_fn(|i| values[i / DIGEST_WIDTH][i % DIGEST_WIDTH]);
-        Self::hash_elements_in_domain(&elements, domain)
+        let domain_u32 = domain_to_u32(domain);
+        let cv = if domain_u32 == 0 {
+            FELT_RATE_CV
+        } else {
+            init_cv(domain_u32, FELT_MODE, RATE as u32)
+        };
+        compress_digest_pair(values, cv)
     }
 
     /// Hash a sequence of digest words under domain 0.
