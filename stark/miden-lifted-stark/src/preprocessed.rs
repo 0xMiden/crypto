@@ -16,7 +16,7 @@
 
 use alloc::vec::Vec;
 
-use miden_lifted_air::{BaseAir, LiftedAir, MultiAir, ProverStatement, Statement, log2_strict_u8};
+use miden_lifted_air::{BaseAir, MultiAir, ProverStatement, Statement, log2_strict_u8};
 use miden_stark_transcript::{ProverTranscript, VerifierChannel, VerifierTranscript};
 use p3_dft::TwoAdicSubgroupDft;
 use p3_field::{ExtensionField, TwoAdicField};
@@ -30,7 +30,6 @@ use crate::{
     lmcs::{Lmcs, LmcsError, LmcsTree, tree_indices::TreeIndices},
     order::TraceOrder,
     prover::commit::Committed,
-    util::bitrev::materialize_bitrev,
 };
 
 // ============================================================================
@@ -122,14 +121,7 @@ where
                     .expect("preprocessed LDE order exceeds field two-adicity");
                 let width = trace.width();
                 info_span!("preprocessed LDE", air = air_idx, log_height = log_h, width).in_scope(
-                    || {
-                        let lde = config.dft().coset_lde_batch(
-                            trace.clone(),
-                            log_blowup.into(),
-                            coset_shift,
-                        );
-                        materialize_bitrev(lde)
-                    },
+                    || config.dft().coset_lde_batch(trace.clone(), log_blowup.into(), coset_shift),
                 )
             })
             .collect();

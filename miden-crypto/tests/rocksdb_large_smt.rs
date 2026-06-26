@@ -3,8 +3,8 @@ use miden_crypto::{
     merkle::{
         InnerNodeInfo,
         smt::{
-            LargeSmt, LargeSmtError, RocksDbConfig, RocksDbSnapshotStorage, RocksDbStorage,
-            SmtStorageReader,
+            LargeSmt, LargeSmtError, LargeSmtResult, RocksDbConfig, RocksDbSnapshotStorage,
+            RocksDbStorage, SmtStorageReader, StorageError,
         },
     },
 };
@@ -12,9 +12,18 @@ use rocksdb::{DB, IteratorMode, Options};
 use tempfile::TempDir;
 
 const LEAVES_CF: &str = "leaves";
-const SUBTREE_CFS: [&str; 5] = ["st24", "st32", "st40", "st48", "st56"];
-const ROCKSDB_CFS: [&str; 8] =
-    ["leaves", "st24", "st32", "st40", "st48", "st56", "metadata", "depth24"];
+const SUBTREE_CFS: [&str; 6] = ["st16", "st24", "st32", "st40", "st48", "st56"];
+const ROCKSDB_CFS: [&str; 9] = [
+    "in_mem_depth",
+    "leaves",
+    "st16",
+    "st24",
+    "st32",
+    "st40",
+    "st48",
+    "st56",
+    "metadata",
+];
 
 fn setup_storage() -> (RocksDbStorage, TempDir) {
     let temp_dir = tempfile::Builder::new()
@@ -128,14 +137,16 @@ fn rocksdb_persistence_reopen() {
     let smt = LargeSmt::<RocksDbStorage>::with_entries(initial_storage, entries).unwrap();
     let root = smt.root();
 
-    let mut inner_nodes: Vec<InnerNodeInfo> = smt.inner_nodes().unwrap().collect();
+    let mut inner_nodes: Vec<InnerNodeInfo> =
+        smt.inner_nodes().unwrap().collect::<Result<Vec<_>, _>>().unwrap();
     inner_nodes.sort_by_key(|info| info.value);
     drop(smt);
 
     let reopened_storage = RocksDbStorage::open(RocksDbConfig::new(db_path)).unwrap();
     let smt = LargeSmt::<RocksDbStorage>::load(reopened_storage).unwrap();
 
-    let mut inner_nodes_2: Vec<InnerNodeInfo> = smt.inner_nodes().unwrap().collect();
+    let mut inner_nodes_2: Vec<InnerNodeInfo> =
+        smt.inner_nodes().unwrap().collect::<Result<Vec<_>, _>>().unwrap();
     inner_nodes_2.sort_by_key(|info| info.value);
 
     assert_eq!(inner_nodes.len(), inner_nodes_2.len());
@@ -169,14 +180,16 @@ fn rocksdb_persistence_after_insertion() {
     let num_leaves = smt.num_leaves();
     let num_entries = smt.num_entries();
 
-    let mut inner_nodes: Vec<InnerNodeInfo> = smt.inner_nodes().unwrap().collect();
+    let mut inner_nodes: Vec<InnerNodeInfo> =
+        smt.inner_nodes().unwrap().collect::<Result<Vec<_>, _>>().unwrap();
     inner_nodes.sort_by_key(|info| info.value);
     drop(smt);
 
     let reopened_storage = RocksDbStorage::open(RocksDbConfig::new(db_path)).unwrap();
     let smt = LargeSmt::<RocksDbStorage>::load(reopened_storage).unwrap();
 
-    let mut inner_nodes_2: Vec<InnerNodeInfo> = smt.inner_nodes().unwrap().collect();
+    let mut inner_nodes_2: Vec<InnerNodeInfo> =
+        smt.inner_nodes().unwrap().collect::<Result<Vec<_>, _>>().unwrap();
     inner_nodes_2.sort_by_key(|info| info.value);
 
     assert_eq!(inner_nodes.len(), inner_nodes_2.len());
@@ -242,7 +255,8 @@ fn rocksdb_persistence_after_insert_batch_with_deletions() {
     smt.insert_batch(batch_entries).unwrap();
     let root = smt.root();
 
-    let mut inner_nodes: Vec<InnerNodeInfo> = smt.inner_nodes().unwrap().collect();
+    let mut inner_nodes: Vec<InnerNodeInfo> =
+        smt.inner_nodes().unwrap().collect::<Result<Vec<_>, _>>().unwrap();
     inner_nodes.sort_by_key(|info| info.value);
     let num_leaves = smt.num_leaves();
     let num_entries = smt.num_entries();
@@ -251,7 +265,8 @@ fn rocksdb_persistence_after_insert_batch_with_deletions() {
     let reopened_storage = RocksDbStorage::open(RocksDbConfig::new(db_path)).unwrap();
     let smt = LargeSmt::<RocksDbStorage>::load(reopened_storage).unwrap();
 
-    let mut inner_nodes_2: Vec<InnerNodeInfo> = smt.inner_nodes().unwrap().collect();
+    let mut inner_nodes_2: Vec<InnerNodeInfo> =
+        smt.inner_nodes().unwrap().collect::<Result<Vec<_>, _>>().unwrap();
     inner_nodes_2.sort_by_key(|info| info.value);
     let num_leaves_2 = smt.num_leaves();
     let num_entries_2 = smt.num_entries();
@@ -334,7 +349,7 @@ fn rocksdb_load_skips_validation() {
 }
 
 #[test]
-fn rocksdb_iter_leaves_skips_corrupt_leaf() {
+fn rocksdb_iter_leaves_returns_error_for_corrupt_leaf() {
     let entries = generate_entries(1);
     let leaf_index = entries[0].0[3].as_canonical_u64();
 
@@ -344,23 +359,19 @@ fn rocksdb_iter_leaves_skips_corrupt_leaf() {
     let smt = LargeSmt::<RocksDbStorage>::with_entries(initial_storage, entries).unwrap();
     drop(smt);
 
-    let storage = RocksDbStorage::open(RocksDbConfig::new(db_path.clone())).unwrap();
-    let expected_count = storage.iter_leaves().unwrap().count();
-    drop(storage);
-
     corrupt_leaf_value(&db_path, leaf_index);
 
-    let storage = RocksDbStorage::open(RocksDbConfig::new(db_path.clone())).unwrap();
-    let leaves: Vec<_> = storage.iter_leaves().unwrap().collect();
+    let storage = RocksDbStorage::open(RocksDbConfig::new(db_path)).unwrap();
+    let result = storage.iter_leaves().unwrap().collect::<Result<Vec<_>, StorageError>>();
+
     assert!(
-        leaves.len() < expected_count,
-        "expected corrupt leaf to be skipped; before={expected_count}, after={}",
-        leaves.len(),
+        matches!(result, Err(StorageError::Value(_))),
+        "expected corrupt leaf deserialization to fail, got {result:?}",
     );
 }
 
 #[test]
-fn rocksdb_iter_subtrees_skips_corrupt_subtree() {
+fn rocksdb_iter_subtrees_returns_error_for_corrupt_subtree() {
     let entries = generate_entries(1000);
 
     let (initial_storage, temp_dir_guard) = setup_storage();
@@ -369,18 +380,14 @@ fn rocksdb_iter_subtrees_skips_corrupt_subtree() {
     let smt = LargeSmt::<RocksDbStorage>::with_entries(initial_storage, entries).unwrap();
     drop(smt);
 
-    let storage = RocksDbStorage::open(RocksDbConfig::new(db_path.clone())).unwrap();
-    let expected_count = storage.iter_subtrees().unwrap().count();
-    drop(storage);
-
     corrupt_first_subtree_value(&db_path);
 
-    let storage = RocksDbStorage::open(RocksDbConfig::new(db_path.clone())).unwrap();
-    let subtrees: Vec<_> = storage.iter_subtrees().unwrap().collect();
+    let storage = RocksDbStorage::open(RocksDbConfig::new(db_path)).unwrap();
+    let result = storage.iter_subtrees().unwrap().collect::<Result<Vec<_>, StorageError>>();
+
     assert!(
-        subtrees.len() < expected_count,
-        "expected corrupt subtree to be skipped; before={expected_count}, after={}",
-        subtrees.len(),
+        matches!(result, Err(StorageError::Subtree(_))),
+        "expected corrupt subtree deserialization to fail, got {result:?}",
     );
 }
 
@@ -468,7 +475,14 @@ fn rocksdb_inner_nodes_match_full_smt() {
     let large_smt = LargeSmt::<RocksDbStorage>::with_entries(storage, entries).unwrap();
 
     let mut control_nodes: Vec<InnerNodeInfo> = control_smt.inner_nodes().collect();
-    let mut rocksdb_nodes: Vec<InnerNodeInfo> = large_smt.inner_nodes().unwrap().collect();
+    let mut rocksdb_nodes: Vec<InnerNodeInfo> = large_smt
+        .inner_nodes()
+        .unwrap()
+        .try_fold(Vec::new(), |mut acc, info| {
+            acc.push(info?);
+            LargeSmtResult::Ok(acc)
+        })
+        .unwrap();
     control_nodes.sort_by_key(|info| info.value);
     rocksdb_nodes.sort_by_key(|info| info.value);
 

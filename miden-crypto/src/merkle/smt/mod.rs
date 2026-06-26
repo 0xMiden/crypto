@@ -22,20 +22,26 @@ mod large;
 pub use full::concurrent::{SubtreeLeaf, build_subtree_for_bench};
 #[cfg(feature = "concurrent")]
 pub use large::{
-    LargeSmt, LargeSmtError, MemoryStorage, MemoryStorageSnapshot, SmtStorage, SmtStorageReader,
-    StorageError, StorageUpdateParts, StorageUpdates, Subtree, SubtreeError, SubtreeUpdate,
+    LargeSmt, LargeSmtError, LargeSmtResult, MemoryStorage, MemoryStorageSnapshot, SmtStorage,
+    SmtStorageReader, StorageError, StorageResult, StorageUpdateParts, StorageUpdates, Subtree,
+    SubtreeError, SubtreeUpdate,
 };
 #[cfg(feature = "rocksdb")]
-pub use large::{RocksDbConfig, RocksDbSnapshotStorage, RocksDbStorage};
+pub use large::{
+    RocksDbBloomFilterBitsPerKey, RocksDbConfig, RocksDbDurabilityMode, RocksDbMemoryBudget,
+    RocksDbSnapshotStorage, RocksDbStorage, RocksDbTuningOptions, RocksDbWriteBufferManagerBudget,
+};
 
 mod large_forest;
 pub use large_forest::{
-    Backend, BackendError, BackendReader, Config as ForestConfig,
-    DEFAULT_MAX_HISTORY_VERSIONS as FOREST_DEFAULT_MAX_HISTORY_VERSIONS, ForestOperation,
+    AppliedLineageMutation, Backend, BackendError, BackendReader, Config as ForestConfig,
+    DEFAULT_MAX_HISTORY_VERSIONS as FOREST_DEFAULT_MAX_HISTORY_VERSIONS,
     InMemoryBackend as ForestInMemoryBackend,
     InMemoryBackendSnapshot as ForestInMemoryBackendReader, LargeSmtForest, LargeSmtForestError,
-    LineageId, MIN_HISTORY_VERSIONS as FOREST_MIN_HISTORY_VERSIONS, RootInfo, SmtForestUpdateBatch,
-    SmtUpdateBatch, TreeEntry, TreeId, TreeWithRoot, VersionId,
+    LineageId, LineageMutation, LineageMutationKind,
+    MIN_HISTORY_VERSIONS as FOREST_MIN_HISTORY_VERSIONS, RootInfo, SmtForestMutationSet,
+    SmtForestOperation, SmtForestUpdateBatch, SmtUpdateBatch, TreeEntry, TreeId, TreeWithRoot,
+    VersionId,
 };
 #[cfg(feature = "persistent-forest")]
 pub use large_forest::{

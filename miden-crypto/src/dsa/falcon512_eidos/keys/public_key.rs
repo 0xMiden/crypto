@@ -1,4 +1,4 @@
-//! Public key types for the Falcon 512 digital signature scheme used in Miden VM.
+//! Public key types for Falcon 512 signatures over Eidos.
 
 use alloc::{string::ToString, vec::Vec};
 use core::{fmt, ops::Deref};

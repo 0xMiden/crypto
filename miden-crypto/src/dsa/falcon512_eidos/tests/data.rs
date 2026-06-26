@@ -2,9 +2,9 @@ use crate::dsa::falcon512_eidos::SIG_SERIALIZED_LEN;
 
 pub(crate) const NUM_TEST_VECTORS: usize = 12;
 
-/// Helper data to indicate the number of bytes the should be draw from the SHAKE256-based PRNG
-/// in order to sync its state to the state of the PRNG in the reference implementation during
-/// testing of the Falcon512 test vectors.
+/// Helper data indicating how many bytes to draw from the SHAKE256-based PRNG
+/// to sync its state with the reference implementation while testing Falcon512
+/// vectors.
 pub(crate) const SYNC_DATA_FOR_TEST_VECTOR: [(usize, usize); NUM_TEST_VECTORS] = [
     (135376, 1),
     (127224, 1),
@@ -20,9 +20,9 @@ pub(crate) const SYNC_DATA_FOR_TEST_VECTOR: [(usize, usize); NUM_TEST_VECTORS] =
     (53332, 1),
 ];
 
-/// Helper data to indicate the number of bytes the should be draw from the SHAKE256-based PRNG
-/// in order to sync its state to the state of the PRNG in the reference implementation before
-/// testing of the Falcon512 test vectors.
+/// Helper data indicating how many bytes to draw from the SHAKE256-based PRNG
+/// to sync its state with the reference implementation before testing Falcon512
+/// vectors.
 pub(crate) const SYNC_DATA: [(usize, usize); 96] = [
     (75776, 2),
     (8192, 3),

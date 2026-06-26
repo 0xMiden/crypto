@@ -1,10 +1,13 @@
 use alloc::{boxed::Box, vec::Vec};
 
-use super::{IN_MEMORY_DEPTH, LargeSmt, SmtStorageReader, is_empty_parent};
+use super::{IN_MEMORY_DEPTH, LargeSmtResult, StorageResult, is_empty_parent};
 use crate::{
     Word,
     hash::eidos::Eidos,
-    merkle::{InnerNodeInfo, smt::large::subtree::Subtree},
+    merkle::{
+        InnerNodeInfo,
+        smt::{LargeSmt, SmtStorageReader, large::subtree::Subtree},
+    },
 };
 
 // ITERATORS
@@ -16,7 +19,7 @@ enum InnerNodeIteratorState<'a> {
         large_smt_in_memory_nodes: &'a [Word],
     },
     Subtree {
-        subtree_iter: Box<dyn Iterator<Item = Subtree> + 'a>,
+        subtree_iter: Box<dyn Iterator<Item = StorageResult<Subtree>> + 'a>,
         current_subtree_node_iter: Option<Box<dyn Iterator<Item = InnerNodeInfo> + 'a>>,
     },
     Done,
@@ -41,7 +44,7 @@ impl<'a, S: SmtStorageReader> LargeSmtInnerNodeIterator<'a, S> {
 }
 
 impl<S: SmtStorageReader> Iterator for LargeSmtInnerNodeIterator<'_, S> {
-    type Item = InnerNodeInfo;
+    type Item = LargeSmtResult<InnerNodeInfo>;
 
     /// Returns the next inner node info in the tree.
     ///
@@ -52,7 +55,7 @@ impl<S: SmtStorageReader> Iterator for LargeSmtInnerNodeIterator<'_, S> {
     fn next(&mut self) -> Option<Self::Item> {
         loop {
             match &mut self.state {
-                // Phase 1: Process in-memory nodes (depths 0-23)
+                // Phase 1: Process in-memory nodes above the storage boundary.
                 InnerNodeIteratorState::InMemory { current_index, large_smt_in_memory_nodes } => {
                     // Iterate through nodes at depths 0 to IN_MEMORY_DEPTH-1
                     // Start at index 1 (root), max node index is (1 << IN_MEMORY_DEPTH) - 1
@@ -75,11 +78,11 @@ impl<S: SmtStorageReader> Iterator for LargeSmtInnerNodeIterator<'_, S> {
                         let child_depth = depth + 1;
 
                         if !is_empty_parent(left, right, child_depth) {
-                            return Some(InnerNodeInfo {
+                            return Some(Ok(InnerNodeInfo {
                                 value: Eidos::merge(&[left, right]),
                                 left,
                                 right,
-                            });
+                            }));
                         }
                     }
 
@@ -92,27 +95,27 @@ impl<S: SmtStorageReader> Iterator for LargeSmtInnerNodeIterator<'_, S> {
                             };
                             continue; // Start processing subtrees immediately
                         },
-                        Err(_e) => {
-                            // Storage error occurred - we should propagate this properly
-                            // For now, transition to Done state to avoid infinite loops
+                        Err(e) => {
+                            // Storage error occurred - we should propagate this error.
+                            // We also transition to Done state to avoid infinite loops.
                             self.state = InnerNodeIteratorState::Done;
-                            return None;
+                            return Some(LargeSmtResult::Err(e.into()));
                         },
                     }
                 },
-                // Phase 2: Process storage subtrees (depths 25-64)
+                // Phase 2: Process storage subtrees from the boundary down to the leaves.
                 InnerNodeIteratorState::Subtree { subtree_iter, current_subtree_node_iter } => {
                     loop {
                         // First, try to get the next node from current subtree
                         if let Some(node_iter) = current_subtree_node_iter
                             && let Some(info) = node_iter.as_mut().next()
                         {
-                            return Some(info);
+                            return Some(Ok(info));
                         }
 
                         // Current subtree exhausted, move to next subtree
                         match subtree_iter.next() {
-                            Some(next_subtree) => {
+                            Some(Ok(next_subtree)) => {
                                 // Collect is necessary here because iter_inner_node_info returns
                                 // an iterator borrowing from next_subtree, which would outlive
                                 // the subtree itself. We need to eagerly evaluate to owned data.
@@ -121,6 +124,7 @@ impl<S: SmtStorageReader> Iterator for LargeSmtInnerNodeIterator<'_, S> {
                                     next_subtree.iter_inner_node_info().collect();
                                 *current_subtree_node_iter = Some(Box::new(infos.into_iter()));
                             },
+                            Some(Err(err)) => return Some(Err(err.into())),
                             None => {
                                 self.state = InnerNodeIteratorState::Done;
                                 return None; // All subtrees processed
