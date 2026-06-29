@@ -249,195 +249,173 @@
 <a href=#249 id=249 data-nosnippet>249</a>            ));
 <a href=#250 id=250 data-nosnippet>250</a>        }
 <a href=#251 id=251 data-nosnippet>251</a>
-<a href=#252 id=252 data-nosnippet>252</a>        <span class="kw">let </span>num_entries = elements.len() / DOUBLE_WORD_LEN;
-<a href=#253 id=253 data-nosnippet>253</a>
-<a href=#254 id=254 data-nosnippet>254</a>        <span class="kw">if </span>num_entries == <span class="number">1 </span>{
-<a href=#255 id=255 data-nosnippet>255</a>            <span class="comment">// Single entry.
-<a href=#256 id=256 data-nosnippet>256</a>            </span><span class="kw">let </span>key = Word::new([elements[<span class="number">0</span>], elements[<span class="number">1</span>], elements[<span class="number">2</span>], elements[<span class="number">3</span>]]);
-<a href=#257 id=257 data-nosnippet>257</a>            <span class="kw">let </span>value = Word::new([elements[<span class="number">4</span>], elements[<span class="number">5</span>], elements[<span class="number">6</span>], elements[<span class="number">7</span>]]);
-<a href=#258 id=258 data-nosnippet>258</a>            <span class="prelude-val">Ok</span>(SmtLeaf::new_single(key, value))
-<a href=#259 id=259 data-nosnippet>259</a>        } <span class="kw">else </span>{
-<a href=#260 id=260 data-nosnippet>260</a>            <span class="comment">// Multiple entries.
-<a href=#261 id=261 data-nosnippet>261</a>            </span><span class="kw">let </span><span class="kw-2">mut </span>entries = Vec::with_capacity(num_entries);
-<a href=#262 id=262 data-nosnippet>262</a>            <span class="comment">// Read k/v pairs from each entry.
-<a href=#263 id=263 data-nosnippet>263</a>            </span><span class="kw">for </span>i <span class="kw">in </span><span class="number">0</span>..num_entries {
-<a href=#264 id=264 data-nosnippet>264</a>                <span class="kw">let </span>base_idx = i * DOUBLE_WORD_LEN;
-<a href=#265 id=265 data-nosnippet>265</a>                <span class="kw">let </span>key = Word::new([
-<a href=#266 id=266 data-nosnippet>266</a>                    elements[base_idx],
-<a href=#267 id=267 data-nosnippet>267</a>                    elements[base_idx + <span class="number">1</span>],
-<a href=#268 id=268 data-nosnippet>268</a>                    elements[base_idx + <span class="number">2</span>],
-<a href=#269 id=269 data-nosnippet>269</a>                    elements[base_idx + <span class="number">3</span>],
-<a href=#270 id=270 data-nosnippet>270</a>                ]);
-<a href=#271 id=271 data-nosnippet>271</a>                <span class="kw">let </span>value = Word::new([
-<a href=#272 id=272 data-nosnippet>272</a>                    elements[base_idx + <span class="number">4</span>],
-<a href=#273 id=273 data-nosnippet>273</a>                    elements[base_idx + <span class="number">5</span>],
-<a href=#274 id=274 data-nosnippet>274</a>                    elements[base_idx + <span class="number">6</span>],
-<a href=#275 id=275 data-nosnippet>275</a>                    elements[base_idx + <span class="number">7</span>],
-<a href=#276 id=276 data-nosnippet>276</a>                ]);
-<a href=#277 id=277 data-nosnippet>277</a>                entries.push((key, value));
-<a href=#278 id=278 data-nosnippet>278</a>            }
-<a href=#279 id=279 data-nosnippet>279</a>            <span class="kw">let </span>leaf = SmtLeaf::new_multiple(entries)<span class="question-mark">?</span>;
-<a href=#280 id=280 data-nosnippet>280</a>            <span class="prelude-val">Ok</span>(leaf)
-<a href=#281 id=281 data-nosnippet>281</a>        }
-<a href=#282 id=282 data-nosnippet>282</a>    }
-<a href=#283 id=283 data-nosnippet>283</a>
-<a href=#284 id=284 data-nosnippet>284</a>    <span class="comment">// HELPERS
-<a href=#285 id=285 data-nosnippet>285</a>    // ---------------------------------------------------------------------------------------------
-<a href=#286 id=286 data-nosnippet>286</a>
-<a href=#287 id=287 data-nosnippet>287</a>    </span><span class="doccomment">/// Inserts key-value pair into the leaf; returns the previous value associated with `key`, if
-<a href=#288 id=288 data-nosnippet>288</a>    /// any.
-<a href=#289 id=289 data-nosnippet>289</a>    ///
-<a href=#290 id=290 data-nosnippet>290</a>    /// The caller needs to ensure that `key` has the same leaf index as all other keys in the leaf
-<a href=#291 id=291 data-nosnippet>291</a>    ///
-<a href=#292 id=292 data-nosnippet>292</a>    /// # Errors
-<a href=#293 id=293 data-nosnippet>293</a>    /// Returns an error if inserting the key-value pair would exceed [`MAX_LEAF_ENTRIES`] (1024
-<a href=#294 id=294 data-nosnippet>294</a>    /// entries) in the leaf.
-<a href=#295 id=295 data-nosnippet>295</a>    </span><span class="kw">pub</span>(<span class="kw">in </span><span class="kw">crate</span>::merkle::smt) <span class="kw">fn </span>insert(
-<a href=#296 id=296 data-nosnippet>296</a>        <span class="kw-2">&amp;mut </span><span class="self">self</span>,
-<a href=#297 id=297 data-nosnippet>297</a>        key: Word,
-<a href=#298 id=298 data-nosnippet>298</a>        value: Word,
-<a href=#299 id=299 data-nosnippet>299</a>    ) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="prelude-ty">Option</span>&lt;Word&gt;, SmtLeafError&gt; {
-<a href=#300 id=300 data-nosnippet>300</a>        <span class="kw">match </span><span class="self">self </span>{
-<a href=#301 id=301 data-nosnippet>301</a>            SmtLeaf::Empty(<span class="kw">_</span>) =&gt; {
-<a href=#302 id=302 data-nosnippet>302</a>                <span class="kw-2">*</span><span class="self">self </span>= SmtLeaf::new_single(key, value);
-<a href=#303 id=303 data-nosnippet>303</a>                <span class="prelude-val">Ok</span>(<span class="prelude-val">None</span>)
-<a href=#304 id=304 data-nosnippet>304</a>            },
-<a href=#305 id=305 data-nosnippet>305</a>            SmtLeaf::Single(kv_pair) =&gt; {
-<a href=#306 id=306 data-nosnippet>306</a>                <span class="kw">if </span>kv_pair.<span class="number">0 </span>== key {
-<a href=#307 id=307 data-nosnippet>307</a>                    <span class="comment">// the key is already in this leaf. Update the value and return the previous
-<a href=#308 id=308 data-nosnippet>308</a>                    // value
-<a href=#309 id=309 data-nosnippet>309</a>                    </span><span class="kw">let </span>old_value = kv_pair.<span class="number">1</span>;
-<a href=#310 id=310 data-nosnippet>310</a>                    kv_pair.<span class="number">1 </span>= value;
-<a href=#311 id=311 data-nosnippet>311</a>                    <span class="prelude-val">Ok</span>(<span class="prelude-val">Some</span>(old_value))
-<a href=#312 id=312 data-nosnippet>312</a>                } <span class="kw">else </span>{
-<a href=#313 id=313 data-nosnippet>313</a>                    <span class="comment">// Another entry is present in this leaf. Transform the entry into a list
-<a href=#314 id=314 data-nosnippet>314</a>                    // entry, and make sure the key-value pairs are sorted by key
-<a href=#315 id=315 data-nosnippet>315</a>                    // This stays within MAX_LEAF_ENTRIES limit. We're only adding one entry to a
-<a href=#316 id=316 data-nosnippet>316</a>                    // single leaf
-<a href=#317 id=317 data-nosnippet>317</a>                    </span><span class="kw">let </span><span class="kw-2">mut </span>pairs = <span class="macro">vec!</span>[<span class="kw-2">*</span>kv_pair, (key, value)];
-<a href=#318 id=318 data-nosnippet>318</a>                    pairs.sort_by(|(key_1, <span class="kw">_</span>), (key_2, <span class="kw">_</span>)| key_1.cmp(key_2));
-<a href=#319 id=319 data-nosnippet>319</a>                    <span class="kw-2">*</span><span class="self">self </span>= SmtLeaf::Multiple(pairs);
-<a href=#320 id=320 data-nosnippet>320</a>                    <span class="prelude-val">Ok</span>(<span class="prelude-val">None</span>)
-<a href=#321 id=321 data-nosnippet>321</a>                }
-<a href=#322 id=322 data-nosnippet>322</a>            },
-<a href=#323 id=323 data-nosnippet>323</a>            SmtLeaf::Multiple(kv_pairs) =&gt; {
-<a href=#324 id=324 data-nosnippet>324</a>                <span class="kw">match </span>kv_pairs.binary_search_by(|kv_pair| kv_pair.<span class="number">0</span>.cmp(<span class="kw-2">&amp;</span>key)) {
-<a href=#325 id=325 data-nosnippet>325</a>                    <span class="prelude-val">Ok</span>(pos) =&gt; {
-<a href=#326 id=326 data-nosnippet>326</a>                        <span class="kw">let </span>old_value = kv_pairs[pos].<span class="number">1</span>;
-<a href=#327 id=327 data-nosnippet>327</a>                        kv_pairs[pos].<span class="number">1 </span>= value;
-<a href=#328 id=328 data-nosnippet>328</a>                        <span class="prelude-val">Ok</span>(<span class="prelude-val">Some</span>(old_value))
-<a href=#329 id=329 data-nosnippet>329</a>                    },
-<a href=#330 id=330 data-nosnippet>330</a>                    <span class="prelude-val">Err</span>(pos) =&gt; {
-<a href=#331 id=331 data-nosnippet>331</a>                        <span class="kw">if </span>kv_pairs.len() &gt;= MAX_LEAF_ENTRIES {
-<a href=#332 id=332 data-nosnippet>332</a>                            <span class="kw">return </span><span class="prelude-val">Err</span>(SmtLeafError::TooManyLeafEntries {
-<a href=#333 id=333 data-nosnippet>333</a>                                actual: kv_pairs.len() + <span class="number">1</span>,
-<a href=#334 id=334 data-nosnippet>334</a>                            });
-<a href=#335 id=335 data-nosnippet>335</a>                        }
-<a href=#336 id=336 data-nosnippet>336</a>                        kv_pairs.insert(pos, (key, value));
-<a href=#337 id=337 data-nosnippet>337</a>                        <span class="prelude-val">Ok</span>(<span class="prelude-val">None</span>)
-<a href=#338 id=338 data-nosnippet>338</a>                    },
-<a href=#339 id=339 data-nosnippet>339</a>                }
-<a href=#340 id=340 data-nosnippet>340</a>            },
-<a href=#341 id=341 data-nosnippet>341</a>        }
-<a href=#342 id=342 data-nosnippet>342</a>    }
-<a href=#343 id=343 data-nosnippet>343</a>
-<a href=#344 id=344 data-nosnippet>344</a>    <span class="doccomment">/// Removes key-value pair from the leaf stored at key; returns the previous value associated
-<a href=#345 id=345 data-nosnippet>345</a>    /// with `key`, if any. Also returns an `is_empty` flag, indicating whether the leaf became
-<a href=#346 id=346 data-nosnippet>346</a>    /// empty, and must be removed from the data structure it is contained in.
-<a href=#347 id=347 data-nosnippet>347</a>    </span><span class="kw">pub</span>(<span class="kw">in </span><span class="kw">crate</span>::merkle::smt) <span class="kw">fn </span>remove(<span class="kw-2">&amp;mut </span><span class="self">self</span>, key: Word) -&gt; (<span class="prelude-ty">Option</span>&lt;Word&gt;, bool) {
-<a href=#348 id=348 data-nosnippet>348</a>        <span class="kw">match </span><span class="self">self </span>{
-<a href=#349 id=349 data-nosnippet>349</a>            SmtLeaf::Empty(<span class="kw">_</span>) =&gt; (<span class="prelude-val">None</span>, <span class="bool-val">false</span>),
-<a href=#350 id=350 data-nosnippet>350</a>            SmtLeaf::Single((key_at_leaf, value_at_leaf)) =&gt; {
-<a href=#351 id=351 data-nosnippet>351</a>                <span class="kw">if </span><span class="kw-2">*</span>key_at_leaf == key {
-<a href=#352 id=352 data-nosnippet>352</a>                    <span class="comment">// our key was indeed stored in the leaf, so we return the value that was stored
-<a href=#353 id=353 data-nosnippet>353</a>                    // in it, and indicate that the leaf should be removed
-<a href=#354 id=354 data-nosnippet>354</a>                    </span><span class="kw">let </span>old_value = <span class="kw-2">*</span>value_at_leaf;
-<a href=#355 id=355 data-nosnippet>355</a>
-<a href=#356 id=356 data-nosnippet>356</a>                    <span class="comment">// Note: this is not strictly needed, since the caller is expected to drop this
-<a href=#357 id=357 data-nosnippet>357</a>                    // `SmtLeaf` object.
-<a href=#358 id=358 data-nosnippet>358</a>                    </span><span class="kw-2">*</span><span class="self">self </span>= SmtLeaf::new_empty(key.into());
-<a href=#359 id=359 data-nosnippet>359</a>
-<a href=#360 id=360 data-nosnippet>360</a>                    (<span class="prelude-val">Some</span>(old_value), <span class="bool-val">true</span>)
-<a href=#361 id=361 data-nosnippet>361</a>                } <span class="kw">else </span>{
-<a href=#362 id=362 data-nosnippet>362</a>                    <span class="comment">// another key is stored at leaf; nothing to update
-<a href=#363 id=363 data-nosnippet>363</a>                    </span>(<span class="prelude-val">None</span>, <span class="bool-val">false</span>)
-<a href=#364 id=364 data-nosnippet>364</a>                }
-<a href=#365 id=365 data-nosnippet>365</a>            },
-<a href=#366 id=366 data-nosnippet>366</a>            SmtLeaf::Multiple(kv_pairs) =&gt; {
-<a href=#367 id=367 data-nosnippet>367</a>                <span class="kw">match </span>kv_pairs.binary_search_by(|kv_pair| kv_pair.<span class="number">0</span>.cmp(<span class="kw-2">&amp;</span>key)) {
-<a href=#368 id=368 data-nosnippet>368</a>                    <span class="prelude-val">Ok</span>(pos) =&gt; {
-<a href=#369 id=369 data-nosnippet>369</a>                        <span class="kw">let </span>old_value = kv_pairs[pos].<span class="number">1</span>;
-<a href=#370 id=370 data-nosnippet>370</a>
-<a href=#371 id=371 data-nosnippet>371</a>                        <span class="kw">let _ </span>= kv_pairs.remove(pos);
-<a href=#372 id=372 data-nosnippet>372</a>                        <span class="macro">debug_assert!</span>(!kv_pairs.is_empty());
+<a href=#252 id=252 data-nosnippet>252</a>        <span class="kw">let </span><span class="kw-2">mut </span>entries = Vec::with_capacity(elements.len() / DOUBLE_WORD_LEN);
+<a href=#253 id=253 data-nosnippet>253</a>        <span class="kw">for </span>entry <span class="kw">in </span>elements.chunks_exact(DOUBLE_WORD_LEN) {
+<a href=#254 id=254 data-nosnippet>254</a>            <span class="kw">let </span>key = Word::new([entry[<span class="number">0</span>], entry[<span class="number">1</span>], entry[<span class="number">2</span>], entry[<span class="number">3</span>]]);
+<a href=#255 id=255 data-nosnippet>255</a>            <span class="kw">let </span>value = Word::new([entry[<span class="number">4</span>], entry[<span class="number">5</span>], entry[<span class="number">6</span>], entry[<span class="number">7</span>]]);
+<a href=#256 id=256 data-nosnippet>256</a>            entries.push((key, value));
+<a href=#257 id=257 data-nosnippet>257</a>        }
+<a href=#258 id=258 data-nosnippet>258</a>
+<a href=#259 id=259 data-nosnippet>259</a>        SmtLeaf::new(entries, leaf_index)
+<a href=#260 id=260 data-nosnippet>260</a>    }
+<a href=#261 id=261 data-nosnippet>261</a>
+<a href=#262 id=262 data-nosnippet>262</a>    <span class="comment">// HELPERS
+<a href=#263 id=263 data-nosnippet>263</a>    // ---------------------------------------------------------------------------------------------
+<a href=#264 id=264 data-nosnippet>264</a>
+<a href=#265 id=265 data-nosnippet>265</a>    </span><span class="doccomment">/// Inserts key-value pair into the leaf; returns the previous value associated with `key`, if
+<a href=#266 id=266 data-nosnippet>266</a>    /// any.
+<a href=#267 id=267 data-nosnippet>267</a>    ///
+<a href=#268 id=268 data-nosnippet>268</a>    /// The caller needs to ensure that `key` has the same leaf index as all other keys in the leaf
+<a href=#269 id=269 data-nosnippet>269</a>    ///
+<a href=#270 id=270 data-nosnippet>270</a>    /// # Errors
+<a href=#271 id=271 data-nosnippet>271</a>    /// Returns an error if inserting the key-value pair would exceed [`MAX_LEAF_ENTRIES`] (1024
+<a href=#272 id=272 data-nosnippet>272</a>    /// entries) in the leaf.
+<a href=#273 id=273 data-nosnippet>273</a>    </span><span class="kw">pub</span>(<span class="kw">in </span><span class="kw">crate</span>::merkle::smt) <span class="kw">fn </span>insert(
+<a href=#274 id=274 data-nosnippet>274</a>        <span class="kw-2">&amp;mut </span><span class="self">self</span>,
+<a href=#275 id=275 data-nosnippet>275</a>        key: Word,
+<a href=#276 id=276 data-nosnippet>276</a>        value: Word,
+<a href=#277 id=277 data-nosnippet>277</a>    ) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="prelude-ty">Option</span>&lt;Word&gt;, SmtLeafError&gt; {
+<a href=#278 id=278 data-nosnippet>278</a>        <span class="kw">match </span><span class="self">self </span>{
+<a href=#279 id=279 data-nosnippet>279</a>            SmtLeaf::Empty(<span class="kw">_</span>) =&gt; {
+<a href=#280 id=280 data-nosnippet>280</a>                <span class="kw-2">*</span><span class="self">self </span>= SmtLeaf::new_single(key, value);
+<a href=#281 id=281 data-nosnippet>281</a>                <span class="prelude-val">Ok</span>(<span class="prelude-val">None</span>)
+<a href=#282 id=282 data-nosnippet>282</a>            },
+<a href=#283 id=283 data-nosnippet>283</a>            SmtLeaf::Single(kv_pair) =&gt; {
+<a href=#284 id=284 data-nosnippet>284</a>                <span class="kw">if </span>kv_pair.<span class="number">0 </span>== key {
+<a href=#285 id=285 data-nosnippet>285</a>                    <span class="comment">// the key is already in this leaf. Update the value and return the previous
+<a href=#286 id=286 data-nosnippet>286</a>                    // value
+<a href=#287 id=287 data-nosnippet>287</a>                    </span><span class="kw">let </span>old_value = kv_pair.<span class="number">1</span>;
+<a href=#288 id=288 data-nosnippet>288</a>                    kv_pair.<span class="number">1 </span>= value;
+<a href=#289 id=289 data-nosnippet>289</a>                    <span class="prelude-val">Ok</span>(<span class="prelude-val">Some</span>(old_value))
+<a href=#290 id=290 data-nosnippet>290</a>                } <span class="kw">else </span>{
+<a href=#291 id=291 data-nosnippet>291</a>                    <span class="comment">// Another entry is present in this leaf. Transform the entry into a list
+<a href=#292 id=292 data-nosnippet>292</a>                    // entry, and make sure the key-value pairs are sorted by key
+<a href=#293 id=293 data-nosnippet>293</a>                    // This stays within MAX_LEAF_ENTRIES limit. We're only adding one entry to a
+<a href=#294 id=294 data-nosnippet>294</a>                    // single leaf
+<a href=#295 id=295 data-nosnippet>295</a>                    </span><span class="kw">let </span><span class="kw-2">mut </span>pairs = <span class="macro">vec!</span>[<span class="kw-2">*</span>kv_pair, (key, value)];
+<a href=#296 id=296 data-nosnippet>296</a>                    pairs.sort_by(|(key_1, <span class="kw">_</span>), (key_2, <span class="kw">_</span>)| key_1.cmp(key_2));
+<a href=#297 id=297 data-nosnippet>297</a>                    <span class="kw-2">*</span><span class="self">self </span>= SmtLeaf::Multiple(pairs);
+<a href=#298 id=298 data-nosnippet>298</a>                    <span class="prelude-val">Ok</span>(<span class="prelude-val">None</span>)
+<a href=#299 id=299 data-nosnippet>299</a>                }
+<a href=#300 id=300 data-nosnippet>300</a>            },
+<a href=#301 id=301 data-nosnippet>301</a>            SmtLeaf::Multiple(kv_pairs) =&gt; {
+<a href=#302 id=302 data-nosnippet>302</a>                <span class="kw">match </span>kv_pairs.binary_search_by(|kv_pair| kv_pair.<span class="number">0</span>.cmp(<span class="kw-2">&amp;</span>key)) {
+<a href=#303 id=303 data-nosnippet>303</a>                    <span class="prelude-val">Ok</span>(pos) =&gt; {
+<a href=#304 id=304 data-nosnippet>304</a>                        <span class="kw">let </span>old_value = kv_pairs[pos].<span class="number">1</span>;
+<a href=#305 id=305 data-nosnippet>305</a>                        kv_pairs[pos].<span class="number">1 </span>= value;
+<a href=#306 id=306 data-nosnippet>306</a>                        <span class="prelude-val">Ok</span>(<span class="prelude-val">Some</span>(old_value))
+<a href=#307 id=307 data-nosnippet>307</a>                    },
+<a href=#308 id=308 data-nosnippet>308</a>                    <span class="prelude-val">Err</span>(pos) =&gt; {
+<a href=#309 id=309 data-nosnippet>309</a>                        <span class="kw">if </span>kv_pairs.len() &gt;= MAX_LEAF_ENTRIES {
+<a href=#310 id=310 data-nosnippet>310</a>                            <span class="kw">return </span><span class="prelude-val">Err</span>(SmtLeafError::TooManyLeafEntries {
+<a href=#311 id=311 data-nosnippet>311</a>                                actual: kv_pairs.len() + <span class="number">1</span>,
+<a href=#312 id=312 data-nosnippet>312</a>                            });
+<a href=#313 id=313 data-nosnippet>313</a>                        }
+<a href=#314 id=314 data-nosnippet>314</a>                        kv_pairs.insert(pos, (key, value));
+<a href=#315 id=315 data-nosnippet>315</a>                        <span class="prelude-val">Ok</span>(<span class="prelude-val">None</span>)
+<a href=#316 id=316 data-nosnippet>316</a>                    },
+<a href=#317 id=317 data-nosnippet>317</a>                }
+<a href=#318 id=318 data-nosnippet>318</a>            },
+<a href=#319 id=319 data-nosnippet>319</a>        }
+<a href=#320 id=320 data-nosnippet>320</a>    }
+<a href=#321 id=321 data-nosnippet>321</a>
+<a href=#322 id=322 data-nosnippet>322</a>    <span class="doccomment">/// Removes key-value pair from the leaf stored at key; returns the previous value associated
+<a href=#323 id=323 data-nosnippet>323</a>    /// with `key`, if any. Also returns an `is_empty` flag, indicating whether the leaf became
+<a href=#324 id=324 data-nosnippet>324</a>    /// empty, and must be removed from the data structure it is contained in.
+<a href=#325 id=325 data-nosnippet>325</a>    </span><span class="kw">pub</span>(<span class="kw">in </span><span class="kw">crate</span>::merkle::smt) <span class="kw">fn </span>remove(<span class="kw-2">&amp;mut </span><span class="self">self</span>, key: Word) -&gt; (<span class="prelude-ty">Option</span>&lt;Word&gt;, bool) {
+<a href=#326 id=326 data-nosnippet>326</a>        <span class="kw">match </span><span class="self">self </span>{
+<a href=#327 id=327 data-nosnippet>327</a>            SmtLeaf::Empty(<span class="kw">_</span>) =&gt; (<span class="prelude-val">None</span>, <span class="bool-val">false</span>),
+<a href=#328 id=328 data-nosnippet>328</a>            SmtLeaf::Single((key_at_leaf, value_at_leaf)) =&gt; {
+<a href=#329 id=329 data-nosnippet>329</a>                <span class="kw">if </span><span class="kw-2">*</span>key_at_leaf == key {
+<a href=#330 id=330 data-nosnippet>330</a>                    <span class="comment">// our key was indeed stored in the leaf, so we return the value that was stored
+<a href=#331 id=331 data-nosnippet>331</a>                    // in it, and indicate that the leaf should be removed
+<a href=#332 id=332 data-nosnippet>332</a>                    </span><span class="kw">let </span>old_value = <span class="kw-2">*</span>value_at_leaf;
+<a href=#333 id=333 data-nosnippet>333</a>
+<a href=#334 id=334 data-nosnippet>334</a>                    <span class="comment">// Note: this is not strictly needed, since the caller is expected to drop this
+<a href=#335 id=335 data-nosnippet>335</a>                    // `SmtLeaf` object.
+<a href=#336 id=336 data-nosnippet>336</a>                    </span><span class="kw-2">*</span><span class="self">self </span>= SmtLeaf::new_empty(key.into());
+<a href=#337 id=337 data-nosnippet>337</a>
+<a href=#338 id=338 data-nosnippet>338</a>                    (<span class="prelude-val">Some</span>(old_value), <span class="bool-val">true</span>)
+<a href=#339 id=339 data-nosnippet>339</a>                } <span class="kw">else </span>{
+<a href=#340 id=340 data-nosnippet>340</a>                    <span class="comment">// another key is stored at leaf; nothing to update
+<a href=#341 id=341 data-nosnippet>341</a>                    </span>(<span class="prelude-val">None</span>, <span class="bool-val">false</span>)
+<a href=#342 id=342 data-nosnippet>342</a>                }
+<a href=#343 id=343 data-nosnippet>343</a>            },
+<a href=#344 id=344 data-nosnippet>344</a>            SmtLeaf::Multiple(kv_pairs) =&gt; {
+<a href=#345 id=345 data-nosnippet>345</a>                <span class="kw">match </span>kv_pairs.binary_search_by(|kv_pair| kv_pair.<span class="number">0</span>.cmp(<span class="kw-2">&amp;</span>key)) {
+<a href=#346 id=346 data-nosnippet>346</a>                    <span class="prelude-val">Ok</span>(pos) =&gt; {
+<a href=#347 id=347 data-nosnippet>347</a>                        <span class="kw">let </span>old_value = kv_pairs[pos].<span class="number">1</span>;
+<a href=#348 id=348 data-nosnippet>348</a>
+<a href=#349 id=349 data-nosnippet>349</a>                        <span class="kw">let _ </span>= kv_pairs.remove(pos);
+<a href=#350 id=350 data-nosnippet>350</a>                        <span class="macro">debug_assert!</span>(!kv_pairs.is_empty());
+<a href=#351 id=351 data-nosnippet>351</a>
+<a href=#352 id=352 data-nosnippet>352</a>                        <span class="kw">if </span>kv_pairs.len() == <span class="number">1 </span>{
+<a href=#353 id=353 data-nosnippet>353</a>                            <span class="comment">// convert the leaf into `Single`
+<a href=#354 id=354 data-nosnippet>354</a>                            </span><span class="kw-2">*</span><span class="self">self </span>= SmtLeaf::Single(kv_pairs[<span class="number">0</span>]);
+<a href=#355 id=355 data-nosnippet>355</a>                        }
+<a href=#356 id=356 data-nosnippet>356</a>
+<a href=#357 id=357 data-nosnippet>357</a>                        (<span class="prelude-val">Some</span>(old_value), <span class="bool-val">false</span>)
+<a href=#358 id=358 data-nosnippet>358</a>                    },
+<a href=#359 id=359 data-nosnippet>359</a>                    <span class="prelude-val">Err</span>(<span class="kw">_</span>) =&gt; {
+<a href=#360 id=360 data-nosnippet>360</a>                        <span class="comment">// other keys are stored at leaf; nothing to update
+<a href=#361 id=361 data-nosnippet>361</a>                        </span>(<span class="prelude-val">None</span>, <span class="bool-val">false</span>)
+<a href=#362 id=362 data-nosnippet>362</a>                    },
+<a href=#363 id=363 data-nosnippet>363</a>                }
+<a href=#364 id=364 data-nosnippet>364</a>            },
+<a href=#365 id=365 data-nosnippet>365</a>        }
+<a href=#366 id=366 data-nosnippet>366</a>    }
+<a href=#367 id=367 data-nosnippet>367</a>}
+<a href=#368 id=368 data-nosnippet>368</a>
+<a href=#369 id=369 data-nosnippet>369</a><span class="kw">impl </span>Serializable <span class="kw">for </span>SmtLeaf {
+<a href=#370 id=370 data-nosnippet>370</a>    <span class="kw">fn </span>write_into&lt;W: ByteWriter&gt;(<span class="kw-2">&amp;</span><span class="self">self</span>, target: <span class="kw-2">&amp;mut </span>W) {
+<a href=#371 id=371 data-nosnippet>371</a>        <span class="comment">// Write: num entries
+<a href=#372 id=372 data-nosnippet>372</a>        </span><span class="self">self</span>.num_entries().write_into(target);
 <a href=#373 id=373 data-nosnippet>373</a>
-<a href=#374 id=374 data-nosnippet>374</a>                        <span class="kw">if </span>kv_pairs.len() == <span class="number">1 </span>{
-<a href=#375 id=375 data-nosnippet>375</a>                            <span class="comment">// convert the leaf into `Single`
-<a href=#376 id=376 data-nosnippet>376</a>                            </span><span class="kw-2">*</span><span class="self">self </span>= SmtLeaf::Single(kv_pairs[<span class="number">0</span>]);
-<a href=#377 id=377 data-nosnippet>377</a>                        }
-<a href=#378 id=378 data-nosnippet>378</a>
-<a href=#379 id=379 data-nosnippet>379</a>                        (<span class="prelude-val">Some</span>(old_value), <span class="bool-val">false</span>)
-<a href=#380 id=380 data-nosnippet>380</a>                    },
-<a href=#381 id=381 data-nosnippet>381</a>                    <span class="prelude-val">Err</span>(<span class="kw">_</span>) =&gt; {
-<a href=#382 id=382 data-nosnippet>382</a>                        <span class="comment">// other keys are stored at leaf; nothing to update
-<a href=#383 id=383 data-nosnippet>383</a>                        </span>(<span class="prelude-val">None</span>, <span class="bool-val">false</span>)
-<a href=#384 id=384 data-nosnippet>384</a>                    },
-<a href=#385 id=385 data-nosnippet>385</a>                }
-<a href=#386 id=386 data-nosnippet>386</a>            },
-<a href=#387 id=387 data-nosnippet>387</a>        }
-<a href=#388 id=388 data-nosnippet>388</a>    }
-<a href=#389 id=389 data-nosnippet>389</a>}
+<a href=#374 id=374 data-nosnippet>374</a>        <span class="comment">// Write: leaf index
+<a href=#375 id=375 data-nosnippet>375</a>        </span><span class="kw">let </span>leaf_index: u64 = <span class="self">self</span>.index().position();
+<a href=#376 id=376 data-nosnippet>376</a>        leaf_index.write_into(target);
+<a href=#377 id=377 data-nosnippet>377</a>
+<a href=#378 id=378 data-nosnippet>378</a>        <span class="comment">// Write: entries
+<a href=#379 id=379 data-nosnippet>379</a>        </span><span class="kw">for </span>(key, value) <span class="kw">in </span><span class="self">self</span>.entries() {
+<a href=#380 id=380 data-nosnippet>380</a>            key.write_into(target);
+<a href=#381 id=381 data-nosnippet>381</a>            value.write_into(target);
+<a href=#382 id=382 data-nosnippet>382</a>        }
+<a href=#383 id=383 data-nosnippet>383</a>    }
+<a href=#384 id=384 data-nosnippet>384</a>}
+<a href=#385 id=385 data-nosnippet>385</a>
+<a href=#386 id=386 data-nosnippet>386</a><span class="kw">impl </span>Deserializable <span class="kw">for </span>SmtLeaf {
+<a href=#387 id=387 data-nosnippet>387</a>    <span class="kw">fn </span>read_from&lt;R: ByteReader&gt;(source: <span class="kw-2">&amp;mut </span>R) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="self">Self</span>, DeserializationError&gt; {
+<a href=#388 id=388 data-nosnippet>388</a>        <span class="comment">// Read: num entries
+<a href=#389 id=389 data-nosnippet>389</a>        </span><span class="kw">let </span>num_entries = source.read_usize()<span class="question-mark">?</span>;
 <a href=#390 id=390 data-nosnippet>390</a>
-<a href=#391 id=391 data-nosnippet>391</a><span class="kw">impl </span>Serializable <span class="kw">for </span>SmtLeaf {
-<a href=#392 id=392 data-nosnippet>392</a>    <span class="kw">fn </span>write_into&lt;W: ByteWriter&gt;(<span class="kw-2">&amp;</span><span class="self">self</span>, target: <span class="kw-2">&amp;mut </span>W) {
-<a href=#393 id=393 data-nosnippet>393</a>        <span class="comment">// Write: num entries
-<a href=#394 id=394 data-nosnippet>394</a>        </span><span class="self">self</span>.num_entries().write_into(target);
-<a href=#395 id=395 data-nosnippet>395</a>
-<a href=#396 id=396 data-nosnippet>396</a>        <span class="comment">// Write: leaf index
-<a href=#397 id=397 data-nosnippet>397</a>        </span><span class="kw">let </span>leaf_index: u64 = <span class="self">self</span>.index().position();
-<a href=#398 id=398 data-nosnippet>398</a>        leaf_index.write_into(target);
-<a href=#399 id=399 data-nosnippet>399</a>
-<a href=#400 id=400 data-nosnippet>400</a>        <span class="comment">// Write: entries
-<a href=#401 id=401 data-nosnippet>401</a>        </span><span class="kw">for </span>(key, value) <span class="kw">in </span><span class="self">self</span>.entries() {
-<a href=#402 id=402 data-nosnippet>402</a>            key.write_into(target);
-<a href=#403 id=403 data-nosnippet>403</a>            value.write_into(target);
-<a href=#404 id=404 data-nosnippet>404</a>        }
-<a href=#405 id=405 data-nosnippet>405</a>    }
-<a href=#406 id=406 data-nosnippet>406</a>}
-<a href=#407 id=407 data-nosnippet>407</a>
-<a href=#408 id=408 data-nosnippet>408</a><span class="kw">impl </span>Deserializable <span class="kw">for </span>SmtLeaf {
-<a href=#409 id=409 data-nosnippet>409</a>    <span class="kw">fn </span>read_from&lt;R: ByteReader&gt;(source: <span class="kw-2">&amp;mut </span>R) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="self">Self</span>, DeserializationError&gt; {
-<a href=#410 id=410 data-nosnippet>410</a>        <span class="comment">// Read: num entries
-<a href=#411 id=411 data-nosnippet>411</a>        </span><span class="kw">let </span>num_entries = source.read_usize()<span class="question-mark">?</span>;
-<a href=#412 id=412 data-nosnippet>412</a>
-<a href=#413 id=413 data-nosnippet>413</a>        <span class="comment">// Read: leaf index
-<a href=#414 id=414 data-nosnippet>414</a>        </span><span class="kw">let </span>leaf_index: LeafIndex&lt;SMT_DEPTH&gt; = {
-<a href=#415 id=415 data-nosnippet>415</a>            <span class="kw">let </span>value = source.read_u64()<span class="question-mark">?</span>;
-<a href=#416 id=416 data-nosnippet>416</a>            LeafIndex::new_max_depth(value)
-<a href=#417 id=417 data-nosnippet>417</a>        };
+<a href=#391 id=391 data-nosnippet>391</a>        <span class="comment">// Read: leaf index
+<a href=#392 id=392 data-nosnippet>392</a>        </span><span class="kw">let </span>leaf_index: LeafIndex&lt;SMT_DEPTH&gt; = {
+<a href=#393 id=393 data-nosnippet>393</a>            <span class="kw">let </span>value = source.read_u64()<span class="question-mark">?</span>;
+<a href=#394 id=394 data-nosnippet>394</a>            LeafIndex::new_max_depth(value)
+<a href=#395 id=395 data-nosnippet>395</a>        };
+<a href=#396 id=396 data-nosnippet>396</a>
+<a href=#397 id=397 data-nosnippet>397</a>        <span class="comment">// Read: entries using read_many_iter to avoid eager allocation
+<a href=#398 id=398 data-nosnippet>398</a>        </span><span class="kw">let </span>entries: Vec&lt;(Word, Word)&gt; =
+<a href=#399 id=399 data-nosnippet>399</a>            source.read_many_iter(num_entries)<span class="question-mark">?</span>.collect::&lt;<span class="prelude-ty">Result</span>&lt;<span class="kw">_</span>, <span class="kw">_</span>&gt;&gt;()<span class="question-mark">?</span>;
+<a href=#400 id=400 data-nosnippet>400</a>
+<a href=#401 id=401 data-nosnippet>401</a>        <span class="self">Self</span>::new(entries, leaf_index)
+<a href=#402 id=402 data-nosnippet>402</a>            .map_err(|err| DeserializationError::InvalidValue(err.to_string()))
+<a href=#403 id=403 data-nosnippet>403</a>    }
+<a href=#404 id=404 data-nosnippet>404</a>
+<a href=#405 id=405 data-nosnippet>405</a>    <span class="doccomment">/// Minimum serialized size: vint64 (num_entries) + u64 (leaf_index) with 0 entries.
+<a href=#406 id=406 data-nosnippet>406</a>    </span><span class="kw">fn </span>min_serialized_size() -&gt; usize {
+<a href=#407 id=407 data-nosnippet>407</a>        <span class="number">1 </span>+ <span class="number">8
+<a href=#408 id=408 data-nosnippet>408</a>    </span>}
+<a href=#409 id=409 data-nosnippet>409</a>}
+<a href=#410 id=410 data-nosnippet>410</a>
+<a href=#411 id=411 data-nosnippet>411</a><span class="comment">// HELPER FUNCTIONS
+<a href=#412 id=412 data-nosnippet>412</a>// ================================================================================================
+<a href=#413 id=413 data-nosnippet>413</a>
+<a href=#414 id=414 data-nosnippet>414</a></span><span class="doccomment">/// Converts a key-value tuple to an iterator of `Felt`s
+<a href=#415 id=415 data-nosnippet>415</a></span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>kv_to_elements((key, value): (Word, Word)) -&gt; <span class="kw">impl </span>Iterator&lt;Item = Felt&gt; {
+<a href=#416 id=416 data-nosnippet>416</a>    <span class="kw">let </span>key_elements = key.into_iter();
+<a href=#417 id=417 data-nosnippet>417</a>    <span class="kw">let </span>value_elements = value.into_iter();
 <a href=#418 id=418 data-nosnippet>418</a>
-<a href=#419 id=419 data-nosnippet>419</a>        <span class="comment">// Read: entries using read_many_iter to avoid eager allocation
-<a href=#420 id=420 data-nosnippet>420</a>        </span><span class="kw">let </span>entries: Vec&lt;(Word, Word)&gt; =
-<a href=#421 id=421 data-nosnippet>421</a>            source.read_many_iter(num_entries)<span class="question-mark">?</span>.collect::&lt;<span class="prelude-ty">Result</span>&lt;<span class="kw">_</span>, <span class="kw">_</span>&gt;&gt;()<span class="question-mark">?</span>;
-<a href=#422 id=422 data-nosnippet>422</a>
-<a href=#423 id=423 data-nosnippet>423</a>        <span class="self">Self</span>::new(entries, leaf_index)
-<a href=#424 id=424 data-nosnippet>424</a>            .map_err(|err| DeserializationError::InvalidValue(err.to_string()))
-<a href=#425 id=425 data-nosnippet>425</a>    }
-<a href=#426 id=426 data-nosnippet>426</a>
-<a href=#427 id=427 data-nosnippet>427</a>    <span class="doccomment">/// Minimum serialized size: vint64 (num_entries) + u64 (leaf_index) with 0 entries.
-<a href=#428 id=428 data-nosnippet>428</a>    </span><span class="kw">fn </span>min_serialized_size() -&gt; usize {
-<a href=#429 id=429 data-nosnippet>429</a>        <span class="number">1 </span>+ <span class="number">8
-<a href=#430 id=430 data-nosnippet>430</a>    </span>}
-<a href=#431 id=431 data-nosnippet>431</a>}
-<a href=#432 id=432 data-nosnippet>432</a>
-<a href=#433 id=433 data-nosnippet>433</a><span class="comment">// HELPER FUNCTIONS
-<a href=#434 id=434 data-nosnippet>434</a>// ================================================================================================
-<a href=#435 id=435 data-nosnippet>435</a>
-<a href=#436 id=436 data-nosnippet>436</a></span><span class="doccomment">/// Converts a key-value tuple to an iterator of `Felt`s
-<a href=#437 id=437 data-nosnippet>437</a></span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>kv_to_elements((key, value): (Word, Word)) -&gt; <span class="kw">impl </span>Iterator&lt;Item = Felt&gt; {
-<a href=#438 id=438 data-nosnippet>438</a>    <span class="kw">let </span>key_elements = key.into_iter();
-<a href=#439 id=439 data-nosnippet>439</a>    <span class="kw">let </span>value_elements = value.into_iter();
-<a href=#440 id=440 data-nosnippet>440</a>
-<a href=#441 id=441 data-nosnippet>441</a>    key_elements.chain(value_elements)
-<a href=#442 id=442 data-nosnippet>442</a>}
+<a href=#419 id=419 data-nosnippet>419</a>    key_elements.chain(value_elements)
+<a href=#420 id=420 data-nosnippet>420</a>}
 </code></pre></div></section></main></body></html>
