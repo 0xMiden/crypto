@@ -165,7 +165,7 @@ impl FromStr for TraceSpec {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let parts: Vec<&str> = s.split(':').collect();
-        if parts.len() < 2 {
+        if !(2..=4).contains(&parts.len()) {
             return Err(format!("expected <air>:<log_height>[:<width>[:<aux_cols>]], got '{s}'"));
         }
 
@@ -180,16 +180,26 @@ impl FromStr for TraceSpec {
         let log_height: u8 =
             parts[1].parse().map_err(|_| format!("invalid log_height '{}'", parts[1]))?;
 
-        let width = if parts.len() > 2 {
-            parts[2].parse().map_err(|_| format!("invalid width '{}'", parts[2]))?
-        } else {
-            DEFAULT_MIDEN_WIDTH
-        };
+        let (width, num_aux_cols) = if air_type == AirType::Miden {
+            let width = if parts.len() > 2 {
+                parts[2].parse().map_err(|_| format!("invalid width '{}'", parts[2]))?
+            } else {
+                DEFAULT_MIDEN_WIDTH
+            };
 
-        let num_aux_cols = if parts.len() > 3 {
-            parts[3].parse().map_err(|_| format!("invalid aux_cols '{}'", parts[3]))?
+            let num_aux_cols = if parts.len() > 3 {
+                parts[3].parse().map_err(|_| format!("invalid aux_cols '{}'", parts[3]))?
+            } else {
+                DEFAULT_MIDEN_AUX_COLS
+            };
+
+            (width, num_aux_cols)
         } else {
-            DEFAULT_MIDEN_AUX_COLS
+            if parts.len() > 2 {
+                return Err(format!("width and aux_cols only apply to miden traces, got '{s}'"));
+            }
+
+            (0, 0)
         };
 
         if air_type == AirType::Miden && width < 9 {
@@ -202,5 +212,60 @@ impl FromStr for TraceSpec {
             width,
             num_aux_cols,
         })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn trace_spec_parses_miden_defaults() {
+        let spec: TraceSpec = "miden:18".parse().unwrap();
+
+        assert!(matches!(spec.air_type, AirType::Miden));
+        assert_eq!(spec.log_height, 18);
+        assert_eq!(spec.width, DEFAULT_MIDEN_WIDTH);
+        assert_eq!(spec.num_aux_cols, DEFAULT_MIDEN_AUX_COLS);
+    }
+
+    #[test]
+    fn trace_spec_parses_miden_dimensions() {
+        let spec: TraceSpec = "miden:18:64:12".parse().unwrap();
+
+        assert!(matches!(spec.air_type, AirType::Miden));
+        assert_eq!(spec.log_height, 18);
+        assert_eq!(spec.width, 64);
+        assert_eq!(spec.num_aux_cols, 12);
+    }
+
+    #[test]
+    fn trace_spec_parses_hash_trace_without_miden_dimensions() {
+        let spec: TraceSpec = "keccak:15".parse().unwrap();
+
+        assert!(matches!(spec.air_type, AirType::Keccak));
+        assert_eq!(spec.log_height, 15);
+        assert_eq!(spec.width, 0);
+        assert_eq!(spec.num_aux_cols, 0);
+    }
+
+    #[test]
+    fn trace_spec_rejects_dimensions_for_non_miden_traces() {
+        let err = match "keccak:15:64".parse::<TraceSpec>() {
+            Ok(_) => panic!("expected trace spec parsing to fail"),
+            Err(err) => err,
+        };
+
+        assert!(err.contains("width and aux_cols only apply to miden traces"));
+    }
+
+    #[test]
+    fn trace_spec_rejects_extra_fields() {
+        let err = match "miden:18:64:12:extra".parse::<TraceSpec>() {
+            Ok(_) => panic!("expected trace spec parsing to fail"),
+            Err(err) => err,
+        };
+
+        assert!(err.contains("expected <air>:<log_height>[:<width>[:<aux_cols>]]"));
     }
 }
