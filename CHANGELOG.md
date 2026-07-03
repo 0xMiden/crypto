@@ -1,3 +1,7 @@
+## 0.27.1 (TBD)
+
+- Made `Felt::from_{u8, u16, u32}` const and added `Felt::MAX` ([#1081](https://github.com/0xMiden/crypto/pull/1081)).
+
 ## 0.27.0 (2026-06-19)
 
 - [BREAKING] Upgraded the RustCrypto and dalek stack: `der`, `hkdf`, `sha2`, `sha3`, `k256`, `curve25519-dalek`, `ed25519-dalek`, and `x25519-dalek` ([#1045](https://github.com/0xMiden/crypto/pull/1045)).
