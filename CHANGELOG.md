@@ -1,6 +1,6 @@
 ## 0.29.0 (TBD)
 
-- [BREAKING] Bound `MmrPeaks::hash_peaks()` commitments to the forest leaf count, preventing structurally distinct MMRs with identical peak values from producing the same commitment ([security-issues#18](https://github.com/0xMiden/security-issues/issues/18), [Cantina finding 85](https://cantina.xyz/code/aa1b6773-00b0-4d84-b1d1-be5dce008134/findings/85), [#997](https://github.com/0xMiden/crypto/pull/997)).
+- [BREAKING] Bound `MmrPeaks::hash_peaks()` commitments to the forest leaf count, preventing structurally distinct MMRs with identical peak values from producing the same commitment ([#1087](https://github.com/0xMiden/crypto/pull/1087)).
 
 ## 0.28.0 (2026-07-03)
 
