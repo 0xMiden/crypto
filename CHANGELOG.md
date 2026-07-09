@@ -1,4 +1,4 @@
-## 0.27.1 (unreleased)
+## 0.27.1 (2026-07-09)
 
 - Fixed builds against the stable RustCrypto `k256`, `ecdsa`, and `primeorder` release line ([#1088](https://github.com/0xMiden/crypto/pull/1088)).
 
