@@ -1,14 +1,26 @@
-## 0.27.0 (TBD)
+## 0.29.0 (TBD)
+
+## 0.28.0 (2026-07-03)
+
+- Added a zeroizing read helper for deserializing sensitive material, fixing secret-key read buffers that were not wiped on error paths (ECDSA) or at all (Falcon, Poseidon2 AEAD) ([#1057](https://github.com/0xMiden/crypto/pull/1057)).
+- [BREAKING] Rename miden-lifted-stark `parallel` feature to `concurrent` and make it a default one ([#1073](https://github.com/0xMiden/crypto/issues/1073)).
+- Parallelize aux trace building for faster proving ([#1074](https://github.com/0xMiden/crypto/issues/1074)).
+- [BREAKING] Changed ECDSA-k256 public-key commitments to hash native affine-coordinate limbs (`qx || qy`, little-endian `u32` limbs) while keeping compressed SEC1 serialization unchanged ([#1075](https://github.com/0xMiden/crypto/issues/1075)).
+- Fixed SMT leaf advice decoding by rebuilding decoded entries through `SmtLeaf::new`, so decoded entries must match the supplied leaf index ([#1076](https://github.com/0xMiden/crypto/pull/1076)).
+- Made `Felt::from_{u8, u16, u32}` const and added `Felt::MAX` ([#1081](https://github.com/0xMiden/crypto/pull/1081)).
+
+## 0.27.0 (2026-06-19)
 
 - [BREAKING] Upgraded the RustCrypto and dalek stack: `der`, `hkdf`, `sha2`, `sha3`, `k256`, `curve25519-dalek`, `ed25519-dalek`, and `x25519-dalek` ([#1045](https://github.com/0xMiden/crypto/pull/1045)).
-- Upgraded `chacha20poly1305` to the current RustCrypto AEAD release line and added Wycheproof checks for ECDH and Ed25519 paths ([#1052](https://github.com/0xMiden/crypto/pull/1052)).
 - Added `Display` (`0x`-prefixed lowercase hex) for the public key and signature types of all DSA schemes ([#1048](https://github.com/0xMiden/crypto/pull/1048)).
-- Use faster DFT algorithm for `PeriodicPolys` ([#1054](https://github.com/0xMiden/crypto/pull/1054)).
-- [BREAKING] Bumped Plonky3 upstream dependencies to v0.6.0 ([#1053](https://github.com/0xMiden/crypto/pull/1053)).
-- [BREAKING] Make `Felt::Packing` resolve to the SIMD-packed `PackedFelt` from Plonky3 ([#1060](https://github.com/0xMiden/crypto/pull/1060)).
-- Improved LargeSmt RocksDB defaults, added per-DB memory-budget controls, and exposed durability mode selection ([#1056](https://github.com/0xMiden/crypto/pull/1056)).
 - Added doctests for ECDSA signature serialization, sponge state sizing, SMT sorted entries, and lifted AIR Fiat-Shamir docs ([#1049](https://github.com/0xMiden/crypto/pull/1049)).
+- Upgraded `chacha20poly1305` to the current RustCrypto AEAD release line and added Wycheproof checks for ECDH and Ed25519 paths ([#1052](https://github.com/0xMiden/crypto/pull/1052)).
+- [BREAKING] Bumped Plonky3 upstream dependencies to v0.6.0 ([#1053](https://github.com/0xMiden/crypto/pull/1053)).
+- Use faster DFT algorithm for `PeriodicPolys` ([#1054](https://github.com/0xMiden/crypto/pull/1054)).
+- Improved LargeSmt RocksDB defaults, added per-DB memory-budget controls, and exposed durability mode selection ([#1056](https://github.com/0xMiden/crypto/pull/1056)).
+- [BREAKING] Make `Felt::Packing` resolve to the SIMD-packed `PackedFelt` from Plonky3 ([#1060](https://github.com/0xMiden/crypto/pull/1060)).
 - perf: factor the DEEP barycentric inner loop to drop the per-row `xᵢ · qᵢ` base×extension multiplication ([#1064](https://github.com/0xMiden/crypto/issues/1064)).
+- Added release tooling for publishing an explicit package list instead of always publishing the full workspace.
 
 ## 0.26.0 (06-02-2026)
 
