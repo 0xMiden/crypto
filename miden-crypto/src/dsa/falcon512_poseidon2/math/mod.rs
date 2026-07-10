@@ -329,5 +329,9 @@ fn xgcd(a: &BigInt, b: &BigInt) -> (BigInt, BigInt, BigInt) {
 /// Asserts that the balanced values of the coefficients of a polynomial are within the interval
 /// [-bound, bound].
 fn check_coefficients_bound(polynomial: &Polynomial<i16>, bound: i16) -> bool {
-    polynomial.to_balanced_values().iter().all(|c| *c <= bound && *c >= -bound)
+    polynomial
+        .coefficients
+        .iter()
+        .map(|&c| FalconFelt::new(c).balanced_value())
+        .all(|c| c <= bound && c >= -bound)
 }

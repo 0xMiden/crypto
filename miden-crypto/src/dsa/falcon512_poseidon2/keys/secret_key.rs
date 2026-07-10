@@ -288,13 +288,17 @@ impl SecretKey {
     }
 }
 
+#[cfg(test)]
 impl PartialEq for SecretKey {
     fn eq(&self, other: &Self) -> bool {
         use subtle::ConstantTimeEq;
-        self.to_bytes().ct_eq(&other.to_bytes()).into()
+        let self_bytes = Zeroizing::new(self.to_bytes());
+        let other_bytes = Zeroizing::new(other.to_bytes());
+        self_bytes.ct_eq(&other_bytes).into()
     }
 }
 
+#[cfg(test)]
 impl Eq for SecretKey {}
 
 // SERIALIZATION / DESERIALIZATION
@@ -486,7 +490,7 @@ pub fn encode_i8(x: &[i8], bits: usize) -> Option<Vec<u8>> {
 /// Decodes a sequence of bytes into a sequence of signed integers such that each integer x
 /// satisfies |x| < 2^(bits-1) for a given parameter bits. bits can take either the value 6 or 8.
 pub fn decode_i8(buf: &[u8], bits: usize) -> Option<Vec<i8>> {
-    let mut x = [0_i8; N];
+    let mut x = Zeroizing::new([0_i8; N]);
 
     let mut i = 0;
     let mut j = 0;
