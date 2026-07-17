@@ -1,5 +1,8 @@
 # Miden Crypto
 
+> [!IMPORTANT]
+> Development has moved to https://github.com/0xmiden/miden-vm.
+
 [![LICENSE](https://img.shields.io/badge/license-MIT-blue.svg)](https://github.com/0xMiden/crypto/blob/main/LICENSE)
 [![test](https://github.com/0xMiden/crypto/actions/workflows/test.yml/badge.svg)](https://github.com/0xMiden/crypto/actions/workflows/test.yml)
 [![build](https://github.com/0xMiden/crypto/actions/workflows/build.yml/badge.svg)](https://github.com/0xMiden/crypto/actions/workflows/build.yml)
