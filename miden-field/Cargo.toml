@@ -10,7 +10,7 @@ name                   = "miden-field"
 readme                 = "README.md"
 repository.workspace   = true
 rust-version.workspace = true
-version.workspace      = true
+version                = "0.29.0"
 
 [lib]
 crate-type = ["rlib"]
@@ -34,8 +34,9 @@ serde                   = { default-features = false, features = ["derive"], ver
 subtle                  = { default-features = false, version = "2.6" }
 
 [features]
-default = []
-testing = ["dep:proptest"]
+arbitrary = ["dep:proptest"]
+default   = []
+testing   = ["arbitrary"]
 
 [dev-dependencies]
 proptest = { features = ["alloc", "std"], workspace = true }

@@ -1,3 +1,8 @@
+## 0.29.0 (TBD)
+
+- Added `arbitrary` features to expose proptest `Arbitrary` implementations without enabling broader testing features ([#1091](https://github.com/0xMiden/crypto/pull/1091)).
+- Updated `miden-bench` Keccak trace summaries to report padded trace rows separately from active Keccak rows ([#1065](https://github.com/0xMiden/crypto/pull/1065)).
+
 ## 0.28.0 (2026-07-03)
 
 - Added a zeroizing read helper for deserializing sensitive material, fixing secret-key read buffers that were not wiped on error paths (ECDSA) or at all (Falcon, Poseidon2 AEAD) ([#1057](https://github.com/0xMiden/crypto/pull/1057)).
@@ -18,6 +23,7 @@
 - Improved LargeSmt RocksDB defaults, added per-DB memory-budget controls, and exposed durability mode selection ([#1056](https://github.com/0xMiden/crypto/pull/1056)).
 - [BREAKING] Make `Felt::Packing` resolve to the SIMD-packed `PackedFelt` from Plonky3 ([#1060](https://github.com/0xMiden/crypto/pull/1060)).
 - perf: factor the DEEP barycentric inner loop to drop the per-row `xᵢ · qᵢ` base×extension multiplication ([#1064](https://github.com/0xMiden/crypto/issues/1064)).
+- Added release tooling for publishing an explicit package list instead of always publishing the full workspace.
 
 ## 0.26.0 (06-02-2026)
 

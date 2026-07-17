@@ -73,9 +73,9 @@ dependencies = [
 
 [[package]]
 name = "cc"
-version = "1.2.65"
+version = "1.2.67"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e228eec9be7c17ccb640b59b36a5cd805ea2a564a4c5e162c2f659fea30d3b96"
+checksum = "e17dd265a7d0f31ef544e1b20e03add05d3b45b491b633b10d67145d2acc1a38"
 dependencies = [
  "find-msvc-tools",
  "jobserver",
@@ -470,9 +470,9 @@ dependencies = [
 
 [[package]]
 name = "k256"
-version = "0.14.0-rc.15"
+version = "0.14.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "78ce7f1aa9a24c53c6572d8017c8c1ceb5d44c6071ff68c9912860fa4d262101"
+checksum = "93f50113171a713f4a4231ef82eb26703607139b35dcb56241f0ceab2ae1f7d8"
 dependencies = [
  "cpubits",
  "ecdsa",
@@ -525,7 +525,7 @@ dependencies = [
 
 [[package]]
 name = "miden-crypto"
-version = "0.28.0"
+version = "0.29.0"
 dependencies = [
  "blake3",
  "cc",
@@ -565,7 +565,7 @@ dependencies = [
 
 [[package]]
 name = "miden-crypto-derive"
-version = "0.28.0"
+version = "0.29.0"
 dependencies = [
  "quote",
  "syn",
@@ -582,7 +582,7 @@ dependencies = [
 
 [[package]]
 name = "miden-field"
-version = "0.28.0"
+version = "0.29.0"
 dependencies = [
  "miden-serde-utils",
  "num-bigint",
@@ -599,7 +599,7 @@ dependencies = [
 
 [[package]]
 name = "miden-lifted-air"
-version = "0.28.0"
+version = "0.29.0"
 dependencies = [
  "p3-air",
  "p3-challenger",
@@ -611,7 +611,7 @@ dependencies = [
 
 [[package]]
 name = "miden-lifted-stark"
-version = "0.28.0"
+version = "0.29.0"
 dependencies = [
  "miden-lifted-air",
  "miden-stark-transcript",
@@ -632,7 +632,7 @@ dependencies = [
 
 [[package]]
 name = "miden-serde-utils"
-version = "0.28.0"
+version = "0.29.0"
 dependencies = [
  "p3-field",
  "p3-goldilocks",
@@ -640,7 +640,7 @@ dependencies = [
 
 [[package]]
 name = "miden-stark-transcript"
-version = "0.28.0"
+version = "0.29.0"
 dependencies = [
  "p3-challenger",
  "p3-field",
@@ -650,7 +650,7 @@ dependencies = [
 
 [[package]]
 name = "miden-stateful-hasher"
-version = "0.28.0"
+version = "0.29.0"
 dependencies = [
  "p3-field",
  "p3-symmetric",
