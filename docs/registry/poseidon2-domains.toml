@@ -1,0 +1,74 @@
+# Poseidon2 domain registry draft.
+#
+# Numeric IDs are normative. Names are for review, docs, and generated constants.
+# Keep entries sorted by domain_id, then version.
+
+# -----------------------------------------------------------------------------
+# Global range allocations
+# -----------------------------------------------------------------------------
+#
+# This section allocates domain_id ranges to maintainer repositories. Delegated
+# repositories maintain their concrete entries in their own ranges.
+
+[[ranges]]
+description = "Capacity domains maintained in the crypto repository."
+end         = 0x00ffff
+maintainer  = "https://github.com/0xMiden/crypto"
+name        = "Miden Crypto primitives and data structures"
+start       = 0x000001
+
+[[ranges]]
+description = "Capacity domains maintained in the miden-vm repository."
+end         = 0x01ffff
+maintainer  = "https://github.com/0xMiden/miden-vm"
+name        = "Miden VM domains"
+start       = 0x010000
+
+[[ranges]]
+description = "Capacity domains maintained in the protocol repository."
+end         = 0x02ffff
+maintainer  = "https://github.com/0xMiden/protocol"
+name        = "Miden protocol domains"
+start       = 0x020000
+
+[[ranges]]
+description = "Initial allocation for ecosystem and application capacity domains."
+end         = 0x10ffff
+maintainer  = "https://github.com/0xMiden"
+name        = "Miden ecosystem domains"
+start       = 0x100000
+
+# The gaps 0x030000..0x0fffff and 0x110000..0xffffff are intentionally
+# unassigned. They are spare capacity for future maintained ranges, not
+# experimental/local space.
+
+# -----------------------------------------------------------------------------
+# Miden Crypto concrete domains
+# -----------------------------------------------------------------------------
+#
+# Concrete domains maintained in this repository. Other allocated ranges are
+# delegated and intentionally left empty here.
+
+[[domains]]
+domain_id    = 0x000001
+frame        = "flattened_key_value_element_count mod 8 (= 0)"
+maintainer   = "https://github.com/0xMiden/crypto"
+name         = "SMT_BUCKET_LEAF"
+param0       = "num_entries (1..=1024)"
+param1       = "0"
+payload_kind = "felt_stream"
+rate         = "flattened sorted (key, value) pairs"
+status       = "proposed"
+version      = 1
+
+[[domains]]
+domain_id    = 0x000002
+frame        = "padded_peak_element_count mod 8 (= 0)"
+maintainer   = "https://github.com/0xMiden/crypto"
+name         = "MMR_PEAKS"
+param0       = "num_leaves low 32 bits"
+param1       = "num_leaves high 32 bits"
+payload_kind = "felt_stream"
+rate         = "canonical zero-padded peak vector"
+status       = "proposed"
+version      = 1
