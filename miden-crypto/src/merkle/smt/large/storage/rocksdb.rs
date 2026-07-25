@@ -1177,10 +1177,9 @@ impl RocksDbSnapshotStorage {
 impl SmtStorageReader for RocksDbSnapshotStorage {
     /// Retrieves the total count of non-empty leaves from the snapshot.
     fn leaf_count(&self) -> StorageResult<usize> {
-        let cf = self.cf_handle(METADATA_CF)?;
-        self.inner
-            .snapshot
-            .get_cf(cf, LEAF_COUNT_KEY)?
+        let table = self.kvdb_snapshot.table(METADATA_CF)?;
+        self.kvdb_snapshot
+            .get(&table, LEAF_COUNT_KEY)?
             .map_or(Ok(0), |bytes| read_count("leaf count", &bytes))
     }
 
