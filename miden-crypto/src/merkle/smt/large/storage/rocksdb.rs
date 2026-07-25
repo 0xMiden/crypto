@@ -374,12 +374,15 @@ impl SmtStorageReader for RocksDbStorage {
     fn iter_leaves(
         &self,
     ) -> StorageResult<Box<dyn Iterator<Item = StorageResult<(u64, SmtLeaf)>> + '_>> {
-        let cf = self.cf_handle(LEAVES_CF)?;
-        let mut read_opts = ReadOptions::default();
-        read_opts.set_total_order_seek(true);
-        let db_iter = self.db.iterator_cf_opt(cf, read_opts, IteratorMode::Start);
-
-        Ok(Box::new(RocksDbDirectLeafIterator { iter: db_iter }))
+        let table = self.kvdb.table(LEAVES_CF)?;
+        let iter = self.kvdb.iter(table).map(|result| {
+            result.and_then(|(key_bytes, value_bytes)| {
+                let idx = index_from_key_bytes(&key_bytes)?;
+                let leaf = SmtLeaf::read_from_bytes_with_budget(&value_bytes, value_bytes.len())?;
+                Ok((idx, leaf))
+            })
+        });
+        Ok(Box::new(iter))
     }
 
     /// Returns an iterator over all `Subtree` instances across all subtree column families.
