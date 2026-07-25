@@ -422,8 +422,8 @@ impl SmtStorageReader for RocksDbStorage {
     ///   error occurs.
     /// - `StorageError::Value`: If any hash bytes are corrupt.
     fn get_top_subtree_roots(&self) -> StorageResult<Vec<(u64, Word)>> {
-        let cf = self.cf_handle(IN_MEM_DEPTH_CF)?;
-        let iter = self.db.iterator_cf(cf, IteratorMode::Start);
+        let table = self.kvdb.table(IN_MEM_DEPTH_CF)?;
+        let iter = self.kvdb.iter(table);
         let mut hashes = Vec::new();
 
         for item in iter {
