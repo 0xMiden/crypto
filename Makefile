@@ -173,7 +173,7 @@ bench-large-smt-memory: ## Run large SMT benchmarks with memory storage
 
 .PHONY: bench-large-smt-rocksdb
 bench-large-smt-rocksdb: ## Run large SMT benchmarks with rocksdb storage
-	cargo run --bin miden-crypto --release --features concurrent,rocksdb,executable -- --storage rocksdb --size 1000000
+	cargo run --bin miden-crypto --release --features concurrent,rocksdb,executable -- --storage rocksdb --size 1000000 --reset
 
 .PHONY: bench-large-smt-rocksdb-open
 bench-large-smt-rocksdb-open: ## Run large SMT benchmarks with rocksdb storage and open existing database
