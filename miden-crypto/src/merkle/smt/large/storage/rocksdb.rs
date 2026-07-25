@@ -1185,10 +1185,9 @@ impl SmtStorageReader for RocksDbSnapshotStorage {
 
     /// Retrieves the total count of key-value entries from the snapshot.
     fn entry_count(&self) -> StorageResult<usize> {
-        let cf = self.cf_handle(METADATA_CF)?;
-        self.inner
-            .snapshot
-            .get_cf(cf, ENTRY_COUNT_KEY)?
+        let table = self.kvdb_snapshot.table(METADATA_CF)?;
+        self.kvdb_snapshot
+            .get(&table, ENTRY_COUNT_KEY)?
             .map_or(Ok(0), |bytes| read_count("entry count", &bytes))
     }
 
