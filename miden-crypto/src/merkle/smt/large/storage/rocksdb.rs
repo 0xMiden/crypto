@@ -1228,9 +1228,9 @@ impl SmtStorageReader for RocksDbSnapshotStorage {
 
     /// Retrieves a single SMT Subtree by its root `NodeIndex` from the snapshot.
     fn get_subtree(&self, index: NodeIndex) -> StorageResult<Option<Subtree>> {
-        let cf = self.subtree_cf(index);
+        let table = self.kvdb_snapshot.table(cf_for_depth(index.depth()))?;
         let key = RocksDbStorage::subtree_db_key(index);
-        match self.inner.snapshot.get_cf(cf, key)? {
+        match self.kvdb_snapshot.get(&table, key.as_slice())? {
             Some(bytes) => {
                 let subtree = Subtree::from_vec(index, &bytes)?;
                 Ok(Some(subtree))
