@@ -544,9 +544,9 @@ impl SmtStorage for RocksDbStorage {
             return Ok(None);
         };
 
-        let mut batch = WriteBatch::default();
-        let cf = self.cf_handle(LEAVES_CF)?;
-        let metadata_cf = self.cf_handle(METADATA_CF)?;
+        let mut batch = self.kvdb.batch();
+        let leaves_table = self.kvdb.table(LEAVES_CF)?;
+        let metadata_table = self.kvdb.table(METADATA_CF)?;
         let db_key = Self::index_db_key(index);
         let mut entry_count = self.entry_count()?;
         let mut leaf_count = self.leaf_count()?;
@@ -559,13 +559,13 @@ impl SmtStorage for RocksDbStorage {
         }
         if is_empty {
             leaf_count -= 1;
-            batch.delete_cf(cf, db_key);
+            batch.delete(&leaves_table, &db_key);
         } else {
-            batch.put_cf(cf, db_key, leaf.to_bytes());
+            batch.put(&leaves_table, &db_key, &leaf.to_bytes());
         }
-        batch.put_cf(metadata_cf, LEAF_COUNT_KEY, leaf_count.to_be_bytes());
-        batch.put_cf(metadata_cf, ENTRY_COUNT_KEY, entry_count.to_be_bytes());
-        self.write_batch(batch)?;
+        batch.put(&metadata_table, LEAF_COUNT_KEY, &leaf_count.to_be_bytes());
+        batch.put(&metadata_table, ENTRY_COUNT_KEY, &entry_count.to_be_bytes());
+        batch.commit()?;
         Ok(current_value)
     }
 
