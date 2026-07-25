@@ -260,15 +260,14 @@ mod subtree;
 pub use subtree::{Subtree, SubtreeError};
 
 mod storage;
+#[cfg(feature = "rocksdb")]
+pub use storage::config as storage_config;
 pub use storage::{
     MemoryStorage, MemoryStorageSnapshot, SmtStorage, SmtStorageReader, StorageError,
     StorageResult, StorageUpdateParts, StorageUpdates, SubtreeUpdate,
 };
 #[cfg(feature = "rocksdb")]
-pub use storage::{
-    RocksDbBloomFilterBitsPerKey, RocksDbConfig, RocksDbDurabilityMode, RocksDbMemoryBudget,
-    RocksDbSnapshotStorage, RocksDbStorage, RocksDbTuningOptions, RocksDbWriteBufferManagerBudget,
-};
+pub use storage::{RocksDbSnapshotStorage, RocksDbStorage};
 
 mod iter;
 pub use iter::LargeSmtInnerNodeIterator;

@@ -16,12 +16,12 @@ mod error;
 pub use error::{StorageError, StorageResult};
 
 #[cfg(feature = "rocksdb")]
+pub mod config;
+
+#[cfg(feature = "rocksdb")]
 mod rocksdb;
 #[cfg(feature = "rocksdb")]
-pub use rocksdb::{
-    RocksDbBloomFilterBitsPerKey, RocksDbConfig, RocksDbDurabilityMode, RocksDbMemoryBudget,
-    RocksDbSnapshotStorage, RocksDbStorage, RocksDbTuningOptions, RocksDbWriteBufferManagerBudget,
-};
+pub use rocksdb::{RocksDbSnapshotStorage, RocksDbStorage};
 
 mod memory;
 pub use memory::{MemoryStorage, MemoryStorageSnapshot};
