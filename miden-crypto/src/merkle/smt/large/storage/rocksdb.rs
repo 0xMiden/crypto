@@ -195,9 +195,9 @@ impl SmtStorageReader for RocksDbStorage {
     /// - `StorageError::Backend`: If the leaves column family is missing or a RocksDB error occurs.
     /// - `StorageError::DeserializationError`: If the retrieved leaf data is corrupt.
     fn get_leaf(&self, index: u64) -> StorageResult<Option<SmtLeaf>> {
-        let cf = self.cf_handle(LEAVES_CF)?;
+        let table = self.kvdb.table(LEAVES_CF)?;
         let key = Self::index_db_key(index);
-        match self.db.get_cf(cf, key)? {
+        match self.kvdb.get(&table, &key)? {
             Some(bytes) => {
                 let leaf = SmtLeaf::read_from_bytes_with_budget(&bytes, bytes.len())?;
                 Ok(Some(leaf))
