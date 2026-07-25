@@ -1341,12 +1341,21 @@ impl SmtStorageReader for RocksDbSnapshotStorage {
             SUBTREE_56_CF,
         ];
 
-        let mut cf_handles = Vec::new();
-        for cf_name in SUBTREE_CFS {
-            cf_handles.push(self.cf_handle(cf_name)?);
+        let mut iters: Vec<_> = Vec::new();
+        for (cf_index, cf_name) in SUBTREE_CFS.into_iter().enumerate() {
+            let table = self.kvdb_snapshot.table(cf_name)?;
+            let depth = IN_MEMORY_DEPTH + (cf_index * 8) as u8;
+
+            let iter = self.kvdb_snapshot.iter(table).map(move |result| {
+                result.and_then(|(key_bytes, value_bytes)| {
+                    let node_idx = subtree_root_from_key_bytes(&key_bytes, depth)?;
+                    Ok(Subtree::from_vec(node_idx, &value_bytes)?)
+                })
+            });
+            iters.push(iter);
         }
 
-        Ok(Box::new(RocksDbSnapshotSubtreeIterator::new(&self.inner.snapshot, cf_handles)))
+        Ok(Box::new(iters.into_iter().flatten()))
     }
 
     /// Retrieves roots of all top level subtrees for efficient startup reconstruction.
