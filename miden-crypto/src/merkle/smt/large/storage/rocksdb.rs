@@ -1032,23 +1032,6 @@ fn read_count(what: &'static str, bytes: &[u8]) -> StorageResult<usize> {
     Ok(usize::from_be_bytes(arr))
 }
 
-fn collect_to_subtree_roots(
-    iter: DBIteratorWithThreadMode<'_, DB>,
-) -> StorageResult<Vec<(u64, Word)>> {
-    let mut hashes = Vec::new();
-
-    for item in iter {
-        let (key_bytes, value_bytes) = item?;
-
-        let index = index_from_key_bytes(&key_bytes)?;
-        let hash = Word::read_from_bytes_with_budget(&value_bytes, value_bytes.len())?;
-
-        hashes.push((index, hash));
-    }
-
-    Ok(hashes)
-}
-
 /// Reconstructs a `NodeIndex` from the variable-length subtree key stored in RocksDB.
 ///
 /// * `key_bytes` is the big-endian tail of the 64-bit value:
@@ -1360,9 +1343,20 @@ impl SmtStorageReader for RocksDbSnapshotStorage {
 
     /// Retrieves roots of all top level subtrees for efficient startup reconstruction.
     fn get_top_subtree_roots(&self) -> StorageResult<Vec<(u64, Word)>> {
-        let cf = self.cf_handle(IN_MEM_DEPTH_CF)?;
-        let iter = self.inner.snapshot.iterator_cf(cf, IteratorMode::Start);
-        collect_to_subtree_roots(iter)
+        let table = self.kvdb_snapshot.table(IN_MEM_DEPTH_CF)?;
+        let iter = self.kvdb_snapshot.iter(table);
+        let mut hashes = Vec::new();
+
+        for item in iter {
+            let (key_bytes, value_bytes) = item?;
+
+            let index = index_from_key_bytes(&key_bytes)?;
+            let hash = Word::read_from_bytes_with_budget(&value_bytes, value_bytes.len())?;
+
+            hashes.push((index, hash));
+        }
+
+        Ok(hashes)
     }
 }
 
