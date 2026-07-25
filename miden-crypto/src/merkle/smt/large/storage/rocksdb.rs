@@ -2,17 +2,15 @@ use alloc::{boxed::Box, vec::Vec};
 use core::fmt;
 use std::{mem::ManuallyDrop, sync::Arc};
 
-use rocksdb::{
-    BlockBasedOptions, Cache, ColumnFamilyDescriptor, DB, DBCompactionStyle, DBCompressionType,
-    DBIteratorWithThreadMode, FlushOptions, IteratorMode, Options, ReadOptions, WriteBatch,
-    WriteBufferManager, WriteOptions,
-};
+use rocksdb::*;
 
 #[rustfmt::skip]
 use super::{
     SmtStorage, SmtStorageReader, StorageError, StorageResult, StorageUpdateParts, StorageUpdates,
     SubtreeUpdate,
     config::*,
+    kvdb::*,
+    rocks_kvdb::{RocksKVDB, RocksKVDBSnapshot},
     schema::*,
 };
 use crate::{
@@ -35,6 +33,7 @@ const DEFAULT_BOTTOMMOST_ZSTD_MAX_TRAIN_BYTES: i32 = 1 << 20;
 #[derive(Debug, Clone)]
 pub struct RocksDbStorage {
     db: Arc<DB>,
+    kvdb: RocksKVDB,
     durability_mode: RocksDbDurabilityMode,
 }
 
@@ -194,8 +193,13 @@ impl RocksDbStorage {
         // Open the database with our tuned CFs
         let db = DB::open_cf_descriptors(&db_opts, config.path, cfs)?;
 
+        let db_ref = &Arc::new(db);
         Ok(Self {
-            db: Arc::new(db),
+            db: Arc::clone(db_ref),
+            kvdb: RocksKVDB {
+                db: Arc::clone(db_ref),
+                durability_mode: config.durability_mode,
+            },
             durability_mode: config.durability_mode,
         })
     }
@@ -580,7 +584,7 @@ impl SmtStorage for RocksDbStorage {
 
     /// Returns a detached read-only snapshot of the current RocksDB-backed storage.
     fn reader(&self) -> StorageResult<Self::Reader> {
-        Ok(RocksDbSnapshotStorage::new(Arc::clone(&self.db)))
+        Ok(RocksDbSnapshotStorage::new(Arc::clone(&self.db), self.kvdb.snapshot()?))
     }
 
     /// Inserts a key-value pair into the SMT leaf at the specified logical `index`.
@@ -1303,6 +1307,7 @@ impl From<rocksdb::Error> for StorageError {
 #[derive(Clone)]
 pub struct RocksDbSnapshotStorage {
     inner: Arc<RocksDbSnapshotInner>,
+    kvdb_snapshot: RocksKVDBSnapshot,
 }
 
 impl fmt::Debug for RocksDbSnapshotStorage {
@@ -1349,9 +1354,10 @@ impl Drop for RocksDbSnapshotInner {
 
 impl RocksDbSnapshotStorage {
     /// Creates a snapshot-backed storage reader from a shared RocksDB handle.
-    pub fn new(db: Arc<DB>) -> Self {
+    pub fn new(db: Arc<DB>, kvdb_snapshot: RocksKVDBSnapshot) -> Self {
         Self {
             inner: Arc::new(RocksDbSnapshotInner::new(db)),
+            kvdb_snapshot,
         }
     }
 

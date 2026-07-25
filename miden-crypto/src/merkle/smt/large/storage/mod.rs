@@ -16,6 +16,9 @@ mod error;
 pub use error::{StorageError, StorageResult};
 
 #[cfg(feature = "rocksdb")]
+mod kvdb;
+
+#[cfg(feature = "rocksdb")]
 pub mod config;
 
 #[cfg(feature = "rocksdb")]
@@ -25,6 +28,9 @@ mod schema;
 mod rocksdb;
 #[cfg(feature = "rocksdb")]
 pub use rocksdb::{RocksDbSnapshotStorage, RocksDbStorage};
+
+#[cfg(feature = "rocksdb")]
+mod rocks_kvdb;
 
 mod memory;
 pub use memory::{MemoryStorage, MemoryStorageSnapshot};
