@@ -673,25 +673,24 @@ impl SmtStorage for RocksDbStorage {
     /// # Errors
     /// - Returns `StorageError::Backend` if any column family lookup or RocksDB write fails.
     fn set_subtrees(&mut self, subtrees: Vec<Subtree>) -> StorageResult<()> {
-        let in_mem_depth_cf = self.cf_handle(IN_MEM_DEPTH_CF)?;
-        let mut batch = WriteBatch::default();
+        let in_mem_table = self.kvdb.table(IN_MEM_DEPTH_CF)?;
+        let mut batch = self.kvdb.batch();
 
         for subtree in subtrees {
-            let subtrees_cf = self.subtree_cf(subtree.root_index());
+            let subtree_table = self.kvdb.table(cf_for_depth(subtree.root_index().depth()))?;
             let key = Self::subtree_db_key(subtree.root_index());
             let value = subtree.to_vec();
-            batch.put_cf(subtrees_cf, key, value);
+            batch.put(&subtree_table, key.as_slice(), &value);
 
             if subtree.root_index().depth() == IN_MEMORY_DEPTH
                 && let Some(root_node) = subtree.get_inner_node(subtree.root_index())
             {
                 let hash_key = Self::index_db_key(subtree.root_index().position());
-                batch.put_cf(in_mem_depth_cf, hash_key, root_node.hash().to_bytes());
+                batch.put(&in_mem_table, &hash_key, &root_node.hash().to_bytes());
             }
         }
 
-        self.write_batch(batch)?;
-        Ok(())
+        batch.commit()
     }
 
     /// Removes a single SMT Subtree from storage, identified by its root `NodeIndex`.
