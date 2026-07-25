@@ -167,6 +167,14 @@ build-sve: ## Build with sve support
 bench: ## Run crypto benchmarks
 	cargo bench --features concurrent
 
+.PHONY: bench-large-smt-criterion-rocksdb
+bench-large-smt-criterion-rocksdb: ## Run criterion large SMT benchmarks with rocksdb storage
+	cargo bench --bench large_smt --features rocksdb -- "large_smt|rocksdb"
+
+.PHONY: bench-large-smt-codspeed-rocksdb
+bench-large-smt-codspeed-rocksdb: ## Run codspeed large SMT benchmarks with rocksdb storage
+	cargo bench --bench smt_codspeed --features rocksdb -- "large_smt/rocksdb"
+
 .PHONY: bench-smt-concurrent
 bench-smt-concurrent: ## Run SMT benchmarks with concurrent feature
 	cargo run --bin miden-crypto --release --features concurrent,executable -- --size 1000000
