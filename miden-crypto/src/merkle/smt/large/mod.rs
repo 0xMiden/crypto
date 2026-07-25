@@ -14,12 +14,12 @@
 //! # {
 //! use miden_crypto::{
 //!     Word,
-//!     merkle::smt::{LargeSmt, RocksDbConfig, RocksDbStorage},
+//!     merkle::smt::{LargeSmt, PersistentSmtStorageConfig, RocksDbStorage},
 //! };
 //!
 //! # fn main() -> Result<(), Box<dyn std::error::Error>> {
 //! # let expected_root: Word = miden_crypto::EMPTY_WORD;
-//! let storage = RocksDbStorage::open(RocksDbConfig::new("/path/to/db"))?;
+//! let storage = RocksDbStorage::open(PersistentSmtStorageConfig::new("/path/to/db"))?;
 //! let smt = LargeSmt::load_with_root(storage, expected_root)?;
 //! assert_eq!(smt.root(), expected_root);
 //! # Ok(())
@@ -31,10 +31,10 @@
 //! ```no_run
 //! # #[cfg(feature = "smt-kvdb")]
 //! # {
-//! use miden_crypto::merkle::smt::{LargeSmt, RocksDbConfig, RocksDbStorage};
+//! use miden_crypto::merkle::smt::{LargeSmt, PersistentSmtStorageConfig, RocksDbStorage};
 //!
 //! # fn main() -> Result<(), Box<dyn std::error::Error>> {
-//! let storage = RocksDbStorage::open(RocksDbConfig::new("/path/to/db"))?;
+//! let storage = RocksDbStorage::open(PersistentSmtStorageConfig::new("/path/to/db"))?;
 //! let smt = LargeSmt::load(storage)?;
 //! let _root = smt.root();
 //! # Ok(())
@@ -48,7 +48,7 @@
 //! # {
 //! use miden_crypto::{
 //!     Felt, Word,
-//!     merkle::smt::{LargeSmt, RocksDbConfig, RocksDbStorage},
+//!     merkle::smt::{LargeSmt, PersistentSmtStorageConfig, RocksDbStorage},
 //! };
 //!
 //! # fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -58,7 +58,7 @@
 //! }
 //! std::fs::create_dir_all(path)?;
 //!
-//! let storage = RocksDbStorage::open(RocksDbConfig::new(path))?;
+//! let storage = RocksDbStorage::open(PersistentSmtStorageConfig::new(path))?;
 //! let mut smt = LargeSmt::new(storage)?; // empty tree
 //!
 //! // Prepare initial entries
@@ -106,11 +106,11 @@
 //! # {
 //! use miden_crypto::{
 //!     EMPTY_WORD, Felt, Word,
-//!     merkle::smt::{LargeSmt, RocksDbConfig, RocksDbStorage},
+//!     merkle::smt::{LargeSmt, PersistentSmtStorageConfig, RocksDbStorage},
 //! };
 //!
 //! # fn main() -> Result<(), Box<dyn std::error::Error>> {
-//! let storage = RocksDbStorage::open(RocksDbConfig::new("/path/to/db"))?;
+//! let storage = RocksDbStorage::open(PersistentSmtStorageConfig::new("/path/to/db"))?;
 //! let mut smt = LargeSmt::load(storage)?;
 //!
 //! let k1 = Word::new([
@@ -158,7 +158,7 @@
 //! # {
 //! use miden_crypto::{
 //!     Felt, Word,
-//!     merkle::smt::{LargeSmt, RocksDbConfig, RocksDbStorage},
+//!     merkle::smt::{LargeSmt, PersistentSmtStorageConfig, RocksDbStorage},
 //! };
 //!
 //! # fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -170,7 +170,7 @@
 //! }
 //! std::fs::create_dir_all(path)?;
 //!
-//! let storage = RocksDbStorage::open(RocksDbConfig::new(path))?;
+//! let storage = RocksDbStorage::open(PersistentSmtStorageConfig::new(path))?;
 //! let entries = vec![
 //!     (
 //!         Word::new([

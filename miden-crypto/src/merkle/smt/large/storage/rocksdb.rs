@@ -46,7 +46,7 @@ impl<TKVDB: KVDB> KVDBSmtStorage<TKVDB> {
     /// # Errors
     /// Returns `StorageError::Backend` if the database cannot be opened or configured,
     /// for example, due to path issues, permissions, or RocksDB internal errors.
-    pub fn open(config: RocksDbConfig) -> StorageResult<Self> {
+    pub fn open(config: PersistentSmtStorageConfig) -> StorageResult<Self> {
         let kvdb = TKVDB::new(config)?;
         Ok(Self { kvdb })
     }

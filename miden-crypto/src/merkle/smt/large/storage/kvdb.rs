@@ -6,7 +6,7 @@ use alloc::vec::Vec;
 use core::ops::Deref;
 use std::fmt::Debug;
 
-use super::{StorageResult, config::RocksDbConfig};
+use super::{StorageResult, config::PersistentSmtStorageConfig};
 
 /// Read-only access to a key-value database.
 /// Shared shape between a live DB and a point-in-time snapshot.
@@ -51,7 +51,7 @@ pub trait KVDB: KVDBReader + 'static {
     where
         Self: 'a;
 
-    fn new(config: RocksDbConfig) -> StorageResult<Self>
+    fn new(config: PersistentSmtStorageConfig) -> StorageResult<Self>
     where
         Self: Sized;
 

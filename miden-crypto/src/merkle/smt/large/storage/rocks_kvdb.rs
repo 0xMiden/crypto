@@ -24,13 +24,13 @@ impl From<RocksError> for StorageError {
 #[derive(Debug, Clone)]
 pub struct RocksKVDB {
     pub(super) db: Arc<DB>,
-    pub(super) durability_mode: RocksDbDurabilityMode,
+    pub(super) durability_mode: PersistentSmtStorageDurabilityMode,
 }
 
 impl RocksKVDB {
     fn write_options(&self) -> WriteOptions {
         let mut write_opts = WriteOptions::default();
-        write_opts.set_sync(self.durability_mode == RocksDbDurabilityMode::Sync);
+        write_opts.set_sync(self.durability_mode == PersistentSmtStorageDurabilityMode::Sync);
         write_opts
     }
 }
@@ -38,7 +38,7 @@ impl RocksKVDB {
 impl KVDB for RocksKVDB {
     type Batch<'a> = RocksKVDBBatch<'a>;
 
-    fn new(config: RocksDbConfig) -> StorageResult<Self> {
+    fn new(config: PersistentSmtStorageConfig) -> StorageResult<Self> {
         let tuning_options = &config.tuning_options;
 
         // Base DB options
@@ -92,7 +92,7 @@ impl KVDB for RocksKVDB {
         #[expect(clippy::items_after_statements)]
         fn subtree_cf(
             cache: &Cache,
-            tuning_options: &RocksDbTuningOptions,
+            tuning_options: &PersistentSmtStorageTuningOptions,
             bloom_filter_bits: f64,
             write_buffer_manager: Option<&WriteBufferManager>,
         ) -> Options {
@@ -255,7 +255,7 @@ fn configure_smt_cf_options(opts: &mut Options) {
 fn configure_block_table_options(
     table_opts: &mut BlockBasedOptions,
     cache: &Cache,
-    tuning_options: &RocksDbTuningOptions,
+    tuning_options: &PersistentSmtStorageTuningOptions,
     bloom_bits_per_key: f64,
 ) {
     // Keep all block-based column families on the same cache and metadata policy.

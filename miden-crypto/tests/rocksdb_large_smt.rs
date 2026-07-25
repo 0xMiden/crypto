@@ -5,8 +5,8 @@ use miden_crypto::{
     merkle::{
         InnerNodeInfo,
         smt::{
-            LargeSmt, LargeSmtError, LargeSmtResult, RocksDbConfig, RocksDbSnapshotStorage,
-            RocksDbStorage,
+            LargeSmt, LargeSmtError, LargeSmtResult, PersistentSmtStorageConfig,
+            RocksDbSnapshotStorage, RocksDbStorage,
         },
     },
 };
@@ -39,7 +39,7 @@ fn setup_storage() -> (RocksDbStorage, TempDir) {
 
     let db_path = temp_dir.path().to_path_buf();
 
-    let storage = RocksDbStorage::open(RocksDbConfig::new(db_path))
+    let storage = RocksDbStorage::open(PersistentSmtStorageConfig::new(db_path))
         .expect("Failed to open RocksDbStorage in temporary directory");
     (storage, temp_dir)
 }
@@ -151,7 +151,7 @@ fn rocksdb_persistence_reopen() {
     inner_nodes.sort_by_key(|info| info.value);
     drop(smt);
 
-    let reopened_storage = RocksDbStorage::open(RocksDbConfig::new(db_path)).unwrap();
+    let reopened_storage = RocksDbStorage::open(PersistentSmtStorageConfig::new(db_path)).unwrap();
     let smt = LargeSmt::<RocksDbStorage>::load(reopened_storage).unwrap();
 
     let mut inner_nodes_2: Vec<InnerNodeInfo> =
@@ -194,7 +194,7 @@ fn rocksdb_persistence_after_insertion() {
     inner_nodes.sort_by_key(|info| info.value);
     drop(smt);
 
-    let reopened_storage = RocksDbStorage::open(RocksDbConfig::new(db_path)).unwrap();
+    let reopened_storage = RocksDbStorage::open(PersistentSmtStorageConfig::new(db_path)).unwrap();
     let smt = LargeSmt::<RocksDbStorage>::load(reopened_storage).unwrap();
 
     let mut inner_nodes_2: Vec<InnerNodeInfo> =
@@ -271,7 +271,7 @@ fn rocksdb_persistence_after_insert_batch_with_deletions() {
     let num_entries = smt.num_entries();
     drop(smt);
 
-    let reopened_storage = RocksDbStorage::open(RocksDbConfig::new(db_path)).unwrap();
+    let reopened_storage = RocksDbStorage::open(PersistentSmtStorageConfig::new(db_path)).unwrap();
     let smt = LargeSmt::<RocksDbStorage>::load(reopened_storage).unwrap();
 
     let mut inner_nodes_2: Vec<InnerNodeInfo> =
@@ -303,7 +303,7 @@ fn rocksdb_load_with_root_validates_correctly() {
     drop(smt);
 
     // Reopen with the correct expected root
-    let reopened_storage = RocksDbStorage::open(RocksDbConfig::new(db_path)).unwrap();
+    let reopened_storage = RocksDbStorage::open(PersistentSmtStorageConfig::new(db_path)).unwrap();
     let smt = LargeSmt::load_with_root(reopened_storage, expected_root)
         .expect("Should successfully open with correct root");
 
@@ -325,7 +325,7 @@ fn rocksdb_load_with_root_mismatch_returns_error() {
     let wrong_root = Word::new([ONE; 4]);
     assert_ne!(wrong_root, actual_root, "Test requires different roots");
 
-    let reopened_storage = RocksDbStorage::open(RocksDbConfig::new(db_path)).unwrap();
+    let reopened_storage = RocksDbStorage::open(PersistentSmtStorageConfig::new(db_path)).unwrap();
     let result = LargeSmt::load_with_root(reopened_storage, wrong_root);
 
     assert!(result.is_err(), "Should fail with wrong root");
@@ -350,7 +350,7 @@ fn rocksdb_load_skips_validation() {
     drop(smt);
 
     // load should succeed
-    let reopened_storage = RocksDbStorage::open(RocksDbConfig::new(db_path)).unwrap();
+    let reopened_storage = RocksDbStorage::open(PersistentSmtStorageConfig::new(db_path)).unwrap();
     let smt =
         LargeSmt::load(reopened_storage).expect("Should successfully open without validation");
 
@@ -371,7 +371,7 @@ fn rocksdb_iter_leaves_returns_error_for_corrupt_leaf() {
 
     corrupt_leaf_value(&db_path, leaf_index);
 
-    let storage = RocksDbStorage::open(RocksDbConfig::new(db_path)).unwrap();
+    let storage = RocksDbStorage::open(PersistentSmtStorageConfig::new(db_path)).unwrap();
     let result = storage.iter_leaves().unwrap().collect::<Result<Vec<_>, StorageError>>();
 
     assert!(
@@ -393,7 +393,7 @@ fn rocksdb_iter_subtrees_returns_error_for_corrupt_subtree() {
 
     corrupt_first_subtree_value(&db_path);
 
-    let storage = RocksDbStorage::open(RocksDbConfig::new(db_path)).unwrap();
+    let storage = RocksDbStorage::open(PersistentSmtStorageConfig::new(db_path)).unwrap();
     let result = storage.iter_subtrees().unwrap().collect::<Result<Vec<_>, StorageError>>();
 
     assert!(
@@ -414,7 +414,7 @@ fn rocksdb_new_fails_on_non_empty_storage() {
     drop(smt);
 
     // Reopen storage and try to use new() - should fail
-    let reopened_storage = RocksDbStorage::open(RocksDbConfig::new(db_path)).unwrap();
+    let reopened_storage = RocksDbStorage::open(PersistentSmtStorageConfig::new(db_path)).unwrap();
     let result = LargeSmt::new(reopened_storage);
 
     assert!(result.is_err(), "new() should fail on non-empty storage");
@@ -468,7 +468,7 @@ fn rocksdb_entry_count_through_leaf_lifecycle() {
 
     // Verify persistence through the lifecycle
     drop(smt);
-    let storage = RocksDbStorage::open(RocksDbConfig::new(&db_path)).unwrap();
+    let storage = RocksDbStorage::open(PersistentSmtStorageConfig::new(&db_path)).unwrap();
     let smt = LargeSmt::load(storage).unwrap();
 
     assert_eq!(smt.num_entries(), 0, "persisted entry count should be 0");

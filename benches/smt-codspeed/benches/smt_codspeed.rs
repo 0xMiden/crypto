@@ -6,7 +6,8 @@ use criterion::{
 use miden_crypto::{
     Felt, ONE, Word,
     merkle::smt::{
-        LargeSmt, LeafIndex, MemoryStorage, RocksDbConfig, RocksDbStorage, SimpleSmt, Smt,
+        LargeSmt, LeafIndex, MemoryStorage, PersistentSmtStorageConfig, RocksDbStorage, SimpleSmt,
+        Smt,
     },
 };
 
@@ -211,7 +212,7 @@ fn large_smt_memory_benches(c: &mut Criterion) {
 
 fn rocksdb_smt(entries_count: usize) -> (tempfile::TempDir, LargeSmt<RocksDbStorage>) {
     let temp_dir = tempfile::TempDir::new().unwrap();
-    let storage = RocksDbStorage::open(RocksDbConfig::new(temp_dir.path())).unwrap();
+    let storage = RocksDbStorage::open(PersistentSmtStorageConfig::new(temp_dir.path())).unwrap();
     let smt = LargeSmt::with_entries(storage, entries(entries_count, 0)).unwrap();
     (temp_dir, smt)
 }
