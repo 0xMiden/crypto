@@ -1294,12 +1294,6 @@ fn cf_for_depth(depth: u8) -> &'static str {
     }
 }
 
-impl From<rocksdb::Error> for StorageError {
-    fn from(e: rocksdb::Error) -> Self {
-        StorageError::Backend(Box::new(e))
-    }
-}
-
 // ROCKSDB SNAPSHOT STORAGE
 // ================================================================================================
 

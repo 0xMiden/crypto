@@ -7,7 +7,7 @@
 use alloc::{boxed::Box, sync::Arc, vec::Vec};
 use core::{fmt, mem::ManuallyDrop, ops::Deref};
 
-use rocksdb::*;
+use rocksdb::{Error as RocksError, *};
 
 #[rustfmt::skip]
 use super::{
@@ -16,6 +16,12 @@ use super::{
     kvdb::*,
     schema::*,
 };
+
+impl From<RocksError> for StorageError {
+    fn from(e: RocksError) -> Self {
+        StorageError::Backend(Box::new(e))
+    }
+}
 
 #[derive(Debug, Clone)]
 pub struct RocksKVDB {
