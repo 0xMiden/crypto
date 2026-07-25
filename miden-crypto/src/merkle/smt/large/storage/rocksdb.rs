@@ -793,11 +793,11 @@ impl SmtStorage for RocksDbStorage {
     fn apply(&mut self, updates: StorageUpdates) -> StorageResult<()> {
         use p3_maybe_rayon::prelude::*;
 
-        let mut batch = WriteBatch::default();
+        let mut batch = self.kvdb.batch();
 
-        let leaves_cf = self.cf_handle(LEAVES_CF)?;
-        let metadata_cf = self.cf_handle(METADATA_CF)?;
-        let in_mem_depth_cf = self.cf_handle(IN_MEM_DEPTH_CF)?;
+        let leaves_table = self.kvdb.table(LEAVES_CF)?;
+        let metadata_table = self.kvdb.table(METADATA_CF)?;
+        let in_mem_table = self.kvdb.table(IN_MEM_DEPTH_CF)?;
 
         let StorageUpdateParts {
             leaf_updates,
@@ -810,8 +810,8 @@ impl SmtStorage for RocksDbStorage {
         for (index, maybe_leaf) in leaf_updates {
             let key = Self::index_db_key(index);
             match maybe_leaf {
-                Some(leaf) => batch.put_cf(leaves_cf, key, leaf.to_bytes()),
-                None => batch.delete_cf(leaves_cf, key),
+                Some(leaf) => batch.put(&leaves_table, &key, &leaf.to_bytes()),
+                None => batch.delete(&leaves_table, &key),
             }
         }
 
@@ -844,23 +844,22 @@ impl SmtStorage for RocksDbStorage {
                 };
 
                 let key = Self::subtree_db_key(index);
-                let subtrees_cf = self.subtree_cf(index);
+                let subtree_table = self.kvdb.table(cf_for_depth(index.depth()))?;
 
-                Ok((subtrees_cf, key, maybe_bytes, in_mem_depth_op))
+                Ok((subtree_table, key, maybe_bytes, in_mem_depth_op))
             })
             .collect();
 
         // Sequential batch building
-        for (subtrees_cf, key, maybe_bytes, in_mem_depth_op) in subtree_ops? {
+        for (subtree_table, key, maybe_bytes, in_mem_depth_op) in subtree_ops? {
             match maybe_bytes {
-                Some(bytes) => batch.put_cf(subtrees_cf, key, bytes),
-                None => batch.delete_cf(subtrees_cf, key),
+                Some(bytes) => batch.put(&subtree_table, key.as_slice(), &bytes),
+                None => batch.delete(&subtree_table, key.as_slice()),
             }
-
             if let Some((hash_key, maybe_hash_bytes)) = in_mem_depth_op {
                 match maybe_hash_bytes {
-                    Some(hash_bytes) => batch.put_cf(in_mem_depth_cf, hash_key, hash_bytes),
-                    None => batch.delete_cf(in_mem_depth_cf, hash_key),
+                    Some(hash_bytes) => batch.put(&in_mem_table, &hash_key, &hash_bytes),
+                    None => batch.delete(&in_mem_table, &hash_key),
                 }
             }
         }
@@ -872,13 +871,11 @@ impl SmtStorage for RocksDbStorage {
             let new_leaf_count = current_leaf_count.saturating_add_signed(leaf_count_delta);
             let new_entry_count = current_entry_count.saturating_add_signed(entry_count_delta);
 
-            batch.put_cf(metadata_cf, LEAF_COUNT_KEY, new_leaf_count.to_be_bytes());
-            batch.put_cf(metadata_cf, ENTRY_COUNT_KEY, new_entry_count.to_be_bytes());
+            batch.put(&metadata_table, LEAF_COUNT_KEY, &new_leaf_count.to_be_bytes());
+            batch.put(&metadata_table, ENTRY_COUNT_KEY, &new_entry_count.to_be_bytes());
         }
 
-        self.write_batch(batch)?;
-
-        Ok(())
+        batch.commit()
     }
 }
 
