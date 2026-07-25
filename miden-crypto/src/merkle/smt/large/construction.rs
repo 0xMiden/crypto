@@ -64,8 +64,9 @@ impl<S: SmtStorageReader> LargeSmt<S> {
     /// ```no_run
     /// # #[cfg(feature = "smt-kvdb")]
     /// # {
-    /// use miden_crypto::merkle::smt::{LargeSmt, PersistentSmtStorageConfig, RocksDbStorage};
-    /// let storage = RocksDbStorage::open(PersistentSmtStorageConfig::new("/path/to/db")).unwrap();
+    /// use miden_crypto::merkle::smt::{LargeSmt, PersistentSmtStorage, PersistentSmtStorageConfig};
+    /// let storage =
+    ///     PersistentSmtStorage::open(PersistentSmtStorageConfig::new("/path/to/db")).unwrap();
     /// let smt = LargeSmt::load(storage).expect("Failed to load SMT");
     /// # }
     /// ```
@@ -92,10 +93,11 @@ impl<S: SmtStorageReader> LargeSmt<S> {
     /// # {
     /// use miden_crypto::{
     ///     Word,
-    ///     merkle::smt::{LargeSmt, PersistentSmtStorageConfig, RocksDbStorage},
+    ///     merkle::smt::{LargeSmt, PersistentSmtStorage, PersistentSmtStorageConfig},
     /// };
     /// # let expected_root: Word = miden_crypto::EMPTY_WORD;
-    /// let storage = RocksDbStorage::open(PersistentSmtStorageConfig::new("/path/to/db")).unwrap();
+    /// let storage =
+    ///     PersistentSmtStorage::open(PersistentSmtStorageConfig::new("/path/to/db")).unwrap();
     /// let smt = LargeSmt::load_with_root(storage, expected_root)
     ///     .expect("Failed to load SMT with expected root");
     /// # }

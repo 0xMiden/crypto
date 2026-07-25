@@ -4,7 +4,7 @@ use std::{path::PathBuf, time::Instant};
 
 use clap::{Parser, ValueEnum};
 #[cfg(feature = "smt-kvdb")]
-use miden_crypto::merkle::smt::{PersistentSmtStorageConfig, RocksDbStorage};
+use miden_crypto::merkle::smt::{PersistentSmtStorage, PersistentSmtStorageConfig};
 use miden_crypto::{
     EMPTY_WORD, Felt, ONE, Word,
     hash::poseidon2::Poseidon2,
@@ -305,7 +305,7 @@ fn get_storage(
                 if !open {
                     prepare_database_directory(&path, reset)?;
                 }
-                let db = RocksDbStorage::open(
+                let db = PersistentSmtStorage::open(
                     PersistentSmtStorageConfig::new(path)
                         .with_cache_size(1 << 30)
                         .with_max_open_files(2048),

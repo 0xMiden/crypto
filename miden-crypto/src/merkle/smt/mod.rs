@@ -29,7 +29,7 @@ pub use large::{
     SubtreeError, SubtreeUpdate,
 };
 #[cfg(feature = "smt-kvdb")]
-pub use large::{RocksDbSnapshotStorage, RocksDbStorage};
+pub use large::{PersistentSmtStorage, PersistentSmtStorageSnapshot};
 
 mod large_forest;
 pub use large_forest::{

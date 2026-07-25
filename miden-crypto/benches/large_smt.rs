@@ -6,7 +6,7 @@ use miden_crypto::{
     merkle::{
         EmptySubtreeRoots, NodeIndex,
         smt::{
-            InnerNode, LargeSmt, MemoryStorage, PersistentSmtStorageConfig, RocksDbStorage,
+            InnerNode, LargeSmt, MemoryStorage, PersistentSmtStorage, PersistentSmtStorageConfig,
             SMT_DEPTH, Subtree,
         },
     },
@@ -130,11 +130,11 @@ benchmark_with_setup_data! {
         let entries = generate_smt_entries_sequential(256);
         let keys = generate_test_keys_sequential(10);
         let temp_dir = tempfile::TempDir::new().unwrap();
-        let storage = RocksDbStorage::open(PersistentSmtStorageConfig::new(temp_dir.path())).unwrap();
+        let storage = PersistentSmtStorage::open(PersistentSmtStorageConfig::new(temp_dir.path())).unwrap();
         let smt = LargeSmt::with_entries(storage, entries).unwrap();
         (smt, keys, temp_dir)
     },
-    |b: &mut criterion::Bencher, (smt, keys, _temp_dir): &(LargeSmt<RocksDbStorage>, Vec<Word>, tempfile::TempDir)| {
+    |b: &mut criterion::Bencher, (smt, keys, _temp_dir): &(LargeSmt<PersistentSmtStorage>, Vec<Word>, tempfile::TempDir)| {
         b.iter(|| {
             for key in keys {
                 hint::black_box(smt.open(key));
@@ -152,11 +152,11 @@ benchmark_with_setup_data! {
         let entries = generate_smt_entries_sequential(10_000);
         let keys = generate_test_keys_sequential(10);
         let temp_dir = tempfile::TempDir::new().unwrap();
-        let storage = RocksDbStorage::open(PersistentSmtStorageConfig::new(temp_dir.path())).unwrap();
+        let storage = PersistentSmtStorage::open(PersistentSmtStorageConfig::new(temp_dir.path())).unwrap();
         let smt = LargeSmt::with_entries(storage, entries).unwrap();
         (smt, keys, temp_dir)
     },
-    |b: &mut criterion::Bencher, (smt, keys, _temp_dir): &(LargeSmt<RocksDbStorage>, Vec<Word>, tempfile::TempDir)| {
+    |b: &mut criterion::Bencher, (smt, keys, _temp_dir): &(LargeSmt<PersistentSmtStorage>, Vec<Word>, tempfile::TempDir)| {
         b.iter(|| {
             for key in keys {
                 hint::black_box(smt.open(key));
@@ -173,13 +173,13 @@ benchmark_with_setup_data! {
     || {
         let entries = generate_smt_entries_sequential(10_000);
         let temp_dir = tempfile::TempDir::new().unwrap();
-        let storage = RocksDbStorage::open(PersistentSmtStorageConfig::new(temp_dir.path())).unwrap();
+        let storage = PersistentSmtStorage::open(PersistentSmtStorageConfig::new(temp_dir.path())).unwrap();
         let smt = LargeSmt::with_entries(storage, entries).unwrap();
         (smt, temp_dir)
     },
-    |b: &mut criterion::Bencher, (smt, _temp_dir): &(LargeSmt<RocksDbStorage>, tempfile::TempDir)| {
+    |b: &mut criterion::Bencher, (smt, _temp_dir): &(LargeSmt<PersistentSmtStorage>, tempfile::TempDir)| {
         // iter_batched drops the returned clone after the timed section, keeping the
-        // RocksDbStorage::drop flush out of the measurement.
+        // PersistentSmtStorage::drop flush out of the measurement.
         b.iter_batched(|| (), |_| hint::black_box(smt.clone()), BatchSize::SmallInput)
     },
 }
@@ -192,12 +192,12 @@ benchmark_with_setup_data! {
     || {
         let entries = generate_smt_entries_sequential(256);
         let temp_dir = tempfile::TempDir::new().unwrap();
-        let storage = RocksDbStorage::open(PersistentSmtStorageConfig::new(temp_dir.path())).unwrap();
+        let storage = PersistentSmtStorage::open(PersistentSmtStorageConfig::new(temp_dir.path())).unwrap();
         let smt = LargeSmt::with_entries(storage, entries).unwrap();
         let new_entries = generate_smt_entries_sequential(10_000);
         (smt, new_entries, temp_dir)
     },
-    |b: &mut criterion::Bencher, (smt, new_entries, _temp_dir): &(LargeSmt<RocksDbStorage>, Vec<(Word, Word)>, tempfile::TempDir)| {
+    |b: &mut criterion::Bencher, (smt, new_entries, _temp_dir): &(LargeSmt<PersistentSmtStorage>, Vec<(Word, Word)>, tempfile::TempDir)| {
         b.iter(|| {
             hint::black_box(smt.compute_mutations(new_entries.clone()).unwrap());
         })
@@ -221,7 +221,7 @@ benchmark_batch! {
             || {
                 let _ = std::fs::remove_dir_all(&bench_dir);
                 std::fs::create_dir_all(&bench_dir).unwrap();
-                let storage = RocksDbStorage::open(PersistentSmtStorageConfig::new(&bench_dir)).unwrap();
+                let storage = PersistentSmtStorage::open(PersistentSmtStorageConfig::new(&bench_dir)).unwrap();
                 let smt = LargeSmt::with_entries(storage, base_entries.clone()).unwrap();
                 let new_entries = generate_smt_entries_sequential(entry_count);
                 let mutations = smt.compute_mutations(new_entries).unwrap();
@@ -255,7 +255,7 @@ benchmark_batch! {
             || {
                 let _ = std::fs::remove_dir_all(&bench_dir);
                 std::fs::create_dir_all(&bench_dir).unwrap();
-                let storage = RocksDbStorage::open(PersistentSmtStorageConfig::new(&bench_dir)).unwrap();
+                let storage = PersistentSmtStorage::open(PersistentSmtStorageConfig::new(&bench_dir)).unwrap();
                 let smt = LargeSmt::with_entries(storage, base_entries.clone()).unwrap();
                 let new_entries = generate_smt_entries_sequential(entry_count);
                 let mutations = smt.compute_mutations(new_entries).unwrap();
@@ -278,7 +278,7 @@ benchmark_batch! {
     |b: &mut criterion::Bencher, insert_count: usize| {
         let base_entries = generate_smt_entries_sequential(256);
         let temp_dir = tempfile::TempDir::new().unwrap();
-        let storage = RocksDbStorage::open(PersistentSmtStorageConfig::new(temp_dir.path())).unwrap();
+        let storage = PersistentSmtStorage::open(PersistentSmtStorageConfig::new(temp_dir.path())).unwrap();
         let mut smt = LargeSmt::with_entries(storage, base_entries).unwrap();
 
         b.iter(|| {
@@ -296,7 +296,7 @@ benchmark_batch! {
         b.iter_batched(
             || {
                 let temp_dir = tempfile::TempDir::new().unwrap();
-                let storage = RocksDbStorage::open(PersistentSmtStorageConfig::new(temp_dir.path())).unwrap();
+                let storage = PersistentSmtStorage::open(PersistentSmtStorageConfig::new(temp_dir.path())).unwrap();
                 let smt = LargeSmt::with_entries(storage, empty()).unwrap();
                 let batch = generate_smt_entries_sequential(insert_count);
 
@@ -320,7 +320,7 @@ benchmark_batch! {
         b.iter_batched(
             || {
                 let temp_dir = tempfile::TempDir::new().unwrap();
-                let storage = RocksDbStorage::open(PersistentSmtStorageConfig::new(temp_dir.path())).unwrap();
+                let storage = PersistentSmtStorage::open(PersistentSmtStorageConfig::new(temp_dir.path())).unwrap();
                 let smt = LargeSmt::with_entries(storage, initial_entries.clone()).unwrap();
                 let batch = generate_smt_entries_sequential(insert_count);
 
