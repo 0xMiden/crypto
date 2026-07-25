@@ -19,6 +19,9 @@ pub use error::{StorageError, StorageResult};
 pub mod config;
 
 #[cfg(feature = "rocksdb")]
+mod schema;
+
+#[cfg(feature = "rocksdb")]
 mod rocksdb;
 #[cfg(feature = "rocksdb")]
 pub use rocksdb::{RocksDbSnapshotStorage, RocksDbStorage};

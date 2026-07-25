@@ -13,6 +13,7 @@ use super::{
     SmtStorage, SmtStorageReader, StorageError, StorageResult, StorageUpdateParts, StorageUpdates,
     SubtreeUpdate,
     config::*,
+    schema::*,
 };
 use crate::{
     EMPTY_WORD, Word,
@@ -28,50 +29,9 @@ use crate::{
 
 const DEFAULT_BOTTOMMOST_ZSTD_MAX_TRAIN_BYTES: i32 = 1 << 20;
 
-/// The name of the RocksDB column family used for storing SMT leaves.
-const LEAVES_CF: &str = "leaves";
-/// The names of the RocksDB column families used for storing SMT subtrees (deep nodes).
-const SUBTREE_16_CF: &str = "st16";
-const SUBTREE_24_CF: &str = "st24";
-const SUBTREE_32_CF: &str = "st32";
-const SUBTREE_40_CF: &str = "st40";
-const SUBTREE_48_CF: &str = "st48";
-const SUBTREE_56_CF: &str = "st56";
-
-/// The name of the RocksDB column family used for storing metadata (e.g., counts).
-const METADATA_CF: &str = "metadata";
-/// The name of the RocksDB column family used for storing in-memory-depth hashes for fast tree
-/// rebuilding.
-const IN_MEM_DEPTH_CF: &str = "in_mem_depth";
-
-/// The key used in the `METADATA_CF` column family to store the total count of non-empty leaves.
-const LEAF_COUNT_KEY: &[u8] = b"leaf_count";
-/// The key used in the `METADATA_CF` column family to store the total count of key-value entries.
-const ENTRY_COUNT_KEY: &[u8] = b"entry_count";
-
-// ROCKSDB STORAGE
-// ================================================================================================
-
 /// A RocksDB-backed persistent storage implementation for a Sparse Merkle Tree (SMT).
 ///
 /// Implements the `SmtStorage` trait, providing durable storage for SMT components
-/// including leaves, subtrees (for deeper parts of the tree), and metadata like the SMT root
-/// and counts. It leverages RocksDB column families to organize data:
-/// - `LEAVES_CF` ("leaves"): Stores `SmtLeaf` data, keyed by their logical u64 index.
-/// - `SUBTREE_16_CF` ("st16"): Stores serialized `Subtree` data at depth 16, keyed by their root
-///   `NodeIndex`.
-/// - `SUBTREE_24_CF` ("st24"): Stores serialized `Subtree` data at depth 24, keyed by their root
-///   `NodeIndex`.
-/// - `SUBTREE_32_CF` ("st32"): Stores serialized `Subtree` data at depth 32, keyed by their root
-///   `NodeIndex`.
-/// - `SUBTREE_40_CF` ("st40"): Stores serialized `Subtree` data at depth 40, keyed by their root
-///   `NodeIndex`.
-/// - `SUBTREE_48_CF` ("st48"): Stores serialized `Subtree` data at depth 48, keyed by their root
-///   `NodeIndex`.
-/// - `SUBTREE_56_CF` ("st56"): Stores serialized `Subtree` data at depth 56, keyed by their root
-///   `NodeIndex`.
-/// - `METADATA_CF` ("metadata"): Stores overall SMT metadata such as the current root hash, total
-///   leaf count, and total entry count.
 #[derive(Debug, Clone)]
 pub struct RocksDbStorage {
     db: Arc<DB>,
