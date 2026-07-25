@@ -615,11 +615,11 @@ impl SmtStorage for RocksDbStorage {
     ///   corrupt.
     fn remove_leaf(&mut self, index: u64) -> StorageResult<Option<SmtLeaf>> {
         let key = Self::index_db_key(index);
-        let cf = self.cf_handle(LEAVES_CF)?;
-        let old_bytes = self.db.get_cf(cf, key)?;
-        let mut batch = WriteBatch::default();
-        batch.delete_cf(cf, key);
-        self.write_batch(batch)?;
+        let table = self.kvdb.table(LEAVES_CF)?;
+        let old_bytes = self.kvdb.get(&table, &key)?;
+        let mut batch = self.kvdb.batch();
+        batch.delete(&table, &key);
+        batch.commit()?;
         Ok(old_bytes.map(|bytes| {
             SmtLeaf::read_from_bytes_with_budget(&bytes, bytes.len())
                 .expect("failed to deserialize leaf")
