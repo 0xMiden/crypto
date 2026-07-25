@@ -699,21 +699,20 @@ impl SmtStorage for RocksDbStorage {
     /// - `StorageError::Backend`: If the subtrees column family is missing or a RocksDB error
     ///   occurs.
     fn remove_subtree(&mut self, index: NodeIndex) -> StorageResult<()> {
-        let subtrees_cf = self.subtree_cf(index);
-        let mut batch = WriteBatch::default();
+        let subtree_table = self.kvdb.table(cf_for_depth(index.depth()))?;
+        let mut batch = self.kvdb.batch();
 
         let key = Self::subtree_db_key(index);
-        batch.delete_cf(subtrees_cf, key);
+        batch.delete(&subtree_table, key.as_slice());
 
         // Also remove in-memory-depth hash cache if this is an in-memory-depth subtree
         if index.depth() == IN_MEMORY_DEPTH {
-            let in_mem_depth_cf = self.cf_handle(IN_MEM_DEPTH_CF)?;
+            let in_mem_table = self.kvdb.table(IN_MEM_DEPTH_CF)?;
             let hash_key = Self::index_db_key(index.position());
-            batch.delete_cf(in_mem_depth_cf, hash_key);
+            batch.delete(&in_mem_table, &hash_key);
         }
 
-        self.write_batch(batch)?;
-        Ok(())
+        batch.commit()
     }
 
     /// Sets or updates a single inner node (non-leaf node) within a Subtree.
