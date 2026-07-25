@@ -157,10 +157,10 @@ impl SmtStorageReader for RocksDbStorage {
     ///   occurs.
     /// - `StorageError::BadValueLen`: If the retrieved count bytes are invalid.
     fn leaf_count(&self) -> StorageResult<usize> {
-        let cf = self.cf_handle(METADATA_CF)?;
-        self.db.get_cf(cf, LEAF_COUNT_KEY)?.map_or(Ok(0), |bytes| {
+        let table = self.kvdb.table(METADATA_CF)?;
+        self.kvdb.get(&table, LEAF_COUNT_KEY)?.map_or(Ok(0), |bytes| {
             let arr: [u8; 8] =
-                bytes.as_slice().try_into().map_err(|_| StorageError::BadValueLen {
+                bytes.as_ref().try_into().map_err(|_| StorageError::BadValueLen {
                     what: "leaf count",
                     expected: 8,
                     found: bytes.len(),
