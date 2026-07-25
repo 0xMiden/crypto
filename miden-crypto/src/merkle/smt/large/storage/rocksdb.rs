@@ -583,20 +583,19 @@ impl SmtStorage for RocksDbStorage {
     /// # Errors
     /// - `StorageError::Backend`: If column families are missing or a RocksDB error occurs.
     fn set_leaves(&mut self, leaves: Map<u64, SmtLeaf>) -> StorageResult<()> {
-        let cf = self.cf_handle(LEAVES_CF)?;
+        let leaves_table = self.kvdb.table(LEAVES_CF)?;
         let leaf_count: usize = leaves.len();
         let entry_count: usize = leaves.values().map(|leaf| leaf.entries().len()).sum();
-        let mut batch = WriteBatch::default();
+        let mut batch = self.kvdb.batch();
         for (idx, leaf) in leaves {
             let key = Self::index_db_key(idx);
             let value = leaf.to_bytes();
-            batch.put_cf(cf, key, &value);
+            batch.put(&leaves_table, &key, &value);
         }
-        let metadata_cf = self.cf_handle(METADATA_CF)?;
-        batch.put_cf(metadata_cf, LEAF_COUNT_KEY, leaf_count.to_be_bytes());
-        batch.put_cf(metadata_cf, ENTRY_COUNT_KEY, entry_count.to_be_bytes());
-        self.write_batch(batch)?;
-        Ok(())
+        let metadata_table = self.kvdb.table(METADATA_CF)?;
+        batch.put(&metadata_table, LEAF_COUNT_KEY, &leaf_count.to_be_bytes());
+        batch.put(&metadata_table, ENTRY_COUNT_KEY, &entry_count.to_be_bytes());
+        batch.commit()
     }
 
     /// Removes a single SMT leaf node by its logical `index` from the `LEAVES_CF` column family.
