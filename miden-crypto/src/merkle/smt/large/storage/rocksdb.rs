@@ -638,27 +638,24 @@ impl SmtStorage for RocksDbStorage {
     /// - Returns `StorageError` if column family lookup, serialization, or the write operation
     ///   fails.
     fn set_subtree(&mut self, subtree: &Subtree) -> StorageResult<()> {
-        let subtrees_cf = self.subtree_cf(subtree.root_index());
-        let mut batch = WriteBatch::default();
+        let subtree_table = self.kvdb.table(cf_for_depth(subtree.root_index().depth()))?;
+        let mut batch = self.kvdb.batch();
 
         let key = Self::subtree_db_key(subtree.root_index());
         let value = subtree.to_vec();
-        batch.put_cf(subtrees_cf, key, value);
+        batch.put(&subtree_table, key.as_slice(), &value);
 
-        // Also update in-memory-depth hash cache if this is an in-memory-depth subtree
         if subtree.root_index().depth() == IN_MEMORY_DEPTH {
             let root_hash = subtree
                 .get_inner_node(subtree.root_index())
                 .ok_or_else(|| StorageError::Unsupported("Subtree root node not found".into()))?
                 .hash();
-
-            let in_mem_depth_cf = self.cf_handle(IN_MEM_DEPTH_CF)?;
+            let in_mem_table = self.kvdb.table(IN_MEM_DEPTH_CF)?;
             let hash_key = Self::index_db_key(subtree.root_index().position());
-            batch.put_cf(in_mem_depth_cf, hash_key, root_hash.to_bytes());
+            batch.put(&in_mem_table, &hash_key, &root_hash.to_bytes());
         }
 
-        self.write_batch(batch)?;
-        Ok(())
+        batch.commit()
     }
 
     /// Bulk-writes subtrees to storage.
