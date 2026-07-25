@@ -473,13 +473,13 @@ impl SmtStorage for RocksDbStorage {
     fn insert_value(&mut self, index: u64, key: Word, value: Word) -> StorageResult<Option<Word>> {
         debug_assert_ne!(value, EMPTY_WORD);
 
-        let mut batch = WriteBatch::default();
+        let mut batch = self.kvdb.batch();
 
         // Fetch initial counts.
         let mut current_leaf_count = self.leaf_count()?;
         let mut current_entry_count = self.entry_count()?;
 
-        let leaves_cf = self.cf_handle(LEAVES_CF)?;
+        let leaves_table = self.kvdb.table(LEAVES_CF)?;
         let db_key = Self::index_db_key(index);
 
         let maybe_leaf = self.get_leaf(index)?;
@@ -496,7 +496,7 @@ impl SmtStorage for RocksDbStorage {
                     current_entry_count += 1;
                 }
                 // current_leaf_count does not change because the leaf itself already existed.
-                batch.put_cf(leaves_cf, db_key, existing_leaf.to_bytes());
+                batch.put(&leaves_table, &db_key, &existing_leaf.to_bytes());
                 old_value
             },
             None => {
@@ -506,19 +506,19 @@ impl SmtStorage for RocksDbStorage {
                 current_leaf_count += 1;
                 // This new leaf contains one new SMT entry.
                 current_entry_count += 1;
-                batch.put_cf(leaves_cf, db_key, new_leaf.to_bytes());
+                batch.put(&leaves_table, &db_key, &new_leaf.to_bytes());
                 // No previous value, as the leaf (and thus the key in it) was new.
                 None
             },
         };
 
         // Add updated metadata counts to the batch.
-        let metadata_cf = self.cf_handle(METADATA_CF)?;
-        batch.put_cf(metadata_cf, LEAF_COUNT_KEY, current_leaf_count.to_be_bytes());
-        batch.put_cf(metadata_cf, ENTRY_COUNT_KEY, current_entry_count.to_be_bytes());
+        let metadata_table = self.kvdb.table(METADATA_CF)?;
+        batch.put(&metadata_table, LEAF_COUNT_KEY, &current_leaf_count.to_be_bytes());
+        batch.put(&metadata_table, ENTRY_COUNT_KEY, &current_entry_count.to_be_bytes());
 
         // Atomically write all changes (leaf data and metadata counts).
-        self.write_batch(batch)?;
+        batch.commit()?;
 
         Ok(value_to_return)
     }
