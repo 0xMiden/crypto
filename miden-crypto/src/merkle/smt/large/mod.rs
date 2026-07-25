@@ -3,12 +3,12 @@
 //! `LargeSmt` stores the top of the tree (depths 0–`IN_MEMORY_DEPTH`-1) in memory and persists
 //! the lower depths in storage as fixed-size subtrees. This hybrid layout scales beyond RAM
 //! while keeping common operations fast. With the `smt-kvdb` feature enabled, the lower
-//! subtrees and leaves are stored in RocksDB. On reload, the in-memory top is reconstructed
+//! subtrees and leaves are stored in DB. On reload, the in-memory top is reconstructed
 //! from cached in-memory-depth subtree roots.
 //!
 //! Examples below require the `smt-kvdb-*` feature.
 //!
-//! Load an existing RocksDB-backed tree with root validation:
+//! Load an existing DB-backed tree with root validation:
 //! ```no_run
 //! # #[cfg(feature = "smt-kvdb")]
 //! # {
@@ -42,7 +42,7 @@
 //! # }
 //! ```
 //!
-//! Initialize an empty RocksDB-backed tree and bulk-load entries:
+//! Initialize an empty DB-backed tree and bulk-load entries:
 //! ```no_run
 //! # #[cfg(feature = "smt-kvdb")]
 //! # {

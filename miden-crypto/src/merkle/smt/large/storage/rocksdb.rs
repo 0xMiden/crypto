@@ -20,7 +20,7 @@ use crate::{
     utils::{Deserializable, Serializable},
 };
 
-/// A RocksDB-backed persistent storage implementation for a Sparse Merkle Tree (SMT).
+/// A persistent storage implementation for a Sparse Merkle Tree (SMT).
 ///
 /// Implements the `SmtStorage` trait, providing durable storage for SMT components
 #[derive(Debug, Clone)]
@@ -29,11 +29,11 @@ pub struct KVDBSmtStorage<TKVDB: KVDB> {
 }
 
 impl<TKVDB: KVDB> KVDBSmtStorage<TKVDB> {
-    /// Opens or creates a RocksDB database at the specified `path` and configures it for SMT
+    /// Opens or creates a database at the specified `path` and configures it for SMT
     /// storage.
     ///
     /// This method sets up the necessary column families (`leaves`, `subtrees`, `metadata`)
-    /// and applies various RocksDB options for performance, such as caching, bloom filters,
+    /// and applies various options for performance, such as caching, bloom filters,
     /// and compaction strategies tailored for SMT workloads.
     ///
     /// The default profile uses:
@@ -45,13 +45,13 @@ impl<TKVDB: KVDB> KVDBSmtStorage<TKVDB> {
     ///
     /// # Errors
     /// Returns `StorageError::Backend` if the database cannot be opened or configured,
-    /// for example, due to path issues, permissions, or RocksDB internal errors.
+    /// for example, due to path issues, permissions, or internal errors.
     pub fn open(config: PersistentSmtStorageConfig) -> StorageResult<Self> {
         let kvdb = TKVDB::new(config)?;
         Ok(Self { kvdb })
     }
 
-    /// Syncs the RocksDB database to disk.
+    /// Syncs the database to disk.
     ///
     /// This ensures that all data is persisted to disk.
     ///
@@ -61,13 +61,13 @@ impl<TKVDB: KVDB> KVDBSmtStorage<TKVDB> {
         self.kvdb.sync()
     }
 
-    /// Converts an index (u64) into a fixed-size byte array for use as a RocksDB key.
+    /// Converts an index (u64) into a fixed-size byte array for use as a DB key.
     #[inline(always)]
     fn index_db_key(index: u64) -> [u8; 8] {
         key_serializer::index_db_key(index)
     }
 
-    /// Converts a `NodeIndex` (for a subtree root) into a `KeyBytes` for use as a RocksDB key.
+    /// Converts a `NodeIndex` (for a subtree root) into a `KeyBytes` for use as a DB key.
     #[inline(always)]
     fn subtree_db_key(index: NodeIndex) -> KeyBytes {
         key_serializer::subtree_db_key(index)
@@ -77,13 +77,13 @@ impl<TKVDB: KVDB> KVDBSmtStorage<TKVDB> {
 mod key_serializer {
     use super::{KeyBytes, NodeIndex};
 
-    /// Converts an index (u64) into a fixed-size byte array for use as a RocksDB key.
+    /// Converts an index (u64) into a fixed-size byte array for use as a DB key.
     #[inline(always)]
     pub fn index_db_key(index: u64) -> [u8; 8] {
         index.to_be_bytes()
     }
 
-    /// Converts a `NodeIndex` (for a subtree root) into a `KeyBytes` for use as a RocksDB key.
+    /// Converts a `NodeIndex` (for a subtree root) into a `KeyBytes` for use as a DB key.
     /// The `KeyBytes` is a wrapper around a 8-byte value with a variable-length prefix.
     #[inline(always)]
     pub fn subtree_db_key(index: NodeIndex) -> KeyBytes {
@@ -105,8 +105,7 @@ impl<TKVDB: KVDB> SmtStorageReader for KVDBSmtStorage<TKVDB> {
     /// Returns 0 if the count is not found.
     ///
     /// # Errors
-    /// - `StorageError::Backend`: If the metadata column family is missing or a RocksDB error
-    ///   occurs.
+    /// - `StorageError::Backend`: If the metadata column family is missing or a DB error occurs.
     /// - `StorageError::BadValueLen`: If the retrieved count bytes are invalid.
     fn leaf_count(&self) -> StorageResult<usize> {
         let table = self.kvdb.table(METADATA_CF)?;
@@ -125,8 +124,7 @@ impl<TKVDB: KVDB> SmtStorageReader for KVDBSmtStorage<TKVDB> {
     /// Returns 0 if the count is not found.
     ///
     /// # Errors
-    /// - `StorageError::Backend`: If the metadata column family is missing or a RocksDB error
-    ///   occurs.
+    /// - `StorageError::Backend`: If the metadata column family is missing or a DB error occurs.
     /// - `StorageError::BadValueLen`: If the retrieved count bytes are invalid.
     fn entry_count(&self) -> StorageResult<usize> {
         let table = self.kvdb.table(METADATA_CF)?;
@@ -144,7 +142,7 @@ impl<TKVDB: KVDB> SmtStorageReader for KVDBSmtStorage<TKVDB> {
     /// Retrieves a single SMT leaf node by its logical `index` from the `LEAVES_CF` column family.
     ///
     /// # Errors
-    /// - `StorageError::Backend`: If the leaves column family is missing or a RocksDB error occurs.
+    /// - `StorageError::Backend`: If the leaves column family is missing or a DB error occurs.
     /// - `StorageError::DeserializationError`: If the retrieved leaf data is corrupt.
     fn get_leaf(&self, index: u64) -> StorageResult<Option<SmtLeaf>> {
         let table = self.kvdb.table(LEAVES_CF)?;
@@ -158,10 +156,10 @@ impl<TKVDB: KVDB> SmtStorageReader for KVDBSmtStorage<TKVDB> {
         }
     }
 
-    /// Retrieves multiple SMT leaf nodes by their logical `indices` using RocksDB's `multi_get_cf`.
+    /// Retrieves multiple SMT leaf nodes by their logical `indices`
     ///
     /// # Errors
-    /// - `StorageError::Backend`: If the leaves column family is missing or a RocksDB error occurs.
+    /// - `StorageError::Backend`: If the leaves column family is missing or a DB error occurs.
     /// - `StorageError::DeserializationError`: If any retrieved leaf data is corrupt.
     fn get_leaves(&self, indices: &[u64]) -> StorageResult<Vec<Option<SmtLeaf>>> {
         let table = self.kvdb.table(LEAVES_CF)?;
@@ -187,7 +185,7 @@ impl<TKVDB: KVDB> SmtStorageReader for KVDBSmtStorage<TKVDB> {
         Ok(self.leaf_count()? > 0)
     }
 
-    /// Batch-retrieves multiple subtrees from RocksDB by their node indices.
+    /// Batch-retrieves multiple subtrees from DB by their node indices.
     ///
     /// This method groups requests by subtree depth into column family buckets,
     /// then performs parallel `multi_get` operations to efficiently retrieve
@@ -204,7 +202,7 @@ impl<TKVDB: KVDB> SmtStorageReader for KVDBSmtStorage<TKVDB> {
     /// # Returns
     /// - A `Vec<Option<Subtree>>` where each index corresponds to the original input.
     /// - `Ok(...)` if all fetches succeed.
-    /// - `Err(StorageError)` if any RocksDB access or deserialization fails.
+    /// - `Err(StorageError)` if any DB access or deserialization fails.
     fn get_subtree(&self, index: NodeIndex) -> StorageResult<Option<Subtree>> {
         let table = self.kvdb.table(cf_for_depth(index.depth()))?;
         let key = Self::subtree_db_key(index);
@@ -217,7 +215,7 @@ impl<TKVDB: KVDB> SmtStorageReader for KVDBSmtStorage<TKVDB> {
         }
     }
 
-    /// Batch-retrieves multiple subtrees from RocksDB by their node indices.
+    /// Batch-retrieves multiple subtrees from DB by their node indices.
     ///
     /// This method groups requests by subtree depth into column family buckets,
     /// then performs parallel `multi_get` operations to efficiently retrieve
@@ -230,7 +228,7 @@ impl<TKVDB: KVDB> SmtStorageReader for KVDBSmtStorage<TKVDB> {
     /// # Returns
     /// - A `Vec<Option<Subtree>>` where each index corresponds to the original input.
     /// - `Ok(...)` if all fetches succeed.
-    /// - `Err(StorageError)` if any RocksDB access or deserialization fails.
+    /// - `Err(StorageError)` if any DB access or deserialization fails.
     fn get_subtrees(&self, indices: &[NodeIndex]) -> StorageResult<Vec<Option<Subtree>>> {
         use p3_maybe_rayon::prelude::*;
 
@@ -300,7 +298,7 @@ impl<TKVDB: KVDB> SmtStorageReader for KVDBSmtStorage<TKVDB> {
     /// delegates to `Subtree::get_inner_node()`.
     ///
     /// # Errors
-    /// - `StorageError::Backend`: If `index.depth() < IN_MEMORY_DEPTH`, or if RocksDB errors occur.
+    /// - `StorageError::Backend`: If `index.depth() < IN_MEMORY_DEPTH`, or if DB errors occur.
     /// - `StorageError::Value`: If the containing Subtree data is corrupt.
     fn get_inner_node(&self, index: NodeIndex) -> StorageResult<Option<InnerNode>> {
         if index.depth() < IN_MEMORY_DEPTH {
@@ -316,12 +314,12 @@ impl<TKVDB: KVDB> SmtStorageReader for KVDBSmtStorage<TKVDB> {
 
     /// Returns an iterator over all (logical u64 index, `SmtLeaf`) pairs in the `LEAVES_CF`.
     ///
-    /// The iterator uses a RocksDB snapshot for consistency and iterates in lexicographical
+    /// The iterator uses a DB snapshot for consistency and iterates in lexicographical
     /// order of the keys (leaf indices). Errors during iteration (e.g., deserialization issues)
     /// are returned as iterator items.
     ///
     /// # Errors
-    /// - `StorageError::Backend`: If the leaves column family is missing or a RocksDB error occurs
+    /// - `StorageError::Backend`: If the leaves column family is missing or a DB error occurs
     ///   during iterator creation.
     fn iter_leaves(
         &self,
@@ -339,12 +337,12 @@ impl<TKVDB: KVDB> SmtStorageReader for KVDBSmtStorage<TKVDB> {
 
     /// Returns an iterator over all `Subtree` instances across all subtree column families.
     ///
-    /// The iterator uses a RocksDB snapshot and iterates in lexicographical order of keys
+    /// The iterator uses a DB snapshot and iterates in lexicographical order of keys
     /// (subtree root NodeIndex) across all depth column families (24, 32, 40, 48, 56).
     /// Errors during iteration (e.g., deserialization issues) are returned as iterator items.
     ///
     /// # Errors
-    /// - `StorageError::Backend`: If any subtree column family is missing or a RocksDB error occurs
+    /// - `StorageError::Backend`: If any subtree column family is missing or a DB error occurs
     ///   during iterator creation.
     fn iter_subtrees(
         &self,
@@ -379,8 +377,8 @@ impl<TKVDB: KVDB> SmtStorageReader for KVDBSmtStorage<TKVDB> {
     /// Retrieves roots of all top level subtrees for efficient startup reconstruction.
     ///
     /// # Errors
-    /// - `StorageError::Backend`: If the in-memory-depth column family is missing or a RocksDB
-    ///   error occurs.
+    /// - `StorageError::Backend`: If the in-memory-depth column family is missing or a DB error
+    ///   occurs.
     /// - `StorageError::Value`: If any hash bytes are corrupt.
     fn get_top_subtree_roots(&self) -> StorageResult<Vec<(u64, Word)>> {
         let table = self.kvdb.table(IN_MEM_DEPTH_CF)?;
@@ -403,7 +401,7 @@ impl<TKVDB: KVDB> SmtStorageReader for KVDBSmtStorage<TKVDB> {
 impl<TKVDB: KVDB> SmtStorage for KVDBSmtStorage<TKVDB> {
     type Reader = KVDBSnapshotStorage<TKVDB>;
 
-    /// Returns a detached read-only snapshot of the current RocksDB-backed storage.
+    /// Returns a detached read-only snapshot of the current storage.
     fn reader(&self) -> StorageResult<Self::Reader> {
         Ok(Self::Reader { kvdb_snapshot: self.kvdb.snapshot()? })
     }
@@ -414,13 +412,13 @@ impl<TKVDB: KVDB> SmtStorage for KVDBSmtStorage<TKVDB> {
     /// 1. Retrieving the current leaf (if any) at `index`.
     /// 2. Inserting the new key-value pair into the leaf.
     /// 3. Updating the leaf and entry counts in the metadata column family.
-    /// 4. Writing all changes (leaf data, counts) to RocksDB in a single batch.
+    /// 4. Writing all changes (leaf data, counts) to DB in a single batch.
     ///
     /// Note: This only updates the leaf. Callers are responsible for recomputing and
     /// persisting the corresponding inner nodes.
     ///
     /// # Errors
-    /// - `StorageError::Backend`: If column families are missing or a RocksDB error occurs.
+    /// - `StorageError::Backend`: If column families are missing or a DB error occurs.
     /// - `StorageError::DeserializationError`: If existing leaf data is corrupt.
     fn insert_value(&mut self, index: u64, key: Word, value: Word) -> StorageResult<Option<Word>> {
         debug_assert_ne!(value, EMPTY_WORD);
@@ -479,9 +477,9 @@ impl<TKVDB: KVDB> SmtStorage for KVDBSmtStorage<TKVDB> {
     ///
     /// This operation involves:
     /// 1. Retrieving the leaf at `index`.
-    /// 2. Removing the `key` from the leaf. If the leaf becomes empty, it's deleted from RocksDB.
+    /// 2. Removing the `key` from the leaf. If the leaf becomes empty, it's deleted from DB.
     /// 3. Updating the leaf and entry counts in the metadata column family.
-    /// 4. Writing all changes (leaf data/deletion, counts) to RocksDB in a single batch.
+    /// 4. Writing all changes (leaf data/deletion, counts) to DB in a single batch.
     ///
     /// Returns `Ok(None)` if the leaf at `index` does not exist or the `key` is not found.
     ///
@@ -489,7 +487,7 @@ impl<TKVDB: KVDB> SmtStorage for KVDBSmtStorage<TKVDB> {
     /// persisting the corresponding inner nodes.
     ///
     /// # Errors
-    /// - `StorageError::Backend`: If column families are missing or a RocksDB error occurs.
+    /// - `StorageError::Backend`: If column families are missing or a DB error occurs.
     /// - `StorageError::DeserializationError`: If existing leaf data is corrupt.
     fn remove_value(&mut self, index: u64, key: Word) -> StorageResult<Option<Word>> {
         let Some(mut leaf) = self.get_leaf(index)? else {
@@ -523,7 +521,7 @@ impl<TKVDB: KVDB> SmtStorage for KVDBSmtStorage<TKVDB> {
 
     /// Sets or updates multiple SMT leaf nodes in the `LEAVES_CF` column family.
     ///
-    /// This method performs a batch write to RocksDB. It also updates the global
+    /// This method performs a batch write to DB. It also updates the global
     /// leaf and entry counts in the `METADATA_CF` based on the provided `leaves` map,
     /// overwriting any previous counts.
     ///
@@ -533,7 +531,7 @@ impl<TKVDB: KVDB> SmtStorage for KVDBSmtStorage<TKVDB> {
     /// persisting the corresponding inner nodes.
     ///
     /// # Errors
-    /// - `StorageError::Backend`: If column families are missing or a RocksDB error occurs.
+    /// - `StorageError::Backend`: If column families are missing or a DB error occurs.
     fn set_leaves(&mut self, leaves: Map<u64, SmtLeaf>) -> StorageResult<()> {
         let leaves_table = self.kvdb.table(LEAVES_CF)?;
         let leaf_count: usize = leaves.len();
@@ -561,7 +559,7 @@ impl<TKVDB: KVDB> SmtStorage for KVDBSmtStorage<TKVDB> {
     /// persisting the corresponding inner nodes.
     ///
     /// # Errors
-    /// - `StorageError::Backend`: If the leaves column family is missing or a RocksDB error occurs.
+    /// - `StorageError::Backend`: If the leaves column family is missing or a DB error occurs.
     /// - `StorageError::DeserializationError`: If the retrieved (to be returned) leaf data is
     ///   corrupt.
     fn remove_leaf(&mut self, index: u64) -> StorageResult<Option<SmtLeaf>> {
@@ -577,7 +575,7 @@ impl<TKVDB: KVDB> SmtStorage for KVDBSmtStorage<TKVDB> {
         }))
     }
 
-    /// Stores a single subtree in RocksDB and optionally updates the in-memory-depth root cache.
+    /// Stores a single subtree in DB and optionally updates the in-memory-depth root cache.
     ///
     /// The subtree is serialized and written to its corresponding column family.
     /// If it’s an in-memory-depth subtree, the root node’s hash is also stored in the
@@ -613,7 +611,7 @@ impl<TKVDB: KVDB> SmtStorage for KVDBSmtStorage<TKVDB> {
     /// Bulk-writes subtrees to storage.
     ///
     /// This method writes a vector of serialized `Subtree` objects directly to their
-    /// corresponding RocksDB column families based on their root index.
+    /// corresponding DB column families based on their root index.
     ///
     /// Uses default write options to keep WAL enabled. Disabling WAL would make writes
     /// non-crash-safe: data in the memtable is lost on unexpected termination, causing root
@@ -623,7 +621,7 @@ impl<TKVDB: KVDB> SmtStorage for KVDBSmtStorage<TKVDB> {
     /// - `subtrees`: A vector of `Subtree` objects to be serialized and persisted.
     ///
     /// # Errors
-    /// - Returns `StorageError::Backend` if any column family lookup or RocksDB write fails.
+    /// - Returns `StorageError::Backend` if any column family lookup or DB write fails.
     fn set_subtrees(&mut self, subtrees: Vec<Subtree>) -> StorageResult<()> {
         let in_mem_table = self.kvdb.table(IN_MEM_DEPTH_CF)?;
         let mut batch = self.kvdb.batch();
@@ -648,8 +646,7 @@ impl<TKVDB: KVDB> SmtStorage for KVDBSmtStorage<TKVDB> {
     /// Removes a single SMT Subtree from storage, identified by its root `NodeIndex`.
     ///
     /// # Errors
-    /// - `StorageError::Backend`: If the subtrees column family is missing or a RocksDB error
-    ///   occurs.
+    /// - `StorageError::Backend`: If the subtrees column family is missing or a DB error occurs.
     fn remove_subtree(&mut self, index: NodeIndex) -> StorageResult<()> {
         let subtree_table = self.kvdb.table(cf_for_depth(index.depth()))?;
         let mut batch = self.kvdb.batch();
@@ -674,7 +671,7 @@ impl<TKVDB: KVDB> SmtStorage for KVDBSmtStorage<TKVDB> {
     /// inserted into the Subtree, and the modified Subtree is written back to storage.
     ///
     /// # Errors
-    /// - `StorageError::Backend`: If `index.depth() < IN_MEMORY_DEPTH`, or if RocksDB errors occur.
+    /// - `StorageError::Backend`: If `index.depth() < IN_MEMORY_DEPTH`, or if DB errors occur.
     /// - `StorageError::Value`: If existing Subtree data is corrupt.
     fn set_inner_node(
         &mut self,
@@ -703,7 +700,7 @@ impl<TKVDB: KVDB> SmtStorage for KVDBSmtStorage<TKVDB> {
     /// is removed from storage.
     ///
     /// # Errors
-    /// - `StorageError::Backend`: If `index.depth() < IN_MEMORY_DEPTH`, or if RocksDB errors occur.
+    /// - `StorageError::Backend`: If `index.depth() < IN_MEMORY_DEPTH`, or if DB errors occur.
     /// - `StorageError::Value`: If existing Subtree data is corrupt.
     fn remove_inner_node(&mut self, index: NodeIndex) -> StorageResult<Option<InnerNode>> {
         if index.depth() < IN_MEMORY_DEPTH {
@@ -728,20 +725,20 @@ impl<TKVDB: KVDB> SmtStorage for KVDBSmtStorage<TKVDB> {
             })
     }
 
-    /// Applies a batch of `StorageUpdates` atomically to the RocksDB backend.
+    /// Applies a batch of `StorageUpdates` atomically to the DB backend.
     ///
     /// This is the primary method for persisting changes to the SMT. It constructs a single
-    /// RocksDB `WriteBatch` containing all specified changes:
+    /// DB batch containing all specified changes:
     /// - Leaf updates/deletions in `LEAVES_CF`.
     /// - Subtree updates/deletions in `SUBTREE_24_CF`, `SUBTREE_32_CF`, `SUBTREE_40_CF`,
     ///   `SUBTREE_48_CF`, `SUBTREE_56_CF`.
     /// - Updates to leaf and entry counts in `METADATA_CF` based on `leaf_count_delta` and
     ///   `entry_count_delta`.
     ///
-    /// All operations in the batch are applied atomically by RocksDB.
+    /// All operations in the batch are applied atomically.
     ///
     /// # Errors
-    /// - `StorageError::Backend`: If any column family is missing or a RocksDB write error occurs.
+    /// - `StorageError::Backend`: If any column family is missing or a DB write error occurs.
     fn apply(&mut self, updates: StorageUpdates) -> StorageResult<()> {
         use p3_maybe_rayon::prelude::*;
 
@@ -831,16 +828,16 @@ impl<TKVDB: KVDB> SmtStorage for KVDBSmtStorage<TKVDB> {
     }
 }
 
-/// Syncs the RocksDB database to disk before dropping the storage.
+/// Syncs the database to disk before dropping the storage.
 ///
 /// This ensures that all data is persisted to disk before the storage is dropped.
 ///
 /// # Panics
-/// - If the RocksDB sync operation fails.
+/// - If the sync operation fails.
 impl<TKVDB: KVDB> Drop for KVDBSmtStorage<TKVDB> {
     fn drop(&mut self) {
         if let Err(e) = self.sync() {
-            panic!("failed to flush RocksDB on drop: {e}");
+            panic!("failed to flush SMT DB on drop: {e}");
         }
     }
 }
@@ -883,7 +880,7 @@ impl AsRef<[u8]> for KeyBytes {
 // HELPERS
 // --------------------------------------------------------------------------------------------
 
-/// Deserializes an index (u64) from a RocksDB key byte slice.
+/// Deserializes an index (u64) from a DB key byte slice.
 /// Expects `key_bytes` to be exactly 8 bytes long.
 ///
 /// # Errors
@@ -906,7 +903,7 @@ fn read_count(what: &'static str, bytes: &[u8]) -> StorageResult<usize> {
     Ok(usize::from_be_bytes(arr))
 }
 
-/// Reconstructs a `NodeIndex` from the variable-length subtree key stored in RocksDB.
+/// Reconstructs a `NodeIndex` from the variable-length subtree key stored in DB.
 ///
 /// * `key_bytes` is the big-endian tail of the 64-bit value:
 ///   - depth 56 → 7 bytes
@@ -955,10 +952,10 @@ fn cf_for_depth(depth: u8) -> &'static str {
     }
 }
 
-// ROCKSDB SNAPSHOT STORAGE
+// SNAPSHOT STORAGE
 // ================================================================================================
 
-/// Read-only, cloneable SMT storage backed by a native RocksDB point-in-time snapshot.
+/// Read-only, cloneable SMT storage backed by a native DB point-in-time snapshot.
 #[derive(Clone, Debug)]
 pub struct KVDBSnapshotStorage<TKVDB: KVDBReader> {
     kvdb_snapshot: TKVDB::Snapshot,
