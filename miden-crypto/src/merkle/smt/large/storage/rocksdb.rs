@@ -310,21 +310,20 @@ impl SmtStorageReader for RocksDbStorage {
             .filter(|(_, bucket)| !bucket.is_empty())
             .map(|(bucket_index, bucket)| -> StorageResult<Vec<(usize, Option<Subtree>)>> {
                 let depth = LargeSmt::<RocksDbStorage>::SUBTREE_DEPTHS[bucket_index];
-                let cf = self.cf_handle(cf_for_depth(depth))?;
+                let table = self.kvdb.table(cf_for_depth(depth))?;
                 let keys: Vec<_> =
                     bucket.iter().map(|(_, idx)| Self::subtree_db_key(*idx)).collect();
+                let key_refs: Vec<&[u8]> = keys.iter().map(KeyBytes::as_slice).collect();
 
-                let db_results = self.db.multi_get_cf(keys.iter().map(|k| (cf, k.as_ref())));
+                let db_results = self.kvdb.multi_get(&table, &key_refs)?;
 
-                // Process results for this bucket
                 bucket
                     .into_iter()
                     .zip(db_results)
                     .map(|((original_index, node_index), db_result)| {
                         let subtree = match db_result {
-                            Ok(Some(bytes)) => Some(Subtree::from_vec(node_index, &bytes)?),
-                            Ok(None) => None,
-                            Err(e) => return Err(e.into()),
+                            Some(bytes) => Some(Subtree::from_vec(node_index, &bytes)?),
+                            None => None,
                         };
                         Ok((original_index, subtree))
                     })
