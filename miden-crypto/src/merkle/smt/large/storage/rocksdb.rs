@@ -1206,19 +1206,17 @@ impl SmtStorageReader for RocksDbSnapshotStorage {
 
     /// Retrieves multiple SMT leaf nodes by their logical `indices` from the snapshot.
     fn get_leaves(&self, indices: &[u64]) -> StorageResult<Vec<Option<SmtLeaf>>> {
-        let cf = self.cf_handle(LEAVES_CF)?;
+        let table = self.kvdb_snapshot.table(LEAVES_CF)?;
         let db_keys: Vec<[u8; 8]> =
             indices.iter().map(|&idx| RocksDbStorage::index_db_key(idx)).collect();
-        let results = self.inner.snapshot.multi_get_cf(db_keys.iter().map(|k| (cf, k.as_ref())));
+        let key_refs: Vec<&[u8]> = db_keys.iter().map(<[u8; 8]>::as_slice).collect();
+        let results = self.kvdb_snapshot.multi_get(&table, &key_refs)?;
 
         results
             .into_iter()
-            .map(|result| match result {
-                Ok(Some(bytes)) => {
-                    Ok(Some(SmtLeaf::read_from_bytes_with_budget(&bytes, bytes.len())?))
-                },
-                Ok(None) => Ok(None),
-                Err(e) => Err(e.into()),
+            .map(|opt| match opt {
+                Some(bytes) => Ok(Some(SmtLeaf::read_from_bytes_with_budget(&bytes, bytes.len())?)),
+                None => Ok(None),
             })
             .collect()
     }
