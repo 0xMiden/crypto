@@ -119,7 +119,17 @@ impl RocksDbStorage {
 
         // Cache and optional write-buffer manager are shared across this DB's column families.
         let cache = Cache::new_lru_cache(config.cache_size);
-        let write_buffer_manager = config.write_buffer_manager(&cache);
+        let write_buffer_manager = config.write_buffer_manager.as_ref().map(|budget| {
+            if budget.charge_to_block_cache {
+                WriteBufferManager::new_write_buffer_manager_with_cache(
+                    budget.buffer_size,
+                    budget.allow_stall,
+                    cache.clone(),
+                )
+            } else {
+                WriteBufferManager::new_write_buffer_manager(budget.buffer_size, budget.allow_stall)
+            }
+        });
 
         // Common table options for bloom filtering and cache
         let mut table_opts = BlockBasedOptions::default();
@@ -1338,20 +1348,6 @@ impl RocksDbConfig {
     pub fn with_durability_mode(mut self, durability_mode: RocksDbDurabilityMode) -> Self {
         self.durability_mode = durability_mode;
         self
-    }
-
-    fn write_buffer_manager(&self, cache: &Cache) -> Option<WriteBufferManager> {
-        self.write_buffer_manager.as_ref().map(|budget| {
-            if budget.charge_to_block_cache {
-                WriteBufferManager::new_write_buffer_manager_with_cache(
-                    budget.buffer_size,
-                    budget.allow_stall,
-                    cache.clone(),
-                )
-            } else {
-                WriteBufferManager::new_write_buffer_manager(budget.buffer_size, budget.allow_stall)
-            }
-        })
     }
 }
 
