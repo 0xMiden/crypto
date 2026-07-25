@@ -1193,9 +1193,9 @@ impl SmtStorageReader for RocksDbSnapshotStorage {
 
     /// Retrieves a single SMT leaf node by its logical `index` from the snapshot.
     fn get_leaf(&self, index: u64) -> StorageResult<Option<SmtLeaf>> {
-        let cf = self.cf_handle(LEAVES_CF)?;
+        let table = self.kvdb_snapshot.table(LEAVES_CF)?;
         let key = RocksDbStorage::index_db_key(index);
-        match self.inner.snapshot.get_cf(cf, key)? {
+        match self.kvdb_snapshot.get(&table, &key)? {
             Some(bytes) => {
                 let leaf = SmtLeaf::read_from_bytes_with_budget(&bytes, bytes.len())?;
                 Ok(Some(leaf))
