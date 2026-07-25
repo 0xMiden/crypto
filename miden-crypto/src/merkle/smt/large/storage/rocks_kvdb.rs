@@ -205,7 +205,28 @@ impl KVDB for RocksKVDB {
 
     /// Flushes all column families and syncs the WAL — durability fence.
     fn sync(&self) -> StorageResult<()> {
-        todo!()
+        let mut opts = FlushOptions::default();
+        opts.set_wait(true);
+
+        for name in [
+            LEAVES_CF,
+            SUBTREE_16_CF,
+            SUBTREE_24_CF,
+            SUBTREE_32_CF,
+            SUBTREE_40_CF,
+            SUBTREE_48_CF,
+            SUBTREE_56_CF,
+            METADATA_CF,
+            IN_MEM_DEPTH_CF,
+        ] {
+            let cf = self.db.cf_handle(name).ok_or_else(|| {
+                StorageError::Unsupported(format!("unknown column family `{name}`"))
+            })?;
+            self.db.flush_cf_opt(cf, &opts)?;
+        }
+
+        self.db.flush_wal(true)?;
+        Ok(())
     }
 }
 

@@ -70,26 +70,7 @@ impl RocksDbStorage {
     /// # Errors
     /// - Returns `StorageError::Backend` if the flush operation fails.
     fn sync(&self) -> StorageResult<()> {
-        let mut fopts = FlushOptions::default();
-        fopts.set_wait(true);
-
-        for name in [
-            LEAVES_CF,
-            SUBTREE_16_CF,
-            SUBTREE_24_CF,
-            SUBTREE_32_CF,
-            SUBTREE_40_CF,
-            SUBTREE_48_CF,
-            SUBTREE_56_CF,
-            METADATA_CF,
-            IN_MEM_DEPTH_CF,
-        ] {
-            let cf = self.cf_handle(name)?;
-            self.db.flush_cf_opt(cf, &fopts)?;
-        }
-
-        self.db.flush_wal(true)?;
-        Ok(())
+        self.kvdb.sync()
     }
 
     fn write_options(&self) -> WriteOptions {
