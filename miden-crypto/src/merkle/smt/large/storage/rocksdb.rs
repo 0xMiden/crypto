@@ -254,9 +254,9 @@ impl SmtStorageReader for RocksDbStorage {
     /// - `Ok(...)` if all fetches succeed.
     /// - `Err(StorageError)` if any RocksDB access or deserialization fails.
     fn get_subtree(&self, index: NodeIndex) -> StorageResult<Option<Subtree>> {
-        let cf = self.subtree_cf(index);
+        let table = self.kvdb.table(cf_for_depth(index.depth()))?;
         let key = Self::subtree_db_key(index);
-        match self.db.get_cf(cf, key)? {
+        match self.kvdb.get(&table, key.as_slice())? {
             Some(bytes) => {
                 let subtree = Subtree::from_vec(index, &bytes)?;
                 Ok(Some(subtree))
