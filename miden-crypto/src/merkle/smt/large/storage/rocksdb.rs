@@ -1,8 +1,4 @@
 use alloc::{boxed::Box, vec::Vec};
-use core::fmt;
-use std::{mem::ManuallyDrop, sync::Arc};
-
-use rocksdb::*;
 
 #[rustfmt::skip]
 use super::{
@@ -30,9 +26,7 @@ use crate::{
 /// Implements the `SmtStorage` trait, providing durable storage for SMT components
 #[derive(Debug, Clone)]
 pub struct RocksDbStorage {
-    db: Arc<DB>,
     kvdb: RocksKVDB,
-    durability_mode: RocksDbDurabilityMode,
 }
 
 impl RocksDbStorage {
@@ -54,13 +48,8 @@ impl RocksDbStorage {
     /// Returns `StorageError::Backend` if the database cannot be opened or configured,
     /// for example, due to path issues, permissions, or RocksDB internal errors.
     pub fn open(config: RocksDbConfig) -> StorageResult<Self> {
-        let durability_mode = config.durability_mode;
         let kvdb = RocksKVDB::new(config)?;
-        Ok(Self {
-            db: kvdb.db.clone(),
-            kvdb,
-            durability_mode,
-        })
+        Ok(Self { kvdb })
     }
 
     /// Syncs the RocksDB database to disk.
@@ -71,21 +60,6 @@ impl RocksDbStorage {
     /// - Returns `StorageError::Backend` if the flush operation fails.
     fn sync(&self) -> StorageResult<()> {
         self.kvdb.sync()
-    }
-
-    fn write_options(&self) -> WriteOptions {
-        let mut write_opts = WriteOptions::default();
-        write_opts.set_sync(self.should_sync_writes());
-        write_opts
-    }
-
-    fn write_batch(&self, batch: WriteBatch) -> StorageResult<()> {
-        self.db.write_opt(batch, &self.write_options())?;
-        Ok(())
-    }
-
-    fn should_sync_writes(&self) -> bool {
-        self.durability_mode == RocksDbDurabilityMode::Sync
     }
 
     /// Converts an index (u64) into a fixed-size byte array for use as a RocksDB key.
@@ -108,24 +82,6 @@ impl RocksDbStorage {
             d => panic!("unsupported depth {d}"),
         };
         KeyBytes::new(index.position(), keep)
-    }
-
-    /// Retrieves a handle to a RocksDB column family by its name.
-    ///
-    /// # Errors
-    /// Returns `StorageError::Backend` if the column family with the given `name` does not
-    /// exist.
-    fn cf_handle(&self, name: &str) -> StorageResult<&rocksdb::ColumnFamily> {
-        self.db
-            .cf_handle(name)
-            .ok_or_else(|| StorageError::Unsupported(format!("unknown column family `{name}`")))
-    }
-
-    /* helper: CF handle from NodeIndex ------------------------------------- */
-    #[inline(always)]
-    fn subtree_cf(&self, index: NodeIndex) -> &rocksdb::ColumnFamily {
-        let name = cf_for_depth(index.depth());
-        self.cf_handle(name).expect("CF handle missing")
     }
 }
 
@@ -434,7 +390,7 @@ impl SmtStorage for RocksDbStorage {
 
     /// Returns a detached read-only snapshot of the current RocksDB-backed storage.
     fn reader(&self) -> StorageResult<Self::Reader> {
-        Ok(RocksDbSnapshotStorage::new(Arc::clone(&self.db), self.kvdb.snapshot()?))
+        Ok(RocksDbSnapshotStorage::new(self.kvdb.snapshot()?))
     }
 
     /// Inserts a key-value pair into the SMT leaf at the specified logical `index`.
@@ -874,103 +830,6 @@ impl Drop for RocksDbStorage {
     }
 }
 
-// ITERATORS
-// --------------------------------------------------------------------------------------------
-
-/// An iterator over leaves directly from RocksDB.
-///
-/// Wraps a `DBIteratorWithThreadMode` and handles deserialization of keys to `u64` (leaf index)
-/// and values to `SmtLeaf`.
-struct RocksDbDirectLeafIterator<'a> {
-    iter: DBIteratorWithThreadMode<'a, DB>,
-}
-
-impl Iterator for RocksDbDirectLeafIterator<'_> {
-    type Item = StorageResult<(u64, SmtLeaf)>;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        self.iter.next().map(|result| {
-            result.map_err(StorageError::from).and_then(|(key_bytes, value_bytes)| {
-                let leaf_idx = index_from_key_bytes(&key_bytes)?;
-                let leaf = SmtLeaf::read_from_bytes_with_budget(&value_bytes, value_bytes.len())?;
-                Ok((leaf_idx, leaf))
-            })
-        })
-    }
-}
-
-/// An iterator over subtrees from multiple RocksDB column families.
-///
-/// Iterates through all subtree column families (24, 32, 40, 48, 56) sequentially.
-/// When one column family is exhausted, it moves to the next one.
-struct RocksDbSubtreeIterator<'a> {
-    db: &'a DB,
-    cf_handles: Vec<&'a rocksdb::ColumnFamily>,
-    current_cf_index: usize,
-    current_iter: Option<DBIteratorWithThreadMode<'a, DB>>,
-}
-
-impl<'a> RocksDbSubtreeIterator<'a> {
-    fn new(db: &'a DB, cf_handles: Vec<&'a rocksdb::ColumnFamily>) -> Self {
-        let mut iterator = Self {
-            db,
-            cf_handles,
-            current_cf_index: 0,
-            current_iter: None,
-        };
-        iterator.advance_to_next_cf();
-        iterator
-    }
-
-    fn advance_to_next_cf(&mut self) {
-        if self.current_cf_index < self.cf_handles.len() {
-            let cf = self.cf_handles[self.current_cf_index];
-            let mut read_opts = ReadOptions::default();
-            read_opts.set_total_order_seek(true);
-            self.current_iter = Some(self.db.iterator_cf_opt(cf, read_opts, IteratorMode::Start));
-        } else {
-            self.current_iter = None;
-        }
-    }
-
-    fn next_from_iter(
-        iter: &mut DBIteratorWithThreadMode<DB>,
-        cf_index: usize,
-    ) -> Option<StorageResult<Subtree>> {
-        iter.next().map(|result| {
-            result.map_err(StorageError::from).and_then(|(key_bytes, value_bytes)| {
-                let depth = IN_MEMORY_DEPTH + (cf_index * 8) as u8;
-
-                let node_idx = subtree_root_from_key_bytes(&key_bytes, depth)?;
-                let value_vec = value_bytes.into_vec();
-                Ok(Subtree::from_vec(node_idx, &value_vec)?)
-            })
-        })
-    }
-}
-
-impl Iterator for RocksDbSubtreeIterator<'_> {
-    type Item = StorageResult<Subtree>;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        loop {
-            let iter = self.current_iter.as_mut()?;
-
-            // Try to get the next valid subtree from current iterator
-            if let Some(result) = Self::next_from_iter(iter, self.current_cf_index) {
-                return Some(result);
-            }
-
-            // Current CF exhausted, advance to next
-            self.current_cf_index += 1;
-            self.advance_to_next_cf();
-
-            // If no more CFs, we're done
-            self.current_iter.as_ref()?;
-        }
-    }
-}
-
 // SUBTREE DB KEY
 // --------------------------------------------------------------------------------------------
 
@@ -1085,75 +944,15 @@ fn cf_for_depth(depth: u8) -> &'static str {
 // ================================================================================================
 
 /// Read-only, cloneable SMT storage backed by a native RocksDB point-in-time snapshot.
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct RocksDbSnapshotStorage {
-    inner: Arc<RocksDbSnapshotInner>,
     kvdb_snapshot: RocksKVDBSnapshot,
-}
-
-impl fmt::Debug for RocksDbSnapshotStorage {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("RocksDbSnapshotStorage").finish_non_exhaustive()
-    }
-}
-
-/// Owns a RocksDB snapshot together with the database it borrows from.
-///
-/// `rocksdb::Snapshot<'a>` borrows the database used to create it. This type stores an `Arc<DB>`
-/// beside the snapshot and releases the snapshot before the `Arc` is dropped, so the borrowed
-/// database remains alive for the full lifetime of the snapshot.
-struct RocksDbSnapshotInner {
-    snapshot: ManuallyDrop<rocksdb::Snapshot<'static>>,
-    db: Arc<DB>,
-}
-
-impl RocksDbSnapshotInner {
-    fn new(db: Arc<DB>) -> Self {
-        let snapshot = db.snapshot();
-        // SAFETY: The snapshot internally stores a reference to the same `DB` allocation owned by
-        // `db`. `RocksDbSnapshotInner` keeps that `Arc<DB>` alive and its `Drop` implementation
-        // manually releases the snapshot before the `Arc<DB>` field is dropped.
-        let snapshot = unsafe {
-            core::mem::transmute::<rocksdb::Snapshot<'_>, rocksdb::Snapshot<'static>>(snapshot)
-        };
-        Self {
-            snapshot: ManuallyDrop::new(snapshot),
-            db,
-        }
-    }
-}
-
-impl Drop for RocksDbSnapshotInner {
-    fn drop(&mut self) {
-        // SAFETY: `snapshot` was placed in `ManuallyDrop` only to control field drop order. It is
-        // dropped exactly once here, before `db` is dropped by Rust's normal field cleanup.
-        unsafe {
-            ManuallyDrop::drop(&mut self.snapshot);
-        }
-    }
 }
 
 impl RocksDbSnapshotStorage {
     /// Creates a snapshot-backed storage reader from a shared RocksDB handle.
-    pub fn new(db: Arc<DB>, kvdb_snapshot: RocksKVDBSnapshot) -> Self {
-        Self {
-            inner: Arc::new(RocksDbSnapshotInner::new(db)),
-            kvdb_snapshot,
-        }
-    }
-
-    /// Retrieves a handle to a RocksDB column family by its name.
-    fn cf_handle(&self, name: &str) -> StorageResult<&rocksdb::ColumnFamily> {
-        self.inner
-            .db
-            .cf_handle(name)
-            .ok_or_else(|| StorageError::Unsupported(format!("unknown column family `{name}`")))
-    }
-
-    #[inline(always)]
-    fn subtree_cf(&self, index: NodeIndex) -> &rocksdb::ColumnFamily {
-        let name = cf_for_depth(index.depth());
-        self.cf_handle(name).expect("CF handle missing")
+    pub fn new(kvdb_snapshot: RocksKVDBSnapshot) -> Self {
+        Self { kvdb_snapshot }
     }
 }
 
@@ -1357,62 +1156,5 @@ impl SmtStorageReader for RocksDbSnapshotStorage {
         }
 
         Ok(hashes)
-    }
-}
-
-/// An iterator over subtrees from multiple RocksDB column families in a single snapshot.
-struct RocksDbSnapshotSubtreeIterator<'a> {
-    snapshot: &'a rocksdb::Snapshot<'static>,
-    cf_handles: Vec<&'a rocksdb::ColumnFamily>,
-    current_cf_index: usize,
-    current_iter: Option<DBIteratorWithThreadMode<'a, DB>>,
-}
-
-impl<'a> RocksDbSnapshotSubtreeIterator<'a> {
-    fn new(
-        snapshot: &'a rocksdb::Snapshot<'static>,
-        cf_handles: Vec<&'a rocksdb::ColumnFamily>,
-    ) -> Self {
-        let mut iterator = Self {
-            snapshot,
-            cf_handles,
-            current_cf_index: 0,
-            current_iter: None,
-        };
-        iterator.advance_to_next_cf();
-        iterator
-    }
-
-    fn advance_to_next_cf(&mut self) {
-        if self.current_cf_index < self.cf_handles.len() {
-            let cf = self.cf_handles[self.current_cf_index];
-            let mut read_opts = ReadOptions::default();
-            read_opts.set_total_order_seek(true);
-            self.current_iter =
-                Some(self.snapshot.iterator_cf_opt(cf, read_opts, IteratorMode::Start));
-        } else {
-            self.current_iter = None;
-        }
-    }
-}
-
-impl Iterator for RocksDbSnapshotSubtreeIterator<'_> {
-    type Item = StorageResult<Subtree>;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        loop {
-            let iter = self.current_iter.as_mut()?;
-
-            if let Some(result) =
-                RocksDbSubtreeIterator::next_from_iter(iter, self.current_cf_index)
-            {
-                return Some(result);
-            }
-
-            self.current_cf_index += 1;
-            self.advance_to_next_cf();
-
-            self.current_iter.as_ref()?;
-        }
     }
 }

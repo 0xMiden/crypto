@@ -1,8 +1,6 @@
 //! RocksDB implementation of the [`KVDB`](super::KVDB) traits.
 
 #![allow(clippy::upper_case_acronyms)]
-// Skeleton — fields and helpers are wired in by subsequent migration steps.
-#![allow(dead_code)]
 
 use alloc::{boxed::Box, sync::Arc, vec::Vec};
 use core::{fmt, mem::ManuallyDrop, ops::Deref};
