@@ -6,7 +6,6 @@ use super::{
     SubtreeUpdate,
     config::*,
     kvdb::*,
-    rocks_kvdb::{RocksKVDB, RocksKVDBSnapshot},
     schema::*,
 };
 use crate::{
@@ -25,11 +24,11 @@ use crate::{
 ///
 /// Implements the `SmtStorage` trait, providing durable storage for SMT components
 #[derive(Debug, Clone)]
-pub struct RocksDbStorage {
-    kvdb: RocksKVDB,
+pub struct KVDBSmtStorage<TKVDB: KVDB> {
+    kvdb: TKVDB,
 }
 
-impl RocksDbStorage {
+impl<TKVDB: KVDB> KVDBSmtStorage<TKVDB> {
     /// Opens or creates a RocksDB database at the specified `path` and configures it for SMT
     /// storage.
     ///
@@ -48,7 +47,7 @@ impl RocksDbStorage {
     /// Returns `StorageError::Backend` if the database cannot be opened or configured,
     /// for example, due to path issues, permissions, or RocksDB internal errors.
     pub fn open(config: RocksDbConfig) -> StorageResult<Self> {
-        let kvdb = RocksKVDB::new(config)?;
+        let kvdb = TKVDB::new(config)?;
         Ok(Self { kvdb })
     }
 
@@ -65,13 +64,29 @@ impl RocksDbStorage {
     /// Converts an index (u64) into a fixed-size byte array for use as a RocksDB key.
     #[inline(always)]
     fn index_db_key(index: u64) -> [u8; 8] {
+        key_serializer::index_db_key(index)
+    }
+
+    /// Converts a `NodeIndex` (for a subtree root) into a `KeyBytes` for use as a RocksDB key.
+    #[inline(always)]
+    fn subtree_db_key(index: NodeIndex) -> KeyBytes {
+        key_serializer::subtree_db_key(index)
+    }
+}
+
+mod key_serializer {
+    use super::{KeyBytes, NodeIndex};
+
+    /// Converts an index (u64) into a fixed-size byte array for use as a RocksDB key.
+    #[inline(always)]
+    pub fn index_db_key(index: u64) -> [u8; 8] {
         index.to_be_bytes()
     }
 
     /// Converts a `NodeIndex` (for a subtree root) into a `KeyBytes` for use as a RocksDB key.
     /// The `KeyBytes` is a wrapper around a 8-byte value with a variable-length prefix.
     #[inline(always)]
-    fn subtree_db_key(index: NodeIndex) -> KeyBytes {
+    pub fn subtree_db_key(index: NodeIndex) -> KeyBytes {
         let keep = match index.depth() {
             16 => 2,
             24 => 3,
@@ -85,7 +100,7 @@ impl RocksDbStorage {
     }
 }
 
-impl SmtStorageReader for RocksDbStorage {
+impl<TKVDB: KVDB> SmtStorageReader for KVDBSmtStorage<TKVDB> {
     /// Retrieves the total count of non-empty leaves from the `METADATA_CF` column family.
     /// Returns 0 if the count is not found.
     ///
@@ -246,7 +261,7 @@ impl SmtStorageReader for RocksDbStorage {
             .enumerate()
             .filter(|(_, bucket)| !bucket.is_empty())
             .map(|(bucket_index, bucket)| -> StorageResult<Vec<(usize, Option<Subtree>)>> {
-                let depth = LargeSmt::<RocksDbStorage>::SUBTREE_DEPTHS[bucket_index];
+                let depth = LargeSmt::<Self>::SUBTREE_DEPTHS[bucket_index];
                 let table = self.kvdb.table(cf_for_depth(depth))?;
                 let keys: Vec<_> =
                     bucket.iter().map(|(_, idx)| Self::subtree_db_key(*idx)).collect();
@@ -385,12 +400,12 @@ impl SmtStorageReader for RocksDbStorage {
     }
 }
 
-impl SmtStorage for RocksDbStorage {
-    type Reader = RocksDbSnapshotStorage;
+impl<TKVDB: KVDB> SmtStorage for KVDBSmtStorage<TKVDB> {
+    type Reader = KVDBSnapshotStorage<TKVDB>;
 
     /// Returns a detached read-only snapshot of the current RocksDB-backed storage.
     fn reader(&self) -> StorageResult<Self::Reader> {
-        Ok(RocksDbSnapshotStorage::new(self.kvdb.snapshot()?))
+        Ok(Self::Reader { kvdb_snapshot: self.kvdb.snapshot()? })
     }
 
     /// Inserts a key-value pair into the SMT leaf at the specified logical `index`.
@@ -822,7 +837,7 @@ impl SmtStorage for RocksDbStorage {
 ///
 /// # Panics
 /// - If the RocksDB sync operation fails.
-impl Drop for RocksDbStorage {
+impl<TKVDB: KVDB> Drop for KVDBSmtStorage<TKVDB> {
     fn drop(&mut self) {
         if let Err(e) = self.sync() {
             panic!("failed to flush RocksDB on drop: {e}");
@@ -945,18 +960,11 @@ fn cf_for_depth(depth: u8) -> &'static str {
 
 /// Read-only, cloneable SMT storage backed by a native RocksDB point-in-time snapshot.
 #[derive(Clone, Debug)]
-pub struct RocksDbSnapshotStorage {
-    kvdb_snapshot: RocksKVDBSnapshot,
+pub struct KVDBSnapshotStorage<TKVDB: KVDBReader> {
+    kvdb_snapshot: TKVDB::Snapshot,
 }
 
-impl RocksDbSnapshotStorage {
-    /// Creates a snapshot-backed storage reader from a shared RocksDB handle.
-    pub fn new(kvdb_snapshot: RocksKVDBSnapshot) -> Self {
-        Self { kvdb_snapshot }
-    }
-}
-
-impl SmtStorageReader for RocksDbSnapshotStorage {
+impl<TKVDB: KVDBReader> SmtStorageReader for KVDBSnapshotStorage<TKVDB> {
     /// Retrieves the total count of non-empty leaves from the snapshot.
     fn leaf_count(&self) -> StorageResult<usize> {
         let table = self.kvdb_snapshot.table(METADATA_CF)?;
@@ -976,7 +984,7 @@ impl SmtStorageReader for RocksDbSnapshotStorage {
     /// Retrieves a single SMT leaf node by its logical `index` from the snapshot.
     fn get_leaf(&self, index: u64) -> StorageResult<Option<SmtLeaf>> {
         let table = self.kvdb_snapshot.table(LEAVES_CF)?;
-        let key = RocksDbStorage::index_db_key(index);
+        let key = key_serializer::index_db_key(index);
         match self.kvdb_snapshot.get(&table, &key)? {
             Some(bytes) => {
                 let leaf = SmtLeaf::read_from_bytes_with_budget(&bytes, bytes.len())?;
@@ -990,7 +998,7 @@ impl SmtStorageReader for RocksDbSnapshotStorage {
     fn get_leaves(&self, indices: &[u64]) -> StorageResult<Vec<Option<SmtLeaf>>> {
         let table = self.kvdb_snapshot.table(LEAVES_CF)?;
         let db_keys: Vec<[u8; 8]> =
-            indices.iter().map(|&idx| RocksDbStorage::index_db_key(idx)).collect();
+            indices.iter().map(|&idx| key_serializer::index_db_key(idx)).collect();
         let key_refs: Vec<&[u8]> = db_keys.iter().map(<[u8; 8]>::as_slice).collect();
         let results = self.kvdb_snapshot.multi_get(&table, &key_refs)?;
 
@@ -1011,7 +1019,7 @@ impl SmtStorageReader for RocksDbSnapshotStorage {
     /// Retrieves a single SMT Subtree by its root `NodeIndex` from the snapshot.
     fn get_subtree(&self, index: NodeIndex) -> StorageResult<Option<Subtree>> {
         let table = self.kvdb_snapshot.table(cf_for_depth(index.depth()))?;
-        let key = RocksDbStorage::subtree_db_key(index);
+        let key = key_serializer::subtree_db_key(index);
         match self.kvdb_snapshot.get(&table, key.as_slice())? {
             Some(bytes) => {
                 let subtree = Subtree::from_vec(index, &bytes)?;
@@ -1051,10 +1059,10 @@ impl SmtStorageReader for RocksDbSnapshotStorage {
             .enumerate()
             .filter(|(_, bucket)| !bucket.is_empty())
             .map(|(bucket_index, bucket)| -> StorageResult<Vec<(usize, Option<Subtree>)>> {
-                let depth = LargeSmt::<RocksDbStorage>::SUBTREE_DEPTHS[bucket_index];
+                let depth = LargeSmt::<Self>::SUBTREE_DEPTHS[bucket_index];
                 let table = self.kvdb_snapshot.table(cf_for_depth(depth))?;
                 let keys: Vec<_> =
-                    bucket.iter().map(|(_, idx)| RocksDbStorage::subtree_db_key(*idx)).collect();
+                    bucket.iter().map(|(_, idx)| key_serializer::subtree_db_key(*idx)).collect();
                 let key_refs: Vec<&[u8]> = keys.iter().map(KeyBytes::as_slice).collect();
 
                 let db_results = self.kvdb_snapshot.multi_get(&table, &key_refs)?;

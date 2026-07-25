@@ -26,11 +26,13 @@ mod schema;
 
 #[cfg(feature = "rocksdb")]
 mod rocksdb;
-#[cfg(feature = "rocksdb")]
-pub use rocksdb::{RocksDbSnapshotStorage, RocksDbStorage};
 
 #[cfg(feature = "rocksdb")]
 mod rocks_kvdb;
+#[cfg(feature = "rocksdb")]
+pub type RocksDbStorage = rocksdb::KVDBSmtStorage<rocks_kvdb::RocksKVDB>;
+#[cfg(feature = "rocksdb")]
+pub type RocksDbSnapshotStorage = rocksdb::KVDBSnapshotStorage<rocks_kvdb::RocksKVDB>;
 
 mod memory;
 pub use memory::{MemoryStorage, MemoryStorageSnapshot};
