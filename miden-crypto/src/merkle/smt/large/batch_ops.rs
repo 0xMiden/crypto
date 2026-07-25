@@ -298,7 +298,7 @@ impl<S: SmtStorage> LargeSmt<S> {
     ///
     /// # Example
     /// ```no_run
-    /// # #[cfg(feature = "rocksdb")]
+    /// # #[cfg(feature = "smt-kvdb")]
     /// # {
     /// use miden_crypto::{
     ///     EMPTY_WORD, Felt, Word,

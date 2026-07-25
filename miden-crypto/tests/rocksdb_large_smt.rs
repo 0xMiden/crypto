@@ -1,18 +1,24 @@
+#[cfg(feature = "smt-kvdb-rocks")]
+use miden_crypto::merkle::smt::{SmtStorageReader, StorageError};
 use miden_crypto::{
     EMPTY_WORD, Felt, ONE, Word, ZERO,
     merkle::{
         InnerNodeInfo,
         smt::{
             LargeSmt, LargeSmtError, LargeSmtResult, RocksDbConfig, RocksDbSnapshotStorage,
-            RocksDbStorage, SmtStorageReader, StorageError,
+            RocksDbStorage,
         },
     },
 };
+#[cfg(feature = "smt-kvdb-rocks")]
 use rocksdb::{DB, IteratorMode, Options};
 use tempfile::TempDir;
 
+#[cfg(feature = "smt-kvdb-rocks")]
 const LEAVES_CF: &str = "leaves";
+#[cfg(feature = "smt-kvdb-rocks")]
 const SUBTREE_CFS: [&str; 6] = ["st16", "st24", "st32", "st40", "st48", "st56"];
+#[cfg(feature = "smt-kvdb-rocks")]
 const ROCKSDB_CFS: [&str; 9] = [
     "in_mem_depth",
     "leaves",
@@ -53,11 +59,13 @@ fn generate_entries(pair_count: usize) -> Vec<(Word, Word)> {
         .collect()
 }
 
+#[cfg(feature = "smt-kvdb-rocks")]
 fn open_raw_db(path: &std::path::Path) -> DB {
     let opts = Options::default();
     DB::open_cf(&opts, path, ROCKSDB_CFS).expect("failed to open raw RocksDB handle")
 }
 
+#[cfg(feature = "smt-kvdb-rocks")]
 fn corrupt_leaf_value(path: &std::path::Path, leaf_index: u64) {
     let db = open_raw_db(path);
     let cf = db.cf_handle(LEAVES_CF).expect("leaves column family missing");
@@ -65,6 +73,7 @@ fn corrupt_leaf_value(path: &std::path::Path, leaf_index: u64) {
         .expect("failed to corrupt leaf value");
 }
 
+#[cfg(feature = "smt-kvdb-rocks")]
 fn corrupt_first_subtree_value(path: &std::path::Path) {
     let db = open_raw_db(path);
 
@@ -348,6 +357,7 @@ fn rocksdb_load_skips_validation() {
     assert_eq!(smt.root(), expected_root);
 }
 
+#[cfg(feature = "smt-kvdb-rocks")]
 #[test]
 fn rocksdb_iter_leaves_returns_error_for_corrupt_leaf() {
     let entries = generate_entries(1);
@@ -370,6 +380,7 @@ fn rocksdb_iter_leaves_returns_error_for_corrupt_leaf() {
     );
 }
 
+#[cfg(feature = "smt-kvdb-rocks")]
 #[test]
 fn rocksdb_iter_subtrees_returns_error_for_corrupt_subtree() {
     let entries = generate_entries(1000);

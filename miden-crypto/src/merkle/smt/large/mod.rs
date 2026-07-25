@@ -2,15 +2,15 @@
 //!
 //! `LargeSmt` stores the top of the tree (depths 0–`IN_MEMORY_DEPTH`-1) in memory and persists
 //! the lower depths in storage as fixed-size subtrees. This hybrid layout scales beyond RAM
-//! while keeping common operations fast. With the `rocksdb` feature enabled, the lower
+//! while keeping common operations fast. With the `smt-kvdb` feature enabled, the lower
 //! subtrees and leaves are stored in RocksDB. On reload, the in-memory top is reconstructed
 //! from cached in-memory-depth subtree roots.
 //!
-//! Examples below require the `rocksdb` feature.
+//! Examples below require the `smt-kvdb-*` feature.
 //!
 //! Load an existing RocksDB-backed tree with root validation:
 //! ```no_run
-//! # #[cfg(feature = "rocksdb")]
+//! # #[cfg(feature = "smt-kvdb")]
 //! # {
 //! use miden_crypto::{
 //!     Word,
@@ -29,7 +29,7 @@
 //!
 //! Load an existing tree without root validation (use with caution):
 //! ```no_run
-//! # #[cfg(feature = "rocksdb")]
+//! # #[cfg(feature = "smt-kvdb")]
 //! # {
 //! use miden_crypto::merkle::smt::{LargeSmt, RocksDbConfig, RocksDbStorage};
 //!
@@ -44,7 +44,7 @@
 //!
 //! Initialize an empty RocksDB-backed tree and bulk-load entries:
 //! ```no_run
-//! # #[cfg(feature = "rocksdb")]
+//! # #[cfg(feature = "smt-kvdb")]
 //! # {
 //! use miden_crypto::{
 //!     Felt, Word,
@@ -102,7 +102,7 @@
 //!
 //! Apply batch updates (insertions and deletions):
 //! ```no_run
-//! # #[cfg(feature = "rocksdb")]
+//! # #[cfg(feature = "smt-kvdb")]
 //! # {
 //! use miden_crypto::{
 //!     EMPTY_WORD, Felt, Word,
@@ -154,7 +154,7 @@
 //!
 //! Quick initialization with `with_entries` (best for modest datasets/tests):
 //! ```no_run
-//! # #[cfg(feature = "rocksdb")]
+//! # #[cfg(feature = "smt-kvdb")]
 //! # {
 //! use miden_crypto::{
 //!     Felt, Word,
@@ -260,13 +260,13 @@ mod subtree;
 pub use subtree::{Subtree, SubtreeError};
 
 mod storage;
-#[cfg(feature = "rocksdb")]
+#[cfg(feature = "smt-kvdb")]
 pub use storage::config as storage_config;
 pub use storage::{
     MemoryStorage, MemoryStorageSnapshot, SmtStorage, SmtStorageReader, StorageError,
     StorageResult, StorageUpdateParts, StorageUpdates, SubtreeUpdate,
 };
-#[cfg(feature = "rocksdb")]
+#[cfg(feature = "smt-kvdb")]
 pub use storage::{RocksDbSnapshotStorage, RocksDbStorage};
 
 mod iter;

@@ -11,16 +11,22 @@ version.workspace      = true
 
 [dev-dependencies]
 criterion    = { package = "codspeed-criterion-compat", version = "=4.6.0" }
-miden-crypto = { default-features = false, features = ["rocksdb"], path = "../../miden-crypto" }
+miden-crypto = { default-features = false, path = "../../miden-crypto" }
 tempfile     = { workspace = true }
+
+[features]
+rocksdb        = ["smt-kvdb-rocks"]
+smt-kvdb       = []
+smt-kvdb-rocks = ["miden-crypto/smt-kvdb-rocks", "smt-kvdb"]
 
 [lib]
 doctest = false
 test    = false
 
 [[bench]]
-harness = false
-name    = "smt_codspeed"
+harness           = false
+name              = "smt_codspeed"
+required-features = ["smt-kvdb"]
 
 [lints]
 workspace = true

@@ -47,7 +47,7 @@ required-features = ["std"]
 [[bench]]
 harness           = false
 name              = "large_smt"
-required-features = ["rocksdb"]
+required-features = ["smt-kvdb"]
 
 [[bench]]
 harness           = false
@@ -87,8 +87,11 @@ executable        = ["concurrent", "dep:clap"]
 fuzzing           = []
 internal          = ["concurrent"]
 persistent-forest = ["rocksdb", "serde"]
-rocksdb           = ["concurrent", "dep:rocksdb"]
+rocksdb           = ["smt-kvdb-rocks"]
 serde             = ["dep:serde", "serde?/alloc"]
+smt-kvdb          = ["concurrent"]
+smt-kvdb-default  = []
+smt-kvdb-rocks    = ["dep:rocksdb", "smt-kvdb"]
 std               = ["blake3/std", "dep:cc", "miden-serde-utils/std", "once_cell/std", "rand/std", "rand/thread_rng", "serde?/std"]
 testing           = ["arbitrary"]
 
@@ -154,4 +157,4 @@ workspace = true
 
 [[test]]
 name              = "rocksdb_large_smt"
-required-features = ["concurrent", "rocksdb"]
+required-features = ["smt-kvdb"]

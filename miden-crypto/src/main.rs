@@ -1,9 +1,9 @@
-#[cfg(any(test, feature = "rocksdb"))]
+#[cfg(any(test, feature = "smt-kvdb"))]
 use std::path::Path;
 use std::{path::PathBuf, time::Instant};
 
 use clap::{Parser, ValueEnum};
-#[cfg(feature = "rocksdb")]
+#[cfg(feature = "smt-kvdb")]
 use miden_crypto::merkle::smt::{RocksDbConfig, RocksDbStorage};
 use miden_crypto::{
     EMPTY_WORD, Felt, ONE, Word,
@@ -297,7 +297,7 @@ fn get_storage(
     match kind {
         StorageKind::Memory => Ok(Box::new(BoxedStorage(MemoryStorage::new()))),
         StorageKind::Rocksdb => {
-            #[cfg(feature = "rocksdb")]
+            #[cfg(feature = "smt-kvdb")]
             {
                 let path = database_path
                     .unwrap_or_else(|| std::env::temp_dir().join("miden_crypto_benchmark"));
@@ -310,7 +310,7 @@ fn get_storage(
                 )?;
                 Ok(Box::new(BoxedStorage(db)))
             }
-            #[cfg(not(feature = "rocksdb"))]
+            #[cfg(not(feature = "smt-kvdb"))]
             {
                 Err(StorageError::Unsupported(
                     "rocksdb storage was requested, but the rocksdb feature is not enabled".into(),
@@ -321,7 +321,7 @@ fn get_storage(
     }
 }
 
-#[cfg(any(test, feature = "rocksdb"))]
+#[cfg(any(test, feature = "smt-kvdb"))]
 fn prepare_database_directory(path: &Path, reset: bool) -> Result<(), LargeSmtError> {
     if path.exists() {
         if !reset {
@@ -344,7 +344,7 @@ fn prepare_database_directory(path: &Path, reset: bool) -> Result<(), LargeSmtEr
     Ok(())
 }
 
-#[cfg(any(test, feature = "rocksdb"))]
+#[cfg(any(test, feature = "smt-kvdb"))]
 fn storage_io_error(message: String, err: std::io::Error) -> LargeSmtError {
     StorageError::Backend(Box::new(std::io::Error::new(err.kind(), format!("{message}: {err}"))))
         .into()
@@ -374,7 +374,7 @@ mod tests {
         assert_eq!(args.storage, StorageKind::Memory);
     }
 
-    #[cfg(not(feature = "rocksdb"))]
+    #[cfg(not(feature = "smt-kvdb"))]
     #[test]
     fn rejects_explicit_rocksdb_storage_without_feature() {
         let err = get_storage(None, false, false, StorageKind::Rocksdb).unwrap_err();
@@ -386,13 +386,13 @@ mod tests {
         }
     }
 
-    #[cfg(feature = "rocksdb")]
+    #[cfg(feature = "smt-kvdb")]
     #[test]
     fn storage_value_parser_accepts_rocksdb_with_feature() {
         assert_eq!(StorageKind::from_str("rocksdb", true).unwrap(), StorageKind::Rocksdb);
     }
 
-    #[cfg(feature = "rocksdb")]
+    #[cfg(feature = "smt-kvdb")]
     #[test]
     fn parses_explicit_rocksdb_storage_with_feature() {
         let args =

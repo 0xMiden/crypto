@@ -62,7 +62,7 @@ impl<S: SmtStorageReader> LargeSmt<S> {
     ///
     /// # Example
     /// ```no_run
-    /// # #[cfg(feature = "rocksdb")]
+    /// # #[cfg(feature = "smt-kvdb")]
     /// # {
     /// use miden_crypto::merkle::smt::{LargeSmt, RocksDbConfig, RocksDbStorage};
     /// let storage = RocksDbStorage::open(RocksDbConfig::new("/path/to/db")).unwrap();
@@ -88,7 +88,7 @@ impl<S: SmtStorageReader> LargeSmt<S> {
     ///
     /// # Example
     /// ```no_run
-    /// # #[cfg(feature = "rocksdb")]
+    /// # #[cfg(feature = "smt-kvdb")]
     /// # {
     /// use miden_crypto::{
     ///     Word,

@@ -15,23 +15,23 @@ use crate::{
 mod error;
 pub use error::{StorageError, StorageResult};
 
-#[cfg(feature = "rocksdb")]
+#[cfg(feature = "smt-kvdb")]
 mod kvdb;
 
-#[cfg(feature = "rocksdb")]
+#[cfg(feature = "smt-kvdb")]
 pub mod config;
 
-#[cfg(feature = "rocksdb")]
+#[cfg(feature = "smt-kvdb")]
 mod schema;
 
-#[cfg(feature = "rocksdb")]
+#[cfg(feature = "smt-kvdb")]
 mod rocksdb;
 
-#[cfg(feature = "rocksdb")]
+#[cfg(feature = "smt-kvdb-rocks")]
 mod rocks_kvdb;
-#[cfg(feature = "rocksdb")]
+#[cfg(feature = "smt-kvdb-rocks")]
 pub type RocksDbStorage = rocksdb::KVDBSmtStorage<rocks_kvdb::RocksKVDB>;
-#[cfg(feature = "rocksdb")]
+#[cfg(feature = "smt-kvdb-rocks")]
 pub type RocksDbSnapshotStorage = rocksdb::KVDBSnapshotStorage<rocks_kvdb::RocksKVDB>;
 
 mod memory;

@@ -20,7 +20,7 @@ pub use full::{MAX_LEAF_ENTRIES, SMT_DEPTH, Smt, SmtLeaf, SmtLeafError, SmtProof
 mod large;
 #[cfg(feature = "internal")]
 pub use full::concurrent::{SubtreeLeaf, build_subtree_for_bench};
-#[cfg(feature = "rocksdb")]
+#[cfg(feature = "smt-kvdb")]
 pub use large::storage_config::*;
 #[cfg(feature = "concurrent")]
 pub use large::{
@@ -28,7 +28,7 @@ pub use large::{
     SmtStorageReader, StorageError, StorageResult, StorageUpdateParts, StorageUpdates, Subtree,
     SubtreeError, SubtreeUpdate,
 };
-#[cfg(feature = "rocksdb")]
+#[cfg(feature = "smt-kvdb")]
 pub use large::{RocksDbSnapshotStorage, RocksDbStorage};
 
 mod large_forest;
