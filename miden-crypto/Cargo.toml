@@ -91,6 +91,7 @@ rocksdb           = ["smt-kvdb-rocks"]
 serde             = ["dep:serde", "serde?/alloc"]
 smt-kvdb          = ["concurrent"]
 smt-kvdb-default  = []
+smt-kvdb-fjall    = ["dep:fjall", "dep:lsm-tree", "smt-kvdb"]
 smt-kvdb-rocks    = ["dep:rocksdb", "smt-kvdb"]
 std               = ["blake3/std", "dep:cc", "miden-serde-utils/std", "once_cell/std", "rand/std", "rand/thread_rng", "serde?/std"]
 testing           = ["arbitrary"]
@@ -109,9 +110,11 @@ clap             = { features = ["derive"], optional = true, workspace = true }
 curve25519-dalek = { workspace = true }
 der              = { workspace = true }
 ed25519-dalek    = { features = ["alloc", "zeroize"], workspace = true }
+fjall            = { features = ["lz4"], optional = true, workspace = true }
 flume            = { workspace = true }
 hkdf             = { workspace = true }
 k256             = { features = ["alloc", "ecdh", "ecdsa", "pkcs8"], workspace = true }
+lsm-tree         = { optional = true, workspace = true }
 num              = { features = ["alloc", "libm"], workspace = true }
 num-complex      = { workspace = true }
 once_cell        = { features = ["alloc", "critical-section"], workspace = true }

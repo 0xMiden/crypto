@@ -17,6 +17,7 @@ tempfile     = { workspace = true }
 [features]
 rocksdb        = ["smt-kvdb-rocks"]
 smt-kvdb       = []
+smt-kvdb-fjall = ["miden-crypto/smt-kvdb-fjall", "smt-kvdb"]
 smt-kvdb-rocks = ["miden-crypto/smt-kvdb-rocks", "smt-kvdb"]
 
 [lib]
