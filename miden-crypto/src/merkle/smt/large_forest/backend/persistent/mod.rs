@@ -50,6 +50,9 @@ use crate::merkle::smt::large::{storage::kvdb::*, storage_config::*};
 #[cfg(feature = "smt-kvdb-rocks")]
 pub mod schema_rocks_kvdb;
 
+#[cfg(all(feature = "smt-kvdb-fjall", not(feature = "smt-kvdb-default")))]
+pub mod schema_fjall_kvdb;
+
 use super::{BackendError, Result};
 #[cfg(test)]
 use crate::merkle::smt::SmtUpdateBatch;

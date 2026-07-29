@@ -97,6 +97,7 @@ std               = ["blake3/std", "dep:cc", "miden-serde-utils/std", "once_cell
 testing           = ["arbitrary"]
 
 persistent-forest-default = []
+persistent-forest-fjall   = ["persistent-forest", "smt-kvdb-fjall"]
 persistent-forest-rocks   = ["persistent-forest", "smt-kvdb-rocks"]
 
 [dependencies]

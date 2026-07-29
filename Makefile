@@ -119,6 +119,10 @@ test-large-smt-forest: ## Run large_forest SMT unit tests
 test-large-smt-fjall: ## Run large SMT unit and integration tests with Fjall database backend
 	cargo nextest run --success-output immediate --profile large-smt-no-forest --cargo-profile test-release --package miden-crypto --features smt-kvdb-fjall
 
+.PHONY: test-large-smt-forest-fjall
+test-large-smt-forest-fjall: ## Run large_forest SMT unit tests with Fjall database backend
+	cargo nextest run --success-output immediate --profile large-smt-forest --cargo-profile test-release --package miden-crypto --features persistent-forest-fjall
+
 .PHONY: test
 test: test-default test-no-std test-docs test-large-smt ## Run all tests except concurrent SMT tests
 
@@ -190,6 +194,10 @@ bench-large-smt-codspeed-rocksdb: ## Run codspeed large SMT benchmarks with rock
 .PHONY: bench-large-smt-criterion-fjall
 bench-large-smt-criterion-fjall: ## Run criterion large SMT benchmarks with Fjall storage
 	cargo bench --bench large_smt --features smt-kvdb-fjall -- "large_smt|rocksdb"
+
+.PHONY: bench-large-smt-forest-fjall
+bench-large-smt-forest-fjall: ## Run large_smt_forest benchmark with Fjall storage
+	cargo bench --bench large_smt_forest --features persistent-forest-fjall
 
 .PHONY: bench-large-smt-codspeed-fjall
 bench-large-smt-codspeed-fjall: ## Run codspeed large SMT benchmarks with Fjall storage
