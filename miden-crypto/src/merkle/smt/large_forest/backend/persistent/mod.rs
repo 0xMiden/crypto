@@ -47,7 +47,7 @@ use snapshot::PersistentBackendReader;
 
 use crate::merkle::smt::large::{storage::kvdb::*, storage_config::*};
 
-#[rustfmt::skip]
+#[cfg(feature = "smt-kvdb-rocks")]
 pub mod schema_rocks_kvdb;
 
 use super::{BackendError, Result};

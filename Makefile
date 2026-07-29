@@ -105,7 +105,7 @@ test-p3-parallel: ## Run Miden STARK crate tests with the parallel feature enabl
 
 .PHONY: test-large-smt
 test-large-smt: ## Run large SMT unit tests and RocksDB integration tests
-	cargo nextest run --success-output immediate --profile large-smt --cargo-profile test-release --features persistent-forest
+	cargo nextest run --success-output immediate --profile large-smt --cargo-profile test-release --features persistent-forest-rocks
 
 .PHONY: test-large-smt-no-forest
 test-large-smt-no-forest: ## Run large SMT unit and integration tests without large_forest tests
@@ -113,7 +113,7 @@ test-large-smt-no-forest: ## Run large SMT unit and integration tests without la
 
 .PHONY: test-large-smt-forest
 test-large-smt-forest: ## Run large_forest SMT unit tests
-	cargo nextest run --success-output immediate --profile large-smt-forest --cargo-profile test-release --features persistent-forest
+	cargo nextest run --success-output immediate --profile large-smt-forest --cargo-profile test-release --features persistent-forest-rocks
 
 .PHONY: test-large-smt-fjall
 test-large-smt-fjall: ## Run large SMT unit and integration tests with Fjall database backend
@@ -181,7 +181,7 @@ bench-large-smt-criterion-rocksdb: ## Run criterion large SMT benchmarks with ro
 
 .PHONY: bench-large-smt-forest-rocksdb
 bench-large-smt-forest-rocksdb:
-	cargo bench --bench large_smt_forest --features persistent-forest
+	cargo bench --bench large_smt_forest --features persistent-forest-rocks
 
 .PHONY: bench-large-smt-codspeed-rocksdb
 bench-large-smt-codspeed-rocksdb: ## Run codspeed large SMT benchmarks with rocksdb storage

@@ -6,7 +6,7 @@ pub mod memory;
 mod persistent;
 #[cfg(feature = "persistent-forest")]
 pub use persistent::config::Config as PersistentBackendConfig;
-#[cfg(feature = "persistent-forest")]
+#[cfg(feature = "persistent-forest-rocks")]
 pub type PersistentBackend =
     persistent::KVDBPersistentBackend<persistent::schema_rocks_kvdb::RocksKVDBSchema>;
 

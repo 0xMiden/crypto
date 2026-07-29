@@ -86,7 +86,7 @@ default           = ["concurrent", "std"]
 executable        = ["concurrent", "dep:clap"]
 fuzzing           = []
 internal          = ["concurrent"]
-persistent-forest = ["rocksdb", "serde"]
+persistent-forest = ["serde"]
 rocksdb           = ["smt-kvdb-rocks"]
 serde             = ["dep:serde", "serde?/alloc"]
 smt-kvdb          = ["concurrent"]
@@ -95,6 +95,9 @@ smt-kvdb-fjall    = ["dep:fjall", "dep:lsm-tree", "smt-kvdb"]
 smt-kvdb-rocks    = ["dep:rocksdb", "smt-kvdb"]
 std               = ["blake3/std", "dep:cc", "miden-serde-utils/std", "once_cell/std", "rand/std", "rand/thread_rng", "serde?/std"]
 testing           = ["arbitrary"]
+
+persistent-forest-default = []
+persistent-forest-rocks   = ["persistent-forest", "smt-kvdb-rocks"]
 
 [dependencies]
 # Miden dependencies
