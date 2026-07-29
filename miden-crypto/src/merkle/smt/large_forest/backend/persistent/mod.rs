@@ -666,7 +666,7 @@ impl PersistentBackend {
         let kvdb = schema_rocks_kvdb::RocksKVDBSchema::make(storage_config)?;
 
         let db = kvdb.db.clone();
-        let lineages = Arc::new(Self::read_all_metadata(db.clone())?);
+        let lineages = Arc::new(Self::read_all_metadata(&kvdb)?);
         let sync_writes = config.sync_writes;
 
         Ok(Self { db, kvdb, lineages, sync_writes })
@@ -1401,11 +1401,11 @@ impl PersistentBackend {
     ///
     /// - [`BackendError::CorruptedData`] if data corruption is discovered.
     /// - [`BackendError::Internal`] if the metadata cannot be read from disk.
-    fn read_all_metadata(db: Arc<DB>) -> Result<HashMap<LineageId, TreeMetadata>> {
-        let cf = db.cf_handle(METADATA_CF).ok_or_else(|| {
-            BackendError::CorruptedData(format!("{METADATA_CF} column not found"))
-        })?;
-        let db_iter = db.iterator_cf(&cf, db::IteratorMode::Start);
+    fn read_all_metadata(db: &RocksKVDB) -> Result<HashMap<LineageId, TreeMetadata>> {
+        let table = db
+            .table(METADATA_CF)
+            .map_err(|_| BackendError::CorruptedData(format!("{METADATA_CF} column not found")))?;
+        let db_iter = db.iter(table);
 
         db_iter
             .map(|bytes| {
