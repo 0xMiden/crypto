@@ -175,6 +175,10 @@ bench: ## Run crypto benchmarks
 bench-large-smt-criterion-rocksdb: ## Run criterion large SMT benchmarks with rocksdb storage
 	cargo bench --bench large_smt --features rocksdb -- "large_smt|rocksdb"
 
+.PHONY: bench-large-smt-forest-rocksdb
+bench-large-smt-forest-rocksdb:
+	cargo bench --bench large_smt_forest --features persistent-forest
+
 .PHONY: bench-large-smt-codspeed-rocksdb
 bench-large-smt-codspeed-rocksdb: ## Run codspeed large SMT benchmarks with rocksdb storage
 	cargo bench --bench smt_codspeed --features rocksdb -- "large_smt/rocksdb"
