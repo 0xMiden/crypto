@@ -70,7 +70,7 @@ impl KVDBSchemaFactory for RocksKVDBSchema {
         // Column family for leaves
         let mut leaves_opts = Options::default();
         leaves_opts.set_block_based_table_factory(&table_opts);
-        configure_smt_cf_options(&mut leaves_opts);
+        configure_smt_cf_options(&mut leaves_opts, &config.tuning_options);
         if let Some(wbm) = write_buffer_manager.as_ref() {
             db_opts.set_write_buffer_manager(wbm);
             leaves_opts.set_write_buffer_manager(wbm);
@@ -94,7 +94,7 @@ impl KVDBSchemaFactory for RocksKVDBSchema {
 
             let mut opts = Options::default();
             opts.set_block_based_table_factory(&table_opts);
-            configure_smt_cf_options(&mut opts);
+            configure_smt_cf_options(&mut opts, tuning_options);
             if let Some(wbm) = write_buffer_manager {
                 opts.set_write_buffer_manager(wbm);
             }
@@ -172,7 +172,10 @@ impl KVDBSchemaFactory for RocksKVDBSchema {
 
 const DEFAULT_BOTTOMMOST_ZSTD_MAX_TRAIN_BYTES: i32 = 1 << 20;
 
-fn configure_smt_cf_options(opts: &mut Options) {
+fn configure_smt_cf_options(
+    opts: &mut Options,
+    tuning_options: &PersistentSmtStorageTuningOptions,
+) {
     // 128 MB memtable
     opts.set_write_buffer_size(128 << 20);
     // Allow up to 3 memtables
@@ -183,7 +186,7 @@ fn configure_smt_cf_options(opts: &mut Options) {
     // Use level-based compaction
     opts.set_compaction_style(DBCompactionStyle::Level);
     // 512 MB target file size
-    opts.set_target_file_size_base(512 << 20);
+    opts.set_target_file_size_base(tuning_options.target_file_size);
     opts.set_target_file_size_multiplier(2);
     // LZ4 compression for active files, ZSTD for bottommost files
     opts.set_compression_type(DBCompressionType::Lz4);

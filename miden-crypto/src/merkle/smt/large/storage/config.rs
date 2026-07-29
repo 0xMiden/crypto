@@ -42,6 +42,7 @@ const DEFAULT_CACHE_SIZE: usize = 1 << 30;
 const DEFAULT_MAX_OPEN_FILES: i32 = 512;
 const DEFAULT_BLOCK_SIZE: usize = 16 << 10;
 const DEFAULT_MAX_TOTAL_WAL_SIZE: u64 = 512 * 1024 * 1024;
+const DEFAULT_TARGET_FILE_SIZE: u64 = 512 << 20;
 const DEFAULT_BLOOM_FILTER_BITS_PER_KEY: f64 = 10.0;
 
 impl PersistentSmtStorageConfig {
@@ -187,6 +188,7 @@ pub struct PersistentSmtStorageWriteBufferManagerBudget {
 pub struct PersistentSmtStorageTuningOptions {
     pub block_size: usize,
     pub max_total_wal_size: u64,
+    pub target_file_size: u64,
     pub bloom_filter_bits_per_key: PersistentSmtStorageBloomFilterBitsPerKey,
 }
 
@@ -195,6 +197,7 @@ impl Default for PersistentSmtStorageTuningOptions {
         Self {
             block_size: DEFAULT_BLOCK_SIZE,
             max_total_wal_size: DEFAULT_MAX_TOTAL_WAL_SIZE,
+            target_file_size: DEFAULT_TARGET_FILE_SIZE,
             bloom_filter_bits_per_key: PersistentSmtStorageBloomFilterBitsPerKey::default(),
         }
     }
@@ -266,6 +269,7 @@ mod tests {
         let tuning_options = PersistentSmtStorageTuningOptions {
             block_size: 8 << 10,
             max_total_wal_size: 2 << 30,
+            target_file_size: DEFAULT_TARGET_FILE_SIZE,
             bloom_filter_bits_per_key: PersistentSmtStorageBloomFilterBitsPerKey {
                 leaves: 11.0,
                 in_mem_depth: 12.0,
