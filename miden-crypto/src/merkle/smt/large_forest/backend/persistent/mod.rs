@@ -50,6 +50,7 @@ use crate::merkle::smt::large::{storage::kvdb::*, storage_config::*};
 
 #[rustfmt::skip]
 use crate::merkle::smt::large::storage::rocks_kvdb::RocksKVDB;
+use crate::merkle::smt::large::storage::rocks_kvdb::RocksKVDBBatch;
 
 #[rustfmt::skip]
 mod schema_rocks_kvdb;
@@ -385,6 +386,9 @@ impl Backend for PersistentBackend {
         }
 
         let lineage_count = mutations.entries.len();
+        if lineage_count == 0 {
+            return Ok(Vec::new());
+        }
 
         // We want to update all trees as part of an atomic update to the backing database, but we
         // also want to do this in parallel. As we cannot share a transaction directly, we instead
@@ -393,7 +397,7 @@ impl Backend for PersistentBackend {
             .entries
             .into_iter()
             .map(|mutation| {
-                let batch = WriteBatch::default();
+                let batch = self.kvdb.batch();
                 (mutation, batch)
             })
             .collect::<Vec<_>>();
@@ -421,21 +425,23 @@ impl Backend for PersistentBackend {
         let (batches, (applied_entries, metadata_updates)): (Vec<_>, (Vec<_>, Vec<_>)) =
             lineage_data.into_iter().unzip();
 
-        let merge_batches = crate::merkle::smt::large::rocks_kvdb_batch_append::merge_batches;
+        fn merge_batches<'a>(l: RocksKVDBBatch<'a>, r: RocksKVDBBatch<'a>) -> RocksKVDBBatch<'a> {
+            l.append(&r)
+        }
 
         // We construct our final WriteBatch in parallel if we have enough of them, otherwise we
         // just do it in serial.
         let final_batch = if lineage_count > MIN_LINEAGES_IN_BATCH_TO_PARALLELIZE {
             batches
                 .into_par_iter()
-                .fold(WriteBatch::new, |l, r| merge_batches(l, &r))
-                .reduce(WriteBatch::new, |l, r| merge_batches(l, &r))
+                .fold(|| self.kvdb.batch(), merge_batches)
+                .reduce(|| self.kvdb.batch(), merge_batches)
         } else {
-            batches.into_iter().fold(WriteBatch::new(), |l, r| merge_batches(l, &r))
+            batches.into_iter().fold(self.kvdb.batch(), merge_batches)
         };
 
         // We first write the full atomic update to disk. If it errors, we bail.
-        self.write(final_batch)?;
+        final_batch.commit()?;
 
         // If it hasn't errored, we can now safely update the in-memory metadata cache.
         self.lineages_mut().extend(metadata_updates);
@@ -884,13 +890,13 @@ impl PersistentBackend {
     /// # Errors
     ///
     /// - [`BackendError::Internal`] if the backend cannot be written to.
-    fn apply_updates_to_lineage(
+    fn apply_updates_to_lineage<'a>(
         &self,
-        mut batch: WriteBatch,
+        mut batch: RocksKVDBBatch<'a>,
         lineage: LineageId,
         updates: StorageUpdates,
-    ) -> Result<WriteBatch> {
-        let leaves_cf = self.cf(LEAVES_CF)?;
+    ) -> Result<RocksKVDBBatch<'a>> {
+        let leaves_cf = self.kvdb.table(LEAVES_CF)?;
 
         let StorageUpdateParts { leaf_updates, subtree_updates, .. } = updates.into_parts();
 
@@ -898,8 +904,8 @@ impl PersistentBackend {
         for (k, v) in leaf_updates {
             let key_bytes = LeafKey { lineage, index: k }.to_bytes();
             match v {
-                Some(leaf) => batch.put_cf(leaves_cf, key_bytes, leaf.to_bytes()),
-                None => batch.delete_cf(leaves_cf, key_bytes),
+                Some(leaf) => batch.put(&leaves_cf, &key_bytes, &leaf.to_bytes()),
+                None => batch.delete(&leaves_cf, &key_bytes),
             }
         }
 
@@ -917,7 +923,7 @@ impl PersistentBackend {
 
                 let key = SubtreeKey { lineage, index };
                 let key_bytes = key.to_bytes();
-                let cf = self.subtree_cf(index)?;
+                let cf = self.kvdb.table(subtree_cf_name(index.depth()))?;
                 Ok((cf, key_bytes, maybe_bytes))
             })
             .collect::<Result<Vec<_>>>()?;
@@ -925,8 +931,8 @@ impl PersistentBackend {
         // We then add all the changes to the transaction in serial for now.
         for (cf, k, mv) in update_data {
             match mv {
-                None => batch.delete_cf(cf, k),
-                Some(bytes) => batch.put_cf(cf, k, bytes),
+                None => batch.delete(&cf, &k),
+                Some(bytes) => batch.put(&cf, &k, &bytes),
             }
         }
 
@@ -1355,19 +1361,6 @@ impl PersistentBackend {
         })
     }
 
-    /// Writes the provided `batch` into the database as part of one atomic operation.
-    ///
-    /// # Errors
-    ///
-    /// - [`BackendError::Internal`] if writing to the database fails for any reason.
-    fn write(&self, batch: WriteBatch) -> Result<()> {
-        let mut write_opts = db::WriteOptions::default();
-        write_opts.set_sync(self.sync_writes);
-        self.db.write_opt(batch, &write_opts)?;
-
-        Ok(())
-    }
-
     /// Forces the underlying database to perform a sync to disk, and thus ensure that all data is
     /// persisted.
     ///
@@ -1388,16 +1381,16 @@ impl PersistentBackend {
     ///
     /// - [`BackendError::Internal`] if the underlying database cannot be accessed for reading or
     ///   staging.
-    fn write_metadata(
+    fn write_metadata<'a>(
         &self,
-        mut batch: WriteBatch,
+        mut batch: RocksKVDBBatch<'a>,
         lineage: LineageId,
         tree_metadata: &TreeMetadata,
-    ) -> Result<WriteBatch> {
-        let metadata = self.cf(METADATA_CF)?;
+    ) -> Result<RocksKVDBBatch<'a>> {
+        let metadata = self.kvdb.table(METADATA_CF)?;
         let metadata_key = lineage.to_bytes();
         let metadata_value = tree_metadata.to_bytes();
-        batch.put_cf(metadata, &metadata_key, &metadata_value);
+        batch.put(&metadata, &metadata_key, &metadata_value);
         Ok(batch)
     }
 

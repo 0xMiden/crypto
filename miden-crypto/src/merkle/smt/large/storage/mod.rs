@@ -28,7 +28,7 @@ mod schema;
 mod persistent;
 
 #[cfg(feature = "smt-kvdb-rocks")]
-pub mod rocks_kvdb_batch_append;
+mod rocks_kvdb_batch_append;
 
 #[cfg(feature = "smt-kvdb-rocks")]
 pub mod rocks_kvdb;
