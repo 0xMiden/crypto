@@ -42,7 +42,6 @@ use std::{collections::HashMap, mem};
 use miden_serde_utils::{Deserializable, DeserializationError, Serializable};
 use num::Integer;
 use rayon::prelude::*;
-use rocksdb as db;
 use schema::*;
 pub use snapshot::PersistentBackendReader;
 
@@ -85,15 +84,6 @@ use crate::{
         },
     },
 };
-
-// TYPE ALIASES
-// ================================================================================================
-
-/// The type of the underlying RocksDB database in use by this backend.
-type DB = db::DB;
-
-/// The type of a write batch in the database associated with a transaction.
-type WriteBatch = db::WriteBatch;
 
 /// Prepared mutations for [`PersistentBackend`].
 ///
@@ -273,18 +263,9 @@ impl Backend for PersistentBackend {
     type PreparedMutations = PersistentPreparedMutations;
 
     fn reader(&self) -> Result<Self::Reader> {
-        let snapshot = self.db.snapshot();
         let kvdb_snapshot = self.kvdb.snapshot()?;
-        // SAFETY: `SnapshotInner` holds both the snapshot and `Arc<DB>`, and its `Drop` impl
-        // drops the snapshot before decrementing the Arc. This guarantees the DB outlives the
-        // snapshot, making the 'static transmute sound.
-        let snapshot: db::Snapshot<'static> = unsafe { mem::transmute(snapshot) };
-        Ok(PersistentBackendReader::new(
-            Arc::clone(&self.db),
-            snapshot,
-            kvdb_snapshot,
-            Arc::clone(&self.lineages),
-        ))
+        let reader = PersistentBackendReader::new(kvdb_snapshot, Arc::clone(&self.lineages));
+        Ok(reader)
     }
 
     /// Computes the mutations required to apply the provided `updates` on the forest.
@@ -614,8 +595,6 @@ pub struct PersistentBackend {
     ///   speed up common queries.
     /// - `SUBTREE_XX_CF`: Stores the [`Subtree`]s with their root at level `XX` in the backend,
     ///   keyed on the [`SubtreeKey`].
-    db: Arc<DB>,
-
     kvdb: RocksKVDB,
 
     /// An in-memory cache of the tree metadata enabling the more rapid servicing of certain kinds
@@ -627,12 +606,6 @@ pub struct PersistentBackend {
     /// Care must be taken that this is _always_ kept in sync with the on-disk copy in the
     /// [`METADATA_CF`] column.
     lineages: Arc<HashMap<LineageId, TreeMetadata>>,
-
-    /// Whether writes should be synchronously flushed to disk.
-    ///
-    /// Setting this to true will result in reduced throughput but may result in higher durability
-    /// in the presence of crashes.
-    sync_writes: bool,
 }
 
 impl PersistentBackend {
@@ -666,11 +639,9 @@ impl PersistentBackend {
 
         let kvdb = schema_rocks_kvdb::RocksKVDBSchema::make(storage_config)?;
 
-        let db = kvdb.db.clone();
         let lineages = Arc::new(Self::read_all_metadata(&kvdb)?);
-        let sync_writes = config.sync_writes;
 
-        Ok(Self { db, kvdb, lineages, sync_writes })
+        Ok(Self { kvdb, lineages })
     }
 
     // Triggers copy-on-write: clones the shared lineages map only if other references exist.
@@ -1329,39 +1300,6 @@ impl PersistentBackend {
         self.load_leaf_raw(&key)
     }
 
-    /// Gets the column family corresponding to the subtree with root index `index`.
-    ///
-    /// # Errors
-    ///
-    /// - [`BackendError::Internal`] if the database cannot be accessed to get the column family.
-    #[inline(always)]
-    fn subtree_cf(&self, index: NodeIndex) -> Result<&db::ColumnFamily> {
-        self.subtree_cf_depth(index.depth())
-    }
-
-    /// Gets the column family corresponding to the subtree with root index `index`.
-    ///
-    /// # Errors
-    ///
-    /// - [`BackendError::Internal`] if the database cannot be accessed to get the column family.
-    #[inline(always)]
-    fn subtree_cf_depth(&self, depth: u8) -> Result<&db::ColumnFamily> {
-        let cf_name = subtree_cf_name(depth);
-        self.cf(cf_name)
-    }
-
-    /// Gets the column family with the specified name.
-    ///
-    /// # Errors
-    ///
-    /// - [`BackendError::Internal`] if the database cannot be accessed to get the column family.
-    #[inline(always)]
-    fn cf(&self, name: &str) -> Result<&db::ColumnFamily> {
-        self.db.cf_handle(name).ok_or_else(|| {
-            BackendError::internal_from_message(format!("Could not load column with name {name}"))
-        })
-    }
-
     /// Forces the underlying database to perform a sync to disk, and thus ensure that all data is
     /// persisted.
     ///
@@ -1490,14 +1428,6 @@ struct LeafMutations {
 impl From<DeserializationError> for BackendError {
     fn from(e: DeserializationError) -> Self {
         Self::CorruptedData(e.to_string())
-    }
-}
-
-/// We generically forward all errors to do with the DB implementation out of the interface of the
-/// [`Backend`] as internal errors.
-impl From<db::Error> for BackendError {
-    fn from(e: db::Error) -> Self {
-        BackendError::internal_from(e)
     }
 }
 

@@ -1,9 +1,7 @@
 use alloc::{sync::Arc, vec::Vec};
-use core::mem::ManuallyDrop;
 use std::collections::HashMap;
 
 use miden_serde_utils::{Deserializable, Serializable};
-use rocksdb as db;
 
 use crate::merkle::smt::large::storage::kvdb::*;
 
@@ -33,35 +31,10 @@ use crate::{
 // ================================================================================================
 
 /// Inner state shared by all clones of a [`PersistentBackendReader`].
-///
-/// Pairs a RocksDB point-in-time snapshot with the `Arc<DB>` that owns the database, so that
-/// the database is guaranteed to outlive the snapshot.
-///
-/// # Safety
-///
-/// `snapshot` contains an internal pointer into the `DB` allocation. `db` must not be dropped
-/// (i.e. its refcount must not reach zero) while `snapshot` is live. The `Drop` impl enforces
-/// this by explicitly dropping `snapshot` before the `Arc<DB>` field is automatically decremented.
 pub(super) struct SnapshotInner {
-    /// The RocksDB snapshot providing the consistent read view.
-    ///
-    /// The `'static` lifetime is a sound lie: the real lifetime is tied to `db`. The `Drop` impl
-    /// guarantees we drop this before `db`.
-    snapshot: ManuallyDrop<db::Snapshot<'static>>,
     kvdb_snapshot: RocksKVDBSnapshot,
-    /// Keeps the database alive for at least as long as `snapshot`.
-    db: Arc<db::DB>,
     /// Point-in-time view of the lineage metadata, shared with the backend via copy-on-write.
     lineages: Arc<HashMap<LineageId, TreeMetadata>>,
-}
-
-impl Drop for SnapshotInner {
-    fn drop(&mut self) {
-        // SAFETY: Drop the snapshot before the Arc<DB> refcount is decremented.
-        unsafe {
-            ManuallyDrop::drop(&mut self.snapshot);
-        }
-    }
 }
 
 impl core::fmt::Debug for SnapshotInner {
@@ -93,19 +66,11 @@ pub struct PersistentBackendReader {
 
 impl PersistentBackendReader {
     pub(super) fn new(
-        db: Arc<db::DB>,
-        snapshot: db::Snapshot<'static>,
         kvdb_snapshot: RocksKVDBSnapshot,
         lineages: Arc<HashMap<LineageId, TreeMetadata>>,
     ) -> Self {
-        Self {
-            inner: Arc::new(SnapshotInner {
-                snapshot: ManuallyDrop::new(snapshot),
-                kvdb_snapshot,
-                db,
-                lineages,
-            }),
-        }
+        let inner = SnapshotInner { kvdb_snapshot, lineages };
+        Self { inner: Arc::new(inner) }
     }
 
     fn load_subtree(&self, tree_key: SubtreeKey) -> Result<Option<Subtree>> {
@@ -135,24 +100,6 @@ impl PersistentBackendReader {
             index: LeafIndex::from(key).position(),
         };
         self.load_leaf_raw(&key)
-    }
-
-    #[inline(always)]
-    fn subtree_cf(&self, index: NodeIndex) -> Result<&db::ColumnFamily> {
-        self.subtree_cf_depth(index.depth())
-    }
-
-    #[inline(always)]
-    fn subtree_cf_depth(&self, depth: u8) -> Result<&db::ColumnFamily> {
-        let cf_name = subtree_cf_name(depth);
-        self.cf(cf_name)
-    }
-
-    #[inline(always)]
-    fn cf(&self, name: &str) -> Result<&db::ColumnFamily> {
-        self.inner.db.cf_handle(name).ok_or_else(|| {
-            BackendError::internal_from_message(format!("Could not load column with name {name}"))
-        })
     }
 }
 
