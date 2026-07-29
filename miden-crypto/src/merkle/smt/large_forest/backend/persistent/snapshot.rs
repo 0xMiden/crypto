@@ -5,6 +5,11 @@ use std::collections::HashMap;
 use miden_serde_utils::{Deserializable, Serializable};
 use rocksdb as db;
 
+use crate::merkle::smt::large::storage::kvdb::*;
+
+#[rustfmt::skip]
+use crate::merkle::smt::large::storage::rocks_kvdb::RocksKVDBSnapshot;
+
 use super::{
     super::{BackendError, Result},
     iterator::PersistentBackendEntriesIterator,
@@ -43,6 +48,7 @@ pub(super) struct SnapshotInner {
     /// The `'static` lifetime is a sound lie: the real lifetime is tied to `db`. The `Drop` impl
     /// guarantees we drop this before `db`.
     snapshot: ManuallyDrop<db::Snapshot<'static>>,
+    kvdb_snapshot: RocksKVDBSnapshot,
     /// Keeps the database alive for at least as long as `snapshot`.
     db: Arc<db::DB>,
     /// Point-in-time view of the lineage metadata, shared with the backend via copy-on-write.
@@ -89,11 +95,13 @@ impl PersistentBackendReader {
     pub(super) fn new(
         db: Arc<db::DB>,
         snapshot: db::Snapshot<'static>,
+        kvdb_snapshot: RocksKVDBSnapshot,
         lineages: Arc<HashMap<LineageId, TreeMetadata>>,
     ) -> Self {
         Self {
             inner: Arc::new(SnapshotInner {
                 snapshot: ManuallyDrop::new(snapshot),
+                kvdb_snapshot,
                 db,
                 lineages,
             }),

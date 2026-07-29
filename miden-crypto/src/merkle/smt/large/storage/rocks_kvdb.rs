@@ -22,9 +22,9 @@ impl From<RocksError> for StorageError {
 
 #[derive(Debug, Clone)]
 pub struct RocksKVDB {
-    pub(super) db: Arc<DB>,
-    pub(super) durability_mode: PersistentSmtStorageDurabilityMode,
-    all_table_names: Vec<&'static str>,
+    pub db: Arc<DB>,
+    pub durability_mode: PersistentSmtStorageDurabilityMode,
+    pub all_table_names: Vec<&'static str>,
 }
 
 impl RocksKVDB {

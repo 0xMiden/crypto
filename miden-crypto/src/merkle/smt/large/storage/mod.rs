@@ -16,7 +16,7 @@ mod error;
 pub use error::{StorageError, StorageResult};
 
 #[cfg(feature = "smt-kvdb")]
-mod kvdb;
+pub mod kvdb;
 
 #[cfg(feature = "smt-kvdb")]
 pub mod config;
@@ -31,7 +31,7 @@ mod persistent;
 pub mod rocks_kvdb_batch_append;
 
 #[cfg(feature = "smt-kvdb-rocks")]
-mod rocks_kvdb;
+pub mod rocks_kvdb;
 #[cfg(feature = "smt-kvdb-rocks")]
 mod rocks_kvdb_schema;
 #[cfg(feature = "smt-kvdb-rocks")]
@@ -40,7 +40,7 @@ pub type PersistentSmtStorage = persistent::KVDBSmtStorage<rocks_kvdb_schema::Ro
 pub type PersistentSmtStorageSnapshot = persistent::KVDBSnapshotStorage<rocks_kvdb::RocksKVDB>;
 
 #[cfg(all(feature = "smt-kvdb-fjall", not(feature = "smt-kvdb-default")))]
-mod fjall_kvdb;
+pub mod fjall_kvdb;
 #[cfg(all(feature = "smt-kvdb-fjall", not(feature = "smt-kvdb-default")))]
 mod fjall_kvdb_schema;
 #[cfg(all(feature = "smt-kvdb-fjall", not(feature = "smt-kvdb-default")))]

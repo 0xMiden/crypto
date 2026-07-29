@@ -47,6 +47,11 @@ use rocksdb as db;
 use schema::*;
 pub use snapshot::PersistentBackendReader;
 
+use crate::merkle::smt::large::{storage::kvdb::*, storage_config::*};
+
+#[rustfmt::skip]
+use crate::merkle::smt::large::storage::rocks_kvdb::RocksKVDB;
+
 use super::{BackendError, Result};
 #[cfg(test)]
 use crate::merkle::smt::SmtUpdateBatch;
@@ -295,6 +300,7 @@ impl Backend for PersistentBackend {
 
     fn reader(&self) -> Result<Self::Reader> {
         let snapshot = self.db.snapshot();
+        let kvdb_snapshot = self.kvdb.snapshot()?;
         // SAFETY: `SnapshotInner` holds both the snapshot and `Arc<DB>`, and its `Drop` impl
         // drops the snapshot before decrementing the Arc. This guarantees the DB outlives the
         // snapshot, making the 'static transmute sound.
@@ -302,6 +308,7 @@ impl Backend for PersistentBackend {
         Ok(PersistentBackendReader::new(
             Arc::clone(&self.db),
             snapshot,
+            kvdb_snapshot,
             Arc::clone(&self.lineages),
         ))
     }
@@ -630,6 +637,8 @@ pub struct PersistentBackend {
     ///   keyed on the [`SubtreeKey`].
     db: Arc<DB>,
 
+    kvdb: RocksKVDB,
+
     /// An in-memory cache of the tree metadata enabling the more rapid servicing of certain kinds
     /// of queries.
     ///
@@ -657,11 +666,23 @@ impl PersistentBackend {
     ///   from disk.
     /// - [`BackendError::Internal`] if the backend cannot be started up properly.
     pub fn load(config: Config) -> Result<Self> {
+        let durability_mode = if config.sync_writes {
+            PersistentSmtStorageDurabilityMode::Sync
+        } else {
+            PersistentSmtStorageDurabilityMode::Relaxed
+        };
+
         let db = Arc::new(Self::build_db_with_options(&config)?);
         let lineages = Arc::new(Self::read_all_metadata(db.clone())?);
         let sync_writes = config.sync_writes;
 
-        Ok(Self { db, lineages, sync_writes })
+        let kvdb = RocksKVDB {
+            db: Arc::clone(&db),
+            durability_mode,
+            all_table_names: ALL_TABLE_NAMES.to_vec(),
+        };
+
+        Ok(Self { db, kvdb, lineages, sync_writes })
     }
 
     // Triggers copy-on-write: clones the shared lineages map only if other references exist.

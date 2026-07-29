@@ -259,7 +259,7 @@ mod tests;
 mod subtree;
 pub use subtree::{Subtree, SubtreeError};
 
-mod storage;
+pub mod storage;
 #[cfg(feature = "smt-kvdb")]
 pub use storage::config as storage_config;
 pub use storage::{
