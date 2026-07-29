@@ -120,9 +120,9 @@ impl PersistentBackendReader {
     }
 
     fn load_leaf_raw(&self, key: &LeafKey) -> Result<Option<SmtLeaf>> {
-        let col = self.cf(LEAVES_CF)?;
+        let table = self.inner.kvdb_snapshot.table(LEAVES_CF)?;
         let key_bytes = key.to_bytes();
-        let leaf_bytes = self.inner.snapshot.get_cf(col, key_bytes)?;
+        let leaf_bytes = self.inner.kvdb_snapshot.get(&table, &key_bytes)?;
         Ok(match leaf_bytes {
             Some(bytes) => Some(SmtLeaf::read_from_bytes_with_budget(&bytes, bytes.len())?),
             None => None,
