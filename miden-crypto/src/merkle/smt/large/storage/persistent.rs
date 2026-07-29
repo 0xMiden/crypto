@@ -24,11 +24,11 @@ use crate::{
 ///
 /// Implements the `SmtStorage` trait, providing durable storage for SMT components
 #[derive(Debug, Clone)]
-pub struct KVDBSmtStorage<TKVDB: KVDB> {
-    kvdb: TKVDB,
+pub struct KVDBSmtStorage<TKVDBFactory: KVDBFactory> {
+    kvdb: TKVDBFactory::TKVDB,
 }
 
-impl<TKVDB: KVDB> KVDBSmtStorage<TKVDB> {
+impl<TKVDBFactory: KVDBFactory> KVDBSmtStorage<TKVDBFactory> {
     /// Opens or creates a database at the specified `path` and configures it for SMT
     /// storage.
     ///
@@ -47,7 +47,7 @@ impl<TKVDB: KVDB> KVDBSmtStorage<TKVDB> {
     /// Returns `StorageError::Backend` if the database cannot be opened or configured,
     /// for example, due to path issues, permissions, or internal errors.
     pub fn open(config: PersistentSmtStorageConfig) -> StorageResult<Self> {
-        let kvdb = TKVDB::new(config)?;
+        let kvdb = TKVDBFactory::make(config)?;
         Ok(Self { kvdb })
     }
 
@@ -100,7 +100,7 @@ mod key_serializer {
     }
 }
 
-impl<TKVDB: KVDB> SmtStorageReader for KVDBSmtStorage<TKVDB> {
+impl<TKVDBFactory: KVDBFactory> SmtStorageReader for KVDBSmtStorage<TKVDBFactory> {
     /// Retrieves the total count of non-empty leaves from the `METADATA_CF` column family.
     /// Returns 0 if the count is not found.
     ///
@@ -398,8 +398,8 @@ impl<TKVDB: KVDB> SmtStorageReader for KVDBSmtStorage<TKVDB> {
     }
 }
 
-impl<TKVDB: KVDB> SmtStorage for KVDBSmtStorage<TKVDB> {
-    type Reader = KVDBSnapshotStorage<TKVDB>;
+impl<TKVDBFactory: KVDBFactory> SmtStorage for KVDBSmtStorage<TKVDBFactory> {
+    type Reader = KVDBSnapshotStorage<TKVDBFactory::TKVDB>;
 
     /// Returns a detached read-only snapshot of the current storage.
     fn reader(&self) -> StorageResult<Self::Reader> {
@@ -834,7 +834,7 @@ impl<TKVDB: KVDB> SmtStorage for KVDBSmtStorage<TKVDB> {
 ///
 /// # Panics
 /// - If the sync operation fails.
-impl<TKVDB: KVDB> Drop for KVDBSmtStorage<TKVDB> {
+impl<TKVDBFactory: KVDBFactory> Drop for KVDBSmtStorage<TKVDBFactory> {
     fn drop(&mut self) {
         if let Err(e) = self.sync() {
             panic!("failed to flush SMT DB on drop: {e}");

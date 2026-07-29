@@ -33,14 +33,18 @@ pub mod rocks_kvdb_batch_append;
 #[cfg(feature = "smt-kvdb-rocks")]
 mod rocks_kvdb;
 #[cfg(feature = "smt-kvdb-rocks")]
-pub type PersistentSmtStorage = persistent::KVDBSmtStorage<rocks_kvdb::RocksKVDB>;
+mod rocks_kvdb_schema;
+#[cfg(feature = "smt-kvdb-rocks")]
+pub type PersistentSmtStorage = persistent::KVDBSmtStorage<rocks_kvdb_schema::RocksKVDBSchema>;
 #[cfg(feature = "smt-kvdb-rocks")]
 pub type PersistentSmtStorageSnapshot = persistent::KVDBSnapshotStorage<rocks_kvdb::RocksKVDB>;
 
 #[cfg(all(feature = "smt-kvdb-fjall", not(feature = "smt-kvdb-default")))]
 mod fjall_kvdb;
 #[cfg(all(feature = "smt-kvdb-fjall", not(feature = "smt-kvdb-default")))]
-pub type PersistentSmtStorage = persistent::KVDBSmtStorage<fjall_kvdb::FjallKVDB>;
+mod fjall_kvdb_schema;
+#[cfg(all(feature = "smt-kvdb-fjall", not(feature = "smt-kvdb-default")))]
+pub type PersistentSmtStorage = persistent::KVDBSmtStorage<fjall_kvdb_schema::FjallKVDBSchema>;
 #[cfg(all(feature = "smt-kvdb-fjall", not(feature = "smt-kvdb-default")))]
 pub type PersistentSmtStorageSnapshot = persistent::KVDBSnapshotStorage<fjall_kvdb::FjallKVDB>;
 

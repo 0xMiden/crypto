@@ -59,7 +59,16 @@ pub trait KVDB: KVDBReader + 'static {
     where
         Self: 'a;
 
-    fn new(config: PersistentSmtStorageConfig) -> StorageResult<Self>
+    type SchemaConfig;
+    type SchemaConfigInput;
+
+    fn new(
+        config: PersistentSmtStorageConfig,
+        schema_factory: impl FnOnce(
+            PersistentSmtStorageConfig,
+            Self::SchemaConfigInput,
+        ) -> StorageResult<Self::SchemaConfig>,
+    ) -> StorageResult<Self>
     where
         Self: Sized;
 
@@ -94,4 +103,20 @@ pub trait KVDBBatch {
     /// Appends another batch of operations to this.
     #[allow(dead_code)]
     fn append(self, other: &Self) -> Self;
+}
+
+pub trait KVDBSchemaFactory: Send + Sync + Debug + 'static {
+    type SchemaConfig;
+    type SchemaConfigInput;
+
+    fn schema(
+        config: PersistentSmtStorageConfig,
+        input: Self::SchemaConfigInput,
+    ) -> StorageResult<Self::SchemaConfig>;
+}
+
+pub trait KVDBFactory: Send + Sync + Debug + 'static {
+    type TKVDB: KVDB;
+
+    fn make(config: PersistentSmtStorageConfig) -> StorageResult<Self::TKVDB>;
 }
