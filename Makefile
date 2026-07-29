@@ -111,6 +111,10 @@ test-large-smt: ## Run large SMT unit tests and RocksDB integration tests
 test-large-smt-no-forest: ## Run large SMT unit and integration tests without large_forest tests
 	cargo nextest run --success-output immediate --profile large-smt-no-forest --cargo-profile test-release --features rocksdb
 
+.PHONY: test-large-smt-forest
+test-large-smt-forest: ## Run large_forest SMT unit tests
+	cargo nextest run --success-output immediate --profile large-smt-forest --cargo-profile test-release --features persistent-forest
+
 .PHONY: test-large-smt-fjall
 test-large-smt-fjall: ## Run large SMT unit and integration tests with Fjall database backend
 	cargo nextest run --success-output immediate --profile large-smt-no-forest --cargo-profile test-release --package miden-crypto --features smt-kvdb-fjall
