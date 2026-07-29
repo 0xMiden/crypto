@@ -25,6 +25,7 @@ impl From<RocksError> for StorageError {
 pub struct RocksKVDB {
     pub(super) db: Arc<DB>,
     pub(super) durability_mode: PersistentSmtStorageDurabilityMode,
+    all_table_names: Vec<&'static str>,
 }
 
 impl RocksKVDB {
@@ -179,6 +180,7 @@ impl KVDB for RocksKVDB {
         Ok(Self {
             db: Arc::new(db),
             durability_mode: config.durability_mode,
+            all_table_names: ALL_TABLE_NAMES.to_vec(),
         })
     }
 
@@ -206,17 +208,7 @@ impl KVDB for RocksKVDB {
         let mut opts = FlushOptions::default();
         opts.set_wait(true);
 
-        for name in [
-            LEAVES_CF,
-            SUBTREE_16_CF,
-            SUBTREE_24_CF,
-            SUBTREE_32_CF,
-            SUBTREE_40_CF,
-            SUBTREE_48_CF,
-            SUBTREE_56_CF,
-            METADATA_CF,
-            IN_MEM_DEPTH_CF,
-        ] {
+        for name in &self.all_table_names {
             let cf = self.db.cf_handle(name).ok_or_else(|| {
                 StorageError::Unsupported(format!("unknown column family `{name}`"))
             })?;

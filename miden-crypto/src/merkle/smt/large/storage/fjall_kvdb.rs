@@ -39,6 +39,8 @@ impl KVDB for FjallKVDB {
             .fsync_on_create(false)
             .open()?;
 
+        _ = ALL_TABLE_NAMES;
+
         const SUBTREE_TABLES: &[&str] = &[
             SUBTREE_16_CF,
             SUBTREE_24_CF,

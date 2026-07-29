@@ -26,3 +26,15 @@ pub(super) const LEAF_COUNT_KEY: &[u8] = b"leaf_count";
 
 /// Key in `METADATA_CF` for the total count of key-value entries.
 pub(super) const ENTRY_COUNT_KEY: &[u8] = b"entry_count";
+
+pub(super) const ALL_TABLE_NAMES: &[&str] = &[
+    LEAVES_CF,
+    SUBTREE_16_CF,
+    SUBTREE_24_CF,
+    SUBTREE_32_CF,
+    SUBTREE_40_CF,
+    SUBTREE_48_CF,
+    SUBTREE_56_CF,
+    METADATA_CF,
+    IN_MEM_DEPTH_CF,
+];
