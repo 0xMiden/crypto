@@ -43,16 +43,12 @@ use miden_serde_utils::{Deserializable, DeserializationError, Serializable};
 use num::Integer;
 use rayon::prelude::*;
 use schema::*;
-pub use snapshot::PersistentBackendReader;
+use snapshot::PersistentBackendReader;
 
 use crate::merkle::smt::large::{storage::kvdb::*, storage_config::*};
 
 #[rustfmt::skip]
-use crate::merkle::smt::large::storage::rocks_kvdb::RocksKVDB;
-use crate::merkle::smt::large::storage::rocks_kvdb::RocksKVDBBatch;
-
-#[rustfmt::skip]
-mod schema_rocks_kvdb;
+pub mod schema_rocks_kvdb;
 
 use super::{BackendError, Result};
 #[cfg(test)]
@@ -89,7 +85,7 @@ use crate::{
 ///
 /// This is the persistent backend's concrete [`Backend::PreparedMutations`] type. It stores
 /// storage-level updates and the resulting metadata computed during the first phase of a forest
-/// update. Applying it builds and commits a RocksDB [`WriteBatch`] without recomputing the Merkle
+/// update. Applying it builds and commits a changes batch without recomputing the Merkle
 /// update batches.
 ///
 /// The fields are private because callers should treat prepared mutation data as opaque and pass it
@@ -123,7 +119,7 @@ const CHUNKING_UNIT: usize = 100;
 // BACKEND READER TRAIT
 // ================================================================================================
 
-impl BackendReader for PersistentBackend {
+impl<TKVDBFactory: KVDBFactory> BackendReader for KVDBPersistentBackend<TKVDBFactory> {
     /// Returns an opening for the specified `key` in the SMT with the specified `lineage`.
     ///
     /// # Errors
@@ -258,8 +254,8 @@ impl BackendReader for PersistentBackend {
 // BACKEND TRAIT
 // ================================================================================================
 
-impl Backend for PersistentBackend {
-    type Reader = PersistentBackendReader;
+impl<TKVDBFactory: KVDBFactory> Backend for KVDBPersistentBackend<TKVDBFactory> {
+    type Reader = PersistentBackendReader<TKVDBFactory::TKVDB>;
     type PreparedMutations = PersistentPreparedMutations;
 
     fn reader(&self) -> Result<Self::Reader> {
@@ -407,7 +403,10 @@ impl Backend for PersistentBackend {
         let (batches, (applied_entries, metadata_updates)): (Vec<_>, (Vec<_>, Vec<_>)) =
             lineage_data.into_iter().unzip();
 
-        fn merge_batches<'a>(l: RocksKVDBBatch<'a>, r: RocksKVDBBatch<'a>) -> RocksKVDBBatch<'a> {
+        fn merge_batches<'a, TKVDB: KVDB>(
+            l: <TKVDB as KVDB>::Batch<'a>,
+            r: <TKVDB as KVDB>::Batch<'a>,
+        ) -> <TKVDB as KVDB>::Batch<'a> {
             l.append(&r)
         }
 
@@ -416,10 +415,12 @@ impl Backend for PersistentBackend {
         let final_batch = if lineage_count > MIN_LINEAGES_IN_BATCH_TO_PARALLELIZE {
             batches
                 .into_par_iter()
-                .fold(|| self.kvdb.batch(), merge_batches)
-                .reduce(|| self.kvdb.batch(), merge_batches)
+                .fold(|| self.kvdb.batch(), merge_batches::<TKVDBFactory::TKVDB>)
+                .reduce(|| self.kvdb.batch(), merge_batches::<TKVDBFactory::TKVDB>)
         } else {
-            batches.into_iter().fold(self.kvdb.batch(), merge_batches)
+            batches
+                .into_iter()
+                .fold(self.kvdb.batch(), merge_batches::<TKVDBFactory::TKVDB>)
         };
 
         // We first write the full atomic update to disk. If it errors, we bail.
@@ -434,7 +435,7 @@ impl Backend for PersistentBackend {
 
 // These are the implementations of helper methods used by the backend tests.
 #[cfg(test)]
-impl PersistentBackend {
+impl<TKVDBFactory: KVDBFactory> KVDBPersistentBackend<TKVDBFactory> {
     /// Adds the provided `lineage` to the forest with the provided `version` and sets the
     /// associated tree to have the value created by applying `updates` to the empty tree, returning
     /// the root of this new tree.
@@ -580,12 +581,12 @@ impl PersistentBackend {
 /// The persistent backend for the SMT forest, providing durable storage for the latest tree in each
 /// lineage in the forest.
 #[derive(Debug)]
-pub struct PersistentBackend {
+pub struct KVDBPersistentBackend<TKVDBFactory: KVDBFactory> {
     /// The underlying database.
     ///
     /// # Layout
     ///
-    /// The data on each tree is stored across a series of RocksDB column families, along with
+    /// The data on each tree is stored across a series of database tables, along with
     /// additional metadata. The layout is fixed (for the moment), and has the following column
     /// families.
     ///
@@ -595,7 +596,7 @@ pub struct PersistentBackend {
     ///   speed up common queries.
     /// - `SUBTREE_XX_CF`: Stores the [`Subtree`]s with their root at level `XX` in the backend,
     ///   keyed on the [`SubtreeKey`].
-    kvdb: RocksKVDB,
+    kvdb: TKVDBFactory::TKVDB,
 
     /// An in-memory cache of the tree metadata enabling the more rapid servicing of certain kinds
     /// of queries.
@@ -608,7 +609,7 @@ pub struct PersistentBackend {
     lineages: Arc<HashMap<LineageId, TreeMetadata>>,
 }
 
-impl PersistentBackend {
+impl<TKVDBFactory: KVDBFactory> KVDBPersistentBackend<TKVDBFactory> {
     /// Constructs an instance of the persistent backend, either opening or creating the data store
     /// at the location specified in the `config`.
     ///
@@ -637,7 +638,7 @@ impl PersistentBackend {
             .with_tuning_options(storage_tuning_opts)
             .with_durability_mode(durability_mode);
 
-        let kvdb = schema_rocks_kvdb::RocksKVDBSchema::make(storage_config)?;
+        let kvdb = TKVDBFactory::make(storage_config)?;
 
         let lineages = Arc::new(Self::read_all_metadata(&kvdb)?);
 
@@ -864,10 +865,10 @@ impl PersistentBackend {
     /// - [`BackendError::Internal`] if the backend cannot be written to.
     fn apply_updates_to_lineage<'a>(
         &self,
-        mut batch: RocksKVDBBatch<'a>,
+        mut batch: <TKVDBFactory::TKVDB as KVDB>::Batch<'a>,
         lineage: LineageId,
         updates: StorageUpdates,
-    ) -> Result<RocksKVDBBatch<'a>> {
+    ) -> Result<<TKVDBFactory::TKVDB as KVDB>::Batch<'a>> {
         let leaves_cf = self.kvdb.table(LEAVES_CF)?;
 
         let StorageUpdateParts { leaf_updates, subtree_updates, .. } = updates.into_parts();
@@ -1322,10 +1323,10 @@ impl PersistentBackend {
     ///   staging.
     fn write_metadata<'a>(
         &self,
-        mut batch: RocksKVDBBatch<'a>,
+        mut batch: <TKVDBFactory::TKVDB as KVDB>::Batch<'a>,
         lineage: LineageId,
         tree_metadata: &TreeMetadata,
-    ) -> Result<RocksKVDBBatch<'a>> {
+    ) -> Result<<TKVDBFactory::TKVDB as KVDB>::Batch<'a>> {
         let metadata = self.kvdb.table(METADATA_CF)?;
         let metadata_key = lineage.to_bytes();
         let metadata_value = tree_metadata.to_bytes();
@@ -1340,7 +1341,7 @@ impl PersistentBackend {
     ///
     /// - [`BackendError::CorruptedData`] if data corruption is discovered.
     /// - [`BackendError::Internal`] if the metadata cannot be read from disk.
-    fn read_all_metadata(db: &RocksKVDB) -> Result<HashMap<LineageId, TreeMetadata>> {
+    fn read_all_metadata(db: &TKVDBFactory::TKVDB) -> Result<HashMap<LineageId, TreeMetadata>> {
         let table = db
             .table(METADATA_CF)
             .map_err(|_| BackendError::CorruptedData(format!("{METADATA_CF} column not found")))?;
@@ -1363,7 +1364,7 @@ impl PersistentBackend {
 
 /// We implement drop in order to force a sync to disk as the program shuts down, ensuring that all
 /// data is correctly persisted.
-impl Drop for PersistentBackend {
+impl<TKVDBFactory: KVDBFactory> Drop for KVDBPersistentBackend<TKVDBFactory> {
     /// Forces the database to be synced to disk on drop.
     ///
     /// # Panics

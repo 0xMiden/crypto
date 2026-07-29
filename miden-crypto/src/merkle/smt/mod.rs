@@ -43,10 +43,7 @@ pub use large_forest::{
     VersionId,
 };
 #[cfg(feature = "persistent-forest")]
-pub use large_forest::{
-    PersistentBackend as ForestPersistentBackend, PersistentBackendConfig,
-    PersistentBackendReader as ForestPersistentBackendReader,
-};
+pub use large_forest::{PersistentBackend as ForestPersistentBackend, PersistentBackendConfig};
 
 mod simple;
 pub use simple::{SimpleSmt, SimpleSmtProof};

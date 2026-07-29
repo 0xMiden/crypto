@@ -3,11 +3,6 @@ use std::collections::HashMap;
 
 use miden_serde_utils::{Deserializable, Serializable};
 
-use crate::merkle::smt::large::storage::kvdb::*;
-
-#[rustfmt::skip]
-use crate::merkle::smt::large::storage::rocks_kvdb::RocksKVDBSnapshot;
-
 use super::{
     super::{BackendError, Result},
     iterator::PersistentBackendEntriesIterator,
@@ -23,6 +18,7 @@ use crate::{
         smt::{
             BackendReader, InnerNode, LeafIndex, LineageId, SMT_DEPTH, SmtLeaf, SmtProof, Subtree,
             TreeEntry, TreeWithRoot, VersionId, full::concurrent::SUBTREE_DEPTH,
+            large::storage::kvdb::*,
         },
     },
 };
@@ -31,13 +27,13 @@ use crate::{
 // ================================================================================================
 
 /// Inner state shared by all clones of a [`PersistentBackendReader`].
-pub(super) struct SnapshotInner {
-    kvdb_snapshot: RocksKVDBSnapshot,
+pub(super) struct SnapshotInner<TKVDB: KVDB> {
+    kvdb_snapshot: TKVDB::Snapshot,
     /// Point-in-time view of the lineage metadata, shared with the backend via copy-on-write.
     lineages: Arc<HashMap<LineageId, TreeMetadata>>,
 }
 
-impl core::fmt::Debug for SnapshotInner {
+impl<TKVDB: KVDB> core::fmt::Debug for SnapshotInner<TKVDB> {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         f.debug_struct("SnapshotInner").finish_non_exhaustive()
     }
@@ -54,19 +50,18 @@ impl core::fmt::Debug for SnapshotInner {
 /// [`PersistentBackend`](super::PersistentBackend) to provide read-only access to a consistent
 /// snapshot of the backend state without exposing any mutation capabilities.
 ///
-/// All reads go through a RocksDB snapshot, so the view is frozen at the instant
-/// [`Backend::reader`](crate::merkle::smt::Backend::reader) was called; concurrent writes to the
+/// All reads go through a DB snapshot, so the view is frozen; concurrent writes to the
 /// underlying database are invisible to this reader.
 ///
 /// Cloning is O(1): both the snapshot and the lineage metadata are owned by the inner `Arc`.
 #[derive(Clone, Debug)]
-pub struct PersistentBackendReader {
-    inner: Arc<SnapshotInner>,
+pub struct PersistentBackendReader<TKVDB: KVDB> {
+    inner: Arc<SnapshotInner<TKVDB>>,
 }
 
-impl PersistentBackendReader {
+impl<TKVDB: KVDB> PersistentBackendReader<TKVDB> {
     pub(super) fn new(
-        kvdb_snapshot: RocksKVDBSnapshot,
+        kvdb_snapshot: TKVDB::Snapshot,
         lineages: Arc<HashMap<LineageId, TreeMetadata>>,
     ) -> Self {
         let inner = SnapshotInner { kvdb_snapshot, lineages };
@@ -103,7 +98,7 @@ impl PersistentBackendReader {
     }
 }
 
-impl BackendReader for PersistentBackendReader {
+impl<TKVDB: KVDB> BackendReader for PersistentBackendReader<TKVDB> {
     fn open(&self, lineage: LineageId, key: Word) -> Result<SmtProof> {
         open_proof(
             &self.inner.lineages,

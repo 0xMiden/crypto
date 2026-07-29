@@ -319,10 +319,7 @@ pub use backend::{
     memory::{InMemoryBackend, InMemoryBackendSnapshot},
 };
 #[cfg(feature = "persistent-forest")]
-pub use backend::{
-    persistent::config::Config as PersistentBackendConfig,
-    persistent::{PersistentBackend, PersistentBackendReader},
-};
+pub use backend::{PersistentBackend, PersistentBackendConfig};
 pub use config::{Config, DEFAULT_MAX_HISTORY_VERSIONS, MIN_HISTORY_VERSIONS};
 pub use error::{LargeSmtForestError, Result};
 pub use operation::{SmtForestOperation, SmtForestUpdateBatch, SmtUpdateBatch};

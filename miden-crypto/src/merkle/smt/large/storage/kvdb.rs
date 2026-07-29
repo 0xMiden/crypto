@@ -88,7 +88,7 @@ pub trait KVDB: KVDBReader + 'static {
 }
 
 /// Atomic batch of put/delete operations spanning one or more tables.
-pub trait KVDBBatch {
+pub trait KVDBBatch: Send + Debug {
     type Table;
 
     /// Stages a put.

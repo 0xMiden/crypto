@@ -3,7 +3,12 @@
 
 pub mod memory;
 #[cfg(feature = "persistent-forest")]
-pub mod persistent;
+mod persistent;
+#[cfg(feature = "persistent-forest")]
+pub use persistent::config::Config as PersistentBackendConfig;
+#[cfg(feature = "persistent-forest")]
+pub type PersistentBackend =
+    persistent::KVDBPersistentBackend<persistent::schema_rocks_kvdb::RocksKVDBSchema>;
 
 use alloc::{boxed::Box, string::String, vec::Vec};
 use core::fmt::Debug;

@@ -11,7 +11,7 @@ use assert_matches::assert_matches;
 use itertools::Itertools;
 use tempfile::{TempDir, tempdir};
 
-use super::{PersistentBackend, Result};
+use super::super::{PersistentBackend, Result};
 use crate::{
     EMPTY_WORD, Word,
     merkle::smt::{
