@@ -215,14 +215,8 @@ impl BackendReader for PersistentBackendReader {
             return Err(BackendError::UnknownLineage(lineage));
         }
         let lineage_bytes = lineage.to_bytes();
-        let cf = self.cf(LEAVES_CF)?;
-        let mut read_opts = db::ReadOptions::default();
-        read_opts.set_prefix_same_as_start(true);
-        let pfx_iterator = self.inner.snapshot.iterator_cf_opt(
-            cf,
-            read_opts,
-            db::IteratorMode::From(&lineage_bytes, db::Direction::Forward),
-        );
+        let table = self.inner.kvdb_snapshot.table(LEAVES_CF)?;
+        let pfx_iterator = self.inner.kvdb_snapshot.iter_prefix(&table, &lineage_bytes);
         Ok(PersistentBackendEntriesIterator::new(lineage, pfx_iterator))
     }
 }

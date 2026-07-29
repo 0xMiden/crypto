@@ -250,13 +250,14 @@ impl BackendReader for PersistentBackend {
             return Err(BackendError::UnknownLineage(lineage));
         }
 
+        let table = self.kvdb.table(LEAVES_CF)?;
         let lineage_bytes = lineage.to_bytes();
 
         // In order to improve iteration performance significantly, we iterate with a prefix. As
         // leaves are keyed on `LeafKey`, which begins with the bytes of the lineage, we can use the
         // lineage as our prefix. That means that the iterator should only yield values whose key
         // begins with the prefix with a high likelihood.
-        let pfx_iterator = self.db.prefix_iterator_cf(self.cf(LEAVES_CF)?, lineage_bytes);
+        let pfx_iterator = self.kvdb.iter_prefix(&table, &lineage_bytes);
 
         // Data ownership concerns mean we cannot use this iterator directly even if we could change
         // its type, so we delegate to our custom entries iterator impl.
