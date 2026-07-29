@@ -132,6 +132,12 @@ impl KVDBBatch for FjallKVDBBatch<'_> {
     fn commit(self) -> StorageResult<()> {
         self.batch.commit().map_err(Into::into)
     }
+
+    fn append(self, other: &Self) -> Self {
+        let mut batch = self.batch;
+        batch.append(&other.batch);
+        Self { batch, _db: self._db }
+    }
 }
 
 impl KVDBReader for FjallKVDB {

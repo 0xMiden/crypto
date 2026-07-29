@@ -82,4 +82,8 @@ pub trait KVDBBatch {
 
     /// Atomically applies all staged operations.
     fn commit(self) -> StorageResult<()>;
+
+    /// Appends another batch of operations to this.
+    #[allow(dead_code)]
+    fn append(self, other: &Self) -> Self;
 }

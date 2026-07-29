@@ -28,7 +28,6 @@
 //! characteristics.
 
 pub mod config;
-mod internal;
 mod iterator;
 mod keys;
 mod property_tests;
@@ -65,7 +64,6 @@ use crate::{
             large_forest::{
                 backend::persistent::{
                     config::Config,
-                    internal::merge_batches,
                     iterator::PersistentBackendEntriesIterator,
                     keys::{LeafKey, SubtreeKey},
                     tree_metadata::TreeMetadata,
@@ -467,6 +465,8 @@ impl Backend for PersistentBackend {
             .collect::<Result<Vec<_>>>()?;
         let (batches, (applied_entries, metadata_updates)): (Vec<_>, (Vec<_>, Vec<_>)) =
             lineage_data.into_iter().unzip();
+
+        let merge_batches = crate::merkle::smt::large::rocks_kvdb_batch_append::merge_batches;
 
         // We construct our final WriteBatch in parallel if we have enough of them, otherwise we
         // just do it in serial.

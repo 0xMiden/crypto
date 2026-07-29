@@ -269,6 +269,10 @@ pub use storage::{
 #[cfg(feature = "smt-kvdb")]
 pub use storage::{PersistentSmtStorage, PersistentSmtStorageSnapshot};
 
+#[rustfmt::skip]
+#[cfg(feature = "persistent-forest")]
+pub use storage::rocks_kvdb_batch_append as rocks_kvdb_batch_append;
+
 mod iter;
 pub use iter::LargeSmtInnerNodeIterator;
 

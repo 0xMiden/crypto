@@ -835,7 +835,7 @@ checksum = "5baebc0774151f905a1a2cc41989300b1e6fbb29aff0ceffa1064fdd3088d582"
 [[package]]
 name = "fjall"
 version = "3.1.8"
-source = "git+https://github.com/battlmonstr/miden-crypto-fjall?rev=ec5a11e#ec5a11e8c93d94d129e7dd163c614810544d8f65"
+source = "git+https://github.com/battlmonstr/miden-crypto-fjall?rev=2c28486#2c28486c0c30b9a19f7912fdd13de6802eb63d65"
 dependencies = [
  "byteorder-lite",
  "byteview",

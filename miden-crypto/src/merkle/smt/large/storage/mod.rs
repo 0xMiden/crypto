@@ -28,6 +28,9 @@ mod schema;
 mod persistent;
 
 #[cfg(feature = "smt-kvdb-rocks")]
+pub mod rocks_kvdb_batch_append;
+
+#[cfg(feature = "smt-kvdb-rocks")]
 mod rocks_kvdb;
 #[cfg(feature = "smt-kvdb-rocks")]
 pub type PersistentSmtStorage = persistent::KVDBSmtStorage<rocks_kvdb::RocksKVDB>;

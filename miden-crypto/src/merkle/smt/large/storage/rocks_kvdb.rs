@@ -285,6 +285,14 @@ impl KVDBBatch for RocksKVDBBatch<'_> {
     fn commit(self) -> Result<(), StorageError> {
         self.db.write_opt(self.batch, &self.write_opts).map_err(Into::into)
     }
+
+    fn append(self, other: &Self) -> Self {
+        Self {
+            batch: super::rocks_kvdb_batch_append::merge_batches(self.batch, &other.batch),
+            write_opts: self.write_opts,
+            db: self.db,
+        }
+    }
 }
 
 impl KVDBReader for RocksKVDB {
