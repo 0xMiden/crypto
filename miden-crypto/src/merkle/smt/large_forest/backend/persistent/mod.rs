@@ -1377,22 +1377,7 @@ impl PersistentBackend {
     ///
     /// - [`BackendError::Internal`] if the flush to disk fails for any reason.
     fn sync(&self) -> Result<()> {
-        let mut flush_opts = db::FlushOptions::default();
-        flush_opts.set_wait(true);
-
-        // Flush all the subtree column families.
-        for name in SUBTREE_CFS {
-            self.db.flush_cf_opt(self.cf(name)?, &flush_opts)?;
-        }
-
-        // Flush the leaves and metadata column families.
-        for name in [LEAVES_CF, METADATA_CF] {
-            self.db.flush_cf_opt(self.cf(name)?, &flush_opts)?;
-        }
-
-        // Flush the WAL.
-        self.db.flush_wal(true)?;
-
+        self.kvdb.sync()?;
         Ok(())
     }
 
