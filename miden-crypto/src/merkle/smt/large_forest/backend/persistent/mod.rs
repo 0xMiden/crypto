@@ -1300,9 +1300,9 @@ impl PersistentBackend {
     /// - [`BackendError::Internal`] if the database cannot be successfully queried.
     #[inline(always)]
     fn load_leaf_raw(&self, key: &LeafKey) -> Result<Option<SmtLeaf>> {
-        let col = self.cf(LEAVES_CF)?;
+        let table = self.kvdb.table(LEAVES_CF)?;
         let key_bytes = key.to_bytes();
-        let leaf_bytes = self.db.get_cf(col, key_bytes)?;
+        let leaf_bytes = self.kvdb.get(&table, &key_bytes)?;
         let leaf = match leaf_bytes {
             Some(bytes) => Some(SmtLeaf::read_from_bytes_with_budget(&bytes, bytes.len())?),
             None => None,
