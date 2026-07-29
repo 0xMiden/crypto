@@ -109,9 +109,9 @@ impl PersistentBackendReader {
     }
 
     fn load_subtree(&self, tree_key: SubtreeKey) -> Result<Option<Subtree>> {
-        let cf = self.subtree_cf(tree_key.index)?;
+        let table = self.inner.kvdb_snapshot.table(subtree_cf_name(tree_key.index.depth()))?;
         let key_bytes = tree_key.to_bytes();
-        let result = match self.inner.snapshot.get_cf(cf, key_bytes) {
+        let result = match self.inner.kvdb_snapshot.get(&table, &key_bytes) {
             Ok(Some(bytes)) => Some(Subtree::from_vec(tree_key.index, &bytes)?),
             Ok(None) => None,
             Err(e) => return Err(e.into()),
