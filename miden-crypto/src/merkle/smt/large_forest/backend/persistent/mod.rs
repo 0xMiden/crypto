@@ -1277,18 +1277,16 @@ impl PersistentBackend {
         &self,
         key_bytes: impl Iterator<Item = &'b Vec<u8>>,
     ) -> Result<Vec<Option<SmtLeaf>>> {
-        let col = self.cf(LEAVES_CF)?;
-        let leaves = self.db.multi_get_cf(key_bytes.map(|k| (col, k.as_slice())));
+        let table = self.kvdb.table(LEAVES_CF)?;
+        let keys: Vec<&[u8]> = key_bytes.map(Vec::as_slice).collect();
+        let leaves = self.kvdb.multi_get(&table, &keys)?;
 
         leaves
             .into_par_iter()
             .with_min_len(CHUNKING_UNIT)
             .map(|result| match result {
-                Ok(Some(bytes)) => {
-                    Ok(Some(SmtLeaf::read_from_bytes_with_budget(&bytes, bytes.len())?))
-                },
-                Ok(None) => Ok(None),
-                Err(e) => Err(e.into()),
+                Some(bytes) => Ok(Some(SmtLeaf::read_from_bytes_with_budget(&bytes, bytes.len())?)),
+                None => Ok(None),
             })
             .collect()
     }
