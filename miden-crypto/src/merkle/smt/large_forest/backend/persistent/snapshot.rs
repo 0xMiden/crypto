@@ -7,9 +7,9 @@ use rocksdb as db;
 
 use super::{
     super::{BackendError, Result},
-    LEAVES_CF,
     iterator::PersistentBackendEntriesIterator,
     keys::{LeafKey, SubtreeKey},
+    schema::*,
     subtree_cf_name,
     tree_metadata::TreeMetadata,
 };

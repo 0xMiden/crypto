@@ -31,6 +31,7 @@ pub mod config;
 mod iterator;
 mod keys;
 mod property_tests;
+mod schema;
 mod snapshot;
 mod tests;
 mod tree_metadata;
@@ -43,6 +44,7 @@ use miden_serde_utils::{Deserializable, DeserializationError, Serializable};
 use num::Integer;
 use rayon::prelude::*;
 use rocksdb as db;
+use schema::*;
 pub use snapshot::PersistentBackendReader;
 
 use super::{BackendError, Result};
@@ -112,32 +114,6 @@ struct PersistentPreparedLineageMutation {
     storage_updates: StorageUpdates,
     kind: LineageMutationKind,
 }
-
-// CONSTANTS / COLUMN FAMILY NAMES
-// ================================================================================================
-
-const LEAVES_CF: &str = "v1/leaves";
-const METADATA_CF: &str = "v1/metadata";
-
-const SUBTREE_00_CF: &str = "v1/st00";
-const SUBTREE_08_CF: &str = "v1/st08";
-const SUBTREE_16_CF: &str = "v1/st16";
-const SUBTREE_24_CF: &str = "v1/st24";
-const SUBTREE_32_CF: &str = "v1/st32";
-const SUBTREE_40_CF: &str = "v1/st40";
-const SUBTREE_48_CF: &str = "v1/st48";
-const SUBTREE_56_CF: &str = "v1/st56";
-
-const SUBTREE_CFS: [&str; 8] = [
-    SUBTREE_00_CF,
-    SUBTREE_08_CF,
-    SUBTREE_16_CF,
-    SUBTREE_24_CF,
-    SUBTREE_32_CF,
-    SUBTREE_40_CF,
-    SUBTREE_48_CF,
-    SUBTREE_56_CF,
-];
 
 // CONSTANTS / DATABASE CONFIGURATION
 // ================================================================================================
