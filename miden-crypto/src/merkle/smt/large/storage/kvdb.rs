@@ -43,6 +43,14 @@ pub trait KVDBReader: Send + Sync + Debug + 'static {
         &'a self,
         table: Self::Table,
     ) -> impl Iterator<Item = StorageResult<(Self::Bytes<'a>, Self::Bytes<'a>)>> + 'a;
+
+    /// Forward prefix scan over a table.
+    /// Yields only key-value pairs whose key starts with `prefix`.
+    fn iter_prefix<'a>(
+        &'a self,
+        table: &Self::Table,
+        prefix: &[u8],
+    ) -> impl Iterator<Item = StorageResult<(Self::Bytes<'a>, Self::Bytes<'a>)>> + use<'a, Self>;
 }
 
 /// Read + write access to a key-value database.

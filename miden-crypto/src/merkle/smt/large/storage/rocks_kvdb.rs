@@ -342,6 +342,23 @@ impl KVDBReader for RocksKVDB {
                 .map_err(Into::into)
         })
     }
+
+    fn iter_prefix<'a>(
+        &'a self,
+        table: &RocksTable,
+        prefix: &[u8],
+    ) -> impl Iterator<Item = StorageResult<(RocksBytes<'a>, RocksBytes<'a>)>> + use<'a> {
+        let cf = table.cf();
+        let mut read_opts = ReadOptions::default();
+        read_opts.set_prefix_same_as_start(true);
+        self.db
+            .iterator_cf_opt(cf, read_opts, IteratorMode::From(prefix, Direction::Forward))
+            .map(|result| {
+                result
+                    .map(|(k, v)| (RocksBytes::Owned(k), RocksBytes::Owned(v)))
+                    .map_err(Into::into)
+            })
+    }
 }
 
 /// RocksTable holds a column family handle.
@@ -514,6 +531,24 @@ impl KVDBReader for RocksKVDBSnapshot {
         self.inner
             .snapshot
             .iterator_cf_opt(cf, read_opts, IteratorMode::Start)
+            .map(|result| {
+                result
+                    .map(|(k, v)| (RocksBytes::Owned(k), RocksBytes::Owned(v)))
+                    .map_err(Into::into)
+            })
+    }
+
+    fn iter_prefix<'a>(
+        &'a self,
+        table: &RocksTable,
+        prefix: &[u8],
+    ) -> impl Iterator<Item = StorageResult<(RocksBytes<'a>, RocksBytes<'a>)>> + use<'a> {
+        let cf = table.cf();
+        let mut read_opts = ReadOptions::default();
+        read_opts.set_prefix_same_as_start(true);
+        self.inner
+            .snapshot
+            .iterator_cf_opt(cf, read_opts, IteratorMode::From(prefix, Direction::Forward))
             .map(|result| {
                 result
                     .map(|(k, v)| (RocksBytes::Owned(k), RocksBytes::Owned(v)))

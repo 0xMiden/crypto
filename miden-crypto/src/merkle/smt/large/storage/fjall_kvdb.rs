@@ -164,6 +164,17 @@ impl KVDBReader for FjallKVDB {
     ) -> impl Iterator<Item = StorageResult<(fjall::UserValue, fjall::UserValue)>> + 'a {
         table.keyspace.iter().map(|guard| guard.into_inner().map_err(Into::into))
     }
+
+    fn iter_prefix<'a>(
+        &'a self,
+        table: &FjallTable,
+        prefix: &[u8],
+    ) -> impl Iterator<Item = StorageResult<(fjall::UserValue, fjall::UserValue)>> + use<'a> {
+        table
+            .keyspace
+            .prefix(prefix)
+            .map(|guard| guard.into_inner().map_err(Into::into))
+    }
 }
 
 /// FjallTable holds a `Keyspace` handle.
@@ -216,6 +227,16 @@ impl KVDBReader for FjallKVDBSnapshot {
     ) -> impl Iterator<Item = StorageResult<(fjall::UserValue, fjall::UserValue)>> + 'a {
         self.snapshot
             .iter(&table.keyspace)
+            .map(|guard| guard.into_inner().map_err(Into::into))
+    }
+
+    fn iter_prefix<'a>(
+        &'a self,
+        table: &FjallTable,
+        prefix: &[u8],
+    ) -> impl Iterator<Item = StorageResult<(fjall::UserValue, fjall::UserValue)>> + use<'a> {
+        self.snapshot
+            .prefix(&table.keyspace, prefix)
             .map(|guard| guard.into_inner().map_err(Into::into))
     }
 }
