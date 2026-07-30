@@ -1,0 +1,1165 @@
+use alloc::{boxed::Box, vec::Vec};
+
+#[rustfmt::skip]
+use super::{
+    SmtStorage, SmtStorageReader, StorageError, StorageResult, StorageUpdateParts, StorageUpdates,
+    SubtreeUpdate,
+    config::*,
+    kvdb::*,
+    schema::*,
+};
+use crate::{
+    EMPTY_WORD, Word,
+    merkle::{
+        NodeIndex,
+        smt::{
+            InnerNode, Map, SmtLeaf,
+            large::{IN_MEMORY_DEPTH, LargeSmt, subtree::Subtree},
+        },
+    },
+    utils::{Deserializable, Serializable},
+};
+
+/// A persistent storage implementation for a Sparse Merkle Tree (SMT).
+///
+/// Implements the `SmtStorage` trait, providing durable storage for SMT components
+#[derive(Debug, Clone)]
+pub struct KVDBSmtStorage<TKVDB: KVDB> {
+    kvdb: TKVDB,
+}
+
+impl<TKVDB: KVDB> KVDBSmtStorage<TKVDB> {
+    /// Opens or creates a database at the specified `path` and configures it for SMT
+    /// storage.
+    ///
+    /// This method sets up the necessary column families (`leaves`, `subtrees`, `metadata`)
+    /// and applies various options for performance, such as caching, bloom filters,
+    /// and compaction strategies tailored for SMT workloads.
+    ///
+    /// The default profile uses:
+    /// - a 1 GiB block cache shared by this database's column families
+    /// - up to 512 open files
+    /// - 16 KiB block-based table blocks with cached index/filter blocks
+    /// - 128 MiB write buffers with up to 3 memtables per write-heavy column family
+    /// - LZ4 compression for active data and ZSTD for bottommost files
+    ///
+    /// # Errors
+    /// Returns `StorageError::Backend` if the database cannot be opened or configured,
+    /// for example, due to path issues, permissions, or internal errors.
+    pub fn open(config: PersistentSmtStorageConfig) -> StorageResult<Self> {
+        let kvdb = TKVDB::new(config)?;
+        Ok(Self { kvdb })
+    }
+
+    /// Syncs the database to disk.
+    ///
+    /// This ensures that all data is persisted to disk.
+    ///
+    /// # Errors
+    /// - Returns `StorageError::Backend` if the flush operation fails.
+    fn sync(&self) -> StorageResult<()> {
+        self.kvdb.sync()
+    }
+
+    /// Converts an index (u64) into a fixed-size byte array for use as a DB key.
+    #[inline(always)]
+    fn index_db_key(index: u64) -> [u8; 8] {
+        key_serializer::index_db_key(index)
+    }
+
+    /// Converts a `NodeIndex` (for a subtree root) into a `KeyBytes` for use as a DB key.
+    #[inline(always)]
+    fn subtree_db_key(index: NodeIndex) -> KeyBytes {
+        key_serializer::subtree_db_key(index)
+    }
+}
+
+mod key_serializer {
+    use super::{KeyBytes, NodeIndex};
+
+    /// Converts an index (u64) into a fixed-size byte array for use as a DB key.
+    #[inline(always)]
+    pub fn index_db_key(index: u64) -> [u8; 8] {
+        index.to_be_bytes()
+    }
+
+    /// Converts a `NodeIndex` (for a subtree root) into a `KeyBytes` for use as a DB key.
+    /// The `KeyBytes` is a wrapper around a 8-byte value with a variable-length prefix.
+    #[inline(always)]
+    pub fn subtree_db_key(index: NodeIndex) -> KeyBytes {
+        let keep = match index.depth() {
+            16 => 2,
+            24 => 3,
+            32 => 4,
+            40 => 5,
+            48 => 6,
+            56 => 7,
+            d => panic!("unsupported depth {d}"),
+        };
+        KeyBytes::new(index.position(), keep)
+    }
+}
+
+impl<TKVDB: KVDB> SmtStorageReader for KVDBSmtStorage<TKVDB> {
+    /// Retrieves the total count of non-empty leaves from the `METADATA_CF` column family.
+    /// Returns 0 if the count is not found.
+    ///
+    /// # Errors
+    /// - `StorageError::Backend`: If the metadata column family is missing or a DB error occurs.
+    /// - `StorageError::BadValueLen`: If the retrieved count bytes are invalid.
+    fn leaf_count(&self) -> StorageResult<usize> {
+        let table = self.kvdb.table(METADATA_CF)?;
+        self.kvdb.get(&table, LEAF_COUNT_KEY)?.map_or(Ok(0), |bytes| {
+            let arr: [u8; 8] =
+                bytes.as_ref().try_into().map_err(|_| StorageError::BadValueLen {
+                    what: "leaf count",
+                    expected: 8,
+                    found: bytes.len(),
+                })?;
+            Ok(usize::from_be_bytes(arr))
+        })
+    }
+
+    /// Retrieves the total count of key-value entries from the `METADATA_CF` column family.
+    /// Returns 0 if the count is not found.
+    ///
+    /// # Errors
+    /// - `StorageError::Backend`: If the metadata column family is missing or a DB error occurs.
+    /// - `StorageError::BadValueLen`: If the retrieved count bytes are invalid.
+    fn entry_count(&self) -> StorageResult<usize> {
+        let table = self.kvdb.table(METADATA_CF)?;
+        self.kvdb.get(&table, ENTRY_COUNT_KEY)?.map_or(Ok(0), |bytes| {
+            let arr: [u8; 8] =
+                bytes.as_ref().try_into().map_err(|_| StorageError::BadValueLen {
+                    what: "entry count",
+                    expected: 8,
+                    found: bytes.len(),
+                })?;
+            Ok(usize::from_be_bytes(arr))
+        })
+    }
+
+    /// Retrieves a single SMT leaf node by its logical `index` from the `LEAVES_CF` column family.
+    ///
+    /// # Errors
+    /// - `StorageError::Backend`: If the leaves column family is missing or a DB error occurs.
+    /// - `StorageError::DeserializationError`: If the retrieved leaf data is corrupt.
+    fn get_leaf(&self, index: u64) -> StorageResult<Option<SmtLeaf>> {
+        let table = self.kvdb.table(LEAVES_CF)?;
+        let key = Self::index_db_key(index);
+        match self.kvdb.get(&table, &key)? {
+            Some(bytes) => {
+                let leaf = SmtLeaf::read_from_bytes_with_budget(&bytes, bytes.len())?;
+                Ok(Some(leaf))
+            },
+            None => Ok(None),
+        }
+    }
+
+    /// Retrieves multiple SMT leaf nodes by their logical `indices`
+    ///
+    /// # Errors
+    /// - `StorageError::Backend`: If the leaves column family is missing or a DB error occurs.
+    /// - `StorageError::DeserializationError`: If any retrieved leaf data is corrupt.
+    fn get_leaves(&self, indices: &[u64]) -> StorageResult<Vec<Option<SmtLeaf>>> {
+        let table = self.kvdb.table(LEAVES_CF)?;
+        let db_keys: Vec<[u8; 8]> = indices.iter().map(|&idx| Self::index_db_key(idx)).collect();
+        let key_refs: Vec<&[u8]> = db_keys.iter().map(<[u8; 8]>::as_slice).collect();
+        self.kvdb
+            .multi_get(&table, &key_refs)?
+            .into_iter()
+            .map(|opt| match opt {
+                Some(bytes) => SmtLeaf::read_from_bytes_with_budget(&bytes, bytes.len())
+                    .map(Some)
+                    .map_err(StorageError::from),
+                None => Ok(None),
+            })
+            .collect()
+    }
+
+    /// Returns true if the storage has any leaves.
+    ///
+    /// # Errors
+    /// Returns `StorageError` if the storage read operation fails.
+    fn has_leaves(&self) -> StorageResult<bool> {
+        Ok(self.leaf_count()? > 0)
+    }
+
+    /// Batch-retrieves multiple subtrees from DB by their node indices.
+    ///
+    /// This method groups requests by subtree depth into column family buckets,
+    /// then performs parallel `multi_get` operations to efficiently retrieve
+    /// all subtrees. Results are deserialized and placed in the same order as
+    /// the input indices.
+    ///
+    /// Note: Retrieval is performed in parallel. If multiple errors occur (e.g.,
+    /// deserialization or backend errors), only the first one encountered is returned.
+    /// Other errors will be discarded.
+    ///
+    /// # Parameters
+    /// - `indices`: A slice of subtree root indices to retrieve.
+    ///
+    /// # Returns
+    /// - A `Vec<Option<Subtree>>` where each index corresponds to the original input.
+    /// - `Ok(...)` if all fetches succeed.
+    /// - `Err(StorageError)` if any DB access or deserialization fails.
+    fn get_subtree(&self, index: NodeIndex) -> StorageResult<Option<Subtree>> {
+        let table = self.kvdb.table(cf_for_depth(index.depth()))?;
+        let key = Self::subtree_db_key(index);
+        match self.kvdb.get(&table, key.as_slice())? {
+            Some(bytes) => {
+                let subtree = Subtree::from_vec(index, &bytes)?;
+                Ok(Some(subtree))
+            },
+            None => Ok(None),
+        }
+    }
+
+    /// Batch-retrieves multiple subtrees from DB by their node indices.
+    ///
+    /// This method groups requests by subtree depth into column family buckets,
+    /// then performs parallel `multi_get` operations to efficiently retrieve
+    /// all subtrees. Results are deserialized and placed in the same order as
+    /// the input indices.
+    ///
+    /// # Parameters
+    /// - `indices`: A slice of subtree root indices to retrieve.
+    ///
+    /// # Returns
+    /// - A `Vec<Option<Subtree>>` where each index corresponds to the original input.
+    /// - `Ok(...)` if all fetches succeed.
+    /// - `Err(StorageError)` if any DB access or deserialization fails.
+    fn get_subtrees(&self, indices: &[NodeIndex]) -> StorageResult<Vec<Option<Subtree>>> {
+        use p3_maybe_rayon::prelude::*;
+
+        let mut depth_buckets: [Vec<(usize, NodeIndex)>; 6] = Default::default();
+
+        for (original_index, &node_index) in indices.iter().enumerate() {
+            let depth = node_index.depth();
+            let bucket_index = match depth {
+                56 => 0,
+                48 => 1,
+                40 => 2,
+                32 => 3,
+                24 => 4,
+                16 => 5,
+                _ => {
+                    return Err(StorageError::Unsupported(format!(
+                        "unsupported subtree depth {depth}"
+                    )));
+                },
+            };
+            depth_buckets[bucket_index].push((original_index, node_index));
+        }
+        let mut results = vec![None; indices.len()];
+
+        // Process depth buckets in parallel
+        let bucket_results: StorageResult<Vec<_>> = depth_buckets
+            .into_par_iter()
+            .enumerate()
+            .filter(|(_, bucket)| !bucket.is_empty())
+            .map(|(bucket_index, bucket)| -> StorageResult<Vec<(usize, Option<Subtree>)>> {
+                let depth = LargeSmt::<Self>::SUBTREE_DEPTHS[bucket_index];
+                let table = self.kvdb.table(cf_for_depth(depth))?;
+                let keys: Vec<_> =
+                    bucket.iter().map(|(_, idx)| Self::subtree_db_key(*idx)).collect();
+                let key_refs: Vec<&[u8]> = keys.iter().map(KeyBytes::as_slice).collect();
+
+                let db_results = self.kvdb.multi_get(&table, &key_refs)?;
+
+                bucket
+                    .into_iter()
+                    .zip(db_results)
+                    .map(|((original_index, node_index), db_result)| {
+                        let subtree = match db_result {
+                            Some(bytes) => Some(Subtree::from_vec(node_index, &bytes)?),
+                            None => None,
+                        };
+                        Ok((original_index, subtree))
+                    })
+                    .collect()
+            })
+            .collect();
+
+        // Flatten results and place them in correct positions
+        for bucket_result in bucket_results? {
+            for (original_index, subtree) in bucket_result {
+                results[original_index] = subtree;
+            }
+        }
+
+        Ok(results)
+    }
+
+    /// Retrieves a single inner node (non-leaf node) from within a Subtree.
+    ///
+    /// This method is intended for accessing nodes at depths greater than or equal to
+    /// `IN_MEMORY_DEPTH`. It first finds the appropriate Subtree containing the `index`, then
+    /// delegates to `Subtree::get_inner_node()`.
+    ///
+    /// # Errors
+    /// - `StorageError::Backend`: If `index.depth() < IN_MEMORY_DEPTH`, or if DB errors occur.
+    /// - `StorageError::Value`: If the containing Subtree data is corrupt.
+    fn get_inner_node(&self, index: NodeIndex) -> StorageResult<Option<InnerNode>> {
+        if index.depth() < IN_MEMORY_DEPTH {
+            return Err(StorageError::Unsupported(
+                "Cannot get inner node from upper part of the tree".into(),
+            ));
+        }
+        let subtree_root_index = Subtree::find_subtree_root(index);
+        Ok(self
+            .get_subtree(subtree_root_index)?
+            .and_then(|subtree| subtree.get_inner_node(index)))
+    }
+
+    /// Returns an iterator over all (logical u64 index, `SmtLeaf`) pairs in the `LEAVES_CF`.
+    ///
+    /// The iterator uses a DB snapshot for consistency and iterates in lexicographical
+    /// order of the keys (leaf indices). Errors during iteration (e.g., deserialization issues)
+    /// are returned as iterator items.
+    ///
+    /// # Errors
+    /// - `StorageError::Backend`: If the leaves column family is missing or a DB error occurs
+    ///   during iterator creation.
+    fn iter_leaves(
+        &self,
+    ) -> StorageResult<Box<dyn Iterator<Item = StorageResult<(u64, SmtLeaf)>> + '_>> {
+        let table = self.kvdb.table(LEAVES_CF)?;
+        let iter = self.kvdb.iter(table).map(|result| {
+            result.and_then(|(key_bytes, value_bytes)| {
+                let idx = index_from_key_bytes(&key_bytes)?;
+                let leaf = SmtLeaf::read_from_bytes_with_budget(&value_bytes, value_bytes.len())?;
+                Ok((idx, leaf))
+            })
+        });
+        Ok(Box::new(iter))
+    }
+
+    /// Returns an iterator over all `Subtree` instances across all subtree column families.
+    ///
+    /// The iterator uses a DB snapshot and iterates in lexicographical order of keys
+    /// (subtree root NodeIndex) across all depth column families (24, 32, 40, 48, 56).
+    /// Errors during iteration (e.g., deserialization issues) are returned as iterator items.
+    ///
+    /// # Errors
+    /// - `StorageError::Backend`: If any subtree column family is missing or a DB error occurs
+    ///   during iterator creation.
+    fn iter_subtrees(
+        &self,
+    ) -> StorageResult<Box<dyn Iterator<Item = StorageResult<Subtree>> + '_>> {
+        // All subtree column family names in order
+        const SUBTREE_CFS: [&str; 6] = [
+            SUBTREE_16_CF,
+            SUBTREE_24_CF,
+            SUBTREE_32_CF,
+            SUBTREE_40_CF,
+            SUBTREE_48_CF,
+            SUBTREE_56_CF,
+        ];
+
+        let mut iters = Vec::new();
+        for (cf_index, cf_name) in SUBTREE_CFS.into_iter().enumerate() {
+            let table = self.kvdb.table(cf_name)?;
+            let depth = IN_MEMORY_DEPTH + (cf_index * 8) as u8;
+
+            let iter = self.kvdb.iter(table).map(move |result| {
+                result.and_then(|(key_bytes, value_bytes)| {
+                    let node_idx = subtree_root_from_key_bytes(&key_bytes, depth)?;
+                    Ok(Subtree::from_vec(node_idx, &value_bytes)?)
+                })
+            });
+            iters.push(iter);
+        }
+
+        Ok(Box::new(iters.into_iter().flatten()))
+    }
+
+    /// Retrieves roots of all top level subtrees for efficient startup reconstruction.
+    ///
+    /// # Errors
+    /// - `StorageError::Backend`: If the in-memory-depth column family is missing or a DB error
+    ///   occurs.
+    /// - `StorageError::Value`: If any hash bytes are corrupt.
+    fn get_top_subtree_roots(&self) -> StorageResult<Vec<(u64, Word)>> {
+        let table = self.kvdb.table(IN_MEM_DEPTH_CF)?;
+        let iter = self.kvdb.iter(table);
+        let mut hashes = Vec::new();
+
+        for item in iter {
+            let (key_bytes, value_bytes) = item?;
+
+            let index = index_from_key_bytes(&key_bytes)?;
+            let hash = Word::read_from_bytes_with_budget(&value_bytes, value_bytes.len())?;
+
+            hashes.push((index, hash));
+        }
+
+        Ok(hashes)
+    }
+}
+
+impl<TKVDB: KVDB> SmtStorage for KVDBSmtStorage<TKVDB> {
+    type Reader = KVDBSnapshotStorage<TKVDB>;
+
+    /// Returns a detached read-only snapshot of the current storage.
+    fn reader(&self) -> StorageResult<Self::Reader> {
+        Ok(Self::Reader { kvdb_snapshot: self.kvdb.snapshot()? })
+    }
+
+    /// Inserts a key-value pair into the SMT leaf at the specified logical `index`.
+    ///
+    /// This operation involves:
+    /// 1. Retrieving the current leaf (if any) at `index`.
+    /// 2. Inserting the new key-value pair into the leaf.
+    /// 3. Updating the leaf and entry counts in the metadata column family.
+    /// 4. Writing all changes (leaf data, counts) to DB in a single batch.
+    ///
+    /// Note: This only updates the leaf. Callers are responsible for recomputing and
+    /// persisting the corresponding inner nodes.
+    ///
+    /// # Errors
+    /// - `StorageError::Backend`: If column families are missing or a DB error occurs.
+    /// - `StorageError::DeserializationError`: If existing leaf data is corrupt.
+    fn insert_value(&mut self, index: u64, key: Word, value: Word) -> StorageResult<Option<Word>> {
+        debug_assert_ne!(value, EMPTY_WORD);
+
+        let mut batch = self.kvdb.batch();
+
+        // Fetch initial counts.
+        let mut current_leaf_count = self.leaf_count()?;
+        let mut current_entry_count = self.entry_count()?;
+
+        let leaves_table = self.kvdb.table(LEAVES_CF)?;
+        let db_key = Self::index_db_key(index);
+
+        let maybe_leaf = self.get_leaf(index)?;
+
+        let value_to_return: Option<Word> = match maybe_leaf {
+            Some(mut existing_leaf) => {
+                let old_value = existing_leaf.insert(key, value).expect("Failed to insert value");
+                // Determine if the overall SMT entry_count needs to change.
+                // entry_count increases if:
+                //   1. The key was not present in this leaf before (`old_value` is `None`).
+                //   2. The key was present but held `EMPTY_WORD` (`old_value` is
+                //      `Some(EMPTY_WORD)`).
+                if old_value.is_none_or(|old_v| old_v == EMPTY_WORD) {
+                    current_entry_count += 1;
+                }
+                // current_leaf_count does not change because the leaf itself already existed.
+                batch.put(&leaves_table, &db_key, &existing_leaf.to_bytes());
+                old_value
+            },
+            None => {
+                // Leaf at `index` does not exist, so create a new one.
+                let new_leaf = SmtLeaf::Single((key, value));
+                // A new leaf is created.
+                current_leaf_count += 1;
+                // This new leaf contains one new SMT entry.
+                current_entry_count += 1;
+                batch.put(&leaves_table, &db_key, &new_leaf.to_bytes());
+                // No previous value, as the leaf (and thus the key in it) was new.
+                None
+            },
+        };
+
+        // Add updated metadata counts to the batch.
+        let metadata_table = self.kvdb.table(METADATA_CF)?;
+        batch.put(&metadata_table, LEAF_COUNT_KEY, &current_leaf_count.to_be_bytes());
+        batch.put(&metadata_table, ENTRY_COUNT_KEY, &current_entry_count.to_be_bytes());
+
+        // Atomically write all changes (leaf data and metadata counts).
+        batch.commit()?;
+
+        Ok(value_to_return)
+    }
+
+    /// Removes a key-value pair from the SMT leaf at the specified logical `index`.
+    ///
+    /// This operation involves:
+    /// 1. Retrieving the leaf at `index`.
+    /// 2. Removing the `key` from the leaf. If the leaf becomes empty, it's deleted from DB.
+    /// 3. Updating the leaf and entry counts in the metadata column family.
+    /// 4. Writing all changes (leaf data/deletion, counts) to DB in a single batch.
+    ///
+    /// Returns `Ok(None)` if the leaf at `index` does not exist or the `key` is not found.
+    ///
+    /// Note: This only updates the leaf. Callers are responsible for recomputing and
+    /// persisting the corresponding inner nodes.
+    ///
+    /// # Errors
+    /// - `StorageError::Backend`: If column families are missing or a DB error occurs.
+    /// - `StorageError::DeserializationError`: If existing leaf data is corrupt.
+    fn remove_value(&mut self, index: u64, key: Word) -> StorageResult<Option<Word>> {
+        let Some(mut leaf) = self.get_leaf(index)? else {
+            return Ok(None);
+        };
+
+        let mut batch = self.kvdb.batch();
+        let leaves_table = self.kvdb.table(LEAVES_CF)?;
+        let metadata_table = self.kvdb.table(METADATA_CF)?;
+        let db_key = Self::index_db_key(index);
+        let mut entry_count = self.entry_count()?;
+        let mut leaf_count = self.leaf_count()?;
+
+        let (current_value, is_empty) = leaf.remove(key);
+        if let Some(current_value) = current_value
+            && current_value != EMPTY_WORD
+        {
+            entry_count -= 1;
+        }
+        if is_empty {
+            leaf_count -= 1;
+            batch.delete(&leaves_table, &db_key);
+        } else {
+            batch.put(&leaves_table, &db_key, &leaf.to_bytes());
+        }
+        batch.put(&metadata_table, LEAF_COUNT_KEY, &leaf_count.to_be_bytes());
+        batch.put(&metadata_table, ENTRY_COUNT_KEY, &entry_count.to_be_bytes());
+        batch.commit()?;
+        Ok(current_value)
+    }
+
+    /// Sets or updates multiple SMT leaf nodes in the `LEAVES_CF` column family.
+    ///
+    /// This method performs a batch write to DB. It also updates the global
+    /// leaf and entry counts in the `METADATA_CF` based on the provided `leaves` map,
+    /// overwriting any previous counts.
+    ///
+    /// Note: This method assumes the provided `leaves` map represents the entirety
+    /// of leaves to be stored or that counts are being explicitly reset.
+    /// Note: This only updates the leaves. Callers are responsible for recomputing and
+    /// persisting the corresponding inner nodes.
+    ///
+    /// # Errors
+    /// - `StorageError::Backend`: If column families are missing or a DB error occurs.
+    fn set_leaves(&mut self, leaves: Map<u64, SmtLeaf>) -> StorageResult<()> {
+        let leaves_table = self.kvdb.table(LEAVES_CF)?;
+        let leaf_count: usize = leaves.len();
+        let entry_count: usize = leaves.values().map(|leaf| leaf.entries().len()).sum();
+        let mut batch = self.kvdb.batch();
+        for (idx, leaf) in leaves {
+            let key = Self::index_db_key(idx);
+            let value = leaf.to_bytes();
+            batch.put(&leaves_table, &key, &value);
+        }
+        let metadata_table = self.kvdb.table(METADATA_CF)?;
+        batch.put(&metadata_table, LEAF_COUNT_KEY, &leaf_count.to_be_bytes());
+        batch.put(&metadata_table, ENTRY_COUNT_KEY, &entry_count.to_be_bytes());
+        batch.commit()
+    }
+
+    /// Removes a single SMT leaf node by its logical `index` from the `LEAVES_CF` column family.
+    ///
+    /// Important: This method currently *does not* update the global leaf and entry counts
+    /// in the metadata. Callers are responsible for managing these counts separately
+    /// if using this method directly, or preferably use `apply` or `remove_value` which handle
+    /// counts.
+    ///
+    /// Note: This only removes the leaf. Callers are responsible for recomputing and
+    /// persisting the corresponding inner nodes.
+    ///
+    /// # Errors
+    /// - `StorageError::Backend`: If the leaves column family is missing or a DB error occurs.
+    /// - `StorageError::DeserializationError`: If the retrieved (to be returned) leaf data is
+    ///   corrupt.
+    fn remove_leaf(&mut self, index: u64) -> StorageResult<Option<SmtLeaf>> {
+        let key = Self::index_db_key(index);
+        let table = self.kvdb.table(LEAVES_CF)?;
+        let old_bytes = self.kvdb.get(&table, &key)?;
+        let mut batch = self.kvdb.batch();
+        batch.delete(&table, &key);
+        batch.commit()?;
+        Ok(old_bytes.map(|bytes| {
+            SmtLeaf::read_from_bytes_with_budget(&bytes, bytes.len())
+                .expect("failed to deserialize leaf")
+        }))
+    }
+
+    /// Stores a single subtree in DB and optionally updates the in-memory-depth root cache.
+    ///
+    /// The subtree is serialized and written to its corresponding column family.
+    /// If it’s an in-memory-depth subtree, the root node’s hash is also stored in the
+    /// dedicated `IN_MEM_DEPTH_CF` cache to support top-level reconstruction.
+    ///
+    /// # Parameters
+    /// - `subtree`: A reference to the subtree to be stored.
+    ///
+    /// # Errors
+    /// - Returns `StorageError` if column family lookup, serialization, or the write operation
+    ///   fails.
+    fn set_subtree(&mut self, subtree: &Subtree) -> StorageResult<()> {
+        let subtree_table = self.kvdb.table(cf_for_depth(subtree.root_index().depth()))?;
+        let mut batch = self.kvdb.batch();
+
+        let key = Self::subtree_db_key(subtree.root_index());
+        let value = subtree.to_vec();
+        batch.put(&subtree_table, key.as_slice(), &value);
+
+        if subtree.root_index().depth() == IN_MEMORY_DEPTH {
+            let root_hash = subtree
+                .get_inner_node(subtree.root_index())
+                .ok_or_else(|| StorageError::Unsupported("Subtree root node not found".into()))?
+                .hash();
+            let in_mem_table = self.kvdb.table(IN_MEM_DEPTH_CF)?;
+            let hash_key = Self::index_db_key(subtree.root_index().position());
+            batch.put(&in_mem_table, &hash_key, &root_hash.to_bytes());
+        }
+
+        batch.commit()
+    }
+
+    /// Bulk-writes subtrees to storage.
+    ///
+    /// This method writes a vector of serialized `Subtree` objects directly to their
+    /// corresponding DB column families based on their root index.
+    ///
+    /// Uses default write options to keep WAL enabled. Disabling WAL would make writes
+    /// non-crash-safe: data in the memtable is lost on unexpected termination, causing root
+    /// mismatch on restart (see miden-node#1558).
+    ///
+    /// # Parameters
+    /// - `subtrees`: A vector of `Subtree` objects to be serialized and persisted.
+    ///
+    /// # Errors
+    /// - Returns `StorageError::Backend` if any column family lookup or DB write fails.
+    fn set_subtrees(&mut self, subtrees: Vec<Subtree>) -> StorageResult<()> {
+        let in_mem_table = self.kvdb.table(IN_MEM_DEPTH_CF)?;
+        let mut batch = self.kvdb.batch();
+
+        for subtree in subtrees {
+            let subtree_table = self.kvdb.table(cf_for_depth(subtree.root_index().depth()))?;
+            let key = Self::subtree_db_key(subtree.root_index());
+            let value = subtree.to_vec();
+            batch.put(&subtree_table, key.as_slice(), &value);
+
+            if subtree.root_index().depth() == IN_MEMORY_DEPTH
+                && let Some(root_node) = subtree.get_inner_node(subtree.root_index())
+            {
+                let hash_key = Self::index_db_key(subtree.root_index().position());
+                batch.put(&in_mem_table, &hash_key, &root_node.hash().to_bytes());
+            }
+        }
+
+        batch.commit()
+    }
+
+    /// Removes a single SMT Subtree from storage, identified by its root `NodeIndex`.
+    ///
+    /// # Errors
+    /// - `StorageError::Backend`: If the subtrees column family is missing or a DB error occurs.
+    fn remove_subtree(&mut self, index: NodeIndex) -> StorageResult<()> {
+        let subtree_table = self.kvdb.table(cf_for_depth(index.depth()))?;
+        let mut batch = self.kvdb.batch();
+
+        let key = Self::subtree_db_key(index);
+        batch.delete(&subtree_table, key.as_slice());
+
+        // Also remove in-memory-depth hash cache if this is an in-memory-depth subtree
+        if index.depth() == IN_MEMORY_DEPTH {
+            let in_mem_table = self.kvdb.table(IN_MEM_DEPTH_CF)?;
+            let hash_key = Self::index_db_key(index.position());
+            batch.delete(&in_mem_table, &hash_key);
+        }
+
+        batch.commit()
+    }
+
+    /// Sets or updates a single inner node (non-leaf node) within a Subtree.
+    ///
+    /// This method is intended for `index.depth() >= IN_MEMORY_DEPTH`.
+    /// If the target Subtree does not exist, it is created. The `node` is then
+    /// inserted into the Subtree, and the modified Subtree is written back to storage.
+    ///
+    /// # Errors
+    /// - `StorageError::Backend`: If `index.depth() < IN_MEMORY_DEPTH`, or if DB errors occur.
+    /// - `StorageError::Value`: If existing Subtree data is corrupt.
+    fn set_inner_node(
+        &mut self,
+        index: NodeIndex,
+        node: InnerNode,
+    ) -> StorageResult<Option<InnerNode>> {
+        if index.depth() < IN_MEMORY_DEPTH {
+            return Err(StorageError::Unsupported(
+                "Cannot set inner node in upper part of the tree".into(),
+            ));
+        }
+
+        let subtree_root_index = Subtree::find_subtree_root(index);
+        let mut subtree = self
+            .get_subtree(subtree_root_index)?
+            .unwrap_or_else(|| Subtree::new(subtree_root_index));
+        let old_node = subtree.insert_inner_node(index, node);
+        self.set_subtree(&subtree)?;
+        Ok(old_node)
+    }
+
+    /// Removes a single inner node (non-leaf node) from within a Subtree.
+    ///
+    /// This method is intended for `index.depth() >= IN_MEMORY_DEPTH`.
+    /// If the Subtree becomes empty after removing the node, the Subtree itself
+    /// is removed from storage.
+    ///
+    /// # Errors
+    /// - `StorageError::Backend`: If `index.depth() < IN_MEMORY_DEPTH`, or if DB errors occur.
+    /// - `StorageError::Value`: If existing Subtree data is corrupt.
+    fn remove_inner_node(&mut self, index: NodeIndex) -> StorageResult<Option<InnerNode>> {
+        if index.depth() < IN_MEMORY_DEPTH {
+            return Err(StorageError::Unsupported(
+                "Cannot remove inner node from upper part of the tree".into(),
+            ));
+        }
+
+        let subtree_root_index = Subtree::find_subtree_root(index);
+        self.get_subtree(subtree_root_index)
+            .and_then(|maybe_subtree| match maybe_subtree {
+                Some(mut subtree) => {
+                    let old_node = subtree.remove_inner_node(index);
+                    let db_operation_result = if subtree.is_empty() {
+                        self.remove_subtree(subtree_root_index)
+                    } else {
+                        self.set_subtree(&subtree)
+                    };
+                    db_operation_result.map(|_| old_node)
+                },
+                None => Ok(None),
+            })
+    }
+
+    /// Applies a batch of `StorageUpdates` atomically to the DB backend.
+    ///
+    /// This is the primary method for persisting changes to the SMT. It constructs a single
+    /// DB batch containing all specified changes:
+    /// - Leaf updates/deletions in `LEAVES_CF`.
+    /// - Subtree updates/deletions in `SUBTREE_24_CF`, `SUBTREE_32_CF`, `SUBTREE_40_CF`,
+    ///   `SUBTREE_48_CF`, `SUBTREE_56_CF`.
+    /// - Updates to leaf and entry counts in `METADATA_CF` based on `leaf_count_delta` and
+    ///   `entry_count_delta`.
+    ///
+    /// All operations in the batch are applied atomically.
+    ///
+    /// # Errors
+    /// - `StorageError::Backend`: If any column family is missing or a DB write error occurs.
+    fn apply(&mut self, updates: StorageUpdates) -> StorageResult<()> {
+        use p3_maybe_rayon::prelude::*;
+
+        let mut batch = self.kvdb.batch();
+
+        let leaves_table = self.kvdb.table(LEAVES_CF)?;
+        let metadata_table = self.kvdb.table(METADATA_CF)?;
+        let in_mem_table = self.kvdb.table(IN_MEM_DEPTH_CF)?;
+
+        let StorageUpdateParts {
+            leaf_updates,
+            subtree_updates,
+            leaf_count_delta,
+            entry_count_delta,
+        } = updates.into_parts();
+
+        // Process leaf updates
+        for (index, maybe_leaf) in leaf_updates {
+            let key = Self::index_db_key(index);
+            match maybe_leaf {
+                Some(leaf) => batch.put(&leaves_table, &key, &leaf.to_bytes()),
+                None => batch.delete(&leaves_table, &key),
+            }
+        }
+
+        // Helper for in-memory-depth operations
+        let is_in_mem_depth = |index: NodeIndex| index.depth() == IN_MEMORY_DEPTH;
+
+        // Parallel preparation of subtree operations
+        let subtree_ops: StorageResult<Vec<_>> = subtree_updates
+            .into_par_iter()
+            .map(|update| -> StorageResult<_> {
+                let (index, maybe_bytes, in_mem_depth_op) = match update {
+                    SubtreeUpdate::Store { index, subtree } => {
+                        let bytes = subtree.to_vec();
+                        let in_mem_depth_op = is_in_mem_depth(index)
+                            .then(|| subtree.get_inner_node(index))
+                            .flatten()
+                            .map(|root_node| {
+                                let hash_key = Self::index_db_key(index.position());
+                                (hash_key, Some(root_node.hash().to_bytes()))
+                            });
+                        (index, Some(bytes), in_mem_depth_op)
+                    },
+                    SubtreeUpdate::Delete { index } => {
+                        let in_mem_depth_op = is_in_mem_depth(index).then(|| {
+                            let hash_key = Self::index_db_key(index.position());
+                            (hash_key, None)
+                        });
+                        (index, None, in_mem_depth_op)
+                    },
+                };
+
+                let key = Self::subtree_db_key(index);
+                let subtree_table = self.kvdb.table(cf_for_depth(index.depth()))?;
+
+                Ok((subtree_table, key, maybe_bytes, in_mem_depth_op))
+            })
+            .collect();
+
+        // Sequential batch building
+        for (subtree_table, key, maybe_bytes, in_mem_depth_op) in subtree_ops? {
+            match maybe_bytes {
+                Some(bytes) => batch.put(&subtree_table, key.as_slice(), &bytes),
+                None => batch.delete(&subtree_table, key.as_slice()),
+            }
+            if let Some((hash_key, maybe_hash_bytes)) = in_mem_depth_op {
+                match maybe_hash_bytes {
+                    Some(hash_bytes) => batch.put(&in_mem_table, &hash_key, &hash_bytes),
+                    None => batch.delete(&in_mem_table, &hash_key),
+                }
+            }
+        }
+
+        if leaf_count_delta != 0 || entry_count_delta != 0 {
+            let current_leaf_count = self.leaf_count()?;
+            let current_entry_count = self.entry_count()?;
+
+            let new_leaf_count = current_leaf_count.saturating_add_signed(leaf_count_delta);
+            let new_entry_count = current_entry_count.saturating_add_signed(entry_count_delta);
+
+            batch.put(&metadata_table, LEAF_COUNT_KEY, &new_leaf_count.to_be_bytes());
+            batch.put(&metadata_table, ENTRY_COUNT_KEY, &new_entry_count.to_be_bytes());
+        }
+
+        batch.commit()
+    }
+}
+
+/// Syncs the database to disk before dropping the storage.
+///
+/// This ensures that all data is persisted to disk before the storage is dropped.
+///
+/// # Panics
+/// - If the sync operation fails.
+impl<TKVDB: KVDB> Drop for KVDBSmtStorage<TKVDB> {
+    fn drop(&mut self) {
+        if let Err(e) = self.sync() {
+            panic!("failed to flush SMT DB on drop: {e}");
+        }
+    }
+}
+
+// SUBTREE DB KEY
+// --------------------------------------------------------------------------------------------
+
+/// Compact key wrapper for variable-length subtree prefixes.
+///
+/// * `bytes` always holds the big-endian 8-byte value.
+/// * `len` is how many leading bytes are significant (3-7).
+#[derive(Copy, Clone, Eq, PartialEq, Debug, Hash)]
+pub(crate) struct KeyBytes {
+    bytes: [u8; 8],
+    len: u8,
+}
+
+impl KeyBytes {
+    #[inline(always)]
+    pub fn new(value: u64, keep: usize) -> Self {
+        debug_assert!((2..=7).contains(&keep));
+        let bytes = value.to_be_bytes();
+        debug_assert!(bytes[..8 - keep].iter().all(|&b| b == 0));
+        Self { bytes, len: keep as u8 }
+    }
+
+    #[inline(always)]
+    pub fn as_slice(&self) -> &[u8] {
+        &self.bytes[8 - self.len as usize..]
+    }
+}
+
+impl AsRef<[u8]> for KeyBytes {
+    #[inline(always)]
+    fn as_ref(&self) -> &[u8] {
+        self.as_slice()
+    }
+}
+
+// HELPERS
+// --------------------------------------------------------------------------------------------
+
+/// Deserializes an index (u64) from a DB key byte slice.
+/// Expects `key_bytes` to be exactly 8 bytes long.
+///
+/// # Errors
+/// - `StorageError::BadKeyLen`: If `key_bytes` is not 8 bytes long or conversion fails.
+fn index_from_key_bytes(key_bytes: &[u8]) -> StorageResult<u64> {
+    if key_bytes.len() != 8 {
+        return Err(StorageError::BadKeyLen { expected: 8, found: key_bytes.len() });
+    }
+    let mut arr = [0u8; 8];
+    arr.copy_from_slice(key_bytes);
+    Ok(u64::from_be_bytes(arr))
+}
+
+fn read_count(what: &'static str, bytes: &[u8]) -> StorageResult<usize> {
+    let arr: [u8; 8] = bytes.try_into().map_err(|_| StorageError::BadValueLen {
+        what,
+        expected: 8,
+        found: bytes.len(),
+    })?;
+    Ok(usize::from_be_bytes(arr))
+}
+
+/// Reconstructs a `NodeIndex` from the variable-length subtree key stored in DB.
+///
+/// * `key_bytes` is the big-endian tail of the 64-bit value:
+///   - depth 56 → 7 bytes
+///   - depth 48 → 6 bytes
+///   - depth 40 → 5 bytes
+///   - depth 32 → 4 bytes
+///   - depth 24 → 3 bytes
+///   - depth 16 → 2 bytes
+///
+/// # Errors
+/// * `StorageError::Unsupported` -  `depth` is not one of 24/32/40/48/56.
+/// * `StorageError::DeserializationError` - `key_bytes.len()` does not match the length required by
+///   `depth`.
+#[inline(always)]
+fn subtree_root_from_key_bytes(key_bytes: &[u8], depth: u8) -> StorageResult<NodeIndex> {
+    let expected = match depth {
+        16 => 2,
+        24 => 3,
+        32 => 4,
+        40 => 5,
+        48 => 6,
+        56 => 7,
+        d => return Err(StorageError::Unsupported(format!("unsupported subtree depth {d}"))),
+    };
+
+    if key_bytes.len() != expected {
+        return Err(StorageError::BadSubtreeKeyLen { depth, expected, found: key_bytes.len() });
+    }
+    let mut buf = [0u8; 8];
+    buf[8 - expected..].copy_from_slice(key_bytes);
+    let value = u64::from_be_bytes(buf);
+    Ok(NodeIndex::new_unchecked(depth, value))
+}
+
+/// Helper that maps an SMT depth to its column family.
+#[inline(always)]
+fn cf_for_depth(depth: u8) -> &'static str {
+    match depth {
+        16 => SUBTREE_16_CF,
+        24 => SUBTREE_24_CF,
+        32 => SUBTREE_32_CF,
+        40 => SUBTREE_40_CF,
+        48 => SUBTREE_48_CF,
+        56 => SUBTREE_56_CF,
+        _ => panic!("unsupported subtree depth: {depth}"),
+    }
+}
+
+// SNAPSHOT STORAGE
+// ================================================================================================
+
+/// Read-only, cloneable SMT storage backed by a native DB point-in-time snapshot.
+#[derive(Clone, Debug)]
+pub struct KVDBSnapshotStorage<TKVDB: KVDBReader> {
+    kvdb_snapshot: TKVDB::Snapshot,
+}
+
+impl<TKVDB: KVDBReader> SmtStorageReader for KVDBSnapshotStorage<TKVDB> {
+    /// Retrieves the total count of non-empty leaves from the snapshot.
+    fn leaf_count(&self) -> StorageResult<usize> {
+        let table = self.kvdb_snapshot.table(METADATA_CF)?;
+        self.kvdb_snapshot
+            .get(&table, LEAF_COUNT_KEY)?
+            .map_or(Ok(0), |bytes| read_count("leaf count", &bytes))
+    }
+
+    /// Retrieves the total count of key-value entries from the snapshot.
+    fn entry_count(&self) -> StorageResult<usize> {
+        let table = self.kvdb_snapshot.table(METADATA_CF)?;
+        self.kvdb_snapshot
+            .get(&table, ENTRY_COUNT_KEY)?
+            .map_or(Ok(0), |bytes| read_count("entry count", &bytes))
+    }
+
+    /// Retrieves a single SMT leaf node by its logical `index` from the snapshot.
+    fn get_leaf(&self, index: u64) -> StorageResult<Option<SmtLeaf>> {
+        let table = self.kvdb_snapshot.table(LEAVES_CF)?;
+        let key = key_serializer::index_db_key(index);
+        match self.kvdb_snapshot.get(&table, &key)? {
+            Some(bytes) => {
+                let leaf = SmtLeaf::read_from_bytes_with_budget(&bytes, bytes.len())?;
+                Ok(Some(leaf))
+            },
+            None => Ok(None),
+        }
+    }
+
+    /// Retrieves multiple SMT leaf nodes by their logical `indices` from the snapshot.
+    fn get_leaves(&self, indices: &[u64]) -> StorageResult<Vec<Option<SmtLeaf>>> {
+        let table = self.kvdb_snapshot.table(LEAVES_CF)?;
+        let db_keys: Vec<[u8; 8]> =
+            indices.iter().map(|&idx| key_serializer::index_db_key(idx)).collect();
+        let key_refs: Vec<&[u8]> = db_keys.iter().map(<[u8; 8]>::as_slice).collect();
+        let results = self.kvdb_snapshot.multi_get(&table, &key_refs)?;
+
+        results
+            .into_iter()
+            .map(|opt| match opt {
+                Some(bytes) => Ok(Some(SmtLeaf::read_from_bytes_with_budget(&bytes, bytes.len())?)),
+                None => Ok(None),
+            })
+            .collect()
+    }
+
+    /// Returns true if the snapshot has any leaves.
+    fn has_leaves(&self) -> StorageResult<bool> {
+        Ok(self.leaf_count()? > 0)
+    }
+
+    /// Retrieves a single SMT Subtree by its root `NodeIndex` from the snapshot.
+    fn get_subtree(&self, index: NodeIndex) -> StorageResult<Option<Subtree>> {
+        let table = self.kvdb_snapshot.table(cf_for_depth(index.depth()))?;
+        let key = key_serializer::subtree_db_key(index);
+        match self.kvdb_snapshot.get(&table, key.as_slice())? {
+            Some(bytes) => {
+                let subtree = Subtree::from_vec(index, &bytes)?;
+                Ok(Some(subtree))
+            },
+            None => Ok(None),
+        }
+    }
+
+    /// Retrieves multiple subtrees from the snapshot.
+    fn get_subtrees(&self, indices: &[NodeIndex]) -> StorageResult<Vec<Option<Subtree>>> {
+        use p3_maybe_rayon::prelude::*;
+
+        let mut depth_buckets: [Vec<(usize, NodeIndex)>; 6] = Default::default();
+
+        for (original_index, &node_index) in indices.iter().enumerate() {
+            let depth = node_index.depth();
+            let bucket_index = match depth {
+                56 => 0,
+                48 => 1,
+                40 => 2,
+                32 => 3,
+                24 => 4,
+                16 => 5,
+                _ => {
+                    return Err(StorageError::Unsupported(format!(
+                        "unsupported subtree depth {depth}"
+                    )));
+                },
+            };
+            depth_buckets[bucket_index].push((original_index, node_index));
+        }
+        let mut results = vec![None; indices.len()];
+
+        let bucket_results: StorageResult<Vec<_>> = depth_buckets
+            .into_par_iter()
+            .enumerate()
+            .filter(|(_, bucket)| !bucket.is_empty())
+            .map(|(bucket_index, bucket)| -> StorageResult<Vec<(usize, Option<Subtree>)>> {
+                let depth = LargeSmt::<Self>::SUBTREE_DEPTHS[bucket_index];
+                let table = self.kvdb_snapshot.table(cf_for_depth(depth))?;
+                let keys: Vec<_> =
+                    bucket.iter().map(|(_, idx)| key_serializer::subtree_db_key(*idx)).collect();
+                let key_refs: Vec<&[u8]> = keys.iter().map(KeyBytes::as_slice).collect();
+
+                let db_results = self.kvdb_snapshot.multi_get(&table, &key_refs)?;
+
+                bucket
+                    .into_iter()
+                    .zip(db_results)
+                    .map(|((original_index, node_index), opt)| {
+                        let subtree = match opt {
+                            Some(bytes) => Some(Subtree::from_vec(node_index, &bytes)?),
+                            None => None,
+                        };
+                        Ok((original_index, subtree))
+                    })
+                    .collect()
+            })
+            .collect();
+
+        for bucket_result in bucket_results? {
+            for (original_index, subtree) in bucket_result {
+                results[original_index] = subtree;
+            }
+        }
+
+        Ok(results)
+    }
+
+    /// Retrieves a single inner node from within a snapshot subtree.
+    fn get_inner_node(&self, index: NodeIndex) -> StorageResult<Option<InnerNode>> {
+        if index.depth() < IN_MEMORY_DEPTH {
+            return Err(StorageError::Unsupported(
+                "Cannot get inner node from upper part of the tree".into(),
+            ));
+        }
+        let subtree_root_index = Subtree::find_subtree_root(index);
+        Ok(self
+            .get_subtree(subtree_root_index)?
+            .and_then(|subtree| subtree.get_inner_node(index)))
+    }
+
+    /// Returns an iterator over all leaves in this snapshot.
+    fn iter_leaves(
+        &self,
+    ) -> StorageResult<Box<dyn Iterator<Item = StorageResult<(u64, SmtLeaf)>> + '_>> {
+        let table = self.kvdb_snapshot.table(LEAVES_CF)?;
+        let iter = self.kvdb_snapshot.iter(table).map(|result| {
+            result.and_then(|(key_bytes, value_bytes)| {
+                let idx = index_from_key_bytes(&key_bytes)?;
+                let leaf = SmtLeaf::read_from_bytes_with_budget(&value_bytes, value_bytes.len())?;
+                Ok((idx, leaf))
+            })
+        });
+        Ok(Box::new(iter))
+    }
+
+    /// Returns an iterator over all subtrees in this snapshot.
+    fn iter_subtrees(
+        &self,
+    ) -> StorageResult<Box<dyn Iterator<Item = StorageResult<Subtree>> + '_>> {
+        const SUBTREE_CFS: [&str; 6] = [
+            SUBTREE_16_CF,
+            SUBTREE_24_CF,
+            SUBTREE_32_CF,
+            SUBTREE_40_CF,
+            SUBTREE_48_CF,
+            SUBTREE_56_CF,
+        ];
+
+        let mut iters: Vec<_> = Vec::new();
+        for (cf_index, cf_name) in SUBTREE_CFS.into_iter().enumerate() {
+            let table = self.kvdb_snapshot.table(cf_name)?;
+            let depth = IN_MEMORY_DEPTH + (cf_index * 8) as u8;
+
+            let iter = self.kvdb_snapshot.iter(table).map(move |result| {
+                result.and_then(|(key_bytes, value_bytes)| {
+                    let node_idx = subtree_root_from_key_bytes(&key_bytes, depth)?;
+                    Ok(Subtree::from_vec(node_idx, &value_bytes)?)
+                })
+            });
+            iters.push(iter);
+        }
+
+        Ok(Box::new(iters.into_iter().flatten()))
+    }
+
+    /// Retrieves roots of all top level subtrees for efficient startup reconstruction.
+    fn get_top_subtree_roots(&self) -> StorageResult<Vec<(u64, Word)>> {
+        let table = self.kvdb_snapshot.table(IN_MEM_DEPTH_CF)?;
+        let iter = self.kvdb_snapshot.iter(table);
+        let mut hashes = Vec::new();
+
+        for item in iter {
+            let (key_bytes, value_bytes) = item?;
+
+            let index = index_from_key_bytes(&key_bytes)?;
+            let hash = Word::read_from_bytes_with_budget(&value_bytes, value_bytes.len())?;
+
+            hashes.push((index, hash));
+        }
+
+        Ok(hashes)
+    }
+}

@@ -107,6 +107,14 @@ test-p3-parallel: ## Run Miden STARK crate tests with the parallel feature enabl
 test-large-smt: ## Run large SMT unit tests and RocksDB integration tests
 	cargo nextest run --success-output immediate --profile large-smt --cargo-profile test-release --features persistent-forest
 
+.PHONY: test-large-smt-no-forest
+test-large-smt-no-forest: ## Run large SMT unit and integration tests without large_forest tests
+	cargo nextest run --success-output immediate --profile large-smt-no-forest --cargo-profile test-release --features rocksdb
+
+.PHONY: test-large-smt-fjall
+test-large-smt-fjall: ## Run large SMT unit and integration tests with Fjall database backend
+	cargo nextest run --success-output immediate --profile large-smt-no-forest --cargo-profile test-release --package miden-crypto --features smt-kvdb-fjall
+
 .PHONY: test
 test: test-default test-no-std test-docs test-large-smt ## Run all tests except concurrent SMT tests
 
@@ -163,6 +171,22 @@ build-sve: ## Build with sve support
 bench: ## Run crypto benchmarks
 	cargo bench --features concurrent
 
+.PHONY: bench-large-smt-criterion-rocksdb
+bench-large-smt-criterion-rocksdb: ## Run criterion large SMT benchmarks with rocksdb storage
+	cargo bench --bench large_smt --features rocksdb -- "large_smt|rocksdb"
+
+.PHONY: bench-large-smt-codspeed-rocksdb
+bench-large-smt-codspeed-rocksdb: ## Run codspeed large SMT benchmarks with rocksdb storage
+	cargo bench --bench smt_codspeed --features rocksdb -- "large_smt/rocksdb"
+
+.PHONY: bench-large-smt-criterion-fjall
+bench-large-smt-criterion-fjall: ## Run criterion large SMT benchmarks with Fjall storage
+	cargo bench --bench large_smt --features smt-kvdb-fjall -- "large_smt|rocksdb"
+
+.PHONY: bench-large-smt-codspeed-fjall
+bench-large-smt-codspeed-fjall: ## Run codspeed large SMT benchmarks with Fjall storage
+	cargo bench --bench smt_codspeed --features smt-kvdb-fjall -- "large_smt/rocksdb"
+
 .PHONY: bench-smt-concurrent
 bench-smt-concurrent: ## Run SMT benchmarks with concurrent feature
 	cargo run --bin miden-crypto --release --features concurrent,executable -- --size 1000000
@@ -173,11 +197,19 @@ bench-large-smt-memory: ## Run large SMT benchmarks with memory storage
 
 .PHONY: bench-large-smt-rocksdb
 bench-large-smt-rocksdb: ## Run large SMT benchmarks with rocksdb storage
-	cargo run --bin miden-crypto --release --features concurrent,rocksdb,executable -- --storage rocksdb --size 1000000
+	cargo run --bin miden-crypto --release --features concurrent,rocksdb,executable -- --storage rocksdb --size 1000000 --reset
 
 .PHONY: bench-large-smt-rocksdb-open
 bench-large-smt-rocksdb-open: ## Run large SMT benchmarks with rocksdb storage and open existing database
 	cargo run --bin miden-crypto --release --features concurrent,rocksdb,executable -- --storage rocksdb --open
+
+.PHONY: bench-large-smt-fjall
+bench-large-smt-fjall: ## Run large SMT benchmarks with Fjall storage
+	cargo run --bin miden-crypto --release --features executable,smt-kvdb-fjall -- --storage rocksdb --size 1000000 --reset
+
+.PHONY: bench-large-smt-fjall-open
+bench-large-smt-fjall-open: ## Run large SMT benchmarks on existing database with Fjall storage
+	cargo run --bin miden-crypto --release --features executable,smt-kvdb-fjall -- --storage rocksdb --open
 
 # --- fuzzing --------------------------------------------------------------------------------
 

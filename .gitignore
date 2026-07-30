@@ -10,6 +10,7 @@ cmake-build-*
 
 # VS Code
 .vscode/
+.idea/
 
 # Proptest
 tests.txt
