@@ -1,7 +1,7 @@
 //! Contains internal functionality for interacting with RocksDB that is not exposed in the RocksDB
 //! crate or the RocksDB C wrapper.
 
-use crate::merkle::smt::large_forest::backend::persistent::WriteBatch;
+use rocksdb::WriteBatch;
 
 /// Merges the provided [`WriteBatch`]es into a single batch using efficient raw-memory operations.
 ///

@@ -1,15 +1,13 @@
 use alloc::{sync::Arc, vec::Vec};
-use core::mem::ManuallyDrop;
 use std::collections::HashMap;
 
 use miden_serde_utils::{Deserializable, Serializable};
-use rocksdb as db;
 
 use super::{
     super::{BackendError, Result},
-    LEAVES_CF,
     iterator::PersistentBackendEntriesIterator,
     keys::{LeafKey, SubtreeKey},
+    schema::*,
     subtree_cf_name,
     tree_metadata::TreeMetadata,
 };
@@ -20,6 +18,7 @@ use crate::{
         smt::{
             BackendReader, InnerNode, LeafIndex, LineageId, SMT_DEPTH, SmtLeaf, SmtProof, Subtree,
             TreeEntry, TreeWithRoot, VersionId, full::concurrent::SUBTREE_DEPTH,
+            large::storage::kvdb::*,
         },
     },
 };
@@ -28,37 +27,13 @@ use crate::{
 // ================================================================================================
 
 /// Inner state shared by all clones of a [`PersistentBackendReader`].
-///
-/// Pairs a RocksDB point-in-time snapshot with the `Arc<DB>` that owns the database, so that
-/// the database is guaranteed to outlive the snapshot.
-///
-/// # Safety
-///
-/// `snapshot` contains an internal pointer into the `DB` allocation. `db` must not be dropped
-/// (i.e. its refcount must not reach zero) while `snapshot` is live. The `Drop` impl enforces
-/// this by explicitly dropping `snapshot` before the `Arc<DB>` field is automatically decremented.
-pub(super) struct SnapshotInner {
-    /// The RocksDB snapshot providing the consistent read view.
-    ///
-    /// The `'static` lifetime is a sound lie: the real lifetime is tied to `db`. The `Drop` impl
-    /// guarantees we drop this before `db`.
-    snapshot: ManuallyDrop<db::Snapshot<'static>>,
-    /// Keeps the database alive for at least as long as `snapshot`.
-    db: Arc<db::DB>,
+pub(super) struct SnapshotInner<TKVDB: KVDB> {
+    kvdb_snapshot: TKVDB::Snapshot,
     /// Point-in-time view of the lineage metadata, shared with the backend via copy-on-write.
     lineages: Arc<HashMap<LineageId, TreeMetadata>>,
 }
 
-impl Drop for SnapshotInner {
-    fn drop(&mut self) {
-        // SAFETY: Drop the snapshot before the Arc<DB> refcount is decremented.
-        unsafe {
-            ManuallyDrop::drop(&mut self.snapshot);
-        }
-    }
-}
-
-impl core::fmt::Debug for SnapshotInner {
+impl<TKVDB: KVDB> core::fmt::Debug for SnapshotInner<TKVDB> {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         f.debug_struct("SnapshotInner").finish_non_exhaustive()
     }
@@ -75,35 +50,28 @@ impl core::fmt::Debug for SnapshotInner {
 /// [`PersistentBackend`](super::PersistentBackend) to provide read-only access to a consistent
 /// snapshot of the backend state without exposing any mutation capabilities.
 ///
-/// All reads go through a RocksDB snapshot, so the view is frozen at the instant
-/// [`Backend::reader`](crate::merkle::smt::Backend::reader) was called; concurrent writes to the
+/// All reads go through a DB snapshot, so the view is frozen; concurrent writes to the
 /// underlying database are invisible to this reader.
 ///
 /// Cloning is O(1): both the snapshot and the lineage metadata are owned by the inner `Arc`.
 #[derive(Clone, Debug)]
-pub struct PersistentBackendReader {
-    inner: Arc<SnapshotInner>,
+pub struct PersistentBackendReader<TKVDB: KVDB> {
+    inner: Arc<SnapshotInner<TKVDB>>,
 }
 
-impl PersistentBackendReader {
+impl<TKVDB: KVDB> PersistentBackendReader<TKVDB> {
     pub(super) fn new(
-        db: Arc<db::DB>,
-        snapshot: db::Snapshot<'static>,
+        kvdb_snapshot: TKVDB::Snapshot,
         lineages: Arc<HashMap<LineageId, TreeMetadata>>,
     ) -> Self {
-        Self {
-            inner: Arc::new(SnapshotInner {
-                snapshot: ManuallyDrop::new(snapshot),
-                db,
-                lineages,
-            }),
-        }
+        let inner = SnapshotInner { kvdb_snapshot, lineages };
+        Self { inner: Arc::new(inner) }
     }
 
     fn load_subtree(&self, tree_key: SubtreeKey) -> Result<Option<Subtree>> {
-        let cf = self.subtree_cf(tree_key.index)?;
+        let table = self.inner.kvdb_snapshot.table(subtree_cf_name(tree_key.index.depth()))?;
         let key_bytes = tree_key.to_bytes();
-        let result = match self.inner.snapshot.get_cf(cf, key_bytes) {
+        let result = match self.inner.kvdb_snapshot.get(&table, &key_bytes) {
             Ok(Some(bytes)) => Some(Subtree::from_vec(tree_key.index, &bytes)?),
             Ok(None) => None,
             Err(e) => return Err(e.into()),
@@ -112,9 +80,9 @@ impl PersistentBackendReader {
     }
 
     fn load_leaf_raw(&self, key: &LeafKey) -> Result<Option<SmtLeaf>> {
-        let col = self.cf(LEAVES_CF)?;
+        let table = self.inner.kvdb_snapshot.table(LEAVES_CF)?;
         let key_bytes = key.to_bytes();
-        let leaf_bytes = self.inner.snapshot.get_cf(col, key_bytes)?;
+        let leaf_bytes = self.inner.kvdb_snapshot.get(&table, &key_bytes)?;
         Ok(match leaf_bytes {
             Some(bytes) => Some(SmtLeaf::read_from_bytes_with_budget(&bytes, bytes.len())?),
             None => None,
@@ -128,27 +96,9 @@ impl PersistentBackendReader {
         };
         self.load_leaf_raw(&key)
     }
-
-    #[inline(always)]
-    fn subtree_cf(&self, index: NodeIndex) -> Result<&db::ColumnFamily> {
-        self.subtree_cf_depth(index.depth())
-    }
-
-    #[inline(always)]
-    fn subtree_cf_depth(&self, depth: u8) -> Result<&db::ColumnFamily> {
-        let cf_name = subtree_cf_name(depth);
-        self.cf(cf_name)
-    }
-
-    #[inline(always)]
-    fn cf(&self, name: &str) -> Result<&db::ColumnFamily> {
-        self.inner.db.cf_handle(name).ok_or_else(|| {
-            BackendError::internal_from_message(format!("Could not load column with name {name}"))
-        })
-    }
 }
 
-impl BackendReader for PersistentBackendReader {
+impl<TKVDB: KVDB> BackendReader for PersistentBackendReader<TKVDB> {
     fn open(&self, lineage: LineageId, key: Word) -> Result<SmtProof> {
         open_proof(
             &self.inner.lineages,
@@ -207,14 +157,8 @@ impl BackendReader for PersistentBackendReader {
             return Err(BackendError::UnknownLineage(lineage));
         }
         let lineage_bytes = lineage.to_bytes();
-        let cf = self.cf(LEAVES_CF)?;
-        let mut read_opts = db::ReadOptions::default();
-        read_opts.set_prefix_same_as_start(true);
-        let pfx_iterator = self.inner.snapshot.iterator_cf_opt(
-            cf,
-            read_opts,
-            db::IteratorMode::From(&lineage_bytes, db::Direction::Forward),
-        );
+        let table = self.inner.kvdb_snapshot.table(LEAVES_CF)?;
+        let pfx_iterator = self.inner.kvdb_snapshot.iter_prefix(&table, &lineage_bytes);
         Ok(PersistentBackendEntriesIterator::new(lineage, pfx_iterator))
     }
 }

@@ -15,13 +15,38 @@ use crate::{
 mod error;
 pub use error::{StorageError, StorageResult};
 
-#[cfg(feature = "rocksdb")]
-mod rocksdb;
-#[cfg(feature = "rocksdb")]
-pub use rocksdb::{
-    RocksDbBloomFilterBitsPerKey, RocksDbConfig, RocksDbDurabilityMode, RocksDbMemoryBudget,
-    RocksDbSnapshotStorage, RocksDbStorage, RocksDbTuningOptions, RocksDbWriteBufferManagerBudget,
-};
+#[cfg(feature = "smt-kvdb")]
+pub mod kvdb;
+
+#[cfg(feature = "smt-kvdb")]
+pub mod config;
+
+#[cfg(feature = "smt-kvdb")]
+mod schema;
+
+#[cfg(feature = "smt-kvdb")]
+mod persistent;
+
+#[cfg(feature = "smt-kvdb-rocks")]
+mod rocks_kvdb_batch_append;
+
+#[cfg(feature = "smt-kvdb-rocks")]
+pub mod rocks_kvdb;
+#[cfg(feature = "smt-kvdb-rocks")]
+mod rocks_kvdb_schema;
+#[cfg(feature = "smt-kvdb-rocks")]
+pub type PersistentSmtStorage = persistent::KVDBSmtStorage<rocks_kvdb_schema::RocksKVDBSchema>;
+#[cfg(feature = "smt-kvdb-rocks")]
+pub type PersistentSmtStorageSnapshot = persistent::KVDBSnapshotStorage<rocks_kvdb::RocksKVDB>;
+
+#[cfg(all(feature = "smt-kvdb-fjall", not(feature = "smt-kvdb-default")))]
+pub mod fjall_kvdb;
+#[cfg(all(feature = "smt-kvdb-fjall", not(feature = "smt-kvdb-default")))]
+mod fjall_kvdb_schema;
+#[cfg(all(feature = "smt-kvdb-fjall", not(feature = "smt-kvdb-default")))]
+pub type PersistentSmtStorage = persistent::KVDBSmtStorage<fjall_kvdb_schema::FjallKVDBSchema>;
+#[cfg(all(feature = "smt-kvdb-fjall", not(feature = "smt-kvdb-default")))]
+pub type PersistentSmtStorageSnapshot = persistent::KVDBSnapshotStorage<fjall_kvdb::FjallKVDB>;
 
 mod memory;
 pub use memory::{MemoryStorage, MemoryStorageSnapshot};

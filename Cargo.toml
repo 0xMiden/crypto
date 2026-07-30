@@ -68,11 +68,13 @@ chacha20poly1305    = { default-features = false, version = "0.11.0-rc.3" }
 curve25519-dalek    = { default-features = false, version = "5.0.0-rc.1" }
 der                 = { default-features = false, version = "0.8" }
 ed25519-dalek       = { default-features = false, version = "3.0.0-rc.1" }
+fjall               = { default-features = false, git = "https://github.com/battlmonstr/miden-crypto-fjall", rev = "2c28486" }
 flume               = { default-features = false, version = "0.12.0" }
 hex                 = { default-features = false, version = "0.4" }
 hkdf                = { default-features = false, version = "0.13" }
 itertools           = "0.15"
 k256                = { default-features = false, version = "0.14" }
+lsm-tree            = { default-features = false, git = "https://github.com/battlmonstr/miden-crypto-lsm-tree", rev = "49ca18da" }
 num                 = { default-features = false, version = "0.4" }
 num-complex         = { default-features = false, version = "0.4" }
 once_cell           = { default-features = false, version = "1.21" }

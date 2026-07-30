@@ -20,17 +20,16 @@ pub use full::{MAX_LEAF_ENTRIES, SMT_DEPTH, Smt, SmtLeaf, SmtLeafError, SmtProof
 mod large;
 #[cfg(feature = "internal")]
 pub use full::concurrent::{SubtreeLeaf, build_subtree_for_bench};
+#[cfg(feature = "smt-kvdb")]
+pub use large::storage_config::*;
 #[cfg(feature = "concurrent")]
 pub use large::{
     LargeSmt, LargeSmtError, LargeSmtResult, MemoryStorage, MemoryStorageSnapshot, SmtStorage,
     SmtStorageReader, StorageError, StorageResult, StorageUpdateParts, StorageUpdates, Subtree,
     SubtreeError, SubtreeUpdate,
 };
-#[cfg(feature = "rocksdb")]
-pub use large::{
-    RocksDbBloomFilterBitsPerKey, RocksDbConfig, RocksDbDurabilityMode, RocksDbMemoryBudget,
-    RocksDbSnapshotStorage, RocksDbStorage, RocksDbTuningOptions, RocksDbWriteBufferManagerBudget,
-};
+#[cfg(feature = "smt-kvdb")]
+pub use large::{PersistentSmtStorage, PersistentSmtStorageSnapshot};
 
 mod large_forest;
 pub use large_forest::{
@@ -44,10 +43,7 @@ pub use large_forest::{
     VersionId,
 };
 #[cfg(feature = "persistent-forest")]
-pub use large_forest::{
-    PersistentBackend as ForestPersistentBackend, PersistentBackendConfig,
-    PersistentBackendReader as ForestPersistentBackendReader,
-};
+pub use large_forest::{PersistentBackend as ForestPersistentBackend, PersistentBackendConfig};
 
 mod simple;
 pub use simple::{SimpleSmt, SimpleSmtProof};

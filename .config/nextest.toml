@@ -13,3 +13,13 @@ failure-output = "immediate-final"
 default-filter = '(test(merkle::smt::large) or binary(rocksdb_large_smt))'
 fail-fast      = false
 failure-output = "immediate-final"
+
+[profile.large-smt-no-forest]
+default-filter = '(test(merkle::smt::large::) or binary(rocksdb_large_smt))'
+fail-fast      = false
+failure-output = "immediate-final"
+
+[profile.large-smt-forest]
+default-filter = 'test(merkle::smt::large_forest)'
+fail-fast      = false
+failure-output = "immediate-final"

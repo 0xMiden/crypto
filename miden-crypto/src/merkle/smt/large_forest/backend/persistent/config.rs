@@ -17,7 +17,7 @@ const DEFAULT_MAX_OPEN_FILES: usize = 1 << 9;
 /// The default maximum size of the write-ahead log in bytes (1 GiB).
 const DEFAULT_MAX_TOTAL_WAL_SIZE_BYTES: u64 = 1 << 30;
 
-/// The default number of bits in the RocksDB bloom filter to use per key.
+/// The default number of bits in the DB bloom filter to use per key.
 const DEFAULT_BLOOM_FILTER_BITS_PER_KEY: c_double = 10.0;
 
 /// The default target file size for the files that make up the database (512 MiB).
@@ -64,7 +64,7 @@ pub struct Config {
     /// Defaults to [`DEFAULT_MAX_TOTAL_WAL_SIZE_BYTES`].
     pub(super) max_wal_size: u64,
 
-    /// The number of bits in the RocksDB bloom filter to use per key.
+    /// The number of bits in the DB bloom filter to use per key.
     ///
     /// This setting balances between the amount of work to look up a key and the size of the bloom
     /// filter. If the bloom filter gets too large, it gets too complex to query and hence slows
@@ -182,7 +182,7 @@ impl Config {
         self
     }
 
-    /// The number of bits in the RocksDB bloom filter to use per key.
+    /// The number of bits in the DB bloom filter to use per key.
     ///
     /// This setting balances between the amount of work to look up a key and the size of the bloom
     /// filter. If the bloom filter gets too large, it gets too complex to query and hence slows

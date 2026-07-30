@@ -10,7 +10,7 @@ operations in `miden-crypto`.
 Run the benchmarks locally with:
 
 ```sh
-cargo codspeed build --measurement-mode walltime --profile optimized -p miden-crypto-smt-codspeed-bench --bench smt_codspeed
+cargo codspeed build --measurement-mode walltime --profile optimized -p miden-crypto-smt-codspeed-bench --bench smt_codspeed --features smt-kvdb-rocks
 cargo codspeed run --measurement-mode walltime -p miden-crypto-smt-codspeed-bench --bench smt_codspeed
 ```
 

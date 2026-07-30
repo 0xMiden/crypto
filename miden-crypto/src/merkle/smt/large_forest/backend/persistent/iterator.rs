@@ -1,41 +1,33 @@
 //! This module contains the iterator needed by the persistent backend of the forest.
 
 use alloc::boxed::Box;
+use std::ops::Deref;
 
 use miden_serde_utils::Deserializable;
-use rocksdb as db;
 
 use crate::{
     Word,
     merkle::smt::{
-        LineageId, SmtLeaf, TreeEntry, large_forest::backend::persistent::keys::LeafKey,
+        LineageId, SmtLeaf, StorageResult, TreeEntry,
+        large_forest::backend::persistent::keys::LeafKey,
     },
 };
-
-// TYPE ALIASES
-// ================================================================================================
-
-/// The type of the underlying iterator over the database.
-///
-/// The type of items that it yields is not statically known, as it just provides bytes for
-/// key-value pairs. Decoding these into the correct types is up to the client of the type.
-pub type DBIterator<'db> = db::DBIteratorWithThreadMode<'db, super::DB>;
 
 // ENTRIES ITERATOR
 // ================================================================================================
 
 /// An iterator over the entries for a given tree in the backend.
-pub struct PersistentBackendEntriesIterator<'db> {
+pub struct PersistentBackendEntriesIterator<DBIterator> {
     /// The lineage whose leaves are being iterated over.
     pub lineage: LineageId,
 
     /// The iterator over all leaves in the database.
-    iterator: DBIterator<'db>,
+    iterator: DBIterator,
 
     /// State-machine tracking.
     state: PersistentBackendEntriesIteratorState,
 }
-impl<'db> PersistentBackendEntriesIterator<'db> {
+impl<DBIterator> PersistentBackendEntriesIterator<DBIterator> {
     /// Constructs a new such iterator in the starting state.
     ///
     /// The provided `iterator` must yield items where the key decodes to a `LeafKey` and the value
@@ -44,7 +36,7 @@ impl<'db> PersistentBackendEntriesIterator<'db> {
     /// For performance, this iterator should be passed a prefix iterator over the database with the
     /// correct prefix (corresponding to the provided `lineage`) set, but it will still function
     /// properly if this is not the case.
-    pub fn new(lineage: LineageId, iterator: DBIterator<'db>) -> Self {
+    pub fn new(lineage: LineageId, iterator: DBIterator) -> Self {
         let state = PersistentBackendEntriesIteratorState::NotInLeaf;
         Self { lineage, iterator, state }
     }
@@ -66,7 +58,12 @@ enum PersistentBackendEntriesIteratorState {
     Faulted,
 }
 
-impl<'db> Iterator for PersistentBackendEntriesIterator<'db> {
+impl<DBIterator, K, V> Iterator for PersistentBackendEntriesIterator<DBIterator>
+where
+    DBIterator: Iterator<Item = StorageResult<(K, V)>>,
+    K: Deref<Target = [u8]>,
+    V: Deref<Target = [u8]>,
+{
     type Item = super::Result<TreeEntry>;
 
     /// Advances the iterator and returns the next item if present.

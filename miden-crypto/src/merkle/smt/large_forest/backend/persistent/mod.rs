@@ -28,23 +28,30 @@
 //! characteristics.
 
 pub mod config;
-mod internal;
 mod iterator;
 mod keys;
 mod property_tests;
+mod schema;
 mod snapshot;
 mod tests;
 mod tree_metadata;
 
 use alloc::{string::ToString, sync::Arc, vec::Vec};
-use core::ffi::c_int;
 use std::{collections::HashMap, mem};
 
 use miden_serde_utils::{Deserializable, DeserializationError, Serializable};
 use num::Integer;
 use rayon::prelude::*;
-use rocksdb as db;
-pub use snapshot::PersistentBackendReader;
+use schema::*;
+use snapshot::PersistentBackendReader;
+
+use crate::merkle::smt::large::{storage::kvdb::*, storage_config::*};
+
+#[cfg(feature = "smt-kvdb-rocks")]
+pub mod schema_rocks_kvdb;
+
+#[cfg(all(feature = "smt-kvdb-fjall", not(feature = "smt-kvdb-default")))]
+pub mod schema_fjall_kvdb;
 
 use super::{BackendError, Result};
 #[cfg(test)]
@@ -65,7 +72,6 @@ use crate::{
             large_forest::{
                 backend::persistent::{
                     config::Config,
-                    internal::merge_batches,
                     iterator::PersistentBackendEntriesIterator,
                     keys::{LeafKey, SubtreeKey},
                     tree_metadata::TreeMetadata,
@@ -78,20 +84,11 @@ use crate::{
     },
 };
 
-// TYPE ALIASES
-// ================================================================================================
-
-/// The type of the underlying RocksDB database in use by this backend.
-type DB = db::DB;
-
-/// The type of a write batch in the database associated with a transaction.
-type WriteBatch = db::WriteBatch;
-
 /// Prepared mutations for [`PersistentBackend`].
 ///
 /// This is the persistent backend's concrete [`Backend::PreparedMutations`] type. It stores
 /// storage-level updates and the resulting metadata computed during the first phase of a forest
-/// update. Applying it builds and commits a RocksDB [`WriteBatch`] without recomputing the Merkle
+/// update. Applying it builds and commits a changes batch without recomputing the Merkle
 /// update batches.
 ///
 /// The fields are private because callers should treat prepared mutation data as opaque and pass it
@@ -115,62 +112,6 @@ struct PersistentPreparedLineageMutation {
     kind: LineageMutationKind,
 }
 
-// CONSTANTS / COLUMN FAMILY NAMES
-// ================================================================================================
-
-const LEAVES_CF: &str = "v1/leaves";
-const METADATA_CF: &str = "v1/metadata";
-
-const SUBTREE_00_CF: &str = "v1/st00";
-const SUBTREE_08_CF: &str = "v1/st08";
-const SUBTREE_16_CF: &str = "v1/st16";
-const SUBTREE_24_CF: &str = "v1/st24";
-const SUBTREE_32_CF: &str = "v1/st32";
-const SUBTREE_40_CF: &str = "v1/st40";
-const SUBTREE_48_CF: &str = "v1/st48";
-const SUBTREE_56_CF: &str = "v1/st56";
-
-const SUBTREE_CFS: [&str; 8] = [
-    SUBTREE_00_CF,
-    SUBTREE_08_CF,
-    SUBTREE_16_CF,
-    SUBTREE_24_CF,
-    SUBTREE_32_CF,
-    SUBTREE_40_CF,
-    SUBTREE_48_CF,
-    SUBTREE_56_CF,
-];
-
-// CONSTANTS / DATABASE CONFIGURATION
-// ================================================================================================
-
-/// The maximum size of the write buffer for the metadata column family (currently 8 MiB).
-const MAX_METADATA_CF_WRITE_BUFFER_SIZE_BYTES: usize = 8 << 20;
-
-/// The maximum size of the write buffer for the leaves column family (currently 128 MiB).
-const MAX_LEAVES_CF_WRITE_BUFFER_SIZE_BYTES: usize = 128 << 20;
-
-/// The maximum size of the write buffer for the subtree column families (currently 128 MiB).
-const MAX_SUBTREE_CF_WRITE_BUFFER_SIZE_BYTES: usize = 128 << 20;
-
-/// The maximum number of write buffers to maintain per column family.
-const MAX_WRITE_BUFFER_COUNT: c_int = 3;
-
-/// The minimum number of write buffers to merge when flushing.
-const MIN_WRITE_BUFFERS_TO_MERGE: c_int = 1;
-
-/// The maximum number of write buffers to retain in memory when flushing.
-const MAX_WRITE_BUFFERS_TO_RETAIN: i64 = 0;
-
-/// The compression mode to be used for all column families where compression is enabled.
-///
-/// This is chosen as it has fast decompression performance, and also does not require the
-/// introduction of any additional dependencies into this project.
-const COMPRESSION_MODE: db::DBCompressionType = db::DBCompressionType::Lz4;
-
-/// Trigger compaction of L0 files when there are this many or more.
-const L0_FILE_COMPACTION_TRIGGER: c_int = 8;
-
 /// The minimum number of lineages in a batch where it is worth spawning additional threads to
 /// combine their batches in parallel.
 const MIN_LINEAGES_IN_BATCH_TO_PARALLELIZE: usize = 5;
@@ -181,7 +122,7 @@ const CHUNKING_UNIT: usize = 100;
 // BACKEND READER TRAIT
 // ================================================================================================
 
-impl BackendReader for PersistentBackend {
+impl<TKVDBFactory: KVDBFactory> BackendReader for KVDBPersistentBackend<TKVDBFactory> {
     /// Returns an opening for the specified `key` in the SMT with the specified `lineage`.
     ///
     /// # Errors
@@ -298,13 +239,14 @@ impl BackendReader for PersistentBackend {
             return Err(BackendError::UnknownLineage(lineage));
         }
 
+        let table = self.kvdb.table(LEAVES_CF)?;
         let lineage_bytes = lineage.to_bytes();
 
         // In order to improve iteration performance significantly, we iterate with a prefix. As
         // leaves are keyed on `LeafKey`, which begins with the bytes of the lineage, we can use the
         // lineage as our prefix. That means that the iterator should only yield values whose key
         // begins with the prefix with a high likelihood.
-        let pfx_iterator = self.db.prefix_iterator_cf(self.cf(LEAVES_CF)?, lineage_bytes);
+        let pfx_iterator = self.kvdb.iter_prefix(&table, &lineage_bytes);
 
         // Data ownership concerns mean we cannot use this iterator directly even if we could change
         // its type, so we delegate to our custom entries iterator impl.
@@ -315,21 +257,14 @@ impl BackendReader for PersistentBackend {
 // BACKEND TRAIT
 // ================================================================================================
 
-impl Backend for PersistentBackend {
-    type Reader = PersistentBackendReader;
+impl<TKVDBFactory: KVDBFactory> Backend for KVDBPersistentBackend<TKVDBFactory> {
+    type Reader = PersistentBackendReader<TKVDBFactory::TKVDB>;
     type PreparedMutations = PersistentPreparedMutations;
 
     fn reader(&self) -> Result<Self::Reader> {
-        let snapshot = self.db.snapshot();
-        // SAFETY: `SnapshotInner` holds both the snapshot and `Arc<DB>`, and its `Drop` impl
-        // drops the snapshot before decrementing the Arc. This guarantees the DB outlives the
-        // snapshot, making the 'static transmute sound.
-        let snapshot: db::Snapshot<'static> = unsafe { mem::transmute(snapshot) };
-        Ok(PersistentBackendReader::new(
-            Arc::clone(&self.db),
-            snapshot,
-            Arc::clone(&self.lineages),
-        ))
+        let kvdb_snapshot = self.kvdb.snapshot()?;
+        let reader = PersistentBackendReader::new(kvdb_snapshot, Arc::clone(&self.lineages));
+        Ok(reader)
     }
 
     /// Computes the mutations required to apply the provided `updates` on the forest.
@@ -432,6 +367,9 @@ impl Backend for PersistentBackend {
         }
 
         let lineage_count = mutations.entries.len();
+        if lineage_count == 0 {
+            return Ok(Vec::new());
+        }
 
         // We want to update all trees as part of an atomic update to the backing database, but we
         // also want to do this in parallel. As we cannot share a transaction directly, we instead
@@ -440,7 +378,7 @@ impl Backend for PersistentBackend {
             .entries
             .into_iter()
             .map(|mutation| {
-                let batch = WriteBatch::default();
+                let batch = self.kvdb.batch();
                 (mutation, batch)
             })
             .collect::<Vec<_>>();
@@ -468,19 +406,28 @@ impl Backend for PersistentBackend {
         let (batches, (applied_entries, metadata_updates)): (Vec<_>, (Vec<_>, Vec<_>)) =
             lineage_data.into_iter().unzip();
 
+        fn merge_batches<'a, TKVDB: KVDB>(
+            l: <TKVDB as KVDB>::Batch<'a>,
+            r: <TKVDB as KVDB>::Batch<'a>,
+        ) -> <TKVDB as KVDB>::Batch<'a> {
+            l.append(&r)
+        }
+
         // We construct our final WriteBatch in parallel if we have enough of them, otherwise we
         // just do it in serial.
         let final_batch = if lineage_count > MIN_LINEAGES_IN_BATCH_TO_PARALLELIZE {
             batches
                 .into_par_iter()
-                .fold(WriteBatch::new, |l, r| merge_batches(l, &r))
-                .reduce(WriteBatch::new, |l, r| merge_batches(l, &r))
+                .fold(|| self.kvdb.batch(), merge_batches::<TKVDBFactory::TKVDB>)
+                .reduce(|| self.kvdb.batch(), merge_batches::<TKVDBFactory::TKVDB>)
         } else {
-            batches.into_iter().fold(WriteBatch::new(), |l, r| merge_batches(l, &r))
+            batches
+                .into_iter()
+                .fold(self.kvdb.batch(), merge_batches::<TKVDBFactory::TKVDB>)
         };
 
         // We first write the full atomic update to disk. If it errors, we bail.
-        self.write(final_batch)?;
+        final_batch.commit()?;
 
         // If it hasn't errored, we can now safely update the in-memory metadata cache.
         self.lineages_mut().extend(metadata_updates);
@@ -491,7 +438,7 @@ impl Backend for PersistentBackend {
 
 // These are the implementations of helper methods used by the backend tests.
 #[cfg(test)]
-impl PersistentBackend {
+impl<TKVDBFactory: KVDBFactory> KVDBPersistentBackend<TKVDBFactory> {
     /// Adds the provided `lineage` to the forest with the provided `version` and sets the
     /// associated tree to have the value created by applying `updates` to the empty tree, returning
     /// the root of this new tree.
@@ -637,12 +584,12 @@ impl PersistentBackend {
 /// The persistent backend for the SMT forest, providing durable storage for the latest tree in each
 /// lineage in the forest.
 #[derive(Debug)]
-pub struct PersistentBackend {
+pub struct KVDBPersistentBackend<TKVDBFactory: KVDBFactory> {
     /// The underlying database.
     ///
     /// # Layout
     ///
-    /// The data on each tree is stored across a series of RocksDB column families, along with
+    /// The data on each tree is stored across a series of database tables, along with
     /// additional metadata. The layout is fixed (for the moment), and has the following column
     /// families.
     ///
@@ -652,7 +599,7 @@ pub struct PersistentBackend {
     ///   speed up common queries.
     /// - `SUBTREE_XX_CF`: Stores the [`Subtree`]s with their root at level `XX` in the backend,
     ///   keyed on the [`SubtreeKey`].
-    db: Arc<DB>,
+    kvdb: TKVDBFactory::TKVDB,
 
     /// An in-memory cache of the tree metadata enabling the more rapid servicing of certain kinds
     /// of queries.
@@ -663,15 +610,9 @@ pub struct PersistentBackend {
     /// Care must be taken that this is _always_ kept in sync with the on-disk copy in the
     /// [`METADATA_CF`] column.
     lineages: Arc<HashMap<LineageId, TreeMetadata>>,
-
-    /// Whether writes should be synchronously flushed to disk.
-    ///
-    /// Setting this to true will result in reduced throughput but may result in higher durability
-    /// in the presence of crashes.
-    sync_writes: bool,
 }
 
-impl PersistentBackend {
+impl<TKVDBFactory: KVDBFactory> KVDBPersistentBackend<TKVDBFactory> {
     /// Constructs an instance of the persistent backend, either opening or creating the data store
     /// at the location specified in the `config`.
     ///
@@ -681,11 +622,30 @@ impl PersistentBackend {
     ///   from disk.
     /// - [`BackendError::Internal`] if the backend cannot be started up properly.
     pub fn load(config: Config) -> Result<Self> {
-        let db = Arc::new(Self::build_db_with_options(&config)?);
-        let lineages = Arc::new(Self::read_all_metadata(db.clone())?);
-        let sync_writes = config.sync_writes;
+        let durability_mode = if config.sync_writes {
+            PersistentSmtStorageDurabilityMode::Sync
+        } else {
+            PersistentSmtStorageDurabilityMode::Relaxed
+        };
 
-        Ok(Self { db, lineages, sync_writes })
+        let mut storage_tuning_opts = PersistentSmtStorageTuningOptions {
+            max_total_wal_size: config.max_wal_size,
+            target_file_size: config.target_file_size,
+            ..Default::default()
+        };
+        storage_tuning_opts.bloom_filter_bits_per_key.leaves = config.bloom_filter_bits;
+
+        let storage_config = PersistentSmtStorageConfig::new(config.path)
+            .with_cache_size(config.cache_size_bytes)
+            .with_max_open_files(config.max_open_files as i32)
+            .with_tuning_options(storage_tuning_opts)
+            .with_durability_mode(durability_mode);
+
+        let kvdb = TKVDBFactory::make(storage_config)?;
+
+        let lineages = Arc::new(Self::read_all_metadata(&kvdb)?);
+
+        Ok(Self { kvdb, lineages })
     }
 
     // Triggers copy-on-write: clones the shared lineages map only if other references exist.
@@ -906,13 +866,13 @@ impl PersistentBackend {
     /// # Errors
     ///
     /// - [`BackendError::Internal`] if the backend cannot be written to.
-    fn apply_updates_to_lineage(
+    fn apply_updates_to_lineage<'a>(
         &self,
-        mut batch: WriteBatch,
+        mut batch: <TKVDBFactory::TKVDB as KVDB>::Batch<'a>,
         lineage: LineageId,
         updates: StorageUpdates,
-    ) -> Result<WriteBatch> {
-        let leaves_cf = self.cf(LEAVES_CF)?;
+    ) -> Result<<TKVDBFactory::TKVDB as KVDB>::Batch<'a>> {
+        let leaves_cf = self.kvdb.table(LEAVES_CF)?;
 
         let StorageUpdateParts { leaf_updates, subtree_updates, .. } = updates.into_parts();
 
@@ -920,8 +880,8 @@ impl PersistentBackend {
         for (k, v) in leaf_updates {
             let key_bytes = LeafKey { lineage, index: k }.to_bytes();
             match v {
-                Some(leaf) => batch.put_cf(leaves_cf, key_bytes, leaf.to_bytes()),
-                None => batch.delete_cf(leaves_cf, key_bytes),
+                Some(leaf) => batch.put(&leaves_cf, &key_bytes, &leaf.to_bytes()),
+                None => batch.delete(&leaves_cf, &key_bytes),
             }
         }
 
@@ -939,7 +899,7 @@ impl PersistentBackend {
 
                 let key = SubtreeKey { lineage, index };
                 let key_bytes = key.to_bytes();
-                let cf = self.subtree_cf(index)?;
+                let cf = self.kvdb.table(subtree_cf_name(index.depth()))?;
                 Ok((cf, key_bytes, maybe_bytes))
             })
             .collect::<Result<Vec<_>>>()?;
@@ -947,8 +907,8 @@ impl PersistentBackend {
         // We then add all the changes to the transaction in serial for now.
         for (cf, k, mv) in update_data {
             match mv {
-                None => batch.delete_cf(cf, k),
-                Some(bytes) => batch.put_cf(cf, k, bytes),
+                None => batch.delete(&cf, &k),
+                Some(bytes) => batch.put(&cf, &k, &bytes),
             }
         }
 
@@ -1103,9 +1063,9 @@ impl PersistentBackend {
     ///
     /// - [`BackendError::Internal`] if the underlying database cannot be accessed.
     fn load_subtree(&self, tree_key: SubtreeKey) -> Result<Option<Subtree>> {
-        let cf = self.subtree_cf(tree_key.index)?;
+        let table = self.kvdb.table(subtree_cf_name(tree_key.index.depth()))?;
         let key_bytes = tree_key.to_bytes();
-        let result = match self.db.get_cf(cf, key_bytes) {
+        let result = match self.kvdb.get(&table, &key_bytes) {
             Ok(Some(bytes)) => Some(Subtree::from_vec(tree_key.index, &bytes)?),
             Ok(None) => None,
             Err(e) => return Err(e.into()),
@@ -1299,18 +1259,16 @@ impl PersistentBackend {
         &self,
         key_bytes: impl Iterator<Item = &'b Vec<u8>>,
     ) -> Result<Vec<Option<SmtLeaf>>> {
-        let col = self.cf(LEAVES_CF)?;
-        let leaves = self.db.multi_get_cf(key_bytes.map(|k| (col, k.as_slice())));
+        let table = self.kvdb.table(LEAVES_CF)?;
+        let keys: Vec<&[u8]> = key_bytes.map(Vec::as_slice).collect();
+        let leaves = self.kvdb.multi_get(&table, &keys)?;
 
         leaves
             .into_par_iter()
             .with_min_len(CHUNKING_UNIT)
             .map(|result| match result {
-                Ok(Some(bytes)) => {
-                    Ok(Some(SmtLeaf::read_from_bytes_with_budget(&bytes, bytes.len())?))
-                },
-                Ok(None) => Ok(None),
-                Err(e) => Err(e.into()),
+                Some(bytes) => Ok(Some(SmtLeaf::read_from_bytes_with_budget(&bytes, bytes.len())?)),
+                None => Ok(None),
             })
             .collect()
     }
@@ -1322,9 +1280,9 @@ impl PersistentBackend {
     /// - [`BackendError::Internal`] if the database cannot be successfully queried.
     #[inline(always)]
     fn load_leaf_raw(&self, key: &LeafKey) -> Result<Option<SmtLeaf>> {
-        let col = self.cf(LEAVES_CF)?;
+        let table = self.kvdb.table(LEAVES_CF)?;
         let key_bytes = key.to_bytes();
-        let leaf_bytes = self.db.get_cf(col, key_bytes)?;
+        let leaf_bytes = self.kvdb.get(&table, &key_bytes)?;
         let leaf = match leaf_bytes {
             Some(bytes) => Some(SmtLeaf::read_from_bytes_with_budget(&bytes, bytes.len())?),
             None => None,
@@ -1346,52 +1304,6 @@ impl PersistentBackend {
         self.load_leaf_raw(&key)
     }
 
-    /// Gets the column family corresponding to the subtree with root index `index`.
-    ///
-    /// # Errors
-    ///
-    /// - [`BackendError::Internal`] if the database cannot be accessed to get the column family.
-    #[inline(always)]
-    fn subtree_cf(&self, index: NodeIndex) -> Result<&db::ColumnFamily> {
-        self.subtree_cf_depth(index.depth())
-    }
-
-    /// Gets the column family corresponding to the subtree with root index `index`.
-    ///
-    /// # Errors
-    ///
-    /// - [`BackendError::Internal`] if the database cannot be accessed to get the column family.
-    #[inline(always)]
-    fn subtree_cf_depth(&self, depth: u8) -> Result<&db::ColumnFamily> {
-        let cf_name = subtree_cf_name(depth);
-        self.cf(cf_name)
-    }
-
-    /// Gets the column family with the specified name.
-    ///
-    /// # Errors
-    ///
-    /// - [`BackendError::Internal`] if the database cannot be accessed to get the column family.
-    #[inline(always)]
-    fn cf(&self, name: &str) -> Result<&db::ColumnFamily> {
-        self.db.cf_handle(name).ok_or_else(|| {
-            BackendError::internal_from_message(format!("Could not load column with name {name}"))
-        })
-    }
-
-    /// Writes the provided `batch` into the database as part of one atomic operation.
-    ///
-    /// # Errors
-    ///
-    /// - [`BackendError::Internal`] if writing to the database fails for any reason.
-    fn write(&self, batch: WriteBatch) -> Result<()> {
-        let mut write_opts = db::WriteOptions::default();
-        write_opts.set_sync(self.sync_writes);
-        self.db.write_opt(batch, &write_opts)?;
-
-        Ok(())
-    }
-
     /// Forces the underlying database to perform a sync to disk, and thus ensure that all data is
     /// persisted.
     ///
@@ -1399,111 +1311,8 @@ impl PersistentBackend {
     ///
     /// - [`BackendError::Internal`] if the flush to disk fails for any reason.
     fn sync(&self) -> Result<()> {
-        let mut flush_opts = db::FlushOptions::default();
-        flush_opts.set_wait(true);
-
-        // Flush all the subtree column families.
-        for name in SUBTREE_CFS {
-            self.db.flush_cf_opt(self.cf(name)?, &flush_opts)?;
-        }
-
-        // Flush the leaves and metadata column families.
-        for name in [LEAVES_CF, METADATA_CF] {
-            self.db.flush_cf_opt(self.cf(name)?, &flush_opts)?;
-        }
-
-        // Flush the WAL.
-        self.db.flush_wal(true)?;
-
+        self.kvdb.sync()?;
         Ok(())
-    }
-
-    // INTERNAL / STARTUP
-    // --------------------------------------------------------------------------------------------
-
-    /// Sets up the basic configuration for the underlying RocksDB database.
-    fn build_db_with_options(config: &Config) -> Result<DB> {
-        let mut db_opts = db::Options::default();
-
-        // We start by initially setting up the base options for the whole database.
-        db_opts.create_if_missing(true);
-        db_opts.create_missing_column_families(true);
-        db_opts.increase_parallelism(rayon::current_num_threads() as _);
-        db_opts.set_max_open_files(config.max_open_files as _);
-        db_opts.set_max_background_jobs(rayon::current_num_threads() as _);
-        db_opts.set_max_total_wal_size(config.max_wal_size);
-
-        // We want to share a block cache across all column families.
-        let cache = db::Cache::new_lru_cache(config.cache_size_bytes);
-
-        // Now we set up our basic options for all column families.
-        let mut cf_opts = db::BlockBasedOptions::default();
-        cf_opts.set_block_cache(&cache);
-        cf_opts.set_bloom_filter(config.bloom_filter_bits, false);
-        cf_opts.set_whole_key_filtering(true); // Better for point lookups.
-        cf_opts.set_pin_l0_filter_and_index_blocks_in_cache(true); // Improves performance.
-
-        // From this, we can set up the configuration for each of our column families. We start with
-        // the one for metadata.
-        let metadata_cf_opts = Self::build_cf_opts(
-            config,
-            &cf_opts,
-            MAX_METADATA_CF_WRITE_BUFFER_SIZE_BYTES,
-            db::DBCompressionType::None,
-        );
-
-        // We can also create the configuration for our leaves column family.
-        let leaves_cf_opts = Self::build_cf_opts(
-            config,
-            &cf_opts,
-            MAX_LEAVES_CF_WRITE_BUFFER_SIZE_BYTES,
-            COMPRESSION_MODE,
-        );
-
-        // Finally we create them for each of our subtree CFs.
-        let subtree_cfs = SUBTREE_CFS.into_iter().map(|name| {
-            db::ColumnFamilyDescriptor::new(
-                name,
-                Self::build_cf_opts(
-                    config,
-                    &cf_opts,
-                    MAX_SUBTREE_CF_WRITE_BUFFER_SIZE_BYTES,
-                    COMPRESSION_MODE,
-                ),
-            )
-        });
-
-        // With the column-specific configuration made, we can then simply create our database
-        // options
-        let mut columns = vec![
-            db::ColumnFamilyDescriptor::new(METADATA_CF, metadata_cf_opts),
-            db::ColumnFamilyDescriptor::new(LEAVES_CF, leaves_cf_opts),
-        ];
-        columns.extend(subtree_cfs);
-
-        Ok(DB::open_cf_descriptors(&db_opts, config.path.clone(), columns)?)
-    }
-
-    /// Unifies the building of options for column families where most parameters are shared,
-    /// customizing only the `max_write_buffer_size` and `compression_mode`.
-    fn build_cf_opts(
-        config: &Config,
-        base: &db::BlockBasedOptions,
-        max_write_buffer_size: usize,
-        compression_mode: db::DBCompressionType,
-    ) -> db::Options {
-        let mut cf_opts = db::Options::default();
-        cf_opts.set_block_based_table_factory(base);
-        cf_opts.set_write_buffer_size(max_write_buffer_size);
-        cf_opts.set_max_write_buffer_number(MAX_WRITE_BUFFER_COUNT);
-        cf_opts.set_min_write_buffer_number_to_merge(MIN_WRITE_BUFFERS_TO_MERGE);
-        cf_opts.set_max_write_buffer_size_to_maintain(MAX_WRITE_BUFFERS_TO_RETAIN);
-        cf_opts.set_compaction_style(db::DBCompactionStyle::Level);
-        cf_opts.set_target_file_size_base(config.target_file_size);
-        cf_opts.set_compression_type(compression_mode);
-        cf_opts.set_level_zero_file_num_compaction_trigger(L0_FILE_COMPACTION_TRIGGER);
-
-        cf_opts
     }
 
     /// Stages the provided `metadata` to be written to the provided `lineage` on disk within the
@@ -1515,16 +1324,16 @@ impl PersistentBackend {
     ///
     /// - [`BackendError::Internal`] if the underlying database cannot be accessed for reading or
     ///   staging.
-    fn write_metadata(
+    fn write_metadata<'a>(
         &self,
-        mut batch: WriteBatch,
+        mut batch: <TKVDBFactory::TKVDB as KVDB>::Batch<'a>,
         lineage: LineageId,
         tree_metadata: &TreeMetadata,
-    ) -> Result<WriteBatch> {
-        let metadata = self.cf(METADATA_CF)?;
+    ) -> Result<<TKVDBFactory::TKVDB as KVDB>::Batch<'a>> {
+        let metadata = self.kvdb.table(METADATA_CF)?;
         let metadata_key = lineage.to_bytes();
         let metadata_value = tree_metadata.to_bytes();
-        batch.put_cf(metadata, &metadata_key, &metadata_value);
+        batch.put(&metadata, &metadata_key, &metadata_value);
         Ok(batch)
     }
 
@@ -1535,11 +1344,11 @@ impl PersistentBackend {
     ///
     /// - [`BackendError::CorruptedData`] if data corruption is discovered.
     /// - [`BackendError::Internal`] if the metadata cannot be read from disk.
-    fn read_all_metadata(db: Arc<DB>) -> Result<HashMap<LineageId, TreeMetadata>> {
-        let cf = db.cf_handle(METADATA_CF).ok_or_else(|| {
-            BackendError::CorruptedData(format!("{METADATA_CF} column not found"))
-        })?;
-        let db_iter = db.iterator_cf(&cf, db::IteratorMode::Start);
+    fn read_all_metadata(db: &TKVDBFactory::TKVDB) -> Result<HashMap<LineageId, TreeMetadata>> {
+        let table = db
+            .table(METADATA_CF)
+            .map_err(|_| BackendError::CorruptedData(format!("{METADATA_CF} column not found")))?;
+        let db_iter = db.iter(table);
 
         db_iter
             .map(|bytes| {
@@ -1558,7 +1367,7 @@ impl PersistentBackend {
 
 /// We implement drop in order to force a sync to disk as the program shuts down, ensuring that all
 /// data is correctly persisted.
-impl Drop for PersistentBackend {
+impl<TKVDBFactory: KVDBFactory> Drop for KVDBPersistentBackend<TKVDBFactory> {
     /// Forces the database to be synced to disk on drop.
     ///
     /// # Panics
@@ -1623,14 +1432,6 @@ struct LeafMutations {
 impl From<DeserializationError> for BackendError {
     fn from(e: DeserializationError) -> Self {
         Self::CorruptedData(e.to_string())
-    }
-}
-
-/// We generically forward all errors to do with the DB implementation out of the interface of the
-/// [`Backend`] as internal errors.
-impl From<db::Error> for BackendError {
-    fn from(e: db::Error) -> Self {
-        BackendError::internal_from(e)
     }
 }
 

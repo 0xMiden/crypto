@@ -2,24 +2,24 @@
 //!
 //! `LargeSmt` stores the top of the tree (depths 0–`IN_MEMORY_DEPTH`-1) in memory and persists
 //! the lower depths in storage as fixed-size subtrees. This hybrid layout scales beyond RAM
-//! while keeping common operations fast. With the `rocksdb` feature enabled, the lower
-//! subtrees and leaves are stored in RocksDB. On reload, the in-memory top is reconstructed
+//! while keeping common operations fast. With the `smt-kvdb` feature enabled, the lower
+//! subtrees and leaves are stored in DB. On reload, the in-memory top is reconstructed
 //! from cached in-memory-depth subtree roots.
 //!
-//! Examples below require the `rocksdb` feature.
+//! Examples below require the `smt-kvdb-*` feature.
 //!
-//! Load an existing RocksDB-backed tree with root validation:
+//! Load an existing DB-backed tree with root validation:
 //! ```no_run
-//! # #[cfg(feature = "rocksdb")]
+//! # #[cfg(feature = "smt-kvdb")]
 //! # {
 //! use miden_crypto::{
 //!     Word,
-//!     merkle::smt::{LargeSmt, RocksDbConfig, RocksDbStorage},
+//!     merkle::smt::{LargeSmt, PersistentSmtStorage, PersistentSmtStorageConfig},
 //! };
 //!
 //! # fn main() -> Result<(), Box<dyn std::error::Error>> {
 //! # let expected_root: Word = miden_crypto::EMPTY_WORD;
-//! let storage = RocksDbStorage::open(RocksDbConfig::new("/path/to/db"))?;
+//! let storage = PersistentSmtStorage::open(PersistentSmtStorageConfig::new("/path/to/db"))?;
 //! let smt = LargeSmt::load_with_root(storage, expected_root)?;
 //! assert_eq!(smt.root(), expected_root);
 //! # Ok(())
@@ -29,12 +29,12 @@
 //!
 //! Load an existing tree without root validation (use with caution):
 //! ```no_run
-//! # #[cfg(feature = "rocksdb")]
+//! # #[cfg(feature = "smt-kvdb")]
 //! # {
-//! use miden_crypto::merkle::smt::{LargeSmt, RocksDbConfig, RocksDbStorage};
+//! use miden_crypto::merkle::smt::{LargeSmt, PersistentSmtStorage, PersistentSmtStorageConfig};
 //!
 //! # fn main() -> Result<(), Box<dyn std::error::Error>> {
-//! let storage = RocksDbStorage::open(RocksDbConfig::new("/path/to/db"))?;
+//! let storage = PersistentSmtStorage::open(PersistentSmtStorageConfig::new("/path/to/db"))?;
 //! let smt = LargeSmt::load(storage)?;
 //! let _root = smt.root();
 //! # Ok(())
@@ -42,13 +42,13 @@
 //! # }
 //! ```
 //!
-//! Initialize an empty RocksDB-backed tree and bulk-load entries:
+//! Initialize an empty DB-backed tree and bulk-load entries:
 //! ```no_run
-//! # #[cfg(feature = "rocksdb")]
+//! # #[cfg(feature = "smt-kvdb")]
 //! # {
 //! use miden_crypto::{
 //!     Felt, Word,
-//!     merkle::smt::{LargeSmt, RocksDbConfig, RocksDbStorage},
+//!     merkle::smt::{LargeSmt, PersistentSmtStorage, PersistentSmtStorageConfig},
 //! };
 //!
 //! # fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -58,7 +58,7 @@
 //! }
 //! std::fs::create_dir_all(path)?;
 //!
-//! let storage = RocksDbStorage::open(RocksDbConfig::new(path))?;
+//! let storage = PersistentSmtStorage::open(PersistentSmtStorageConfig::new(path))?;
 //! let mut smt = LargeSmt::new(storage)?; // empty tree
 //!
 //! // Prepare initial entries
@@ -102,15 +102,15 @@
 //!
 //! Apply batch updates (insertions and deletions):
 //! ```no_run
-//! # #[cfg(feature = "rocksdb")]
+//! # #[cfg(feature = "smt-kvdb")]
 //! # {
 //! use miden_crypto::{
 //!     EMPTY_WORD, Felt, Word,
-//!     merkle::smt::{LargeSmt, RocksDbConfig, RocksDbStorage},
+//!     merkle::smt::{LargeSmt, PersistentSmtStorage, PersistentSmtStorageConfig},
 //! };
 //!
 //! # fn main() -> Result<(), Box<dyn std::error::Error>> {
-//! let storage = RocksDbStorage::open(RocksDbConfig::new("/path/to/db"))?;
+//! let storage = PersistentSmtStorage::open(PersistentSmtStorageConfig::new("/path/to/db"))?;
 //! let mut smt = LargeSmt::load(storage)?;
 //!
 //! let k1 = Word::new([
@@ -154,11 +154,11 @@
 //!
 //! Quick initialization with `with_entries` (best for modest datasets/tests):
 //! ```no_run
-//! # #[cfg(feature = "rocksdb")]
+//! # #[cfg(feature = "smt-kvdb")]
 //! # {
 //! use miden_crypto::{
 //!     Felt, Word,
-//!     merkle::smt::{LargeSmt, RocksDbConfig, RocksDbStorage},
+//!     merkle::smt::{LargeSmt, PersistentSmtStorage, PersistentSmtStorageConfig},
 //! };
 //!
 //! # fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -170,7 +170,7 @@
 //! }
 //! std::fs::create_dir_all(path)?;
 //!
-//! let storage = RocksDbStorage::open(RocksDbConfig::new(path))?;
+//! let storage = PersistentSmtStorage::open(PersistentSmtStorageConfig::new(path))?;
 //! let entries = vec![
 //!     (
 //!         Word::new([
@@ -259,16 +259,15 @@ mod tests;
 mod subtree;
 pub use subtree::{Subtree, SubtreeError};
 
-mod storage;
+pub mod storage;
+#[cfg(feature = "smt-kvdb")]
+pub use storage::config as storage_config;
 pub use storage::{
     MemoryStorage, MemoryStorageSnapshot, SmtStorage, SmtStorageReader, StorageError,
     StorageResult, StorageUpdateParts, StorageUpdates, SubtreeUpdate,
 };
-#[cfg(feature = "rocksdb")]
-pub use storage::{
-    RocksDbBloomFilterBitsPerKey, RocksDbConfig, RocksDbDurabilityMode, RocksDbMemoryBudget,
-    RocksDbSnapshotStorage, RocksDbStorage, RocksDbTuningOptions, RocksDbWriteBufferManagerBudget,
-};
+#[cfg(feature = "smt-kvdb")]
+pub use storage::{PersistentSmtStorage, PersistentSmtStorageSnapshot};
 
 mod iter;
 pub use iter::LargeSmtInnerNodeIterator;
