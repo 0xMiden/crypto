@@ -455,7 +455,7 @@ where
             panic!();
         }
         if self.is_zero() {
-            Self::zero();
+            return Self::zero();
         }
         let mut remainder = self;
         let mut quotient = Polynomial::<F>::zero();
@@ -671,4 +671,13 @@ mod tests {
             Polynomial::reduce_negacyclic(&Polynomial::mul_modulo_p(&poly1, &poly2))
         );
     }
+
+    #[test]
+    fn div_zero_numerator_returns_zero() {
+        let zero = Polynomial::<i64>::zero();
+        let nonzero = Polynomial::new(vec![1i64, 2, 3]);
+        let result = zero / nonzero;
+        assert!(result.is_zero());
+    }
+
 }
