@@ -45,8 +45,9 @@ skip = [
   { name = "shlex", version = "=1.3.0" },
 ]
 skip-tree = [
+  { name = "num-bigint" },
   # Dev/test-only proptest still depends on rand 0.9.
-  { name = "rand", version = "=0.9.4" },
+  { name = "rand", version = "=0.9.5" },
   { name = "rand_chacha", version = "=0.9.0" },
   { name = "rand_core", version = "=0.9.5" },
 ]
