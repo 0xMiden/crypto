@@ -12,6 +12,9 @@
 - Fixed SMT leaf advice decoding by rebuilding decoded entries through `SmtLeaf::new`, so decoded entries must match the supplied leaf index ([#1076](https://github.com/0xMiden/crypto/pull/1076)).
 - Made `Felt::from_{u8, u16, u32}` const and added `Felt::MAX` ([#1081](https://github.com/0xMiden/crypto/pull/1081)).
 
+- Added a zeroizing read helper for deserializing sensitive material, fixing secret-key read buffers that were not wiped on error paths (ECDSA) or at all (Falcon, Poseidon2 AEAD) ([#1057](https://github.com/0xMiden/crypto/pull/1057)).
+- Made Falcon secret polynomial temporaries wipeable and wiped: added `Zeroize` for `FalconFelt`, removed the unbacked `ZeroizeOnDrop` marker on `Polynomial`, and zeroized the secret-carrying temporaries in `SecretKey` deserialization, serialization, and seed generation ([#1061](https://github.com/0xMiden/crypto/pull/1061)).
+
 ## 0.27.0 (2026-06-19)
 
 - [BREAKING] Upgraded the RustCrypto and dalek stack: `der`, `hkdf`, `sha2`, `sha3`, `k256`, `curve25519-dalek`, `ed25519-dalek`, and `x25519-dalek` ([#1045](https://github.com/0xMiden/crypto/pull/1045)).
